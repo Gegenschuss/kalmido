@@ -13,7 +13,7 @@ from ..core.access import Denied, acx_drop
 from ..core.errors import BadInput
 from .packs import office_features, office_pack, office_pack_codes, office_pack_for, office_pack_validate, pack_features, pack_retention
 from .model import (
-    MD_KINDS, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
+    LTX_KIND, MD_KINDS, OFFICE_ADMIN_ONLY, office_create, office_delete, office_export, office_gate, office_import, office_org, office_role, office_row,
     office_rows, office_seed_texts, office_settings, office_settings_clean, office_settings_lock, office_settings_save, office_update, office_number_format,
     office_number_next, office_scheme_clean, office_scheme_period, sr_public, pb_info, onc_preview, OFFER_COUNTERS, num_kind, num_scheme,
 )
@@ -21,9 +21,10 @@ from .ledger import ofx_company, ofx_company_clean, ofx_company_save, ofx_diff, 
 from .doclang import doc_lg
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from .rights import AREA_LEGACY, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
+from .rights import AREA_LEGACY, ofr_admin_or, ofr_area_of, ofr_mine, ofr_rights, office_can  # 2.187.0 A (#2476)
 from .rcsubmit import rsb_flag  # 2.356.0 D (#3129)
 from .cards import cc_flag  # 2.444.0 (#3447)
+from .bankacc import bka_count, bka_seed, bka_sees  # 2.470.0 (#3596)
 
 IMPORT_MAX = 4 * 1024 * 1024
 
@@ -44,11 +45,14 @@ def office_settings_get():
     from .procdoc import pd_offered
     procdoc = pd_offered(c, oid, s)  # 2.449.0 (#3768)
     role = office_role(c, uid, oid)
+    sees = bka_sees(c, uid, oid)  # 2.470.0 (#3596): the rule moved to bankacc.py, the accounts use it too
+    if sees and bka_seed(c, oid):
+        c.commit()
     cf = ofx_company(c, oid)
     rights = ofr_mine(c, uid, oid)  # 2.187.0 A (#2476): menu, tabs and buttons follow the office rights
-    if role != "admin" and not (not rights["legacy"] and office_can(c, uid, oid, "settings", "manage")):  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
+    if not sees:  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
-    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, pack=office_pack_info(pack, s), procdoc=procdoc,
+    return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, bank_accounts=bka_count(c, oid) if sees else 0, pack=office_pack_info(pack, s), procdoc=procdoc,
                    rights={**{k: rights[k] for k in ("levels", "specials", "manager", "legacy")},
                            "adm": [k for k, v in AREA_LEGACY.items() if v == "admin"]},  # the areas that were the admins' before
                    features=feats,  # 2.147.0 (#2459, #2460): {key: on} -- menus, tabs and buttons follow it, the routes check it too
@@ -276,6 +280,21 @@ def _kind(kind):
     return kind
 
 
+# 2.470.0 (#3596): the letter blocks (kind letter of texts) keep the right they had: the correspondence's, on top of the texts' route
+def _ltx_may(c, uid, oid, level):
+    return ofr_admin_or(c, uid, oid, "letters", level)
+
+
+def _ltx_need(c, uid, oid, r, level="edit"):
+    if r.get("kind") == LTX_KIND and not _ltx_may(c, uid, oid, level):
+        raise Denied(404 if level == "view" else 403, tr(OFFICE_ADMIN_ONLY))
+
+
+def _ltx_log(r):
+    """What the log keeps of a row: a letter block's text stays out (the log is sealed only where it names a protected key)."""
+    return {**r, "text_de": ""} if r.get("kind") == LTX_KIND else r
+
+
 @app.get("/api/office/<kind>")
 def office_rows_get(kind):
     """?q=search &archived=1 (else only live rows)."""
@@ -283,7 +302,11 @@ def office_rows_get(kind):
     c, uid, oid = _ctx()
     a = request.args
     adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)  # 2.47.0 (#1649): members never get purchase prices / markups
-    rows = [sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "")]
+    letters = kind == "texts" and _ltx_may(c, uid, oid, "view")
+    if letters:
+        from .lettermail import ltb_settle
+        ltb_settle(c, oid, strict=False)  # a locked key must not take the other texts away
+    rows = [sr_public(kind, r, adm) for r in office_rows(c, oid, kind, archived=a.get("archived") == "1", q=a.get("q") or "", letters=letters)]
     if kind == "equipment" and adm:  # 2.92.0 B (#1931): + depreciation, book / new / current value (admins only)
         from .assets import ast_enrich
         ast_enrich(c, oid, rows)
@@ -300,8 +323,9 @@ def office_row_post(kind):
     b = body()
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
+    _ltx_need(c, uid, oid, b if kind == "texts" else {})
     r = office_create(c, oid, kind, b)
-    ofx_log(c, oid, "create", target=kind, detail={"id": r["id"], "after": r})
+    ofx_log(c, oid, "create", target=kind, detail={"id": r["id"], "after": _ltx_log(r)})
     c.commit()
     return jsonify(r), 201
 
@@ -312,6 +336,7 @@ def office_row_get(kind, rid):
     c, uid, oid = _ctx()
     adm = office_role(c, uid, oid) == "admin" or rd2_manage(c, uid, oid)
     r = sr_public(kind, office_row(c, oid, kind, rid), adm)  # 2.47.0 (#1649)
+    _ltx_need(c, uid, oid, r, "view")
     if kind == "equipment" and adm:  # 2.92.0 B (#1931)
         from .assets import ast_enrich
         ast_enrich(c, oid, [r])
@@ -326,12 +351,13 @@ def office_row_patch(kind, rid):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     old = office_row(c, oid, kind, rid)
+    _ltx_need(c, uid, oid, old)
     from .undo import oun_post, oun_pre
     oun_pre(c, uid, oid, kind, rid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
     r = office_update(c, oid, kind, rid, b)
     from .legacyimport import imr_restored
     imr_restored(c, oid, kind, old, r)  # 2.144.6 B (#2400 F4): restored on purpose -> "Archive leftover entries" skips it
-    diff = ofx_diff(old, r)
+    diff = ofx_diff(_ltx_log(old), _ltx_log(r))
     diff["after"].pop("updated_at", None)
     diff["before"].pop("updated_at", None)
     if diff["after"]:
@@ -347,8 +373,9 @@ def office_row_delete(kind, rid):
     _kind(kind)
     c, uid, oid = _ctx(admin=True)
     old = office_row(c, oid, kind, rid)
+    _ltx_need(c, uid, oid, old)
     res = office_delete(c, oid, kind, rid)
-    ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": old})
+    ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": _ltx_log(old)})
     c.commit()
     return jsonify(ok=True, result=res, **({"trash_id": g.otb_id} if res == "deleted" and g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
 

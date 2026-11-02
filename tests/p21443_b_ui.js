@@ -81,8 +81,8 @@ const ago = n => { const d = new Date(Date.now() - n * 864e5); return d.toISOStr
     // ================= the settings
     // 2.147.1 (#2054): the office settings come in areas and save each field on its own (#2247): the area "docs" holds both
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="docs"]')`, 80);
-    await ev(`(() => { document.querySelector('#ofc-set [data-ostsub="docs"]').click(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('#ofc-set #s-biz-docs')`, 80);
+    await ev(`(() => { document.querySelector('#ofc-set #s-biz-docs').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#os-dun-on')?.getClientRects().length && !!document.querySelector('#os-girocode')`, 80), 'the settings: suggestions and GiroCode in the area of documents');
     check(await ev(`document.querySelector('#os-dun-on').checked && document.querySelector('#os-dun-days').value === '7' && document.querySelector('#os-girocode').checked`), 'the settings: defaults on, 7 days');
     await ev(`(() => { const d = document.querySelector('#os-dun-days'); d.focus(); d.value = '5'; d.dispatchEvent(new Event('input', {bubbles: true})); d.dispatchEvent(new FocusEvent('focusout', {bubbles: true})); return 1; })()`);

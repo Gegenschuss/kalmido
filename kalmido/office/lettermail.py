@@ -17,23 +17,22 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..accounts.login import auth_key  # 2.312.0 C (#3265)
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
+from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields, oc_is_enc
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, iso, now_utc
+from ..core.db import body, bump
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
 from .letters import lt_ctx, lt_kick, lt_line, lt_multi, lt_mark_sent, lt_pdf, lt_public, lt_row
 from .doclang import DOC_LANGS  # 2.185.0 C (#2520)
 from .doctpl_samples import sample_langs, sample_text  # 2.449.0 (#3768)
-from .model import office_ctx  # 2.424.0 B (#3450)
+from .model import LTX_KIND, office_create, office_ctx, office_row, office_rows, office_update  # 2.424.0 B (#3450)
 from ..docs.maillink import ml_token_new  # 2.424.0 B (#3450)
 
 LTM_MAIL_RE = r"[^@\s,;<>]+@[^@\s,;<>]+\.[^@\s,;<>]+"
 LTM_MSGID_RE = re.compile(r"<[^<>\s]{3,250}>")
 LTM_TEXT_MAX = 5000
 LTB_LIST_MAX = 500
-LTB_NAME_MAX, LTB_BODY_MAX = 120, 20000
 LTB_NOTE = N_("Sample text, no legal advice.")
 
 
@@ -321,42 +320,64 @@ LTB_STARTERS = sample_langs({  # 2.449.0 (#3768): fr / es / it / nl from doctpl_
 }, "BLOCKS")
 
 
-def ltb_row(c, oid, bid):
+def ltb_settle(c, oid, strict=True):
+    """2.470.0 (#3596): the blocks of office oid that are still only in office_letter_blocks go to office_texts (kind letter), once:
+    moved_to marks them, so a block deleted in the texts later stays deleted and nothing doubles. Runs at the first look of an office,
+    not at the start: it needs the organisation's key. Without the key nothing moves (strict: the error, as any sealed value would give
+    it; else the old rows wait for the next look). A body sealed before is never stored in clear (encryption switched off meanwhile: it
+    waits as well). The old table keeps its rows: a step back to an older version shows the blocks as they were at the move (changes since then live only in
+    office_texts, and that version lists these rows empty under Text blocks); blocks written there come over at the next look."""
+    q = "FROM office_letter_blocks WHERE org_id=? AND moved_to IS NULL"
+    if not c.execute(f"SELECT 1 {q} LIMIT 1", (oid,)).fetchone():
+        return 0
+    write_lock(c, f"ltb-settle-{oid}")
+    rows = c.execute(f"SELECT * {q} ORDER BY id", (oid,)).fetchall()
     try:
-        bid = int(bid)
-    except (TypeError, ValueError):
-        raise Denied(404) from None
-    r = c.execute("SELECT * FROM office_letter_blocks WHERE id=? AND org_id=?", (bid, oid)).fetchone()
-    if not r:
+        sealed = [oc_enc_fields(c, oid, "office_texts", {"body": oc_dec_fields(c, oid, "office_letter_blocks", r)["body"]})["body"] for r in rows]
+        if any(oc_is_enc(r["body"]) and not oc_is_enc(v) for r, v in zip(rows, sealed)):
+            raise OrgCryptError(f"org {oid}: the text blocks wait for the encryption")
+    except OrgCryptError:
+        if strict:
+            raise
+        return 0
+    for r, v in zip(rows, sealed):
+        tid = insert_id(c, "INSERT INTO office_texts(org_id, kind, key, body, archived) VALUES(?,?,?,?,?)", (oid, LTX_KIND, r["name"], v, r["archived"]))
+        c.execute("UPDATE office_letter_blocks SET moved_to=? WHERE id=? AND org_id=?", (tid, r["id"], oid))
+    c.commit()
+    return len(rows)
+
+
+def ltb_ctx():
+    c, uid, oid = lt_ctx()
+    ltb_settle(c, oid)
+    return c, uid, oid
+
+
+def ltb_row(c, oid, bid):
+    r = office_row(c, oid, "texts", bid)
+    if r["kind"] != LTX_KIND:
         raise Denied(404)
-    return oc_dec_fields(c, oid, "office_letter_blocks", r)
+    return r
 
 
 def ltb_public(d):
-    return {k: d.get(k) for k in ("id", "name", "body", "archived", "created_by", "created_at", "updated_at")}
+    return {"id": d["id"], "name": d["key"], "body": d["text_de"], "archived": d["archived"]}
 
 
-def ltb_clean(b, cur=None):
+def ltb_clean(b):
+    """{name, body} -> the fields of the text row (ltx_clean checks them)."""
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    out = {}
-    if "name" in b or cur is None:
-        out["name"] = lt_line(b.get("name"), "name", LTB_NAME_MAX)
-        if not out["name"]:
-            raise BadInput(tr("Name missing"))
-    if "body" in b or cur is None:
-        out["body"] = lt_multi(b.get("body"), "body", LTB_BODY_MAX)
-    return out
+    return {t: b[k] for k, t in (("name", "key"), ("body", "text_de")) if k in b}
 
 
 @app.get("/api/office/letter-blocks")
 def ltb_list():
     """?archived=1 also the deleted ones -> {blocks, note}."""
-    c, uid, oid = lt_ctx()
-    arch = request.args.get("archived") == "1"
-    rows = c.execute("SELECT * FROM office_letter_blocks WHERE org_id=?" + ("" if arch else " AND archived=0") + " ORDER BY lower(name), id LIMIT ?",
-                     (oid, LTB_LIST_MAX)).fetchall()
-    return jsonify(blocks=[ltb_public(oc_dec_fields(c, oid, "office_letter_blocks", r)) for r in rows], note=tr(LTB_NOTE))
+    c, uid, oid = ltb_ctx()
+    rows = [r for r in office_rows(c, oid, "texts", archived=request.args.get("archived") == "1", letters=True) if r["kind"] == LTX_KIND]
+    rows.sort(key=lambda r: (r["key"].lower(), r["id"]))
+    return jsonify(blocks=[ltb_public(r) for r in rows[:LTB_LIST_MAX]], note=tr(LTB_NOTE))
 
 
 @app.get("/api/office/letter-blocks/starters")
@@ -373,7 +394,7 @@ def ltb_starters_get():
 def ltb_post():
     """{name, body} or {starter: cancel|objection|reminder|extension, lang?} (a sample as own block) -> 201."""
     from .doctpl import dt_lang
-    c, uid, oid = lt_ctx()
+    c, uid, oid = ltb_ctx()
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
@@ -384,28 +405,22 @@ def ltb_post():
         lg = dt_lang(c, oid, b.get("lang"))
         nm, tx = sample_text(st, lg)  # 2.449.0 (#3768)
         b = {"name": nm, "body": tx}
-    row = ltb_clean(b)
-    ts = iso(now_utc())
-    row.update(org_id=oid, created_by=uid, created_at=ts, updated_at=ts)
-    row = oc_enc_fields(c, oid, "office_letter_blocks", row)
-    bid = insert_id(c, f"INSERT INTO office_letter_blocks({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
+    r = office_create(c, oid, "texts", {**ltb_clean(b), "kind": LTX_KIND})
     bump(c)
     c.commit()
-    return jsonify(ltb_public(ltb_row(c, oid, bid))), 201
+    return jsonify(ltb_public(r)), 201
 
 
 @app.patch("/api/office/letter-blocks/<int:bid>")
 def ltb_patch(bid):
-    c, uid, oid = lt_ctx()
+    c, uid, oid = ltb_ctx()
     cur = ltb_row(c, oid, bid)
-    row = ltb_clean(body(), cur)
+    row = ltb_clean(body())
     if row:
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_letter_blocks", row)
-        c.execute(f"UPDATE office_letter_blocks SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [cur["id"], oid])
+        cur = office_update(c, oid, "texts", cur["id"], row)
         bump(c)
         c.commit()
-    return jsonify(ltb_public(ltb_row(c, oid, bid)))
+    return jsonify(ltb_public(cur))
 
 
 @app.delete("/api/office/letter-blocks/<int:bid>")
@@ -420,9 +435,8 @@ def ltb_restore(bid):
 
 
 def ltb_set_archived(bid, v):
-    c, uid, oid = lt_ctx()
-    cur = ltb_row(c, oid, bid)
-    c.execute("UPDATE office_letter_blocks SET archived=?, updated_at=? WHERE id=? AND org_id=?", (v, iso(now_utc()), cur["id"], oid))
+    c, uid, oid = ltb_ctx()
+    r = office_update(c, oid, "texts", ltb_row(c, oid, bid)["id"], {"archived": v})
     bump(c)
     c.commit()
-    return jsonify(ltb_public(ltb_row(c, oid, bid)))
+    return jsonify(ltb_public(r))

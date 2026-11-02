@@ -90,8 +90,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     await shot('p2380rf-money.png');
     // the switches under Settings > Functions
     await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="functions"]')`, 80), '#3411: the office settings');
-    await click(ev, '#ofc-set [data-ostsub="functions"]');
+    check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-functions')`, 80), '#3411: the office settings');
+    await click(ev, '#ofc-set #s-biz-functions');
     check(await ready(ev, `['money.cashflow', 'money.kpi', 'money.travel', 'money.meals', 'money.subs'].every(k => document.querySelector('#ofc-set [data-feat="' + k + '"]')?.checked)`, 20),
       '#3411: Functions has the five switches of Money, all on');
     await shot('p2380rf-functions.png');
@@ -103,8 +103,8 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,docs,agents,fields,dep
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && !!document.querySelector('.office[data-ofctab]') && document.querySelector('.office').dataset.ofctab !== 'kpi'`, 80),
       '#3411: a link to the figures opens another page ' + await ev(`document.querySelector('.office')?.dataset.ofctab`));
     await nav(B + '#office/settings');
-    await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="functions"]')`, 80);
-    await click(ev, '#ofc-set [data-ostsub="functions"]');
+    await ready(ev, `!!document.querySelector('#ofc-set #s-biz-functions')`, 80);
+    await click(ev, '#ofc-set #s-biz-functions');
     await ready(ev, `!!document.querySelector('#ofc-set [data-feat="money.kpi"]')`, 20);
     check(await ev(`document.querySelector('#ofc-set [data-feat="money.kpi"]').checked === false`), '#3411: the switch shows off');
     await click(ev, '#ofc-set [data-feat="money.kpi"]');

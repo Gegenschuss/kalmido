@@ -6,8 +6,6 @@
    The rules live on the server (kalmido/files/filereq.py). Classic script sharing the global scope (after ablage.js). */
 'use strict';
 
-const FRQ_KINDS = [['docs', N_('Documents (PDF, Office, text)')], ['images', N_('Pictures')], ['design', N_('Design files (AI, EPS, PSD)')],
-  ['archives', N_('Archives (ZIP)')], ['media', N_('Audio and video')]];
 const frq_until = iso => iso ? fmtDay('short', new Date(iso)) : '';
 const frq_stateText = r => r.state === 'active' ? tr('Open until {0}', frq_until(r.expires_at)) : r.state === 'expired' ? tr('Expired on {0}', frq_until(r.expires_at))
   : r.state === 'revoked' ? tr('Turned off') : tr('Not working: the creator can no longer add files to this folder');

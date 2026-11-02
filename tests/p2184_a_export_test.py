@@ -160,6 +160,8 @@ r = A.put(B + LT + "/profile", json={"greeting": "Beste Grüße", "name": "Alice
 check(r.ok, "setup: the signature with a picture " + r.text[:200])
 r = A.post(B + "/api/office/letter-blocks", json={"name": "Widerspruch", "body": "Hiermit widerspreche ich fristgerecht."})
 check(r.status_code == 201, "setup: a text block " + r.text[:200])
+# 2.470.0 B (#3596): a block still only in the old table, as in an archive of an older version
+wr("INSERT INTO office_letter_blocks(org_id, name, body, created_at, updated_at) VALUES(?,?,?,?,?)", (ORG, "Altbaustein", "Aus dem alten Archiv", "2026-01-02T10:00:00Z", "2026-01-02T10:00:00Z"))
 r = A.post(B + LT, json={"answers": D1})
 check(r.status_code == 201, "setup: a letter answering the document " + r.text[:200])
 L1 = r.json()["id"]
@@ -238,6 +240,8 @@ check([tuple(x) for x in lk] == [(GD, "answers")], f"the letter answers the new 
 bl = A.get(B + "/api/office/letter-blocks").json()
 bl = bl.get("blocks", bl) if isinstance(bl, dict) else bl
 check(any(b.get("name") == "Widerspruch" and "fristgerecht" in str(b.get("body")) for b in bl or []), f"the text block came along {bl}")
+check(sorted(b.get("name") for b in bl or []) == ["Altbaustein", "Widerspruch"], f"2.470.0 B (#3596): each block once, the old one moved on the first look {bl}")
+check(all(x[0].startswith("kenc1:") for x in sql("SELECT body FROM office_texts WHERE org_id=? AND kind='letter'", (GAM,))), "2.470.0 B (#3596): the blocks are sealed again")
 pr = A.get(B + LT + "/profile").json()
 check(pr.get("name") == "Alice Ablage" and pr.get("greeting") == "Beste Grüße", f"the signature came along {pr}")
 check(one("SELECT image FROM office_letter_profiles WHERE org_id=? AND user_id=?", (GAM, ALICE))[0].startswith("kenc1:"),

@@ -778,6 +778,7 @@ function settingsModal(focus) {
       ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
       <h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
       ${hint(tr('Off: a video sign-off first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}
+      ${xl_stdHtml(hint)}${''/* 2.470.0 (#3596) */}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
@@ -831,6 +832,7 @@ function settingsModal(focus) {
     <div class="sbody"><nav class="snav" role="tablist" aria-label="${tr('Settings')}">${secs.map(([k, i, n]) => `<button role="tab" id="st-${k}" aria-controls="sp-${k}" aria-selected="${k === cur}" data-sec="${k}" class="${k === cur ? 'on' : ''}"${k === 'access' && k !== cur && !acz_mine() ? ' hidden' : ''/* 2.364.0 C (#3044) */}>${ic(i, 's')}<span>${tr(n)}</span>${SET_DESC[k] ? `<small class="sndesc">${esc(tr(SET_DESC[k]))}</small>` : ''}</button>`).join('')}</nav>${mvOn() ? `<button type="button" class="snmv" data-mv="off">${ic('eye', 's')}<span>${tr('Show administration again')}</span></button>` : ''/* 2.436.0 (#3620): the way back, under the areas */}
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
+  xl_stdMount(md);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js)
   $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
@@ -979,7 +981,7 @@ function settingsModal(focus) {
   // Agents) or a folded section opens it; nothing found hides the panes behind one clear line
   const sres = $('#s-search', md) && $('#s-sres', md);
   const SYN = [[['logout', 'log out', 'sign out', 'abmelden', 'ausloggen', 'déconnexion', 'cerrar sesión', 'esci', 'uitloggen'], '[data-acc="logout"]'], [['push', 'benachrichtigung', 'notification', 'glocke', 'bell', 'notificación', 'notifica', 'melding', 'cloche', 'campana', 'campanella'], '[data-pane="notify"] h4'],
-    [['sidebar', 'seitenleiste', 'barre latérale', 'barra lateral', 'zijbalk'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort', 'mot de passe', 'contraseña', 'wachtwoord'], '#a-cur'],
+    [['freigabe', 'freigaben', 'externe links', 'datei-anfrage', 'dateianfrage', 'gültigkeit', 'sharing', 'external link', 'file request', 'partage', 'compartir', 'condivisione', 'delen'], '#s-xlstd-h'], [['sidebar', 'seitenleiste', 'barre latérale', 'barra lateral', 'zijbalk'], '#s-side-h'], [['navigation', 'menü anpassen', 'ausblenden', 'reihenfolge'], '#s-nav-h'], [['menü', 'menu', 'tab bar', 'tab-leiste'], '#s-tabbar-h'], [['wartet', 'waiting', 'warten', 'extern'], '[data-modrow="deps"]'], [['passwort', 'password', 'kennwort', 'mot de passe', 'contraseña', 'wachtwoord'], '#a-cur'],
     [['speicher', 'storage', 'quota', 'kontingent', 'stockage', 'almacenamiento', 'archiviazione', 'opslag'], '#s-storage-h'], [['dunkel', 'dark', 'hell', 'light', 'theme', 'sombre', 'oscuro', 'scuro', 'donker', 'thème', 'tema', 'thema'], '#s-lookin h4'], [['sprache', 'language', 'langue', 'idioma', 'lingua', 'taal'], '#s-lang-h'], [['region', 'région', 'regione', 'wochenstart', 'week start', 'uhrzeit', '12 h', '24 h'], '#s-fmt-h']];
   const shown = el => !el.closest('[hidden]') || el.closest('[data-admp], [data-aisp]');
   // 2.46.2 (#1651): readonly until focus keeps password managers out; a value nobody typed is cleared
@@ -1642,7 +1644,7 @@ const SS_AREA = [
     secs: [[N_('Sorting automatically'), ['sortieren', 'sorting', 'erkennen', 'recognise'], '#s-dcs-auto-h'], [N_('Archive numbers'), ['archivnummer', 'asn', 'trennblatt', 'separator'], '#s-dcs-asn-h'],
       [N_('Rules'), ['regel', 'rule'], '#s-dcs-rules-h'], [N_('Senders, types and tags'), ['absender', 'sender', 'dokumenttyp', 'schlagwort', 'tags', 'feld', 'felder', 'field', 'fields'], '#s-dcs-lists-h'],
       [N_('Inboxes'), ['eingang', 'eingänge', 'inbox', 'mail', 'e-mail', 'scanner', 'wächter', 'watcher'], '#s-dcs-in-h']]},
-  {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bnr_settingsHtml',
+  {src: ['ofcSettingsHtml', 'agbSettingsHtml', 'bp_settingsHtml', 'dun_settingsHtml', 'tpSettingsHtml', 'pep_settingsHtml', 'dx_settingsHtml', 'dv_settingsHtml', 'brl_settingsHtml', 'bka_settingsHtml', 'bnr_settingsHtml',
     'rcm_settingsHtml', 'ocf_settingsHtml', 'oa_settingsHtml', 'rk_settingsHtml', 'bw_settingsHtml', 'cfs_settingsHtml', 'ocm_settingsHtml', 'ccn_settingsHtml'], area: N_('Settings'), name: N_('Company & office'), words: ['büro', 'office', 'firma', 'company'],
     on: () => modOn('office') && ss_ofm('settings'), open: () => settingsModal('biz'), root: '#s-biz #ofc-set',  // 2.365.2 (#2789): Settings > Company & office
     secs: [[N_('Company'), ['firma', 'adresse', 'address', 'logo', 'bank', 'iban', 'bankverbindung', 'bank details', 'konto', 'steuernummer', 'ust-idnr', 'vat id', 'register'], '', 'company'], [N_('Terms and conditions (PDF)'), ['agb', 'terms'], '#agb-box', 'company'], [N_('Letterhead'), ['briefpapier', 'briefkopf', 'letterhead'], '#bp-h', 'company'],
@@ -1652,8 +1654,11 @@ const SS_AREA = [
       [N_('Suggest payment reminders for overdue invoices'), ['mahnung', 'mahnungen', 'mahnwesen', 'zahlungserinnerung', 'reminder', 'dunning', 'girocode'], '#os-dun-on', 'docs'],
       [N_('Invoice from a quotation with parts'), ['teile', 'parts'], '#os-parts-inv', 'docs'],
       [N_('E-invoices over the Peppol network'), ['peppol', 'e-rechnung', 'einvoice', 'xrechnung', 'zugferd'], '#pep-set', 'docs', () => ss_ofcFeat('docs.einvoice')],
+      [N_('Texts & templates'), ['vorlage', 'vorlagen', 'templates', 'katalog', 'catalogue'], '#s-biz-tpl', 'tpl'], [N_('Services'), ['leistung', 'leistungen', 'services', 'preisliste', 'price list'], '[data-osttpl="services"]', 'tpl'],
+      [N_('Text blocks'), ['textbaustein', 'textbausteine', 'baustein', 'text blocks'], '[data-osttpl="texts"]', 'tpl'], [N_('Document templates'), ['dokumentvorlage', 'dokumentvorlagen', 'document templates'], '[data-osttpl="gendocs"]', 'tpl'],  // 2.470.0 (#3596)
       [N_('Calculation rules'), ['kalkulation', 'calculation', 'steuer', 'tax'], '', 'docs'], [N_('Default texts'), ['texte', 'texts', 'einleitung', 'schluss'], '', 'docs'],
       [N_('DATEV export (booking batch)'), ['datev', 'export', 'steuerberatung', 'steuerberater', 'tax advisor', 'skr03', 'skr04'], '.dxset', 'data', () => ss_ofcFeat('books.datev')],
+      [N_('Bank accounts'), ['bank', 'iban', 'bic', 'konto', 'bankkonto', 'bankverbindung', 'bank account', 'bank details', 'girocode', 'datev'], '#bka-h', 'tax'],  // 2.470.0 (#3596)
       [N_('Bank rules'), ['bank', 'regel', 'rule', 'konto'], '#brl-h', 'data'], [N_('Bank bookings without a receipt'), ['beleg', 'receipt', 'bank'], '', 'data'], [N_('Card positions without a receipt'), ['beleg', 'receipt', 'karte', 'card', 'kreditkarte'], '', 'data'],
       [N_('Receipts by e-mail'), ['weiterleitung', 'forwarding', 'gmail', 'e-mail', 'mail'], '#rcm-h', 'data'],  // 2.424.0 B (#3450)
       [N_('Country pack'), ['land', 'country', 'paket', 'pack'], '', 'packs'], [N_('Travel expenses'), ['reise', 'reisekosten', 'travel'], '#rkp-h', 'packs'],
@@ -1689,7 +1694,7 @@ async function ss_areaOpen(h) {
   const {w, s} = h;
   await w.open();
   if (!await ss_until(() => $(w.root))) return;
-  if (s?.[3] && typeof ost_show === 'function') ost_show(s[3], true);  // the office pane (kept, so a redraw shows it too)
+  if (s?.[3] && typeof ost_show === 'function') ost_show(s[3]);  // the office pane
   const box = () => { const rt = $(w.root); return rt && (rt.closest('.modal, .card, .dash') || rt.parentElement || rt); };
   const head = (b, l) => $$('h3, h4, h5, summary, legend, .row > label', b).find(x => !x.closest('[hidden]') && ss_text(x).startsWith(tr(l)));
   const mark = () => {
@@ -1725,8 +1730,7 @@ async function biz_draw(md) {
   const box = $('#s-biz', md); if (!box) return;
   try { await loadModule('office'); } catch { box.innerHTML = `<p class="muted">${esc(tr('Could not be loaded'))}</p>`; return; }
   if (!box.isConnected) return;
-  if (S.route.mod === 'office' && ofcTab() === 'settings' && !['import', 'rights'].includes(S.route.tab)) go('office/start');  // one settings form on the screen
-  if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
+  if (!box._biz) { box._biz = 1; box.addEventListener('click', e => { if (e.target.closest('a[href^="#"], [data-go]')) $('[data-m="close"]', md)?.click(); }); }  // a link into the office (import, rights) closes Settings
   setTimeout(biz_paint, 0);
   biz_mailDraw(md);
 }

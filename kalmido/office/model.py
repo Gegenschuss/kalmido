@@ -21,7 +21,7 @@ from ..core.access import Denied, acx_drop
 from ..core.errors import BadInput
 from .packs import office_pack, office_pack_codes, office_pack_for, office_feature_on, office_path_feature
 from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
-from ..core.orgcrypt import oc_enc_fields, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_load, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
 from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
 from ..core.db import iso_ms  # 2.269.0 C (#3017)
 from ..notify.alerts import aa_now  # 2.312.0 C (#3265)
@@ -35,7 +35,9 @@ UNITS = ("day", "hour", "piece", "minute", "flat", "percent")  # 2.47.0 (#1649):
 TAXES = ("standard", "reduced", "exempt")
 INTEXT = ("intern", "extern", "shooting")  # 2.47.0 (#1216): shooting = only in the shoot calculation
 CREW_INTEXT = ("intern", "extern")  # 2.47.0 (#1649): the Drehpersonal
-TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note")
+TEXT_KINDS = ("rights_time", "rights_territory", "rights_media", "intro", "closing", "note", "block", "raw_note", "letter")
+LTX_KIND = "letter"  # 2.470.0 (#3596): the letter text blocks, see ltx_clean
+LTB_NAME_MAX, LTB_BODY_MAX = 120, 20000
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 SCHEME_RE = re.compile(r"\{(yyyy|yy|seq(?::0?(\d{1,2}))?|project|client|kuerzel|date|isodate|initials|version)\}")  # 2.118.0 A (#2265): version; 2.138.2 A (#2391): isodate; 2.433.0 (#3604): kuerzel
 NAME_MAX = 200
@@ -349,7 +351,6 @@ def office_settings(c, oid):
     except ValueError:
         d = {}
     if isinstance(d, dict):  # 2.42.0 (#828): the company lines (bank / tax) are encrypted at rest
-        from ..core.orgcrypt import oc_json_load
         oc_json_load(c, oid, "office_settings", "data", d)
     out = json.loads(json.dumps(SETTINGS_DEFAULTS))
     for k in SETTINGS_KEYS:
@@ -1085,15 +1086,16 @@ JSON_COLS = {"items", "rates"}
 
 def _row_dict(kind, r, c=None, oid=None):
     if c is not None and kind == "contracts":  # 2.42.0 (#828): the special rates are encrypted at rest
-        from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, "office_contracts", r)
     if c is not None and MD.get(kind, {}).get("crypt"):  # 2.92.0 B (#1931): the equipment's prices / values
-        from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, MD[kind]["crypt"], r)
     if c is not None and MD.get(kind, {}).get("table") == "office_roles":  # 2.47.0 (#1649): costs -> cost_day / cost_hour
-        from ..core.orgcrypt import oc_dec_fields
         r = oc_dec_fields(c, oid, "office_roles", r)
     d = dict(r)
+    if kind == "texts":  # 2.470.0 (#3596): a letter block's sealed text shows as text_de (one text, in the language it was written in)
+        b = {"body": d.pop("body", "")}
+        if d.get("kind") == LTX_KIND and c is not None:
+            d.update(text_de=oc_dec_fields(c, oid, "office_texts", b)["body"], text_en="")
     if "costs" in d:
         try:
             j = json.loads(d.pop("costs") or "{}")
@@ -1122,13 +1124,17 @@ def _row_dict(kind, r, c=None, oid=None):
 TRANS_Q = "EXISTS (SELECT 1 FROM jsonb_each(CAST(trans AS jsonb)) tl, jsonb_each_text(tl.value) tv WHERE tv.value ILIKE ? ESCAPE '\\')"
 
 
-def office_rows(c, oid, kind, archived=True, q=""):
+def office_rows(c, oid, kind, archived=True, q="", letters=False):
+    """letters: 2.470.0 (#3596) texts with the letter blocks: only for the callers that checked the correspondence right (office/web.py)
+    and the block routes; everyone else (documents, agents, export, reseed) never sees these rows."""
     m = MD[kind]
     sql = f"SELECT * FROM {m['table']} WHERE org_id=?"
     args = [oid]
     if m.get("kind"):  # 2.47.0 (#1649): office_roles holds two masters
         sql += " AND kind=?"
         args.append(m["kind"])
+    if kind == "texts" and not letters:
+        sql += f" AND kind<>'{LTX_KIND}'"
     if not archived:
         sql += " AND archived=0"
     if q:
@@ -1143,12 +1149,16 @@ def office_rows(c, oid, kind, archived=True, q=""):
             sql += f" AND (name_de ILIKE ? ESCAPE '\\' OR name_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
             args += [like, like, like]
         elif kind == "texts":
-            sql += f" AND (key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
+            sql += f" AND (kind='{LTX_KIND}' OR key ILIKE ? ESCAPE '\\' OR text_de ILIKE ? ESCAPE '\\' OR text_en ILIKE ? ESCAPE '\\' OR {TRANS_Q})"
             args += [like, like, like, like]
         else:
             sql += f" AND {m['label']} ILIKE ? ESCAPE '\\'"
             args.append(like)
-    return [_row_dict(kind, r, c, oid) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
+    rows = [_row_dict(kind, r, c, oid) for r in c.execute(sql + f" ORDER BY {m['order']}", args)]
+    if q and kind == "texts":  # 2.470.0 (#3596): sealed, so searched after opening them
+        n = q.strip().lower()
+        rows = [r for r in rows if r["kind"] != LTX_KIND or n in r["key"].lower() or n in r["text_de"].lower()]
+    return rows
 
 
 def office_row(c, oid, kind, rid):
@@ -1295,12 +1305,33 @@ def _clean_col(c, oid, kind, k, v):
             if rate in (None, ""):
                 continue
             out[str(i)] = _num(rate, k, 0, 1e9)
-        from ..core.orgcrypt import oc_enc_fields
         return oc_enc_fields(c, oid, "office_contracts", {"rates": json.dumps(out)})["rates"]  # 2.42.0 (#828)
     raise BadInput(tr("Invalid value: {0}", k))
 
 
+def ltx_clean(c, oid, b, cur=None):
+    """2.470.0 (#3596): the columns of a letter block (kind letter of office_texts) from b, sealed: key = its name, text_de = its one
+    text (longer than the other kinds', written in one language). text_en has no place here: said, never dropped silently."""
+    from .letters import lt_line, lt_multi
+    if b.get("text_en") not in (None, ""):
+        raise BadInput(tr("Invalid value: {0}", "text_en"))
+    out = {}
+    if "key" in b or cur is None:
+        out["key"] = lt_line(b.get("key"), "key", LTB_NAME_MAX)
+        if not out["key"]:
+            raise BadInput(tr("Name missing"))
+    if "text_de" in b or cur is None:
+        out["body"] = lt_multi(b.get("text_de"), "text_de", LTB_BODY_MAX)
+    for k in ("sort", "archived"):
+        if k in b:
+            out[k] = _clean_col(c, oid, "texts", k, b[k])
+    return oc_enc_fields(c, oid, "office_texts", out)
+
+
 def office_create(c, oid, kind, b):
+    if kind == "texts" and b.get("kind") == LTX_KIND:
+        row = {**ltx_clean(c, oid, b), "org_id": oid, "kind": LTX_KIND}
+        return office_row(c, oid, kind, insert_id(c, f"INSERT INTO office_texts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     m = MD[kind]
     cols, vals = ["org_id"], [oid]
     for k, (typ, req, spec) in m["cols"].items():
@@ -1332,6 +1363,15 @@ def office_update(c, oid, kind, rid, b):
     has_ts = "updated_at" in _cols(c, m["table"])
     if has_ts:
         ccf_check(b, r.get("updated_at"), "row", lambda: r)  # 409 with the current row (rates, items: no field merge)
+    if kind == "texts":
+        letter = r["kind"] == LTX_KIND
+        if "kind" in b and (b["kind"] == LTX_KIND) != letter:  # 2.470.0 (#3596): a sealed text never turns into a text in clear (or back)
+            raise BadInput(tr("Invalid value: {0}", "kind"))
+        if letter:
+            row = ltx_clean(c, oid, b, r)
+            if row:
+                c.execute(f"UPDATE office_texts SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", [*row.values(), r["id"], oid])
+            return office_row(c, oid, kind, rid)
     sets, vals = [], []
     for k, v in b.items():
         if k not in m["cols"]:
@@ -1538,6 +1578,9 @@ def office_import(c, oid, d, overwrite=False):
             if not isinstance(src, dict):
                 raise BadInput(tr("Invalid value: {0}", kind))
             b = {k: v for k, v in src.items() if k in MD[kind]["cols"]}
+            if kind == "texts" and b.get("kind") == LTX_KIND:  # 2.470.0 (#3596): never in this file (office_export), only through the block routes
+                counts[kind]["skipped"] += 1
+                continue
             old_id = src.get("id")
             # remap foreign ids of earlier kinds
             where = (kind, b.get(MD[kind]["label"]))
@@ -1614,7 +1657,7 @@ def _i(v):
 # ---------------------------------------------------------------- starter texts from the pack (first use of an organisation)
 def office_seed_texts(c, oid):
     """Copies the pack's rights catalogue + intro / closing into office_texts when the organisation has none yet."""
-    if c.execute("SELECT 1 FROM office_texts WHERE org_id=? LIMIT 1", (oid,)).fetchone():
+    if c.execute(f"SELECT 1 FROM office_texts WHERE org_id=? AND kind<>'{LTX_KIND}' LIMIT 1", (oid,)).fetchone():  # 2.470.0 (#3596): letter blocks are no catalogue
         return 0
     pack = office_pack_for(office_settings(c, oid))
     if not pack:

@@ -257,7 +257,7 @@ OT = [r["table_name"] for r in dbx("""SELECT table_name FROM information_schema.
                                       AND column_name='org_id' AND table_name LIKE 'office_%' ORDER BY table_name""")]
 diff = {}
 for t in OT:
-    if t in ("office_doc_log",):  # the export itself writes log entries
+    if t in ("office_doc_log", "office_bank_accounts"):  # the export itself writes log entries; 2.470.0 (#3596): the first look at the settings makes the account of a company with a bank
         continue
     n1, n2 = (dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?", (o,))[0]["n"] for o in (ORG, ORG2))
     if n1 != n2:

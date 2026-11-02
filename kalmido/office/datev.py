@@ -238,7 +238,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     """The booking lines (dicts of DX_COLUMNS names) of the period [d_from, d_to] (ISO dates). 2.120.0 C (#2090): inside =
     with the input side (when switched on in the settings); hints_out (a list) gets its hints."""
     s = s if s is not None else office_settings(c, oid)
-    st = dx_settings(s)
+    from .bankacc import bka_datev
+    st = bka_datev(c, oid, dx_settings(s))  # 2.470.0 (#3596): the ledger account of the default bank account, when it has one
     home = hc_home(s)  # 2.189.0 B (#2475): lines in the home currency (DATEV itself only for EUR, dx_need_eur)
     from .books import bk_reverse_dom  # 2.355.0 C (#2844)
     out, memo = [], {}

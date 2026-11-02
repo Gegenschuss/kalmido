@@ -43,6 +43,7 @@ from ..core.access import Denied, acx_anon_bind, acx_of
 from ..core.orgcrypt import oc_read_file, oc_send_file
 from ..accounts.session import _accept_lang, _rate_blocked, _rate_fail, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
+from ..accounts.sharedefs import sd_for  # 2.470.0 (#3596)
 from ..notify.alerts import aa_count, aa_now
 from ..lists.public import (PUB_ACTOR, PUB_BAD_LIMIT, PUB_BURST, PUB_BURST_S, PUB_PW_LIMIT, PUB_TOKEN_RE,
                             PUB_VIEW_RATE, pub_gone, pub_headers, pub_html, pub_limited, public_links_on)
@@ -101,9 +102,10 @@ def xl_why_not(c, n, chain):
     return None
 
 
-def xl_expiry(b):
-    """{expires: 1d | 7d (default) | 30d | none | YYYY-MM-DD, tz?} -> the UTC end (iso) or None."""
-    v = b.get("expires", "7d")
+def xl_expiry(b, std="7d"):
+    """{expires: 1d | 7d | 30d | none | YYYY-MM-DD, tz?} -> the UTC end (iso) or None; no expires = std (2.470.0 #3596: the
+    workspace's default)."""
+    v = b.get("expires", std)
     if v in (None, "", "none"):
         return None
     if v in XL_DAYS:
@@ -496,7 +498,8 @@ def xl_answer(c, n, extra=None):
               (n["id"], iso(now_utc() - timedelta(days=XL_REVOKED_DAYS))))
     rows = c.execute("SELECT * FROM fs_ext_links WHERE node_id=? AND revoked_at IS NULL ORDER BY id", (n["id"],)).fetchall()
     names = _names(c, [r["created_by"] for r in rows])
-    out = {"enabled": public_links_on(c), "blocked": xl_why_not(c, n, fs_chain(c, n["id"])), "links": [xl_json(c, r, names) for r in rows]}
+    out = {"enabled": public_links_on(c), "blocked": xl_why_not(c, n, fs_chain(c, n["id"])), "links": [xl_json(c, r, names) for r in rows],
+           "default_expires": sd_for(c, n["org_id"], me())["link_expires"]}  # 2.470.0 (#3596): what the dialog starts with
     return {**out, **(extra or {})}
 
 
@@ -528,14 +531,15 @@ def xl_list(nid):
 
 @app.post("/api/files/nodes/<int:nid>/ext-links")
 def xl_create(nid):
-    """{expires?: 1d | 7d | 30d | none | YYYY-MM-DD (default 7d), tz?, password?, label?} -> a new link (several per node)."""
+    """{expires?: 1d | 7d | 30d | none | YYYY-MM-DD (default: the workspace's, 7d), tz?, password?, label?} -> a new link
+    (several per node)."""
     c = db()
     n = xl_need(c, nid)
     why = xl_why_not(c, n, fs_chain(c, nid))
     if why:
         return err(why, 409)
     b = body()
-    exp = xl_expiry(b)
+    exp = xl_expiry(b, sd_for(c, n["org_id"], me())["link_expires"])  # 2.470.0 (#3596)
     label = " ".join(str(b.get("label") or "").split())[:XL_LABEL_MAX]
     pw = b.get("password") or ""
     if not isinstance(pw, str) or (pw and not 4 <= len(pw) <= 200):

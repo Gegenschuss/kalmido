@@ -72,8 +72,8 @@ const camt = rows => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn
 
     // ---- the office settings, area Data: Bank rules
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="data"]')`, 80), 'the settings page');
-    await ev(click(`document.querySelector('#ofc-set [data-ostsub="data"]')`));
+    check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-data')`, 80), 'the settings page');
+    await ev(click(`document.querySelector('#ofc-set #s-biz-data')`));
     check(await ready(ev, `document.querySelectorAll('.brlset .brlrow').length === 1 && /Kiosk Beispiel/.test(document.querySelector('.brlrow').textContent) && /1 hit/.test(document.querySelector('.brlrow').textContent)`, 60),
       'the section "Bank rules" lists the rule with its hits');
     check(await ev(`!document.querySelector('.brlset').closest('[data-ostp]').hidden`), 'it sits in the area shown');

@@ -1281,6 +1281,9 @@ def org_mine_update(oid):
     if "areas_off" in b:  # 2.409.0 (#3490): the areas switched off for every member (admins only); nothing is deleted
         from .wsareas import wsa_clean_org
         c.execute("UPDATE orgs SET areas_off=? WHERE id=?", (wsa_clean_org(b["areas_off"]), oid))
+    if "share_defaults" in b:  # 2.470.0 (#3596): what new external links and file requests start with (admins only)
+        from .sharedefs import sd_clean
+        c.execute("UPDATE orgs SET share_defaults=? WHERE id=?", (sd_clean(b["share_defaults"]), oid))
     if "nav_off" in b:  # 2.418.0 (#3560): menu points switched off for every member (admins only); only the menus change
         c.execute("UPDATE orgs SET nav_off=? WHERE id=?", (nav_clean_org(b["nav_off"]), oid))
     _org_patch(c, oid, b)

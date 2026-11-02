@@ -62,8 +62,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await signIn(ev);
     // ================= the settings block
     await nav(B + '#office/settings');
-    await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="docs"]')`, 80);
-    await ev(`(() => { document.querySelector('#ofc-set [data-ostsub="docs"]').click(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('#ofc-set #s-biz-docs')`, 80);
+    await ev(`(() => { document.querySelector('#ofc-set #s-biz-docs').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#pep-set #pep-provider')?.getClientRects().length || (() => { const d = document.querySelector('#pep-set'); if (d) d.open = true; return !!document.querySelector('#pep-set #pep-provider'); })()`, 80),
       'the settings show the Peppol block');
     check(await ev(`/bills you directly/.test(document.querySelector('#pep-set').textContent)`), 'the block says the provider bills directly');

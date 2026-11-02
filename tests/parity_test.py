@@ -365,7 +365,8 @@ APP_ONLY = [
      "(agents read and write files one by one); external share links publish data to people without an account and stay with "
      "people on purpose -- agents never make, list or revoke them",
      ("=POST /api/files/trash", "=POST /api/files/restore", "=GET /api/files/zip", "=POST /api/files/scan",
-      "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/")),
+      "=GET /api/files/nodes/{}/ext-links", "=POST /api/files/nodes/{}/ext-links", "* /api/files/ext-links/",
+      "=GET /api/share-defaults")),  # 2.470.0 (#3596): the workspace's start values of these links, for people (agents get 403)
     ("2.477.0 (#3936): the small preview of a picture is the cards' image in the browser; agents read the file itself (/files/{}/content)",
      ("=GET /api/files/nodes/{}/thumb",)),
     ("2.48.0 (#1111): documents -- a person's own steps (upload by hand / share sheet, review and accept, recognise again, the "

@@ -87,8 +87,8 @@ const camt = es => `<?xml version="1.0" encoding="UTF-8"?><Document xmlns="urn:i
     await ready(ev, `${rows} === 2`);
     // the reminder in the settings (area Data)
     await nav(B + '#office/settings');
-    await ready(ev, `!!document.querySelector('[data-ostsub="data"]')`, 80);
-    await ev(`(() => { document.querySelector('[data-ostsub="data"]').click(); return 1; })()`);
+    await ready(ev, `!!document.querySelector('#s-biz-data')`, 80);
+    await ev(`(() => { document.querySelector('#s-biz-data').click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#bnr-every') && document.querySelector('#bnr-every').value === 'off'`, 60), 'settings: the reminder, off');
     await ev(`(() => { const s = document.querySelector('#bnr-every'); s.value = 'week'; s.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/bank/noreceipt/reminder', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.every === 'week' && !!j.task)`), 'settings: weekly saves itself, the task is there');

@@ -60,9 +60,9 @@ const FEAT = 'cal,comments,collab,clients';
   // 2.98.0 (#2180): the office rail; services and text blocks are the tab "Templates" under Settings, not in the rail
   await until(() => d.querySelector('#side [data-ofm="settings"][aria-current="page"]'), 30);
   // CI of 2.223.0: on a slow runner the panel and the tab were not drawn yet (menu, tab, "New service" all red at once)
-  await until(() => d.querySelector('.office .ofrseg2 [data-go="office/services"][aria-selected="true"]') && d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 60);  // 2.152.2 (#2617): the panel redraws once the office has loaded
+  await until(() => d.querySelector('.office [data-setgo="biz-tpl"]') && d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 60);  // 2.152.2 (#2617): the panel redraws once the office has loaded
   check([...d.querySelectorAll('#side [data-ofm]')].filter(b => b.dataset.go.startsWith('office/')).length === w.eval("OFC_TABS.filter(t => t[0] !== 'time').length") - 2 && w.eval('OFC_TABS.length') >= 14, 'the menu has every office point (admin)');  // 2.152.2 (#2617): the office points sit in the panel #side; 2.187.1 B (#2735): Times to bill only for a person ruled by office groups, not for the admin
-  check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && d.querySelector('.office .ofrseg2 [data-go="office/services"]')?.getAttribute('aria-selected') === 'true', 'point Settings, tab Templates > Services shown');  // 2.152.2 (#2617): the office points sit in the panel #side
+  check(d.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.go === 'office/settings' && !!d.querySelector('.office [data-setgo="biz-tpl"]'), 'point Settings, the way back to Texts & templates');  // 2.152.2 (#2617): the office points sit in the panel #side
   check(!!d.querySelector('.office [data-ofc="new"][data-kind="services"]'), 'admin: "New service"');
   check(/Nothing here yet/.test(d.querySelector('.office .ofcbody')?.textContent || ''), 'empty hint');
   d.querySelector('.office [data-ofc="new"][data-kind="services"]').click(); await until(() => d.querySelector('.ofcdlg'));
@@ -104,11 +104,11 @@ const FEAT = 'cal,comments,collab,clients';
   check(!!md.querySelector('[data-m="del"]') && !!md.querySelector('#of-archived'), 'admin: delete + archive in the dialog');
   md.querySelector('[data-m="close"]').click(); await until(() => !d.querySelector('.ofcdlg'));
   // settings tab
-  w.eval(`go('office/settings')`); await until(() => d.querySelector('.office .ofcset'), 60);
+  w.eval(`go('office/settings')`); await until(() => d.querySelector('#s-biz .ofcset'), 60);
   check(/next: KVA-\d{4}-001/.test(d.querySelector('#os-preview')?.textContent || ''), 'settings: the number preview ' + d.querySelector('#os-preview')?.textContent);
-  check(/19/.test(d.querySelector('.office .ofcset')?.textContent || '') && /7/.test(d.querySelector('.office .ofcset')?.textContent || '') && d.querySelector('#os-pack')?.value === 'DE', 'settings: pack DE with its tax rates');
+  check(/19/.test(d.querySelector('#s-biz .ofcset')?.textContent || '') && /7/.test(d.querySelector('#s-biz .ofcset')?.textContent || '') && d.querySelector('#os-pack')?.value === 'DE', 'settings: pack DE with its tax rates');
   // 2.113.0 (#2247): no Save button any more (every field saves itself); the areas instead
-  check(!d.querySelector('.office [data-ofc="save-settings"]') && !!d.querySelector('#ofc-set [data-ostsub="company"]') && !!d.querySelector('.office [data-ofc="import"]') && !!d.querySelector('.office a[href="/api/office/export"]'), 'settings: areas, import, export');
+  check(!d.querySelector('#s-biz [data-ofc="save-settings"]') && !!d.querySelector('#ofc-set #s-biz-company') && !!d.querySelector('#s-biz [data-ofc="import"]') && !!d.querySelector('#s-biz a[href="/api/office/export"]'), 'settings: areas, import, export');
   d.querySelector('#os-name').value = 'Studio Nordlicht GmbH'; d.querySelector('#os-lines').value = 'Hafenstraße 12\n20457 Hamburg';
   d.querySelector('#ofc-set').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   await until(async () => (await call('GET', '/api/office/settings')).settings?.company?.name === 'Studio Nordlicht GmbH', 40);
@@ -127,7 +127,7 @@ const FEAT = 'cal,comments,collab,clients';
   md = d.querySelector('.ofcdlg');
   check(md && md.querySelector('#of-name_de').disabled && !md.querySelector('[data-m="save"]') && !md.querySelector('[data-m="del"]'), 'member: the dialog is read-only');
   md.querySelector('[data-m="close"]').click();
-  w.eval(`go('office/settings')`); await until(() => d.querySelector('.office .ofcset'), 60);
+  w.eval(`go('office/settings')`); await until(() => d.querySelector('#s-biz .ofcset'), 60);
   check(!d.querySelector('.office [data-ofc="save-settings"]') && d.querySelector('#os-name')?.disabled, 'member: settings read-only');
   w.close();
 
@@ -153,9 +153,9 @@ const FEAT = 'cal,comments,collab,clients';
     await ev(`(() => { document.querySelector('.ofcdlg [data-m="close"]').click(); return 1; })()`);
     // the dialog's own history entry (backclose.js) goes with a history.back() a moment later: wait for it, or it lands after the next nav
     await o.until(`!document.querySelector('.ofcdlg') && !history.state?.f8d && (typeof f8d_bk === 'undefined' || (!f8d_bk.pushed && !f8d_bk.skip && !f8d_bk.queued))`);
-    await o.nav(B + '#office/settings'); await ready(o, `!!document.querySelector('.office .ofcset') && /KVA-/.test(document.querySelector('#os-preview')?.textContent || '')`);
+    await o.nav(B + '#office/settings'); await ready(o, `!!document.querySelector('#s-biz .ofcset') && /KVA-/.test(document.querySelector('#os-preview')?.textContent || '')`);
 
-    const st = await ev(`(() => { const f = document.querySelector('.office .ofcset'); return f ? {over: document.documentElement.scrollWidth > window.innerWidth + 1, pv: document.querySelector('#os-preview')?.textContent || ''} : null; })()`);
+    const st = await ev(`(() => { const f = document.querySelector('#s-biz .ofcset'); return f ? {over: document.documentElement.scrollWidth > window.innerWidth + 1, pv: document.querySelector('#os-preview')?.textContent || ''} : null; })()`);
     check(st && !st.over && /KVA-/.test(st.pv), '390: settings fit, preview shows ' + JSON.stringify(st));
     await shot('p2361b-390-settings.png');
   }, true);

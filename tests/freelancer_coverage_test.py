@@ -1012,6 +1012,7 @@ ROUTES = {
     # 2.120.0 B (#2088): documents in the customer portal of a freelancer's personal office (p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "link", "POST /api/office/clients/{}/portal-link": "office",
     # 2.112.1 B (#2058): external share links of the file store (p21121_b_api_test.py calls them as a freelancer too)
+    "GET /api/share-defaults": "files",  # 2.470.0 (#3596)
     "GET /api/files/nodes/{}/ext-links": "files", "POST /api/files/nodes/{}/ext-links": "files",
     "POST /api/files/ext-links/{}/regenerate": "files", "DELETE /api/files/ext-links/{}": "files",
     "POST /api/files/ext-links/{}/restore": "files", "GET /s/f/{}": "link", "POST /s/f/{}/unlock": "link",
@@ -1052,6 +1053,10 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.470.0 (#3596): the bank accounts of an office (pr2470_a_bankacc_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/settings/bank-accounts": "office", "POST /api/office/settings/bank-accounts": "office", "PUT /api/office/settings/bank-accounts/{}": "office",
+    "POST /api/office/settings/bank-accounts/{}/default": "office", "POST /api/office/settings/bank-accounts/{}/archive": "office",
+    "POST /api/office/settings/bank-accounts/{}/restore": "office",
     # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
     "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/{}": "office", "DELETE /api/office/cards/{}": "office",
     "POST /api/office/cards/{}/restore": "office", "GET /api/office/cards/{}/statements": "office", "POST /api/office/cards/{}/statements": "office",

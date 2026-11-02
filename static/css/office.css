@@ -72,8 +72,6 @@
 .ofclogo{max-height:3rem;max-width:12rem;object-fit:contain;background:#fff;border-radius:var(--r-s);padding:.125rem}
 .ofcset .foot{display:flex;align-items:center;gap:.5rem;margin:.75rem 0}
 /* 2.113.0 (#2247): the areas of the settings (the strip of Settings > Administration; settings.css loads lazily) and "Saved" at a field */
-.ofcset .ostsub{display:flex;width:100%;margin:0 0 .875rem;overflow-x:auto;scrollbar-width:none;scroll-padding-inline:.5rem}
-.ofcset .ostsub button{flex:1 0 auto;justify-content:center;white-space:nowrap;min-height:2rem}
 .ofcset .ostp{border:0;margin:0;padding:0;min-width:0}
 .ofcset .ostp>h3:first-child{margin-top:.25rem}
 .ostok{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);opacity:0}
@@ -90,8 +88,6 @@
 .peplist li{margin:.25rem 0}
 .pepset code,.ofddlg code{font-size:var(--fs-b)}
 @media (prefers-reduced-motion:no-preference) { .ostok{transition:opacity .2s} }
-@media (max-width:767px) { .ofcset .ostsub button{flex:none;padding:.25rem .375rem} }
-@media (pointer:coarse) { .ofcset .ostsub button{min-height:2.75rem} }
 /* 2.113.0 (#2246): Switched on / Off with its switch on an industry pack's card */
 .pkc-on{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.375rem;font-size:var(--fs-m)}
 .pkc-on .swl{min-height:2.25rem;cursor:pointer}
@@ -444,6 +440,8 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bnkbyr{font-size:var(--fs-s);white-space:nowrap}
 .brlrow{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}
 .brlrow .ofcn{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column}
+.bkarow{display:flex;align-items:center;gap:.375rem;flex-wrap:wrap}.bkarow .btn{min-height:2.75rem}
+.bkarow .ofcn{flex:1 1 12rem;min-width:0;display:flex;flex-direction:column}.bkaold{margin-top:.5rem}
 /* 2.299.0 C (#3192): bookings without a receipt; computer: open receipts beside the list (drag onto a row) */
 .bnrbar select{min-height:2.75rem}
 .bnrcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(14rem,18rem);gap:1rem;align-items:start}
@@ -1136,9 +1134,9 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .ofm-prev img{display:block;height:3rem;width:auto;max-width:100%;margin-bottom:.375rem}
 /* 2.452.0 (#3836): the other office lists on phones like #3834: no symbols in the row, a long press opens its menu. The buttons stay for screen readers */
 @media (max-width:767px){
-  .agr-doc,.agr-fold,.rin-acts,.brlrow>.swl,.brlrow>.btn,.dma-f[data-fid] .dma-acts,.dimpsup .ib,.rkplist .iconbtn,.dsbsec .ctlinks li>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
+  .agr-doc,.agr-fold,.rin-acts,.brlrow>.swl,.brlrow>.btn,.bkarow[data-acct]>.btn,.dma-f[data-fid] .dma-acts,.dimpsup .ib,.rkplist .iconbtn,.dsbsec .ctlinks li>.iconbtn{position:absolute!important;width:1px;min-width:0;height:1px;min-height:0;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%);border:0}
   .agr-li .ofcrow>svg:last-child{display:none}
-  .agr-li .ofcrow,.rin-it,.brlrow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
+  .agr-li .ofcrow,.rin-it,.brlrow,.bkarow,.dma-open,.dsbsec .ctlinks li{-webkit-touch-callout:none}
 }
 /* 2.459.0 (#3853): phone 320 px - the long ZIP button takes the whole row; the meal dialog's lines fit (kind on its own row) */
 @media (max-width:420px){
@@ -1149,3 +1147,4 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 }
 /* 2.460.0 (#3767): the language tabs over the own texts of a form; a filled language in bold */
 .ofclts{margin:.25rem 0 .5rem}.ofclts .seg{flex-wrap:wrap;margin-bottom:.5rem}.ofclts .seg button.ltfill{font-weight:600}
+.ostpl{display:flex;align-items:center;justify-content:space-between;gap:.75rem}

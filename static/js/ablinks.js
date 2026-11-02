@@ -53,7 +53,7 @@ async function xl_copy(url) {
 async function xl_click(e, box, n) {
   const b = /** @type {any} */ (e.target).closest('[data-xl]'); if (!b) return;
   const a = b.dataset.xl, id = +b.closest('[data-xlid]')?.dataset.xlid, l = (box._j?.links || []).find(x => x.id === id);
-  if (a === 'new') { xl_newDlg(n.id, () => xl_reload(box, n)); return; }
+  if (a === 'new') { xl_newDlg(n.id, () => xl_reload(box, n), box._j?.default_expires); return; }
   if (!l) return;
   if (a === 'copy') { xl_copy(l.url); return; }
   if (a === 'regen') {
@@ -75,7 +75,11 @@ async function xl_req(m, url, box, n) {
 }
 
 // ---- the dialog that makes a link (then shows it with "Copy")
-function xl_newDlg(nid, done) {
+const xl_expOpts = (cur, day) => [['1d', tr('1 day')], ['7d', tr('7 days')], ['30d', tr('30 days')], ...(day ? [['date', tr('Until a date')]] : []), ['none', tr('No end date')]]
+  .map(([v, t]) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${t}</option>`).join('');
+// 2.470.0 (#3596): std = the workspace's default validity (the server's answer; asked here when the caller has none)
+async function xl_newDlg(nid, done, std) {
+  if (!std) { try { std = (await api('GET', `/api/files/nodes/${nid}/ext-links`)).default_expires; } catch { /* the toast said it */ } }
   $('.xldlg')?.remove();
   const node = ab_item(nid);
   /** @type {any} */
@@ -83,7 +87,7 @@ function xl_newDlg(nid, done) {
     <div class="shint lhint keep">${node?.kind === 'folder' ? tr('Whoever has the link can open this folder with everything in it and download the files. No account needed.') : tr('Whoever has the link can open and download this file. No account needed.')}</div>
     <div class="xl-form">
       <label for="xl-exp">${tr('Valid')}</label>
-      <select id="xl-exp"><option value="1d">${tr('1 day')}</option><option value="7d" selected>${tr('7 days')}</option><option value="30d">${tr('30 days')}</option><option value="date">${tr('Until a date')}</option><option value="none">${tr('No end date')}</option></select>
+      <select id="xl-exp">${xl_expOpts(std || '7d', true)}</select>
       <span class="xl-date" hidden>${dateIn('xl-day', '', {label: tr('Valid until'), min: today()})}</span>
       <label for="xl-pw">${tr('Password (optional)')}</label>
       <input id="xl-pw" type="password" autocomplete="new-password" maxlength="200">
@@ -146,4 +150,51 @@ function xl_paneDraw(box) {
       offerUndo(label, histAdd({label, undo: put(!on), redo: put(on)}));
     });
   }
+}
+
+// the kinds of file a request may allow (here since 2.470.0, #3596: filereq.js loads on demand, Settings needs them too)
+const FRQ_KINDS = [['docs', N_('Documents (PDF, Office, text)')], ['images', N_('Pictures')], ['design', N_('Design files (AI, EPS, PSD)')],
+  ['archives', N_('Archives (ZIP)')], ['media', N_('Audio and video')]];
+
+// ---- 2.470.0 (#3596): Settings > Data: the sharing defaults of a workspace (kalmido/accounts/sharedefs.py). Private: the person,
+// an organisation: its admins (the others read them); opens on the current workspace, a select reaches the others
+const xl_stdHtml = hint => S.me?.kid ? '' : `<h4 id="s-xlstd-h">${tr('Sharing defaults')}</h4>${hint(tr('What new external links and file requests start with. You can still change it each time.'))}<div id="s-xlstd"></div>`;
+function xl_stdMount(md) {
+  /** @type {any} */
+  const box = $('#s-xlstd', md); if (!box) return;
+  box.addEventListener('change', e => xl_stdChange(box, /** @type {any} */ (e.target)));
+  box.addEventListener('click', e => { if (/** @type {any} */ (e.target).closest('[data-xlstd="reset"]')) xl_stdSave(box, {}); });
+  const w = wsOn() ? wsCur() : 'private';
+  xl_stdLoad(box, w === 'all' ? 'private' : w);
+}
+async function xl_stdLoad(box, ws) {
+  let j; try { j = await api('GET', `/api/share-defaults?space=${encodeURIComponent(ws)}`); } catch { return; }
+  if (box.isConnected) xl_stdDraw(box, j);
+}
+function xl_stdDraw(box, j) {
+  box._j = j;
+  const d = j.defaults, lim = j.limits, dis = j.can_edit ? '' : 'disabled', oid = j.space === 'private' ? '' : j.space.slice(4);
+  box.innerHTML = `${wsOn() ? `<div class="row"><label for="s-xlstd-ws">${tr('Workspace')}</label>${wsSelectHtml('s-xlstd-ws', oid)}</div>` : ''}
+    <div class="row"><label for="s-xlstd-exp">${tr('External links valid for')}</label><select id="s-xlstd-exp" ${dis}>${xl_expOpts(d.link_expires)}</select></div>
+    <div class="row"><label for="s-xlstd-days">${tr('File requests valid for (days)')}</label><input id="s-xlstd-days" type="number" inputmode="numeric" min="1" max="${lim.days}" value="${d.req_days}" ${dis}></div>
+    <div class="row"><label for="s-xlstd-mb">${tr('At most MB per file')}</label><input id="s-xlstd-mb" type="number" inputmode="numeric" min="1" max="${lim.max_mb}" value="${d.req_mb}" ${dis}></div>
+    <div class="row"><label for="s-xlstd-n">${tr('At most files in all')}</label><input id="s-xlstd-n" type="number" inputmode="numeric" min="1" max="${lim.max_files}" value="${d.req_files}" ${dis}></div>
+    <fieldset class="frq-kinds"><legend>${tr('Allowed files')}</legend>${FRQ_KINDS.filter(([k]) => lim.types.includes(k)).map(([k, l]) => `<label class="chkl"><input type="checkbox" value="${k}" ${d.req_types.includes(k) ? 'checked' : ''} ${dis}> ${esc(tr(l))}</label>`).join('')}</fieldset>
+    ${j.can_edit ? (Object.keys(j.stored).length ? `<div class="row"><button type="button" class="btn sm" data-xlstd="reset">${tr('Back to the default values')}</button></div>` : '') : `<div class="shint keep">${tr('Only an admin of this organisation can change it.')}</div>`}`;
+}
+function xl_stdChange(box, el) {
+  if (el.id === 's-xlstd-ws') { xl_stdLoad(box, el.value ? 'org:' + el.value : 'private'); return; }
+  xl_stdSave(box, {link_expires: $('#s-xlstd-exp', box).value, req_days: +$('#s-xlstd-days', box).value, req_mb: +$('#s-xlstd-mb', box).value,
+    req_files: +$('#s-xlstd-n', box).value, req_types: $$('.frq-kinds input:checked', box).map(x => x.value)});
+}
+async function xl_stdSave(box, v) {
+  const {space: ws, stored: was} = box._j;
+  const put = x => async () => {
+    if (ws === 'private') { const t = JSON.stringify(x); await api('PATCH', '/api/settings', {share_defaults: t}); S.settings.share_defaults = t; }
+    else await api('PATCH', `/api/orgs/${ws.slice(4)}`, {share_defaults: x});
+    await xl_stdLoad(box, ws); return {};
+  };
+  try { await put(v)(); } catch { if (box.isConnected) xl_stdDraw(box, box._j); return; }
+  const label = tr('Sharing defaults of {0}', qn(wsName(ws)));
+  offerUndo(label, histAdd({label, undo: put(was), redo: put(v)}));
 }

@@ -129,7 +129,7 @@ const release = (w, el) => ptr(w, el, 'pointerup');
 
   // ================= 2.452.0 (#3836): the other office lists: real row HTML, a long press opens everything the row had
   const css2 = css.slice(css.indexOf('(#3836)'));
-  check(/@media \(max-width:767px\)\{\s*\.agr-doc,\.agr-fold,\.rin-acts,\.brlrow>\.swl,\.brlrow>\.btn,\.dma-f\[data-fid\] \.dma-acts,\.dimpsup \.ib,\.rkplist \.iconbtn,\.dsbsec \.ctlinks li>\.iconbtn\{position:absolute/.test(css2), 'phones: the symbols of the other lists leave the row, for screen readers they stay');
+  check(/@media \(max-width:767px\)\{\s*\.agr-doc,\.agr-fold,\.rin-acts,\.brlrow>\.swl,\.brlrow>\.btn,\.bkarow\[data-acct\]>\.btn,\.dma-f\[data-fid\] \.dma-acts,\.dimpsup \.ib,\.rkplist \.iconbtn,\.dsbsec \.ctlinks li>\.iconbtn\{position:absolute/.test(css2), 'phones: the symbols of the other lists leave the row, for screen readers they stay');
   const rows = async mobile => {
     const w = await boot({hash: 'office/offers', ...(mobile ? {mobile: true} : {})}), d = w.document;
     await until(() => d.querySelector('.office .ofcbody'), 60);

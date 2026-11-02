@@ -19,6 +19,7 @@ const LD_MODS = {
     'office_peppol',  // 2.154.0 B (#1960): e-invoices over Peppol
     'office_payonline',  // 2.469.0 (#3459): online payment of invoices
     'office_bankrules',  // 2.299.0 B (#3191): bank rules
+    'office_bankacc',  // 2.470.0 (#3596): the bank accounts of the office
     'office_docproject',  // 2.168.0 A (#2665): documents bound to a project
     'office_agreements', 'office_assets',  // 2.92.0 (#1925, #1931)
     'office_meals',  // 2.119.0 A (#2288): entertainment receipts

@@ -92,21 +92,16 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
-    // Settings: General | Templates (services and text blocks; their old routes lead there)
     await click(ev, '#side [data-ofm="settings"]');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
-    // 2.365.2 (#2789): the menu point opens Settings > Company & office; the page office/settings stays for old links
+    // 2.365.2 (#2789): the menu point opens Settings > Company & office
     check(await ready(ev, `!!document.querySelector('.smodal .snav [data-sec="biz"][aria-selected="true"]') && !!document.querySelector('.smodal #s-biz #ofc-set')`, 60), '#2789: the menu point Settings opens Settings > Company & office');
-    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); location.hash = '#office/settings'; return 1; })()`);
-    check(await ready(ev, `location.hash === '#office/settings' && !!document.querySelector('.office .ofrseg [data-go="office/settings"][aria-selected="true"]') && !!document.querySelector('#ofc-set')`, 60), '#2180: Settings opens on General');
-    check(await ev(`!document.querySelector('#side [data-ofm="services"],#side [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
-    await click(ev, '.office .ofrseg [aria-selected="false"]');
-    check(await ready(ev, `location.hash === '#office/services' && !!document.querySelector('.office[data-ofctab="services"] .ofrseg2 [data-go="office/services"][aria-selected="true"]') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'settings'`, 60), '#2180: the tab Templates = services, the rail stays on Settings');  // // 2.152.2 (#2617): the office points sit in the panel #side, no rail in the page
-    await click(ev, '.office .ofrseg2 [data-go="office/texts"]');
-    check(await ready(ev, `location.hash === '#office/texts' && !!document.querySelector('.office[data-ofctab="texts"] .ofrseg [aria-selected="true"]') && document.querySelector('.office .ofrseg [aria-selected="true"]').dataset.go === 'office/texts'`, 60), '#2180: Templates > Text blocks');
-    await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('.office .ofrseg [data-go="office/texts"]')`, 60), '#2180: Templates opens the one used last');
-    await nav(B + '#office/services');
-    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="services"] .ofrseg2') && document.querySelector('#top h1')?.textContent.trim() === 'Settings'`, 60), '#2180: the old route #office/services leads into the tab');
+    // 2.470.0 (#3596): the page office/settings is gone (suite pr2470_d_ui); services and text blocks are led to from
+    // Settings > Company & office > Texts & templates, their pages lead back
+    check(await ev(`!document.querySelector('#side [data-ofm="services"],#side [data-ofm="texts"]')`), '#2180: services and text blocks are no points of the rail');
+    await ev(`(() => { document.querySelector('.smodal [data-osttpl="services"]').click(); return 1; })()`);
+    check(await ready(ev, `location.hash === '#office/services' && !document.querySelector('.smodal') && !!document.querySelector('.office[data-ofctab="services"] [data-setgo="biz-tpl"]') && document.querySelector('#side [data-ofm][aria-current="page"]')?.dataset.ofm === 'settings'`, 60), '#2180: services from Settings, the rail stays on Settings');
+    await nav(B + '#office/texts');
+    check(await ready(ev, `!!document.querySelector('.office[data-ofctab="texts"] [data-setgo="biz-tpl"]')`, 60), '#2180: the route #office/texts');
     // the path of a detail page instead of the heading
     await nav(B + '#client/' + cl.id);
     check(await ready(ev, `!!document.querySelector('#view .ofbody > .ofmcrumb')`, 60), '#2180: the path on a client, inside the page column');

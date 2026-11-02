@@ -38,7 +38,7 @@ D = O + "/docs"
 CBS = O + "/cashbooks"
 CHK, MV = O + "/move/check", O + "/move/org"
 MAIN = ("office_docs", "office_doc_items", "office_payments", "office_cash_entries", "office_cash_closings")  # the log grows by reading
-KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers")
+KEEP = ("office_settings", "office_company", "office_bank_accounts", "office_cf_start", "office_cf_actual", "office_numbers")
 
 
 def sql(q, args=()):

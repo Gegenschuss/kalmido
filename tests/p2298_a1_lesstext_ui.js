@@ -40,7 +40,7 @@ const SH = !!process.env.P2298A1_SHOTS;
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   // visible = takes room on the page (a hidden .iisrc / a clipped block does not)
   const vis = sel => `(() => { const e = document.querySelector('${sel}'); if (!e) return false; const b = e.getBoundingClientRect(); return b.width > 2 && b.height > 2 && getComputedStyle(e).visibility !== 'hidden'; })()`;
-  const sub = async (ev, k) => { await ev(`(() => { document.querySelector('#ofc-set [data-ostsub="${k}"]')?.click(); return 1; })()`); await sleep(300); };
+  const sub = async (ev, k) => { await ev(`(() => { document.querySelector('#ofc-set #s-biz-${k}')?.click(); return 1; })()`); await sleep(300); };
   const toastSaved = `[...document.querySelectorAll('#toast, .toast')].some(t => t.offsetParent && /^\\s*Gespeichert\\s*$/.test(t.textContent))`;
   // headless Firefox without window focus fires no focus events (and matches no :focus-within): the page's own focusin /
   // focusout listeners get the event by hand, they read document.activeElement (a real focus change sets it)
@@ -57,7 +57,7 @@ const SH = !!process.env.P2298A1_SHOTS;
       await call(CA, 'PATCH', '/api/settings', {workspace: ws});
       if (tag === 'org') await call(CA, 'PUT', '/api/office/settings', {company: {name: 'Alpha GmbH'}, lang: 'de'});
       await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-      check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="company"]')`, 80), 'the office settings' + T);
+      check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-company')`, 80), 'the office settings' + T);
       // ---- company: the help of the company name sits behind the (i) of its label
       await sub(ev, 'company');
       if (SH) await shot(`p2298a1-${tag}-settings-company.png`);

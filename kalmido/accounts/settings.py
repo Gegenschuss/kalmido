@@ -301,6 +301,9 @@ def clean_setting(k, v):
     if k == "ws_areas_off":  # 2.409.0 (#3490): my areas switched off per workspace
         from .wsareas import wsa_clean_own
         return wsa_clean_own(v)
+    if k == "share_defaults":  # 2.470.0 (#3596): the sharing defaults of my private workspace
+        from .sharedefs import sd_clean
+        return sd_clean(v)
     if k == "nav_menus":  # 2.418.0 (#3560): my arrangement of the areas' menus and the tab bar
         from .navmenus import nav_clean_menus
         return nav_clean_menus(v)

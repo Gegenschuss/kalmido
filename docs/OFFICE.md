@@ -310,7 +310,9 @@ mode: not checked yet) keeps its line in the list without the file (2.306.0).
 - **Contracts & insurance** (2.92.0, admins) - business contracts and insurances with notice deadlines, see
   [Contracts and insurance](#contracts-and-insurance).
 - **Text blocks** - reusable texts per language, grouped by kind: the rights catalogue (`rights_time`,
-  `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note.
+  `rights_territory`, `rights_media`), introduction, closing, note, free block between positions, raw data note, and
+  **Letters**: the text blocks of the correspondence, one text in the language it was written in, encrypted at rest. Only
+  people with the area Correspondence see them here.
   The first call of the module copies the country pack's catalogue into the organisation's text blocks.
 - **Own texts per language** (2.460) - services, equipment, roles, text blocks, framework contracts and the invoice, delivery
   note and reminder closings have one tab per language in their form. German and English stay in their columns, the others in
@@ -2212,6 +2214,20 @@ street, postcode, city, country, VAT ID, customer number, buyer reference (for e
 invoices and payment terms in days; the free address stays. These fields are for people only and are not part of agent
 answers.
 
+**Bank accounts** (2.470): Settings > Company & office > Bank & taxes holds the office's bank accounts as master data (table
+`office_bank_accounts`): name, IBAN, BIC, bank, an optional DATEV account; several per office, exactly one is the default. IBAN, BIC
+and bank are encrypted at rest. Documents print the default account, else the company fields, else the free bank lines; the payment
+data of a document, the e-invoice and the GiroCode read the same. A finished document keeps the account in its frozen sender. The
+DATEV batch books bank payments on the default account's own DATEV account; empty = the bank account of the DATEV settings as before.
+The first look at the settings makes the default account from the company fields (once, the fields stay stored); a later write to
+those fields through `company_fields` reaches the default account. With an account, the company form shows a link instead of its
+bank fields. The last active account cannot be archived; archiving the default hands it on to the next one.
+Routes (who may see the company's bank data: the admin or a group managing the settings, everybody else 403; no agents):
+`GET /api/office/settings/bank-accounts` (`?archived=1`) -> `{items, count}`, `POST` the same path `{label, iban, bic, bank_name,
+datev_account, default}`, `PUT .../<id>` partial, `POST .../<id>/default`, `POST .../<id>/archive` -> `{account, default_id,
+was_default}`, `POST .../<id>/restore`. `GET /api/office/settings` adds `bank_accounts` (the number of active accounts, 0 without the
+right). Changes are in the office log without the whole IBAN.
+
 ## Approval by the customer
 
 *Since 2.50.0.*
@@ -2469,7 +2485,9 @@ creates no document (as every mail to the document address).
 **Text blocks** are reusable paragraphs per office: **Insert text block** above the letter text opens a searchable list
 and puts the chosen block at the cursor. New, change and delete (with undo) in the same list; four samples (cancellation,
 objection, payment reminder, request for an extension; German and English) can be taken over. Sample text, no legal
-advice. API: `GET/POST /api/office/letter-blocks`, `PATCH/DELETE /api/office/letter-blocks/<id>`, `POST .../<id>/restore`,
+advice. Since 2.470.0 they are the rows of kind `letter` of the Text blocks (one place for texts): the list Text blocks and this
+list show and change the same rows. The old table `office_letter_blocks` keeps its rows, so a step back to an older version shows the blocks as they were at the move (later changes exist only in the new place, and that version lists these rows empty under Text blocks); an
+office's blocks move over once at its first look, because that needs its key (nothing moves while the key is missing). API: `GET/POST /api/office/letter-blocks`, `PATCH/DELETE /api/office/letter-blocks/<id>`, `POST .../<id>/restore`,
 `GET .../starters`; `GET /api/office/letters/mail-info`, `GET /api/office/letters/<id>/mail-draft`,
 `POST /api/office/letters/<id>/send-mail` (admins of the office, like every letter route).
 

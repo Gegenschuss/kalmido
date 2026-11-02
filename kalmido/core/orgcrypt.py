@@ -87,6 +87,7 @@ FIELDS = {
     "office_bank_balances": ("amount", "account"),  # 2.124.0 D (#2342): balances of the imported statements
     "office_bank_rules": ("name", "counterpart", "iban", "purpose", "amount_min", "amount_max", "category"),  # 2.299.0 B (#3191): bank rules
     "office_bank_vendors": ("match", "name", "portal"),  # 2.425.0 B (#3451): recurring providers of the bank bookings
+    "office_bank_accounts": ("iban", "bic", "bank_name"),  # 2.470.0 (#3596): the bank accounts of an office
     "office_cc_cards": ("holder_name", "last4", "account"), "office_cc_statements": ("total",),  # 2.444.0 (#3447): credit card statements
     "office_cc_lines": ("merchant", "amount", "orig_amount"),
     "office_payonline": ("secret_key", "webhook_secret", "hook_token"), "office_pay_links": ("token",),  # 2.469.0 (#3459): the provider key, the webhook secret, the public tokens
@@ -100,6 +101,7 @@ FIELDS = {
     "office_bookarch_docs": ("file_name",), "office_bookarch_files": ("file_name",),  # 2.414.0 review F8: names may carry a client's
     "office_letters": ("rcpt_name", "rcpt_address", "rcpt_email", "subject", "body", "ref_line"),  # 2.153.0 (#2028): letters
     "office_letter_blocks": ("body",), "office_letter_profiles": ("image", "mail_sig", "mail_from_name", "mail_reply_to"),  # 2.153.0 (#2030, #2028): text blocks, signature picture; 2.439.0 (#3617): the mail signature, sender name, answer address
+    "office_texts": ("body",),  # 2.470.0 (#3596): the text of a letter block (kind letter); the other kinds are in text_de / text_en, in clear
     "office_deals": ("value", "contact", "note", "lost_reason",
                      "next_step", "email", "phone", "company"),  # 2.50.0 (#1196): the sales pipeline; 2.94.0 A (#1930): leads
     "time_sheets": ("note",),  # 2.125.0 R (#2119): the note of a timesheet decision
@@ -141,6 +143,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_bank_rules": N_("Bank statements"),  # 2.299.0 B (#3191)
                  "office_bank_vendors": N_("Bank statements"),  # 2.425.0 B (#3451)
                  "office_payonline": N_("Stored access tokens (online payment)"), "office_pay_links": N_("Stored access tokens (online payment)"),  # 2.469.0 (#3459)
+                 "office_bank_accounts": N_("Bank and tax data of the company"),  # 2.470.0 (#3596)
                  "office_cc_cards": N_("Credit cards"), "office_cc_statements": N_("Credit cards"), "office_cc_lines": N_("Credit cards"),  # 2.444.0 (#3447)
                  "office_doc_templates": N_("Document templates and documents"), "office_gen_docs": N_("Document templates and documents"),  # 2.93.0 A (#1927)
                  "office_vehicles": N_("Logbook"), "office_drives": N_("Logbook"), "office_drive_log": N_("Logbook"),  # 2.93.0 B (#1928)
@@ -150,6 +153,7 @@ PM_CRYPT_CATS = {"office_company": N_("Bank and tax data of the company"), ("off
                  "office_bookarch": N_("Booking archive"), "office_bookarch_accts": N_("Booking archive"),  # 2.414.0 (#3502)
                  "office_bookarch_docs": N_("Booking archive"), "office_bookarch_files": N_("Booking archive"),
                  "office_letters": N_("Letters"), "office_letter_blocks": N_("Letters"), "office_letter_profiles": N_("Letters"),  # 2.153.0 (#2028)
+                 "office_texts": N_("Letters"),  # 2.470.0 (#3596): only the letter blocks' text
                  "hub_absences": N_("Kind and note of absences"),  # 2.50.0 (#1195)
                  "time_sheets": N_("Notes on timesheet decisions"),  # 2.125.0 R (#2119)
                  # 2.72.0 (#1333): amounts, texts and limits of the household budget, its receipts

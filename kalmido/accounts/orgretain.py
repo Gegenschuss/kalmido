@@ -103,7 +103,7 @@ ODL_MORE_SKIP = frozenset((
     # counted in ODL_CONTENT / checked by the delete itself (projects, files)
     "wiki_pages", "sheets", "office_docs", "office_archive", "office_trips", "office_drives", "clients", "lists", "fs_nodes",
     # the organisation itself: members, keys, invitations, settings, numbering, logs, jobs, search indexes
-    "org_members", "org_list_log", "org_keys", "org_invites", "org_joins", "office_settings", "office_company", "office_numbers",
+    "org_members", "org_list_log", "org_keys", "org_invites", "org_joins", "office_settings", "office_company", "office_bank_accounts", "office_numbers",
     "office_import_runs", "office_undo", "office_rights_log", "office_period_locks", "office_pack_installs", "office_rgroups",
     "office_rgroup_members", "office_inv_series", "office_datev_guids", "office_peppol", "office_pay_props", "bg_jobs",
     "office_payonline", "office_pay_links", "office_pay_sessions", "office_pay_events", "office_pay_payouts",  # 2.469.0 (#3459)

@@ -54,7 +54,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   en.querySelector('[data-agb="up"]').click();
   await until(() => d.querySelector('#ofd-agb-file'), 20);
   check(!!d.querySelector('#ofd-agb-file') && d.querySelector('#ofd-agb-date')?.type === 'hidden' && !!d.querySelector('[data-dpfor="ofd-agb-date"]'), 'the upload dialog: file + the app\'s own date picker');
-  d.querySelector('.modal [data-m="close"]')?.click();
+  d.querySelector('.modal:not(.smodal) [data-m="close"]')?.click();  // 2.470.0 (#3596): the block sits in the Settings dialog
   de.querySelector('[data-agb="del"]').click();
   await until(() => /No terms and conditions yet/.test(d.querySelector('#agb-box .agbrow[data-lg="de"]')?.textContent || ''), 40);
   check((await call('GET', '/api/office/terms')).terms.de === null, 'Remove: the German terms are gone');

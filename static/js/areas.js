@@ -61,7 +61,7 @@ const mg_wrap = (mod, html) => mg_areaOf(mod)?.[0] === 'office' && !isMobile() &
 // page office/start with four tiles and the figures, on every other page the path "Office › group" (back to the tiles) and
 // the group's points. The old routes stay (#office/offers, #clients, #contacts …); the path on detail pages is text only.
 // 2.98.0 C (#2180): three groups (On the road is gone: travel expenses -> Money, framework contracts -> Sell); services and
-// text blocks are no menu points any more but the tab "Templates" under Settings (ofr_setTabsHtml), their routes stay
+// text blocks are no menu points any more but Settings > Company & office > Texts & templates (2.470.0, #3596), their routes stay
 const OFM_GROUPS = [['sell', 'tag', N_('Sell|office')], ['money', 'wallet', N_('Money|office')], ['admin', 'sliders', N_('Administration|office')]];
 const ofm_ofc = () => officeOn();
 const ofm_sub = () => typeof OFC !== 'undefined' && !!OFC.info?.submit;  // 2.356.0 D (#3129)
@@ -226,9 +226,10 @@ function ofm_cur(mod) {
 function ofm_remember(key) {
   const o = LS.get('ofmLast', null); if (o !== key) LS.set('ofmLast', key);
 }
+// 2.470.0 (#3596): Settings is a dialog, no page to open the office on
 function ofm_entry() {
   const its = ofm_items(), last = LS.get('ofmLast', null);
-  return its.find(i => i.key === last) || its.find(i => i.key === (ofm_adm() && ofm_used()?.inquiry ? 'pipeline' : 'offers')) || its.find(i => i.key === 'offers') || its[0] || {key: 'offers', go: 'office/offers'};
+  return its.find(i => i.key === last && i.key !== 'settings') || its.find(i => i.key === (ofm_adm() && ofm_used()?.inquiry ? 'pipeline' : 'offers')) || its.find(i => i.key === 'offers') || its[0] || {key: 'offers', go: 'office/offers'};
 }
 const ofm_btn = (i, cur, cls) => `<button type="button" class="${cls} ${i.key === cur ? 'on' : ''}" data-go="${i.go}" data-ofm="${i.key}"${i.key === cur ? ' aria-current="page"' : ''}>${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></button>`;
 // the path of a detail page ("Clients › Example Ltd"), grey text, not a navigation
@@ -274,18 +275,6 @@ function ofr_after(root) {
   const b = $('.ofpb .ofpt2.on', root || document); if (!b) return;
   const row = b.parentElement, r = row.getBoundingClientRect(), x = b.getBoundingClientRect();  // sideways only, the page stays
   if (x.left < r.left || x.right > r.right) row.scrollLeft += x.left - r.left - Math.max(0, (r.width - x.width) / 2);
-}
-// the tabs of the office's Settings: General | Templates; Templates = services and text blocks (their routes office/services
-// and office/texts lead here, the last one used on this device opens)
-function ofr_setTabsHtml(tab) {
-  const tpl = tab === 'services' || tab === 'texts', last = LS.get('ofrTpl', 'services') === 'texts' ? 'texts' : 'services';
-  if (tpl && last !== tab) LS.set('ofrTpl', tab);
-  const b = (go, on, n) => `<button type="button" role="tab" data-go="office/${go}" aria-selected="${on}" class="${on ? 'on' : ''}">${esc(tr(n))}</button>`;
-  // 2.187.0 A (#2476): + Rights (office/rights); a person ruled by groups sees the tabs of the areas they reach
-  const rt = S.route.tab === 'rights', lv = ofm_lv(), see = k => !lv || (lv[k] || 'none') !== 'none', tp = see('services') || see('texts');
-  const gen = see('settings') ? b('settings', !tpl && !rt, 'General') : '', tpb = tp ? b(tpl ? tab : last, tpl, 'Templates') : '';
-  return `<div class="ofrset"><div class="seg ofrseg" role="tablist" aria-label="${esc(tr('Settings'))}">${gen}${tpb}${b('rights', rt || !gen && !tpl, N_('Rights|office'))}</div>`
-    + (tpl ? `<div class="seg ofrseg2" role="tablist" aria-label="${esc(tr('Templates'))}">${b('services', tab === 'services', 'Services')}${b('texts', tab === 'texts', 'Text blocks')}</div>` : '') + '</div>';
 }
 // the office start page (office/start, a phone's way in): the figures (admins), then per group a small caps heading and a
 // card with one row per point (2.98.0 C, #2180: one column, was a tile per group)

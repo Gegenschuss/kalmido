@@ -68,7 +68,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await fresh(ev, nav, 'alice');
     await nav(B + '#office/rights');
     check(await ready(ev, `!!document.querySelector('.orr .orrsub')`, 80), 'alice: the page Rights with its sections ' + await ev(txt).catch(e => String(e)).then(t => String(t).slice(0, 200)));
-    check(await ev(`!!document.querySelector('.ofrseg [data-go="office/rights"][aria-selected="true"]') && !!document.querySelector('.ofrseg [data-go="office/settings"]')`), 'the tab Rights next to General | Templates');
+    check(await ev(`!!document.querySelector('.office [data-setgo="biz"]')`), 'the way back into Settings');  // 2.470.0 (#3596): was the tab row
     check(await ev(`/Admins of the organisation always see everything/.test(document.querySelector('.orr-hint').textContent)`), 'the hint on top');  // 2.298.0 A2 (#3186): wording
     check(await ev(`(() => { const ps = [...document.querySelectorAll('.orr-p')]; const a = ps.find(p => /Alice/.test(p.textContent)), b = ps.find(p => /Bob/.test(p.textContent));
       return !!a && !!a.querySelector('.orr-fixed') && !a.querySelector('.orr-pick') && !!b && !!b.querySelector('.orr-pick') && /Previous access/.test(b.textContent); })()`), 'People: the admin fixed, Bob with the picker (Previous access)');
@@ -123,7 +123,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await nav(B + '#office/settings');
     check(await ready(ev, `!!document.querySelector('.orr') && /My rights/.test(${txt}) && !document.querySelector('.orr select:not([disabled])')`, 60), 'Settings: "My rights", read only');
     check(await ev(`/Own entries only/.test(${txt}) && /No access/.test(${txt})`), 'My rights: the levels in words');
-    check(await ev(`!document.querySelector('.ofrseg [data-go="office/settings"]')`), 'no tab General without the settings');
+    check(await ev(`location.hash === '#office/rights' && !document.querySelector('.office [data-setgo]')`), 'the address moved on, no way into Settings');  // 2.470.0 (#3596): was the tab row
 
     // ---- Carl (own group, quotations "edit" without the special "release"): a draft opens, no "Finalise"
     check((await call(CA, 'PATCH', `/api/office/rights/groups/${gid}`, {levels: {offers: 'edit'}})).http === 200, 'the own group edits quotations');

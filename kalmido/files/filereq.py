@@ -39,6 +39,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, write_lock
 from ..core.access import acx_anon_bind, Denied
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
 from ..accounts.login import auth_key, seal, unseal
+from ..accounts.sharedefs import FRQ_DAYS_MAX, FRQ_FILES_MAX, FRQ_TYPES, sd_for  # 2.470.0 (#3596): the limits moved there
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from .store import fs_chain, fs_deleted, fs_role, fs_put, safe_fs_name, _now, _place
 from .fsroots import fs_area_folder_name  # 2.200.0 A (#2747, review 6)
@@ -46,9 +47,6 @@ from .fslock import fsl_need_unlocked  # 2.353.0 A (#2758)
 
 FRQ_TOKEN_RE = re.compile(r"[A-Za-z0-9_-]{20,64}")
 FRQ_TITLE_MAX, FRQ_NOTE_MAX, FRQ_NAME_MAX = 120, 2000, 120
-FRQ_DAYS_DEFAULT, FRQ_DAYS_MAX = 14, 90
-FRQ_FILES_DEFAULT, FRQ_FILES_MAX = 20, 200
-FRQ_MB_DEFAULT = min(25, MAX_FILE_MB)
 FRQ_PER_FOLDER = 50   # requests per folder (not deleted)
 FRQ_PER_POST = 10     # files in one send of the plain form (the script sends one per request)
 FRQ_VIEW_RATE, FRQ_SEND_RATE, FRQ_SEND_HOUR = 60, 30, 300  # per address / minute, per address / minute, per link / hour
@@ -58,16 +56,8 @@ try:  # a typo in the variable must not stop the server
     FRQ_DAY_MB = max(1, int(os.environ.get("KALMIDO_FILE_REQUEST_MB_DAY") or 1000))
 except ValueError:
     FRQ_DAY_MB = 1000
-# the kinds a request may allow (endings); the default is documents + pictures. Programs, scripts, HTML and SVG never
-# (tasks/attachments.py EXEC_EXT, FRQ_NEVER) -- also not inside an allowed ending (the content check, frq_content_ok)
-FRQ_TYPES = {
-    "docs": ("pdf", "txt", "csv", "md", "rtf", "odt", "ods", "odp", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "xml", "eml"),
-    "images": ("jpg", "jpeg", "png", "gif", "webp", "heic", "heif", "avif", "tif", "tiff", "bmp"),
-    "design": ("ai", "eps", "psd", "indd", "idml"),
-    "archives": ("zip", "7z", "rar", "tar", "gz"),
-    "media": ("mp3", "m4a", "wav", "aac", "ogg", "mp4", "mov", "m4v", "webm"),
-}
-FRQ_TYPES_DEFAULT = ("docs", "images")
+# Programs, scripts, HTML and SVG never (tasks/attachments.py EXEC_EXT, FRQ_NEVER) -- also not inside an allowed ending (the
+# content check, frq_content_ok); the kinds a request may allow: accounts/sharedefs.py FRQ_TYPES
 FRQ_NEVER = {"html", "htm", "xhtml", "shtml", "svg", "svgz", "js", "mjs", "php", "py", "pl", "rb", "swf", "xsl", "xslt"}
 # endings whose content the magic bytes know: the file must really be one of them
 FRQ_MAGIC = {"pdf": ("application/pdf",), "jpg": ("image/jpeg",), "jpeg": ("image/jpeg",), "png": ("image/png",),
@@ -248,10 +238,11 @@ def frq_list(nid):
     n = _folder(c, nid)
     rows = c.execute("SELECT * FROM fs_upload_requests WHERE node_id=? AND deleted_at IS NULL ORDER BY id DESC", (nid,)).fetchall()
     names = _names(c, [r["created_by"] for r in rows])
+    d = sd_for(c, n["org_id"], me())  # 2.470.0 (#3596): the workspace's defaults (the limits stay)
     return jsonify(requests=[frq_json(c, r, n["role"], names) for r in rows], public_links=public_links_on(c),
                    limits={"max_mb": MAX_FILE_MB, "max_files": FRQ_FILES_MAX, "days": FRQ_DAYS_MAX, "types": list(FRQ_TYPES),
-                           "default_mb": FRQ_MB_DEFAULT, "default_files": FRQ_FILES_DEFAULT, "default_days": FRQ_DAYS_DEFAULT,
-                           "default_types": list(FRQ_TYPES_DEFAULT)})
+                           "default_mb": d["req_mb"], "default_files": d["req_files"], "default_days": d["req_days"],
+                           "default_types": d["req_types"]})
 
 
 @app.post("/api/files/nodes/<int:nid>/requests")
@@ -264,9 +255,10 @@ def frq_create(nid):
         return err(tr("Public links are turned off on this server"), 409)
     fsl_need_unlocked(c, nid, "fs_locked_link")  # 2.353.0 A (#2758): an external person has no key
     f = frq_clean(body(), new=True)
-    f.setdefault("max_mb", FRQ_MB_DEFAULT)
-    f.setdefault("max_files", FRQ_FILES_DEFAULT)
-    f.setdefault("types", ",".join(FRQ_TYPES_DEFAULT))
+    d = sd_for(c, n["org_id"], me())  # 2.470.0 (#3596): the workspace's defaults
+    f.setdefault("max_mb", d["req_mb"])
+    f.setdefault("max_files", d["req_files"])
+    f.setdefault("types", ",".join(d["req_types"]))
     if c.execute("SELECT COUNT(*) FROM fs_upload_requests WHERE node_id=? AND deleted_at IS NULL", (nid,)).fetchone()[0] >= FRQ_PER_FOLDER:
         return err(tr("At most {0} file requests per folder", FRQ_PER_FOLDER), 409)
     tok = secrets.token_urlsafe(24)

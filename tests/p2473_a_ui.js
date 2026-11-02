@@ -29,14 +29,14 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // ================= a freelancer: the personal office
   let w = await boot({hash: 'office/settings'}); let d = w.document;
   await until(() => d.querySelector('#os-small'), 60);
-  check(/Private/.test(d.querySelector('.office .ofchead')?.textContent || ''), 'freelancer: the office is the personal one: ' + (d.querySelector('.office .ofchead')?.textContent || ''));
+  check(/Private/.test(d.querySelector('#s-biz .sbizws')?.textContent || ''), 'freelancer: the office is the personal one: ' + (d.querySelector('#s-biz .sbizws')?.textContent || ''));
   check(/section 19/.test(d.querySelector('#os-small')?.closest('.row')?.textContent || ''), 'freelancer: the switch small business (section 19 UStG)');
   check(!!d.querySelector('[data-ofc="pb-move"]'), 'freelancer: the instance admin may move the office into an organisation');
   check(!d.querySelector('.pbhint'), 'freelancer: no hint without an organisation');
   {  // 2.180.0 C (#2695): merged from p21446_c_ui.js (#2436) - ONE section "Transfer into an organisation"
-    const hs = [...d.querySelectorAll('.office h3')].filter(h => /^Transfer into an organisation$/.test(h.textContent.trim()));
+    const hs = [...d.querySelectorAll('#s-biz h3')].filter(h => /^Transfer into an organisation$/.test(h.textContent.trim()));
     check(hs.length === 1, 'freelancer: exactly one transfer heading: ' + hs.length);
-    check(![...d.querySelectorAll('.office h3')].some(h => /^Move into/.test(h.textContent.trim())), 'freelancer: no "Move into" heading any more');
+    check(![...d.querySelectorAll('#s-biz h3')].some(h => /^Move into/.test(h.textContent.trim())), 'freelancer: no "Move into" heading any more');
     check(d.querySelectorAll('[data-ofc="pb-move"]').length === 1, 'freelancer: the new-organisation button is there once');
     const sec = d.querySelector('[data-ofc="pb-move"]')?.closest('fieldset');
     check(!!sec && sec === hs[0]?.closest('fieldset'), 'freelancer: the button sits in the same section as the heading');

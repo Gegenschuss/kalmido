@@ -8,7 +8,7 @@ const OFC_TABS = [['offers', 'file', N_('Quotations')], ['invoices', 'receipt', 
 const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece', N_('Piece|unit')], ['minute', N_('Minute|unit')], ['flat', N_('Flat rate|unit')], ['percent', N_('Percent|unit')]];  // 2.47.0 (#1649): percent (KSK)
 const OFC_TAXES = [['standard', N_('standard rate')], ['reduced', N_('reduced rate')], ['exempt', N_('exempt')]];
 const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territory', N_('Rights: territory')], ['rights_media', N_('Rights: media')],
-  ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')]];
+  ['intro', N_('Introduction')], ['closing', N_('Closing')], ['note', N_('Note|office')], ['block', N_('Text block between positions')], ['raw_note', N_('Raw data note')], ['letter', N_('Letters')]];  // 2.470.0 (#3596): letter: one sealed text, the same rows as the letters' text blocks
 // 2.53.0 (#1410): officeOn lives in lazyload.js (asked at start, before the office is loaded)
 // 2.143.0 A (#2151): the organisation role accounting reads the admins' bookkeeping too (the server refuses every change)
 // 2.187.0 A (#2476): a person ruled by office groups: "admin" = the area of the shown tab allows it (an area that was the
@@ -142,6 +142,23 @@ const ofcOwnGap = (r, base, lg, de = base + '_de', en = base + '_en') => lg === 
 const ofcText = (id, lg) => { const t = ofcRow('texts', id); return t ? ofcOwn(t, 'text', lg) : ''; };
 
 // ---- the view
+// 2.470.0 (#3596): the page office/settings is gone: an old link or bookmark opens Settings > Company & office over the office's
+// start page and the address is replaced, so Back never lands on the jump again; a person without the settings gets "My rights"
+function ofc_setJump() {
+  if (OFC.jump) return;
+  OFC.jump = true;
+  setTimeout(() => {
+    OFC.jump = false;
+    if (S.route.mod !== 'office' || S.route.tab !== 'settings') return;
+    if (ofr_grp() && ofr_lvOf('settings') === 'none') { location.replace('#office/rights'); return; }
+    location.replace('#office/start');
+    const sm = $('.smodal'); if (sm) { sm._noflush = true; sm.remove(); }
+    settingsModal('biz');
+  }, 0);
+}
+const ofc_setBody = () => S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : `<p class="muted lempty">${tr('Loading…')}</p>`;
+// 2.470.0 (#3596): the pages behind Settings (services, text blocks, rights) lead back there; was the tab row General | Templates
+const ofr_backHtml = tab => ofr_grp() && ofr_lvOf('settings') === 'none' ? '' : `<div class="ofcbar"><button type="button" class="btn sm" data-setgo="${tab === 'settings' ? 'biz' : 'biz-tpl'}">${ic('back', 's')} ${tr('Settings')}</button></div>`;
 function viewOffice() {
   if (!officeOn()) return `<div class="empty">${tr('Office & finance is off (Settings > Modules)')}</div>`;
   const tab = ofcTab();
@@ -151,19 +168,20 @@ function viewOffice() {
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
   if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
+  if (OFC.info && !OFC.infoErr && S.route.tab === 'settings' && tab === 'settings') ofc_setJump();
   let body;
   if (OFC.infoErr) body = `<div class="empty nempty eact">${ic('building')}<span>${esc(OFC.infoErr)}</span><a class="btn" href="#settings">${tr('Settings')}</a></div>`;
   else if (!OFC.info) body = `<p class="muted lempty">${tr('Loading…')}</p>`;
   else if (tab === 'start') body = (pb_hintHtml() || '') + ofcMemberHint() + ofm_startHtml();  // 2.87.9 (#1917); 2.356.0 D (#3006): + the members' line
   else if (tab === 'settings' && (S.route.tab === 'rights' || (ofr_grp() && ofr_lvOf('settings') === 'none')) && typeof orr_html === 'function') body = orr_html();  // 2.187.0 A (#2476): the page "Rights" (a person without the settings: only "My rights")
   else if (ofr_grp() && ofr_area(tab) && ofr_lvOf(ofr_area(tab)) === 'none' && !(tab === 'receipts' && OFC.info.submit)) body = `<div class="empty">${ic('lock')}<span>${tr('Your office rights do not include this area')}</span>${ofcMemberHint()}</div>`;  // 2.356.0 D (#3006): + the way to hand in receipts  // 2.187.0 A (#2476): a direct link to a hidden area
-  else if (pb_hintHtml()) body = pb_hintHtml() + (ofcDocTab(tab) ? '<div class="pboffers"></div>' : tab === 'settings' ? (S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml()) : typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function' ? OFC_TABS.find(t => t[0] === tab)[4]() : ofcListHtml(tab));  // 2.47.3 (#1360); 2.92.0 A (#1925): tabs of their own module here too
+  else if (pb_hintHtml()) body = pb_hintHtml() + (ofcDocTab(tab) ? '<div class="pboffers"></div>' : tab === 'settings' ? ofc_setBody() : typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function' ? OFC_TABS.find(t => t[0] === tab)[4]() : ofcListHtml(tab));  // 2.47.3 (#1360); 2.92.0 A (#1925): tabs of their own module here too
   else if (ofcDocTab(tab) && ofcMemberHint()) body = ofcMemberHint() + '<div class="pboffers"></div>';  // 2.356.0 D (#3006): the desktop start of members
   else if (ofcDocTab(tab)) body = typeof ofdOffersTab === 'function' ? '' : `<div class="empty">${ic('receipt')}<span>${tr('Quotations arrive with the next step of this module.')}</span></div>`;
-  else if (tab === 'settings') body = S.route.tab === 'import' && typeof oimHtml === 'function' ? oimHtml() : ofcSettingsHtml();  // 2.39.1 (#1182): office/import
+  else if (tab === 'settings') body = ofc_setBody();  // 2.39.1 (#1182): office/import
   else if (typeof OFC_TABS.find(t => t[0] === tab)?.[4] === 'function') body = OFC_TABS.find(t => t[0] === tab)[4]();  // 2.47.3 (B, #1022 #1652): tabs of their own module, [3] = admins only
   else body = ofcListHtml(tab);
-  if (OFC.info && !OFC.infoErr && ['settings', 'services', 'texts'].includes(tab)) body = ofr_setTabsHtml(tab) + body;  // 2.98.0 C (#2180): General | Templates
+  if (OFC.info && !OFC.infoErr && (['services', 'texts'].includes(tab) || S.route.tab === 'rights')) body = ofr_backHtml(tab) + body;  // 2.470.0 (#3596): the way back into Settings (was the tabs General | Templates)
   const och = OFC.info && !OFC.infoErr && typeof ocf_chooseHtml === 'function' ? ocf_chooseHtml() : '';  // 2.147.0 (#2462): the country of a new office
   if (och) body = och + (ofcDocTab(tab) && !body ? '<div class="pboffers"></div>' : body);  // (the quotations fill .pboffers below it)
   const ro = ['readonly', 'accounting'].includes(OFC.info?.role)  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
@@ -232,7 +250,7 @@ function ofcListBody(kind) {
     list = (typeof astSummaryHtml === 'function' ? astSummaryHtml(d) : '') + list;  // 2.92.0 B (#1931): sums + insurance list export (admins); 2.92.3: office_assets.js may still be loading (a redraw follows)
     const sets = ofcRows('sets').filter(r => hit(r) && (OFC.arch || !r.archived));
     list += `<h3 class="ofcgrp">${tr('Sets')}</h3>` + (sets.length ? `<ul class="ofclist" role="list">${sets.map(r => ofcRowBtn('sets', r, r.name, [trn('{0} device', '{0} devices', (r.items || []).length), r.discount_pct ? tr('{0} % discount', fmtNum(r.discount_pct, 1)) : ''].filter(Boolean).join(' · '))).join('')}</ul>` : `<p class="muted lempty">${tr('No sets yet. A set bundles devices with one discount.')}</p>`);
-  } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key ? (uiLang().slice(0, 2) === 'de' ? r.text_de || r.text_en : r.text_en || r.text_de) || r.key : (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en ? tr('no English text stored') + ' · ' : '') + (r.key ? r.key : (r.text_en || '').slice(0, 80)))  /* 2.223.0 B (#2822): a keyed block shows its text as the title, the key small and grey below */, OFC_TEXT_KINDS.map(k => tr(k[1])));
+  } else if (kind === 'texts') list = ofcGrouped(rows, r => tr(OFC_TEXT_KINDS.find(k => k[0] === r.kind)?.[1] || r.kind), r => ofcRowBtn('texts', r, r.key ? (uiLang().slice(0, 2) === 'de' ? r.text_de || r.text_en : r.text_en || r.text_de) || r.key : (r.text_de || r.text_en).slice(0, 60), (r.text_de && !r.text_en && r.kind !== 'letter' ? tr('no English text stored') + ' · ' : '') + (r.key ? r.key : (r.text_en || '').slice(0, 80)))  /* 2.223.0 B (#2822): a keyed block shows its text as the title, the key small and grey below */, OFC_TEXT_KINDS.map(k => tr(k[1])));
   else list = rows.length ? `<ul class="ofclist" role="list">${rows.map(r => ofcRowBtn('contracts', r, r.name, [r.date ? fmtDateLoc(r.date) : '', r.raw_included ? tr('raw data included') : '', r.client_id && cdn_label((S.clients || []).find(c => c.id === r.client_id))].filter(Boolean).join(' · '), typeof dmaClip === 'function' ? dmaClip(r.files) : '')).join('')}</ul>` : '';
   if (!rows.length && !list) list = `<div class="empty nempty eact">${ic(kind === 'texts' ? 'note' : 'list')}<span>${q ? tr('Nothing matches.') : kind === 'services' ? tr('No services yet.') : kind === 'equipment' ? tr('No equipment yet.') : tr('Nothing here yet.')}</span></div>`;
   if (!q && (kind === 'services' || kind === 'equipment')) list += oim_link('master', !rows.length);  // 2.122.3 A (#2335)
@@ -339,8 +357,10 @@ function ofcModal(kind, r) {
     f = ofcRowF('of-name', tr('Name'), ofcIn('of-name', r?.name)) + ofcRowF('of-discount_pct', tr('Discount'), ofcIn('of-discount_pct', r?.discount_pct != null ? fmtNum(r.discount_pct, 1) : '', {num: true}), '%', {keep: 1})
       + `<div class="row"><label>${tr('Devices')}</label></div><div id="of-items" class="ofcitems">${items.map(it => ofcSetItemHtml(eq, it)).join('')}</div>${adm ? `<button type="button" class="btn sm" data-m="add-item">${ic('plus', 's')} ${tr('Add device')}</button>` : ''}`;
   } else if (kind === 'texts') {
-    f = ofcRowF('of-kind', tr('Kind'), ofcSel('of-kind', r?.kind || 'block', OFC_TEXT_KINDS.map(([v, n]) => [v, tr(n)]))) + ofcRowF('of-key', tr('Short name'), ofcIn('of-key', r?.key, {max: 80, ph: tr('optional')}))
-      + ofcLangTabs([ofcTrField(r, 'text', 'text_de', 'text_en', {label: tr('Text'), rows: 4})]) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
+    // 2.470.0 (#3596): a letter block stays one (the server refuses a change of kind), the kind only for people with the correspondence; one text, in its own language
+    const ltr = r?.kind === 'letter', lv = ofm_lv(), kinds = OFC_TEXT_KINDS.filter(([v]) => (v === 'letter') === ltr || (!r && v === 'letter' && (!lv || ['edit', 'manage'].includes(lv.letters))));
+    f = ofcRowF('of-kind', tr('Kind'), ofcSel('of-kind', r?.kind || 'block', kinds.map(([v, n]) => [v, tr(n)]))) + ofcRowF('of-key', ltr ? tr('Name') : tr('Short name'), ofcIn('of-key', r?.key, {max: ltr ? 120 : 80, ph: ltr ? '' : tr('optional')}))
+      + (ltr ? `<div class="row"><label for="of-text_de">${tr('Text')}</label><textarea id="of-text_de" rows="4" maxlength="20000">${esc(r?.text_de || '')}</textarea></div><input type="hidden" id="of-text_en" value="">` : ofcLangTabs([ofcTrField(r, 'text', 'text_de', 'text_en', {label: tr('Text'), rows: 4})])) + ofcRowF('of-sort', tr('Order'), ofcIn('of-sort', r?.sort ?? '', {num: true}));
   } else if (kind === 'contracts') {
     const cl = (typeof clientsOn === 'function' && clientsOn()) ? (S.clients || []).filter(c => !c.archived).map(c => [c.id, cdn_label(c)]) : [];
     const svc = ofcRows('services').filter(x => !x.archived);
@@ -365,6 +385,7 @@ function ofcModal(kind, r) {
   const close = fgModal(md);  // 2.40.0 (#1371): Cancel / Esc / backdrop ask before unsaved input is lost
   if (!adm) for (const el of $$('input,select,textarea,button[data-dpfor]', md)) el.disabled = true;
   if (kind === 'equipment') astBind(md, r);  // 2.92.0 B (#1931)
+  if (kind === 'texts' && !r) $('#of-kind', md).addEventListener('change', e => { const l = /** @type {any} */ (e.target).value === 'letter', box = $('.ofclts', md); $('#of-text_de', md).maxLength = l ? 20000 : 8000; if (l) { $('[data-lt="de"]', box)?.click(); $$('textarea', box).forEach(t => { if (t.id !== 'of-text_de') t.value = ''; }); } $('.seg', box).style.display = l ? 'none' : ''; });  // 2.470.0 (#3596): a letter block has one text, no language tabs
   if (kind === 'contracts' && typeof dmaLoad === 'function') dmaLoad(md);  // 2.117.0 B (#2285)
   // 2.119.1 C (#2298): a contract (with its PDF files) into another workspace, admins of the office (officemove.py)
   if (['contracts', 'services', 'equipment', 'texts', 'sets'].includes(kind) && r && adm && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom())) $('.foot .spacer', md)?.insertAdjacentHTML('beforebegin', `<button class="btn" data-m="move">${ic('brief', 's')} ${esc(tr('Move to another workspace…'))}</button>`);
@@ -433,7 +454,7 @@ function ofcSettingsHtml() {
   // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)
   return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" data-fg-live autocomplete="off">
     ${adm ? '' : `<p class="muted ofclockhint">${ic('lock', 's')}<span>${tr('Only admins and the bookkeeping change this.')}</span></p>`}${/* 2.356.0 D (#3006) */ ''}
-    ${ost_subsHtml()}${ost_p('company', dis)}
+    ${ost_p('company', dis)}
     <h3>${tr('Company')}</h3>
     ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || orgN).split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || orgN)}</textarea>`, orgN && !cf.name && !co.name ? tr('Suggested from the organisation’s name, saved once you change or confirm it') : tr('up to three lines'))}${orgN && adm && !cf.name && !co.name ? `<p class="ofcnamesug"><button type="button" class="btn sm" data-ofc="name-take">${tr('Confirm name')}</button></p>` : ''}
     ${ofcCompanyFieldsHtml(cf, dis)}
@@ -482,6 +503,7 @@ function ofcSettingsHtml() {
     ${ofcFeat('docs.einvoice') ? ofcEinvRow(s) : ''}
     ${ofcFeat('docs.einvoice') && typeof pep_settingsHtml === 'function' ? pep_settingsHtml() : '' /* 2.154.0 B (#1960) */}
     ${typeof pol_settingsHtml === 'function' ? pol_settingsHtml() : '' /* 2.469.0 (#3459) */}
+    </fieldset>${ost_p('tpl')}${ost_tplHtml()}${/* 2.470.0 (#3596) */ ''}
     </fieldset>${ost_p('data', dis)}
     ${ofcFeat('books.datev') ? `${ofcRowF('os-datev', tr('DATEV inbox'), `<input id="os-datev" type="email" value="${esc(s.datev_email || '')}" maxlength="200" placeholder="${esc(tr('e-mail address of the document inbox'))}" ${dis}>`)}${ofcII('datev')}
     ${ofcChk('os-datev-auto', tr('Send every invoice to the DATEV inbox when it is sent'), s.datev_auto)}${ofcII('datev_auto')}` : ''}
@@ -611,8 +633,10 @@ const OFC_CO_FIELDS = [['street', N_('Street'), 200], ['address_extra', N_('Addr
   ['email', N_('E-mail'), 200], ['website', N_('Website'), 200], ['phone', N_('Phone'), 60], ['tax_number', N_('Tax number'), 40], ['vat_id', N_('VAT ID'), 20], ['bank_name', N_('Bank'), 120],  // 2.408.0 (#3494): + website
   ['iban', N_('IBAN'), 42], ['bic', N_('BIC'), 11], ['register_court', N_('Register court'), 120], ['register_no', N_('Register number'), 60],
   ['managing_directors', N_('Managing directors'), 300]];
+const OFC_CO_BANK = ['bank_name', 'iban', 'bic'];  // 2.470.0 (#3596): with bank accounts these live in Bank & taxes (office_bankacc.js)
 function ofcCompanyFieldsHtml(cf, dis) {
-  return `<div class="ofcco">${OFC_CO_FIELDS.map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''}${k === 'website' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="www.example.com"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}</div>`;
+  const acc = !!OFC.info?.bank_accounts;
+  return `<div class="ofcco">${OFC_CO_FIELDS.filter(([k]) => !acc || !OFC_CO_BANK.includes(k)).map(([k, n, mx]) => ofcCoHint(k, k === 'country' ? ofcRowF('osc-country-q', tr(n), ctyField('osc-country', cf.country, {attrs: 'data-co="country"', dis, label: tr(n)})) : ofcRowF('osc-' + k, tr(n), `<input id="osc-${k}" data-co="${k}" value="${esc(cf[k] || '')}" maxlength="${mx}" ${k === 'country' ? 'class="numin" autocapitalize="characters"' : ''}${k === 'website' ? ' inputmode="url" autocapitalize="off" spellcheck="false" placeholder="www.example.com"' : ''} ${dis}>`))).join('')}${ofcMdLabelHtml(cf, dis)}${acc ? ofcSetLink('tax', tr('Bank accounts')) : ''}</div>`;
 }
 // 2.40.0 (#1377): the word printed before the management's names (Geschäftsführung, Gesellschafter, ...); the options show the
 // print word of the document's language (German in the German interface, otherwise English; 2.446.0 #3763); '' = Geschäftsführung as before
@@ -746,7 +770,7 @@ function ost_fxBody(s, val) {
 // 2.113.0 (#2247): the full PUT body of the page (Save all; a single field takes its part of it, ost_part)
 function ofcSettingsBody(form) {
   const v = id => $(id, form)?.value ?? '', lines = id => v(id).split('\n').map(x => x.trim()).filter(Boolean);
-  const cof = {name: v('#os-name')}; for (const [k] of OFC_CO_FIELDS) cof[k] = v('#osc-' + k).trim();
+  const cof = {name: v('#os-name')}; for (const [k] of OFC_CO_FIELDS) if ($('#osc-' + k, form)) cof[k] = v('#osc-' + k).trim();  // 2.470.0 (#3596): a field not shown stays as it is
   if ($('#osc-md_label', form)) cof.md_label = v('#osc-md_label');  // 2.40.0 (#1377)
   const body = {company: {name: v('#os-name'), lines: lines('#os-lines'), contact_lines: lines('#os-contact'), register_lines: lines('#os-register'), bank_lines: lines('#os-bank')},
     company_fields: cof, offer_number_at: v('#os-numat') || 'create',
@@ -782,16 +806,15 @@ function ofcSettingsBody(form) {
   if (typeof oa_settingsBody === 'function') Object.assign(body, oa_settingsBody(form));  // 2.51.0 A (#1348): agents_read
   return body;
 }
-// ---- 2.113.0 (#2247): the settings in five areas (the pattern of Settings > Administration): one shown, the last one
-// remembered per device; an area may have several parts in the page's order (ost_p), fields sit in a fieldset that is
-// disabled for members
-const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('Bank & taxes')], ['docs', 'file', N_('Documents & numbers')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
+// ---- 2.113.0 (#2247): the settings in areas; an area may have several parts in the form's order (ost_p, biz_paint gathers them
+// under one heading), fields sit in a fieldset that is disabled for members
+const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('Bank & taxes')], ['docs', 'file', N_('Documents & numbers')], ['tpl', 'note', N_('Texts & templates')], ['packs', 'pack', N_('Packs')], ['functions', 'sliders', N_('Functions')], ['data', 'archive', N_('Data')], ['access', 'shield', N_('Access')]];  // 2.147.0 (#2460): Functions
 // 2.365.2 D (#2789): Bank & taxes -- what the tabs Bookkeeping, Logbook, Cash flow and Cash book set before (tax reserve and VAT
 // basis, tax dates, mileage allowance, start balance and monthly check of the cash flow, cash boxes). Every part keeps its own
 // route, autosave and undo (data-fg-skip: not a field of this form); the tabs keep a link here (ofcSetLink).
 function ost_taxHtml() {
   if (!ofcAdmin()) return `<p class="muted">${tr('Only admins and the bookkeeping change this.')}</p>`;
-  return `<div class="ostax" data-fg-skip>${[typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
+  return `<div class="ostax" data-fg-skip>${[typeof bka_settingsHtml === 'function' ? bka_settingsHtml() : '' /* 2.470.0 (#3596) */, typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
     typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '',
     typeof lb_rateSetHtml === 'function' ? lb_rateSetHtml() : '', typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : '',
     typeof fci_setHtml === 'function' ? fci_setHtml() : '', typeof cb_setHtml === 'function' ? cb_setHtml() : ''].join('')}</div>`;
@@ -800,19 +823,17 @@ function ost_taxHtml() {
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.tagName === 'INPUT' && x.closest?.('#ofc-set .ostax')) { e.preventDefault(); x.blur(); } }, true);
 // where a setting of a tab moved: a quiet line with the way into Settings > Company & office (events.js data-setgo)
 const ofcSetLink = (k, what) => `<p class="muted ofchint ofcsetl">${ic('gear', 's')} <span>${esc(what)}:</span> <button type="button" class="linkbtn" data-setgo="biz-${k}">${esc(tr('Settings › Company & office › {0}', tr(OST_SUBS.find(x => x[0] === k)?.[2] || 'Company & office')))}</button></p>`;
-const ost_cur = want => { const k = want || LS.get('ofcSetSub', 'company'); return OST_SUBS.some(x => x[0] === k) ? k : 'company'; };
-function ost_subsHtml() {
-  const cur = ost_cur();
-  return `<div class="seg aisub ostsub" role="tablist" aria-label="${esc(tr('Sections'))}">${OST_SUBS.map(([k, i, n]) => `<button type="button" role="tab" id="osts-${k}" data-ostsub="${k}" aria-selected="${k === cur}" class="${k === cur ? 'on' : ''}">${ic(i, 's')}<span>${esc(tr(n))}</span></button>`).join('')}</div>`;
-}
-const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" role="tabpanel" aria-labelledby="osts-${k}" ${ost_cur() === k ? '' : 'hidden'} ${dis || ''}>`;
-function ost_show(want, save) {
-  const k = ost_cur(want); if (save) LS.set('ofcSetSub', k);
-  if ($('#s-biz #ofc-set')) { $('#s-biz-' + k)?.scrollIntoView?.({block: 'start'}); return; }  // 2.365.2 (#2789): Settings shows the areas one below the other
-  $$('#ofc-set [data-ostsub]').forEach(b => { const on = b.dataset.ostsub === k; b.classList.toggle('on', on); b.setAttribute('aria-selected', on); });
-  $$('#ofc-set [data-ostp]').forEach(p => { p.hidden = p.dataset.ostp !== k; });
-  const b = $(`#ofc-set [data-ostsub="${k}"]`);
-  if (typeof segReveal === 'function') segReveal(b); else b?.scrollIntoView?.({block: 'nearest', inline: 'nearest'});  // (settings.js loads lazily)
+const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" ${dis || ''}>`;
+const ost_show = k => $('#s-biz-' + k)?.scrollIntoView?.({block: 'start'});  // 2.365.2 (#2789): the areas stand one below the other
+// 2.470.0 (#3596): Texts & templates: the catalogues keep their own pages (office/services, office/texts, the document templates);
+// here one row each with what it holds and the way there, as far as the person reaches that point of the office
+const OST_TPL = [['services', 'list', N_('Services'), 'office/services'], ['texts', 'note', N_('Text blocks'), 'office/texts'], ['gendocs', 'file', N_('Document templates'), 'office/gendocs']];
+function ost_tplHtml() {
+  const rows = OST_TPL.filter(([k]) => { const i = OFM_ITEMS.find(x => x.key === k); return !!i && i.on() && ofm_ok(i) && !ofm_menuOff(k); }).map(([k, i, n, go]) => {
+    const c = Array.isArray(OFC.data[k]) ? OFC.data[k].filter(x => !x.archived).length : null;
+    return `<div class="row ostpl"><span class="ostpl-n">${ic(i, 's')} ${esc(tr(n))}${c === null ? '' : ` <span class="muted">${c}</span>`}</span><a class="btn sm" href="#${go}" data-osttpl="${k}">${esc(tr('Open'))}</a></div>`;
+  });
+  return rows.length ? `<p class="shint keep">${esc(tr('What your quotations, invoices and letters are built from.'))}</p>${rows.join('')}` : '';
 }
 // ---- 2.365.2 (#2789): the settings live in Settings > Company & office (settings.js biz_draw): the same form #ofc-set with its
 // autosave for the current workspace (private = the person's own office), the areas one below the other with a heading each
@@ -822,19 +843,19 @@ function biz_paint() {
   pb_wsFollow();
   if (OFC.infoErr) { box.innerHTML = `<p class="muted">${esc(OFC.infoErr)}</p>`; return; }
   if (!OFC.info) { if (!OFC.infoLoading && !OFC.pbWait) setTimeout(ofcInfo, 0); box.innerHTML = `<div class="muted mhint">${tr('Loading…')}</div>`; return; }
-  const rights = typeof orr_html === 'function' && OFC.info.role === 'admin' && OFC.info.rights;
-  keepFocus(box, () => {
-    box.innerHTML = `<div class="sbizws"><span class="muted">${esc(tr('Applies to'))}</span> ${ofcAreaHtml()}</div>${ofcSettingsHtml()}
-      ${rights ? `<h4 id="s-biz-rights">${esc(tr('Rights|office'))}</h4><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
-    const form = $('#ofc-set', box); if (!form) return;
-    $('.ostsub', form)?.remove();
-    for (const [k, , n] of OST_SUBS) {
-      const fs = $$(`[data-ostp="${k}"]`, form).filter(f => f.children.length); if (!fs.length) continue;
-      const h = document.createElement('h4'); h.id = 's-biz-' + k; h.textContent = tr(n);
-      form.append(h, ...fs);
-      fs.forEach(f => { f.hidden = false; f.removeAttribute('role'); f.setAttribute('aria-labelledby', h.id); });
-    }
-  });
+  const rights = typeof orr_html === 'function' && OFC.info.rights;  // 2.470.0 (#3596): members too, their "My rights" (was a tab of the old page)
+  // 2.470.0 (#3596): the areas are put in order before the drawing: setHtml keeps input being typed, and a field moved afterwards would lose the focus
+  const t = document.createElement('template');
+  t.innerHTML = `<div class="sbizws"><span class="muted">${esc(tr('Applies to'))}</span> ${ofcAreaHtml()}</div>${pb_hintHtml()}${typeof ocf_chooseHtml === 'function' ? ocf_chooseHtml(true) : '' /* 2.470.0 (#3596): were on the old page */}${ofcSettingsHtml()}
+    ${rights ? `<h4 id="s-biz-rights">${esc(tr('Rights|office'))}</h4><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
+  const form = $('#ofc-set', t.content);
+  for (const [k, , n] of OST_SUBS) {
+    const fs = form ? $$(`[data-ostp="${k}"]`, form).filter(f => f.children.length) : []; if (!fs.length) continue;
+    const h = document.createElement('h4'); h.id = 's-biz-' + k; h.textContent = tr(n);
+    form.append(h, ...fs);
+    fs.forEach(f => f.setAttribute('aria-labelledby', h.id));
+  }
+  keepFocus(box, () => setHtml(box, t.innerHTML));
   if (S.bizJump) biz_jump(box);
 }
 // 2.365.2 D (#2789): settingsModal('biz-<part>') (settings.js sets S.bizJump) scrolls once to the part's heading or to one of
@@ -1011,8 +1032,8 @@ document.addEventListener('click', async e => {
 document.addEventListener('submit', e => { const f = e.target.closest?.('#ofc-set'); if (!f) return; e.preventDefault(); if (OFC.info?.role === 'admin') ofcSaveSettings(f); });
 // 2.113.0 (#2247): an area of the settings; a field saves on its change (boxes, choices, the country) or when it is left
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('#ofc-set [data-ostsub]'); if (b) { e.preventDefault(); ost_show(b.dataset.ostsub, true); return; }
-  const g = e.target.closest?.('#ofc-set [data-ostgo]'); if (g) { e.preventDefault(); ost_show(g.dataset.ostgo, true); return; }  // 2.147.0 (#2460): "Change country"
+  if (e.target.closest?.('[data-osttpl="gendocs"]') && typeof DT !== 'undefined') DT.view = 'templates';  // 2.470.0 (#3596): the templates of the documents' page
+  const g = e.target.closest?.('#ofc-set [data-ostgo]'); if (g) { e.preventDefault(); ost_show(g.dataset.ostgo); return; }  // 2.147.0 (#2460): "Change country"
   const u = e.target.closest?.('#ofc-set [data-ost-undo]'); if (!u) return;
   e.preventDefault(); const m = u.closest('.ostok');
   if (m?._e && HIST.undo[HIST.undo.length - 1] === m._e) { m.classList.remove('on'); histStep('undo'); }

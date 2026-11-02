@@ -186,7 +186,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ready(ev, `${undoToast} && /Removed/.test(document.querySelector('#toast').textContent)`);
     await ev(clk('#toast button'));
     check(await ready(ev, `${getJ('/api/office/meals/choices')}.then(j => j.places.length + j.persons.length === 4)`), 'one undo step brings it back');
-    check(await ev(`location.hash === '#office/settings'`), 'still the settings');
+    check(await ev(`!!document.querySelector('#s-biz #ofc-set')`), 'still the settings');  // 2.470.0 (#3596): in Settings
     await shot('p2119-a-settings.png');
 
     // ---- a person without an organisation

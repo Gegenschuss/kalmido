@@ -5,7 +5,7 @@
 // - it shows the office's settings form (#ofc-set) of the current workspace, the areas one below the other with a heading
 //   each (no tab row, no hidden part), "Applies to" with the workspace
 // - a field saves itself there (autosave, the same PUT as the office page)
-// - the office menu's point Settings opens Settings > Company & office (the page office/settings stays for old links)
+// - the office menu's point Settings opens Settings > Company & office (the old address leads there, 2.470.0 #3596)
 // - the settings search finds the moved office settings by their words (Nummernkreis, Bankverbindung, Mahnung)
 // - the workspace's mailbox (IMAP / SMTP) with Set up / Change in Company & office
 // - the same for a person without an organisation (their private office, they are its admin)
@@ -43,7 +43,7 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
     const form = await until(() => d.querySelector('.smodal #s-biz #ofc-set'), 100);
     check(!!form, `${who}: the office settings form sits in Settings`);
     if (form) {
-      check(!form.querySelector('.ostsub') && !form.querySelector('[data-ostp][hidden]'), `${who}: no tab row, no hidden area`);
+      check(!form.querySelector('[data-ostp][hidden]'), `${who}: no tab row, no hidden area`);
       const hs = [...form.querySelectorAll(':scope > h4')].map(h => h.id);
       check(hs[0] === 's-biz-company' && hs.includes('s-biz-docs') && hs.length >= 4, `${who}: one heading per area, Company first ` + hs.join());
       check(/Applies to/.test(d.querySelector('#s-biz .sbizws')?.textContent || ''), `${who}: "Applies to" names the workspace`);

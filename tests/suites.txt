@@ -1532,6 +1532,9 @@ fresh; run p21121_a_ui node p21121_a_ui.js "$KALMIDO_TEST_DATA"
 # 2.112.1 part B (#2058): external share links for files and folders
 fresh; run p21121_b_api "$PY" p21121_b_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p21121_b_ui node p21121_b_ui.js "$KALMIDO_TEST_DATA"
+# 2.470.0 part C (#3596): sharing defaults of a workspace (external links, file requests)
+fresh; run pr2470_c_api "$PY" pr2470_c_api_test.py "$KALMIDO_TEST_DATA"
+fresh; run pr2470_c_ui node pr2470_c_ui.js "$KALMIDO_TEST_DATA"
 # 2.113.0 part A: office settings in sections, autosave, industry pack switch (#2247 #2246)
 fresh; run p2113_a_api "$PY" p2113_a_api_test.py "$KALMIDO_TEST_DATA"
 fresh; run p2113_a_ui node p2113_a_ui.js "$KALMIDO_TEST_DATA"

@@ -53,6 +53,7 @@ RX_TABLES = (
     ("invoices/payments.csv", "office_payments"),
     ("invoices/clients.csv", "clients"),
     ("invoices/company.csv", "office_company"),
+    ("invoices/bank-accounts.csv", "office_bank_accounts"),  # 2.470.0 (#3596)
     # 2.362.2 (#3105): every other record of the office the books and the tax office ask for; RX_LEFT names the rest with its reason
     ("invoices/client-contacts.csv", "office_client_contacts"),
     ("invoices/document-parts.csv", "office_doc_parts"),

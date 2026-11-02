@@ -150,7 +150,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `${getJ('/api/office/trips/purposes')}.then(j => j.purposes.length === 1) && !!document.querySelector('.rkpset [data-rkp="del"]')`), 'one undo step brings it back');
     await ev(`(() => { const x = document.querySelector('#rkp-new'); x.value = 'Workshop'; x.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true})); return 1; })()`);
     check(await ready(ev, `${getJ('/api/office/trips/purposes')}.then(j => j.purposes.length === 2)`), 'Enter adds one (no submit of the settings form)');
-    check(await ev(`location.hash === '#office/settings' && !!document.querySelector('#ofc-set')`), 'still the settings');
+    check(await ev(`!!document.querySelector('#s-biz #ofc-set')`), 'still the settings');  // 2.470.0 (#3596): in Settings
     await shot('p2117-a-settings.png');
 
     // ---- a person without an organisation, travelling alone

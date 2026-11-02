@@ -168,6 +168,10 @@ def ofx_company(c, oid):
     out = {k: (r[k] if r and k in r.keys() else "") or "" for k in COMPANY_COLS}
     if not any(out[k] for k in ("street", "zip", "city")):  # 2.99.0 D (#2188): the old free address lines, read into the fields
         out.update(ofx_company_from_free(out, (office_settings(c, oid).get("company") or {}).get("lines") or []))
+    from .bankacc import BKA_BANK, bka_default
+    acc = bka_default(c, oid)  # 2.470.0 (#3596): the default bank account goes before the company's own fields (print, payment, GiroCode)
+    if acc:
+        out.update({k: acc[k] or "" for k in BKA_BANK})
     return out
 
 
@@ -234,6 +238,8 @@ def ofx_company_clean(v, cur):
 
 def ofx_company_save(c, oid, d):
     cols = list(COMPANY_COLS)
+    from .bankacc import bka_mirror
+    bka_mirror(c, oid, d)  # 2.470.0 (#3596): one truth for the bank data
     d = oc_enc_fields(c, oid, "office_company", {k: d.get(k) or "" for k in cols})  # 2.42.0 (#828)
     c.execute(f"INSERT INTO office_company(org_id, {', '.join(cols)}, updated_at) VALUES(?{', ?' * len(cols)}, ?) "
               f"ON CONFLICT(org_id) DO UPDATE SET {', '.join(k + '=excluded.' + k for k in cols)}, updated_at=excluded.updated_at",

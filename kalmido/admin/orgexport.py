@@ -297,6 +297,7 @@ OX_AREAS = (
     ("newsletter/consent_log.json", "nl_consent_log", "org_id=?"),
     ("clients.json", "clients", "org_id=?"),
     ("office/company.json", "office_company", "org_id=?"),
+    ("office/bank_accounts.json", "office_bank_accounts", "org_id=?"),  # 2.470.0 (#3596)
     ("office/settings.json", "office_settings", "org_id=?"),
     ("office/services.json", "office_services", "org_id=?"),
     ("office/roles.json", "office_roles", "org_id=?"),  # 2.47.0 (#1649): Freelancer-Rollen + Drehpersonal (costs decrypted like the others)

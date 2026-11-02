@@ -128,6 +128,27 @@ def _p_once(table, text):
     return prep
 
 
+def _p_company(c, run, src, d, ctx):
+    """2.470.0 (#3596): notes that the target keeps its own company: its bank accounts stay in charge too (_p_bank_account)."""
+    r = _p_once("office_company", N_("The target office already has its own company data; they were kept."))(c, run, src, d, ctx)
+    if r is None:
+        run.oi_own_company = True
+    return r
+
+
+def _p_bank_account(c, run, src, d, ctx):
+    """2.470.0 (#3596): an office that kept its own company keeps the bank details it prints (a new default would change them,
+    no account coming along would make the company's IBAN the imported one); else at most one default (the unique index)."""
+    if getattr(run, "oi_own_company", False):
+        if not getattr(run, "oi_bank_warned", False):  # 2.470.0 (#3596, review): not a silent loss
+            run.oi_bank_warned = True
+            run.warning(N_("The target office keeps its own bank accounts; the bank accounts of the archive were left out."))
+        return False
+    if d.get("is_default") and c.execute("SELECT 1 FROM office_bank_accounts WHERE org_id=? AND is_default=1", (ctx.space,)).fetchone():
+        d["is_default"] = 0
+    return d
+
+
 def _p_settings(c, run, src, d, ctx):
     if _oi_has(c, "office_settings", ctx.space):
         run.warning(N_("The target office already has its own office settings; they were kept."))
@@ -475,7 +496,8 @@ SPECS = [
     OiT("office/client_contacts.json", "office_client_contacts", refs={"client_id": "clients", "contact_id": "contacts",
         "import_run_id": "office_import_runs"}, need=("client_id",)),
     OiT("office/company.json", "office_company", private="office", rid=False, key=("org_id",), label=N_("Office"),
-        prep=_p_once("office_company", N_("The target office already has its own company data; they were kept."))),
+        prep=_p_company),
+    OiT("office/bank_accounts.json", "office_bank_accounts", private="office", prep=_p_bank_account),  # 2.470.0 (#3596)
     OiT("office/texts.json", "office_texts", private="office"),
     OiT("office/roles.json", "office_roles", refs={"import_run_id": "office_import_runs"}, private="office"),
     OiT("office/services.json", "office_services", refs={"role_id": "office_roles", "import_run_id": "office_import_runs"}, private="office"),

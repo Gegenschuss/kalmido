@@ -1239,6 +1239,7 @@ ROUTES = {
     # a draft 404) and the office's "Send portal link" (a client of the office area only; p2120_b_api_test.py)
     "GET /portal/docs/{}/pdf": "portal", "POST /api/office/clients/{}/portal-link": "office",
     # 2.112.1 B (#2058): external share links (p21121_b_api_test.py)
+    "GET /api/share-defaults": "fileextlink",  # 2.470.0 (#3596): tests/pr2470_c_api_test.py (a stranger gets 404)
     "GET /api/files/nodes/{}/ext-links": "fileextlink", "POST /api/files/nodes/{}/ext-links": "fileextlink",
     "POST /api/files/ext-links/{}/regenerate": "fileextlink", "DELETE /api/files/ext-links/{}": "fileextlink",
     "POST /api/files/ext-links/{}/restore": "fileextlink", "GET /s/f/{}": "fileextlink", "POST /s/f/{}/unlock": "fileextlink",
@@ -1282,6 +1283,10 @@ ROUTES = {
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
+    # 2.470.0 (#3596): the bank accounts of an office (pr2470_a_bankacc_test.py: another organisation 404, a person without an organisation the same)
+    "GET /api/office/settings/bank-accounts": "office", "POST /api/office/settings/bank-accounts": "office", "PUT /api/office/settings/bank-accounts/{}": "office",
+    "POST /api/office/settings/bank-accounts/{}/default": "office", "POST /api/office/settings/bank-accounts/{}/archive": "office",
+    "POST /api/office/settings/bank-accounts/{}/restore": "office",
     # 2.444.0 (#3447): credit card statements (p2444_a_cards_test.py: another organisation 404, a person without an organisation the same)
     "GET /api/office/cards": "office", "POST /api/office/cards": "office", "PATCH /api/office/cards/{}": "office", "DELETE /api/office/cards/{}": "office",
     "POST /api/office/cards/{}/restore": "office", "GET /api/office/cards/{}/statements": "office", "POST /api/office/cards/{}/statements": "office",

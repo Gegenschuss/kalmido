@@ -36,8 +36,6 @@ const FEAT = 'cal,comments,collab,office,clients';
   await call(CE, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT, workspace: 'private'});
   const srv = async (ck, f, n = 40) => { for (let i = 0; i < n; i++) { const j = await call(ck, 'GET', '/api/office/settings'); if (f(j)) return j; await sleep(250); } return null; };
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
-  const shown = `[...new Set([...document.querySelectorAll('#ofc-set [data-ostp]')].filter(p => !p.hidden).map(p => p.dataset.ostp))].join(',')`;
-  const tab = k => `(() => { document.querySelector('#ofc-set [data-ostsub="${k}"]').click(); return 1; })()`;
   const flip = k => `(() => { const el = document.querySelector('#ofc-set [data-feat="${k}"]'); el.click(); return 1; })()`;
 
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
@@ -47,13 +45,11 @@ const FEAT = 'cal,comments,collab,office,clients';
     const as = u => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
     await as('alice');
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]') && !!document.getElementById('os-name')`, 80), 'the settings page');
+    check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-company') && !!document.getElementById('os-name')`, 80), 'the settings page');
     check(await ev(`!document.querySelector('.ocf-choose')`), '#2462: an office with saved settings is not asked for its country');
 
     // ================= #2460 the area Functions
-    check(await ev(`[...document.querySelectorAll('#ofc-set [data-ostsub]')].map(b => b.dataset.ostsub).filter(k => k !== 'tax').join(',')`) === 'company,docs,packs,functions,data,access', '#2460: the areas, Functions after Packs (Bank & taxes of #2789 left out: main has it, the train not yet)');
-    await ev(tab('functions'));
-    check(await ev(shown) === 'functions', '#2460: the area Functions shown alone');
+    check(await ev(`[...document.querySelectorAll('#ofc-set > h4')].map(h => h.id.replace('s-biz-', '')).filter(k => !['tax', 'tpl'].includes(k)).join(',')`) === 'company,docs,packs,functions,data,access', '#2460: the areas, Functions after Packs');  // 2.470.0 (#3596): headings in Settings, no tabs
     const feats = await ev(`[...document.querySelectorAll('#ofc-set [data-feat]')].map(x => x.dataset.feat + ':' + (x.checked ? 1 : 0) + (x.disabled ? 'd' : '')).join(',')`);
     // 2.380 (#3411): + the five points of Money; 2.434.0 (#3608): + docs.delivery
     check(feats === 'books.datev:1,docs.delivery:1,docs.einvoice:1,books.vat_return:1,books.tax_dates:1,books.export_csv:1,books.gobd:1d,money.meals:1,money.travel:1,money.subs:1,money.cashflow:1,money.kpi:1', '#2460: DE offers every function, finalising rules locked ' + feats);
@@ -65,9 +61,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ocf-books-datev')?.closest('.row')?.querySelector('.ostok.on')`), '#2460: "Saved" at the switch');
     check(await ev(`HIST.undo.length === 1`), '#2460: one undo step');
     check(s1?.settings?.datev_email === 'inbox@example.com', '#2460: the DATEV address stays saved');
-    await ev(tab('data'));
     check(await ready(ev, `!document.getElementById('os-datev') && !document.querySelector('#ofc-set .dxset')`), '#2460: DATEV off -> no DATEV fields in Data');
-    await ev(tab('functions'));
     await ev(flip('books.vat_return'));
     check(!!(await srv(CA, j => (j.settings?.features_off || []).includes('books.vat_return'))), '#2460: VAT return figures off saved');
     await nav(B + '#office/books');
@@ -78,8 +72,7 @@ const FEAT = 'cal,comments,collab,office,clients';
 
     // ================= #2462 the change of the country asks first
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub]')`, 80), 'settings again');
-    await ev(tab('packs'));
+    check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-company')`, 80), 'settings again');
     check(await ready(ev, `!!document.querySelector('#os-pack option[value="XX"]')`, 60), '#2461: the base pack is in the country choice');
     // 2.209.0 B (#2569): on a phone the country select takes the row width (was ~45 px)
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 800}}); await sleep(400);
@@ -99,8 +92,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     // ================= a member: switches locked
     await as('bob');
     await nav(B + 'static/icon.svg'); await nav(B + '#office/settings');
-    check(await ready(ev, `!!document.querySelector('#ofc-set [data-ostsub="functions"]')`, 80), 'member: settings');
-    await ev(tab('functions'));
+    check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-functions')`, 80), 'member: settings');
     check(await ev(`[...document.querySelectorAll('#ofc-set [data-feat]')].every(x => x.matches(':disabled'))`), 'member: every switch locked');
 
     // ================= P4: a person without an organisation is asked for the country

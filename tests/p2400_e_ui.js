@@ -72,7 +72,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(unload), '#1371: closing the page asks while the field being typed in is unsaved');
     await shot('p2400-e-unsaved.png');
     // leave the view (another module) and come back
-    await ev(`(() => { location.hash = '#inbox'; return 1; })()`);
+    await ev(`(() => { document.querySelector('.smodal [data-m="close"]').click(); location.hash = '#inbox'; return 1; })()`);  // 2.470.0 (#3596): the form sits in the Settings dialog
     check(await ready(ev, `!document.querySelector('#ofc-set') && S.route.mod !== 'office'`), '#1371: left the settings');
     await ev(`(() => { location.hash = '#office/settings'; return 1; })()`);
     check(await ready(ev, `!!document.querySelector('#ofc-set #osc-street')`, 60), '#1371: back on the settings');
@@ -99,7 +99,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ready(ev, `!!document.querySelector('.modal.ofcdlg #of-name_de')`);
     await ev(`(() => { const el = document.querySelector('.modal.ofcdlg #of-name_de'); el.value = 'Ton'; el.dispatchEvent(new Event('input', {bubbles: true})); document.querySelector('.modal.ofcdlg [data-m="close"]').click(); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('.modal')].some(m => /Discard changes/.test(m.textContent))`), '#1371: Cancel in a changed dialog asks first');
-    await ev(`(() => { document.querySelectorAll('.modal').forEach(m => m.remove()); return 1; })()`);
+    await ev(`(() => { document.querySelectorAll('.modal:not(.smodal)').forEach(m => m.remove()); return 1; })()`);
 
     // ================= #1379 producing / raw data off
     const hid = sel => `getComputedStyle(document.querySelector('${sel}')).display === 'none'`;

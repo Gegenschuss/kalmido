@@ -409,6 +409,12 @@
     'GET /api/me/tokens': () => ({tokens: []}), 'GET /api/me/webhooks': () => ({webhooks: []}), 'GET /api/me/app-passwords': () => ({passwords: []}),
     'GET /api/me/2fa': () => ({totp: false, passkeys: [], recovery_left: 0}),
     'GET /api/agents/usage': () => ({days: [], agents: []}), 'POST /api/news/read': () => ({ok: true}),
+    // 2.470.0 (#3596): office/settings opens Settings, whose panes ask for these on their own
+    'GET /api/share-defaults': () => ({space: 'private', can_edit: true, stored: {}, defaults: {link_expires: '7d', req_days: 14, req_mb: 50, req_files: 20, req_types: ['docs', 'images']}, limits: {days: 90, max_mb: 500, max_files: 100, types: ['docs', 'images', 'design', 'archives', 'media']}}),
+    'GET /api/team/absences/feed': () => ({states: STATES, own: MD().state || '', state: ''}), 'GET /api/me/mail': () => ({enabled: false, lists: [], digest: {enabled: false}}),
+    'GET /api/me/ntfy-inbox': () => ({enabled: false, default_server: '', url: ''}), 'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
+    'GET /api/account/export': () => ({state: 'none'}), 'GET /api/account/import': () => ({current: null}), 'GET /api/videos/signoffs/orphaned': () => ({signoffs: []}),
+    'GET /api/hubmail/mailboxes': () => ({spaces: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
     'GET /api/pomo/stats': () => ({per_day: {}, today: {count: 0, minutes: 0}, week: {count: 0, minutes: 0}, per_task: [], recent: []}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
     'GET /api/briefing': () => ({}), 'GET /api/inbox': () => ({total: 0, counts: {}, items: []}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),

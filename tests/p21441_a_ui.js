@@ -34,7 +34,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const ob = document.querySelector('#view .ofbody'); const can = e => e && /auto|scroll/.test(getComputedStyle(e).overflowY); if (can(v)) v.scrollTop = 500; if (can(ob)) ob.scrollTop = 500;  // a finger scrolls these only
     const t1 = nav.getBoundingClientRect().top, b1 = pad.getBoundingClientRect().top;
     const se = document.scrollingElement; return {kind: nav.className, t0, t1, b0, b1, doc: se.scrollHeight > se.clientHeight + 1, view: v.scrollTop > 0 || !!(ob && ob.scrollTop > 0)}; })()`;
-  const TABS = ['offers', 'cashflow', 'bank', 'settings'];
+  const TABS = ['offers', 'cashflow', 'bank', 'services'];  // 2.470.0 (#3596): office/settings became a jump into Settings
   const sizes = [['tablet portrait', 820, 1180, true], ['tablet landscape', 1180, 820, true], ['desktop', 1440, 900, false]];
   for (const [name, w, h, touch] of sizes) {
     await firefox(async ({cmd, ev, ctx, nav, shot}) => {

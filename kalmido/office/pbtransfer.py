@@ -46,7 +46,7 @@ from .payonline import POL_EXPIRE_S
 from .periodlock import pl_lock, pl_through  # 2.355.0 B (#2845)
 from ..files.fsmove import fsm_apply, fsm_plan  # 2.356.0 A (#2926)
 
-PBT_KEEP = ("office_settings", "office_company", "office_cf_start", "office_cf_actual", "office_numbers",
+PBT_KEEP = ("office_settings", "office_company", "office_bank_accounts", "office_cf_start", "office_cf_actual", "office_numbers",
             "office_period_locks",  # 2.148.0 A (#2471): the locks of each area stay its own
             "office_rgroups", "office_rgroup_members",  # 2.187.0 C (#2476): the personal office's rights groups (its agents) stay; the log goes
             "office_payonline",  # 2.469.0 (#3459): as the Peppol connection: the webhook URL and the provider account stay the area's

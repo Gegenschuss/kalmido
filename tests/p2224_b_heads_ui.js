@@ -62,7 +62,9 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await ev(`(() => { document.querySelector('.ocf-slim [data-go]').click(); return 1; })()`);
     check(await ready(ev, `location.hash === '#office/pipeline' && !!document.querySelector('.ocf-choose #ocf-ch')`, 60), '#2816: "Choose country" leads to the card');
     await nav(B + '#office/settings');
-    check(await ready(ev, `${h1} === 'Settings' && !!document.querySelector('.ocf-slim')`, 80), '#2816: Settings: the name, the slim line');
+    check(await ready(ev, `!!document.querySelector('#s-biz .ocf-slim') && document.querySelectorAll('#ocf-ch').length <= 1`, 80), '#2816: Settings: the slim line, one country choice on the screen');  // 2.470.0 (#3596): the dialog over office/start
+    await ev(`(() => { document.querySelector('#s-biz .ocf-slim [data-go]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.smodal') && location.hash === '#office/pipeline'`, 60), '#3596: its button closes Settings');
     // ---- Tables: one heading, one new button
     await nav(B + '#sheets');
     check(await ready(ev, `!!document.querySelector('.shvov [data-shv="new"]')`, 80), '#2816: the tables overview');

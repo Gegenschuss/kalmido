@@ -6335,7 +6335,6 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .oflr>svg:first-child{width:var(--ic-l);height:var(--ic-l);color:var(--accent);flex:none}
 .oflr>span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .oflr>svg:last-child{width:var(--ic);height:var(--ic);color:var(--faint);transform:rotate(-90deg);flex:none}
-.ofrset{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem .75rem;margin:0 0 .875rem}
 /* 2.45.0 D (#1504): the start page -- one sentence on top, Today with a box to add, compact News, slim empty cards, two
    columns (wide main, narrow side; every column stacks on its own), the app font everywhere, links without underline */
 .hpsum{margin:-.5rem 0 1.125rem;color:var(--text2);font-size:var(--fs-b)}

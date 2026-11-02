@@ -37,7 +37,7 @@ UMZ_LEFT_TABLES = {
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG,
     "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
     "nl_members": _ORG, "nl_suppress": _ORG, "office_agreements": _ORG, "office_archive": _ORG, "office_archive_log": _ORG, "office_bank_balances": _ORG,
-    "office_bank_imports": _ORG, "office_bank_rule_nos": _ORG, "office_bank_rules": _ORG, "office_bank_tx": _ORG, "office_bank_vendors": _ORG,
+    "office_bank_accounts": _ORG, "office_bank_imports": _ORG, "office_bank_rule_nos": _ORG, "office_bank_rules": _ORG, "office_bank_tx": _ORG, "office_bank_vendors": _ORG,
     "office_bookarch": _ORG, "office_bookarch_accts": _ORG, "office_bookarch_docs": _ORG, "office_bookarch_files": _ORG, "office_cash_closings": _ORG,
     "office_cash_entries": _ORG, "office_cash_log": _ORG, "office_cashbooks": _ORG, "office_cc_cards": _ORG, "office_cc_lines": _ORG,
     "office_cc_statements": _ORG, "office_cf_actual": _ORG, "office_cf_adjust": _ORG, "office_cf_start": _ORG, "office_client_contacts": _ORG,

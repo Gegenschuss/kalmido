@@ -37,7 +37,7 @@ const call = async (method, url, body, ck) => { const r = await fetch(B + url.re
     check((await call('PUT', '/api/office/settings', {offer_scheme: KV, offer_counter: 'org'}, ck)).status === 200, tag + 'scheme + org counter saved first');
     await nav(B + '#office/settings');
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#os-counter')`).catch(() => false)); i++) await sleep(300);
-    await ev(`(() => { document.querySelector('[data-ostsub="docs"]')?.click(); return 1; })()`);  // 2.113.0 (#2247): the numbering is in the area Documents
+    await ev(`(() => { document.querySelector('#s-biz-docs')?.click(); return 1; })()`);  // 2.113.0 (#2247): the numbering is in the area Documents
     await sleep(400);
     await sleep(800);
     const sel = await ev(`(() => { const s = document.querySelector('#os-counter'); if (!s) return null; const r = s.getBoundingClientRect(); return {opts: [...s.options].map(x => x.value), val: s.value, label: document.querySelector('label[for=os-counter]')?.textContent || '', w: r.width, vis: r.height > 0}; })()`);
