@@ -214,7 +214,7 @@ ph = dict(pt, lines=[line(1, 900, part_id=7, title="Dreh", detail="\n".join(f"Dr
 d6 = pdf.office_pdf(ph)
 p6 = pdfcheck.layout(d6)
 tg6 = [t["s"] for _, t in tags(p6)]
-check(len(tg6) == 2 and tg6[0].startswith("SEITE ") and tg6[1] == f"SEITE {next(n for n in texts(p6, 'Schnitt') if n > 1)}", f"tall part row: both rows carry their tag {tg6}")
+check(tg6 == [f"SEITE {max(texts(p6, t))}" for t in ("Dreh", "Schnitt")], f"tall part row: both rows carry the tag of their part's page {tg6}")  # the title page itself runs over several pages
 check(len(texts(p6, "Drehtag 120: Kamera, Licht und Ton am Set")) == 1 and texts(p6, "Drehtag 120: Kamera, Licht und Ton am Set")[0] > 1, "tall part row: the detail really runs over page 1")
 
 
