@@ -1108,7 +1108,7 @@ def occ_revive(c, cid, kind, lid):
     from ..family.family import _jparse, occ_next, occ_rule
     from ..tasks.lifecycle import restore_task
     src = f"contact:{cid}"
-    rows = c.execute("SELECT * FROM tasks WHERE list_id=? AND fam LIKE ? AND id NOT IN (SELECT task_id FROM contact_occ WHERE task_id IS NOT NULL) "
+    rows = c.execute("SELECT * FROM tasks WHERE list_id=? AND fam ILIKE ? AND id NOT IN (SELECT task_id FROM contact_occ WHERE task_id IS NOT NULL) "
                      "ORDER BY deleted_at IS NOT NULL, deleted_at DESC, id DESC", (lid, f'%"{src}"%')).fetchall()
     t = next((x for x in rows if (_jparse(x["fam"]) or {}).get("src") == src and (_jparse(x["fam"]) or {}).get("kind") == kind), None)
     if not t:

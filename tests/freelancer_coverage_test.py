@@ -1301,8 +1301,6 @@ POST /api/clients/merges/{}/undo
 POST /api/comments/{}/apply
 POST /api/comments/{}/choice
 POST /api/comments/{}/reactions
-POST /api/contacts/merge
-POST /api/contacts/merges/{}/undo
 POST /api/disc/blocks/{}
 POST /api/disc/check
 POST /api/disc/confirm
