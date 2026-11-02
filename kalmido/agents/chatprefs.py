@@ -133,6 +133,16 @@ def cp_route_agent_style(uid):
     return jsonify(user_id=uid, reply_style=cp_style(c, aid, uid), max=CP_STYLE_MAX)
 
 
+def cp_spec(paths, op, ok, errs, pid):
+    """2.491.0 (#2849): OpenAPI of GET /agent/chats/{id}/reply-style (called from agents/usage.py agent_spec)."""
+    paths["/agent/chats/{id}/reply-style"] = {"get": op(
+        "2.491.0 (#2849): the wishes person {id} set for your replies in their chat settings (free text, e.g. \"short answers, no "
+        "tables\"; '' = none). The same text comes as reply_style in that person's chat / chat_choice / message_edited events. "
+        "Only a person you reach in the chat (else 404)", "Agents",
+        ok({"type": "object", "properties": {"user_id": {"type": "integer"}, "reply_style": {"type": "string", "maxLength": CP_STYLE_MAX},
+                                             "max": {"type": "integer"}}}) | errs("400", "403", "404"), [pid("id", "User id")])}
+
+
 @app.post("/api/agents/<int:aid>/chat/<int:mid>/dismiss")
 def cp_route_dismiss(aid, mid):
     """X on a collected suggestion: it leaves the collection on every device (choices.dismissed_at); a press then answers 409."""

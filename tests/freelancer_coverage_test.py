@@ -1240,7 +1240,6 @@ DELETE /api/v1/team/messages/{}
 DELETE /api/v1/templates/{}
 DELETE /api/v1/time/timer
 DELETE /api/v1/trash
-PATCH /api/agents/{}/chat/{}
 PATCH /api/books/{}/org
 PATCH /api/budget/recurring/{}
 PATCH /api/calendars/{}
