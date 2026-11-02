@@ -75,7 +75,7 @@ T0 = A.post(B + "/api/tasks", json={"title": "Existing task", "list_id": L}).jso
 
 # ================================================================== migration (start-up) + an old backup
 now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Beta", "2099-11-01", 0, ids["bob"], now))  # 2.475 CI: far ahead - the burndown draws its ideal line only while the due day is not past (2026-11-01 was a date bomb)
+dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Beta", "2099-11-01", 0, ids["bob"], now))  # 2.475 CI: far ahead - the burndown draws its ideal line only while the due day is not past (2026-11-01 was a date bomb); GA in 2099-12 keeps its place behind Beta
 dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Alpha", "2026-10-01", 1, 999, now))
 n0 = len(A.get(B + "/api/admin/backups").json()["items"])
 check(A.post(B + "/api/admin/backups").status_code == 202, "a backup with the old milestone rows")
@@ -107,17 +107,17 @@ ov = A.get(B + f"/api/lists/{L}/overview").json()
 check([m["name"] for m in ov["milestones"]] == ["Alpha", "Beta"] and ov["milestones"][0]["done"] is True, "overview: the milestone block from the tasks")
 
 # ================================================================== compatibility routes (web + v1)
-r = A.post(B + f"/api/lists/{L}/milestones", json={"name": "GA", "day": "2026-12-01"})
+r = A.post(B + f"/api/lists/{L}/milestones", json={"name": "GA", "day": "2099-12-01"})
 GA = r.json()["id"]
-check(r.ok and r.json() == {"id": GA, "name": "GA", "day": "2026-12-01", "done": False}, f"web POST: a milestone task {r.text}")
+check(r.ok and r.json() == {"id": GA, "name": "GA", "day": "2099-12-01", "done": False}, f"web POST: a milestone task {r.text}")
 g = A.get(B + f"/api/tasks/{GA}").json()
-check(g.get("ms") == 1 and g["list_id"] == L and g["due"] == "2026-12-01" and g["parent_id"] is None, "… which is a task with ms = 1")
+check(g.get("ms") == 1 and g["list_id"] == L and g["due"] == "2099-12-01" and g["parent_id"] is None, "… which is a task with ms = 1")
 check(A.patch(B + f"/api/lists/{L}/milestones/{GA}", json={"done": True}).json()["done"] is True and A.get(B + f"/api/tasks/{GA}").json()["status"] == 2,
       "web PATCH done -> the task is completed")
-check(A.patch(B + f"/api/lists/{L}/milestones/{GA}", json={"done": False, "day": "2026-12-02", "name": "GA 1"}).json() == {"id": GA, "name": "GA 1", "day": "2026-12-02", "done": False},
+check(A.patch(B + f"/api/lists/{L}/milestones/{GA}", json={"done": False, "day": "2099-12-02", "name": "GA 1"}).json() == {"id": GA, "name": "GA 1", "day": "2099-12-02", "done": False},
       "web PATCH: reopen, new day + name")
 check(A.patch(B + f"/api/lists/{L}/milestones/{T0['id']}", json={"done": True}).status_code == 404, "a normal task is no milestone here: 404")
-check(C.post(B + f"/api/lists/{L}/milestones", json={"name": "x", "day": "2026-12-01"}).status_code == 403, "a viewer cannot add milestones")
+check(C.post(B + f"/api/lists/{L}/milestones", json={"name": "x", "day": "2099-12-01"}).status_code == 403, "a viewer cannot add milestones")
 check(A.post(B + f"/api/lists/{L}/milestones", json={"name": "x"}).status_code == 400, "web POST needs a day")
 check(A.delete(B + f"/api/lists/{L}/milestones/{GA}").ok and dbx("SELECT deleted_at FROM tasks WHERE id=?", (GA,))[0][0], "web DELETE -> trash")
 check(A.post(B + f"/api/tasks/{GA}/restore").ok, "restore it")
