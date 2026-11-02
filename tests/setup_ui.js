@@ -44,7 +44,7 @@ async function step1(w, user = 'admin') {
   if (!form) return false;
   d.querySelector('#au-user').value = user; d.querySelector('#au-name').value = 'Admin'; d.querySelector('#au-pw').value = 'password123';
   form.dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
-  for (let i = 0; i < 30 && !d.querySelector('.setupcard'); i++) await sleep(100);
+  for (let i = 0; i < 150 && !d.querySelector('.setupcard'); i++) await sleep(100);  // #3506: up to 15 s - under a full Mac load (16 places) 3 s were too short
   return !!d.querySelector('.setupcard');
 }
 const feats = st => st.settings.features.split(',');
