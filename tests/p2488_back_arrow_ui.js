@@ -20,6 +20,7 @@ if (!process.env.P2488A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
   await call('POST', '/api/admin/setup', {lang: 'en', modules: ['cal']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal'});
   const lid = (await call('POST', '/api/lists', {name: 'Project one'})).id;
+  const lid2 = (await call('POST', '/api/lists', {name: 'Project two'})).id;
 
   const ready = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   await firefox(async o => {
@@ -78,8 +79,8 @@ if (!process.env.P2488A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
     await ev(`Object.defineProperty(history, 'length', {configurable: true, get: () => 50})`);
     await ev(`location.hash = '#l/${lid}'`);
     await route(`l:${lid}`);
-    await ev(`location.hash = '#cal'`);
-    check(await route('cal'), 'a third view opens');
+    await ev(`location.hash = '#l/${lid2}'`);
+    check(await route(`l:${lid2}`), 'a third view opens');
     check(await ready(ev, `${btn}.disabled === false`, 12), 'active with a full history (length frozen at 50)');
     await ev(`history.back()`);
     check(await route(`l:${lid}`) && await ready(ev, `${btn}.disabled === false`, 12), 'one step back: still active');
