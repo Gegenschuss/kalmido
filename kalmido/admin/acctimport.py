@@ -130,6 +130,15 @@ UMZ_SETTINGS_MORE = ("detail_split", "detail_cm_fold", "detail_fold", "agent_ste
                      "nav_order", "mods_all", "folders_closed", "folder_colors", "photo_meta_strip", "week_start", "time_format",
                      "date_order", "mail_trim_fwd", "mail_trim_eml")
 UMZ_SETTINGS_ALL = frozenset(UMZ_SETTINGS + UMZ_SETTINGS_MORE)
+def _umz_delivery(t):
+    """2.392.2 (#3365, review): the delivery state of an imported task: in progress names a job of the old server (gone here),
+    waiting keeps only its note (the task it waited for is an id of the old server); parked stays with its reason."""
+    st, note = t.get("delivery") or "", _txt(t.get("delivery_note"), 500)
+    if st == "parked" or (st == "waiting" and note):
+        return {"delivery": st, "delivery_note": note}
+    return {"delivery": "", "delivery_note": "", "delivery_at": None}
+
+
 # columns never taken from a file, in addition to ids, *_id / *_by columns, foreign keys and OX_SECRET_COLS
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
@@ -1416,7 +1425,8 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             "list_id": lid, "section_id": sid, "title": _txt(t.get("title"), TITLE_MAX) or "…",
             "content": _txt(t.get("content"), CONTENT_MAX), "status": status, "milestone_id": run.m("list_milestones", t.get("milestone_id")),
             "created_by": uid, "completed_by": uid if status else None, "assignee_id": aid, "assigned_by": uid if aid else None,
-            "tt_id": f"kalmido:{eid[:16]}:{_oid(t.get('id')) or 0}", "parent_id": None, "updated_at": ts}, ts)
+            "tt_id": f"kalmido:{eid[:16]}:{_oid(t.get('id')) or 0}", "parent_id": None, "updated_at": ts,
+            **_umz_delivery(t)}, ts)
         tid = umz_insert(c, "tasks", d) if d else None
         if not tid:
             run.warning(N_("A task could not be taken over: {0}"), _txt(t.get("title"), 80))
