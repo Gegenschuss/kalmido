@@ -88,7 +88,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     check(await key(ev, 'ArrowUp') === 'offers' && await key(ev, 'ArrowUp') === 'pipeline', '#2180: ArrowUp = the point before');  // 2.351.0 (#3312): over the tree arrow
     // 2.351.0 (#3312): no group "Folders" any more (the document areas are trees): End = the last point of the panel
     // 2.418.0 (#3560): "Customise" (the menu's editor) is the panel's last button now, the last point right before it
-    check(await key(ev, 'End') === '' && await ev(`document.activeElement?.dataset?.act === 'nav-edit'`) && await key(ev, 'ArrowUp') === 'settings', '#2180: End = the panel\'s last button (Customize), the last point before it');
+    check(await key(ev, 'End') === '' && await ev(`document.activeElement?.dataset?.act === 'nav-edit'`) && await key(ev, 'ArrowUp') === 'contacts', '#2180: End = the panel\'s last button (Customize), the last point before it');  // 2.489.0 (#2664): the address book, an entry of its own after Administration
     await ev(`(() => { document.querySelector('#side [data-ofm="settings"]').focus(); return 1; })()`);
     check(await key(ev, 'ArrowUp') === 'agreements', '#2180: ArrowUp from the last point = the one before');  // 2.152.2 (#2617): Home leaves the office points (the panel's first button)
     check(await ev(`location.hash === '#office/offers'`), '#2180: the keys only move the focus');
