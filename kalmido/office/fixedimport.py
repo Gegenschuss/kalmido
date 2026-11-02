@@ -39,6 +39,7 @@ from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functi
 
 FCI_FILE_MAX = 2 * 1024 * 1024
 FCI_ROWS_MAX = 500
+FCI_UNDO_HOURS = 24  # 2.370.4 (#3089 N15): the undo window of an import (as integrations.importers.IMPORT_UNDO_HOURS)
 FCI_YEAR = 2026  # every imported cost starts in January 2026 (decided 2026-10-16)
 FCI_HEAD = {  # normalised header (letters / digits only) -> field
     "name": "label", "bezeichnung": "label", "posten": "label",
@@ -314,13 +315,12 @@ def fci_import_post():
 
 def fci_remove(c, oid, ids):
     """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
-    reminder sent). 2.370.4 (#3089 N15): and made within the undo window (IMPORT_UNDO_HOURS) - an older row stays.
+    reminder sent). 2.370.4 (#3089 N15): and made within the undo window (FCI_UNDO_HOURS) - an older row stays.
     -> how many went. No commit."""
     if not ids:
         return 0
-    from ..integrations.importers import IMPORT_UNDO_HOURS
     q = ",".join("?" * len(ids))
-    cut = iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS))
+    cut = iso(now_utc() - timedelta(hours=FCI_UNDO_HOURS))
     return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=?
                          AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids + [cut]).rowcount
 

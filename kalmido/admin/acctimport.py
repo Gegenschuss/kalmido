@@ -71,6 +71,7 @@ from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin
 from ..integrations.importers import IMPORT_UNDO_HOURS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.bulk import bk_occ_drop, ctt_unlink  # 2.370.4 (#3089)
 from ..accounts.invite import invite_new  # 2.369.5 (#2517): pulled up from functions
 from .orgexport import OX_MAGIC, OX_FK_AAD  # 2.369.5 (#2517): pulled up from functions
 from ..core.config import DATABASE_URL  # 2.369.5 (#2517): pulled up from functions
@@ -2259,7 +2260,6 @@ def umz_undo_parts(c, cr):
 def umz_undo_books(c, uid, bids):
     """2.370.4 (#3089) M6: the address books bids of uid into the trash like op_book_delete (birthday tasks to the trash, the
     clients' contact persons unlinked until a restore); restore and the purge after the trash days as there."""
-    from ..contacts.bulk import bk_occ_drop, ctt_unlink
     for bid in bids:
         if not c.execute("SELECT 1 FROM books WHERE id=? AND owner_id=? AND deleted_at IS NULL", (bid, uid)).fetchone():
             continue

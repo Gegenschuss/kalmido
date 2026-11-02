@@ -43,6 +43,7 @@ VMI_FILE_MAX = 2 * 1024 * 1024
 VMI_SHEETS_MAX = 30
 VMI_ROWS_MAX = 500  # trip rows per sheet
 VMI_IMPORT_MAX = 2000  # trips per import / per undo
+VMI_UNDO_HOURS = 24  # 2.370.4 (#3089 N15): the undo window of an import (as integrations.importers.IMPORT_UNDO_HOURS)
 VMI_HEAD = {  # normalised header (letters / digits only) -> field
     "vom": "date_from", "von": "date_from", "ab": "date_from", "datumvon": "date_from", "from": "date_from", "datefrom": "date_from",
     "abreise": "date_from", "bis": "date_to", "datumbis": "date_to", "to": "date_to", "until": "date_to", "dateto": "date_to",
@@ -547,8 +548,7 @@ def vmi_remove(c, oid, ids):
     # 2.152.0 (#2168, review B-H1): receipts ticked "in DATEV" lock their trip here as on the single delete
     billed |= {r["trip_id"] for r in c.execute(f"SELECT * FROM office_trip_items WHERE org_id=? AND trip_id IN ({q})", [oid] + ids)
                if olk_trip_item_reason(c, oid, r)}
-    from ..integrations.importers import IMPORT_UNDO_HOURS
-    cut = iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS))  # 2.370.4 (#3089 N15): older trips stay (kept)
+    cut = iso(now_utc() - timedelta(hours=VMI_UNDO_HOURS))  # 2.370.4 (#3089 N15): older trips stay (kept)
     kept = {r["id"] for r in c.execute(f"""SELECT id FROM office_trips t WHERE org_id=? AND id IN ({q}) AND (updated_at!=created_at
                                             OR created_at<? OR EXISTS (SELECT 1 FROM office_trip_items i WHERE i.trip_id=t.id)
                                             OR EXISTS (SELECT 1 FROM office_drives d WHERE d.trip_id=t.id)

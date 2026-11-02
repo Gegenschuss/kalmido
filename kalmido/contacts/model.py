@@ -24,6 +24,7 @@ from ..accounts.orgs import org_role as om_role, user_orgs, clean_org_id, ws_obj
 from ..accounts.orgroles import org_roles_of, org_readonly  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
 from ..family.family import _jparse, occ_create, occ_next, occ_rule  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.lifecycle import restore_task  # 2.370.4 (#3089)
 from ..collab.liste2e import le2a_gen_locked  # 2.369.5 (#2517): pulled up from functions
 from ..events.model import need_event  # 2.369.5 (#2517): pulled up from functions
 
@@ -1105,8 +1106,6 @@ def occ_revive(c, cid, kind, lid):
     or its address book went to the trash, bk_occ_drop): a live one without a link (restored from the tasks' trash meanwhile)
     or the newest one in the tasks' trash, taken out of it. It gets its link again (the caller updates name and date);
     None = nothing there (occ_sync makes a new task)."""
-    from ..family.family import _jparse, occ_next, occ_rule
-    from ..tasks.lifecycle import restore_task
     src = f"contact:{cid}"
     rows = c.execute("SELECT * FROM tasks WHERE list_id=? AND fam ILIKE ? AND id NOT IN (SELECT task_id FROM contact_occ WHERE task_id IS NOT NULL) "
                      "ORDER BY deleted_at IS NOT NULL, deleted_at DESC, id DESC", (lid, f'%"{src}"%')).fetchall()

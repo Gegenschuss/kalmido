@@ -37,6 +37,8 @@ from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..files.scan import sc_needs_retry  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
+from ..core.merges import mg_fk_refs  # 2.370.4 (#3089)
+from ..team.clients import cl_trash  # 2.370.4 (#3089)
 from ..office.model import pb_personal  # 2.369.5 (#2517): pulled up from functions
 from .acctexport import umz_user_conn  # 2.369.5 (#2517): pulled up from functions
 from ..core.orgcrypt import _write_atomic  # 2.369.5 (#2517): pulled up from functions
@@ -446,7 +448,6 @@ def oi_undo(c, cr):
         table, rid, space = item
         if table == "clients":  # 2.370.4 (#3089) M6: an imported client goes into the client trash (restorable), not for good
             if rid in cl_gone:
-                from ..team.clients import cl_trash
                 cl_trash(c, rid)
                 n += 1
             continue
@@ -488,7 +489,6 @@ def _oi_undo_clients(c, cr, space_cols):
                 gone.add(rid)
     if not have:
         return gone, have, {}
-    from ..core.merges import mg_fk_refs
     return gone, have, {t: k for t, k, d in mg_fk_refs(c, "clients") if d == "c" and t != "clients"}
 
 
