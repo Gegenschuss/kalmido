@@ -1199,7 +1199,7 @@ setInterval(async () => {
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
     // 2.41.0 (#1376): only light areas: their parts, the rest bundled; 2.42.0 (#1376): the tasks area: only the changed tasks (delta)
     if (chg && v !== S.v && !editing() && (lpLive(v, lpCh, n) || await lpDelta(v, lpCh, n))) { /* drawn there */ }
-    else if (chg && !editing()) { S.viewStale = false; const lpBack = lpFull(); S.lpN.state++; if (await load(true) === 'brake') lpBack(); td_renderSoon(); }  // 2.40.0 (#1430): bundled; 2.280.0 F (#3109): braked: the follow-up stays
+    else if (chg && !editing()) { S.viewStale = lpHold(); const lpBack = lpFull(); S.lpN.state++; if (await load(true) === 'brake') lpBack(); td_renderSoon(); }  // 2.40.0 (#1430): bundled; 2.280.0 F (#3109): braked: the follow-up stays; #3402: a held element keeps the view stale (drawn after letting go)
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
     else if (S.viewStale && !editing()) viewSafeRender();
