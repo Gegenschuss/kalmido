@@ -19,6 +19,17 @@
 
 ## What's new
 
+**2.488.0** (2026-11-02):
+- **Export and import**: the account export carries your own office and the files of knowledge pages and tables, plain ZIP on servers without a server key; importing twice creates nothing twice; sprints, rules, placements, customer reports, filed e-mails, bookmarks and most settings move along.
+- **Notifications**: approvals, reviews, agent questions, calendar changes and bookings reach the person under their own name; one-click off link in notification mails, "Only the title in the push" for the lock screen; new event "Integrations", forwardings can include your own changes.
+- **Agents**: works with Codex CLI as well as Claude Code, Cursor, Windsurf and Gemini CLI connect over MCP; agents read and create scheduling polls, filed e-mails, invoice series and subscriptions through the API (shared items only); the reference starter can work a list off on its own (*Work the list off*); "AI agent" label (EU AI Act Art. 50).
+- **Office**: personal e-mail signature, online payment of invoices with your own Stripe account, Tax forms (Anlage EÜR, annual VAT return), declining depreciation per device, bank accounts as master data.
+- **Documents and notes**: swipe through documents on the phone; quick note with one grip (hold Plus / key `m`) in the private list "Notes".
+- **Chat and phone**: team chat is its own area "Chat" in the app bar; short introductions per area; big accounts load a project's tasks when it is opened.
+- **Hosting**: support access only with the customer's consent, operator console without seeing content.
+- **Public holidays**: Germany by state; Austria, Switzerland, France, Spain, Italy and the Netherlands nationwide.
+- **Upgrading**: a step needed from you is listed in docs/UPGRADING.md; a database keeps a format limit.
+
 **2.487.0** (2026-11-02):
 - **Favourites**: favourites of everything - one row of symbols in the head bar for all workspaces, from a project to a single invoice.
 
@@ -298,8 +309,7 @@ How to update depends on how you installed:
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
 | git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
 
-Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; migrations only add, so the data of
-an older version stays readable.
+Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; going back is limited: see docs/UPGRADING.md (what each version needs, format limits, never below 2.149).
 
 **Installing a specific version** (vX.Y.Z = a tag from the releases page): with the installer
 `curl -fsSL https://kalmido.com/install.sh | KALMIDO_VERSION=vX.Y.Z sh` (the same variable pins updates:
