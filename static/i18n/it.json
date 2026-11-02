@@ -16015,5 +16015,7 @@
   "Branch: {0}": "Branch: {0}",
   "Left out": "Escluse",
   "encrypted project": "progetto cifrato",
-  "At most {0} tasks": "Al massimo {0} attività"
+  "At most {0} tasks": "Al massimo {0} attività",
+  "New notes stay private: only you see them. To share one, move it into a project.": "Le nuove note restano private: le vedi solo tu. Per condividerne una, spostala in un progetto.",
+  "Only you see this review. Your journal stays in Private.": "Solo tu vedi questo riepilogo. Il tuo diario resta in Privato."
 }

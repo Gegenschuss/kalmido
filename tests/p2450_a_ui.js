@@ -140,8 +140,9 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
 
   // ================= #1516 the notes of all lists
   w = await boot({user: 'alice', hash: 'inbox', ls: {'tasks.sideOpenG': JSON.stringify(['views'])}}); d = w.document; await sleep(300);
-  const nrow = d.querySelector('#side .sg-views .srow[data-go="notes"]');
-  check(nrow && nrow.querySelector('.c')?.textContent === '3', '#1516: "Notes" in Views with 3 ' + nrow?.textContent);
+  // 2.398.0 (#3405, intended change): Notes are an icon of the main bar (an area of their own), no longer a row of Views
+  const nrow = d.querySelector('#srail [data-sbb="notes"]');
+  check(nrow && !d.querySelector('#side .sg-views .srow[data-go="notes"]'), '#1516 / #3405: "Notes" is an icon of the bar, not in Views ' + nrow?.textContent);
   click(w, nrow); await until(() => d.querySelector('#view .sbnall'));
   const cards = () => [...d.querySelectorAll('#view .sbncard')];
   check(cards().length === 3 && cards()[0].getAttribute('href') === `#note/${N2}` && /Website/.test(cards()[0].querySelector('.sbnl').textContent) && /Garden/.test(cards().find(a => a.getAttribute('href') === `#note/${N3}`)?.textContent || ''), '#1516: all notes, pinned first, the list on each card');

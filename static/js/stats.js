@@ -2,13 +2,16 @@
    templates.js, whose charts barChart / lineChart / hbarChart the time tracking and the agent usage share and keep).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
-S.st = {data: null, loading: false, err: null, v: -1, mode: LS.get('statsMode', 'week')};
+S.st = {data: null, loading: false, err: null, v: -1, sp: '', mode: LS.get('statsMode', 'week')};
+// 2.398.0 (#3406): the statistics of the shown workspace (its projects; Private: also focus and time without a project);
+// "All workspaces" = everything. A switch loads again (S.st.sp = the workspace the data is of)
+const st_space = () => typeof wsCur === 'function' ? wsCur() : 'all';
 async function loadStats() {
   if (S.st.loading) return;
   S.st.loading = true;
-  const v = S.v;
-  try { S.st.data = await rawFetch('GET', '/api/stats?ws=' + weekStart()); S.st.err = null; S.st.v = v; }
-  catch (e) { if (e.message !== 'auth') S.st.err = e instanceof Offline ? 'offline' : e.message; S.st.v = v; }
+  const v = S.v, sp = st_space();
+  try { S.st.data = await rawFetch('GET', '/api/stats?ws=' + weekStart() + (sp !== 'all' ? '&space=' + encodeURIComponent(sp) : '')); S.st.err = null; S.st.v = v; S.st.sp = sp; }
+  catch (e) { if (e.message !== 'auth') S.st.err = e instanceof Offline ? 'offline' : e.message; S.st.v = v; S.st.sp = sp; }
   finally { S.st.loading = false; }
   if (S.route.mod === 'stats') renderView();
 }
@@ -31,8 +34,8 @@ function heatmap(weeks, perDay, t0, {unit}) {  // weeks: first days (locale week
 const listLabel = x => x.id === -1 ? tr('No task') : x.id === 0 ? tr('Other projects') : x.is_inbox && inboxDef(x.name) ? tr('Basket') : listName(x.name);
 function viewStats() {
   const st = S.st;
-  if ((st.v !== S.v || !st.data) && !st.loading) setTimeout(loadStats, 0);
-  const j = st.data;
+  if ((st.v !== S.v || st.sp !== st_space() || !st.data) && !st.loading) setTimeout(loadStats, 0);
+  const j = st.sp === st_space() ? st.data : null;  // 2.398.0 (#3406): never another workspace's numbers
   if (!j && S.ly.view === 'stats') return `<div class="stats">${lyHtml('stats', {})}</div>`;  // 2.55.0 (#1067)
   if (!j) return `<div class="empty">${st.err ? (st.err === 'offline' ? tr('Statistics are only available online.') : esc(st.err)) : tr('Loading…')}</div>`;
   const wl = j.weeks.map(shortDay), tipW = (i, s) => `${tr('Week of {0}', fmtDate(j.weeks[i]))}: ${s}`;
@@ -61,7 +64,7 @@ function viewStats() {
   if (timeOn() && j.time) P.time = `<section class="stcard"><div class="sthead"><h3>${tr('Tracked time')}</h3><span class="muted">${tr('12 weeks: {0}', fmtH(j.time.total))}</span><span class="spacer"></span><button class="btn sm" data-go="time">${ic('clock', 's')} ${tr('Reports')}</button></div>
       ${barChart(j.time.per_week, wl, {fmt: v => fmtH(Math.round(v)), tip: i => tipW(i, fmtH(j.time.per_week[i])), label: tr('Tracked minutes per week'), time: true})}
       <h4>${tr('By project')}</h4>${hbarChart(j.time.by_list.map(x => ({name: listLabel(x), v: x.minutes})), {fmt: fmtH, label: tr('Tracked time by project')})}</section>`;
-  const hs = feat('habits') ? S.habits.filter(x => !x.archived) : [];
+  const hs = feat('habits') && !o3a_orgView() ? S.habits.filter(x => !x.archived) : [];  // 2.398.0 (#3406): habits are private (not in an organisation's view)
   if (hs.length) P.habits = `<section class="stcard"><div class="sthead"><h3>${tr('Habits')}</h3></div><div class="sthabits">
       <div class="shh muted"><span></span><span>${tr('rate')}</span><span>${tr('streak')}</span><span>${tr('best')}</span></div>
       ${hs.map(x => { const s = habitStats(x), col = cssColor(x.color) || HCOLORS[0]; return `<div class="shr" data-act="habit-open" data-id="${x.id}" title="${esc(x.per_week ? tr('Share of the last 4 weeks that reached the target') : tr('Share of the scheduled days of the last 30 days'))}"><span class="n"><i class="sw" style="background:${col}"></i>${esc(x.name)}</span>

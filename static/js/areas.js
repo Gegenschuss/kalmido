@@ -346,11 +346,13 @@ async function mg_areaSwitch(md, el) {
   if (id === 'time' && on && !$('#s-trnd', md)) { const cur = LS.get('settingsSec'); md._noflush = true; md.remove(); settingsModal(cur); }  // the time options
 }
 // ---- 2.83.0 (#1845): an organisation's view shows only what belongs to the organisation. Home (home & life, family,
-// budget), habits, review (review & journal, statistics) and notes are private -- hidden in the sidebar, the phone's tab
-// bar and the search while an organisation is the shown workspace (Time stays); an old link opens them in Private
+// budget) and habits are private -- hidden in the sidebar, the phone's tab bar and the search while an organisation is the
+// shown workspace (Time stays); an old link opens them in Private. 2.398.0 (#3405 #3406): notes, review and statistics are in
+// every workspace, each showing only that workspace's data (notes: its projects + my private list Notes; review, statistics:
+// its projects, the journal only outside an organisation)
 // 2.173.0 A (#2680): Home is in an organisation's view too while travel or staying in touch is on -- as "Travel & contacts"
 // with only these two (contracts, devices, health, budget and family stay private); its view shows the organisation's own
-const O3A_PRIV = ['family', 'budget', 'habits', 'review', 'stats', 'notes'];  // 2.85.0 B (#1162): + feeds; 2.172.0 B (#2677): feeds out (Reading is in every workspace)
+const O3A_PRIV = ['family', 'budget', 'habits'];  // 2.85.0 B (#1162): + feeds; 2.172.0 B (#2677): feeds out (Reading is in every workspace)
 const O3A_LIFE_ORG = ['travel', 'care'];
 const o3a_lifeOrg = () => O3A_LIFE_ORG.some(m => feat(m));
 const o3a_privOnly = mod => O3A_PRIV.includes(mod) || (mod === 'life' && !o3a_lifeOrg());
@@ -404,7 +406,9 @@ function o3a_toPrivate(mod) {
 // [id, icon, name, on(), routes]; an area of MG_AREAS takes its icon, name and parts from there. Tasks is every other route.
 // 2.208.0 (#2771): the area 'tasks' is called Projects (its entries stay tasks), icon proj instead of the tick
 // 2.364.0 B (#3031): Start (the overview, route home) is the first icon, on the computer's bar and in the phone's drawer
-const SBB_RAIL = [['home', 'start', N_('Start|home'), () => true, ['home']], ['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']], ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
+const SBB_RAIL = [['home', 'start', N_('Start|home'), () => true, ['home']], ['tasks', 'proj', N_('Projects')], ['cal', 'cal', N_('Calendar'), () => feat('cal'), ['cal']],
+  ['notes', 'note', N_('Notes'), () => !S.me?.kid, ['notes']],  // 2.398.0 (#3405): Notes are an area of their own (were a view of Projects), in every workspace
+  ['office'], ['time'], ['review'], ['life'], ['reading'], ['ablage'],
   ['wiki', 'book', N_('Knowledge|area'), () => feat('wiki'), ['wiki']], ['sheets', 'sheet', N_('Tables'), () => feat('sheets'), ['sheets']],
   ['habits', 'habit', N_('Habits'), () => feat('habits'), ['habits']],
   ['team', 'comment', N_('Chat'), () => teamOn(), ['team']],  // 2.479.0 (#2814): the team chat is an area of its own (was in Projects, its list a second column)
@@ -414,7 +418,7 @@ const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.clas
 // 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
 // Calendars window the head's button; Habits one entry; Time / Review two): on a computer no panel, the page takes the
 // width and an area's parts are the tabs on top (mg_tabsHtml). The phone's drawer keeps them (sbm_*)
-const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home'];  // 2.364.0 B (#3031): Start has no panel either
+const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home', 'notes'];  // 2.398.0 (#3405): Notes have their own list and filter on the page  // 2.364.0 B (#3031): Start has no panel either
 const sbb_noPan = (id = sbb_area()) => sbb_on() && SBB_NOPANEL.includes(id);
 // 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
 // mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)
@@ -423,7 +427,7 @@ const sbb_panelOn = () => sbb_on() || sbm_on();
 const sbb_areaOfMod = mod => (SBB_RAIL.map(r => sbb_def(r[0])).find(d => d[0] !== 'tasks' && (d[4] || []).includes(mod)) || ['tasks'])[0];
 const sbb_area = () => sbb_areaOfMod(S.route.mod);
 // the area of a kept hash (the router's first word; old links like client/3 or ev/5 belong to their module)
-const SBB_HMOD = {client: 'clients', mailhub: 'clients', ev: 'cal', job: 'agents'};
+const SBB_HMOD = {client: 'clients', mailhub: 'clients', ev: 'cal', job: 'agents', note: 'notes'};  // 2.398.0 (#3405): + a single note
 const sbb_hashMod = h => { const a = String(h || '').split('/')[0]; return SBB_HMOD[a] || a; };
 const sbb_shown = id => { const d = sbb_def(id); return !!d && (id === 'tasks' || d[3]()) && !o3a_hid(id); };
 // a page left: the area keeps it (a task / reply / push link keeps the view below it)
@@ -897,7 +901,7 @@ function sbb_panelHtml0(id) {
 // on in at least one workspace. Nothing is deleted. feat() (core.js) asks wsa_featOff; WSA.raw > 0 = the main switches only
 // (Settings > Modules shows and changes those)
 const WSA_AREAS = ['office', 'time', 'review', 'life', 'reading', 'ablage', 'wiki', 'sheets'];
-const WSA_ORG = WSA_AREAS.filter(a => a !== 'review');  // review is private only (O3A_PRIV)
+const WSA_ORG = WSA_AREAS;  // 2.398.0 (#3406): review is in an organisation's view too (was private only)
 const WSA = {raw: 0, cur: null, own: null, ws: null, off: new Set(), ownS: null, ownO: {}};
 function wsa_raw(fn) { WSA.raw++; try { return fn(); } finally { WSA.raw--; } }
 const wsa_feats = id => mg_area(id) ? mg_feats(id) : [id];  // wiki, sheets: the module itself
@@ -910,15 +914,15 @@ function wsa_own() {
 }
 const wsa_adm = ws => ws?.startsWith('org:') ? wsOrg(ws.slice(4))?.areas_off || [] : [];
 const wsa_spaces = () => wsOn() ? wsOptions().filter(w => w !== 'all') : ['private'];
-// on in workspace ws (below the main switch); review only in Private
-const wsa_wsOn = (ws, id) => !(id === 'review' && ws !== 'private') && !wsa_adm(ws).includes(id) && !(wsa_own()[ws] || []).includes(id);
+// on in workspace ws (below the main switch); 2.398.0 (#3406): review in every workspace (was Private only)
+const wsa_wsOn = (ws, id) => !wsa_adm(ws).includes(id) && !(wsa_own()[ws] || []).includes(id);
 const wsa_areaOn = (id, ws = wsCur()) => ws === 'all' ? wsa_spaces().some(w => wsa_wsOn(w, id)) : wsa_wsOn(ws, id);
 function wsa_featOff(f) {
   if (WSA.raw || !S.settings) return false;
   const cur = wsCur();
   if (cur !== WSA.cur || S.settings.ws_areas_off !== WSA.own || S.me?.workspaces !== WSA.ws) {
     WSA.cur = cur; WSA.own = S.settings.ws_areas_off; WSA.ws = S.me?.workspaces;
-    WSA.off = new Set(WSA_AREAS.filter(id => !(id === 'review' && cur !== 'private' && cur !== 'all') && !wsa_areaOn(id, cur)).flatMap(wsa_feats));
+    WSA.off = new Set(WSA_AREAS.filter(id => !wsa_areaOn(id, cur)).flatMap(wsa_feats));  // 2.398.0 (#3406): review like the others
   }
   return WSA.off.has(f);
 }
@@ -929,11 +933,11 @@ function wsa_modHtml() {
   const sps = wsa_spaces(); if (sps.length < 2 || S.me?.kid) return '';
   const ids = WSA_AREAS.filter(wsa_mainOn); if (!ids.length) return '';
   const grp = ws => {
-    const rows = ids.filter(id => ws === 'private' || id !== 'review').map(id => {
+    const rows = ids.map(id => {  // 2.398.0 (#3406): review in every workspace
       const adm = wsa_adm(ws).includes(id), on = wsa_wsOn(ws, id);
       return `<div class="modrow ${on ? '' : 'off'}" data-wsarow="${id}"><label class="mmain"><span class="swc"><input type="checkbox" data-wsa="${id}" data-wsaws="${ws}" ${on ? 'checked' : ''} ${adm ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span><span><b>${esc(tr(wsa_name(id, ws)))}</b>${adm ? `<small class="muted">${esc(tr('Switched off by the admins of {0}', wsName(ws)))}</small>` : ''}</span></label></div>`;
     });
-    const n = ids.filter(id => (ws === 'private' || id !== 'review') && wsa_wsOn(ws, id)).length, t = ids.filter(id => ws === 'private' || id !== 'review').length;
+    const n = ids.filter(id => wsa_wsOn(ws, id)).length, t = ids.length;
     return `<details class="modgrp wsagrp" data-wsagrp="${ws}"><summary><span class="mgn">${wsIcon(ws)} ${esc(wsName(ws))}</span><span class="mgc muted">${esc(tr('{0} of {1} on', n, t))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${rows.join('')}</div></details>`;
   };
   return `<h4 id="s-wsa-h">${tr('Areas per workspace')}</h4><div class="shint">${tr('Switched off here, an area disappears only in that workspace; the switches above apply everywhere. Nothing is deleted.')}</div>${sps.map(grp).join('')}`;

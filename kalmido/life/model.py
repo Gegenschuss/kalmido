@@ -23,6 +23,7 @@ from ..core.errors import BadInput
 from ..family.family import PACKING
 from ..accounts.orgs import user_orgs
 from ..accounts.orgroles import need_org_area, need_org_write
+from ..accounts.wsareas import wsa_space_lists  # 2.398.0 (#3406)
 from ..family.family import packing_templates  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.model import contacts_on, need_contact, contact_visible  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.dayplan import dayplan_mine_sql  # 2.369.5 (#2517): pulled up from functions
@@ -849,10 +850,14 @@ def journal_export(c, uid, b, fmt):
     return "\n".join(out)
 
 
-def review(c, uid, period, day, journal=True):
+def review(c, uid, period, day, journal=True, space=""):
     """{period, from, to, done, open, moved, next, journal}: what uid completed in the day / week (Monday to Sunday) of
-    `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days."""
+    `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days.
+    2.398.0 (#3406): space "private" / "org:<id>" = only the tasks of that workspace's lists (wsa_space_lists)."""
     tv, tvt = tvis(c, uid), tvis(c, uid, "t.")  # 2.360.0 D (#2496): a participant's hidden tasks stay out (as in every view)
+    sq = wsa_space_lists(c, uid, space)
+    if sq:  # the narrowing joins the visibility condition
+        tv, tvt = f"{tv} AND list_id IN {sq}", f"{tvt} AND t.list_id IN {sq}"
     lo_d = day - timedelta(days=day.weekday()) if period == "week" else day
     hi_d = lo_d + timedelta(days=6 if period == "week" else 0)
     a = datetime(lo_d.year, lo_d.month, lo_d.day, tzinfo=TZ).astimezone(timezone.utc)

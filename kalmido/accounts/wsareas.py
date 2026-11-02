@@ -19,12 +19,15 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from .orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 
-# the areas that can be switched per workspace (the ids of MG_AREAS / SBB_RAIL in areas.js); review is private only
+# the areas that can be switched per workspace (the ids of MG_AREAS / SBB_RAIL in areas.js); 2.398.0 (#3406): review is in
+# every workspace now (was private only), so an organisation's admin may switch it off too
 WSA_AREAS = ("office", "time", "review", "life", "reading", "ablage", "wiki", "sheets")
-WSA_ORG_AREAS = tuple(a for a in WSA_AREAS if a != "review")  # what an organisation's admin may switch off
+WSA_ORG_AREAS = WSA_AREAS  # what an organisation's admin may switch off
 WSA_KEY_RE = re.compile(r"private|org:[1-9][0-9]{0,11}")
 # the API paths of an area (prefix match on the path); only these are refused for an organisation that has the area off
-WSA_PATHS = (("/api/office/", "office"), ("/api/time", "time"), ("/api/pomo", "time"), ("/api/life", "life"),
+# 2.398.0 (#3406): the review, the journal and the statistics belong to the area review (before /api/life = Home)
+WSA_PATHS = (("/api/office/", "office"), ("/api/time", "time"), ("/api/pomo", "time"), ("/api/life/review", "review"),
+             ("/api/life/journal", "review"), ("/api/stats", "review"), ("/api/life", "life"),
              ("/api/reading", "reading"), ("/api/feeds", "reading"), ("/api/bookmarks", "reading"),
              ("/api/files", "ablage"), ("/api/docs", "ablage"), ("/api/wiki", "wiki"), ("/api/sheets", "sheets"))
 # the file store: only its own views are refused (the office, contact folders, letters and page / table attachments use the
@@ -77,6 +80,24 @@ def wsa_org_off(c, oid):
         r = c.execute("SELECT areas_off FROM orgs WHERE id=?", (oid,)).fetchone()
         cache[oid] = [x for x in ((r[0] if r else "") or "").split(",") if x in WSA_AREAS]
     return cache[oid]
+
+
+def wsa_space_lists(c, uid, v):
+    """2.398.0 (#3406): ?space= of the review and the statistics -> an SQL subquery (no ? params: the id is a checked int)
+    of the list ids of that workspace: "private" = lists without an organisation (the basket too), "org:<id>" = the lists of
+    an organisation I am a member of; "" / "all" = "" (no narrowing). An unknown value is a 400, an organisation I am not in
+    a 404. The narrowing only ever removes rows (who may see a list is checked as before)."""
+    if v in (None, "", "all"):
+        return ""
+    if not isinstance(v, str) or not WSA_KEY_RE.fullmatch(v):
+        raise BadInput(tr("Invalid value: {0}", "space"))
+    if v == "private":
+        return "(SELECT id FROM lists WHERE org_id IS NULL)"
+    from .orgs import user_orgs
+    oid = int(v[4:])
+    if oid not in user_orgs(c, uid):
+        raise Denied(404)
+    return f"(SELECT id FROM lists WHERE org_id={oid})"  # noqa: S608 (a checked int)
 
 
 def wsa_org_check(c, oid, area):

@@ -379,19 +379,24 @@ document.addEventListener('change', e => {
 });
 
 // ---- the review: the day or week, the journal
+// 2.398.0 (#3406): the review of the shown workspace (its projects' tasks); the journal is private and stays out of an
+// organisation's view (there no History either); "All workspaces" = everything. RV.data.space = the workspace it is of
+const rv_space = () => typeof wsCur === 'function' ? wsCur() : 'all';
+const rv_org = () => rv_space().startsWith('org:');
 async function rvLoad() {
-  const seq = ++RV.seq;
+  const seq = ++RV.seq, sp = rv_space();
   RV.loading = true;
-  try { const j = await api('GET', `/api/life/review?period=${RV.period}&date=${RV.date || today()}`); if (seq === RV.seq) RV.data = j; } catch { if (seq === RV.seq) RV.data = RV.data || null; }
+  try { const j = await api('GET', `/api/life/review?period=${RV.period}&date=${RV.date || today()}${sp !== 'all' ? '&space=' + encodeURIComponent(sp) : ''}`); if (seq === RV.seq) RV.data = {...j, space: sp}; } catch { if (seq === RV.seq) RV.data = RV.data || null; }
   RV.loading = false;
   if (S.route.mod === 'review' && seq === RV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('review', viewReview()))); }
 }
 function viewReview() {
   RV.date = RV.date || today();
+  if (RV.period === 'hist' && rv_org()) RV.period = 'day';  // 2.398.0 (#3406): the journal's history only outside an organisation
   if (RV.period === 'hist') return viewJournalHist();  // 2.140.0 C (#2133)
-  const r = RV.data;
+  const r0 = RV.data, r = r0 && r0.space === rv_space() ? r0 : null;  // 2.398.0 (#3406): never another workspace's review
   if ((!r || r.period !== RV.period || !(r.from <= RV.date && RV.date <= r.to)) && !RV.loading) setTimeout(rvLoad, 0);
-  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')], ['hist', tr('History')]].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
+  const seg = `<div class="seg" role="radiogroup" aria-label="${esc(tr('Period'))}">${[['day', tr('Day')], ['week', tr('Week')], ...(rv_org() ? [] : [['hist', tr('History')]])].map(([k, w]) => `<button type="button" role="radio" data-act="rv-period" data-p="${k}" class="${RV.period === k ? 'on' : ''}" aria-checked="${RV.period === k}">${esc(w)}</button>`).join('')}</div>`;
   const label = !r ? '' : r.from === r.to ? fmtDayAbs(r.from) : fmtDayAbs(r.from) + ' – ' + fmtDayAbs(r.to);
   const nav = `<span class="fwnav"><button type="button" class="iconbtn" data-act="rv-move" data-d="-1" aria-label="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}" title="${esc(RV.period === 'week' ? tr('Previous week') : tr('Previous day'))}">${ic('left', 's')}</button><b class="rvlab" aria-live="polite">${esc(label)}</b><button type="button" class="iconbtn" data-act="rv-move" data-d="1" aria-label="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}" title="${esc(RV.period === 'week' ? tr('Next week') : tr('Next day'))}">${ic('right', 's')}</button>${RV.date !== today() ? `<button type="button" class="btn sm" data-act="rv-today">${tr('Today')}</button>` : ''}</span>`;
   const head = `<div class="dashhead rvhead">${seg}${nav}<span class="spacer"></span>${lyCustomBtn('review')}</div>`;  // 2.43.0 (#1452)
@@ -406,14 +411,14 @@ function viewReview() {
   const journal = r.journal ? `<section class="dcard fcard lcard rvjournal" aria-labelledby="rvh-j"><h2 id="rvh-j">${ic('journal', 's')}<span>${tr('Journal')}</span><span class="spacer"></span><span class="muted rvsaved" aria-live="polite"></span></h2>${jdays}
     <div class="rvmood" role="radiogroup" aria-label="${esc(tr('How was the day?'))}">${MOODS.map(([v, e, w]) => `<button type="button" role="radio" data-act="rv-mood" data-v="${v}" class="${je.mood === v ? 'on' : ''}" aria-checked="${je.mood === v}" title="${esc(tr(w))}" aria-label="${esc(tr(w))}">${e}</button>`).join('')}</div>
     <textarea id="rv-text" data-day="${jsel}" rows="6" maxlength="20000" placeholder="${esc(tr('What happened, what went well, what is on your mind?'))}" aria-label="${esc(tr('Journal of {0}', fmtDayAbs(jsel)))}">${esc(je.text)}</textarea>
-    <p class="muted rvpriv">${rvPrivHtml(r.journal_sealed)}</p></section>` : '';
+    <p class="muted rvpriv">${rvPrivHtml(r.journal_sealed)}</p></section>` : rv_org() ? `<p class="muted rvpriv rvorg">${ic('lock', 's')} ${esc(tr('Only you see this review. Your journal stays in Private.'))}</p>` : '';  // 2.398.0 (#3406)
   // 2.43.0 (#1452): the cards are blocks of the view builder (width, height, order, hide at their "…" menu)
   return `<div class="dash fam review">${head}${lyHtml('review', {
     done: card('done', 'done', tr('Done'), li(r.done, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing ticked off yet.')}</p>`, r.done.length),
     open: card('open', 'alert', tr('Still open'), li(r.open, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing left over.')}</p>`, r.open.length),
     moved: r.moved.length ? card('moved', 'skip', tr('Moved'), li(r.moved, x => `<li>${tl(x)}</li>`), r.moved.length) : '',
     next: card('next', 'cal', tr('Coming up'), li(r.next, x => `<li>${tl(x)}</li>`) || `<p class="muted">${tr('Nothing due in the next seven days.')}</p>`, r.next.length),
-    ...(r.journal ? {journal} : {})})}</div>`;
+    ...(r.journal || rv_org() ? {journal} : {})})}</div>`;
 }
 // ---- 2.140.0 C (#2133): the journal history: all entries (newest first), search, mood filter, export, mood statistics
 const JH = {q: '', mood: 0, days: 30, from: '', to: '', items: [], next: null, loaded: false, loading: false, stats: null, seq: 0, t: null, sealed: null};

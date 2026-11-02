@@ -402,7 +402,7 @@ function dashCard(k) {
     return ts.length ? card(tasksList(ts, lyo_get('home', 'pinned', 'n', 6)), `<a class="linkbtn" href="#pinned">${tr('Open')}</a>`, ts.length) : slim();
   }
   if (k === 'notes') {
-    const ns = (S.notes || []).slice(0, 5);
+    const ns = nt_wsNotes().slice(0, 5);  // 2.398.0 (#3405): the shown workspace's notes
     return ns.length ? card(`<ul class="dwl">${ns.map(n => `<li><a href="#note/${n.id}">${ic('edit', 's')}<span class="dwt"><b>${esc(n.title)}</b> <span class="muted">${esc(lname(listById(n.list_id)) || '')} · ${esc(relTime(n.updated_at))}</span></span></a></li>`).join('')}</ul>`) : '';
   }
   if (k === 'agents') {

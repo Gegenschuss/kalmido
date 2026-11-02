@@ -7,7 +7,12 @@
 // "New note" opens a quick note (2.477.0, #3881: in the filtered list, else in the private list "Notes"). #notes/<id> stays the
 // notes of one list.
 S.sbn = {q: '', lid: 0, hits: null, ex: {}, exLoaded: false, qT: null};
-const sb_noteCount = () => (S.notes || []).length;
+// 2.398.0 (#3405): Notes are in every workspace and show that workspace's notes: the notes of its projects plus my private list
+// "Notes" (only I see it; sharing = moving a note into a project, with the warning that names who sees it then). The server
+// keeps who may read a note (the list's people); this only decides what the view shows
+const nt_inWs = n => { const l = n && listById(n.list_id); return !!l && (inWs(l) || qn_isList(l.id)); };  // a list not loaded: not shown (inWs(undefined) is true)
+const nt_wsNotes = () => (S.notes || []).filter(nt_inWs);
+const sb_noteCount = () => nt_wsNotes().length;
 const sb_noteWritable = () => S.lists.filter(l => !l.archived && notesOn(l) && canEditList(l.id));
 const sb_notesShown = () => S.lists.some(l => !l.archived && notesOn(l)) || sb_noteCount() > 0;
 function sb_noteExcerpts() {  // the first lines of the newest notes (S.notes has no text)
@@ -17,8 +22,8 @@ function sb_noteExcerpts() {  // the first lines of the newest notes (S.notes ha
 }
 function sb_notesItems() {
   const f = S.sbn.lid;
-  if (S.sbn.q.trim()) return S.sbn.hits;  // null = the server is still asked
-  return (S.notes || []).filter(n => !f || n.list_id === f).sort((a, b) => (b.pinned - a.pinned) || String(b.updated_at).localeCompare(String(a.updated_at)));
+  if (S.sbn.q.trim()) return S.sbn.hits && S.sbn.hits.filter(nt_inWs);  // null = the server is still asked; 2.398.0 (#3405): this workspace's
+  return nt_wsNotes().filter(n => !f || n.list_id === f).sort((a, b) => (b.pinned - a.pinned) || String(b.updated_at).localeCompare(String(a.updated_at)));
 }
 function sb_noteCardsHtml() {
   const vis = sb_notesItems(), q = S.sbn.q.trim();
@@ -34,13 +39,14 @@ function sb_noteCardsHtml() {
 }
 function sb_notesView() {
   sb_noteExcerpts();
-  const ids = new Set((S.notes || []).map(n => n.list_id)), ls = S.lists.filter(l => ids.has(l.id) || l.id === S.sbn.lid);
+  const ids = new Set(nt_wsNotes().map(n => n.list_id)), ls = S.lists.filter(l => ids.has(l.id) || l.id === S.sbn.lid);  // 2.398.0 (#3405)
   const opt = l => `<option value="${l.id}" ${l.id === S.sbn.lid ? 'selected' : ''}>${esc(lname(l))}</option>`;
   const prj = ls.filter(l => !l.is_inbox), oth = ls.filter(l => l.is_inbox);  // 2.352.0 B (#2752)
   const sel = ls.length > 1 || S.sbn.lid ? `<select id="sbn-l" class="sbnsel" aria-label="${esc(tr('Project'))}"><option value="0">${tr('All projects')}</option>${prj.length && oth.length ? `<optgroup label="${esc(tr('Projects'))}">${prj.map(opt).join('')}</optgroup><optgroup label="${esc(tr('Other projects'))}">${oth.map(opt).join('')}</optgroup>` : ls.map(opt).join('')}</select>` : '';
   return `<div class="ntwrap"><div class="ntview sbnall"><div class="ntlist">
     <div class="ntbar sbnbar"><div class="ssearch">${ic('search', 's')}<input id="sbn-q" type="search" value="${esc(S.sbn.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>${sel}
       ${S.me?.kid ? '' : `<button type="button" class="btn sm pri" data-sb="note-new">${ic('plus', 's')}${tr('New note')}</button>` /* 2.477.0 (#3881): always (the list Notes comes with it) */}</div>
+    ${o3a_orgView() && !S.me?.kid && (!S.sbn.lid || qn_isList(S.sbn.lid)) ? `<p class="muted shint sbnpriv">${ic('lock', 's')} ${esc(tr('New notes stay private: only you see them. To share one, move it into a project.'))}</p>` : '' /* 2.398.0 (#3405) */}
     <div id="sbn-res">${sb_noteCardsHtml()}</div></div></div></div>`;
 }
 function sb_notesPatch() { const r = $('#sbn-res'); if (r) fl_set(r, sb_noteCardsHtml()); }  // 2.46.2 (#1718)
@@ -62,7 +68,8 @@ document.addEventListener('input', e => {
 document.addEventListener('change', e => {
   if (e.target.id !== 'sbn-l') return;
   S.sbn.lid = +e.target.value || 0; S.sbn.hits = null;
-  if (S.sbn.q.trim()) sb_notesSearch(); sb_notesPatch();
+  if (S.sbn.q.trim()) sb_notesSearch();
+  if (o3a_orgView()) renderView(); else sb_notesPatch();  // 2.398.0 (#3405): the privacy line follows the filter
 });
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="note-new"]'); if (!b) return;

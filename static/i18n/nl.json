@@ -16015,5 +16015,7 @@
   "Branch: {0}": "Branch: {0}",
   "Left out": "Weggelaten",
   "encrypted project": "versleuteld project",
-  "At most {0} tasks": "Hoogstens {0} taken"
+  "At most {0} tasks": "Hoogstens {0} taken",
+  "New notes stay private: only you see them. To share one, move it into a project.": "Nieuwe notities blijven privé: alleen jij ziet ze. Om er een te delen, verplaats je hem naar een project.",
+  "Only you see this review. Your journal stays in Private.": "Alleen jij ziet deze terugblik. Je dagboek blijft in Privé."
 }

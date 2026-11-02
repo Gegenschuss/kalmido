@@ -93,13 +93,16 @@ def _review_args():
 
 @app.get("/api/life/review")
 def life_review():
-    """?period=day|week&date=YYYY-MM-DD: done, still open, moved, the next 7 days and the journal entries of the range."""
+    """?period=day|week&date=YYYY-MM-DD: done, still open, moved, the next 7 days and the journal entries of the range.
+    2.398.0 (#3406): &space=private|org:<id> = only the tasks of that workspace's projects; the journal is private and never
+    part of an organisation's review."""
     c, uid = db(), me()
     need_life(c, uid, "review")
     p, d, e = _review_args()
     if e:
         return e
-    return jsonify(review(c, uid, p, d, journal=not health_hidden(c, uid)))
+    sp = request.args.get("space") or ""
+    return jsonify(review(c, uid, p, d, journal=not health_hidden(c, uid) and not sp.startswith("org:"), space=sp))
 
 
 @app.get("/api/life/journal")

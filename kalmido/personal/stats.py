@@ -7,6 +7,7 @@ from ..core.db import db, iso, local_day as _local_day, local_now, now_utc
 from ..accounts.session import me
 from ..core.access import time_all
 from ..core.state import visible_lists
+from ..accounts.wsareas import wsa_space_lists
 from ..personal.habits import pomo_elapsed
 from ..personal.timetrack import entry_secs
 
@@ -19,7 +20,18 @@ from ..personal.timetrack import entry_secs
 # Overdue trend: at the end of each week (today for the current one), the tasks I am responsible for
 # (assigned to me, or unassigned in my own lists) whose due date had passed and that were still open,
 # based on today's due dates. On time: completed on or before the due day.
+# 2.398.0 (#3406): ?space=private|org:<id> = only that workspace's projects (wsa_space_lists): tasks and tracked time of its
+# lists, focus on its tasks; focus without a task and time without a project count for Private only (they have no
+# organisation). Without it (All workspaces) everything as before. Always only the person's own numbers.
 STATS_WEEKS = 12
+
+
+def _space_ids(c, sq, lids):
+    """2.398.0 (#3406): which of the list ids lids lie in the asked workspace (sq = wsa_space_lists)."""
+    lids = sorted({int(x) for x in lids if x is not None})
+    if not lids:
+        return set()
+    return {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({','.join(map(str, lids))}) AND id IN {sq}")}  # noqa: S608 (ints, wsa_space_lists)
 
 
 @app.get("/api/stats")
@@ -34,12 +46,16 @@ def stats_api():
     weeks = [mon0 + timedelta(weeks=i) for i in range(STATS_WEEKS)]
     lo = iso(datetime(mon0.year, mon0.month, mon0.day, tzinfo=TZ))
     vis = {l["id"]: l for l in visible_lists(c, uid)}
+    sp = request.args.get("space") or ""
+    sq = wsa_space_lists(c, uid, sp)
+    org = sp.startswith("org:")
+    lw, tw = (f" AND list_id IN {sq}", f" AND t.list_id IN {sq}") if sq else ("", "")
     wk = lambda d: (d - mon0).days // 7  # noqa: E731
 
     days_all, per_day, per_week, by_list = set(), {}, [0] * STATS_WEEKS, {}
     with_due = ontime = 0
-    for r in c.execute("""SELECT list_id, due, completed_at FROM tasks WHERE completed_by=? AND status=2
-                          AND completed_at IS NOT NULL""", (uid,)):
+    for r in c.execute(f"""SELECT list_id, due, completed_at FROM tasks WHERE completed_by=? AND status=2
+                          AND completed_at IS NOT NULL{lw}""", (uid,)):
         d = _local_day(r["completed_at"])
         days_all.add(d)
         if d < mon0 or d > today:
@@ -63,9 +79,9 @@ def stats_api():
 
     samples = [w + timedelta(days=6) for w in weeks[:-1]] + [today]
     over = [0] * len(samples)
-    for r in c.execute("""SELECT t.due, t.status, t.created_at, t.completed_at, t.deleted_at FROM tasks t JOIN lists l ON l.id=t.list_id
+    for r in c.execute(f"""SELECT t.due, t.status, t.created_at, t.completed_at, t.deleted_at FROM tasks t JOIN lists l ON l.id=t.list_id
                           WHERE t.due IS NOT NULL AND t.due<? AND l.archived=0 AND (t.assignee_id=? OR (t.assignee_id IS NULL AND l.owner_id=?))
-                            AND (t.status=0 OR t.completed_at>=?)""", (today.isoformat(), uid, uid, lo)):
+                            AND (t.status=0 OR t.completed_at>=?){tw}""", (today.isoformat(), uid, uid, lo)):
         created, done, deleted = _local_day(r["created_at"]), _local_day(r["completed_at"]), _local_day(r["deleted_at"])
         if r["status"] != 0 and not done:
             continue
@@ -75,8 +91,15 @@ def stats_api():
                 over[i] += 1
 
     f_day, f_week, f_list = {}, [0.0] * STATS_WEEKS, {}
-    for p in c.execute("""SELECT p.*, t.list_id FROM pomos p LEFT JOIN tasks t ON t.id=p.task_id
-                          WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p."end" IS NOT NULL AND p.start>=?""", (uid, lo)):
+    pomos = c.execute("""SELECT p.*, t.list_id FROM pomos p LEFT JOIN tasks t ON t.id=p.task_id
+                          WHERE p.user_id=? AND p.kind IN ('focus','stopwatch') AND p."end" IS NOT NULL AND p.start>=?""", (uid, lo)).fetchall()
+    times = c.execute("SELECT start, \"end\", seconds, list_id FROM time_entries WHERE user_id=? AND start>=?", (uid, lo)).fetchall()  # 2.41.0 (#1471): any list
+    if sq:  # 2.398.0 (#3406): only the workspace's; without a project (no list) only in Private
+        ins = _space_ids(c, sq, [p["list_id"] for p in pomos if p["task_id"]] + [e["list_id"] for e in times])
+        keep = lambda lid: (not org) if lid is None else lid in ins  # noqa: E731
+        pomos = [p for p in pomos if keep(p["list_id"] if p["task_id"] else None)]
+        times = [e for e in times if keep(e["list_id"])]
+    for p in pomos:
         d = _local_day(p["start"])
         if d < mon0 or d > today:
             continue
@@ -88,7 +111,7 @@ def stats_api():
 
     # tracked time (module "time"): my entries by the local day they start (running timer up to now)
     t_week, t_list, ref = [0] * STATS_WEEKS, {}, now_utc()
-    for e in c.execute("SELECT start, \"end\", seconds, list_id FROM time_entries WHERE user_id=? AND start>=?", (uid, lo)):  # 2.41.0 (#1471): any list
+    for e in times:
         d = _local_day(e["start"])
         if d < mon0 or d > today:
             continue
