@@ -314,7 +314,8 @@ def ctm_undo(c, uid, rid):
     if t is not None and t["deleted_at"]:  # 2.370.4 (#3089, review N6): its columns could not go back -> restore it first
         need_contact(c, t["id"], write=True, uid=uid, trash=True)
         raise Denied(409, tr("The contact the others were merged into is in the trash; restore it first, then undo the merge"))
-    if t is not None and c.execute("SELECT deleted_at FROM books WHERE id=?", (t["book_id"],)).fetchone()[0]:
+    bk = c.execute("SELECT deleted_at FROM books WHERE id=?", (t["book_id"],)).fetchone() if t is not None else None  # review N2: no 500
+    if t is not None and (bk is None or bk[0]):
         need_book(c, t["book_id"], write=True, uid=uid, trash=True)
         raise Denied(409, tr("The address book is in the trash; restore it first, then undo the merge"))
     # rights: the target while it exists + every address book the merged contacts come back to; nothing checked = 404

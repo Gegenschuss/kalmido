@@ -169,6 +169,16 @@ check(one("SELECT deleted_at FROM books WHERE id=?", (BK,)), "M6: its address bo
 r = Fr.post(B + f"/api/clients/{C5}/restore")
 check(r.ok and len(Fr.get(B + f"/api/clients/{C5}").json().get("contacts") or []) == 1, f"M6: the client comes back with its contact person {r.text[:200]}")
 check(Fr.post(B + f"/api/books/{BK}/restore").ok and one("SELECT deleted_at FROM books WHERE id=?", (BK,)) is None, "M6: the address book comes back")
+# review M1: a client put into the trash by hand before the undo keeps its contact person (restorable with it)
+C6 = Fr.post(B + "/api/clients", json={"name": "Imported Foxtrot", "contacts": [{"name": "Fiona Example"}]}).json()["id"]
+K6 = one("SELECT id FROM office_client_contacts WHERE client_id=?", (C6,))
+check(Fr.delete(B + f"/api/clients/{C6}").ok and one("SELECT deleted_at FROM clients WHERE id=?", (C6,)), "M6: setup: client into the trash by hand")
+IID6 = run("INSERT INTO imports(user_id, source, file_name, created, report, created_at) VALUES(?,?,?,?,?,?) RETURNING id",
+           (FID, "Kalmido", "p23704b-2.kalmido-export", json.dumps({"oi": [["clients", C6, None], ["office_client_contacts", K6, None]]}), "{}",
+            ago(hours=1)))[0][0]
+r = Fr.post(B + f"/api/imports/{IID6}/undo")
+check(r.ok and one("SELECT COUNT(*) FROM office_client_contacts WHERE id=?", (K6,)) == 1,
+      f"M6: the contact person of a client already in the trash stays after the undo {r.status_code} {r.text[:200]}")
 
 # ================================================================== N11: the numbers of many clients at once
 ids = []

@@ -2264,6 +2264,9 @@ def umz_undo_books(c, uid, bids):
         if not c.execute("SELECT 1 FROM books WHERE id=? AND owner_id=? AND deleted_at IS NULL", (bid, uid)).fetchone():
             continue
         live = [x[0] for x in c.execute("SELECT id FROM contacts WHERE book_id=? AND deleted_at IS NULL", (bid,)).fetchall()]
+        from ..newsletter.sync import NWL_BLOCKED, nls_keep  # review N1: the unsubscriptions outlive the book (as op_book_delete)
+        nls_keep(c, [r[0] for r in c.execute(f"SELECT id FROM contacts WHERE book_id=? AND nl_status IN ({','.join('?' * len(NWL_BLOCKED))})",
+                                             (bid, *NWL_BLOCKED))])
         bk_occ_drop(c, uid, live)
         ctt_unlink(c, live)
         c.execute("UPDATE books SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
