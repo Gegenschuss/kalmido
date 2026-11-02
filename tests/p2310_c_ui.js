@@ -116,12 +116,12 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   const lost = row.all.filter(x => !pan.all.includes(x) && !['New date…', 'Today', 'Tomorrow', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down', 'Pin', 'Start time tracking', 'Assign…'].includes(x));
   check(!lost.length, '#1056 the panel menu lost nothing else ' + lost.join('|'));
   check(pan.items.includes('Skip this occurrence') && pan.items.includes('Assign…') === !d.querySelector('#detail .dmeta [data-act="assign"]'), '#1056 panel: skip stays under Plan, Assign… only without the chip');
-  // "More" in the tab bar: Views / Conversations, "Customise tab bar" last
+  // "More" in the tab bar: Views / Areas, "Customise tab bar" last (2.489.0 #2664: no heading Conversations)
   w.eval(`tabsMore(document.querySelector('#top h1'))`);
   await until(() => d.querySelector('#pop [role="menuitem"]'));
   const mh = [...d.querySelectorAll('#pop .mgh')].map(h => h.textContent), mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(b => b.textContent.trim());
   // 2.364.0 (#3040): the areas as in the drawer, the conversations, Search, the tab bar, Settings fixed at the end
-  check(mh[0] === 'Areas' && mh.includes('Conversations') && mi.includes('Customise tab bar') && mi[mi.length - 1] === 'Settings', '#1056 "More": groups ' + mh.join('|') + ' / ' + mi.join('|'));
+  check(mh[0] === 'Areas' && !mh.includes('Conversations') /* 2.489.0 (#2664): no heading Conversations any more */ && mi.includes('Customise tab bar') && mi[mi.length - 1] === 'Settings', '#1056 "More": groups ' + mh.join('|') + ' / ' + mi.join('|'));
   w.eval('closePop()');
   // #1057: the tab "Search" opens the palette (no page "Search")
   check(w.eval(`tabItem('search').act`) === 'palette', '#1057 the tab "Search" opens the search');
