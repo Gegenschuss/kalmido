@@ -75,7 +75,7 @@ T0 = A.post(B + "/api/tasks", json={"title": "Existing task", "list_id": L}).jso
 
 # ================================================================== migration (start-up) + an old backup
 now = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Beta", "2026-11-01", 0, ids["bob"], now))
+dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Beta", "2099-11-01", 0, ids["bob"], now))  # 2.475 CI: far ahead - the burndown draws its ideal line only while the due day is not past (2026-11-01 was a date bomb)
 dbx("INSERT INTO list_milestones(list_id,name,day,done,created_by,created_at) VALUES(?,?,?,?,?,?)", (L, "Alpha", "2026-10-01", 1, 999, now))
 n0 = len(A.get(B + "/api/admin/backups").json()["items"])
 check(A.post(B + "/api/admin/backups").status_code == 202, "a backup with the old milestone rows")
@@ -97,7 +97,7 @@ st = A.get(B + "/api/state").json()
 lst = next(x for x in st["lists"] if x["id"] == L)
 MS_A = next(t for t in st["tasks"] if t["title"] == "Alpha")["id"]
 MS_B = next(t for t in st["tasks"] if t["title"] == "Beta")["id"]
-check([m["id"] for m in lst["milestones"]] == [MS_A, MS_B] and lst["milestones"][1] == {"id": MS_B, "name": "Beta", "day": "2026-11-01", "done": False},
+check([m["id"] for m in lst["milestones"]] == [MS_A, MS_B] and lst["milestones"][1] == {"id": MS_B, "name": "Beta", "day": "2099-11-01", "done": False},
       f"/api/state: l.milestones keep their shape, ids = task ids {lst['milestones']}")
 t_b = next(t for t in st["tasks"] if t["id"] == MS_B)
 t_0 = next(t for t in st["tasks"] if t["id"] == T0["id"])
@@ -200,10 +200,10 @@ rep = C.get(B + f"/api/tasks/{MS_B}/milestone").json()
 check(rep["progress"] == {"done": 3, "total": 5, "percent": 60}, f"progress: closed / all (a viewer reads it) {rep['progress']}")
 check([x["status"] for x in rep["tasks"]][:2] == ["open", "open"] and {x["id"] for x in rep["tasks"]} == {T0["id"], T1["id"], T2["id"], T3["id"], TD}, "its tasks, open first")
 bd = rep["burndown"]
-check(bd["days"] and bd["days"][-1]["open"] == 2 and bd["days"][-1]["day"] == bd["end"] and bd["due"] == "2026-11-01", f"burndown: open tasks per day up to today {bd['days'][-1:]}")
-check(bd["ideal"] == [{"day": bd["start"], "open": 5}, {"day": "2026-11-01", "open": 0}], f"burndown: the ideal line {bd['ideal']}")
+check(bd["days"] and bd["days"][-1]["open"] == 2 and bd["days"][-1]["day"] == bd["end"] and bd["due"] == "2099-11-01", f"burndown: open tasks per day up to today {bd['days'][-1:]}")
+check(bd["ideal"] == [{"day": bd["start"], "open": 5}, {"day": "2099-11-01", "open": 0}], f"burndown: the ideal line {bd['ideal']}")
 rn = rep["release_notes"]
-check(rn.startswith("## Beta (2026-11-01)") and "### Features" in rn and f"- #{T1['id']} Login page" in rn and "### Fixes" in rn
+check(rn.startswith("## Beta (2099-11-01)") and "### Features" in rn and f"- #{T1['id']} Login page" in rn and "### Fixes" in rn
       and f"- #{T2['id']} Crash on start" in rn and "Polish" not in rn, f"release notes: completed tasks by type, not won't do {rn!r}")
 check(rn.index("### Features") < rn.index("### Fixes"), "Features before Fixes")
 D.patch(B + "/api/settings", json={"lang": "de"})
