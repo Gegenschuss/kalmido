@@ -185,9 +185,11 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   w.close();
   await call('POST', `/api/agents/${AG}/chat`, {body: 'Still there?'});
   w = await boot({user: 'alice', hash: 'l/' + P}); d = w.document;
-  w.eval(`chatOpen(${AG})`); await sleep(500);
-  w.eval(`Object.assign(S.agents.find(a => a.id === ${AG}), {online: false}); chatDraw()`);
-  check(/offline – will answer later/.test(d.querySelector('#chat-msgs .chpend.off')?.textContent || ''), '"offline – will answer later"');
+  // 2.489.0 (job/2331): wait for the opened chat to have loaded (its messages drawn) instead of a fixed 500 ms - under load the
+  // late load redrew the chat from the server's state (online) after the test had set it offline
+  w.eval(`chatOpen(${AG})`);
+  await until(() => [...d.querySelectorAll('#chat-msgs .cmsg')].some(m => /Still there\?/.test(m.textContent)));
+  check(await until(() => { w.eval(`Object.assign(S.agents.find(a => a.id === ${AG}), {online: false}); chatDraw()`); return /offline – will answer later/.test(d.querySelector('#chat-msgs .chpend.off')?.textContent || ''); }), '"offline – will answer later"');
   w.close();
 
   // ================= #420 Settings > Agents > Set up
