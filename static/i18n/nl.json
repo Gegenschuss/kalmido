@@ -15861,5 +15861,6 @@
   "A support sign-in link does not work for an account with two-factor sign-in": "Een aanmeldlink van support werkt niet bij een account met tweestapsaanmelding",
   "Support (support access)": "Support (toegang voor support)",
   "A team agent creates polls in its workspace (space org:<id>)": "Een teamagent maakt peilingen in zijn werkruimte (space org:<id>)",
-  "Switched to {0}": "Gewisseld naar {0}"
+  "Switched to {0}": "Gewisseld naar {0}",
+  "Add signature picture": "Afbeelding van de handtekening toevoegen"
 }

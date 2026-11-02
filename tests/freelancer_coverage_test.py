@@ -471,6 +471,7 @@ ROUTES = {
     "GET /api/office/trips/purposes": "office", "POST /api/office/trips/purposes": "office",  # 2.117.0 A (#2292)
     "PATCH /api/office/trips/purposes/{}": "office", "DELETE /api/office/trips/purposes/{}": "office",
     "GET /api/office/meals": "office", "POST /api/office/meals": "office", "GET /api/office/meals/{}": "office",  # 2.119.0 A (#2288): entertainment receipts
+    "GET /api/office/meals/signature": "office", "PUT /api/office/meals/signature": "office", "DELETE /api/office/meals/signature": "office",  # 2.372.0 (#3316)
     "PATCH /api/office/meals/{}": "office", "DELETE /api/office/meals/{}": "office", "POST /api/office/meals/{}/restore": "office",
     "POST /api/office/meals/{}/approve": "office", "POST /api/office/meals/{}/unlock": "office", "POST /api/office/meals/{}/file": "office",
     "GET /api/office/meals/{}/file/{}": "office", "DELETE /api/office/meals/{}/file/{}": "office",

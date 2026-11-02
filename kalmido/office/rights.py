@@ -134,6 +134,7 @@ OWN_ROUTES = {
     "GET /api/office/meals", "GET /api/office/meals/choices", "GET /api/office/meals/<int:mid>", "POST /api/office/meals",
     "PATCH /api/office/meals/<int:mid>", "DELETE /api/office/meals/<int:mid>", "POST /api/office/meals/<int:mid>/restore",
     "POST /api/office/meals/<int:mid>/approve", "POST /api/office/meals/<int:mid>/file",
+    "GET /api/office/meals/signature", "PUT /api/office/meals/signature", "DELETE /api/office/meals/signature",  # 2.372.0 (#3316): only the own picture
     "GET /api/office/meals/<int:mid>/file/<int:fid>", "DELETE /api/office/meals/<int:mid>/file/<int:fid>",
     "POST /api/office/meals/<int:mid>/file/<int:fid>/restore", "GET /api/office/meals/<int:mid>/pdf",
     # 2.187.1 B (#2735): the person's own reports (filtered like the lists; the files for the tax adviser keep the special "export")

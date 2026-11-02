@@ -79,7 +79,7 @@ FIELDS = {
     "office_trips": ("people", "note"),  # 2.47.3 (#1022): participants and note of a trip
     "office_trip_items": ("amount", "amount_home"),  # 2.47.3 (#1022): the amounts of a travel receipt
     # 2.119.0 A (#2288): entertainment receipts -- place, occasion, people, amounts, the log's names and reasons
-    "office_meals": ("place_name", "place_address", "occasion", "host", "guests", "amounts", "tip", "note", "approved_name"),
+    "office_meals": ("place_name", "place_address", "occasion", "host", "guests", "amounts", "tip", "note", "approved_name", "sign_pic"),  # 2.372.0 (#3316): sign_pic
     "office_meal_choices": ("name", "extra"), "office_meal_log": ("user_name", "reason"),
     "office_fixed_costs": ("amount",),  # 2.47.3 (#1652): fixed costs of the cash flow
     "office_cf_start": ("amount",), "office_cf_adjust": ("amount", "note"), "office_cf_actual": ("amount",),  # 2.123.0 D (#2341)

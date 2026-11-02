@@ -15861,5 +15861,6 @@
   "A support sign-in link does not work for an account with two-factor sign-in": "Un link di accesso del supporto non funziona per un account con accesso a due fattori",
   "Support (support access)": "Supporto (accesso del supporto)",
   "A team agent creates polls in its workspace (space org:<id>)": "Un agente di team crea sondaggi nel suo spazio di lavoro (space org:<id>)",
-  "Switched to {0}": "Passato a {0}"
+  "Switched to {0}": "Passato a {0}",
+  "Add signature picture": "Aggiungi l'immagine della firma"
 }

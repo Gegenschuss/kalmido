@@ -330,15 +330,17 @@ function ltSigPad(el) {
   };
   return {url, clear: () => { cx.clearRect(0, 0, LT_PAD_W, LT_PAD_H); bb = null; }};
 }
-/** opts.draw: open with the drawing field; done(profile) after saving */
+/** opts.draw: open with the drawing field; done(profile) after saving; 2.372.0 (#3316): opts.url = only the own picture through
+ * that route (the entertainment receipts' /api/office/meals/signature: PUT {image}, DELETE), without greeting and name */
 function ltProfileModal(opts = {}) {
-  const P = opts.profile || LT.data?.profile || {};
+  const only = !!opts.url, U = opts.url || '/api/office/letters/profile', UDEL = only ? U : `${U}/image`;
+  const P = opts.profile || (only ? {} : LT.data?.profile) || {};
   let img = P.image || '', pad = null;
   const pic = () => img ? `<img src="${esc(img)}" alt="${esc(tr('Signature picture'))}" class="lt-sigimg">` : `<p class="muted">${tr('No signature picture yet.')}</p>`;
   /** @type {any} */
   const md = modal(`<h3>${tr('Signature')}</h3><p class="muted">${esc(tr('The picture is only printed in your own letters and on the entertainment receipts you approve.'))}</p>
-    ${ofcRowF('lt-pgreet', tr('Greeting'), ofcIn('lt-pgreet', P.greeting, {max: 120, ph: P.default_greeting}))}
-    ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}
+    ${only ? '' : `${ofcRowF('lt-pgreet', tr('Greeting'), ofcIn('lt-pgreet', P.greeting, {max: 120, ph: P.default_greeting}))}
+    ${ofcRowF('lt-pname', tr('Name under the letter'), ofcIn('lt-pname', P.name, {max: 120, ph: P.default_name}))}`}
     <div class="row"><label>${tr('Signature picture')}</label><div class="lt-sigbox">${pic()}</div></div>
     <div class="lt-padbox" hidden></div>
     <div class="row lt-sigbtns"><label class="btn sm">${ic('upload', 's')} ${tr('Choose picture')}<input type="file" id="lt-pfile" accept="image/png,image/jpeg" hidden></label>
@@ -377,15 +379,16 @@ function ltProfileModal(opts = {}) {
     const old = {greeting: P.greeting || '', name: P.name || '', image: P.image || ''};
     if (pad?.url()) { img = pad.url(); changed = true; }
     try {
-      const body = {greeting: $('#lt-pgreet', md).value, name: $('#lt-pname', md).value};
+      const body = only ? {} : {greeting: $('#lt-pgreet', md).value, name: $('#lt-pname', md).value};
       if (changed && img) body.image = img;
-      let j = await api('PUT', '/api/office/letters/profile', body);
-      if (changed && !img && old.image) j = await api('DELETE', '/api/office/letters/profile/image');
-      md.remove(); if (LT.data) LT.data.profile = j;
+      let j = only && !body.image ? P : await api('PUT', U, body);
+      if (changed && !img && old.image) j = await api('DELETE', UDEL);
+      md.remove(); if (!only && LT.data) LT.data.profile = j;
       if (opts.done) opts.done(j); else ofcDraw();
       toast(tr('Saved'), async () => {
-        const o = await api('PUT', '/api/office/letters/profile', {greeting: old.greeting, name: old.name, ...(old.image ? {image: old.image} : {})});
-        if (LT.data) LT.data.profile = old.image ? o : await api('DELETE', '/api/office/letters/profile/image');
+        if (only) { opts.done?.(old.image ? await api('PUT', U, {image: old.image}) : await api('DELETE', UDEL)); return; }
+        const o = await api('PUT', U, {greeting: old.greeting, name: old.name, ...(old.image ? {image: old.image} : {})});
+        if (LT.data) LT.data.profile = old.image ? o : await api('DELETE', UDEL);
         ofcDraw();
       });
     } catch (x) { err(x.message || ''); }

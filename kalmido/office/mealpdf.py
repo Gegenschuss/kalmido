@@ -1,11 +1,14 @@
 """2.119.0 A (#2288): the PDFs of the entertainment receipts (office/meals.py) with the office's own PDF writer (office/pdf.py):
 the receipt of one meal (Eigenbeleg: head, the details block, the amounts block, the host's confirmation, the approval log)
 and the evaluation (one row per approved meal, the sums 70 / 30 and the input VAT per rate). No routes."""
+import base64
+import binascii
 from datetime import date, timezone
 
 from ..core.config import TZ
 from ..core.db import local_now, parse_iso
 from ..core.i18n import lang, tr, trn
+from ..core.orgcrypt import oc_dec_fields  # 2.372.0 (#3316): the signature snapshot
 from .pdf import (C_INK, C_INK2, C_RULE, C_RULE2, MM, PDF_CW, PDF_L, PDF_LOGO_MAX_W, PDF_TOP, _Page, p3f_fit, p3f_foot_h, pdf_body_bottom, pdf_logo_frame,
                   pdf_date, pdf_draw_footer, pdf_footer_cols, pdf_image_object, pdf_money, pdf_wrap, pdf_write)
 from .model import office_settings  # 2.357.0 A (#3156)
@@ -78,6 +81,16 @@ def bw_sig_image(c, oid, m):
     approved receipt with sign_image and only the picture of the person who approved it (approved_by), never another's."""
     if m.get("status") != "approved" or not m.get("sign_image") or not m.get("approved_by"):
         return None
+    # 2.372.0 (#3316): the snapshot taken at approving (meals.bw_meal_approve); a receipt approved before 2.372 has none and
+    # keeps reading the approver's profile picture
+    r = c.execute("SELECT sign_pic FROM office_meals WHERE id=? AND org_id=?", (m["id"], oid)).fetchone() if m.get("id") else None
+    pic = oc_dec_fields(c, oid, "office_meals", r).get("sign_pic") if r else ""
+    if pic:
+        from .pdf import pdf_image_object
+        try:
+            return pdf_image_object(base64.b64decode(pic))
+        except (binascii.Error, ValueError):
+            return None
     return lt_sig_pic(c, oid, m["approved_by"])  # the same picture as letters / documents (2.357.0 C, #3158)
 
 

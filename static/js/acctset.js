@@ -986,7 +986,11 @@ async function ofmSigSettings() {
 async function ltSigSettings() {
   try {
     if (typeof ltProfileModal !== 'function') await loadModule('office');
-    const profile = await api('GET', '/api/office/letters/profile');
-    ltProfileModal({profile, done: () => toast(tr('Saved'))});
+    let profile, url;
+    try { profile = await api('GET', '/api/office/letters/profile'); } catch (x) {
+      if (x.status !== 403) throw x;
+      url = '/api/office/meals/signature'; profile = await api('GET', url);  // 2.372.0 (#3316): without the correspondence: the picture for the entertainment receipts
+    }
+    ltProfileModal({profile, url, done: () => toast(tr('Saved'))});
   } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
 }

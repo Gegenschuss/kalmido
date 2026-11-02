@@ -10,7 +10,7 @@ freelancer-matrix: office
  - approve with sign_image 0: no picture; a draft: no picture
  - only approved_by's picture: Alice has one, Bob (without one) approves Alice's receipt -> no picture, sign_image 0
  - undo the approval: the picture leaves the PDF (sign_image 0), the log keeps both entries
- - the approver removes the picture later: the PDF goes back to the text
+ - the approver removes the picture later: the approved receipt keeps its snapshot (2.372.0, #3316)
  - a transparent, drawn PNG (RGBA) is accepted by the profile route (the drawing field saves through it)
  - a person without organisation (personal office): own picture on the own receipt
 usage: p2332_c_meal_signature_test.py <datadir>"""
@@ -137,7 +137,8 @@ check(lg == ["approve", "unlock"] and "Approval undone" in text(d), f"undone: th
 approve(A, m1)
 check(images(pdf(A, m1)) == 1, "approved again: the picture is back")
 check(A.delete(B + O + "/letters/profile/image").ok, "picture removed")
-check(images(pdf(A, m1)) == 0, "the approver's picture removed: the receipt shows the text only")
+# 2.372.0 (#3316): the picture is a snapshot taken at approving - removing it from the profile leaves the approved receipt as it was
+check(images(pdf(A, m1)) == 1, "the approver's picture removed later: the approved receipt keeps its snapshot")
 
 # a person without organisation
 r = Fr.put(B + O + "/letters/profile", json={"image": PIC})

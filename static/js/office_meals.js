@@ -107,6 +107,18 @@ async function bw_unlock(m, md) {
 }
 // 2.332.0 C (#3301): the approver's signature picture (letters profile) on the receipt PDF
 const BW_SIG_HINT = N_('Your signature picture then stands on the signature line of the PDF. A picture of a signature is not an electronic signature; clarify its acceptance by the tax office with your tax adviser.');
+const BW_SIG_U = `${BW_U}/signature`;
+// 2.372.0 (#3316): no picture yet -> "Add signature picture" opens the own picture (also without the right to the
+// correspondence); the switch is there from the start (hidden), so the dialog does not count as changed afterwards
+const bw_sigHtml = () => `<div class="bwsigbox"><div class="bwsigon"${BW.data?.my_sig ? '' : ' hidden'}>${ofcChk('bw-sig', tr('With my signature'), true)}<p class="muted ofchint">${esc(tr(BW_SIG_HINT))}</p></div>
+  <div class="bwsigoff"${BW.data?.my_sig ? ' hidden' : ''}><button type="button" class="btn sm" data-bwm="sigset">${ic('edit', 's')}<span>${tr('Add signature picture')}</span></button></div></div>`;
+function bw_sigSet(md) {
+  ltProfileModal({draw: true, url: BW_SIG_U, profile: {}, done: j => {
+    if (BW.data) BW.data.my_sig = j?.has_image ? 1 : 0;
+    const on = $('.bwsigon', md), off = $('.bwsigoff', md);
+    if (on && off) { on.hidden = !BW.data?.my_sig; off.hidden = !!BW.data?.my_sig; }
+  }});
+}
 async function bw_approve(id, sig) {
   const j = await api('POST', `${BW_U}/${id}/approve`, {sign_image: sig ? 1 : 0}); bw_reload();
   toast(tr('Approved and locked'), async () => { await api('POST', `${BW_U}/${id}/unlock`, {reason: tr('Undone right after approving')}); bw_reload(); });
@@ -178,7 +190,7 @@ function bw_modal(m0) {
     </fieldset>
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
-    ${(hostOk || (!ro && m?.own_host !== 0)) && BW.data?.my_sig ? `${ofcChk('bw-sig', tr('With my signature'), true)}<p class="muted ofchint">${esc(tr(BW_SIG_HINT))}</p>` : ''}
+    ${hostOk || (!ro && m?.own_host !== 0) ? bw_sigHtml() : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot bwfoot">${m?.own_ro ? '' : ro ? `<button class="btn" data-bwm="unlock">${ic('undo', 's')}<span>${tr('Undo approval…')}</span></button>` : m ? `<button class="btn danger" data-bwm="del">${tr('Delete')}</button>` : ''}
       <span class="spacer"></span>${m ? `<button class="btn" data-bwm="pdf">${ic('pdf', 's')}<span>PDF</span></button>` : ''}
@@ -240,6 +252,7 @@ function bw_modal(m0) {
     const b = /** @type {any} */ (e.target).closest('[data-bwm]'); if (!b) return;
     const a = b.dataset.bwm;
     if (a === 'close') { close(); return; }
+    if (a === 'sigset') { bw_sigSet(md); return; }  // 2.372.0 (#3316)
     if (a === 'addline') { $('.bwlines', md).insertAdjacentHTML('beforeend', bw_lineHtml({kind: 'food', rate: bw_rate('food', val('#bw-date')), def: 1})); /** @type {any} */ ($('.bwln:last-child [data-bwl="gross"]', md))?.focus(); return; }
     if (a === 'rmline') { b.closest('.bwln')?.remove(); sum(); return; }
     if (a === 'addguest') {

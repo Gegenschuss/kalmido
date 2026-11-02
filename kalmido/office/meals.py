@@ -45,7 +45,7 @@ from ..core.errors import BadInput
 from ..files.scan import sc_after_store, sc_guard, sc_scan  # 2.190.0 D (#2561): pulled up, the later scan
 from .calc import dec, dstr, money
 from .ledger import ofx_log
-from .letters import lt_profile  # 2.332.0 C (#3301): the one signature picture of a person
+from .letters import lt_image_in, lt_profile, lt_profile_save  # 2.332.0 C (#3301): the one signature picture of a person
 from .rights import ofr_own_uid, NO_SPECIAL, ofr_allows
 from .travel import _amount, _csv_safe, _ctx, _date, _text, rk_home_cur, rk_people, rka_person_arg, rka_pkey
 
@@ -673,9 +673,13 @@ def bw_meal_approve(mid):
     row = oc_enc_fields(c, oid, "office_meals", {"approved_name": name})
     b = body()
     want = b.get("sign_image", True) if isinstance(b, dict) else True
-    sig = 1 if want not in (False, 0, "0", "false", None) and bw_sig_raw(c, oid, uid) else 0  # 2.332.0 C (#3301): only with a picture
-    c.execute("UPDATE office_meals SET status='approved', approved_at=?, approved_by=?, approved_name=?, sign_image=?, updated_at=? WHERE id=? AND org_id=?",
-              (ts, uid, row["approved_name"], sig, ts, mid, oid))
+    raw = bw_sig_raw(c, oid, uid) if want not in (False, 0, "0", "false", None) else None
+    sig = 1 if raw else 0  # 2.332.0 C (#3301): only with a picture
+    # 2.372.0 (#3316): a snapshot of the picture stays with the receipt (encrypted), so a later new / removed profile picture
+    # never changes an approved receipt; undoing the approval removes it
+    pic = oc_enc_fields(c, oid, "office_meals", {"sign_pic": base64.b64encode(raw).decode() if raw else ""})["sign_pic"]
+    c.execute("UPDATE office_meals SET status='approved', approved_at=?, approved_by=?, approved_name=?, sign_image=?, sign_pic=?, updated_at=? WHERE id=? AND org_id=?",
+              (ts, uid, row["approved_name"], sig, pic, ts, mid, oid))
     bw_log(c, oid, mid, uid, name, "approve", "", ts)
     bw_adopt(c, oid, uid, m)
     ofx_log(c, oid, "approve", target="meals", detail={"id": mid})
@@ -697,13 +701,51 @@ def bw_meal_unlock(mid):
     b = body()
     reason = _text(b.get("reason") if isinstance(b, dict) else None, "reason", 500)
     ts = iso(now_utc())
-    c.execute("UPDATE office_meals SET status='draft', approved_at=NULL, approved_by=NULL, approved_name='', sign_image=0, updated_at=? WHERE id=? AND org_id=?",
+    c.execute("UPDATE office_meals SET status='draft', approved_at=NULL, approved_by=NULL, approved_name='', sign_image=0, sign_pic='', updated_at=? WHERE id=? AND org_id=?",
               (ts, mid, oid))
     bw_log(c, oid, mid, uid, bw_user_name(c, uid), "unlock", reason, ts)
     ofx_log(c, oid, "unlock", target="meals", detail={"id": mid})
     bump(c)
     c.commit()
     return jsonify(_one(c, oid, mid))
+
+
+# 2.372.0 (#3316): the person's OWN signature picture from the entertainment receipts -- for everybody who may work here
+# (also on the level "own", without a right to the correspondence, whose dialog guards /api/office/letters/profile).
+# Always the profile row of the signed-in person in this area (letters.lt_profile), never somebody else's; the greeting and
+# the name of the letters stay with the correspondence.
+def bw_sig_public(c, oid, uid):
+    p = lt_profile(c, oid, uid) or {}
+    img = p.get("image") or ""
+    return {"has_image": bool(img), "image": f"data:{p.get('image_mime') or 'image/png'};base64,{img}" if img else ""}
+
+
+@app.get("/api/office/meals/signature")
+def bw_sig_get():
+    c, uid, oid = _ctx()
+    return jsonify(bw_sig_public(c, oid, uid))
+
+
+@app.put("/api/office/meals/signature")
+def bw_sig_put():
+    """{image: PNG / JPEG as data URI or base64 (at most 300 KB)} -> {has_image, image}."""
+    c, uid, oid = _ctx()
+    b = body()
+    if not isinstance(b, dict) or b.get("image") in (None, ""):
+        raise BadInput(tr("Invalid value: {0}", "image"))
+    img, mime = lt_image_in(b["image"])
+    lt_profile_save(c, oid, uid, {"image": img, "image_mime": mime})
+    c.commit()
+    return jsonify(bw_sig_public(c, oid, uid))
+
+
+@app.delete("/api/office/meals/signature")
+def bw_sig_delete():
+    c, uid, oid = _ctx()
+    if lt_profile(c, oid, uid):
+        lt_profile_save(c, oid, uid, {"image": "", "image_mime": ""})
+        c.commit()
+    return jsonify(bw_sig_public(c, oid, uid))
 
 
 def bw_sig_raw(c, oid, uid):
