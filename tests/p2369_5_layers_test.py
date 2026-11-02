@@ -50,6 +50,8 @@ if fn is not None:
           src)
 inline = []
 for p in pyfiles():
+    if p.endswith(os.path.join("agents", "core.py")):
+        continue  # need_person() itself
     lines = read(p).split("\n")
     for i, ln in enumerate(lines[:-1]):
         m = re.match(r"^(\s*)if is_agent\(g\.user\):\s*(#.*)?$", ln)
