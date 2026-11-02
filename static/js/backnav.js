@@ -54,4 +54,4 @@ document.addEventListener('keydown', e => {
   e.preventDefault(); bnBack();
 });
 document.addEventListener('mouseup', e => { if (e.button !== 3 || isMobile()) return; e.preventDefault(); bnBack(); });
-for (const ev of ['mousedown', 'auxclick']) document.addEventListener(ev, e => { if (e.button === 3 && !isMobile()) e.preventDefault(); });
+for (const ev of ['mousedown', 'auxclick']) document.addEventListener(ev, (/** @type {any} */ e) => { if (e.button === 3 && !isMobile()) e.preventDefault(); });
