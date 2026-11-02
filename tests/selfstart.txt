@@ -964,3 +964,4 @@ p2363_3_c_ui
 p2459_b_phone320_ui
 p2459_a_wikisave_ui
 p2388_source_ui
+p2369_3_teamchat_notify

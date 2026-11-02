@@ -321,6 +321,16 @@ def list_bell(c, uid, lid):
     return (r["mode"], bell_custom_of(r["custom"])) if r else ("default", {})
 
 
+def list_bells(c, uids, lid):
+    """2.369.3 (#3199): list_bell of several accounts for one list in one query: {uid: (mode, custom)}."""
+    out = {u: ("default", {}) for u in uids}
+    if lid and out:
+        for r in c.execute("SELECT user_id, mode, custom FROM list_bell WHERE list_id=? AND user_id = ANY(CAST(? AS BIGINT[]))",
+                           (lid, sorted(out))):
+            out[r["user_id"]] = (r["mode"], bell_custom_of(r["custom"]))
+    return out
+
+
 def bell_custom_of(raw):
     try:
         o = json.loads(raw or "{}")
@@ -347,10 +357,11 @@ def bell_custom_clean(v):
     return json.dumps(out, separators=(",", ":"), sort_keys=True)
 
 
-def notif_ok(c, uid, s, row, ch, lid=None, own=False):
+def notif_ok(c, uid, s, row, ch, lid=None, own=False, bell=None):
     """THE check for News (ch 'news') and pushes (ch 'push') of event row to uid about list lid.
     own (2.266.0, #2962): the due reminder / nag / follow-up is uid's own (uid = the task's reminder recipient, e.g. its
-    assignee) - the owner's template does not limit it (it is meant for the noise of others, not one's own due dates)."""
+    assignee) - the owner's template does not limit it (it is meant for the noise of others, not one's own due dates).
+    bell (2.369.3, #3199): uid's list_bell(lid), when the caller read it already (list_bells)."""
     m = notif_matrix(s)[row]
     if m[ch] is None:  # 2.453.0 (#3781): was news only; a row without pushes (NOTIF_NO_PUSH) too
         return False
@@ -358,7 +369,7 @@ def notif_ok(c, uid, s, row, ch, lid=None, own=False):
         from ..notify.caps import cap_ok
         if not cap_ok(c, uid, row, lid):
             return False
-    bell, cust = list_bell(c, uid, lid) if lid and row not in NOTIF_NO_BELL else ("default", {})
+    bell, cust = (bell or list_bell(c, uid, lid)) if lid and row not in NOTIF_NO_BELL else ("default", {})
     if bell == "mute" and row not in NOTIF_UNMUTED:
         return False
     if bell == "all":

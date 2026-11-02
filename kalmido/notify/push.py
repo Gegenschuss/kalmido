@@ -429,6 +429,20 @@ def push_reachable(c, uid, s):
     return bool(s.get("ntfy_topic")) or webpush_count(c, uid) > 0 or chn_reachable(c, uid)
 
 
+def push_reachable_many(c, S):
+    """2.369.3 (#3199): push_reachable for several accounts at once ({uid: settings} -> the set of reachable ones): the
+    devices and the channels of everyone without an ntfy topic in one query each (was one or two per person)."""
+    out = {u for u, s in S.items() if s.get("ntfy_topic")}
+    rest = sorted(set(S) - out)
+    if rest and WEBPUSH_ON:
+        out |= {r[0] for r in c.execute("SELECT DISTINCT user_id FROM push_subs WHERE user_id = ANY(CAST(? AS BIGINT[]))", (rest,))}
+        rest = sorted(set(rest) - out)
+    if rest:
+        from .channels import chn_reachable_many
+        out |= chn_reachable_many(c, rest)
+    return out
+
+
 def webpush_payload(title, msg, prio, click=None, actions=None, tag=None, task=None, due=None, lang=None):
     """What the notification shows, nothing more: title, text, the in-app link (hash only), buttons."""
     hash_ = urllib.parse.urlsplit(click).fragment if click else ""

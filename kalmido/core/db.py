@@ -1536,6 +1536,15 @@ def usettings(c, uid):
     return s
 
 
+def usettings_many(c, uids):
+    """2.369.3 (#3199): usettings() of several accounts in one query: {uid: settings} (same answers as one by one)."""
+    S = {int(u): dict(USER_DEFAULTS) for u in uids}
+    if S:
+        for r in c.execute("SELECT user_id, key, value FROM user_settings WHERE user_id = ANY(CAST(? AS BIGINT[]))", (sorted(S),)):
+            S[r[0]][r[1]] = r[2]
+    return S
+
+
 def uset(c, uid, key, value):
     c.execute("INSERT INTO user_settings(user_id,key,value) VALUES(?,?,?) "
               "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, key, str(value)))

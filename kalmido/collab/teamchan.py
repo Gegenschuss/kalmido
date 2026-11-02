@@ -96,12 +96,32 @@ def tcx_members_of(c, rooms):
     return out
 
 
-def tcx_room_ok(c, r, uid, mem=None):
-    """May uid read the channel / group r? Members; an open channel also every person of its organisation."""
+def tcx_room_ok(c, r, uid, mem=None, who=None):
+    """May uid read the channel / group r? Members; an open channel also every person of its organisation.
+    2.369.3 (#3199): who = a dict the caller keeps for one person over many rooms (tcx_rooms_of, the channel list): uid's
+    organisations, agent flag and person check are read once into it, not again per open channel."""
     if uid in (tcx_members(c, r) if mem is None else mem):  # 2.281.0 B (#3110): mem = tcx_members, when known
         return True
-    return bool(r["kind"] == "channel" and r["is_open"] and r["org_id"] and not r["archived_at"] and not is_agent_id(c, uid)
-                and r["org_id"] in _orgs_full(c, uid) and tcx_person_ok(c, uid))  # 2.143.0 A (#2151): not guests / accounting
+    if not (r["kind"] == "channel" and r["is_open"] and r["org_id"] and not r["archived_at"]):
+        return False
+    w = _tcx_who(c, uid, {} if who is None else who)
+    return bool(not w["agent"] and r["org_id"] in w["orgs"] and w["ok"])  # 2.143.0 A (#2151): not guests / accounting
+
+
+def _tcx_who(c, uid, who):
+    """2.369.3 (#3199): the per-person part of tcx_room_ok, filled once per dict (same order and checks as before)."""
+    if who.get("uid") != uid:
+        who.clear()
+        who["uid"] = uid
+    if "agent" not in who:
+        who["agent"] = is_agent_id(c, uid)
+    if not who["agent"] and "orgs" not in who:
+        who["orgs"] = set(_orgs_full(c, uid))
+    if not who["agent"] and "ok" not in who and who["orgs"]:
+        who["ok"] = tcx_person_ok(c, uid)
+    who.setdefault("orgs", set())
+    who.setdefault("ok", False)
+    return who
 
 
 def is_agent_id(c, uid):
@@ -129,7 +149,8 @@ def tcx_rooms_of(c, uid, mems=None):
     mm = tcx_members_of(c, rows)
     if mems is not None:
         mems.update(mm)
-    return [r for r in rows if tcx_room_ok(c, r, uid, mm[r["id"]])]
+    who = {}  # 2.369.3 (#3199): uid's organisations once, not per room
+    return [r for r in rows if tcx_room_ok(c, r, uid, mm[r["id"]], who)]
 
 
 def tcx_group_name(c, r, uid, mem=None):
@@ -300,7 +321,9 @@ def tcx_channels():
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
                      (uid, uid, *orgs)).fetchall()
     mm = tcx_members_of(c, rows)  # 2.281.0 B (#3110): the members of every channel at once
-    chans = [tcx_out(c, r, uid, mm[r["id"]]) for r in rows if tcx_room_ok(c, r, uid, mm[r["id"]]) or tcx_can_manage(c, r, uid, mm[r["id"]])]
+    who = {"uid": uid, "orgs": set(orgs)}  # 2.369.3 (#3199): the organisations read above, once for every channel
+    chans = [tcx_out(c, r, uid, mm[r["id"]]) for r in rows
+             if tcx_room_ok(c, r, uid, mm[r["id"]], who) or tcx_can_manage(c, r, uid, mm[r["id"]])]
     if is_agent(g.user):
         return jsonify(channels=chans, orgs=[], people=[], agents=[], users={})
     people = sorted(tchat_coworkers(c, uid))

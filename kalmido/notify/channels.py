@@ -400,6 +400,16 @@ def chn_reachable(c, uid):
                                  AND n.enabled=1 AND u.disabled=0 LIMIT 1""", (uid,)).fetchone())  # 2.240.0 B (#2867)
 
 
+def chn_reachable_many(c, uids):
+    """2.369.3 (#3199): chn_reachable of several accounts in one query -> the set of those with a channel switched on."""
+    if not CH_ON or not uids:
+        return set()
+    with system_ctx(c):  # as chn_reachable
+        return {r[0] for r in c.execute("""SELECT DISTINCT n.user_id FROM notify_channels n JOIN users u ON u.id=n.user_id
+                                           WHERE n.user_id = ANY(CAST(? AS BIGINT[])) AND n.org_id IS NULL AND n.enabled=1
+                                           AND u.disabled=0""", (sorted(uids),))}
+
+
 # ---------------------------------------------------------------- events of lists -> organisation channels / own list channels
 CH_ACT = {"created": "newtask", "complete": "complete", "assign": "assign", "comment": "comment"}
 
