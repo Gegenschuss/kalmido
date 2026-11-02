@@ -328,8 +328,14 @@ class Mig:
                 "WHERE con.contype='f' AND con.connamespace=current_schema()::regnamespace").fetchall():
             fks.setdefault(t.strip('"'), []).append((col, ref.strip('"'), dt))
         self.cols, self.fks = cols, fks
-        deps = {t: {r for _c, r, _d in fks.get(t, ()) if r != t} for t in cols}
-        self.order = list(graphlib.TopologicalSorter(deps).static_order())
+        # #3506: only a column the SQLite file has orders the copy; a newer column (tasks.delivery_job_id -> agent_jobs, #3365)
+        # gets its default (NULL) and would only close a cycle (agent_jobs.task_id -> tasks) that the old data cannot have
+        src = {t: set(self.src_cols(t)) for t in cols if t in self.src_tables}
+        deps = {t: {r for col, r, _d in fks.get(t, ()) if r != t and col in src.get(t, ())} for t in cols}
+        try:
+            self.order = list(graphlib.TopologicalSorter(deps).static_order())
+        except graphlib.CycleError as e:
+            raise MigError(f"the tables point to each other in a cycle ({' -> '.join(e.args[1])}), no copy order") from None
 
     def plan(self, t):
         """(columns copied, their types) for table t; notes for columns only one side has."""

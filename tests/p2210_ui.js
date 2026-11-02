@@ -344,6 +344,9 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
     check(await sideways(ev) <= 0, `${tag}: task panel: nothing sideways`);
     const sm4 = await ev(SMALL('#detail .lksec button'));
     check(!sm4.length, `${tag}: "People and dates": 44 px ` + JSON.stringify(sm4));
+    // #4038 (#3506): on the phone the panel's fixed foot (date, basket, complete, comment) covers the lower edge of the scroll area;
+    // which button sits under that edge only depends on the scroll position, so the section under test is scrolled into the middle first
+    if (vw === 390) { await ev(`(() => { document.querySelector('#detail .lksec').scrollIntoView({block: 'center'}); return 1; })()`); await sleep(300); }
     if (vw === 390) await axe(ev, `${tag} task panel`);
   }, true);
   await firefox(async o => {
