@@ -362,11 +362,12 @@ def _need_draft(r):
         raise Denied(409, tr(BW_LOCKED))
 
 
-def bw_purge(c, oid, paths):
+def bw_purge(c, oid, paths, dry=False):
     """Trashed meals older than BW_PURGE_DAYS and trashed files: the rows go for good, the stored files' paths are added to
     `paths` (caller commits, then bw_rm(paths)). 2.272.0 A (#3026): only with ret_on("trash") (off = nothing goes), period
-    ret_trash_cut; the files after the commit (they went before the rows and the commit)."""
-    if not ret_on("trash"):
+    ret_trash_cut; the files after the commit (they went before the rows and the commit). 2.370.4 (#3089) N12: dry = only
+    count what would go, with the same rules (the bills kept by law are not counted)."""
+    if not ret_on("trash") and not dry:
         return 0
     old = ret_trash_cut()
     gone = c.execute("SELECT id FROM office_meals WHERE org_id=? AND deleted_at IS NOT NULL AND deleted_at<?", (oid, old)).fetchall()
@@ -384,15 +385,18 @@ def bw_purge(c, oid, paths):
                 kept[f["meal_id"]] = bool(k and today < k)
             if kept[f["meal_id"]]:
                 continue
+        n += 1
+        if dry:
+            continue
         c.execute("DELETE FROM office_meal_files WHERE id=? AND org_id=?", (f["id"], oid))
         p = bw_path(oid, f["file"])
         if p:
             paths.append(p)
-        n += 1
-    for mid in ids:
-        if not c.execute("SELECT 1 FROM office_meal_files WHERE meal_id=? AND org_id=? LIMIT 1", (mid, oid)).fetchone():
-            c.execute("DELETE FROM office_meal_log WHERE meal_id=? AND org_id=?", (mid, oid))
-            c.execute("DELETE FROM office_meals WHERE id=? AND org_id=?", (mid, oid))
+    for mid in ids:  # dry: its files above all go, so the meal goes too
+        if dry or not c.execute("SELECT 1 FROM office_meal_files WHERE meal_id=? AND org_id=? LIMIT 1", (mid, oid)).fetchone():
+            if not dry:
+                c.execute("DELETE FROM office_meal_log WHERE meal_id=? AND org_id=?", (mid, oid))
+                c.execute("DELETE FROM office_meals WHERE id=? AND org_id=?", (mid, oid))
             n += 1
     return n
 
@@ -415,14 +419,11 @@ def bw_purge_tick(c):
     BW_TICK["at"] = time.time()
     old, purge, paths = ret_trash_cut(), ret_on("trash"), []
     with system_ctx(c):  # trashed rows of every office area (ids and stored names only, no content is read)
-        if purge:
-            oids = {r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<? "
-                                                   "UNION SELECT DISTINCT org_id FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?",
-                                                   (old, old)).fetchall()}
-            n = sum(bw_purge(c, oid, paths) for oid in oids)
-        else:  # 2.272.0 A (#3026): dry run (meals + files in the trash; approved meals' bills are kept by law either way)
-            n = c.execute("SELECT (SELECT COUNT(*) FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<?) + "
-                          "(SELECT COUNT(*) FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?)", (old, old)).fetchone()[0]
+        oids = {r["org_id"] for r in c.execute("SELECT DISTINCT org_id FROM office_meals WHERE deleted_at IS NOT NULL AND deleted_at<? "
+                                               "UNION SELECT DISTINCT org_id FROM office_meal_files WHERE deleted_at IS NOT NULL AND deleted_at<?",
+                                               (old, old)).fetchall()}
+        # 2.272.0 A (#3026): switch off = dry run; 2.370.4 (#3089) N12: with the rules of the real run (bills kept by law not counted)
+        n = sum(bw_purge(c, oid, paths, dry=not purge) for oid in oids)
         ret_report(c, "trash", {"meals": n}, purge, run="meals")
     c.commit()
     bw_rm(paths)
