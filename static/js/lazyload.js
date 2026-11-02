@@ -57,6 +57,7 @@ const LD_MODS = {
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   abscan: ['abscan'],  // 2.112.1 (#2058): the phone scan dialog of the file store and the documents
   pubvideo: ['pubvideo'],  // 2.99.1 A (#1959): only the customer page of a video sign-off loads it (/s/q/<token>), the app never
+  flow: ['flow'],  // 2.393.2 (#3374): the card "Flow" of a project page (projects.js asks for it when it draws the card)
   hookin: ['hookin'],  // 2.115.0 (#2061): inbound webhooks of a list, loaded when its settings open
   polls: ['polls'],  // 2.102.0 C (#2208): scheduling polls (#1953), on the first "Find a date"
   formq: ['formq'],  // 2.102.0 C (#2208): questionnaires (#1954), with the forms dialog of a list

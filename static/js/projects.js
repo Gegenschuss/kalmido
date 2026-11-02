@@ -304,7 +304,8 @@ function viewProjOv() {
   const ts = timeSumHtml([l]);
   P.kpis = fxKpiPart(l);  // 2.43.0 (#1328): key figures (undefined = not offered)
   P.velocity = spt_povPart(l);  // 2.60.0 (#1511): completed points of the last sprints
-  P.flow = flw_povPart(l);  // 2.393.2 A (#3374): lead / cycle time, cumulative flow, bug trend
+  // 2.393.2 A (#3374): lead / cycle time, cumulative flow, bug trend; flow.js loads on demand (start budget), a stand-in meanwhile
+  P.flow = typeof flw_povPart === 'function' ? flw_povPart(l) : l.is_inbox ? undefined : (ld_later('flow'), x => povSec('flow', tr('Flow'), `<p class="muted">${esc(tr('Loading…'))}</p>`, x));
   if (timeOn() && j.time) P.time = x => povSec('time', tr('Tracked time'), ts || '', x, emp(!ts, tr('No time tracked yet.')));
   for (const p of j.layout?.pads || []) P['np' + p.id] = () => wgPadHtml(l, p, can);  // 2.43.0 (#1346): the notepads
   const y = j.layout || {}, cust = S.ly.view === 'project';

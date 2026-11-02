@@ -32,7 +32,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js',
   '/static/js/liste2echan.js', '/static/js/wikie2e.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/ablage.js',
   '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js',
-  '/static/js/points.js', '/static/js/flow.js', '/static/js/oneway.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js',
+  '/static/js/points.js', '/static/js/oneway.js', '/static/js/photometa.js', '/static/js/ablinks.js', '/static/js/filetext.js',
   '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js', '/static/js/contractprop.js',
   '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js', '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
@@ -62,7 +62,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/asstprop.js', '/static/js/sheetprop.js', '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js',
   '/static/js/sheetsio.js', '/static/js/sheetsize.js', '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js',
   '/static/js/sheetbook.js', '/static/js/fslock.js', '/static/js/tagsel.js', '/static/js/filereq.js', '/static/js/fsshare.js',
-  '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js',
+  '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/flow.js', '/static/js/hookin.js', '/static/js/polls.js', '/static/js/formq.js',
   '/static/js/navmenu.js', '/static/js/tourmods.js', '/static/js/office_undo.js', '/static/js/voice.js', '/static/js/hubmailbox.js',
   '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js', '/static/js/dpmodal.js',
   '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js', '/static/js/hubmail.js',
