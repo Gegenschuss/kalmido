@@ -7053,7 +7053,6 @@
   "New signature link": "Nuevo enlace de firma",
   "New template": "Nueva plantilla",
   "No documents match the filter.": "Ningún documento coincide con el filtro.",
-  "No documents yet.": "Aún no hay documentos.",
   "No documents yet. Create one from a template for a client.": "Aún no hay documentos. Crea uno a partir de una plantilla para un cliente.",
   "No documents yet. Start with a template: take over a sample under Templates.": "Aún no hay documentos. Empieza con una plantilla: adopta un modelo en Plantillas.",
   "No templates yet. Take over a sample under Templates.": "Aún no hay plantillas. Adopta un modelo en Plantillas.",
@@ -16125,5 +16124,7 @@
   "Not delivered: no device accepted it": "No entregada: ningún dispositivo la aceptó",
   "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} notificación push no se entregó porque ningún dispositivo del usuario la aceptó: {1}", "{0} notificaciones push no se entregaron porque ningún dispositivo de los usuarios las aceptó: {1}"],
   "This address differs from PUBLIC_URL": "Esta dirección no coincide con PUBLIC_URL",
-  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Los enlaces de correos, avisos push y restablecimiento de contraseña usan {0}, pero esta página está abierta en {1}. Si todos usan {1}, pon PUBLIC_URL con ese valor en .env y reinicia (SELF-HOSTING.md, From localhost to your own address)."
+  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Los enlaces de correos, avisos push y restablecimiento de contraseña usan {0}, pero esta página está abierta en {1}. Si todos usan {1}, pon PUBLIC_URL con ese valor en .env y reinicia (SELF-HOSTING.md, From localhost to your own address).",
+  "New letter or contract": "Nuevo documento",
+  "No letters or contracts yet.": "Aún no hay documentos."
 }

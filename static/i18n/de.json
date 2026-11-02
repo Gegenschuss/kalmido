@@ -7035,7 +7035,6 @@
   "New signature link": "Neuer Unterschriftslink",
   "New template": "Neue Vorlage",
   "No documents match the filter.": "Keine Dokumente passen zum Filter.",
-  "No documents yet.": "Noch keine Dokumente.",
   "No documents yet. Create one from a template for a client.": "Noch keine Dokumente. Erstelle eines aus einer Vorlage für einen Kunden.",
   "No documents yet. Start with a template: take over a sample under Templates.": "Noch keine Dokumente. Beginne mit einer Vorlage: übernimm ein Muster unter Vorlagen.",
   "No templates yet. Take over a sample under Templates.": "Noch keine Vorlagen. Übernimm ein Muster unter Vorlagen.",
@@ -16125,5 +16124,7 @@
   "Not delivered: no device accepted it": "Nicht zugestellt: Kein Gerät hat sie angenommen",
   "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} Push wurde nicht zugestellt, weil kein Gerät der Person ihn angenommen hat: {1}", "{0} Pushes wurden nicht zugestellt, weil kein Gerät der Personen sie angenommen hat: {1}"],
   "This address differs from PUBLIC_URL": "Diese Adresse weicht von PUBLIC_URL ab",
-  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in Mails, Push-Nachrichten und beim Passwort-Zurücksetzen nutzen {0}, diese Seite ist aber unter {1} geöffnet. Wenn alle {1} nutzen: PUBLIC_URL in .env darauf setzen und neu starten (SELF-HOSTING.md, From localhost to your own address)."
+  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in Mails, Push-Nachrichten und beim Passwort-Zurücksetzen nutzen {0}, diese Seite ist aber unter {1} geöffnet. Wenn alle {1} nutzen: PUBLIC_URL in .env darauf setzen und neu starten (SELF-HOSTING.md, From localhost to your own address).",
+  "New letter or contract": "Neues Schreiben oder Vertrag",
+  "No letters or contracts yet.": "Noch keine Schreiben oder Verträge."
 }

@@ -36,7 +36,7 @@ function ms_clGdHtml(c) {
   if (MSC.gd?.id !== c.id) { if (!MSC.gdLoading) setTimeout(() => ms_clGdLoad(c.id), 0); return ''; }
   const ds = MSC.gd.docs; if (!ds) return '';
   const st = {draft: tr('Draft'), final: tr('Finished'), signed: tr('Signed'), declined: tr('Declined')};
-  return `<div class="ctsec"><h4>${tr('Documents')}</h4>${ds.length ? `<ul class="ctlinks">${ds.map(x => `<li><a class="linkbtn" href="#office/gendocs/${x.id}">${ic('file', 's')} ${esc(x.title || x.kind_label)}</a><span class="muted"> · ${esc([x.list_name, st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No documents yet.')}</p>`}<a class="btn sm" href="#office/gendocs">${ic('plus', 's')} ${tr('New document')}</a></div>`;
+  return `<div class="ctsec"><h4>${tr('Letters & contracts')}</h4>${ds.length ? `<ul class="ctlinks">${ds.map(x => `<li><a class="linkbtn" href="#office/gendocs/${x.id}">${ic('file', 's')} ${esc(x.title || x.kind_label)}</a><span class="muted"> · ${esc([x.list_name, st[x.status] || x.status].filter(Boolean).join(' · '))}</span></li>`).join('')}</ul>` : `<p class="muted">${tr('No letters or contracts yet.')}</p>`}<a class="btn sm" href="#office/gendocs">${ic('plus', 's')} ${tr('New letter or contract')}</a></div>`;  // 2.491.0 (#4020): the texts follow the name of the area (Schreiben & Verträge)
 }
 async function ms_clGdLoad(id, q) {
   MSC.gdLoading = true;

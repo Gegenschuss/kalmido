@@ -7053,7 +7053,6 @@
   "New signature link": "Nieuwe ondertekeningslink",
   "New template": "Nieuwe sjabloon",
   "No documents match the filter.": "Geen documenten passen bij het filter.",
-  "No documents yet.": "Nog geen documenten.",
   "No documents yet. Create one from a template for a client.": "Nog geen documenten. Maak er een op basis van een sjabloon voor een klant.",
   "No documents yet. Start with a template: take over a sample under Templates.": "Nog geen documenten. Begin met een sjabloon: neem een voorbeeld over onder Sjablonen.",
   "No templates yet. Take over a sample under Templates.": "Nog geen sjablonen. Neem een voorbeeld over onder Sjablonen.",
@@ -16125,5 +16124,7 @@
   "Not delivered: no device accepted it": "Niet bezorgd: geen enkel apparaat heeft hem geaccepteerd",
   "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} push is niet bezorgd omdat geen enkel apparaat van de gebruiker hem accepteerde: {1}", "{0} pushes zijn niet bezorgd omdat geen enkel apparaat van de gebruikers ze accepteerde: {1}"],
   "This address differs from PUBLIC_URL": "Dit adres wijkt af van PUBLIC_URL",
-  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in e-mails, pushmeldingen en bij het herstellen van wachtwoorden gebruiken {0}, maar deze pagina is geopend op {1}. Gebruikt iedereen {1}, zet PUBLIC_URL daar dan op in .env en herstart (SELF-HOSTING.md, From localhost to your own address)."
+  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "Links in e-mails, pushmeldingen en bij het herstellen van wachtwoorden gebruiken {0}, maar deze pagina is geopend op {1}. Gebruikt iedereen {1}, zet PUBLIC_URL daar dan op in .env en herstart (SELF-HOSTING.md, From localhost to your own address).",
+  "New letter or contract": "Nieuw document",
+  "No letters or contracts yet.": "Nog geen documenten."
 }
