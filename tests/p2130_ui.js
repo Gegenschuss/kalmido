@@ -335,6 +335,9 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   };
   // 2.358.0 C (#2782): settle = the page's requests done (ff.js idle) + two frames drawn, instead of fixed sleeps after an action
   const settle = async (ev, idle) => { await idle({quiet: 300}); await ev(`new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1))))`).catch(() => 0); };
+  // job/2299 (CI of 2.487.3): the agent's chat box comes after the view's own requests on a slow runner - wait for it (10 s),
+  // then focus; missing = one clear FAIL instead of a TypeError of the page
+  const chatIn = async (ev, what) => { let ok = false; for (let i = 0; i < 40 && !ok; i++) { ok = await ev(`(() => { const x = document.querySelector('#chat-in'); if (!x) return false; x.focus(); return true; })()`).catch(() => false); if (!ok) await sleep(250); } check(ok, what + ': the chat box is there'); };
   const ready = async (ev, idle, n = 30) => { await require('./boot').until(() => ev(`!!document.querySelector('#top h1')`).catch(() => false), {timeout: n * 300, step: 150}); await settle(ev, idle); };
   const CTR = `(fg, bg) => { const p = s => s.match(/[\\d.]+/g).slice(0, 3).map(Number).map(v => /^color\\(/.test(s) ? v * 255 : v).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }); const L = c => { const [r, g, b] = p(c); return .2126 * r + .7152 * g + .0722 * b; }; const a = L(fg), b = L(bg); return (Math.max(a, b) + .05) / (Math.min(a, b) + .05); }`;
   const bgOf = `el => { for (let n = el; n; n = n.parentElement) { const c = getComputedStyle(n).backgroundColor; if (c && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(c)) return c; } return 'rgb(255,255,255)'; }`;
@@ -399,7 +402,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     await ev(`(() => { S.multi.clear(); S.multiMode = false; render(); return 1; })()`);
     // the keyboard: the chat with a keyboard-sized viewport keeps the newest message in view (#453 N4 still holds)
     await nav(B + '?p=5#agents/' + AG); await settle(ev, idle);
-    await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
+    await chatIn(ev, '390 keyboard');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 464}}); await fu(`(() => { const b = document.querySelector('#chat-msgs'); return document.body.classList.contains('kb-open') && b.clientHeight >= 260 && b.scrollHeight - b.scrollTop - b.clientHeight <= 2; })()`);
     const kb = await ev(`(() => { const b = document.querySelector('#chat-msgs'); return {kb: document.body.classList.contains('kb-open'), h: Math.round(b.clientHeight), gap: Math.round(b.scrollHeight - b.scrollTop - b.clientHeight)}; })()`);
     check(kb.kb && kb.h >= 260 && kb.gap <= 2, '390 keyboard: the chat without the page header has more room ' + JSON.stringify(kb));
@@ -446,7 +449,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     check(sh.bottom <= sh.lim + 1, `${vw} iOS: a bottom sheet sits above the keyboard ` + JSON.stringify(sh));
     await ev(`(() => { closePop(); return 1; })()`);
     await nav(B + `?ios2=${vw}#agents/` + AG); await settle(ev, idle);
-    await ev(`(() => { document.querySelector('#chat-in').focus(); return 1; })()`);
+    await chatIn(ev, `${vw} iOS`);
     await ev(`(${FAKE})(560, 0)`); await fu(`(() => { const c = document.querySelector('#chat-in').getBoundingClientRect(); return c.bottom <= visualViewport.height + 1 && visualViewport.height - c.bottom < 90; })()`);
     const ch = await ev(`(() => { const c = document.querySelector('#chat-in').getBoundingClientRect(), s = document.querySelector('[data-act="chat-send"]').getBoundingClientRect(); return {sw: document.scrollingElement.scrollWidth, iw: innerWidth, send: Math.round(s.right), inBottom: Math.round(c.bottom), lim: visualViewport.height, gap: Math.round(visualViewport.height - c.bottom), meta: document.querySelector('meta[name=viewport]').content}; })()`);
     check(ch.sw <= ch.iw && ch.send <= ch.iw && ch.inBottom <= ch.lim + 1 && ch.gap < 90, `${vw} iOS: chat: no sideways overflow, Send on screen, the box right above the keyboard ` + JSON.stringify(ch));

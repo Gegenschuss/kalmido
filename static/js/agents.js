@@ -568,7 +568,7 @@ function viewAgents() {
 async function jobDo(jid, a) {
   if (a !== 'approve' && !await askConfirm(a === 'stop' ? tr('Stop this job?') : tr('Reject this job?'), tr('The agent is told at once.'), {ok: a === 'stop' ? tr('Stop') : tr('Reject'), danger: true})) return;
   try { await api('POST', `/api/agents/jobs/${jid}/action`, {action: a}); toast({approve: tr('Approved'), reject: tr('Rejected'), stop: tr('Stopped')}[a]); } catch { return; }
-  await load(); if (typeof mwLoad === 'function') await mwLoad(true); loadJobs(); render();  // the settled job leaves "Waiting for me" and the Today card at once, not within the minute
+  await load(); await window.mwLoad?.(true); loadJobs(); render();  // the settled job leaves "Waiting for me" and the Today card at once, not within the minute
 }
 
 // ---- 2.3.0 (#260 #261 #262 #263): agent proposals. A person asks an agent (project from a briefing, break down a task,
@@ -856,7 +856,7 @@ async function propApply(b) {
   let r;
   try { r = await calReq('POST', `/api/proposals/${P.jid}/apply`, q); } catch (x) { const e = $('#pp-err', P.md); e.textContent = x.message; e.hidden = false; b.disabled = false; return; }
   P.md.remove(); S.prop = null;
-  await load().catch(() => {}); if (typeof mwLoad === 'function') await mwLoad(true); if (lyp_is(v)) await lyp_after(v); if (aim_is(v)) aim_after(); render();
+  await load().catch(() => {}); await window.mwLoad?.(true); if (lyp_is(v)) await lyp_after(v); if (aim_is(v)) aim_after(); render();
   const name = v.agent.name, jid = P.jid, ly = lyp_is(v) ? () => load().then(() => lyp_after(v)).then(render).catch(() => {}) : aim_is(v) ? aim_after : () => {};  // 2.55.0 (#1066); 2.68.0 (#1839)
   // 2.58.0 (#1810): a new project opens its list; Undo removes it again, so it goes back to the view before (when still on it)
   const proj = (v.kind === 'project' || v.kind === 'inquiry') && r.list_id && listById(r.list_id), back = location.hash.slice(1) || LS.get('lastKey', START_KEY);
@@ -878,7 +878,7 @@ async function propDiscard() {
   try { await calReq('POST', `/api/proposals/${P.jid}/discard`); } catch (x) { toast(x.message); return; }
   P.md.remove(); S.prop = null;
   toast(req ? tr('Request cancelled') : tr('Proposal discarded'));
-  load().then(() => typeof mwLoad === 'function' && mwLoad(true)).then(render).catch(() => {});
+  load().then(() => window.mwLoad?.(true)).then(render).catch(() => {});
   if (S.route.mod === 'agents') loadJobs();
 }
 
