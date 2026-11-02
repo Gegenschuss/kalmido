@@ -4151,7 +4151,7 @@ OpenAI-compatible model itself, for six small helps a person starts with a tap (
 extract tasks, suggest tags and a due date, sort the basket, plan the day). It is not an agent:
 
 - It is no user and no member of any project. Each person switches it on and ticks the projects it may read
-  (Settings > Assistant); it never sees anything else.
+  (Settings > Agents > Built-in assistant); it never sees anything else.
 - It has no events, no token, no API and no MCP tools; it never acts on its own or on a schedule.
 - Its results are proposals of the person who asked (they show as "Assistant" in the proposal dialog) and use the
   same Apply / Discard / Undo as the [proposals](#proposals) of agents. Agents get no events about them.

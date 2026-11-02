@@ -134,9 +134,10 @@ with this exemption reason.
 
 The area Office (office, clients, contacts) has one menu with three groups instead of tab rows:
 
-- **Sell** - Pipeline, Quotations, Invoices (2.380.0, before one point *Quotes & invoices*), Clients, Contacts, Documents, Framework contracts
-- **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Subscriptions & tools, Travel expenses, Entertainment receipts
-- **Administration** - Equipment, Contracts & insurance, Settings
+- **Sell** - Pipeline, Quotations, Invoices (2.380.0, before one point *Quotes & invoices*), Letters & contracts (2.489.0, before *Documents*), Clients, Framework contracts
+- **Money** - Receipts (2.276), Cash flow, Figures, Bank, Bookkeeping, Cash book (2.121), Travel expenses, Entertainment receipts
+- **Administration** - Equipment, Contracts & subscriptions (2.489.0: one point, before *Contracts & insurance* and *Subscriptions & tools*; the kind - all / contracts / insurances / subscriptions - is a filter at the top), Settings
+- **Address book** (2.489.0) - an entry of its own after Administration, no longer a point of Sell
 
 Services and text blocks are no menu points any more: they are the tab **Templates** under **Settings** (Settings has the
 tabs *General* and *Templates*; Templates switches between *Services* and *Text blocks*, the one used last opens).
@@ -789,7 +790,7 @@ Nothing is stored before you confirm.
 
 *Since 2.91.*
 
-The office tab "Subscriptions & tools" (office admins; in a personal office its owner) shows every fixed cost marked as a
+The office tab "Subscriptions & tools" (2.489.0: the filter *Subscriptions* of the point *Contracts & subscriptions*; office admins; in a personal office its owner) shows every fixed cost marked as a
 subscription: price, repeat, the next renewal, the last day to cancel (notice period in days), who uses it and a "hardly
 used" switch. At the top are the sums per month and per year (net or gross; quarterly and yearly amounts spread over the
 months, one-off costs not counted) and, when some are marked, what the hardly used ones cost a year. Subscriptions are
@@ -1151,7 +1152,7 @@ Routes (office admins only): `GET /api/office/tax-dates`, `PUT /api/office/tax-d
 
 *Since 2.92.0.*
 
-The tab **Contracts & insurance** (office admins only; in a personal office its person) keeps the business contracts of the
+The tab **Contracts & insurance** (2.489.0: the point *Contracts & subscriptions* with the filter *Contracts* / *Insurances*; office admins only; in a personal office its person) keeps the business contracts of the
 office in one place: insurances, rent, leasing, service providers and others. Per contract: name, provider, policy or
 contract number, the contribution per month / quarter / year (net when a VAT rate is set), start, the end of the current
 term, the notice period (days, weeks, months), the automatic renewal (or "ends without renewal"), how many days before the

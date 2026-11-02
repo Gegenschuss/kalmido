@@ -74,7 +74,7 @@ on your data) applies.
 
 ## Log
 
-Settings > Assistant > *Log* lists every call: time, kind, status (done, error, took too long, refused, shortened) and
+Settings > Agents > *Built-in assistant* > *Log* (2.489.0: a tab of Agents, before its own section *Assistant*) lists every call: time, kind, status (done, error, took too long, refused, shortened) and
 duration. Texts are not kept, neither the question nor the answer. Admins see the number of calls and errors per day in
 Settings > Administration > Server.
 

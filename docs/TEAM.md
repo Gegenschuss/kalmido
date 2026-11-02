@@ -805,9 +805,9 @@ Related changes in the same release:
 API for scripts of the web app: `GET /api/orgs` carries `joins` (my open invitations: `org_id`, `name`, `role`, `by`),
 `POST /api/orgs/{org}/join` accepts, `DELETE /api/orgs/{org}/join` declines (404 without an open invitation).
 
-## The group "Conversations" in the sidebar
+## The group "People" in the sidebar
 
-*Since 2.99.0.*
+*Since 2.99.0; 2.489.0: called "People", before "Conversations" (the team chat is an area of its own, #2814).*
 
 The group no longer grows with every person you share a project with:
 
