@@ -46,6 +46,7 @@ APP_TO_API = {
     # 2.484.0 (#2200): agents read the scheduling polls they may see and create new ones (never vote, never decide)
     "GET /api/polls": ["GET /polls"], "POST /api/polls": ["POST /polls"], "GET /api/polls/{}": ["GET /polls/{}"],
     "PUT /api/tasks/{}/irreversible": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/irreversible": ["PATCH /tasks/{}"],  # 2.392.0 C (#3370)
+    "PUT /api/tasks/{}/delivery": ["PATCH /tasks/{}"], "DELETE /api/tasks/{}/delivery": ["PATCH /tasks/{}"],  # 2.392.2 (#3365)
     "GET /api/tasks/{}/decisions": ["GET /tasks/{}/decisions"], "POST /api/tasks/{}/decisions": ["POST /tasks/{}/decisions"],
     "GET /api/state": ["GET /lists", "GET /tasks", "GET /habits", "GET /filters", "GET /me"],
     "GET /api/me/storage": ["GET /me/storage"],  # 2.24.0 (#910)
