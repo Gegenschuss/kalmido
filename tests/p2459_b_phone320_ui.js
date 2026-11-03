@@ -107,6 +107,9 @@ const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?
         const bb = [...b.querySelectorAll('.mbb')].map(e => e.getBoundingClientRect()), lap = bb.some(e => e.left < c.right - 1 && c.left < e.right - 1 && e.top < c.bottom - 1 && c.top < e.bottom - 1);
         return {right: Math.round(r.right), left: Math.round(r.left), xr: Math.round(x.right), vw: innerWidth, lap, sw: b.scrollWidth, cw: b.clientWidth}; })()`);
       check(g && g.xr <= g.vw && g.left >= 0 && g.right <= g.vw && !g.lap && g.sw <= g.cw + 1, 'mbar: inside the screen, count does not overlap a button ' + JSON.stringify(g));
+      // 2.499.0 (#3899): the buttons' lower bound is 44 px, and four of them with the close button stay in one row at 320 px
+      const m = await ev(`(() => { const bs = [...document.querySelectorAll('#mbar .mbb')]; return {n: bs.length, min: Math.min(...bs.map(e => parseFloat(getComputedStyle(e).minWidth))), w: Math.min(...bs.map(e => e.getBoundingClientRect().width)), tops: new Set(bs.map(e => Math.round(e.getBoundingClientRect().top))).size}; })()`);
+      check(m && m.n === 4 && m.min >= 44 && m.w >= 44 && m.tops === 1, '#3899: selection bar buttons 44 px wide, one row ' + JSON.stringify(m));
     } else check(false, 'mbar: tasks loaded ' + await DIAG(ev));
 
     // a document title that is too long ends in an ellipsis instead of running out

@@ -62,10 +62,15 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
       await sleep(250);
       s = await ev(`${SPLIT}('#side .sbmr .srbn')`);
       check(s.length === 0, `#3880 ${px} px: no word split in the drawer: ` + JSON.stringify(s));
+      // 2.499.0 (#4047): nothing in the drawer is cut: no "…" class, no text beyond its box in either direction
+      const cut = await ev(`[...document.querySelectorAll('#side .sbmr .srbn')].filter(n => n.classList.contains('srcut') || getComputedStyle(n).getPropertyValue('-webkit-line-clamp') !== 'none' || n.scrollWidth > n.clientWidth + 1 || n.scrollHeight > n.clientHeight + 1).map(n => n.textContent)`);
+      check(cut.length === 0, `#4047 ${px} px: no area name cut in the drawer: ` + JSON.stringify(cut));
       await shot(`p2458-${px}-drawer.png`);
     }
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); n.textContent = 'Donaudampfschifffahrtsgesellschaft'; sbb_fit(); return 1; })()`);
-    check(await ev(`document.querySelector('#side .sbmr .srbn').classList.contains('srcut') && document.querySelector('#side .sbmr .srb').title.length > 10`), '#3880: far too long: "…", the whole name as title');
+    // 2.499.0 (#4047, replaces the "…" of #3880 on the phone): a word far too long breaks inside the word, all of it to read
+    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); return {cut: n.classList.contains('srcut'), brk: n.classList.contains('srbrk'), sw: n.scrollWidth, cw: n.clientWidth, sh: n.scrollHeight, ch: n.clientHeight, lines: Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize))}; })()`);
+    check(!lng.cut && lng.brk && lng.sw <= lng.cw + 1 && lng.sh <= lng.ch + 1 && lng.lines >= 2, '#4047: far too long: broken over lines, never "…" ' + JSON.stringify(lng));
 
     await nav(B + '#today'); await sleep(300);
     // #3855 at 320 px: the real rules on small pieces of the pages
