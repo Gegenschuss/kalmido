@@ -293,6 +293,7 @@ for _ in range(480):  # the account export of "own" runs in the background: its 
 SUBST = [
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
+    (r"/api/v1/agent/chats/$", "me"),  # 2.491.0 (#2849): the agent (its token) reads the reply style wishes of its own person
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),
