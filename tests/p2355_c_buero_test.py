@@ -220,6 +220,13 @@ rows = extf(A, "2026-08-01", "2026-08-31")
 acc = {g(x, "Belegfeld 1"): g(x, "Gegenkonto (ohne BU-Schlüssel)") for x in rows if g(x, "Konto") == "10000"}
 n3 = A.get(B + f"{D}/{R3}").json()["number"]
 check(acc.get(n3) == "8338", f"#4081: DATEV: the not taxable account 8338, not 8336 {acc} {n3}")
+# review: such an older document can still be corrected (the correction inherits the note and may not change it)
+r = A.post(B + f"{D}/{R3}/credit")
+check(r.status_code == 201, "#4081: correction draft of the older document " + r.text[:200])
+RK3 = r.json()["id"]
+final(A, RK3, "2026-08-06")
+k = ustva(A, "m08")["kz"]
+check(k["45"] == "500" and k["21"] == "0", f"#4081: the correction takes it out of field 45 again {k}")
 A.put(B + O + "/settings", json={"vat_basis": "ist"})
 # a foreign currency without a rate: rate 1 = none
 FX = draft(A, C_DE, extra={"currency": "GBP"})

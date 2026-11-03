@@ -318,7 +318,8 @@ def inv_missing(c, oid, r, s, pack, items):
         # the client needs a VAT id only for the EU case or when the e-invoice is built (BR-AE-02 asks for BT-48)
         ctry = cl["country"] if cl is not None and "country" in cl.keys() else ""
         case = fk_reverse_case(ctry, co.get("country") or "DE")
-        if fk_third_country(ctry, co.get("country") or "DE"):  # 2.502.0 (#4081): Kz 21 / category AE are for the EU only
+        # 2.502.0 (#4081): field 21 / category AE are for the EU only; a correction inherits its invoice's note and must stay possible
+        if fk_third_country(ctry, co.get("country") or "DE") and not _col(r, "cancels_id"):
             miss.append([N_("for a client in a third country the VAT note not taxable domestically instead of reverse charge")])
         if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
             miss.append([N_("your VAT ID (reverse charge)")])
