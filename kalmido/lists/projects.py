@@ -13,7 +13,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, pars
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
 from ..core.access import (
-    collab_all, Denied, list_people, list_role, need_collab, need_list, need_project, need_task, pvis, time_all, tvis,
+    collab_all, Denied, list_people, list_role, need_list, need_project, need_task, pvis, time_all, tvis,
     WRITE_ROLES,
 )
 from ..core.serializers import unlink_files
@@ -39,7 +39,7 @@ from ..core.orgcrypt import oc_list_org, oc_list_space, oc_seal_path  # 2.369.5 
 
 # ---------------------------------------------------------------- project status + progress, package 3
 # Status of a list (owner or edit members set it, with a short note; history in list_status) and a
-# News item "status" for the other list members (collab). Progress (in /api/state per list): main tasks
+# News item "status" for the other list members (collab; 2.395.0 #3379: the status itself works without it). Progress (in /api/state per list): main tasks
 # (subtasks too with the user setting progress_subtasks), all time, done vs. open, won't do and the trash
 # left out; done copies of recurring tasks are not counted (a recurring task counts once, as open).
 LIST_STATUSES = ("on_track", "at_risk", "off_track", "on_hold", "complete")
@@ -105,8 +105,9 @@ def bell_store(c, uid, lid, mode, custom=None):
 
 @app.post("/api/lists/<int:lid>/status")
 def list_status_set(lid):
-    """{status: on_track|at_risk|off_track|on_hold|complete|'' (none), note}: owner or edit member."""
-    need_collab()
+    """{status: on_track|at_risk|off_track|on_hold|complete|'' (none), note}: owner or edit member.
+    2.395.0 (#3379): every project has a status, also with collaboration off (one person / freelancer); only the
+    News item + push to the other members stays bound to collaboration (collab_user checks the server switch)."""
     b = body()
     c = db()
     need_list(c, lid)
@@ -133,8 +134,7 @@ def list_status_set(lid):
 
 @app.get("/api/lists/<int:lid>/status")
 def list_status_history(lid):
-    """The last status updates of a list (newest first)."""
-    need_collab()
+    """The last status updates of a list (newest first). 2.395.0 (#3379): no longer bound to collaboration."""
     c = db()
     need_list(c, lid, write=False)
     rows = c.execute("SELECT * FROM list_status WHERE list_id=? ORDER BY id DESC LIMIT 30", (lid,)).fetchall()

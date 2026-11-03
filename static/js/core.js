@@ -199,7 +199,7 @@ const noFab = () => ['habits', 'pomo', 'news', 'stats', 'time', 'overview', 'age
 const dockView = () => S.route.mod === 'tasks' && !isKanban() && !isTimeline() && !isRoadmap() && !isOverview() && !noFab();
 const fabOff = () => noFab() || (isTouch() && (!isMobile() || tabletDock()));
 const progressOn = () => feat('progress');
-const statusOn = () => progressOn() && collab();
+const statusOn = () => progressOn();  // 2.395.0 (#3379): a project status also without collaboration (one person / freelancer)
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
 // 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
 const isTracked = l => !!l && !l.is_inbox && !!l.status;
