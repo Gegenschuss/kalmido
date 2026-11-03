@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Web Push (1.1.3): VAPID key, subscriptions, endpoint allow-list (SSRF), RFC 8291 encryption (decrypted here
 with http_ece, acting as the browser), VAPID JWT (RFC 8292), channel routing ntfy / webpush / both incl. the
-ntfy fallback, priorities -> Urgency / TTL, 404 / 410 / 429 / 403 handling, the push kinds (reminder with
+ntfy fallback (own ntfy server; the public ntfy.sh gets none, #4215, p21481_c_api_test.py), priorities -> Urgency / TTL, 404 / 410 / 429 / 403 handling, the push kinds (reminder with
 actions, collaboration incl. the instance + personal switches, habit, digest, time tracking, test).
 Starts its OWN test container (start.sh) with a fake push service inside it (stub_webpush.py on
 127.0.0.1:9997, allowed via KALMIDO_WEBPUSH_HOSTS). Leaves the container running for webpush_ui.js.

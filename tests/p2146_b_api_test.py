@@ -17,7 +17,7 @@ Own container (start.sh, org encryption on, the IMAP stub for the mail input). I
  - mail to the document address: a ZIP attachment unpacked, the same PDF twice in one mail and again in a second mail
    stays one document
  - HEIC (a 640x240 picture with two text lines drawn with Pillow and encoded with libheif's heif-enc at quality 80, 2.6 KB,
-   embedded below; no photo): recognised (text from it), a preview made
+   embedded below; no photo): 2.499.0 (#4168) kept, but not read: no reader in the image, the hint "no_heif", no preview
 usage: p2146_b_api_test.py <datadir>   (P2146B_NOSTART=1: the container with the IMAP stub runs already)"""
 import base64
 import email.message
@@ -395,11 +395,14 @@ r = up(Fr, [("IMG_0001.HEIC", HEIC, "image/heic")])
 check(r.status_code == 201, "HEIC upload " + r.text[:160])
 if r.status_code == 201:
     HID = r.json()["ids"][0]
+    # 2.499.0 (#4168): pi-heif (discontinued, known holes in its libheif / libde265) left the image: the photo is kept, the server
+    # says it cannot read it, no text and no preview. Red again as soon as a HEIC reader is back in the image: then review this
     d = done(Fr, HID, 120)
-    check(d and d["state"] == "done" and not d["error"], f"HEIC recognised ({d and d['state']} {d and d['error']} {d and d.get('error_text')})")
-    t = ((d or {}).get("text") or "").upper()
-    check(any(w in t for w in ("4711", "SUMME", "KASSENBON", "42,00")), f"text read from the photo {t[:120]!r}")
-    check(d and d["thumb"] and Fr.get(B + f"/api/docs/{HID}/thumb").content[:2] == b"\xff\xd8", "a preview (JPEG)")
+    check(d and d["state"] == "failed" and d["error"] == "no_heif", f"HEIC: no reader in the image ({d and d['state']} {d and d['error']} {d and d.get('error_text')})")
+    check(d and "JPEG" in (d.get("error_text") or ""), f"HEIC: the hint names JPEG {d and d.get('error_text')!r}")
+    check(d and not (d.get("text") or "") and not d["thumb"], "HEIC: no text and no preview")
+    fl = Fr.get(B + f"/api/docs/{HID}/file")
+    check(fl.status_code == 200 and fl.content[4:8] == b"ftyp", f"HEIC: the photo itself is kept ({fl.status_code})")
     r = up(Fr, [("IMG_0001.HEIC", HEIC, "image/heic")])
     check(r.status_code == 200 and [x["id"] for x in r.json().get("dups", [])] == [HID], "the same photo again: a duplicate (before its metadata was cut)")
 

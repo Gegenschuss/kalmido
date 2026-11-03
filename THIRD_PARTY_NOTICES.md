@@ -51,8 +51,6 @@ Kalmido itself and only loaded when a page has a formula or a diagram; the brows
 - click (BSD-3-Clause), dependency of x-wr-timezone
 - Pillow (MIT-CMU / HPND), profile photos (resize, orientation, metadata removal)
 - pypdf (BSD-3-Clause), reads the text layer of PDF attachments for agents and the briefing field
-- pi-heif (BSD-3-Clause; bundles libheif and libde265, LGPL-3.0, used unmodified as shared libraries, decoding only),
-  reads HEIC / HEIF photos of receipts (2.146.0); source: [bigcat88/pillow_heif](https://github.com/bigcat88/pillow_heif)
 - xlrd (BSD-3-Clause), reads old Excel files (.xls) in the legacy import of the office (2.185.0)
 - psycopg, psycopg-binary and psycopg-pool (LGPL-3.0-only), the PostgreSQL driver, used unmodified as installed libraries;
   source: [psycopg/psycopg](https://github.com/psycopg/psycopg) and [psycopg/psycopg-pool](https://github.com/psycopg/psycopg-pool).

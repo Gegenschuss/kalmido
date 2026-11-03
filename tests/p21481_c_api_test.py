@@ -397,7 +397,7 @@ j = wait_imp(Bo, iid2) if r.ok else {"state": r.status_code}
 check(j.get("state") == "preview", f"#2492: once a slot is free the same upload goes on {j.get('state')} {j.get('error')}")
 Bo.delete(B + f"/api/account/import/{iid2}")
 
-# ================================================================== #2494 push fallback, v1 export, the account export, sign-in log
+# ================================================================== #2494 #4215 push fallback, v1 export, the account export, sign-in log
 code = f"""
 import json, app
 from kalmido.notify import push
@@ -410,6 +410,8 @@ push.NTFY_URL = "https://ntfy.example.com"
 push.notify({BRUNO}, "Own server title", "Own server body", click="https://kalmido.example/#task/77", s=s)
 push.NTFY_URL = "https://ntfy.sh"
 push.notify({BRUNO}, "Chosen ntfy title", "Chosen body", click="https://kalmido.example/#task/77", s={{**s, "push_channel": "ntfy"}})
+push.NTFY_TOKEN = "own-token"
+push.notify({BRUNO}, "Token title", "Token body", click="https://kalmido.example/#task/77", s=s)
 print(json.dumps(sent))
 """
 rc, out, err_ = py(code)
@@ -417,11 +419,24 @@ try:
     sent = json.loads(out.strip().splitlines()[-1])
 except (ValueError, IndexError):
     sent = []
-check(rc == 0 and len(sent) == 3, f"#2494: three pushes went to ntfy {out[-300:]} {err_[-400:]}")
-if len(sent) == 3:
-    check("Secret" not in json.dumps(sent[0]) and "Health" not in json.dumps(sent[0]) and "#task" not in str(sent[0][2]) and not sent[0][3],
-          f"#2494: the fallback to the public ntfy.sh carries a neutral text only {sent[0]}")
-    check(sent[1][0] == "Own server title" and sent[2][0] == "Chosen ntfy title", f"#2494: own ntfy server / ntfy chosen: as before {sent[1:]}")
+# 2.499.0 (#4215): the fallback to the public ntfy.sh is off: nothing at all goes there unless ntfy was chosen; own server, a token and the chosen channel as before
+check(rc == 0 and [x[0] for x in sent] == ["Own server title", "Chosen ntfy title", "Token title"],
+      f"#4215: nothing to the public ntfy.sh on the channel Web Push; own server / ntfy chosen / token as before {out[-300:]} {err_[-400:]}")
+code = f"""
+import json, app
+from kalmido.core.db import connect
+from kalmido.notify import alerts, push
+b = {{"items": {{"{BRUNO}": 1}}, "n": 1}}
+c = connect()
+push.NTFY_URL, push.NTFY_TOKEN = "https://ntfy.sh", ""
+pub = alerts._aa_build(c, "webpush", "fallback", b)
+push.NTFY_URL = "https://ntfy.example.com"
+own = alerts._aa_build(c, "webpush", "fallback", b)
+print(json.dumps({{"pub": str(pub[1]), "own": str(own[1])}}))
+"""
+rc, out, err_ = py(code)
+txt = jout(out)
+check("stayed in the app" in txt.get("pub", "") and "went to ntfy" in txt.get("own", ""), f"#4215: the admin alert says what really happened {out[-300:]} {err_[-400:]}")
 
 
 def tok(s, scopes):

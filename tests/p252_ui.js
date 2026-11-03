@@ -114,6 +114,11 @@ async function firefox(fn) {
   check(wps && /No device subscribed for push yet\. Until then, notifications go to your ntfy topic\./.test(wps.textContent) && !wps.classList.contains('warn'), 'notifications: a neutral hint, not red: ' + wps?.textContent);
   w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [], ntfy: false})`);
   check(/Turn on “Notify on this device”/.test(wps.textContent), 'without ntfy: how to turn it on');
+  // 2.499.0 (#4215): the public ntfy.sh gets no fallback on Web Push, the hints do not promise one
+  w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [], ntfy: true, ntfy_public: true})`);
+  check(/Turn on “Notify on this device”/.test(wps.textContent), '#4215 public ntfy.sh, no device: how to turn it on, no ntfy promise: ' + wps.textContent);
+  w.eval(`wpState(document.querySelector('.smodal'), {channel: 'webpush', subs: [{}], ntfy: true, ntfy_public: true})`);
+  check(/^Web Push to 1 device\.$/.test(wps.textContent), '#4215 public ntfy.sh, one device: no ntfy promise: ' + wps.textContent);
   md.remove();
   w.eval(`settingsModal('users')`);
   md = await until(() => d.querySelector('.smodal #aa-on') && d.querySelector('.smodal'));

@@ -343,11 +343,11 @@ to *deny* and allow each app per group, so a new account does not open every app
   downloaded, never shown inline, except pictures and PDFs.
 - **Only Web Push?** Then remove ntfy topics you do not use: a topic on the public `ntfy.sh` can be read by anyone who
   knows its name.
-- **The ntfy fallback (2.148.1).** A person with the channel *Web Push* gets a message over ntfy when no device takes
-  the push (no subscribed device, an expired subscription). When that goes to the public `ntfy.sh` (the default `NTFY_URL`
-  without `NTFY_TOKEN`), it carries only "New notification in Kalmido" and the app's address, no title, no text and no
-  task link. With your own ntfy server (`NTFY_URL` elsewhere or `NTFY_TOKEN` set) or for people who chose *ntfy* as their
-  channel the messages stay as before.
+- **No fallback to the public ntfy.sh (2.499).** A person with the channel *Web Push* whose devices do not take a push
+  (none subscribed, an expired subscription) gets nothing on the public `ntfy.sh` (the default `NTFY_URL` without
+  `NTFY_TOKEN`): the message stays in the app under News, and the admins get an alert about the device problem. Whoever
+  wants `ntfy.sh` chooses the channel *ntfy*. With your own ntfy server (`NTFY_URL` elsewhere or `NTFY_TOKEN` set) the
+  message goes there in full, as before.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
   WebSocket protocol in the Android app, and let your proxy pass WebSocket upgrades.
 - **Share inbox per person (ntfy):** 2.142.0 (#2150): everyone switches it on in *Settings > Notifications > Share inbox*
@@ -1477,9 +1477,9 @@ gross (they must add up, else only the gross stays) and the invoice number. They
 sheet and the office's receipt sheet show one line *Recognised: ...* with *Take over* (sender, VAT rate and amount, one
 undo step) and *Discard*; the invoice number stays visible with a copy button.
 
-2.146.0: HEIC / HEIF photos (iPhone) are read with `pi-heif` (BSD-3-Clause, read only; its bundled libheif / libde265 are
-LGPL, no encoder) -- part of the image. An own build without it keeps working: such photos show *This server cannot read
-HEIC photos yet*. The same file is not stored twice in a workspace (upload, share and mail input compare the bytes); an
+2.146.0: HEIC / HEIF photos (iPhone) were read with `pi-heif`. Since 2.499 it is no longer in the image (discontinued, known
+holes in its bundled libraries): such photos are stored, but get no preview and no text recognition and show *This server
+cannot read HEIC photos at the moment*. The same file is not stored twice in a workspace (upload, share and mail input compare the bytes); an
 invoice that looks like an older one (same supplier and invoice number, or same supplier, amount and date) gets the
 warning *Possibly a duplicate of ...* and stays out of the DATEV batch until someone answers *No duplicate* or the export
 includes it. The receipt upload and the mail input unpack ZIP files and Outlook's `winmail.dat` in memory (PDF, pictures,
@@ -1979,7 +1979,7 @@ or a person sets the function up.
 | Built-in assistant | Task texts, notes and comments of the list the person picked, texts they type, for a day plan their busy times, to the service in `KALMIDO_AI_BASE_URL` | per call of the person | off while `KALMIDO_AI_BASE_URL` is empty (default) |
 | Similarity service | Titles and descriptions of tasks, to the service in `KALMIDO_EMBED_URL` | in the background | off while `KALMIDO_EMBED_URL` is empty (default) |
 | Agents you connect | What the agent reads, to the AI provider you connected it with | when the agent works | do not connect agents; see [AGENT-SECURITY.md](AGENT-SECURITY.md) |
-| ntfy push | Title and text of a notification, in plain text, to `NTFY_URL` (default ntfy.sh) | per notification, once a person picked a topic | do not set a topic; set `NTFY_URL` to your own server |
+| ntfy push | Title and text of a notification, in plain text, to `NTFY_URL` (default ntfy.sh) | per notification, for people who chose the channel ntfy (with an own ntfy server also when no device takes a Web Push) | do not choose ntfy; set `NTFY_URL` to your own server |
 | ntfy inbox | Poll of a person's ntfy topic | every 20 seconds, opt-in per person | person switches it off |
 | Browser push | Encrypted notification to the push service of the browser (Google, Mozilla, Apple, Microsoft) | per notification | `KALMIDO_WEBPUSH=0` |
 | Bookmark preview | Every saved bookmark address and its image are fetched by the server | when a bookmark is saved | leave the bookmarks module off |

@@ -21,6 +21,7 @@ version you pass, and make a backup first. There is no need to stop at each vers
 | 2.45 | The server key moves into a file on its own folder: `mkdir secret && chown 1000 secret` next to `data`, then restart. The installer does it. | [The server key](SELF-HOSTING.md#first-setup-and-the-server-key) |
 | 2.46 | One kind of server: the instance mode is gone; its variable is only read for the row-level security check (see ENV.md). | CHANGELOG 2.46.0 |
 | 2.149 | `.env` needs a `COMPOSE_PROFILES` line (for example `COMPOSE_PROFILES=localdb,clamav`) and Docker Compose 2.20 or newer. The installer adds the line. | [Update, downgrade and restore](SELF-HOSTING.md#update-downgrade-and-restore) |
+| 2.499 | On the channel *Web Push* nothing goes to the public `ntfy.sh` any more. If you had subscribed to your random topic there as a backup, switch to the channel *ntfy* under *Settings > Notifications*. An own ntfy server changes nothing. | [Installed app and push](SELF-HOSTING.md#installed-app-pwa-and-push) |
 
 ## Format limits: going back
 
