@@ -51,3 +51,5 @@ p2147_a_ui 2026-11-17 #4039 rot in der Vorprüfung über a19ce221, zweimal grün
 p2425_c_ui 2026-11-17 #4042 rot in der Vorprüfung über b2d93cd9, zweimal grün auf dem Mac b2d93cd97eaf (#1814): red 03.11.2026 06:29; green Mac 20261103-062913-463670-s1, Mac 20261103-063251-483045-s1 (same code)
 p2115_a_ui 2026-11-17 #4044 rot in der Vorprüfung über 47d912c1, zweimal grün auf dem Mac 47d912c18b7e (#1814): red 03.11.2026 09:35; green Mac 20261103-093600-1348713-s1, Mac 20261103-093754-1368334-s1 (same code)
 p21383_b_ui 2026-11-17 #4045 rot in der Vorprüfung über 47d912c1, zweimal grün auf dem Mac 47d912c18b7e (#1814): red 03.11.2026 09:35; green Mac 20261103-093600-1348713-s1, Mac 20261103-093754-1368334-s1 (same code)
+p2190_family_ui 2026-11-17 #4049 rot in der Vorprüfung über 0b37b164, zweimal grün auf dem Mac 0b37b1640ce9 (#1814): red 03.11.2026 12:37; green Mac 20261103-123757-2663693-s1, Mac 20261103-124250-2678506-s1 (same code)
+p23672_notify 2026-11-17 #4050 rot in der Vorprüfung über 0b37b164, zweimal grün auf dem Mac 0b37b1640ce9 (#1814): red 03.11.2026 12:37; green Mac 20261103-123757-2663693-s1, Mac 20261103-124250-2678506-s1 (same code)
