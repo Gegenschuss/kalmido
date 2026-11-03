@@ -492,6 +492,7 @@ def v1_list(d):
             "ticket_key": d.get("ticket_key") or None,  # 2.390.0 (#3353): the project's key APP (its tasks: APP-1, APP-2, ...)
             "time_tracking": bool(d.get("time_tracking")),  # 2.41.0 (#1471): time tracking on for this list
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
+            "mail_guests": bool(d.get("mail_guests")),  # 2.395.0 (#3380): guests read the project's filed e-mails (read only here)
             "irreversible_needs_yes": bool(d.get("irreversible_needs_yes")),  # 2.392.0 C (#3370): the gates wait for a person's yes to one-way tasks
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)

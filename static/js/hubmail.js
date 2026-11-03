@@ -41,8 +41,10 @@ const hbm_state = key => {
 function hbm_headHtml(key) {
   const j = HBM.s[key]?.j;
   const nw = typeof hmb_newBtn === 'function' ? hmb_newBtn(key, j) : '';  // 2.141.0 A (#2138): hubmailbox.js
-  if (!j || key.startsWith('inbox') || !j.can_address) return nw;
-  return `${nw}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('E-mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
+  // 2.395.0 (#3380): the owner / a project admin decides whether guests (participant / view) read the project's mails (default off)
+  const gs = j && j.can_guests ? `<label class="chkl hbmguests" title="${esc(tr('E-mails often hold customer data and attachments'))}"><input type="checkbox" data-hbmguests="${esc(key)}" ${j.guests ? 'checked' : ''}> ${tr('Guests can read e-mails')}</label>` : '';
+  if (!j || key.startsWith('inbox') || !j.can_address) return nw + gs;
+  return `${nw}${gs}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('E-mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
 }
 function hbm_listHtml(key) {
   const s = HBM.s[key], j = s?.j, inbox = key.startsWith('inbox');
@@ -74,6 +76,7 @@ function hbm_clientHtml(c) {
 function hbm_projHtml(l) {
   if (!l || l.is_inbox || l.e2e) return '';
   const key = 'list:' + l.id, j = hbm_state(key).j;
+  if (j && j.can_read === false) return '';  // 2.395.0 (#3380): a guest without the project's switch sees no e-mails section
   if (!j || (!j.enabled && !j.can_send && !j.total && !(HBM.s[key].q || '').trim())) return '';  // shown once loaded (2.141.0 A: or sending works)
   return `<section class="povs hbmsec hbmpov" id="pov-mails"><div class="povh"><h3>${tr('E-mails')}</h3></div>${hbm_bodyHtml(key)}</section>`;
 }
@@ -253,6 +256,12 @@ function hbm_addrMenu(b, key, ws) {
 }
 
 // ---- events
+document.addEventListener('change', async e => {  // 2.395.0 (#3380): the switch "Guests can read e-mails"
+  const k = e.target.dataset?.hbmguests; if (!k) return;
+  const on = e.target.checked, lid = +k.split(':')[1];
+  try { await api('PATCH', `/api/lists/${lid}`, {mail_guests: on}); } catch { e.target.checked = !on; return; }
+  hbm_load(k); toast(on ? tr('Guests can read the e-mails of this project') : tr('Only editors read the e-mails of this project'));
+});
 document.addEventListener('input', e => {
   const k = e.target.dataset?.hbmq; if (!k) return;
   const s = HBM.s[k]; if (!s) return;

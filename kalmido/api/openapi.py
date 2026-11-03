@@ -303,6 +303,7 @@ def openapi_spec():
             "ticket_key": nul("string", description="2.390.0: the project's ticket key (2-6 capitals / digits, a letter first, unique per workspace); "
                               "its tasks get keys like APP-12 (field key of a task); null = none"),
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "mail_guests": {"type": "boolean", "description": "2.395.0 (#3380): guests of the project (participant / view) read its filed e-mails (GET /mails); default off, set by the owner / a project admin in the app. Edit roles always read them"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},

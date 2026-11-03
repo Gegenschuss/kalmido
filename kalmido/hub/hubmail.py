@@ -18,7 +18,9 @@ like the other office texts, core/orgcrypt.py FIELDS; 2.306.0 A (#2885): a priva
 attachment out, a full quota all of them (a note on the mail). The search uses hashed words (hub_words, the documents'
 index key per workspace, docs/store.py), never a plain index.
 
-Visibility (strict): a project's mail = whoever sees the list, a client's mail = whoever sees the client, a mail that is
+Visibility (strict): a project's mail = whoever may edit the list (2.395.0 #3380: owner, admin, edit; guests -- participant,
+view, an organisation reader -- only with the project's switch lists.mail_guests, default off, set by a project admin; agents
+and API tokens follow their account's role), a client's mail = whoever sees the client, a mail that is
 not assigned = its recipient; always inside the mail's workspace (client / list of another organisation = nobody).
 Writing (assign, delete, restore) = the write right on the list / for a client its mail's recipient, who created the
 client or an organisation admin (2.360.0) / the recipient. Agents and kid
@@ -37,7 +39,7 @@ from ..core.config import app
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc
-from ..core.access import Denied, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql
+from ..core.access import Denied, MANAGE_ROLES, WRITE_ROLES, acx_of, list_role, list_roles, need_list, reading_sql, vis_sql
 from ..core.orgcrypt import FIELDS, OrgCryptError, PREFIX, oc_active_for, oc_dec_fields, oc_enc_fields, oc_is_enc, oc_plain_safe
 from ..accounts.session import me
 from ..files.fslock import fsl_need_plain  # 2.353.0 F (#2758)
@@ -112,8 +114,23 @@ _NO_MAIL = f"(l.is_inbox<>0 OR COALESCE(l.life, '')<>'' OR COALESCE(l.family, ''
 
 
 def _list_row(c, lid):
-    return c.execute(f"SELECT l.id, l.name, l.org_id, l.kind, l.is_inbox, l.client_id, l.e2e, {_NO_MAIL} AS no_mail FROM lists l WHERE l.id=?",
+    return c.execute(f"SELECT l.id, l.name, l.org_id, l.kind, l.is_inbox, l.client_id, l.e2e, l.mail_guests, {_NO_MAIL} AS no_mail "
+                     "FROM lists l WHERE l.id=?",
                      (lid,)).fetchone()
+
+
+def hbm_list_read(role, guests):
+    """2.395.0 (#3380): may a role of a project read its filed e-mails? Edit roles yes; guests (participant / view) only with the
+    project's switch mail_guests on. Mails often hold customer data and attachments."""
+    return role in WRITE_ROLES or bool(role and guests)
+
+
+def _mail_guests(c, lids):
+    """{list id: switch mail_guests} for the lists lids (one query)."""
+    if not lids:
+        return {}
+    q = ",".join("?" * len(lids))
+    return {int(r[0]): bool(r[1]) for r in c.execute(f"SELECT id, mail_guests FROM lists WHERE id IN ({q})", list(lids))}
 
 
 def hbm_can(c, uid, m, write=False):
@@ -123,7 +140,7 @@ def hbm_can(c, uid, m, write=False):
         if not l or (l["org_id"] or None) != (m["org_id"] or None):
             return False
         role = list_role(c, m["list_id"], uid)
-        return role in WRITE_ROLES if write else bool(role)
+        return role in WRITE_ROLES if write else hbm_list_read(role, l["mail_guests"])
     if m["client_id"]:
         cl = _visible_client(c, uid, m["client_id"])
         if not cl or (cl["org_id"] or None) != (m["org_id"] or None):
@@ -157,7 +174,8 @@ def hbm_node_sql(c, uid):
         return "SELECT 0 WHERE FALSE"
     filed = "(m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)"
     lids = [r[0] for r in c.execute(f"SELECT DISTINCT m.list_id FROM hub_mails m WHERE {filed} AND m.list_id IN {vis_sql()}", (uid, uid))]
-    lids = sorted(int(x) for x, role in list_roles(c, uid, lids).items() if role)
+    mg = _mail_guests(c, lids)
+    lids = sorted(int(x) for x, role in list_roles(c, uid, lids).items() if hbm_list_read(role, mg.get(int(x))))  # 2.395.0 (#3380)
     cids = sorted(int(r["id"]) for r in client_rows(c, uid))
     orgs = sorted(int(x) for x in acx_of(c, uid).org_ids)
     w = [f"(m.list_id IS NULL AND m.client_id IS NULL AND m.owner_id={int(uid)} AND "
@@ -457,6 +475,9 @@ def hbm_mails():
         rows = c.execute("SELECT * FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (l["id"], l["org_id"])).fetchall()
         addr, can = _address_of(c, "list", uid, l["org_id"], None, l["id"]), role in WRITE_ROLES and not l["no_mail"] and not l["e2e"]
+        # 2.395.0 (#3380): may I read the project's mails at all; the switch for guests (project admin only)
+        extra = {"can_read": hbm_list_read(role, l["mail_guests"]), "guests": bool(l["mail_guests"]),
+                 "can_guests": role in MANAGE_ROLES and not l["no_mail"] and not l["e2e"]}
     elif request.args.get("unassigned") in ("1", "true"):
         rows = c.execute("SELECT * FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
@@ -471,7 +492,7 @@ def hbm_mails():
     org = cl["org_id"] if a.get("client_id") else l["org_id"] if a.get("list_id") else None
     send = bool(can) and not request.args.get("unassigned") and mbx_can_send(c, org or None, uid)
     return jsonify(enabled=hbm_on(), address=addr if hbm_on() else "", can_address=bool(can) and hbm_on(), total=len(rows),
-                   mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]], can_send=send)
+                   mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]], can_send=send, **(extra if a.get("list_id") else {}))
 
 
 @app.get("/api/hubmail/inbox")

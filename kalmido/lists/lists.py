@@ -30,6 +30,7 @@ LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist
 LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
 LIST_FIELDS += ("points_on",)  # 2.60.0 (#1511): story points shown in the app (owner; default off)
 LIST_FIELDS += ("irreversible_needs_yes",)  # 2.392.0 C (#3370): one-way tasks wait for a person's yes at the gates (owner; default off)
+LIST_FIELDS += ("mail_guests",)  # 2.395.0 (#3380): guests of the project read its filed e-mails (owner + project admins; default off)
 LIST_FIELDS += ("def_ttype",)  # 2.483.0 (#3916): default type of new tasks (owner; '' | bug | feature | task, needs ticket types on)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
@@ -283,7 +284,7 @@ def clean_list_value(k, v, member=False):
         return v
     if k in ("archived", "checklist", "dep_shift", "tickets", "time_tracking"):
         return 1 if v else 0
-    if k in ("points_on", "irreversible_needs_yes"):  # 2.60.0 (#1511); 2.392.0 C (#3370)
+    if k in ("points_on", "irreversible_needs_yes", "mail_guests"):  # 2.60.0 (#1511); 2.392.0 C (#3370); 2.395.0 (#3380)
         return 1 if v else 0
     if k == "def_ttype":  # 2.483.0 (#3916)
         v = v or ""
@@ -593,6 +594,7 @@ def list_update(lid):
         if adm and is_agent(g.user):  # 2.82.0 (#1467): agents never rename / recolour / archive a list (#1431 is for people)
             adm = ()
         adm += ("checklist",) if role == "admin" else ()  # 2.410.0 (#3440): "Show completed at the bottom", like done_in_section
+        adm += ("mail_guests",) if role == "admin" and not is_agent(g.user) else ()  # 2.395.0 (#3380): a project admin, never an agent
         if "rate" in b or "ticket_tpl" in b or "day_hours" in b or any(k in b for k in LIST_FIELDS if k not in MEMBER_LIST_FIELDS + adm):
             return err(tr("Only the owner can change this project"), 403)
         if adm and ("name" in vals or "color" in vals):
@@ -604,6 +606,8 @@ def list_update(lid):
             if "name" in vals and vals["name"] != lr["name"]:
                 c.execute("UPDATE lists SET name=? WHERE id=?", (vals["name"], lid))
                 lm_owner_news(c, lr, "lrename", extra={"old": lr["name"], "name": vals["name"]})  # colour / icon: no news
+        if "mail_guests" in adm and "mail_guests" in vals:  # 2.395.0 (#3380)
+            c.execute("UPDATE lists SET mail_guests=? WHERE id=?", (vals["mail_guests"], lid))
         if "checklist" in adm and "checklist" in vals:  # 2.410.0 (#3440)
             c.execute("UPDATE lists SET checklist=? WHERE id=?", (vals["checklist"], lid))
         if adm and "archived" in vals:

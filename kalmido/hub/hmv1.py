@@ -3,8 +3,9 @@
 A token reads the mails filed with a client or a project only, never the mails "Not assigned" (not even its own person's:
 those stay in the app's hub inbox), never a deleted one. The app routes /api/hubmail/* keep their 403 for agents (_gate);
 this module has its own checks:
-- a project's mail: the token's user sees the project (list_role: the token's list restriction, an agent's data lock and
-  its shares) and the project lies in the mail's workspace (hbm_can);
+- a project's mail: the token's user may read the project's mails (list_role: the token's list restriction, an agent's data
+  lock and its shares; 2.395.0 #3380: an edit role, a guest role only with the project's switch mail_guests) and the project
+  lies in the mail's workspace (hbm_can);
 - a client's mail: a PERSON's token -- the person sees the client (team/clients.py client_rows) in the mail's workspace;
   an AGENT (client_rows gives agents no clients) and a person's token limited to some projects -- the client is in the
   mail's workspace, not in the trash, and the token's user sees at least one project of that client in the same
@@ -24,7 +25,7 @@ from ..core.i18n import tr
 from ..core.errors import BadInput
 from ..tasks.validation import as_int
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
-from .hubmail import HBM_PAGE, _search, _visible_client, hbm_can, hbm_public
+from .hubmail import HBM_PAGE, _search, _visible_client, hbm_can, hbm_list_read, hbm_public
 
 HMV_ORDER = "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000"
 HMV_LIMIT, HMV_LIMIT_MAX = 100, 500  # like api/v1.py API_PAGE_DEFAULT / API_PAGE_MAX
@@ -110,9 +111,9 @@ def v1_hub_mails():
         rows = c.execute("SELECT * FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,
                          (cid, k["org_id"])).fetchall()
     else:
-        if not list_role(c, lid):
+        lo = c.execute("SELECT org_id, mail_guests FROM lists WHERE id=?", (lid,)).fetchone()
+        if not lo or not hbm_list_read(list_role(c, lid), lo["mail_guests"]):  # 2.395.0 (#3380): guests only with the switch
             raise Denied(404)
-        lo = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
         if hmv_locked(c, uid, lo["org_id"] if lo else None):
             raise Denied(404)
         rows = c.execute("SELECT * FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,

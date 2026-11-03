@@ -16045,5 +16045,9 @@
   "Request blocked": "Anfrage blockiert",
   "The page was open too long. Start the connection in the app again.": "Die Seite war zu lange offen. Starte die Verbindung in der App neu.",
   "Please choose an agent.": "Bitte wähle einen Agenten.",
-  "The app sent an invalid request. Start the connection in the app again.": "Die App hat eine ungültige Anfrage geschickt. Starte die Verbindung in der App neu."
+  "The app sent an invalid request. Start the connection in the app again.": "Die App hat eine ungültige Anfrage geschickt. Starte die Verbindung in der App neu.",
+  "Guests can read e-mails": "Gäste dürfen E-Mails lesen",
+  "E-mails often hold customer data and attachments": "E-Mails enthalten oft Kundendaten und Anhänge",
+  "Guests can read the e-mails of this project": "Gäste dürfen die E-Mails dieses Projekts lesen",
+  "Only editors read the e-mails of this project": "Nur Bearbeitende lesen die E-Mails dieses Projekts"
 }
