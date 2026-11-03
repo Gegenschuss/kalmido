@@ -562,7 +562,7 @@ function renderTop0() {
   if (mg_title(m) && !S.me?.kid && !(sbb_on() && mg_areaOf(m)?.[0] !== 'office')) title = mg_title(m);  // 2.44.0 (#1187): the area's name, its tabs below; 2.152.2 (#2618): sidebar B has no tabs, the part's own name (the office's page has its own heading)
   if (sbb_on() && mg_areaOf(m)?.[0] === 'office' && !S.me?.kid && typeof ofm_cur === 'function') { const oit = ofm_all().find(i => i.key === ofm_cur(m)); if (oit) title = tr(oit.name); }  // 2.224.0 B (#2816): the big heading of an office page = its name ("Office" stands above the panel)
   let acts = '';
-  if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri" data-act="list-new" aria-haspopup="menu">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects
+  if (m === 'tasks' && k === 'projects') acts += `<button class="btn sm pri tnewp" data-act="list-new" aria-haspopup="menu" title="${esc(tr('New project'))}" aria-label="${esc(tr('New project'))}">${ic('plus', 's')}<span>${tr('New project')}</span></button>`;  // 2.417.0 A (#3559): the start page of Projects; 2.498.0 (#3854): a narrow phone: the symbol
   if (m === 'tasks' && (k.startsWith('l:') || k === 'inbox')) {
     const l = k === 'inbox' ? inbox() : listById(+k.slice(2));
     if (l) {
@@ -626,10 +626,13 @@ function renderTop0() {
 //   tl4  New task moves into "…" too (.tf4), the open count goes, the status chip is only its dot + number; Search stays
 //        (2.18.0, #651), and when even tl4 does not fit, the title is cut below its 12 characters (ellipsis; the h1 keeps
 //        the whole title as its tooltip and for screen readers)
+//   tl5  2.498.0 (#3854), phones only (on top of tl4): the workspace sign moves into "…" (.tf5); title and bell come first
+//   tl6  phones only: the agents' sign too (.tf6; the status chip keeps its running timer): it says who is working, so it goes last
 // jsdom has no layout (every width is 0), so there everything fits at level 0.
 const TOP_LVLS = 4;
 let topW = 0;
-function topLevel() { const t = $('#top'); const m = t && /\btl(\d)\b/.exec(t.className); return m ? +m[1] : 0; }
+const topMax = () => isMobile() ? 6 : TOP_LVLS;
+function topLevel() { const t = $('#top'); const m = t && [...t.className.matchAll(/\btl(\d)\b/g)].pop(); return m ? +m[1] : 0; }
 // width the first 12 characters of the title need (with "…"), measured on its text
 function topNeed(ht, k = 12) {  // 2.18.0 (#651): k = fewer characters when even the last level does not fit
   const n = ht && ht.firstChild; if (!n || n.nodeType !== 3) return 0;
@@ -657,7 +660,7 @@ function fitTop() {
   // (6, 4, 2 + "…"), never none
   let cut = null;
   const set = l => {
-    for (let i = 1; i <= TOP_LVLS; i++) t.classList.toggle('tl' + i, i === l);
+    for (let i = 1; i <= 6; i++) t.classList.toggle('tl' + i, i === l || (i >= 4 && i < l));
     if (more) more.hidden = !topMoreItems().length;
     // the title never gets less than its first 12 characters (plus its icon / badge / count): the rest has to make room
     if (h1 && nd) {
@@ -673,11 +676,13 @@ function fitTop() {
   // levels (tl3 / tl4: view switch, undo / redo, Share, New task into "…") are only taken when nothing fits with the title
   // cut to its minimum at a non-folding level (tl0 - tl2 only make the pills more compact)
   let best = -1, wide = -1, ww = -1;
-  for (let l = 0; l <= TOP_LVLS; l++) {
+  const top = topMax();
+  for (let l = 0; l <= top; l++) {
     if (l >= 3 && wide >= 0) break;  // the title is already cut to >= 12 characters without folding anything
     // 2.26.x (1280 px, wide sidebar + task panel): before the view switch folds into "…", the title shortens further
     // (6 characters + "…") at the last non-folding level
-    if (l === 3 && nd) { cut = topNeed(ht, 6); set(2); if (topFits(t, ht, cut)) return; cut = null; }
+    // 2.498.0 (#3854): a phone has no view switch up there: the signs give way, not the title
+    if (l === 3 && nd && !isMobile()) { cut = topNeed(ht, 6); set(2); if (topFits(t, ht, cut)) return; cut = null; }
     if (l) set(l);
     const f = topFits(t, ht, nd);
     if (f === 2) { best = l; break; }
@@ -686,9 +691,9 @@ function fitTop() {
     if (f && w > ww + 4) { wide = l; ww = w; }
   }
   if (best < 0 && wide < 0 && nd) {
-    for (const k of [6, 4, 2]) { cut = topNeed(ht, k); set(TOP_LVLS); if (topFits(t, null, null)) return; }
+    for (const k of [6, 4, 2]) { cut = topNeed(ht, k); set(top); if (topFits(t, null, null)) return; }
   }
-  set(best >= 0 ? best : wide >= 0 ? wide : TOP_LVLS);
+  set(best >= 0 ? best : wide >= 0 ? wide : top);
 }
 if (document.fonts?.ready) document.fonts.ready.then(() => fitTop()).catch(() => {});
 if (typeof ResizeObserver !== 'undefined') {
@@ -696,12 +701,12 @@ if (typeof ResizeObserver !== 'undefined') {
   const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => { if (t.clientWidth !== topW) fitTop(); }); topRO.observe(t); };
   domReady(topWatch);  // 2.191.0 B (#2505): defer
 } else addEventListener('resize', () => fitTop());
-// the header items that moved into "…" (tl3 / tl4), as menu items that click the hidden button
+// the header items that moved into "…" (tl3 - tl6), as menu items that click the hidden button
 function topFolded() {
   const l = topLevel(); if (l < 3) return [];
-  const els = $$('#top .tf [data-act], #top [data-act].tf' + (l >= 4 ? ', #top [data-act].tf4' : ''));
+  const els = $$('#top .tf [data-act], #top [data-act].tf' + (l >= 4 ? ', #top [data-act].tf4' : '') + (l >= 5 ? ', #top [data-act].tf5' : '') + (l >= 6 ? ', #top [data-act].tf6' : ''));
   return els.filter(b => !b.disabled || b.closest('.hist')).map(b => ({label: (b.getAttribute('aria-label') || b.title || b.textContent || '').replace(/\s*\([^)]*\)\s*$/, '').trim(), icon: b.dataset.ico || (/hist-undo/.test(b.dataset.act) ? 'undo' : /hist-redo/.test(b.dataset.act) ? 'redo' : ''),
-    on: b.classList.contains('on'), dis: b.disabled, fn: () => b.click()}));
+    on: b.classList.contains('on'), dis: b.disabled, fn: () => (b.isConnected ? b : $(`#top [data-act="${b.dataset.act}"]`) || b).click()}));  // 2.498.0 (#3854): a live redraw while the menu is open
 }
 // UX1 (U01, owner decision 4): the header's "…" menu. Phones: "Undo: …" / "Redo: …" first (no ← → there), then the rarer
 // view actions (select, sort), then the list's own menu or the filter

@@ -1,0 +1,25 @@
+/* 2.498.0 (#3854): phone layout down to 320 px (start styles, see start-base.css). Sent behind app.css, so these rules
+   come after the view switch and top bar rules there. */
+/* 2.498.0 (#3854): the phone-only header levels tl5 / tl6 (fitTop in render.js): the workspace sign, then the agents' sign, go into "…";
+   a running timer of the status chip stays in sight */
+#top.tl5 .tf5,#top.tl6 .achip{display:none!important}
+#top.tl6 .stchip .sta{display:none}
+/* 2.498.0 (#3854): with many views the chosen tab shows its whole name or only the symbol, never "L…": a name that does not
+   fit wraps onto a second line, and that one stays clipped */
+.vsegm.many button.on{flex-wrap:wrap;align-content:flex-start;height:2.25rem;overflow:hidden}
+.vsegm.many button.on>svg.i{height:2.25rem}
+.vsegm.many button.on>span{flex:none;overflow:visible;line-height:2.25rem}
+/* 2.498.0 (#3854): a narrow phone: "New project" is its symbol; the workspace sign a real 44 px target, the name keeps the sidebar */
+@media (max-width:767px){
+  #top:is(.tl1,.tl2,.tl3,.tl4) .tnewp>span{display:none}
+  #top:is(.tl1,.tl2,.tl3,.tl4) .tnewp{padding:0;min-width:2.75rem;justify-content:center}
+}
+@media (max-width:767px) and (pointer:coarse){
+  #top h1:has(.wsbadge){overflow:visible}
+  #top :is(.wschip,.wsbadge){position:relative;min-width:2.75rem;justify-content:center}
+  #top :is(.wschip,.wsbadge)::after{content:"";position:absolute;left:0;right:0;top:50%;height:2.75rem;margin-top:-1.375rem}
+}
+@media (max-width:359px){
+  #side :is(.srow,.fhead) :is(.sbc-sl,.o3c-ring,.shr:not(.bellm)){display:none}
+  #side .srow:not(.reorder):has(.shk){padding-right:.5rem}
+}

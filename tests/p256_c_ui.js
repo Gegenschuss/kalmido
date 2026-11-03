@@ -64,7 +64,8 @@ const FEAT = 'cal,collab,agents,comments,progress';
     await shot(`p256c-${w}-${theme}.png`);
   };
   await firefox(async o => { await run(o, 1440, 'light', false); await run(o, 1440, 'dark', false); }, false);
-  await firefox(async o => { await run(o, 390, 'light', true); await run(o, 390, 'dark', true); await run(o, 344, 'light', true); await run(o, 680, 'dark', true); }, true);
+  await firefox(async o => { await run(o, 390, 'light', true); await run(o, 390, 'dark', true); await run(o, 360, 'light', true);  // 2.498.0 (#3854): below 360 px the columns give way to the name (p2498_a_phone320_ui)
+     await run(o, 680, 'dark', true); }, true);
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

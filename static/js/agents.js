@@ -120,7 +120,7 @@ function agentChip() {
   // 2.7.2 (#417): a robot always leads (the agents' status), the dots follow it
   const lead = `<span class="abot" aria-hidden="true">${ic('bot', 's')}</span>` + (ags.length ? hdotsHtml(ags) : ab.busy.length === 1 ? av(ab.busy[0].id, ab.busy[0].name, 'avatar sm') : '');
   const ring = st === 'working' ? 'aspin' : st === 'waiting' ? 'await' : '';
-  return `<button class="achip ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
+  return `<button class="achip tf6 ${ab ? 'busy' : 'calm'} ${attn ? 'attn' : ''} ${ring || ''}" data-act="agent-chip" data-ico="bot" aria-haspopup="menu" title="${esc(tip)}" aria-label="${esc(lab)}">${lead}${ab ? `<span class="act">${esc(txt)}</span><span class="acn" aria-hidden="true">${ab.n}</span>` : ''}</button>`;  // 2.5.2 (K01): phones show the bot + a number
 }
 // ---- 2.8.0 (#434) the agent band under the list / project header (desktop + tablets): every shown agent of the view
 // (a list: its agents; a folder: the agents of its lists; Inbox / Today / Next 7 days / All / Assigned: all shown agents)
@@ -201,7 +201,7 @@ function stChip() {
   const x = it[0], who = ab ? (ab.busy.length === 1 ? ab.busy[0].name : tr('Agents')) : ags.map(a => `${a.name} ${agentSt(a)}`).join(', ');
   const lab = [who, ...it.map(r => `${tr(RUN_KIND[r.k][1])} ${r.txt}`)].join(' · ');
   const st = ab ? agentBusyState() : '';
-  return `<button class="stchip ${ab && (ab.wait || ab.unread) ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" title="${esc([lab, ...ags.map(agentHstLine)].join('\n'))}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta"><span class="abot">${ic('bot', 's')}</span>${ags.length ? hdotsHtml(ags, 3) : ''}${ab ? `<b>${ab.n}</b>` : ''}</span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
+  return `<button class="stchip tf6 ${ab && (ab.wait || ab.unread) ? 'attn' : ''} ${st === 'working' ? 'aspin' : ''}" data-act="st-chip" data-ico="bot" title="${esc([lab, ...ags.map(agentHstLine)].join('\n'))}" aria-label="${esc(lab)}" aria-haspopup="menu"><span class="sta"><span class="abot">${ic('bot', 's')}</span>${ags.length ? hdotsHtml(ags, 3) : ''}${ab ? `<b>${ab.n}</b>` : ''}</span><span class="str k-${x.k}"><span class="rec"></span>${it.length === 1 ? `<span ${x.attr}>${x.txt}</span>` : `<b>${it.length}</b>`}</span></button>`;
 }
 function stChipMenu(a) {
   const ab = agentBusy(), ags = shownAgents(), it = runItems();
