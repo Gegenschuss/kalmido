@@ -48,7 +48,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await sleep(600);
     let d = await ev(drawer);
     check(d.open && d.scrim, '#3847: no kept view: the drawer stays open ' + JSON.stringify(d));
-    // a view in the organisation, then away and back: the kept view is restored, the drawer still stays
+    // a view in the organisation, then away and back: the drawer still stays
+    // 2.497.0 (#4048): the page stays through both switches (no page kept per workspace any more)
     await ev(`(() => { go('cal'); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#side.open')`, 20), '#3847: an entry tapped right after a switch without a route closes the drawer');
     await open(ev);
@@ -57,7 +58,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(d.open && d.ws === 'private', '#3847: switch to Private: the drawer stays ' + JSON.stringify(d));
     await ev(`(() => { wsSet('org:${ORG}'); return 1; })()`); await sleep(900);
     d = await ev(drawer);
-    check(d.open && d.scrim && d.ws === 'org:' + ORG && /cal/.test(d.hash), '#3847: kept view restored (calendar) and the drawer stays ' + JSON.stringify(d));
+    check(d.open && d.scrim && d.ws === 'org:' + ORG && /cal/.test(d.hash), '#3847: the calendar stays and the drawer stays ' + JSON.stringify(d));
     check(await ev(`(() => { const t = document.querySelector('#kbar .kbsw, #side .wsbar'); return !!t && (t.textContent || '').includes('Studio'); })()`), '#3847: the switch shows the new workspace');
     // the hold does not leak: a later page change closes the drawer as before
     await ev(`(() => { go('today'); return 1; })()`); await sleep(700);

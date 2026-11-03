@@ -34,7 +34,8 @@ const toastText = w => { const t = w.document.querySelector('#toast'); return t 
   await until(() => w.eval('S.route.mod') !== 'habits');
   await sleep(300);
   check(w.eval('wsCur()') === OW, '#3950: the workspace is the organisation ' + w.eval('wsCur()'));
-  check(w.eval('S.route.mod') === 'tasks' && w.eval('S.route.key') === w.eval('START_KEY'), '#3950: its start page is shown ' + w.eval('S.route.mod + "/" + S.route.key'));
+  // 2.497.0 (#4048): the area does not exist in the organisation -> Start (the page called Start, was the inbox)
+  check(w.eval('S.route.mod') === 'home', '#3950: its start page is shown ' + w.eval('S.route.mod + "/" + S.route.key'));
   check(!/Switched to/.test(toastText(w)), '#3950: a deliberate switch gives no note');
   await until(async () => ((await call('GET', '/api/state')).settings || {}).workspace === OW);
   check(((await call('GET', '/api/state')).settings || {}).workspace === OW, '#3950: the server knows the organisation');

@@ -31,82 +31,100 @@ const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation'))
 const p61b_WS = {};
 const p61b_wsOn = (name, fn) => { p61b_WS[name] = fn; };
 const p61b_wsRun = after => { for (const [n, fn] of Object.entries(p61b_WS)) { try { fn(after); } catch (x) { console.error('workspace switch', n, x); } } };
-// 2.397.0 (#3404): every workspace keeps its view on this device (LS wsView = {'private' | 'org:<id>': {...}}): the page
-// (hash), the open task, the scroll position of the view (and of the office's own scroll box), the sidebar's open groups and
-// folders and the per-device choices of its areas (WSV_KEYS). "All workspaces" has none: switching to it keeps what is shown
-// and only adds the other workspaces' data, and nothing done there is written back. WSV = the workspace + page route() drew
-// last; a jump from outside (link, notification, search, wsFollow) wins, and the next save makes it that workspace's view.
+// 2.397.0 (#3404): every workspace keeps its state on this device (LS wsView = {'private' | 'org:<id>': {...}}): the sidebar's
+// open groups and folders and the per-device choices of its areas (WSV_KEYS). "All workspaces" has none: nothing done there
+// is written back. WSV = the workspace route() drew last.
+// 2.497.0 (#4048): the page itself is no longer kept per workspace (it was #3404's target rule): a switch stays in the area
+// shown (ws_target); the scroll position of a view per workspace comes from viewmem.js (the workspace is part of its key)
 const WSV_KEYS = ['lastKey', 'sbbLast', 'mgTab', 'ofmLast', 'sideOpenG', 'sideGroups', 'sbbOpen', 'newsFilter', 'newsKind', 'jobsFilter'];
-const WSV = {ws: '', hash: ''};
+const WSV = {ws: ''};
 const wsv_hashNow = () => location.hash.slice(1) || keyToHash(S.route?.key || START_KEY);
 const wsv_folders = ws => folderNames().filter(f => S.lists.some(l => !l.is_inbox && fUnder(l.folder, f) && wsOf(l) === ws));
-function wsv_save(ws, hash) {
+function wsv_save(ws) {
   if (!ws || ws === 'all' || !wsOn()) return;
-  const v = $('#view'), all = LS.get('wsView', {}) || {};
-  all[ws] = {hash, top: v?.scrollTop || 0, oft: $('#view .ofbody')?.scrollTop || 0, sel: S.sel || null,
-    ls: Object.fromEntries(WSV_KEYS.map(k => [k, LS.get(k, null)])), shut: wsv_folders(ws).filter(f => foldClosed(f))};
+  const all = LS.get('wsView', {}) || {};
+  all[ws] = {ls: Object.fromEntries(WSV_KEYS.map(k => [k, LS.get(k, null)])), shut: wsv_folders(ws).filter(f => foldClosed(f))};
   LS.set('wsView', all);
 }
-// route(): before a new page replaces the one of the same workspace (r = the parsed new route, after it: wsv_seen)
-const wsv_leave = () => { if (WSV.ws && WSV.ws === wsCur()) wsv_save(WSV.ws, WSV.hash); };
-function wsv_seen(r) { WSV.ws = wsCur(); WSV.hash = r.task || r.prop || r.msg || r.snooze || r.complete || r.nagoff ? keyToHash(S.route.key) : wsv_hashNow(); }
-addEventListener('pagehide', () => { if (WSV.ws === wsCur()) wsv_save(WSV.ws, wsv_hashNow()); });  // reloading / closing the app keeps the scroll position
-document.addEventListener('visibilitychange', () => { if (document.hidden && WSV.ws === wsCur()) wsv_save(WSV.ws, wsv_hashNow()); });
+// route(): before a new page replaces the one of the same workspace (after it: wsv_seen)
+const wsv_leave = () => { if (WSV.ws && WSV.ws === wsCur()) wsv_save(WSV.ws); };
+const wsv_seen = () => { WSV.ws = wsCur(); };
+addEventListener('pagehide', () => { if (WSV.ws === wsCur()) wsv_save(WSV.ws); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && WSV.ws === wsCur()) wsv_save(WSV.ws); });
 // the open task stays only when it belongs to the workspace now shown
 const wsv_taskIn = (id, ws) => { const t = id && taskById(id); return !!t && !t.deleted_at && inWs(listById(t.list_id), ws); };
 // closing it here takes no Back step (a phone's task entry would land on the old workspace's page): the entry is cleared
 const wsv_close = () => { closeDetail(true); if (history.state?.detail) history.replaceState(null, '', location.hash); };
-// the scroll position once the page is drawn tall enough (it may load first); a page that stays shorter takes what it has
-function wsv_scroll(top, oft) {
-  const mod = S.route.mod, key = S.route.key;
-  let n = 0;
-  const step = () => {
-    if (S.route.mod !== mod || S.route.key !== key) return;
-    const v = $('#view'), of = oft ? $('#view .ofbody') : null;
-    const okV = !!v && v.scrollHeight - v.clientHeight >= top, okO = !oft || (!!of && of.scrollHeight - of.clientHeight >= oft);
-    if ((okV && okO) || ++n > 180) { if (v) v.scrollTop = top; if (of) of.scrollTop = oft; return; }
-    requestAnimationFrame(step);
-  };
-  step();
-}
-async function wsv_restore(v, ws) {
+// the target workspace's own state of its areas (choices, open groups, folded folders) -- never its page
+function wsv_restore(v, ws) {
   for (const k of WSV_KEYS) if (v.ls?.[k] == null) LS.del(k); else LS.set(k, v.ls[k]);
   if (S.nf) { S.nf.filter = LS.get('newsFilter', '') ? 'me' : ''; S.nf.kind = LS.get('newsKind', ''); S.nf.items = null; }
   if (S.jobs) { S.jobs.f = LS.get('jobsFilter', 'open'); S.jobs.items = null; }
   const shut = new Set(v.shut || []);
   for (const f of wsv_folders(ws)) if (foldClosed(f) !== shut.has(f)) foldSet(f, shut.has(f));
-  let h = String(v.hash || '');
-  if (h.startsWith('l/') && !(l => l && !l.archived && inWs(l, ws))(listById(+h.slice(2)))) h = keyToHash(START_KEY);  // a list gone or moved meanwhile
-  if (o3a_hid(h.split('/')[0].split('?')[0])) h = keyToHash(START_KEY);  // 2.484.0 (#3950): the kept view is itself a private module
-  if (S.sel && !(v.sel === S.sel && wsv_taskIn(S.sel, ws))) wsv_close();
-  history.replaceState(history.state, '', '#' + h);
-  await route();
-  if (v.sel && S.sel !== v.sel && wsv_taskIn(v.sel, ws)) openDetail(v.sel);
-  wsv_scroll(v.top || 0, v.oft || 0);
 }
-// o.keep: the caller goes on to its own target (a link into the other workspace, News' or the office's "Switch"): the view
-// stays and only follows the filter, like the first visit of a workspace without a kept view
+// 2.497.0 (#4048): where a switch to the workspace now set (ws) lands: the same page when it exists there; a single object that is
+// not there -> the overview of the same area; a list (folder, marked lists) not there -> the inbox; an area that does not exist
+// there or is switched off there (module off, an area off for the workspace #3490, an organisation's part off #3560, a private
+// module in an organisation #3950) -> Start. null = the page stays.
+const WS_START = 'home';
+const ws_listIn = (id, ws) => (l => !!l && !l.archived && inWs(l, ws))(listById(+id));
+// the overview page of an object's area (the router's first word; old links like ev/5 or client/3 to their module)
+const WS_ROOT = {ev: 'cal', client: 'clients', job: 'agents', note: 'notes'};
+function ws_target(ws) {
+  if (ws === 'all' || S.me?.kid) return null;  // "All" shows everything of the page; a kid has its own home
+  const h = wsv_hashNow(), [a, b, c] = h.split('?')[0].split('/'), mod = S.route?.mod || 'tasks';
+  const area = mod === 'tasks' || mod === 'home' ? null : typeof wsa_areaOfMod === 'function' ? wsa_areaOfMod(mod) : null;
+  if (!modOn(mod) || o3a_hid(mod) || (area && WSA_AREAS.includes(area) && !wsa_areaOn(area, ws))) return WS_START;
+  const mg = mod !== 'tasks' && mg_areaOf(mod);
+  if (mg && nav_orgOff(mg[0], mod)) return WS_START;
+  if (mod === 'tasks') {
+    const k = String(S.route.key || '');
+    if (k.startsWith('l:')) return ws_listIn(k.slice(2), ws) ? null : START_KEY;
+    if (k.startsWith('lists:')) return k.slice(6).split(',').some(id => ws_listIn(id, ws)) ? null : START_KEY;
+    if (k.startsWith('folder:')) { const f = k.slice(7); return S.lists.some(l => !l.is_inbox && !l.archived && fUnder(l.folder, f) && inWs(l, ws)) ? null : START_KEY; }
+    return null;  // the inbox, Today, Projects, filters, tags, people: every workspace has them (they show its share)
+  }
+  if (!b) return null;  // an area's overview stays
+  // what an object page may keep: its own workspace is known (a note's list, an agent, a table of a list), else its overview
+  if (mod === 'notes') { const lid = a === 'note' ? (S.notes || []).find(n => n.id === +b)?.list_id : +b || null; return lid != null && ws_listIn(lid, ws) ? null : 'notes'; }
+  if (mod === 'agents' && a === 'agents') { const ag = agentById(+b); return ag && wsAgentIn(ag, ws) ? null : 'agents'; }
+  if (mod === 'sheets' && b === 'l') return ws_listIn(c, ws) ? null : 'sheets';
+  if (mod === 'office') return c ? 'office/' + b : null;  // office/<tab> is a part of the office, office/<tab>/<id> one document
+  if (mod === 'docs' && b === 'review') return null;  // a saved filter, no object
+  if (mod === 'ablage' && /^aus-/.test(b)) return null;  // a collection
+  if (mod === 'clients' && a === 'mailhub') return null;
+  if (mod === 'msv') return null;  // a list on another server belongs to no workspace
+  return WS_ROOT[a] || a;
+}
+// o.keep: the caller goes on to its own target (a link into the other workspace, News' or the office's "Switch"): the page
+// only follows the filter (a list or private module not there -> the inbox, as before) and the caller then opens its target
 async function wsSet(ws, o = {}) {
   if (!wsOptions().includes(ws)) ws = 'all';
   const from = wsCur();
-  if (WSV.ws === from) wsv_save(from, wsv_hashNow());  // 2.397.0 (#3404)
+  if (WSV.ws === from) wsv_save(from);  // 2.397.0 (#3404)
   S.settings.workspace = ws; LS.set('ws', ws);
-  // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() (a kept view / go) must not close it either
+  // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() must not close it either
   const hold = !!$('#side.open') && typeof SBM !== 'undefined';
   if (hold) SBM.keep = true; else closeSide?.();
   if (typeof pb_wsChanged === 'function') pb_wsChanged(true);  // 2.47.3 (#1360): the office follows once the server knows it
   p61b_wsRun(false);  // 2.66.1 (#1945)
   const to = wsCur(), kept = !o.keep && to !== 'all' ? (LS.get('wsView', {}) || {})[to] : null;
   WSV.ws = '';  // the page shown now belongs to the old workspace: route() must not keep it for the new one
-  if (kept) { await wsv_restore(kept, to); if (hold) SBM.keep = false; }  // 2.397.0 (#3404): the workspace as it was left
-  else {
-    if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
-    // 2.49.0 (#1770): the open list does not stay when it is not part of the new workspace -> that workspace's inbox
-    // 2.397.0 (#3404): the first visit without a kept view: the same page when the workspace has it, else the start
+  if (kept) wsv_restore(kept, to);  // its areas' own state, not its page
+  // 2.497.0 (#4048): the open task (side panel, phone drawer, "All") stays when the new workspace shows it, else it closes
+  if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
+  let h = null;
+  if (o.keep) {
+    // 2.49.0 (#1770) / 2.484.0 (#3950): a list not in the new workspace or a private module's page -> Start, then the caller's target
     const ol = S.route?.mod === 'tasks' && String(S.route.key || '').startsWith('l:') ? listById(+S.route.key.slice(2)) : null;
-    // 2.484.0 (#3950): a page of a private module (Habits, Budget, ...) does not exist in an organisation: its start page, no quiet way back
-    if ((ol && !inWs(ol, to)) || o3a_hid(S.route?.mod)) go(keyToHash(START_KEY)); else { if (hold) SBM.keep = false; render(); WSV.ws = to; WSV.hash = wsv_hashNow(); }  // no route follows: the next tap on an entry closes the drawer
-  }
+    if ((ol && !inWs(ol, to)) || o3a_hid(S.route?.mod)) h = keyToHash(START_KEY);
+  } else h = ws_target(to);
+  if (h != null && h !== wsv_hashNow()) {
+    history.replaceState(history.state, '', '#' + h);  // no Back step into the old workspace's page
+    await route();
+  } else { render(); WSV.ws = to; }  // no route follows
+  if (hold) SBM.keep = false;  // the next tap on an entry closes the drawer
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)
   // 2.305 (bundle): the disposition too -- it followed only the state reload of the live update, which 2.280.0 (#3109) may brake for 8 s
@@ -126,7 +144,7 @@ function wsFollow(key) {
   ws_autoNote(from);
 }
 // 2.484.0 (#3950): Kalmido switched the workspace by itself (a link to a private module or to a list of another workspace): a short
-// note with "Back" (the workspace before, on its start page when the page does not exist there). A deliberate switch says nothing
+// note with "Back" (the workspace before; 2.497.0 (#4048): in the same area, Start when the area does not exist there). A deliberate switch says nothing
 function ws_autoNote(from) {
   const to = wsCur();
   if (!S.booted || !from || from === to) return;
