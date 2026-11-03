@@ -56,6 +56,7 @@ from ..core.errors import BadInput
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, client_ip, me, rate_ip
 from ..accounts.login import seal, unseal
 from ..accounts.orgs import op_foreign_account
+from ..accounts.supportgrant import SGA_REFUSED, sga_is_support  # 2.500.0 (#4070)
 from ..agents.core import agent_row, is_agent, need_person
 from ..agents.admin import agent_policy, agent_token_new, agent_ws_allowed_any, my_agent_make
 from ..api.common import hit_limit
@@ -396,6 +397,8 @@ def mcpr_authorize():
         return redirect("/?oauth=" + urllib.parse.quote("?" + request.query_string.decode("latin-1"), safe=""), 303)
     if not _person_ok(u):
         return _msg_page(tr("Connection not possible"), tr("This account cannot connect apps."), 403)
+    if sga_is_support(c):  # 2.500.0 (#4070): an access of an app would outlive the client's consent; the POST: sga_guard
+        return _msg_page(tr("Connection not possible"), tr(SGA_REFUSED), 403)
     return _consent(c, u, cl, {"c": cl["client_id"], "r": ruri, "ch": p["code_challenge"], "s": p["state"], "res": p["resource"]})
 
 

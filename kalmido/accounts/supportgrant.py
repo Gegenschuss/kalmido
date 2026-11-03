@@ -29,7 +29,7 @@ from flask import g, has_request_context, jsonify, request
 from ..core.config import app, COOKIE
 from ..core.db import body, connect, db, err, iso, now_utc, parse_iso
 from ..core.errors import Denied
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
 from ..core.env import env_bool
 from .session import _token_hash, me
@@ -142,32 +142,59 @@ def sga_close(c, r, now):
         ses_end(c, r["user_id"], gone)
 
 
-# 2.485.0 (#3939, review F1): what a support session (via 'support', sga_session_cap) never does: credentials, ways out to other
-# services and support access itself -- they would outlive the client's consent. Writes only; reading stays.
-SGA_GUARD = ("/api/me/2fa", "/api/me/app-passwords", "/api/me/passkeys", "/api/me/tokens", "/api/me/drop-token", "/api/me/mail/token",
-             "/api/me/webhooks", "/api/me/channels", "/api/me/ntfy-inbox", "/api/me/sessions", "/api/my/agents", "/api/support-access",
-             "/api/stepup")
+# 2.500.0 (#4070, decision of 03.11.2026): a support session (via 'support', sga_session_cap) reads and edits contents, nothing
+# else (2.485.0, #3939, review F1, named only credentials; the audit found ways that outlive the consent beside them). A positive list:
+# a write goes through only in a contents' area (SGA_CONTENT, the path's second segment) and when no segment of its path hands out
+# access, leaves the account or cannot be taken back (SGA_NOT_CONTENT). Everything else, a new area too, is refused; reading stays.
+SGA_CONTENT = frozenset((
+    "tasks", "comments", "lists", "sections", "section-templates", "list-checks", "list-files", "list-tags", "deps", "tags", "fields",
+    "filters", "sprints", "templates", "layouts", "folders", "folder-heads", "docs", "files", "attachments", "receipt-suggestions",
+    "wiki", "sheets", "contacts", "events", "evcals", "notes", "notepads", "outline", "bookmarks", "habits", "pomo", "time", "budget",
+    "clients", "office", "fsref", "videos", "books", "reading"))
+SGA_NOT_CONTENT = frozenset((
+    "public-link", "public-links", "regenerate", "members", "people", "groups", "owner", "org", "shares", "ext-links", "portal-link",
+    "requests", "signoff", "signoffs", "agent", "agents", "ask-agent", "hooks-in", "error-hook", "repos", "folder-repo", "envs", "rules",
+    "forms", "e2e", "keys", "lock", "scan-keys", "feed", "fetchers", "rights", "settings", "payonline", "peppol", "mail", "mail-notice",
+    "mail-profile", "receipt-mail", "notify-template", "send", "send-mail", "purge", "anonymize"))
+SGA_PLAIN = frozenset(("/api/auth/logout", "/api/client-errors", "/api/settings", "/api/me"))  # /api/me: never SGA_GUARD_ME
 SGA_GUARD_ME = {"password", "email", "username", "current_password", "new_password"}
+SGA_REFUSED = N_("Support access does not hand out sign-in data or add people: the client does that")
+
+
+def sga_may_write(path):
+    """True when a support session may write to path."""
+    if path in SGA_PLAIN:
+        return True
+    seg = path.split("/")
+    return len(seg) > 2 and seg[1] == "api" and seg[2] in SGA_CONTENT and not SGA_NOT_CONTENT.intersection(seg)
+
+
+def sga_is_support(c):
+    """True when this request runs in a support session (the session cookie's row, via 'support')."""
+    tok = request.cookies.get(COOKIE) if g.get("auth_via") == "session" else None
+    r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
+    return bool(r) and r[0] == "support"
 
 
 @app.before_request
 def sga_guard():
     if request.method in ("GET", "HEAD", "OPTIONS") or g.get("auth_via") != "session" or g.get("user") is None:
         return None
+    c = db()
+    if not sga_is_support(c):
+        return None
+    # 2.500.0 (#4070): every write of a support session stands on the grant's log, a refused one too (sga_flush): the client sees it
+    gid = sga_open(c, uid=g.user["id"], note=False)
+    if gid:
+        g.sga_used = {*(g.get("sga_used") or ()), int(gid)}
+        g.sga_support = True
     p = request.path
-    hit = p.startswith(SGA_GUARD)
+    hit = not sga_may_write(p)
     if not hit and p == "/api/me" and request.method == "PATCH":
         b = request.get_json(silent=True)
         hit = isinstance(b, dict) and bool(set(b) & SGA_GUARD_ME)
-    if not hit:
-        return None
-    tok = request.cookies.get(COOKIE)
-    if not tok:
-        return None
-    c = db()
-    r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone()
-    if r and r[0] == "support":
-        return jsonify(error=tr("Support access does not hand out sign-in data or add people: the client does that"), code="support_session"), 403
+    if hit:
+        return jsonify(error=tr(SGA_REFUSED), code="support_session"), 403
     return None
 
 
@@ -185,6 +212,8 @@ def sga_flush(resp):
     try:
         now = now_utc()
         e = {"at": iso(now), "by": int(g.user["id"]), "m": request.method[:8], "r": _route(), "s": int(resp.status_code)}
+        if g.get("sga_support"):  # 2.500.0 (#4070): done in a support session, not by the person
+            e["sup"] = 1
         c = connect()
         try:
             with system_ctx(c):  # an organisation's grant is behind row-level security; this connection runs inside a request
@@ -235,7 +264,7 @@ def sga_public(c, r, names=None):
     return {"id": r["id"], "org_id": r["org_id"], "created_at": r["created_at"], "ends_at": r["ends_at"], "ended_at": r["ended_at"] or "",
             "active": not r["ended_at"] and r["ends_at"] > now, "by": names.get(r["user_id"], ""),
             "ended_by": names.get(r["ended_by"], "") if r["ended_by"] else "",
-            "uses": [{"at": u.get("at") or "", "by": names.get(u.get("by"), ""), "method": u.get("m") or "", "route": u.get("r") or "",
+            "uses": [{"at": u.get("at") or "", "by": tr("Support access") if u.get("sup") else names.get(u.get("by"), ""), "method": u.get("m") or "", "route": u.get("r") or "",
                       "status": u.get("s") or 0} for u in reversed(uses)]}
 
 
