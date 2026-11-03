@@ -734,9 +734,12 @@ anything: every script tag (raw and gzip size, count) and the stylesheets, and l
 `tests/perf_ui.js` checks in the browser). CI runs the tool in the lint job; a value over its limit prints
 `Budget exceeded: <key> <actual> > <limit>` and fails the build. `tests/perf_budget_test.py` proves that an oversized state fails.
 
-To raise a limit on purpose, change the value in `tools/perf_budget.json` in the same commit as the growth and say why;
-otherwise move the code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints machine-readable
-output, `--budget FILE` and `--root DIR` are for tests.
+The limits only stay low when they cannot be raised in passing: `--ratchet [BASE]` compares them with the base (in CI: the commit
+before the push, the merge base with main on `job/**` and `hotfix/**`, the parent in a pull request; no base = red; a nightly or
+manual run prints that it did not compare). The sums of the gzip limits and of the byte limits and `start_scripts` must not
+grow, so a limit rises only when the same change lowers another by as much, and the lowered one still has to hold the normal
+check. Make room by moving code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints
+machine-readable output, `--budget FILE` and `--root DIR` are for tests.
 
 ## Browser demo (rebuilt per release since 2.74.0)
 
