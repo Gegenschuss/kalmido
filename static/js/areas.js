@@ -495,10 +495,14 @@ function sbb_render(hid) {
 // type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
 // #3506 (#3405): a smaller type can break a name of several words into other lines, so the width is measured again after
 // each step (and scrollWidth counts too) until it fits; one rule of three left "Reisen & Kontakte" 2 px too wide at 320 px
-// #4047: on the phone (the drawer's row) a name is never cut: a word too wide even in 9 px breaks inside the word instead of "…"
+// #4047: on the phone (the drawer's row) a name is never cut: a word too wide even in 9 px widens its column and the row
+// scrolls sideways (never "…", never split inside the word)
 function sbb_fit() {
+  const row = $('#side .sbmr');
+  if (row) { row.style.gridTemplateColumns = ''; row.style.overflow = ''; }
+  let tooWide = false;
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
-    n.classList.remove('srcut'); n.style.fontSize = ''; n.style.overflowWrap = '';
+    n.classList.remove('srcut'); n.style.fontSize = '';
     const box = n.clientWidth; if (!box) continue;
     const wide = () => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
     let need = wide();
@@ -511,10 +515,11 @@ function sbb_fit() {
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; n.style.overflowWrap = 'anywhere'; continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide = true; continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
+  if (tooWide) { row.style.gridTemplateColumns = 'repeat(var(--sbmc,5),minmax(min-content,1fr))'; row.style.overflow = 'auto hidden'; }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
 document.fonts?.addEventListener('loadingdone', sbb_fit);
