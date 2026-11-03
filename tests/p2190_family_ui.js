@@ -288,20 +288,21 @@ const FAM = 'cal,habits,comments,collab,family';
   check(['a:occ', 'a:dl', 'a:pack:pool', `a:shop:${L.shopping}`, 'v:family'].every(id => pal.includes(id)), 'palette: new birthday / deadline / packing list, shopping mode, the Family view');
   w.close();
 
-  // ================= jsdom: the welcome tour asks "What do you use Kalmido for?"
+  // ================= jsdom: a new account is asked "What do you use Kalmido for?"
   const NEWU = (await call('POST', '/api/users', {username: 'nina', display_name: 'Nina', password: 'password123'})).id;
   await call('PATCH', `/api/users/${NEWU}`, {});
   const CN = await login('nina');
   await call('PATCH', '/api/settings', {tour: 'pending'}, CN);
   await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CN}, body: JSON.stringify({tour: 'pending'})});
   w = await boot({user: 'nina', hash: 'today', ls: {'tasks.lastKey': null}}); d = w.document;
-  if (await until(() => d.querySelector('.tour .tpurp'), 40)) {
-    check(d.querySelectorAll('.tour [data-tpurpose]').length === 4, 'tour: four purposes on the first card');
-    click(w, d.querySelector('.tour [data-tpurpose="family"]')); await sleep(100);
-    check(d.querySelector('.tour [data-tpurpose="family"]').classList.contains('on'), 'tour: Family picked');
-    click(w, d.querySelector('.tour [data-tour="next"]'));
-    check(await until(async () => (await call('GET', '/api/state', null, CN)).settings.features.split(',').includes('family'), 60), 'tour: leaving the first card sets the purpose');
-  } else check(false, 'tour: no purpose card for a new account');  // 2.501.0 (#4296): was check(true)
+  // 2.501.0 (#4296): the question left the tour's first card for its own dialog (paskOpen, 2.364.0 #3032); this used to look for
+  // `.tour .tpurp`, find nothing and pass with check(true)
+  const pask = await until(() => d.querySelector('.paskdlg'), 40);
+  check(pask && pask.querySelectorAll('[data-pask]').length >= 4, 'a new account: the purposes in their own dialog');
+  click(w, pask?.querySelector('[data-pask="family"]'));
+  check(d.querySelector('.paskdlg [data-pask="family"]')?.getAttribute('aria-checked') === 'true', 'purpose: Family picked');
+  click(w, d.querySelector('.paskdlg [data-pask-go]'));
+  check(await until(async () => (await call('GET', '/api/state', null, CN)).settings.features.split(',').includes('family'), 60), 'purpose: Continue switches the module on');
   w.close();
 
   // ================= Firefox: layout, touch, axe
