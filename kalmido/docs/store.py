@@ -74,7 +74,7 @@ ERRORS = {
     "too_complex": N_("The file took too long or too much memory to read."),
     "missing": N_("The file is missing on the server."),
     "failed": N_("The recognition failed."),
-    "no_heif": N_("This server cannot read HEIC photos yet. Please send the photo as JPEG or update the server."),  # 2.146.0 B (#2454)
+    "no_heif": N_("This server cannot read HEIC photos at the moment. Please send the photo as JPEG."),  # 2.146.0 B (#2454); #4168: no HEIC reader in the image for now
 }
 
 

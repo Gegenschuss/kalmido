@@ -495,9 +495,10 @@ function sbb_render(hid) {
 // type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
 // #3506 (#3405): a smaller type can break a name of several words into other lines, so the width is measured again after
 // each step (and scrollWidth counts too) until it fits; one rule of three left "Reisen & Kontakte" 2 px too wide at 320 px
+// #4047: on the phone (the drawer's row) a name is never cut: a word too wide even in 9 px breaks inside the word instead of "…"
 function sbb_fit() {
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
-    n.classList.remove('srcut'); n.style.fontSize = '';
+    n.classList.remove('srcut', 'srbrk'); n.style.fontSize = '';
     const box = n.clientWidth; if (!box) continue;
     const wide = () => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
     let need = wide();
@@ -509,7 +510,10 @@ function sbb_fit() {
       if (!(need > box + .5)) break;
       px = Math.min(px - .2, px * box / need);
     }
-    if (px < 9 || need > box + .5) { n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
+    if (px < 9 || need > box + .5) {
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; n.classList.add('srbrk'); continue; }
+      n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
+    }
   }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));

@@ -685,11 +685,11 @@ def push_vapid():
 
 @app.get("/api/push/subs")
 def push_subs_list():
-    from ..notify.push import push_channel, WEBPUSH_ON
+    from ..notify.push import ntfy_public, push_channel, WEBPUSH_ON
     c = db()
     s = usettings(c, me())
     rows = c.execute("SELECT * FROM push_subs WHERE user_id=? ORDER BY id", (me(),)).fetchall()
-    return jsonify(enabled=WEBPUSH_ON, channel=push_channel(s), ntfy=bool(s.get("ntfy_topic")),
+    return jsonify(enabled=WEBPUSH_ON, channel=push_channel(s), ntfy=bool(s.get("ntfy_topic")), ntfy_public=ntfy_public(),  # 2.499.0 (#4215)
                    subs=[push_sub_public(r) for r in rows])
 
 
@@ -774,7 +774,7 @@ def push_handled_api():
 @app.post("/api/push/test")
 def push_test():
     """Test push. {"id": n} = only that device (Web Push); without = over the user's channel, like a reminder."""
-    from ..notify.push import notify, push_channel, push_prio, webpush_count, webpush_payload, webpush_user
+    from ..notify.push import notify, ntfy_public, push_channel, push_prio, webpush_count, webpush_payload, webpush_user
     c = db()
     s = usettings(c, me())
     if hit_limit(f"pushtest:{me()}", PUSH_TEST_LIMIT, 3600):  # 2.367.5 (#2980): like the channel and mail tests
@@ -788,7 +788,7 @@ def push_test():
                          push_prio(s), ttl=600, topic="test", only=sid)
         return jsonify(ok=n > 0, webpush=n)
     ok = notify(me(), title, tr("Notifications are arriving."), push_prio(s), PUBLIC_URL, s=s, tag="test")
-    return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()))
+    return jsonify(ok=ok, channel=push_channel(s), devices=webpush_count(c, me()), ntfy_public=ntfy_public())  # 2.499.0 (#4215)
 
 
 def umz_export_queries(uid):

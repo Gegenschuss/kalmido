@@ -6,9 +6,12 @@
 function wpState(md, j = md._wp) {
   const el = $('#s-wpstate', md); if (!el || !j) return;
   const ch = $('#s-pushch', md)?.value || j.channel, n = j.subs.length;
+  // 2.499.0 (#4215): on Web Push the public ntfy.sh gets no fallback, the message stays in the app
+  const noFb = j.ntfy_public && ch !== 'both';
   el.textContent = ch === 'ntfy' ? tr('Everything goes to ntfy.')
-    : !n ? (j.ntfy ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” above.'))
+    : !n ? (j.ntfy && !noFb ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” above.'))
     : ch === 'both' ? trn('Web Push to {0} device and ntfy.', 'Web Push to {0} devices and ntfy.', n)
+    : noFb ? trn('Web Push to {0} device.', 'Web Push to {0} devices.', n)
     : trn('Web Push to {0} device. ntfy only if no device accepts a push.', 'Web Push to {0} devices. ntfy only if no device accepts a push.', n);
   el.classList.remove('warn');  // 2.5.2 (K04): a neutral hint, not a red warning
 }
@@ -1190,7 +1193,7 @@ function settingsModal(focus) {
     }
     if (a === 'sample-rm') { b.disabled = true; try { await sampleRemove(); } finally { const r = $('#s-sample', md); if (r) r.innerHTML = sampleRowHtml(); } return; }
     if (a === 'test') { const j = await api('POST', '/api/ntfy/test'); toast(j.ok ? tr('Test sent') : tr('ntfy not reachable')); }
-    if (a === 'ptest') { const j = await api('POST', '/api/push/test'); toast(j.ok ? tr('Test sent') : tr('Not delivered: no device accepted it and ntfy is not reachable')); }
+    if (a === 'ptest') { const j = await api('POST', '/api/push/test'); toast(j.ok ? tr('Test sent') : j.ntfy_public && j.channel === 'webpush' ? tr('Not delivered: no device accepted it') : tr('Not delivered: no device accepted it and ntfy is not reachable')); }
     if (a === 'wp-test') { const j = await api('POST', '/api/push/test', {id: +b.dataset.sub}); toast(j.ok ? tr('Test sent to this device') : tr('The push service did not accept it')); if (!j.ok) wpDraw(md); }
     if (a === 'wp-del') {
       const cur = await wpSub();

@@ -555,8 +555,8 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if ch in ("ntfy", "both"):
         return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
     if not sent:
-        if ntfy_public():  # 2.148.1 C (#2494): the fallback to the public ntfy.sh carries no content (the person did not choose ntfy)
-            return ntfy(APP_NAME, tr("New notification in {0}", APP_NAME, lg=lg), prio, ntfy_plain_click(click), topic=s.get("ntfy_topic")) or queued
+        if ntfy_public():  # 2.499.0 (#4215): nothing goes to the public ntfy.sh unless the person chose ntfy; the message stays in the app (News)
+            return queued
         return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
     return True
 
@@ -564,11 +564,6 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
 def ntfy_public():
     """2.148.1 C (#2494): True when ntfy messages go to the public default server (ntfy.sh without a token of an own one)."""
     return (urllib.parse.urlsplit(NTFY_URL).hostname or "").lower() in ("ntfy.sh", "www.ntfy.sh") and not NTFY_TOKEN
-
-
-def ntfy_plain_click(click):
-    """The app's address without the part after # (no task / list id in a message to the public server)."""
-    return click.split("#", 1)[0] if click else None
 
 
 def reminder_recipient(c, t, users, memo=None):

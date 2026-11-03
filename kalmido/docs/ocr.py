@@ -192,7 +192,7 @@ for k, v in ((resource.RLIMIT_AS, 768 << 20), (resource.RLIMIT_CPU, 20), (resour
         pass
 from PIL import Image, ImageOps
 Image.MAX_IMAGE_PIXELS = 80_000_000
-try:  # 2.146.0 B (#2454): HEIC / HEIF photos (pi-heif, read only); an image without it: no preview of them
+try:  # 2.146.0 B (#2454): HEIC / HEIF photos; #4168: pi-heif left the image (its libheif / libde265 have known holes), so no preview of them for now
     import pi_heif
     pi_heif.register_heif_opener()
 except Exception:
@@ -235,7 +235,8 @@ def thumb_bytes(data, kind):
 
 
 # 2.146.0 B (#2454): a HEIC / HEIF photo -> a JPEG for the text recognition (Tesseract reads no HEIF). Exit 3 = pi-heif is
-# missing in this image (the server says so, never a 500), any other failure = unreadable
+# missing in this image (the server says so, never a 500), any other failure = unreadable. #4168: it is missing in the
+# official image for now: pi-heif is discontinued, its last release bundles libheif / libde265 with known holes
 HEIF_WORKER = r"""
 import io, resource, sys
 for k, v in ((resource.RLIMIT_AS, 1024 << 20), (resource.RLIMIT_CPU, 30), (resource.RLIMIT_FSIZE, 0)):

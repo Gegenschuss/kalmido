@@ -11324,7 +11324,6 @@
   "{0}: the Outlook attachment (winmail.dat) cannot be read": "{0}: de Outlook-bijlage (winmail.dat) kan niet worden gelezen",
   "{0}: {1} files of another type were left out": "{0}: {1} bestanden van een ander type zijn overgeslagen",
   "{0}: no PDF or picture inside": "{0}: geen pdf of afbeelding erin",
-  "This server cannot read HEIC photos yet. Please send the photo as JPEG or update the server.": "Deze server kan nog geen HEIC-foto's lezen. Stuur de foto als JPEG of werk de server bij.",
   "{0} possibly duplicate receipts are not exported": "{0} mogelijk dubbele bonnen worden niet geëxporteerd",
   "1 possibly duplicate receipt is not exported": "1 mogelijk dubbele bon wordt niet geëxporteerd",
   "{0} possibly duplicate receipts are exported": "{0} mogelijk dubbele bonnen worden meegeëxporteerd",
@@ -16120,5 +16119,9 @@
   "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Gedeeld met anderen, deze blijven en gaan naar wie ze het langst mag wijzigen: {0}.",
   "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Gedeeld met anderen, maar niemand anders kan ze overnemen, dus ze verdwijnen met het account: {0}.",
   "The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore.": "Het herstel is mislukt en de weg terug ook: de database is mogelijk onvolledig, daarom blijft de server gesloten. Start hem opnieuw: de start maakt de database compleet. De veiligheidsback-up {0} bevat de stand van voor het herstel.",
-  "A restore failed and the server stayed closed. An administrator has to restart it.": "Een herstel is mislukt en de server blijft gesloten. Een beheerder moet hem opnieuw starten."
+  "A restore failed and the server stayed closed. An administrator has to restart it.": "Een herstel is mislukt en de server blijft gesloten. Een beheerder moet hem opnieuw starten.",
+  "This server cannot read HEIC photos at the moment. Please send the photo as JPEG.": "Deze server kan op dit moment geen HEIC-foto's lezen. Stuur de foto als JPEG.",
+  "Web Push to {0} device.": ["Web Push naar {0} apparaat.", "Web Push naar {0} apparaten."],
+  "Not delivered: no device accepted it": "Niet bezorgd: geen enkel apparaat heeft hem geaccepteerd",
+  "{0} push stayed in the app because none of the user's devices accepted it: {1}": ["{0} push bleef in de app omdat geen enkel apparaat van de gebruiker hem accepteerde: {1}", "{0} pushes bleven in de app omdat geen enkel apparaat van de gebruikers ze accepteerde: {1}"]
 }

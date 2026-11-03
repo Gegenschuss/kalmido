@@ -21,7 +21,7 @@ from ..tasks.validation import valid_hm
 from ..core.errors import BadInput
 from ..accounts.users import need_admin
 from ..notify.push import (
-    ntfy, NTFY_TOPIC_RE, push_channel, PUSH_PRIORITIES, webpush_count, WEBPUSH_ON, webpush_payload, webpush_user,
+    ntfy, ntfy_public, NTFY_TOPIC_RE, push_channel, PUSH_PRIORITIES, webpush_count, WEBPUSH_ON, webpush_payload, webpush_user,
 )
 from ..core.env import env_bool
 from ..core.rls import STATE  # 2.149.0 G (#2517): pulled up from functions
@@ -328,6 +328,10 @@ def _aa_build(c, kind, key, b):
     if kind == "webpush" and key == "fallback":
         names = _aa_names(c, items)
         users = {names.get(int(k), "#" + k) if k.isdigit() else k: v for k, v in items.items()}
+        if ntfy_public():  # 2.499.0 (#4215): the public ntfy.sh gets no fallback, the device problem is still reported
+            return ("fallback:" + ",".join(sorted(users))[:150],
+                    Nn_("{0} push stayed in the app because none of the user's devices accepted it: {1}",
+                        "{0} pushes stayed in the app because none of the users' devices accepted them: {1}"), [_aa_list(users)], b["n"])
         return ("fallback:" + ",".join(sorted(users))[:150],
                 Nn_("{0} push went to ntfy instead because none of the user's devices accepted it: {1}",
                     "{0} pushes went to ntfy instead because none of the users' devices accepted them: {1}"), [_aa_list(users)], b["n"])

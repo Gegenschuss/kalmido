@@ -8736,11 +8736,12 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbmr::-webkit-scrollbar{display:none}
 #side .sbmr .srb{flex:none;width:3.875rem;min-height:2.75rem;scroll-snap-align:start}
 /* 2.364.0 B (#3040): the area icons as a grid of rows (all in sight, two rows for the usual 6-10 areas) instead of one row to swipe */
-/* 2.442.0 (#3739): at most two rows at any number of areas (--sbmc from sbm_rowHtml), smaller tiles; a long name may take a third line, never cut */
+/* 2.442.0 (#3739): at most two rows at any number of areas (--sbmc from sbm_rowHtml), smaller tiles; #4047: a long name takes the lines it needs, never cut (no line limit, no "…") */
 #side .sbmr{display:grid;grid-template-columns:repeat(var(--sbmc,5),minmax(0,1fr));overflow:visible;scroll-snap-type:none;padding-inline:.25rem;gap:0}
 #side .sbmr .srb{width:auto;min-width:0;padding:.25rem .0625rem .1875rem;gap:.125rem;font-size:var(--fs-xxs)}
 #side .sbmr .srb svg.i{width:var(--ic,1rem);height:var(--ic,1rem)}
-#side .sbmr .srb .srbn:not(.srcut){-webkit-line-clamp:3;line-clamp:3}
+#side .sbmr .srb .srbn{overflow:visible;-webkit-line-clamp:none;line-clamp:none}
+#side .sbmr .srb .srbn.srbrk{overflow-wrap:anywhere;hyphens:auto}  /* #4047: a single word too long even in 9 px type breaks inside the word (areas.js sbb_fit) */
 #side .sbmr .srb .srbd{right:.25rem;top:.125rem}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}
 /* 2.290.0 C (#3163): an unfolded Fold 8 landscape / small tablets (900-1199 px). With a task open the panel folds into the
@@ -8837,7 +8838,7 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
   .ntbar .ssearch{flex:1 1 100%}
   #mbar.mb4{flex-wrap:wrap;row-gap:0}
   #mbar.mb4 .mcount{order:-1;flex:1 1 100%;min-width:0;overflow:hidden;text-overflow:ellipsis;padding:0 .5rem .125rem}
-  #mbar.mb4 .mbb{min-width:2.5rem}
+  #mbar.mb4 .mbb{min-width:2.75rem}  /* #3899: 44 px on the narrowest phones too (fits at 320 px: four buttons + close, the count has its own line) */
   .ppseg{max-width:100%;overflow-x:auto;scrollbar-width:none}
   .ppseg button{flex:none;white-space:nowrap}
   #dc-h{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}

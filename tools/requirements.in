@@ -17,7 +17,6 @@ pyasn1-modules==0.4.2
 pyOpenSSL==26.4.0
 typing-extensions==4.16.0
 pillow==13.0.0
-pi-heif==1.4.0
 pypdf==6.21.4
 xlrd==2.0.2
 psycopg[binary]==3.3.6

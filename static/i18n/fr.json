@@ -11324,7 +11324,6 @@
   "{0}: the Outlook attachment (winmail.dat) cannot be read": "{0} : la pièce jointe Outlook (winmail.dat) est illisible",
   "{0}: {1} files of another type were left out": "{0} : {1} fichiers d'un autre type ont été ignorés",
   "{0}: no PDF or picture inside": "{0} : aucun PDF ni image à l'intérieur",
-  "This server cannot read HEIC photos yet. Please send the photo as JPEG or update the server.": "Ce serveur ne sait pas encore lire les photos HEIC. Envoyez la photo en JPEG ou mettez le serveur à jour.",
   "{0} possibly duplicate receipts are not exported": "{0} justificatifs peut-être en double ne sont pas exportés",
   "1 possibly duplicate receipt is not exported": "1 justificatif peut-être en double n'est pas exporté",
   "{0} possibly duplicate receipts are exported": "{0} justificatifs peut-être en double sont exportés",
@@ -16120,5 +16119,9 @@
   "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Partagés avec d'autres, ils restent et passent à la personne autorisée depuis le plus longtemps à les modifier : {0}.",
   "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Partagés avec d'autres, mais personne d'autre ne peut les reprendre : ils disparaissent avec le compte : {0}.",
   "The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore.": "La restauration a échoué, le retour en arrière aussi : la base de données est peut-être incomplète, le serveur reste donc fermé. Redémarrez-le : le démarrage complète la base de données. La sauvegarde de sécurité {0} contient l'état d'avant la restauration.",
-  "A restore failed and the server stayed closed. An administrator has to restart it.": "Une restauration a échoué et le serveur reste fermé. Un administrateur doit le redémarrer."
+  "A restore failed and the server stayed closed. An administrator has to restart it.": "Une restauration a échoué et le serveur reste fermé. Un administrateur doit le redémarrer.",
+  "This server cannot read HEIC photos at the moment. Please send the photo as JPEG.": "Ce serveur ne peut pas lire les photos HEIC pour le moment. Envoyez la photo en JPEG.",
+  "Web Push to {0} device.": ["Web Push vers {0} appareil.", "Web Push vers {0} appareils."],
+  "Not delivered: no device accepted it": "Non distribuée : aucun appareil ne l'a acceptée",
+  "{0} push stayed in the app because none of the user's devices accepted it: {1}": ["{0} push est resté dans l'application, car aucun appareil de l'utilisateur ne l'a accepté : {1}", "{0} push sont restés dans l'application, car aucun appareil des utilisateurs ne les a acceptés : {1}"]
 }

@@ -11324,7 +11324,6 @@
   "{0}: the Outlook attachment (winmail.dat) cannot be read": "{0}: el adjunto de Outlook (winmail.dat) no se puede leer",
   "{0}: {1} files of another type were left out": "{0}: se omitieron {1} archivos de otro tipo",
   "{0}: no PDF or picture inside": "{0}: no contiene ningún PDF ni imagen",
-  "This server cannot read HEIC photos yet. Please send the photo as JPEG or update the server.": "Este servidor aún no puede leer fotos HEIC. Envía la foto como JPEG o actualiza el servidor.",
   "{0} possibly duplicate receipts are not exported": "{0} recibos posiblemente duplicados no se exportan",
   "1 possibly duplicate receipt is not exported": "1 recibo posiblemente duplicado no se exporta",
   "{0} possibly duplicate receipts are exported": "{0} recibos posiblemente duplicados se exportan",
@@ -16120,5 +16119,9 @@
   "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Compartidos con otras personas, se conservan y pasan a quien lleva más tiempo pudiendo modificarlos: {0}.",
   "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Compartidos con otras personas, pero nadie más puede hacerse cargo, así que se eliminan con la cuenta: {0}.",
   "The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore.": "La restauración falló y también la vuelta atrás: puede que la base de datos esté incompleta, por lo que el servidor permanece cerrado. Reinícialo: el arranque completa la base de datos. La copia de seguridad {0} contiene el estado anterior a la restauración.",
-  "A restore failed and the server stayed closed. An administrator has to restart it.": "Una restauración ha fallado y el servidor sigue cerrado. Un administrador debe reiniciarlo."
+  "A restore failed and the server stayed closed. An administrator has to restart it.": "Una restauración ha fallado y el servidor sigue cerrado. Un administrador debe reiniciarlo.",
+  "This server cannot read HEIC photos at the moment. Please send the photo as JPEG.": "Este servidor no puede leer fotos HEIC por ahora. Envía la foto como JPEG.",
+  "Web Push to {0} device.": ["Web Push a {0} dispositivo.", "Web Push a {0} dispositivos."],
+  "Not delivered: no device accepted it": "No entregada: ningún dispositivo la aceptó",
+  "{0} push stayed in the app because none of the user's devices accepted it: {1}": ["{0} notificación push se quedó en la app porque ningún dispositivo del usuario la aceptó: {1}", "{0} notificaciones push se quedaron en la app porque ningún dispositivo de los usuarios las aceptó: {1}"]
 }
