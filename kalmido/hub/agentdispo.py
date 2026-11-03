@@ -31,6 +31,7 @@ from ..accounts.session import me
 from ..core.errors import BadInput
 from ..api.common import v1_args, v1_err, v1_json, v1_view
 from .dispo import DSP_DAYS_MAX, DSP_KINDS, dsp_conflicts, dsp_public, dsp_resources, dsp_units, _res_index, _ts
+from ..accounts.orgroles import need_org_write  # 2.502.0 (#4308)
 from .absence import abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_state
 from ..events.model import default_cal, ev_fields, ev_store  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.lifecycle import do_delete, restore_task  # 2.369.5 (#2517): pulled up from functions
@@ -359,6 +360,7 @@ def adz_run(c, j, sel, ed, rec):
         try:
             need_feat("dispo")
             abs_org(c, uid, oid, create=False)  # books only in an area the person belongs to (else: drafts without options)
+            need_org_write(c, uid, oid)  # 2.502.0 (#4308): and may change (read-only: drafts without options)
         except Denied:
             rec["skipped_crew"] = len(crew)
             crew = []

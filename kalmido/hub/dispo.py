@@ -30,7 +30,7 @@ from ..core.errors import BadInput
 from .absence import abs_admin, abs_days, abs_holidays, abs_holidays_shown, abs_org, abs_people, abs_state
 from ..contacts.model import my_book_ids  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_write, org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions; 2.502.0 (#4308): + write check
 from ..calendars.icalfeed import ics_fold, ics_text, ics_utc  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell as cell  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import list_role  # 2.369.5 (#2517): pulled up from functions
@@ -208,7 +208,9 @@ def _row(c, bid):
 
 
 def _may_change(c, uid, rows):
-    """2.360.0 C (#2496): other people's bookings only by an admin of the area (rls lets every member reach them)."""
+    """2.360.0 C (#2496): other people's bookings only by an admin of the area (rls lets every member reach them).
+    2.502.0 (#4308): nothing at all with a role that changes nothing in the organisation, the own bookings neither."""
+    need_org_write(c, uid, rows[0]["org_id"])
     if any(r["created_by"] != uid for r in rows) and not abs_admin(c, uid, rows[0]["org_id"]):
         raise Denied(403, tr("Only who saved it or an admin of the organisation can change it"))
 
@@ -243,7 +245,7 @@ def dsp_get():
     mine = user_orgs_full(c, uid)  # 2.143.0 A (#2151): not guests / accounting
     return jsonify(org_id=oid, orgs=[{"id": r[0], "name": r[1]} for r in c.execute(
         "SELECT id, name FROM orgs WHERE personal_of IS NULL ORDER BY lower(name), id") if r[0] in mine],
-        can_book=True, admin=abs_admin(c, uid, oid), today=today.isoformat(), start=first.isoformat(), end=last.isoformat(),
+        can_book=org_writes(c, uid, oid), admin=abs_admin(c, uid, oid), today=today.isoformat(), start=first.isoformat(), end=last.isoformat(),
         resources=res, bookings=[dsp_public(r, conf.get(r["id"])) for r in rows],
         away={str(k): v for k, v in gone.items()},
         holidays=abs_holidays_shown(abs_holidays(abs_state(c, oid), first, last)))
@@ -354,6 +356,7 @@ def dsp_create():
     c, uid = _gate()
     b = body()
     oid = _area(c, uid, b.get("org"))
+    need_org_write(c, uid, oid)  # 2.502.0 (#4308)
     v = _clean(b)
     res = b.get("resources")
     if not isinstance(res, list) or not res or len(res) > DSP_RES_MAX:

@@ -263,5 +263,40 @@ check(not Bo.get(B + "/api/team/bookings/mine", params={"since": "2026-11-01"}).
 check(Ca.post(B + "/api/team/dispo/bookings/restore", json={"ids": r.json()["ids"]}).json().get("restored") == 2, "Undo restores the job")
 check(Da.post(B + "/api/team/dispo/bookings/restore", json={"ids": r.json()["ids"]}).status_code == 404, "another organisation cannot restore")
 
+# 2.502.0 (#4308): read-only sees the disposition and changes nothing in it, also not what they booked themselves
+wk = {"start": "2026-11-16", "days": 7, "org": ORG}
+for s_ in (Bo, Er):
+    s_.patch(B + "/api/settings", json={"features": "collab,workload,dispo,office,contacts"})
+rb = Bo.post(B + "/api/team/dispo/bookings", json={"title": "Bob's own", "start": "2026-11-18", "resources": [{"kind": "equipment", "id": CAM}]})
+check(rb.status_code == 201, "a member books " + rb.text[:160])
+BOWN = rb.json()["bookings"][0]["id"]
+check(Bo.get(B + "/api/team/dispo", params=wk).json()["can_book"] is True, "a member: can_book")
+rd = Bo.delete(B + f"/api/team/dispo/bookings/{BOWN}")
+check(rd.ok, "a member deletes the own booking " + rd.text[:160])
+dbx("UPDATE org_members SET role='readonly' WHERE org_id=? AND user_id=?", (ORG, BOB), write=True)
+j = Bo.get(B + "/api/team/dispo", params=wk).json()
+check(j.get("can_book") is False and j.get("org_id") == ORG and any(x["id"] == bk["user"]["id"] for x in j.get("bookings", [])), f"read-only: sees the week, can_book false: {j.get('can_book')}")
+check(Bo.get(B + "/api/team/dispo/free", params={"date": "2026-11-17", "org": ORG}).ok, "read-only: who is free")
+r = Bo.post(B + "/api/team/dispo/bookings", json={"title": "x", "start": "2026-11-19", "resources": [{"kind": "equipment", "id": CAM}]})
+check(r.status_code == 403, f"read-only: no new booking (403) {r.status_code} {r.text[:120]}")
+check(Bo.patch(B + f"/api/team/dispo/bookings/{bk['user']['id']}", json={"title": "x"}).status_code == 403, "read-only: no change (403)")
+check(Bo.delete(B + f"/api/team/dispo/bookings/{bk['user']['id']}").status_code == 403, "read-only: no delete (403)")
+check(Bo.delete(B + f"/api/team/dispo/bookings/{bk['user']['id']}", params={"all": 1}).status_code == 403, "read-only: no delete of the job (403)")
+check(Bo.post(B + "/api/team/dispo/bookings/restore", json={"ids": [BOWN]}).status_code == 403, "read-only: no restore, also of the own booking (403)")
+check(dbx("SELECT deleted_at FROM hub_bookings WHERE id=?", (BOWN,))[0][0] is not None, "read-only: the own booking stayed deleted")
+check(not dbx("SELECT 1 FROM hub_bookings WHERE title='x'"), "read-only: nothing was written")
+for role in ("guest", "accounting"):  # the area is closed to them, the direct way to a booking too
+    dbx("UPDATE org_members SET role=? WHERE org_id=? AND user_id=?", (role, ORG, BOB), write=True)
+    check(Bo.get(B + "/api/team/dispo", params={"org": ORG, "start": "2026-11-16"}).status_code == 404, f"{role}: no disposition (404)")
+    check(Bo.patch(B + f"/api/team/dispo/bookings/{bk['user']['id']}", json={"title": "x"}).status_code in (403, 404), f"{role}: no change")
+dbx("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=?", (ORG, BOB), write=True)
+check(Bo.get(B + "/api/team/dispo", params=wk).json()["can_book"] is True, "member again: can_book")
+# freelancer-matrix: hub -- without an organisation the person is the own admin of the personal area
+j = Er.get(B + "/api/team/dispo", params={"start": "2026-11-16", "days": 7}).json()
+check(j.get("can_book") is True, f"freelancer: can_book {j.get('can_book')}")
+r = Er.post(B + "/api/team/dispo/bookings", json={"title": "Solo", "start": "2026-11-18", "resources": [{"kind": "user", "id": ERIN}]})
+check(r.status_code == 201, "freelancer: books " + r.text[:160])
+check(r.status_code == 201 and Er.delete(B + f"/api/team/dispo/bookings/{r.json()['bookings'][0]['id']}").ok, "freelancer: deletes the own booking")
+
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

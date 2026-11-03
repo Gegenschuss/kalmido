@@ -82,7 +82,7 @@ function dp_view() {
       ${d.orgs.length > 1 ? `<select id="dp-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="dp-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="dp-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="dp-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       ${dp_exports(d)}
-      <button class="btn sm pri" data-act="dp-new">${ic('plus', 's')} ${tr('Book')}</button></div>
+      ${d.can_book ? `<button class="btn sm pri" data-act="dp-new">${ic('plus', 's')} ${tr('Book')}</button>` : ''}</div>
     <div class="wlwrap dpgrid"><table class="wltable dptable"><thead><tr><th scope="col">${tr('Resource')}</th>${head}</tr></thead><tbody>${body || `<tr><td colspan="${days.length + 1}" class="muted">${typeof wsCur === 'function' && wsCur() === 'private' ? tr('Nothing to show yet: add equipment in Office & finance.') : tr('Nothing to show yet: add people to the workspace or equipment in Office & finance.')}</td></tr>`}</tbody></table></div>
     <ul class="dpdays">${dayList || `<li class="muted">${tr('No bookings this week.')}</li>`}</ul>
     <p class="muted dplegend"><span class="dpk firm"></span>${tr('Firm')} <span class="dpk option"></span>${tr('Option')} <span class="dpk away"></span>${tr('Away')} ${ic('alert', 's')} ${tr('Double booking or away: a warning, the booking stays')}</p>
@@ -142,16 +142,17 @@ async function dp_sheet(day) {
 
 // a booking: change the job (title, period, option / firm) or delete it (one resource or the whole job), with Undo
 function dp_editSheet(b) {
-  const d = DPV.data, job = d.bookings.filter(x => x.job === b.job);
+  const d = DPV.data, job = d.bookings.filter(x => x.job === b.job), can = d.can_book;  // 2.502.0 (#4308): read-only people only look
   const md = modal(`<h3>${esc(b.title)}</h3><p class="muted">${esc(dp_when(b))}</p>
-    <ul class="dpjobres">${job.map(x => `<li class="${dp_warn(x) ? 'warn' : ''}"><span>${dp_warn(x) ? ic('alert', 's') : ''}${esc(x.label)}</span>${dp_warn(x) ? `<small>${esc(dp_warnText(x))}</small>` : ''}<button type="button" class="iconbtn" data-m="delone" data-id="${x.id}" aria-label="${esc(tr('Remove {0}', x.label))}" title="${esc(tr('Remove {0}', x.label))}">${ic('x', 's')}</button></li>`).join('')}</ul>
+    <ul class="dpjobres">${job.map(x => `<li class="${dp_warn(x) ? 'warn' : ''}"><span>${dp_warn(x) ? ic('alert', 's') : ''}${esc(x.label)}</span>${dp_warn(x) ? `<small>${esc(dp_warnText(x))}</small>` : ''}${can ? `<button type="button" class="iconbtn" data-m="delone" data-id="${x.id}" aria-label="${esc(tr('Remove {0}', x.label))}" title="${esc(tr('Remove {0}', x.label))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>
     <div class="row"><label for="dpe-title">${tr('What')}</label><input id="dpe-title" maxlength="200" value="${esc(b.title)}"></div>
     <div class="row ab2dates"><label>${tr('From')}${dateIn('dpe-from', b.start.slice(0, 10))}</label><label>${tr('To')}${dateIn('dpe-to', b.end.slice(0, 10))}</label></div>
     <div class="row ab2dates"><label>${tr('Start time')}${timeIn('dpe-t0', dp_time(b.start))}</label><label>${tr('End time')}${timeIn('dpe-t1', dp_time(b.end) === '23:59' && !dp_time(b.start) ? '' : dp_time(b.end))}</label></div>
     <div class="row"><span class="lbl">${tr('Status')}</span><div class="seg dpstat" role="group" aria-label="${esc(tr('Status'))}">${['option', 'firm'].map(s => `<button type="button" data-s="${s}" class="${b.status === s ? 'on' : ''}" aria-pressed="${b.status === s}">${s === 'firm' ? tr('Firm') : tr('Option')}</button>`).join('')}</div></div>
     <div class="row"><label for="dpe-note">${tr('Note')}</label><input id="dpe-note" maxlength="1000" value="${esc(b.note || '')}"></div>
-    <div class="foot"><button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button></div>`);
+    <div class="foot">${can ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${can ? tr('Cancel') : tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`);
   md.classList.add('ab2md', 'dpmd');
+  if (!can) $$('input, select, .dpstat button', md).forEach(x => { x.disabled = true; });
   const del = async (id, all) => {
     try {
       const r = await api('DELETE', `/api/team/dispo/bookings/${id}${all ? '?all=1' : ''}`);
