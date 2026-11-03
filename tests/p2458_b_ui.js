@@ -69,7 +69,7 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
     }
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); n.textContent = 'Donaudampfschifffahrtsgesellschaft'; sbb_fit(); return 1; })()`);
     // 2.499.0 (#4047, replaces the "…" of #3880 on the phone): a word far too long breaks inside the word, all of it to read
-    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); return {cut: n.classList.contains('srcut'), brk: n.classList.contains('srbrk'), sw: n.scrollWidth, cw: n.clientWidth, sh: n.scrollHeight, ch: n.clientHeight, lines: Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize))}; })()`);
+    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); return {cut: n.classList.contains('srcut'), brk: n.style.overflowWrap === 'anywhere', sw: n.scrollWidth, cw: n.clientWidth, sh: n.scrollHeight, ch: n.clientHeight, lines: Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize))}; })()`);
     check(!lng.cut && lng.brk && lng.sw <= lng.cw + 1 && lng.sh <= lng.ch + 1 && lng.lines >= 2, '#4047: far too long: broken over lines, never "…" ' + JSON.stringify(lng));
 
     await nav(B + '#today'); await sleep(300);
