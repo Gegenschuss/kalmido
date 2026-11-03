@@ -235,7 +235,8 @@ check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "pa
 check(Ca.get(B + f"/api/hubmail/mails/{m_list}").ok, "#3380 participant with the switch: reads")
 check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "admin"}).ok, "#3380 setup: carol a project admin")
 check(Ca.patch(B + f"/api/lists/{LB}", json={"mail_guests": False}).ok and app_list(Ca, LB).get("guests") is False, "#3380 a project admin switches it off")
-check(requests.patch(V + f"/lists/{LB}", headers=BOH, json={"mail_guests": True}).status_code == 400, "#3380 not writable through the API v1 (app only)")
+r = requests.patch(V + f"/lists/{LB}", headers=BOH, json={"mail_guests": True})
+check(r.status_code in (400, 403) and get(BOH, f"/lists/{LB}").json().get("mail_guests") is False, f"#3380 not writable through the API v1 (app only) ({r.status_code} {r.text[:120]})")
 check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "edit"}).ok and Ca.get(B + f"/api/hubmail/mails/{m_list}").ok,
       "#3380 edit member: reads without the switch")
 check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "view"}).ok and Ca.get(B + f"/api/hubmail/mails/{m_list}").status_code == 404,

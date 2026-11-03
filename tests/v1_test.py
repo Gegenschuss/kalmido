@@ -220,7 +220,6 @@ check(r.ok, f"off: status can be set without collaboration ({r.status_code} {r.t
 h = A.get(B + f"/api/lists/{lid}/status")
 check(h.ok and h.json()["items"][0]["status"] == "at_risk", f"off: status history readable ({h.status_code} {h.text[:80]})")
 check(dbx("SELECT COUNT(*) FROM notifications WHERE kind='status'")[0][0] == n0, "off: status sends no News to members")
-check(A.post(B + f"/api/lists/{lid}/status", json={"status": ""}).ok, "off: status cleared again")
 # 2.0.6 (#315): comments stay as personal notes: the timeline without activity / people, a comment without mentions,
 # News or pushes; the author rule for editing stays
 tl0 = A.get(B + f"/api/tasks/{tid}/timeline")
@@ -240,7 +239,8 @@ check(dbx("SELECT COUNT(*) FROM notifications")[0][0] == news_before, "off: comp
 check(not [x for x in (open(os.path.join(DATA, "ntfy.log")).read().splitlines() if os.path.exists(os.path.join(DATA, "ntfy.log")) else [])
            if "t-bob" in x], "off: no collaboration push to bob")
 after = {t: dbx(f"SELECT COUNT(*) FROM {t}")[0][0] for t in ("list_members", "comments", "list_status")}
-check(all(after[k] == before[k] + (1 if k == "comments" else 0) for k in after), f"off: memberships, comments (+ the deleted note), status history untouched: {before} {after}")
+# 2.395.0 (#3379): + the one status update set above while collaboration was off
+check(all(after[k] == before[k] + (1 if k in ("comments", "list_status") else 0) for k in after), f"off: memberships, comments (+ the deleted note), status history (+ #3379 update) kept: {before} {after}")
 # personal lists keep working
 check(Bo.post(B + "/api/tasks", json={"title": "solo", "list_id": blid}).ok, "off: own lists work normally")
 ical = A.post(B + "/api/ical", json={"action": "create"}).json()
