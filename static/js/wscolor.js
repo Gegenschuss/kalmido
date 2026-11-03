@@ -30,11 +30,13 @@ const wsp_vars = ws => { const t = wsp_tone(ws); return t ? `--wsd:${t[0]};--wsl
 // like wsc_attr for a workspace key (the switch, the chip, a list's sign): Private takes my colour too
 const wsp_attr = ws => { const v = wsp_vars(ws); return v ? ` data-wsc="1" style="${v}"` : ''; };
 // 2.138.2 C (#2389): the colour of the stripe on top of the sidebar (and the dot of the switch) -- my own choice, else the
-// organisation's (its admins' colour), else Kalmido's accent for Private (also without an organisation, P4); "All" and a
-// neutral choice: null (grey stripe, hollow dot)
+// organisation's (its admins' colour), else Kalmido's accent for Private (also without an organisation, P4)
+// 2.504.0 (#4222): "All" and "No colour" take Kalmido's accent too; only with the switch ws_accent off they stay null (grey stripe, hollow dot)
 const wsp_barTone = ws => {
-  if (!ws || ws === 'all') return null;
-  if (ws !== 'private') return wsOn() ? wsc_tone(wsc_ofWs(ws)) : null;
+  if (!ws) return null;
+  const glob = () => wac_on() ? ['var(--accent)', 'var(--accent)'] : null;
+  if (ws === 'all') return glob();
+  if (ws !== 'private') return wsOn() ? wsc_tone(wsc_ofWs(ws)) || glob() : null;
   const t = wsp_own('private');
   return t && t !== 'none' ? [t[2], t[4]] : ['var(--accent)', 'var(--accent)'];
 };
@@ -53,10 +55,9 @@ function wsp_side() {
 // focus): --accent / --accent-ink are set on :root (class wac-on, the variables --wad / --waid / --wal / --wail per theme, app.css),
 // so every colour derived from the accent at :root follows; backgrounds stay untinted (#2389), an open list's colour (#main.lp-acc)
 // stays its own signal. The colour = the stripe's (wsp_barTone: my choice, else the organisation's); Private without a choice
-// keeps Kalmido's accent (the device's accent), "All" and "No colour" a neutral grey. Setting ws_accent ('0' = off, the old look).
+// keeps Kalmido's accent (the device's accent), and so do "All" and "No colour" (2.504.0, #4222). Setting ws_accent ('0' = off, the old look).
 // Each tone is darkened (light theme, white ink) or lightened (dark theme, dark ink) until text on a button reaches 4.5:1.
 const WAC_VARS = ['--wad', '--waid', '--wal', '--wail'];
-const WAC_GREY = ['#a3a6ad', '#5d6068'];  // "All" / "No colour": neutral, [dark, light]
 const WAC_INK = ['#0b0c0e', '#ffffff'];  // ink on a button: dark in the dark theme, white in the light one
 const wac_on = () => S.settings?.ws_accent !== '0';
 const wac_lum = c => { const l = c.map(v => v / 255).map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126 * l[0] + .7152 * l[1] + .0722 * l[2]; };
@@ -72,9 +73,9 @@ function wac_fit(hex, light) {
 // the accent of a workspace: [dark, dark ink, light, light ink] or null (= Kalmido's accent stays)
 function wac_tone(ws) {
   if (!wac_on()) return null;
-  const t = ws === 'all' ? null : wsp_barTone(ws);
-  if (t && t[0] === 'var(--accent)') return null;  // Private without a choice
-  const [d, l] = t || WAC_GREY, fd = wac_fit(d, false), fl = wac_fit(l, true);
+  const t = wsp_barTone(ws);
+  if (!t || t[0] === 'var(--accent)') return null;  // Private without a choice, "All", "No colour" (2.504.0, #4222)
+  const [d, l] = t, fd = wac_fit(d, false), fl = wac_fit(l, true);
   return fd && fl ? [fd, WAC_INK[0], fl, WAC_INK[1]] : null;
 }
 // put the tone onto :root and remember it for the next start (set before the first paint, see the end of this file)
@@ -85,6 +86,26 @@ function wac_sync(ws) {
   const t = wac_tone(ws); wac_put(t);
   const k = t ? t.join() : '';
   if ((LS.get('wsAccent', '') || '') !== k) { if (k) LS.set('wsAccent', k); else LS.del('wsAccent'); }
+}
+// ---- 2.504.0 (#4222): "All workspaces" has no colour of its own: :root stays Kalmido's accent, and what belongs to one workspace wears
+// that workspace's tone locally (class wac-loc + the same --wad / --waid / --wal / --wail on the element, start-wsaccent.css): a task row
+// or calendar card of a mixed view (lp_cls / lp_sty), the open list's #view, the #detail of a task. A person without an organisation
+// has wsCur() 'all' too, hence wsOn(). The tone per workspace is kept (these run per row); its key holds all it depends on.
+const wac_locMemo = new Map();
+function wac_locVars(ws) {
+  const k = `${S.settings?.ws_colors || ''}|${S.settings?.ws_accent}|${wsOrg(wsc_ofWs(ws))?.color || ''}`;
+  let m = wac_locMemo.get(ws);
+  if (!m || m.k !== k) { const t = wac_tone(ws); m = {k, v: t ? WAC_VARS.map((n, i) => `${n}:${t[i]}`).join(';') : ''}; wac_locMemo.set(ws, m); }
+  return m.v;
+}
+// the tone of a list's workspace in "All" ('' = stay global: another view, the switch off, no such list, a workspace without a tone)
+const wac_listVars = l => l && wsOn() && wac_on() && wsCur() === 'all' ? wac_locVars(l.is_inbox ? 'private' : wsOf(l)) : '';
+const wac_openList = () => { const k = S.route?.mod === 'tasks' ? String(S.route.key || '') : ''; return k.startsWith('l:') ? listById(+k.slice(2)) : null; };
+// a row or card: nothing inside an open list (#view has the tone there)
+const wac_rowVars = t => wac_openList() ? '' : wac_listVars(lp_listOf(t?.list_id));
+// #view of an open list: the header in #main stays global, so #view and not #main; a list's own colour (#main.lp-acc) wins
+function wac_viewSync() {
+  lp_put($('#view'), 'wac-loc', $('#main')?.classList.contains('lp-acc') ? '' : wac_listVars(wac_openList()), WAC_VARS);
 }
 // 2.490.0 B (#4026): no flicker on a start -- the last shown workspace's accent before the app draws (like the theme, icons.js)
 try { const v = String(LS.get('wsAccent', '') || '').split(','); if (v.length === 4 && v.every(x => /^#[0-9a-f]{6}$/i.test(x))) wac_put(v); } catch { /* no storage */ }
@@ -153,11 +174,14 @@ function wsc_sync() {
   const k = S.route?.mod === 'tasks' ? String(S.route.key || '') : '';
   lp_put($('#main'), 'wsc-on', wsc_listVars(k.startsWith('l:') ? listById(+k.slice(2)) : null), WSC_VARS);
   wsc_detail();
+  wac_viewSync();  // 2.504.0 (#4222)
   wsp_side();  // 2.57.0 B (#1807); 2.138.2 C (#2389): the stripe's colour
 }
 function wsc_detail() {
   const t = S.sel ? taskById(S.sel) : null;
-  lp_put($('#detail'), 'wsc-on', wsc_listVars(t ? listById(t.list_id) : null), WSC_VARS);
+  const l = t ? listById(t.list_id) : null;
+  lp_put($('#detail'), 'wsc-on', wsc_listVars(l), WSC_VARS);
+  lp_put($('#detail'), 'wac-loc', wac_listVars(l), WAC_VARS);  // 2.504.0 (#4222)
 }
 
 // ---- Settings > Workspaces: an organisation's colour (its admins choose, every member sees the same)

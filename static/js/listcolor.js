@@ -48,8 +48,9 @@ const lp_keep = (l, c) => l && c && c === lp_col(l) ? l.color || '' : c;
 const lp_dotOnly = () => S.settings?.list_color_dot === '1';
 const lp_vars = t => t ? `--lpd:${t[2]};--lpid:${t[3]};--lpl:${t[4]};--lpil:${t[5]}` : '';
 // the card edge of a task (Kanban, calendar, the collected views): a class + the tone as variables (theme picks, see app.css)
-const lp_cls = t => !lp_dotOnly() && lp_tone(t?.list_id) ? ' lpc lpv' : '';
-const lp_sty = t => lp_dotOnly() ? '' : lp_vars(lp_tone(t?.list_id));
+// 2.504.0 (#4222): both also carry the workspace's tone in "All workspaces" (wscolor.js wac_rowVars), also with "Only as a dot"
+const lp_cls = t => (!lp_dotOnly() && lp_tone(t?.list_id) ? ' lpc lpv' : '') + (wac_rowVars(t) ? ' wac-loc' : '');
+const lp_sty = t => [lp_dotOnly() ? '' : lp_vars(lp_tone(t?.list_id)), wac_rowVars(t)].filter(Boolean).join(';');
 const lp_attr = t => { const v = lp_sty(t); return v ? ` style="${v}"` : ''; };
 
 // ---- folders: a colour per folder of mine (setting folder_colors {path: colour}); a new list in it takes it (the server

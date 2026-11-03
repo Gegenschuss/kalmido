@@ -15965,7 +15965,6 @@
   "Bookmark in team…": "Marcador en equipo…",
   "Saved in “{0}”: {1}": "Guardado en «{0}»: {1}",
   "Interface in the colour of the workspace": "Interfaz en el color del espacio de trabajo",
-  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour, “All workspaces” a neutral grey. Off: always the accent colour.": "Los botones principales, la navegación activa, las marcas, el progreso y el foco toman el color del espacio de trabajo mostrado; Privado mantiene el color de acento, «Todos los espacios de trabajo» un gris neutro. Desactivado: siempre el color de acento.",
   "Flow": "Flujo",
   "{0} days|flow": "{0} días",
   "Earlier column": "Columna anterior",
@@ -16069,5 +16068,6 @@
   "{0} account deleted since then stays deleted or disabled either way.": ["{0} cuenta eliminada desde entonces sigue eliminada o desactivada en cualquier caso.", "{0} cuentas eliminadas desde entonces siguen eliminadas o desactivadas en cualquier caso."],
   "Deleted for good since this backup": "Eliminado definitivamente desde esta copia",
   "Delete them again (default, for data protection)": "Eliminarlos de nuevo (por defecto, por la protección de datos)",
-  "Keep everything in the backup (recorded in the admin alerts and the log)": "Conservar todo lo de la copia (queda en los avisos de administración y en el registro)"
+  "Keep everything in the backup (recorded in the admin alerts and the log)": "Conservar todo lo de la copia (queda en los avisos de administración y en el registro)",
+  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour. In “All workspaces” tasks and lists show the colour of their workspace, everything else the accent colour. Off: always the accent colour.": "Los botones principales, la navegación activa, las marcas, el progreso y el foco toman el color del espacio de trabajo mostrado; Privado mantiene el color de acento. En «Todos los espacios de trabajo», las tareas y las listas muestran el color de su espacio, todo lo demás el color de acento. Desactivado: siempre el color de acento."
 }

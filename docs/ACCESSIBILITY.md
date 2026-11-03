@@ -50,7 +50,8 @@ the app has not yet been tested by people who use a screen reader every day (see
   shown workspace is a 4 px stripe across the top of the sidebar (3 px on top of the header while the sidebar is
   closed, on phones and in the folded-away rail). The setting is called *Workspace colour*: your choice, else the
   organisation's colour, else Kalmido purple for Private (also without an organisation, on the account page); *All
-  workspaces* and *No color* show a grey stripe. The head has no logo: its first row is the workspace switch (dot,
+  workspaces* and *No color* show the accent colour (a grey stripe only with *Interface in the colour of the
+  workspace* switched off). The head has no logo: its first row is the workspace switch (dot,
   name, arrow), the buttons to fold all groups or fold the sidebar away show on hover and keyboard focus (always on
   touch screens). The account picture sits next to the search at the bottom without dots; the connection dot only
   appears offline or while changes go out (its state stays in the picture's name and the account menu), the update dot

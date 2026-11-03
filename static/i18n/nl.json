@@ -15965,7 +15965,6 @@
   "Bookmark in team…": "Bladwijzer in team…",
   "Saved in “{0}”: {1}": "Opgeslagen in ‘{0}’: {1}",
   "Interface in the colour of the workspace": "Interface in de kleur van de werkruimte",
-  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour, “All workspaces” a neutral grey. Off: always the accent colour.": "Hoofdknoppen, de actieve navigatie, vinkjes, voortgang en focus krijgen de kleur van de getoonde werkruimte; Privé houdt de accentkleur, „Alle werkruimtes” een neutraal grijs. Uit: altijd de accentkleur.",
   "Flow": "Doorstroom",
   "{0} days|flow": "{0} dagen",
   "Earlier column": "Eerdere kolom",
@@ -16069,5 +16068,6 @@
   "{0} account deleted since then stays deleted or disabled either way.": ["{0} sindsdien verwijderd account blijft in elk geval verwijderd of uitgeschakeld.", "{0} sindsdien verwijderde accounts blijven in elk geval verwijderd of uitgeschakeld."],
   "Deleted for good since this backup": "Definitief verwijderd sinds deze back-up",
   "Delete them again (default, for data protection)": "Opnieuw verwijderen (standaard, voor de gegevensbescherming)",
-  "Keep everything in the backup (recorded in the admin alerts and the log)": "Alles uit de back-up houden (vastgelegd in de beheermeldingen en het logboek)"
+  "Keep everything in the backup (recorded in the admin alerts and the log)": "Alles uit de back-up houden (vastgelegd in de beheermeldingen en het logboek)",
+  "Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour. In “All workspaces” tasks and lists show the colour of their workspace, everything else the accent colour. Off: always the accent colour.": "Hoofdknoppen, de actieve navigatie, vinkjes, voortgang en focus krijgen de kleur van de getoonde werkruimte; Privé houdt de accentkleur. In „Alle werkruimtes” tonen taken en lijsten de kleur van hun werkruimte, al het andere de accentkleur. Uit: altijd de accentkleur."
 }

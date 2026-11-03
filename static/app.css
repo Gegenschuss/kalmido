@@ -8415,7 +8415,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 /* 2.138.2 C (#2392, #2389): the sidebar's head -- no logo; the workspace switch is the heading (dot + name + arrow), the
    fold buttons appear on hover / keyboard focus (always on touch screens), the connection dot only offline / while syncing;
    the account picture sits next to the search at the bottom; a 6 px stripe (4 px before 2.490.0 B, #4026) in the workspace's colour (--wbd / --wbl on #app,
-   wscolor.js wsp_side: my choice, else the organisation's, else the accent for Private; grey under "All") is #side's top border,
+   wscolor.js wsp_side: my choice, else the organisation's, else the accent for Private, under "All" and "No colour" too, 2.504.0 #4222; grey only with ws_accent off) is #side's top border,
    4 px (3 px before #4026) on top of the header while the sidebar is closed (phone, rail) */
 #app{--wbc:var(--muted)}
 #app.wsb-on{--wbc:var(--wbd)}

@@ -4,3 +4,8 @@
 :root.wac-on{--accent:var(--wad);--accent-ink:var(--waid)}
 :root.wac-on[data-theme="light"]{--accent:var(--wal);--accent-ink:var(--wail)}
 @media (prefers-color-scheme: light){ :root.wac-on[data-theme="auto"]{--accent:var(--wal);--accent-ink:var(--wail)} }
+/* 2.504.0 (#4222): in "All workspaces" one part of the page in its workspace's tone (wscolor.js wac_locVars: the same four variables on the
+   element). :root has the derived colours resolved already, so they are derived again here, like #main.lp-acc in app.css */
+.wac-loc{--accent:var(--wad);--accent-ink:var(--waid);--accent-soft:color-mix(in srgb,var(--accent) 9%,var(--bg));--st-complete:var(--accent)}
+:root[data-theme="light"] .wac-loc{--accent:var(--wal);--accent-ink:var(--wail)}
+@media (prefers-color-scheme: light){ :root[data-theme="auto"] .wac-loc{--accent:var(--wal);--accent-ink:var(--wail)} }

@@ -1,7 +1,7 @@
 // kalmido-suite: fresh
 // 2.490.0 B UI tests, own container (start.sh). #4026: the interface in the colour of the shown workspace -- the accent (main
 // buttons, active navigation, ticks, progress, focus) follows the workspace: an organisation's colour (my own choice first), Private
-// keeps Kalmido's accent (my own choice first), "All workspaces" a neutral grey; each tone fitted so text on a button reaches 4.5:1
+// keeps Kalmido's accent (my own choice first), "All workspaces" Kalmido's accent (2.504.0, #4222, tests/p2504_c_ui.js: was a neutral grey); each tone fitted so text on a button reaches 4.5:1
 // (dark and light theme); setting ws_accent (Settings > Appearance, default on, off = the accent as before); the last shown colour
 // is set from localStorage before the app draws; an open list's colour stays its own signal; backgrounds stay untinted.
 // freelancer-matrix: n/a - nur Oberfläche (Person ohne Organisation: Privat-Fall + eigene Wahl, in der Datei geprüft)
@@ -51,7 +51,8 @@ const PETROL = ['rgb(79, 179, 193)', 'rgb(24, 115, 129)'];  // Kalmido's accent,
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'teal'}); render()`);
   check(v('--wad') === '#2dd4bf' && v('--wal') === '#0f766e', '#4026: my own colour for the organisation wins ' + v('--wad'));
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'none'}); render()`);
-  check(v('--wad') === w.eval('wac_fit(WAC_GREY[0], false)') && v('--wal') === w.eval('wac_fit(WAC_GREY[1], true)'), '#4026: "No colour": the neutral grey');
+  // 2.504.0 (#4222): "No colour" = Kalmido's accent, no grey
+  check(!html().classList.contains('wac-on') && !v('--wad'), '#4222: "No colour": Kalmido\'s accent');
   w.eval(`S.settings.ws_colors = '{}'; render()`);
   // Private: Kalmido's accent (no override), my own choice first
   await w.eval(`wsSet('private')`);
@@ -61,18 +62,18 @@ const PETROL = ['rgb(79, 179, 193)', 'rgb(24, 115, 129)'];  // Kalmido's accent,
   w.eval(`S.settings.ws_colors = JSON.stringify({private: 'blue'}); render()`);
   check(html().classList.contains('wac-on') && v('--wad') === '#6d8cff' && v('--wal') === '#3b5bdb', '#4026: Private: my own choice is the accent');
   w.eval(`S.settings.ws_colors = '{}'; render()`);
-  // All workspaces: grey; every organisation list in the sidebar keeps its stripe on the left
+  // All workspaces: no colour of its own; every organisation list in the sidebar keeps its stripe on the left
   await w.eval(`wsSet('all')`);
-  await until(() => v('--wad') === w.eval('wac_fit(WAC_GREY[0], false)'));
-  check(html().classList.contains('wac-on') && v('--wad') === w.eval('wac_fit(WAC_GREY[0], false)'), '#4026: "All workspaces": the neutral grey');
+  await until(() => !html().classList.contains('wac-on'));
+  check(!html().classList.contains('wac-on') && !v('--wad'), '#4222: "All workspaces": Kalmido\'s accent at :root');  // 2.504.0 (#4222)
   check(!!d.querySelector(`#side .srow[data-list="${WL}"][data-wsc]`), '#4026: "All workspaces": an organisation\'s list shows its workspace as a stripe on the left');
   // an open list with a colour: its own accent on #main stays (the list colour is its own signal)
   await w.eval(`wsSet('org:${ORG}')`);
   w.location.hash = 'l/' + RL;
   await until(() => d.querySelector('#main').classList.contains('lp-acc'));
   check(d.querySelector('#main').classList.contains('lp-acc') && d.querySelector('#main').style.getPropertyValue('--lpd') === '#f87171' && html().classList.contains('wac-on'), '#4026: an open list keeps its own colour as the accent of the list view');
-  // contrast fitting: every tone (organisation palette, my list tones, grey, extreme colours) reaches 4.5:1 with its ink
-  const fits = w.eval(`(() => { const out = []; const all = [...WSC_TONES.map(t => [t[0], t[1]]), ...LP_TONES.map(t => [t[2], t[4]]), WAC_GREY, ['#ffff00', '#ffff00'], ['#101010', '#101010'], ['#ffffff', '#000000']];
+  // contrast fitting: every tone (organisation palette, my list tones, extreme colours) reaches 4.5:1 with its ink
+  const fits = w.eval(`(() => { const out = []; const all = [...WSC_TONES.map(t => [t[0], t[1]]), ...LP_TONES.map(t => [t[2], t[4]]), ['#ffff00', '#ffff00'], ['#101010', '#101010'], ['#ffffff', '#000000']];
     for (const [dk, lt] of all) out.push([dk, wac_fit(dk, false), lt, wac_fit(lt, true)]); return out; })()`);
   const bad = fits.filter(([, fd, , fl]) => ratio(fd, '#0b0c0e') < 4.5 || ratio(fl, '#ffffff') < 4.5);
   check(fits.length > 20 && !bad.length, '#4026: every fitted tone reaches 4.5:1 for its ink (dark / light) ' + JSON.stringify(bad));
@@ -142,9 +143,9 @@ const PETROL = ['rgb(79, 179, 193)', 'rgb(24, 115, 129)'];  // Kalmido's accent,
       p = await o.until(`(() => { const p = ${PROBE}; return /wac-on/.test(p.cls) ? null : p; })()`);
       check(p && PETROL.includes(p.bg) && ratio(p.bg, p.fg) >= 4.5, `${theme}: #4026 Private: Kalmido's petrol ` + JSON.stringify(p));
       await ev(`(() => { wsSet('all'); return 1; })()`);
-      p = await o.until(`(() => { const p = ${PROBE}; return /wac-on/.test(p.cls) ? p : null; })()`);
-      const g = p && rgbOf(p.bg);
-      check(p && g && Math.max(...g) - Math.min(...g) <= 12 && ratio(p.bg, p.fg) >= 4.5, `${theme}: #4026 All workspaces: a neutral grey, text >= 4.5:1 ` + JSON.stringify(p));
+      // 2.504.0 (#4222): Kalmido's accent, no grey (the local tones: tests/p2504_c_ui.js)
+      p = await o.until(`(() => { const p = ${PROBE}; return /wac-on/.test(p.cls) ? null : p; })()`);
+      check(p && PETROL.includes(p.bg) && ratio(p.bg, p.fg) >= 4.5, `${theme}: #4222 All workspaces: Kalmido's petrol, text >= 4.5:1 ` + JSON.stringify(p));
       await shot(`p2490b-1280-${theme}-all.png`);
       // the switch to "All" is saved before this browser closes, so the next round starts from the state set below
       check(await until(async () => (await call('GET', '/api/state')).settings.workspace === 'all'), `${theme}: the switch to All is saved`);

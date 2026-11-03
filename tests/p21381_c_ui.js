@@ -71,7 +71,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'teal'}); render()`);
   check(app().style.getPropertyValue('--wbd') === '#2dd4bf', '#2389: my own choice wins over the organisation\'s colour');
   w.eval(`S.settings.ws_colors = JSON.stringify({'org:${ORG}': 'none'}); render()`);
-  check(!app().classList.contains('wsb-on'), '#2389: "No colour": a grey stripe');
+  // 2.504.0 (#4222): "No colour" and "All" take Kalmido's accent, a grey stripe only with the switch ws_accent off (tests/p2504_c_ui.js)
+  check(app().classList.contains('wsb-on') && app().style.getPropertyValue('--wbd') === 'var(--accent)', '#4222: "No colour": the stripe in the global accent');
   // #3506: the choice is saved on the server too and the check waits for the stripe - a state reload under load (core.js
   // takes S.settings from the server) wiped the local-only choice before the fixed 400 ms were over (Vorprüfung 2.409)
   await call('PATCH', '/api/settings', {ws_colors: JSON.stringify({private: 'blue'})});
@@ -80,8 +81,8 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(app().style.getPropertyValue('--wbd') === '#6d8cff', '#2389: Private: my own choice wins over purple');
   await call('PATCH', '/api/settings', {ws_colors: '{}'});
   await w.eval(`S.settings.ws_colors = '{}'; wsSet('all')`);
-  await until(() => !app().classList.contains('wsb-on'));
-  check(!app().classList.contains('wsb-on'), '#2389: "All": a grey stripe');
+  await until(() => app().style.getPropertyValue('--wbd') === 'var(--accent)');
+  check(app().classList.contains('wsb-on') && app().style.getPropertyValue('--wbd') === 'var(--accent)', '#4222: "All": the stripe in the global accent');
   w.eval(`wsSet('private')`); await sleep(300);
   // the setting: "Workspace colour", Private's default = purple
   w.eval(`settingsModal(lmOrgPaneOn() ? 'org' : 'account')`);
