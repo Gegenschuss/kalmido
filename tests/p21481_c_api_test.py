@@ -436,7 +436,7 @@ print(json.dumps({{"pub": str(pub[1]), "own": str(own[1])}}))
 """
 rc, out, err_ = py(code)
 txt = jout(out)
-check("stayed in the app" in txt.get("pub", "") and "went to ntfy" in txt.get("own", ""), f"#4215: the admin alert says what really happened {out[-300:]} {err_[-400:]}")
+check("not delivered" in txt.get("pub", "") and "went to ntfy" in txt.get("own", ""), f"#4215: the admin alert says what really happened {out[-300:]} {err_[-400:]}")
 
 
 def tok(s, scopes):

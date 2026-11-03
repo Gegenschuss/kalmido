@@ -345,8 +345,9 @@ to *deny* and allow each app per group, so a new account does not open every app
   knows its name.
 - **No fallback to the public ntfy.sh (2.499).** A person with the channel *Web Push* whose devices do not take a push
   (none subscribed, an expired subscription) gets nothing on the public `ntfy.sh` (the default `NTFY_URL` without
-  `NTFY_TOKEN`): the message stays in the app under News, and the admins get an alert about the device problem. Whoever
-  wants `ntfy.sh` chooses the channel *ntfy*. With your own ntfy server (`NTFY_URL` elsewhere or `NTFY_TOKEN` set) the
+  `NTFY_TOKEN`). What writes a News entry (comments, assignments) has it there; a reminder only shows on its task in the
+  app, without a push. When devices exist and none accepts, the admins get an alert. Whoever wants `ntfy.sh` chooses the
+  channel *ntfy*. With your own ntfy server (`NTFY_URL` elsewhere or `NTFY_TOKEN` set) the
   message goes there in full, as before.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
   WebSocket protocol in the Android app, and let your proxy pass WebSocket upgrades.
@@ -541,8 +542,8 @@ docker compose up -d kalmido
 ## Backup and encryption
 
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
-  (`kalmido.dump`), the small attachments and office files and a manifest with checksums (format 3, 2.432.0). Files from
-  64 KiB on lie once in `backups/.store`, **the zip alone is not complete**: see *Disk space and passphrase* below; restoring runs in
+  (`kalmido.dump`), the small attachments and office files and a manifest with checksums. Files from 64 KiB on lie once in
+  `backups/.store` (format 3, 2.432.0), **the zip alone is not complete**: see *Disk space and passphrase* below; restoring runs in
   maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
   still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
   also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
