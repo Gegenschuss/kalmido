@@ -20,7 +20,8 @@ const LONG = 'Start of a really long task title that wraps over several lines in
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   CK = await login('alice');
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', show_done_default: '1', show_done_new: '0'});
+  await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true, modules: ['cal']});  // (the setup card would lie over the list)
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal', show_done_default: '1', show_done_new: '0'});
   const ffLogin = async ({ev, nav}) => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
@@ -76,7 +77,7 @@ const LONG = 'Start of a really long task title that wraps over several lines in
         await o.until(`!document.querySelector('.ttlin') && !!${row}`, {timeout: 5000});
         const pt = await ev(`(() => { const t = ${row}.querySelector('.ttl'), n = [...t.childNodes].find(x => x.nodeType === 3) || t.firstChild, rg = document.createRange(); const at = ${JSON.stringify(LONG)}.indexOf('really'); rg.setStart(n, at + 2); rg.setEnd(n, at + 3); const b = rg.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, at}; })()`);
         // the "Renamed" note of the step before may still lie over the row: the title itself under the pointer
-        check(await o.until(`!!document.elementFromPoint(${pt.x}, ${pt.y})?.closest('.ttl')`, {timeout: 15000}), `${tag}: the title is free to click`);
+        check(await o.until(`!!document.elementFromPoint(${pt.x}, ${pt.y})?.closest('.ttl')`, {timeout: 15000}), `${tag}: the title is free to click ` + await ev(`(e => { const a = []; for (let x = e, n = 0; x && n < 5; x = x.parentElement, n++) a.push(x.tagName + '.' + x.className); return a.join(' < ') + ' ' + (e?.textContent || '').slice(0, 60); })(document.elementFromPoint(${pt.x}, ${pt.y}))`));
         const click = [{type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}];
         await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(pt.x), y: Math.round(pt.y)}, ...click, ...click]}]});
         await cmd('input.releaseActions', {context: ctx});
