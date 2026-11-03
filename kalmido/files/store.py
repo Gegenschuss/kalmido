@@ -700,6 +700,13 @@ def fs_purge(c, nid):
     (ids, paths); the caller commits and only then calls fs_purge_files(ids, paths) -- 2.86.0 (N25): a failed commit
     keeps the rows and their files."""
     ids = fs_subtree(c, nid)
+    with system_ctx(c):  # 2.493.0 (#4034): the documents going along locked before the first write, in one order (#3090): a
+        # recognition run (docs/store.process, its first write is the document's own row) ends first or waits - else the
+        # purge held the node row while the run held the document row: deadlock, 500
+        srt = sorted(int(i) for i in ids)
+        for k in range(0, len(srt), 500):
+            part = srt[k:k + 500]
+            c.execute(f"SELECT node_id FROM doc_meta WHERE node_id IN ({','.join('?' * len(part))}) ORDER BY node_id FOR UPDATE", part).fetchall()
     paths = []
     for i in ids:
         for f in fs_on_delete:

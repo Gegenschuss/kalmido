@@ -7,6 +7,7 @@ freelancer-matrix: office
  - #2600 removing the VAT rate / the payment day keeps the lock (doc_meta.kept_until); the books count only what is booked now
  - #2600 the lock also covers a receipt of the cash book, of the equipment list and one billed on a finalised invoice
  - #3796 deleting an item of the equipment list or swapping its receipt keeps the old receipt's lock
+ - #4034 purging a receipt swapped out of an item (no lock running) while a recognition run is busy: 200, no deadlock
  - #2600 the version clean-up (more than 20 versions) leaves every version of a booked receipt alone
  - #2601 the running month cannot be closed (400), a past one can
  - #2601 a client with drives or travel expenses is archived instead of deleted (single and several at once)
@@ -200,6 +201,51 @@ check(r.ok, "#3796: the item deleted " + r.text[:200])
 check(not sql("SELECT 1 FROM office_equipment WHERE id=?", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
 r = purge(A, R_E3)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt of a deleted item keeps its lock " + r.text[:200])
+# 2.493.0 (#4034): a receipt swapped out of an item, no lock running (the swap fell after its period), is purged for good
+# with 200 - also while a recognition run of it is busy: the run writes the document row first, then a row that needs the
+# node (here fs_log, like its tags / index); the purge used to take the node row first -> deadlock, 500. Now the purge locks
+# the document rows first and waits for the run (#3090 order). The stand-in run waits for the purge to wait (a real state).
+R_E4, R_E5 = (receipt(A, WSO, f"anlage{i}.pdf", 19) for i in (4, 5))
+it3 = A.post(B + EQ, json={"name": "Stativ", "purchase_date": f"{TODAY.year}-01-15", "life_months": 36, "receipt_node_id": R_E4})
+sql("DELETE FROM rc_receipts WHERE node_id=?", (R_E4,), write=True)
+r = A.patch(B + f"{EQ}/{it3.json()['id']}", json={"receipt_node_id": R_E5})
+check(r.ok, "#4034: the receipt swapped " + r.text[:200])
+sql("UPDATE doc_meta SET kept_until=NULL WHERE node_id=?", (R_E4,), write=True)  # no lock kept at the swap
+check(A.delete(B + f"/api/files/nodes/{R_E4}").ok, "#4034: the old receipt in the trash")
+RUN = f"""import time
+import app  # noqa: F401
+from kalmido.core.db import connect
+from kalmido.core.pg import system_ctx
+c, w = connect(), connect()
+try:
+    with system_ctx(c):
+        c.execute("UPDATE doc_meta SET updated_at=updated_at WHERE node_id=?", ({R_E4},))
+        print("held", flush=True)
+        seen, t0 = 0, time.time()
+        while not seen and time.time() - t0 < 30:
+            with system_ctx(w):
+                seen = w.execute("SELECT COUNT(*) FROM pg_locks WHERE NOT granted AND pid<>pg_backend_pid()").fetchone()[0]
+            w.rollback()
+            time.sleep(0.05)
+        c.execute("INSERT INTO fs_log(node_id, user_id, agent, action, detail, at) VALUES(?,?,?,?,?,?)",
+                  ({R_E4}, None, 0, "test4034", "", "2026-01-01T00:00:00"))
+        c.commit()
+        print("run done", seen, flush=True)
+except Exception as e:  # noqa: BLE001
+    print("run failed", type(e).__name__, flush=True)
+"""
+run = subprocess.Popen(["docker", "exec", CT, "python", "-c", RUN], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+pre = []  # start-up lines of the app (logs) come first
+for ln in run.stdout:
+    pre.append(ln.strip())
+    if ln.strip() in ("held",) or ln.startswith("run failed"):
+        break
+check(pre[-1:] == ["held"], "#4034: the stand-in recognition run holds the document row " + " | ".join(pre)[-300:])
+r = A.delete(B + f"/api/files/nodes/{R_E4}?purge=1")
+out = run.communicate(timeout=60)[0]
+check(r.status_code == 200, f"#4034: purged for good while a recognition run was busy ({r.status_code} {r.text[:200]})")
+check(out.startswith("run done") and not out.startswith("run done 0"), "#4034: the run waited for nothing and ended first (no deadlock on its side) " + out[-300:])
+check(not sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_E4,)), "#4034: the old receipt is gone")
 CL = A.post(B + "/api/clients", json={"name": "Kunde Eins GmbH", "street": "Kundenweg 2", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": DAY(30), "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})
 INV = r.json()["id"]
