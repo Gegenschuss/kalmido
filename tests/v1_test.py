@@ -208,13 +208,19 @@ refused = {
     "share": A.put(B + f"/api/lists/{lid}/members", json={"user_id": ids["carol"], "role": "view"}),
     "unshare": A.delete(B + f"/api/lists/{lid}/members/{ids['bob']}"),
     "leave": Bo.delete(B + f"/api/lists/{lid}/members/{ids['bob']}"),
-    "status": A.post(B + f"/api/lists/{lid}/status", json={"status": "on_track"}),
-    "status history": A.get(B + f"/api/lists/{lid}/status"),
     "assign": A.patch(B + f"/api/tasks/{tid}", json={"assignee_id": ids["bob"]}),
     "assign on create": A.post(B + "/api/tasks", json={"title": "y", "list_id": lid, "assignee_id": ids["alice"]}),
 }
 for k, r in refused.items():
     check(r.status_code == 403 and "Collaboration is turned off" in r.json().get("error", ""), f"off: {k} refused with 403 ({r.status_code} {r.text[:80]})")
+# 2.395.0 (#3379): the project status works without collaboration (one person / freelancer); no News for others
+n0 = dbx("SELECT COUNT(*) FROM notifications WHERE kind='status'")[0][0]
+r = A.post(B + f"/api/lists/{lid}/status", json={"status": "at_risk", "note": "solo"})
+check(r.ok, f"off: status can be set without collaboration ({r.status_code} {r.text[:80]})")
+h = A.get(B + f"/api/lists/{lid}/status")
+check(h.ok and h.json()["items"][0]["status"] == "at_risk", f"off: status history readable ({h.status_code} {h.text[:80]})")
+check(dbx("SELECT COUNT(*) FROM notifications WHERE kind='status'")[0][0] == n0, "off: status sends no News to members")
+check(A.post(B + f"/api/lists/{lid}/status", json={"status": ""}).ok, "off: status cleared again")
 # 2.0.6 (#315): comments stay as personal notes: the timeline without activity / people, a comment without mentions,
 # News or pushes; the author rule for editing stays
 tl0 = A.get(B + f"/api/tasks/{tid}/timeline")
