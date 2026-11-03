@@ -6,7 +6,7 @@
 // ---- #182 edit a title right in the list: double-click (desktop) or E / F2 on the keyboard-focused row. Enter saves (one
 // undo step), Esc cancels, leaving the field saves. A re-render (sync) keeps the field, its text and the caret.
 S.ie = null;  // {id, v, s, e}
-function inlineEditStart(id) {
+function inlineEditStart(id, at) {
   const t = taskById(id);
   if (!t || !(t.id > 0)) return;
   if (!canEdit(t)) { roToast(); return; }
@@ -14,8 +14,28 @@ function inlineEditStart(id) {
   if (!$(`#view .trow[data-id="${id}"] .ttl`)) return;
   if (S.ie && S.ie.id !== id) inlineEditCommit();
   S.ie = {id, v: t.title};
+  if (at != null) S.ie.s = S.ie.e = ttlRawPos(t.title, at);  // 2.497.0 (#4056): the caret where the double-click was
   inlineEditMount(true);
 }
+// 2.497.0 (#4056): the caret offset in the shown title (formatting stripped) -> the offset in the raw title of the field
+function ttlRawPos(raw, n) {
+  let i = 0, j = 0; const shown = mdPlain(raw);
+  if (shown === raw) return Math.min(n, raw.length);
+  while (i < raw.length && j < n) { if (raw[i] === shown[j]) j++; i++; }
+  return i;
+}
+// the caret offset in .ttl's text at a screen point (caretPositionFromPoint: Firefox, caretRangeFromPoint: WebKit / Blink)
+function ttlPointPos(ttl, x, y) {
+  let node, off;
+  if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(x, y); if (c) { node = c.offsetNode; off = c.offset; } }
+  else if (document.caretRangeFromPoint) { const r = document.caretRangeFromPoint(x, y); if (r) { node = r.startContainer; off = r.startOffset; } }
+  if (!node || !ttl.contains(node)) return null;
+  const r = document.createRange(); r.setStart(ttl, 0);
+  try { r.setEnd(node, off); } catch { return null; }
+  return r.toString().length;
+}
+// the field grows with the text: as many lines as the title has in the row (no scrolling sideways, the start stays visible)
+function ttlinFit(i) { if (!i) return; i.style.height = 'auto'; i.style.height = i.scrollHeight + 'px'; }
 function inlineEditMount(focus) {
   const ie = S.ie; if (!ie) return;
   const row = $(`#view .trow[data-id="${ie.id}"]`), ttl = row && $('.ttl', row);
@@ -23,9 +43,15 @@ function inlineEditMount(focus) {
   if ($('.ttlin', ttl)) return;
   row.classList.add('iedit'); row.removeAttribute('draggable');
   ttl.removeAttribute('role'); ttl.removeAttribute('tabindex');  // 2.16.0 (#473): no field inside a button
-  ttl.innerHTML = `<input class="ttlin" value="${esc(ie.v)}" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off">`;
+  // 2.497.0 (#4056): a wrapping field in the title's own font and lines instead of a one-line input (that pushed the start
+  // out of view and collapsed a four-line row to one line); a title has no line breaks: pasted ones become spaces
+  ttl.innerHTML = `<textarea class="ttlin" rows="1" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off" spellcheck="true">${esc(ie.v)}</textarea>`;
   const i = $('.ttlin', ttl);
-  i.addEventListener('input', () => { ie.v = i.value; });
+  ttlinFit(i);
+  i.addEventListener('input', () => {
+    if (/[\r\n]/.test(i.value)) { const p = i.selectionStart; i.value = i.value.replace(/\r\n?|\n/g, ' '); try { i.setSelectionRange(p, p); } catch { /* ignore */ } }
+    ie.v = i.value; ttlinFit(i);
+  });
   i.addEventListener('keydown', e => {
     if (e.isComposing) return;
     if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); inlineEditCommit(true); }
@@ -49,8 +75,9 @@ function inlineEditCancel() { const ie = S.ie; S.ie = null; renderView(); if (ie
 document.addEventListener('dblclick', e => {
   const r = e.target.closest?.('#view .trow');
   if (!r || isTouch() || S.multiMode || !e.target.closest('.tmain') || e.target.closest('button,a,input,.ttlin')) return;
+  const ttl = $('.ttl', r), at = ttl && e.target.closest('.ttl') ? ttlPointPos(ttl, e.clientX, e.clientY) : null;
   e.preventDefault(); window.getSelection?.()?.removeAllRanges?.();
-  inlineEditStart(+r.dataset.id);
+  inlineEditStart(+r.dataset.id, at);
 });
 
 // ---- #283 "+" on a section header: an input right below it, Enter adds the task there and stays open for the next one

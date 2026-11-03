@@ -181,7 +181,7 @@ function sgEdit(c, typed) {
   if (!canEdit(t)) { roToast(); return; }
   if (c.k === 'title') {
     inlineEditStart(t.id);
-    if (typed != null && S.ie) { S.ie.v = typed; S.ie.s = S.ie.e = typed.length; const i = $('.ttlin'); if (i) { i.value = typed; i.setSelectionRange(typed.length, typed.length); } }
+    if (typed != null && S.ie) { S.ie.v = typed; S.ie.s = S.ie.e = typed.length; const i = $('.ttlin'); if (i) { i.value = typed; i.setSelectionRange(typed.length, typed.length); ttlinFit(i); } }
     SG.ttl = t.id;
     return;
   }

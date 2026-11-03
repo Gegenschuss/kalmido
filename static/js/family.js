@@ -582,6 +582,9 @@ document.addEventListener('click', e => {
 // ---- shopping mode: big ticks, grouped by shop area, live for everyone (polls every 2 s while open)
 function shopModeOpen(lid) {
   const l = listById(lid); if (!l) return;
+  // 2.497.0 (#4040): opened once: a second open (double tap, palette + button) stacked a second overlay and history entry,
+  // closing then left one overlay and the entry behind
+  if ($('.shopmode')) return;
   S.shop = {lid};
   const ov = document.createElement('div');
   ov.className = 'modal shopmode'; ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-labelledby', 'shop-h');
