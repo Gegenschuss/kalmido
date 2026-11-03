@@ -218,7 +218,10 @@ def app_list(s, lid):
 
 check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "view"}).ok, "#3380 setup: carol a guest (view) of Acme film")
 j = app_list(Ca, LB)
-check(j.get("can_read") is False and j.get("mails") == [] and j.get("can_guests") is False, f"#3380 guest: no mails, may not switch ({j})")
+check(j.get("can_read") is False and j.get("mails") == [] and j.get("can_guests") is False and not j.get("address"),
+      f"#3380 guest: no mails, no address, may not switch ({j})")
+Bo.post(B + "/api/hubmail/address", json={"list_id": LB})  # the project's filing address exists (the guest still gets none)
+check(not app_list(Ca, LB).get("address"), "#3380 guest: the project's address stays hidden")
 check(Ca.get(B + f"/api/hubmail/mails/{m_list}").status_code == 404, "#3380 guest: one project mail = 404")
 check(get(CAH, "/mails", list_id=LB).status_code == 404 and get(CAH, f"/mails/{m_list}").status_code == 404, "#3380 guest's token: 404")
 check(Ca.patch(B + f"/api/lists/{LB}", json={"mail_guests": True}).status_code == 403, "#3380 a guest cannot switch it on")
