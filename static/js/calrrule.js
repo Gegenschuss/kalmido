@@ -31,12 +31,12 @@ function crr_build(st) {
   if (st.f === 'MONTHLY' && !st.keep) parts.push(st.mode === 'nth' ? `BYDAY=${st.pos}${st.wd}` : `BYMONTHDAY=${st.md}`);
   return [...parts, ...st.rest].join(';');
 }
-const crr_ordWord = pos => pos < 0 ? tr('last|nth') : tr(CRR_ORD[pos - 1]);
+// crr_ordWord(pos, wd): quickadd.js (2.383.0, #2587: the form follows the weekday's gender)
 
 function crr_html(st) {
   const plural = trn('day', 'days', st.n), units = [['DAILY', plural], ['WEEKLY', trn('week', 'weeks', st.n)], ['MONTHLY', trn('month', 'months', st.n)], ['YEARLY', trn('year', 'years', st.n)]];
   const wds = wdOrder().map(i => `<button type="button" class="${st.days.has(RR_WD[i]) ? 'on' : ''}" data-crrwd="${RR_WD[i]}" aria-pressed="${st.days.has(RR_WD[i])}" aria-label="${esc(WDL[i])}">${esc(WD[i])}</button>`).join('');
-  const posOpts = [1, 2, 3, 4, -1].map(p => `<option value="${p}" ${st.pos === p ? 'selected' : ''}>${esc(crr_ordWord(p))}</option>`).join('');
+  const posOpts = [1, 2, 3, 4, -1].map(p => `<option value="${p}" ${st.pos === p ? 'selected' : ''}>${esc(crr_ordWord(p, st.wd))}</option>`).join('');
   const wdOpts = wdOrder().map(i => `<option value="${RR_WD[i]}" ${st.wd === RR_WD[i] ? 'selected' : ''}>${esc(WDL[i])}</option>`).join('');
   return `<div class="lhdr"><h3>${tr('Custom repeat')}</h3><span class="spacer"></span><button class="iconbtn" data-crr="cancel" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="row crrrow"><label for="crr-n">${tr('Every|repeat')}</label><input type="number" id="crr-n" class="numin" min="1" max="99" inputmode="numeric" value="${st.n}" aria-label="${esc(tr('Interval'))}">
@@ -66,7 +66,11 @@ function crr_open(parent, base, start, done) {
       }
       if (t.name === 'crr-m') st.mode = t.value;
       if (t.id === 'crr-md') { st.md = Math.max(1, Math.min(31, +t.value || 1)); st.mode = 'day'; const r = /** @type {HTMLInputElement|null} */ ($('input[name="crr-m"][value="day"]', md)); if (r) r.checked = true; }
-      if (t.id === 'crr-pos' || t.id === 'crr-wd') { if (t.id === 'crr-pos') st.pos = +t.value; else st.wd = t.value; st.mode = 'nth'; const r = /** @type {HTMLInputElement|null} */ ($('input[name="crr-m"][value="nth"]', md)); if (r) r.checked = true; }
+      if (t.id === 'crr-pos' || t.id === 'crr-wd') {
+        if (t.id === 'crr-pos') st.pos = +t.value; else st.wd = t.value; st.mode = 'nth'; const r = /** @type {HTMLInputElement|null} */ ($('input[name="crr-m"][value="nth"]', md)); if (r) r.checked = true;
+        // 2.383.0 (#2587): the ordinals take the new weekday's form (Italian: primo lunedì, prima domenica)
+        if (t.id === 'crr-wd') md.querySelectorAll('#crr-pos option').forEach(/** @param {HTMLOptionElement} o */ o => { o.textContent = crr_ordWord(+o.value, st.wd); });
+      }
       prev();
     });
     md.addEventListener('click', e => {

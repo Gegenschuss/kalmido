@@ -14,13 +14,14 @@ from flask import request, Response
 
 from ..core.config import APP_NAME, TZ
 from ..core.i18n import tr
-from ..core.db import IntegrityError, gsetting, iso_ms, now_utc, parse_iso
+from ..core.db import bump, IntegrityError, gsetting, iso_ms, now_utc, parse_iso
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
     dav_response, dav_xml, DAV_MAX_BODY, DAV_NAME_RE, DAV_SYNC_KEEP, DavError, dav_color, dav_report_props,
 )
 from ..events.model import att_rows, ev_att_ok, ev_delete, ev_expand, events_on, my_cal_ids
+from ..events.model import cal_touch, is_occ, occ_ps_of, EV_OCC_PS_MAX  # 2.383.0 (#2587)
 from ..events.ics import etag, ev_lines, EvError, read_vevent, store_parsed, wrap
 from ..events.web import op_rsvp  # 2.369.5 (#2517): pulled up from functions
 from ..calendars.caldav import dav_lists, dav_caps_add  # 2.369.5 (#2517): pulled up from functions
@@ -29,7 +30,8 @@ from ..events.model import cal_create  # 2.369.5 (#2517): pulled up from functio
 _CACHE, _LOCK = {}, threading.Lock()
 EV_REPORTS = ("<D:supported-report><D:report><C:calendar-query/></D:report></D:supported-report>"
               "<D:supported-report><D:report><C:calendar-multiget/></D:report></D:supported-report>"
-              "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>")
+              "<D:supported-report><D:report><D:sync-collection/></D:report></D:supported-report>"
+              "<D:supported-report><D:report><C:free-busy-query/></D:report></D:supported-report>")  # 2.383.0 (#2587)
 
 
 def evdav_colls(c, u):
@@ -279,8 +281,50 @@ def ev_report(c, u, coll, raw):
                 yield f"<D:response><D:href>{_xe(dav_href(*base, n))}</D:href><D:status>HTTP/1.1 404 Not Found</D:status></D:response>"
         return dav_multistatus(gen(), f"<D:sync-token>{_xe(ec.token)}</D:sync-token>")
     if root.tag == C_ + "free-busy-query":
-        raise DavError(403, "Free / busy is not offered", "<D:supported-report/>")
+        return ev_freebusy(c, u, coll, ec, root)
     raise DavError(403, "Unsupported report", "<D:supported-report/>")
+
+
+def _fb_dt(s):
+    """A time-range bound of a free-busy-query (RFC 4791 9.9: UTC date with time) -> aware datetime, or None."""
+    s = (s or "").strip()
+    try:
+        if re.fullmatch(r"\d{8}T\d{6}Z", s) and 1900 <= int(s[:4]) <= 2999:
+            return datetime.strptime(s, "%Y%m%dT%H%M%SZ").replace(tzinfo=timezone.utc)
+    except (ValueError, OverflowError):
+        pass
+    return None
+
+
+def ev_freebusy(c, u, coll, ec, root):
+    """2.383.0 (#2587): CALDAV:free-busy-query (RFC 4791 7.10) on an event collection: one VFREEBUSY with the busy times of
+    its events in the asked range, by the rules of the availability bar (events/freebusy.py efb_utc: busy events, not
+    cancelled, timed; in the invitations only the accepted dates). The collection is one the person reads anyway (their own,
+    one shared with them, their invitations), so the answer shows nothing new; it never names a title, a place or a person."""
+    from ..events.freebusy import efb_utc
+    tr_ = root.find(C_ + "time-range")
+    a, b = (_fb_dt(tr_.get("start")), _fb_dt(tr_.get("end"))) if tr_ is not None else (None, None)
+    if tr_ is None or (tr_.get("start") and a is None) or (tr_.get("end") and b is None) or not (a or b):
+        raise DavError(400, "free-busy-query needs a time-range with UTC times", "<C:valid-filter/>")
+    a = a or b - timedelta(days=1)
+    b = b or a + timedelta(days=1)
+    if b <= a or (b - a).days > 3660:
+        raise DavError(400, "The time-range of a free-busy-query must be shorter than ten years", "<C:valid-filter/>")
+    rows = [m[4] for m in ec.members.values()]
+    occ_ok = None
+    if coll["id"] is None:  # the invitations: only the dates the person accepted (2.383.0, #2587: also a single one)
+        mine = {r[0]: (r[1], occ_ps_of(r)) for r in c.execute("SELECT event_id, partstat, occ_ps FROM event_attendees WHERE user_id=?",
+                                                               (u["id"],))}
+        rows = [r for r in rows if r["id"] in mine and (mine[r["id"]][0] == "accepted" or "accepted" in mine[r["id"]][1].values())]
+
+        def occ_ok(r, occ):
+            ps, occs = mine[r["id"]]
+            return occs.get(occ, ps) == "accepted"
+    fmt = "%Y%m%dT%H%M%SZ"
+    lines = ["BEGIN:VFREEBUSY", f"DTSTAMP:{now_utc().strftime(fmt)}", f"DTSTART:{a.strftime(fmt)}", f"DTEND:{b.strftime(fmt)}"]
+    lines += [f"FREEBUSY;FBTYPE=BUSY:{s.strftime(fmt)}/{e.strftime(fmt)}" for s, e in efb_utc(rows, a, b, occ_ok)]
+    lines.append("END:VFREEBUSY")
+    return Response(wrap(lines, set()), 200, content_type="text/calendar; charset=utf-8")
 
 
 def ev_att_learn(c, pw_row, v):
@@ -330,6 +374,8 @@ def ev_put(c, u, coll, name, pw_row=None):
         store_parsed(c, u["id"], coll["id"], v, eid=eid, keep_attendees=not v["attendees_raw"] and not knows_att)
         if v["uid"] != have[0]["uid"]:
             c.execute("UPDATE events SET uid=? WHERE id=?", (v["uid"], eid))
+        if v["attendees_raw"]:  # 2.383.0 (#2587): the own answers to single dates, also in a calendar one may edit
+            ev_occ_answers(c, u, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), v)
         c.commit()
         return Response(status=204)
     dup = c.execute("SELECT href FROM events WHERE cal_id=? AND uid=? AND deleted_at IS NULL", (coll["id"], v["uid"])).fetchone()
@@ -475,9 +521,47 @@ def ev_rsvp_put(c, u, coll, name):
     ps = _rsvp_mine(u, v["attendees_raw"])
     eid = have[0]["id"]
     cur = c.execute("SELECT partstat FROM event_attendees WHERE event_id=? AND user_id=?", (eid, u["id"])).fetchone()
+    changed = False
     if ps and cur and ps != cur[0]:
         op_rsvp(c, u["id"], eid, {"partstat": ps})
+        changed = True
+    if ev_occ_answers(c, u, have[0], v) or not changed:
+        # 2.383.0 (#2587): answers to single dates; and a PUT whose other changes (time, title) were ignored gets a new ETag
+        # all the same, so the phone loads the stored event again instead of keeping its own copy
+        ev_touch(c, eid)
     return Response(status=204)
+
+
+def ev_occ_answers(c, u, r, v):
+    """2.383.0 (#2587): the person's own answers to single dates of series r from the changed occurrences of a PUT
+    (read_vevent ov_atts: RECURRENCE-ID + the own ATTENDEE) -> event_attendees.occ_ps, only the dates whose answer differs
+    from the answer to the series and that the series really has. The PUT names every date it knows, so a date without
+    an own answer of its own follows the series again. True when something changed (not committed)."""
+    if not r["rrule"]:
+        return False
+    row = c.execute("SELECT partstat, occ_ps FROM event_attendees WHERE event_id=? AND user_id=?", (r["id"], u["id"])).fetchone()
+    if not row:
+        return False
+    new = {}
+    for k, raw in sorted((v.get("ov_atts") or {}).items()):
+        ps = _rsvp_mine(u, raw)
+        if ps and ps != "needs-action" and ps != row["partstat"] and len(new) < EV_OCC_PS_MAX and is_occ(r, k):
+            new[k] = ps
+    if new == occ_ps_of(row):
+        return False
+    c.execute("UPDATE event_attendees SET occ_ps=? WHERE event_id=? AND user_id=?",
+              (json.dumps(new, separators=(",", ":"), sort_keys=True) if new else "", r["id"], u["id"]))
+    return True
+
+
+def ev_touch(c, eid):
+    """2.383.0 (#2587): a new ETag for an event (a later updated_at, at least one second on: DTSTAMP counts seconds) + commit."""
+    r = c.execute("SELECT updated_at, cal_id FROM events WHERE id=?", (eid,)).fetchone()
+    t = max(now_utc(), parse_iso(r[0]) + timedelta(seconds=1))
+    c.execute("UPDATE events SET updated_at=? WHERE id=?", (iso_ms(t), eid))
+    cal_touch(c, r[1])
+    bump(c)
+    c.commit()
 
 
 def ev_rsvp_delete(c, u, coll, name):

@@ -482,7 +482,7 @@ def apb_busy(c, uid, p, lo, hi, skip=None):
     calendars uid sees and did not hide plus the page's calendar, events uid accepted, timed events of visible subscriptions,
     absences (whole / half days in the page's zone), open bookings and confirmed ones without an event (the event stands for
     the booking: moved or deleted in the calendar, the time follows)."""
-    from ..events.model import ev_expand, my_cal_ids
+    from ..events.model import ev_expand, my_cal_ids, occ_ps_of
     zone = apb_zone(p)
     dlo, dhi = (lo - timedelta(days=1)).date(), (hi + timedelta(days=1)).date()
     out = []
@@ -502,11 +502,16 @@ def apb_busy(c, uid, p, lo, hi, skip=None):
         q = ",".join("?" * len(cals))
         rows = c.execute(f"""SELECT * FROM events WHERE cal_id IN ({q}) AND deleted_at IS NULL AND busy=1 AND status<>'cancelled'
                              AND first_day<=? AND (last_day='' OR last_day>=?)""", [*cals, dhi.isoformat(), dlo.isoformat()]).fetchall()
-    rows += c.execute("""SELECT e.* FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=? WHERE a.partstat='accepted'
-                         AND e.deleted_at IS NULL AND e.busy=1 AND e.status<>'cancelled' AND e.first_day<=? AND (e.last_day='' OR e.last_day>=?)""",
-                      (uid, dhi.isoformat(), dlo.isoformat())).fetchall()
-    for r in rows:
+    rows = [(r, None) for r in rows]
+    # 2.383.0 (#2587): an invitation blocks on the dates accepted (the answer to the series or that date's own one)
+    rows += [(r, (r["apb_ps"], occ_ps_of(r))) for r in c.execute(
+        """SELECT e.*, a.partstat AS apb_ps, a.occ_ps FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
+           WHERE (a.partstat='accepted' OR a.occ_ps<>'') AND e.deleted_at IS NULL AND e.busy=1 AND e.status<>'cancelled'
+           AND e.first_day<=? AND (e.last_day='' OR e.last_day>=?)""", (uid, dhi.isoformat(), dlo.isoformat())).fetchall()]
+    for r, inv in rows:
         for o in ev_expand(r, dlo, dhi):
+            if inv and inv[1].get(o["occ"], inv[0]) != "accepted":
+                continue
             if o["all_day"]:
                 out.append(day_span(o["s"], o["e"]))
             else:

@@ -12171,7 +12171,7 @@
   "third|nth": "terzo",
   "fourth|nth": "quarto",
   "last|nth": "ultimo",
-  "on the": "il",
+  "on the": "ogni",
   "Weekday": "Giorno della settimana",
   "Team absences": "Assenze del team",
   "Holidays of": "Festività di",
@@ -16049,5 +16049,15 @@
   "Guests can read e-mails": "Gli ospiti possono leggere le e-mail",
   "Guests can read the e-mails of this project": "Gli ospiti possono leggere le e-mail di questo progetto",
   "Only editors read the e-mails of this project": "Solo chi modifica legge le e-mail di questo progetto",
-  "E-mails often hold client data and attachments": "Le e-mail contengono spesso dati dei clienti e allegati"
+  "E-mails often hold client data and attachments": "Le e-mail contengono spesso dati dei clienti e allegati",
+  "_wd_fem": ["SU"],
+  "first|nth-fem": "prima",
+  "second|nth-fem": "seconda",
+  "third|nth-fem": "terza",
+  "fourth|nth-fem": "quarta",
+  "last|nth-fem": "ultima",
+  "Monthly on the {0} {1}|fem": "Ogni mese la {0} {1}",
+  "Every {0} months on the {1} {2}|fem": "Ogni {0} mesi la {1} {2}",
+  "Monthly on the last {0}|fem": "Ogni mese l’ultima {0}",
+  "Every {0} months on the last {1}|fem": "Ogni {0} mesi l’ultima {1}"
 }

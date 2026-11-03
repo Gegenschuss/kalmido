@@ -32,7 +32,7 @@ from ..core.access import Denied, need_feat, token_lists
 from ..personal.timetrack import BadInput
 from ..accounts.orgs import user_orgs, visible_people
 from ..accounts.orgroles import user_orgs_full
-from ..events.model import ev_att_ok, ev_expand, my_cal_ids, ev_zone, tz_ok, ev_role_of  # 2.369.5 (#2517): pulled up from functions
+from ..events.model import ev_att_ok, ev_expand, my_cal_ids, ev_zone, tz_ok, ev_role_of, occ_ps_of  # 2.369.5 (#2517): pulled up from functions
 from ..calendars.subscriptions import CAL_ON  # 2.369.5 (#2517): pulled up from functions
 
 EFB_USERS_MAX = 20
@@ -133,17 +133,21 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
         q = ",".join("?" * len(cals))
         rows = c.execute(f"""SELECT * FROM events WHERE cal_id IN ({q}) AND deleted_at IS NULL AND busy=1 AND status<>'cancelled'
                              AND all_day=0 AND first_day<=? AND (last_day='' OR last_day>=?)""", [*cals, hi.isoformat(), lo.isoformat()]).fetchall()
-    rows += [r for r in c.execute("""SELECT e.*, k.org_id AS efb_org FROM events e JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
-                         JOIN ev_cals k ON k.id=e.cal_id WHERE a.partstat='accepted'
+    rows = [(r, None) for r in rows]
+    rows += [(r, (r["efb_ps"], occ_ps_of(r))) for r in c.execute("""SELECT e.*, k.org_id AS efb_org, a.partstat AS efb_ps, a.occ_ps FROM events e
+                         JOIN event_attendees a ON a.event_id=e.id AND a.user_id=?
+                         JOIN ev_cals k ON k.id=e.cal_id WHERE (a.partstat='accepted' OR a.occ_ps<>'')
                          AND e.deleted_at IS NULL AND e.busy=1 AND e.status<>'cancelled' AND e.all_day=0 AND e.first_day<=?
                          AND (e.last_day='' OR e.last_day>=?)""", (uid, hi.isoformat(), lo.isoformat())).fetchall()
              if ev_att_ok(c, uid, r["efb_org"]) and (orgs is None or r["efb_org"] in orgs)]  # review 2.155.0: not the invitations of an organisation the person left
     seen = set()
-    for r in rows:
+    for r, inv in rows:  # inv = (answer to the series, answers to single dates) of an invitation, None = own calendar
         if r["id"] in seen or (skip and r["id"] == skip):
             continue
         seen.add(r["id"])
         for o in ev_expand(r, lo, hi):
+            if inv and inv[1].get(o["occ"], inv[0]) != "accepted":  # 2.383.0 (#2587): only the dates accepted
+                continue
             if not o["all_day"]:  # an occurrence moved to a whole day does not block either
                 clip(o["s"], o["e"], busy)
     if CAL_ON and orgs is None:  # 2.240.0 C (#2868): subscriptions are private sources
@@ -160,6 +164,25 @@ def efb_spans(c, uid, day, zone, skip=None, orgs=None):
     if orgs is None and abs_holidays_year(day.year, abc_state(c, uid)).get(day.isoformat()):  # 2.360.5 (#3245)
         away.append((0, 1440))
     return [(a, b, "away") for a, b in efb_merge(away)] + [(a, b, "busy") for a, b in efb_merge(busy)]
+
+
+def efb_utc(rows, a, b, occ_ok=None):
+    """2.383.0 (#2587): the merged busy spans [(start, end)] (aware datetimes, UTC) of event rows between a and b (aware), by the
+    rules of efb_spans: busy=1, not cancelled, timed (an all-day event never blocks); occ_ok(row, occurrence key) -> False
+    leaves an occurrence out (an invitation declined for that date). For the CalDAV free-busy-query (events/dav.py)."""
+    from datetime import timezone
+    lo, hi = (a - timedelta(days=1)).date(), (b + timedelta(days=1)).date()
+    out = []
+    for r in rows:
+        if not r["busy"] or r["status"] == "cancelled" or r["all_day"]:
+            continue
+        for o in ev_expand(r, lo, hi):
+            if o["all_day"] or (occ_ok is not None and not occ_ok(r, o["occ"])):
+                continue
+            s, e = max(o["s"], a), min(o["e"], b)
+            if e > s:
+                out.append((s.astimezone(timezone.utc), e.astimezone(timezone.utc)))
+    return efb_merge(out)
 
 
 def efb_merge(spans):

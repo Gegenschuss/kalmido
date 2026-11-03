@@ -407,6 +407,10 @@ function repeatLabel(r) {
   return repeatLabelBase(rrBase(r)) + suffix;
 }
 const CRR_ORD = [N_('first|nth'), N_('second|nth'), N_('third|nth'), N_('fourth|nth')];
+// 2.383.0 (#2587): the forms for a weekday whose name is feminine in the language (its list "_wd_fem", e.g. Italian domenica)
+const CRR_ORD_F = [N_('first|nth-fem'), N_('second|nth-fem'), N_('third|nth-fem'), N_('fourth|nth-fem')];
+const crr_fem = wd => { const f = i18nGet('_wd_fem'); return Array.isArray(f) && f.includes(wd); };
+const crr_ordWord = (pos, wd) => crr_fem(wd) ? (pos < 0 ? tr('last|nth-fem') : tr(CRR_ORD_F[pos - 1])) : pos < 0 ? tr('last|nth') : tr(CRR_ORD[pos - 1]);
 // the n-th weekday of a parsed rule ({BYDAY: '2TU'} or {BYDAY: 'TU', BYSETPOS: '2'}) -> {pos: 1..4 | -1, wd}, else null
 function crr_nthOf(p) {
   const m = /^(-?\d)([A-Z]{2})$/.exec(p.BYDAY || '');
@@ -418,6 +422,11 @@ function crr_monthLabel(n, p, nth) {
   const one = n === 1, wd = nth && WDL[RR_WD.indexOf(nth.wd)];
   if (p.BYMONTHDAY) return one ? tr('Monthly on day {0}', p.BYMONTHDAY) : tr('Every {0} months on day {1}', n, p.BYMONTHDAY);
   if (!nth) return one ? tr('Monthly') : tr('Every {0} months', n);
+  if (crr_fem(nth.wd)) {  // 2.383.0 (#2587): article and ordinal agree with a feminine weekday
+    if (nth.pos < 0) return one ? tr('Monthly on the last {0}|fem', wd) : tr('Every {0} months on the last {1}|fem', n, wd);
+    const ordF = crr_ordWord(nth.pos, nth.wd);
+    return one ? tr('Monthly on the {0} {1}|fem', ordF, wd) : tr('Every {0} months on the {1} {2}|fem', n, ordF, wd);
+  }
   if (nth.pos < 0) return one ? tr('Monthly on the last {0}', wd) : tr('Every {0} months on the last {1}', n, wd);
   const ord = tr(CRR_ORD[nth.pos - 1]);
   return one ? tr('Monthly on the {0} {1}', ord, wd) : tr('Every {0} months on the {1} {2}', n, ord, wd);

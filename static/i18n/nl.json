@@ -16049,5 +16049,14 @@
   "Guests can read e-mails": "Gasten mogen e-mails lezen",
   "Guests can read the e-mails of this project": "Gasten mogen de e-mails van dit project lezen",
   "Only editors read the e-mails of this project": "Alleen bewerkers lezen de e-mails van dit project",
-  "E-mails often hold client data and attachments": "E-mails bevatten vaak klantgegevens en bijlagen"
+  "E-mails often hold client data and attachments": "E-mails bevatten vaak klantgegevens en bijlagen",
+  "first|nth-fem": "eerste",
+  "second|nth-fem": "tweede",
+  "third|nth-fem": "derde",
+  "fourth|nth-fem": "vierde",
+  "last|nth-fem": "laatste",
+  "Monthly on the {0} {1}|fem": "Maandelijks op de {0} {1}",
+  "Every {0} months on the {1} {2}|fem": "Elke {0} maanden op de {1} {2}",
+  "Monthly on the last {0}|fem": "Maandelijks op de laatste {0}",
+  "Every {0} months on the last {1}|fem": "Elke {0} maanden op de laatste {1}"
 }

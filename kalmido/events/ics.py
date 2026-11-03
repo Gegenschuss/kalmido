@@ -108,23 +108,28 @@ def ev_lines(c, r, atts=None):
             addr, name = cal_addr(c, r["created_by"]) if r["created_by"] else (None, "")
             if addr:
                 L.append(f"ORGANIZER;CN={_pq(name)}:{addr}")
-        for a in atts:
-            addr = f"urn:kalmido:user:{a['user_id']}" if a["user_id"] else (f"mailto:{a['email']}" if a["email"] else None)
-            if not addr:
-                continue
-            p = [f"CN={_pq(a['name'])}"] if a["name"] else []
-            p += [f"PARTSTAT={PS_ICS.get(a['partstat'], 'NEEDS-ACTION')}", "ROLE=" + ("OPT-PARTICIPANT" if a["role"] == "opt" else "REQ-PARTICIPANT")]
-            if a["user_id"]:
-                p.append(f"X-KALMIDO-USER={a['user_id']}")
-            L.append(f"ATTENDEE;{';'.join(p)}:{addr}")
+        L += _att_lines(atts)
     for off in [x for x in (r["reminders"] or "").split(",") if x.strip()]:
         L += ["BEGIN:VALARM", "ACTION:DISPLAY", f"DESCRIPTION:{ics_text(r['title'])}", f"TRIGGER:{ics_dur(-int(off))}", "END:VALARM"]
     L += _extra_merge(L, extra, own_rule)
     L.append("END:VEVENT")
     tzs = {tzname} if not ad else set()
-    for o in ov_list(r):
-        if not isinstance(o, dict) or not o.get("rid"):
-            continue
+    # 2.383.0 (#2587): answers to single dates. Only when someone answered one: the changed occurrences then carry the
+    # attendees with their answer for that date, and an answered date that is no changed occurrence gets its own VEVENT
+    # (RECURRENCE-ID, times of the series), so the phone keeps showing it. Without such answers nothing changes (same ETag).
+    occ_rids = sorted({k for a in atts for k in (a.get("occ_partstat") or {})}) if atts and r["rrule"] else []
+    ovs = [o for o in ov_list(r) if isinstance(o, dict) and o.get("rid")]
+    if occ_rids:
+        from ..events.model import _span, is_occ
+        have = {o["rid"] for o in ovs}
+        ex = set(x for x in (r["exdates"] or "").split(",") if x)
+        for k in occ_rids:
+            if k in have or k in ex or not is_occ(r, k):
+                continue
+            e_ = _span(r, k)[1]
+            ovs.append({"rid": k, "start": k, "end": e_.isoformat() if ad else wall_s(e_.replace(tzinfo=None)), "_answer": True})
+    org_line = [x for x in L if _prop_name(x) == "ORGANIZER"][:1]
+    for o in ovs:
         oad = bool(o.get("all_day", ad))
         X = ["BEGIN:VEVENT", f"UID:{ics_text(r['uid'])}", f"DTSTAMP:{stamp}", _dt_line("RECURRENCE-ID", o["rid"], ad, tzname),
              f"SEQUENCE:{r['seq'] or 0}", f"SUMMARY:{ics_text(o.get('title') or r['title'])}",
@@ -134,6 +139,10 @@ def ev_lines(c, r, atts=None):
         if o.get("description", r["description"]):
             X.append(f"DESCRIPTION:{ics_text(o.get('description', r['description']))}")
         X.append(f"STATUS:{(o.get('status') or r['status']).upper()}")
+        if o.get("_answer"):  # 2.383.0 (#2587): a date that only has its own answer: busy / transparent like the series
+            X.append("TRANSP:" + ("OPAQUE" if r["busy"] else "TRANSPARENT"))
+        if occ_rids:
+            X += org_line + _att_lines(atts, o["rid"])
         oex = (o.get("extra") or "").split("\n") if o.get("extra") else []
         X += _extra_merge(X, oex, False)
         X.append("END:VEVENT")
@@ -141,6 +150,23 @@ def ev_lines(c, r, atts=None):
         if not oad:
             tzs.add(tzname)
     return L, tzs
+
+
+def _att_lines(atts, rid=None):
+    """The ATTENDEE lines of an event's attendees; rid = for this date of a series (its own answer where one was given,
+    2.383.0 #2587)."""
+    out = []
+    for a in atts:
+        addr = f"urn:kalmido:user:{a['user_id']}" if a["user_id"] else (f"mailto:{a['email']}" if a["email"] else None)
+        if not addr:
+            continue
+        ps = (a.get("occ_partstat") or {}).get(rid, a["partstat"]) if rid else a["partstat"]
+        p = [f"CN={_pq(a['name'])}"] if a["name"] else []
+        p += [f"PARTSTAT={PS_ICS.get(ps, 'NEEDS-ACTION')}", "ROLE=" + ("OPT-PARTICIPANT" if a["role"] == "opt" else "REQ-PARTICIPANT")]
+        if a["user_id"]:
+            p.append(f"X-KALMIDO-USER={a['user_id']}")
+        out.append(f"ATTENDEE;{';'.join(p)}:{addr}")
+    return out
 
 
 def _pq(s):
@@ -292,6 +318,14 @@ def read_vevent(text, uid_hint=None):
     return _read_group(comps, raws, masters[0] if masters else None)
 
 
+def _att_in(line):
+    """One ATTENDEE line of a client -> {addr, name, partstat (app value), role, kuser}."""
+    p = _params(line)
+    val = line.split(":", 1)[1] if ":" in line else ""
+    return {"addr": val.strip(), "name": p.get("CN", "")[:200], "partstat": PS_IN.get(p.get("PARTSTAT", "").upper(), "needs-action"),
+            "role": "opt" if p.get("ROLE", "").upper() == "OPT-PARTICIPANT" else "req", "kuser": p.get("X-KALMIDO-USER")}
+
+
 def _read_group(comps, raws, mi):
     """One series: master index mi (None = only changed occurrences arrived: the first one stands for the series)."""
     first = comps[mi if mi is not None else 0]
@@ -373,11 +407,7 @@ def _read_group(comps, raws, mi):
         elif name == "X-KALMIDO-GUESTS-VISIBLE":  # 2.380 H (#3392): a client without the line leaves the switch as it is
             v["guests_visible"] = val.strip().upper() in ("TRUE", "1", "YES")
         elif name == "ATTENDEE":
-            p = _params(line)
-            addr = val.strip()
-            a = {"addr": addr, "name": p.get("CN", "")[:200], "partstat": PS_IN.get(p.get("PARTSTAT", "").upper(), "needs-action"),
-                 "role": "opt" if p.get("ROLE", "").upper() == "OPT-PARTICIPANT" else "req", "kuser": p.get("X-KALMIDO-USER")}
-            atts.append(a)
+            atts.append(_att_in(line))
         elif name == "ORGANIZER":
             if not (val.lower().startswith("urn:kalmido:user:")):
                 keep.append(line)  # an outside organiser stays; Kalmido's own one is written again
@@ -408,7 +438,7 @@ def _read_group(comps, raws, mi):
     v["extra"] = _cap("\n".join(x for x in keep if x))
     v["attendees_raw"] = atts
     # changed occurrences
-    ovs, ov_mod = [], {}
+    ovs, ov_mod, ov_atts = [], {}, {}
     for i, comp in enumerate(comps):
         if i == mi or comp.get("RECURRENCE-ID") is None:
             continue
@@ -440,6 +470,7 @@ def _read_group(comps, raws, mi):
             if oe.tzinfo is None:
                 oe = oe.replace(tzinfo=ost.tzinfo)
             okeys = (_key(ost, zone, False), _key(max(oe, ost), zone, False))
+        ov_atts[rkey] = [_att_in(x) for x in r2["lines"] if _prop_name(x) == "ATTENDEE"]  # 2.383.0 (#2587): answers per date
         ov_mod[rkey] = _ics_mod(comp)  # 2.363.3 (#3133): a changed occurrence has its own LAST-MODIFIED (import_ics)
         ost_s = str(comp.get("STATUS") or "").strip().upper()
         okeep = [x for x in r2["lines"] if _prop_name(x) not in EV_MAPPED]
@@ -452,9 +483,27 @@ def _read_group(comps, raws, mi):
     if mi is None:  # only occurrences arrived (an invitation to one date of a series): it is a single event
         v["rrule"] = ""
         ovs = []
+    # 2.383.0 (#2587): a date that differs from the series in nothing (ev_lines writes one for an answer to that date) is no
+    # changed occurrence: kept as one, a later change of the series would no longer reach it
+    ovs = [o for o in ovs if not _ov_plain(v, o)]
     v["overrides"] = json.dumps(ovs[:500], ensure_ascii=False) if ovs else ""
     v["ov_mod"] = ov_mod if ovs else {}
+    v["ov_atts"] = ov_atts if mi is not None else {}  # 2.383.0 (#2587): {occurrence key: ATTENDEE lines of that date}
     return v
+
+
+def _ov_plain(v, o):
+    """2.383.0 (#2587): True when override o of read values v is the series' own date unchanged (same texts, status, times)."""
+    if o["extra"] or o["title"] != v["title"] or o["location"] != v["location"] or o["description"] != v["description"] \
+            or o["status"] != v["status"] or bool(o["all_day"]) != bool(v["all_day"]) or o["start"] != o["rid"]:
+        return False
+    try:
+        if v["all_day"]:
+            d = date.fromisoformat(v["end"][:10]) - date.fromisoformat(v["start"][:10])
+            return o["end"] == (date.fromisoformat(o["rid"][:10]) + d).isoformat()
+        return o["end"] == wall_s(wall(o["rid"]) + (wall(v["end"]) - wall(v["start"])))
+    except (TypeError, ValueError):
+        return False
 
 
 def _cap(s):
@@ -488,7 +537,11 @@ def atts_resolve(c, uid, raw, eid=None, cal_id=None):
         if em and not row["user_id"] and c.execute("SELECT 1 FROM users WHERE id=? AND lower(email)=lower(?)", (uid, em)).fetchone():
             continue  # the writer's own address: the organiser
         if row["user_id"] == uid:
-            continue  # the writer is the organiser
+            if uid not in had_u:
+                continue  # the writer is the organiser
+            # 2.383.0 (#2587): the writer is invited (a calendar they may edit): their own answer from the device counts,
+            # like op_rsvp; before, the line was dropped and the PUT took them off the event
+            row["partstat"] = a["partstat"]
         if not row["user_id"]:
             if not em or not re.fullmatch(r"[^@\s<>\"]+@[^@\s<>\"]+", em):
                 continue

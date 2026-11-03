@@ -630,7 +630,26 @@ def att_rows(c, ids):
             "id": a["id"], "user_id": a["user_id"], "contact_id": a["contact_id"], "email": a["email"],
             "name": a["name"] or (a["display_name"] or a["username"] if a["user_id"] else "") or a["c_fn"] or a["email"],
             "partstat": a["partstat"], "role": a["role"]})
+        occ = occ_ps_of(a)
+        if occ:  # 2.383.0 (#2587): answers of single dates of a series that differ from the answer to the series
+            out[a["event_id"]][-1]["occ_partstat"] = occ
     return out
+
+
+EV_OCC_PS_MAX = 500  # 2.383.0 (#2587): answers to single dates per attendee and series
+
+
+def occ_ps_of(a):
+    """2.383.0 (#2587): {occurrence key: partstat} of an attendee row (event_attendees.occ_ps), {} when none / unreadable."""
+    try:
+        raw = a["occ_ps"]
+    except (KeyError, IndexError):
+        return {}
+    try:
+        d = json.loads(raw) if raw else {}
+    except ValueError:
+        return {}
+    return {k: v for k, v in d.items() if isinstance(k, str) and v in EV_PARTSTAT} if isinstance(d, dict) else {}
 
 
 def ev_att_ok(c, uid, cal_org_id):
@@ -725,22 +744,25 @@ def ev_range(c, uid, lo, hi, cal=None):
                if ev_att_ok(c, uid, r["cal_org"])]  # 2.87.0 (#1983)
     allc = my_cal_ids(c, uid)
     out, seen = [], set()
-    nat = {}
+    nat, occ_mine = {}, {}
     ids = [r["id"] for r in rows] + [r["id"] for r in inv]
     if ids:
         for i in range(0, len(ids), 900):
             part = ids[i:i + 900]
             q = ",".join("?" * len(part))
-            for a in c.execute(f"SELECT event_id, user_id, partstat FROM event_attendees WHERE event_id IN ({q})", part):
+            for a in c.execute(f"SELECT event_id, user_id, partstat, occ_ps FROM event_attendees WHERE event_id IN ({q})", part):
                 n, ps = nat.get(a[0], (0, None))
                 nat[a[0]] = (n + 1, a[2] if a[1] == uid else ps)
+                if a[1] == uid and a[3]:
+                    occ_mine[a[0]] = occ_ps_of(a)  # 2.383.0 (#2587): the own answers to single dates
     for r, role in [(r, cals[r["cal_id"]]) for r in rows] + [(r, "attendee") for r in inv if r["cal_id"] not in allc]:
         if r["id"] in seen:
             continue
         seen.add(r["id"])
         n, ps = nat.get(r["id"], (0, None))
+        om = occ_mine.get(r["id"]) or {}
         for o in ev_expand(r, lo, hi):
-            out.append(occ_out(r, o, role, n, ps))
+            out.append(occ_out(r, o, role, n, om.get(o["occ"], ps) if ps else ps))
             if len(out) >= 20000:
                 return out
     return out
@@ -876,8 +898,9 @@ def att_set(c, eid, rows, r=None):
     for a in rows:
         if a["user_id"] and a["user_id"] in old and a["partstat"] == "needs-action":
             a = {**a, "partstat": old[a["user_id"]]["partstat"]}
-        c.execute("INSERT INTO event_attendees(event_id,user_id,contact_id,email,name,partstat,role) VALUES(?,?,?,?,?,?,?)",
-                  (eid, a["user_id"], a["contact_id"], a["email"], a["name"], a["partstat"], a["role"]))
+        occ = old[a["user_id"]]["occ_ps"] if a["user_id"] and a["user_id"] in old else ""  # 2.383.0 (#2587): answers to single dates stay
+        c.execute("INSERT INTO event_attendees(event_id,user_id,contact_id,email,name,partstat,role,occ_ps) VALUES(?,?,?,?,?,?,?,?)",
+                  (eid, a["user_id"], a["contact_id"], a["email"], a["name"], a["partstat"], a["role"], occ or ""))
         if a["user_id"] and a["user_id"] not in old and a["user_id"] != actor:
             news_add(c, a["user_id"], "evinvite", data={"event_id": eid, "title": r["title"][:200], "start": r["start"],
                                                          "all_day": bool(r["all_day"])}, row="assign")
