@@ -596,6 +596,8 @@ after the last day), like iCalendar. Scope `calendar` for every operation.
 
 `attendees`: `[{user_id}]` (a person of this server: sees that event, and only that one, gets News + a push and
 answers), `[{contact_id}]` (a contact you see), `[{email, name?}]`; each with `partstat` and `role` (`req`, `opt`).
+2.383.0: a person who answered single dates of a series differently (from a calendar app) also has `occ_partstat`
+(`{occ: partstat}`, only those dates); `GET /events` gives each date the answer that counts for it.
 Reminders are minutes before the start (all day: before midnight, so `-540` = 9:00 on the day).
 2.138.1: `send_invites: true` on `POST /events` / `PATCH /events/{id}` mails the invitation (an `.ics` with METHOD:REQUEST,
 Reply-To = the inviting person) to the new external attendees (addresses, contacts) and, when time, place, title, repeat or

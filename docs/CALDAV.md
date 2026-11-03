@@ -113,8 +113,11 @@ Everything else a calendar app writes (Apple's travel time and structured locati
 is kept as it came and sent back unchanged. Each of your calendars is one collection (`/dav/calendars/<user>/e<id>/`);
 events you are invited to by someone else come in a calendar **Invitations** (`…/inv/`). There you answer them in
 your calendar app (accept, maybe, decline): Kalmido takes only your own answer (`PARTSTAT` of your `ATTENDEE`), the
-organiser sees it as if you had answered in the app; other changes to an invitation are ignored, and deleting one counts
-as declined (it stays in the calendar, marked as declined). A new calendar created in a calendar app (`MKCALENDAR`) is an
+organiser sees it as if you had answered in the app; other changes to an invitation are ignored (the event gets a new
+ETag, so the app loads Kalmido's version again), and deleting one counts as declined (it stays in the calendar, marked as
+declined). Since 2.383 an answer to one date of a series (a `VEVENT` with `RECURRENCE-ID` and your own `PARTSTAT`) counts
+for that date only: the calendar view, the free / busy bar and the booking page follow it, the series keeps its answer. In a
+calendar you may edit, your own answer in a saved event is taken the same way (other people's answers stay theirs). A new calendar created in a calendar app (`MKCALENDAR`) is an
 own calendar in Kalmido, in the same workspace a new calendar in the app would get (without an organisation: your private
 space), with its name, colour and description; the app keeps the address it chose. Calendars are shared and deleted in
 Kalmido; a calendar shared with you *view only* is read-only in the apps.
@@ -342,7 +345,9 @@ the organisations you share; Calendar > Calendars > *Show my free / busy times* 
 ones, other organisations, subscriptions) or turns it off. Since 2.360.5 the organisation view counts only the
 organisation calendars you own (a team calendar shared with you is not your time; its events count once you accepted the
 invitation) and shows no public holidays (they would tell your state) - you see your holidays in your own bar, colleagues
-only with "all my calendars". The answers are limited per person (120 a minute). A CalDAV `free-busy-query` REPORT is still answered with 403.
+only with "all my calendars". The answers are limited per person (120 a minute). Since 2.383 a CalDAV `free-busy-query` REPORT (RFC 4791 7.10) on one of your
+calendars answers a `VFREEBUSY` with the busy times of its events in the asked range by the same rules (busy, timed, not
+cancelled; in *Invitations* only the dates you accepted), never a title; without a `time-range` it is `400`.
 
 ## For admins
 

@@ -2,6 +2,7 @@
 // Mon + Wed + Fri are saved as the right RRULE, a saved rule opens the editor pre-filled, cancel keeps the old choice;
 // the calendar's year view (#2078): twelve months, a day with an event is tinted, a tap on a day opens the day view, a tap on
 // a month name the month view, the arrows turn the year, the chosen mode is remembered.
+// 2.383.0 (#2587): in Italian the ordinals and the article agree with a feminine weekday (la prima domenica).
 const {boot, sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -116,6 +117,28 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, d.querySelector(`#cyear [data-cym="${t0.slice(0, 7)}"]`));
   check(await until(() => d.querySelector('#view .cal .cell')) && w.eval('S.calMonth') === t0.slice(0, 7), 'a tap on a month name opens the month view');
   w.close();
+
+  // ---- 2.383.0 (#2587): the ordinal words follow the weekday's gender (Italian: domenica is feminine)
+  await call('PATCH', '/api/settings', {lang: 'it'});
+  w = await boot({user: 'alice', hash: 'cal', ls: {'tasks.calMode': '"month"'}}); d = w.document;
+  await until(() => d.querySelector('#view [data-act="ev-new"]') && w.eval('I18N.code') === 'it');
+  const lab = r => w.eval(`repeatLabelBase(${JSON.stringify(r)})`);
+  check(lab('FREQ=MONTHLY;BYDAY=1SU') === 'Ogni mese la prima domenica', 'it: the first Sunday is feminine: ' + lab('FREQ=MONTHLY;BYDAY=1SU'));
+  check(lab('FREQ=MONTHLY;BYDAY=-1SU') === 'Ogni mese l’ultima domenica', 'it: the last Sunday: ' + lab('FREQ=MONTHLY;BYDAY=-1SU'));
+  check(lab('FREQ=MONTHLY;BYDAY=2MO') === 'Ogni mese il secondo lunedì', 'it: a masculine weekday stays as it was: ' + lab('FREQ=MONTHLY;BYDAY=2MO'));
+  check(lab('FREQ=MONTHLY;INTERVAL=2;BYDAY=3SU') === 'Ogni 2 mesi la terza domenica', 'it: every 2 months: ' + lab('FREQ=MONTHLY;INTERVAL=2;BYDAY=3SU'));
+  md = await newEvent('Messa');
+  cm = await openCustom(md);
+  change(w, cm.querySelector('#crr-f'), 'MONTHLY');
+  cm = d.querySelector('.modal.crrmodal');
+  click(w, cm.querySelector('input[name="crr-m"][value="nth"]'));
+  change(w, cm.querySelector('#crr-wd'), 'SU');
+  const ords = () => [...cm.querySelectorAll('#crr-pos option')].map(o => o.textContent).join(',');
+  check(ords() === 'prima,seconda,terza,quarta,ultima', 'it dialog: the ordinals take the feminine form for domenica: ' + ords());
+  change(w, cm.querySelector('#crr-wd'), 'MO');
+  check(ords() === 'primo,secondo,terzo,quarto,ultimo', 'it dialog: ... and the masculine one for lunedì: ' + ords());
+  w.close();
+  await call('PATCH', '/api/settings', {lang: 'en'});
 
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
