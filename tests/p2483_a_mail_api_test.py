@@ -199,11 +199,47 @@ check(get(FAH, "/mails", client_id=FC).status_code == 404 and get(FAH, "/mails",
       and get(FAH, f"/mails/{m_f}").status_code == 404 and get(FAH, f"/mails/{m_fl}").status_code == 404,
       "her agent with the default data lock \"Private e-mails\": 404")
 check(Fr.patch(B + f"/api/agents/{FA}/data-lock", json={"areas": {"mail": False}}).ok, "setup: she opens private e-mails for her agent")
+# 2.395.0 (#3380): her agent is a guest (view) of the project: its mails only once she, her own project admin, switches it on
+r = get(FAH, "/mails", client_id=FC)
+check(r.ok and ids_of(r) == [m_f] and get(FAH, "/mails", list_id=FL).status_code == 404 and get(FAH, f"/mails/{m_fl}").status_code == 404,
+      f"#3380 her agent as a guest: the project's mail hidden without the switch ({ids_of(r)})")
+check(Fr.patch(B + f"/api/lists/{FL}", json={"mail_guests": True}).ok, "#3380 she switches on: guests read the project's e-mails")
 r = get(FAH, "/mails", client_id=FC)
 check(r.ok and ids_of(r) == sorted([m_f, m_fl]), f"her agent: the private client's mails through the shared project ({ids_of(r)})")
 check(get(FAH, f"/mails/{m_f}").ok and get(FAH, f"/mails/{m_fun}").status_code == 404, "her agent: one mail, never \"Not assigned\"")
 check(get(BOH, f"/mails/{m_f}").status_code == 404 and get(AGH, f"/mails/{m_fl}").status_code == 404 and get(BOH, "/mails", client_id=FC).status_code == 404,
       "another person / another agent: the freelancer's mails = 404")
+
+# ================================================================ 4. 2.395.0 (#3380): project mails = edit roles; guests with the project's switch
+def app_list(s, lid):
+    r = s.get(B + "/api/hubmail/mails", params={"list_id": lid})
+    return r.json() if r.ok else {"status": r.status_code}
+
+
+check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "view"}).ok, "#3380 setup: carol a guest (view) of Acme film")
+j = app_list(Ca, LB)
+check(j.get("can_read") is False and j.get("mails") == [] and j.get("can_guests") is False, f"#3380 guest: no mails, may not switch ({j})")
+check(Ca.get(B + f"/api/hubmail/mails/{m_list}").status_code == 404, "#3380 guest: one project mail = 404")
+check(get(CAH, "/mails", list_id=LB).status_code == 404 and get(CAH, f"/mails/{m_list}").status_code == 404, "#3380 guest's token: 404")
+check(Ca.patch(B + f"/api/lists/{LB}", json={"mail_guests": True}).status_code == 403, "#3380 a guest cannot switch it on")
+j = app_list(Bo, LB)
+check(j.get("can_read") is True and j.get("can_guests") is True and j.get("guests") is False and [m["id"] for m in j.get("mails", [])] == [m_list],
+      f"#3380 owner: reads, may switch, default off ({ {k: j.get(k) for k in ('can_read', 'can_guests', 'guests')} })")
+check(Bo.patch(B + f"/api/lists/{LB}", json={"mail_guests": True}).ok, "#3380 owner switches guests on")
+j = app_list(Ca, LB)
+check(j.get("can_read") is True and [m["id"] for m in j.get("mails", [])] == [m_list] and Ca.get(B + f"/api/hubmail/mails/{m_list}").ok
+      and ids_of(get(CAH, "/mails", list_id=LB)) == [m_list], f"#3380 guest with the switch: reads (app + token) ({j.get('can_read')})")
+r = get(BOH, f"/lists/{LB}")
+check(r.ok and (r.json().get("data") or r.json()).get("mail_guests") is True, f"#3380 API v1: mail_guests in the project ({r.status_code})")
+check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "participant"}).ok, "#3380 setup: carol a participant")
+check(Ca.get(B + f"/api/hubmail/mails/{m_list}").ok, "#3380 participant with the switch: reads")
+check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "admin"}).ok, "#3380 setup: carol a project admin")
+check(Ca.patch(B + f"/api/lists/{LB}", json={"mail_guests": False}).ok and app_list(Ca, LB).get("guests") is False, "#3380 a project admin switches it off")
+check(requests.patch(V + f"/lists/{LB}", headers=BOH, json={"mail_guests": True}).status_code == 400, "#3380 not writable through the API v1 (app only)")
+check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "edit"}).ok and Ca.get(B + f"/api/hubmail/mails/{m_list}").ok,
+      "#3380 edit member: reads without the switch")
+check(Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": CAROL, "role": "view"}).ok and Ca.get(B + f"/api/hubmail/mails/{m_list}").status_code == 404,
+      "#3380 back to guest, switch off: 404 again")
 
 print(f"p2483_a_mail_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
