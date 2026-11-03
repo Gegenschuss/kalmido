@@ -173,7 +173,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   await call('PATCH', '/api/settings', {features: ALL.replace(',collab', '')});
   w = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.pov': JSON.stringify([P])}}); d = w.document;
   await until(() => d.querySelector('#view .pov .povs'));
-  check(!d.querySelector('#pov-people') && !d.querySelector('#pov-status'), 'without collaboration: no members or status');
+  check(!d.querySelector('#pov-people'), 'without collaboration: no members');
+  check(d.querySelector('#pov-status [data-act="status"]'), 'without collaboration: status updates + "Set status" stay (#3379)');
   w.close();
   await call('PATCH', '/api/settings', {features: ALL});
   if (errs.length) check(false, 'JS errors: ' + [...new Set(errs)].join(' | '));
