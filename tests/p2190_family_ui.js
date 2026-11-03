@@ -341,6 +341,10 @@ const FAM = 'cal,habits,comments,collab,family';
     check(sb.h >= 43.5, `${tag}: the Shopping mode button is a 44 px target in view ` + JSON.stringify(sb));
     await tap(sb.x, sb.y);
     check(await until(() => ev(`!!document.querySelector('.shopmode .shopi')`), 40), `${tag}: one tap opens shopping mode`);
+    // 2.497.0 (#4040): a second open (double tap, palette) keeps the one overlay and the one history entry
+    const hl = await ev(`history.length`);
+    await ev(`(() => { shopModeOpen(${L.shopping}); return 1; })()`);
+    check(await ev(`document.querySelectorAll('.shopmode').length === 1 && history.length === ${hl}`), `${tag}: shopping mode opened twice stays one overlay, one history entry`);
     await sleep(200);
     check(await ev(`document.activeElement?.id !== 'shop-in'`), `${tag}: shopping mode on touch: the add field is not focused (no keyboard over the list)`);
     check(await ev(`document.documentElement.scrollWidth - innerWidth`) <= 0, `${tag}: shopping mode: nothing sideways`);
@@ -354,8 +358,12 @@ const FAM = 'cal,habits,comments,collab,family';
     await call('POST', `/api/tasks/${it.id}/reopen`);
     // 2.463.0 (#3887): closed by its button, and the link only after shopping mode's history entry is gone: closing goes one
     // step back, a raw remove and a link at once lost the link to that step (a test effect: nothing in the app does both)
+    // 2.497.0 (#4040): red three times in full runs only: wait on the real states one after the other (the overlay gone, then the
+    // history step back done, the popstate is async) with the shared default window, and say which state stuck
     await ev(`(() => { document.querySelector('.shopmode [data-act="shop-close"]').click(); return 1; })()`);
-    check(await until(() => ev(`!document.querySelector('.shopmode') && !S.shop && !history.state?.shop`), 80), `${tag}: shopping mode closes, its history entry gone`);
+    check(await until(() => ev(`!document.querySelector('.shopmode') && !S.shop`)), `${tag}: shopping mode closes`);
+    const shopSt = `JSON.stringify({ov: document.querySelectorAll('.shopmode').length, shop: !!S.shop, st: history.state, n: history.length, h: location.hash})`;
+    check(await until(() => ev(`!history.state?.shop`)), `${tag}: shopping mode's history entry gone ` + await ev(shopSt));
     // the task panel's family section
     await o.nav(B + '#t/' + BD.id);
     // #3506: the panel really open (the section can sit in a panel still hidden: the checks below then measured nothing),
