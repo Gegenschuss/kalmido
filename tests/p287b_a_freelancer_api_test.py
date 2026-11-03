@@ -11,6 +11,7 @@ tests/freelancer_fixture.py) on a server that has an organisation. Invented name
    without an id of an own object (QUERY gives the GETs that need one their query)
  - nothing of the organisation leaks into the private workspace (state, people list, office)
 usage: p287b_a_freelancer_api_test.py <datadir>      (a fresh container; KMT_NOSTART=1 = the server already runs)"""
+import base64
 import os
 import re
 import subprocess
@@ -43,6 +44,8 @@ ALLOW = {
 EXPECT_4XX = {
     "GET /api/assistant": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
     "GET /api/assistant/log": (404, "the assistant is off on the test server (the operator's switch, the same for every person)"),
+    "GET /mcp": (404, "hosted MCP access is off on the test server (the operator's switch mcp_remote, the same for every person)"),  # 2.488.0 (#3363)
+    "GET /oauth/authorize": (404, "hosted MCP access is off on the test server (the operator's switch mcp_remote, the same for every person)"),  # 2.488.0 (#3363)
     "GET /api/attachments/{}/preview": (415, "the own attachment is a text file: no preview (the same for every person)"),
     "GET /api/files/nodes/{}/preview": (415, "the own file is a text file: no server preview (the same for every person)"),
     "GET /api/files/nodes/{}/thumb": (404, "the own file is a text file: no small picture preview (#3936, the same for every person)"),
@@ -164,6 +167,9 @@ ok(F.get(B + "/api/paperless", params={"ws": "private"}), "office: the Paperless
 w = ok(F.post(B + "/api/wiki/pages", json={"space": "private", "path": "Kit/Camera", "body": "lens list"}), "wiki: a private page", (200, 201))
 IDS["wiki"] = w.get("id")
 ok(F.patch(B + f"/api/wiki/pages/{IDS['wiki']}", json={"body": "lens list v2"}), "wiki: change")
+r = F.post(B + f"/api/wiki/pages/{IDS['wiki']}/files", files=[("file", ("lenses.png", base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="), "image/png"))])
+check(r.ok and r.json().get("files"), f"wiki: a file on the own page -> {r.status_code} {r.text[:200]}")  # 2.488.0 (#2209)
+IDS["wikifile"] = (r.json().get("files") or [{}])[-1].get("id") if r.ok else None
 ok(F.get(B + "/api/wiki/search", params={"space": "private", "q": "lens"}), "wiki: search")
 
 # ================================================================== files + documents
@@ -291,6 +297,7 @@ SUBST = [
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),
     (r"/office/cards/lines/$", "cardline"), (r"/office/cards/statements/$", "cardstmt"), (r"/office/cards/$", "card"), (r"/files/collections/$", "collection"),
+    (r"/api/v1/wiki/files/$", "wikifile"),  # 2.488.0 (#2209): the file of the own knowledge page
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
     (r"/lists/\d+/files/$", None),
     (r"/api/v1/mails/$", "client"),  # 2.483.0 (#1902): no filed mail on the test server (EXPECT_4XX)
