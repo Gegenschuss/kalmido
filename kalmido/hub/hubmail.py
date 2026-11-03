@@ -491,6 +491,8 @@ def hbm_mails():
     from .mailbox import mbx_can_send  # 2.141.0 A (#2138): "New e-mail" from a client's / project's filing
     org = cl["org_id"] if a.get("client_id") else l["org_id"] if a.get("list_id") else None
     send = bool(can) and not request.args.get("unassigned") and mbx_can_send(c, org or None, uid)
+    if a.get("list_id") and not extra["can_read"]:
+        addr = ""  # 2.395.0 (#3380, review): a guest without the switch gets no filing address either
     return jsonify(enabled=hbm_on(), address=addr if hbm_on() else "", can_address=bool(can) and hbm_on(), total=len(rows),
                    mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]], can_send=send, **(extra if a.get("list_id") else {}))
 
