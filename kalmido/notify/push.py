@@ -38,6 +38,7 @@ from ..core.access import _list_role  # 2.369.5 (#2517): pulled up from function
 from ..lists.listtrash import otr_prune  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.tasktrash import ttp_tick  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgretain import odl_retired_prune  # 2.369.5 (#2517): pulled up from functions
+from ..lists.listhead import o3c_pic_tick  # 2.498.0 (#3884): module level, it sits in a lower layer
 from ..accounts.tenancy import boundary_tick  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -792,6 +793,7 @@ def _watchdog_tick(c):
     _wd_section(c, "account export cleanup", umz_cleanup)  # 2.73.0 B (#1473): account exports + import uploads after 24 h
     from ..accounts.servers import msv_cleanup
     _wd_section(c, "server link tokens", msv_cleanup)  # 2.73.0 A (#661) review N1: tokens of removed accounts after 30 days
+    _wd_section(c, "list picture sizes", o3c_pic_tick)  # 2.498.0 (#3884): pictures nobody measured yet
     _wd_section(c, "tidy events", tidy_tick)  # 2.27.0 (#999)
     _wd_section(c, "agent bursts", burst_tick)  # 2.29.0 (#1031)
     from ..agents.workstyle import ws_held_tick

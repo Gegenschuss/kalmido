@@ -8,6 +8,7 @@ import io
 import os
 import re
 import secrets
+import time
 
 from flask import g, jsonify, request
 
@@ -16,9 +17,10 @@ from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.access import Denied, list_role, need_list
 from ..accounts.session import me
+from ..accounts.pictures import list_icon_path, list_pic_guard
 from ..core.errors import BadInput
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
-from ..core.orgcrypt import oc_list_space, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_list_space, oc_plain_size, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import clean_folder  # 2.369.5 (#2517): pulled up from functions
 
 HEAD_STYLES = ("", "gradient", "dots", "lines", "grid", "image")
@@ -27,6 +29,8 @@ HEAD_MAX_MB = 2
 HEAD_W, HEAD_H = 1600, 800
 HEAD_DIR = os.path.join(ATT_DIR, "listheads")
 _TOK = re.compile(r"[A-Za-z0-9_-]{8,40}")
+PIC_TICK_S = 600
+_PIC_TICK = {"at": 0.0}
 
 
 def o3c_head_rel(lid, tok):
@@ -47,6 +51,31 @@ def o3c_head_drop(lid, tok):
     if tok and _TOK.fullmatch(tok):
         with contextlib.suppress(OSError):
             os.remove(os.path.join(ATT_DIR, o3c_head_rel(lid, tok)))
+
+
+def _pic_size(path):
+    try:
+        return oc_plain_size(path)  # as the upload stores it
+    except FileNotFoundError:
+        return 0  # the file is gone: nothing to count, and not measured again
+    except OSError:
+        return None  # storage away for the moment: the next tick measures it, never a lasting 0
+
+
+def o3c_pic_tick(c):
+    """2.498.0 (#3884), watchdog (every 10 minutes): the sizes of pictures nobody measured: from before this version, or a list
+    that came with an import. Without one-way step: the columns are only added to, older versions ignore them."""
+    if time.time() - _PIC_TICK["at"] < PIC_TICK_S:
+        return
+    _PIC_TICK["at"] = time.time()
+    with system_ctx(c):  # housekeeping over every space: only the size of a stored file, no content
+        rows = c.execute("SELECT id, icon, header_file, icon_size, header_size FROM lists WHERE (icon LIKE 'u:%' AND icon_size IS NULL) "  # pg-ok: prefix marker u: is case-exact
+                         "OR (header_file<>'' AND header_size IS NULL) LIMIT 500").fetchall()
+        for r in rows:
+            ic = _pic_size(list_icon_path(r["id"], r["icon"][2:])) if (r["icon"] or "").startswith("u:") and r["icon_size"] is None else None
+            hd = _pic_size(os.path.join(ATT_DIR, o3c_head_rel(r["id"], r["header_file"]))) if r["header_file"] and r["header_size"] is None else None
+            c.execute("UPDATE lists SET icon_size=COALESCE(icon_size,?), header_size=COALESCE(header_size,?) WHERE id=?", (ic, hd, r["id"]))
+    c.commit()
 
 
 def o3c_head_process(raw):
@@ -137,12 +166,13 @@ def o3c_head_upload(lid):
         jpg = o3c_head_process(raw)
     except BadInput as e:
         return err(str(e))
+    list_pic_guard(c, lid, "header", me(), len(jpg))  # 2.498.0 (#3884)
     tok = secrets.token_urlsafe(12)
     os.makedirs(HEAD_DIR, exist_ok=True)
     # sealed at rest with the list's space key (organisation, else the owner's account), as attachments are
     oc_write_file(c, oc_list_space(c, lid), os.path.join(ATT_DIR, o3c_head_rel(lid, tok)), jpg, fresh=True)
     old = c.execute("SELECT header_file FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    c.execute("UPDATE lists SET header_style='image', header_file=? WHERE id=?", (tok, lid))
+    c.execute("UPDATE lists SET header_style='image', header_file=?, header_size=?, header_by=? WHERE id=?", (tok, len(jpg), me(), lid))  # 2.498.0 (#3884)
     bump(c)
     c.commit()
     if old and old != tok:

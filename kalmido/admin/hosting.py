@@ -121,7 +121,18 @@ def _user_bytes(c, uids):
             for t in ("office_meal_files", "office_contract_files"))
     t_ = c.execute(f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.113.1 (#2059): team chat files
     t_ += c.execute(f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.363.3 (#3134)
-    return int(a + b + d + e + g + h + k + t_)
+    return int(a + b + d + e + g + h + k + t_ + _list_pic_bytes(c, uids, q))
+
+
+def _list_pic_bytes(c, uids, q):
+    """2.498.0 (#3884): a list's own icon and header picture count for who uploaded them, else (older pictures, the person
+    is gone) for the owner of the list. System context: a person may have left the list they uploaded to; only a sum of the
+    person's own bytes comes out. A list in the trash counts no more (as the other files), a header picture only while the
+    list shows it: taking it off keeps the file for undo, but it is gone for the person."""
+    with system_ctx(c):
+        return (c.execute(f"SELECT COALESCE(SUM(icon_size),0) FROM lists WHERE deleted_at IS NULL AND icon LIKE 'u:%' AND (icon_by IN ({q}) OR (icon_by IS NULL AND owner_id IN ({q})))", [*uids, *uids]).fetchone()[0]  # pg-ok: prefix marker u: is case-exact
+                + c.execute(f"""SELECT COALESCE(SUM(header_size),0) FROM lists WHERE deleted_at IS NULL AND header_style='image' AND header_file<>''
+                                 AND (header_by IN ({q}) OR (header_by IS NULL AND owner_id IN ({q})))""", [*uids, *uids]).fetchone()[0])
 
 
 def quota_info(c, uid):

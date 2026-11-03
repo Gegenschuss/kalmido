@@ -7,6 +7,7 @@ import re
 from ..core.config import ATT_DIR
 from ..core.i18n import tr
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_plain_size  # 2.498.0 (#3884)
 
 
 # ---- 1.9.0: profile pictures. A preset (funny animal pictures, static SVGs) or an own photo: the client crops it square, the
@@ -101,6 +102,27 @@ def avatar_process(raw):
 LIST_ICON_PRESETS = ("kalmido",) + ALL_PRESETS
 LIST_ICON_PX = 128
 LIST_ICON_DIR = os.path.join(ATT_DIR, "listicons")
+
+
+def list_pic_guard(c, lid, what, uid, n):
+    """2.498.0 (#3884): the storage quota before a list's new picture of n bytes (what: "icon" | "header"): QuotaExceeded when it
+    does not fit; the picture it replaces comes free when it counts for uid (admin/hosting.py _list_pic_bytes)."""
+    from ..admin.hosting import quota_guard
+    r = c.execute(f"SELECT {what}_size AS size, {what}_by AS by_id, owner_id, header_style, header_file, icon FROM lists WHERE id=?", (lid,)).fetchone()
+    shown = r and ((r["header_style"] == "image" and r["header_file"]) if what == "header" else (r["icon"] or "").startswith("u:"))  # as _list_pic_bytes: only what counts
+    counted = shown and (r["by_id"] or r["owner_id"]) == uid
+    old = (r["size"] or 0) if counted else 0
+    quota_guard(c, uid, n - old, rate=False)
+
+
+def list_icon_cols(lid, value, uid):
+    """2.498.0 (#3884): (icon_size, icon_by) for the icon value about to be stored; a preset or none holds no bytes."""
+    if not (value or "").startswith("u:"):
+        return None, None
+    try:
+        return oc_plain_size(list_icon_path(lid, value[2:])), uid
+    except OSError:
+        return None, uid  # measured by the watchdog (lists/listhead.py o3c_pic_tick)
 
 
 def list_icon_url(r):

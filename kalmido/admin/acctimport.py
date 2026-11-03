@@ -143,7 +143,7 @@ def _umz_delivery(t):
 # columns never taken from a file, in addition to ids, *_id / *_by columns, foreign keys and OX_SECRET_COLS
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
-              "org_visibility", "org_edit", "git_folder_off", "icon",
+              "org_visibility", "org_edit", "git_folder_off", "icon", "icon_size", "header_size",  # 2.498.0 (#3884): sizes are measured here
               "header_file",  # 2.459.0 (#3849): a token of the old server (orgimport.oi_pictures makes a new one with the picture)
               # 2.538.0 (#4372, review 2646 finding 3): a locked project never moves along (umz_write); an archive whose e2e is
               # set but empty ("") would bring one in locked, with its plain texts: the lock state never comes from a file

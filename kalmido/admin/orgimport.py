@@ -401,13 +401,13 @@ def oi_pictures(c, run, uid, zf, files, data):
                 png = _oi_pic(c, run, uid, zf, files, path, AVATAR_MAX_MB, list_icon_process)
                 if png is None:
                     continue
-                c.execute("UPDATE lists SET icon=? WHERE id=?", ("u:" + tok, lid))
+                c.execute("UPDATE lists SET icon=?, icon_size=NULL, icon_by=NULL WHERE id=?", ("u:" + tok, lid))  # 2.498.0 (#3884): the watchdog measures it
                 full, kind, sealed = list_icon_path(lid, tok), "icon", oc_list_org(c, lid)  # as users.list_icon_store
             else:
                 png = _oi_pic(c, run, uid, zf, files, path, HEAD_MAX_MB, o3c_head_process)
                 if png is None:
                     continue
-                c.execute("UPDATE lists SET header_file=?" + (", header_style='image'" if styles.get(old) == "image" else "") + " WHERE id=?", (tok, lid))
+                c.execute("UPDATE lists SET header_file=?, header_size=NULL, header_by=NULL" + (", header_style='image'" if styles.get(old) == "image" else "") + " WHERE id=?", (tok, lid))
                 full, kind, sealed = os.path.join(ATT_DIR, o3c_head_rel(lid, tok)), "head", oc_list_space(c, lid)  # as listhead.o3c_head_upload
         os.makedirs(HEAD_DIR if kind == "head" else LIST_ICON_DIR, exist_ok=True)
         run.written.append(full)

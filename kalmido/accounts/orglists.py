@@ -19,7 +19,7 @@ from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
 from ..core.access import Denied, my_inbox
 from ..accounts.orgs import _need_org_admin, user_orgs
 from .orgoutreq import oor_rows  # 2.361.2 (#2923)
-from ..accounts.pictures import list_icon_url
+from ..accounts.pictures import list_icon_cols, list_icon_url
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import ov_open  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.pictures import list_icon_drop_file, LIST_ICON_PRESETS  # 2.369.5 (#2517): pulled up from functions
@@ -288,7 +288,7 @@ def ole_patch(oid, lid):
 def _ole_icon_set(c, oid, lr, value):
     old = lr["icon"]
     if (old or None) != (value or None):
-        c.execute("UPDATE lists SET icon=? WHERE id=?", (value, lr["id"]))
+        c.execute("UPDATE lists SET icon=?, icon_size=?, icon_by=? WHERE id=?", (value, *list_icon_cols(lr["id"], value, me()), lr["id"]))  # 2.498.0 (#3884)
         _ol_log(c, oid, lr, "icon", detail={"icon": [_ole_icon_label(old), _ole_icon_label(value)]})
         _ol_news(c, oid, lr, "restyle")
         bump(c)

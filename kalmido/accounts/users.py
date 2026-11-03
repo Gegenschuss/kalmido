@@ -16,7 +16,7 @@ from ..core.pg import system_ctx
 from ..accounts.session import _rate_fail, _rate_keys, _token_hash, login_wait, me, session_gen, user_public
 from ..accounts.pictures import (
     AVATAR_DIR, avatar_drop_file, AVATAR_MAX_MB, avatar_path, AVATAR_PRESETS, avatar_process, avatar_url, LIST_ICON_DIR,
-    list_icon_drop_file, list_icon_path, LIST_ICON_PRESETS, list_icon_process, list_icon_url,
+    list_icon_cols, list_icon_drop_file, list_icon_path, LIST_ICON_PRESETS, list_icon_process, list_icon_url, list_pic_guard,
 )
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..accounts.sessions import ses_end  # 2.190.0 A (#1991)
@@ -900,7 +900,7 @@ def avatar_get(uid, tok):
 
 def _list_icon_set(c, lid, value):
     old = c.execute("SELECT icon FROM lists WHERE id=?", (lid,)).fetchone()
-    c.execute("UPDATE lists SET icon=? WHERE id=?", (value, lid))
+    c.execute("UPDATE lists SET icon=?, icon_size=?, icon_by=? WHERE id=?", (value, *list_icon_cols(lid, value, me()), lid))  # 2.498.0 (#3884)
     bump(c)
     c.commit()
     if old and old[0] != value:
@@ -944,6 +944,7 @@ def list_icon_store(lid):
     tok = secrets.token_urlsafe(12)
     os.makedirs(LIST_ICON_DIR, exist_ok=True)
     c = db()  # 2.58.0 (#1805): an organisation list's picture is sealed with its key at rest (private lists plain, as attachments)
+    list_pic_guard(c, lid, "icon", me(), len(png))  # 2.498.0 (#3884)
     oc_write_file(c, oc_list_org(c, lid), list_icon_path(lid, tok), png)
     return "u:" + tok
 
