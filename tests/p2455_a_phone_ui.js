@@ -2,6 +2,7 @@
 // #3847 the phone's open drawer stays open when the workspace is switched (with and without a kept view) and shows the new one
 // #3852 at 320 px a member's name in Settings > Organisation gets the whole first line (role choice + buttons below), a receipt
 //       row with labels gives the file name the whole first line; the wide view is unchanged
+// 2.498.0 #3863 tapped through the sheet from a project page: the kept view of the target comes and stays, drawer open or closed
 // freelancer-matrix: n/a (no new route; the workspace switch is the same for a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -20,10 +21,13 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {org_name: 'Studio', lang: 'en', collab_all: true, modules: ['comments', 'cal', 'office']});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', workspace: 'private'});
-  await call(CA, 'POST', '/api/lists', {name: 'Home'});
+  const HOME = (await call(CA, 'POST', '/api/lists', {name: 'Home'})).id;
   const ORG = ((await call(CA, 'GET', '/api/state')).me.workspaces || [])[0]?.id;
   check(!!ORG, 'the fixture organisation ' + ORG);
   if (!ORG) throw new Error('no organisation in the fixture');
+
+  const PROJ = (await call(CA, 'POST', '/api/lists', {name: 'Studio project', org_id: ORG, kind: 'project'})).id;
+  check(!!HOME && !!PROJ, 'the fixture lists ' + HOME + ' ' + PROJ);
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = async o => {
@@ -72,6 +76,40 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     check(await ready(ev, `wsCur() === 'private' && !SBM.keep`, 20), '#3847: the hold ends with the switch');
     await ev(`(() => { history.back(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#side.open')`, 20), '#3847: Back closes the drawer after a switch');
+
+    // #3863 real taps (the sheet's Back entry takes part): project page of the organisation -> Private with a kept view
+    const tap = async sel => {
+      const at = `(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(x => x.offsetParent); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`;
+      await ready(ev, `(() => { const q = ${at}; return !!q && q.x > 0 && q.x < innerWidth && q.y < innerHeight && !document.querySelector('#side').getAnimations().length; })()`, 20);  // the drawer has finished sliding in
+      const p = await ev(at);
+      check(!!p, '#3863: tap target ' + sel); if (!p) return;
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(p.x), y: Math.round(p.y)}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 40}, {type: 'pointerUp', button: 0}]}]});
+      await cmd('input.releaseActions', {context: ctx});
+    };
+    const pick = async label => { check(await ready(ev, `[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => b.textContent.includes(${JSON.stringify(label)}))`, 20), '#3863: the sheet offers ' + label);
+      const i = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].findIndex(b => b.textContent.includes(${JSON.stringify(label)}))`);
+      await tap(`#pop [role="menuitem"][data-i="${await ev(`document.querySelectorAll('#pop [role="menuitem"]')[${i}].dataset.i`)}"]`); };
+    const toProject = async () => {  // in the organisation, on its project page, Private's kept view = the list Home
+      await nav(B + '#today'); await ready(ev, `!!S.booted`, 80);
+      await ev(`(async () => { closeSide(); LS.set('wsView', {}); await wsSet('private'); go('l/${HOME}'); return 1; })()`);
+      await ready(ev, `S.route.key === 'l:${HOME}'`, 20);
+      await ev(`(async () => { await wsSet('org:${ORG}', {keep: true}); go('l/${PROJ}'); return 1; })()`);
+      return ready(ev, `S.route.key === 'l:${PROJ}' && wsCur() === 'org:${ORG}'`, 20);
+    };
+    const settled = `wsCur() === 'private' && S.route.key === 'l:${HOME}' && location.hash === '#l/${HOME}'`;
+    check(await toProject(), '#3863: drawer open: on the project page');
+    check(await ev(`(LS.get('wsView', {}) || {}).private?.hash === 'l/${HOME}'`), '#3863: Private keeps its view ' + JSON.stringify(await ev(`LS.get('wsView', {})?.private?.hash`)));
+    await open(ev);
+    await tap('#side .wsbar'); await pick('Private');
+    await ready(ev, settled, 20); await sleep(900);
+    d = await ev(drawer);
+    check(await ev(settled) && d.open, '#3863: open drawer, tapped: Private with its kept view, it stays ' + JSON.stringify(d));
+    check(await toProject(), '#3863: drawer closed: on the project page');
+    await ev(`(() => { closeSide(); return 1; })()`);
+    await ev(`(() => { render(); return 1; })()`);
+    const pill = await ev(`!!document.querySelector('.wsbadge, .wschip')`);
+    check(pill, '#3863: the header offers the workspace switch');
+    if (pill) { await tap('.wsbadge, .wschip'); await pick('Private'); await ready(ev, settled, 20); await sleep(900); d = await ev(drawer); check(await ev(settled) && !d.open, '#3863: closed drawer, tapped: the same ' + JSON.stringify(d)); }
 
     // #3852 at 320 x 640
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 320, height: 640}});

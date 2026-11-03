@@ -124,7 +124,8 @@ async function wsSet(ws, o = {}) {
     if ((ol && !inWs(ol, to)) || o3a_hid(S.route?.mod)) h = keyToHash(START_KEY);
   } else h = ws_target(to);
   if (h != null && h !== wsv_hashNow()) {
-    history.replaceState(history.state, '', '#' + h);  // no Back step into the old workspace's page
+    // 2.498.0 (#3863): the menu's Back entry (backclose.js) would stay "ours" under the new hash: its history.back() took the switch back
+    history.replaceState(history.state?.f8d ? null : history.state, '', '#' + h);  // no Back step into the old workspace's page
     await route();
   } else { render(); WSV.ws = to; }  // no route follows
   if (typeof VM !== 'undefined') VM.noSel = false;
@@ -164,7 +165,7 @@ function wsBadge(l) {
   if (!wsOn() || !l || l.is_inbox) return '';
   const ws = wsOf(l), nm = wsLabel(l.org_id);
   // 2.53.0 (#1474): an organisation's list: the sign in the organisation's colour (Private stays neutral)
-  return `<button type="button" class="wsbadge" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}"${wsp_attr(ws) /* 2.57.0 B (#1807): my colour, Private too */}>${wsIcon(ws)}<span>${esc(nm)}</span></button>`;
+  return `<button type="button" class="wsbadge tf5" data-act="ws-menu" data-ico="${ws === 'private' ? 'home' : 'brief'}" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', nm))}" aria-label="${esc(tr('Workspace: {0}', nm))}"${wsp_attr(ws) /* 2.57.0 B (#1807): my colour, Private too */}>${wsIcon(ws)}<span>${esc(nm)}</span></button>`;
 }
 // the switch in the sidebar (under the brand): one button naming the shown workspace (a long organisation name fits), the
 // menu offers Private | <organisations> | All workspaces
@@ -197,7 +198,7 @@ wsBlinkPlan();
 function wsChip() {
   if (!wsOn() || wsCur() === 'all') return '';
   const cur = wsCur();
-  return `<button type="button" class="wschip" data-act="ws-menu" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', wsName(cur)) + ' · ' + tr('Only this workspace is shown'))}" aria-label="${esc(tr('Workspace: {0}', wsName(cur)))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}<span>${esc(wsName(cur))}</span></button>`;
+  return `<button type="button" class="wschip tf5" data-act="ws-menu" data-ico="${cur === 'private' ? 'home' : 'brief'}" aria-haspopup="menu" title="${esc(tr('Workspace: {0}', wsName(cur)) + ' · ' + tr('Only this workspace is shown'))}" aria-label="${esc(tr('Workspace: {0}', wsName(cur)))}"${wsp_attr(cur) /* 2.53.0 (#1474), 2.57.0 B (#1807) */}>${wsIcon(cur)}<span>${esc(wsName(cur))}</span></button>`;
 }
 function wsMenu(anchor) {
   const cur = wsOn() ? wsCur() : 'private';
