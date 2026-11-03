@@ -2,8 +2,8 @@
 
 Practical notes for running Kalmido on your own server: what tends to go wrong behind a reverse proxy, with installed
 apps and push, with backups, mail and moving to another machine, and how to harden the host. The README has the basics
-([Quick start](../README.md#quick-start), [Reverse proxy](../README.md#reverse-proxy),
-[Configuration](../README.md#configuration), [Backups and restore](../README.md#backups-and-restore),
+([Quick start](../README.md#quick-start), [Reverse proxy](#reverse-proxy),
+[Configuration](#configuration), [Backups and restore](../README.md#backups-and-restore),
 [Updating](../README.md#updating)); this page collects what comes on top. Everything here is generic: adjust names,
 addresses and paths to your setup.
 
@@ -2142,3 +2142,299 @@ servers only; with `KALMIDO_HOSTED=1` the section, the badge and the hint are hi
 
 Keys are made with `tools/supporter_key.py` (`genkey --out FILE` keeps the private key outside the repository with mode
 600 and prints only the public key; `sign --key FILE --type server|person [--id X] [--date YYYY-MM-DD]` prints a key).
+
+## Try it locally
+
+No proxy needed for a quick look. After the quick start above, open **http://localhost:3040** on the same machine.
+Everything works there, including installing it as an app and offline mode (browsers treat `localhost` as secure).
+Push notifications and `/drop` stay off until you configure them.
+
+To try it from your phone or another device on your network, change the port line in `docker-compose.yml` to
+`"3040:3040"`, run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
+app works, but it cannot be installed and has no offline mode.
+
+> [!WARNING]
+> Over plain HTTP your password travels unencrypted through your network. Fine for a test at home; for daily
+> use put it behind a reverse proxy with HTTPS (next section) and switch the port back.
+
+To remove the test again: `docker compose down` and delete the folder (your test data is in `./data`).
+
+## Login
+
+**Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
+("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20, which slows sign-ins down instead of refusing them; names known at that address for 30 days are not slowed down) and per user
+name from all addresses (100, against slow distributed guessing) within 15 minutes, so one attacker cannot lock a person out.
+*Administration > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
+`172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
+Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
+default loopback + the Docker bridge gateway). Upgrading from the single-user
+version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give it a password once with
+`docker exec -it kalmido python app.py set-password admin`.
+
+**Single sign-on via your reverse proxy:** set `AUTH_PROXY_HEADER` (e.g. `Remote-User`) and
+`AUTH_TRUSTED_PROXIES`, then enter each person's proxy user name as *SSO login* in *Settings > Administration*. A logged-in
+proxy user without an Kalmido account sees a "no account, ask the admin" page. Without the header (or from an
+untrusted address) Kalmido falls back to its own login page.
+
+**Two-factor, passkeys, OpenID Connect:** the built-in login can ask for a second factor (authenticator app,
+passkey, recovery code) and passkeys can log in without a password; Kalmido can also log you in through an OpenID
+Connect provider. See the two sections below.
+
+> [!CAUTION]
+> The header is a password: whoever can send it to Kalmido is that user. Kalmido only trusts it from
+> `AUTH_TRUSTED_PROXIES` (the **direct** peer address), never on `/drop`, `/ical/`, `/s/`, `/api/v1/`, `/manifest.json` and static files, and
+> your proxy **must remove client-supplied copies** before its auth step, especially on paths that bypass the login.
+> With Docker port publishing every connection (your proxy, other containers, monitoring) usually arrives from the
+> Docker bridge gateway address; then also set `AUTH_PROXY_PORT=3045` and publish that container port only
+> on the address your proxy uses (`127.0.0.1:3040:3045`), so nothing else can reach the port that trusts the header.
+
+**CSRF:** every state-changing API request must carry `X-Requested-With: kalmido` (the app always sends it; other
+sites cannot without a CORS preflight, which Kalmido never allows). The REST API under `/api/v1` only accepts personal
+access tokens (never the session cookie or the proxy header), so it needs no such header.
+
+**Headers:** every page and API response carries a strict Content-Security-Policy (no inline scripts,
+`frame-ancestors 'none'`), `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: same-origin`
+and a restrictive `Permissions-Policy`. Attachments are served with a sandbox CSP; only images
+and PDFs are shown inline, everything else is a download. Your proxy does not need to add anything.
+
+**Server-side requests:** the server only contacts services you or your admin configure or use (full list: [docs/SELF-HOSTING.md](SELF-HOSTING.md#outgoing-connections)); the browser loads no CDN, fonts or scripts from outside (exception: the video review shows YouTube / Vimeo players and video files from other https hosts once such a review is opened). The services are
+(ntfy, Git hosts), the push services of the browsers that subscribed to Web Push (see *Notifications*), the calendar
+links and CalDAV servers your users subscribe to (with an SSRF guard that refuses internal addresses unless an admin
+allows the host, see *Calendar subscriptions*), the OpenID Connect provider if you configure one (same guard), your users' webhook URLs (same guard, no redirects, see [docs/API.md](API.md#webhooks)), plus an optional update check against GitHub (`api.github.com`,
+see *Updating*), all http/https only with redirects only within the same host (calendar links: see there). Web Push only goes to https endpoints of an allow-list of known push services, so a crafted
+subscription cannot make the server call anything else. Links in tasks or shared text are not fetched, with these exceptions: the preview of a saved bookmark (module on), contact photos at a Google import, feeds and calendar subscriptions you add.
+
+### Two-factor authentication and passkeys
+
+For accounts with a password (the built-in login). *Settings > Account > Two-factor authentication*:
+
+- **Authenticator app (TOTP, RFC 6238):** scan the QR code (made on the server, no external service) or type the key
+  into Aegis, 2FAS, Google Authenticator, 1Password, Bitwarden, ... and confirm with a first code. After the password
+  the login asks for the 6-digit code. A code is accepted once (a used time step is never accepted again), ±30 s of
+  clock drift are fine. The secret is stored encrypted with a key derived from a random server secret.
+- **Passkeys (WebAuthn):** fingerprint, face, device PIN or a security key. Work as the second factor and, unless an
+  admin turns it off, for **logging in without a password** ("Log in with a passkey"; the device must verify the user).
+  Add, rename and remove them in the same place; several per account. Passkeys need HTTPS (or `localhost`) and a host
+  name, not an IP address. The RP ID is the host the page is opened on (`PUBLIC_URL`, plus the origins in
+  `KALMIDO_WEBAUTHN_ORIGINS`), or `KALMIDO_WEBAUTHN_RP_ID` for several hosts under one domain; a passkey only ever works on
+  the address it was created on. Registrations use attestation "none"; a sign counter that goes backwards (a cloned
+  authenticator) is refused.
+- **Recovery codes:** 10 one-time codes, shown once when the first method is set up (copy / download). Only their
+  SHA-256 is stored. *New codes* replaces them. Logging in with one tells the admins (admin alert).
+- Setting up a method needs the current password; turning the app off needs the password and a code; the first
+  method ends your other sessions. Lost phone and codes: an admin can *reset* two-factor in *Settings > Administration* (the
+  user's sessions end).
+
+**Admin policy:** *Settings > Administration > Whole server > Require two-factor authentication for built-in logins*. Users
+without a second factor must set one up at their next login (before they get a session); the last method cannot be
+removed while the policy is on. Logins through the proxy header or OIDC are not affected: two-factor is the job of
+your login proxy / identity provider there, and the account page says so. Wrong codes count against the same limits as
+wrong passwords (5 per user name / 20 per IP in 15 minutes), a login ticket dies after 5 wrong codes, and the answers
+never reveal whether an account exists or has two-factor on.
+
+### OpenID Connect (Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra, ...)
+
+A *Log in with ...* button on the login page. Set it up in *Settings > Administration > Sign-in* (2.9.0: the client
+secret is stored encrypted with `KALMIDO_SECRET_KEY`, *Check connection* tests the discovery; the sign-in is a draft until the check passed and it is switched on) or with environment
+variables; a variable that is set always wins for its field (the settings show it locked). Step-by-step guides per
+provider (redirect URI, scopes, group claims): [docs/OIDC.md](OIDC.md).
+
+```ini
+KALMIDO_OIDC_ISSUER=https://auth.example.com          # discovery: <issuer>/.well-known/openid-configuration
+KALMIDO_OIDC_CLIENT_ID=kalmido
+KALMIDO_OIDC_CLIENT_SECRET=...                        # empty = public client (PKCE only)
+KALMIDO_OIDC_BUTTON_LABEL=Authentik
+#KALMIDO_OIDC_SCOPES=openid profile email             # add "groups" if your provider needs it for the groups claim
+#KALMIDO_OIDC_USERNAME_CLAIM=preferred_username
+#KALMIDO_OIDC_GROUPS_CLAIM=groups
+#KALMIDO_OIDC_REQUIRED_GROUP=kalmido                   # only members may log in
+#KALMIDO_OIDC_ADMIN_GROUP=kalmido-admins               # admin flag follows this group (the last admin is never demoted)
+#KALMIDO_OIDC_ADMIN_DOMAINS=example.com               # 2.9.0: a verified e-mail of these domains = admin too
+```
+
+Register Kalmido at the provider as a confidential client with the redirect URI **`<PUBLIC_URL>/api/auth/oidc/callback`**
+(exactly; the admin page shows it with a copy button), grant type *authorization code*, PKCE S256, token endpoint auth
+`client_secret_basic` (or `client_secret_post`). Example for Authelia (`identity_providers.oidc.clients`):
+
+```yaml
+- client_id: kalmido
+  client_name: Kalmido
+  client_secret: '$pbkdf2-sha512$...'   # authelia crypto hash generate pbkdf2 --random
+  public: false
+  authorization_policy: two_factor
+  redirect_uris: ['https://tasks.example.com/api/auth/oidc/callback']
+  scopes: ['openid', 'profile', 'email', 'groups']
+  grant_types: ['authorization_code']
+  response_types: ['code']
+  require_pkce: true
+  pkce_challenge_method: S256
+  token_endpoint_auth_method: client_secret_basic
+```
+
+**Accounts:** by default only users an admin created can log in. The first OIDC login links a user whose user name
+equals the username claim, or whose e-mail (optional field in *Settings > Administration*) equals the provider's **verified**
+e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
+needs the same verified e-mail as well (accounts made for SSO, without password and e-mail, link as before), and admins, accounts with a second factor and child accounts are linked only from
+their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
+login page says "no account, ask the admin". *Create accounts on the first OIDC login* (admin switch) creates them
+instead (no admin rights unless the admin group says so, no password). An admin can unlink a user again.
+
+**Security:** Authorization Code flow with PKCE (S256), `state` (one-time, 10 minutes, bound to the browser by an
+HttpOnly cookie, so nobody can log you into their account) and `nonce`. The ID token is verified by Kalmido itself:
+signature against the provider's JWKS (RSA, RSA-PSS, ECDSA, Ed25519; never `none` or HMAC; keys cached for an hour and
+fetched again for an unknown key id), `iss`, `aud`, `azp`, `exp`, `iat`, `nbf`, `nonce`. Extra claims come from the
+userinfo endpoint (only with the same `sub`). Every request to the provider goes through the same SSRF guard as the
+calendar subscriptions: public addresses and https only, unless the host is allowed (`KALMIDO_OIDC_ALLOW_HOSTS` or the
+internal hosts list under *Settings > Administration > Advanced*), which you need for a provider in your own network. The
+client secret, codes and tokens are never logged or shown. Two-factor for OIDC logins is the provider's job.
+
+## Reverse proxy
+
+More from running Kalmido (proxy pitfalls, VPN-only setups, PWA and push, backups and encryption at rest, server
+hardening, mail, moving to a new server, production updates): [docs/SELF-HOSTING.md](SELF-HOSTING.md).
+
+Terminate HTTPS in your proxy. If the proxy has its own login (single sign-on), put it in front of everything
+except these paths:
+
+| Path | Why it must bypass the login |
+|---|---|
+| `/manifest.json`, `/static/icon-192.png`, `/static/icon-512.png`, `/static/badge-96.png` | Browsers fetch these without cookies when installing the PWA or showing a notification. They contain no data. |
+| `/static/shortcuts/*` | Icons of the app shortcuts in the manifest, also fetched without cookies. |
+| `/drop` (and `/drop/drop`) | Upload endpoint for share apps. Protected by each user's own bearer token. `/drop/drop` is an alias for shortcuts that append `/drop` to an address that already ends in it. |
+| `/ical/*` | Calendar subscription. Calendar apps cannot log in; the secret token in the URL protects it. |
+| `/dav`, `/dav/*`, `/.well-known/caldav` | CalDAV (2.9.0). Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
+| `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public project links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
+| `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with an Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](API.md#behind-a-reverse-proxy) for nginx and Traefik). |
+
+Example for Caddy with Authelia (single sign-on). The `route` keeps the order: first strip any client-sent
+`Remote-*` headers, then let `forward_auth` set the real ones:
+
+```caddyfile
+tasks.example.com {
+	route {
+		request_header -Remote-User
+		request_header -Remote-Groups
+		request_header -Remote-Email
+		request_header -Remote-Name
+		# REST API with a personal access token: no login, and to port 3040 where the Remote-User header is never trusted
+		@kalmido_api {
+			path /api/v1/*
+			header_regexp Authorization ^Bearer\s+abk_[A-Za-z0-9_-]{20,}$
+		}
+		reverse_proxy @kalmido_api 127.0.0.1:3040
+		# calendar apps (CalDAV): user name + app password, checked by Kalmido
+		@kalmido_dav path /dav /dav/* /.well-known/caldav /.well-known/caldav/*
+		reverse_proxy @kalmido_dav 127.0.0.1:3040
+		@gated not path /manifest.json /static/icon-192.png /static/icon-512.png /static/badge-96.png /static/shortcuts/* /drop /drop/drop /ical/* /s/* /static/public.css /static/fonts/* /static/icon.svg
+		forward_auth @gated authelia:9091 {
+			uri /api/authz/forward-auth
+			copy_headers Remote-User Remote-Groups Remote-Email Remote-Name
+		}
+		reverse_proxy 127.0.0.1:3040
+	}
+}
+```
+
+With `AUTH_PROXY_PORT` (see *Login*) the last line points at the proxy port instead (`127.0.0.1:3045` or wherever you
+published it), while the API line keeps using the app port. With the built-in login a plain
+`reverse_proxy 127.0.0.1:3040` is enough.
+
+## Configuration
+
+All settings are environment variables in `.env` (see [.env.example](../.env.example)); [docs/ENV.md](ENV.md) lists every variable the server reads with its default (2.149, generated from the code). Switches accept `1`/`true`/`yes`/`on` and `0`/`false`/`no`/`off`.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `TZ` | `Europe/Berlin` | Time zone for due dates and reminders |
+| `PUBLIC_URL` | `http://localhost:3040` | Your address, used in notification links |
+| `NTFY_URL` | `https://ntfy.sh` | ntfy server for push notifications (see *Notifications*) |
+| `NTFY_TOPIC` | random | Topic of the first admin; every other user gets a random one (editable by admins) |
+| `NTFY_TOKEN` | | Access token for a protected ntfy server |
+| `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
+| `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
+| `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
+| `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
+| `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared project or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
+| `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
+| `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
+| `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |
+| `TASKS_DROP_TOKEN` | | Becomes the first admin's `/drop` token (every user has an own one, see *Share from your phone*) |
+| `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
+| `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox (2.142.0: everyone can also set an own share inbox under *Settings > Notifications*; this variable stays the fallback) |
+| `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
+| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
+| `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
+| `KALMIDO_SETUP_CODE` | | 2.45.0: empty = while no account exists the server prints a one-time setup code into its log and the setup page asks for it. **Only for tests and automation:** a fixed code, or `off` (no code: whoever opens the page first becomes the admin) |
+| `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
+| `KALMIDO_IMPORT_MAX_MB`, `KALMIDO_IMPORT_MAX_TASKS` | `20`, `20000` | Limits of one import (*Moving from other apps*) |
+| `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per user within 10 minutes |
+| `KALMIDO_PDF_MEM_MB`, `KALMIDO_PDF_PARALLEL`, `KALMIDO_PDF_TIMEOUT_S` | `512`, `2`, `20` | 2.34.0: reading the text of a PDF (agents' *read attachment*, the briefing field) runs in its own process: its memory limit in MB, how many PDFs are read at the same time (small servers: `1`) and the seconds one PDF may take |
+| `TASKS_PUSH_GAP` | `60` | Seconds in which further comments / changes on a task are bundled into one summary push |
+| `TASKS_NEWS_DAYS` | `90` | Days a News item is kept |
+| `TASKS_NEWS_MAX` | `500` | News items kept per user (newest) |
+| `KALMIDO_UPDATE_CHECK` | `1` | `0` turns the update check off completely (see *Updating*) |
+| `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / project addresses) |
+| `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; deleted after a complete import, `KALMIDO_IMAP_KEEP=1` only marks them read) |
+| `KALMIDO_MAIL_AUTHSERV_ID` | *(empty)* | 2.86: the hub takes a mail from a person's own address as forwarded (the original sender picks the client) only when the receiving mail server confirmed that domain (DKIM / DMARC / SPF pass in its `Authentication-Results`); set its authserv-id (the first word of that header, e.g. `mx.example.com`) to read only its header, empty = the topmost one. Without the proof the mail stays *Not assigned* |
+| `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_INSECURE`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
+| `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
+| `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |
+| `KALMIDO_ORG_NAME` | *(empty)* | the name of the organisation the first-run setup creates (else asked once in the setup); 2.46.0: never renames an existing one |
+| `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
+| `KALMIDO_UPLOAD_HOURLY_MB` | `1024` | Uploads per person and hour in MB (0 = off); above it a clear 429 message |
+| `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
+| `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
+| `KALMIDO_AI_BASE_URL` | *(empty)* | 2.75.0: base URL of an OpenAI-compatible chat API (`…/v1`) for the built-in assistant; empty = no assistant (no menu entry, routes 404) |
+| `KALMIDO_AI_MODEL` | *(empty)* | 2.75.0: model name sent to that API (required together with the URL) |
+| `KALMIDO_AI_KEY_FILE` | *(empty)* | 2.75.0: file with the API key (one line); `KALMIDO_AI_KEY` sets it directly; Ollama needs none. Never logged or shown |
+| `KALMIDO_AI_NAME` | *(host of the URL)* | 2.75.0: provider name people see when they share projects with the assistant |
+| `KALMIDO_AI_TIMEOUT_S` | `60` | 2.75.0: time limit of one model call; `KALMIDO_AI_MAX_CHARS` (`24000`) caps the input, `KALMIDO_AI_MAX_TOKENS` (`1500`) the answer |
+| `KALMIDO_ONBOARDING` | `1` | `0`: new accounts start empty (no "Getting started" project, no welcome tour) |
+| `KALMIDO_SEARCH_INDEX` | `0` | 2.29.0: search engines stay out by default (`X-Robots-Tag: noindex, nofollow` on every answer, `/robots.txt` with `Disallow: /`); `1` lets them index the sign-in page. Public project links, forms, feeds and the API stay noindex either way |
+| `KALMIDO_AGENT_EVENTS_STALE_H` | `48` | 2.29.0: agent events older than this many hours reach a poller as one `missed` summary instead of one by one (`0` = off; see docs/AGENTS.md) |
+| `KALMIDO_CHANNELS` | `1` | 2.142.0 (#2145): `0` turns the Slack / Matrix / Telegram / Signal channels off |
+| `KALMIDO_CHANNEL_FAILS` | `5` | Failed sends in a row after which a channel switches itself off |
+| `KALMIDO_TELEGRAM_API` | `https://api.telegram.org` | Base address for Telegram channels (a local Bot API server) |
+| `KALMIDO_EVENT_MAIL_DELAY`, `KALMIDO_EVENT_MAIL_GAP` | `600`, `600` | 2.142.0 (#2146): seconds an assignment / mention mail waits to collect more, and the least time between two such mails to one person |
+| `KALMIDO_WEBPUSH` | `1` | `0` turns Web Push off (no key handed out, no new devices, everything goes to ntfy) |
+| `KALMIDO_VAPID_SUBJECT` | `PUBLIC_URL` | Contact the push services see in the VAPID signature: `mailto:you@example.com` or an https URL (Apple needs one of the two; without an https `PUBLIC_URL` the default is `mailto:admin@example.com`) |
+| `KALMIDO_WEBPUSH_HOSTS` | | Extra push services, comma list: `host`, `*.domain` or an exact origin `https://host:port` (only this form allows plain `http://`, e.g. for tests) |
+| `KALMIDO_ADMIN_ALERTS` | `1` | `0` turns the admin alerts off completely (see *Notifications > Admin alerts*) |
+| `KALMIDO_ADMIN_TOPIC` | | One fixed ntfy topic for all admin alerts (instead of each admin's own topic; the setting in the app is then read-only) |
+| `KALMIDO_ADMIN_ALERT_WINDOW` | `3600` | Seconds over which counted events (failed logins, skipped watchdog rows, removed devices) are summed up into one alert |
+| `KALMIDO_CALENDARS` | `1` | `0` turns calendar subscriptions off (no fetching, no events, the settings say so) |
+| `KALMIDO_GIT_POLL` | `180` | 2.2.0: seconds between two checks of a connected repository (see *Git integration*) |
+| `KALMIDO_TENANT_CHECK_HOUR` | `3` | 2.30.0 (#1036): hour of the nightly workspace boundary check (memberships across organisations / private; admin alert when the count changes) |
+| `KALMIDO_TIDY_QUIET_S` | `120` | 2.27.0: seconds a new task must be left alone before its agent gets the `tidy` event (and nobody may have it open in a field); `0` = at once |
+| `KALMIDO_AUDIT_DAYS` | `90` | 2.2.1: days the agents' activity log is kept (see *AI agents*); `0` = no log |
+| `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the project under *Settings > Administration > Advanced*) |
+| `KALMIDO_CALENDAR_MAX_MB` | `10` | Largest calendar download (ICS file or CalDAV answer) in MB |
+| `KALMIDO_CALENDAR_MAX_EVENTS` | `5000` | Occurrences kept per calendar (the ones closest to today) |
+| `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per user within 15 minutes |
+| `KALMIDO_BACKUPS` | `1` | `0` turns automatic backups and restore off completely (see *Backups and restore*) |
+| `KALMIDO_BACKUP_DIR` | `backups/` next to the database | Folder for the backup archives |
+| `KALMIDO_BACKUP_PASSPHRASE` | | Passphrase for encrypted backups (instead of setting it in the app; the app then shows it as set) |
+| `KALMIDO_BACKUP_MAX_MB` | `4096` | Largest backup a restore accepts (upload size and unpacked total) |
+| `KALMIDO_WEBAUTHN_RP_ID` | host of the page | Passkeys: relying party ID, e.g. `example.com` to use passkeys on several subdomains |
+| `KALMIDO_WEBAUTHN_ORIGINS` | | Passkeys: extra origins (comma list, e.g. `https://tasks.example.net`) besides `PUBLIC_URL` |
+| `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on. 2.9.0: also settable in *Settings > Administration > Sign-in*; a set variable wins per field |
+| `KALMIDO_OIDC_ADMIN_DOMAINS` | | Comma list of e-mail domains: a verified e-mail of one of them makes the person an admin (like `KALMIDO_OIDC_ADMIN_GROUP`) |
+| `KALMIDO_OIDC_SCOPES` | `openid profile email` | Scopes requested from the provider |
+| `KALMIDO_OIDC_USERNAME_CLAIM`, `KALMIDO_OIDC_GROUPS_CLAIM` | `preferred_username`, `groups` | Claims for the user name and the groups |
+| `KALMIDO_OIDC_REQUIRED_GROUP`, `KALMIDO_OIDC_ADMIN_GROUP` | | Only members of this group may log in; members of this one are admins |
+| `KALMIDO_OIDC_BUTTON_LABEL` | `OpenID Connect` | Text on the login button ("Log in with ...") |
+| `KALMIDO_OIDC_ALLOW_HOSTS` | | Internal hosts the OIDC requests may reach (`host` or `host:port`), e.g. a provider in your LAN |
+| `KALMIDO_CALDAV` | `1` | `0` turns CalDAV off (`/dav` and `/.well-known/caldav` answer 404, no new app passwords) |
+| `KALMIDO_CALDAV_DONE_DAYS` | `90` | Days completed tasks stay in the calendar apps |
+| `KALMIDO_CALDAV_HTTP` | `0` | `1` allows CalDAV logins while `PUBLIC_URL` is plain `http://` (only inside a trusted network: the app password is sent with every request) |
+| `KALMIDO_API` | `1` | `0` turns the REST API off (every `/api/v1` request answers 404, no new tokens) |
+| `KALMIDO_API_RATE` | `120` | API requests per token and minute |
+| `KALMIDO_WEBHOOKS` | `1` | `0` turns webhooks off (nothing is queued or sent) |
+| `KALMIDO_WEBHOOK_ALLOW_HOSTS` | | Internal hosts webhooks may reach (`host` or `host:port`, comma list), in addition to *Allowed internal hosts* in the app; only these may use `http://` |
+| `KALMIDO_PUBLIC_LINKS` | `1` | `0` turns public project links off for good (the admin switch in the app is then off and locked) |
+| `KALMIDO_PUBLIC_RATE` | `60` | Public link page views per client address and minute |
+| `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link within 10 minutes that trigger an admin alert |
+| `KALMIDO_IMAGE` | `kalmido:local` | Image for `docker compose`; set `ghcr.io/gegenschuss/kalmido:<version>` to use the prebuilt one |
+
+Everything else (language, reminder defaults, digest time, pomodoro lengths, which modules are shown) is set per user in the app under *Settings*; the switches for the whole server (collaboration, time tracking, public links, update check, sign-in policy, OIDC, backups, admin alerts, allowed internal hosts) are under *Settings > Administration > Whole server*.

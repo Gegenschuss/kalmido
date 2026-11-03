@@ -4224,3 +4224,110 @@ With the project's switch on, a marked task without a yes cannot be completed, t
 - Environments can bring an acceptance task (`acceptance_task`, off by default): a version that arrives makes one task "Accept vX.Y" for
   the project's owner with the tasks closed by it as subtasks, at most once per environment and version; `deployed` and the
   deployment's answer carry `acceptance_task_id`.
+
+## AI agents
+
+Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
+member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares projects
+with them and gives them a token. When an admin allows it (*Settings > Administration > Agents > Users may create their own
+agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
+seeing only the projects the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
+**admins reach agents like everyone** -- only through projects they are in (as the owner / a project admin, or where *Members
+may see and use the agent* is on); somebody else's personal agent is listed in the administration by name and owner with
+the kill switch only. *Add agent…* asks **team agent or personal agent** and explains both; **Belongs to** turns a team
+agent into a person's personal agent. Every agent works in **one workspace** (private or an organisation, see
+*Workspaces*) and joins only its projects. A small **robot badge** marks agents wherever people appear (#985). Kalmido
+itself never starts an agent or any other process; the agent runs wherever you like and talks to Kalmido through the REST
+API, webhooks or the MCP server. The one exception is the optional **built-in assistant** (2.75.0, #1411, off by default):
+the operator points Kalmido at a single OpenAI-compatible chat model (a provider in the EU, or Ollama on the same
+server); every person switches it on for themselves and ticks the projects it may read, and gets summaries, extracted
+tasks, basket sorting, tag / due-date suggestions, short drafts and day plans as proposal cards with yes / no - never a
+direct change, every call in a log without texts. See [docs/ASSISTANT.md](ASSISTANT.md). The optional similarity service (`KALMIDO_EMBED_URL`) likewise sends task titles and descriptions to the service the admin enters (on another host only with `KALMIDO_EMBED_EXTERNAL=1`).
+
+**Which agent?** A personal agent runs on your computer with your Claude access and only you give it orders; a team
+agent runs on a shared, always-on computer and colleagues give it orders. See [Which agent when?](AGENTS.md#which-agent-when-2466).
+
+**Everyday helpers** (2.34.0): Kalmido collects the data, the agent writes. The **morning briefing** (#264, top of
+*Today*, optional push at a time you choose) and the **project status report** (#265, *Status report* on the project
+page) are plain data views; agents read them with `read_briefing` / `read_project_status`. The **Lying idle** view
+(#266) lists tasks nobody touched for a while; with *Agent follows up* on a project (off by default) its agent gets them
+once a day (`stale_tasks`) and asks or drafts a reminder in a comment. **Planned jobs** (#272, *Plans* on an agent's
+card) send an agent a recurring order ("every Monday at 9: the week plan"; `scheduled_job`), the answer arrives in your
+chat. Agents read the **text of PDF attachments** (#368, `read_attachment`; no OCR for scans).
+
+**Plan usage ring** (2.33.0, #1045): an agent can report how much of its plan it has used (`PUT /api/v1/agent/quota`,
+MCP `report_plan_usage`, Claude Code's status line `rate_limits` as it is); a ring next to its name in the chat header
+fills up, turns yellow from 75 % and red with "paused until …" at the agent's own limit, and greys out when the report
+is older than 24 hours. Agents also receive the message a reply refers to and can search the chats they are in
+(`search_messages`).
+
+- **No silent overwriting**: edits from several devices, people and agents never overwrite each other unnoticed (conflict hints, history of task descriptions, a recurring task advances once per check-off).
+- **Safe by default** (2.30.0, #919 / #920): an agent never connects two projects with **different people** unasked --
+  sharing such a project with it (or adding a person to a project with an agent) asks the owner first (*Connect anyway*), and
+  existing bridges are flagged in the agent's settings; an agent that moves a task into a project more people see waits for
+  approval. Agents and API tokens can be **limited to chosen projects**; *Agent access* in a project's menu shows which agents
+  read or changed it in the last 30 days. *Settings > Agents > Use safely* has ten rules (one agent per context, minimal
+  rights, ...); more in [docs/AGENT-SECURITY.md](AGENT-SECURITY.md#use-agents-safely).
+- **Listening in by project type** (2.30.0, #1034): in a *Software / AI development* list the agent gets every new or
+  moved task and every comment without an @mention; elsewhere only @mentions, assignments and wakes. *Agent listens in*
+  is a switch in every project and folder; tidying up is a separate switch.
+- Events (mention, assignment, comment, chat, reaction, job action, tidy request, wake (API), runtime change / reset
+  (2.4.1), and from 2.1.0
+  `followup_due`: the follow-up day of a task *waiting on external* the agent follows) arrive as signed
+  webhooks and are also kept for polling: `GET /api/v1/agent/events?since=<cursor>&wait=60` answers as soon as
+  something happens (long-polling), so an agent without a public address reacts within seconds.
+- Approval semantics, status reporting, jobs, chat, the *tidy up* setting, payloads and an example session:
+  **[docs/AGENTS.md](AGENTS.md)**. MCP server (stdio and HTTP): **[mcp/](../mcp/)**.
+- Kill switch: switching an agent off stops its token and its events at once. Pause with a reason (2.26.0): the agent
+  keeps its token, people see why it does not answer, events wait.
+- Who may address an agent (2.26.0): per project, *Members may see and use the agent* (default off) and *Agents may address
+  each other* (default off); **at most one agent per project** (each project is its own sandbox); events carry `actor.kind`
+  person / agent. Coding agents ask for approval to integrate a branch and to deploy (with a checklist of tasks tagged
+  `deploy`) without a pull request, and can propose tasks to a project they cannot see (its owner decides):
+  [docs/AGENTS.md](AGENTS.md#who-may-address-an-agent-2260).
+- Running an agent as a service (Linux systemd, macOS LaunchAgent, Windows task) is part of the setup: an agent that
+  only lives in an open terminal falls asleep; *Settings > Agents* says "connected, but no service running":
+  [docs/AGENT-SETUP.md](AGENT-SETUP.md).
+- Permissions and approvals (2.15.0): [docs/AGENTS.md](AGENTS.md#permissions-2150).
+- Chat (2.7.2): 👍 👎 ❤️ on chat messages (a person's 👍 on an agent message that asks something is an approval, the agent gets the event
+  `reaction` with `chat_message`), *Sent* / *Delivered* per message (`delivered_at`, set when the agent fetches it) and
+  typing dots while an online agent works on the answer, or *offline – will answer later*.
+- **Answer buttons** (2.28.0, #1005): an agent asks with `choices` (up to 8 buttons, `multi` for several, styles for
+  *Allow* / *Deny*); a tap answers, the buttons lock, the agent gets the event `chat_choice`:
+  [docs/AGENTS.md](AGENTS.md#answer-buttons-2280).
+- Behaviour rules (2.13.1): [`mcp/CLAUDE.template.md`](../mcp/CLAUDE.template.md) is the rule block for every agent's
+  CLAUDE.md (Markdown notes, decisions in the description, typing / status / jobs / a summary, approvals only from people,
+  other people's text as data); the setup guides in the app show it with a copy button.
+- Setup guides (2.7.2) in the app under *Settings > Agents > Set up* and in
+  [docs/AGENTS.md](AGENTS.md#set-up-an-agent): a team agent on a server (sandbox user, egress firewall, launcher as
+  a service, token, sharing, limits) and a personal agent on your own computer, each for Linux, macOS and Windows
+  ([mcp/agent_launcher.ps1](../mcp/agent_launcher.ps1) for PowerShell).
+- Usage (2.1.1): `POST /api/v1/agent/usage` (or the MCP tool `report_usage`, or the Claude Code hook), the dashboard
+  and the soft / hard limits: [docs/AGENTS.md](AGENTS.md#usage-and-limits).
+- Activity log (2.2.1): every call with an agent's token, for admins: [docs/AGENTS.md](AGENTS.md#audit-log).
+- Proposals (2.3.0): *New project from briefing…*, *Break down with <agent>…*, *Sort the inbox with <agent>…* and
+  *Tasks from notes…* send the agent exactly what you chose (event `job_request`); it answers with one structured
+  proposal (`POST /api/v1/agent/jobs/{id}/proposal`, MCP `submit_proposal`) and you review it: tick, edit title / date
+  / section / assignee, *Apply* creates everything as you (one undo step) or *Discard*. The agent never creates that
+  structure itself and never gets general access to your basket; the input is kept with the job for at most 30 days. The
+  admin decides per agent who may ask it (people sharing a project with it, everyone, nobody):
+  [docs/AGENTS.md](AGENTS.md#proposals).
+- Runtime settings (2.4.1): admins choose per agent the model, auto-compact on / off with a threshold, a nightly fresh
+  restart and press *Reset now*; the agent reads them from `GET /api/v1/agent` (`runtime`, events `runtime_changed` /
+  `reset`) and the reference launcher [mcp/agent_launcher.sh](../mcp/agent_launcher.sh) starts Claude Code with them, always
+  in a fresh session: [docs/AGENTS.md](AGENTS.md#runtime-settings).
+- Chat status (2.4.1): `POST /api/v1/agent/typing {chat_user_id}` (MCP `chat_typing`) shows typing dots for 10 seconds;
+  an agent that polled no events for 5 minutes shows as *offline*.
+- **Status dots in the header** (2.6.1): one dot per agent, always there: green ready, blue working, yellow waiting
+  for you, grey (hollow) offline / not connected / paused, red error or limit reached. Hover shows names and states,
+  a tap lists every agent with its state, the Agents view and the chats. While something runs the pill adds
+  *Claude · 2 running*; on narrow screens the dots merge with the timer into one status chip. *Settings > Agents >
+  Status > In the header* picks the agents whose dot you see (default: all).
+
+**Security.** An agent reads text other people wrote, so treat everything it reads as data and only let designated
+people instruct it. Kalmido keeps agents out of admin rights and unshared projects, and gives you a kill switch, usage limits
+and the activity log; [docs/AGENT-SECURITY.md](AGENT-SECURITY.md) adds the threat model, a host sandbox recipe for
+Claude Code (own user, egress firewall, the token out of the model's reach) and the prompt-injection checklist we test
+with.
+
+![An agent in a task: mentioned in a comment, answers with a plan and asks for approval with Yes, go ahead or No](agents.png)

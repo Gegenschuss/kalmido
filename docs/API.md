@@ -2124,3 +2124,31 @@ entry at the same time both keep their change; the result is checked like a whol
 notification matrix takes a partial `{"notify": {"<event>": {"news"?: 0|1, "push"?: 0|1}}}` the same way.
 `PUT /api/office/settings` (partial body) and every other change of the office settings read and write under the office
 area's lock: two saves with different keys at the same moment both stay.
+
+## REST API and webhooks
+
+Kalmido has a small REST API (`/api/v1`) for scripts and integrations, and outgoing webhooks. Full reference with
+examples for curl, Home Assistant, n8n and a shell script: **[docs/API.md](API.md)**; the OpenAPI 3.1 description
+is served at `/api/v1/openapi.json`.
+
+- **Personal access tokens** (*Settings > Access*, was *Account > Advanced > API tokens*): name, permissions (2.15.0: *Read* always,
+  *Tasks*, *Comments*, *Structure*, *Delete & trash*, *Read files*, *Upload files*, *Time tracking*, *Export*, *Account
+  settings*, and *Admin read* for admins; changeable later with the lock button), optional address restriction and
+  expiry. Older tokens with *write* keep everything. Shown once (`abk_...`), stored only as a SHA-256 hash, revocable. A token acts as its user
+  and never has more rights: the same project roles and switches as in the app apply to every request, and a disabled
+  user's tokens stop working. Send it as `Authorization: Bearer abk_...`; the API accepts nothing else (no cookie, no
+  proxy header), so it needs no CSRF header. 120 requests per token and minute (`KALMIDO_API_RATE`).
+- **Endpoints:** projects (also archive, delete, members, folders), sections, tasks (filter by project, due range, status,
+  tag, assignee, updated since; create, change, complete, reopen, move with position, batch, skip, trash and restore),
+  subtasks, dependencies, custom fields, templates, files, tags, comments, saved filters, News, time entries and the
+  timer, habits, search, export, and for admins users and server status. JSON, ISO dates, cursor pages, one error format. Changes show up in the task history
+  *via API* and notify people like changes in the app.
+- **Webhooks** (*Settings > Integrations > Advanced > Webhooks*): up to 10 URLs per user for `task.created`, `task.updated`,
+  `task.completed`, `task.reopened`, `task.deleted`, `comment.created` and `list.shared`, only for projects that user can
+  see. Every delivery is signed (`X-Kalmido-Signature: t=...,v1=<HMAC-SHA256>`, check it and reject anything older than
+  5 minutes), retried after 1 min, 5 min, 30 min and 2 h, then the webhook is turned off and the admins are alerted.
+  A delivery log (last 50 attempts, no bodies) and *Send test* help setting it up. Only public https addresses, like
+  calendar subscriptions; internal hosts need the admin allow-list (then http:// works too).
+- **Strict input** (2.2.1): an unknown JSON field is refused with `400` and `{"error": {"code": "unknown_field",
+  "fields": [...]}}`, so a misspelt field never gets lost silently (`content` is accepted as an alias of `notes`).
+- `KALMIDO_API=0` / `KALMIDO_WEBHOOKS=0` turn them off.

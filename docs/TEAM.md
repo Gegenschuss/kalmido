@@ -962,3 +962,327 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
 - **Project head in the printable view.** *Print* on a project starts with a compact head: the description, the status with
   its note (who, when), the period of the tasks and the progress, the members with their role and the milestones with date
   and state. It uses what the project page shows you; parts without content are left out. A plain project prints its name only.
+
+## Users and sharing
+
+<p align="center"><img src="share.png" width="760" alt="The Share dialog of a project: people with their roles open, groups, agents, the public link and the owner folded with their state"></p>
+
+- **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
+  optional SSO login, admin flag, ntfy topic, disable / delete). Everyone can change their own display name and
+  password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
+  admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
+  under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
+  (*Managed under Agents*). A user who still owns projects cannot be deleted (delete the projects or
+  disable the user instead); deleting removes their inbox, habits, filters and focus history.
+- **Private per user:** inbox, habits, focus sessions, filters, folders and sidebar order, tags (two people can tag
+  the same shared task differently; right-click or long-press a tag in the sidebar, or "…" in the tag view, >
+  *Delete tag…* removes it from all your tasks after showing how many, the tasks stay, undo brings it back), settings (language, notifications, digest, ...), ntfy topic, upload token.
+- **The Share dialog** (2.6.0): *Share…* in a project's "…" menu, the *Share* button next to the project title (desktop), or
+  *Sharing > Share…* in the project dialog. One place for everything about who sees a project: **People** (members with their
+  role, *Share with …* + role + *Add* to invite, remove), **Agents** (the project's agent: one select *Agent: No agent / …*
+  -- **one agent per project** (2.26.0), switching swaps it in one step with Undo; *Members may see and use the agent*
+  (default off: only the owner and project admins can chat with it, @mention it or assign it tasks here), *Agents may
+  address each other* (default off), which agent may tidy up entries), the **Public link** (owner) and the **Owner** (*Transfer
+  ownership…* / *Take over…* with the history). Members see who is in the project, read-only. The project dialog keeps the
+  project's own settings and shows a one-line summary ("Shared with 2 people · 1 agent").
+- **Sharing and roles:** in the Share dialog add people with a role (*What the roles may do* explains each one):
+
+  | Role | Sees | Changes |
+  |---|---|---|
+  | **Owner** | everything | everything; the only one who renames, changes the type, archives, deletes, creates a public link or custom fields |
+  | **Admin** | everything | every task, sections, project status; adds and removes members and sets their roles (never the owner's); moderates comments |
+  | **Member** | everything | every task, sections, project status |
+  | **Participant** | only the tasks assigned to them, with their subtasks, comments, files and time; the main task of an assigned subtask as read-only context (title, dates, status) | their own tasks; may add tasks (always assigned to themselves) and subtasks; never deletes, moves out or reassigns |
+  | **Viewer** | everything | nothing (may comment) |
+
+  A participant's view is filtered on the server everywhere (search, calendar feed, statistics, time reports, News,
+  pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
+  their tasks. Changing a role takes effect at once. Projects shared before 1.10.0 keep their meaning: *Can edit* is now
+  *Member*, *View only* is *Viewer*. Members can leave a project; the basket cannot be shared.
+- **Transfer ownership:** the owner hands a project to another person in the Share dialog (*Owner > Transfer ownership…*)
+  (a member or anyone they could share with; confirmed twice). The new owner gets it in the same folder and place
+  where they had it as a member (otherwise at the end of their sidebar) and a News item; the old owner stays in the
+  project as a **project admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
+  transferred from X to Y"). Agents never become owners and never transfer; baskets cannot be transferred.
+  **Admins take over** projects whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
+  cannot share, disabled users cannot log in): *Settings > Administration > Projects owned by agents or disabled users >
+  Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the project. An
+  agent that owned the project stays in it as a *Member* (agents are never project admins). API:
+  `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope structure; agent tokens get 403).
+  Moving a task into a project needs edit rights there, moving it out needs edit rights on its current project. Members
+  with edit rights can only move a task out of a shared project into a project that all its current people can see (e.g. between
+  two projects shared with the same people); moving it anywhere else is up to the project owner, so a member can never take a
+  shared task (with its subtasks and comments) away from the owner. Subtasks follow their parent; a subtask that lives
+  in someone else's project stays there (at the top level) when a member moves the parent elsewhere.
+- **Trash:** deletion after the trash period needs `KALMIDO_RETENTION_PURGE=1` (new installations get it from the installer). Everyone with edit rights can move tasks to the trash and restore them. Only the project owner deletes
+  tasks of a shared project permanently (*Empty trash* of a member leaves shared projects of other owners alone, marks those
+  items *stays* and says how many stayed). Instance admins also empty the trash of shared projects where they may edit.
+- **Assignment:** in shared projects a task or subtask can be assigned to the owner or any member (task panel >
+  *Assignee*, or the **assignee column**: every row of a shared project shows the assignee's picture or a dashed circle
+  for nobody; a click opens the assign menu; on phones a small cell at the end of the row; 2.14: project *…* > *Columns…*
+  shows or hides it, and orders it among the other columns, for everyone in the project). A subtask's assignee is independent of its main task.
+  Reminders go to the assignee, otherwise to whoever created the task (if they still see it, else to the project owner). The daily digest contains your own
+  projects' tasks plus everything assigned to you.
+- **Export** (*Settings > Data > Export*) contains your data and the projects you own (tasks with links, comments and history) and your templates.
+  Note: the export of a project owner includes the comments that other members wrote in the owner's shared projects.
+
+### Public links
+
+A project owner can share one project with people who have **no account**: *Share… > Public link > Create public link* (the Share dialog, 2.6.0).
+The link (`/s/<token>`, 192 random bits) opens a plain page with only that project: its sections, open tasks with their
+subtasks and due dates, and the tasks completed in the last 7 days (in a checklist: all done items). Never comments,
+assignees, tags, files, custom fields or anything from other projects; task notes only if you tick *Show task notes*
+(then as plain text).
+
+- **Access:** *View only* or *View and tick off*. Ticking goes through the normal completion: the history says
+  *Someone via the public link*, and the task's creator gets a News item and a push like after any completion in a
+  shared project (if collaboration is on). Put back on the project works too; nothing else can be changed.
+- **Password** (optional, stored hashed): visitors enter it once per browser (a cookie for that link only). Changing
+  or removing the password, *New link* and *Turn off* take effect at once.
+- **Expiry** (optional): the link works through the end of that day.
+- Only the owner creates and manages the link; the basket cannot be shared. The page loads no scripts and nothing
+  external, is marked `noindex`, is never cached, and has a strict Content-Security-Policy. Views, ticks, unknown links
+  and wrong passwords are rate-limited per address; an unusual number of views of one link sends the admins an alert.
+- Admins can turn public links off for everyone (*Settings > Administration > Whole server*; existing links then stop working
+  but are kept); `KALMIDO_PUBLIC_LINKS=0` turns them off for good.
+
+### Show completed at the bottom
+
+For projects you work through again and again (groceries, packing, a cleaning routine): *Show completed at the bottom* in
+the project's *…* menu, its *Sort* menu or the project dialog (2.7.2; before, this was the project type *Shopping & packing list*
+/ *Checklist*: such projects became plain projects with the option on, nothing changed for their items).
+Ticked-off items move to a **Done** section at the bottom (open, collapsible) instead of disappearing, sorted by name,
+and go back on the project with one tap (↺). *Uncheck all* puts everything back, *Clear done* moves the done items to the
+trash. Quick add works as usual, and it works with sharing and public links (*View and tick off* makes a shared shopping
+project for the whole household, no accounts needed). API: the project field `done_at_bottom`; `kind: "checklist"` and the
+boolean `checklist` are still accepted as deprecated aliases.
+
+### Comments and activity
+
+<p align="center"><img src="comments.png" alt="Task panel with comments of the team, reactions and activity lines"></p>
+
+- **Comments** (module *Comments*, on by default): everyone who can see a task can comment on it, including *View only*
+  members (they still cannot change the task). In private projects and without collaboration, comments are personal
+  notes with a timestamp: no @mentions, no News, no pushes, no history of your own changes. Checklists have none.
+  On a desktop (2.31.0, #344) the comments and the history have their own area below the properties: drag the line
+  between them (or use the arrow keys) to resize it, fold it with a double-click or the arrow in its head; position and
+  fold are saved per user. On phones and tablets the comments and the history sit at the end of the task panel (a small
+  *To the comments* link jumps there; order and history are in the "…" of the comment head). The comment box stays at
+  the bottom edge of the panel while you scroll, a single line until you use it. Opened from a comment (News, a
+  push), the panel shows the newest one. Comments support a little Markdown,
+  links, files (images show as thumbnails inside the comment, not in the task's attachment list) and
+  **@mentions**: type `@` for a list of the people who can see the task. Mentions are stored by user, so a
+  renamed user stays linked. *Ctrl+Enter* sends.
+- **Edit and delete:** you can edit and delete your own comments (edited ones show *edited*, deleted ones and
+  their files disappear). The owner and the admins of a project may delete any comment in it (moderation); server
+  admins have no extra rights on other people's comments. Participants comment on their own tasks only.
+- **Activity:** the task panel shows the history between the comments: created, renamed, dates, priority,
+  assignment, moves, completion, repetition, links, attachments, subtasks, trash. Sort order, pins, reminders
+  and your private tags are not logged. *Show activity* hides it (remembered per device).
+- **Unread:** tasks with comments show a count; a dot marks comments by others you have not seen yet. Opening the
+  task marks them as read.
+- **Notifications** (over each person's own channel, Web Push and / or ntfy, in their language; tapping opens the task; never for your
+  own actions and only to people who can still see the task):
+  - new comment: to the assignee, the creator and everyone who commented before; *@mentioned* people always,
+    with "mentioned you"
+  - *Sam assigned you: task* to the new assignee (with project and due date), *Sam unassigned you from: task*
+    to the previous one
+  - *Robin completed: task* to the creator and whoever assigned it, for tasks in shared projects
+  - bundling: after a push about a task, anything else on that task within a minute is collected into one
+    summary push ("2 more comments · 1 more change").
+- **Offline:** comments need a connection. Offline, the text stays in the box with a notice (task edits still
+  queue up and sync later as before).
+- **Comments off:** *Settings > Modules > Comments* hides every comment (they stay stored), the API refuses new ones
+  (409) and you get no comment News or pushes. Collaboration keeps working without them (sharing, assigning, history,
+  News about assignments and status).
+- **Simple mode:** *Settings > Modules > Collaboration* (per user) hides activity, mentions, assignee chips, the sharing section, the assignee field, *Assigned to me* and the News inbox, and stops these
+  notifications and News entries. Shared projects you are in stay visible as normal projects, nothing is deleted.
+  The website link field is always available.
+- **For the whole server:** admins can switch collaboration off for everyone (*Settings > Modules*, the
+  *for everyone* switch next to *Collaboration*). Then nobody can share, assign, mention or get News and collaboration pushes
+  (comments stay as personal notes), the related API endpoints answer 403, and shared projects are only visible to their owner. Personal switches are shown
+  disabled. Nothing is deleted: switched back on, memberships, comments, assignments and status history are all
+  there again. When an admin creates the second user while it is off, Kalmido offers to turn it on.
+
+### News and notifications
+
+2.28.0 (#987): News come in two parts. **For you** holds what *people* send you -- @mentions, assignments, replies to
+your comments, approval decisions -- and the unread direct messages of the team chat; **Activity** holds every change
+and everything agents do. The bell counts only *For you*, its dropdown shows *For you* first, the News view has the
+tabs *For you | Activity | All*, and the start page shows *N messages for you* while something is unread. Pushes for
+what agents do (their comments, completions, new tasks, status) are off by default (*Settings > Notifications > Pushes
+for what agents do*); an agent's @mention of you and its approval requests push as before.
+
+**Notification templates** (2.33.0, #927): the owner of a shared project or folder chooses in the share dialog how much
+the other people are notified at most -- *Read only* (mentions, assignments, direct replies), *Collaborate* (+ comments
+on their tasks and due reminders), *Everything* or *Custom*, also per person. Members can set themselves quieter, never
+louder, and see who limited the project; the News list stays complete, only pushes are held back. New shares start with
+*Read only*; projects and folders shared before 2.33.0 keep *Everything* until the owner chooses (asked once).
+
+<p align="center"><img src="news.png" alt="News inbox with mentions, grouped comments, an assignment, a completion and a shared project"></p>
+
+**Bundled (2.17.0):** News are grouped per task (or project) with one line of what happened ("2 comments · completed"),
+three sections (2.138.2): *For you* (unread approvals, proposals, mentions, assignments, follow-ups; the number is the
+bell's), *Also new* (other unread activity) and *Read* (muted, below), *Mark read* per group;
+*Bundled* in the bar switches to the plain list (per device). *Summarize* sends your unread News to an agent's chat,
+which answers with a short summary.
+
+- **News** (bell icon in the top bar, also as a sidebar entry and a pinnable tab) lists what concerns you,
+  newest first: *@mentions*, new comments on tasks you take part in (creator, assignee, earlier commenter),
+  *assigned you* / *unassigned you*, completions by others (same rule as the push; off by default, see below), and projects someone shared
+  with you, your role changes and *removed you from a project*. Never your own actions.
+- Same recipients as the push notifications, but nothing is bundled: every event is kept (people without an
+  ntfy topic get them too). Consecutive comments on the same task are shown as one row with a count.
+- Only items you may still see: if you lose access to a project or a task goes to the trash, its items disappear;
+  deleted comments disappear as well. Comment items show a short excerpt with mentions highlighted.
+- Works like a mail inbox: unread items are bold, tapping one opens the task and marks it read (opening a task any
+  other way also marks its items read), *×* (desktop) or a swipe sideways (touch) removes a single item, *Mark all as
+  read* and the filter *All | Mentions & assigned to me* are at the top. The unread badge updates with the normal sync.
+- **What notifies you** (2.1.0) is one table under *Settings > Notifications* (or the gear next to the filter): every
+  event with a *News* and a *Push* checkbox. Events: comments on your tasks (created by you or assigned to you),
+  replies to your comment (the comment right before is yours), comments on tasks you follow (you commented on them),
+  mentions, assignments, new tasks in shared projects (someone else created them), completions by others, project status,
+  projects shared with you, unblocked tasks, an agent waiting for your approval, the follow-up day of a task *waiting on
+  external*, reminders (push only), repeated reminders (2.7.0, push only; a muted project bell stops them) and, for admins, an agent reaching a usage limit (2.1.1). A comment counts once, as the first of: mention, your task, reply, follow.
+  Defaults = the behaviour before 2.1.0 (completions only as a push; status and sharing only in News); new tasks in
+  shared projects are off, replies and follow-ups on. `GET /api/v1/me` shows the settings, `PATCH /api/v1/me/notifications`
+  changes them.
+- **The bell of a project** (project menu > *Notifications*, or the project dialog), for you only: *All activity* = every
+  comment, new task and change in that project as News and push; *Default* = the table above; *Mute* = nothing from that
+  project except mentions of you and tasks assigned to you (those follow the table); *Custom selection…* (2.6.1) = your
+  own choice per event for this project, News and Push each: new tasks, comments, mentions, assignments, completions,
+  project status, unblocked tasks, agents waiting for approval. A ticked event reaches you from every task of the
+  project, an unticked one never; the choice is kept when you switch to another mode and back. Reminders and follow-ups
+  are your own and are never muted. A muted project shows a crossed-out bell in the sidebar.
+- **The bell in the top bar** (2.6.1) opens the newest News right where you are (a dropdown on the desktop, a sheet
+  from the bottom on a phone): open an item, remove it, *Mark all as read*, *Show all* for the full view; a click
+  outside or Esc closes it and you stay in your project. **Filter chips** (*Mentions*, *Comments*, *Assignments*, *New
+  tasks*, *Completed*, *Status*, *Agents*, …, only the kinds that are there) narrow the dropdown and the News view;
+  they only change what you see, per device.
+- Items are kept for 90 days, at most 500 per person (`TASKS_NEWS_DAYS`, `TASKS_NEWS_MAX`).
+
+## Workspaces: work and private apart
+
+Since 2.28.0.
+
+Every project belongs to a **workspace**: your private space or one of your organisations (the project dialog, *Workspace*).
+The switch at the top of the sidebar (*Private | <organisation> | All*) shows the projects, tasks, News, agents and team
+chats of one workspace at a time (the basket is always there); a chip in the header says which one you look at, and the
+choice follows you to every device. A new project starts in the shown workspace.
+
+What the server keeps apart:
+
+- An **organisation's project** is shared only with the organisation's members (a share with somebody else is refused with
+  a clear message, a share by e-mail address into it does nothing and reveals nothing); its groups must consist of
+  members and its ownership stays inside the organisation.
+- **Private projects** are shared with anyone you may see (also colleagues) and stay invisible to the organisation.
+- **Agents work in one workspace** and join only its projects: an organisation's agent never sees a private project, a private
+  agent never an organisation's project. "Used for" (family / household) and Home & life projects are private only.
+- Changing a project's workspace is the owner's call and refused while people or agents in it do not fit the new one.
+- *Settings > Account > Workspaces* lists your organisations with their members; an organisation's admins manage them
+  there (see below).
+
+**Leaving an organisation** (removed by an admin, or on your own): your projects of that workspace stay with the
+organisation (they go to the admin who removes you, or to the next admin), you leave every list of the organisation;
+your private projects go with you. When the only admin leaves, the operator (an instance admin) takes the organisation over.
+
+**On the update** to 2.28.0 every list of a server with an organisation stays in the organisation (a server from before
+was one company), except family / household and Home & life projects, projects in a top folder named like *Private* /
+*Family* / *Home* and every basket: those become private. Team agents work in the organisation, a personal agent in the
+workspace most of its projects are in; an agent that already sits in a list of another workspace is kept and pointed out --
+the owner decides.
+
+**Calendars and address books** (2.30.0, #1036) belong to a workspace too, with the same rules: an organisation's
+calendar or address book is shared only with its members and agents, a private one never with an organisation's agent,
+and a share always needs a person you may see. *New calendar…* / *New address book…* ask for the workspace, *Workspace…*
+in their menu moves one (the owner; refused while a member does not fit). The sidebar switch filters events, calendars,
+contacts and address books as well. Groups of another organisation stay unknown. On the update every calendar and
+address book of a server with an organisation goes into its owner's organisation, except the ones named like *Private* /
+*Family* / *Home*, address books mirrored from an outside account and those with a member who does not fit (they stay
+private; nobody loses access). A **nightly boundary check** counts every membership across the workspace boundary
+(projects, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
+*Administration > Organisations*.
+
+## Organisations and invitations
+
+2.46.0: **one kind of server** - organisations plus a private space for everybody. People see the members of their
+organisations and the people they are connected with (a project or group in common, their kids, their agents); on a server
+without any organisation everyone sees everyone (a household). People outside your organisations are reached by sharing
+a private project by e-mail address (the answer never says whether the address has an account).
+
+- The **instance admin** (the operator) creates organisations with a first admin and deletes empty ones; *Users* lists
+  every account. When adding a person the admin picks the organisation (none, or one of them) and the role (member /
+  admin); with exactly one organisation it is preselected.
+- 2.143.0: besides member and admin an organisation knows **read-only** (sees what members see, changes nothing; team
+  chat stays open), **guest** (sees only what is shared with them personally) and **accounting** (reads and exports the
+  office, uploads receipts). The server checks the role everywhere (see docs/TEAM.md). Going back to an older version
+  treats these roles as "member" - set them back to member first.
+- **Organisation admins** manage their members (add by e-mail address, roles, removal - the removed person's projects of the
+  organisation go to the admin), name and e-mail domains under *Settings > Account > Workspaces*, without being admins of
+  the server.
+- New accounts join no organisation by themselves: registrations join the organisation of their e-mail domain, or one
+  that invited them. The login page names no organisation.
+- The first-run setup asks for an optional organisation name (or takes `KALMIDO_ORG_NAME`): with a name the server starts
+  with that organisation and you as its admin, without one only with private spaces.
+- **Organisation projects** are shared with invited people only, or (2.46.0) with *everyone in the organisation*: members see
+  them read-only until they join (or may edit, when the project allows it); agents only when invited.
+- Upgrading from 2.45 or older: memberships, roles and projects stay as they are; nobody is added to an organisation at a
+  start any more. `KALMIDO_INSTANCE_MODE=organisation` is ignored (a log line says so); `shared` (no organisations, people
+  see only their own contacts) still works when set explicitly.
+
+**Registration** (*Settings > Administration > Sign-in*, off by default): *Create account* on the login page for addresses
+of certain e-mail domains, for anyone after an admin approves it, or (shared servers) for anyone with a confirmed
+address. With e-mail (SMTP) people confirm their address with a link and choose their password; without it only
+"after an admin approves" works. New accounts start without access to projects, never as admins or child accounts; the
+answer never says whether an address already has an account. Admins approve waiting accounts under *Users*.
+
+**Sign-in link / QR code** (user dialog; parents for their children in the family): for family members without an
+e-mail address. Opened on their device it signs them in there, once, within 7 days.
+
+**Invitations**: create a person without a password and Kalmido e-mails them a link (valid 7 days, once) to *Set up
+your account*: they choose their own password and are signed in. *Send the invitation again* / *Send a link to set a
+new password* in the user dialog; without SMTP you copy the link.
+
+## Clients, workload, approvals, forms
+
+Three modules under *Settings > Modules > Projects and team*, each off until you switch it on, all within your
+organisation:
+
+- **Clients**: name, contact, address, an hourly rate for projects without their own, a budget in hours and / or money
+  (the bar turns amber at 80 %, red over 100 %). A project belongs to a client (project dialog). The client's page shows the
+  hours of the month and in total, the amount, the estimate (the tasks' durations) next to the tracked time per project,
+  and the **timesheet** of a month (printable / PDF, CSV). The sidebar lists the clients above the projects.
+- **Workload**: open tasks assigned to each person, week by week (by their planned start, else the due date; overdue
+  ones count this week), weighed with their duration, against their hours per week (each person sets their own; admins
+  for everyone). Only what you can see is counted.
+- **Forms**: a project's form is a link with a small page (subject, description, name, e-mail). What someone sends becomes
+  a task in the project, the project's agents get it to sort in. For signed-in people of your organisation or, with public
+  links on, for anyone with the link (a honeypot and limits against spam).
+
+**Approvals** (with collaboration): *Ask for approval…* in a task's menu assigns it to a person of the project; they
+**approve** it (done), **ask for changes** (back to you, with a note) or **reject** it (won't do). Agents can ask, never
+decide.
+
+## Team chat
+
+People talk to each other in Kalmido: **direct messages** between two people who work together (they share a project or a
+group) and **one channel per shared project** for everyone who sees the whole project. Agents shared with the project are in its
+channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
+can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0; "+" for any other emoji,
+2.19.0), and you edit or delete your own (project owners and admins delete
+any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
+devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
+the project menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
+docs/API.md); agents cannot open direct messages.
+
+**Reply to one message** (2.33.0, #1076): swipe a message to the right on a phone (or *Reply* on hover / in its menu
+on a computer); the answer shows a small quote that jumps to the original, and its author is notified. The same works
+in comments and the agent chat. **Search** (#1080): the magnifier in a chat's header searches that conversation; the
+search page and the command field find messages and comments everywhere you may read them.
+
+**Several chats at once** (#1720): Ctrl/Cmd+click a chat (or *Open in split window* in its right-click menu or the person
+card) opens it below the chat that is open; agent chats, channels and direct messages share the panel, each window keeps
+its draft and unread dot, a header folds, moves or closes it, the divider between two windows moves (double-click: equal
+heights). On phones a row of the open chats at the top switches between them. Every agent and person has a **fixed
+colour** (#1721) in avatars everywhere; change yours under *Settings > Account*, an agent's in its settings, and switch
+people's colours off under *Settings > Appearance*.
