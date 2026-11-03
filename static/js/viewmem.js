@@ -17,7 +17,7 @@
 
 const VM_MAX = 50, VM_LS = 'viewMem';
 /** @type {any} */
-const VM = {key: '', side: '', want: null, wantSide: null, obs: null, t: 0, ts: 0, until: 0, boxes: new Set(), keep: null, hash: '', fresh: ''};
+const VM = {key: '', side: '', want: null, wantSide: null, obs: null, t: 0, ts: 0, until: 0, boxes: new Set(), keep: null, hash: '', fresh: '', noSel: false};
 // the entries a place is anchored on (the first one at the top of a box)
 const VM_SEL = '[data-id],[data-vlg],[data-key],[data-go],[data-k],[id],h1,h2,h3,h4,.ghead,li,tr,label';
 const VM_ATTR = ['data-id', 'data-vlg', 'data-key', 'data-go', 'data-k'];
@@ -126,7 +126,7 @@ function vm_after() {
     clearTimeout(VM.t); VM.t = 0;  // a save still waiting belonged to the view before
     VM.key = k; VM.boxes = new Set(); VM.keep = null; if (fresh) VM.fresh = '';
     const rec = k && !fresh ? vm_all()[k] || null : null;  // 2.484.0 (#3949): a call through the bar starts at the top
-    VM.want = rec ? {...rec, opened: false} : null;
+    VM.want = rec ? {...rec, opened: !!VM.noSel} : null;  // 2.497.0 (#4048): VM.noSel = entered by a workspace switch
   }
   vm_try();
 }

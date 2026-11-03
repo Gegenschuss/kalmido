@@ -64,7 +64,7 @@ function wsv_restore(v, ws) {
   for (const f of wsv_folders(ws)) if (foldClosed(f) !== shut.has(f)) foldSet(f, shut.has(f));
 }
 // 2.497.0 (#4048): where a switch to the workspace now set (ws) lands: the same page when it exists there; a single object that is
-// not there -> the overview of the same area; a list (folder, marked lists) not there -> the inbox; an area that does not exist
+// not there -> the overview of the same area (a project: Projects); a list (folder, marked lists) not there -> the inbox; an area that does not exist
 // there or is switched off there (module off, an area off for the workspace #3490, an organisation's part off #3560, a private
 // module in an organisation #3950) -> Start. null = the page stays.
 const WS_START = 'home';
@@ -80,7 +80,7 @@ function ws_target(ws) {
   if (mg && nav_orgOff(mg[0], mod)) return WS_START;
   if (mod === 'tasks') {
     const k = String(S.route.key || '');
-    if (k.startsWith('l:')) return ws_listIn(k.slice(2), ws) ? null : START_KEY;
+    if (k.startsWith('l:')) return ws_listIn(k.slice(2), ws) ? null : listById(+k.slice(2))?.kind === 'project' ? 'projects' : START_KEY;  // a project -> the overview of Projects, a list -> the inbox
     if (k.startsWith('lists:')) return k.slice(6).split(',').some(id => ws_listIn(id, ws)) ? null : START_KEY;
     if (k.startsWith('folder:')) { const f = k.slice(7); return S.lists.some(l => !l.is_inbox && !l.archived && fUnder(l.folder, f) && inWs(l, ws)) ? null : START_KEY; }
     return null;  // the inbox, Today, Projects, filters, tags, people: every workspace has them (they show its share)
@@ -114,6 +114,8 @@ async function wsSet(ws, o = {}) {
   if (kept) wsv_restore(kept, to);  // its areas' own state, not its page
   // 2.497.0 (#4048): the open task (side panel, phone drawer, "All") stays when the new workspace shows it, else it closes
   if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
+  // 2.497.0 (#4048): the view entered by this switch does not reopen the task kept for it (viewmem.js, vm_after); only one open here stays
+  if (typeof VM !== 'undefined') VM.noSel = !o.keep;
   let h = null;
   if (o.keep) {
     // 2.49.0 (#1770) / 2.484.0 (#3950): a list not in the new workspace or a private module's page -> Start, then the caller's target
@@ -124,6 +126,7 @@ async function wsSet(ws, o = {}) {
     history.replaceState(history.state, '', '#' + h);  // no Back step into the old workspace's page
     await route();
   } else { render(); WSV.ws = to; }  // no route follows
+  if (typeof VM !== 'undefined') VM.noSel = false;
   if (hold) SBM.keep = false;  // the next tap on an entry closes the drawer
   try { await api('PATCH', '/api/settings', {workspace: ws}); } catch { /* api() said it */ }
   if (typeof AB2 !== 'undefined') { AB2.org = null; ab2_reload(); }  // 2.96.0 D (#1941): absences follow the switch (server reads it)

@@ -2,7 +2,7 @@
 // A workspace switch stays in the area shown (#3404's page per workspace is gone):
 // - Projects (the overview) private -> organisation stays Projects; a page every workspace has stays (Calendar)
 // - a single object not in the target -> the overview of the same area (a project's notes -> Notes, a knowledge page -> Knowledge)
-// - a list of Private -> the inbox of the target (a project is a list: l/<id>, see the note on the task)
+// - a list of Private -> the inbox of the target; a project of Private (kind project) -> Projects of the target
 // - an area that is off in the target (ws_areas_off) or a private module (Habits) -> Start
 // - an open task stays when the target shows it (inbox task, "All"), else it closes; no page comes back from the last visit
 // - the same on a phone's width (mobile: drawer stays open, #3847)
@@ -30,6 +30,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me})).id, OW = 'org:' + ORG;
   const P = (await call('POST', '/api/lists', {name: 'Garden', org_id: null})).id;
   const O = (await call('POST', '/api/lists', {name: 'Website', org_id: ORG})).id;
+  const PP = (await call('POST', '/api/lists', {name: 'Renovation', org_id: null, kind: 'project'})).id;
   const PT = (await call('POST', '/api/tasks', {title: 'Mow', list_id: P})).id;
   const OT = (await call('POST', '/api/tasks', {title: 'Deploy', list_id: O})).id;
   const IT = (await call('POST', '/api/tasks', {title: 'Sort', list_id: (await call('GET', '/api/state')).lists.find(l => l.is_inbox).id})).id;
@@ -55,6 +56,13 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
     check(w.eval('S.route.mod') === 'cal', tag + 'Calendar -> Private: stays the calendar, not the page left there ' + at(w));
     await sw(w, OW);
     check(w.eval('S.route.mod') === 'cal', tag + 'Calendar -> organisation: stays the calendar ' + at(w));
+    w.close();
+
+    // ---- an open project of Private -> the target's Projects overview, not the inbox and not Start
+    w = await start('l/' + PP, 'private', {mobile});
+    await until(() => w.eval('S.route.key') === 'l:' + PP);
+    await sw(w, OW);
+    check(w.eval('S.route.mod') === 'tasks' && w.eval('S.route.key') === 'projects' && w.location.hash === '#projects', tag + 'a private project -> Projects of the organisation ' + at(w));
     w.close();
 
     // ---- a list of Private -> the target's inbox
