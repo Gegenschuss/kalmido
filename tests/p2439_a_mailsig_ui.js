@@ -39,7 +39,7 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   check(d.querySelector('#ofm-reply')?.value === 'hallo@nordlicht.example', 'answer address = the company');
   check(!!d.querySelector('.ofm-send')?.nextElementSibling?.textContent, 'one sentence on the sender');
 
-  d.querySelector('[data-ofm="edit"]').click();
+  d.querySelector('[data-ofmsig="edit"]').click();  // 2.500.0 (#4058): its own attribute
   await until(() => d.querySelector('#ofm-text'));
   check(!d.querySelector('#ofm-logo'), 'no logo, no logo switch');
   const ta = d.querySelector('#ofm-text');
@@ -62,6 +62,24 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   d.querySelector('#ofm-reply').value = 'einmal@nordlicht.example';
   const b = w.eval('(md => ofmSendBody(md))')(d.querySelector('.ofm-send').closest('.modal, [role="dialog"]') || d.body);
   check(b.signature === false && b.reply_to === 'einmal@nordlicht.example', 'Send carries the tick and the address ' + JSON.stringify(b));
+
+  // 2.500.0 (#4058): the office's navigation carries data-ofm="<area>"; a click on it moves on and opens no signature editor.
+  // Counted synchronously at the click (the editor is opened by the document's click listener), computer panel and phone list
+  for (const mobile of [false, true]) {
+    const w2 = await boot({hash: 'office', mobile}); const d2 = w2.document;
+    const who = mobile ? 'phone' : 'computer';
+    check(w2.eval('typeof ofmSigModal') === 'function', `${who}: the editor's function exists (the count below means something)`);
+    w2.eval('window.__sig = 0; ofmSigModal = () => { window.__sig++; }');
+    await until(() => d2.querySelector('[data-ofm]'));
+    for (const key of ['cashbook', 'offers']) {
+      const b2 = await until(() => d2.querySelector(`[data-ofm="${key}"]`));
+      b2.click();
+      check(w2.__sig === 0, `${who}: a click on the office's point ${key} opens no signature editor`);
+      await until(() => w2.location.hash.startsWith(`#office/${key}`));
+      if (mobile) { w2.location.hash = '#office'; await until(() => d2.querySelector('.ofmstart [data-ofm]')); }
+    }
+    check(!d2.querySelector('#ofm-text'), `${who}: no editor open after the clicks`);
+  }
 
   console.log(`p2439_a_mailsig_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
