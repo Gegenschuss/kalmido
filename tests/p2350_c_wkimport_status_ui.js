@@ -74,7 +74,10 @@ function holdServer(w, hold) {
   hold.progress = {done: 2, total: 3};
   check(await until(() => /Import running · 66 %/.test(note()?.textContent || '') && dot()?.textContent === '66 %'), 'the note follows the progress');
   w.eval('render()');
-  check(await until(() => note() && dot(), 10), 'after a redraw both are still there ' + !!note() + ' ' + !!dot() + ' ' + [...d.querySelectorAll('[data-sbb="wiki"], [data-go="wiki"]')].map(e => e.parentElement?.id + ':' + e.outerHTML.slice(0, 160)).join(' || '));
+  // #3506: in jsdom a redraw can draw the bar without the dot (V8 in a vm context keeps "typeof wki_dotHtml" of the hot sbb_btnHtml as
+  // undefined when it ran before the lazy module; a real Firefox draws it) and the next poll (1.5 s + the answer) puts it back:
+  // the shared wait, not a window as long as the poll's beat
+  check(await until(() => note() && dot()), 'after a redraw both are still there ' + !!note() + ' ' + !!dot() + ' ' + [...d.querySelectorAll('[data-sbb="wiki"], [data-go="wiki"]')].map(e => e.parentElement?.id + ':' + e.outerHTML.slice(0, 160)).join(' || '));
   // a click on the note opens the window again
   note().click();
   check(await until(() => /Unpacking: 2 of 3 files/.test(box()?.textContent || '')), 'a click on the note opens the window again');

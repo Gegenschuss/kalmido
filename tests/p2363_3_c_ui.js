@@ -91,7 +91,7 @@ const cutUpload = (ck, tid) => new Promise(res => {
     check(/Upload cancelled/.test(await ev(`document.querySelector('#toast')?.textContent || ''`)), 'a toast says so');
 
     // the body is out: no Cancel any more, the answer ends it
-    await ev(`(() => { window.fxSent = false; window.res = null; uploadFiles(${T.id}, [mkf(2, 'later.bin')]).then(x => { window.res = String(x); }); return 1; })()`);
+    await ev(`(() => { S.maxFileMb = 50; window.fxSent = false; window.res = null; uploadFiles(${T.id}, [mkf(2, 'later.bin')]).then(x => { window.res = String(x); }); return 1; })()`);
     check(await ready(ev, `!!window.fxSent && !!document.querySelector('.upbar')`), 'the bar again');
     await ev(`window.fx.upload.onload()`);
     check(await ev(`!document.querySelector('.upbar button')`), 'no Cancel once the body is out');
@@ -102,8 +102,11 @@ const cutUpload = (ck, tid) => new Promise(res => {
 
     // a list drop: Cancel takes the new task with it
     const before = await ev(`S.tasks.size`);
-    await ev(`(() => { window.fxSent = false; window.res = null; filesToTasks(listById(${L.id}), [mkf(2, 'drop.bin')]).then(() => { window.res = 'end'; }); return 1; })()`);
-    check(await ready(ev, `!!window.fxSent && !!document.querySelector('.upbar')`), 'the list drop shows the bar');
+    // #3506: a load of the state (the poll, after a change) puts the server's limit of 1 MB back: S.maxFileMb in the same step as the
+    // upload, and one load on purpose here (the CI's "no bar": upLimit had refused the 2 MB, a toast instead of an upload)
+    await ev(`load().then(() => 1)`);
+    await ev(`(() => { S.maxFileMb = 50; window.fxSent = false; window.res = null; filesToTasks(listById(${L.id}), [mkf(2, 'drop.bin')]).then(() => { window.res = 'end'; }); return 1; })()`);
+    check(await ready(ev, `!!window.fxSent && !!document.querySelector('.upbar')`), 'the list drop shows the bar: ' + await ev(`document.querySelector('#toast')?.textContent || ''`));
     await ev(`document.querySelector('.upbar button').click()`);
     check(await ready(ev, `window.res === 'end'`), 'the list drop ends');
     check(await ev(`S.tasks.size`) === before, 'no task without its file stays behind');

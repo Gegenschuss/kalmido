@@ -312,6 +312,49 @@ r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not sql("SELECT 1 FROM office_letters WHERE org_id=?", (PB,)) and not sql("SELECT 1 FROM doc_fields WHERE ws=?", (f"u{FID}",)),
       "freelancer: undo removes the letters and the fields")
 
+# #3506 (CI 2.496.0: "asks for the recovery key failed The import was interrupted"): the run ends between two looks at its row. The
+# status reads the state again after the look that found no row, so only a run that really ended without its end says "interrupted"
+RACE = r"""
+import json
+from kalmido.core.config import app
+from kalmido.admin import acctimport as ai, wkimport as wi, acctexport as ae, orgexport as ox
+def seq(*v):
+    it = iter(v)
+    return lambda *a, **k: next(it, v[-1])
+res = {}
+with app.test_request_context():
+    ai._st = lambda u, i: {"state": "key"}
+    ai._busy = seq(True, False)
+    res["import ends between the looks"] = ai._view(1, "x", {"state": "checking"})["state"]
+    ai._busy = seq(False)
+    res["import ended before the look"] = ai._view(1, "x", {"state": "checking"})["state"]
+    ai._st = lambda u, i: {"state": "checking"}
+    res["import lost"] = ai._view(1, "x", {"state": "checking"})["state"]
+    wi._st = lambda u, i: {"state": "done"}
+    wi._busy = seq(True, False)
+    res["knowledge ends between the looks"] = wi._view(1, "x", {"state": "running"})["state"]
+    wi._st = lambda u, i: {"state": "running"}
+    wi._busy = seq(False)
+    res["knowledge lost"] = wi._view(1, "x", {"state": "running"})["state"]
+    for name, m, fn in (("account export", ae, ae.umz_status), ("organisation export", ox, ox.ox_status)):
+        m._running = seq(False)
+        m._state = seq({"state": "running"}, {"state": "failed", "error": "other"})
+        res[name + " ended after the read"] = fn(1)["error"] != fn.__globals__["tr"]("The export was interrupted. Please start it again.")
+        m._state = seq({"state": "running"})
+        res[name + " lost"] = fn(1)["state"]
+print(json.dumps(res))
+"""
+r = subprocess.run(["docker", "exec", CT, "python3", "-c", RACE], capture_output=True, text=True)
+try:
+    res = json.loads(r.stdout.strip().splitlines()[-1])
+except (ValueError, IndexError):
+    res = {"error": (r.stdout + r.stderr)[-600:]}
+for name, want in (("import ends between the looks", "checking"), ("import ended before the look", "key"), ("import lost", "failed"),
+                   ("knowledge ends between the looks", "running"), ("knowledge lost", "failed"),
+                   ("account export ended after the read", True), ("account export lost", "failed"),
+                   ("organisation export ended after the read", True), ("organisation export lost", "failed")):
+    check(res.get(name) == want, f"#3506 status: {name}: {want} {res}")
+
 if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
     print(subprocess.run(["docker", "logs", "--tail", "80", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                          text=True).stdout[-8000:], flush=True)
