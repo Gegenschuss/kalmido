@@ -83,7 +83,9 @@ const FEATS = 'cal,collab,comments,contacts,files,clients,office,wiki,sheets,tim
   check(box, 'the section "Areas in this organisation"');
   const ob = box?.querySelector('input[data-wsaorg="office"]');
   check(ob && !ob.checked && ob.disabled, 'office off, a member cannot change it');
-  check(box?.querySelector('input[data-wsaorg="wiki"]')?.checked === true && !box.querySelector('input[data-wsaorg="review"]'), 'the others on, no review');
+  // 2.398.0 (#3406, intended change): review is in every workspace now, an organisation's admins may switch it off too
+  const orv = box?.querySelector('input[data-wsaorg="review"]');
+  check(box?.querySelector('input[data-wsaorg="wiki"]')?.checked === true && orv && orv.checked && orv.disabled, 'the others on, review too (#3406), read-only for a member');
 
   console.log(`p2409_b_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

@@ -493,15 +493,23 @@ function sbb_render(hid) {
 }
 // 2.458.0 (#3880): an area's name never breaks inside a word (app.css .srbn): a word too wide for its icon takes a smaller
 // type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
+// #3506 (#3405): a smaller type can break a name of several words into other lines, so the width is measured again after
+// each step (and scrollWidth counts too) until it fits; one rule of three left "Reisen & Kontakte" 2 px too wide at 320 px
 function sbb_fit() {
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
-    const box = n.clientWidth, rg = document.createRange(); rg.selectNodeContents(n);
-    const need = box ? rg.getBoundingClientRect?.().width : 0;
+    const box = n.clientWidth; if (!box) continue;
+    const wide = () => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
+    let need = wide();
     if (!(need > box + .5)) continue;
-    const px = parseFloat(getComputedStyle(n).fontSize) * box / need;
-    if (px >= 9) n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
-    else { n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
+    let px = parseFloat(getComputedStyle(n).fontSize) * box / need;
+    for (let i = 0; i < 12 && px >= 9; i++) {
+      n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
+      need = wide();
+      if (!(need > box + .5)) break;
+      px = Math.min(px - .2, px * box / need);
+    }
+    if (px < 9 || need > box + .5) { n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
   }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));

@@ -39,7 +39,7 @@ const css = fs.readFileSync(path.join(__dirname, '..', 'static', 'app.css'), 'ut
     // many areas: a long name in place of one of them
     for (const w of [360, 320]) {
       await size(w, 740); await drawer(); await sleep(350);
-      await ev(`(() => { const n = document.querySelector('#side .sbmr .srb[data-sbb="life"] .srbn, #side .sbmr .srb .srbn'); n.textContent = 'Reisen & Kontakte'; return 1; })()`);
+      await ev(`(() => { const n = document.querySelector('#side .sbmr .srb[data-sbb="life"] .srbn, #side .sbmr .srb .srbn'); n.textContent = 'Reisen & Kontakte'; sbb_fit(); return 1; })()`);  // 2.458.0 (#3880): the app fits a name after each draw; the swapped name too (with Notes, #3405, 11 areas = 6 columns at 320 px)
       const g = await ev(GRID);
       check(g.n >= 8 && g.rows <= 2 && g.inside && g.side && g.minH >= 43 && !g.cut.length, `#3739 ${w}: two rows at most, nothing cut ` + JSON.stringify(g));
     }
