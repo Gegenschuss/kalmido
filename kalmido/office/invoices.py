@@ -372,18 +372,20 @@ def inv_before_finalize(c, oid, r, s, pack):
 def inv_check_date(c, oid, r, s):
     """2.38.0 review (GoBD, chronological series): the date of an invoice / credit note being finalised lies neither in
     the future nor before the date of the last finalised document of the same series (organisation, kind, counter
-    period); the due date never lies before the date. BadInput otherwise."""
+    period; 2.502.0, #4080: a shared counter is one series of both kinds, with its period); the due date never lies
+    before the date. BadInput otherwise."""
     d = r["date"]
     if d > local_now().date().isoformat():
         raise BadKey(N_("The date must not lie in the future"))
     due = _col(r, "due_date")
     if due and due < d:
         raise BadKey(N_("The due date must not lie before the date"))
-    scheme = inv_scheme(s, r["kind"])
+    scheme = num_scheme(s, r["kind"])
     period = office_scheme_period(scheme, date.fromisoformat(d))
+    kinds = [k for k in ("invoice", "credit") if num_kind(s, k) == num_kind(s, r["kind"])]
     # 2.144.10 B (#2576): trial documents have their own series; they neither count for real ones nor the other way round
-    for row in c.execute("SELECT date FROM office_docs WHERE org_id=? AND kind=? AND locked_at IS NOT NULL AND id<>? AND date>? AND trial=? "
-                         "ORDER BY date DESC", (oid, r["kind"], r["id"], d, 1 if _col(r, "trial") else 0)):
+    for row in c.execute(f"SELECT date FROM office_docs WHERE org_id=? AND kind IN ({', '.join('?' * len(kinds))}) AND locked_at IS NOT NULL AND id<>? AND date>? AND trial=? "
+                         "ORDER BY date DESC", (oid, *kinds, r["id"], d, 1 if _col(r, "trial") else 0)):
         try:
             if office_scheme_period(scheme, date.fromisoformat(row["date"])) == period:
                 raise BadKey(N_("The date must not lie before the last finalised document of this series ({0})"), row["date"])

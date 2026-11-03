@@ -10,15 +10,19 @@ companies and people only.
    correction scheme still at the pack's value becomes the invoice scheme with _RK, invoice / correction / invoice give
    4_R / 5_RK / 6_R (one counter, no double number, no gap), the number ranges show the corrections' row greyed (shared,
    not settable), the switch is in the office log; off again = the corrections' own counter continues above (never back)
+ - 2.502.0 (#4080) while shared the date check takes both kinds as one series: neither a correction nor an invoice before
+   the last finalised document of the other kind (400, no number used); off again each kind has its own series
 usage: p2433_office_numbers_test.py <datadir>"""
 import os
 import re
 import sys
+from datetime import date, timedelta
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import FAILS, OKS, check, sess  # noqa: E402
+import dbx as dbxm  # noqa: E402
 import requests  # noqa: E402
 
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -28,6 +32,17 @@ D = O + "/docs"
 COMPANY = {"name": "Studio Nordlicht", "street": "Hafenstraße 12", "zip": "20457", "city": "Hamburg", "country": "DE",
            "email": "hallo@nordlicht.example", "tax_number": "12/345/67890", "vat_id": "DE999999999",
            "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
+
+
+
+def dbx(sql, args=()):
+    c = dbxm.connect(os.path.join(sys.argv[1], "tasks.db"), timeout=10)
+    try:
+        c.execute(sql, args)
+        c.commit()
+    finally:
+        c.close()
+
 
 s0 = requests.Session()
 s0.headers.update(H)
@@ -122,14 +137,34 @@ def run(S, who):
        f"#3597: invoice, correction, invoice = 4_R / 5_RK / 6_R: {n4} {n5} {n6}")
     rg = {x["kind"]: x for x in S.get(B + O + "/number-ranges").json()["ranges"]}
     ok(rg["invoice"]["next"] == 7 and rg["credit"]["next"] == 7, f"#3597: one counter for both: {rg['invoice']['next']} {rg['credit']['next']}")
+    # 2.502.0 (#4080): one counter = one chronological series, whichever kind came last
+    day = date.fromisoformat(S.get(B + f"{D}/{i6}").json()["date"])
+    dbx("UPDATE office_docs SET date=? WHERE kind='credit' AND locked_at IS NOT NULL", ((day - timedelta(days=9)).isoformat(),))  # only the invoices are later
+    r = S.post(B + f"{D}/{i6}/credit")
+    ok(r.status_code == 201, "#4080: correction draft " + r.text[:160])
+    late = r.json()["id"]
+    ok(S.patch(B + f"{D}/{late}", json={"date": (day - timedelta(days=1)).isoformat()}).ok, "#4080: older date set")
+    r = S.post(B + f"{D}/{late}/finalize")
+    ok(r.status_code == 400 and "last finalised document" in r.text, f"#4080: a correction before the last invoice: 400 {r.status_code} {r.text[:160]}")
+    ok(S.patch(B + f"{D}/{late}", json={"date": day.isoformat()}).ok, "#4080: date set back")
+    nl = finalize(late)
+    ok(re.fullmatch(r"7_TNP_\S+_RK", nl), f"#4080: with the right date the next number, the refusal used none: {nl}")
+    dbx("UPDATE office_docs SET date=? WHERE id=?", ((day + timedelta(days=1)).isoformat(), late))  # the only later document of the series is the correction
+    i0 = invoice(tnp["id"])
+    r = S.post(B + f"{D}/{i0}/finalize")
+    ok(r.status_code == 400 and "last finalised document" in r.text, f"#4080: an invoice before the last correction: 400 {r.status_code} {r.text[:160]}")
+    ok(S.delete(B + f"{D}/{i0}").ok, "#4080: the refused draft goes")
+    dbx("UPDATE office_docs SET date=? WHERE id=?", (day.isoformat(), late))
     # off again: the corrections' own counter continues above the shared numbers
     r = S.put(B + O + "/settings", json={"credit_shared": 0})
     ok(r.ok and r.json()["settings"]["credit_scheme"] == "{seq}_{kuerzel}_{isodate}_RK", "#3597: off again, the scheme stays " + r.text[:120])
     rg = {x["kind"]: x for x in S.get(B + O + "/number-ranges").json()["ranges"]}
-    ok("shared" not in rg["credit"] and rg["credit"]["next"] == 7, f"#3597: the own counter goes on above the shared numbers: {rg['credit']}")
-    r = S.post(B + f"{D}/{i6}/credit")
-    n7 = finalize(r.json()["id"]) if r.status_code == 201 else ""
-    ok(re.fullmatch(r"7_TNP_\S+_RK", n7), f"#3597: the next correction on its own counter, not back to 1: {n7}")
+    ok("shared" not in rg["credit"] and rg["credit"]["next"] == 8, f"#3597: the own counter goes on above the shared numbers: {rg['credit']}")  # 2.502.0 (#4080): one more shared number above
+    i8 = invoice(tnp["id"])
+    finalize(i8)
+    r = S.post(B + f"{D}/{i8}/credit")
+    n8 = finalize(r.json()["id"]) if r.status_code == 201 else ""
+    ok(re.fullmatch(r"8_TNP_\S+_RK", n8), f"#3597: the next correction on its own counter, not back to 1: {n8}")
     allnums = [d["number"] for k in ("invoice", "credit") for d in S.get(B + D + f"?kind={k}").json()["docs"] if d["number"]]
     ok(len(allnums) == len(set(allnums)), f"#3597: no double number: {allnums}")
 
