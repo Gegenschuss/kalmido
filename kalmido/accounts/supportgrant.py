@@ -155,9 +155,11 @@ SGA_NOT_CONTENT = frozenset((
     "public-link", "public-links", "regenerate", "members", "people", "groups", "owner", "org", "shares", "ext-links", "portal-link",
     "requests", "signoff", "signoffs", "agent", "agents", "ask-agent", "hooks-in", "error-hook", "repos", "folder-repo", "envs", "rules",
     "forms", "e2e", "keys", "lock", "scan-keys", "feed", "fetchers", "rights", "settings", "payonline", "peppol", "mail", "mail-notice",
-    "mail-profile", "receipt-mail", "notify-template", "send", "send-mail", "purge", "anonymize"))
+    "mail-profile", "receipt-mail", "notify-template", "send", "send-mail", "purge", "anonymize", "pay-online", "move-space"))
 SGA_PLAIN = frozenset(("/api/auth/logout", "/api/client-errors", "/api/settings", "/api/me"))  # /api/me: never SGA_GUARD_ME
 SGA_GUARD_ME = {"password", "email", "username", "current_password", "new_password"}
+SGA_GUARD_SCOPE = {"org_id", "org_visibility", "org_edit"}  # review F2: a PATCH that carries contents out of the account's scope
+SGA_SECRET_READ = frozenset(("public-link", "public-links", "feed", "ext-links"))  # review F1: answers with a working link: it would outlive the grant
 SGA_REFUSED = N_("Support access does not hand out sign-in data or add people: the client does that")
 
 
@@ -178,7 +180,12 @@ def sga_is_support(c):
 
 @app.before_request
 def sga_guard():
-    if request.method in ("GET", "HEAD", "OPTIONS") or g.get("auth_via") != "session" or g.get("user") is None:
+    if g.get("auth_via") != "session" or g.get("user") is None or request.method == "OPTIONS":
+        return None
+    if request.method in ("GET", "HEAD"):
+        p = request.path
+        if p.startswith("/api/") and p.rsplit("/", 1)[-1] in SGA_SECRET_READ and sga_is_support(db()):
+            return jsonify(error=tr(SGA_REFUSED), code="support_session"), 403
         return None
     c = db()
     if not sga_is_support(c):
@@ -190,9 +197,9 @@ def sga_guard():
         g.sga_support = True
     p = request.path
     hit = not sga_may_write(p)
-    if not hit and p == "/api/me" and request.method == "PATCH":
+    if not hit and request.method == "PATCH":
         b = request.get_json(silent=True)
-        hit = isinstance(b, dict) and bool(set(b) & SGA_GUARD_ME)
+        hit = isinstance(b, dict) and bool(set(b) & (SGA_GUARD_ME if p == "/api/me" else SGA_GUARD_SCOPE))
     if hit:
         return jsonify(error=tr(SGA_REFUSED), code="support_session"), 403
     return None

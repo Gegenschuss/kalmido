@@ -6,6 +6,7 @@ tenant-matrix: support
  - the consent page of an app (GET + POST /oauth/authorize) is refused, no code, no new agent; the person's own session still gets it
  - a route per way that would outlive the consent (agents, public links, invitations, webhooks, shares, keys, feeds, ...): 403 code
    support_session; the person's own session is not stopped there; a new area is refused too (positive list)
+ - working links stay unread (public link, feed, external links), a PATCH does not carry a project out of the account's scope
  - contents stay editable: a project, a task, a comment; settings; signing out
  - the writes stand on the grant's log, the refused ones too, marked as the support session
 usage: p2500_b_support_test.py <datadir>"""
@@ -87,6 +88,20 @@ r = Fr.post(B + "/api/me/tokens", json={"name": "mine"})
 check(r.status_code != 403, f"frida's own session is not stopped there {r.status_code}")
 r = Fr.put(B + f"/api/lists/{LID}/members", json={"email": "nobody@example.com"})
 check(r.json().get("code") != "support_session", "frida's own session: the project's members")
+
+# ---------------------------------------------------------------- review: working links, the project's scope
+for path in (f"/api/lists/{LID}/public-link", "/api/evcals/1/feed", "/api/files/nodes/1/ext-links", "/api/folders/public-links"):
+    r = X.get(B + path)
+    check(r.status_code == 403 and r.json().get("code") == "support_session", f"support session: GET {path} (a working link) 403, {r.status_code}")
+check(Fr.get(B + f"/api/lists/{LID}/public-link").status_code != 403, "frida's own session reads the project's link state")
+check(X.get(B + f"/api/lists/{LID}").status_code != 403 or X.get(B + "/api/state").ok, "support session: reading stays")
+for key, val in (("org_id", 1), ("org_visibility", "all"), ("org_edit", True)):
+    r = X.patch(B + f"/api/lists/{LID}", json={key: val})
+    check(r.status_code == 403 and r.json().get("code") == "support_session", f"support session: PATCH the project's {key} 403, {r.status_code}")
+check(X.patch(B + f"/api/lists/{LID}", json={"name": "Help project 2"}).ok, "support session: renames the project")
+for meth, path in (("put", "/api/office/docs/1/pay-online"), ("post", "/api/files/nodes/1/move-space")):
+    r = getattr(X, meth)(B + path, json={})
+    check(r.status_code == 403 and r.json().get("code") == "support_session", f"support session: {meth.upper()} {path} 403, {r.status_code}")
 
 # ---------------------------------------------------------------- the consent page of an app
 cl = requests.post(B + "/oauth/register", json={"redirect_uris": [CB], "client_name": "Test Connector"}).json()
