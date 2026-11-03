@@ -541,7 +541,8 @@ docker compose up -d kalmido
 ## Backup and encryption
 
 - **In-app backups (2.37.0).** *Back up now* and the automatic backups write a zip with a `pg_dump` of the database
-  (`kalmido.dump`), the attachments, the office files and a manifest with checksums (format 2); restoring runs in
+  (`kalmido.dump`), the small attachments and office files and a manifest with checksums (format 3, 2.432.0). Files from
+  64 KiB on lie once in `backups/.store`, **the zip alone is not complete**: see *Disk space and passphrase* below; restoring runs in
   maintenance mode with a safety backup first. Backups from before 2.37 (SQLite, a `tasks.db` in the zip) can
   still be restored: the database file goes through the same move to PostgreSQL as an upgrade. Since 2.48 the archive
   also holds the file store (`attachments/files/<id>/`, every version) and the project files (`attachments/lists/<id>/`,
@@ -580,7 +581,7 @@ docker compose up -d kalmido
   password revoked after the backup was written revoked (the server notes what was revoked; a restore onto a fresh server
   or of the safety backup keeps every token the backup holds); the sessions end as before.
 
-- **The server key is part of every backup (2.359.0).** A backup holds the data, never the server key
+- **The server key is not part of any backup (2.359.0).** A backup holds the data, never the server key
   (`KALMIDO_SECRET_KEY` or `secret/kalmido.key`), on purpose: a backup that carries its own key protects nothing. Keep a
   copy of the key apart from the backups (a password manager). To restore on another server (a move, a new disk, a lost
   server), put the old key in place **before the new server's first start**: in `.env` as `KALMIDO_SECRET_KEY=…`, or as the
@@ -596,9 +597,14 @@ docker compose up -d kalmido
   the passphrase was entered again).
 
 - **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
-  archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
-  the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of every restore,
-  so plan roughly 22 times the size of one backup (the backup page shows the size of each archive and the free space).
+  archive holds the database and the small files; attachments and office files from 64 KiB on (`KALMIDO_BACKUP_SHARED_MIN`)
+  lie once in the hidden folder `backups/.store`, however many archives refer to them (2.432.0). **An archive alone is
+  not complete:** without its shared files the larger attachments are missing. A complete file comes from *Download* or
+  from `bkstore.py assemble` (see [A copy of the backup folder elsewhere](#database-postgresql)); copy the folder only with
+  `.store`. With the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of
+  every restore, so plan the size of the attachments once plus roughly 22 times the database (the backup page shows the
+  size of each archive and the free space). A restore takes at most `KALMIDO_BACKUP_MAX_MB` (default 4096 MB, upload and
+  unpacked, shared files included) and refuses a larger backup with a message; set it higher on the restoring server.
   On a small disk keep fewer of them (Settings > Administration > Whole server > Backups > *Keep*) or put the backup folder on another
   disk with `KALMIDO_BACKUP_DIR`; the backup page warns once less than about three more archives fit. Without *Encrypt
   backups* the archives are plain zips: anyone who can read the backup folder (or a copy of it) reads every task, file and
@@ -626,7 +632,7 @@ docker compose up -d kalmido
 - **Encryption at rest.** Put the data disk on LUKS (or your platform's disk encryption) and keep the key off the
   server. For unattended reboots, let the server unlock from a second machine (a key fetched over the network, for
   example with clevis / tang), so a stolen disk alone is unreadable.
-- **Offsite backups by pull.** Let a second machine pull the backups (the server cannot delete them), encrypt them
+- **Offsite backups by pull.** Let a second machine pull the backup folder **with `.store`** (the server cannot delete them), encrypt them
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
 - **Off-site target (2.143.0).** Settings > Administration > Server > *Off-site backup*: one target per server --
   S3-compatible storage (endpoint, region, bucket, folder, access key and secret key; requests signed with Signature V4;
@@ -637,6 +643,7 @@ docker compose up -d kalmido
   only this host key is accepted (*Forget fingerprint* after a planned change of the server). The image ships the `sftp`
   program (openssh-client); a server run outside the image needs it on the `PATH`.
   - Only encrypted backups are uploaded: the target cannot be switched on without *Encrypt backups* and its passphrase.
+    The shared files go up first, as `kalmido-blob-…` files next to the backups (2.432.0).
   - After every backup (automatic or *Back up now*; not the safety copies of a restore) the backup thread uploads the
     newest one, checks its size on the target (S3: also `Content-MD5` and the signed SHA-256 of the body) and keeps the
     newest N backups there (default: the daily count kept locally); older files of Kalmido's backup name pattern are
@@ -652,7 +659,9 @@ docker compose up -d kalmido
     and *Upload now* ask for the password (and second factor) once more; a sign-in through a login provider confirms
     there. A restore keeps the current off-site settings. On a hosted instance the target must be a public `https://`
     address (no private, loopback or link-local addresses; checked on saving and on every connection).
-  - Restoring from the target: download the backup there and use *Restore from a file* (or copy it into the backup folder).
+  - Restoring from the target: download the backup **and the `kalmido-blob-…` files** there, assemble one complete file
+    ([A copy of the backup folder elsewhere](#database-postgresql)) and use *Restore from a file*. The backup alone is not
+    complete: the restore then stops with a message that shared files are missing.
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
 - **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 52 weeks (an older, higher setting
@@ -1939,8 +1948,10 @@ Notes:
 **What a backup archive holds:** `kalmido.dump`, `manifest.json`, `office/<organisation>/` and below `attachments/`:
 `<task>/` for task attachments; the folders `avatars/`, `listicons/`, `docthumbs/`, `listheads/` and `bookmarks/` with
 their files directly inside; the folders `files/`, `lists/`, `budget/`, `wiki/`, `tchat/`, `sheets/` and `tplfiles/` with one folder per
-entry; and `chat/<agent>-<person>/`. Without the app: unpack `attachments/` to `./data/attachments` and `office/` to
-`./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
+entry; and `chat/<agent>-<person>/`. Files from 64 KiB on are not in the zip of the backup folder but in `backups/.store`.
+Without the app: **first make one complete file** with the *Download* button or `bkstore.py assemble`
+([A copy of the backup folder elsewhere](#database-postgresql)), otherwise all larger attachments are lost without a warning. Unpack that
+file's `attachments/` to `./data/attachments` and `office/` to `./data/office`, restore the dump with `PGOPTIONS="-c app.role=system"` as in the backup section above. Restoring keeps
 the backup settings (`bk_` keys) of the running server; every other setting comes from the backup.
 <!-- /backup-folders -->
 
@@ -2421,7 +2432,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
 | `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox (2.142.0: everyone can also set an own share inbox under *Settings > Notifications*; this variable stays the fallback) |
 | `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
-| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
+| `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everything encrypted with it is lost for good (attachments, private files, organisation files, office documents, see [Moving to a new server](#moving-to-a-new-server)) and everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
 | `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
 | `KALMIDO_SETUP_CODE` | | 2.45.0: empty = while no account exists the server prints a one-time setup code into its log and the setup page asks for it. **Only for tests and automation:** a fixed code, or `off` (no code: whoever opens the page first becomes the admin) |
 | `TASKS_MAX_FILE_MB` | `50` | Maximum size per attachment (task and comment files) |
