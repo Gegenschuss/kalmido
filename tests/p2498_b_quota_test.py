@@ -94,7 +94,7 @@ check((ics, hs) == (ics_up, hs_up), f"#3884: upload and watchdog measure the sam
 check(A.patch(B + f"/api/users/{FID}", json={"storage_quota_mb": 1}).ok, "1 MB")
 L2 = Fr.post(B + "/api/lists", json={"name": "Shed"}).json()["id"]
 check(head(Fr, L2).ok, "there is room")
-dbx("UPDATE lists SET icon_size=? WHERE id=?", (MB - used(Fr), L2))  # the rest of the 1 MB as a measured picture
+dbx("UPDATE lists SET icon='u:abcdefgh', icon_size=? WHERE id=?", (MB - used(Fr), L2))  # the rest of the 1 MB as a measured picture
 check(used(Fr) == MB, "the storage is exactly full")
 r = icon(Fr, L)
 check(r.ok, f"#3884: replacing a picture that counts here still fits {r.status_code} {r.text[:200]}")
