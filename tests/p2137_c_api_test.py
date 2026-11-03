@@ -519,7 +519,7 @@ PB = one("SELECT id FROM orgs WHERE personal_of=?", (ALICE,))
 check(PL and one("SELECT COUNT(*) FROM notes WHERE list_id=?", (PL,)) == 1 and one("SELECT COUNT(*) FROM forms WHERE list_id=?", (PL,)) == 1,
       "private: project note + form on the private list")
 check(T("SELECT user_id FROM time_entries WHERE list_id=?", (PL,)) == [(ALICE,)], "private: only alice's time entry")
-check(one("SELECT COUNT(*) FROM hub_absences WHERE org_id=?", (PB,)) == 0 if PB else True, "private: nobody else's absence in alice's own office")
+check(one("SELECT COUNT(*) FROM hub_absences a JOIN orgs o ON o.id=a.org_id WHERE o.personal_of=?", (ALICE,)) == 0, "private: nobody else's absence in alice's own office")  # 2.501.0 (#4296): no `if PB else True`
 check(one("SELECT COUNT(*) FROM nl_conns WHERE owner_id=? AND org_id IS NULL", (ALICE,)) == 1, "private: the newsletter connection is alice's")
 check(one("SELECT COUNT(*) FROM portal_tickets WHERE list_id=? AND org_id IS NULL AND owner_id=?", (PL, ALICE)) == 1, "private: the customer report")
 check(T("SELECT color FROM orgs WHERE personal_of=?", (ALICE,)) in ([], [("",)]), "private: no organisation settings")

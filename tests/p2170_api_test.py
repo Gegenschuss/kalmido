@@ -222,7 +222,8 @@ check(AG.get(f"/team/rooms/{DM}/messages").status_code == 404, "v1: the agent ca
 rd = A.post(B + "/api/me/tokens", json={"name": "readonly", "scopes": ["read"]}).json()["token"]
 r = Api(rd).post(f"/team/rooms/{RID}/messages", json={"body": "x"})
 check(r.status_code == 403 and r.json()["error"].get("required_scope") == "comments", "v1: writing needs the scope comments")
-check(all(p in spec["paths"] or True for p in ("/team/rooms",)) and "/team/rooms/{id}/messages" in requests.get(B + "/api/v1/openapi.json").json()["paths"], "OpenAPI documents the team chat")
+v1paths = requests.get(B + "/api/v1/openapi.json").json()["paths"]  # 2.501.0 (#4296): "/team/rooms" was `... or True`
+check("/team/rooms" in v1paths and "/team/rooms/{id}/messages" in v1paths, "OpenAPI documents the team chat")
 
 # ================================================================== #443 e-mail
 j = A.get(B + "/api/me/mail").json()

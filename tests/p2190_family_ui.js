@@ -301,7 +301,7 @@ const FAM = 'cal,habits,comments,collab,family';
     check(d.querySelector('.tour [data-tpurpose="family"]').classList.contains('on'), 'tour: Family picked');
     click(w, d.querySelector('.tour [data-tour="next"]'));
     check(await until(async () => (await call('GET', '/api/state', null, CN)).settings.features.split(',').includes('family'), 60), 'tour: leaving the first card sets the purpose');
-  } else check(true, 'tour not offered to this account (sample_ask off): skipped');
+  } else check(false, 'tour: no purpose card for a new account');  // 2.501.0 (#4296): was check(true)
   w.close();
 
   // ================= Firefox: layout, touch, axe

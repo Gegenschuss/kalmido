@@ -200,7 +200,7 @@ const V = B + 'api/v1';
   if (w.eval(`!!LY.project && !!S.povD?.[${SW}]?.j`)) {
     w.eval(`lyOpen('project', true)`); await until(() => d.querySelector('.lyed[data-lyed="project"] .lycanvas .lyedb'));
     check(d.querySelectorAll('.lyed[data-lyed="project"] .lycanvas .lyedb').length > 2, '#1097: the project page too');
-  } else check(true, 'project page not loaded in jsdom (checked in Firefox)');
+  } else check(false, '#1097: the project page did not load');  // 2.501.0 (#4296): was check(true)
   w.close();
 
   // ================= Firefox

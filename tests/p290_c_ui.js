@@ -51,8 +51,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // undo
   check(await until(() => /Tax dates saved/.test(d.body.textContent), 30), 'a toast with undo');
   const ub = [...d.querySelectorAll('.toast button, #toast button, .toast .undo, [data-toast-undo]')][0];
-  if (ub) { ub.click(); check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'none', 40) && await until(() => w.eval("TXD.data?.ustva === 'none'")), 'undo: back to none, the task ended'); }
-  else check(true, 'undo button not found by selector (covered by the API test)');
+  check(ub, 'the toast has its undo button');  // 2.501.0 (#4296): no button used to pass
+  ub?.click(); check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'none', 40) && await until(() => w.eval("TXD.data?.ustva === 'none'")), 'undo: back to none, the task ended');
   // lead days
   mount();
   const lead = d.querySelector('#txd-lead'); lead.value = '40';

@@ -148,7 +148,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   d.querySelector('.dcust li').dispatchEvent(new w.KeyboardEvent('keydown', {key: 'ArrowDown', altKey: true, bubbles: true}));
   const vt = await until(async () => { const s = (await call('GET', '/api/state')).settings.view_today; return s && JSON.parse(s).order[1] === first ? JSON.parse(s) : null; });
   check(vt, '#1063: Alt + ↓ moves a block, saved in view_today ' + JSON.stringify(vt));
-  check(/Moved down/.test(d.querySelector('#srlive')?.textContent || '') || true, 'announced');
+  check(await until(() => /Moved down/.test(d.querySelector('#srlive')?.textContent || '')), 'announced: ' + d.querySelector('#srlive')?.textContent);  // 2.501.0 (#4296): no `|| true`
   w.eval(`lyOpen('today', false)`); await sleep(200);
   check(d.querySelector('.lyb[data-lyk="tasks"]'), '#1063: Today renders again after Done');
   w.close();

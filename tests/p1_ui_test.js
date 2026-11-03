@@ -259,7 +259,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
   const scope = d.querySelector('#s-icalscope'); scope.value = 'mine'; scope.dispatchEvent(new w.Event('change', {bubbles: true}));
   await until(async () => (await call('GET', '/api/state')).settings.ical_scope === 'mine');
   check((await call('GET', '/api/state')).settings.ical_scope === 'mine', 'scope saved at once (1.5)');
-  check(/How to subscribe/.test(d.body.textContent) || true, 'instructions present');
+  check(/How to subscribe/.test(d.body.textContent), 'instructions present');  // 2.501.0 (#4296): no `|| true`
   w.close();
 
   check(!errs.length, 'no script errors: ' + errs.slice(0, 3).join(' | '));

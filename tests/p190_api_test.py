@@ -164,7 +164,7 @@ check(D.get(B + "/api/me").json()["avatar"] == "/static/avatars/robot.svg", "dav
 # deleting a user removes the photo
 r = C.post(B + "/api/me/avatar", files={"file": ("me.jpg", jpeg_with_exif(200, 200, 1), "image/jpeg")})
 check(r.ok and len(os.listdir(os.path.join(DATA, "attachments", "avatars"))) == 1, "carol has a photo")
-assert A.delete(B + f"/api/lists/{L}/members/{ids['carol']}").ok or True
+check(A.delete(B + f"/api/lists/{L}/members/{ids['carol']}").ok, "carol leaves the shared list first")  # 2.501.0 (#4296): was `.ok or True`
 check(A.delete(B + f"/api/users/{ids['carol']}").ok and not os.listdir(os.path.join(DATA, "attachments", "avatars")), "user deleted: photo file gone")
 
 # ================================================================== tags

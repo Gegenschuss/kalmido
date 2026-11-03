@@ -217,14 +217,12 @@ check("same time" in src["writeback_error"] and src["status"] == "ok", "the sour
 lid = occs()["wb-c1|birthday"]["list_id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 r = Fr.put(B + f"/api/lists/{lid}/members", json={"user_id": ALICE, "role": "edit"})
-if r.ok:
-    settle()
-    n4, c1_now = len(puts()), card("u", "c1.vcf")
-    patch(occs()["wb-c1|birthday"], {"due": nxt(4, 9), "_act": "occ_date"}, A)
-    settle()
-    check(len(puts()) == n4 and card("u", "c1.vcf") == c1_now, "a change by another member is not written into the owner's address book")
-else:
-    print("note: sharing the list failed, member case skipped:", r.status_code, r.text[:200])
+check(r.ok, f"the list is shared with another member {r.status_code} {r.text[:200]}")  # 2.501.0 (#4296): a failure used to skip the case with a print
+settle()
+n4, c1_now = len(puts()), card("u", "c1.vcf")
+patch(occs()["wb-c1|birthday"], {"due": nxt(4, 9), "_act": "occ_date"}, A)
+settle()
+check(len(puts()) == n4 and card("u", "c1.vcf") == c1_now, "a change by another member is not written into the owner's address book")
 
 # ---- a read-only mirror and a book that answers 403
 r = Fr.post(B + "/api/family/contacts", json={"url": URL, "username": "m", "password": PW})

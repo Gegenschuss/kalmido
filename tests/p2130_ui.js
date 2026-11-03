@@ -478,7 +478,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
       check(s300 < k0.col * .9 && s1200 > s300, `904 A4: edge scroll: after 300 ms ${s300} px (< 1 column of ${Math.round(k0.col)}), then on to ${s1200}`);
       const moved = await ev(`fetch('/api/state', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.tasks.find(t => t.id === ${k0.id}).section_id)`);
       check(moved !== k0.sec && moved !== undefined, '904 A4: the card was dropped into a column (not discarded): section ' + moved);
-    } else check(true, '904 A4: board fits, no edge scroll needed');
+    } else check(false, '904 A4: the board fits, the edge scroll was not tested (the fixture needs more columns)');  // 2.501.0 (#4296): was check(true)
     await shot('p2130-kanban-904-dark-fr.png');
     // A15: the sidebar can be folded away; the (i) and the logo in the accent
     const sf = await ev(`(() => { const b = document.querySelector('#side .sbbhide, #side .sfold'); if (!b) return null; b.click(); return new Promise(r => setTimeout(() => r({rail: document.querySelector('#app').classList.contains('side-rail'), logo: getComputedStyle(document.querySelector('.sbrand svg.logo') || document.body).color}), 300)); })()`);  // 2.152.3 (#2619): on a computer (904 px) the fold button is "Hide the panel" (.sbbhide)

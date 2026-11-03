@@ -84,7 +84,7 @@ const CARD = 'BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ui-c1\r\nFN:Erik Beispiel\r\nBDA
   await until(() => w.eval('typeof famDetailHtml') === 'function', 40);
   const html = id => w.eval(`(() => { const t = taskById(${id}); return t ? famDetailHtml(t, listById(t.list_id), false) : 'missing'; })()`);
   check(fromBook && /id="d-fdate"/.test(html(fromBook.id)), 'a birthday from the address book: the date field');
-  check(occ.id ? !/id="d-fdate"/.test(html(occ.id)) : true, 'a birthday made by hand: no date field ' + JSON.stringify(occ).slice(0, 120));
+  check(occ.id && !/id="d-fdate"/.test(html(occ.id)), 'a birthday made by hand: no date field ' + JSON.stringify(occ).slice(0, 120));
   w.close();
 
   console.log(`p2140_d_ui: ${ok} ok, ${F.length} failed`);

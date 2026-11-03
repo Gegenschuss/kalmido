@@ -240,8 +240,8 @@ check(A.put(B + f"/api/lists/{P}/members", json={"user_id": Bo.get(B + "/api/sta
 check(ask(Bo, agent_id=AG, list_id=P, branch="r").status_code in (403, 404), "#1201: a viewer cannot ask for ideas")
 J5 = ask(A, agent_id=AG, list_id=P, branch="r").json()["id"]
 A.delete(B + f"/api/lists/{P}/members/{AG}")
-if agents_for(A, P) == []:
-    check(answer(AGS, J5, {"items": [{"title": "Late"}]}).status_code == 403, "#1201: the list no longer shared: 403")
+check(agents_for(A, P) == [], f"#1201: no agent to ask once the list is no longer shared {agents_for(A, P)}")  # 2.501.0 (#4296): was `if ...:` around the next check
+check(answer(AGS, J5, {"items": [{"title": "Late"}]}).status_code == 403, "#1201: the list no longer shared: 403")
 
 # ================================================================ a freelancer: five levels + ideas in the private workspace
 FID, Fr = freelancer(B, A)

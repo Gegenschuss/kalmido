@@ -341,14 +341,12 @@ check(r.ok, "moved into the organisation " + r.text[:200])
 check(pub(MP).status_code == 404 and not dbx("SELECT 1 FROM fs_ext_links WHERE node_id=?", (MV,)), "the move ended the link")
 
 # ---- the folder ZIP (files/bulk.py of part A; joined after the merge)
+# 2.501.0 (#4296): files/bulk.py is in; a 404 here used to print "skip" and pass
 r = pub(f"{FP}/zip")
-if r.status_code == 404 and "Download all as ZIP" not in pub(FP).text:
-    print("skip: folder ZIP (files/bulk.py not in this branch)")
-else:
-    check(r.status_code == 200 and r.content[:2] == b"PK" and "attachment" in r.headers.get("Content-Disposition", ""), "ZIP of the folder")
-    check(pub(f"{FP}/zip?p={OUT}").status_code == 404, "ZIP: nothing outside the tree")
-    # 2.112.1 (#2058, review): one history line for the ZIP (on the folder), not one per file
-    check(dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='ext_download'", (F,))[0][0] >= 1, "ZIP: history line on the folder")
+check(r.status_code == 200 and r.content[:2] == b"PK" and "attachment" in r.headers.get("Content-Disposition", ""), f"ZIP of the folder {r.status_code}")
+check(pub(f"{FP}/zip?p={OUT}").status_code == 404, "ZIP: nothing outside the tree")
+# 2.112.1 (#2058, review): one history line for the ZIP (on the folder), not one per file
+check(dbx("SELECT COUNT(*) FROM fs_log WHERE node_id=? AND action='ext_download'", (F,))[0][0] >= 1, "ZIP: history line on the folder")
 
 # ---- the boundary check, cascade, rollback
 check(not dbx("SELECT x.id FROM fs_ext_links x JOIN fs_nodes n ON n.id=x.node_id WHERE x.org_id IS DISTINCT FROM n.org_id"),

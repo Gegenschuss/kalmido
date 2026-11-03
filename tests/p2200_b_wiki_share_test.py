@@ -125,7 +125,7 @@ check(Gi.get(B + f"/api/wiki/pages/{SECRET}").status_code == 404, "a page outsid
 check(Gi.patch(B + f"/api/wiki/pages/{P1}", json={"body": "changed"}).status_code == 403, "view: no change")
 check(Gi.post(B + "/api/wiki/shared/pages", json={"folder_id": FA, "name": "New"}).status_code == 403, "view: no new page")
 sr = Gi.get(B + "/api/wiki/search", params={"q": "Secret"})
-check(sr.status_code in (200, 404) and SECRET not in [p["id"] for p in (sr.json().get("pages", []) if sr.ok else [])], "search finds no hidden page")
+check(sr.status_code == 200 and SECRET not in [p["id"] for p in sr.json().get("pages", [])], f"search finds no hidden page {sr.status_code}")  # 2.501.0 (#4296): was `in (200, 404)`
 # edit
 check(A.patch(B + f"/api/files/shares/{SID}", json={"role": "edit"}).ok, "the share becomes edit")
 check(Gi.patch(B + f"/api/wiki/pages/{P1}", json={"body": "changed by gina"}).ok, "edit: the guest changes the text")
@@ -154,10 +154,9 @@ check(Gi.post(B + "/api/wiki/shared/pages", json={"folder_id": folder_of(A, SP, 
 check({f["name"] for f in mine(Gi)["folders"]} == {"Customer A", "Drafts"}, "the subfolder is listed")
 # the earlier shares stay: a public link of the folder, listed for the dialog's section
 r = A.post(B + "/api/wiki/shares", json={"space": SP, "folder": "Internal/Customer A", "kind": "link"})
-check(r.status_code in (201, 409), f"a public link of the folder (or links off) {r.status_code}")
-if r.status_code == 201:
-    j = A.get(B + "/api/wiki/shares", params={"space": SP, "folder": "Internal/Customer A"}).json()
-    check(any(s["kind"] == "link" for s in j["shares"]), "the public link is listed")
+check(r.status_code == 201, f"a public link of the folder {r.status_code} {r.text[:120]}")  # 2.501.0 (#4296): 409 (links off) used to pass and skip the next one
+j = A.get(B + "/api/wiki/shares", params={"space": SP, "folder": "Internal/Customer A"}).json()
+check(any(s["kind"] == "link" for s in j["shares"]), "the public link is listed")
 # moving out / withdrawing
 check(A.patch(B + f"/api/files/nodes/{node(A, P2)}", json={"parent_id": folder_of(A, SP, "Internal")}).ok, "the page moved out of the folder")
 check(Gi.get(B + f"/api/wiki/pages/{P2}").status_code == 404 and P2 not in [p["id"] for p in mine(Gi)["pages"]], "moved out = gone at once")
@@ -174,12 +173,11 @@ check(Gi.patch(B + f"/api/wiki/pages/{P1}", json={"body": "text only"}).ok, "rev
 A.delete(B + f"/api/files/shares/{r.json().get('id')}")
 # tenant-matrix: wiki -- a person of another organisation gets no share
 r = A.post(B + "/api/admin/orgs", json={"name": "Beta"})
-check(r.ok, f"setup: a second organisation {r.status_code} {r.text[:200]}")
-if r.ok:
-    OB = r.json().get("id")
-    Ot = person("otto", "member", OB)
-    check(share(A, FA, uid["otto"]).status_code == 409, "tenant-matrix: wiki -- no share with a person of another organisation")
-    check(Ot.get(B + f"/api/wiki/pages/{P1}").status_code == 404, "tenant-matrix: wiki -- the other organisation sees nothing")
+assert r.ok, f"setup: a second organisation {r.status_code} {r.text[:200]}"  # 2.501.0 (#4296): no second organisation used to skip the tenant cases
+OB = r.json().get("id")
+Ot = person("otto", "member", OB)
+check(share(A, FA, uid["otto"]).status_code == 409, "tenant-matrix: wiki -- no share with a person of another organisation")
+check(Ot.get(B + f"/api/wiki/pages/{P1}").status_code == 404, "tenant-matrix: wiki -- the other organisation sees nothing")
 
 # ================================================================ freelancer-matrix: wiki (a person without an organisation)
 FID, Fr = freelancer(B, A)
@@ -233,12 +231,13 @@ TEAM = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_nam
 A.post(B + "/api/admin/groups", json={"name": "Crew"})
 t = Fr.get(B + f"/api/files/nodes/{FF}/share-targets").json()
 ids = {x["id"] for x in t.get("agents", [])}
-check(OWN.status_code != 201 or OWN.json()["id"] in ids, f"review B5: her own agent is offered {ids}")
-check(TEAM.status_code != 201 or TEAM.json()["id"] not in ids, "review B5: an agent without an owner is not offered")
+# 2.501.0 (#4296): both agents must exist, a refused create used to pass all of this
+assert OWN.status_code == 201 and TEAM.status_code == 201, f"setup: the two agents {OWN.status_code} {OWN.text[:120]} {TEAM.status_code} {TEAM.text[:120]}"
+check(OWN.json()["id"] in ids, f"review B5: her own agent is offered {ids}")
+check(TEAM.json()["id"] not in ids, "review B5: an agent without an owner is not offered")
 check(t.get("groups") == [], f"review B6: no groups in private knowledge {t.get('groups')}")
-if TEAM.status_code == 201:
-    r = Fr.post(B + f"/api/files/nodes/{FF}/shares", json={"agent_id": TEAM.json()["id"], "role": "view"})
-    check(r.status_code == 409, f"review B5: a share with it is refused ({r.status_code})")
+r = Fr.post(B + f"/api/files/nodes/{FF}/shares", json={"agent_id": TEAM.json()["id"], "role": "view"})
+check(r.status_code == 409, f"review B5: a share with it is refused ({r.status_code})")
 # locked later: the old share gives nothing, a new one is 409, nothing is deleted
 sql("INSERT INTO wiki_spaces(owner_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (FID,), write=True)
 check(Bo.get(B + f"/api/wiki/pages/{FP}").status_code == 404 and mine(Bo)["pages"] == [], "a space locked later: the old share gives nothing")

@@ -136,7 +136,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   w.eval(`go('l/${P}')`); await sleep(300);
   const dq = d.querySelector('#view .qadd.dock #qinput');
   if (dq) { input(w, dq, 'Call tomorrow 3pm !high'); await sleep(100); check(dq.closest('.qadd.dock').classList.contains('has-text'), 'UX-30: the docked bar keeps its chips while it holds text'); }
-  else check(true, 'UX-30: (no docked bar in this jsdom width)');
+  else check(false, 'UX-30: no docked bar in this list');  // 2.501.0 (#4296): was check(true)
   // UX-35: Today
   w.eval(`go('today')`); await sleep(300);
   // 2.31.0 (#1052): grouped by date, the two actions sit in the head of "Overdue" (no line of their own)

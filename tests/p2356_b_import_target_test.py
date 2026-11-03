@@ -7,6 +7,8 @@ the organisation X?" / "Import into your private workspace?"). A static check of
  - discovery: every POST / PUT to an /import route in static/js sits in a block that asks importTargetConfirm, or is a step
    that stores nothing (preview, check, parse, key) or is listed in EXEMPT with the place that asks instead. A new importer
    without the question fails here.
+ 2.501.0 (#4296): this stays a static check on purpose, only reading the source can find an importer nobody wrote a test for;
+ tests/p2501_b_import_target_ui.js checks the behaviour of the four of #2934 (question first, "no" stores nothing).
 usage: p2356_b_import_target_test.py"""
 import os
 import re

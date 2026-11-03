@@ -45,8 +45,7 @@ const FEAT = 'cal,comments,collab';
   const item = await until(() => [...d.querySelectorAll('[role=menuitem]')].find(x => /Pixel/.test(x.textContent)));
   check(item && ![...d.querySelectorAll('[role=menuitem]')].some(x => /Carol/.test(x.textContent)), 'only agents are offered');
   click(w, item);
-  await until(async () => (await call('GET', `/api/tasks/${T}`)).delegate_agent_id === ag);
-  check(true, 'stored');
+  check(await until(async () => (await call('GET', `/api/tasks/${T}`)).delegate_agent_id === ag), 'stored');  // 2.501.0 (#4296): was check(true) after the wait
   await until(() => /Pixel/.test(d.querySelector('#detail .dlg-c')?.textContent || ''));
   click(w, d.querySelector('#detail .dlg-w'));
   await until(() => d.querySelector('#detail .dlg-w.on'));

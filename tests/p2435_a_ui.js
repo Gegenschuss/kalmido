@@ -54,7 +54,7 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,time';
   check(foldBtn(d, 'lists').getAttribute('aria-expanded') === 'false' && /Projects\s*\(2\)/.test(lt) && !d.querySelector('#view .cltable'), '#3600: projects folded with the number in the title: ' + lt);
   check(foldBtn(d, 'month')?.getAttribute('aria-expanded') === 'false' && !d.querySelector('#view .sttiles'), '#3600: time tracking folded');
   check(/Letters\s*\(0\)/.test(foldBtn(d, 'letters').textContent) && foldBtn(d, 'letters').getAttribute('aria-expanded') === 'false', '#3600: letters a block of their own, folded: ' + foldBtn(d, 'letters').textContent);
-  check(keys(d).includes('gendocs') ? foldBtn(d, 'gendocs').getAttribute('aria-expanded') === 'false' : true, '#3600: documents folded');
+  check(foldBtn(d, 'gendocs')?.getAttribute('aria-expanded') === 'false', '#3600: documents folded');  // 2.501.0 (#4296): no `: true`
 
   // ================= fold open / closed, hide: kept per person
   click(w, foldBtn(d, 'lists'));

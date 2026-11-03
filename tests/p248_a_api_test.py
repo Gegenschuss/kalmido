@@ -217,7 +217,8 @@ check(dbx("SELECT owner_id, created_by FROM fs_nodes WHERE id=?", (EF,))[0] == (
 check(A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2000-01-01"}).ok, "expiry in the past")
 check(content(Er, P1).status_code == 404, "expired share: no access")
 check(A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2999-01-01"}).ok and content(Er, P1).ok, "expiry in the future: access")
-check(A.post(B + f"/api/files/nodes/{F1}/shares", json={"user_id": BOB, "role": "view"}).status_code in (201, 409), "bob: a share target or refused")
+r = A.post(B + f"/api/files/nodes/{F1}/shares", json={"user_id": BOB, "role": "view"})  # 2.501.0 (#4296): was `in (201, 409)`
+check(r.status_code == 201, f"bob: a share target of alice's private folder {r.status_code} {r.text[:120]}")
 
 # ---- groups
 F3 = folder(A, "For the group")

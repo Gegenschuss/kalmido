@@ -70,7 +70,7 @@ const TEST_IBAN = 'DE02120300000000202051';
     const warn = md.querySelector('.ofdwarn')?.textContent || '';
     check(/not set up/.test(warn) && !/KALMIDO_SMTP_HOST/.test(warn), '#1368 10: plain hint for people who are no admin: ' + warn.slice(0, 100));
     check(md.querySelector('[data-m="ok"]')?.textContent === 'Download PDF' && d.querySelector('#ofd-s-to').disabled, '#1368 10: without mail the button downloads the PDF, fields locked');
-  } else check(true, 'mail is set up in this container: the send button stays');
+  } else check(md.querySelector('[data-m="ok"]')?.textContent !== 'Download PDF' && !d.querySelector('#ofd-s-to').disabled, '#1368 10: with mail set up the send button stays, the fields open');  // 2.501.0 (#4296): was check(true)
   md.querySelector('[data-m="close"]')?.click();
   w.close();
 

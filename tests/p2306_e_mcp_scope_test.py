@@ -117,5 +117,5 @@ me = Me()
 hidden = [n for n in ("set_deployment", "duplicate_list", "set_task_sprint", "set_list_review", "review_task", "list_documents",
                       "get_document", "update_document") if mcp.tool_allowed(me, n)]
 check(not hidden, f"a read token does not see them: {hidden}")
-check(mcp.tool_allowed(me, "list_tasks") if "list_tasks" in mcp.TOOL_MAP else True, "a read tool stays visible")
+check("list_tasks" in mcp.TOOL_MAP and mcp.tool_allowed(me, "list_tasks"), "a read tool stays visible")  # 2.501.0 (#4296): no `else True`
 sys.exit(done("p2306_e_mcp_scope"))

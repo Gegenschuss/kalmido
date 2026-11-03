@@ -42,8 +42,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(blk().querySelectorAll('.cevrow.cevpast').length === 2 && blk().querySelector('.cevpastl').getAttribute('aria-expanded') === 'true', 'a tap unfolds the two past events (pale)');
   check(blk().querySelector('.ghead .c').textContent.trim() === '3', 'the count is unchanged when unfolded');
   click(w, blk().querySelector('.cevpastl'));
-  await until(() => !blk().querySelector('.cevrow.cevpast'));
-  check(true, 'a second tap folds them again');
+  check(await until(() => !blk().querySelector('.cevrow.cevpast')), 'a second tap folds them again');  // 2.501.0 (#4296): was check(true) after the wait
   // all past: only the line
   setItems([{t: 'Past A', s: -180, e: -120}, {t: 'Past B', s: -90, e: -30}]);
   await until(() => blk() && blk().querySelector('.cevpastl') && !blk().textContent.includes('Running'));

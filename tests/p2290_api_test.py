@@ -249,7 +249,7 @@ A.put(B + "/api/folders/people", json={"folder": "Clients", "user_id": BOB, "rol
 # a list Bob creates in the folder shared with him: stays his, shared with Alice (admin) + the folder's people
 A.put(B + "/api/folders/people", json={"folder": "Clients", "user_id": CAROL, "role": "participant"})
 bl = {l["id"]: l for l in state(Bo)["lists"]}
-check(bl[L1["id"]]["m_folder"] if "m_folder" in bl[L1["id"]] else True, "#929: Bob sees the folder")
+check(bl[L1["id"]]["folder"] == "Clients", f"#929: Bob sees the folder {bl[L1['id']].get('folder')}")  # 2.501.0 (#4296): the state says `folder`, `m_folder` was never there
 sh = state(Bo).get("folders_shared_in") or []
 check(any(x["folder"] == "Clients" and x["owner_id"] == ME["id"] for x in sh), "#929: the state names the folders shared with Bob " + str(sh))
 BL = Bo.post(B + "/api/lists", json={"name": "Bob's", "folder": "Clients"}).json()

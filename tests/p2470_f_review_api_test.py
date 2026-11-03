@@ -37,10 +37,7 @@ def dbx(sql, args=()):
 
 
 def pdf_text(data):
-    try:
-        from pypdf import PdfReader
-    except ImportError:
-        return None
+    from pypdf import PdfReader  # 2.501.0 (#4296): tests/requirements.txt has it; a missing pypdf used to skip the text checks
     return "\n".join(p.extract_text() or "" for p in PdfReader(io.BytesIO(data)).pages)
 
 
@@ -109,9 +106,8 @@ check(sh.get("staff") and not any(k in r_ for r_ in (sh.get("staff") or []) + (s
 A.post(B + f"{D}/{DOC}/status", json={"status": "sent"})
 r = A.get(B + f"{D}/{DOC}/pdf")
 check(r.ok and r.content[:4] == b"%PDF", f"sent quotation with a shoot part: PDF {r.status_code}")
-txt = pdf_text(r.content) if r.ok else None
-if txt is not None:
-    check("Lighting" in txt and "Car" in txt, "PDF of the sent quotation: the shoot rows from the cache")
+txt = pdf_text(r.content)
+check("Lighting" in txt and "Car" in txt, "PDF of the sent quotation: the shoot rows from the cache")
 
 # ---------------------------------------------------------------- #1649 / #1215: percent position in a part, invoice = quotation
 # 2.138.4 (#2252): the Film & Video pack switches handling costs (4 %) on for a new quotation since 2.113.1; this

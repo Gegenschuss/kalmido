@@ -251,7 +251,7 @@ p = calls()[0]["prompt"]
 check("was stopped" in p and "Do not start it again" in p, "a stopped job: a wake run with the hint not to restart it")
 j = mkjob(52, state="done", chat_user=None)
 check(not aj.add_wake(j, "done", "x") and not os.path.exists(os.path.join(r.state_dir, "wakes", "52.json")), "no chat person: no wake run")
-check(any("Job #52" in n for n in r.extras.take_notes()) if r.extras else True, "... a note for the next run instead")
+check(any("Job #52" in n for n in r.extras.take_notes()), "... a note for the next run instead")  # 2.501.0 (#4296): no `if r.extras else True`
 
 # ---- #1445: after a restart a lost job is continued ONCE in the same session
 spawned = []

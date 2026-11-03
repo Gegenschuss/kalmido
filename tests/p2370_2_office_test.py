@@ -5,7 +5,7 @@ Invented companies, people and figures only.
 tenant-matrix: office  freelancer-matrix: office
  - comments: the same client_ref twice = one comment, also over the API (200 the second time), one deleted since gives it free
  - an agent's payment suggestion: the same client_ref twice = one suggestion, also once the invoice is paid
- - a refused mail hands the address counter back; a mail sent counts
+ - a refused mail hands the address counter back; a mail sent counts; marking that fails sends no mail (2.501.0, #4296)
  - a save without expect_updated_at names the positions that stayed (kept_ids)
  - a deleted document: the ref makes a new one; restoring the old one from the trash next to it works
  - time entries whose position goes away are open again, with their billed date gone; the rest of the invoice stays bound
@@ -206,6 +206,33 @@ def mail_case(s, who, cl):
     return inv, addr
 
 
+def sent_to(addr):
+    try:
+        return [x for x in open(os.path.join(DATA, "mail", "out.jsonl"), encoding="utf-8") if addr in x]
+    except FileNotFoundError:
+        return []
+
+
+def marked_before_mail(s, who, cl):
+    """2.501.0 (#4296, was a look at the order of the source lines): a mail out is always marked. Whatever fails in marking - forced
+    here with a database trigger, once on the status and once on the log line - fails while nothing has gone out; a second try
+    with the fault gone sends exactly one mail, which also shows that the stub would have seen it."""
+    for tag, table, when in (("status", "office_docs", "NEW.sent_at IS NOT NULL AND OLD.sent_at IS NULL"), ("log", "office_doc_log", "NEW.action = 'send'")):
+        addr, inv, kind = f"mark-{tag}-{who}@example.com", invoice(s, cl), "UPDATE" if table == "office_docs" else "INSERT"
+        dbx("CREATE FUNCTION p4296_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'marking fails'; END $$ LANGUAGE plpgsql", write=True)
+        dbx(f"CREATE TRIGGER p4296 BEFORE {kind} ON {table} FOR EACH ROW WHEN ({when}) EXECUTE FUNCTION p4296_fail()", write=True)
+        try:
+            r = s.post(B + f"{D}/{inv}/send", json={"to": addr})
+        finally:
+            dbx(f"DROP TRIGGER p4296 ON {table}", write=True)
+            dbx("DROP FUNCTION p4296_fail()", write=True)
+        d = s.get(B + f"{D}/{inv}").json()
+        check(not r.ok and not sent_to(addr) and d["status"] == "issued", f"{who}: marking fails ({tag}): no mail, nothing marked {r.status_code} {d.get('status')} {len(sent_to(addr))}")
+        r = s.post(B + f"{D}/{inv}/send", json={"to": addr})
+        d = s.get(B + f"{D}/{inv}").json()
+        check(r.ok and len(sent_to(addr)) == 1 and d["status"] == "sent", f"{who}: fault gone ({tag}): one mail, marked {r.status_code} {d.get('status')} {len(sent_to(addr))}")
+
+
 def after_stub(s, who, inv, addr):
     r = s.post(B + f"{D}/{inv}/send", json={"to": addr})
     d = s.get(B + f"{D}/{inv}").json()
@@ -231,19 +258,14 @@ for who, s, uid in (("org", A, AID), ("frei", Fr, FID)):
     time_case(s, who, uid, cl)
     ref_case(s, who, cl)
     budget_case(s, who)
-    pending.append((s, who, *mail_case(s, who, cl)))
+    pending.append((s, who, cl, *mail_case(s, who, cl)))
 
 shutil.copy(os.path.join(N, "stub_mail.py"), DATA)
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_mail.py"])
 kt.until(lambda: subprocess.run(["docker", "exec", CT, "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 1025), 1)"],
                                 capture_output=True).returncode == 0, 15)
-for s, who, inv, addr in pending:
+for s, who, cl, inv, addr in pending:
     after_stub(s, who, inv, addr)
-
-# a mail out is always marked: whatever can fail in marking comes before the mail
-src = open(os.path.join(N, "..", "kalmido", "office", "invoices.py"), encoding="utf-8").read()
-fn = src[src.index("def inv_send_mail("):src.index("INV_OWN_TEXT_DAY =")]
-check(fn.index('ofx_log(c, oid, "send"') < fn.index('_mail(m["to"]') and fn.index("UPDATE office_docs SET status") < fn.index('_mail(m["to"]'),
-      "the sending is marked before the mail goes out")
+    marked_before_mail(s, who, cl)
 
 sys.exit(kt.done("p2370_2_office"))

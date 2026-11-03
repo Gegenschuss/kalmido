@@ -423,8 +423,9 @@ out = subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_outpu
 check(out.stdout.strip().endswith("[true, 1, 1]"), f"#3512: the push after the window keeps the counted mention {(out.stdout + out.stderr)[-300:]}")
 got = until(lambda: [x for x in pushes() if x["topic"] == "t-pete" and x["title"] == "Pete assigned subtask" and "mentioned" in x["msg"]], 20)
 check(got, f"#3512: the summary one window later says 'you were mentioned' {[x for x in pushes() if x['topic'] == 't-pete']}")
-check(any(x["topic"] == "t-carol" and "HIDDEN2" not in x["msg"] for x in pushes()) or True, "carol pushes (not asserted)")
-check(any("Hidden task" in json.dumps(n) for n in A.get(B + "/api/news").json()["items"]) or True, "owner feed")
+# 2.501.0 (#4296): were `any(...) or True`
+check(not any(x["topic"] == "t-carol" and "HIDDEN2" in x["msg"] for x in pushes()), "carol's pushes do not name the hidden comment")
+check(any("Hidden task" in json.dumps(n) for n in A.get(B + "/api/news").json()["items"]), "owner feed names the task")
 # reminders: an unassigned task pete created, later moved out of his sight, reminds the owner instead
 A.post(B + f"/api/tasks/{T3}/reopen")
 TR = mk(P, title="Pete reminder", list_id=L)

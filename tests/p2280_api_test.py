@@ -324,8 +324,11 @@ check(BOB in seen(Ca) and CAROL in seen(Bo), "workspaces: now they are connected
 r = Ca.put(B + f"/api/lists/{LB['id']}/members", json={"user_id": BOB, "role": "edit"})
 check(r.status_code == 409 and "not a member of the organisation" in r.text, "workspaces: Beta's list still refuses bob (not a member) " + r.text[:100])
 check(Ca.put(B + f"/api/lists/{LB['id']}/members", json={"user_id": DAVE, "role": "edit"}).ok, "workspaces: ... and takes dave")
-# review 5 / 12: an organisation admin cannot remove the last admin of an organisation
-check(Bo.delete(B + f"/api/orgs/{ORG}/members/1").status_code == 409 if dbx("SELECT COUNT(*) FROM org_members WHERE org_id=? AND role='admin'", (ORG,))[0][0] <= 1 else True, "review 12: the last admin of an organisation cannot be removed")
+# review 5 / 12: the last admin of an organisation cannot give the role up
+# 2.501.0 (#4296): was `... == 409 if <one admin> else True`, with two admins here it checked nothing; Beta has only carol
+r = Ca.put(B + f"/api/orgs/{BETA}/members", json={"user_id": CAROL, "role": "member"})
+check(r.status_code == 409 and dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (BETA, CAROL))[0][0] == "admin",
+      f"review 12: the last admin of an organisation cannot step down {r.status_code} {r.text[:100]}")
 # the cross-tenant matrix: nothing of Beta reaches alice / bob
 # 2.30.0 (#1036, tests/tenant_coverage_test.py): tenant-matrix: aggregate, task, list, news, team, agent, people, org
 TBETA = Ca.post(B + "/api/tasks", json={"title": "Secret Beta plan", "list_id": LB["id"]}).json()["id"]
