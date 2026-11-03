@@ -144,6 +144,28 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
   }
 };
 
+// 2.501.0 (#4282): a click as a person does it: the element comes into view, then the real pointer moves to its middle and presses
+// (input.performActions, so the browser decides what is hit: a dialog in front of it takes the click, a script click would not
+// notice). Pass what firefox() hands the suite. -> {ok, on}: ok = the element itself (or a child) lay under the pointer and was pressed;
+// on = what lay there (something else: nothing is pressed, the suite reports it).
+//   const {realClick} = require('./ff');  const r = await realClick(o, '#side [data-ofm="bank"]');  check(r.ok, r.on);
+module.exports.realClick = async ({cmd, ev, ctx}, sel, {kind = 'mouse'} = {}) => {
+  // the element may still slide in (a drawer): measure until it stands still over two frames, at most 3 s
+  const p = await ev(`(async () => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
+    e.scrollIntoView({block: 'center', inline: 'nearest'});
+    const frame = () => new Promise(r => requestAnimationFrame(r)), at = () => { const r = e.getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; };
+    let a = at(); const end = performance.now() + 3000;
+    for (;;) { await frame(); await frame(); const b = at(), still = Math.abs(a[0] - b[0]) < 0.5 && Math.abs(a[1] - b[1]) < 0.5; a = b; if (still || performance.now() > end) break; }
+    const [x, y] = a, h = document.elementFromPoint(x, y);
+    return {x: Math.round(x), y: Math.round(y), ok: !!h && (h === e || e.contains(h)), on: h ? h.tagName.toLowerCase() + (h.id ? '#' + h.id : '') + (typeof h.className === 'string' && h.className ? '.' + h.className.trim().split(/\\s+/).join('.') : '') : 'nothing at that place'}; })()`);
+  if (!p) return {ok: false, on: `no element ${sel}`};
+  if (!p.ok) return p;  // nothing is pressed: the pointer would hit something else
+  await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'pc', parameters: {pointerType: kind},
+    actions: [{type: 'pointerMove', x: p.x, y: p.y}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
+  await cmd('input.releaseActions', {context: ctx});
+  return {ok: true, on: p.on};
+};
+
 // 2.312.0 A (#3283): click the Undo button of the toast with the EXPECTED text. A hidden toast keeps its old button in the DOM
 // (events.js toast(): only .hidden) and the server saves before the app has the answer, so an older toast's Undo can still be there:
 // wait until #toast is shown, carries `text` (string or RegExp) and has its Undo button, only then click. opts.after: an expression to
