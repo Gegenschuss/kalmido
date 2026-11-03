@@ -68,9 +68,9 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
       await shot(`p2458-${px}-drawer.png`);
     }
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); n.textContent = 'Donaudampfschifffahrtsgesellschaft'; sbb_fit(); return 1; })()`);
-    // 2.499.0 (#4047, replaces the "…" of #3880 on the phone): a word far too long breaks inside the word, all of it to read
-    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); return {cut: n.classList.contains('srcut'), brk: n.style.overflowWrap === 'anywhere', sw: n.scrollWidth, cw: n.clientWidth, sh: n.scrollHeight, ch: n.clientHeight, lines: Math.round(n.getBoundingClientRect().height / parseFloat(getComputedStyle(n).fontSize))}; })()`);
-    check(!lng.cut && lng.brk && lng.sw <= lng.cw + 1 && lng.sh <= lng.ch + 1 && lng.lines >= 2, '#4047: far too long: broken over lines, never "…" ' + JSON.stringify(lng));
+    // 2.499.0 (#4047, replaces the "…" of #3880 on the phone): a word far too long stays whole, its column grows, the row scrolls sideways
+    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'), r = n.closest('.sbmr'), w = document.createRange(); w.selectNodeContents(n); const h = w.getClientRects().length; return {cut: n.classList.contains('srcut'), sw: n.scrollWidth, cw: n.clientWidth, lines: h, rsw: r.scrollWidth, rcw: r.clientWidth, ox: getComputedStyle(r).overflowX}; })()`);
+    check(!lng.cut && lng.sw <= lng.cw + 1 && lng.lines === 1 && lng.rsw > lng.rcw && lng.ox === 'auto', '#4047: far too long: whole, never "…" or split; the row scrolls ' + JSON.stringify(lng));
 
     await nav(B + '#today'); await sleep(300);
     // #3855 at 320 px: the real rules on small pieces of the pages
