@@ -14,17 +14,17 @@ function inlineEditStart(id, at) {
   if (!$(`#view .trow[data-id="${id}"] .ttl`)) return;
   if (S.ie && S.ie.id !== id) inlineEditCommit();
   S.ie = {id, v: t.title};
-  if (at != null) S.ie.s = S.ie.e = ttlRawPos(t.title, at);  // 2.497.0 (#4056)
+  if (at != null) S.ie.s = S.ie.e = ttlRawPos(t.title, at);  // 2.497.0 (#4056): the caret where the double-click was
   inlineEditMount(true);
 }
-// 2.497.0 (#4056): caret offset in the shown title -> in the raw one
+// 2.497.0 (#4056): the caret offset in the shown title (formatting stripped) -> the offset in the raw title of the field
 function ttlRawPos(raw, n) {
   let i = 0, j = 0; const shown = mdPlain(raw);
   if (shown === raw) return Math.min(n, raw.length);
   while (i < raw.length && j < n) { if (raw[i] === shown[j]) j++; i++; }
   return i;
 }
-// caret offset in .ttl's text at a screen point
+// the caret offset in .ttl's text at a screen point (caretPositionFromPoint: Firefox, caretRangeFromPoint: WebKit / Blink)
 function ttlPointPos(ttl, x, y) {
   let node, off;
   if (document.caretPositionFromPoint) { const c = document.caretPositionFromPoint(x, y); if (c) { node = c.offsetNode; off = c.offset; } }
@@ -34,8 +34,9 @@ function ttlPointPos(ttl, x, y) {
   try { r.setEnd(node, off); } catch { return null; }
   return r.toString().length;
 }
+// the field grows with the text: as many lines as the title has in the row (no scrolling sideways, the start stays visible)
 function ttlinFit(i) { if (!i) return; i.style.height = 'auto'; i.style.height = i.scrollHeight + 'px'; }
-// measured again when its width changes (the row's layout settling, the task panel)
+// measured again whenever its width changes: the row's own layout settles after the mount, the task panel or the window narrows the list
 function ttlinWatch(i) {
   if (typeof ResizeObserver === 'undefined') return;
   let w = -1;
@@ -48,8 +49,9 @@ function inlineEditMount(focus) {
   if ($('.ttlin', ttl)) return;
   row.classList.add('iedit'); row.removeAttribute('draggable');
   ttl.removeAttribute('role'); ttl.removeAttribute('tabindex');  // 2.16.0 (#473): no field inside a button
-  // 2.497.0 (#4056): wraps like the title; pasted line breaks become spaces
-  ttl.innerHTML = `<textarea class="ttlin" rows="1" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off">${esc(ie.v)}</textarea>`;
+  // 2.497.0 (#4056): a wrapping field in the title's own font and lines instead of a one-line input (that pushed the start
+  // out of view and collapsed a four-line row to one line); a title has no line breaks: pasted ones become spaces
+  ttl.innerHTML = `<textarea class="ttlin" rows="1" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off" spellcheck="true">${esc(ie.v)}</textarea>`;
   const i = $('.ttlin', ttl);
   ttlinFit(i); ttlinWatch(i);
   i.addEventListener('input', () => {
