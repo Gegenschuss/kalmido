@@ -69,7 +69,7 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
     }
     await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'); n.textContent = 'Donaudampfschifffahrtsgesellschaft'; sbb_fit(); return 1; })()`);
     // 2.499.0 (#4047, replaces the "…" of #3880 on the phone): a word far too long stays whole, its column grows, the row scrolls sideways
-    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'), r = n.closest('.sbmr'), w = document.createRange(); w.selectNodeContents(n); const h = w.getClientRects().length; return {cut: n.classList.contains('srcut'), sw: n.scrollWidth, cw: n.clientWidth, lines: h, rsw: r.scrollWidth, rcw: r.clientWidth, ox: getComputedStyle(r).overflowX}; })()`);
+    const lng = await ev(`(() => { const n = document.querySelector('#side .sbmr .srbn'), r = n.closest('.sbmr'), w = document.createRange(); w.selectNodeContents(n); const h = w.getClientRects().length; return {cut: n.classList.contains('srcut'), sw: n.scrollWidth, cw: n.clientWidth, lines: h, rsw: r.scrollWidth, rcw: r.clientWidth, ox: getComputedStyle(r).overflowX, st: r.getAttribute('style')}; })()`);
     check(!lng.cut && lng.sw <= lng.cw + 1 && lng.lines === 1 && lng.rsw > lng.rcw && lng.ox === 'auto', '#4047: far too long: whole, never "…" or split; the row scrolls ' + JSON.stringify(lng));
 
     await nav(B + '#today'); await sleep(300);
