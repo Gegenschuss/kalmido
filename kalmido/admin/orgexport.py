@@ -62,6 +62,7 @@ from ..hub.hubmail import hbm_can  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import _need_org_admin, org_role  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgretain import odl_admin_export  # 2.369.5 (#2517): pulled up from functions
 from ..office.ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.bgjobs import bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
 
 EXPORT_DIR = os.environ.get("TASKS_EXPORT_DIR", os.path.join(os.path.dirname(DB), "exports"))
 OX_KEEP_H = 24  # a finished archive waits this long, then the watchdog removes it
@@ -1004,9 +1005,27 @@ def _state_set(oid, d):
     os.replace(tmp, p)
 
 
-def _running(oid):
+def _running(oid, c=None):
+    """2.370.3 (#2760): the export runs or waits for the worker: its queue row (any process), or a thread of this process
+    (the queue's fallback without a database)."""
     t = _OX.get(int(oid))
-    return bool(t and t.is_alive())
+    if t and t.is_alive():
+        return True
+    try:
+        return bgj_busy("ox:export", org_id=int(oid), c=c)
+    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
+        return False
+
+
+@bgj_fn("ox:export", long=True)
+def ox_export_row(oid, uid):
+    """2.370.3 (#2760): the queue row of an organisation's export (run again after a lost run: it only writes its file)."""
+    with _OX_LOCK:
+        t = _OX.get(int(oid))
+        if t and t.is_alive():  # review 2: a run taken again while the first still writes here: never two at once
+            raise RuntimeError("export still running in this process")
+        _OX[int(oid)] = threading.current_thread()
+    ox_run(oid, uid)
 
 
 def ox_run(oid, uid):
@@ -1203,17 +1222,21 @@ def ox_start(oid):
     _need(c, oid, own)
     if oc_status(c, oid).get("rotating"):  # 2.138.0 C (#1972, review F2): the archive's recovery header needs the finished key
         return err(tr("The organisation’s key is being renewed on the server. Try again when that is finished."), 409)
-    with _OX_LOCK:
-        if _running(oid):
-            return err(tr("An export of this organisation is already running"), 409)
+    uid = me()
+
+    def guard(qc):  # 2.370.3 (#2760): under the queue's lock of the organisation: one export at a time in every process
+        if _running(oid, qc):
+            raise Denied(409, tr("An export of this organisation is already running"))
         st = _state(oid) or {}
         fx = ox_foreign(c, oid, own, {**st, "state": ox_status(oid).get("state")})
         if fx and fx[1]:  # 2.278.0 A (#3093): never replace the archive of another admin who still holds the organisation
-            return err(_ox_foreign_msg(st, fx[0]), 403)
-        _state_set(oid, {"state": "running", "by": me(), "started_at": iso(now_utc())})
-        t = threading.Thread(target=ox_run, args=(int(oid), me()), daemon=True)
-        _OX[int(oid)] = t
-        t.start()
+            raise Denied(403, _ox_foreign_msg(st, fx[0]))
+        _state_set(oid, {"state": "running", "by": uid, "started_at": iso(now_utc())})
+    with _OX_LOCK:
+        try:
+            bgj_add("ox:export", int(oid), uid, org_id=int(oid), user_id=uid, lock=f"ox:export:{int(oid)}", guard=guard)
+        except Denied as e:
+            return err(e.text(), e.code)
     return jsonify(ox_status(oid)), 202
 
 
@@ -1247,6 +1270,7 @@ def ox_delete(oid):
     c = db()
     oid, own = _ox_area(c, oid)
     _need(c, oid, own)
+    bgj_drop("ox:export", org_id=oid)  # 2.370.3 (review 6): an export still waiting for the worker can be removed
     if _running(oid):
         return err(tr("An export of this organisation is already running"), 409)
     st = ox_status(oid)

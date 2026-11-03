@@ -385,14 +385,12 @@ for kind in ("todoist", "markdown"):
     check(r.ok and dbx("SELECT COUNT(*) FROM org_list_log WHERE org_id=? AND list_id=? AND action='export'", (ORG, LO))[0][0] == 1,
           f"#2492: the {kind} ZIP export of an organisation's list is in its list history")
 # parallel imports: the one slot of this server is taken -> 429
-code = "import time, app\nfrom kalmido.core.config import DATABASE_URL\nfrom kalmido.core.pg import connect_direct\nc = connect_direct(DATABASE_URL)\n" \
-       "c.execute('SELECT pg_advisory_lock(21481, 0)').fetchone(); c.commit(); print('held', flush=True); time.sleep(25)\n"
-holder = subprocess.Popen(["docker", "exec", "-i", CT, "python", "-c", code], stdout=subprocess.PIPE, text=True)
-while holder.stdout.readline().strip() != "held":  # 2.360.2 (#2561): past the start log (#3729)
-    pass
+# 2.370.3 (#2760): a slot is a waiting / running import row of the queue bg_jobs (any process), no advisory lock any more
+dbx("INSERT INTO bg_jobs(kind, payload, state, attempts, run_after, created_at) VALUES('wki:import', '', 'wait', 0, "
+    "'2999-01-01T00:00:00+00:00', '2026-01-01T00:00:00+00:00')")
 iid2, r429 = upload(Bo, crafted)
 check(r429 is not None and r429.status_code == 429, f"#2492: a further import while the slots are taken: 429 {r429.status_code if r429 is not None else 'none'}")
-holder.wait(timeout=60)
+dbx("DELETE FROM bg_jobs WHERE kind='wki:import' AND run_after='2999-01-01T00:00:00+00:00'")
 off = len(crafted) - min(len(crafted), 1 << 20)
 r = Bo.put(B + f"/api/account/import/{iid2}?offset={off}", data=crafted[off:], headers={"Content-Type": "application/octet-stream"})
 j = wait_imp(Bo, iid2) if r.ok else {"state": r.status_code}

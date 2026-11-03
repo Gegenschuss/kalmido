@@ -680,6 +680,16 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   row beats every 30 s, a row without a beat for 150 s waits again (at most 3 runs). In the role `web` no queue starts a
   thread (`bg_here()`), the worker takes the rows. The agents' log writers flush their own process's rows and run in
   every web process. Incoming mail is claimed per mailbox (`mail_in_seen`, Message-ID + IMAP UID).
+- **Exports, imports and pushes through the queue (2.370.3, #2760).** The account and organisation export, the account
+  import (check, key step, run), the knowledge import and the contacts import are rows too, of kinds registered with
+  `@bgj_fn(kind, long=True)`: they take slots of their own (`KALMIDO_BG_LONG_SLOTS`, default 4 per process), so a long
+  import never holds the mails off. Whether one runs is the row (`bgj_busy`, any process), the browser's state the file the
+  run writes or the row's `progress` (`bgj_progress` / `bgj_state`). `bgj_add(lock=, guard=)` checks "one per person" /
+  "at most n on the server" and adds the row in one step (the import slots are rows, no advisory lock of a thread). Kinds
+  that write must not run twice: `tries=1` (imports, pushes); a lost run is "interrupted". The pushes after a request
+  (comments, a client's approval or video comment) are one row `push:send` each; the update check and the bookmark
+  previews of a web process go to the worker the same way. On SIGTERM (`bgj_on_term`) a process puts its running rows
+  back at once (rows with runs left wait, one-run rows fail "stopped") and ends.
 - **Session limits.** Every connection runs with `statement_timeout` 30 s, `idle_in_transaction_session_timeout`
   5 min and `jit=off`. Network calls (mail, calendar and contact sync, Web Push) run outside open transactions.
   `init_db` and the backup lift the statement limit for themselves.

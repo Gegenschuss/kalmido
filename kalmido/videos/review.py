@@ -25,14 +25,14 @@ from urllib.parse import parse_qs, quote, urlencode, urlsplit, urlunsplit
 from flask import Response, jsonify, redirect, request
 
 from ..core.config import app, PUBLIC_URL
-from ..collab.comments import lang_of  # 2.367.5 (#2980)
+from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#2760): push_later
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
-from ..accounts.session import gated_thread, me, rate_ip
+from ..accounts.session import me, rate_ip
 from ..accounts.login import auth_key
 from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -769,8 +769,7 @@ def vdr_pub_comment(token):
     push = vdr_pub_notify(c, s, r, name, text)
     c.commit()
     print("video review customer comment", r["id"], flush=True)
-    if push:
-        gated_thread(push)  # 2.370.2 (#2779)
+    push_later(push)  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
     return pub_headers(redirect(f"{SIG_PREFIX}{token}?sent=1#vdr-f", 303))
 
 
@@ -796,12 +795,11 @@ def vdr_pub_notify(c, s, r, name, text):
     if not sends:
         return None
     VDR_PUSHED[r["id"]] = time.time()
-    from ..notify.push import notify
     click = vdr_click(r)
     click = click if click.startswith("http") else f"{PUBLIC_URL}/{click}"  # 2.266.0 (#2965): ntfy needs an absolute link
     sc = f"l:{lid}" if lid else f"o:{s['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the list / the office
-    return lambda: [notify(uid, tr("Comment from the client", lg=lang_of(st)), f"{name}: {text[:200]}", prio="4", click=click, s=st,
-                           scope=sc) for uid, st in sends]
+    return [(uid, tr("Comment from the client", lg=lang_of(st)), f"{name}: {text[:200]}", {"prio": "4", "click": click, "scope": sc})
+            for uid, st in sends]  # 2.370.3 (#2760): collab.comments.push_later
 
 
 def vdr_list_of(c, r):

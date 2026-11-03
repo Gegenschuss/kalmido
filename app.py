@@ -65,6 +65,8 @@ if __name__ == "__main__":
         sys.exit(0 if n else f"no user {sys.argv[2]!r}")
     if len(sys.argv) >= 3 and sys.argv[1] == "announce":  # 2.24.0 (#907): docker exec <container> python app.py announce "text" --minutes 30
         sys.exit(announce_cli(sys.argv[2:]))
+    from kalmido.accounts.bgjobs import bgj_on_term
+    bgj_on_term()  # 2.370.3 (#2760): a stop (SIGTERM) puts this process' running queue rows back at once
     if WRK_ROLE == "worker":  # 2.102.0 D (#1997): kalmido/admin/worker.py
         sys.exit(wrk_main())
     from kalmido.accounts.setupcode import sh_code_startup

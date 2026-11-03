@@ -11,9 +11,9 @@ from werkzeug.exceptions import RequestEntityTooLarge
 from ..core.config import app
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc
-from ..core.pg import write_lock  # 2.269.0 B (#3034)
+from ..core.pg import system_ctx, write_lock  # 2.269.0 B (#3034); 2.370.3 (#2760): system_ctx
 from ..accounts.session import me
-from ..core.access import Denied, list_role, need_feat, WRITE_ROLES
+from ..core.access import Denied, acx_of, list_role, need_feat, WRITE_ROLES
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
 from ..contacts.model import (
@@ -24,6 +24,7 @@ from ..contacts.model import (
 from ..core.retention import ret_days
 from ..contacts.bulk import bk_occ_drop, ctt_relink, ctt_restore, ctt_trash, ctt_unlink  # 2.272.0 E1 (#3038)
 from ..accounts.orgs import user_orgs
+from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn, bgj_progress, bgj_state  # 2.370.3 (#2760)
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
@@ -322,9 +323,12 @@ def op_import(c, uid, bid, raw, bg=False, csv_ok=False, mapping=None, preview=Fa
 
 # 2.41.0 (#1437): a large vCard file is imported in the background: the request answers at once with an import id, a thread
 # of this process stores the cards in batches (each committed) and GET /api/books/imports/<id> tells the progress. Only the
-# person who started it sees it; the state lives in memory for an hour (one process, like the backup's state).
+# person who started it sees it. 2.370.3 (#2760): a row of the queue (accounts/bgjobs.py, kind "contacts:import", the worker
+# runs it) whose progress is the state the route reads (any process); it goes with the queue's done rows (BGJ_KEEP_DONE_H).
+# _IMP keeps the state of this process' runs too (the queue's fallback without a database).
 IMPORT_SYNC_MAX = 100
 _IMP, _IMP_LOCK = {}, threading.Lock()
+LV_KIND = "contacts:import"
 
 
 def lv_import_public(st):
@@ -335,7 +339,15 @@ def lv_import_public(st):
     return d
 
 
-IMP_RUNNING_MAX = 4  # 2.126.0 C (#1986): background imports at once in this process
+IMP_RUNNING_MAX = 4  # 2.126.0 C (#1986): background imports at once (2.370.3, #2760: on the server, the queue's rows)
+
+
+def _lv_guard(uid, qc):
+    """2.370.3 (#2760): one import per person, IMP_RUNNING_MAX on the server (waiting or running queue rows)."""
+    if bgj_busy(LV_KIND, user_id=uid, c=qc):
+        raise Denied(409, tr("An import is already running"))
+    if bgj_active(LV_KIND, c=qc) >= IMP_RUNNING_MAX:
+        raise Denied(429, tr("Too many imports, please wait a few minutes"))
 
 
 def lv_import_start(c, uid, bid, cards, since=None, photos=True):
@@ -346,16 +358,35 @@ def lv_import_start(c, uid, bid, cards, since=None, photos=True):
     with _IMP_LOCK:
         for k in [k for k, v in _IMP.items() if v["ended_at"] and now - v["ended_at"] > 3600]:
             _IMP.pop(k, None)
-        running = [v for v in _IMP.values() if not v["ended_at"]]  # 2.126.0 C (#1986): one per person, a few per process
-        if any(v["user_id"] == uid for v in running):
-            raise Denied(409, tr("An import is already running"))
-        if len(running) >= IMP_RUNNING_MAX:
-            raise Denied(429, tr("Too many imports, please wait a few minutes"))
-        _IMP[iid] = st
-    ctx = c.ctx  # the starter's row-level-security context goes with the thread
-    threading.Thread(target=lv_import_run, args=(st, ctx, uid, bid, cards, since, photos), daemon=True).start()
+    ctx = c.ctx  # the starter's row-level-security context goes with the run
+    bgj_add(LV_KIND, st, ctx, uid, bid, cards, since, photos, user_id=uid, lock=LV_KIND, guard=lambda qc: _lv_guard(uid, qc),
+            progress=st)
+    return lv_import_public(st)
+
+
+@bgj_fn(LV_KIND, tries=1, long=True)  # 2.370.3 (#2760): commits per batch, so a lost run is "interrupted", never run twice
+def lv_import_row(st, ctx, uid, bid, cards, since=None, photos=True):
+    # review 3: the person's organisations as they are now (the row may have waited), the role as at the start
+    c = connect()
+    try:
+        with system_ctx(c):  # the person's memberships (structure) for their context
+            orgs = tuple(acx_of(c, uid).org_ids)
+        c.rollback()
+    finally:
+        c.close()
+    lv_import_run(st, (ctx[0], orgs, ctx[2]), uid, bid, cards, since, photos)
+
+
+def _lv_put(st, **kw):
+    """The run's state: in this process (_IMP) and in its queue row (bgj_progress: the route of any process reads it)."""
     with _IMP_LOCK:
-        return lv_import_public(st)
+        st.update(**kw)
+        _IMP[st["import_id"]] = st
+        d = dict(st)
+    try:
+        bgj_progress(bgj_current(), d)
+    except Exception as e:  # noqa: BLE001 -- the progress is best effort; the end state is written again below
+        print("contacts import: progress", type(e).__name__, flush=True)
 
 
 def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
@@ -368,6 +399,7 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
         res["over_limit"] = over
     t_end = time.monotonic() + 900
     c = None
+    _lv_put(st)
     try:
         for i in range(0, len(cards), IMPORT_BATCH):
             c = connect()
@@ -384,15 +416,13 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
                 res["bad"] = (res.get("bad", []) + part["bad"])[:VC_BAD_MAX]
             if part.get("kept_newer"):       # 2.273.0 C (#3048)
                 res["kept_newer"] = res.get("kept_newer", 0) + part["kept_newer"]
-            with _IMP_LOCK:
-                st.update(done=min(i + IMPORT_BATCH, len(cards)), **res)
+            _lv_put(st, done=min(i + IMPORT_BATCH, len(cards)), **res)
         if since is not None:  # 2.119.1 A (#2084): the new contacts that look like one already there
             from ..contacts.ctxlist import ctx_import_dupes
             c = connect()
             c.set_ctx(*ctx)
             res.update(ctx_import_dupes(c, uid, bid, since))
-        with _IMP_LOCK:
-            st.update(state="done", done=st["total"], **res)
+        _lv_put(st, state="done", done=st["total"], ended_at=time.time(), **res)
     except Exception as e:  # noqa: BLE001 -- any failure ends the import with a message; the batches before it stay
         msg = e.text() if isinstance(e, Denied) else str(e) if isinstance(e, BadInput) else ""
         print("contacts import failed:", type(e).__name__, flush=True)
@@ -401,16 +431,29 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
                 c.rollback()
         except Exception:  # noqa: BLE001
             pass
-        with _IMP_LOCK:
-            st.update(state="failed", error=msg)
+        _lv_put(st, state="failed", error=msg, ended_at=time.time())
     finally:
         with _IMP_LOCK:
-            st["ended_at"] = time.time()
+            if not st["ended_at"]:
+                st["ended_at"] = time.time()
         if c:
             c.close()
 
 
 def op_import_state(uid, iid):
+    """2.370.3 (#2760): the state from the import's queue row (any process); a row that ended without its run writing the end
+    (the server stopped meanwhile) is an interrupted import."""
+    try:
+        got = bgj_state(LV_KIND, uid, lambda p: p.get("import_id") == iid)
+    except Exception:  # noqa: BLE001 -- no database: the runs of this process
+        got = None
+    if got:
+        row, st = got
+        if st.get("user_id") != uid:
+            raise Denied(404)
+        if row in ("done", "failed") and st.get("state") == "running":
+            st = {**st, "state": "failed", "error": tr("The import was interrupted. Please start it again."), "ended_at": st.get("ended_at") or time.time()}
+        return lv_import_public(st)
     with _IMP_LOCK:
         st = _IMP.get(iid)
         if not st or st["user_id"] != uid:

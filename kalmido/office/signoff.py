@@ -20,7 +20,7 @@ from datetime import date, datetime, timedelta
 from flask import g, jsonify, redirect, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..collab.comments import lang_of  # 2.367.5 (#2980)
+from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#2760): push_later
 from ..core.i18n import browser_lang, lang, LANGS, N_, tr
 from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -30,7 +30,7 @@ from .model import office_role, pb_owner
 from .rights import NO_RIGHT, ofr_admin_or, ofr_allows
 from ..accounts.orgroles import OFFICE_READ
 from ..accounts.orgs import user_orgs
-from ..accounts.session import _accept_lang, gated_thread, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
+from ..accounts.session import _accept_lang, me, _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
@@ -256,7 +256,6 @@ def sig_notify(c, r, st, name):
     """Push to the link's creator (notification switch "signoff", "approval" before 2.266.0): the customer decided. 2.266.0 (#2965): only while the
     creator is still in the office (else its admins, sig_people), plus a News item "signoff" (the bell) for each of them;
     the push opens an absolute link (ntfy cannot open "#office/..."). Caller commits."""
-    from ..notify.push import notify
     lid = r["list_id"]
     click = f"#office/offers/{r['doc_id']}" if r["doc_id"] else f"#office/gendocs/{r['gen_doc_id']}" if r["kind"] == "document" else f"#l/{r['list_id']}"
     if r["kind"] == "video":  # 2.99.1 A (#1959): the list of the review's task / project (its mute switch)
@@ -286,7 +285,7 @@ def sig_notify(c, r, st, name):
     if not sends:
         return None
     scope = f"l:{lid}" if lid and not (r["doc_id"] or r["gen_doc_id"]) else f"o:{r['org_id']}"  # 2.240.0 B2 (#2867): the channels follow the office / the list
-    return lambda: [notify(u, t, msg, prio="4", click=url, s=s, scope=scope) for u, t, s in sends]
+    return [(u, t, msg, {"prio": "4", "click": url, "scope": scope}) for u, t, _s in sends]  # 2.370.3 (#2760): collab.comments.push_later
 
 
 # ---------------------------------------------------------------- managing (members of the organisation / list owner)
@@ -855,6 +854,5 @@ def sig_decide(token):
     print("signoff", r["id"], st, flush=True)
     if r["kind"] == "offer" and st == "accepted":
         qac_file(c, r)
-    if push:
-        gated_thread(push)  # 2.370.2 (#2779)
+    push_later(push)  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
     return redirect(SIG_PREFIX + token, 303)

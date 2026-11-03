@@ -265,7 +265,10 @@ def admin_settings():
         aa_now("security", f"calhosts:{int(time.time())}", N_("{0} changed the internal hosts calendar subscriptions may reach: {1}"),
                [g.user["username"], hosts or "-"])
     if b.get("update_check") is True and UPDATE_CHECK_ENV:
-        threading.Thread(target=_update_now, daemon=True).start()
+        if UPDATE_KICK:  # 2.370.3 (#2760): the worker checks (a queue row, admin/worker.py), not a thread of this request
+            UPDATE_KICK[0]()
+        else:
+            threading.Thread(target=_update_now, daemon=True).start()
     return jsonify(about_info(c, g.user))
 
 
@@ -389,7 +392,12 @@ def _apply_instance(c, b):
     return None
 
 
+UPDATE_KICK = []  # 2.370.3 (#2760): f() -> queues the check (registered by admin/worker.py; the core imports no queue)
+
+
 def _update_now():
+    """The update check at once (Settings > Server: switched on). 2.370.3 (#2760): the queue's kind "instance:update"
+    (registered in admin/worker.py with UPDATE_KICK: the core imports no queue)."""
     c = connect()
     try:
         update_check(c, force=True)

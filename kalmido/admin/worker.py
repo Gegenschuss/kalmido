@@ -15,6 +15,10 @@ starts (mails after an action, "Back up now", "Upload now", the organisation key
 (accounts/bgjobs.py, loop "bgjobs"); the health shows its rows per state ("queue"). The agents' log writers (agent-audit,
 agent-access) flush the rows of their own process, so they run in every web process; their cleanups are the watchdog's.
 Incoming mail is claimed per mailbox (integrations/mail.py mail_seen_claim): two processes never handle one twice.
+
+2.370.3 (#2760): the exports / imports a person starts, the pushes after a request, "check for updates now" and the bookmark
+previews of a web process are rows of bg_jobs as well (accounts/bgjobs.py, long slots for the exports / imports); on SIGTERM
+a process puts its running rows back at once (bgj_on_term in app.py).
 """
 import json
 import os
@@ -29,7 +33,11 @@ from ..core.db import db_log_err  # 2.239.0 B (#2888): no values of database err
 from ..core.pg import POOL_MAX, WEB_THREADS, connect_direct, pool_stats
 from ..core.reqtime import rt_stats
 from ..accounts.session import _BG_TURN, GATE
-from ..accounts.bgjobs import bgj_counts, bgj_kick
+from ..accounts.bgjobs import bgj_add, bgj_counts, bgj_fn, bgj_kick
+from ..core.instance import UPDATE_KICK, _update_now
+
+bgj_fn("instance:update")(_update_now)  # 2.370.3 (#2760): "check for updates now" (core/instance.py) through the queue
+UPDATE_KICK.append(lambda: bgj_add("instance:update", once=True))
 from ..accounts.users import need_admin
 from ..files.textscan import ts_kick  # 2.369.5 (#2517): pulled up from functions
 from ..paperless.ngx import pl_kick  # 2.369.5 (#2517): pulled up from functions

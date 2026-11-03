@@ -11,7 +11,8 @@ from ..core.env import env_bool
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import LANGS, short_day, tr, trn
 from ..core.db import body, bump, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
-from ..accounts.session import gated_thread, me
+from ..accounts.session import me
+from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
 from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
@@ -771,14 +772,34 @@ def assignment_events(c, tid, old_assignee, new_assignee):
 
 
 def send_pushes(pushes):
-    from ..notify.push import notify
     if pushes and has_request_context():
         pushes = push_filtered(pushes)
     if pushes:
         # (uid, title, msg, click, prio[, extra]): extra = notify() keywords (2.0.8: actions + task of comment pushes)
         # 2.142.0 A (#2145): kind "other" for the notification channels unless the push names its own
-        gated_thread(lambda: [notify(x[0], x[1], x[2], x[4], x[3], **{"kind": "other", **(x[5] if len(x) > 5 else {})})
-                              for x in pushes])  # 2.370.2 (#2779): through the maintenance gate
+        push_later([(x[0], x[1], x[2], {"prio": x[4], "click": x[3], "kind": "other", **(x[5] if len(x) > 5 else {})})
+                    for x in pushes])  # 2.370.2 (#2779): through the maintenance gate; 2.370.3 (#2760): a queue row
+
+
+PUSH_SKIP_KW = ("s", "ws")  # 2.370.3 (#2760): no settings snapshot in the row (notify reads them), "ws" is no notify keyword
+
+
+def push_later(calls):
+    """2.370.3 (#2760): the pushes after a request as ONE row of the queue (bgjobs "push:send": the worker sends them, through
+    the maintenance gate) instead of a thread of the web process. calls = [(uid, title, msg, notify keywords)]."""
+    calls = [[int(u), t, m, {k: v for k, v in (kw or {}).items() if k not in PUSH_SKIP_KW}] for u, t, m, kw in calls or ()]
+    if calls:
+        bgj_add("push:send", calls)
+
+
+@bgj_fn("push:send", tries=1)  # a push is never sent twice: a lost run is failed, not repeated
+def push_rows(calls):
+    from ..notify.push import notify
+    for uid, title, msg, kw in calls:
+        try:
+            notify(uid, title, msg, **kw)
+        except Exception as e:  # noqa: BLE001 -- one push that fails never holds the others back
+            print("push failed:", type(e).__name__, flush=True)
 
 
 PUSH_BURST_SKIP = []  # 2.236.0 (#2909): f(c, uid) -> True = no push and no burst count (agents/workstyle.py ws_burst_skip)

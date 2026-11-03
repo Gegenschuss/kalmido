@@ -285,7 +285,9 @@ VARS = (
     _v("KALMIDO_LOOP_LOCKS", "1", "Each background loop runs in one process of the instance; 0 = every process runs its loops.", "workers"),
     _v("KALMIDO_WORKER_HEARTBEAT", "30", "Seconds between two heartbeats of a background loop.", "workers"),
     _v("KALMIDO_STALE_HOUR", "09:00", "Local time from which the daily event about stale tasks goes out.", "workers"),
-    _v("KALMIDO_ACCOUNT_IMPORT_PARALLEL", "2", "At most this many account checks / imports run at once on the whole server (2.148.1).", "workers"),
+    _v("KALMIDO_ACCOUNT_IMPORT_PARALLEL", "2", "At most this many account checks / imports run at once on the whole server (2.148.1); knowledge imports count too, each a waiting or running queue row (2.370.3).", "workers"),
+    _v("KALMIDO_BG_LONG_SLOTS", "4", "Exports and imports the queue runs at once per process, next to the short work (mails, pushes) (2.370.3).", "workers"),
+    _v("KALMIDO_BG_STOP_WAIT_S", "8", "On a stop (SIGTERM) the server waits up to this many seconds for running queue jobs before it puts the rest back and ends (2.370.3).", "workers"),
 
     # ---- hosting, retention and quotas
     _v("KALMIDO_HOSTED", "0", "Switch: a server run as a service for others; integrations may only reach public HTTPS addresses, the instance admin stays out of the customers' organisations and accounts (2.399).", "hosting"),

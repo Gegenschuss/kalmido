@@ -64,6 +64,7 @@ from ..calendars.subscriptions import cal_url_hint  # 2.369.5 (#2517): pulled up
 from ..core.orgcrypt import oc_dec_fields  # 2.369.5 (#2517): pulled up from functions
 from ..wiki.wkhist import wsb_body_or  # 2.369.5 (#2517): pulled up from functions
 from ..life.budget import bud_export  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.bgjobs import bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
 
 UMZ_DIR = os.path.join(EXPORT_DIR, "account")
 UMZ_KEEP_H = 24
@@ -134,7 +135,7 @@ UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key b
                 "files open with the same passphrase. Into an account that already has keys they arrive unreadable. Projects "
                 "encrypted in the browser are not taken over by the import (switch their encryption off before the export).")
 
-_UMZ = {}  # user id -> the running export thread
+_UMZ = {}  # user id -> the running export thread (of this process; 2.370.3 (#2760): the queue row tells it for every process)
 _UMZ_LOCK = threading.Lock()
 
 
@@ -716,9 +717,16 @@ def umz_write_state(folder, d):
     os.replace(tmp, p)
 
 
-def _running(uid):
+def _running(uid, c=None):
+    """2.370.3 (#2760): the export runs or waits for the worker: its queue row (any process), or a thread of this process
+    (the queue's fallback without a database)."""
     t = _UMZ.get(int(uid))
-    return bool(t and t.is_alive())
+    if t and t.is_alive():
+        return True
+    try:
+        return bgj_busy("umz:export", user_id=int(uid), c=c)
+    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
+        return False
 
 
 def umz_log_org_lists(c, uid):
@@ -747,6 +755,16 @@ def umz_user_conn(c, uid):
     with system_ctx(c):  # the person's memberships (structure) for their context
         ax = acx_of(c, uid)
     c.set_ctx(uid, ax.org_ids, "user")
+
+
+@bgj_fn("umz:export", long=True)  # 2.370.3 (#2760): a row of the queue, run again after a lost run (it only writes its file)
+def umz_export_row(uid, export_id):
+    with _UMZ_LOCK:
+        t = _UMZ.get(int(uid))
+        if t and t.is_alive():  # review 2: a run taken again while the first still writes here: never two at once
+            raise RuntimeError("export still running in this process")
+        _UMZ[int(uid)] = threading.current_thread()
+    umz_run(uid, export_id)
 
 
 def umz_run(uid, export_id):
@@ -871,15 +889,18 @@ def umz_start():
     need += c.execute("SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id=?", (uid,)).fetchone()[0] or 0  # #3134
     if not umz_space_ok(UMZ_DIR, need * 1.1):
         return err(tr("There is not enough space on the server for the export. Please ask the server admin."), 507)
-    with _UMZ_LOCK:
-        if _running(uid):
-            return err(tr("Your export is already running"), 409)
+    c.rollback()
+
+    def guard(qc):  # 2.370.3 (#2760): under the queue's lock of this person: one export at a time in every process
+        if _running(uid, qc):
+            raise Denied(409, tr("Your export is already running"))
         os.makedirs(_udir(uid), mode=0o700, exist_ok=True)
         umz_write_state(_udir(uid), {"state": "running", "started_at": iso(now_utc())})
-        t = threading.Thread(target=umz_run, args=(uid, secrets.token_hex(16)), daemon=True)
-        _UMZ[uid] = t
-        t.start()
-    c.rollback()
+    with _UMZ_LOCK:
+        try:
+            bgj_add("umz:export", uid, secrets.token_hex(16), user_id=uid, lock=f"umz:export:{int(uid)}", guard=guard)
+        except Denied as e:
+            return err(e.text(), e.code)
     return jsonify(umz_status(uid)), 202
 
 
@@ -912,6 +933,7 @@ def umz_delete():
     """Removes my finished export now (instead of after UMZ_KEEP_H hours)."""
     umz_person()
     uid = me()
+    bgj_drop("umz:export", user_id=uid)  # 2.370.3 (review 6): an export still waiting for the worker can be removed
     if _running(uid):
         return err(tr("Your export is already running"), 409)
     shutil.rmtree(_udir(uid), ignore_errors=True)

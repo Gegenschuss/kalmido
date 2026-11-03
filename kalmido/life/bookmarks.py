@@ -19,7 +19,8 @@ from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied
 from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_file
-from ..accounts.session import me
+from ..accounts.session import bg_here, me
+from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
 from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.spacemove import SMV_MAX, smv_answer, smv_refuse_agent, smv_target
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.361.2 B (#2923)
@@ -568,7 +569,13 @@ _BM_STATE = {"run": False, "queued": set()}
 
 
 def bm_kick(ids):
-    """Queues previews (after the commit that made the rows) for the one worker thread (started when it is not running)."""
+    """Queues previews (after the commit that made the rows) for the one worker thread (started when it is not running).
+    2.370.3 (#2760): in a process without background work (the role web) the ids go to the worker as a queue row instead."""
+    if not bg_here():
+        ids = [int(i) for i in ids][:BM_KICK_MAX]
+        if ids:
+            bgj_add("life:bmpreview", ids)
+        return
     with _BM_LOCK:
         for i in ids:
             i = int(i)
@@ -583,6 +590,14 @@ def bm_kick(ids):
             return
         _BM_STATE["run"] = True
     threading.Thread(target=_bm_worker, daemon=True).start()
+
+
+BM_KICK_MAX = 200  # 2.370.3 (#2760): ids per queue row (the watchdog queues the rest later)
+
+
+@bgj_fn("life:bmpreview")  # 2.370.3 (#2760): hands the ids to the worker's one preview thread (queued twice = one fetch)
+def bm_kick_row(ids):
+    bm_kick(ids)
 
 
 def _bm_worker():

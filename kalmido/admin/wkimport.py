@@ -42,7 +42,8 @@ from ..wiki.wikiatt import WKA_FILE_MAX, tr
 from ..wiki.wikie2e import wke_guard
 from .orgexport import EXPORT_DIR
 from .acctexport import UMZ_BLOCK, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok, umz_user_conn, umz_write_state
-from .acctimport import UMZ_CHUNK, UMZ_SETTLE_S, _env_mb, _slot, umz_disk_size
+from .acctimport import UMZ_CHUNK, _env_mb, umz_disk_size, umz_settle, umz_slots_guard  # 2.370.3 (#2760): + the queue's slots
+from ..accounts.bgjobs import bgj_add, bgj_busy, bgj_drop, bgj_fn, bgj_lock
 from .hosting import quota_guard
 
 WKI_DIR = os.path.join(EXPORT_DIR, "wiki-import")
@@ -50,8 +51,7 @@ WKI_MAX_MB = _env_mb("KALMIDO_WIKI_IMPORT_MAX_MB", 4096)
 WKI_MAX_FILES = _env_mb("KALMIDO_WIKI_IMPORT_MAX_FILES", 10000)
 WKI_KEEP_H = 24  # an upload / result nobody looks at any more is removed after this
 WKI_TICK_S = 0.5  # the progress is written at most this often
-_WKI = {}  # user id -> running import thread
-_WKI_LAST = {}  # 2.363.0 (#3280): user id -> the last worker until it really ended (_WKI forgets it before its slot is free)
+_WKI = {}  # user id -> running import thread (of this process; 2.370.3 (#2760): the queue row tells it for every process)
 _WKI_LOCK = threading.Lock()
 _PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
 
@@ -91,9 +91,16 @@ def _wki_json(path, v):
     os.replace(path + ".tmp", path)
 
 
-def _busy(uid):
+def _busy(uid, c=None):
+    """2.370.3 (#2760): my import waits or runs: its queue row (any process), or a thread of this process (the queue's
+    fallback without a database)."""
     t = _WKI.get(int(uid))
-    return bool(t and t.is_alive())
+    if t and t.is_alive():
+        return True
+    try:
+        return bgj_busy("wki:import", user_id=int(uid), c=c)
+    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
+        return False
 
 
 def _need(uid, iid):
@@ -240,33 +247,27 @@ def wki_run(uid, iid):
 
 def _settle(uid):
     """2.363.0 (#3280): the worker publishes "done" and then still tidies up and frees its slot: the person's next step
-    right after it waits for that end instead of answering "already running" (as acctimport._thread, #3261)."""
-    t = _WKI_LAST.get(int(uid))
-    if t and t is not threading.current_thread():
-        t.join(UMZ_SETTLE_S)
+    right after it waits for that end instead of answering "already running" (as acctimport._thread, #3261). 2.370.3
+    (#2760): the end of its queue row."""
+    umz_settle(_busy, uid)
+
+
+@bgj_fn("wki:import", tries=1, long=True)  # 2.370.3 (#2760): one transaction; a lost run says "interrupted", never runs twice
+def wki_import_row(uid, iid):
+    with _WKI_LOCK:
+        _WKI[int(uid)] = threading.current_thread()
+    wki_run(uid, iid)
 
 
 def _thread(uid, iid):
+    """2.370.3 (#2760): the import as a queue row (the worker runs it); the import slots of the server are shared with the
+    account import (acctimport.umz_slots_guard). The state "running" is written under the queue lock, with the row (review L6)."""
     _settle(uid)
-    with _WKI_LOCK:
-        if _busy(uid):
-            raise Denied(409, tr("An import is already running"))
-        lc = _slot()  # the import slots of the server (shared with the account import)
-        if lc is None:
-            raise Denied(429, tr("Too many imports are running on this server right now. Please try again in a few minutes."))
 
-        def run():
-            try:
-                wki_run(uid, iid)
-            finally:
-                lc.close()
-                with _WKI_LOCK:
-                    if _WKI_LAST.get(int(uid)) is threading.current_thread():
-                        _WKI_LAST.pop(int(uid), None)
-        t = threading.Thread(target=run, daemon=True)
-        _WKI[int(uid)] = _WKI_LAST[int(uid)] = t
-        _set(uid, iid, state="running", progress={"done": 0, "total": 0})  # review L6: under the lock, with the thread known
-        t.start()
+    def guard(qc):
+        umz_slots_guard(uid, _busy, qc)
+        _set(uid, iid, state="running", progress={"done": 0, "total": 0})
+    bgj_add("wki:import", uid, iid, user_id=uid, lock="umz:import", guard=guard)
 
 
 # ---------------------------------------------------------------- routes
@@ -375,12 +376,25 @@ def wki_cancel(iid):
     umz_person()
     uid = me()
     _need(uid, iid)
-    with _WKI_LOCK:  # review L6: not between "running" and the thread's start
-        if (_st(uid, iid) or {}).get("state") == "running" and _busy(uid):
+    c = db()
+    bgj_lock(c, "umz:import")  # review L6: not between "running" and the queue row (2.370.3, #2760: the queue's lock)
+    try:
+        bgj_drop("wki:import", user_id=uid, c=c)  # 2.370.3 (review 6): a row still waiting for the worker goes
+        running = (_st(uid, iid) or {}).get("state") == "running" and _busy(uid, c)
+        if running:
             with open(os.path.join(_dir(uid, iid), "stop"), "w"):
                 pass
-            return jsonify(ok=True, state="stopping"), 202
-        if os.path.exists(os.path.join(_dir(uid, iid), "saved.json")):
-            _orphans(_dir(uid, iid))
-        shutil.rmtree(_dir(uid, iid), ignore_errors=True)
+        else:
+            try:
+                os.replace(_dir(uid, iid), _dir(uid, iid) + ".gone")  # out of the way before the lock ends (review 5)
+            except OSError:  # gone already (another cancel)
+                pass
+    finally:
+        c.commit()  # review 5: the lock ends here, the clean-up below holds no import start up
+    if running:
+        return jsonify(ok=True, state="stopping"), 202
+    gone = _dir(uid, iid) + ".gone"
+    if os.path.exists(os.path.join(gone, "saved.json")):
+        _orphans(gone)
+    shutil.rmtree(gone, ignore_errors=True)
     return jsonify(ok=True)

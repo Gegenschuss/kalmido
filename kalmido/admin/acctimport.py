@@ -51,6 +51,7 @@ from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
 from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
+from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
 from ..lists.listhead import HEAD_STYLES  # 2.459.0 (#3849)
 from ..lists.lists import LIST_COLOR_RE
 from ..lists.fields import fx_tpl_fix  # 2.362.4 (#3100)
@@ -74,8 +75,6 @@ from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled
 from ..contacts.bulk import bk_occ_drop, ctt_unlink  # 2.370.4 (#3089)
 from ..accounts.invite import invite_new  # 2.369.5 (#2517): pulled up from functions
 from .orgexport import OX_MAGIC, OX_FK_AAD  # 2.369.5 (#2517): pulled up from functions
-from ..core.config import DATABASE_URL  # 2.369.5 (#2517): pulled up from functions
-from ..core.pg import connect_direct  # 2.369.5 (#2517): pulled up from functions
 from ..hub.mailbox import mbx_take_values  # 2.369.5 (#2517): pulled up from functions
 
 UMZ_IN_DIR = os.path.join(EXPORT_DIR, "account-import")
@@ -207,13 +206,14 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
 
-_UMI = {}  # user id -> running check / import thread
-_UMI_LAST = {}  # 2.308.0 (#3261): user id -> the last worker until it really ended (umz_unlock leaves _UMI before that)
+_UMI = {}  # user id -> running check / import thread (of this process; 2.370.3 (#2760): the queue row tells it for every process)
 _UMI_START = {}  # 2.308.0 (#3261): user id -> steps waiting for that worker's end before they start their own
-# 2.148.1 C (#2492, #2485): at most this many checks / imports at once on the whole server (every process): a slot is a
-# session advisory lock (class UMZ_SLOT_CLASS, key 0..n-1) on an own connection that the thread holds until it ends
+# 2.148.1 C (#2492, #2485): at most this many checks / imports at once on the whole server (every process). 2.370.3 (#2760):
+# a slot is a waiting or running queue row of UMZ_IMPORT_KINDS (counted under the queue lock "umz:import" when one is added),
+# no longer an advisory lock a thread of the web process holds
 UMZ_PARALLEL = max(1, _env_mb("KALMIDO_ACCOUNT_IMPORT_PARALLEL", 2))
-UMZ_SLOT_CLASS = 21481
+UMZ_KINDS = ("umz:check", "umz:unlock", "umz:import")  # 2.370.3 (#2760): the steps of an account import (queue rows)
+UMZ_IMPORT_KINDS = UMZ_KINDS + ("wki:import",)  # the import slots are shared with the knowledge import (admin/wkimport.py)
 UMZ_SETTLE_S = 5  # 2.308.0 (#3261): how long a new step waits for the person's previous worker to end
 _UMI_LOCK = threading.Lock()
 _PIECE_LOCK = threading.Lock()  # one piece at a time: two requests at the same offset must not both append
@@ -259,9 +259,16 @@ def _set(uid, iid, **kw):
     return st
 
 
-def _busy(uid):
+def _busy(uid, c=None):
+    """2.370.3 (#2760): a step of my import waits or runs: its queue row (any process), or a thread of this process (the
+    queue's fallback without a database)."""
     t = _UMI.get(int(uid))
-    return bool(t and t.is_alive())
+    if t and t.is_alive():
+        return True
+    try:
+        return bgj_busy(UMZ_KINDS, user_id=int(uid), c=c)
+    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
+        return False
 
 
 def _need(uid, iid):
@@ -2188,62 +2195,75 @@ def umz_unlock(uid, iid, okey, can_invite):
             _UMI.pop(int(uid), None)
 
 
-def _slot():
-    """2.148.1 C (#2492): an own connection holding a free import slot of the server, None when all are taken."""
-    lc = connect_direct(DATABASE_URL)
-    try:
-        for i in range(UMZ_PARALLEL):
-            if lc.execute("SELECT pg_try_advisory_lock(?, ?)", (UMZ_SLOT_CLASS, i)).fetchone()[0]:
-                lc.commit()
-                return lc
-    except Exception:
-        lc.close()
-        raise
-    lc.close()
-    return None
+def umz_slots_guard(uid, busy, qc):
+    """2.370.3 (#2760): the check before a step of an import is queued (under the queue lock "umz:import"): 409 while one of
+    the person's runs, 429 when UMZ_PARALLEL imports wait or run on the server (account and knowledge import together)."""
+    if busy(uid, qc):
+        raise Denied(409, tr("An import is already running"))
+    if bgj_active(UMZ_IMPORT_KINDS, c=qc) >= UMZ_PARALLEL:
+        raise Denied(429, tr("Too many imports are running on this server right now. Please try again in a few minutes."))
 
 
-def _thread(uid, fn, *args):
-    # 2.308.0 (#3261): the worker publishes its state (key, preview, done) and then still closes its file and connections:
-    # the person's next step right after it waits for that end instead of answering "already running"
-    # (meanwhile the step's state - checking / running - is not "interrupted": _UMI_START)
-    t0 = _UMI_LAST.get(int(uid))
-    if t0 and t0 is not threading.current_thread():
-        with _UMI_LOCK:
-            _UMI_START[int(uid)] = _UMI_START.get(int(uid), 0) + 1
-        try:
-            t0.join(UMZ_SETTLE_S)
-            _thread_go(uid, fn, *args)
-        finally:
-            with _UMI_LOCK:
-                _UMI_START[int(uid)] -= 1
-                if not _UMI_START[int(uid)]:
-                    _UMI_START.pop(int(uid))
-        return
-    _thread_go(uid, fn, *args)
+def umz_settle(busy, uid):
+    """2.308.0 (#3261): the worker publishes its state (key, preview, done) and then still closes its file and connections:
+    the person's next step right after it waits (at most UMZ_SETTLE_S s) for that end instead of answering "already
+    running". 2.370.3 (#2760): the end is the queue row's end (any process)."""
+    end = time.monotonic() + UMZ_SETTLE_S
+    while busy(uid) and time.monotonic() < end:
+        time.sleep(0.05)
 
 
-def _thread_go(uid, fn, *args):
+def umz_work(uid, fn, *args):
+    """2.370.3 (#2760): a step in the thread of its queue row; known in this process while it runs (_UMI)."""
     with _UMI_LOCK:
-        if _busy(uid):
-            raise Denied(409, tr("An import is already running"))
-        lc = _slot()
-        if lc is None:
-            raise Denied(429, tr("Too many imports are running on this server right now. Please try again in a few minutes."))
+        t = _UMI.get(int(uid))
+        if t and t.is_alive():  # review 2: a step taken again while the first still runs here: never two at once
+            raise RuntimeError("import step still running in this process")
+        _UMI[int(uid)] = threading.current_thread()
+    try:
+        fn(uid, *args)
+    finally:
+        if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_UMZ_END_DELAY"):  # tests only (#3261)
+            time.sleep(float(os.environ["KALMIDO_TEST_UMZ_END_DELAY"]))
 
-        def run():
-            try:
-                fn(uid, *args)
-            finally:
-                if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_UMZ_END_DELAY"):  # tests only (#3261)
-                    time.sleep(float(os.environ["KALMIDO_TEST_UMZ_END_DELAY"]))
-                lc.close()  # (the slot's lock ends with its connection)
-                with _UMI_LOCK:
-                    if _UMI_LAST.get(int(uid)) is threading.current_thread():
-                        _UMI_LAST.pop(int(uid), None)
-        t = threading.Thread(target=run, daemon=True)
-        _UMI[int(uid)] = _UMI_LAST[int(uid)] = t
-        t.start()
+
+@bgj_fn("umz:check", long=True)  # the check only reads the upload and builds the preview: run again after a lost run
+def umz_check_row(uid, iid, can_invite):
+    umz_work(uid, umz_check, iid, can_invite)
+
+
+@bgj_fn("umz:unlock", tries=1, long=True)  # replaces the upload with its opened ZIP: never twice
+def umz_unlock_row(uid, iid, okey, can_invite):
+    umz_work(uid, umz_unlock, iid, tuple(okey), can_invite)
+
+
+@bgj_fn("umz:import", tries=1, long=True)  # writes into the account: a lost run says "interrupted", never a second run
+def umz_import_row(uid, iid, opts):
+    umz_work(uid, umz_run, iid, opts)
+
+
+_UMZ_KIND_OF = {"umz_check": "umz:check", "umz_unlock": "umz:unlock", "umz_run": "umz:import"}
+
+
+def _thread(uid, fn, *args, iid=None, state=None):
+    """2.370.3 (#2760): the step as a queue row (the worker runs it). state (review 4): the step's state (checking / running),
+    written under the queue lock right before the row, so no process sees it without its row; meanwhile the waiting of this
+    process is not "interrupted" either (_UMI_START)."""
+    with _UMI_LOCK:
+        _UMI_START[int(uid)] = _UMI_START.get(int(uid), 0) + 1
+
+    def guard(qc):
+        umz_slots_guard(uid, _busy, qc)
+        if state:
+            _set(uid, iid, **state)
+    try:
+        umz_settle(_busy, uid)
+        bgj_add(_UMZ_KIND_OF[fn.__name__], uid, *args, user_id=uid, lock="umz:import", guard=guard)
+    finally:
+        with _UMI_LOCK:
+            _UMI_START[int(uid)] -= 1
+            if not _UMI_START[int(uid)]:
+                _UMI_START.pop(int(uid))
 
 
 def umz_undo_parts(c, cr):
@@ -2441,9 +2461,8 @@ def umz_piece(iid):
             w.finish()
         st = _set(uid, iid, received=off + n)
     if last:
-        _set(uid, iid, state="checking")
         try:
-            _thread(uid, umz_check, iid, bool(g.user["is_admin"]))
+            _thread(uid, umz_check, iid, bool(g.user["is_admin"]), iid=iid, state={"state": "checking"})
         except Denied:
             _set(uid, iid, state="upload", received=off)
             raise
@@ -2505,9 +2524,9 @@ def umz_go(iid):
             if "role" in v:  # 2.278.0 A (#3095): the role the admin confirmed (unknown = member; none sent = the file's)
                 picks[e]["role"] = umz_role(v["role"])
     c.rollback()
-    _set(uid, iid, state="running", progress={"done": 0, "total": 1}, target=org)
     try:
-        _thread(uid, umz_run, iid, {"org": org, "people": picks, "can_invite": bool(g.user["is_admin"])})
+        _thread(uid, umz_run, iid, {"org": org, "people": picks, "can_invite": bool(g.user["is_admin"])}, iid=iid,
+                state={"state": "running", "progress": {"done": 0, "total": 1}, "target": org})
     except Denied:
         _set(uid, iid, state="preview")
         raise
@@ -2527,9 +2546,8 @@ def umz_key_route(iid):
         okey = rck_parse(body().get("recovery_key"))  # 2.138.0 C (#1972): ("secret" | "key", 32 bytes), umz_org_decrypt
     except ValueError:
         return err(tr("This is not a recovery key (52 characters A-Z and 2-7, in groups of 4)."))
-    _set(uid, iid, state="checking")
     try:
-        _thread(uid, umz_unlock, iid, okey, bool(g.user["is_admin"]))
+        _thread(uid, umz_unlock, iid, okey, bool(g.user["is_admin"]), iid=iid, state={"state": "checking"})
     except Denied:
         _set(uid, iid, state="key")
         raise
@@ -2542,6 +2560,7 @@ def umz_cancel(iid):
     umz_person()
     uid = me()
     st = _need(uid, iid)
+    bgj_drop(UMZ_KINDS, user_id=uid)  # 2.370.3 (review 6): a step still waiting for the worker can be cancelled
     if st.get("state") in ("checking", "running") and _busy(uid):
         return err(tr("An import is already running"), 409)
     _drop(uid, iid)
