@@ -9,6 +9,7 @@ freelancer-matrix: office
    when a DATEV export already covers the payment's day the reversal is dated today (in the next export, review F2)
  - #2844 VAT note eu_goods: the client in another EU state with its VAT id (else 400), category K + deliver-to country in the
    XML, field 41; export: a client outside the EU, category G, field 43; reverse charge at home = field 60 / DATEV 8337,
+   2.502.0 (#4081) reverse charge to a third country refused, an older one in field 45 / DATEV 8338,
    to the EU = field 21 / DATEV 8336; a foreign currency without a rate is not finalised
  - the same for a person without an organisation (own office): eu_goods + field 41, the discount period check
 usage: p2355_c_buero_test.py <datadir>"""
@@ -196,6 +197,29 @@ acc = {g(x, "Belegfeld 1"): g(x, "Gegenkonto (ohne BU-Schlüssel)") for x in row
 nums = {did: A.get(B + f"{D}/{did}").json()["number"] for did in (E3, E5, R1, R2)}
 check(acc.get(nums[E3]) == "8125" and acc.get(nums[E5]) == "8120" and acc.get(nums[R1]) == "8337" and acc.get(nums[R2]) == "8336",
       f"#2844: DATEV accounts 8125 / 8120 / 8337 (13b at home) / 8336 (EU services) {acc} {nums}")
+# 2.502.0 (#4081): reverse charge to a client in a third country is refused ("not taxable domestically" is right there); an
+# older document that went out that way counts as not taxable: field 45 (not 21), DATEV 8338 (not 8336); the same in the ist basis
+C_CH = client(A, "Muster AG", "CH", "CHE-123.456.788")
+R3 = draft(A, C_CH, rate=900, extra=dict(NV, vat_note="reverse"))
+r = A.post(B + f"{D}/{R3}/finalize")
+check(r.status_code == 400 and "third country" in r.text, "#4081: reverse charge for a client in a third country refused " + r.text[:200])
+R3A = draft(A, C_CH, rate=500, extra=dict(NV, vat_note="abroad"))
+final(A, R3A, "2026-08-04")
+x = A.get(B + f"{D}/{R3A}/xml")
+check(x.ok and b"<ram:CategoryCode>O</ram:CategoryCode>" in x.content, "#4081: not taxable domestically = category O")
+k = ustva(A, "m08")["kz"]
+check(k["45"] == "500" and k["21"] == "0", f"#4081: the note 'abroad' in field 45 {k}")
+dbx("UPDATE clients SET country='FR' WHERE id=?", (C_CH,), write=True)  # the older document: finalised with the rule of before
+check(A.post(B + f"{D}/{R3}/finalize").ok, "#4081: (older document) finalised")
+dbx("UPDATE clients SET country='CH' WHERE id=?", (C_CH,), write=True)
+dbx("UPDATE office_docs SET date='2026-08-05', recipient_snapshot=replace(recipient_snapshot, '\"FR\"', '\"CH\"') WHERE id=?", (R3,), write=True)
+check('"CH"' in dbx("SELECT recipient_snapshot FROM office_docs WHERE id=?", (R3,))[0][0], "#4081: (older document) its snapshot says CH")
+k = ustva(A, "m08")["kz"]
+check(k["45"] == "1400" and k["21"] == "0", f"#4081: older reverse charge document of a third country in field 45, not 21 {k}")
+rows = extf(A, "2026-08-01", "2026-08-31")
+acc = {g(x, "Belegfeld 1"): g(x, "Gegenkonto (ohne BU-Schlüssel)") for x in rows if g(x, "Konto") == "10000"}
+n3 = A.get(B + f"{D}/{R3}").json()["number"]
+check(acc.get(n3) == "8338", f"#4081: DATEV: the not taxable account 8338, not 8336 {acc} {n3}")
 A.put(B + O + "/settings", json={"vat_basis": "ist"})
 # a foreign currency without a rate: rate 1 = none
 FX = draft(A, C_DE, extra={"currency": "GBP"})
@@ -213,6 +237,9 @@ F1 = draft(Fr, F_AT, rate=250, extra=dict(NV, vat_note="eu_goods"))
 final(Fr, F1, "2026-06-03")
 Fr.put(B + O + "/settings", json={"vat_basis": "soll"})
 check(ustva(Fr, "m06")["kz"]["41"] == "250", "freelancer: goods to the EU in field 41")
+F_CH = client(Fr, "Muster AG", "CH")  # 2.502.0 (#4081)
+r = Fr.post(B + f"{D}/{draft(Fr, F_CH, extra=dict(NV, vat_note='reverse'))}/finalize")
+check(r.status_code == 400 and "third country" in r.text, "freelancer: #4081 reverse charge for a third country refused " + r.text[:200])
 F2 = draft(Fr, F_AT, extra={"skonto_pct": 3, "skonto_days": 20, "payment_days": 10})
 r = Fr.post(B + f"{D}/{F2}/finalize")
 check(r.status_code == 400 and "cash discount period" in r.text, "freelancer: the discount period check " + r.text[:200])

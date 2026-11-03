@@ -16058,5 +16058,6 @@
   "Monthly on the {0} {1}|fem": "Monatlich am {0} {1}",
   "Every {0} months on the {1} {2}|fem": "Alle {0} Monate am {1} {2}",
   "Monthly on the last {0}|fem": "Monatlich am letzten {0}",
-  "Every {0} months on the last {1}|fem": "Alle {0} Monate am letzten {1}"
+  "Every {0} months on the last {1}|fem": "Alle {0} Monate am letzten {1}",
+  "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "für Kunden im Drittland den Hinweis „Nicht im Inland steuerbar“ statt Reverse Charge"
 }

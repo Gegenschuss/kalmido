@@ -82,3 +82,11 @@ def fk_reverse_case(client, home):
     if cc in ("", h):
         return "domestic"
     return "eu" if cc in FK_EU and h in FK_EU else "other"
+
+
+def fk_third_country(client, home):
+    """2.502.0 (#4081): is the client's country a real one outside the EU and outside the sender's own country? (A text that
+    is no country code says nothing.) Reverse charge stops there: a service to CH / GB / US is not taxable domestically."""
+    cc = fk_country_code(client)
+    h = fk_country_code(home) or str(home or "").strip().upper() or "DE"
+    return bool(cc) and cc != h and cc not in FK_EU

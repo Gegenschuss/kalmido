@@ -241,7 +241,7 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
     from .bankacc import bka_datev
     st = bka_datev(c, oid, dx_settings(s))  # 2.470.0 (#3596): the ledger account of the default bank account, when it has one
     home = hc_home(s)  # 2.189.0 B (#2475): lines in the home currency (DATEV itself only for EUR, dx_need_eur)
-    from .books import bk_reverse_dom  # 2.355.0 C (#2844)
+    from .books import bk_reverse_key  # 2.355.0 C (#2844)
     out, memo = [], {}
     docs = c.execute("SELECT d.*, cl.customer_no AS dx_customer_no, cl.name AS dx_client_name FROM office_docs d "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE d.org_id=? AND d.kind IN ('invoice','credit') "
@@ -256,8 +256,8 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
         text = (r["number"] + " " + name).strip()[:60]
         perf = _ddmmyyyy(r["service_to"] or r["date"] or "") if "service_to" in r.keys() else ""
         case = _case(r, s)
-        if case == "reverse" and bk_reverse_dom(c, oid, r, memo):
-            case = "reverse_dom"  # 2.355.0 C (#2844): section 13b at home
+        if case == "reverse":
+            case = bk_reverse_key(c, oid, r, memo)  # 2.355.0 C (#2844): section 13b at home; 2.502.0 (#4081): a third country = not taxable
         parts = []  # (case, gross amount in the document's currency)
         if case:
             parts.append((case, dec(t.get("gross") or 0)))

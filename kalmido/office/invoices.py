@@ -32,7 +32,7 @@ from .contacts_cl import fk_send_rcpts  # 2.433.0 (#3599)
 from .model import SCHEME_RE, scheme_variants  # 2.355.0 A (#2839)
 from .ledger import ofx_company, ofx_locked, ofx_log, ofx_need_editable
 from .rights import ofr_admin_or, NO_SPECIAL, ofr_allows, ofr_need_area
-from .countries import fk_reverse_case  # 2.296.0 F (#3168)
+from .countries import fk_reverse_case, fk_third_country  # 2.296.0 F (#3168); 2.502.0 (#4081)
 from .pdfweb import epdf_format  # 2.296.0 F (#3173)
 from . import abschlag as _abs  # 2.354.0 B (#2836): the module, abschlag imports invoices too (cycle)
 from .calc import office_calc  # 2.369.5 (#2517): pulled up from functions
@@ -316,7 +316,10 @@ def inv_missing(c, oid, r, s, pack, items):
     if r["vat_mode"] == "novat" and _col(r, "vat_note") == "reverse":  # 2.296.0 B (#3168): both VAT ids (section 14a (1) UStG, BR-AE-02)
         # 2.296.0 F (#3168): a stale note of a taxed invoice counts no more; at home (section 13b) the tax number will do and
         # the client needs a VAT id only for the EU case or when the e-invoice is built (BR-AE-02 asks for BT-48)
-        case = fk_reverse_case(cl["country"] if cl is not None and "country" in cl.keys() else "", co.get("country") or "DE")
+        ctry = cl["country"] if cl is not None and "country" in cl.keys() else ""
+        case = fk_reverse_case(ctry, co.get("country") or "DE")
+        if fk_third_country(ctry, co.get("country") or "DE"):  # 2.502.0 (#4081): Kz 21 / category AE are for the EU only
+            miss.append([N_("for a client in a third country the VAT note not taxable domestically instead of reverse charge")])
         if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
             miss.append([N_("your VAT ID (reverse charge)")])
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (

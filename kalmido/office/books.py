@@ -30,7 +30,7 @@ from ..core.i18n import N_, csv_dialect, tr, trn, lang
 from ..core.errors import BadInput
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
 from .calc import calc_lang, dec, dstr, money
-from .countries import fk_reverse_case  # 2.355.0 C (#2844)
+from .countries import fk_reverse_case, fk_third_country  # 2.355.0 C (#2844); 2.502.0 (#4081)
 from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
 from .ledger import ofx_company  # 2.355.0 C (#2844)
@@ -272,16 +272,19 @@ def _income_label(key):
             "abroad": tr("Tax-free revenue / reverse charge"), "exempt": tr("Tax-free revenue / reverse charge")}[key]
 
 
-def bk_reverse_dom(c, oid, r, memo):
-    """2.355.0 C (#2844): True when reverse charge document r goes to a client in the office's own country (section 13b
-    UStG, field 60) instead of another EU state (field 21); the client's country of the snapshot, else the live client."""
+def bk_reverse_key(c, oid, r, memo):
+    """2.355.0 C (#2844): the tax case of reverse charge document r: "reverse_dom" for a client in the office's own country
+    (section 13b UStG, field 60), "reverse" for another EU state (field 21); 2.502.0 (#4081): "abroad" for a third country,
+    finalised before the refusal in inv_missing (field 45). The client's country of the snapshot, else the live client."""
     if "home" not in memo:
         memo["home"] = ofx_company(c, oid).get("country") or "DE"
     cc = _j(r["recipient_snapshot"] if "recipient_snapshot" in r.keys() else "").get("country") or ""
     if not cc and r["client_id"]:
         cl = c.execute("SELECT country FROM clients WHERE id=?", (r["client_id"],)).fetchone()
         cc = (cl["country"] if cl else "") or ""
-    return fk_reverse_case(cc, memo["home"]) == "domestic"
+    if fk_reverse_case(cc, memo["home"]) == "domestic":
+        return "reverse_dom"
+    return "abroad" if fk_third_country(cc, memo["home"]) else "reverse"
 
 
 def bk_payments(c, oid, frm, to, home):
@@ -434,8 +437,8 @@ def bk_ustva(c, oid, year, period):
     memo = {}
 
     def add(k, net, vat, r=None):
-        if k == "reverse" and r is not None and bk_reverse_dom(c, oid, r, memo):
-            k = "reverse_dom"  # 2.355.0 C (#2844): section 13b at home = field 60, not 21
+        if k == "reverse" and r is not None:
+            k = bk_reverse_key(c, oid, r, memo)  # 2.355.0 C (#2844): section 13b at home = field 60, not 21; 2.502.0 (#4081): a third country = 45
         x = sums.setdefault(k, [Decimal(0), Decimal(0)])
         x[0], x[1] = x[0] + net, x[1] + vat
 

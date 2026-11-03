@@ -16058,5 +16058,6 @@
   "Monthly on the {0} {1}|fem": "Maandelijks op de {0} {1}",
   "Every {0} months on the {1} {2}|fem": "Elke {0} maanden op de {1} {2}",
   "Monthly on the last {0}|fem": "Maandelijks op de laatste {0}",
-  "Every {0} months on the last {1}|fem": "Elke {0} maanden op de laatste {1}"
+  "Every {0} months on the last {1}|fem": "Elke {0} maanden op de laatste {1}",
+  "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "voor een klant in een derde land de vermelding „Niet belastbaar in het binnenland” in plaats van btw verlegd"
 }
