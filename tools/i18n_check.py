@@ -144,7 +144,7 @@ def split_check():
     for rel in [os.path.join("static", "js", f) for f in start] + [r for r in SOURCES if r.endswith(".py")]:
         src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
         for _, key, _, _ in KEYS.key_calls(src, rel.endswith(".py")):
-            if key in mod_of:
+            if key in mod_of and not (rel.endswith(".py") and mod_of[key] == KEYS.PY_PART):  # 2.501.0 (#4198)
                 errs.append(f"split: {key!r} of {rel} is in the part of the module {mod_of[key]}, not in the core")
     return mod_of, mods, errs
 

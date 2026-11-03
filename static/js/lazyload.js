@@ -32,7 +32,7 @@ const LD_MODS = {
   pdf: ['pdfview', 'docpreview'],  // 2.92.0 C (#1926): docpreview.js = the Word / Excel preview
   mindmap: ['mindmap'],
   diagram: ['diagram'],  // 2.382.0 (#3153): formulas / Mermaid diagrams of knowledge pages, only when a page has one (wiki.js wk_dgNeed)
-  wiki: ['wkshare', 'wkhist', 'wkembed', 'wklive', 'wktags', 'wiki', 'wkimport'],  // 2.371 (#3150): wktags.js = tags + the abfrage block; wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes
+  wiki: ['wikie2e', 'wkshare', 'wkhist', 'wkembed', 'wklive', 'wktags', 'wiki', 'wkimport'],  // 2.371 (#3150): wktags.js = tags + the abfrage block; wiki.js after the parts its view draws with (a redraw in between hit wem_cut undefined), before wkimport.js (its wki_resume reports with wka_done);  2.177.0 (#2685): wkimport.js = large ZIP imports with progress; 2.123.0 B (#2104): wkshare.js = shares; A (#2102, #2106): wkhist.js = history + text search; C (#2103, #2107, #2108): wkembed.js = Ablage pictures, links, checkboxes; 2.501.0 (#4198): wikie2e.js FIRST: a failed load stops the chain, so wiki.js never runs (and writes) without the lock of its space
   stats: ['stats'],
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
@@ -52,6 +52,8 @@ const LD_MODS = {
   sheets: ['sheetfold', 'sheets', 'sheets2', 'sheetsio', 'sheetsize', 'sheetshare', 'sheetchart', 'sheetkinds', 'sheetbook'],  // 2.89.0 (#1916); D: sheets2.js (step 2), C: sheetsio.js (import/export); 2.98.0 C (#2181): sheetsize.js (the frame); 2.124.0 A (#2115): sheetchart.js; C (#2113): sheetshare.js; B (#2110): sheetkinds.js; E (#2116): sheetbook.js; 2.199.0 C (#2742): sheetfold.js (folders; 2.200.0 F: first, the overview calls it when sheets.js is in)
   fslock: ['fslock'],  // 2.353.0 A (#2758): locked folders of the file store (loaded by the file store's first view)
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
+  ablage: ['ablage', 'ablinks'],  // 2.501.0 (#4198): the file store (ablage.js) and its external links, on its first view / panel
+  family: ['family'],  // 2.501.0 (#4198): the module Family, on its view, a family list, a task panel while it is on
   filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
   fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
@@ -85,10 +87,13 @@ const LD_MODS = {
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['tagsel', 'asstprop'], office: ['asstprop', 'ofundo'], sheets: ['ofundo']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'ablage', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop'], office: ['asstprop', 'ofundo', 'ablage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
+// 2.501.0 (#4198): module ablage: settings (the sharing defaults), docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation)
+  ablage: ['ab_linkFile'],  // 2.501.0 (#4198): the button of a file row in a task / project
+  family: ['occModal', 'dlModal', 'famPack', 'shopModeOpen', 'paskOpen', 'kd_pinAsk'],  // 2.501.0 (#4198): the palette, the first start, a child's PIN
   contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'], fsshare: ['fs_shareDialog'],  // 2.199.0 A (#2742): fsshare
   // 2.65.0 (#1823)
   agentchat: ['acdDeleteMsg', 'chatOpen', 'ac_modOff', 'chatClose', 'chatPop', 'chatDock', 'chatFloatMin', 'apvJump', 'chatChoice', 'shareDest', 'chatFileRm', 'chatReact',
@@ -116,7 +121,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
   integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], abscan: ['abscan'], calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
-const LD_VIEW = {viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
+const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
   chatViewHtml: ['agentchat', 1], jobStepsHtml: ['agentchat'], aiuCardHtml: ['agentchat'], aiuNewsText: ['agentchat'], chatInner: ['agentchat'],
@@ -144,6 +149,59 @@ document.addEventListener('click', e => {
     tpo_edit(null, {task_id: t.id, title: t.title, space: wsOf(listById(t.list_id))});
   }
 });
+// 2.501.0 (#4198) the file store (ablage.js, module ablage): what the start files ask before it is loaded stays here (moved here):
+// the module switch, the names of the spaces, the hint of a trashed folder, the "Show in the file store" button of a file row
+const ab_on = () => feat('files') && !S.me?.kid;
+FEAT_DESC.files = N_('Folders and files, shared with people and agents, versions');
+const ab_spaceName = s => s === 'private' ? tr('My files') : s === 'shared' ? tr('Shared with me') : s === 'trash' ? tr('Trash') : wsName(s);
+const ab_spaceIcon = s => s === 'private' ? ic('home', 's') : s === 'shared' ? ic('users', 's') : s === 'trash' ? ic('trash', 's') : wsIcon(s);
+const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
+const ab_linkBtn = (kind, id, org, cls) => ab_on() ? `<button type="button" class="${cls} ablink" data-ablink="${kind}:${id}:${org || ''}" title="${esc(tr('Show in the file store'))}" aria-label="${esc(tr('Show in the file store'))}">${ic('folder', 's')}</button>` : '';
+document.addEventListener('click', e => {
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-ablink]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  const [k, id, org] = b.dataset.ablink.split(':');
+  ab_linkFile(k, +id, +org || null);
+}, true);
+// 2.501.0 (#4198) the module Family (family.js, module family; off by default): what the rows, the task panel, the start page, the
+// palette and a child's PIN ask at start stays here (moved here); its bar and the panel's section load it when one is drawn.
+const famOn = () => feat('family');
+S.kids = []; S.famWeek = null; S.shop = null;
+const famKindOf = lid => listById(lid)?.family || '';
+const isOcc = t => !!t?.fam && (t.fam.kind === 'birthday' || t.fam.kind === 'anniversary');
+const occAge = t => isOcc(t) && t.fam.year && t.due ? +t.due.slice(0, 4) - t.fam.year : null;
+function occWhat(t) {
+  const a = occAge(t); if (a == null || a < 0) return '';
+  return t.fam.kind === 'birthday' ? tr('turns {0}', a) : trn('{0} year', '{0} years', a);
+}
+const daysTo = d => Math.round((+pd(d) - +pd(today())) / 864e5);
+function daysWord(n) { return n === 0 ? tr('today') : n === 1 ? tr('tomorrow') : n < 0 ? trn('{0} day ago', '{0} days ago', -n) : trn('in {0} day', 'in {0} days', n); }
+const isShopItem = t => !!t && !t.parent_id && (t.fam?.kind === 'shop' || (famKindOf(t.list_id) === 'shopping' && !t.fam));
+const shopQty = t => t?.fam?.kind === 'shop' && t.fam.qty != null ? fmtNum(t.fam.qty, 3) + (t.fam.unit ? ' ' + t.fam.unit : '') : (t?.fam?.kind === 'shop' && t.fam.unit ? t.fam.unit : '');
+const famRowQty = t => famOn() && isShopItem(t) && shopQty(t) ? `<span class="qtym" title="${esc(tr('Quantity'))}">${esc(shopQty(t))}</span>` : '';
+const PACK_UI = [['holiday', N_('Holiday'), 'beach'], ['pool', N_('Swimming pool'), 'wave'], ['daycare', N_('Daycare'), 'bag'], ['camping', N_('Camping'), 'tent'], ['business', N_('Business trip'), 'brief']];  // 2.223.0 C (#2820): app icons, not emoji
+function rxMore(anchor) {
+  const act = anchor.dataset.rxact, mid = +anchor.dataset.mid;
+  reactPicker(anchor, null, v => act === 'chat-react' ? chatReact(mid, v) : act === 'tc-react' ? tcReact(mid, v) : null);
+  setTimeout(() => $('#pop .rxgrid button')?.focus({preventScroll: true}), 0);
+}
+document.addEventListener('click', e => { const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-act="rx-more"]'); if (!b) return; e.preventDefault(); e.stopPropagation(); rxMore(b); });
+function sideSearchSync() {
+  const sc = $('#scrim'); if (!sc) return;
+  let b = $('.sidesearch', sc);
+  if (!b) {
+    b = document.createElement('button'); b.type = 'button'; b.className = 'iconbtn sidesearch';
+    b.addEventListener('click', e => { e.stopPropagation(); closeSide(); openPalette(); });
+    sc.appendChild(b);
+  }
+  const lab = tr('Search and commands');
+  if (b.getAttribute('aria-label') !== lab) { b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = ic('search'); }
+}
+const kd_me = () => (S.me?.kid && (S.kids || [])[0]) || null;
+function kd_pinNeed() { const k = kd_me(); return !!(k && k.pin && !(k.pin_open && Date.parse(k.pin_open) > Date.now())); }
+function kd_pinClosed() { const k = kd_me(); if (k) { k.pin_open = null; if (!$('.kdpin')) kd_pinAsk(); } }
+window.famBar = l => { if (famOn() && l?.family && !l.archived) ld_later('family'); return ''; };
+window.famDetailHtml = t => { if (famOn() && t?.id > 0 && !t.context) loadModule('family').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 // stays at start (core.js modOn, areas, dashboard, the client page ask it before anything of the office is loaded)
 const officeOn = () => feat('office') && !S.me?.kid;
 

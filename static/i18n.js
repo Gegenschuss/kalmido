@@ -120,6 +120,19 @@ async function i18nPartLoad(name) {  // -> true: texts were added
   if (I18N_MISS.size || I18N.stale) i18nRetry();
   return !miss.length;
 }
+// 2.501.0 (#4198): the keys only the server's code names are a part of their own (core/i18nkeys.py PY_PART). A key tr() does not know
+// may be one the server handed out (tr(variable)): it shows in English for a moment, this part comes once per language, then the
+// app draws again.
+function i18nPyAsk() {
+  const t = I18N;
+  if (t.pyAsk || t.code === 'en' || t.whole || t.parts?.has('py') || !Array.isArray(t.dict._mods) || !t.dict._mods.includes('py')) return;
+  t.pyAsk = true;
+  setTimeout(() => {
+    i18nPartLoad('py').then(got => {
+      if (got && I18N === t && typeof render === 'function' && typeof S !== 'undefined' && S.booted) { try { render(); } catch { /* next render */ } }
+    }, () => {});
+  }, 0);
+}
 // 2.191.0 A: the parts of every module of the active language, fetched one per idle moment when a service worker keeps them
 // (each module opens translated offline too); a part already kept is not fetched again
 // 2.191.0 F2 (#2518): started by each language load (i18nWarmSoon), not by the idle chain of lazyload.js; waits for the
@@ -210,6 +223,7 @@ const i18nKey = k => { const bar = k.indexOf('|'); return bar > 0 && !/[<>]/.tes
 /** @param {string} key @param {...any} a @returns {string} */  // 2.102.0 (#1995)
 function tr(key, ...a) {
   const v = I18N.dict[key];
+  if (v === undefined) i18nPyAsk();
   return i18nFmt(typeof v === 'string' ? v : i18nKey(key), a);
 }
 // 2.11.0: the "one" form follows the language's plural rule where it differs (French: 0 and 1), else n === 1
@@ -222,6 +236,7 @@ function plOne(n) {
 /** @param {string} one @param {string} other @param {number} n @param {...any} a @returns {string} */
 function trn(one, other, n, ...a) {
   const v = I18N.dict[one], i = Array.isArray(v) && plOne(n) ? 0 : n === 1 ? 0 : 1;
+  if (v === undefined) i18nPyAsk();
   return i18nFmt(Array.isArray(v) ? v[i] : i18nKey(i ? other : one), [n, ...a]);
 }
 /** @type {(s: string) => string} */

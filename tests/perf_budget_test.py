@@ -30,6 +30,7 @@ check(rc == 0, "(a) current state within the budget: " + out)
 rc, out = run("--json")
 d = json.loads(out)
 check(rc == 0 and d["over"] == [] and d["measured"]["start_scripts"] > 50, "(a) --json output")
+check(all(d["limits"].get(k) for k in ("start_i18n_bytes", "start_i18n_gzip")) and d["measured"]["start_i18n_gzip"] > 0, "(a) 2.501.0 (#4198): the language core has limits")
 
 with tempfile.TemporaryDirectory() as tmp:
     small = os.path.join(tmp, "small.json")

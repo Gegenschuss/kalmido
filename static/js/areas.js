@@ -889,7 +889,7 @@ function sbb_panelHtml0(id) {
   // 2.152.3 B (#2619 #2620): sheets.js / wiki.js come with their page (lazyload.js); their load draws the panel (sbb_sync)
   if (id === 'sheets') return title + (typeof shv_panelHtml === 'function' ? (SBB_LAST.sheets = shv_panelHtml()) : (ld_later('sheets'), ''));
   if (id === 'wiki') return title + (typeof wk_panelHtml === 'function' ? (SBB_LAST.wiki = wk_panelHtml()) : (ld_later('wiki'), ''));
-  if (id === 'ablage') return title + (SBB_LAST.ablage = ab_panelHtml());  // 2.152.3 B (#2621): ablage.js
+  if (id === 'ablage') return title + (typeof ab_panelHtml === 'function' ? (SBB_LAST.ablage = ab_panelHtml()) : (ld_later('ablage'), ''));  // 2.152.3 B (#2621): ablage.js; 2.501.0 (#4198): on demand
   // 2.152.2 (#2618): time, review, home, file store: their parts as entries (hidden ones per part stay hidden, unless open)
   const a = mg_area(id);
   if (a) return title + `<div class="sgroup sbbp">${mg_partsMenu(a).map(p => {

@@ -83,6 +83,8 @@ Translations: English is the source language in the code. `tr("English text")` i
 module loaded on demand with the module (`/static/i18n/<code>.mod-<name>.json`); the server splits the one file per
 language at run time (`kalmido/core/i18nparts.py`, keys read by `kalmido/core/i18nkeys.py`, the same reader as
 `tools/i18n_check.py`).
+2.501.0 (#4198): the keys only the server's code names (no call, no string literal in any client file) are the part `py`, outside the
+core. A key `tr()` does not know may be one the server handed out: it shows in English, the part loads once and the app draws again.
 
 ## Server: the package `kalmido/`
 
@@ -730,7 +732,7 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 `python tools/perf_budget.py` measures, statically from `static/index.html`, what the browser loads before the app shows
 anything: every script tag (raw and gzip size, count) and the stylesheets, and lists the files loaded on demand (`LAZY` /
 `LAZY_CSS` in `static/sw.js`) for comparison. The limits are in `tools/perf_budget.json` (`start_js_bytes`, `start_js_gzip`,
-`start_css_bytes`, `start_css_gzip`, `start_scripts`, and `start_ms`, the load time until the list shows, which
+`start_css_bytes`, `start_css_gzip`, `start_i18n_bytes`, `start_i18n_gzip` (the language core of `de`), `start_scripts`, and `start_ms`, the load time until the list shows, which
 `tests/perf_ui.js` checks in the browser). CI runs the tool in the lint job; a value over its limit prints
 `Budget exceeded: <key> <actual> > <limit>` and fails the build. `tests/perf_budget_test.py` proves that an oversized state fails.
 

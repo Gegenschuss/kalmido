@@ -6,7 +6,7 @@
    numbers); server side kalmido/wiki/wikie2e.py. Decrypted texts live only in this page's memory (H1): the wiki index and
    the open page (WK) and the memo below; wkeWipe drops them when the encryption is locked or the person logs out. */
 'use strict';
-// lazy-ok-module wiki: 2.149.0 F (#2519): the page helpers (wk_*) run from wiki.js (create / rename / move / import / export / the lock dialog) or after typeof wk_spaces
+// 2.501.0 (#4198): loads as the first file of the module wiki (lazyload.js); nothing of it runs before wiki.js is there
 
 // ------------------------------------------------------------------ state
 // st: space -> {space_id, mode, gen, rotate, reenc, pending, mine, can_manage} (the index's e2e or the e2e route; only spaces
@@ -921,11 +921,6 @@ function wkeScopeBox() {
   const sps = Object.keys(WKE.st).filter(sp => WKE.st[sp]?.mode);
   if (!sps.length) return '<div class="wkescope" hidden></div>';
   return `<div class="pmcs br wkescope"><b>${ic('lock', 's')} ${esc(tr('Encrypted in the browser (knowledge pages)'))}</b><ul>${sps.map(sp => `<li>${esc(wk_spaceName(sp))}</li>`).join('')}</ul><small class="muted pmcsn">${esc(tr('Agents have no access to these knowledge pages.'))}</small></div>`;
-}
-
-// a news entry "the key of the knowledge pages of <organisation> was released to you" (collab.js newsText)
-function wkeNewsText(it, who, q) {
-  return tr('{0} released the key for the knowledge pages of {1} to you', who, q(it.data?.name || tr('Organisation')));
 }
 
 // ------------------------------------------------------------------ 2.97.0 D (#2050): to another workspace with the lock

@@ -15,7 +15,7 @@ function render0() {
   lp_sync();  // 2.53.0 (#1426): the open list's colour as the accent of the list view (listcolor.js)
   wsc_sync();  // 2.53.0 (#1474): its workspace's colour as the header stripe and the frame of the input fields (wscolor.js)
   sideSearchSync(); badgeSync();
-  if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included)
+  if (S.shop) shopDraw();  // 2.19.0: shopping mode follows every reload (the app's own poll included); lazy-ok: only shopModeOpen (family.js) sets S.shop
   fitLayout(true); renderSide(); annSync(); ntfAskSync(); if (typeof le2u_barSync === 'function') le2u_barSync(); renderTop(); renderView(); renderTabs(); quotaNudge(); sup_barSync();  // 2.64.1 (#1817): le2u = the bar of a locked list; 2.74.0 (#338): + the yearly supporter hint
   $('#fab').innerHTML = ic('plus'); $('#fab').setAttribute('aria-label', tr('New task')); $('#fab').title = kt(tr('New task'), 'n');
   fabSync();
@@ -1827,6 +1827,7 @@ function viewListBody() {
   // 2.396.0 (#3385): the project dialog has no "Used for" any more: a private list named like a shopping list offers the
   // shopping mode once (aisles, quantities, ticked at the bottom); a packing list keeps the tip below (only ticked at the bottom)
   const shopHint = !!rl && !ro && isOwner(rl) && famOn() && !rl.family && !rl.org_id && !rl.is_inbox && !isTracked(rl) && /einkauf|shopping|groceries|courses|compra|spesa|boodschap/i.test(rl.name) && !hintSeen('shop');
+  if (shopHint) loadModule('family').catch(() => {});  // 2.501.0 (#4198): its button is handled in family.js
   if (shopHint) h += `<div class="onehint" data-hint="shop">${ic('cart', 's')}<span>${esc(tr('Use as a shopping list? Shopping mode with aisles and amounts, ticked items stay at the bottom.'))}</span><button type="button" class="btn sm" data-act="shop-on" data-id="${rl.id}">${tr('Use as a shopping list')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="shop" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   else if (rl && !ro && isOwner(rl) && !ck && (['shopping', 'packing'].includes(rl.family) || /einkauf|shopping|groceries|pack(liste|ing)|courses|compra|spesa|boodschap|paklijst/i.test(rl.name)) && !hintSeen('dab')) h += `<div class="onehint" data-hint="dab">${ic('cart', 's')}<span>${esc(tr('Shopping or packing list? Ticked items stay at the bottom and come back with a tap.'))}</span><button type="button" class="btn sm" data-act="dab-on" data-id="${rl.id}">${tr('Turn on')}</button><button type="button" class="iconbtn hx" data-act="hint-x" data-k="dab" aria-label="${esc(tr('Dismiss'))}" title="${esc(tr('Dismiss'))}">${ic('x', 's')}</button></div>`;
   // 2.31.0 (#1052): grouped by date, "All to today" / "Another day…" sit in the head of "Overdue" (no card of their own)

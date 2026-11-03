@@ -27,10 +27,12 @@ function ftxtResults() {
   const items = r.items || [], lfs = r.list_files || [];
   if (!items.length && !lfs.length) return `<div class="empty abempty">${ic('search')}<span>${tr('No results.')}</span></div>`;
   const why = h => h === 'text' ? tr('Found in the text') : h === 'doc' ? tr('Found in sender, type or tags') : '';  // 2.353.0 D (#2759): doc
+  // lazy-ok-begin: ftxtResults draws inside the file store's view (ablage.js is loaded)
   const fsRows = items.map(n => {
     const meta = [why(n.hit), n.folder ? tr('in {0}', n.folder) : ''].filter(Boolean).join(' · ');
     return `<div class="abrow ftxtrow" role="listitem" data-abid="${n.id}"><button type="button" class="abopen" data-ab="open" data-id="${n.id}">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button><span class="abmeta muted">${esc(meta)}</span><span class="abbadges"></span><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   }).join('');
+  // lazy-ok-end
   const lfRows = lfs.map(f => {
     const meta = [why(f.hit), tr('Project {0}', f.list_name)].filter(Boolean).join(' · ');
     return `<div class="abrow ftxtrow" role="listitem"><button type="button" class="abopen" data-ftxt-lf="${f.id}">${ic(f.mime === 'application/pdf' ? 'pdf' : /^image\//.test(f.mime || '') ? 'picture' : 'file')}<span class="abtxt"><span class="abname">${esc(f.name)}</span><span class="abmeta2 muted">${esc(meta)}</span></span></button><span class="abmeta muted">${esc(meta)}</span></div>`;

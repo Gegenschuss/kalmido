@@ -5,12 +5,8 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const ab_on = () => feat('files') && !S.me?.kid;
-FEAT_DESC.files = N_('Folders and files, shared with people and agents, versions');
 const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Set(), drag: null};
 const ab_spaces = () => { const w = wsCur(); return [...(w === 'all' || w === 'private' || !wsOn() ? ['private'] : []), ...(wsOn() ? (S.me?.workspaces || []).filter(o => w === 'all' || w === 'org:' + o.id).map(o => 'org:' + o.id) : []), 'shared', 'trash']; };
-const ab_spaceName = s => s === 'private' ? tr('My files') : s === 'shared' ? tr('Shared with me') : s === 'trash' ? tr('Trash') : wsName(s);
-const ab_spaceIcon = s => s === 'private' ? ic('home', 's') : s === 'shared' ? ic('users', 's') : s === 'trash' ? ic('trash', 's') : wsIcon(s);
 const ab_curSpace = () => { const sp = ab_spaces(); return sp.includes(AB.space) ? AB.space : sp[0]; };
 const ab_url = (n, dl, v) => `/api/files/nodes/${n.id}/content?${[dl ? 'dl=1' : '', v ? 'v=' + v : ''].filter(Boolean).join('&')}`;
 const ab_isImg = n => /^image\/(png|jpe?g|gif|webp|avif)$/.test(n.mime || '');
@@ -24,7 +20,6 @@ const FS_REF_ICON = {address_book: 'book', contact: 'user', contract_file: 'pdf'
 const FS_REF_VIEW = {contract_file: 'pdf', office_agreement: 'text'};
 const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n.kind === 'link' ? ic('link') : n.kind === 'ref' ? ic(FS_REF_ICON[n.ref_kind] || 'file') : ab_isPdf(n) ? ic('pdf') : ab_isImg(n) ? ic('picture') : ic('file');
 // 2.199.0 A (#2742): the hint after a folder went into the trash: what may not be deleted stayed, one level up (kept of the server)
-const fs_keptText = kept => kept?.length ? trn('{0} entry stays, one level up: {1}', '{0} entries stay, one level up: {1}', kept.length, [...new Set(kept.map(k => k.reason))].join(', ')) : '';
 
 // ---- loading
 const ab_key = r => r.nid ? 'n:' + r.nid : r.aus ? 'c:' + r.aus + ':' + ab_curSpace() : 's:' + ab_curSpace();  // 2.429.0 (#3580): + a collection
@@ -451,18 +446,11 @@ function ab_sideDrop(e) {
 }
 // ---- "Show in the file store" for a task / project file: a link at the top of the file's workspace (no copy; the original's
 // rights stay). The button sits on the file tiles of tasks (attachments.js) and project pages (projects.js).
-const ab_linkBtn = (kind, id, org, cls) => ab_on() ? `<button type="button" class="${cls} ablink" data-ablink="${kind}:${id}:${org || ''}" title="${esc(tr('Show in the file store'))}" aria-label="${esc(tr('Show in the file store'))}">${ic('folder', 's')}</button>` : '';
 async function ab_linkFile(refKind, refId, org) {
   let n; try { n = await api('POST', '/api/files/links', {ref_kind: refKind, ref_id: refId, space: org ? 'org:' + org : 'private'}); } catch { return; }
   if (S.route.mod === 'ablage') ab_reload();
   offerUndo(tr('“{0}” is now in your files', n.name), histAdd({label: tr('Show “{0}” in the file store', n.name), undo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`), redo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`)}));
 }
-document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-ablink]'); if (!b) return;
-  e.preventDefault(); e.stopPropagation();
-  const [k, id, org] = b.dataset.ablink.split(':');
-  ab_linkFile(k, +id, +org || null);
-}, true);
 
 // ---- 2.96.0 A (#1941): choose several rows (checkboxes, big targets on phones) and move them -- within the space ("Move to…")
 // or into the other workspace (private <-> organisation, the shared dialog of spacemove.js). Each action = ONE undo step.
@@ -588,3 +576,4 @@ function abm_scan() {
     offerUndo(tr('“{0}” saved', created[0].name), histAdd({label: tr('Scan'), undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
   }});
 }
+if (typeof sbb_sync === 'function') sbb_sync('ablage');  // 2.501.0 (#4198): loaded later than the panel was drawn (lazyload.js): its panel now

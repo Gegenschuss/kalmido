@@ -562,7 +562,7 @@ function unionRect(els) {
 const tourOrg = () => (S.me?.workspaces || []).find(w => w.role !== 'admin') || null;
 const tourHasProjects = () => { const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived); return ls.some(l => l.owner_id !== S.me?.id) || ls.length > 1; };
 function tourSteps() {
-  if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js)
+  if (S.me?.kid) return kd_tourSteps();  // 2.49.0 (#1533): a child gets its own short tour (family.js); lazy-ok: tourStart loads it first
   const m = isMobile(), touch = isTouch(), s = [];
   const rect = sel => () => { const e = typeof sel === 'function' ? sel() : $(sel); return e ? e.getBoundingClientRect() : null; };
   // 2.365.0 (#2802): the phone's own wording: the Basket is in the bar at the bottom (the ring went to the menu at the top)
@@ -641,6 +641,7 @@ window.addEventListener('hashchange', () => setTimeout(() => {
   else tourModAuto();
 }, 0));
 function tourStart(mod) {
+  if (!mod && S.me?.kid && typeof kd_tourSteps !== 'function') { loadModule('family').then(() => tourStart(), () => {}); return; }  // 2.501.0 (#4198): a child's tour is in family.js
   TOUR.wait = false; TOUR.paused = false; TOUR.mod = mod || '';
   closePalette(); $$('.modal:not(.authscreen)').forEach(x => x.remove()); closePop(); if (S.sel) closeDetail();
   const inList = S.route.mod === 'tasks' && !NOLIST_KEYS.includes(S.route.key) && !isKanban() && !isTimeline();

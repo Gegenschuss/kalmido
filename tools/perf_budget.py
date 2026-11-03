@@ -92,7 +92,7 @@ def pbg_measure(root):
 
 def pbg_i18n(root, code="de"):
     """2.191.0 A (#2518): the language texts of the start = the core of <code>.json (kalmido/core/i18nkeys.py, as the server
-    splits it); the texts of the modules come with them. Measured only (no limit in perf_budget.json yet)."""
+    splits it); the texts of the modules come with them. 2.501.0 (#4198): start_i18n_* are limits now."""
     import importlib.util
     path, kp = os.path.join(root, "static", "i18n", code + ".json"), os.path.join(root, "kalmido", "core", "i18nkeys.py")
     if not os.path.isfile(path) or not os.path.isfile(kp):

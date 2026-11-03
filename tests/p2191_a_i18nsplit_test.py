@@ -80,6 +80,13 @@ for rel in KEYS.key_sources(ROOT):
         elif fn in ("N_", "Nn_"):
             marked.add(key)
 must_core |= marked
+# 2.501.0 (#4198): the keys only the server's code names are the part "py"; none of them may be named by a client file
+py_part = {k for k, m in MOD_OF.items() if m == KEYS.PY_PART}
+client_keys = {key for rel in KEYS.key_sources(ROOT) if not rel.endswith(".py")
+               for _, key, _, _ in KEYS.key_calls(open(os.path.join(ROOT, rel), encoding="utf-8").read(), False) if key}
+check(py_part and py_part <= server_keys, f"the part py holds server keys ({len(py_part)})")
+check(not py_part & client_keys, f"no key a client file names is in the part py {sorted(py_part & client_keys)[:3]}")
+must_core -= py_part
 check(not must_core & set(MOD_OF), f"no key of a start script / the server / a N_ mark is in a part {sorted(must_core & set(MOD_OF))[:3]}")
 
 sizes = {}

@@ -8,28 +8,17 @@
 // lists (see the server's section): birthdays / anniversaries (yearly tasks, the age, gift ideas = subtasks, import from
 // CardDAV contacts), household rotation (tasks.rotation), kid accounts (simple view, stars, rewards), who comes along
 // (task people), shopping lists (areas = sections, shopping mode), household deadlines, meal plan, packing templates.
-const famOn = () => feat('family');
 const kidMe = () => !!S.me?.kid;
-S.kids = []; S.famWeek = null; S.shop = null;
 const FAM_KINDS = [['', N_('An ordinary project')], ['shopping', N_('Shopping list')], ['meals', N_('Meal plan')], ['birthdays', N_('Birthdays')],
   ['household', N_('Household')], ['packing', N_('Packing list')], ['family', N_('Family')], ['recipes', N_('Recipes')]];  // 2.46.1 (#1615): "family"; 2.140.0 A (#2132): "recipes"
 const FAM_KIND_ICON = {shopping: 'cart', meals: 'meal', birthdays: 'cake', household: 'home', packing: 'bag', recipes: 'book'};
-const famKindOf = lid => listById(lid)?.family || '';
-const isOcc = t => !!t?.fam && (t.fam.kind === 'birthday' || t.fam.kind === 'anniversary');
 const isDl = t => t?.fam?.kind === 'deadline';
 // 2.46.1 (#1615): a meal = a task marked as one (fam.kind meal, any list) or a task of an old Meal plan list
 const pm_isMeal = t => t?.fam?.kind === 'meal' || famKindOf(t?.list_id) === 'meals';
-const occAge = t => isOcc(t) && t.fam.year && t.due ? +t.due.slice(0, 4) - t.fam.year : null;
 // "turns 80" / "25 years" (the anniversary), '' without a year
-function occWhat(t) {
-  const a = occAge(t); if (a == null || a < 0) return '';
-  return t.fam.kind === 'birthday' ? tr('turns {0}', a) : trn('{0} year', '{0} years', a);
-}
 const DL_TYPES = [['passport', N_('Passport'), 'key'], ['id_card', N_('ID card'), 'user'], ['car', N_('Car inspection'), 'pulse'],
   ['insurance', N_('Insurance'), 'lock'], ['contract', N_('Contract'), 'file'], ['other', N_('Other deadline'), 'hourglass']];
 const dlName = k => tr((DL_TYPES.find(x => x[0] === k) || DL_TYPES[5])[1]);
-const daysTo = d => Math.round((pd(d) - pd(today())) / 864e5);
-function daysWord(n) { return n === 0 ? tr('today') : n === 1 ? tr('tomorrow') : n < 0 ? trn('{0} day ago', '{0} days ago', -n) : trn('in {0} day', 'in {0} days', n); }
 
 // ---- what the Family view shows (the same rules as GET /api/family on the server)
 // the whole turn order from whoever is on now: "Alice → Bob → Lina"
@@ -48,9 +37,6 @@ function famData() {
 const shopOpen = lid => [...S.tasks.values()].filter(t => t.list_id === lid && t.status === 0 && !t.deleted_at && !t.parent_id).length;
 
 // ---- 2.140.0 A (#2131): amount + price of a shopping item (tasks.fam {kind: shop, qty?, unit?, price?}; the title stays the name)
-const isShopItem = t => !!t && !t.parent_id && (t.fam?.kind === 'shop' || (famKindOf(t.list_id) === 'shopping' && !t.fam));
-const shopQty = t => t?.fam?.kind === 'shop' && t.fam.qty != null ? fmtNum(t.fam.qty, 3) + (t.fam.unit ? ' ' + t.fam.unit : '') : (t?.fam?.kind === 'shop' && t.fam.unit ? t.fam.unit : '');
-const famRowQty = t => famOn() && isShopItem(t) && shopQty(t) ? `<span class="qtym" title="${esc(tr('Quantity'))}">${esc(shopQty(t))}</span>` : '';
 // the same rules as the server's shop_split: a clear leading amount ("2 Milch", "500 g Mehl", "2x Eier"); else none
 const SHOP_UNITS = 'x|×|kg|g|gr|mg|l|ml|cl|dl|liter|litre|liters|litres|stk|st|stück|pck|pack|packs|packung|packungen|dose|dosen|can|cans|bund|bunch|el|tl|tbsp|tsp|cup|cups|pcs|piece|pieces|becher|glas|gläser|flasche|flaschen|bottle|bottles|scheiben|slice|slices|zehen|clove|cloves|prise|pinch|oz|lb|lbs';
 const SHOP_SPLIT = new RegExp(`^\\s*(\\d{1,5}(?:[.,]\\d{1,3})?|\\d{1,3}\\s*/\\s*\\d{1,3}|\\d{0,3}\\s*[½¼¾⅓⅔])\\s*(?:(${SHOP_UNITS})\\.?(?=\\s)|)\\s+(\\S.*)$`, 'iu');
@@ -129,7 +115,6 @@ function viewFamily() {
       pack: card('pack', 'bag', tr('Packing lists'), packH),
     })}</div>`;
 }
-const PACK_UI = [['holiday', N_('Holiday'), 'beach'], ['pool', N_('Swimming pool'), 'wave'], ['daycare', N_('Daycare'), 'bag'], ['camping', N_('Camping'), 'tent'], ['business', N_('Business trip'), 'brief']];  // 2.223.0 C (#2820): app icons, not emoji
 
 // ---- kids: a parent's card (stars, requests, give stars, rewards) and the kid's own view
 function kidCardHtml(k) {
@@ -782,13 +767,6 @@ async function purposeSet(p) {
   return true;
 }
 
-// ---- 2.19.0: more reactions in the chats: "+" next to 👍 👎 ❤️ opens the emoji grid of the comments (any emoji too)
-function rxMore(anchor) {
-  const act = anchor.dataset.rxact, mid = +anchor.dataset.mid;
-  reactPicker(anchor, null, v => act === 'chat-react' ? chatReact(mid, v) : act === 'tc-react' ? tcReact(mid, v) : null);
-  setTimeout(() => $('#pop .rxgrid button')?.focus({preventScroll: true}), 0);
-}
-document.addEventListener('click', e => { const b = e.target.closest?.('[data-act="rx-more"]'); if (!b) return; e.preventDefault(); e.stopPropagation(); rxMore(b); });
 // Settings > Modules: "What do you use Kalmido for?"
 let pm_purposeBusy = false;
 document.addEventListener('click', async e => {
@@ -802,19 +780,6 @@ document.addEventListener('click', async e => {
   if (!ok) return;
   const mds = $$('.smodal'); if (mds.length) { mds.forEach(md => { md._noflush = true; md.remove(); }); settingsModal('modules'); settingsSync(); setTimeout(() => $(`.smodal [data-purpose="${b.dataset.purpose}"]`)?.focus(), 80); }
 });
-// 2.19.0 (owner, #655): the magnifier stays visible on a phone while the sidebar drawer is open: a round search button on
-// the dimmed area next to the drawer, where the header's search sits (the header itself is under the scrim then)
-function sideSearchSync() {
-  const sc = $('#scrim'); if (!sc) return;
-  let b = $('.sidesearch', sc);
-  if (!b) {
-    b = document.createElement('button'); b.type = 'button'; b.className = 'iconbtn sidesearch';
-    b.addEventListener('click', e => { e.stopPropagation(); closeSide(); openPalette(); });
-    sc.appendChild(b);
-  }
-  const lab = tr('Search and commands');
-  if (b.getAttribute('aria-label') !== lab) { b.setAttribute('aria-label', lab); b.title = lab; b.innerHTML = ic('search'); }
-}
 // 2.49.0 (#1537): what a child account sees in Settings: its account (name, picture, colour, password, sign-in), General
 // (language), Appearance and Notifications (push). The areas whose writes the server refuses to a child (organisation,
 // modules, integrations, agents, data, administration), the help for grown-ups and in the account pane app passwords,
@@ -823,9 +788,6 @@ function sideSearchSync() {
 // ---- 2.49.0 (#1551): the parents' PIN of a child account. With a PIN the child needs it for Settings, its account and
 // Log out (the server checks too, family/pin.py); a correct PIN opens them for 5 minutes in this session. Ticking off and
 // asking for rewards never need it.
-const kd_me = () => (S.me?.kid && (S.kids || [])[0]) || null;
-function kd_pinNeed() { const k = kd_me(); return !!(k && k.pin && !(k.pin_open && Date.parse(k.pin_open) > Date.now())); }
-function kd_pinClosed() { const k = kd_me(); if (k) { k.pin_open = null; if (!$('.kdpin')) kd_pinAsk(); } }
 function kd_pinAsk(then) {
   const k = kd_me(); if (!k) return;
   $('.kdpin')?.remove();

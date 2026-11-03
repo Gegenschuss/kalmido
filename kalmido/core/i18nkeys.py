@@ -260,10 +260,16 @@ def lazy_modules(lazyload_js):
     return {x.group(1): re.findall(r"'([\w-]+)'", x.group(2)) for x in re.finditer(r"(\w+): \[(.*?)\]", body, re.S)}
 
 
+# 2.501.0 (#4198): the part of the keys only the server's code names (no key call, no string literal in any client file). They leave
+# the start's core; a key the server hands out reaches the browser through tr(variable), whose miss loads this part (i18n.js i18nPyAsk)
+PY_PART = "py"
+
+
 def module_keys(root, uses=None):
     """-> ({key: module} of the keys only one module uses, {module: [files]}). 2.191.0 F2 (#2518): ValueError when LD_MODS
     names no module; a string literal of a file outside the modules (key_sources, core_sources) that is a key keeps it in
-    the core; uses (a dict) gets {module: every key its files use with tr / trn}."""
+    the core; uses (a dict) gets {module: every key its files use with tr / trn}. 2.501.0 (#4198): + the keys of PY_PART (a module
+    without files)."""
     with open(os.path.join(root, "static", "js", "lazyload.js"), encoding="utf-8") as f:
         mods = lazy_modules(f.read())
     if not mods:
@@ -272,7 +278,7 @@ def module_keys(root, uses=None):
     for m, files in mods.items():
         for fn in files:
             f2m.setdefault(fn + ".js", set()).add(m)
-    core, use, lits = set(), {}, set()
+    core, use, lits, client, py_calls = set(), {}, set(), set(), set()
     for rel in key_sources(root) + core_sources(root):
         path = os.path.join(root, rel)
         if not os.path.exists(path):
@@ -281,13 +287,21 @@ def module_keys(root, uses=None):
             src = f.read()
         py = rel.endswith(".py")
         mm = None if py or os.path.dirname(rel) != os.path.join("static", "js") else f2m.get(os.path.basename(rel))
-        if not mm:
-            lits |= str_literals(src, py)
+        if not mm or not py:
+            found = str_literals(src, py)
+            if not mm:
+                lits |= found
+            if not py:
+                client |= found
         if rel in core_sources(root):
             continue
         for fn, key, _, _ in key_calls(src, py):
             if key is None:
                 continue
+            if py:
+                py_calls.add(key)
+            else:
+                client.add(key)
             if mm and fn in ("tr", "trn"):
                 use.setdefault(key, set()).update(mm)
             else:
@@ -296,7 +310,9 @@ def module_keys(root, uses=None):
         for k, v in use.items():
             for m in v:
                 uses.setdefault(m, set()).add(k)
-    return {k: next(iter(v)) for k, v in use.items() if len(v) == 1 and k not in core and k not in lits}, mods
+    mod_of = {k: next(iter(v)) for k, v in use.items() if len(v) == 1 and k not in core and k not in lits}
+    mod_of.update(dict.fromkeys(py_calls - client, PY_PART))
+    return mod_of, {**mods, PY_PART: []}
 
 
 def split_lang(d, mod_of):
