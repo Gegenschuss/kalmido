@@ -817,7 +817,9 @@ def umz_run(uid, export_id):
 def umz_status(uid):
     st = _state(uid) or {"state": "none"}
     if st.get("state") == "running" and not _running(uid):
-        st = {**st, "state": "failed", "error": "interrupted"}
+        st = _state(uid) or {"state": "none"}  # #3506: the run may have written its end and finished after st was read
+        if st.get("state") == "running":
+            st = {**st, "state": "failed", "error": "interrupted"}
     if st.get("state") == "done":
         p = os.path.join(_udir(uid), st.get("file") or "-")
         if not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):

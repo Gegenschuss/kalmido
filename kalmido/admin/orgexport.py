@@ -1096,7 +1096,9 @@ def ox_run(oid, uid):
 def ox_status(oid):
     st = _state(oid) or {"state": "none"}
     if st.get("state") == "running" and not _running(oid):
-        st = {**st, "state": "failed", "error": "interrupted"}
+        st = _state(oid) or {"state": "none"}  # #3506: the run may have written its end and finished after st was read
+        if st.get("state") == "running":
+            st = {**st, "state": "failed", "error": "interrupted"}
     if st.get("state") == "done":
         p = os.path.join(_odir(oid), st.get("file") or "")
         if not st.get("file") or not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):

@@ -2371,10 +2371,13 @@ def umz_undo(c, uid, r):
 
 # ---------------------------------------------------------------- routes (people only)
 def _view(uid, iid, st):
+    lost = False
     if st.get("state") in ("checking", "running") and not _busy(uid):
         st = _st(uid, iid) or st  # 2.307.1 (CI): the thread may have written its last state and ended after st was read
+        # #3506: the second look only after that fresh read; a row ending between two looks at an old st said "interrupted"
+        lost = st.get("state") in ("checking", "running") and not _busy(uid) and int(uid) not in _UMI_START
     out = {"id": iid, "state": st.get("state"), "size": st.get("size"), "received": st.get("received"), "name": st.get("name", "")}
-    if st.get("state") in ("checking", "running") and not _busy(uid) and int(uid) not in _UMI_START:
+    if lost:
         out["state"] = "failed"
         out["error"] = tr("The import was interrupted. Please start it again.")
     if st.get("state") == "key" and st.get("key_error"):
