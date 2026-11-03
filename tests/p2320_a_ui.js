@@ -51,7 +51,7 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   let w = await boot({user: 'alice', hash: 'l/' + P, ls: pov}), d = w.document;
   await until(() => d.querySelector('#view .pov .lygrid .povs'));
   const blocks = () => [...d.querySelectorAll('#view .lygrid[data-ly="project"] > .lyb')].map(b => b.dataset.lyk);
-  check(blocks().join() === 'desc,status,ms,files,links,people,notes,chat,time'.split(',').filter(k => d.querySelector('#pov-' + k)).join() && blocks().length >= 6, '#983: the blocks in the default order ' + blocks());
+  check(blocks().join() === 'desc,status,ms,files,links,people,notes,chat,time,flow'.split(',').filter(k => d.querySelector('#pov-' + k)).join() && blocks().length >= 6, '#983: the blocks in the default order ' + blocks());
   check(d.querySelector('#pov-ms.povs-empty .povh [data-pov="ms-add"]') && d.querySelector('#pov-links.povs-empty .povh [data-pov="link-add"]'), '#1061: an empty block is one line with its button in the head');
   check(!d.querySelector('#pov-desc.povs-empty') && d.querySelector('#pov-desc .povmd'), '#1061: a block with content stays big');
   check(!d.querySelector('#pov-ms .povempty'), '#1061: no separate empty paragraph any more');
@@ -84,7 +84,8 @@ const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAFklEQVR
   await until(() => d.querySelector('.lyed[data-lyed="project"]'));
   const ed = d.querySelector('.lyed');
   // 2.43.0 (#1328): + the block "Key figures" (10 blocks; it shows on the page only once key figures are set up)
-  check(ed.querySelectorAll('.dcust li').length === 10 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Default for everyone", "Different on the phone"');
+  // 2.393.2 A (#3374): + the block "Flow" (11 blocks)
+  check(ed.querySelectorAll('.dcust li').length === 11 && ed.querySelector('[data-act="ly-scope"][data-k="std"]') && ed.querySelector('[data-lyphone="project"]'), '#1063: the editor: every block, "Default for everyone", "Different on the phone"');
   await sleep(150);
   check(d.activeElement?.closest('.dcust'), '#1063: the focus lands in the list');
   click(w, ed.querySelector('[data-act="ly-scope"][data-k="std"]')); await sleep(100);
