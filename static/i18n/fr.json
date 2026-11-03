@@ -16047,7 +16047,7 @@
   "Please choose an agent.": "Choisis un agent.",
   "The app sent an invalid request. Start the connection in the app again.": "L’application a envoyé une requête invalide. Relance la connexion dans l’application.",
   "Guests can read e-mails": "Les invités peuvent lire les e-mails",
-  "E-mails often hold customer data and attachments": "Les e-mails contiennent souvent des données clients et des pièces jointes",
   "Guests can read the e-mails of this project": "Les invités peuvent lire les e-mails de ce projet",
-  "Only editors read the e-mails of this project": "Seuls les éditeurs lisent les e-mails de ce projet"
+  "Only editors read the e-mails of this project": "Seuls les éditeurs lisent les e-mails de ce projet",
+  "E-mails often hold client data and attachments": "Les e-mails contiennent souvent des données clients et des pièces jointes"
 }

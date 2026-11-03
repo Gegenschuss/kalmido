@@ -42,7 +42,7 @@ function hbm_headHtml(key) {
   const j = HBM.s[key]?.j;
   const nw = typeof hmb_newBtn === 'function' ? hmb_newBtn(key, j) : '';  // 2.141.0 A (#2138): hubmailbox.js
   // 2.395.0 (#3380): the owner / a project admin decides whether guests (participant / view) read the project's mails (default off)
-  const gs = j && j.can_guests ? `<label class="chkl hbmguests" title="${esc(tr('E-mails often hold customer data and attachments'))}"><input type="checkbox" data-hbmguests="${esc(key)}" ${j.guests ? 'checked' : ''}> ${tr('Guests can read e-mails')}</label>` : '';
+  const gs = j && j.can_guests ? `<label class="chkl hbmguests" title="${esc(tr('E-mails often hold client data and attachments'))}"><input type="checkbox" data-hbmguests="${esc(key)}" ${j.guests ? 'checked' : ''}> ${tr('Guests can read e-mails')}</label>` : '';
   if (!j || key.startsWith('inbox') || !j.can_address) return nw + gs;
   return `${nw}${gs}<button type="button" class="btn sm" data-hbma="copy" data-hbmk="${key}" title="${esc(tr('E-mails to this address are filed here'))}">${ic('copy', 's')}<span>${tr('Copy address')}</span></button>${j.address ? `<button type="button" class="iconbtn" data-hbma="menu" data-hbmk="${key}" aria-haspopup="menu" aria-label="${esc(tr('Address'))}" title="${esc(tr('Address'))}">${ic('dots', 's')}</button>` : ''}`;
 }

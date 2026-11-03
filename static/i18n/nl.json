@@ -16047,7 +16047,7 @@
   "Please choose an agent.": "Kies een agent.",
   "The app sent an invalid request. Start the connection in the app again.": "De app heeft een ongeldig verzoek gestuurd. Start de verbinding opnieuw in de app.",
   "Guests can read e-mails": "Gasten mogen e-mails lezen",
-  "E-mails often hold customer data and attachments": "E-mails bevatten vaak klantgegevens en bijlagen",
   "Guests can read the e-mails of this project": "Gasten mogen de e-mails van dit project lezen",
-  "Only editors read the e-mails of this project": "Alleen bewerkers lezen de e-mails van dit project"
+  "Only editors read the e-mails of this project": "Alleen bewerkers lezen de e-mails van dit project",
+  "E-mails often hold client data and attachments": "E-mails bevatten vaak klantgegevens en bijlagen"
 }
