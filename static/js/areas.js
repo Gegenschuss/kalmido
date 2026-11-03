@@ -499,7 +499,7 @@ function sbb_render(hid) {
 // scrolls sideways (never "…", never split inside the word)
 function sbb_fit() {
   const row = $('#side .sbmr');
-  if (row) { row.style.gridTemplateColumns = ''; row.style.overflow = ''; }
+  if (row) { row.style.gridTemplateColumns = row.style.overflowX = row.style.overflowY = ''; }
   let tooWide = false;
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
@@ -519,7 +519,7 @@ function sbb_fit() {
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
-  if (tooWide) { row.style.gridTemplateColumns = 'repeat(var(--sbmc,5),minmax(min-content,1fr))'; row.style.overflow = 'auto hidden'; }
+  if (tooWide) { row.style.gridTemplateColumns = 'repeat(var(--sbmc,5),minmax(min-content,1fr))'; row.style.overflowX = 'auto'; row.style.overflowY = 'hidden'; }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
 document.fonts?.addEventListener('loadingdone', sbb_fit);
