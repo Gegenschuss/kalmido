@@ -13,7 +13,7 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.493.0] - 2026-11-03
+## [2.494.0] - 2026-11-03
 
 Package 2.448 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Tests auf main rot: p2186_c_retention und p2361_d_, Sammelpaket: Aufgaben ohn).
 
@@ -896,6 +896,10 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Changing the time or title of an invitation in a calendar app is still ignored, but the event now gets a new ETag, so the phone shows Kalmido's version again instead of its own copy (#2587)
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
+
+## [2.493.0] - 2026-11-03
+
+Not released (the CI of this version was red); its changes went live with 2.494.0.
 
 ## [2.487.4] - 2026-11-02
 
@@ -1806,7 +1810,8 @@ Package 2.401 (Teil 3/5: Bündel Selbstständige: Org verlassen/löschen, eigene
 ### Fixed
 - CI of next train: six older tests (p258_c_api, p2113b_b_api, p2149_c_api, p2280_ui, p2466_b_ui, p272_ui) follow the agent rules of 2.361.4 (#2928, #2935): the organisation allows members' own agents first, an agent leaves its organisation's projects before it moves out, the guide text names the organisation's admins.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.493.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.494.0...HEAD
+[2.494.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.494.0
 [2.493.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.493.0
 [2.487.4]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.4
 [2.487.3]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.487.3
