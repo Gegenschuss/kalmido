@@ -57,7 +57,7 @@ const absOk = async (w, d) => { const b = await until(() => d.querySelector('.mo
   await w.eval(`HIST.undo[HIST.undo.length - 1].undo()`);
   check(await until(async () => (await svc()).map(x => x.sort).join() === '30,70', 40), '#2237: undo brings the old order values back');
   await until(() => d.querySelector('.office [data-ofc="open"][data-kind="services"]') && !w.eval('typeof OFCP === "object" && OFCP.stale'), 40);
-  // 2.138.0: a tap while the office view reloads after a save is replayed later (#2327, CSS.escape, not in jsdom): wait for it
+  // 2.138.0: a tap while the office view reloads after a save is replayed later (#2327): wait for it
   d.querySelector('.office [data-ofc="open"][data-kind="services"]').click();
   const rate = await until(() => d.querySelector('.modal #of-daily_rate'), 30);
   const row = rate?.closest('.row'), cur = row?.querySelector('.imrcur');

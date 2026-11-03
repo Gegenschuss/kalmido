@@ -114,6 +114,28 @@ process.on('unhandledRejection', e => {
   if (lateAppError(e)) { console.log('late app rejection after a window was closed (ignored):', String(e.stack).split('\n').slice(0, 2).join(' | ')); return; }
   console.error(e); process.exit(1);
 });
+// 2.504.0 (#4084): jsdom has no CSS object, the app uses it (office.js ost_find, core.js, ...: a ReferenceError when the path gets there).
+// escape = CSSOM "serialize an identifier" (UTF-16 code units). supports: nothing in static/js asks; only two vendored files do, and
+// each keeps the path it took without a CSS object: pdf.js (backdrop-filter) gets false, mermaid ("color", value) the same test
+// on an Option's style as its own fallback. Everything else is false: jsdom cannot tell.
+const cssEscape = value => {
+  const s = String(value);
+  if (s === '-') return '\\-';
+  let out = '';
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i), hex = () => '\\' + c.toString(16) + ' ';
+    if (c === 0) out += '�';
+    else if (c <= 0x1f || c === 0x7f) out += hex();
+    else if (c >= 0x30 && c <= 0x39 && (i === 0 || (i === 1 && s[0] === '-'))) out += hex();
+    else if (c >= 0x80 || c === 0x2d || c === 0x5f || (c >= 0x30 && c <= 0x39) || (c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a)) out += s[i];
+    else out += '\\' + s[i];
+  }
+  return out;
+};
+const cssObject = w => ({escape: cssEscape, supports: (prop, value) => {
+  if (prop !== 'color' || value === undefined) return false;
+  const st = new w.Option().style; st.color = value; return st.color === value;
+}});
 // 1.5: the app asks with its own dialog (askConfirm / askPrompt, .modal.cdlg) instead of window.confirm / prompt. This
 // bridge answers it with the suite's w.confirm / w.prompt stubs (title + text as the message), so older suites keep
 // working; w.__dialogs = 'manual' leaves the dialogs alone (tests/ux1_ui.js drives them itself).
@@ -169,6 +191,7 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
       const told = k => { for (const o of shared ? shared.wins : []) if (o !== w) { const e = new o.Event('storage'); e.key = k; o.dispatchEvent(e); } };
       Object.defineProperty(w, 'localStorage', {value: {getItem: k => k in store ? store[k] : null, setItem: (k, v) => { store[k] = String(v); told(k); }, removeItem: k => { delete store[k]; told(k); }, key: i => Object.keys(store)[i], get length() { return Object.keys(store).length; }}});
       w.visualViewport = null;  // 2.456.0 (#3837): jsdom has none; a drag's scrollBox (dnd.js tdBox) asks for it
+      w.CSS = cssObject(w);  // 2.504.0 (#4084)
       w.__offline = false;
       w.fetch = (u, o = {}) => { if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); const hd = {...(o.headers || {}), ...(proxy ? {'Remote-User': proxy} : {Cookie: cookie})}; const sg = o.signal && (ac => { if (o.signal.aborted) ac.abort(); else o.signal.addEventListener('abort', () => ac.abort()); return ac.signal; })(new AbortController());  // 2.116.0 (#2065): a jsdom signal -> Node's
         return fetch(new URL(String(u), B), {...o, headers: hd, ...(sg ? {signal: sg} : {})}); };

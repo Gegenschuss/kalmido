@@ -45,7 +45,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   const arrows = d => [...d.querySelectorAll('#side [data-act="sbb-tree"]')];
   const openKeys = d => arrows(d).filter(a => a.dataset.open).map(a => a.dataset.k).sort().join('|');
   // ---- Knowledge
-  let w = await boot({user: 'frida', hash: 'wiki', ls: {'tasks.wkSpace': JSON.stringify('private')}}); let d = w.document; w.CSS = {escape: x => String(x).replace(/"/g, '\\"')};
+  let w = await boot({user: 'frida', hash: 'wiki', ls: {'tasks.wkSpace': JSON.stringify('private')}}); let d = w.document;
   check(await until(() => rowOf(d, 'Docs')), 'wiki: the panel shows Docs');
   check(fa(d) && fa(d).getAttribute('aria-pressed') === 'true', 'wiki: nothing open - the button is there, as "Unfold all"');
   rowOf(d, 'Docs').querySelector('[data-act="sbb-tree"]').click();
@@ -63,7 +63,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   check(await until(() => rowOf(d, 'Deep')) && openKeys(d) !== '', 'wiki: without a remembered state the first level opens');
   w.close();
   // ---- File store
-  w = await boot({user: 'frida', hash: 'ablage'}); d = w.document; w.CSS = {escape: x => String(x).replace(/"/g, '\\"')};
+  w = await boot({user: 'frida', hash: 'ablage'}); d = w.document;
   check(await until(() => rowOf(d, 'Invoices')) && fa(d) && fa(d).getAttribute('aria-pressed') === 'true', 'files: the button is there with nothing open');
   rowOf(d, 'Invoices').querySelector('[data-act="sbb-tree"]').click();
   check(await until(() => rowOf(d, 'Q1')), 'files: Invoices opened');
