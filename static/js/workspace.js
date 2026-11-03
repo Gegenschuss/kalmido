@@ -31,11 +31,9 @@ const wsLabel = (org_id) => org_id ? (wsOrg(org_id)?.name || tr('Organisation'))
 const p61b_WS = {};
 const p61b_wsOn = (name, fn) => { p61b_WS[name] = fn; };
 const p61b_wsRun = after => { for (const [n, fn] of Object.entries(p61b_WS)) { try { fn(after); } catch (x) { console.error('workspace switch', n, x); } } };
-// 2.397.0 (#3404): every workspace keeps its state on this device (LS wsView = {'private' | 'org:<id>': {...}}): the sidebar's
-// open groups and folders and the per-device choices of its areas (WSV_KEYS). "All workspaces" has none: nothing done there
-// is written back. WSV = the workspace route() drew last.
-// 2.497.0 (#4048): the page itself is no longer kept per workspace (it was #3404's target rule): a switch stays in the area
-// shown (ws_target); the scroll position of a view per workspace comes from viewmem.js (the workspace is part of its key)
+// 2.397.0 (#3404): every workspace keeps on this device (LS wsView): the sidebar's open groups and folders and the choices of its
+// areas (WSV_KEYS), not "All". WSV = the workspace route() drew last. 2.497.0 (#4048): no page any more (a switch stays in the
+// area, ws_target); a view's scroll position per workspace: viewmem.js
 const WSV_KEYS = ['lastKey', 'sbbLast', 'mgTab', 'ofmLast', 'sideOpenG', 'sideGroups', 'sbbOpen', 'newsFilter', 'newsKind', 'jobsFilter'];
 const WSV = {ws: ''};
 const wsv_hashNow = () => location.hash.slice(1) || keyToHash(S.route?.key || START_KEY);
@@ -63,13 +61,10 @@ function wsv_restore(v, ws) {
   const shut = new Set(v.shut || []);
   for (const f of wsv_folders(ws)) if (foldClosed(f) !== shut.has(f)) foldSet(f, shut.has(f));
 }
-// 2.497.0 (#4048): where a switch to the workspace now set (ws) lands: the same page when it exists there; a single object that is
-// not there -> the overview of the same area (a project: Projects); a list (folder, marked lists) not there -> the inbox; an area that does not exist
-// there or is switched off there (module off, an area off for the workspace #3490, an organisation's part off #3560, a private
-// module in an organisation #3950) -> Start. null = the page stays.
+// 2.497.0 (#4048): where a switch lands: null = the page stays; a single object not there -> its area's overview (a project: Projects);
+// a list, folder, marked lists not there -> the inbox; an area missing or off there (#3490, #3560, #3950) -> Start
 const WS_START = 'home';
 const ws_listIn = (id, ws) => (l => !!l && !l.archived && inWs(l, ws))(listById(+id));
-// the overview page of an object's area (the router's first word; old links like ev/5 or client/3 to their module)
 const WS_ROOT = {ev: 'cal', client: 'clients', job: 'agents', note: 'notes'};
 function ws_target(ws) {
   if (ws === 'all' || S.me?.kid) return null;  // "All" shows everything of the page; a kid has its own home
@@ -86,7 +81,6 @@ function ws_target(ws) {
     return null;  // the inbox, Today, Projects, filters, tags, people: every workspace has them (they show its share)
   }
   if (!b) return null;  // an area's overview stays
-  // what an object page may keep: its own workspace is known (a note's list, an agent, a table of a list), else its overview
   if (mod === 'notes') { const lid = a === 'note' ? (S.notes || []).find(n => n.id === +b)?.list_id : +b || null; return lid != null && ws_listIn(lid, ws) ? null : 'notes'; }
   if (mod === 'agents' && a === 'agents') { const ag = agentById(+b); return ag && wsAgentIn(ag, ws) ? null : 'agents'; }
   if (mod === 'sheets' && b === 'l') return ws_listIn(c, ws) ? null : 'sheets';
@@ -97,13 +91,12 @@ function ws_target(ws) {
   if (mod === 'msv') return null;  // a list on another server belongs to no workspace
   return WS_ROOT[a] || a;
 }
-// o.keep: the caller goes on to its own target (a link into the other workspace, News' or the office's "Switch"): the page
-// only follows the filter (a list or private module not there -> the inbox, as before) and the caller then opens its target
+// o.keep: the caller goes on to its own target (a link into the other workspace, News' or the office's "Switch")
 async function wsSet(ws, o = {}) {
   if (!wsOptions().includes(ws)) ws = 'all';
   const from = wsCur();
   if (WSV.ws === from) wsv_save(from);  // 2.397.0 (#3404)
-  if (typeof vm_leave === 'function') vm_leave();  // 2.497.0 (#4048): the place of the view left: no route may follow (the page stays)
+  if (typeof vm_leave === 'function') vm_leave();  // 2.497.0 (#4048): no route may follow
   S.settings.workspace = ws; LS.set('ws', ws);
   // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() must not close it either
   const hold = !!$('#side.open') && typeof SBM !== 'undefined';
@@ -113,9 +106,8 @@ async function wsSet(ws, o = {}) {
   const to = wsCur(), kept = !o.keep && to !== 'all' ? (LS.get('wsView', {}) || {})[to] : null;
   WSV.ws = '';  // the page shown now belongs to the old workspace: route() must not keep it for the new one
   if (kept) wsv_restore(kept, to);  // its areas' own state, not its page
-  // 2.497.0 (#4048): the open task (side panel, phone drawer, "All") stays when the new workspace shows it, else it closes
   if (S.sel && !wsv_taskIn(S.sel, to)) wsv_close();
-  // 2.497.0 (#4048): the view entered by this switch does not reopen the task kept for it (viewmem.js, vm_after); only one open here stays
+  // 2.497.0 (#4048): the view entered reopens no task kept for it (viewmem.js)
   if (typeof VM !== 'undefined') VM.noSel = !o.keep;
   let h = null;
   if (o.keep) {

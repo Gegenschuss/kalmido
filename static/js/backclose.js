@@ -8,7 +8,7 @@ const f8d_open = () => {
   if ($('.lightbox')) return 'lightbox';
   const pop = $('#pop');
   if ((pop && !pop.classList.contains('hidden')) || $('.qadd.sheet')) return 'pop';
-  // 2.497.0 (#4040): shopping mode has its own history entry (family.js): a second one here stayed behind after closing it (a dead Back)
+  // 2.497.0 (#4040): shopping mode has its own entry (family.js), a second one stayed behind
   if ($('.modal:not(.authscreen):not(.an-out):not(.shopmode)')) return 'modal';
   if ($('.tsheet')) return 'tsheet';
   return '';
