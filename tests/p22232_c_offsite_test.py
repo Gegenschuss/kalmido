@@ -54,7 +54,10 @@ for mode, port in (("webdav", 8094), ("webdav", 8095), ("s3", 8093)):
     shutil.copy(os.path.join(N, "fake_offsite.py"), os.path.join(DATA, "fake_offsite.py"))
     subprocess.run(["docker", "exec", "-d", CT, "python", "/data/fake_offsite.py", mode, str(port),
                     S3KEY if mode == "s3" else "kbk", S3SECRET if mode == "s3" else DAVPASS])
-time.sleep(1.0)
+# 2.500.0 (#4083, #3901): a real state instead of a fixed second: all three fakes accept connections (red as "conn" before)
+for _port in (8094, 8095, 8093):
+    check(until(lambda: subprocess.run(["docker", "exec", CT, "python", "-c", f"import socket; socket.create_connection(('127.0.0.1', {_port}), 1)"],
+                                       capture_output=True).returncode == 0, 20), f"setup: the fake on {_port} is up")
 REM = os.path.join(DATA, "fake-remote")
 
 

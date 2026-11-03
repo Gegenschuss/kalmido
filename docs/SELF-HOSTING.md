@@ -2109,7 +2109,11 @@ organisation). While it is open, the instance admin's ways into exactly that acc
 self-hosted server (sign-in link, password link, members and roles, its projects and agents); the instance admin's
 account list shows the end time. Every request that passed only thanks to a grant is listed for the customer on the
 grant: time, who, method, route and status, never values or contents. An organisation's grant ends as soon as the admin
-who granted it is no admin of it any more. Agents and API tokens cannot grant. The backup download stays off on a hosted
+who granted it is no admin of it any more. *Since 2.500:* a session started with such a sign-in link (a support session)
+reads everything the person reads and edits contents (projects, tasks, documents, files, wiki, tables, contacts, office
+records), and nothing else: no credentials, agents, app connections (OAuth), public links, shares, members, invitations,
+webhooks, keys, settings of the office, sending, or deleting for good. Its writes stand on the grant as well, refused ones
+included, marked as the support session. Agents and API tokens cannot grant. The backup download stays off on a hosted
 server (it holds every customer's content). Routes: `GET /api/support-access`, `POST /api/support-access`
 `{hours, org_id?}`, `DELETE /api/support-access/<id>`.
 
