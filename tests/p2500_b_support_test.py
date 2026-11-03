@@ -53,7 +53,7 @@ r = X.post(B + "/api/tasks", json={"title": "Fixed by support", "list_id": LID})
 check(r.status_code in (200, 201), "support session: a new task " + r.text[:160])
 TID = r.json()["id"]
 check(X.patch(B + f"/api/tasks/{TID}", json={"title": "Fixed by support, 2"}).ok, "support session: edits a task")
-check(X.post(B + f"/api/tasks/{TID}/comments", json={"text": "Done"}).status_code in (200, 201), "support session: a comment")
+check(X.post(B + f"/api/tasks/{TID}/comments", json={"body": "Done"}).status_code in (200, 201), "support session: a comment")
 check(X.patch(B + "/api/settings", json={"lang": "en"}).ok, "support session: ordinary settings")
 check(X.patch(B + "/api/me", json={"display_name": "Frida"}).ok, "support session: the display name")
 
