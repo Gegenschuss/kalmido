@@ -13,7 +13,13 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.496.0] - 2026-11-03
+## [2.496.1] - 2026-11-04
+
+Main red after CI 2.496.0 (#3506).
+### Fixed
+- main: account import, knowledge import, account export and organisation export no longer report "interrupted" when the run ends in the moment the status is read (#3506).
+- main: tests p2363_3_c_ui and p2350_c_wkimport_status_ui no longer depend on the timing of a state load or of the import poll (#3506).
+- main: test p271_ui expects the project status without collaboration (decision of #3379) and runs again, its line in tests/skip.txt is gone (#3745, #3506).
 
 ### Fixed
 - Agent chat: after turning a tablet or unfolding a phone while typing, the message box keeps its focus. It used to lose it on a slow device because the new layout came later than the single retry (#3506)
@@ -902,6 +908,10 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Changing the time or title of an invitation in a calendar app is still ignored, but the event now gets a new ETag, so the phone shows Kalmido's version again instead of its own copy (#2587)
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
+
+## [2.496.0] - 2026-11-03
+
+Not released (the CI of this version was red); its changes are listed under 2.496.1.
 
 ## [2.495.0] - 2026-11-03
 
@@ -1824,7 +1834,8 @@ Package 2.401 (Teil 3/5: Bündel Selbstständige: Org verlassen/löschen, eigene
 ### Fixed
 - CI of next train: six older tests (p258_c_api, p2113b_b_api, p2149_c_api, p2280_ui, p2466_b_ui, p272_ui) follow the agent rules of 2.361.4 (#2928, #2935): the organisation allows members' own agents first, an agent leaves its organisation's projects before it moves out, the guide text names the organisation's admins.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.496.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.496.1...HEAD
+[2.496.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.496.1
 [2.496.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.496.0
 [2.495.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.495.0
 [2.494.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.494.0
