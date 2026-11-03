@@ -555,7 +555,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
     if ch in ("ntfy", "both"):
         return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or sent > 0 or queued
     if not sent:
-        if ntfy_public():  # 2.499.0 (#4215): nothing goes to the public ntfy.sh unless the person chose ntfy; the message stays in the app (News)
+        if ntfy_public():  # 2.499.0 (#4215): nothing goes to the public ntfy.sh unless the person chose ntfy; what writes a News entry has it there
             return queued
         return ntfy(title, nmsg, prio, click, topic=s.get("ntfy_topic"), actions=actions) or queued
     return True

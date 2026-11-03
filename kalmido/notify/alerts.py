@@ -330,8 +330,8 @@ def _aa_build(c, kind, key, b):
         users = {names.get(int(k), "#" + k) if k.isdigit() else k: v for k, v in items.items()}
         if ntfy_public():  # 2.499.0 (#4215): the public ntfy.sh gets no fallback, the device problem is still reported
             return ("fallback:" + ",".join(sorted(users))[:150],
-                    Nn_("{0} push stayed in the app because none of the user's devices accepted it: {1}",
-                        "{0} pushes stayed in the app because none of the users' devices accepted them: {1}"), [_aa_list(users)], b["n"])
+                    Nn_("{0} push was not delivered because none of the user's devices accepted it: {1}",
+                        "{0} pushes were not delivered because none of the users' devices accepted them: {1}"), [_aa_list(users)], b["n"])
         return ("fallback:" + ",".join(sorted(users))[:150],
                 Nn_("{0} push went to ntfy instead because none of the user's devices accepted it: {1}",
                     "{0} pushes went to ntfy instead because none of the users' devices accepted them: {1}"), [_aa_list(users)], b["n"])

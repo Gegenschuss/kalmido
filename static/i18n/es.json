@@ -16123,5 +16123,5 @@
   "This server cannot read HEIC photos at the moment. Please send the photo as JPEG.": "Este servidor no puede leer fotos HEIC por ahora. Envía la foto como JPEG.",
   "Web Push to {0} device.": ["Web Push a {0} dispositivo.", "Web Push a {0} dispositivos."],
   "Not delivered: no device accepted it": "No entregada: ningún dispositivo la aceptó",
-  "{0} push stayed in the app because none of the user's devices accepted it: {1}": ["{0} notificación push se quedó en la app porque ningún dispositivo del usuario la aceptó: {1}", "{0} notificaciones push se quedaron en la app porque ningún dispositivo de los usuarios las aceptó: {1}"]
+  "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} notificación push no se entregó porque ningún dispositivo del usuario la aceptó: {1}", "{0} notificaciones push no se entregaron porque ningún dispositivo de los usuarios las aceptó: {1}"]
 }
