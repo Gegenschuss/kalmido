@@ -17,7 +17,7 @@ from ..tasks.validation import REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm
 from ..calendars.icalfeed import ics_dur, ics_fold, ics_text, ics_utc, ics_vtimezone
 from ..core.errors import BadInput
 from ..events.model import (
-    att_rows, ev_att_ok, ev_store, ev_zone, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
+    _span, att_rows, ev_att_ok, ev_store, ev_zone, is_occ, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
 )
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 
@@ -120,7 +120,6 @@ def ev_lines(c, r, atts=None):
     occ_rids = sorted({k for a in atts for k in (a.get("occ_partstat") or {})}) if atts and r["rrule"] else []
     ovs = [o for o in ov_list(r) if isinstance(o, dict) and o.get("rid")]
     if occ_rids:
-        from ..events.model import _span, is_occ
         have = {o["rid"] for o in ovs}
         ex = set(x for x in (r["exdates"] or "").split(",") if x)
         for k in occ_rids:
