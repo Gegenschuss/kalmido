@@ -19,7 +19,7 @@
 
 ## What's new
 
-**2.489.0** (2026-11-03):
+**2.490.0** (2026-11-03):
 - **Export and import**: the account export carries your own office, files, templates and settings; importing twice creates nothing twice; the import brings filed e-mails, bookmarks and more.
 - **Notifications**: quiet hours hold every push, pushes are bundled, approvals and calendar changes reach the right person.
 - **Office**: online payment of invoices, tax forms, personal e-mail signature, bank accounts as master data, document languages fr / es / it / nl.
