@@ -34,6 +34,7 @@ from .model import ofx_name1, office_gate, office_org, office_settings
 from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
+from .rights import ofr_need_area  # 2.500.0 (#4072)
 from ..core.db import local_now  # 2.369.5 (#2517): pulled up from functions
 from .books import bk_ws, bk_receipts, _year, bk_csv_cell as cell  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
@@ -487,6 +488,7 @@ def _cb_pay(c, oid, uid, eid, e, no):
     the cash) gets none -- the entry stays as booked."""
     if e.get("dir") != "in" or not e.get("invoice_id"):
         return
+    ofr_need_area(c, uid, oid, "offers", "edit", "pay")  # 2.500.0 (#4072): like the invoice's own payments; cash without an invoice stays free
     try:
         pid = inv_pay_add(c, oid, uid, e["invoice_id"], {"date": e["day"], "amount": e["amount"], "method": "cash",
                                                          "note": tr("Cash book no. {0}", no)})
@@ -568,6 +570,7 @@ def cb_entry_cancel(eid):
     _log(c, oid, bid, sid, "create", dict(_vals(plain), storno_of=cur["no"]), uid)
     _log(c, oid, bid, eid, "cancel", {"by_no": no}, uid)
     if cur.get("payment_id") and cur.get("invoice_id"):  # 2.355.0 B (#2843): the payment it booked goes too (a reversal line)
+        ofr_need_area(c, uid, oid, "offers", "edit", "pay")  # 2.500.0 (#4072): taking a payment back needs the same right as booking it
         try:
             inv_pay_del(c, oid, cur["invoice_id"], cur["payment_id"], uid=uid)
         except Denied as x:  # taken back by hand meanwhile

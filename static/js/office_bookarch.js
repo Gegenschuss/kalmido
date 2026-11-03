@@ -123,7 +123,7 @@ function bkaRunsHtml() {
     c.docs ? trn('{0} receipt image', '{0} receipt images', c.docs) : '', c.skipped ? tr('{0} skipped', c.skipped) : ''].filter(Boolean).join(' · ');
   const run = r => `<li class="bka-run${r.undone_at ? ' bka-undone' : ''}" data-run="${r.id}"><span class="ofcn"><b>${esc(fmtDateNum(new Date(r.created_at)))}${r.user_name ? ` · ${esc(r.user_name)}` : ''}</b>
     <small class="muted">${esc(cnt(r.counts || {}))}</small>
-    ${r.undone_at ? '' : `<span class="bka-files">${(r.files || []).map(f => `<a href="${BKA_URL}/files/${f.id}" download title="SHA-256 ${esc(f.sha256 || '')}">${ic('download', 's')}<span>${esc(f.name)}</span></a>`).join('')}</span>`}</span>
+    ${r.undone_at || ofr_noSp('books', 'export') /* 2.500.0 (#4072) */ ? '' : `<span class="bka-files">${(r.files || []).map(f => `<a href="${BKA_URL}/files/${f.id}" download title="SHA-256 ${esc(f.sha256 || '')}">${ic('download', 's')}<span>${esc(f.name)}</span></a>`).join('')}</span>`}</span>
     ${r.undone_at ? `<span class="rotag">${tr('undone')}</span>` : `<button type="button" class="btn sm ghost" data-bka="undo" data-id="${r.id}">${ic('undo', 's')}<span>${tr('Undo')}</span></button>`}</li>`;
   return `<section class="bk-sec bka-runs" aria-labelledby="bka-rh"><h3 class="ofcgrp" id="bka-rh">${tr('Imports')}</h3><ul class="ofclist" role="list">${runs.map(run).join('')}</ul></section>`;
 }

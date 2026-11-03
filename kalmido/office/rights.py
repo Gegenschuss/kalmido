@@ -120,6 +120,10 @@ SPECIAL_ROUTES = {
     "GET /api/office/trips/vma.pdf": "export", "GET /api/office/equipment/value.csv": "export",
     "GET /api/office/equipment/value.pdf": "export", "GET /api/office/subs.csv": "export", "GET /api/office/procdoc.md": "export",
     "GET /api/office/procdoc.pdf": "export", "POST /api/office/docs/<int:did>/datev": "export",
+    # 2.500.0 (#4072): the tax forms as files, the original export files of the booking archive (the page and a receipt's image stay "view")
+    "GET /api/office/books/taxform/euer.csv": "export", "GET /api/office/books/taxform/euer.pdf": "export",
+    "GET /api/office/books/taxform/ust.csv": "export", "GET /api/office/books/taxform/ust.pdf": "export",
+    "GET /api/office/books/archive/files/<int:fid>": "export",
 }
 # "METHOD rule" of the areas with AREA_OWN that filter to the person's own entries when the level is "own" (g.ofr_own);
 # every other route of such an area needs "view" / "edit" (fail closed: a route that does not filter never sees "own").

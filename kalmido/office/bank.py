@@ -715,9 +715,11 @@ def bnk_match(tid):
             c.execute(f"UPDATE office_payments SET bank_tx_id=? WHERE org_id=? AND id IN ({','.join('?' * len(pids))})", (tid, oid, *pids))
         mid, pid = parts[0][0], pids[0]
     elif kind == "payout":  # 2.469.0 (#3459)
+        ofr_need_area(c, uid, oid, "receipts", "edit")  # 2.500.0 (#4072): it writes the fees' receipt
         mid, fee_node = pol_bank_match(c, oid, uid, t, int(b["id"]) if isinstance(b.get("id"), int) and not isinstance(b.get("id"), bool) else None)
     elif kind == "card":
         from .cards import cc_bank_check
+        ofr_need_area(c, uid, oid, "cards", "edit")  # 2.500.0 (#4072): it settles a statement of the credit cards
         cc_bank_check(c, oid, t, mid, b.get("accept_diff") is True)  # 2.444.0 (#3447): the sum of the statement against the booking
     elif kind == "receipt":
         if t["amount"] >= 0:

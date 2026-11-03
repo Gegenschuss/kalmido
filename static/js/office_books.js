@@ -209,7 +209,7 @@ function tfHtml() {
   if (!d.rows.length) return bar + `<p class="bk-warn">${esc(d.notes[0])}</p>` + d.notes.slice(1).map(n => `<p class="muted bk-note">${esc(n)}</p>`).join('');
   const dl = kind === 'euer' ? 'euer' : 'ust';
   const head = `<div class="ofcbar"><h3 class="ofcgrp">${esc(kind === 'euer' ? tr('Anlage EÜR {0}', d.year) : tr('Annual VAT return {0}', d.year))}</h3><span class="spacer"></span>
-    <a class="btn sm ghost" href="/api/office/books/taxform/${dl}.csv?year=${d.year}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/taxform/${dl}.pdf?year=${d.year}" download>${ic('download', 's')}<span>PDF</span></a></div>`;
+    ${ofr_noSp('books', 'export') /* 2.500.0 (#4072) */ ? '' : `<a class="btn sm ghost" href="/api/office/books/taxform/${dl}.csv?year=${d.year}" download>${ic('download', 's')}<span>CSV</span></a><a class="btn sm ghost" href="/api/office/books/taxform/${dl}.pdf?year=${d.year}" download>${ic('download', 's')}<span>PDF</span></a>`}</div>`;
   const table = `<table class="bk-tab"><thead><tr><th class="num">${tr('Line')}</th><th class="num">${tr('Field')}</th><th>${tr('Description')}</th><th class="num">${tr('Base')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${d.rows.map(tfRow).join('')}</tbody></table>`;
   const foot = kind === 'euer'
     ? `<div class="bk-profit"><span>${tr('Line sum income minus line sum expenses')}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
