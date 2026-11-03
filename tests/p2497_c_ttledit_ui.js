@@ -35,18 +35,26 @@ const LONG = 'Start of a really long task title that wraps over several lines in
       await o.nav(B + '#inbox');
       check(await o.until(`!!document.querySelector('#view .trow[data-id="${T}"] .ttl')`, {timeout: 20000}), `${tag}: the row is there`);
       const row = `document.querySelector('#view .trow[data-id="${T}"]')`;
+      // a computer's row with columns shows one line with an ellipsis (the whole title only while editing); a phone's row wraps
+      const wraps = wd < 768;
       const before = await ev(`(() => { const r = ${row}, t = r.querySelector('.ttl'); return {row: r.getBoundingClientRect().height, ttl: t.getBoundingClientRect().height, top: t.getBoundingClientRect().top}; })()`);
-      check(before.ttl > 40, `${tag}: the long title wraps ` + JSON.stringify(before));
+      if (wraps) check(before.ttl > 40, `${tag}: the long title wraps ` + JSON.stringify(before));
       await ev(`(() => { inlineEditStart(${T}); return 1; })()`);
-      const g = await ev(`(() => { const r = ${row}, i = r.querySelector('.ttlin'); const b = i.getBoundingClientRect(), cs = getComputedStyle(i); return {tag: i.tagName, row: r.getBoundingClientRect().height, h: b.height, top: b.top, sh: i.scrollHeight, ch: i.clientHeight, sl: i.scrollLeft, v: i.value, bw: cs.borderTopWidth, ol: cs.outlineStyle}; })()`);
+      const geo = `(() => { const r = ${row}, i = r.querySelector('.ttlin'), b = i.getBoundingClientRect(), cs = getComputedStyle(i); return {tag: i.tagName, row: r.getBoundingClientRect().height, h: b.height, w: b.width, top: b.top, sh: i.scrollHeight, ch: i.clientHeight, sl: i.scrollLeft, v: i.value, bw: cs.borderTopWidth}; })()`;
+      // the height follows the width the row's layout settles on: a real state, no fixed time
+      await o.until(`(g => g.sh <= g.ch + 1 && g.h < 400 && g.h > 10)(${geo})`, {timeout: 5000});
+      const g = await ev(geo);
       check(g.tag === 'TEXTAREA' && g.v === LONG, `${tag}: a wrapping field with the raw title ` + JSON.stringify(g));
       check(g.sh <= g.ch + 1 && g.sl === 0, `${tag}: the whole text is visible, the start not pushed away ` + JSON.stringify(g));
-      check(Math.abs(g.row - before.row) <= 2, `${tag}: the row keeps its height ` + JSON.stringify([before, g]));
-      check(Math.abs(g.h - before.ttl) <= 2 && Math.abs(g.top - before.top) <= 2, `${tag}: the field lies where the title stood, as many lines ` + JSON.stringify([before, g]));
+      check(g.h < 400 && g.w > 120, `${tag}: a field of sensible size (it measured itself at its real width) ` + JSON.stringify(g));
+      if (wraps) {
+        check(Math.abs(g.row - before.row) <= 2, `${tag}: the row keeps its height ` + JSON.stringify([before, g]));
+        check(Math.abs(g.h - before.ttl) <= 2 && Math.abs(g.top - before.top) <= 2, `${tag}: the field lies where the title stood, as many lines ` + JSON.stringify([before, g]));
+      } else check(g.h > before.ttl + 10, `${tag}: the one-line row opens to the whole title ` + JSON.stringify([before, g]));
       check(g.bw === '0px', `${tag}: no frame over the text ` + JSON.stringify(g));
       await o.shot(`p2497c-${tag}-edit.png`);
       // it grows with the text
-      const grown = await ev(`(() => { const i = ${row}.querySelector('.ttlin'), h = i.getBoundingClientRect().height; i.value += ' and more words'.repeat(12); i.dispatchEvent(new Event('input', {bubbles: true})); return {was: h, now: i.getBoundingClientRect().height, sh: i.scrollHeight, ch: i.clientHeight}; })()`);
+      const grown = await ev(`(() => { const i = ${row}.querySelector('.ttlin'), h = i.getBoundingClientRect().height; i.value += ' and more words'.repeat(40); i.dispatchEvent(new Event('input', {bubbles: true})); return {was: h, now: i.getBoundingClientRect().height, sh: i.scrollHeight, ch: i.clientHeight}; })()`);
       check(grown.now > grown.was && grown.sh <= grown.ch + 1, `${tag}: the field grows with the text ` + JSON.stringify(grown));
       // pasted line breaks become spaces, Esc cancels
       const pasted = await ev(`(() => { const i = ${row}.querySelector('.ttlin'); i.value = 'One\\nTwo\\r\\nThree'; i.dispatchEvent(new Event('input', {bubbles: true})); return i.value; })()`);
@@ -60,13 +68,15 @@ const LONG = 'Start of a really long task title that wraps over several lines in
       check(tt === 'Renamed ' + tag && await ev(`!document.querySelector('.ttlin')`), `${tag}: Enter saves without a line break: ` + JSON.stringify(tt));
       // leaving the field saves
       await ev(`(() => { inlineEditStart(${T2}); return 1; })()`);
-      await ev(`(() => { const i = document.querySelector('#view .ttlin'); i.value = 'Blurred ${tag}'; i.dispatchEvent(new Event('input', {bubbles: true})); i.blur(); return 1; })()`);
+      await ev(`(() => { const i = document.querySelector('#view .ttlin'); i.value = 'Blurred ${tag}'; i.dispatchEvent(new Event('input', {bubbles: true})); i.blur(); i.dispatchEvent(new FocusEvent('blur')); return 1; })()`);  // (a headless window without focus fires no blur of its own)
       tt = ''; for (let n = 0; n < 60 && tt !== 'Blurred ' + tag; n++) { tt = (await call('GET', `/api/tasks/${T2}`)).title; if (tt !== 'Blurred ' + tag) await sleep(150); }
       check(tt === 'Blurred ' + tag, `${tag}: a click beside saves: ` + JSON.stringify(tt));
       if (wd === 1200) {
-        // a real double click on a word of the second line: the caret lands there, not at the end
+        // a real double click on a word inside the title: the caret lands there, not at the end
         await o.until(`!document.querySelector('.ttlin') && !!${row}`, {timeout: 5000});
-        const pt = await ev(`(() => { const t = ${row}.querySelector('.ttl'), n = [...t.childNodes].find(x => x.nodeType === 3) || t.firstChild, rg = document.createRange(); const at = ${JSON.stringify(LONG)}.indexOf('kitchen'); rg.setStart(n, at + 2); rg.setEnd(n, at + 3); const b = rg.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, at}; })()`);
+        const pt = await ev(`(() => { const t = ${row}.querySelector('.ttl'), n = [...t.childNodes].find(x => x.nodeType === 3) || t.firstChild, rg = document.createRange(); const at = ${JSON.stringify(LONG)}.indexOf('really'); rg.setStart(n, at + 2); rg.setEnd(n, at + 3); const b = rg.getBoundingClientRect(); return {x: b.left + b.width / 2, y: b.top + b.height / 2, at}; })()`);
+        // the "Renamed" note of the step before may still lie over the row: the title itself under the pointer
+        check(await o.until(`!!document.elementFromPoint(${pt.x}, ${pt.y})?.closest('.ttl')`, {timeout: 15000}), `${tag}: the title is free to click`);
         const click = [{type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}];
         await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(pt.x), y: Math.round(pt.y)}, ...click, ...click]}]});
         await cmd('input.releaseActions', {context: ctx});
