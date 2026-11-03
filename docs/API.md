@@ -1819,7 +1819,9 @@ Scope `read`. `GET /mails?client_id=|list_id=` (exactly one, else `400`; `q`, `l
 next_cursor}` newest first (`id, org_id, client_id, client_name, list_id, list_name, from_addr, from_name, subject, sent_at,
 created_at, files, dir, state`), and `GET /mails/{id}` -> one mail with `body`, `body_short`, `to` and `attachments` (name,
 size, mime, scan; no download through the API). Only mails filed with a client or a project the token's user sees, in that
-client's / project's workspace; an agent sees a client's mails through a project of that client shared with it. Never the
+client's / project's workspace (2.395.0: a project's mails need an edit role -- owner, admin, edit; a guest role,
+`participant` / `view`, only while the project's switch `mail_guests` is on, default off, set in the app by the owner or a
+project admin and shown read-only in the project as `mail_guests`); an agent sees a client's mails through a project of that client shared with it. Never the
 mails *Not assigned* (also not the token user's own), never deleted ones, never another organisation's: `404`. An agent with the data lock *Private e-mails* (the default): none of a private space either (`404`). Kid
 accounts `403`. Everything else of the filing (addresses, the hub inbox, assigning, deleting, attachments, HTML view,
 sending) stays in the app (session only).

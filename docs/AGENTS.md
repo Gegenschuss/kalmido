@@ -4099,7 +4099,9 @@ Mails filed with a client or a project (the e-mail filing of the hub) can be **r
 | The mails of one client (`client_id`) or one project (`list_id`), newest first: sender, subject, date, direction, number of attachments (`q` = words in subject, sender or text; `limit` up to 200, `cursor` = `next_cursor`) | `GET /api/v1/mails` | `list_filed_mails` |
 | One mail with its plain text (`body`, `body_short` without quoted earlier mails and signature), recipients and the names of its attachments | `GET /api/v1/mails/{id}` | `get_filed_mail` |
 
-What an agent sees: the mails of a project shared with it (inside its project restriction and data lock), and the mails of
+What an agent sees: the mails of a project shared with it (inside its project restriction and data lock; 2.395.0: with an edit
+role -- shared with role `view` or `participant`, only while the project's owner or a project admin switched on *Guests can
+read e-mails*, field `mail_guests` of the project, default off), and the mails of
 a client when it sees at least one project of that client in the client's workspace (a private client: a project of the
 client's own person). Never the mails *Not assigned* of anybody (also not its owner's), never deleted ones, never a mail of
 another organisation: all of that answers `404`. The data lock *Private e-mails* of an agent (on by default) hides every mail filed in a private space (no organisation) from it: `404` too. A person's token reads what the person sees, but never *Not assigned*
