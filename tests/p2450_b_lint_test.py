@@ -63,6 +63,8 @@ if shutil.which("pwsh"):
            "if ($e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }" % os.path.join(ROOT, "install.ps1"))
     r = subprocess.run(["pwsh", "-NoProfile", "-Command", cmd], capture_output=True, text=True)
     check(r.returncode == 0, f"install.ps1 parses: {r.stdout[:300]}")
+else:
+    print("p2450_b_lint: install.ps1 parse check SKIP (no pwsh)")  # 2.501.0 (#4296)
 
 # ---- docker-compose.yml
 dc = read("docker-compose.yml")

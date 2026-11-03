@@ -1,5 +1,6 @@
 // ff.js -- Firefox headless driven over WebDriver BiDi, shared by the UI suites that check the real layout (2.7.2: one copy
-// instead of one per suite). Skipped (with a note) when there is no firefox on PATH.
+// instead of one per suite). 2.501.0 (#4296): no firefox on PATH = a failed check (it used to end green with only a log line);
+// KALMIDO_SKIP_FIREFOX=1 leaves the browser part out on purpose, with a line that run_all.sh counts as partly skipped.
 //   const firefox = require('./ff')({tag: 'p272', check, shots: 'P272_SHOTS'});
 //   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle}) => { ... }, touch);
 // touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
@@ -29,11 +30,17 @@ const NET = () => {
       try { return send.apply(this, arguments); } catch (e) { end(id); throw e; } }; }
 };
 
+// 2.501.0 (#4296): true = no browser part in this run, the caller returns; the suites with an own firefox() use it too
+const noFirefox = (tag, check) => {
+  if (process.env.KALMIDO_SKIP_FIREFOX === '1') { console.log(`${tag}: Firefox part skipped (KALMIDO_SKIP_FIREFOX=1)`); return true; }
+  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); return false; } catch { check(false, `${tag}: no firefox on PATH, the browser part cannot run (KALMIDO_SKIP_FIREFOX=1 leaves it out on purpose)`); return true; }
+};
+
 // prefs: extra Firefox preferences for one suite (2.13.0)
 // 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
 // suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
 module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async function firefox(fn, touch) {
-  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log(`${tag}: Firefox part skipped (no firefox on PATH)`); return; }
+  if (noFirefox(tag, check)) return;
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
@@ -108,7 +115,15 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
           console.log(`ff: navigate ${String(url).slice(0, 120)} gave no answer in 40 s, once more`);
         }
       }
-      if (!lazy) await ev(`typeof ld_all === 'function' ? ld_all().then(() => 1, () => 0) : 0`).catch(() => 0);
+      // 2.501.0 (#4296): a module that does not load is red (the suite's later calls would only fail by chance); a page that
+      // went away while it loaded (its own redirect or reload) is no load error. On purpose without the modules: lazy: true
+      if (!lazy) {
+        const e = await ev(`typeof ld_all === 'function' ? ld_all().then(() => '', e => String(e && e.message || e)) : ''`).catch(x => {
+          if (/^JS: |no answer within/.test(x.message)) return x.message;
+          console.log(`ff: ${String(url).slice(0, 120)} went away during ld_all: ${x.message}`); return '';
+        });
+        if (e) check(false, `${tag}: ld_all failed on ${String(url).slice(0, 120)}: ${e}`);
+      }
       return r;
     };
     const shot = async name => { const dir = shots && process.env[shots]; if (!dir) return; const r = await cmd('browsingContext.captureScreenshot', {context: ctx}); fs.writeFileSync(path.join(dir, name), Buffer.from(r.data, 'base64')); };
@@ -178,3 +193,4 @@ module.exports.undoToast = async (ev, text, {after = null, n = 60} = {}) => {
   await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
   return after ? ready(after) : true;
 };
+module.exports.noFirefox = noFirefox;

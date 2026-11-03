@@ -25,6 +25,10 @@
 #                                shard,group,suite,seconds,rc; group = its first suite, suite "*" = the whole group); tools/shards.py
 # Needs: docker, python3 with tests/requirements.txt, node 18+ with `npm ci` done in tests/.
 # Exit code 0 = everything passed.
+# 2.501.0 (#4296): green says what it left out - before the last line "SKIPPED suites (N): a b" (skip.txt) and "PARTLY SKIPPED
+#                                suites (N): c d" (passed, but their output has a skip line, SKIP_RE: Firefox part, no pwsh, a missing
+#                                tool); each passed suite with such a line prints the first three under its "== x: passed".
+#                                The last line stays "ALL SUITES PASSED" / "FAILED suites: ..." (kalmido-mactest.sh, kalmido-livezug.py).
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
@@ -129,7 +133,10 @@ mine() {
   [[ $CUR -gt 0 ]] && [[ $SHARD -eq 0 || $CUR -eq $SHARD ]] && [[ -z "$WANT_G" || "$WANT_G" == *" $GI "* ]]
 }
 if [[ -n "${BUILD:-}" ]]; then docker build -q -t "$KALMIDO_TEST_IMAGE" "$HERE/.." >/dev/null || exit 1; fi
-FAILED=()
+FAILED=(); SKIPPED=(); PARTLY=()
+# 2.501.0 (#4296): a skip line of a suite: the words SKIP / SKIPPED / skipped / Skipped or "skip:" on their own (not skip_files, not "skip link")
+SKIP_RE='(^|[^[:alnum:]_])(SKIP|SKIPPED|skipped|Skipped|skip:)([^[:alnum:]_]|$)'
+skip_lines() { grep -E "$SKIP_RE" <<< "$1" | grep -vE '^FAIL|(^|[^0-9])0 skipped'; }
 SKIPS=" $(awk -v d="$(TZ=Europe/Berlin date +%F)" '!/^#/ && NF >= 3 && $2 >= d {printf "%s ", $1}' "$HERE/skip.txt" 2>/dev/null) "
 run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   mine || return 0
@@ -138,7 +145,7 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   # #1315: a proven flaky suite is skipped until the date of its line in skip.txt (tests/skip_test.py: CI red after it);
   # a run naming it (ONLY, kalmido-mactest.sh run SUITE) runs it - that is how it gets fixed
-  [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]] && { echo "== $name: SKIPPED (wackelt, tests/skip.txt)"; return 0; }
+  [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]] && { SKIPPED+=("$name"); echo "== $name: SKIPPED (wackelt, tests/skip.txt)"; return 0; }
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"
   local out rc t0
@@ -151,7 +158,10 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
     if [[ -n "${GITHUB_ACTIONS:-}" ]]; then
       echo "::error title=suite $name failed::$( { echo "$out" | grep -E "^FAIL|Error|Traceback|failed" | head -8; echo "$out" | tail -3; } | tr '\n' ' ' | sed 's/%/%25/g' | cut -c1-900)"
     fi
-  else echo "== $name: passed"; fi
+  else echo "== $name: passed"
+    local sk; sk=$(skip_lines "$out")
+    if [[ -n "$sk" ]]; then PARTLY+=("$name"); head -3 <<< "$sk" | cut -c1-200 | sed 's/^/   /'; fi
+  fi
 }
 # 2.180.0 C (#2695): the start is lazy - right before the group's first suite that runs; a suite in selfstart.txt starts its own
 # container first thing (tests/selfstart_test.py guards that), for it the old container is only removed (no second start)
@@ -167,5 +177,11 @@ _fresh_start() {  # _fresh_start <suite>
 eval "$LIST"
 _group_end
 docker rm -f "${KALMIDO_TEST_CONTAINER:-kalmido-test}" "${KALMIDO_TEST_DB_CONTAINER:-${KALMIDO_TEST_CONTAINER:-kalmido-test}-db}" >/dev/null 2>&1  # 2.37.0: + its Postgres
+# 2.501.0 (#4296): what this run did not check, red or green
+[[ ${#SKIPPED[@]} -gt 0 ]] && echo "SKIPPED suites (${#SKIPPED[@]}): ${SKIPPED[*]}"
+[[ ${#PARTLY[@]} -gt 0 ]] && echo "PARTLY SKIPPED suites (${#PARTLY[@]}): ${PARTLY[*]}"
+if [[ -n "${GITHUB_ACTIONS:-}" && $(( ${#SKIPPED[@]} + ${#PARTLY[@]} )) -gt 0 ]]; then
+  echo "::warning title=suites not fully run::skipped: ${SKIPPED[*]:-none}; partly skipped: ${PARTLY[*]:-none}"
+fi
 if [[ ${#FAILED[@]} -gt 0 ]]; then echo "FAILED suites: ${FAILED[*]}"; exit 1; fi
 echo "ALL SUITES PASSED$([[ $SHARD -gt 0 ]] && echo " (shard $SHARD/$SHARDS_DEFINED)")"

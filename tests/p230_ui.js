@@ -30,7 +30,7 @@ const menuClick = (w, d, re) => click(w, [...d.querySelectorAll('#pop .menu-list
 const ALL = 'cal,timeline,matrix,habits,pomo,kanban,paperless,collab,stats,time,progress,deps,fields,comments,agents';
 
 async function firefox(fn) {
-  try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('p230_ui: Firefox part skipped (no firefox on PATH)'); return; }
+  if (require('./ff').noFirefox('p230_ui', check)) return;  // 2.501.0 (#4296): no firefox = red
   const PORT = 9300 + Math.floor(Math.random() * 600);
   const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'kalmido-p230-'));
   fs.writeFileSync(path.join(prof, 'user.js'), [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1]]

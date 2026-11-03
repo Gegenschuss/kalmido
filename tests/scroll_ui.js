@@ -4,8 +4,8 @@
 // not be cancelled by a touch handler (preventDefault on touchmove). Bug in 1.7.0: the docked composer (1.5.3) set the
 // list column's bottom padding to 0, also on phones where the composer is hidden, so the last rows sat under the tab bar
 // and a list only a little longer than the screen (the user's "Tomorrow") could not be scrolled at all.
-// jsdom has no layout, so this suite drives Firefox headless over WebDriver BiDi. No Firefox on PATH = skipped (exit 0).
-const {spawn, execFileSync} = require('child_process');
+// jsdom has no layout, so this suite drives Firefox headless over WebDriver BiDi. No Firefox on PATH = red (KALMIDO_SKIP_FIREFOX=1 leaves it out, ff.js).
+const {spawn} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
 const {B, login, sleep} = require('./boot');
 const TC = require('./testclock');
@@ -17,7 +17,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); const j = await r.json().catch(() => ({})); if (!r.ok) throw new Error(`${method} ${url} ${r.status} ${JSON.stringify(j)}`); return j; };
 const ymd = n => TC.day(n);
 
-try { execFileSync('firefox', ['--version'], {stdio: 'ignore'}); } catch { console.log('scroll_ui: skipped (no firefox on PATH)\n0 ok, 0 failed'); process.exit(0); }
+if (require('./ff').noFirefox('scroll_ui', check)) { console.log(`${ok} ok, ${F.length} failed`); process.exit(F.length ? 1 : 0); }  // 2.501.0 (#4296): no firefox = red
 
 async function seed() {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

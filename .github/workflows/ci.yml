@@ -314,6 +314,9 @@ jobs:
         run: npm ci --prefix tests
       - name: Build the demo
         run: python tools/build_demo.py /tmp/kalmido-demo && test -f /tmp/kalmido-demo/index.html
+      # 2.501.0 (#4296): without Firefox every suite with a browser part is red (tests/ff.js): say why at once, not suite by suite
+      - name: Firefox is there
+        run: firefox --version || { echo "::error title=no Firefox::the runner image has no firefox, the UI suites cannot run"; exit 1; }
       - name: Demo smoke test (jsdom, Firefox)
         env:
           TZ: Europe/Berlin
@@ -395,6 +398,9 @@ jobs:
         with:
           name: shard-plan
           path: /tmp/plan
+      # 2.501.0 (#4296): without Firefox every suite with a browser part is red (tests/ff.js): say why at once, not suite by suite
+      - name: Firefox is there
+        run: firefox --version || { echo "::error title=no Firefox::the runner image has no firefox, the UI suites cannot run"; exit 1; }
       - name: Run all suites
         env:
           TZ: Europe/Berlin

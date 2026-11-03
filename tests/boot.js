@@ -214,7 +214,9 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
   } else await new Promise(r => setTimeout(r, wait));
   // 2.98.0: a slow place may still be loading the start scripts after `wait` (appearance_ui saw calendar.js not yet run): up to 15 s more until all ran
   for (let i = 0; i < 150 && dom.window.document.readyState !== 'complete'; i++) await new Promise(r => setTimeout(r, 100));
-  if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => console.log('ld_all:', e.message));
+  // 2.501.0 (#4296): a module that does not load stops the suite (it used to be a log line nobody sees); only a window started
+  // without network on purpose (setup: __offline, p2140_ui, p2238_b) may fail here. No modules wanted: lazy: true
+  if (!lazy && typeof dom.window.ld_all === 'function') await dom.window.ld_all().catch(e => { if (!dom.window.__offline) throw new Error('ld_all failed: ' + e.message); console.log('ld_all (offline start):', e.message); });
   dom.window.__cookie = cookie; dom.window.__store = store;
   if (shared) shared.wins.push(dom.window);
   const close = dom.window.close.bind(dom.window), realmTE = dom.window.TypeError;

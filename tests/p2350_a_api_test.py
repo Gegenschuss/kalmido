@@ -243,7 +243,7 @@ if PWSH:
         stop_launcher(P)
         LOG.close()
 else:
-    print("p2350_a_api: pwsh missing, the .ps1 is covered by launcher_parity + launcher_ps1 (static)")
+    print("p2350_a_api: ps1 run SKIP (no pwsh), the .ps1 is covered by launcher_parity + launcher_ps1 (static)")
 
 # ---- an older server (stub): no steps / ring / host fields / approval -> still answers, as before
 SEEN = {"posts": [], "status": []}
