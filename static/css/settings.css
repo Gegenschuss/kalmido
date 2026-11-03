@@ -197,7 +197,8 @@
 .sgvuses{margin:0 0 .5rem 2.5rem;font-size:var(--fs-s)}
 .sgvuses code{font-size:var(--fs-xs)}
 /* 2.364.0 C (#3041): an info button at the right end of a wide switch row keeps its tap area inside the area (no sideways scroll) */
-.spane .featgrid label.wide>.ib:last-child{margin-right:.6875rem}
+/* #3363 (main red 03.11.2026): the same for a switch label in a settings row whose text wraps to the edge (Admin > Agents, hosted MCP) */
+.spane .featgrid label.wide>.ib:last-child,.spane .row>label.chkl>.ib:last-child{margin-right:.6875rem}
 /* 2.436.0 (#3620): "Show administration again" under the areas (View as member); the nav is a tab list, so it sits beside it */
 .snmv{position:absolute;left:.5rem;bottom:.625rem;width:11.5rem;display:flex;align-items:center;gap:.625rem;padding:.4375rem .625rem;border-radius:var(--radius);border:1px solid var(--line2);color:var(--text2);font-size:var(--fs-m);text-align:left}
 .snmv:hover{background:var(--bg3);color:var(--text)}

@@ -121,6 +121,9 @@ UMZ_LEFT_USERS = {
     "disc_quota": _U_SERVER, "support_grants": _U_SERVER, "ev_invite_day": _U_SERVER, "ev_reminded": _U_SERVER, "idem_keys": _U_SERVER, "imports": _U_SERVER, "login_ips": _U_SERVER,
     "notify_mail_queue": _U_SERVER, "sample_items": _U_SERVER, "task_push": _U_SERVER,
     "agent_jobs": _U_AGENT, "job_watch": _U_AGENT, "agents": _U_AGENT,
+    # #3363 (main red 03.11.2026): one-time authorization codes (10 min) and accesses of MCP clients to an agent: credentials of this server, given
+    # anew on the target (consent page); on deleting the account (or the agent) both go by foreign key (ON DELETE CASCADE)
+    "oauth_codes": _U_SECRET, "oauth_grants": _U_SECRET,
     "dav_sync": _U_DERIVED, "dav_sync2": _U_DERIVED, "dl_changes": _U_DERIVED, "list_activity": _U_DERIVED, "rss_items": _U_DERIVED, "sheet_lastvals": _U_DERIVED,
     "book_members": _U_SHARE, "ev_cal_members": _U_SHARE, "folder_people": _U_SHARE, "fs_shares": _U_SHARE, "group_members": _U_SHARE, "sheet_shares": _U_SHARE,
     "office_archive_log": _U_ORG, "office_doc_log": _U_ORG, "office_drives": _U_ORG, "office_letter_profiles": _U_ORG, "office_meal_log": _U_ORG,

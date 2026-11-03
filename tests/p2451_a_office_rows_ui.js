@@ -134,6 +134,9 @@ const release = (w, el) => ptr(w, el, 'pointerup');
     const w = await boot({hash: 'office/offers', ...(mobile ? {mobile: true} : {})}), d = w.document;
     await until(() => d.querySelector('.office .ofcbody'), 60);
     await until(() => w.eval(`typeof rinListHtml + typeof brl_settingsHtml + typeof dmaListHtml + typeof dimp_supHtml`) === 'functionfunctionfunctionfunction', 60);
+    // main red 03.11.2026: .ofcbody is drawn with "Loading…" before GET /api/office/settings answers; series and bank rules
+    // draw only for the office's admin (ofcAdmin reads OFC.info), so a slow answer (full run under load) left them out
+    check(await until(() => w.eval(`!!OFC.info && !OFC.infoLoading && ofcAdmin()`), 60), `${mobile ? 'phone' : 'computer'}: the office settings are loaded (admin)`);
     w.eval(`(() => {
       window.__c = [];
       const spy = n => { window[n] = (...a) => __c.push([n, ...a]); return window[n]; };
@@ -152,6 +155,7 @@ const release = (w, el) => ptr(w, el, 'pointerup');
         + '<ul class="rkplist"><li><input value="Messe" data-rkp="name" data-id="1"><button type="button" class="iconbtn" data-rkp="del" data-id="1"></button></li></ul>';
       document.body.append(h);
     })()`);
+    check(d.querySelector('#tst .rin-it .ofcn') && d.querySelector('#tst .brlrow .ofcn'), `${mobile ? 'phone' : 'computer'}: the series and bank rule rows are drawn`);
     return {w, d};
   };
   let {w: w2, d: d2} = await rows(true);
