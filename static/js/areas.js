@@ -500,7 +500,7 @@ function sbb_render(hid) {
 function sbb_fit() {
   const row = $('#side .sbmr');
   if (row) { row.style.gridTemplateColumns = row.style.overflowX = row.style.overflowY = ''; }
-  let tooWide = false;
+  const tooWide = new Map();  // a name of the drawer's row -> its width in 9 px
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
     const box = n.clientWidth; if (!box) continue;
@@ -515,11 +515,15 @@ function sbb_fit() {
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide = true; continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide.set(n, wide()); continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
-  if (tooWide) { row.style.gridTemplateColumns = 'repeat(var(--sbmc,5),minmax(min-content,1fr))'; row.style.overflowX = 'auto'; row.style.overflowY = 'hidden'; }
+  if (tooWide.size) {  // the other columns keep their width, the row scrolls
+    const cols = parseInt(row.style.getPropertyValue('--sbmc')) || 5, w = Array(cols).fill($('.srb', row).offsetWidth);
+    $$('.srbn', row).forEach((n, i) => { if (tooWide.has(n)) w[i % cols] = Math.max(w[i % cols], Math.ceil(tooWide.get(n)) + 4); });
+    row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflowX = 'auto'; row.style.overflowY = 'hidden';
+  }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
 document.fonts?.addEventListener('loadingdone', sbb_fit);
