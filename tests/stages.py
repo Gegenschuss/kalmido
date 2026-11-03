@@ -17,8 +17,10 @@ test files and the changed files, nothing is started; Python standard library on
     --touched        2.181.0 (#2696): only the suites of the changed files plus the suites before them in their group that
                      write a state file they read (*ids.json) and
                      the route guards for a new route and (2.381.0, #2853) the static guards ALWAYS_SUITES (never "full":
-                     unmappable files go to stderr as `UNMAPPED: FILE (reason)` lines, #3505: the train's check reads them -
-                     a package with such files is "not checked", never green);
+                     2.501.0 (#4016): core files, start files, translations and server files without a route get a small
+                     fixed set, TOUCHED_FIXED; what is left (CI basics, test helpers, "too broad") goes to stderr as
+                     `UNMAPPED: FILE (reason)` lines, #3505: the train's check reads them - a package with such files is
+                     "not checked", never green);
                      prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
     --unmapped-out F #3505: with --touched also write the unmapped files to F, one `FILE<TAB>reason` line each (empty
                      file = every changed file has its suites)
@@ -32,6 +34,8 @@ With a separate test runner, only the suites a branch touches (exit 3 = the chan
 """
 import argparse
 import bisect
+import datetime
+import json
 import os
 import re
 import subprocess
@@ -120,6 +124,13 @@ class Repo:
         if rel not in self._text:
             self._text[rel] = read(os.path.join(self.root, rel))
         return self._text[rel]
+
+    def skipped(self):
+        """2.501.0 (#4016): the suites tests/skip.txt holds back today (the same rule as run_all.sh; the date is Berlin's there,
+        a day's difference only moves a line that is about to end)."""
+        today = datetime.date.today().isoformat()
+        rows = (ln.split() for ln in self.text("tests/skip.txt").splitlines() if not ln.startswith("#"))
+        return {r[0] for r in rows if len(r) >= 3 and r[1] >= today}
 
     def security(self):
         """{suite: why} - the always-run suites."""
@@ -406,13 +417,111 @@ ALWAYS_SUITES = ("parity", "pg_dialect", "rls_static", "tenant_coverage", "freel
 # the WS_VIEWS guard (p2661_b_ui) needs a container: along when a server / client file changed (the files it scans)
 APP_GUARD_SUITES = ("p2661_b_ui",)
 APP_PREFIXES = ("kalmido/", "static/")
+# 2.501.0 (#4016): files the push stage sends to the full run, for --touched only (the small runs; select() and the CI stay as they
+# are): 330 einreihen checks ran only a sample because schema.py / db.py / app.css (272 times), translations (194), start files
+# of the client (66) and server files without a route (44) mapped to no suite. Each group = the suites that really check it, about 10.
+TOUCHED_FIXED = {
+    "db": ("api", "rls_static", "export_coverage", "p2475_a_api", "p2192_c_upgrade", "pg_layer", "pg_prepare", "p2102_d_api",
+           "p2103_c_api", "p2300_tenant"),
+    "server_start": ("api", "security", "settings_ui", "p2437_l_start", "p2102_d_api", "p2192_c_upgrade",
+                     "p2306_d1_core_hardening", "p2369_5_layers", "p2300_tenant"),
+    "css": ("ui", "settings_ui", "appearance_ui", "p2476_b_appcss", "p2476_b_startcss_ui", "p2217_a_handy_css", "p2209_a_layout_ui",
+            "p2455_a_phone_ui", "p2459_b_phone320_ui", "perf_budget"),
+    "client_start": ("ui", "settings_ui", "offline", "setup_ui", "p2209_e_sw", "p3136_lazy_ui", "perf_budget", "perf_ui",
+                     "p2209_a_layout_ui", "p2455_a_phone_ui"),
+    "i18n": ("i18n", "quick_lang", "p2191_a_i18nsplit", "p2191_a_i18nsplit_ui", "p2191_f2_i18nrobust", "p2447_a_lang"),
+}
+TOUCHED_VIA_COMMON_RE = re.compile(r" via tests/(?:boot\.js|ff\.js|kt\.py|dbx\.py|testclock\.py|testclock\.js)\b")
+TOUCHED_DB_CORE = {"schema", "db", "pg", "rls", "fkeys", "dlock"}
+TOUCHED_HITS_MAX = 10  # the suites a file adds by name on top of its group
+TOUCHED_HITS_BROAD = 15  # a text or name more suites than this mention says nothing about the change (as the train's TREFFER_BREIT)
+TOUCHED_PY_DEF_RE = re.compile(r"^def ([a-z][a-z0-9_]{5,})\(", re.M)
+
+
+def touched_group(p, why):
+    """The group of TOUCHED_FIXED of a file classify() sends to the full run, None when it stays unmapped."""
+    stem = os.path.splitext(os.path.basename(p))[0]
+    if p.startswith("static/i18n/") and p.endswith(".json"):
+        return "i18n"
+    if p in ("app.py", "kalmido/__init__.py", "kalmido/startup.py"):
+        return "server_start"
+    if p.startswith("kalmido/core/"):
+        if p.startswith("kalmido/core/migrations.d/") or stem in TOUCHED_DB_CORE:
+            return "db"
+        return "i18n" if stem.startswith("i18n") else "server_start"
+    if p == "static/app.css" or p.startswith("static/css/") and why == "stylesheet no suite names":
+        return "css"
+    if p in ("static/index.html", "static/sw.js", "static/i18n.js", "static/manifest.json"):
+        return "client_start"
+    if p.startswith("static/js/") and why in ("client start file", "client module no suite names"):
+        return "client_start"
+    if p.startswith("kalmido/") and why == "server module without a route a suite names":
+        return "server_start"
+    return None
+
+
+def rare_hits(repo, tokens, skip=()):
+    """{suite: token} of the suites whose own test file names a token, rare tokens first, at most TOUCHED_HITS_MAX suites; a token
+    in more than TOUCHED_HITS_BROAD suites is left out. Own files only: a helper most suites load would name every suite."""
+    score, why = {}, {}
+    for tok in tokens:
+        hit = {s for rel in repo._files_with(tok) for s in repo.by_file.get(rel, ())} - set(skip)
+        if not hit or len(hit) > TOUCHED_HITS_BROAD:
+            continue
+        for s in hit:
+            score[s] = score.get(s, 0.0) + 1.0 / len(hit)
+            why.setdefault(s, tok)
+    return {s: why[s] for s in sorted(score, key=lambda x: (-score[x], x))[:TOUCHED_HITS_MAX]}
+
+
+def i18n_changed_texts(base, head, rel, root):
+    """The old and new texts of the changed keys of a translation file, and the keys gone from it; [] without a diff."""
+    d = diff_lines(base, head, rel, root)
+    if d is None:
+        return []
+
+    def rows(lines):
+        out = {}
+        for ln in lines:
+            try:
+                out.update(json.loads("{" + ln.strip().rstrip(",") + "}"))
+            except ValueError:  # a line of another form: not a key of this file
+                continue
+        return out
+    old, new = rows(d[0]), rows(d[1])
+    texts = [v for k, v in old.items() if new.get(k) != v] + [v for k, v in new.items() if k in old and old[k] != v]
+    texts += [k for k in old if k not in new]
+    return [t for t in dict.fromkeys(texts) if isinstance(t, str) and len(t) >= 4]
+
+
+def touched_fixed(repo, p, why, base=None, head=None):
+    """2.501.0 (#4016): {suite: why} for a file classify() sends to the full run, None when it stays unmapped. Its group of
+    TOUCHED_FIXED, plus the suites that name what changed: a translation's changed texts, a server module by its path / public
+    functions. A suite on tests/skip.txt stays out (a named run would run it, the run_all.sh skip does not hold there)."""
+    group = touched_group(p, why)
+    if group is None:
+        return None
+    skip = repo.skipped()
+    out = {s: f"fixed set {group} (#4016)" for s in TOUCHED_FIXED[group] if s in repo.group_of and s not in skip}
+    toks, what = [], ""
+    if group == "i18n" and p.endswith(".json"):
+        toks, what = i18n_changed_texts(base, head, p, repo.root), "names the changed text"
+    elif p.startswith("kalmido/") and p.endswith(".py"):
+        mod = py_module(p)
+        pkg, name = mod.rsplit(".", 1) if "." in mod else ("", mod)
+        toks = [p, mod, f"from {pkg} import {name}"] + sorted(TOUCHED_PY_DEF_RE.findall(repo.text(p)))
+        what = "names the module"
+    for s, tok in rare_hits(repo, toks, skip).items():
+        out.setdefault(s, f"{what}: {tok[:40]}")
+    return out
 
 
 def touched(repo, files, base=None, head=None):
     """--touched (2.181.0, #2696, the Mac runner's small runs): only the suites of the changed files, each with the suites
     before it in its group that write a state file it reads (calendars_ui after calendars), plus the route guards when a
     server file gains a route, plus (2.381.0, #2853) the guards ALWAYS_SUITES (APP_GUARD_SUITES for a server / client file).
-    A file that would need the full run is listed, not run (the CI does that).
+    2.501.0 (#4016): a core, start or translation file takes its small fixed set (TOUCHED_FIXED). Any other file that would need
+    the full run is listed, not run (the CI does that).
     -> (suites in run order, {suite: why}, [unmapped files])"""
     why, unmapped = {}, []
     for f in files:
@@ -422,8 +531,19 @@ def touched(repo, files, base=None, head=None):
             toks = routes(repo.text(f)) or set().union(*(routes(repo.text(x)) for x in importers(repo, f, depth=1)))
             # /api/lists, /api/settings: every UI suite sets up through them, not the module's area (as js_tokens)
             res = repo.mentioning(sorted(t for t in toks if t.count("/") >= 3)) or res
+        if kind == "suites":  # 2.501.0 (#4016): a name in a helper (nearly) every suite loads says nothing about the suite
+            own = {s: w for s, w in res.items() if not TOUCHED_VIA_COMMON_RE.search(w)}
+            if not own and res:
+                kind, res = "full", ("client module no suite names" if f.startswith("static/js/")
+                                     else "server module without a route a suite names")
+            else:
+                res = own
         if kind == "suites" and len(res) > TOUCHED_BROAD:  # a helper most areas use: that is the CI's full run
             kind, res = "full", f"too broad: {len(res)} suites"
+        if kind == "full":  # 2.501.0 (#4016): a small fixed set instead of no suite at all
+            fixed = touched_fixed(repo, f, res, base, head)
+            if fixed:
+                kind, res = "suites", fixed
         if kind == "full":
             unmapped.append(f"{f} ({res})")
         elif kind == "suites":

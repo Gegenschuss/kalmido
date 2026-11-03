@@ -45,15 +45,16 @@ check(all(s in order for s in stages.ALWAYS_SUITES + stages.APP_GUARD_SUITES), "
 check(why.get("parity") == "guard, always (#2853)", f"--why names the reason: {why.get('parity')}")
 order, _, _ = stages.touched(repo, [])
 check(order == [], f"nothing changed = nothing to test: {order}")
-_, _, unm = stages.touched(repo, ["kalmido/core/schema.py", "docs/AGENTS.md"])
-check([u.split(" (")[0] for u in unm] == ["kalmido/core/schema.py"], f"#3505: core file unmapped, docs not: {unm}")
+# 2.501.0 (#4016): schema.py has its fixed set now; the CI basics stay unmapped
+_, _, unm = stages.touched(repo, ["Dockerfile", "docs/AGENTS.md"])
+check([u.split(" (")[0] for u in unm] == ["Dockerfile"], f"#3505: a CI basic unmapped, docs not: {unm}")
 with tempfile.TemporaryDirectory() as tmp:
     out = os.path.join(tmp, "unmapped.txt")
     p = subprocess.run([sys.executable, os.path.join(N, "stages.py"), "--touched", "--unmapped-out", out,
-                        "kalmido/core/schema.py"], capture_output=True, text=True, cwd=os.path.dirname(N))
+                        "Dockerfile"], capture_output=True, text=True, cwd=os.path.dirname(N))
     rows_out = open(out, encoding="utf-8").read().splitlines() if os.path.exists(out) else []
-    check(p.returncode == 0 and "UNMAPPED: kalmido/core/schema.py (" in p.stderr, f"#3505: UNMAPPED line on stderr: {p.stderr[-300:]}")
-    check(len(rows_out) == 1 and rows_out[0].startswith("kalmido/core/schema.py\t") and rows_out[0].split("\t")[1],
+    check(p.returncode == 0 and "UNMAPPED: Dockerfile (" in p.stderr, f"#3505: UNMAPPED line on stderr: {p.stderr[-300:]}")
+    check(len(rows_out) == 1 and rows_out[0].startswith("Dockerfile\t") and rows_out[0].split("\t")[1],
           f"#3505: --unmapped-out has FILE<TAB>reason: {rows_out}")
 
 print(f"p2381_a_guards: {OKS[0]} ok, {len(FAILS)} failed")
