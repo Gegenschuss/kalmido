@@ -133,7 +133,7 @@ function ofmSendHtml(p, rt, dis) {
   if (!p) return '';
   const d = dis ? 'disabled' : '';
   return `${rt ? ofcRowF('ofm-reply', tr('Answers to'), `<input id="ofm-reply" type="email" inputmode="email" autocomplete="off" maxlength="254" value="${esc(p.reply_to || p.default_reply_to || '')}" ${d}>`) : ''}
-    <div class="ofm-send"><div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofm-on" ${p.signature ? 'checked' : 'disabled'} ${d}> ${tr('Attach signature')}</label><button type="button" class="linkbtn" data-ofm="edit">${tr('Edit')}</button></div>
+    <div class="ofm-send"><div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofm-on" ${p.signature ? 'checked' : 'disabled'} ${d}> ${tr('Attach signature')}</label><button type="button" class="linkbtn" data-ofmsig="edit">${tr('Edit')}</button></div>
     <div class="ofm-box">${ofmSigBox(p.signature)}</div></div>
     <p class="muted ofchint">${esc(p.note || '')}</p>`;
 }
@@ -211,7 +211,7 @@ async function ltmMailModal(id) {
 }
 
 document.addEventListener('click', e => {
-  const o = /** @type {any} */ (e.target).closest?.('[data-ofm]');
+  const o = /** @type {any} */ (e.target).closest?.('[data-ofmsig]');  // 2.500.0 (#4058): its own attribute, data-ofm is the office's navigation (areas.js, office_tree.js)
   if (o) {  // 2.439.0 (#3617): from a send dialog: back in it with the new signature
     const send = o.closest('.ofm-send');
     ofmSigModal(j => { if (!send?.isConnected) return; $('.ofm-box', send).innerHTML = ofmSigBox(j.signature); const on = $('#ofm-on', send); on.disabled = !j.signature; on.checked = !!j.signature; });
