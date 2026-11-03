@@ -418,6 +418,21 @@ function dc_auto(d, f) {
   const by = d.auto?.[f];
   return by ? `<button type="button" class="dc-auto" data-dc="edit:${esc(f)}" title="${esc(tr(DC_BY[by] || by))}">${tr('automatic')}</button>` : '';
 }
+// 2.497.0 A (#4046): the action row of the document: looking at it first (show, readable view, download), the rarer ones
+// (split, file store, share, link, other workspace) behind "More…" (one of them alone stands in the row), Delete apart as the last
+function dc_actsHtml(d, w) {
+  const look = [`<button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>`,
+    d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` : '',  // 2.146.0 A (#2451)
+    `<a class="btn sm" href="${dc_fileUrl(d, true)}" download>${ic('archive', 's')} ${tr('Download')}</a>`].join('');
+  const more = [typeof dsp_actBtn === 'function' ? dsp_actBtn(d, w) : '',  // 2.154.0 A (#1111): split a stack
+    d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : '',
+    d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : '',
+    d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '',  // 2.210 C (#2761)
+    w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''].filter(Boolean);
+  const open = DC.actsMore === d.id;
+  const rest = more.length > 1 ? `<button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore">${tr('More…')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div>` : more.join('');
+  return `${look}${rest}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}`;
+}
 function dc_mdDraw(md) {
   const d = DC.doc; if (!d || !md) return;
   const set = DC.set || {senders: [], types: [], tags: [], folders: []};
@@ -425,8 +440,10 @@ function dc_mdDraw(md) {
   const dl = (id, list) => `<datalist id="${id}">${list.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist>`;
   const field = (f, label, input) => `<div class="row dc-f"><label for="dc-${f}">${label}</label>${input}${dc_auto(d, f)}</div>`;
   // 2.98.0 D (#2178): an empty due date / amount stays hidden (a button opens them) -- they are guessed only for invoices / receipts
-  const opt = (f, label, input, empty) => empty ? (ro ? '' : `<div class="row dc-f dc-opt" hidden><label for="dc-${f}">${label}</label>${input}</div>`) : field(f, label, input);
-  const noDue = !d.due, noAmt = !d.amount;
+  // 2.497.0 A (#4046): a field opened by its chip stays open through redraws of the same document
+  const shown = f => DC.optOpen?.id === d.id && DC.optOpen[f];
+  const opt = (f, label, input, empty) => empty && !shown(f) ? (ro ? '' : `<div class="row dc-f dc-opt" data-opt="${f}" hidden><label for="dc-${f}">${label}</label>${input}</div>`) : field(f, label, input);
+  const noDue = !d.due && !shown('due'), noAmt = !d.amount && !shown('amount');
   const sug = Object.entries(d.suggest || {});
   const sugHtml = d.review ? `<div class="dc-rev" role="group" aria-label="${esc(tr('To review'))}">
     <b>${tr('To review')}</b>
@@ -446,15 +463,7 @@ function dc_mdDraw(md) {
   fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="dc-top">${dc_navHtml(d)}
       <button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>
-      <div class="dc-acts">
-        <button type="button" class="btn sm" data-dc="view">${ic('eye', 's')} ${tr('Show')}</button>
-        ${d.einvoice ? `<a class="btn sm dc-einv" href="/api/docs/${d.id}/einvoice" target="_blank" rel="noopener">${ic('receipt', 's')} ${tr('Readable view')}</a>` /* 2.146.0 A (#2451) */ : ''}
-        <a class="btn sm" href="${dc_fileUrl(d, true)}" download>${ic('archive', 's')} ${tr('Download')}</a>
-        ${typeof dsp_actBtn === 'function' ? dsp_actBtn(d, w) : '' /* 2.154.0 A (#1111): split a stack */}
-        ${d.parent_id ? `<a class="btn sm" href="#ablage/${d.parent_id}" data-dc="close">${ic('folder', 's')} ${tr('Show in the file store')}</a>` : ''}
-        ${d.role === 'owner' && typeof ab_share === 'function' ? `<button type="button" class="btn sm" data-dc="share">${ic('users', 's')} ${tr('Share…')}</button>` : ''}${d.role === 'owner' && typeof xl_newDlg === 'function' ? `<button type="button" class="btn sm" data-dc="xlink">${ic('link', 's')} ${tr('Link for external people…')}</button>` : '' /* 2.210 C (#2761) */}
-        ${w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''}
-        ${w ? `<button type="button" class="btn sm danger" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}
+      <div class="dc-acts">${dc_actsHtml(d, w) /* 2.497.0 A (#4046): grouped, Delete set apart at the end */}
       </div></div>
     <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
@@ -469,10 +478,10 @@ function dc_mdDraw(md) {
       ${opt('due', tr('Due'), dateIn('dc-due', d.due || '', {label: tr('Due'), ro: !!ro, attrs: 'data-dcp="due"'}), noDue)}
       ${field('asn', tr('Archive number'), `<span class="dc-amt"><input type="number" min="1" id="dc-asn" data-dcp="asn" value="${esc(d.asn || '')}" ${ro}>${w && !d.asn ? `<button type="button" class="btn sm" data-dc="asnnext">${tr('Next free number')}</button>` : ''}</span>`)}
       ${opt('amount', tr('Amount'), `<span class="dc-amt"><input id="dc-amount" data-dcp="amount" inputmode="decimal" value="${esc(d.amount ? numField(d.amount, 6, 2) : '')}" ${ro}><input id="dc-currency" data-dcp="currency" value="${esc(d.currency || '')}" maxlength="3" aria-label="${esc(tr('Currency'))}" placeholder="EUR" ${ro}></span>`, noAmt)}
-      ${!ro && (noDue || noAmt) ? `<div class="row dc-f dc-optbtn"><button type="button" class="linkbtn" data-dc="showopt">${tr('Add')}: ${tr('Due')} / ${tr('Amount')}</button></div>` : ''}
+      ${!ro && (noDue || noAmt) ? `<div class="dc-optbtn" role="group" aria-label="${esc(tr('Add'))}">${noDue ? `<button type="button" class="dc-chip" data-dc="showopt:due">${ic('plus', 's')} ${tr('Due')}</button>` : ''}${noAmt ? `<button type="button" class="dc-chip" data-dc="showopt:amount">${ic('plus', 's')} ${tr('Amount')}</button>` : ''}</div>` : '' /* 2.497.0 A (#4046): one chip per field */}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
-    <details class="dc-text"><summary>${tr('Recognised text')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`);
+    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`);
   dc_pvDraw(md, d);
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
 }
@@ -591,7 +600,21 @@ async function dc_mdClick(e) {
     else window.open(dc_fileUrl(d), '_blank', 'noopener');
     return;
   }
-  if (a === 'showopt') { md.querySelectorAll('.dc-opt').forEach(e => { e.hidden = false; }); const ob = md.querySelector('.dc-optbtn'); if (ob) ob.hidden = true; md.querySelector('.dc-opt input')?.focus(); return; }
+  if (a === 'actsmore') {  // 2.497.0 A (#4046): the rarer actions; stays open through redraws of the same document
+    const on = DC.actsMore !== d.id; DC.actsMore = on ? d.id : null;
+    b.setAttribute('aria-expanded', String(on)); $('#dc-amore', md).hidden = !on;
+    return;
+  }
+  if (a.startsWith('showopt:')) {  // 2.497.0 A (#4046): the chip of one optional field (due date / amount) opens it
+    const f = a.slice(8);
+    if (DC.optOpen?.id !== d.id) DC.optOpen = {id: d.id};
+    DC.optOpen[f] = true;
+    const row = md.querySelector(`.dc-opt[data-opt="${f}"]`); if (row) row.hidden = false;
+    b.remove();
+    const ob = md.querySelector('.dc-optbtn'); if (ob && !ob.children.length) ob.hidden = true;
+    row?.querySelector('input')?.focus();
+    return;
+  }
   if (a === 'asnnext') { await dc_patch(d.id, {asn: 'next'}, tr('Archive number of {0}', d.name)); return; }
   if (a.startsWith('edit:')) { $(`#dc-${a.slice(5)}`, md)?.focus(); return; }
   if (a === 'redo') {

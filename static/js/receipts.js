@@ -34,10 +34,21 @@ function rc_html() {
     + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
   // 2.185.0 A (#2583): an e-invoice in the office's documents that is no receipt yet (read before, moved in) -> take it over
   const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Take over as receipt')}</button></div>` : '';
+  // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
+  // recognised invoice values; any other document (a letter) gets the button "Record as receipt" that shows them
+  if (!rc_isReceipt(d) && RC.open !== RC.id) {
+    return w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '';
+  }
   return `<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
-    <div class="row"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
-    <div class="row"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
-    <div class="row"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
+    <div class="row dc-f"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
+    <div class="row dc-f"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
+    <div class="row dc-f"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
+}
+// 2.497.0 A (#4046): is the document a receipt (or about to become one)? DC.doc.extracted = what the recognition read off an
+// invoice; a gross amount alone is no sign (a fee in an official letter), such a document gets the button
+function rc_isReceipt(d) {
+  const x = typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.extracted : null;
+  return !!(d.receipt?.is_receipt || d.suggestions?.length || d.einvoice_offer || (x && (x.net || x.vat_pct || x.invoice_no)));
 }
 // 2.154.0 A (#1356): "Suggested by <agent>, confirmed by <person>" while the assignment is the one taken over
 const rc_confHtml = d => d?.confirmed ? `<p class="muted rc-conf">${ic('check', 's')} ${esc(tr('Suggested by {0}, confirmed by {1}', d.confirmed.agent?.name || tr('an agent'), d.confirmed.by?.name || ''))}</p>` : '';
@@ -103,6 +114,7 @@ document.addEventListener('click', async e => {
   const [act, sid] = b.dataset.rc.split(':'), id = RC.id;
   b.disabled = true;
   if (act === 'einv') { rc_einvTake(id, b); return; }
+  if (act === 'open') { RC.open = id; rc_draw(); $('#rc-proj')?.focus(); return; }  // 2.497.0 A (#4046): show the receipt fields
   const body = act === 'accept' ? rc_accBody(b) : undefined;
   try { await rc_post(id, +sid, act, body); } catch { b.disabled = false; return; }
   const label = act === 'accept' ? tr('Suggestion accepted') : tr('Suggestion rejected');

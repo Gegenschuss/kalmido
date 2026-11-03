@@ -6473,7 +6473,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 /* 2.46.1 E (#1622) inline title edit: the field is a block on the circle's line (no inline baseline / strut offset), the frame
    ends before the columns, row-mode rows centre it instead of baseline-aligning to the meta */
 .trow.iedit .ttl{display:block;line-height:var(--lh);min-height:calc(var(--row-fs) * 1.45)}
-.trow.iedit .ttlin{display:block;width:100%;min-height:0;line-height:inherit;margin:0;vertical-align:top;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;letter-spacing:inherit;color:inherit;padding:0;border:0;border-radius:2px;background:color-mix(in srgb,var(--accent) 9%,transparent);box-shadow:none}  /* 2.497.0 (#4056): the title as it stands: same font and wrapping, height from ttlinFit, a soft tint instead of a frame */
+.trow.iedit .ttlin{display:block;width:100%;min-height:0;line-height:inherit;margin:0;vertical-align:top;resize:none;overflow:hidden;white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;letter-spacing:inherit;color:inherit;padding:0;border:0;border-radius:2px;background:color-mix(in srgb,var(--accent) 9%,transparent)}  /* 2.497.0 (#4056): the title as it stands: same font and wrapping, height from ttlinFit, a soft tint instead of a frame */
 @media (min-width:600px){
   .trow.hascols.iedit:not(.haslc) .tmain{align-items:center}
   .trow.hascols.iedit .ttl{flex:1 1 auto;min-width:0}

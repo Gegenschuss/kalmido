@@ -16059,5 +16059,6 @@
   "Every {0} months on the {1} {2}|fem": "Tous les {0} mois le {1} {2}",
   "Monthly on the last {0}|fem": "Tous les mois le dernier {0}",
   "Every {0} months on the last {1}|fem": "Tous les {0} mois le dernier {1}",
-  "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "pour un client dans un pays tiers, la mention « Non imposable dans le pays » au lieu de l'autoliquidation"
+  "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "pour un client dans un pays tiers, la mention « Non imposable dans le pays » au lieu de l'autoliquidation",
+  "Record as receipt": "Enregistrer comme justificatif"
 }

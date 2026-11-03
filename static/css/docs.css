@@ -82,7 +82,13 @@
   .dc-paneon>.dc-view{display:none}
   .dc-pane{position:static;max-height:none;margin:0;padding:.5rem 0;border:0;background:none}
 }
-.dc-acts{display:flex;flex-wrap:wrap;gap:.375rem}
+.dc-acts{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+/* 2.497.0 A (#4046): the row of actions; the rarer ones fold out on a line of their own, Delete apart at the end */
+.dc-ag{display:flex;flex-wrap:wrap;gap:.375rem}
+.dc-amore{flex-basis:100%}
+.dc-adel{margin-left:auto}
+.dc-acts [data-dc="actsmore"] .dc-chev{transition:transform .15s}
+.dc-acts [data-dc="actsmore"][aria-expanded="true"] .dc-chev{transform:rotate(180deg)}
 .dc-acts .btn{min-height:2.5rem}
 .dc-state{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-s)}
 .dc-state.failed{color:var(--danger)}
@@ -93,6 +99,36 @@
 .dc-due{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
 .dc-f{position:relative}
 .dc-f input,.dc-f select{min-height:2.5rem}
+/* 2.497.0 A (#4046): one fixed grid for all fields of the document (receipt, document): label column, field, "automatic" */
+.dc-body .dc-f{display:grid;grid-template-columns:var(--dc-lw,8.5rem) minmax(0,1fr) auto;align-items:center;gap:.25rem .625rem;margin:0 0 .5rem}
+.dc-body .dc-f[hidden]{display:none}
+.dc-body .dc-f>label,.dc-body .dc-f>span:first-child:empty{grid-column:1;min-width:0;width:auto;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
+.dc-body .dc-f>:nth-child(2){grid-column:2;min-width:0;width:100%;box-sizing:border-box}
+.dc-body .dc-f>input[type=checkbox]{width:auto;justify-self:start}
+.dc-body .dc-f>.dpw{display:flex}
+.dc-body .dc-f>.dpw>*{flex:1 1 auto;min-width:0}
+.dc-body .dc-f>.dc-auto{grid-column:3;margin-left:0}
+.dc-optbtn{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .5rem calc(var(--dc-lw,8.5rem) + .625rem)}
+.dc-chip{display:inline-flex;align-items:center;gap:.25rem;min-height:2.25rem;padding:.25rem .75rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer}
+.dc-chip:hover,.dc-chip:focus-visible{border-color:var(--accent);color:var(--text)}
+.dc-text{margin:.625rem 0;border-top:1px solid var(--line)}
+.dc-text>summary{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;list-style:none}
+.dc-text>summary::-webkit-details-marker{display:none}
+.dc-text>summary h4{margin:0;flex:1}
+.dc-text .dc-chev{flex:none;color:var(--muted);transition:transform .15s}
+.dc-text[open] .dc-chev{transform:rotate(180deg)}
+.rc-add{margin:.625rem 0}
+.rc-add .btn{min-height:2.5rem}
+@media (max-width:30rem){
+  /* phones: the label above its field, still one grid for all fields */
+  .dc-body .dc-f{grid-template-columns:minmax(0,1fr) auto;gap:.125rem .5rem}
+  .dc-body .dc-f>label,.dc-body .dc-f>span:first-child:empty{grid-column:1 / -1}
+  .dc-body .dc-f>span:first-child:empty{display:none}
+  .dc-body .dc-f>:nth-child(2){grid-column:1}
+  .dc-body .dc-f>.dc-auto{grid-column:2}
+  .dc-optbtn{margin-left:0}
+}
+@media (prefers-reduced-motion:reduce){ .dc-text .dc-chev,.dc-acts [data-dc="actsmore"] .dc-chev{transition:none} }
 .dc-auto{margin-left:.375rem;padding:.125rem .5rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--muted);font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}
 .dc-auto:hover,.dc-auto:focus-visible{border-color:var(--accent);color:var(--text)}
 .dc-amt{display:flex;gap:.375rem;flex:1;min-width:0}

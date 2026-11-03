@@ -103,6 +103,7 @@ async function wsSet(ws, o = {}) {
   if (!wsOptions().includes(ws)) ws = 'all';
   const from = wsCur();
   if (WSV.ws === from) wsv_save(from);  // 2.397.0 (#3404)
+  if (typeof vm_leave === 'function') vm_leave();  // 2.497.0 (#4048): the place of the view left: no route may follow (the page stays)
   S.settings.workspace = ws; LS.set('ws', ws);
   // 2.455.0 (#3847): the phone's open drawer stays and shows the new workspace; route() must not close it either
   const hold = !!$('#side.open') && typeof SBM !== 'undefined';

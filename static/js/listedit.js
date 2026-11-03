@@ -36,6 +36,12 @@ function ttlPointPos(ttl, x, y) {
 }
 // the field grows with the text: as many lines as the title has in the row (no scrolling sideways, the start stays visible)
 function ttlinFit(i) { if (!i) return; i.style.height = 'auto'; i.style.height = i.scrollHeight + 'px'; }
+// measured again whenever its width changes: the row's own layout settles after the mount, the task panel or the window narrows the list
+function ttlinWatch(i) {
+  if (typeof ResizeObserver === 'undefined') return;
+  let w = -1;
+  new ResizeObserver(() => { if (!i.isConnected || i.clientWidth === w) return; w = i.clientWidth; ttlinFit(i); }).observe(i);
+}
 function inlineEditMount(focus) {
   const ie = S.ie; if (!ie) return;
   const row = $(`#view .trow[data-id="${ie.id}"]`), ttl = row && $('.ttl', row);
@@ -47,7 +53,7 @@ function inlineEditMount(focus) {
   // out of view and collapsed a four-line row to one line); a title has no line breaks: pasted ones become spaces
   ttl.innerHTML = `<textarea class="ttlin" rows="1" aria-label="${esc(tr('Title'))}" maxlength="500" enterkeyhint="done" autocomplete="off" spellcheck="true">${esc(ie.v)}</textarea>`;
   const i = $('.ttlin', ttl);
-  ttlinFit(i);
+  ttlinFit(i); ttlinWatch(i);
   i.addEventListener('input', () => {
     if (/[\r\n]/.test(i.value)) { const p = i.selectionStart; i.value = i.value.replace(/\r\n?|\n/g, ' '); try { i.setSelectionRange(p, p); } catch { /* ignore */ } }
     ie.v = i.value; ttlinFit(i);
