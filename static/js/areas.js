@@ -498,7 +498,7 @@ function sbb_render(hid) {
 // #4047: on the phone (the drawer's row) a name is never cut: a word too wide even in 9 px breaks inside the word instead of "…"
 function sbb_fit() {
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
-    n.classList.remove('srcut', 'srbrk'); n.style.fontSize = '';
+    n.classList.remove('srcut'); n.style.fontSize = ''; n.style.overflowWrap = '';
     const box = n.clientWidth; if (!box) continue;
     const wide = () => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
     let need = wide();
@@ -511,7 +511,7 @@ function sbb_fit() {
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; n.classList.add('srbrk'); continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; n.style.overflowWrap = 'anywhere'; continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }

@@ -8741,7 +8741,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbmr .srb{width:auto;min-width:0;padding:.25rem .0625rem .1875rem;gap:.125rem;font-size:var(--fs-xxs)}
 #side .sbmr .srb svg.i{width:var(--ic,1rem);height:var(--ic,1rem)}
 #side .sbmr .srb .srbn{overflow:visible;-webkit-line-clamp:none;line-clamp:none}
-#side .sbmr .srb .srbn.srbrk{overflow-wrap:anywhere;hyphens:auto}  /* #4047: a single word too long even in 9 px type breaks inside the word (areas.js sbb_fit) */
 #side .sbmr .srb .srbd{right:.25rem;top:.125rem}
 #side .sbmdock .sset{flex:1;min-width:0;margin:0}
 /* 2.290.0 C (#3163): an unfolded Fold 8 landscape / small tablets (900-1199 px). With a task open the panel folds into the
