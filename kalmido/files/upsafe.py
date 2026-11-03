@@ -16,7 +16,12 @@ KINDS = ("fs", "att", "list", "chat", "tchat")  # 2.113.1 (#2059): tchat = tchat
 
 
 class UploadRefused(ValueError):
-    """The upload is refused (a virus find); the message is shown to the uploader as it is."""
+    """The upload is refused (a virus find); the message is shown to the uploader as it is. 2.498.0 (#3858): stored = key +
+    values of the message for a run that keeps it for later (err_stored)."""
+
+    def __init__(self, msg, stored=None):
+        super().__init__(msg)
+        self.stored = stored
 
 
 H6D_CHUNK = 1024 * 1024

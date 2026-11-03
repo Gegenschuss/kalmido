@@ -151,6 +151,7 @@ def sc_size_mark(size):
     return {"scan": "unchecked", "scan_why": "size"} if sc_target() and size > sc_max_bytes() else None
 
 
+SC_FOUND = N_("{0}: malware found ({1}), not uploaded")
 SC_RETRY_TEXT = N_("The virus scanner cannot check the file right now. Please try again in a few minutes.")
 
 
@@ -268,7 +269,7 @@ def sc_scan(name, data):
         return "unchecked"
     if st == "found":
         print(f"upload refused: {sig} found", flush=True)
-        raise UploadRefused(tr("{0}: malware found ({1}), not uploaded", name, sig))
+        raise UploadRefused(tr(SC_FOUND, name, sig), stored=(SC_FOUND, name, sig))  # 2.498.0 (#3858)
     if st == "error":
         print("virus scanner error:", sig, flush=True)
         return "unchecked"

@@ -12,6 +12,9 @@ key + values. The first admin speaks German here, so a text that silently falls 
  - invoice series: a failed check of finalising or sending follows each admin
  - account import: the areas that stay behind (preview, warning) follow who reads the state
  - wiki import: a check text of the background run follows who reads the state
+ 2.498.0 (#3858), the last ones:
+ - wiki import: the reasons of skipped files follow who reads the state, an older run's plain text stays
+ - wiki space lock and a switched-off office function keep their key for a background run
  - proposal: the title in a task's history is kept as a key, the asker's words stay in title
  The cases without the series run for a person without an organisation (tests/freelancer_fixture.py)."""
 import base64
@@ -245,6 +248,62 @@ check(st.get("error") == "Ce n'est pas un fichier ZIP", f"#3808: the same state 
 # only the key may be compared. The budget of that run is 4 GB, too much to reach here: a guard on the code (2.454.0, #3808)
 src = open(os.path.join(N, "..", "kalmido", "wiki", "wikiatt.py"), encoding="utf-8").read()
 check('str(e) == tr("The archive is too large")' not in src and src.count('getattr(e, "stored", None) == (WKA_TOO_LARGE,)') == 2, "#3808: the wiki import compares the key of the archive budget")
+
+# ================================================================ wiki import: skipped files and later checks (2.498.0, #3858)
+def wiki_zip():
+    bio = io.BytesIO()
+    with zipfile.ZipFile(bio, "w", zipfile.ZIP_DEFLATED) as z:
+        z.writestr("Seite.md", "Text")
+        z.writestr("notes.txt", "kept out")  # an unknown ending: refused where the archive is read
+        z.writestr("fake.png", b"no picture at all")  # refused by wka_check, the path through BadInput
+    return bio.getvalue()
+
+
+# 2.498.0 (#3858, review): in the background run a skipped file builds its text without a database connection of its own
+CT_ = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+r = subprocess.run(["docker", "exec", CT_, "python3", "-c", "import app\nimport kalmido.core.db as d\nfrom kalmido.core.i18n import BG_LANG\nfrom kalmido.core.errors import BadKey\n"
+                    "BG_LANG.lg = 'fr'\nn = []\nreal = d.connect\nd.connect = lambda *a, **k: (n.append(1), real(*a, **k))[1]\n"
+                    "for i in range(5):\n    str(BadKey('The file is empty'))\nprint('connections', len(n))\n"], capture_output=True, text=True, timeout=120)
+check("connections 0" in r.stdout, f"#3858: no connection per skipped file {r.stdout} {r.stderr[:300]}")
+
+WZIP = wiki_zip()
+speak(Fr, "fr")
+r = Fr.post(B + "/api/wiki/import/upload", json={"size": len(WZIP), "name": "w.zip", "space": "private", "replace": False})
+check(r.ok, "a wiki upload with skipped files " + r.text[:200])
+WID = r.json()["id"]
+Fr.put(B + f"/api/wiki/import/upload/{WID}?offset=0", data=WZIP, headers={"Content-Type": "application/octet-stream"})
+st = until(lambda: (lambda j: j if j.get("state") == "done" else None)(Fr.get(B + f"/api/wiki/import/upload/{WID}").json()), 30) or {}
+why = lambda j: {x["name"]: x["reason"] for x in (j.get("result") or {}).get("skipped_detail") or []}  # noqa: E731
+FR_WHY = {"notes.txt": "Uniquement des fichiers PDF et des images (PNG, JPEG, GIF, WebP, SVG)", "fake.png": "Le contenu ne correspond pas au type de fichier"}
+DE_WHY = {"notes.txt": "Nur PDF-Dateien und Bilder (PNG, JPEG, GIF, WebP, SVG)", "fake.png": "Der Inhalt passt nicht zum Dateityp"}
+check(why(st) == FR_WHY, f"#3858: the reasons in French while French {why(st)}")
+speak(Fr, "de")
+st = Fr.get(B + f"/api/wiki/import/upload/{WID}").json()
+check(why(st) == DE_WHY, f"#3858: the same run read in German {why(st)}")
+check((Fr.get(B + "/api/wiki/import/upload").json().get("current") or {}).get("result", {}).get("skipped_detail") == st["result"]["skipped_detail"],
+      "#3858: the app's pick-up after a reload answers the same way")
+check(st["result"]["skipped_n"] == 2 and sorted(st["result"]["skipped"]) == ["fake.png", "notes.txt"], f"#3858: the names stay the plain list {st['result']}")
+# a run of an older version kept plain text: it stays as it is, next to a stored reason
+in_ct("import app, json\nfrom kalmido.admin import wkimport as w\n"
+      f"uid, iid = {FID}, {WID!r}\nst = w._st(uid, iid)\nd = st['result']['skipped_detail']\n"
+      "assert all(isinstance(x['reason'], list) for x in d), d\nd[0]['reason'] = 'Alter Grund'\nw._set(uid, iid, result=st['result'])\n")
+st = Fr.get(B + f"/api/wiki/import/upload/{WID}").json()
+check("Alter Grund" in why(st).values() and len(set(why(st).values()) & set(DE_WHY.values())) == 1, f"#3858: an old plain reason stays, the stored one is translated {why(st)}")
+check(Fr.delete(B + f"/api/wiki/import/upload/{WID}").ok, "the wiki result goes")
+# the single POST answers at once, in the language of the request
+r = Fr.post(B + "/api/wiki/import?space=private", files={"file": ("w.zip", WZIP, "application/zip")})
+check(r.ok and why({"result": r.json()})["fake.png"] == DE_WHY["fake.png"], f"#3858: the single POST answers with text {r.text[:300]}")
+check(why({"result": r.json()})["Seite.md"] == "Eine Seite mit diesem Namen gibt es schon", f"#3858: a page already there {r.text[:300]}")
+
+speak(Fr, "fr")
+
+# the checks a background run reaches without a request keep their key: the space lock of the wiki and a switched-off office function
+in_ct("import app\nfrom kalmido.core.errors import err_stored\nfrom kalmido.core.i18n import tr_stored\n"
+      "from kalmido.wiki.wikie2e import wke_denied\nfrom kalmido.office import model as m\n"
+      "s = err_stored(wke_denied('wiki_e2e'))\nassert isinstance(s, tuple) and 'verschl' in tr_stored(s, 'de'), s\n"
+      "m.office_feature_on = lambda *a: False\n"
+      "try:\n    m.office_need_feature(None, 1, 'x', {})\n    raise SystemExit('no refusal')\n"
+      "except m.Denied as e:\n    assert e.code == 404 and tr_stored(err_stored(e), 'fr').startswith('Cette fonction'), e.__dict__\n")
 
 # ================================================================ history: the key, the reader's app translates it
 tid = Fr.post(B + "/api/tasks", json={"title": "Sealed"}).json()["id"]

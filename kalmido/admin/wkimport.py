@@ -32,7 +32,7 @@ from ..core.config import app, ATT_DIR
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput, BadKey
-from ..core.i18n import N_, lang, tr_stored
+from ..core.i18n import BG_LANG, N_, lang, tr_stored
 from ..core.pg import system_ctx
 from ..core.serializers import unlink_files
 from ..accounts.session import me
@@ -125,6 +125,8 @@ def _view(uid, iid, st):
             out[k] = st[k]
     if "error" in out:
         out["error"] = tr_stored(out["error"])
+    if "result" in out:
+        out["result"] = wikiatt.wka_report(out["result"])  # 2.498.0 (#3858): the skipped reasons, for who asks
     return out
 
 
@@ -186,7 +188,7 @@ def wki_run(uid, iid):
     saved = []
     try:
         umz_user_conn(c, uid)
-        wikiatt.WKA_LANG.lg = lang(c, uid)
+        wikiatt.WKA_LANG.lg = BG_LANG.lg = lang(c, uid)  # 2.498.0 (#3858): a thread of its own, a skipped file builds its text without a connection
         st = _st(uid, iid) or {}
         oid = wiki_space(c, uid, st.get("space"), write=True)  # the rights may have changed while the upload ran
         wke_guard(c, oid, uid, kind="import")

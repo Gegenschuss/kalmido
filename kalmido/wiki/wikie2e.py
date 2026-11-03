@@ -44,7 +44,9 @@ WKE_MSG = {
 
 
 def wke_denied(code, status=409, **extra):
-    return LE2EDenied(code, status, tr(WKE_MSG[code]), **extra)
+    e = LE2EDenied(code, status, tr(WKE_MSG[code]), **extra)
+    e.stored = (WKE_MSG[code],)  # 2.498.0 (#3858): the background import keeps the key (wki_run), its reader gets the text
+    return e
 
 
 def wke_body_max():

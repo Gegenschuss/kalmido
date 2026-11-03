@@ -3,6 +3,7 @@ import glob
 import json
 import os
 import re
+import threading
 from flask import g, has_request_context, request
 
 from ..core.config import APP_DIR
@@ -51,10 +52,15 @@ def browser_lang():
     return None
 
 
+BG_LANG = threading.local()  # 2.498.0 (#3858): a background run working for one person sets .lg once: each text of the run asks no database
+
+
 def lang(c=None, uid=None):
     """UI language of a user. In a request: the logged-in user, 2.447.0 (#3761): without one the browser's language, else
     English, never silently the first admin's. In the watchdog threads (no request): the given user, else the first admin."""
     from ..core.db import connect, db, default_uid
+    if c is None and uid is None and not has_request_context() and getattr(BG_LANG, "lg", None):
+        return BG_LANG.lg
     try:
         if uid is None and has_request_context():
             if not getattr(g, "user", None) or not g.user["id"]:  # id 0: the visitor of a public link (PUB_ACTOR)

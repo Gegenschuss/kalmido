@@ -18,7 +18,7 @@ from ..core.pg import insert_id, like_escape, table_columns, system_ctx, write_l
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop
-from ..core.errors import BadInput
+from ..core.errors import BadInput, DeniedKey
 from .packs import office_pack, office_pack_codes, office_pack_for, office_feature_on, office_path_feature
 from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_json_load, oc_json_store  # 2.149.0 G (#2517): pulled up from functions
@@ -400,7 +400,7 @@ def office_need_feature(c, oid, key, s=None):
     """2.147.0 (#2459, #2460): the server half of the country pack's functions -- a route of a function the pack does not
     offer or the admin switched off answers 404 (nothing is deleted; switching it on again brings everything back)."""
     if not office_feature_on(s if s is not None else office_settings(c, oid), key):
-        raise Denied(404, tr(OF_FEATURE_OFF))
+        raise DeniedKey(404, OF_FEATURE_OFF)  # 2.498.0 (#3858): a series run keeps the key, each admin reads their language
 
 
 def office_feature(c, oid, key, s=None):

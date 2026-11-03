@@ -28,7 +28,7 @@ from ..accounts.session import me
 from ..accounts.orgs import is_org_admin  # 2.306.0 D3 (#2875)
 from ..core.access import Denied, task_visible
 from ..collab.comments import user_names
-from ..core.errors import BadInput
+from ..core.errors import BadInput, BadKey
 from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_area, org_writes, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
@@ -53,14 +53,14 @@ def wiki_clean_path(v):
     parts = [re.sub(r"\s+", " ", WIKI_BAD_CHARS.sub("", p)).strip() for p in v.replace("\\", "/").split("/")]
     parts = [p for p in parts if p]
     if not parts or any(p in (".", "..") or p.startswith(".") for p in parts):
-        raise BadInput(tr("Please give the page a name"))
+        raise BadKey(N_("Please give the page a name"))  # 2.498.0 (#3858): the wiki import keeps key + values
     if len(parts) > WIKI_DEPTH:
-        raise BadInput(tr("Too many folder levels (at most {0})", WIKI_DEPTH))
+        raise BadKey(N_("Too many folder levels (at most {0})"), WIKI_DEPTH)
     out = "/".join(parts)
     if out.lower().startswith("e2e1:"):  # 2.64.3 (#1817, review M1): the prefix of browser ciphertexts is never a plain name
-        raise BadInput(tr("Invalid value: {0}", "path"))
+        raise BadKey(N_("Invalid value: {0}"), "path")
     if len(out) > WIKI_PATH_MAX:
-        raise BadInput(tr("The name is too long (at most {0} characters)", WIKI_PATH_MAX))
+        raise BadKey(N_("The name is too long (at most {0} characters)"), WIKI_PATH_MAX)
     return out
 
 
@@ -86,7 +86,7 @@ def _wiki_cut(part, n):
 
 
 def wiki_fit_paths(names):
-    """2.210 A (#2755): import names -> {name: (path, shortened)} or {name: (None, reason)}. A path deeper than WIKI_DEPTH
+    """2.210 A (#2755): import names -> {name: (path, shortened)} or {name: (None, reason)}, reason = key + values. A path deeper than WIKI_DEPTH
     keeps its first folders, the deeper ones join the page's name ("a - b - Page"); a path longer than WIKI_PATH_MAX gets its
     long folder names shortened (the same folder the same way for every page in it, so a folder stays one folder), then
     its page name. Two names that end up the same get " (2)", " (3)" ... (first come first served)."""
@@ -127,18 +127,18 @@ def wiki_fit_paths(names):
     out, seen = {}, set()
     for nm, parts in raw.items():
         if not parts:
-            out[nm] = (None, tr("Invalid value: {0}", "path"))
+            out[nm] = (None, (N_("Invalid value: {0}"), "path"))
             continue
         cur = apply(parts)
         folder = "/".join(cur[:-1])
         room = WIKI_PATH_MAX - len(folder) - (1 if folder else 0)
         if room < 8:
-            out[nm] = (None, tr("The name is too long (at most {0} characters)", WIKI_PATH_MAX))
+            out[nm] = (None, (N_("The name is too long (at most {0} characters)"), WIKI_PATH_MAX))
             continue
         page = _wiki_cut(cur[-1], room)
         path = f"{folder}/{page}" if folder else page
         if path.lower().startswith("e2e1:"):
-            out[nm] = (None, tr("Invalid value: {0}", "path"))
+            out[nm] = (None, (N_("Invalid value: {0}"), "path"))
             continue
         n = 2
         while path.lower() in seen:

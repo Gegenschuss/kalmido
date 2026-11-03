@@ -25,14 +25,14 @@ from urllib.parse import quote, unquote
 from flask import jsonify, request, send_file
 
 from ..core.config import app, ATT_DIR
-from ..core.i18n import N_, tr as _tr_base
+from ..core.i18n import N_, tr as _tr_base, tr_stored
 from ..core.db import bump, db, err, insert_id, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_read_file, oc_send_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
-from ..core.errors import BadInput, BadKey
+from ..core.errors import BadInput, BadKey, err_stored
 from ..tasks.attachments import file_ext, safe_name, send_stored
 from .pages import (WIKI_ZIP_FILES, WIKI_ZIP_FILE_MAX, wiki_clean_path, wiki_fit_paths, wiki_path_parts, wiki_frontmatter, wiki_insert, wiki_need,
                     wiki_set_links, wiki_space_sql)
@@ -42,6 +42,9 @@ from .wikie2e import wke_page_mode  # 2.369.5 (#2517): pulled up from functions
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
 WKA_TOO_LARGE = N_("The archive is too large")
 WKA_MOVE_FILE_FAIL = N_("A file could not be copied into the other workspace; nothing was moved")  # 2.528.0 (#4306 B25)
+WKA_LOST = N_("The page cannot be read (the key of its encryption is missing)")
+WKA_TAKEN = N_("A page with this name already exists")
+WKA_FULL = N_("Your storage is full")
 
 
 def tr(key, *a, lg=None):
@@ -143,7 +146,7 @@ def _local(n):
 def wka_svg_clean(data):
     """An SVG without scripts, event attributes, foreign content and references outside itself (only #ids and embedded
     pictures stay); no DOCTYPE / ENTITY at all. BadInput when it cannot be cleaned."""
-    bad = BadInput(tr("The SVG picture could not be cleaned"))
+    bad = BadKey(N_("The SVG picture could not be cleaned"))  # 2.498.0 (#3858): the import keeps key + values
     if b"\x00" in data[:64] or re.search(rb"<!\s*(?:doctype|entity)", data, re.I):  # review L3: also UTF-16 / 32 (no DTD at all)
         raise bad
     try:
@@ -170,15 +173,15 @@ def wka_check(name, data):
     """(mime, bytes to store) of a file for a page, or BadInput with the reason: a supported ending whose content agrees."""
     want = WKA_TYPES.get(file_ext(name))
     if not want:
-        raise BadInput(tr("Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)"))
+        raise BadKey(N_("Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)"))
     if not data:
-        raise BadInput(tr("The file is empty"))
+        raise BadKey(N_("The file is empty"))
     if len(data) > WKA_FILE_MAX:
-        raise BadInput(tr("Larger than {0} MB", WKA_FILE_MAX // (1024 * 1024)))
+        raise BadKey(N_("Larger than {0} MB"), WKA_FILE_MAX // (1024 * 1024))
     if want == SVG:
         return SVG, wka_svg_clean(data)
     if wka_sniff(data[:1024]) != want:
-        raise BadInput(tr("The content does not match the file type"))
+        raise BadKey(N_("The content does not match the file type"))
     return want, data
 
 
@@ -190,7 +193,7 @@ def wka_store(c, page, name, mime, data, uid, saved):
     quota_guard(c, uid, len(data))
     data, got, info = up_check(c, name, data, mime, uid, page["org_id"], "wiki")
     if mime != SVG and got != mime:  # the scan's sniffing found another type: never stored as a picture
-        raise BadInput(tr("The content does not match the file type"))
+        raise BadKey(N_("The content does not match the file type"))
     rel = os.path.join("wiki", str(int(page["id"])), f"{uuid.uuid4().hex[:12]}-{name}")
     full = os.path.join(ATT_DIR, rel)
     os.makedirs(os.path.dirname(full), exist_ok=True)
@@ -469,16 +472,23 @@ def wka_import_zip(c, uid, oid, replace):
         except (zipfile.BadZipFile, ValueError, OSError):
             raise BadInput(tr("This is not a ZIP file"))
         with z:
-            return _wka_import(c, uid, oid, replace, z, infos, saved)
+            return wka_report(_wka_import(c, uid, oid, replace, z, infos, saved))
     except BaseException:
         c.rollback()
         unlink_files(saved)
         raise
 
 
+def wka_report(res):
+    """2.498.0 (#3858): the report of _wka_import for who reads it: the reasons are kept as key + values, the plain text of an
+    older run stays as it is."""
+    return {**res, "skipped_detail": [{**s, "reason": tr_stored(s.get("reason"))} for s in res.get("skipped_detail") or []]}
+
+
 def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_files=WIKI_ZIP_FILES, tick=None):
     """2.177.0 (#2685): total / max_files = the limits of the route (wkimport.py: larger), tick() after every entry (the
-    progress of the background import; it may raise to stop -- the caller rolls back)."""
+    progress of the background import; it may raise to stop -- the caller rolls back). 2.498.0 (#3858): skipped_detail
+    carries stored texts (tr_stored): the caller keeps them or answers with wka_report."""
     from ..files.upsafe import UploadRefused
     from ..admin.hosting import QuotaExceeded
     tick = tick or (lambda n=1: None)
@@ -500,7 +510,7 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
     fit = wiki_fit_paths([i.filename for i in infos if file_ext(_wka_nfc(i.filename)) == "md" and "__MACOSX" not in _wka_nfc(i.filename).split("/")])
     short, renamed = [], {}
 
-    def skip(name, why):
+    def skip(name, why):  # 2.498.0 (#3858): why = a stored text, each reader gets it in their language (wka_report)
         skipped.append({"name": name[:200], "reason": why})
     for i in infos:
         name = i.filename
@@ -508,32 +518,32 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
         parts = [p for p in nm.split("/") if p]
         ext = file_ext(nm)
         if "__MACOSX" in parts or (parts and parts[-1] in (".DS_Store", "Thumbs.db", "desktop.ini")):
-            skip(name, tr("System file"))
+            skip(name, [N_("System file")])
             continue
         if ext == "md":
             if i.file_size > WIKI_ZIP_FILE_MAX or i.file_size > md_left[0]:
-                skip(name, tr("Larger than {0} MB", WIKI_ZIP_FILE_MAX // 1_000_000) if i.file_size > WIKI_ZIP_FILE_MAX else tr("The archive is too large"))
+                skip(name, [N_("Larger than {0} MB"), WIKI_ZIP_FILE_MAX // 1_000_000] if i.file_size > WIKI_ZIP_FILE_MAX else [WKA_TOO_LARGE])
                 continue
             folder = "/".join(parts[:-1])  # the page's folder in the archive (its relative links start there)
             try:
-                path, cutn = fit.get(name) or (None, tr("Invalid value: {0}", "path"))
+                path, cutn = fit.get(name) or (None, (N_("Invalid value: {0}"), "path"))
                 if path is None:
-                    raise BadInput(cutn)
+                    raise BadKey(*cutn)
                 path = wiki_clean_path(path)
                 raw = _wka_read(z, i, WIKI_ZIP_FILE_MAX, budget)
                 if raw is None:
-                    raise BadInput(tr("Larger than {0} MB", WIKI_ZIP_FILE_MAX // 1_000_000))
+                    raise BadKey(N_("Larger than {0} MB"), WIKI_ZIP_FILE_MAX // 1_000_000)
                 md_left[0] -= len(raw)
                 text = raw.decode("utf-8-sig", "replace")
                 if text.startswith("e2e1:"):  # 2.64.3 (#1817, review M1): no ciphertext-like text in an open space
-                    raise BadInput(tr("Invalid value: {0}", "body"))
+                    raise BadKey(N_("Invalid value: {0}"), "body")
             except BadInput as e:
                 if getattr(e, "stored", None) == (WKA_TOO_LARGE,):
                     raise
-                skip(name, str(e))
+                skip(name, err_stored(e))
                 continue
             except (zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError, EOFError):
-                skip(name, tr("The file is damaged"))
+                skip(name, [N_("The file is damaged")])
                 continue
             if cutn:
                 short.append({"name": name[:200], "path": path})
@@ -545,25 +555,25 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
                 continue
             old = c.execute(f"SELECT id FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND lower(path)=?", [*a, path.lower()]).fetchone()
             if replace and old and _wka_lost(c, old["id"]):  # 2.139.0 C (#2386): an unreadable page is never overwritten
-                skip(name, tr("The page cannot be read (the key of its encryption is missing)"))
+                skip(name, [WKA_LOST])
             elif replace and old:
                 _wka_save(c, old["id"], text, uid, ts)  # 2.123.0 A (#2105, #2102): sealed, the text before in the history
                 updated.append(old["id"])
                 pages.append((old["id"], folder, path, text))
             else:
-                skip(name, tr("A page with this name already exists"))
+                skip(name, [WKA_TAKEN])
             continue
         if ext not in WKA_TYPES:
-            skip(name, tr("Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)"))
+            skip(name, [N_("Only PDF files and pictures (PNG, JPEG, GIF, WebP, SVG)")])
             continue
         if not parts or any(p in (".", "..") or p.startswith(".") for p in parts):
-            skip(name, tr("Invalid value: {0}", "path"))
+            skip(name, [N_("Invalid value: {0}"), "path"])
             continue
         if i.file_size > WKA_FILE_MAX:
-            skip(name, tr("Larger than {0} MB", WKA_FILE_MAX // (1024 * 1024)))
+            skip(name, [N_("Larger than {0} MB"), WKA_FILE_MAX // (1024 * 1024)])
             continue
         if i.file_size > 1 << 20 and i.file_size > WKA_RATIO * max(1, i.compress_size):  # 2.177.0 (#2685)
-            skip(name, tr("The file is damaged"))
+            skip(name, [N_("The file is damaged")])
             continue
         files["/".join(parts).lower()] = (i, name, "/".join(parts))
     tick(len(infos) - len(files))  # 2.177.0 (#2685): the pages and skipped entries; the files count one by one below
@@ -632,14 +642,14 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
             pid = old["id"]
             if _wka_lost(c, pid):  # 2.139.0 C (#2386): its list cannot be added to -- the file is skipped, the page named once
                 if not any(x["name"] == path for x in skipped):
-                    skip(path, tr("The page cannot be read (the key of its encryption is missing)"))
-                raise BadInput(tr("The page cannot be read (the key of its encryption is missing)") + ": " + path)
+                    skip(path, [WKA_LOST])
+                raise BadKey("{0}: {1}", (WKA_LOST,), path)
             if pid not in updated and pid not in created:
                 updated.append(pid)
         else:
             pid = wiki_insert(c, oid, uid, path, "", ts)
             if pid is None:
-                raise BadInput(tr("A page with this name already exists"))
+                raise BadKey(WKA_TAKEN)
             created.append(pid)
         by_path[path.lower()] = pid
         return pid
@@ -657,12 +667,12 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
         else:  # nobody links it: the page "Imported files" of its folder lists it (made once a file of it passed)
             pid, listed = None, True
         if full[0]:
-            skip(name, tr("Your storage is full"))
+            skip(name, [WKA_FULL])
             continue
         try:
             data = _wka_read(z, info, WKA_FILE_MAX, budget)
             if data is None:
-                raise BadInput(tr("Larger than {0} MB", WKA_FILE_MAX // (1024 * 1024)))
+                raise BadKey(N_("Larger than {0} MB"), WKA_FILE_MAX // (1024 * 1024))
             fname = wka_name(posixpath.basename(_wka_nfc(name)))
             mime, data = wka_check(fname, data)
             if pid is None:
@@ -674,17 +684,17 @@ def _wka_import(c, uid, oid, replace, z, infos, saved, total=WKA_ZIP_TOTAL, max_
         except BadInput as e:
             if getattr(e, "stored", None) == (WKA_TOO_LARGE,):  # 2.454.0 (#3808): str(e) is in the first admin's language in the background run
                 raise
-            skip(name, str(e))
+            skip(name, err_stored(e))
             continue
         except UploadRefused as e:
-            skip(name, str(e))
+            skip(name, err_stored(e))
             continue
         except QuotaExceeded:
             full[0] = True
-            skip(name, tr("Your storage is full"))
+            skip(name, [WKA_FULL])
             continue
         except (zipfile.BadZipFile, OSError, RuntimeError, NotImplementedError, EOFError):
-            skip(name, tr("The file is damaged"))
+            skip(name, [N_("The file is damaged")])
             continue
         if not same:
             new_ids.append(fid)
