@@ -47,16 +47,6 @@ COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345"
 BE_ID = "0208:0123456749"
 
 
-def _load_ein():  # the UBL check without a server (office/einvoice.py loaded on its own, like tests/p2355_c_einvoice_test.py)
-    spec = importlib.util.spec_from_file_location("einvoice", os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "einvoice.py"))
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.ein_ubl_check
-
-
-ein_ubl_check = _load_ein()
-
-
 def dbx(sql, args=()):
     return dbxm.connect(DATA).execute(sql, args).fetchall()
 
@@ -210,7 +200,10 @@ pay = re.search(rb"<cbc:PayableAmount[^>]*>([^<]+)<", raw)
 due = re.search(r"<ram:DuePayableAmount>([^<]+)<", xml0)
 check(pay and due and pay.group(1).decode() == due.group(1) and float(due.group(1)) == gross and b"PrepaidAmount" not in raw,
       f"#4079: PayableAmount sent = the stored XML = the full amount: {pay and pay.group(1)} {due and due.group(1)} {gross}")
-check(ein_ubl_check(raw) == [], f"#4079: the UBL sent passes the own check {ein_ubl_check(raw)}")
+spec = importlib.util.spec_from_file_location("einvoice", os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "einvoice.py"))
+ein = importlib.util.module_from_spec(spec)  # the own check without a server, like tests/p2355_c_einvoice_test.py
+spec.loader.exec_module(ein)
+check(ein.ein_ubl_check(raw) == [], f"#4079: the UBL sent passes the own check {ein.ein_ubl_check(raw)}")
 check("peppol_send" in acts, f"office log peppol_send: {acts}")
 check(A.post(B + f"{D}/{DID}/peppol", json={}).status_code == 409 and A.post(B + f"{D}/{DID}/peppol", json={"again": 1}).status_code == 409, "never twice")
 v = view(A, DID, refresh=True).json()
