@@ -269,7 +269,7 @@ def _party(parent, tag, name, fields, lang, home, contact=False, email=None, leg
 def _abs_full(m):
     """2.408.0 (#3520, BMF letter of 15.10.2026 no. 3): (totals, prepaid, note) of a print model. A final invoice whose
     deduction lines abschlag.abs_prepaid_view took out of the lines: the totals of the whole service (tax per rate, gross,
-    tax in the home currency), the progress invoices' gross as prepaid (BT-113, with the payments) and their details as
+    tax in the home currency), the progress invoices' gross as prepaid (BT-113; 2.502.0, #4079: no payments of today) and their details as
     one note (BT-22). Else the totals as they are, 0, ''."""
     tot = m.get("totals") or {}
     full = m.get("abs_full")
@@ -433,7 +433,8 @@ def ein_build(model, fmt="zugferd"):
         _e(pt, "ram:Description", tr(EIN_WORDS["now"], lg=lang))
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
-    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) + prepaid if kind == "invoice" else Decimal("0")
+    # 2.502.0 (#4079): BT-113 of a finalised document is fixed like its PDF: no payments of today, only the progress invoices
+    paid = prepaid if kind == "invoice" else Decimal("0")
     ms = _e(se, "ram:SpecifiedTradeSettlementHeaderMonetarySummation")
     _e(ms, "ram:LineTotalAmount", _m(line_sum))
     _e(ms, "ram:TaxBasisTotalAmount", _m(line_sum))
@@ -867,7 +868,8 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(_u(root, "cac:TaxTotal"), "cbc:TaxAmount", _m(tot.get("tax_eur") if tot.get("tax_eur") not in (None, "") else tax_sum), currencyID=hcur)
     gross = tot.get("gross") if tot.get("gross") not in (None, "") else line_sum + tax_sum
     gross = _d(gross).quantize(Q2, rounding=ROUND_HALF_UP)
-    paid = _d(tot.get("paid")).quantize(Q2, rounding=ROUND_HALF_UP) + prepaid if kind == "invoice" else Decimal("0")
+    # 2.502.0 (#4079): BT-113 of a finalised document is fixed like its PDF: no payments of today, only the progress invoices
+    paid = prepaid if kind == "invoice" else Decimal("0")
     mt = _u(root, "cac:LegalMonetaryTotal")
     _u(mt, "cbc:LineExtensionAmount", _m(line_sum), currencyID=cur)
     _u(mt, "cbc:TaxExclusiveAmount", _m(line_sum), currencyID=cur)

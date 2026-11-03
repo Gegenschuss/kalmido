@@ -3,7 +3,7 @@
 """2.408.0 A (#3520): the e-invoice of a final invoice after the BMF letter of 15.10.2026 (no. 3), pure Python, no server.
  - the print model of a final invoice (abschlag.abs_prepaid_view) has the full positions in its lines, the remaining amount
    in its totals and the whole service in abs_full; the XML (CII and UBL) carries the full sums, the progress invoices' gross
-   as BT-113 (paid amount, with a real payment on top), DuePayable = the remaining amount, the details in one note (BT-22)
+   as BT-113 (paid amount; 2.502.0, #4079: a real payment does not count), DuePayable = the remaining amount, the details in one note (BT-22)
  - the module's checks (ein_check, ein_ubl_check) find nothing; the files go to tests/.data/einvoice/ for KoSIT in CI
 usage: p2408_a_einvoice_test.py            (KALMIDO_SRC = the source tree, default ../ next to tests/)"""
 import importlib.util
@@ -72,8 +72,9 @@ for fmt in ("zugferd", "xrechnung"):
     x = ein.ein_build(M, fmt).decode("utf-8")
     check("<ram:LineTotalAmount>-" not in x and "<ram:LineTotalAmount>10000.00</ram:LineTotalAmount>" in x and "<ram:GrandTotalAmount>11660.00</ram:GrandTotalAmount>" in x
           and '<ram:TaxTotalAmount currencyID="EUR">1660.00</ram:TaxTotalAmount>' in x, f"{fmt}: the whole service, no negative lines")
-    check("<ram:TotalPrepaidAmount>6318.28</ram:TotalPrepaidAmount>" in x and "<ram:DuePayableAmount>5341.72</ram:DuePayableAmount>" in x,
-          f"{fmt}: BT-113 = progress invoices + the payment, due = the remaining amount less the payment " + str(re.findall(r"<ram:(?:TotalPrepaid|DuePayable)Amount>[^<]*", x)))
+    # 2.502.0 (#4079): a payment after finalising is no part of it any more (BT-113 was progress invoices + payment)
+    check("<ram:TotalPrepaidAmount>6218.28</ram:TotalPrepaidAmount>" in x and "<ram:DuePayableAmount>5441.72</ram:DuePayableAmount>" in x,
+          f"{fmt}: BT-113 = the progress invoices, due = the remaining amount " + str(re.findall(r"<ram:(?:TotalPrepaid|DuePayable)Amount>[^<]*", x)))
     notes = re.findall(r"<ram:IncludedNote>\s*<ram:Content>([^<]*)</ram:Content>", x)
     check(any("RE-2026-0101" in n and "RE-2026-0107" in n for n in notes), f"{fmt}: BT-22 lists the progress invoices {notes}")
     check(ein.ein_check(x.encode()) == [], f"{fmt}: ein_check clean {ein.ein_check(x.encode())}")
@@ -81,7 +82,7 @@ for fmt in ("zugferd", "xrechnung"):
         fh.write(x.encode())
 # Peppol ids like tests/p2154_b_ubl_test.py and the real send (pep_ubl): the e-mail fallback (EM) is not in the Peppol EAS list, KoSIT rejects it
 u = ein.ein_ubl_build(M, "peppol", "9930:DE123456789", "0208:0123456749").decode("utf-8")
-check('<cbc:PrepaidAmount currencyID="EUR">6318.28</cbc:PrepaidAmount>' in u and '<cbc:PayableAmount currencyID="EUR">5341.72</cbc:PayableAmount>' in u
+check('<cbc:PrepaidAmount currencyID="EUR">6218.28</cbc:PrepaidAmount>' in u and '<cbc:PayableAmount currencyID="EUR">5441.72</cbc:PayableAmount>' in u  # 2.502.0 (#4079)
       and '<cbc:TaxInclusiveAmount currencyID="EUR">11660.00</cbc:TaxInclusiveAmount>' in u and "RE-2026-0107" in u, "UBL: the same sums and the note")
 check(ein.ein_ubl_check(u.encode()) == [], f"UBL: ein_ubl_check clean {ein.ein_ubl_check(u.encode())}")
 with open(os.path.join(OUT, "ubl-invoice-p2408-final.xml"), "wb") as fh:

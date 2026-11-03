@@ -279,9 +279,11 @@ mq["totals"].update({"net": "34000.00", "tax_lines": [{"pct": "19", "base": "340
 xq = ein.ein_build(mq, "zugferd")
 check(b"<ram:ChargeAmount>422.90</ram:ChargeAmount>" in xq and b'<ram:BilledQuantity unitCode="C62">-1</ram:BilledQuantity>' in xq and b"<ram:LineTotalAmount>-422.90</ram:LineTotalAmount>" in xq
       and ein.ein_check(xq) == [], f"calculator discount line: quantity -1, price positive, line total negative: {ein.ein_check(xq)}")
+# 2.502.0 (#4079): a payment after finalising changes nothing in the XML (BT-113 stays 0, BT-115 the full amount, as in the PDF)
 mp = fixture(paid="10000.00")
 xp = ein.ein_build(mp, "zugferd")
-check(t(xp, MS + "ram:TotalPrepaidAmount") == "10000.00" and t(xp, MS + "ram:DuePayableAmount") == "30963.25" and ein.ein_check(xp) == [], "part payment: BT-113 / BT-115")
+check(t(xp, MS + "ram:TotalPrepaidAmount") == "0.00" and t(xp, MS + "ram:DuePayableAmount") == "40963.25" and ein.ein_check(xp) == [], "part payment: BT-113 / BT-115 unchanged")
+check(xp == ein.ein_build(fixture(), "zugferd"), "part payment: the XML is the one of before the payment")
 
 # 2.296.0 B (#3169): a taxed invoice with a tax-exempt position (0 %): the line is category E with the invoice's reason
 me = fixture()

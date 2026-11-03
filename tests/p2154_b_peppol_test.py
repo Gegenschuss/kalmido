@@ -17,8 +17,10 @@
  - a person without an organisation (freelancer-matrix: office) sets up the connection in the personal office and sends
 usage: p2154_b_peppol_test.py <datadir>      (P2154B_NOSTART=1 = the server already runs, with the stub on port 8098)"""
 import base64
+import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -43,6 +45,16 @@ STUB = "http://127.0.0.1:8098"
 COMPANY = {"name": "Beispiel Film GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE", "email": "hallo@beispiel.example",
            "phone": "+49 30 000000", "vat_id": "DE123456789", "iban": "DE02120300000000202051", "bic": "BYLADEM1001", "bank_name": "Beispielbank"}
 BE_ID = "0208:0123456749"
+
+
+def _load_ein():  # the UBL check without a server (office/einvoice.py loaded on its own, like tests/p2355_c_einvoice_test.py)
+    spec = importlib.util.spec_from_file_location("einvoice", os.path.join(os.environ.get("KALMIDO_SRC") or os.path.join(N, ".."), "kalmido", "office", "einvoice.py"))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod.ein_ubl_check
+
+
+ein_ubl_check = _load_ein()
 
 
 def dbx(sql, args=()):
@@ -180,6 +192,25 @@ check(any(x["path"] == "/sc/api/v2/discovery/receives" for x in stub_log()[n0:])
 doc = A.get(B + f"{D}/{DID}").json()
 check(doc["status"] == "sent" and (doc.get("peppol") or {}).get("status") == "sent", f"the invoice is sent, the answer carries peppol: {doc.get('status')} {doc.get('peppol')}")
 acts = [r[0] for r in dbx("SELECT action FROM office_doc_log WHERE doc_id=?", (DID,))]
+# 2.502.0 (#4079): a part payment after finalising changes neither the UBL nor what the provider gets: the same amounts as the stored XML
+DPP = invoice(A, CL)
+ubl0 = A.get(B + f"{D}/{DPP}/ubl").text
+xml0 = A.get(B + f"{D}/{DPP}/xml").text
+gross = float(A.get(B + f"{D}/{DPP}").json()["totals"]["gross"])
+check(A.post(B + f"{D}/{DPP}/payments", json={"amount": round(gross / 2, 2), "date": "2026-05-20"}).ok, "#4079: half of it paid")
+check(A.get(B + f"{D}/{DPP}").json()["status"] != "paid" and float(A.get(B + f"{D}/{DPP}").json()["open"]) < gross, "#4079: the payment is booked")
+check(A.get(B + f"{D}/{DPP}/ubl").text == ubl0, "#4079: the UBL after the part payment is the UBL before it")
+check(A.get(B + f"{D}/{DPP}/xml").text == xml0, "#4079: the stored XML stays")
+n2 = len(stub_log())
+r = A.post(B + f"{D}/{DPP}/peppol", json={})
+check(r.status_code == 201, "#4079: sent after the part payment " + r.text[:200])
+sub = [x for x in stub_log()[n2:] if x["path"] == "/sc/api/v2/document_submissions"]
+raw = base64.b64decode(json.loads(base64.b64decode(sub[0]["body"]))["document"]["rawDocumentData"]["document"]) if sub else b""
+pay = re.search(rb"<cbc:PayableAmount[^>]*>([^<]+)<", raw)
+due = re.search(r"<ram:DuePayableAmount>([^<]+)<", xml0)
+check(pay and due and pay.group(1).decode() == due.group(1) and float(due.group(1)) == gross and b"PrepaidAmount" not in raw,
+      f"#4079: PayableAmount sent = the stored XML = the full amount: {pay and pay.group(1)} {due and due.group(1)} {gross}")
+check(ein_ubl_check(raw) == [], f"#4079: the UBL sent passes the own check {ein_ubl_check(raw)}")
 check("peppol_send" in acts, f"office log peppol_send: {acts}")
 check(A.post(B + f"{D}/{DID}/peppol", json={}).status_code == 409 and A.post(B + f"{D}/{DID}/peppol", json={"again": 1}).status_code == 409, "never twice")
 v = view(A, DID, refresh=True).json()
