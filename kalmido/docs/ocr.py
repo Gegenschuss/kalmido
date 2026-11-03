@@ -13,8 +13,11 @@ import subprocess
 import sys
 import tempfile
 import threading
-from ..tasks.attachtext import file_kind, pdf_text, _decode  # 2.369.5 (#2517): pulled up from functions
-from ..files.photometa import pm_kind  # 2.369.5 (#2517): pulled up from functions
+try:  # 2.369.5 (#2517): pulled up from functions; #3506: guarded, ocr.py is also loaded as a single file (tests, ocr_langs)
+    from ..tasks.attachtext import file_kind, pdf_text, _decode
+    from ..files.photometa import pm_kind
+except ImportError:  # loaded as a single file (tests, no package): only the pure helpers are used there
+    file_kind = pdf_text = _decode = pm_kind = None
 
 
 def _env_int(name, default, lo, hi):

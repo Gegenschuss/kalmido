@@ -1,0 +1,7 @@
+/* #3506 (after #2798, every new list tracks time): the last step of fitDtop() (detail.js, dtl6) sets the header's icons and the
+   date chip closer, so a narrow panel with the timer still shows the whole date; 24 px targets stay (WCAG 2.5.8). A mouse
+   only: on touch the buttons keep their 44 px (app.css) */
+@media (pointer:fine){
+  #detail .dtop.dtl6 .iconbtn{padding:.25rem}
+  #detail .dtop.dtl6 .dchip{padding-left:.375rem;padding-right:.375rem}
+}

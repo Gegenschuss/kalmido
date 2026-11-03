@@ -555,8 +555,11 @@ function renderDetail() {
 }
 // 2.431.0 A (#3593): the header's words fall away step by step (dtl1..dtl5: -1 day, +1 day / Tomorrow, Today, Lock / Time / Pin,
 // Priority) until nothing is cut or overflows; the words stay as tooltips. Like fitTop() for #top.
-const DTOP_LVLS = 5;
-let dtopW = 0, dtopRO = null;
+// #3506 (main red in p2431_a_ui after #2798 put "Time" into every new list): dtl6 sets the icons closer (start-dtop.css), so a
+// 420 px panel with the timer still shows the whole date; the date chip is watched too (it shrinks when a neighbour grows or
+// a web font arrives while the header keeps its width), and a late web font fits again
+const DTOP_LVLS = 6;
+let dtopW = 0, dtopCW = -1, dtopRO = null;
 function fitDtop() {
   const d = document.getElementById('detail'), t = d && d.querySelector('.dtop');
   if (!t || !t.clientWidth) return;  // no layout (hidden, jsdom)
@@ -571,11 +574,14 @@ function fitDtop() {
     if (!cut()) break;
   }
   }
+  const chip = t.querySelector('.dchip');
+  dtopCW = chip ? chip.clientWidth : -1;
   if (typeof ResizeObserver === 'function' && !dtopRO) {
-    dtopRO = new ResizeObserver(() => { const x = document.querySelector('#detail .dtop'); if (x && x.clientWidth !== dtopW) fitDtop(); });
+    dtopRO = new ResizeObserver(() => { const x = document.querySelector('#detail .dtop'), c = x && x.querySelector('.dchip'); if (x && (x.clientWidth !== dtopW || (c ? c.clientWidth : -1) !== dtopCW)) fitDtop(); });
   }
-  if (dtopRO) { dtopRO.disconnect(); dtopRO.observe(t); }
+  if (dtopRO) { dtopRO.disconnect(); dtopRO.observe(t); if (chip) dtopRO.observe(chip); }
 }
+document.fonts?.addEventListener?.('loadingdone', () => { if (document.querySelector('#detail .dtop')) fitDtop(); });
 // 2.280.0 A (#3108): a long note is not in the start state (no content, content_n = its length): the detail loads it
 // (GET /api/tasks/<id>). Until it is there - or offline - the detail shows no note field at all, so an empty note is never
 // typed over or saved (the offline queue, the autosave). TKN_OFF: when loading failed (tried again after TKN_RETRY_MS).
