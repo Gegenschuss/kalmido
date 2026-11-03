@@ -48,12 +48,13 @@ async function importer(w, who, name, open, go, url) {
 }
 
 async function all(user, who, isOrg) {
-  const w = await boot({user, hash: 'today', setup: watch});
+  const w = await boot({user, hash: 'office', setup: watch});
+  check(await until(() => w.eval('!!OFC.info')), `${who}: the office is open`);  // ofcWs(): the workspace of the shown office
   const ws = o => check(o && (isOrg ? String(o.ws).startsWith('org:') : !String(o.ws || 'private').startsWith('org:')), `${who}: the question names the right workspace: ${o && o.ws}`);
   ws(await importer(w, who, 'bank statement', () => w.eval(`bnkImpModal(${JSON.stringify(camt)}, 'auszug.xml')`),
     d => d.querySelector('.foot button.pri[data-bi]'), /office\/bank\/import/));
   [...w.document.querySelectorAll('[data-bi="close"]')].forEach(b => b.click());
-  ws(await importer(w, who, 'DATEV', () => w.eval(`dimp_dialog(); DIMP.file = new File(['x'], 'datev.csv', {type: 'text/csv'});`),
+  ws(await importer(w, who, 'DATEV', () => w.eval(`{ const md = dimp_dialog(); DIMP.file = new File(['x'], 'datev.csv', {type: 'text/csv'}); md.querySelector('[data-m="ok"]').disabled = false; }`),  // the file step (dimp_check) only opens the button
     d => [...d.querySelectorAll('[data-m="ok"]')].pop(), /office\/datev\/import/));
   [...w.document.querySelectorAll('[data-m="close"]')].forEach(b => b.click());
   const csv = 'Name,E-Mail\\nNeu GmbH,neu-' + who + '@example.com\\n';

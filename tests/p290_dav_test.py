@@ -480,7 +480,7 @@ check(put(TO, HOME + "other-name.ics", TASKSORG).status_code == 403, "the same U
 e = TO.get(B + mv).headers["ETag"]
 check(TO.delete(B + mv, headers={"If-Match": '"stale"'}).status_code == 412, "DELETE with an old ETag: 412")
 check(TO.delete(B + mv, headers={"If-Match": e}).status_code == 204 and task(t3)["deleted_at"], "DELETE: 204, the task is in the trash")
-check(t3 in [x["id"] for x in A.get(B + "/api/trash").json().get("tasks", [])], "visible in the trash")  # 2.501.0 (#4296): no `else True`
+check(t3 in [x["id"] for x in A.get(B + "/api/tasks?scope=trash").json()["tasks"]], "visible in the trash")  # 2.501.0 (#4296): /api/trash has no GET, `else True` hid that
 put(TO, WORK + "parent.ics", mk("parent-1", "SUMMARY:Parent", "STATUS:COMPLETED"))
 check(task(tc)["status"] == 2, "completing a parent completes its subtasks (as in the app)")
 check(TO.delete(B + WORK + "parent.ics").status_code == 204 and task(tc)["deleted_at"], "deleting a parent trashes its subtasks")

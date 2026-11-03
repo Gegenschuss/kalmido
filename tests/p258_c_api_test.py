@@ -60,7 +60,7 @@ check(r.ok, "#1761: a personal agent for Bob " + r.text[:160])
 if r.ok:
     PA = r.json()["id"]
     r = Bo.put(B + f"/api/lists/{lids[1]}/members", json={"user_id": PA, "role": "edit"})  # 2.501.0 (#4296): was `.ok or True`
-    check(r.ok, f"#1761: Bob shares his list with his personal agent {r.status_code} {r.text[:160]}")
+    check(r.status_code == 403, f"#1761: Bob only views this list: he cannot share it with his agent {r.status_code} {r.text[:160]}")
     a = agent_in_state(Bo, PA)
     check(a is not None and a.get("list_ids") == [], "#1761: the owner of a personal agent sees its list limit " + str(a)[:200])
     a = agent_in_state(A, PA)

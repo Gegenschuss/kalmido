@@ -425,7 +425,7 @@ got = until(lambda: [x for x in pushes() if x["topic"] == "t-pete" and x["title"
 check(got, f"#3512: the summary one window later says 'you were mentioned' {[x for x in pushes() if x['topic'] == 't-pete']}")
 # 2.501.0 (#4296): were `any(...) or True`
 check(not any(x["topic"] == "t-carol" and "HIDDEN2" in x["msg"] for x in pushes()), "carol's pushes do not name the hidden comment")
-check(any("Hidden task" in json.dumps(n) for n in A.get(B + "/api/news").json()["items"]), "owner feed names the task")
+check(not any("Hidden task" in json.dumps(n) for n in P.get(B + "/api/news").json()["items"]), "pete's feed does not name the task he cannot see")
 # reminders: an unassigned task pete created, later moved out of his sight, reminds the owner instead
 A.post(B + f"/api/tasks/{T3}/reopen")
 TR = mk(P, title="Pete reminder", list_id=L)

@@ -219,13 +219,13 @@ def marked_before_mail(s, who, cl):
     with the fault gone sends exactly one mail, which also shows that the stub would have seen it."""
     for tag, table, when in (("status", "office_docs", "NEW.sent_at IS NOT NULL AND OLD.sent_at IS NULL"), ("log", "office_doc_log", "NEW.action = 'send'")):
         addr, inv, kind = f"mark-{tag}-{who}@example.com", invoice(s, cl), "UPDATE" if table == "office_docs" else "INSERT"
-        dbx("CREATE FUNCTION p4296_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'marking fails'; END $$ LANGUAGE plpgsql", write=True)
-        dbx(f"CREATE TRIGGER p4296 BEFORE {kind} ON {table} FOR EACH ROW WHEN ({when}) EXECUTE FUNCTION p4296_fail()", write=True)
+        dbx("CREATE FUNCTION p4296_fail() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'marking fails'; END $$ LANGUAGE plpgsql")
+        dbx(f"CREATE TRIGGER p4296 BEFORE {kind} ON {table} FOR EACH ROW WHEN ({when}) EXECUTE FUNCTION p4296_fail()")
         try:
             r = s.post(B + f"{D}/{inv}/send", json={"to": addr})
         finally:
-            dbx(f"DROP TRIGGER p4296 ON {table}", write=True)
-            dbx("DROP FUNCTION p4296_fail()", write=True)
+            dbx(f"DROP TRIGGER p4296 ON {table}")
+            dbx("DROP FUNCTION p4296_fail()")
         d = s.get(B + f"{D}/{inv}").json()
         check(not r.ok and not sent_to(addr) and d["status"] == "issued", f"{who}: marking fails ({tag}): no mail, nothing marked {r.status_code} {d.get('status')} {len(sent_to(addr))}")
         r = s.post(B + f"{D}/{inv}/send", json={"to": addr})

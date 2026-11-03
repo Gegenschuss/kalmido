@@ -218,7 +218,7 @@ check(A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2000-01-01"}).
 check(content(Er, P1).status_code == 404, "expired share: no access")
 check(A.patch(B + f"/api/files/shares/{SH}", json={"expires_at": "2999-01-01"}).ok and content(Er, P1).ok, "expiry in the future: access")
 r = A.post(B + f"/api/files/nodes/{F1}/shares", json={"user_id": BOB, "role": "view"})  # 2.501.0 (#4296): was `in (201, 409)`
-check(r.status_code == 201, f"bob: a share target of alice's private folder {r.status_code} {r.text[:120]}")
+check(r.status_code == 409 and "same workspace" in r.text, f"bob (admin of another workspace, alice is no member): no share target {r.status_code} {r.text[:120]}")
 
 # ---- groups
 F3 = folder(A, "For the group")

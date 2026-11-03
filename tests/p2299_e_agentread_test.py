@@ -161,7 +161,7 @@ check("cost" not in str(inp) and "agent_read" not in v1d, "API v1 never shows th
 a = dget(A, DOC).get("agent_read") or {}
 check(a.get("job") == J1 and a.get("state") == "requested" and a.get("agent", {}).get("id") == AG, f"the document sheet: the agent is reading {a}")
 r = Bo.get(B + f"/api/docs/{DOC}")  # 2.501.0 (#4296): was `... if <ok> else True`
-check(r.ok and r.json().get("agent_read") is None, f"another person: no agent_read {r.status_code}")
+check(r.status_code == 404 and "agent_read" not in r.text, f"another person: the document stays hidden, no agent_read {r.status_code}")
 
 # ---------------------------------------------------------------- the answer, strictly checked
 for bad, what in (({"foo": 1}, "an unknown field"), ({"positions": [{"text": "x"}] * 101}, "101 positions"), ({"vat_id": "xx"}, "a bad VAT id"),
