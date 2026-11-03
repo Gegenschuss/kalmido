@@ -1814,7 +1814,8 @@ keep their numeric totals.
 
 Head fields of an invoice: `order_ref` (the client's PO number), `payment_days` and `due_date` (the due date is set from
 the payment days when it is empty: the client's payment terms, else the organisation's default), `vat_note` for
-documents without VAT (`reverse`, `abroad`, `small`, 2.355.0: `eu_goods` = goods to a business in another EU state,
+documents without VAT (`reverse`: refused before finalising for a client outside the EU and outside your own country, use
+`abroad` there (2.502); `abroad`, `small`, 2.355.0: `eu_goods` = goods to a business in another EU state,
 e-invoice category K, both VAT ids and the deliver-to address, field 41; `export` = goods to a client outside the EU,
 category G, field 43; the text comes from the country pack and is required before finalising), `einvoice_format` (`zugferd` by default, `xrechnung` proposed for clients with a buyer reference).
 
@@ -2749,6 +2750,9 @@ Set its VAT rate there if your provider's fees carry VAT (Stripe bills from abro
 ## E-invoices over the Peppol network
 
 *Since 2.154.*
+
+The amounts of an e-invoice are fixed with the document: a payment after finalising changes neither the XML nor the Peppol
+document (paid amount BT-113 only from progress invoices, 2.502).
 
 A finalised invoice or credit note can go to the client over the Peppol network -- through **your own account** at a Peppol
 access point provider. Kalmido is no access point and charges nothing for it; the provider bills you directly (per document
