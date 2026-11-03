@@ -29,6 +29,10 @@ check("p2321_a_suites" in names, "this file is a suite by its marker line (no en
 check(not any("p2321_a_suites" in ln for ln in open(os.path.join(N, "suites.txt"), encoding="utf-8")), "and suites.txt has no line for it")
 gs = shards.groups(os.path.join(N, "run_all.sh"))
 check([g[0] for g in gs] == [g[0] for g in suites.groups(N)], f"shards.py reads the same {len(gs)} groups")
+# job/2398 (CI of 2.493.0): the shard count follows the measured time (full run too), capped by --shards and the groups
+check(shards.shard_count([1800.0] * 50, 28, 30) == 28 and shards.shard_count([600.0] * 60, 28, 30) == 20
+      and shards.shard_count([60.0] * 3, 28, 30) == 1 and shards.shard_count([3000.0] * 2, 28, 30) == 2,
+      "shards.py: shard_count = time / target, at most --shards, at least 1, never more than groups")
 check([(g, s) for g, s, _ in stages.suites(os.path.join(N, "run_all.sh"))] == [(g, s) for g, s, _ in rows], "stages.py reads the same rows")
 check(suites.main(["--check"]) == 0, "suites.py --check is green on the real tree")
 out = subprocess.run([sys.executable, os.path.join(N, "suites.py"), "--file", "p2321_a_suites"], capture_output=True, text=True)

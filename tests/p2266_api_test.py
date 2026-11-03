@@ -112,9 +112,13 @@ if now.hour < 23 or now.minute < 50:
                                        "due_time": due, "reminders": "5"}).json()["id"]
     check(until(lambda: [p for p in pushes("t-bob") if p["title"] == "Book the studio"], 8),
           "#2962: the assignee's own due reminder pushes although the owner's template is read")
+    # job/2398 (CI of 2.493.0): the assign push goes through the background queue (push_later) and came AFTER the watchdog's
+    # reminder on a loaded runner, i.e. after clear() - wait for it first, then the comment alone counts
+    check(until(lambda: [p for p in pushes("t-bob") if p["title"].endswith("assigned you: Book the studio")], 8),
+          "#2962: setup: the assign push of the new task is in before the comment")
     clear()
     A.post(B + f"/api/tasks/{T}/comments", json={"body": "a plain comment"})
-    time.sleep(2.5)
+    time.sleep(4)  # longer than BGJ_IDLE (3 s): a queued comment push would be in by now
     check(not pushes("t-bob"), "#2962: a plain comment of the owner stays capped by read (the template still works)")
 
 # ================================================================ #2970 a DM after leaving the organisation

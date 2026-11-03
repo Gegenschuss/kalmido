@@ -528,11 +528,12 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     // the rotation while the chat is open
     await vp(1200, 904); await nav(B + '?rot=1#l/' + P); await ready(ev, idle);
     await ev(`(() => { chatOpen(${AG}); return 1; })()`); await settle(ev, idle);
+    await chatIn(ev, '1200x904 rotation');  // job/2398: wait for the box (Firefox 2.487.3: querySelector(...) is null)
     await ev(`(() => { const t = document.querySelector('#chat-in'); t.focus(); t.value = 'Entwurf beim Drehen'; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     let L = await ev(LAY);
     check(L.panel > 0 && L.mainR <= L.panel + 1 && L.ttl > 200, '1200x904: the panel, the main area beside it (not under it) ' + JSON.stringify(L));
     await shot('p2130-rotate-1200-panel.png');
-    await vp(904, 1200); await fu(`(() => { const L = ${LAY}; return L.full && L.panel === -1 && L.gap <= 2; })()`);
+    await vp(904, 1200); await fu(`(() => { const L = ${LAY}; return L.full && L.panel === -1 && L.gap <= 2 && L.focus === 'chat-in'; })()`);  // job/2398: + the focus back (chatRefocus)
     L = await ev(LAY);
     check(L.full && L.panel === -1 && L.draft === 'Entwurf beim Drehen' && L.focus === 'chat-in' && L.gap <= 2, 'rotated to 904x1200: a full page, draft + focus + newest message kept ' + JSON.stringify(L));
     await shot('p2130-rotate-904-full.png');

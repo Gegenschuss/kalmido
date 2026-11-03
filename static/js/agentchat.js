@@ -14,7 +14,13 @@ function chatRelayout() {
   if (panel && chatFull()) { panel.classList.add('hidden'); panel.innerHTML = ''; delete panel.dataset.aid; document.body.classList.remove('chat-open'); if (!/^#agents\//.test(location.hash)) S.chatBack = location.hash.slice(1); go('agents/' + aid); }
   else if (!panel && !chatFull() && S.route.mod === 'agents' && S.route.agent === aid) route();
   else return;
-  if (f) setTimeout(() => { const n = $('#chat-in'); if (n) { n.focus({preventScroll: true}); chatBottom(); } }, 60);
+  // job/2398 (CI of 2.493.0, Firefox 2.487.3): the new layout is drawn by route() after the hashchange (async, loadExtra) -
+  // one try after 60 ms lost the focus on a slow device; wait for the box of the new layout (up to 3 s) like replyFocus
+  if (f) chatRefocus();
+}
+function chatRefocus(k = 0) {
+  const n = $(chatFull() ? '#view .chview #chat-in' : '#achat:not(.hidden) #chat-in');
+  if (n) { n.focus({preventScroll: true}); chatBottom(); } else if (k < 60) setTimeout(() => chatRefocus(k + 1), 50);
 }
 window.addEventListener('resize', () => { clearTimeout(chatRelT); chatRelT = setTimeout(() => { chatRelayout(); chatFabDraw(); }, 150); });
 try { screen.orientation?.addEventListener('change', () => { clearTimeout(chatRelT); chatRelT = setTimeout(chatRelayout, 150); }); } catch { /* old browsers */ }

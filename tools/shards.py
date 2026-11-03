@@ -14,7 +14,7 @@ hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from
     --assign     print "group shard" per group (the LPT assignment)
     --only F     2.180.0 A (#2695): only the groups whose first suite is a line of F (tests/stages.py --groups-out, the push
                  stage); --assign then starts with "# stage push" (run_all.sh skips the groups not in the plan)
-    --target-min M  with --only: as many shards as M minutes each need (at most --shards, at least 1)
+    --target-min M  as many shards as M minutes each need (at most --shards, at least 1; push stage and, job/2398, full run)
 Groups without a measurement count as DEFAULT_SUITE_S per suite plus DEFAULT_FRESH_S (shown as "estimated").
 """
 import argparse
@@ -105,6 +105,13 @@ def cost(g, t):
     return sum(known) + DEFAULT_SUITE_S * (len(suites) - len(known)) + DEFAULT_FRESH_S, False
 
 
+def shard_count(costs, most, target_min):
+    """As many shards as TARGET_MIN minutes each need (sum of the group times / target, rounded up), at most MOST, at least 1,
+    never more than groups. The LPT plan then aims at about TARGET_MIN per shard; the runner adds its setup and slower
+    suites under load (2.493.0: plan 37:36, real 48-50 min at 20 shards)."""
+    return max(1, min(most, -(-int(sum(costs)) // max(1, int(target_min * 60))), len(costs)))
+
+
 def lpt(costs, n):
     """Longest processing time first: [(shard number, [group indexes], seconds)] - the order of run_all.sh within a shard."""
     load = [0.0] * n
@@ -151,8 +158,8 @@ def main(argv=None):
     cs = [cost(g, t) for g in gs]
     costs = [c for c, _ in cs]
     measured = sum(1 for _, ok in cs if ok)
-    if a.only is not None and a.target_min > 0:
-        n = max(1, min(n, -(-int(sum(costs)) // int(a.target_min * 60)), len(gs)))
+    if a.target_min > 0:  # job/2398: the full run too (--shards = the most), it grew past 20 x 30 min (CI 2.493.0: 2 shards at 50 min)
+        n = shard_count(costs, n, a.target_min)
     if a.assign:
         if a.only is not None:
             print("# stage push")

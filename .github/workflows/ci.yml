@@ -109,8 +109,10 @@ jobs:
               || { stage=full; REASON="push stage plan failed - full run"; }
           fi
           if [ "$stage" = full ]; then
-            python3 tools/shards.py --shards 20 $t | tail -5
-            python3 tools/shards.py --shards 20 --assign $t > shard-plan.txt
+            # job/2398 (CI of 2.493.0): 20 fixed shards had grown to a 37-min plan, two shards hit the 50-min limit with every
+            # suite green - the full run now takes as many shards as 30 min each need (at most 28; above 20 they queue)
+            python3 tools/shards.py --shards 28 --target-min 30 $t | tail -5
+            python3 tools/shards.py --shards 28 --target-min 30 --assign $t > shard-plan.txt
           fi
           test -s shard-plan.txt
           n=$(awk '!/^#/ && $2 > m {m = $2} END {print m + 0}' shard-plan.txt)

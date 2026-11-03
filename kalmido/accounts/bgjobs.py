@@ -228,6 +228,7 @@ def _bgj_start():
 def _loop():
     while True:
         n = 0
+        _WAKE.clear()  # job/2398: before taking, not after the wait - a kick between wait() and clear() was lost (up to BGJ_IDLE late)
         try:
             if _kinds_free():
                 with GATE.bg():  # only the taking: each row goes through the gate itself (_run)
@@ -237,7 +238,6 @@ def _loop():
             time.sleep(BGJ_IDLE)
         if not n:
             _WAKE.wait(BGJ_IDLE)
-            _WAKE.clear()
 
 
 def bgj_house(c, force=False):
