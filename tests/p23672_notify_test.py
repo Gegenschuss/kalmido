@@ -262,6 +262,9 @@ def evnews(s, eid):
 
 E1 = event("Kickoff")
 check(news(Bo, "evinvite"), "(8) the invitation as before")
+# 2.519.0 (#4050): the invitation pushes leave in a thread; clear() only after all three arrived, else one lands after it
+for _t in ("t-bob", "t-carol", "t-dave"):
+    wait_push(lambda x, _t=_t: x["topic"] == _t and "invited you" in (x.get("title") or ""))
 clear()
 r = A.patch(B + f"/api/events/{E1}", json={"start": f"{D}T16:00", "end": f"{D}T17:00"})
 check(r.ok, f"(8) moved {r.status_code} {r.text[:200]}")
