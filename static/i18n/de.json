@@ -16243,5 +16243,8 @@
   "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Degressiv: für Käufe von Juli 2025 bis Dezember 2027. Keine: der Preis dient nur dem Wert und der Versicherungsliste, der Beleg zählt als normale Ausgabe. Keine Steuerberatung.",
   "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Standard: der Kaufpreis. Nur für die Versicherungsliste: ein Wert hier ist keine Ausgabe und wird nicht abgeschrieben.",
   "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Abgeschrieben ohne verknüpften Beleg: verknüpfe hier den Kaufbeleg, sonst zählt der Kauf in der Einnahmen-Überschuss-Rechnung womöglich doppelt (als Beleg und als Abschreibung).",
-  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Abschreibung ohne verknüpften Beleg: {0}. Verknüpfe den Kaufbeleg am Gerät, sonst zählt er womöglich doppelt."
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Abschreibung ohne verknüpften Beleg: {0}. Verknüpfe den Kaufbeleg am Gerät, sonst zählt er womöglich doppelt.",
+  "A support session books nothing in the office and deletes nothing for good: the client does that": "Eine Support-Sitzung bucht im Büro nichts und löscht nichts endgültig: das macht der Kunde selbst",
+  "A support session puts nothing into an organisation that has not granted support access": "Eine Support-Sitzung legt nichts in eine Organisation, die keinen Support-Zugriff freigegeben hat",
+  "Not possible in a support session": "In einer Support-Sitzung nicht möglich"
 }

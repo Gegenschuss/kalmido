@@ -466,7 +466,13 @@ def ws_obj_default(c, uid):
     u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     if u and (u["kind"] or "user") == "agent":
         return agent_org(c, uid)
-    return ws_chosen_org(c, uid)  # 2.148.1 H (#2480): the chosen / only organisation, else private (was the first one)
+    return _ws_sga(c, ws_chosen_org(c, uid))  # 2.148.1 H (#2480): the chosen / only organisation, else private (was the first one)
+
+
+def _ws_sga(c, oid):
+    """2.538.0 (#4365): a support session's new object lands privately, never by default in an organisation without support access."""
+    from .supportgrant import sga_org_foreign
+    return None if sga_org_foreign(c, oid) else oid
 
 
 def ws_chosen_org(c, uid):
@@ -526,6 +532,8 @@ def clean_org_id(c, v, uid):
         raise Denied(400, tr("Invalid value: {0}", "org_id")) from None
     if oid not in user_orgs(c, uid):
         raise Denied(409, tr(WS_MSG_OWNER))
+    from .supportgrant import sga_scope_check
+    sga_scope_check(c, oid)  # 2.538.0 (#4365): a support session puts nothing into an organisation without support access
     from .orgroles import need_org_write
     need_org_write(c, uid, oid)  # 2.143.0 A (#2151): guests / read-only / accounting add nothing to the organisation
     return oid
@@ -598,8 +606,8 @@ def ws_default_org(c, uid, folder=""):
                          (uid, folder, like_escape(folder.split("/", 1)[0]) + "/%")).fetchall()
         oids = {r[0] for r in rows}
         if len(oids) == 1 and (None in oids or oids <= set(_orgs_w(c, uid))):  # 2.143.0 A (#2151)
-            return oids.pop()
-    return ws_chosen_org(c, uid)  # 2.148.1 A (#2480): the chosen / only organisation, else private (was the first one)
+            return _ws_sga(c, oids.pop())  # 2.538.0 (#4365)
+    return _ws_sga(c, ws_chosen_org(c, uid))  # 2.148.1 A (#2480): the chosen / only organisation, else private (was the first one)
 
 
 def ws_apply_default(c, uid, lid, folder=""):

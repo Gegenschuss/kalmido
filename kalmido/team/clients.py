@@ -364,6 +364,9 @@ def client_create():
     f = clean_client(c, uid, body(), new=True)
     if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
         f["org_id"] = ws_chosen_org(c, uid)
+        from ..accounts.supportgrant import sga_org_foreign
+        if sga_org_foreign(c, f["org_id"]):  # 2.538.0 (#4365): a support session's new client lands privately
+            f["org_id"] = None
     cl_bill_strip(c, uid, f.get("org_id"), f)  # 2.187.1 A (#2735)
     ts = iso(now_utc())
     f.update(created_by=uid, created_at=ts, updated_at=iso_ms(now_utc()))  # 2.269.0 C (#3017): the base of the next save

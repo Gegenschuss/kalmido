@@ -24,6 +24,7 @@ proxy sign-in only). A self-hosted server has no use for it: the routes answer h
   DELETE /api/support-access/<id>     ends a grant early -> {ok}
 """
 import json
+import re
 from datetime import timedelta
 
 from flask import g, has_request_context, jsonify, request
@@ -169,6 +170,27 @@ SGA_SECRET_READ = frozenset(("public-link", "public-links", "feed", "ext-links")
 # review of 2.536.0: the HTTP Shortcuts ZIP makes a new drop token of the client on GET (users.py) -- it would outlive the grant
 SGA_GET_REFUSED = frozenset(("/api/auth/oidc/start", "/api/me/share/httpshortcuts.zip"))
 SGA_REFUSED = N_("Support access does not hand out sign-in data or add people: the client does that")
+# 2.538.0 (#4365, decision of 04.11.2026): a support session books nothing in the office; editing contents is neither
+# booking nor changing the account's structure. Refused besides SGA_NOT_CONTENT, whatever the area: finalising, cancelling,
+# unlocking, payments, the cash book, the bank, DATEV, period / logbook closing, bookkeeping imports, the move of the personal
+# office, deleting for good (trash, purge, delete-all) and deleting a project. (methods or None = every write, the whole path)
+SGA_NO_WRITE = tuple((m, re.compile(p)) for m, p in (
+    (None, r"/api/office/docs/\d+/(finalize|unlock|credit|datev|fee|payments(/\d+)?)"),  # fee: changes a finalised reminder
+    (None, r"/api/office/(cashbooks|cash-entries|bank|datev|books|legacy|periods|move)(/.*)?"),
+    (None, r"/api/office/(logbook/close|trial/delete-all|series/\d+/run|gen-docs/\d+/final)"),
+    (None, r"/api/office/(meals/\d+/(approve|unlock)|cards/statements/\d+/(confirm|reopen)|cards/lines/\d+/(match|unmatch))"),
+    (("DELETE",), r"/api/office/trash/\d+"),
+    (None, r"/api/tasks/purge-done|/api/lists/\d+/time/delete-all"),
+    # 2.538.0 (#4365): the master data import changes the office's structure; the import undos delete for good
+    (None, r"/api/office/(import|fixed-costs/delete|trips/delete)"),
+    (("DELETE",), r"/api/lists/\d+"),
+    # 2.538.0 (#4365, review F4): deleting one trip / fixed cost has the client's undo only, like the bulk delete above
+    (("DELETE",), r"/api/office/(trips|fixed-costs)/\d+"),
+    # 2.538.0 (#4365, review F6): the next running number (a gap in the invoice series) is the bookkeeping's structure
+    (None, r"/api/office/number-ranges/[^/]+"),
+))
+SGA_BOOKING = N_("A support session books nothing in the office and deletes nothing for good: the client does that")
+SGA_FOREIGN = N_("A support session puts nothing into an organisation that has not granted support access")
 
 
 def sga_may_write(path):
@@ -179,11 +201,79 @@ def sga_may_write(path):
     return len(seg) > 2 and seg[1] == "api" and seg[2] in SGA_CONTENT and not SGA_NOT_CONTENT.intersection(seg)
 
 
+def sga_no_write(method, path, b):
+    """2.538.0 (#4365): True when a support session may not make this write (SGA_NO_WRITE; a status change to / from paid is
+    a payment)."""
+    if any((m is None or method in m) and rx.fullmatch(path) for m, rx in SGA_NO_WRITE):
+        return True
+    return bool(re.fullmatch(r"/api/office/docs/\d+/status", path)) and isinstance(b, dict) and b.get("status") == "paid"
+
+
 def sga_is_support(c):
-    """True when this request runs in a support session (the session cookie's row, via 'support')."""
-    tok = request.cookies.get(COOKIE) if g.get("auth_via") == "session" else None
-    r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
-    return bool(r) and r[0] == "support"
+    """True when this request runs in a support session (the session cookie's row, via 'support'). Asked once per request."""
+    if not has_request_context() or g.get("user") is None:
+        return False
+    if "sga_is_sup" not in g:
+        tok = request.cookies.get(COOKIE) if g.get("auth_via") == "session" else None
+        r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (_token_hash(tok),)).fetchone() if tok else None
+        g.sga_is_sup = bool(r) and r[0] == "support"
+    return g.sga_is_sup
+
+
+def sga_org_foreign(c, oid):
+    """2.538.0 (#4365): True when this request is one of a support session and organisation oid is neither the person's own
+    office nor under an open support access of its own (sga_open): a support session puts no contents there."""
+    if not oid or not sga_is_support(c):
+        return False
+    try:
+        oid = int(oid)
+    except (TypeError, ValueError):
+        return False  # not an organisation's id: the route answers it
+    with system_ctx(c):  # the organisation's kind and grants: structure, no content
+        r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
+    if r is None:
+        return False  # no such organisation: the route answers it (no hint for the support session)
+    return r[0] != g.user["id"] and not sga_open(c, oid=oid, note=False)
+
+
+def sga_list_foreign(c, lid):
+    """2.538.0 (#4365): sga_org_foreign for the organisation of list lid (a task / document put into it)."""
+    if isinstance(lid, bool) or not isinstance(lid, (int, str)) or not str(lid).isdigit() or not sga_is_support(c):
+        return False
+    with system_ctx(c):  # only the list's organisation id: structure, no content
+        r = c.execute("SELECT org_id FROM lists WHERE id=?", (int(lid),)).fetchone()
+    return bool(r) and sga_org_foreign(c, r[0])
+
+
+# 2.538.0 (#4365, review F5): a new event / contact / note goes into the organisation of its container: the calendar (cal_id),
+# the address book (book_id, an organisation's own book first) or the project in the path (its notes, notepads, checks, files,
+# links, milestones)
+SGA_BOX_ORG = {"cal_id": "SELECT org_id FROM ev_cals WHERE id=?", "book_id": "SELECT COALESCE(owner_org_id, org_id) FROM books WHERE id=?"}
+SGA_LIST_NEW = re.compile(r"/api/lists/(\d+)/(notes|notepads|checklist|checks|files|links|milestones)")
+
+
+def sga_box_foreign(c, method, path, b):
+    """2.538.0 (#4365, review F5): True when a support session's write puts contents into an organisation without its own
+    support access through a container: cal_id / book_id in the body or a new item of the project in the path (POST)."""
+    if not sga_is_support(c):
+        return False
+    for k, q in SGA_BOX_ORG.items():
+        v = b.get(k) if isinstance(b, dict) else None
+        if isinstance(v, bool) or not isinstance(v, (int, str)) or not str(v).isdigit():
+            continue  # none / not an id: the route answers it (an empty one picks the person's default)
+        with system_ctx(c):  # only the container's organisation id: structure, no content
+            r = c.execute(q, (int(v),)).fetchone()
+        if r and sga_org_foreign(c, r[0]):
+            return True
+    m = SGA_LIST_NEW.fullmatch(path) if method == "POST" else None
+    return bool(m) and sga_list_foreign(c, m.group(1))
+
+
+def sga_scope_check(c, oid):
+    """2.538.0 (#4365): for the routes that work out an organisation themselves (a default workspace): Denied 403 code
+    support_session when a support session would put contents into an organisation without support access."""
+    if sga_org_foreign(c, oid):
+        raise Denied(403, tr(SGA_FOREIGN), data={"code": "support_session"})
 
 
 def sga_session_mark(c, token_hash):
@@ -216,11 +306,17 @@ def sga_guard():
         g.sga_support = g.user["id"]
     p = request.path
     hit = not sga_may_write(p)
+    b = request.get_json(silent=True) if request.is_json else None
     if not hit and request.method == "PATCH":
-        b = request.get_json(silent=True)
         hit = isinstance(b, dict) and bool(set(b) & (SGA_GUARD_ME if p == "/api/me" else SGA_GUARD_SCOPE))
     if hit:
         return jsonify(error=tr(SGA_REFUSED), code="support_session"), 403
+    if sga_no_write(request.method, p, b):  # 2.538.0 (#4365): no booking, nothing deleted for good
+        return jsonify(error=tr(SGA_BOOKING), code="support_session"), 403
+    # 2.538.0 (#4365): contents go into no organisation without its own support access (a new object's org_id, a list_id)
+    if (isinstance(b, dict) and (sga_org_foreign(c, b.get("org_id")) or sga_list_foreign(c, b.get("list_id")))) \
+            or sga_box_foreign(c, request.method, p, b):  # review F5: through a calendar, an address book, a project's path
+        return jsonify(error=tr(SGA_FOREIGN), code="support_session"), 403
     return None
 
 

@@ -16243,5 +16243,8 @@
   "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Degressief: voor aankopen van juli 2025 tot december 2027. Geen: de prijs dient alleen voor de waarde en de verzekeringslijst, het bonnetje telt als gewone uitgave. Geen belastingadvies.",
   "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Standaard: de aankoopprijs. Alleen voor de verzekeringslijst: een waarde hier is geen uitgave en wordt niet afgeschreven.",
   "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Afgeschreven zonder gekoppeld bonnetje: koppel hier het aankoopbonnetje, anders telt de aankoop mogelijk dubbel in de inkomsten-uitgavenrekening (als bonnetje en als afschrijving).",
-  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Afschrijving zonder gekoppeld bonnetje: {0}. Koppel het aankoopbonnetje aan het apparaat, anders telt het mogelijk dubbel."
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Afschrijving zonder gekoppeld bonnetje: {0}. Koppel het aankoopbonnetje aan het apparaat, anders telt het mogelijk dubbel.",
+  "A support session books nothing in the office and deletes nothing for good: the client does that": "Een supportsessie boekt niets in het kantoor en verwijdert niets definitief: dat doet de klant zelf",
+  "A support session puts nothing into an organisation that has not granted support access": "Een supportsessie zet niets in een organisatie die geen supporttoegang heeft gegeven",
+  "Not possible in a support session": "Niet mogelijk in een supportsessie"
 }
