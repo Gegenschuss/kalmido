@@ -58,7 +58,9 @@
 
   $Dir = if ($env:KALMIDO_DIR) { $env:KALMIDO_DIR } else { Join-Path $env:USERPROFILE 'kalmido' }
   # 2.527.0 (#4312): a relative KALMIDO_DIR as a full path (the update script and the compose calls run from other folders)
-  $Dir = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir))   # Combine keeps a full path as it is
+  if ($Dir -match '^~([\\/]|$)') { $Dir = $env:USERPROFILE + $Dir.Substring(1) }   # ~\kalmido as the home folder, like before
+  try { $Dir = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir)) }   # Combine keeps a full path as it is
+  catch { Fail "KALMIDO_DIR is not a usable folder path: $Dir" }
   # 2.513.0 (#4356): KALMIDO_URL, checked before anything changes: links in mails, push messages and password resets are built from it
   $PubUrl = "$env:KALMIDO_URL".TrimEnd('/')
   if ($PubUrl -and $PubUrl -cnotmatch '^https?://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:[0-9]+)?$') { Fail 'KALMIDO_URL must be the address people open, like https://tasks.example.com (without a path).' }
@@ -85,7 +87,7 @@
     # 2.527.0 (#4312): only a release from before 2.277 may go on unchecked, and only when GitHub says the list is not there (404);
     # any other failure (no network, a proxy, a server error, an empty file) stops instead of switching the check off
     $sumsCode = 0
-    try { Invoke-WebRequest -UseBasicParsing -Uri "$GH/releases/download/$Version/SHA256SUMS" -OutFile $sf; $Sums = [IO.File]::ReadAllText($sf); $sumsCode = 200 }
+    try { Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$GH/releases/download/$Version/SHA256SUMS" -OutFile $sf; $Sums = [IO.File]::ReadAllText($sf); $sumsCode = 200 }
     catch { try { if ($_.Exception.Response) { $sumsCode = [int]$_.Exception.Response.StatusCode } } catch { } }
     finally { Remove-Item -Force $sf -ErrorAction SilentlyContinue }
     $beforeSums = ($Version -match '^v(\d+)\.(\d+)\.') -and (([int]$Matches[1] -lt 2) -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 277))
@@ -148,11 +150,13 @@
   }
   # 2.527.0 (#4312): the same Compose 2.20 floor as install.sh (the profiles of docker-compose.yml need depends_on ... required: false)
   $cv = ''
+  $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'   # stderr of a native command must not stop here (PS 5.1)
   try { $cv = if ($ComposeV2) { "$(& docker compose version --short 2>$null)" } else { "$(& docker-compose version --short 2>$null)" } } catch { }
-  if ($cv -match '^v?(\d+)\.(\d+)') {
-    if ([int]$Matches[1] -lt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 20)) {
-      Fail "Docker Compose $cv is too old: Kalmido needs Compose 2.20 or newer. Update Docker Desktop, then run this installer again."
-    }
+  finally { $ErrorActionPreference = $eap }
+  $cv = "$cv".Trim()
+  if ($cv -notmatch '^v?(\d+)\.(\d+)' -or [int]$Matches[1] -lt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 20)) {
+    $shown = if ($cv) { $cv } else { '?' }
+    Fail "Docker Compose $shown is too old: Kalmido needs Compose 2.20 or newer. Update Docker Desktop, then run this installer again."
   }
   Say 'Docker is running.'
 
@@ -230,7 +234,7 @@
     }
     $Rev = (& git -C $Dir rev-parse --short HEAD)
     # 2.527.0 (#4312): say what was (not) checked
-    if ($Sums) { Say 'Source from git over HTTPS (not compared with SHA256SUMS; the image digest is)' }
+    if ($Sums) { Say 'Source from git over HTTPS (not compared with SHA256SUMS; only the prebuilt image, when used, is pinned to the release digest)' }
   } else {
     Step "Downloading Kalmido $Version (zip)"
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('kalmido-' + [Guid]::NewGuid().ToString('N'))

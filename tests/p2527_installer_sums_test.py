@@ -70,6 +70,8 @@ rc, out, _ = assets("v1.9.0", "404")
 check(rc == 0 and "SUMS=none" in out, f"#4312: version 1.x counts as before 2.277 ({rc} {out})")
 rc, out, _ = assets("v2.200.0", "000", "", "7")
 check(rc != 0 and "Could not fetch the checksum list" in out, f"#4312: an old release with no network stops too ({rc} {out})")
+check("--max-time 60 -o \"$TMPD/SHA256SUMS\"" in SH and "-TimeoutSec 60 -Uri \"$GH/releases/download/$Version/SHA256SUMS\"" in PS,
+      "#4312: the fetch of the checksum list cannot hang for ever")
 rc, out, called = assets("main", "000", "", "6")
 check(rc == 0 and "SUMS=none" in out and "curl" not in called, f"#4312: a branch fetches no list ({rc} {out})")
 
@@ -80,12 +82,12 @@ for name, src in (("install.sh", SH), ("install.ps1", PS)):
           f"#4312: {name} no longer promises a source check on every way")
     check("with git the tag is fetched from GitHub over HTTPS, without that check" in head,
           f"#4312: {name} names the git way as not checked against SHA256SUMS")
-    check("not compared with SHA256SUMS; the image digest is" in src, f"#4312: {name} says so on the git way")
+    check("not compared with SHA256SUMS; only the prebuilt image, when used, is pinned to the release digest" in src, f"#4312: {name} says so on the git way")
 check("$sumsCode -eq 404 -and $beforeSums" in PS and "Could not fetch the checksum list of release $Version" in PS
       and "catch { }\n    finally" not in PS.split("SHA256SUMS\" -OutFile $sf")[1][:400],
       "#4312: install.ps1 goes on unchecked only on a 404 of a release before 2.277, else stops")
-check("Kalmido needs Compose 2.20 or newer" in PS and "compose version --short" in PS, "#4312: install.ps1 has the Compose 2.20 floor of install.sh")
-check("[IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir))" in PS, "#4312: install.ps1 turns a relative KALMIDO_DIR into a full path")
+check("Kalmido needs Compose 2.20 or newer" in PS and "compose version --short" in PS and "$cv -notmatch" in PS, "#4312: install.ps1 has the Compose 2.20 floor of install.sh")
+check("[IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir))" in PS and "$env:USERPROFILE + $Dir.Substring(1)" in PS and "KALMIDO_DIR is not a usable folder path" in PS, "#4312: install.ps1 turns a relative KALMIDO_DIR into a full path")
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2527_installer_sums: {OKS[0]} ok, {len(FAILS)} failed")

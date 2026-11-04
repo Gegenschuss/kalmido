@@ -126,7 +126,7 @@ fetch_code() {
     fi
     REV=$(git -C "$DIR" rev-parse --short HEAD)
     # 2.527.0 (#4312): say what was (not) checked
-    [ -z "$SUMS" ] || say "Source from git over HTTPS (not compared with SHA256SUMS; the image digest is)"
+    [ -z "$SUMS" ] || say "Source from git over HTTPS (not compared with SHA256SUMS; only the prebuilt image, when used, is pinned to the release digest)"
   else
     step "Downloading Kalmido $VERSION (tarball)"
     command -v tar >/dev/null 2>&1 || die "Neither git nor tar is available."
@@ -176,7 +176,7 @@ release_assets() {
   tmpdir
   # 2.527.0 (#4312): only a release from before 2.277 may go on unchecked, and only when GitHub says the list is not there (404);
   # any other failure (no network, a proxy, a server error, an empty file) stops instead of switching the check off
-  code=$(curl -sSL -o "$TMPD/SHA256SUMS" -w '%{http_code}' "$GH/releases/download/$VERSION/SHA256SUMS" 2>/dev/null) || code=000
+  code=$(curl -sSL --max-time 60 -o "$TMPD/SHA256SUMS" -w '%{http_code}' "$GH/releases/download/$VERSION/SHA256SUMS" 2>/dev/null) || code=000
   if [ "$code" = 200 ] && [ -s "$TMPD/SHA256SUMS" ]; then
     SUMS="$TMPD/SHA256SUMS"
   elif [ "$code" = 404 ] && release_before_sums "$VERSION"; then
