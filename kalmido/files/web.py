@@ -30,6 +30,7 @@ from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
 from ..core.retention import ret_days, ret_on  # 2.369.5 (#2517): pulled up from functions
+from ..api.common import hit_limit  # 2.523.0 (#4073 d)
 from ..accounts.orgroles import org_writes, need_org_write  # 2.369.5 (#2517): pulled up from functions
 
 SHARE_MAX = 200  # shares per node
@@ -426,13 +427,17 @@ def files_content(nid):
 
 
 FS_THUMB_MAX = 40 << 20  # 2.477.0 (#3936): a bigger picture gets no small preview (the card shows its icon)
+# 2.523.0 (#4073 d): each preview starts a worker process -> at most FS_THUMB_RATE per person and minute, one worker at a time
+# with the text recognition (docs/ocr.py _SEM); more, or waiting longer than FS_THUMB_WAIT_S: 429 (the card shows its icon)
+FS_THUMB_RATE = 60
+FS_THUMB_WAIT_S = 10
 
 
 @app.get("/api/files/nodes/<int:nid>/thumb")
 def files_thumb(nid):
     """2.477.0 (#3936): a small JPEG of a picture file for the cards of the file store (instead of the original; ?v= the
     version: cached by the browser). Made on request, never stored (a private file's preview would lie unsealed on disk).
-    404: no picture, a locked folder (ciphertext), too big or unreadable -- the card then shows the icon."""
+    404: no picture, a locked folder (ciphertext), too big or unreadable; 429 (#4073 d): too many at once -- the card then shows the icon."""
     c = db()
     n = need_node(c, nid)
     if n["kind"] != "file" or not str(n["mime"] or "").startswith("image/"):
@@ -444,8 +449,16 @@ def files_thumb(nid):
     if not v or (v["size"] or 0) > FS_THUMB_MAX:
         raise Denied(404)
     sc_guard(c, "fs", nid, v["no"])
-    from ..docs.ocr import thumb_bytes
-    jpg = thumb_bytes(fs_read(c, nid, v["no"]), "image")
+    if hit_limit(f"fsthumb:{me()}", FS_THUMB_RATE):
+        raise Denied(429, tr("Too many requests, please slow down"))
+    from ..docs.ocr import _SEM, thumb_bytes
+    data = fs_read(c, nid, v["no"])
+    if not _SEM.acquire(timeout=FS_THUMB_WAIT_S):
+        raise Denied(429, tr("Too many requests, please slow down"))
+    try:
+        jpg = thumb_bytes(data, "image")
+    finally:
+        _SEM.release()
     if not jpg:
         raise Denied(404)
     r = Response(jpg, mimetype="image/jpeg")

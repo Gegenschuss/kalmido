@@ -49,6 +49,10 @@ BA_KIND = "datev_archive"            # office_import_runs.kind
 BA_FILE_MAX = 60 * 1024 * 1024       # one booking batch / one receipt image
 BA_ROWS_MAX = 250000                 # booking lines of one batch
 BA_TOTAL_MAX = 400 * 1024 * 1024     # all files of one ZIP, unpacked
+# 2.523.0 (#4073 c): what one upload reads into memory, all its files together (before: each file up to BA_TOTAL_MAX); a
+# longer request is refused from its length before it is read, never above the app's own request limit
+BA_UPLOAD_MAX = min(200 * 1024 * 1024, app.config.get("MAX_CONTENT_LENGTH") or 200 * 1024 * 1024)
+BA_UPLOAD_SLACK = 1024 * 1024        # the form's framing around the files
 BA_ENTRIES_MAX = 30000               # entries of one ZIP
 BA_LIST_MAX = 500                    # bookings per page of the list
 BA_PREVIEW = 20                      # names per list of the preview
@@ -84,6 +88,7 @@ BA_UNDO_LATE = N_("An archive import can only be undone within 24 hours of its i
 BA_NO_YEAR = N_("The year of the batch cannot be read")
 BA_ROW_BAD = N_("{0} lines without a readable amount, debit / credit mark or account (only in the original file)")
 BA_NOTHING = N_("Nothing to take over")
+BA_TOO_BIG = N_("The files are too large together (at most {0} MB)")  # as core/zipread.py
 
 _GUID = re.compile(r"[0-9A-Fa-f]{8}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}-[0-9A-Fa-f]{12}")
 _FILE = re.compile(r"bka-[0-9a-f]{16}\.(csv|xml|pdf|jpg|png|tif)")
@@ -766,11 +771,17 @@ def _ctx():
 
 
 def _uploads(check):
-    out = []
+    """2.523.0 (#4073 c): the files of the upload share BA_UPLOAD_MAX (a longer request: 413 before its form is read)."""
+    big = Denied(413, tr(BA_TOO_BIG, BA_UPLOAD_MAX // (1024 * 1024)))
+    if (request.content_length or 0) > BA_UPLOAD_MAX + BA_UPLOAD_SLACK:
+        raise big
+    request.max_content_length = min(request.max_content_length or 1 << 62, BA_UPLOAD_MAX + BA_UPLOAD_SLACK)
+    out, left = [], BA_UPLOAD_MAX
     for f in request.files.getlist("file"):
-        raw = f.read(BA_TOTAL_MAX + 1)
-        if len(raw) > BA_TOTAL_MAX:
-            raise Denied(413, tr("The file is too large (at most {0} MB)", BA_TOTAL_MAX // (1024 * 1024)))
+        raw = f.read(left + 1)
+        left -= len(raw)
+        if left < 0:
+            raise big
         out.append((base_name(f.filename or "") or "file", raw))
     if not out:
         raise BadInput(tr("No file"))

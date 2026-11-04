@@ -20,7 +20,12 @@ from .calc import dec, money
 CCR_PAGES_MAX = 60
 CCR_LINES_MAX = 2000
 CCR_TEXT_MAX = 200
-_NUM = r"\d{1,3}(?:\.\d{3})+,\d{2}|\d+,\d{2}"
+# 2.523.0 (#4073 a): the reader's work is bounded however the PDF's text layer looks: a line is cut to CCR_ROW_MAX characters
+# before any pattern sees it, the whole text to CCR_ALL_MAX, and an amount has no unbounded repetition inside a repetition
+# (thousands groups at most six, plain digits at most 15) -- a statement's line is far shorter, its amounts far smaller
+CCR_ROW_MAX = 400
+CCR_ALL_MAX = 2 * 1024 * 1024
+_NUM = r"\d{1,3}(?:\.\d{3}){0,5},\d{2}|\d{4,15},\d{2}"
 _DAY = r"\d{2}\.\d{2}\.(?:\d{4}|\d{2})?"
 LINE_RE = re.compile(rf"^(?P<d1>{_DAY})\s+(?:(?P<d2>{_DAY})\s+)?(?P<text>\S.*?)\s+(?P<pre>[+-]\s?)?(?:EUR\s+)?(?P<amt>{_NUM})(?:\s*EUR)?(?:\s*(?P<post>[+-]|S|H))?$")
 TAIL_RE = re.compile(rf"^(?P<text>\S.*?)\s+(?P<pre>[+-]\s?)?(?:EUR\s+)?(?P<amt>{_NUM})(?:\s*EUR)?(?:\s*(?P<post>[+-]|S|H))?$")
@@ -95,7 +100,7 @@ def _fx(text):
 
 def ccr_mastercard(text):
     """The text of a Mastercard statement -> see the module's text (error None here; no lines = not readable)."""
-    rows = [re.sub(r"\s+", " ", x).strip() for x in text.splitlines()]
+    rows = [re.sub(r"\s+", " ", x[:CCR_ROW_MAX * 4]).strip()[:CCR_ROW_MAX] for x in text[:CCR_ALL_MAX].splitlines()]
     head = next((d for d in (_iso(m.group(1)) for x in rows for m in [HEAD_DAY_RE.search(x)] if m) if d), None)
     total = None
     last4 = None
@@ -166,7 +171,14 @@ def ccr_text(data):
         rd = PdfReader(io.BytesIO(data))
         if rd.is_encrypted:
             return ""
-        return "\n".join((p.extract_text(extraction_mode="layout") or p.extract_text() or "") for p in rd.pages[:CCR_PAGES_MAX])
+        out, size = [], 0
+        for p in rd.pages[:CCR_PAGES_MAX]:  # 2.523.0 (#4073 a): no more text than the reader reads
+            t = p.extract_text(extraction_mode="layout") or p.extract_text() or ""
+            out.append(t)
+            size += len(t) + 1
+            if size >= CCR_ALL_MAX:
+                break
+        return "\n".join(out)[:CCR_ALL_MAX]
     except Exception:  # noqa: BLE001 -- a broken file is "not readable", never a 500
         return ""
 

@@ -71,24 +71,25 @@ def _num(s):
 
 def _fields(text):
     """-> [(tag, value)] in file order; "-" / an envelope line ends a statement (tag "-"). Continuation lines are
-    joined with a newline."""
+    joined with a newline. 2.523.0 (#4073 b): a field's lines are collected in a list and joined once (adding each line
+    to the string copied the whole field per line: quadratic on a field of many lines)."""
     out = []
     for raw in _lines_text(text).split("\n"):
         line = raw.rstrip()
         if line.startswith("{") and ("{4:" in line or line.startswith("{1:")):
-            out.append(("-", ""))
+            out.append(("-", []))
             line = line.split("{4:", 1)[1] if "{4:" in line else ""
         if line.strip() in ("-", "-}", "}"):
-            out.append(("-", ""))
+            out.append(("-", []))
             continue
         if line.endswith("-}"):
             line = line[:-2]
         m = MT_TAG_RE.match(line)
         if m:
-            out.append((m.group(1), m.group(2)))
+            out.append((m.group(1), [m.group(2)]))
         elif out and line.strip() and out[-1][0] != "-":
-            out[-1] = (out[-1][0], out[-1][1] + "\n" + line)
-    return out
+            out[-1][1].append(line)
+    return [(t, "\n".join(v)) for t, v in out]
 
 
 def _account(v):
