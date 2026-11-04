@@ -19,13 +19,11 @@
 
 ## What's new
 
-**2.493.0** (2026-11-03):
-- **Export and import**: the account export carries your own office, files, templates and settings; importing twice creates nothing twice; the import brings filed e-mails, bookmarks and more.
-- **Notifications**: quiet hours hold every push, pushes are bundled, approvals and calendar changes reach the right person.
-- **Office**: online payment of invoices, tax forms, personal e-mail signature, bank accounts as master data, document languages fr / es / it / nl.
-- **Agents**: Codex CLI, Cursor, Windsurf and Gemini CLI over MCP; polls, filed e-mails and invoice series through the API; delegation and watchers.
-- **Phone and chat**: own area "Chat", quick notes, swipe through documents, faster start for big accounts.
-- **Hosting**: support access only with the customer's consent.
+**2.506.0** (2026-11-04):
+- **Import**: Linear (API key or CSV export), Jira CSV with type, story points and sprint, GitHub / GitLab issues through a connected repository; undo no longer removes work done since the import.
+- **Git connection**: optional two-way sync of GitHub / GitLab issues (newer change wins, the other version stays in the history).
+- **Backups and restore**: the restore dialog shows what would be deleted again and offers to keep it.
+- **Hosting and office**: stricter support access and office rights.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
