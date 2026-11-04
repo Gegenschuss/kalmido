@@ -505,19 +505,19 @@ function sbb_fit() {
     if (need <= box + .5) continue;
     let px = parseFloat(getComputedStyle(n).fontSize) * box / need;
     for (let i = 0; i < 12 && px >= 9; i++) {
-      n.style.fontSize = `${px.toFixed(1)}px`;
+      n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
       need = wide(n);
       if (need <= box + .5) break;
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      n.style.fontSize = '';
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = 1; } else { n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = 1; continue; }
+      n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
   if (far) {
     const c = +row.style.getPropertyValue('--sbmc'), w = [];
-    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, wide(n) + 4); });
+    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, Math.ceil(wide(n)) + 4); });
     row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
   }
 }
