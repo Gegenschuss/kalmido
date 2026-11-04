@@ -60,6 +60,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   // (core.js setInterval, load(true) on a new version, which this test's own writes cause) stays quiet; measured 5-6 = 3 + its 2-3
   Object.defineProperty(w.document, 'hidden', {configurable: true, get: () => true});
   check(await until(() => w.eval('!td_polling')), 'no live poll is on its way');  // one that started before stays out too
+  // CI red of 2.529.0 (n 5): the queue reloads once Pete's save is through (outFlush ends with load()); on the slower CI that
+  // reload ran into the counted window. Wait for the empty queue and no request in flight first
+  check(await until(() => w.eval('!OUT.q.length && !OUT.flushing')), 'the queue is through');
+  await idle(w, {quiet: 400});
   const f0 = w.fetch; let n = 0, dots = 0;
   w.fetch = async (u, o = {}) => {
     if ((o.method || 'GET') !== 'GET' || !/\/api\/state(\?|$)/.test(String(u))) return f0(u, o);
