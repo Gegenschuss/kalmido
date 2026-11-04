@@ -45,7 +45,7 @@ from flask import g, jsonify, Response
 
 from ..core.config import app, APP_VERSION, ATT_DIR, PUBLIC_URL, SECRET_KEY
 from ..core.db import connect, db, err, iso, now_utc
-from ..core.pg import system_ctx
+from ..core.pg import snapshot_level, system_ctx
 from ..core.i18n import N_, lang, tr
 from ..core.access import Denied, acx_lists_sql, acx_of
 from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
@@ -784,19 +784,9 @@ def umz_export_row(uid, export_id):
 def dva_umz_snapshot(c, on=True):
     """2.533.0 (#4318) F15: the export reads the files and, later, the rows of the same tables; with READ COMMITTED a file
     added in between came as a row without its file. on: the next transaction of c (the export's own connection) is
-    REPEATABLE READ, one snapshot for every read of the run; off (before c goes back to the pool): rolled back and the
-    pool's default again. The driver takes the level only while the connection is idle."""
-    from psycopg import IsolationLevel
-    from psycopg.pq import TransactionStatus
-    pgc = c._pg
-    if pgc.closed:
-        return
-    if pgc.info.transaction_status != TransactionStatus.IDLE:
-        if on:
-            c.commit()  # only the reads of umz_user_conn so far
-        else:
-            pgc.rollback()
-    pgc.isolation_level = IsolationLevel.REPEATABLE_READ if on else None
+    REPEATABLE READ, one snapshot for every read of the run; off (before c goes back to the pool): the default again
+    (the driver part lives in core/pg.py: snapshot_level)."""
+    snapshot_level(c, on)
 
 
 def umz_run(uid, export_id):

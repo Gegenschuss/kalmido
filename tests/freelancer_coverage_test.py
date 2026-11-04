@@ -1404,7 +1404,6 @@ POST /api/office/drives/{}/restore
 POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders
 POST /api/office/import
-POST /api/office/legacy/archive/address
 POST /api/office/legacy/counter
 POST /api/office/legacy/runs/{}/tidy
 POST /api/office/legacy/split
@@ -1450,7 +1449,6 @@ POST /api/sprints/{}/start
 POST /api/supporter/{}/swap
 POST /api/tags/delete
 POST /api/tags/restore
-POST /api/tasks/purge-done
 POST /api/tasks/similar
 POST /api/tasks/{}/bell/undo
 POST /api/tasks/{}/chain/pull

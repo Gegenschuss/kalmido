@@ -612,6 +612,21 @@ def insert_id(c, sql, args=()):
     return r[0] if r else None
 
 
+def snapshot_level(c, on=True):
+    """2.533.0 (#4318) F15 (account export): on = the next transaction of connection c is REPEATABLE READ (one snapshot for
+    every read until it ends; reads so far are committed first); off = rolled back and the pool's default level again (before
+    c goes back to the pool). The driver takes the level only while the connection is idle."""
+    pgc = c._pg
+    if pgc.closed:
+        return
+    if pgc.info.transaction_status != TransactionStatus.IDLE:
+        if on:
+            c.commit()
+        else:
+            pgc.rollback()
+    pgc.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ if on else None
+
+
 def write_lock(c, name="kalmido"):
     """Serializes a check-then-write section across connections until the transaction ends (SQLite: an immediate write transaction)."""
     c.execute("SELECT pg_advisory_xact_lock(hashtext(?))", (name,))

@@ -394,7 +394,7 @@ def dvb_trash_terms(c, oid):
     """2.533.0 A2 (#4318 B21): the terms files named by a document copy in the office trash (office_trash.snap) of office
     area oid: a restored draft finds its frozen terms again."""
     out = set()
-    for r in c.execute("SELECT snap FROM office_trash WHERE org_id=? AND snap LIKE ?", (oid, '%terms-%')):
+    for r in c.execute("SELECT snap FROM office_trash WHERE org_id=? AND snap ILIKE ?", (oid, '%terms-%')):
         try:
             snap = json.loads(r["snap"]) if isinstance(r["snap"], str) else {}
         except ValueError:
