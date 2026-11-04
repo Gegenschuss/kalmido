@@ -133,13 +133,18 @@ def _mail_guests(c, lids):
     return {int(r[0]): bool(r[1]) for r in c.execute(f"SELECT id, mail_guests FROM lists WHERE id IN ({q})", list(lids))}
 
 
-def hbm_can(c, uid, m, write=False):
-    """May account uid read (write: assign / delete) hub mail row m? Always inside the mail's workspace."""
+def hbm_can(c, uid, m, write=False, memo=None):
+    """May account uid read (write: assign / delete) hub mail row m? Always inside the mail's workspace.
+    2.525.0 (#4195): memo = a dict of the caller kept over the rows of one list (the project's row and uid's role read once)."""
     if m["list_id"]:
-        l = _list_row(c, m["list_id"])
+        if memo is None or m["list_id"] not in memo:
+            got = _list_row(c, m["list_id"])
+            got = (got, list_role(c, m["list_id"], uid) if got else None)
+            if memo is not None:
+                memo[m["list_id"]] = got
+        l, role = got if memo is None else memo[m["list_id"]]
         if not l or (l["org_id"] or None) != (m["org_id"] or None):
             return False
-        role = list_role(c, m["list_id"], uid)
         return role in WRITE_ROLES if write else hbm_list_read(role, l["mail_guests"])
     if m["client_id"]:
         cl = _visible_client(c, uid, m["client_id"])
@@ -381,15 +386,26 @@ def _files(m):
     return [int(x) for x in v if isinstance(x, int)]
 
 
-def _names(c, cid, lid):
+def _names(c, cid, lid, memo=None):
+    """(client name, project name); 2.525.0 (#4195): memo = a dict over the rows of one list (each name read once)."""
+    if memo is not None and (cid, lid) in memo:
+        return memo[(cid, lid)]
     cn = c.execute("SELECT name FROM clients WHERE id=?", (cid,)).fetchone() if cid else None
     ln = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone() if lid else None
-    return (cn[0] if cn else ""), (ln[0] if ln else "")
+    out = (cn[0] if cn else ""), (ln[0] if ln else "")
+    if memo is not None:
+        memo[(cid, lid)] = out
+    return out
 
 
-def hbm_public(c, m, full=False):
+# 2.525.0 (#4195): the columns of a mail in a list -- everything but the text (body, opened only for the one mail shown)
+HBM_LIST_COLS = ("id, org_id, owner_id, client_id, list_id, ws, message_id, from_addr, from_name, to_addrs, subject, sent_at, files, eml_id, "
+                 "note, folder_id, created_at, deleted_at, deleted_by, direction, send_state")
+
+
+def hbm_public(c, m, full=False, memo=None):
     d = _open(c, m)
-    cn, ln = _names(c, m["client_id"], m["list_id"])
+    cn, ln = _names(c, m["client_id"], m["list_id"], memo)
     out = {"id": m["id"], "org_id": m["org_id"], "client_id": m["client_id"], "client_name": cn, "list_id": m["list_id"],
            "list_name": ln, "from_addr": d["from_addr"], "from_name": d["from_name"], "subject": d["subject"],
            "sent_at": m["sent_at"], "created_at": m["created_at"], "files": len(_files(m)), "note": m["note"] or "",
@@ -435,8 +451,10 @@ def _search(c, rows, q):
             if not exact:
                 check.append(w)
         keep |= cand
-        if check:
-            for m in [x for x in rows if x["id"] in cand]:
+        if check and cand:
+            # 2.525.0 (#4195): the list rows carry no text (HBM_LIST_COLS): the whole rows of the candidates only
+            part = sorted(cand)
+            for m in c.execute(f"SELECT * FROM hub_mails WHERE id IN ({','.join('?' * len(part))})", part).fetchall():
                 d = _open(c, m)
                 have = set(DS.index_words(" ".join(str(d[k] or "") for k in ("subject", "from_name", "from_addr", "body"))))
                 if not all(any(x.startswith(w) for x in have) for w in check):
@@ -466,25 +484,26 @@ def hbm_mails():
         cl = _visible_client(c, uid, a["client_id"])
         if not cl:
             raise Denied(404)
-        rows = c.execute("SELECT * FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
+        rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (cl["id"], cl["org_id"])).fetchall()
         addr, can = _address_of(c, "client", uid, cl["org_id"], cl["id"], None), True
     elif a.get("list_id"):
         role = need_list(c, a["list_id"], write=False)
         l = _list_row(c, a["list_id"])
-        rows = c.execute("SELECT * FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
+        rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (l["id"], l["org_id"])).fetchall()
         addr, can = _address_of(c, "list", uid, l["org_id"], None, l["id"]), role in WRITE_ROLES and not l["no_mail"] and not l["e2e"]
         # 2.395.0 (#3380): may I read the project's mails at all; the switch for guests (project admin only)
         extra = {"can_read": hbm_list_read(role, l["mail_guests"]), "guests": bool(l["mail_guests"]),
                  "can_guests": role in MANAGE_ROLES and not l["no_mail"] and not l["e2e"]}
     elif request.args.get("unassigned") in ("1", "true"):
-        rows = c.execute("SELECT * FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
+        rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
                          "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
         addr, can = "", True
     else:
         raise Denied(400, tr("Invalid data"))
-    rows = [m for m in rows if hbm_can(c, uid, m)]
+    memo = {}  # 2.525.0 (#4195): a project's row / role once for all its mails
+    rows = [m for m in rows if hbm_can(c, uid, m, memo=memo)]
     q = (request.args.get("q") or "").strip()
     if q:
         rows = _search(c, rows, q)
@@ -494,7 +513,7 @@ def hbm_mails():
     if a.get("list_id") and not extra["can_read"]:
         addr = ""  # 2.395.0 (#3380, review): a guest without the switch gets no filing address either
     return jsonify(enabled=hbm_on(), address=addr if hbm_on() else "", can_address=bool(can) and hbm_on(), total=len(rows),
-                   mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]], can_send=send, **(extra if a.get("list_id") else {}))
+                   mails=[hbm_public(c, m, memo=memo) for m in rows[:HBM_PAGE]], can_send=send, **(extra if a.get("list_id") else {}))
 
 
 @app.get("/api/hubmail/inbox")
@@ -508,13 +527,14 @@ def hbm_inbox():
         o = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
         if o and not o["personal_of"]:
             spaces.append({"ws": f"org:{oid}", "name": o["name"], "address": _address_of(c, "inbox", uid, oid, None, None)})
-    rows = c.execute("SELECT * FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
+    rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE owner_id=? AND client_id IS NULL AND list_id IS NULL AND deleted_at IS NULL "
                      "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000", (uid,)).fetchall()
-    rows = [m for m in rows if hbm_can(c, uid, m)]
+    memo = {}  # 2.525.0 (#4195): a project's row / role once for all its mails
+    rows = [m for m in rows if hbm_can(c, uid, m, memo=memo)]
     q = (request.args.get("q") or "").strip()
     if q:
         rows = _search(c, rows, q)
-    return jsonify(enabled=hbm_on(), spaces=spaces if hbm_on() else [], total=len(rows), mails=[hbm_public(c, m) for m in rows[:HBM_PAGE]])
+    return jsonify(enabled=hbm_on(), spaces=spaces if hbm_on() else [], total=len(rows), mails=[hbm_public(c, m, memo=memo) for m in rows[:HBM_PAGE]])
 
 
 @app.get("/api/hubmail/mails/<int:mid>")

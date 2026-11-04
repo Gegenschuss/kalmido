@@ -25,7 +25,7 @@ from ..core.i18n import tr
 from ..core.errors import BadInput
 from ..tasks.validation import as_int
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_view
-from .hubmail import HBM_PAGE, _search, _visible_client, hbm_can, hbm_list_read, hbm_public
+from .hubmail import HBM_LIST_COLS, HBM_PAGE, _search, _visible_client, hbm_can, hbm_list_read, hbm_public
 
 HMV_ORDER = "ORDER BY COALESCE(sent_at, created_at) DESC, id DESC LIMIT 2000"
 HMV_LIMIT, HMV_LIMIT_MAX = 100, 500  # like api/v1.py API_PAGE_DEFAULT / API_PAGE_MAX
@@ -66,18 +66,19 @@ def hmv_locked(c, uid, org_id):
     return bool(d and d["_mail"] and not org_id)
 
 
-def hmv_can(c, uid, m):
-    """May the token's user read hub mail row m through the API? Only a filed one (client or project), never deleted."""
+def hmv_can(c, uid, m, memo=None):
+    """May the token's user read hub mail row m through the API? Only a filed one (client or project), never deleted.
+    2.525.0 (#4195): memo as hbm_can's (one list's rows)."""
     if m["deleted_at"] or not (m["client_id"] or m["list_id"]) or hmv_locked(c, uid, m["org_id"]):
         return False
     if m["list_id"]:
-        return hbm_can(c, uid, m)
+        return hbm_can(c, uid, m, memo=memo)
     k = hmv_client(c, uid, m["client_id"])
     return bool(k) and (k["org_id"] or None) == (m["org_id"] or None)
 
 
-def hmv_public(c, m, full=False):
-    d = hbm_public(c, m, full=full)
+def hmv_public(c, m, full=False, memo=None):
+    d = hbm_public(c, m, full=full, memo=memo)
     for k in HMV_DROP:
         d.pop(k, None)
     for a in d.get("attachments") or []:
@@ -108,7 +109,7 @@ def v1_hub_mails():
         k = hmv_client(c, uid, cid)
         if not k or hmv_locked(c, uid, k["org_id"]):
             raise Denied(404)
-        rows = c.execute("SELECT * FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,
+        rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE client_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,
                          (cid, k["org_id"])).fetchall()
     else:
         lo = c.execute("SELECT org_id, mail_guests FROM lists WHERE id=?", (lid,)).fetchone()
@@ -116,14 +117,15 @@ def v1_hub_mails():
             raise Denied(404)
         if hmv_locked(c, uid, lo["org_id"] if lo else None):
             raise Denied(404)
-        rows = c.execute("SELECT * FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,
+        rows = c.execute(f"SELECT {HBM_LIST_COLS} FROM hub_mails WHERE list_id=? AND deleted_at IS NULL AND org_id IS NOT DISTINCT FROM ? " + HMV_ORDER,
                          (lid, lo["org_id"] if lo else None)).fetchall()
-    rows = [m for m in rows if hmv_can(c, uid, m)]
+    memo = {}  # 2.525.0 (#4195): the project's row / role and the names once for all rows
+    rows = [m for m in rows if hmv_can(c, uid, m, memo)]
     q = (a.get("q") or "").strip()[:200]
     if q:
         rows = _search(c, rows, q)
     off, n = cursor_dec("o", a.get("cursor")), min(as_int(a.get("limit", HMV_LIMIT), "limit", 1, HMV_LIMIT_MAX), HBM_PAGE)
-    out = [hmv_public(c, m) for m in rows[off:off + n]]
+    out = [hmv_public(c, m, memo=memo) for m in rows[off:off + n]]
     return jsonify(data=out, next_cursor=cursor_enc("o", off + n) if len(rows) > off + n else None)
 
 

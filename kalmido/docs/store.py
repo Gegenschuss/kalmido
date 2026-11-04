@@ -604,8 +604,10 @@ def docs_root(c, node):
 def folder_label(c, node):
     """The folder feature of a document: the id of the folder it lies in below the documents folder, at any depth (2.199.0 B
     (#2742); "" = in the documents folder itself / the inbox / outside)."""
+    if not node["parent_id"]:
+        return ""  # 2.525.0 (#4195): at the root nothing to look up (was the chain of every such row)
     root = docs_root(c, node)
-    if not root or not node["parent_id"] or node["parent_id"] == root:
+    if not root or node["parent_id"] == root:
         return ""
     return str(node["parent_id"]) if _in_docs_tree(c, root, node["parent_id"]) else ""
 

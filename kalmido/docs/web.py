@@ -13,6 +13,7 @@ from ..core.config import app, ATT_DIR
 from ..core.db import body, bump, db, err, iso, now_utc, insert_id
 from ..core.i18n import tr
 from ..core.numtext import server_num
+from ..core.pg import st_ids  # 2.525.0 (#4195): an id set as one array parameter
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -95,7 +96,9 @@ def _agent_folder(c, aid, node, r):
 
 
 # ---- serializing ------------------------------------------------------------------------------------------------------
-def doc_json(c, m, node, full=False, role=None):
+def doc_json(c, m, node, full=False, role=None, pre=None):
+    """The document view of doc_meta row m and its node. 2.525.0 (#4195): pre = doc_prefetch of the list's rows (tags and the
+    shared flag of every row read once, not per row)."""
     ws = m["ws"]
     auto = S.meta_json(c, m, "auto", {})
     hand = S.hand_fields(auto)  # 2.273.0 C (#3047): own key, not a feature of "automatic"
@@ -131,11 +134,12 @@ def doc_json(c, m, node, full=False, role=None):
          "amount": S.doc_open(c, ws, "doc_meta.amount", m["amount"]) or None, "currency": m["currency"] or None,
          "sender": {"id": m["sender_id"], "name": S.label_name(c, ws, "sender", m["sender_id"])} if m["sender_id"] else None,
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
-         "tags": S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
+         "tags": pre["tags"].get(m["node_id"], []) if pre else S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
          "thumb": bool(m["thumb"]), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
          "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand}
     # 2.210 C (#2761): only a flag whether the document is shared (no names)
-    d["shared"] = bool(node["org_access"]) or bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone())
+    d["shared"] = bool(node["org_access"]) or (m["node_id"] in pre["shared"] if pre else
+                                                bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone()))
     from .split import sp_view
     sp = sp_view(m)  # 2.154.0 A (#1111): a stack waiting to be split / a part of one
     # 2.522.0 (#4468): a stack waiting for the decision is several letters: no recognised values, hints, duplicate warning
@@ -166,6 +170,28 @@ def doc_json(c, m, node, full=False, role=None):
         if acx_of(c, me()).role != "agent":  # 2.522.0 (#4433): office or private space, "Move to office" / "Wrong area"
             d["area"] = ar_view(c, dict(node, role=role or "view"), m, me())
     return d
+
+
+def doc_prefetch(c, ids):
+    """2.525.0 (#4195): what doc_json reads per row, for the rows ids of a list in three queries: {nodes: {id: fs_nodes row},
+    tags: {id: [S.node_tags]}, shared: {ids with a share}}."""
+    q = st_ids(ids)
+    nodes = {r["id"]: r for r in c.execute("SELECT * FROM fs_nodes WHERE id = ANY(CAST(? AS BIGINT[]))", (q,))}
+    tags = {}
+    for r in c.execute("SELECT nt.node_id, t.id, t.name, nt.auto FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id "
+                       "WHERE nt.node_id = ANY(CAST(? AS BIGINT[])) ORDER BY nt.node_id, lower(t.name)", (q,)):
+        tags.setdefault(r[0], []).append({"id": r[1], "name": r[2], "auto": r[3] or ""})
+    shared = {r[0] for r in c.execute("SELECT DISTINCT node_id FROM fs_shares WHERE node_id = ANY(CAST(? AS BIGINT[]))", (q,))}
+    return {"nodes": nodes, "tags": tags, "shared": shared}
+
+
+def doc_visible(c, uid):
+    """2.525.0 (#4195): the visibility of the documents list worked out ONCE per request (was up to nine times: count,
+    review, waiting, facets, folders ...): (SQL condition on n.id, its one parameter). The ids are fs_visible_sql's, only
+    the nodes a list can ask for (every folder / non-file node and the files with a document), as one array parameter."""
+    ids = [r[0] for r in c.execute(f"SELECT n.id FROM fs_nodes n WHERE n.id IN {fs_visible_sql(uid, c)} AND "
+                                   "(n.kind <> 'file' OR EXISTS (SELECT 1 FROM doc_meta x WHERE x.node_id = n.id))")]
+    return "= ANY(CAST(? AS BIGINT[]))", st_ids(ids)
 
 
 def _doc(c, nid, write=False):
@@ -203,10 +229,12 @@ def _sort_value(c, r, key):
         return None
 
 
-def doc_query(c, uid, args):
+def doc_query(c, uid, args, vis=None):
     """The documents account uid sees, filtered by args (ws, q, sender, type, tag, from, to, review, state) -> (rows, total,
-    review count). Rows: doc_meta + node columns, sorted by doc_sort (newest document date first by default)."""
-    where, params = [f"n.id IN {fs_visible_sql(uid, c)}", "n.kind='file'"], []
+    review count). Rows: doc_meta + node columns, sorted by doc_sort (newest document date first by default).
+    vis: doc_visible of the request (2.525.0, #4195; None = worked out here)."""
+    vis = vis or doc_visible(c, uid)
+    where, params = [f"n.id {vis[0]}", "n.kind='file'"], [vis[1]]
     ws = str(args.get("ws") or "all")
     if ws == "private":
         where.append("n.org_id IS NULL")
@@ -266,10 +294,12 @@ def doc_query(c, uid, args):
     return [got[i] for i in ids if i in got], total, review
 
 
-def facets(c, uid, ws_filter):
+def facets(c, uid, ws_filter, vis=None):
     """Senders, types and tags of the documents uid can see (in the workspace filter), merged by name: [{name, ids}] each.
-    Only labels used on visible documents: names from documents one cannot open never show up in the filters."""
-    where, params = [f"n.id IN {fs_visible_sql(uid, c)}"], []
+    Only labels used on visible documents: names from documents one cannot open never show up in the filters.
+    vis: doc_visible of the request (2.525.0, #4195; None = worked out here)."""
+    vv = vis or doc_visible(c, uid)
+    where, params = [f"n.id {vv[0]}"], [vv[1]]
     if ws_filter == "private":
         where.append("n.org_id IS NULL")
     elif re.fullmatch(r"org:\d+", str(ws_filter or "")):
@@ -292,7 +322,7 @@ def facets(c, uid, ws_filter):
     # 2.122.0 B (#2294): the folders the visible documents lie in (merged by name as the labels)
     merged = {}
     for r in c.execute(f"SELECT DISTINCT p.id, p.name FROM fs_nodes p WHERE p.id IN (SELECT n.parent_id FROM doc_meta d JOIN fs_nodes n "
-                       f"ON n.id=d.node_id WHERE {' AND '.join(where)}) AND p.id IN {fs_visible_sql(uid, c)}", params):
+                       f"ON n.id=d.node_id WHERE {' AND '.join(where)}) AND p.id {vv[0]}", params + [vv[1]]):
         merged.setdefault(r[1].lower(), {"name": r[1], "ids": []})["ids"].append(r[0])
     out["folders"] = sorted(merged.values(), key=lambda v: v["name"].lower())
     return out
@@ -306,15 +336,14 @@ def docs_list():
     added_to=, no_tag=1, no_sender=1, no_type=1, ftype=pdf,image,office,text,other; q takes the syntax of docs/dsearch.py."""
     c = db()
     uid = me()
-    rows, total, review = doc_query(c, uid, request.args)
-    out = []
-    for r in rows:
-        node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (r["node_id"],)).fetchone()
-        out.append(doc_json(c, r, node))
-    waiting = c.execute(f"SELECT COUNT(*) FROM doc_meta d WHERE d.state IN ('wait','run') AND d.node_id IN {fs_visible_sql(uid, c)}").fetchone()[0]
+    vis = doc_visible(c, uid)  # 2.525.0 (#4195): once for the whole answer
+    rows, total, review = doc_query(c, uid, request.args, vis)
+    pre = doc_prefetch(c, [r["node_id"] for r in rows])  # 2.525.0 (#4195): the row helpers in three queries, not per row
+    out = [doc_json(c, r, pre["nodes"][r["node_id"]], pre=pre) for r in rows if r["node_id"] in pre["nodes"]]
+    waiting = c.execute(f"SELECT COUNT(*) FROM doc_meta d WHERE d.state IN ('wait','run') AND d.node_id {vis[0]}", (vis[1],)).fetchone()[0]
     res = {"docs": out, "total": total, "review": review, "waiting": waiting}
     if request.args.get("facets") != "0":
-        res["facets"] = facets(c, uid, request.args.get("ws"))
+        res["facets"] = facets(c, uid, request.args.get("ws"), vis)
     return jsonify(res)
 
 
