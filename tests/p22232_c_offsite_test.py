@@ -59,6 +59,8 @@ for _port in (8094, 8095, 8093):
     check(until(lambda: subprocess.run(["docker", "exec", CT, "python", "-c", f"import socket; socket.create_connection(('127.0.0.1', {_port}), 1)"],
                                        capture_output=True).returncode == 0, 20), f"setup: the fake on {_port} is up")
 REM = os.path.join(DATA, "fake-remote")
+for sub in ("dav/bk", "dav2/bk"):  # 2.510.0 (#4286): the stand-in creates no folder on a PUT any more, like a real WebDAV server
+    os.makedirs(os.path.join(REM, "webdav", sub), exist_ok=True)
 
 
 def dav_log():

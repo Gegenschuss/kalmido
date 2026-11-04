@@ -312,6 +312,7 @@ if r.returncode == 0:
     v = A.post(B + f"/api/admin/backups/{up.json().get('upload', 'x')}/verify", json={"passphrase": PASS2})
     check(v.ok, f"... and taken as an upload and checked fine {v.status_code} {v.text[:160]}")
 # a new large file + two more backups: the oldest backup leaves the target, its files stay while a kept one needs them
+open(os.path.join(REM, "s3.page"), "w").write("1")  # 2.510.0 (#4286): one name per page: the list must follow IsTruncated
 T2 = A.post(B + "/api/tasks", json={"title": "later", "list_id": L}).json()["id"]
 NEW = os.urandom(100 * 1024)
 A.post(B + f"/api/tasks/{T2}/attachments", files={"file": ("later.bin", NEW, "application/octet-stream")})
@@ -320,6 +321,8 @@ check(until(lambda: A.get(OFF).json().get("last_name") == o3.get("name"), 60), "
 check(len(blobs()) == 3 and len(puts()) == n_put + 1, f"only the new file was sent {len(blobs())} {len(puts()) - n_put}")
 kept = dbx("SELECT value FROM settings WHERE key='bko_remote'", data=DATA)
 check(kept and json.loads(kept[0][0]) == sorted([o2["name"], o3["name"]], reverse=True), f"the kept names on the target are remembered (bko_remote) {kept}")
+check(any("continuation-token=" in json.loads(x).get("path", "") for x in open(os.path.join(REM, "s3.log")) if x.strip()),
+      "2.510.0 (#4286): a list of several pages: the app asks for the next one")
 kid3 = members(dec(open(os.path.join(BK, o3["name"]), "rb").read(), PASS2)[1])[0]["store"]["kid"]
 check(all(b.startswith(f"kalmido-blob-{kid3}-") for b in blobs()), f"the files on the target carry the store key's id {kid3}")
 sys.exit(done("p2432_bkstore"))

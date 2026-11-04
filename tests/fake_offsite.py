@@ -5,7 +5,9 @@ the test container: docker exec -d python /data/fake_offsite.py <mode> <port> <u
 Files go to /data/fake-remote/<mode>/<path>. Every request is logged to /data/fake-remote/<mode>.log (one JSON line: method,
 path, status, sig = the Signature V4 was checked and matched). S3 checks the signature with its own implementation (path
 style), the signed body hash and Content-MD5; WebDAV checks Basic auth. /data/fake-remote/<mode>.fail holding a number N:
-the next N uploads answer 500 (the number counts down)."""
+the next N uploads answer 500 (the number counts down).
+2.510.0 (#4286) like the real ones: an S3 list comes in pages (/data/fake-remote/s3.page holding a number N: N keys per page,
+default 1000 = max-keys, IsTruncated + NextContinuationToken) and honours the delimiter; a WebDAV PUT creates no folder (409)."""
 import base64
 import hashlib
 import hmac
@@ -128,11 +130,19 @@ class H(BaseHTTPRequestHandler):
                 for r, _, fs in os.walk(bucket):
                     for fn in fs:
                         k = os.path.relpath(os.path.join(r, fn), bucket).replace(os.sep, "/")
-                        if k.startswith(pre):
+                        if k.startswith(pre) and not (q.get("delimiter") and q["delimiter"] in k[len(pre):]):
                             keys.append(k)
+                keys.sort()
+                try:
+                    size = int(open(ROOT + ".page").read().strip())
+                except (OSError, ValueError):
+                    size = int(q.get("max-keys") or 1000)
+                at = int(q.get("continuation-token") or 0)
+                more = at + size < len(keys)
                 xml = ('<?xml version="1.0"?><ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">'
-                       + "".join(f"<Contents><Key>{escape(k)}</Key></Contents>" for k in sorted(keys))
-                       + "<IsTruncated>false</IsTruncated></ListBucketResult>")
+                       + "".join(f"<Contents><Key>{escape(k)}</Key></Contents>" for k in keys[at:at + size])
+                       + f"<IsTruncated>{'true' if more else 'false'}</IsTruncated>"
+                       + (f"<NextContinuationToken>{at + size}</NextContinuationToken>" if more else "") + "</ListBucketResult>")
                 return self.reply(200, xml.encode())
             return self.reply(405)
         # WebDAV
@@ -148,7 +158,8 @@ class H(BaseHTTPRequestHandler):
                 time.sleep(float(open(ROOT + ".slow").read().strip() or 0))
             except (OSError, ValueError):
                 pass
-            os.makedirs(os.path.dirname(p), exist_ok=True)
+            if not os.path.isdir(os.path.dirname(p)):  # (RFC 4918: a missing parent is a conflict, the app needs the folder to exist)
+                return self.reply(409)
             with open(p, "wb") as f:
                 f.write(data)
             return self.reply(201)
