@@ -44,6 +44,8 @@ from .pdfweb import _stored  # 2.296.0 F (#3177)
 from ..team.clients import cdn_split_free  # 2.369.5 (#2517): pulled up from functions
 from .pdf import pdf_phone  # 2.369.5 (#2517): pulled up from functions
 from .catalog import pkc_origin  # 2.369.5 (#2517): pulled up from functions
+from .calc import calc_tax_day  # 2.531.0 (#4498)
+from .chain import hch_append, hch_check, hch_migrate  # 2.531.0 (#4497)
 
 # P2: does a document of this kind get its number only when it is finalised? (quotations: at creation, unless the
 # organisation chose otherwise; invoices / credit notes of a later release: always at finalising)
@@ -344,7 +346,6 @@ def ofx_finalize(c, oid, uid, did):
     r = doc_row(c, oid, did)
     ofx_need_editable(r)
     s = office_settings(c, oid)
-    from .calc import calc_tax_day
     pack = office_pack_for(s, calc_tax_day(dict(r))) or {}  # 2.531.0 (#4498): the rates of its day of service (frozen below)
     if r["kind"] != "offer":  # 2.38.0 (#1021, F1): the required fields of an invoice (400 with the list), due date
         write_lock(c, f"office_num_{int(oid)}")  # 2.126.0 A (#1979 F5): the date check and the number in one go (docs._assign_number)
@@ -439,7 +440,6 @@ def ofx_finalize(c, oid, uid, did):
                                                      "pack_version": tsnap["version"], "logo_sha256": sha})
     if r["kind"] != "offer":  # 2.38.0: status issued, a credit note settles its invoice, the stored PDF / XML (F2)
         inv_after_finalize(c, oid, uid, doc_row(c, oid, did))
-    from .chain import hch_append
     try:  # review job/2606: data that cannot be read now (decryption) never undoes the finalising - it stays "pending"
         with c.savepoint():
             hch_append(c, oid, did, s)  # 2.531.0 (#4497): its place in the hash chain of its series (not a quotation / trial document)
@@ -471,7 +471,6 @@ def ofx_migrate(c):
             and not c.execute("SELECT 1 FROM office_doc_items WHERE org_id IS NULL LIMIT 1").fetchone():
         c.execute("ALTER TABLE office_doc_items ALTER COLUMN org_id SET NOT NULL")
     ix_ensure(c, "CREATE INDEX IF NOT EXISTS office_doc_items_org ON office_doc_items(org_id, doc_id)")
-    from .chain import hch_migrate
     hch_migrate(c)  # 2.531.0 (#4497): finalised documents not chained yet (before 2.531, an imported office) join their chain
 
 
@@ -550,6 +549,5 @@ def ofx_log_get():
 def ofx_log_chain_get():
     """2.531.0 (#4497): the organisation's admin (like the log): the hash chains of the finalised documents recomputed ->
     {ok, count, pending, first_bad: {id, number, chain, seq} | null} (office/chain.py hch_check). Reads only."""
-    from .chain import hch_check
     c, uid, oid = _ctx(admin=True)
     return jsonify(hch_check(c, oid))

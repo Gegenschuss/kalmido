@@ -18,6 +18,7 @@ from decimal import Decimal
 from flask import g, jsonify, request
 
 from ..core.config import app
+from .calc import calc_tax_day  # 2.531.0 (#4498)
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, stored_join, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
@@ -447,7 +448,6 @@ def _lines_eur(c, oid, r):
     2.189.0 (#2475): in the home currency of the office (EUR for every office of before)."""
     from .docs import _calc_doc, doc_items
     s = office_settings(c, oid)
-    from .calc import calc_tax_day
     pack = office_pack_for(s, calc_tax_day(dict(r)))  # 2.531.0 (#4498)
     d = _calc_doc(r, hc_home(s))
     d["currency"] = d["home"]
