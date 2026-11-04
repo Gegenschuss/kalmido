@@ -1058,8 +1058,10 @@ def inv_render(c, oid, r, m, t, pack, L, lang, fmt_date):
             rows.append([lab, tl.get("amount_text") or fmt_money(tl.get("amount") or 0, lang, cur)])
         rows.append([L.get("credit_total" if kind == "credit" else "invoice_total", tr("Total|credit note" if kind == "credit" else "Total|invoice", lg=lang)), tot["gross_text"]])
         if kind == "invoice" and dec(mf["paid"]) > 0:
-            rows.append([L.get("paid", tr("Already paid|document", lg=lang)), fmt_money(mf["paid"], lang, cur)])
-            rows.append([L.get("open", tr("Amount outstanding|document", lg=lang)), tot["open_text"]])
+            # 2.509.0 (#4331): today's payment state, named for pdfweb._model: the PDF of a finalised document leaves them out (the preview keeps them)
+            tot["paid_rows"] = [[L.get("paid", tr("Already paid|document", lg=lang)), fmt_money(mf["paid"], lang, cur)],
+                                [L.get("open", tr("Amount outstanding|document", lg=lang)), tot["open_text"]]]
+            rows += tot["paid_rows"]
         m["reminder"] = None
     tot["rows"] = rows
     if kind == "delivery":  # 2.120.0 D (#2089): no prices, no totals, no tax, no payment info; the receipt box is drawn by pdf.py

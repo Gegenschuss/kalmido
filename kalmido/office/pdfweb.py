@@ -153,6 +153,9 @@ def epdf_stored(c, oid, r, ext, commit=True):
 def _model(c, oid, did):
     from .docs import odoc_render
     model = odoc_render(c, did, oid)
+    tot = model.get("totals") or {}
+    if model.get("locked") and tot.get("paid_rows"):  # 2.509.0 (#4331): a finalised document is the state of its date, like its XML, not today's payments
+        tot["rows"] = [x for x in tot["rows"] if x not in tot["paid_rows"]]
     co = model.setdefault("company", {})
     if not model.get("locked"):  # 2.36.2: a finalised document prints the logo of its snapshot (set by odoc_render)
         lp = opdf_logo_path(oid)
