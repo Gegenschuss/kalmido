@@ -3,6 +3,7 @@
 """2.536.0 (#4363): a support session counts as "no session" for the OIDC sign-in. Own container (hosted, a server key, a fake
 OIDC provider inside: stub_oidc.py). Invented accounts only; the client is a person without an organisation (tests/freelancer_fixture.py).
  - GET /api/auth/oidc/start from a support session: 403 code support_session (the guard's GET block), no authorization redirect
+ - review of 2.536.0: GET /api/me/share/httpshortcuts.zip from a support session: 403, the client's drop token unchanged
  - the callback with a support session cookie (a state from another browser, its binding cookie): refused (#login-error=support),
    nothing linked to the client's account, the support session stays the only session (no unmarked one in its place)
  - the person's own session is unchanged: start + callback link the provider identity (hosted: only from the own session)
@@ -84,6 +85,12 @@ CLAIMS = {"sub": "sub-frida", "preferred_username": "frida", "email": "frida@exa
 r, q = start(X)
 check(r.status_code == 403 and (r.json() if r.headers.get("Content-Type", "").startswith("application/json") else {}).get("code") == "support_session"
       and not q, f"#4363: support session: the OIDC start is refused ({r.status_code} {r.headers.get('Location', '')[:60]})")
+
+# ---- review of 2.536.0: the HTTP Shortcuts ZIP makes a new drop token of the client on GET -- refused in a support session
+H0 = kt.dbx("SELECT drop_token_hash FROM users WHERE id=?", (FID,))
+r = X.get(B + "/api/me/share/httpshortcuts.zip", headers={"Sec-Fetch-Site": "same-origin"})
+check(r.status_code == 403 and kt.dbx("SELECT drop_token_hash FROM users WHERE id=?", (FID,)) == H0,
+      f"#4363: support session: no HTTP Shortcuts ZIP (a new drop token would outlive the grant) ({r.status_code})")
 
 # ---- the callback: a state from another browser, carried over with its binding cookie, is refused for the support session
 Y = kt.sess(None)
