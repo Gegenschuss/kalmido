@@ -36,6 +36,16 @@ with tempfile.TemporaryDirectory() as d:
         f.write("# Title\n\n[ok](#title) [anchor](#no-such-heading-2100) [file](missing.md#x)\n")
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_links.py"), bad], capture_output=True, text=True)
     check(r.returncode == 1 and "no-such-heading-2100" in r.stdout and "missing.md" in r.stdout, "check_links.py reports a broken anchor and a missing file")
+    # 2.527.0 (#4313): a code block without its closing fence swallowed the rest of docs/API.md and nobody saw it
+    with open(bad, "w", encoding="utf-8") as f:
+        f.write("# Title\n\n```bash\ncurl one\n\n## Next\n\n```bash\ncurl two\n```\n\n````md\n```bash\nnested\n```\n````\n")
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_links.py"), bad], capture_output=True, text=True)
+    check(r.returncode == 1 and "bad.md:8: code block opened at line 3 is not closed" in r.stdout and r.stdout.count("code block opened") == 1 and "never closed" not in r.stdout,
+          "check_links.py reports a code block left open (and not a shorter fence nested in a longer one): " + r.stdout)
+    with open(bad, "w", encoding="utf-8") as f:
+        f.write("# Title\n\n```bash\ncurl one\n")
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_links.py"), bad], capture_output=True, text=True)
+    check(r.returncode == 1 and "bad.md:3: code block is never closed" in r.stdout, "check_links.py reports a block open at the end: " + r.stdout)
 
 # the MCP server reports the app's version, not a fixed 2.21.0
 spec = importlib.util.spec_from_file_location("kalmido_mcp_f", os.path.join(ROOT, "mcp", "kalmido_mcp.py"))
