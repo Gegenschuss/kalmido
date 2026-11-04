@@ -1323,10 +1323,12 @@ def umz_template_files(c, run, uid, zf, files, data):
         run.count("template_files")
 
 
-def umz_undo_templates(c, uid, cr):
+def umz_undo_templates(c, uid, cr, plan):
     """2.464.0 (#3865): the files that go with the undo: of the run's templates (the rows go with the template) and the ones it put
-    on a template of an earlier run. Before the templates go -> the paths to unlink after the commit."""
-    tpl, ids = [int(x) for x in cr.get("templates") or []], [int(x) for x in cr.get("template_files") or []]
+    on a template of an earlier run. Before the templates go -> the paths to unlink after the commit.
+    2.506.0 (#4299): only of what the plan lets go (a template changed since keeps its files, also the ones added since)."""
+    tpl = [x for x in (int(y) for y in cr.get("templates") or []) if plan.goes("templates", x)]
+    ids = [x for x in (int(y) for y in cr.get("template_files") or []) if plan.goes("template_files", x)]
     paths = []
     for i in range(0, max(len(tpl), len(ids)), 500):
         t, f = tpl[i:i + 500] or [0], ids[i:i + 500] or [0]
@@ -1991,8 +1993,10 @@ def umz_run(uid, iid, opts):
                 if o in people:
                     names[people[o]] = _txt(p.get("name"), 100)
             umz_fix_people(c, run, uid, names)
-            if iid_db and run.created.get("org_joins"):  # 2.360.2 M (#2561): made by the sharing, after the import was recorded
-                c.execute("UPDATE imports SET created=? WHERE id=?", (json.dumps(run.created), iid_db))
+            if iid_db:  # 2.360.2 M (#2561): org_joins, made by the sharing, after the import was recorded
+                from .orgimport import oi_prints
+                run.created["prints"] = oi_prints(c, run.created)  # 2.506.0 (#4299): the state the undo compares with, now that all is written
+                c.execute("UPDATE imports SET created=? WHERE id=?", (json.dumps({**run.created, "src": run.src}), iid_db))
             bump(c)
             c.commit()
         finally:
@@ -2266,15 +2270,21 @@ def _thread(uid, fn, *args, iid=None, state=None):
                 _UMI_START.pop(int(uid))
 
 
-def umz_undo_parts(c, cr):
-    """2.455.0 (#3469): the rows umz_part recorded."""
+def umz_undo_parts(c, cr, plan, since):
+    """2.455.0 (#3469): the rows umz_part recorded. 2.506.0 (#4299): the ones unchanged since the import -> how many stay."""
+    kept = 0
     for table, key in reversed(cr.get("parts") or []):
         if table == "task_links":
+            r = c.execute("SELECT created_at, section_at FROM task_links WHERE task_id=? AND list_id=?", (int(key[0]), int(key[1]))).fetchone()
+            if r and (imp_undo_after(r["created_at"], since) or imp_undo_after(r["section_at"], since)):
+                kept += 1
+                continue
             c.execute("DELETE FROM task_links WHERE task_id=? AND list_id=?", (int(key[0]), int(key[1])))
-        elif table in ("sprints", "list_rules", "portal_tickets"):
+        elif table in ("sprints", "list_rules", "portal_tickets") and plan.goes(table, int(key)):
             if table == "sprints":  # tasks.sprint_id has no foreign key
                 c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (int(key),))
             c.execute(f"DELETE FROM {table} WHERE id=?", (int(key),))
+    return kept
 
 
 def umz_undo_books(c, uid, bids):
@@ -2298,14 +2308,15 @@ def umz_undo(c, uid, r):
     since the import: changed tasks, tasks with comments / files / time entries / subtasks added since and lists with such
     tasks, other people's tasks or new project files stay; calendars and address books only go when nothing changed in them."""
     cr = json.loads(r["created"] or "{}")
-    from .orgimport import oi_undo, oi_undo_files
-    n_oi = oi_undo(c, cr)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
-    umz_undo_parts(c, cr)  # 2.455.0 (#3469)
-    from .umz_more import umz_more_undo
-    umz_more_undo(c, uid, cr)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells
-    tpl_paths = umz_undo_templates(c, uid, cr)  # 2.464.0 (#3865)
-    own_lists = [int(x) for x in cr.get("lists") or []]
     since = parse_iso(r["created_at"])
+    from .orgimport import oi_undo, oi_undo_files, oi_undo_plan
+    plan = oi_undo_plan(c, cr, since)  # 2.506.0 (#4299): before anything goes: only what is unchanged since and has nothing new below it
+    n_oi, kept_rows = oi_undo(c, uid, cr, since, plan)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
+    kept_rows += umz_undo_parts(c, cr, plan, since)  # 2.455.0 (#3469)
+    from .umz_more import umz_more_undo
+    kept_rows += umz_more_undo(c, uid, cr, since, plan)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells
+    tpl_paths = umz_undo_templates(c, uid, cr, plan)  # 2.464.0 (#3865)
+    own_lists = [int(x) for x in cr.get("lists") or []]
     mine = []
     ids = [int(x) for x in cr.get("tasks") or []]
     for i in range(0, len(ids), 500):  # the run's tasks: only still writable ones (in its own lists the user is the owner)
@@ -2321,6 +2332,8 @@ def umz_undo(c, uid, r):
     for table, col in (("habits", "user_id"), ("filters", "user_id"), ("templates", "user_id"), ("ev_cals", "owner_id"),
                        ("books", "owner_id"), ("time_entries", "user_id")):
         part = [int(x) for x in cr.get(table) or []]
+        if table not in ("ev_cals", "books"):  # 2.506.0 (#4299)
+            part = [x for x in part if plan.goes(table, x)]
         if table in ("ev_cals", "books"):  # 2.272.0 C (#3027): only a calendar / address book nothing was added to or changed in
             sub, mem = ("events", "cal_id") if table == "ev_cals" else ("contacts", "book_id")
             mt, mc = ("ev_cal_members", "cal_id") if table == "ev_cals" else ("book_members", "book_id")
@@ -2348,6 +2361,10 @@ def umz_undo(c, uid, r):
             c.execute(f"DELETE FROM {table} WHERE id IN ({','.join('?' * len(p))}) AND {col}=?"
                       + (" AND billed_doc_id IS NULL" if table == "time_entries" else ""), p + [uid])
     for day in cr.get("journal") or []:
+        j = c.execute("SELECT updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
+        if j and imp_undo_after(j["updated_at"], since):  # 2.506.0 (#4299): written on since the import
+            kept_rows += 1
+            continue
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
     for mid in cr.get("hub_mailboxes") or []:  # 2.144.5 B (#2410): a mailbox the import set up (not changed since: no password yet)
         # 2.144.5 A2 (#2410, review R7): + still error "password" (saving it in the settings clears that, even without a password)
@@ -2364,9 +2381,11 @@ def umz_undo(c, uid, r):
     c.commit()
     oi_undo_files(cr)  # 2.272.0 C (#3027): the files of the tasks stay with them in the trash (the trash run deletes them)
     unlink_files(tpl_paths)  # 2.464.0 (#3865)
-    print("account import undo", r["id"], "user", uid, "tasks", len(back), "kept", len(kept), "area rows", n_oi, flush=True)
+    kept_rows += plan.kept_n
+    print("account import undo", r["id"], "user", uid, "tasks", len(back), "kept", len(kept), "area rows", n_oi, "kept rows", kept_rows,
+          "into the trash", plan.trashed, flush=True)
     return {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
-            "kept_cals": kept_cals, "kept_books": kept_books, "trash": True}
+            "kept_cals": kept_cals, "kept_books": kept_books, "kept_rows": kept_rows, "trash_rows": plan.trashed, "trash": True}
 
 
 # ---------------------------------------------------------------- routes (people only)

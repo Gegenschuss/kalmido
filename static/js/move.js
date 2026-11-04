@@ -196,10 +196,12 @@ function umzInit(md) {
       }
       if (a === 'undo') {
         // 2.272.0 C (#3027): trash instead of delete, what changed since stays -- the texts say exactly that
-        if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients go to the trash of the clients; the other imported office data, times, habits and journal entries are deleted for good; times billed since stay.'), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 F (#3027, review M6); 2.370.4 (#3089) M6: clients / address books to the trash
+        if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients, files, knowledge pages and tables go to their trash; the other imported office data, times, habits and journal entries are deleted for good. Whatever changed since the import or got something new stays.'), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 F (#3027, review M6); 2.370.4 (#3089) M6: clients / address books to the trash
         const r = await api('POST', `/api/imports/${+b.dataset.id}/undo`);
         toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', r.tasks || 0),
           r.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', r.kept_tasks) : '',
+          r.kept_rows ? trn('{0} entry changed since the import stays', '{0} entries changed since the import stay', r.kept_rows) : '',
+          r.trash_rows ? trn('{0} file, page or table moved to its trash', '{0} files, pages or tables moved to their trash', r.trash_rows) : '',
           r.kept_lists ? trn('{0} project stays because something was added to it', '{0} projects stay because something was added to them', r.kept_lists) : '',
           r.kept_cals || r.kept_books ? trn('{0} calendar or address book stays', '{0} calendars or address books stay', (r.kept_cals || 0) + (r.kept_books || 0)) : ''].filter(Boolean).join('. '));
         if (UMZ.cur?.id) await api('DELETE', `/api/account/import/${UMZ.cur.id}`).catch(() => {});

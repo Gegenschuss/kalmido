@@ -37,10 +37,9 @@ from ..core.access import acx_drop  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..files.scan import sc_needs_retry  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
-from ..core.merges import mg_fk_refs  # 2.370.4 (#3089)
-from ..team.clients import cl_trash  # 2.370.4 (#3089)
 from ..office.model import pb_personal  # 2.369.5 (#2517): pulled up from functions
 from .acctexport import umz_user_conn  # 2.369.5 (#2517): pulled up from functions
+from .umz_undoplan import undo_files_left, undo_key, undo_key_stays, undo_plan, undo_prints, undo_trash  # 2.506.0 (#4299)
 from ..core.orgcrypt import _write_atomic  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -428,33 +427,45 @@ def oi_counts(data):
     return [{"what": k, "count": n} for k, n in out.items()]  # 2.454.0 (#3808): the key, acctimport.umz_areas_tr translates it
 
 
-def oi_undo(c, cr):
-    """Removes the rows this engine created (newest first), then their files. Only tables of SPECS, only rows still in the
-    space they were created in. -> number of rows removed."""
+def oi_undo(c, uid, cr, since, plan):
+    """Removes the rows this engine created (newest first) that the plan lets go (umz_undoplan, #4299: unchanged since the import,
+    nothing new below them, still in their space), the rest of what goes into its trash first, then their files.
+    -> (rows removed, rows of settings that stay)."""
     tables = oi_tables()
     space_cols = {s.table: s.space for s in oi_specs()}
-    n = 0
+    n = kept_keys = 0
     keyed = oi_key_tables()
-    cl_gone, cl_have, cl_kids = _oi_undo_clients(c, cr, space_cols)
+    undo_trash(c, uid, plan)
+    stayed, stay_keys, roots_kept = [], set(), set()
+    for item in cr.get("oi") or []:  # first: a stored file named by a setting that stays stays too
+        if isinstance(item, list) and len(item) == 3 and item[0] in keyed and isinstance(item[1], dict):
+            r = undo_key_stays(c, item[0], item[1], since, cr.get("prints"))
+            if r is not None:
+                stayed.append(r)
+                stay_keys.add((item[0], undo_key(item[1])))
+            elif item[0] == "fs_area_roots":  # the marker of a top folder that stays (umz_undoplan.undo_plan)
+                m = c.execute("SELECT node_id FROM fs_area_roots WHERE ws=? AND area=?", (item[1].get("ws"), item[1].get("area"))).fetchone()
+                if m and plan.stays("fs_nodes", m[0]):
+                    roots_kept.add(undo_key(item[1]))
+    if cr.get("oi_files"):
+        cr["oi_files"] = undo_files_left(c, plan, cr["oi_files"], stayed)
     for item in reversed(cr.get("oi") or []):
         if isinstance(item, list) and len(item) == 4 and item[0] == "doc_fields":
             _oi_undo_options(c, *item[1:])
             continue
         if isinstance(item, list) and len(item) == 3 and item[0] in keyed and isinstance(item[1], dict):
+            if (item[0], undo_key(item[1])) in stay_keys:
+                kept_keys += 1
+                continue
+            if item[0] == "fs_area_roots" and undo_key(item[1]) in roots_kept:
+                continue
             n += _oi_undo_key(c, item[0], keyed[item[0]], item[1], item[2], (space_cols.get(item[0]) or (None,))[0])
             continue
         if not (isinstance(item, list) and len(item) == 3 and item[0] in tables and isinstance(item[1], int)):
             continue
         table, rid, space = item
-        if table == "clients":  # 2.370.4 (#3089) M6: an imported client goes into the client trash (restorable), not for good
-            if rid in cl_gone:
-                cl_trash(c, rid)
-                n += 1
+        if not plan.goes(table, rid):
             continue
-        # review M1: also of a client put into the trash by hand before the undo (it stays there, restorable with them)
-        if table in cl_kids and c.execute(f"SELECT 1 FROM {table} WHERE id=? AND {cl_kids[table]} IN ({','.join('?' * len(cl_have))})",
-                                          (rid, *sorted(cl_have))).fetchone():
-            continue  # its contact persons, data protection sheets ... stay with it (they go with the client for good)
         col = (space_cols.get(table) or (None,))[0]
         if col and col in umz_cols(c, table)[0]:
             if space is None:
@@ -464,32 +475,7 @@ def oi_undo(c, cr):
         else:
             n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
     _oi_undo_pics(c, cr)
-    return n
-
-
-def _oi_undo_clients(c, cr, space_cols):
-    """2.370.4 (#3089) M6: (ids of the imported clients still in their space and not in the trash, ids of those still in their
-    space (also in the trash), {table: client column} of the tables hanging on a client by ON DELETE CASCADE) for oi_undo."""
-    col = (space_cols.get("clients") or (None,))[0]
-    gone, have = set(), set()
-    for item in cr.get("oi") or []:
-        if not (isinstance(item, list) and len(item) == 3 and item[0] == "clients" and isinstance(item[1], int)):
-            continue
-        rid, space = item[1], item[2]
-        if not col:
-            w, a = "", (rid,)
-        elif space is None:
-            w, a = f" AND {col} IS NULL", (rid,)
-        else:
-            w, a = f" AND {col}=?", (rid, space)
-        x = c.execute(f"SELECT deleted_at FROM clients WHERE id=?{w}", a).fetchone()
-        if x:
-            have.add(rid)
-            if x[0] is None:
-                gone.add(rid)
-    if not have:
-        return gone, have, {}
-    return gone, have, {t: k for t, k, d in mg_fk_refs(c, "clients") if d == "c" and t != "clients"}
+    return n, kept_keys
 
 
 def _oi_undo_pics(c, cr):
@@ -597,6 +583,16 @@ def _oi_undo_key(c, table, key, vals, space, col):
     return c.execute(f"DELETE FROM {table} WHERE {where} AND {col}=?", (*args, space)).rowcount
 
 
+def oi_undo_plan(c, cr, since):
+    """2.506.0 (#4299): what the undo of this run may take back (umz_undoplan.undo_plan)."""
+    return undo_plan(c, cr, since, oi_tables(), {s.table: s.space for s in oi_specs()})
+
+
+def oi_prints(c, created):
+    """2.506.0 (#4299): the fingerprints of a finished run (umz_undoplan.undo_prints)."""
+    return undo_prints(c, created, oi_tables(), oi_key_tables())
+
+
 def oi_undo_files(cr):
     roots = [os.path.realpath(ATT_DIR) + os.sep, os.path.realpath(OFFICE_DIR) + os.sep]
     for p in cr.get("oi_files") or []:
@@ -607,5 +603,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files", "oi_undo_plan", "oi_prints",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

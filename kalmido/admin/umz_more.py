@@ -15,7 +15,8 @@ from ..accounts.layouts import clean_layout
 from ..accounts.layoutsets import lyv_key_ok, lyv_save
 from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_STATES, BM_TITLE_MAX, bm_key, bm_norm_url, bm_site, bm_tags
 from ..notify.taskbell import TBL_LEVELS
-from .acctimport import _iso_ts, _oid, _txt, tr, umz_insert, umz_row
+from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
+from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_insert, umz_row
 
 # the parts written here (each also in acctimport.UMZ_READ)
 UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers")
@@ -163,9 +164,11 @@ _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care":
          "task_bell": "task_id", "task_watchers": "task_id"}
 
 
-def umz_more_undo(c, uid, cr):
-    """The rows umz_more_write recorded (a saved arrangement changed since stays: it is the person's own work now; a bookmark goes, its preview fetch changes it too)."""
-    n = 0
+def umz_more_undo(c, uid, cr, since, plan):
+    """The rows umz_more_write recorded -> how many stay (2.506.0 #4299): one changed since the import is the person's own work now.
+    Bookmarks: the plan judges them (their preview fetch writes the time columns) and counts them. A focus session is finished and
+    has no way to change."""
+    kept = 0
     for item in reversed(cr.get("more") or []):
         if not (isinstance(item, list) and len(item) == 2 and item[0] in _UNDO):
             continue
@@ -174,7 +177,16 @@ def umz_more_undo(c, uid, cr):
         v = key.get(col) if isinstance(key, dict) else key
         if not isinstance(v, int):
             continue
-        extra = " AND updated_at<=created_at" if table == "view_layouts" else ""
-        n += c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?{extra}", (v, uid)).rowcount
-    return n
-
+        if table == "bookmarks":
+            if not plan.goes(table, v):
+                continue
+        elif "updated_at" in umz_cols(c, table)[0]:
+            r = c.execute(f"SELECT updated_at, created_at FROM {table} WHERE {col}=? AND user_id=?", (v, uid)).fetchone() if table == "view_layouts" else \
+                c.execute(f"SELECT updated_at FROM {table} WHERE {col}=? AND user_id=?", (v, uid)).fetchone()
+            if r is None:
+                continue
+            if imp_undo_after(r["updated_at"], since) or (table == "view_layouts" and r["updated_at"] > r["created_at"]):
+                kept += 1
+                continue
+        c.execute(f"DELETE FROM {table} WHERE {col}=? AND user_id=?", (v, uid))
+    return kept

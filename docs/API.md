@@ -722,7 +722,9 @@ field, `notes` for the ones without a field). Importing the same file again skip
 into the trash (restorable), its new projects too when nothing else is left in them, its empty sections are removed. Tasks
 changed since the import or with comments, files, time entries or subtasks added since stay, and so do projects with other
 content; answer `{tasks, lists, sections, kept_lists, kept_tasks, trash}` (`tasks` / `lists` = moved into the trash,
-`kept_*` = stayed), `409` when it was undone already or is too old.
+`kept_*` = stayed), `409` when it was undone already or is too old. An account or organisation import treats its other rows the
+same way and adds `kept_rows` (entries that stayed because they changed or got something new since) and `trash_rows` (files,
+knowledge pages and tables moved into their trash).
 Limits: 20 MB and 20,000 tasks per file, 30 imports (previews included) per user within 10 minutes. Nothing inside a
 file is fetched; imports do not send one webhook per task.
 
