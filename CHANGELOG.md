@@ -14,7 +14,47 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.520.0] - 2026-11-04
+## [2.529.0] - 2026-11-04
+
+Package 2.499 (Bündel: Sicherheit: mitgelieferte HEIC-Bibliotheken in pi-, Doku Sicherung: Format 3 (2.432) überall nachziehe, Push: Rückfall von Web Push ).
+
+### Security
+- HEIC / HEIF photos are no longer decoded: `pi-heif` left the image. It is discontinued and its last release bundles libheif 1.23.0 and libde265 1.1.0 with known memory-corruption holes, reachable by uploaded files. iPhone photos are still stored and can be downloaded; they get no preview and no text recognition, and a receipt shows "This server cannot read HEIC photos at the moment" (#4168).
+- On the channel Web Push nothing goes to the public ntfy.sh any more when no device takes a push (before: a neutral message). What writes a News entry has it there; a reminder shows only on its task. An own ntfy server and the channels ntfy and Both are unchanged; see docs/UPGRADING.md. Admin alert and the hints in Settings > Notifications say so (#4215).
+
+### Fixed
+- Phone: the buttons of the selection bar stay at least 44 px wide on the narrowest screens (#3899).
+- Phone: in the side menu area names are never cut with "…": they take the lines they need; when a word does not fit, columns with short names give room, and only if that is not enough the row scrolls sideways (#4047).
+- Backup docs describe format 3 only: an archive alone is not complete, every way by hand and from an off-site target needs the Download or `bkstore.py assemble`; the wrong line about the server key is corrected (#4172).
+
+Package 2.513.0 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Releases are published in two steps (#4354): a version tag builds the image `:X.Y.Z` and the GitHub release without "latest"; the image `:latest` and the latest release, which the installers, `update.sh` and the update check read, move only after that version passed its device test (workflow `promote.yml`, tag `latest-ok/X.Y.Z`). A blocker or a test that could not run leaves them where they were.
+- The installers read the latest version from the forward of `github.com/.../releases/latest` instead of the API, which allows 60 requests an hour per address (#4355).
+### Added
+- Installer: over SSH it prints the ready `ssh -L` command instead of "Open it now"; `KALMIDO_URL=https://...` sets `PUBLIC_URL` in a new or an existing `.env`; at the end it says which address the links use (#4356).
+- Administration > Server: a hint when the page is open on another address than `PUBLIC_URL`, the links in e-mails, push messages and password resets lead there (#4356).
+- docs/SELF-HOSTING.md: section "From localhost to your own address"; "Try it locally" no longer advises a change in `docker-compose.yml`, which the next update overwrites (#4356).
+### Fixed
+- Installer: when GitHub does not answer it stops with a clear message instead of silently installing the unreleased branch `main`; `KALMIDO_VERSION=main` still works when named (#4355).
+- Installer: the fallback `network_mode: bridge` is gone, Compose refused it beside the networks of `docker-compose.yml` and the file blocked every further try. Without a free address range it now names `docker network prune` and `default-address-pools`; the old line leaves the override on the next run (#4358).
+
+Package 2.516 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Undoing an import no longer deletes the stored PDF and XML of a finalised invoice that stays (for example because a payment was booked since): the import notes which document each office file belongs to, older imports are judged by the document number in the file name, and the logo and letterhead copies stay while any remaining document names them (#4364).
+- Undoing an account import keeps an imported calendar or address book that was changed since (for example renamed), no longer keeps every habit with a reminder time by mistake, and leaves sprints, rules and customer tickets alone in a list the person can no longer edit (#4366).
+- Two flaky test suites are stable again and run in CI (#3716, #3717).
+
+Package 2.491 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Agent chat > gear: "Wishes for the replies" - a short text per agent (e.g. "Short answers, no tables"), with quick buttons for short answers, no tables and your language; saved on the server for you and this agent, on every device. Kalmido does not use it itself: it hands the text to the agent as `reply_style` with each of your chat messages, answer buttons and edits, and agents can read it through the agent API (`GET /api/v1/agent/chats/{uid}/reply-style`) and the MCP tool `get_reply_style`; an agent only sees the wishes of people it shares a chat with. The reference agent puts them into its prompt (#2849)
+### Changed
+- Office > client card: the block of documents made from templates is called "Letters & contracts" like its office page, with "No letters or contracts yet." and "New letter or contract"; the block name in the view builder and the area entry follow (#4020)
+- Changelog: closed hundred series of versions move unchanged to docs/changelog/ (links under "Older versions" at the top); the "What's new" section of the README shows only the newest release (#2960)
+
+### Fixed
+- main: the Calendars dialog takes a click on its buttons at once instead of only after the calendars loaded; two test fixes (retention stub, a real login check after the upgrade).
+- main: the MCP tool get_reply_style is in the chat toolset (an agent with --toolsets sees it).
 
 Package 2.508 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
@@ -1022,6 +1062,10 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
 
+## [2.520.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.529.0.
+
 ## [2.518.0] - 2026-11-04
 
 Not released (the CI of this version was red); its changes are listed under 2.520.0.
@@ -1038,7 +1082,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.520.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.529.0...HEAD
+[2.529.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.529.0
 [2.520.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.520.0
 [2.518.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.518.0
 [2.511.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.511.0
