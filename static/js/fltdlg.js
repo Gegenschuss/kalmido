@@ -86,8 +86,8 @@ function flt_vals(c, cs) {
 const flt_sum = (c, cs) => { const on = new Set((c.v || []).map(String)); const n = flt_vals(c, cs).filter(([v]) => on.has(String(v))).map(x => x[1]); return n.length ? n.join(', ') : ''; };
 // a fresh condition for a "what" key
 function flt_new(key) {
-  if (key.startsWith('cfid|')) { const fd = fieldById(+key.slice(5)); const c = {f: 'cf', fid: fd?.id, op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = flt_isList(c) ? [] : ''; return c; }
-  if (key.startsWith('cf|')) { const g = flt_cfGroups().find(x => x.key === key); const c = {f: 'cf', name: g?.name || '', ft: g?.ft || 'select', op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = flt_isList(c) ? [] : ''; return c; }
+  if (key.startsWith('cfid|')) { const fd = fieldById(+key.slice(5)); const c = {f: 'cf', fid: fd?.id, op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = /** @type {any} */ (flt_isList(c) ? [] : ''); return c; }
+  if (key.startsWith('cf|')) { const g = flt_cfGroups().find(x => x.key === key); const c = {f: 'cf', name: g?.name || '', ft: g?.ft || 'select', op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = /** @type {any} */ (flt_isList(c) ? [] : ''); return c; }
   return key === 'text' ? {f: 'text', op: 'has', v: ''} : {f: key, op: 'in', v: []};
 }
 function flt_rowHtml(c, i, cs, groups) {
@@ -95,7 +95,7 @@ function flt_rowHtml(c, i, cs, groups) {
   const std = FLT_WHAT.filter(([k]) => k === c.f || (k !== 'type' || ticketsAny()) && (k !== 'sprint' || sprOn));
   const own = c.fid ? (() => { const fd = fieldById(+c.fid); return fd ? [[key, `${lname(listById(fd.list_id))} › ${fd.name}`]] : []; })() : [];
   const cfo = [...groups.map(g => [g.key, g.label]), ...own];
-  const opt = ([k, n], t = true) => `<option value="${esc(k)}" ${k === key ? 'selected' : ''}>${esc(t ? tr(n) : n)}</option>`;
+  const opt = (/** @type {any} */ [k, n], t = true) => `<option value="${esc(k)}" ${k === key ? 'selected' : ''}>${esc(t ? tr(n) : n)}</option>`;
   const what = `<select class="fc-f" data-i="${i}" aria-label="${esc(tr('Condition'))}">${std.map(x => opt(x)).join('')}${cfo.length ? `<optgroup label="${esc(tr('Custom fields'))}">${cfo.map(x => opt(x, false)).join('')}</optgroup>` : ''}</select>`;
   const ops = `<select class="fc-op" data-i="${i}" aria-label="${esc(tr('Comparison'))}">${flt_ops(c).map(o => `<option value="${o}" ${o === c.op ? 'selected' : ''}>${esc(tr(FLT_OPN[o]))}</option>`).join('')}</select>`;
   const unit = c.fid ? fieldById(+c.fid)?.options?.unit : null;
@@ -136,13 +136,14 @@ function filterModal(id) {
   const r = {op: r0.op === 'or' ? 'or' : 'and'};
   // an old filter opens converted; a condition of a gone field was off and stays out
   const cs = JSON.parse(JSON.stringify(flt_conds(r0))).filter(c => c && (c.f !== 'cf' || (c.fid ? fieldById(+c.fid) : true)));
-  const md = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
+  const md0 = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
     <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
     <div class="row"><label>${tr('Match')}</label><div class="seg" id="f-op"><button data-op="and" class="${r.op !== 'or' ? 'on' : ''}">${tr('AND: all conditions')}</button><button data-op="or" class="${r.op === 'or' ? 'on' : ''}">${tr('OR: any one')}</button></div></div>
     <div id="f-conds" class="fconds" role="group" aria-label="${esc(tr('Conditions'))}"></div>
     <div><button type="button" class="btn sm" data-m="cond-add">${ic('plus', 's')} ${tr('Condition')}</button></div>
     <div class="muted" id="f-count" role="status" style="font-size:var(--fs-m);margin-top:.875rem"></div>
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  const md = /** @type {any} */ (md0);  // $() / $$() are typed for a Document root
   md.classList.add('fltdlg');
   const rules = () => ({op: r.op, conds: cs.filter(c => flt_cond(c)).map(c => ({...c}))});
   const count = () => {

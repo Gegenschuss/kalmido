@@ -234,13 +234,20 @@ def docs_run_once():
         c.close()
 
 
+def _replicas():
+    """KALMIDO_REPLICAS as admin/worker.py WRK_REPLICAS reads it (read here: that module is a layer above and imports this one)."""
+    try:
+        return max(1, int(os.environ.get("KALMIDO_REPLICAS", "") or 1))
+    except ValueError:
+        return 1
+
+
 def docs_take_up(c):
     """2.521.0 E (#4475): runs cut off by a restart go back to wait at once instead of after RUN_STALE minutes: the one this
     thread lost when the database went away (an OOM restart of Postgres ends every connection; only this process ran it),
     and at the first step of a process that is the only one with a docs queue (KALMIDO_REPLICAS 1) every running row (the
     process before it is gone). A failure leaves the marks for the next step."""
-    from ..admin.worker import WRK_REPLICAS  # here: admin/worker.py imports this module
-    every = _Q["first"] and WRK_REPLICAS == 1
+    every = _Q["first"] and _replicas() == 1
     lost = _Q["lost"]
     if not every and not lost:
         return

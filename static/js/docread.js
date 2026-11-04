@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: Documents, the reading view and the widths of the pane (2.521.0, #4476, includes #4399).
    Computer only (a window of 64rem and more; phones and narrow windows stay as they were): the button "Read" in the bar of
    the list turns the open document's pane into the main part of the page - the list becomes a narrow column (sender, date,
@@ -138,7 +139,7 @@ async function dcr_pvDraw(md, d) {
 // the pages get their final size before they are drawn (no jumps): the width of the box times the zoom
 function dcr_layout(box, keep, force) {
   if (!box?.isConnected || !box._base) return;
-  const cs = getComputedStyle(box), avail = Math.max(160, box.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0) - 2);
+  const cs = getComputedStyle(box), avail = Math.max(160, box.clientWidth - parseFloat(cs.paddingLeft || '0') - parseFloat(cs.paddingRight || '0') - 2);
   if (!force && !keep && Math.abs((box._aw || 0) - avail) < 2) return;
   box._aw = avail;
   const fit = Math.min(2, avail / Math.max(...box._base.map(b => b.w))), s = fit * DCR.rz, top = box.scrollTop / Math.max(1, box.scrollHeight);
@@ -171,11 +172,11 @@ async function dcr_page(pdf, p) {
 }
 // Ctrl / Cmd + wheel and + / - / 0 on the preview zoom it
 document.addEventListener('wheel', e => {
-  const box = e.target.closest?.('.dc-pane .dc-rv'); if (!box || !(e.ctrlKey || e.metaKey)) return;
+  const box = /** @type {any} */ (e.target).closest?.('.dc-pane .dc-rv'); if (!box || !(e.ctrlKey || e.metaKey)) return;
   e.preventDefault(); dcr_zoom(box.closest('.dc-md'), DCR.rz * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
 }, {passive: false});
 document.addEventListener('keydown', e => {
-  const box = e.target.closest?.('.dc-pane .dc-rv'); if (!box || e.altKey || e.ctrlKey || e.metaKey) return;
+  const box = /** @type {any} */ (e.target).closest?.('.dc-pane .dc-rv'); if (!box || e.altKey || e.ctrlKey || e.metaKey) return;
   const md = box.closest('.dc-md'), k = e.key;
   if (k === '+' || k === '=') { e.preventDefault(); dcr_zoom(md, DCR.rz * 1.25); } else if (k === '-') { e.preventDefault(); dcr_zoom(md, DCR.rz / 1.25); } else if (k === '0') { e.preventDefault(); dcr_zoom(md, 1); }
 });
@@ -203,7 +204,7 @@ function dcr_gripNow(which) {  // the width it sets, as it stands
   return $('.dc-props', wrap)?.getBoundingClientRect().width || 0;
 }
 document.addEventListener('pointerdown', e => {
-  const gr = e.target.closest?.('[data-dcgrip]'); if (!gr || e.button !== 0) return;
+  const gr = /** @type {any} */ (e.target).closest?.('[data-dcgrip]'); if (!gr || e.button !== 0) return;
   e.preventDefault();
   const which = gr.dataset.dcgrip;
   DCR.drag = {which, x0: e.clientX, w0: dcr_gripNow(which), px: null};
@@ -223,9 +224,9 @@ function dcr_dragEnd() {
 }
 document.addEventListener('pointerup', dcr_dragEnd);
 document.addEventListener('pointercancel', dcr_dragEnd);
-document.addEventListener('dblclick', e => { const gr = e.target.closest?.('[data-dcgrip]'); if (gr) { e.preventDefault(); dcr_gripSet(gr.dataset.dcgrip, null); } });
+document.addEventListener('dblclick', e => { const gr = /** @type {any} */ (e.target).closest?.('[data-dcgrip]'); if (gr) { e.preventDefault(); dcr_gripSet(gr.dataset.dcgrip, null); } });
 document.addEventListener('keydown', e => {
-  const gr = e.target.closest?.('[data-dcgrip]'); if (!gr) return;
+  const gr = /** @type {any} */ (e.target).closest?.('[data-dcgrip]'); if (!gr) return;
   const which = gr.dataset.dcgrip, step = (e.shiftKey ? 4 : 1) * dcr_rem(), sign = which === 'list' ? 1 : -1;
   if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); dcr_gripSet(which, dcr_gripNow(which) + (e.key === 'ArrowRight' ? step : -step) * sign, true); }
   else if (e.key === 'Home' || e.key === 'Delete') { e.preventDefault(); dcr_gripSet(which, null); }
