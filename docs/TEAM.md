@@ -77,7 +77,7 @@ Book crew and equipment for shoot days and see who and what is free.
 - **Week grid** with one row per resource (phones: a project per day), **Who is free on ...?** for a single day.
 - **My bookings** lists your own bookings; a firm booking also shows up in your News (event "assigned to me", with
   its usual switch in the notification settings).
-- Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone.
+- Changing or deleting a booking applies to the whole job (one shoot day); deleting can be undone. A member changes only their own bookings of a job (the others stay as they are); deleting a job that holds other people's bookings needs an admin.
 - **Export (2.141.0):** the buttons *CSV* and *ICS* next to *Book* download the bookings the view shows (same period, filter and
   organisation). CSV: resource, kind, booking, project, status, start, end, hours (timed bookings only), note. ICS: one event per
   booking, whole days as all-day events, an option as tentative. Your own bookings also appear in your calendar.
@@ -253,7 +253,7 @@ questions stays the classic form.
   A running timer of that month has to be stopped first. *Reopen* unlocks it again as long as nobody approved it.
 - **Approval in an organisation.** The admins of your organisation get a News item (and a push) and see your closed month
   under *Timesheets of your team*, with the hours on the organisation's projects (never your private time). They *Approve* it
-  or *Send back* with a note: then the month is open again and you get the note. An approved month only an admin reopens.
+  or *Send back* with a note: then the month is open again and you get the note. An approved month only an admin reopens (after leaving the organisation the person reopens their own sheet; an admin's own sheet needs a second admin to approve it when there is one).
   Members cannot decide, admins of another organisation never see it. Every step is one Undo step.
 - **Without an organisation** you are your own admin: closing locks the month, there is no approval step, you reopen it
   yourself.
@@ -522,7 +522,7 @@ a live link carries a link badge; the details list every link with views and the
 **New link** (the old address stops at once) and **Revoke** (one undo step brings the same address back).
 
 Only who may share the item (its owner, an organisation's admins) makes a link; agents never do, and folders of agents,
-linked task files and items in the trash cannot be shared outside. A link stops working at once when it expires, is
+linked task files, locked folders, folders of the knowledge areas and items in the trash cannot be shared outside. A link stops working at once when it expires, is
 revoked, the item or a folder above it goes into the trash or into another workspace, the person who made it can no
 longer share it (left the organisation, no longer admin), the organisation's admin turns off **Allow external share
 links** (Settings > Organisation > People; nothing is deleted, turning it on brings the links back) or the server's admin turns off
@@ -626,9 +626,9 @@ of the same organisation (or the same personal office) whose e-mail or e-mail fo
 - **Getting in.** In the client's menu (*More*) **Send portal link** mails the client the same one-time sign-in link
   (30 minutes, once; then signed in for 7 days) to the e-mail for invoices, else the e-mail. No account, no password;
   at most three links per address and hour.
-- **What the customer never sees:** drafts, invoices that were finalised but not sent yet, reminders, internal notes,
+- **What the customer never sees:** drafts, invoices that were finalised but not sent yet (a paid invoice shows even if it was never sent), reminders, internal notes,
   purchase prices, documents of other clients - and nothing of another organisation, even with the same address.
-- Switched off (or public links off on the server), the portal is exactly as before.
+- Switched off with the document switch, the portal is exactly as before. With public links off on the server (or the portal's own switch off there, see SELF-HOSTING.md) the status links and the sign-in are gone altogether.
 
 <a id="a-task-in-several-lists-2710"></a>
 
@@ -668,7 +668,7 @@ workspace).
   its owner.
 - A change made by a rule never starts another rule, so two rules cannot play ping-pong.
 - The history of the task and the comment show "Rule <name>".
-- Health projects, the basket and locked projects have no rules. Copying a project or making a template does not copy its rules.
+- Health and budget projects, the basket and locked projects have no rules. Copying a project or making a template does not copy its rules.
 - Agents read rules and can only propose one; the owner or an admin accepts it with 👍.
 
 2.138.0 adds three triggers and three actions:
@@ -833,7 +833,7 @@ The group no longer grows with every person you share a project with:
   logo, the stored PDFs and XML) and the own files go, the inbox goes with its attachments, the person's own agents go
   with their access keys. What belongs to others stays: time entries in projects of an organisation (without the
   person's name), calendars of an organisation (to an admin of the organisation, as when leaving it), direct
-  conversations (for the other person). Mentions of the person read "@Deleted user"; the histories keep no id of it.
+  conversations (for the other person). Mentions of the person read "@Deleted person"; the histories keep no id of it.
 - **What the account shares privately stays (2.508):** before an account is deleted, its private calendars, address books, tables
   and the knowledge pages somebody else may write go to the person who has had the right to write them longest (a share of a
   folder they lie in counts; never an agent, a child account or a disabled account). Others keep their shares; read-only shares
@@ -855,7 +855,7 @@ The group no longer grows with every person you share a project with:
   the agents, calendars, time entries and conversations.
 
 API for scripts of the web app (session): `GET /api/admin/orgs/{id}/delete-info` answers `{content, kept, retain_until,
-kept_until, retired, projects, files, can_export}`; `DELETE /api/admin/orgs/{id}` answers 409 with these numbers while
+kept_until, retired, lists, members, notice, more, files, can_export, can_retention}`; `DELETE /api/admin/orgs/{id}` answers 409 with these numbers while
 content would go along or the organisation must be retired, `?confirm=1` deletes or retires it (`{retired: true,
 retain_until}`); `GET /api/admin/orgs` adds `retired_at`, `retain_until`, `retired_personal`; `GET /api/orgs` adds `retired` (2.186.0:
 `[{id, name, retain_until}]`, the retired organisations the caller was an admin of); `GET /api/users/{id}/delete-info`
@@ -926,7 +926,7 @@ Notifications can also go to a chat service, as a short text with the link to th
   Never a project shared only with some people, never a private area, never another organisation; a project with end-to-end
   encryption shows only the neutral word. When the admin who set a channel up is no admin any more, it turns itself off; an
   admin who switches it on again owns it.
-- **The address is a secret:** stored encrypted, never shown again (only the service, the name and the last characters).
+- **The address is a secret:** stored encrypted, never shown again (only the service, the name and the last characters; with Slack, Matrix and Signal also the host name).
   Editing leaves it unchanged unless you type a new one.
 - **Your own changes:** *Changes in my own projects* leaves out what you did yourself; tick *Including my own changes* to get
   those too. An inbound webhook and a rule count as news, even though they act in your name. An organisation's channel is a
