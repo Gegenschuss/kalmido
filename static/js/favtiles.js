@@ -166,7 +166,7 @@ function fv2_fit() {
   more.classList.toggle('on', FV2.over.some(x => x.classList.contains('on')));
 }
 function fv2_moreMenu(b) {
-  menu(b, FV2.over.filter(x => x.classList.contains('fv2-tile')).map(x => ({label: x.getAttribute('aria-label'), icon: 'star', on: x.classList.contains('on'), fn: () => x.click()})), null, null, tr('Favourites'));
+  menu(b, [...FV2.over.filter(x => x.classList.contains('fv2-tile')).map(x => ({label: x.getAttribute('aria-label'), icon: 'star', on: x.classList.contains('on'), fn: () => x.click()})), ...fv2_onlyItem()], null, null, tr('Favourites'));
 }
 try { new ResizeObserver(() => fv2_fit()).observe(document.documentElement); } catch { /* an old engine: fitted at each draw */ }
 // the page "Favourites" (the tab of a phone; #favorites)
@@ -205,7 +205,7 @@ async function fv2_open(b) {
 function fv2_sideHtml(lists, head) {
   const side = fv2_sideOn(), sv = sv_tilesHtml(), ts = side ? fv2_tiles().filter(t => !t.sep) : [];
   if (side) fv2_fetch();  // the names of the objects (quotations, pages, files) come from the server
-  if (!favAny() && !ts.length) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
+  if (sbb_on() || (!favAny() && !ts.length)) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
   const only = favOnly(), lab = tr('Only favourites');  // 2.441.0 (#3592): the tiles moved into the head bar
   const acts = favAny() ? `<button type="button" data-fav-only class="${only ? 'on' : ''}" aria-pressed="${only}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('filter', 's')}</button>` : '';
   const rows = ts.length && sideOpen('favs') ? `<div class="fv2side" role="group" aria-label="${esc(tr('Favourites'))}">${ts.map(fv2_rowHtml).join('')}</div>` : '';
@@ -284,6 +284,8 @@ const fv2_topItems = () => isMobile() ? fv2_menuRow(fv2_routeKey()) : [];
 // the entry for a row's menu
 const fv2_menuRow = key => !key ? [] : fv2_is(key) ? [{label: tr('Remove from favourites'), icon: 'star', fn: () => fv2_set(key, false)}]
   : [{label: tr('Add to favourites'), icon: 'star', fn: () => fv2_set(key, true)}];
+// 2.521.0 (#4396): "Only favourites" lives in the head bar's menus (the sidebar shows no section "Favourites" then); same setting as [data-fav-only]
+const fv2_onlyItem = () => !favAny() ? [] : ['-', {label: tr('Only favourites'), icon: 'filter', on: favOnly(), fn: () => favSetting('fav_only', favOnly() ? '0' : '1')}];
 // a tile's menu: open, move (WCAG 2.5.7: arranging without dragging), remove
 function fv2_tileMenu(b) {
   const key = b.dataset.fv2, box = b.closest('.fv2bar, .fv2side'), sh = box ? $$('[data-fv2]', box).map(x => x.dataset.fv2) : [], i = sh.indexOf(key), col = !!box?.classList.contains('fv2side'); if (i < 0) return;
@@ -296,7 +298,8 @@ function fv2_tileMenu(b) {
     ...(col ? [] : [{label: tr('Add a divider'), icon: 'minus', fn: () => fv2_sepAdd(key)}]), '-',  // 2.489.0 (#4014): the sidebar's entries show no dividers
     lp_menuRow(m.c || '', c => fv2_metaSet(key, {c})),
     {label: tr('Symbol…'), icon: m.i || 'star', more: [{label: tr('Default'), on: !m.i, fn: () => fv2_metaSet(key, {i: ''})}, ...FV2_ICONS.map(x => ({label: tr(x[1]), icon: x[0], on: m.i === x[0], fn: () => fv2_metaSet(key, {i: x[0]})}))]},
-    '-', {label: tr('Remove from favourites'), icon: 'star', fn: () => fv2_set(key, false)}]);
+    '-', {label: tr('Remove from favourites'), icon: 'star', fn: () => fv2_set(key, false)},
+    ...(col ? [] : fv2_onlyItem())]);
 }
 // a row without a menu of its own (Plan, views, areas, filters, tags, people, groups, agents): a small one with the star
 function fv2_rowMenu(r) {

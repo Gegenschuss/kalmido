@@ -100,6 +100,8 @@ function dt_abBody(sp) {
     ${items ? `<span class="tsfn" aria-live="polite">${esc(trn('{0} hit', '{0} hits', items.length))}${r.more ? '+' : ''}</span>` : ''}<button type="button" class="linkbtn" data-dtab="clear">${tr('Reset filters')}</button></div>`;
   if (!items) return bar + `<p class="muted lempty">${tr('Loading…')}</p>`;
   if (!items.length) return bar + `<div class="empty abempty">${ic('tag')}<span>${tr('No files with these tags')}</span></div>`;
+  // 2.521.0 (#4398): a filter never changes the chosen view: a folder / space shown as cards stays cards while tags filter it
+  if (typeof abd_cardsOn === 'function' && typeof abd_cardsHtml2 === 'function' && abd_cardsOn(ab_key(S.route))) return bar + abd_cardsHtml2({items});
   return bar + `<div class="ablist" role="list">${items.map(n => ab_rowHtml(n, false)).join('')}</div>`;
 }
 const dt_abItem = id => (DT_AB.res?.items || []).find(x => x.id === +id) || null;
