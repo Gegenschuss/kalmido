@@ -14,6 +14,38 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.535.0] - 2026-11-04
+
+Package 2.517 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Project page, project files: the search text and its filter stay when the page redraws (a live update showed all files again while the field still held the text) (#3586).
+- Tables with several sheets: Undo right after "+" while the new sheet is still loading goes back to the previous sheet with the bar of two sheets; a late load no longer replaces the open sheet (#3714).
+- Tests: p2331_a_ui waits for the new page after a reload (the cause of its flake), p2124_e_ui waits for the Undo step instead of a fixed pause; p2331_a_ui, p2124_e_ui and p1_ui leave tests/skip.txt (#3586, #3714, #4012).
+
+Package 2.522 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-Plan: Zeiten abgebrochener Shards nicht einplan, CI-only rot: p2151_ui, Sa).
+### Added
+- Documents: for a person with an office, the general input (upload without a target, the share menu, a mail to the own document address) sorts after recognition: a recognised invoice (e-invoice, invoice number, net amount or VAT rate) goes into the office, everything else and every doubt stays private; nothing becomes a receipt by itself. An organisation's office receives automatically only from its admins (members could not take a file out again), members get "Move to office". Bound inputs (scan inbox, receipt fetcher, an organisation's address, uploads into a chosen workspace, office uploads) are never re-sorted (#4433).
+- Documents: the private file store offers "Move to office" instead of "Record as receipt"; a sorted document has "Wrong area" (one click, undo); the file store list shows no receipts and office documents; Office > Receipts has a block "New in the office" (#4433).
+### Fixed
+- Knowledge pages: a diagram's own `%%{init}%%` can no longer switch HTML labels back on or bring its own CSS, font or sanitizer settings; Mermaid locks these keys too (#4170).
+- Documents: a scan that waits to be split into letters (a stack) no longer offers a "Recognised" suggestion, an invoice number, receipt hints or a duplicate warning mixed from several letters; one line says the values are recognised per letter after splitting. Taking values over, "Record as receipt" and reading with an agent are off for such a stack; "No stack" brings everything back (#4468).
+- Tests: p271_ui checks the project status that #3379 keeps on purpose and runs in the CI again (#4326).
+
+### Changed
+- Public repository tidied: no internal tool names in comments, a stray backup file removed (`*~` is ignored now), docs/ENV.md lists every variable the server reads (retention periods and switches, `KALMIDO_SPLIT_PAGES`; `tools/env_check.py` also sees helpers called through a module), current numbers in CONTRIBUTING, ARCHITECTURE, the MCP README and the third-party notices (#4180).
+
+Package 2.527 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Offline conflicts from moving or editing several tasks at once now name the right task, and "Use mine" saves it to that task instead of failing (#4304).
+- Knowledge pages: text typed just before the tab is closed or reloaded is no longer lost; in an encrypted space only the encrypted text is kept and sent. A text the server refuses (no right, too large) stays at the page as a draft with "Compare" (#4304).
+- Ended session: input in the client dialog, comment drafts, the project dialog and the settings is kept and comes back after signing in again (#4304).
+- Signing in with another account on the same device first downloads the previous account's unsynced changes and conflict copies as a text file (#4304).
+- Installer: a failed download of a release's checksum list stops the installer instead of continuing unchecked (only releases before 2.277, which have no list, go on with a note); the Windows installer checks for Compose 2.20 and accepts a relative or ~ install folder (#4312).
+- main red: p2391_b_toolsets was already fixed on main, suite checked green again (#4493).
+### Changed
+- The installers say exactly what they check: the prebuilt image is pinned to the release digest; the source is compared with SHA256SUMS on the tarball/zip way, not when it comes via git (#4312).
+- API: the token dialog's help, the OpenAPI description and docs/API.md say everything the scope "read" opens (team chat with direct messages, clients with amounts, absences, family, home & life, video sign-offs and more); corrected defaults and answers (time_tracking, DELETE /lists, from-events, archived, address book trash); the outdated closing section is gone; the link check reports a code block left open (#4313).
+
 ## [2.532.0] - 2026-11-04
 
 Package 2.521 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -1118,7 +1150,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.532.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.535.0...HEAD
+[2.535.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.535.0
 [2.532.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.532.0
 [2.529.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.529.0
 [2.520.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.520.0
