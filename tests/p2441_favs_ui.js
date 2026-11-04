@@ -159,7 +159,8 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     check(fit.vis > 0 && fit.text === '+' + fit.hid && fit.in, '+N counts what is hidden and stays inside the row ' + JSON.stringify(fit));
     check(await ev(GEO) === g2, 'the others do not shrink: ' + g2 + ' / ' + await ev(GEO));
     await ev(`(() => { document.querySelector('#kbar .fv2-more').click(); return 1; })()`);
-    check(await ready(ev, `document.querySelectorAll('.menu-list [role="menuitem"]').length === ${fit.hid}`), '+N lists the rest');
+    // 2.521.0 (#4396): the +N menu ends with "Only favourites" (it moved out of the sidebar), so the rest is one item less
+    check(await ready(ev, `document.querySelectorAll('.menu-list [role="menuitem"]').length === ${fit.hid} + 1`), '+N lists the rest (and Only favourites)');
     await shot('p2441-more.png');
   }, false);
   // frida: no organisation; a gone favourite is counted
