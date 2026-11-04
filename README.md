@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.506.0** (2026-11-04):
-- **Import**: Linear (API key or CSV export), Jira CSV with type, story points and sprint, GitHub / GitLab issues through a connected repository; undo no longer removes work done since the import.
-- **Git connection**: optional two-way sync of GitHub / GitLab issues (newer change wins, the other version stays in the history).
-- **Backups and restore**: the restore dialog shows what would be deleted again and offers to keep it.
-- **Hosting and office**: stricter support access and office rights.
+**2.525.0** (2026-11-04):
+- **Releases**: a new version is published in two steps; `:latest` and the latest release follow only after its device test.
+- **Installer**: `KALMIDO_URL=https://...` sets `PUBLIC_URL`; over SSH it prints the tunnel command.
+- **Agents**: per-agent "Wishes for the replies" in the agent chat.
+- **Security**: HEIC photos are stored but no longer decoded.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -74,6 +74,9 @@ The same without the website:
 ```sh
 curl -fsSL https://github.com/Gegenschuss/kalmido/releases/latest/download/install.sh | sh
 ```
+
+`KALMIDO_URL=https://... ` in front of `sh` sets `PUBLIC_URL`; on a server over SSH the installer prints the tunnel command
+(see docs/SELF-HOSTING.md, "From localhost to your own address").
 
 <details>
 <summary><b>Install by hand (git clone, or the prebuilt image)</b></summary>
@@ -240,7 +243,7 @@ How to update depends on how you installed:
 |---|---|
 | the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: `update.ps1` also makes a `pg_dump` into `data/backups/`), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
-| git + local build | `git fetch --tags && git checkout "$(git tag --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
+| git + local build | `git fetch --tags && git checkout "$(git tag -l 'latest-ok/*' --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (takes the newest tested version; a `v*` tag can be newer; 2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
 
 Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; going back is limited: see docs/UPGRADING.md (what each version needs, format limits, never below 2.149).
 
@@ -263,7 +266,7 @@ stays empty. Otherwise the server creates a key once and from then on encrypts o
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:X.Y.Z` and its GitHub release appear after the CI of that version is green; the image `:latest` and the latest release follow after its device test.
 
 </details>
 
@@ -308,7 +311,7 @@ project). You type `RESTORE` to confirm. Kalmido then:
 5. ends every session except yours (you get a fresh one; with single sign-on nothing changes). The backup settings
    (`bk_` keys) stay as they are.
 
-Restoring the safety backup undoes a restore. Without the app: see *Moving to a new server* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
+Restoring the safety backup undoes a restore. Without the app (a backup archive alone is not complete: files from 64 KiB on lie once in `backups/.store`, so start with the Download or `bkstore.py assemble`): see *Moving to a new server* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)
 (`pg_restore` of `kalmido.dump`, attachments unzipped into `./data`, `office/` into `./data/office`, `PGOPTIONS="-c app.role=system"`).
 
 </details>
