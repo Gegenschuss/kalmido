@@ -133,6 +133,7 @@ OWN_ROUTES = {
     "GET /api/office/trips", "POST /api/office/trips", "PATCH /api/office/trips/<int:tid>", "DELETE /api/office/trips/<int:tid>",
     "POST /api/office/trips/<int:tid>/items", "PATCH /api/office/trips/<int:tid>/items/<int:iid>",
     "DELETE /api/office/trips/<int:tid>/items/<int:iid>", "GET /api/office/trips/purposes",
+    "POST /api/office/trips/trash/<int:tid>/restore",  # 2.530.0 C (#4315): the undo of deleting (office/travel.py rk_trash_restore)
     "GET /api/office/vehicles", "GET /api/office/drives", "POST /api/office/drives", "PATCH /api/office/drives/<int:did>",
     "DELETE /api/office/drives/<int:did>", "POST /api/office/drives/<int:did>/restore", "GET /api/office/drives/<int:did>/log",
     "GET /api/office/meals", "GET /api/office/meals/choices", "GET /api/office/meals/<int:mid>", "POST /api/office/meals",

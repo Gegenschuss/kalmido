@@ -120,7 +120,7 @@ function rk_rowMenu(id, anchor) {
       if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', label), '', {ok: tr('Delete'), danger: true})) return;
       try {
         const j = await api('DELETE', `/api/office/trips/${t.id}`); rk_reload();
-        toast(tr('Deleted'), async () => { await api('POST', '/api/office/trips', j.trip); rk_reload(); });
+        toast(tr('Deleted'), async () => { await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); });  // 2.530.0 C (#4315): from the office trash
       } catch (x) { toast(x.message || tr('unknown')); }
     }} : null]);
 }
@@ -252,7 +252,7 @@ function rk_tripModal(t) {
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', t.dest || rk_span(t)), '', {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/trips/${t.id}`); md.remove(); RK.open = null; rk_reload();
-        toast(tr('Deleted'), async () => { await api('POST', '/api/office/trips', j.trip); rk_reload(); });
+        toast(tr('Deleted'), async () => { await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); });  // 2.530.0 C (#4315): from the office trash
         return;
       }
       const v = id => $(id, md)?.value ?? '';
@@ -300,7 +300,7 @@ function rk_itemModal(t, i) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/trips/${t.id}/items/${i.id}`); md.remove(); rk_reload();
-        const o = j.item; toast(tr('Deleted'), async () => { await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no}); rk_reload(); });
+        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_reload(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no}); rk_reload(); });
         return;
       }
       const v = id => $(id, md)?.value ?? '';

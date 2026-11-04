@@ -16161,5 +16161,6 @@
   "Your change was not saved ({0}): your text waits here": "Deine Änderung ist nicht gespeichert ({0}): dein Text wartet hier",
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Die Anmeldung mit einem anderen Konto löscht sie von diesem Gerät, vorher wird eine Kopie als Textdatei heruntergeladen. Abbrechen meldet wieder ab: dann kann sich das vorige Konto anmelden und sie senden.",
   "Your unsaved input is back": "Deine noch nicht gespeicherte Eingabe ist wieder da",
-  "Unsaved input of a dialog was kept: open the dialog again to finish it": "Eine noch nicht gespeicherte Eingabe in einem Dialog wurde behalten: öffne den Dialog erneut, um sie abzuschließen"
+  "Unsaved input of a dialog was kept: open the dialog again to finish it": "Eine noch nicht gespeicherte Eingabe in einem Dialog wurde behalten: öffne den Dialog erneut, um sie abzuschließen",
+  "An archive import can only be undone within 24 hours of its import.": "Ein Archiv-Import lässt sich nur innerhalb von 24 Stunden nach dem Import rückgängig machen."
 }

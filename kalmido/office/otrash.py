@@ -8,7 +8,8 @@ they are. GET /api/office/trash lists the trash of the office area, POST .../<id
 old ids (a number taken since is left empty, a reference emptied since is set again only where it is still empty),
 DELETE .../<id> (the app asks first) deletes one copy for good. After the trash period (ret_days("trash"), at least one day)
 files/trashpurge.py tp_tick calls otb_tick: it counts, and deletes the copies while ret_on("trash") is on.
-Booked / sent documents never come here: they stay locked (legal retention)."""
+Booked / sent documents never come here: they stay locked (legal retention). 2.530.0 C (#4315): also a finalised quotation
+that was never sent (deleting it is allowed, bga_offer_block), trips and travel receipts (kinds trip / trip_item, office/travel.py)."""
 import base64
 import json
 from datetime import timedelta
@@ -58,6 +59,8 @@ def otb_snap(c, table, ids, out=None, depth=0):
         return out
     out["rows"].append([table, [{k: _val(r[k]) for k in r.keys()} for r in rows]])
     for child, col, kind in otb_refs(c, table):
+        if "id" not in table_columns(c, child):  # 2.530.0 C (#4315): a link table without an id (life_trip_costs -> office_trips)
+            continue  # cannot be pointed at by id: its reference stays emptied after a restore
         for pid in [r["id"] for r in rows]:
             got = [x[0] for x in c.execute(f"SELECT id FROM {child} WHERE {col}=?", (pid,)).fetchall()]
             if not got:
@@ -165,6 +168,9 @@ def otb_restore_route(tid):
     _need_kind(c, uid, oid, tid)
     t0 = c.execute("SELECT deleted_at FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     kind, ref = otb_restore(c, oid, tid)
+    if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
+        from .travel import rk_trash_check
+        rk_trash_check(c, oid, kind, ref)
     if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
         since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
         for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",

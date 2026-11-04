@@ -16161,5 +16161,6 @@
   "Your change was not saved ({0}): your text waits here": "Je wijziging is niet opgeslagen ({0}): je tekst wacht hier",
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Aanmelden met een ander account verwijdert ze van dit apparaat, eerst wordt een kopie als tekstbestand gedownload. Annuleren meldt weer af: het vorige account kan zich dan aanmelden en ze versturen.",
   "Your unsaved input is back": "Je niet-opgeslagen invoer is terug",
-  "Unsaved input of a dialog was kept: open the dialog again to finish it": "Niet-opgeslagen invoer van een dialoogvenster is bewaard: open het dialoogvenster opnieuw om het af te maken"
+  "Unsaved input of a dialog was kept: open the dialog again to finish it": "Niet-opgeslagen invoer van een dialoogvenster is bewaard: open het dialoogvenster opnieuw om het af te maken",
+  "An archive import can only be undone within 24 hours of its import.": "Een archiefimport kan alleen binnen 24 uur na de import ongedaan worden gemaakt."
 }

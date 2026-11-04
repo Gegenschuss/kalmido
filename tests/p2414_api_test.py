@@ -27,6 +27,7 @@ import subprocess
 import time
 import uuid
 import zipfile
+from datetime import timedelta, timezone
 
 import kt
 from kt import B, CT, FAILS, OKS, check, sess
@@ -68,6 +69,10 @@ Y1, Y2, YOLD = NOW - 7, NOW - 6, NOW - 12  # two archived years; YOLD is past it
 
 def sql(q, args=()):
     return kt.dbx(q, args)
+
+
+def _ago(**kw):  # 2.530.0 (#4315): a stored time (core/db.py iso) that far back
+    return (testclock.now() - timedelta(**kw)).astimezone(timezone.utc).isoformat(timespec="seconds")
 
 
 def head(cat, name, ver, fy, frm="", to=""):
@@ -328,6 +333,19 @@ check(OLDFILE not in ls and "bka-" in ls, f"the old file is gone from the disk, 
 check(sql("SELECT COUNT(*) FROM office_bookarch WHERE org_id=?", (ORG,))[0][0] == 7, "the younger years stay")
 
 # ---------------------------------------------------------------- undo
+# 2.530.0 (#4315): the undo works within 24 hours of the import only and keeps the files on disk until the trash period ended
+RUNFILES = [x[0] for x in sql("SELECT file FROM office_bookarch_files WHERE run_id=? UNION ALL SELECT file FROM office_bookarch_docs WHERE run_id=?",
+                              (RUN, RUN))]
+r = up(A, BA + "/import", [("late.csv", extf21(Y2, [("7,00", "S", "1200", "8400", "0303", "L-1", "Spaet", "")]))])
+LATE = r.json().get("run_id")
+sql("UPDATE office_import_runs SET created_at=? WHERE id=?", (_ago(hours=25), LATE))
+r = A.post(B + BA + f"/runs/{LATE}/undo")
+check(r.status_code == 409 and "24" in r.text and sql("SELECT COUNT(*) FROM office_bookarch WHERE run_id=?", (LATE,))[0][0] == 1,
+      "2.530.0 (#4315): an archive run older than 24 hours cannot be undone (409, its lines stay) " + r.text[:200])
+r = Er.post(B + O + f"/legacy/runs/{LATE}/undo")
+check(r.status_code == 404, "the late run: another office 404")
+r = A.post(B + O + f"/legacy/runs/{LATE}/undo")
+check(r.status_code == 409, "the late run: the import page's undo refuses it too " + r.text[:200])
 r = A.post(B + BA + f"/runs/{RUN}/undo")
 check(r.ok and r.json()["removed"]["bookings"] == 7 and r.json()["removed"]["docs"] == 1 and r.json()["removed"]["master"] == 1,
       "undo: lines, receipt and the DATEV run of the master data " + r.text[:300])
@@ -337,6 +355,19 @@ check(A.get(B + BA + f"/files/{fid}").status_code == 404 and A.get(B + BA + f"/d
 check("10001" not in {x.get("customer_no") or (x.get("billing") or {}).get("customer_no") for x in A.get(B + "/api/clients").json()["clients"]},
       "undo: the client of the master data is gone")
 check(A.post(B + BA + f"/runs/{RUN}/undo").status_code == 409, "a second undo 409")
+DIRLS = f"import os\nfrom kalmido.core.config import OFFICE_DIR\nprint(' '.join(os.listdir(os.path.join(OFFICE_DIR, '{ORG}'))))"
+ls = box(DIRLS)
+check(RUNFILES and all(f in ls for f in RUNFILES), f"2.530.0 (#4315): the undo keeps the run's files on disk until the trash period {RUNFILES}")
+check('"trash_files"' in sql("SELECT detail FROM office_import_runs WHERE id=?", (RUN,))[0][0], "the run remembers them")
+box(TICK, on=True)
+check(all(f in box(DIRLS) for f in RUNFILES), "a run undone within the trash period keeps its files at the run")
+sql("UPDATE office_import_runs SET undone_at=? WHERE id=?", (_ago(days=40), RUN))
+box(TICK)
+check(all(f in box(DIRLS) for f in RUNFILES), "switch off: the files of the undone run stay (counted)")
+box(TICK, on=True)
+ls = box(DIRLS)
+check(not any(f in ls for f in RUNFILES) and '"trash_files"' not in sql("SELECT detail FROM office_import_runs WHERE id=?", (RUN,))[0][0],
+      "after the trash period the run removes the files of the undone run " + ls[:200])
 runs = {x["id"]: x for x in A.get(B + O + "/legacy/runs").json()["runs"]}
 check(runs.get(RUN, {}).get("kind") == "datev_archive" and runs[RUN]["undone_at"], "the import page lists the run as undone")
 r = Er.post(B + O + f"/legacy/runs/{ERUN}/undo")  # the import page's undo hands the kind over

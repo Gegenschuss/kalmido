@@ -17,7 +17,7 @@ the bookings of the chosen period along.
 
 Flow like the other imports: POST .../check = the preview (counts per year, debit = credit control, nothing written), POST
 .../import = one run in office_import_runs (kind "datev_archive"), POST .../runs/<id>/undo removes everything of the run
-(the files after the commit). Office admins only (a personal office: its owner; groups: the area "books"), never agents
+(2.530.0 C, #4315: within 24 hours of the import only; the files stay on disk until the trash period ended, ba_retention_tick). Office admins only (a personal office: its owner; groups: the area "books"), never agents
 (office_gate). Retention: 10 years from the end of the archived year (core/retention.py RET_LEGAL_YEARS "book", also the
 receipt images: the careful side), then deleted for good (ba_retention_tick, the watchdog; only while ret_on("trash"))."""
 import hashlib
@@ -25,7 +25,7 @@ import json
 import os
 import re
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from xml.etree import ElementTree as ET
 
@@ -33,11 +33,11 @@ from flask import jsonify, request
 
 from ..core.config import OFFICE_DIR, app
 from ..core.access import Denied
-from ..core.db import bump, iso, local_now, now_utc
+from ..core.db import bump, iso, local_now, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_send_file, oc_seal
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.retention import RET_LEGAL_YEARS, ret_due, ret_on, ret_report
+from ..core.retention import RET_LEGAL_YEARS, ret_due, ret_on, ret_report, ret_trash_cut
 from ..core.zipread import ZipLimit, is_zip, zip_read, base_name
 from ..personal.timetrack import BadInput
 from .model import office_ctx, office_need_feature
@@ -77,6 +77,10 @@ BA_NOTE = N_("No tax advice. Whether this archive replaces the DATEV data access
 BA_DUP = N_("Already in the archive (import of {0})")
 BA_DUP_UPLOAD = N_("The same file twice in this upload")
 BA_UNKNOWN = N_("Not a DATEV file this archive reads")
+# 2.530.0 C (#4315, B15): an archive run goes back only within a day of its import, like the other imports (legacyimport.py
+# OLK_UNDO_HOURS; the archive cannot be edited, so "untouched" holds by itself); its files wait for the trash period
+BA_UNDO_HOURS = 24
+BA_UNDO_LATE = N_("An archive import can only be undone within 24 hours of its import.")
 BA_NO_YEAR = N_("The year of the batch cannot be read")
 BA_ROW_BAD = N_("{0} lines without a readable amount, debit / credit mark or account (only in the original file)")
 BA_NOTHING = N_("Nothing to take over")
@@ -501,6 +505,12 @@ def ba_undo(c, oid, uid, r):
     """Undoes the archive run r -> (removed, kept, file names to remove after the commit, []) like legacyimport.fi_undo."""
     if r["undone_at"]:
         raise Denied(409, tr("This import has already been undone"))
+    try:
+        at = parse_iso(r["created_at"])
+    except (TypeError, ValueError):
+        at = None
+    if at is None or now_utc() - at > timedelta(hours=BA_UNDO_HOURS):  # 2.530.0 C (#4315, B15)
+        raise Denied(409, tr(BA_UNDO_LATE))
     rid = r["id"]
     try:
         detail = json.loads(r["detail"] or "{}")
@@ -522,8 +532,37 @@ def ba_undo(c, oid, uid, r):
             removed["master"] += 1
         except Denied:  # its clients are older than a day or used: they stay (the DATEV run can be undone on its own)
             kept["master"] += 1
-    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=? WHERE id=? AND org_id=?", (iso(now_utc()), uid, rid, oid))
-    return removed, kept, files, []
+    # 2.530.0 C (#4315, B15): the original files and receipt images stay on disk until the trash period ended
+    # (ba_retention_tick removes them then); the run remembers their names
+    if files:
+        detail["trash_files"] = files
+    c.execute("UPDATE office_import_runs SET undone_at=?, undone_by=?, detail=? WHERE id=? AND org_id=?",
+              (iso(now_utc()), uid, json.dumps(detail), rid, oid))
+    return removed, kept, [], []
+
+
+def ba_trash_files(c):
+    """2.530.0 C (#4315, B15): the files of archive runs undone before the trash period -> {office: [(run id, [names])]};
+    the caller (system context) removes them while ret_on("trash") and forgets them (ba_trash_forget)."""
+    out = {}
+    for r in c.execute("SELECT id, org_id, detail FROM office_import_runs WHERE kind=? AND undone_at IS NOT NULL AND undone_at<? "
+                       "AND detail LIKE ?", (BA_KIND, ret_trash_cut(), '%"trash_files"%')).fetchall():
+        try:
+            names = json.loads(r["detail"] or "{}").get("trash_files") or []
+        except ValueError:
+            continue
+        out.setdefault(r["org_id"], []).append((r["id"], [n for n in names if isinstance(n, str)]))
+    return out
+
+
+def ba_trash_forget(c, rid):
+    r = c.execute("SELECT detail FROM office_import_runs WHERE id=?", (rid,)).fetchone()
+    try:
+        detail = json.loads(r["detail"] or "{}") if r else {}
+    except ValueError:
+        return
+    detail.pop("trash_files", None)
+    c.execute("UPDATE office_import_runs SET detail=? WHERE id=?", (json.dumps(detail), rid))
 
 
 # ---------------------------------------------------------------- the view
@@ -689,11 +728,17 @@ def ba_retention_tick(c, force=False):
         nd = c.execute("SELECT COUNT(*) FROM office_bookarch_docs WHERE year<=?", (cut,)).fetchone()[0]
         nf = c.execute("SELECT COUNT(*) FROM office_bookarch_files WHERE year<=?", (cut,)).fetchone()[0]
         counts = {"archive_bookings": sum(r["n"] for r in due), "archive_docs": nd, "archive_files": nf}
+        undone = ba_trash_files(c)  # 2.530.0 C (#4315, B15): the files of undone runs after the trash period
+        counts["archive_undone_files"] = sum(len(n) for runs in undone.values() for _rid, n in runs)
         if not ret_on("trash"):
             ret_report(c, "trash", counts, False, run="bookarch")
             c.commit()
             return 0
         names = {}
+        for oid, runs in undone.items():
+            for rid, n in runs:
+                names.setdefault(oid, []).extend(n)
+                ba_trash_forget(c, rid)
         for t in ("office_bookarch_docs", "office_bookarch_files"):
             for r in c.execute(f"SELECT org_id, file FROM {t} WHERE year<=?", (cut,)):
                 names.setdefault(r["org_id"], []).append(r["file"])

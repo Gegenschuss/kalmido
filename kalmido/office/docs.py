@@ -1805,7 +1805,8 @@ def odoc_delete(did):
         raise Denied(409, tr("The client has signed this quotation; the record is kept"))  # 2.50.0 (#1200 review)
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"], "net": _j(r["totals"], {}).get("net"),
                                                   **({"locked": True} if locked else {})})  # 2.114.2 A (#2263): the number gap stays traceable
-    if not locked and r["status"] == "draft":  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the
+    # 2.530.0 C (#4315, B13): a finalised quotation that was never sent (bga_offer_block let it through) goes there too
+    if r["kind"] == "offer" or (not locked and r["status"] == "draft"):  # 2.272.0 E2 (#3038): a draft goes to the office trash (restore), with the
         # time entries it billed (they are open meanwhile and bound again on restore while still open)
         te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
         cl = c.execute("SELECT name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
