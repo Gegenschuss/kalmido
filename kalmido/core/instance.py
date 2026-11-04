@@ -15,6 +15,7 @@ from ..core.config import (
 from ..core.schema import USER_DEFAULTS
 from ..core.i18n import LANGS, N_, tr
 from ..core.db import body, bump, connect, db, err, gset, gsetting, iso, now_utc, parse_iso, uset, usettings
+from ..core.pg import write_lock  # 2.528.0 (#4305)
 from ..accounts.session import GATE, me
 from ..accounts.oidc import oidc_public, oidc_reauth
 from ..core.access import _COLLAB_ALL, _TIME_ALL, collab_all, time_all
@@ -305,6 +306,7 @@ def admin_setup():
     # 2.44.0 (#1187): the areas Review and Home bring the journal and Home & life: on for the admin only (as with a purpose)
     from ..family.family import _LIFE
     fs = ",".join([x for x in fs.split(",") if x] + [m for m in _LIFE if m in mods and m not in fs.split(",")])
+    write_lock(c, f"usettings-{int(me())}")  # 2.528.0 B (#4305, A11): the admin's own settings below like PATCH /api/settings
     uset(c, me(), "features", fs)
     if lang:
         gset(c, "default_lang", lang)

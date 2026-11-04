@@ -364,6 +364,8 @@ const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
 // what the others wrote (an entry keeps its object, known by its key k, so undo steps still find it; one that left the queue
 // elsewhere counts as done), outSave changes the fresh copy and writes it back, and only one tab replays (flush, Web Locks)
 const outKey = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+// 2.528.0 (#4305 B1): a write that brings its own idempotency key (body._idem: one per press) sends it online and in the queue
+const oxaKey = b => b && typeof b === 'object' && !(b instanceof FormData) && typeof b._idem === 'string' ? b._idem : undefined;
 function outSync() {
   if (OBX.on) { obxAdopt(); return OUT.q; }  // 2.143.0 C (#2153): the other tabs' changes arrive on the channel
   const mine = new Map(OUT.q.map(x => [x.k, x])), q = LS.get('outbox', []);
@@ -630,7 +632,8 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  try { const j = await rawFetch(method, url, body); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
+  const ox = oxbPrev(method, url, body); body = ox.body;  // 2.528.0 B (#4305)
+  try { const j = await rawFetch(method, url, body, oxaKey(body)); if (ox.on && j?.conflicts?.length) addConflicts(j.id || +url.split('/').pop(), j.conflicts, j.title); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -671,6 +674,28 @@ function outPrev(method, url, body) {
     if (t) body = {...body, _prev: Object.fromEntries(Object.keys(body).filter(k => !k.startsWith('_')).map(k => [k, k === 'tags' ? [...(t.tags || [])] : t._enc && k in t._enc ? t._enc[k] : (t[k] ?? null)]))};  // 2.64.1 (#1817): a locked list's text = its cipher
   }
   return body;
+}
+// 2.528.0 B (#4305): an online change of a task carries what this device saw (_prev) like the queue does, so a field changed on
+// another device meanwhile is kept and lands in the conflicts dialog instead of being overwritten. A field whose seen value
+// equals its new one is no base (a caller showed the change before sending it) and stays out (last write, as before).
+// on = the _prev was added here: its conflicts go into the dialog (callers with their own _prev handle theirs)
+// a custom field's value as the server has it (a locked list: its cipher, the others as they are)
+const oxbField = (t, fk) => t?._enc?.fields?.[fk] ?? t?.fields?.[fk] ?? null;
+function oxbPrev(method, url, body) {
+  const b = outPrev(method, url, body);
+  if (b === body || !b?._prev) return {body, on: false};
+  const same = (x, y) => JSON.stringify(Array.isArray(x) ? [...x].map(String).sort() : x ?? null) === JSON.stringify(Array.isArray(y) ? [...y].map(String).sort() : y ?? null);
+  const p = {};
+  for (const [k, v] of Object.entries(b._prev)) {
+    if (k === 'sort') continue;  // a position is never a conflict (as batch / reorder)
+    if (k === 'fields') {
+      const nf = b.fields && typeof b.fields === 'object' ? b.fields : {}, t = S.tasks.get(+url.split('/').pop());
+      const f = Object.fromEntries(Object.keys(nf).map(fk => [fk, oxbField(t, fk)]).filter(([fk, o]) => !same(o, nf[fk] ?? null)));
+      if (Object.keys(f).length) p.fields = f;
+    } else if (!same(v, b[k])) p[k] = v;
+  }
+  if (!Object.keys(p).length) return {body, on: false};
+  return {body: {...body, _prev: p}, on: true};
 }
 // 2.359.0 A (#3024): entries that must survive a page going away right now (pagehide, an ended session before the reload):
 // without IndexedDB straight into the queue (localStorage), with it into localStorage first, which the IndexedDB queue takes
@@ -762,7 +787,7 @@ function enqueue(method, url, body) {
   // 2.363.3 (#3133): a whole new order of "My tasks" replaces the one still waiting, whose _prev stays the base the server confirmed
   const mo = method === 'PUT' && url === '/api/tasks/mine-order' && outSync().find((x, i) => (i > 0 || !OUT.flushing) && !x.sending && !x.done && x.url === url);
   if (mo) { outSave(() => { mo.body = {...mo.body, ids: body.ids}; }); return {ok: true}; }
-  const e = {method, url, body, uid: S.me?.id, k: outKey()};
+  const e = {method, url, body, uid: S.me?.id, k: oxaKey(body) || outKey()};  // 2.528.0 (#4305 B1): the key the press chose
   if (method === 'POST' && (url === '/api/tasks' || /^\/api\/lists\/\d+\/notes$/.test(url))) e.tmp = -Date.now() - Math.floor(Math.random() * 1000);  // 2.143.0 C (#2153): + a note
   outSave(() => OUT.q.push(e));  // 2.126.0 D (#1989)
   obxSyncReg();  // 2.143.0 C (#2153)
@@ -883,6 +908,10 @@ async function outFlush() {
         if (st >= 500 || st === 429 || st === 408) {
           const tries = (e.tries || 0) + 1;
           if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; e.tries = tries; }); outRetry(); return; }
+        }
+        if (err.data?.code === 'skip_stale') {  // 2.528.0 (#4305 B1): skipped elsewhere already = not skipped twice, the current date
+          if (err.data.task && typeof putTask === 'function') putTask(err.data.task);
+          setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; continue;
         }
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
         if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
@@ -1012,7 +1041,7 @@ function fmtVal(field, v) {
 }
 function conflictModal() {
   const md = modal(`<h3>${tr('Conflicts')}</h3>
-    <div class="muted" style="font-size:var(--fs-m);margin-bottom:.625rem">${tr('These fields were changed on another device while you entered something else here (offline). The other version is saved.')}</div>
+    <div class="muted" style="font-size:var(--fs-m);margin-bottom:.625rem">${tr('These fields were changed on another device while you entered something else here. The other version is saved.')}</div>
     <div id="cf-list"></div>
     <div class="foot"><button class="btn" data-m="all-server">${tr('All: keep the other version')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
   const draw = () => {

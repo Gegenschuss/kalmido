@@ -515,6 +515,8 @@ def ox_live(c, table, where):
     """2.223.3 B (#2879): where without the soft-deleted rows of table and the rows of a deleted parent (OX_GONE_WITH)."""
     if table not in OX_KEEP_DELETED and "deleted_at" in _table_cols(c, table):
         where = f"({where}) AND deleted_at IS NULL"
+    if "wkx_held_at" in _table_cols(c, table):  # 2.528.0 D (#4306): versions held at a lock stay out (only who read them then)
+        where = f"({where}) AND wkx_held_at IS NULL"
     for parent, col in OX_GONE_WITH.get(table, ()):
         if "deleted_at" in _table_cols(c, parent):
             where = f"({where}) AND {col} NOT IN (SELECT id FROM {parent} WHERE deleted_at IS NOT NULL)"

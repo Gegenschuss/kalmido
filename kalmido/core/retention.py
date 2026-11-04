@@ -21,6 +21,7 @@ Expired credentials (sessions, tokens, codes past their end) are no data of a pe
                                                                     appointment types, file requests
   wiki (wiki/pages.py)                  trash    trash             trashed pages with versions + their files
   wiki_files (wiki/wikiatt.py)          trash    trash             files trashed on their own
+  wiki_e2e_held (wiki/wkhist.py)        trash    trash             2.528.0 D (#4306): versions held when a space's lock went on
   sheet_files (sheets/shkinds.py)       trash    trash             table files no cell holds any more
   videos (videos/review.py)             trash    trash             trashed video reviews / comments
   events (events/model.py)              trash    trash             trashed events

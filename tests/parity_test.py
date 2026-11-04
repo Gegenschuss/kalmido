@@ -321,7 +321,8 @@ APP_ONLY = [
      ("=DELETE /api/sheets/{}", "=POST /api/sheets/{}/restore", "=PATCH /api/sheets/{}/columns/{}", "=DELETE /api/sheets/{}/columns/{}",
       "=POST /api/sheets/{}/columns/{}/restore", "=DELETE /api/sheets/{}/rows/{}", "=POST /api/sheets/{}/rows/{}/restore",
       "=POST /api/sheets/{}/rows/order", "=POST /api/sheets/{}/cells/{}/freeze", "=POST /api/sheets/{}/cells/{}/name",
-      "=POST /api/sheets/{}/presence")),
+      "=POST /api/sheets/{}/presence",
+      "=GET /api/sheets/trash", "=GET /api/sheets/{}/trash", "=POST /api/sheets/purge")),  # 2.528.0 (#4306 B22): the trash of tables
     ("2.124.0 E (#2116): arranging the sheets of a table stays with people in the app -- renaming, moving in the sheet bar, the "
      "trash / restore of a sheet (like arranging rows and columns); an agent lists the sheets, adds one and works in each with the "
      "table tools and the sheet's id (taking back its call moves a sheet it added to the trash)",

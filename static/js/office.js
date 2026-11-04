@@ -755,11 +755,36 @@ function ofcLogHtml() {
   const rows = OFC.logAg ? OFC.log.filter(x => /^agent_/.test(x.action)) : OFC.log;
   return (typeof oa_logFilter === 'function' ? oa_logFilter() : '') + `<ul class="ofdlog" role="list">${rows.map(x => `<li><span class="muted">${esc(typeof ofdWhen === 'function' ? ofdWhen(x.at) : x.at)}</span> <b>${esc(x.user_name || '?')}</b> ${x.action === 'delete' && x.detail?.testphase ? esc(tr(x.detail.kind === 'invoice' ? N_('Invoice {0} deleted in the test phase') : N_('{0} deleted in the test phase'), x.detail.number || '#' + x.doc_id)) : `${esc(typeof ofdActText === 'function' ? ofdActText(x.action) : x.action)} · ${esc(tr(tg[x.target] || x.target))}${x.doc_id ? ` <a href="#office/offers/${x.doc_id}">#${x.doc_id}</a>` : ''}`}</li>`).join('')}</ul>`;  // 2.162.0 A (#2603): no link to the gone document
 }
+// 2.528.0 (#4305 A3): only what differs from the saved settings (a field another admin changed meanwhile is never sent back
+// with the old value this page still showed); a group of fields (company, the text ids, ...) per field
+function oxaChanged(body) {
+  const old = ost_old(body), same = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null), out = {};
+  for (const [k, v] of Object.entries(body)) {
+    const o = old[k];
+    if (k !== 'tax_rates' && v && typeof v === 'object' && !Array.isArray(v) && o && typeof o === 'object' && !Array.isArray(o) && Object.keys(o).length) {
+      const sub = Object.fromEntries(Object.entries(v).filter(([f, x]) => !same(x, o[f])));
+      if (Object.keys(sub).length) out[k] = sub;
+    } else if (!same(v, o)) out[k] = v;
+  }
+  return out;
+}
+// 2.528.0 (#4305 A3): the settings changed elsewhere since this page loaded them (409 with the current ones)
+const oxaStale = x => x?.status === 409 && !!x.data?.settings;
+const oxaAt = () => OFC.info?.settings?.updated_at ?? '';
+// the PUT with the version; errors shown as api() shows them, except the 409 of a newer version (handled by the caller)
+const oxaPut = b => rawFetch('PUT', '/api/office/settings', {...b, expect_updated_at: oxaAt()}).catch(x => {
+  if (!oxaStale(x) && x.message !== 'auth' && !x.shown) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message);
+  throw x;
+});
 async function ofcSaveSettings(form) {
-  const body = ofcSettingsBody(form), at = document.activeElement?.closest?.('#ofc-set') ? document.activeElement : null;
+  const body = oxaChanged(ofcSettingsBody(form)), at = document.activeElement?.closest?.('#ofc-set') ? document.activeElement : null;
   // 2.298.0 A1 (#3186): Enter saves the page quietly: the mark at the field instead of the toast "Saved"
-  try { const j = await api('PUT', '/api/office/settings', body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); ofcDraw(); const f = at && (at.isConnected ? at : ost_find(at)); if (f) ost_mark(f, 'ok'); else toast(tr('Saved')); }
-  catch (x) { const el = $('.aerr', form); if (el) el.textContent = x.message || ''; }
+  try { const j = await oxaPut(body); OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null; fgDone(form.dataset.fg); ofcDraw(); const f = at && (at.isConnected ? at : ost_find(at)); if (f) ost_mark(f, 'ok'); else toast(tr('Saved')); }
+  catch (x) {
+    // 2.528.0 (#4305 A3): changed elsewhere: the current settings are drawn, what was typed here stays (formguard draft), save again
+    if (oxaStale(x)) { await ofcInfo(true); toast(tr('Someone else changed the settings meanwhile. The page shows their state, your changes are kept: check and save again.')); return; }
+    const el = $('.aerr', form); if (el) el.textContent = x.message || '';
+  }
 }
 // 2.189.0 (#2475): the home currency (chosen only in a pack that allows it, fixed after the first bookings), the currency of new
 // documents and its office rate (EUR offices keep "1 € in USD" in fx_usd; any other pair goes to fx_rates)
@@ -935,8 +960,19 @@ function ost_old(part) {
   return o;
 }
 async function ost_put(b) {
-  const j = await api('PUT', '/api/office/settings', b);
-  const pk = OFC.info.settings?.pack;
+  // 2.528.0 (#4305 A3): with the version this page loaded; moved on and this field was not changed elsewhere = sent again on
+  // top of the current settings (the page is drawn again: pk true); changed elsewhere too = the hint, the input stays
+  const seen = ost_old(b);
+  let j, stale = false;
+  try { j = await oxaPut(b); }
+  catch (x) {
+    if (!oxaStale(x)) throw x;
+    const cur = await api('GET', '/api/office/settings');
+    OFC.info.settings = cur.settings; OFC.info.company_fields = cur.company_fields || OFC.info.company_fields; stale = true;
+    if (JSON.stringify(ost_old(b)) !== JSON.stringify(seen)) { const e = new Error(tr('Someone else changed this setting meanwhile. Check it and save again.')); e.oxaRedraw = true; throw e; }  // the caller keeps the input, then draws
+    j = await oxaPut(b);
+  }
+  const pk = stale ? null : OFC.info.settings?.pack;
   OFC.info.settings = j.settings; OFC.info.company_fields = j.company_fields || OFC.info.company_fields; OFC.info.number_preview = j.number_preview; OFC.log = null;
   if (j.features) OFC.info.features = j.features;  // 2.147.0 (#2460): menus, tabs and buttons follow at once
   if ('home_locked' in j) OFC.info.home_locked = j.home_locked;  // 2.189.0 (#2475)
@@ -971,14 +1007,15 @@ function ost_save(el) {
     } catch (x) {
       el._ostV = undefined;
       const d = FG.d[fk] || (FG.d[fk] = {f: {}}); d.f[k] = v;  // the value stays (a redraw puts it back, closing the page asks)
-      ost_mark(el, 'err', x instanceof Offline ? tr('Offline: only works again with a connection') : x?.message || tr('Could not save'));
+      if (x?.oxaRedraw) await ofcInfo(true);  // 2.528.0 (#4305 A3): changed elsewhere: the current settings, the typed value on top
+      ost_mark(el.isConnected ? el : ost_find(el) || el, 'err', x instanceof Offline ? tr('Offline: only works again with a connection') : x?.message || tr('Could not save'));  // 2.528.0 (#4305 A3): the field drawn again (changed elsewhere)
     }
   });
   return OST.q;
 }
 async function ost_back(b) {
   const a = document.activeElement; if (a?.closest?.('#ofc-set')) a.blur();  // (a redraw keeps the value of a focused field)
-  try { const pk = await ost_put(b); if (pk) await ofcInfo(true); else ofcDraw(); } catch { /* shown by api() */ }
+  try { const pk = await ost_put(b); if (pk) await ofcInfo(true); else ofcDraw(); } catch (x) { if (x?.oxaRedraw) { toast(x.message); await ofcInfo(true); } /* else shown by api() */ }  // 2.528.0 (#4305 A3)
   return {skipped: []};
 }
 // the field again after a redraw

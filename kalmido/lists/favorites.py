@@ -10,6 +10,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, now_utc, uset, usettings
+from ..core.pg import write_lock
 from ..core.access import Denied, need_list, vis_sql
 from ..accounts.session import me
 from ..accounts.settings import FV2_MAX  # 2.369.5 (#2517): pulled up from functions
@@ -44,6 +45,7 @@ def vw_list_favorite(lid):
     need_person(403, tr("Favourites are a personal setting of a person"))
     c = db()
     on = request.method == "PUT" and bool((body() or {}).get("on", True))
+    write_lock(c, f"usettings-{int(me())}")  # 2.528.0 B (#4305, A11): fav_lists / fav_items read-change-write like PATCH /api/settings
     had = vw_fav_ids(c, me())
     ids = [x for x in had if x != lid]
     # 2.40.1: a list the person cannot see is 404 for PUT and DELETE alike (route scan); only an own star of a list the

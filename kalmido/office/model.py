@@ -704,7 +704,14 @@ def office_settings_lock(c, oid):
 def office_settings_save(c, oid, data):
     data = oc_json_store(c, oid, "office_settings", "data", data)  # 2.42.0 (#828): the company lines encrypted at rest
     c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
-              "updated_at=excluded.updated_at", (oid, json.dumps(data, ensure_ascii=False), iso(now_utc())))
+              "updated_at=excluded.updated_at", (oid, json.dumps(data, ensure_ascii=False), iso_ms(now_utc())))  # 2.528.0 (#4305 A3): ms, the page's version
+
+
+def oxa_settings_at(c, oid):
+    """2.528.0 (#4305 A3): the version of the office settings (office_settings.updated_at; None = never saved). The page sends
+    it back as expect_updated_at; PUT /api/office/settings answers 409 when it moved on (core/conflict.py)."""
+    r = c.execute("SELECT updated_at FROM office_settings WHERE org_id=?", (oid,)).fetchone()
+    return r[0] if r else None
 
 
 def office_logo_set(c, oid, name):

@@ -15,8 +15,8 @@ decrypt-all and decrypt-private make them plain as well (for all / the private s
 within WKH_MERGE seconds share one version (the autosave does not make hundreds), at most WKH_KEEP per page (the oldest
 go). A state saved outside this path (an older version of the app, a [[link]] renamed, an import) is noted as its own
 version before the next save. Restoring = the old text saved as a new version (Undo in the app: the text before).
-Spaces with the lock keep no history (the server cannot read their texts; switching the lock on drops the history of the
-space, wikie2e.py wke_start). The rows go with their page (trash -> final deletion), its organisation or its owner.
+Spaces with the lock keep no history (the server cannot read their texts; switching the lock on holds the history of the
+space until the trash period ends, 2.528.0 D #4306: wkx_hold_space / wkx_tick). The rows go with their page (trash -> final deletion), its organisation or its owner.
 """
 import os
 import re
@@ -31,6 +31,8 @@ from ..core.db import body, bump, db, iso_ms, now_utc
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError, PREFIX, _aad, _b64u, oc_active_for, oc_dec_k, oc_is_enc, oc_key, oc_user_space
 from ..core.pg import system_ctx, write_lock
+from ..core.retention import ret_due, ret_report, ret_trash_cut  # 2.528.0 D (#4306)
+from ..core.serializers import unlink_files  # 2.528.0 D (#4306)
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.comments import user_names
@@ -168,7 +170,7 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
     if not r or _locked(r):
         return
     text = wkh_body(c, r)
-    last = c.execute("SELECT id, org_id, owner_id, path, body, created_by, created_at FROM wiki_versions WHERE page_id=? "
+    last = c.execute("SELECT id, org_id, owner_id, path, body, created_by, created_at, wkx_held_at FROM wiki_versions WHERE page_id=? "
                      "ORDER BY id DESC LIMIT 1", (pid,)).fetchone()
     try:
         ltext = _vbody(c, last) if last else None
@@ -184,7 +186,8 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
         return  # nothing changed
     if prev is not None and last is None and ltext == text and prev[1] == r["path"]:
         return
-    if (last is not None and not fresh and last["created_by"] == uid and 0 <= _ts(ts) - _ts(last["created_at"]) < WKH_MERGE):
+    if (last is not None and not fresh and last["created_by"] == uid and 0 <= _ts(ts) - _ts(last["created_at"]) < WKH_MERGE
+            and not last["wkx_held_at"]):  # 2.528.0 D (#4306): a version held at a lock takes no new text
         c.execute("UPDATE wiki_versions SET path=?, body=?, size=?, updated_at=? WHERE id=?",
                   (r["path"], wkh_seal(c, r["org_id"], r["owner_id"], text, WKH_VCTX), len(text.encode()), ts, last["id"]))
     elif text or last is not None or prev is not None:
@@ -199,11 +202,101 @@ def wkh_prev(c, r):
     return (wkh_body(c, r) if not _locked(r) else "", r["path"], r["updated_by"], r["updated_at"])
 
 
-def wkh_drop_space(c, oid, owner):
-    """The history and the word index of a space go (its lock is switched on: no plain copy stays on the server)."""
-    w, a = (("org_id=?", [oid]) if oid else ("org_id IS NULL AND owner_id=?", [owner]))
-    c.execute(f"DELETE FROM wiki_versions WHERE {w}", a)
+# ---- 2.528.0 D (#4306, B26): switching the lock on holds the history and the files in the trash instead of deleting them ---
+# wkx_held_at (migrations.d/4306_d.py) marks the rows; while the space is locked nobody sees them (the routes below answer a
+# locked space without history, wikiatt serves no file of it); wkx_tick deletes held versions and held trash files after the
+# trash period (ret_trash_cut; review 2.528: also with the retention switch off), or earlier wka_tick / wiki_trash_tick. Once the
+# lock is off again a held row is shown only to the people named in wiki_spaces.wkx_holds for its time (who could read the
+# space then): no later member, share or agent gets it. The org export leaves held versions out (admin/orgexport.py ox_live).
+def _wkx_where(oid, owner, alias=""):
+    p = alias + "." if alias else ""
+    return (f"{p}org_id=?", [oid]) if oid else (f"{p}org_id IS NULL AND {p}owner_id=?", [owner])
+
+
+def wkx_counts(c, oid, owner):
+    """What switching the lock on would hold: {versions, files} of the space (the dialog before the switch, wke_info)."""
+    w, a = _wkx_where(oid, owner)
+    return {"versions": c.execute(f"SELECT COUNT(*) FROM wiki_versions WHERE {w}", a).fetchone()[0],
+            "files": c.execute(f"SELECT COUNT(*) FROM wiki_files WHERE deleted_at IS NOT NULL AND {w}", a).fetchone()[0]}
+
+
+def wkx_hold_space(c, sp, users, ts):
+    """The lock of space row sp is switched on at ts (wikie2e.wke_start): its word index goes (derived, plain words); its
+    versions and its files in the trash are held from ts (also rows an earlier switch held: the new period counts) for the
+    people users. -> {versions, files} held. The caller commits."""
+    import json
+    oid, owner = sp["org_id"], sp["owner_id"]
+    w, a = _wkx_where(oid, owner)
     c.execute(f"DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
+    row = c.execute("SELECT wkx_holds FROM wiki_spaces WHERE id=?", (sp["id"],)).fetchone()
+    try:
+        holds = json.loads(row[0] or "{}") if row else {}
+    except ValueError:
+        holds = {}
+    old = {}  # earlier holds: only who was named then AND now keeps a re-held row
+    for r in c.execute(f"SELECT DISTINCT wkx_held_at FROM wiki_versions WHERE {w} AND wkx_held_at IS NOT NULL UNION "
+                       f"SELECT DISTINCT wkx_held_at FROM wiki_files WHERE {w} AND wkx_held_at IS NOT NULL", [*a, *a]):
+        old[r[0]] = set(holds.get(r[0]) or [])
+    now = set(int(u) for u in users)
+    for o in old.values():
+        now &= o
+    n_v = c.execute(f"UPDATE wiki_versions SET wkx_held_at=? WHERE {w}", [ts, *a]).rowcount
+    n_f = c.execute(f"UPDATE wiki_files SET wkx_held_at=? WHERE deleted_at IS NOT NULL AND {w}", [ts, *a]).rowcount
+    c.execute("UPDATE wiki_spaces SET wkx_holds=? WHERE id=?", (json.dumps({ts: sorted(now)} if n_v or n_f else {}), sp["id"]))
+    return {"versions": n_v, "files": n_f}
+
+
+def wkx_may_see(c, r, held_at, uid):
+    """May uid see a row of page r held at held_at? An ordinary row (None): yes; a held one: only who wkx_holds names for it."""
+    import json
+    if not held_at:
+        return True
+    w, a = _wkx_where(r["org_id"], r["owner_id"])
+    sp = c.execute(f"SELECT wkx_holds FROM wiki_spaces WHERE {w}", a).fetchone()
+    try:
+        holds = json.loads(sp["wkx_holds"] or "{}") if sp else {}
+    except ValueError:
+        return False
+    return int(uid) in set(holds.get(held_at) or [])
+
+
+def wkx_tick(c, force=False):
+    """Watchdog (hourly): held versions and held trash files of spaces still locked go after the trash period. Review 2.528
+    (Fable 1): also with the retention switch off -- the person agreed to the period when switching the lock on, readable
+    copies of an encrypted space must not stay for good. A space open again keeps them (its people see them again,
+    wkx_may_see). Holds no row names any more are cleared."""
+    import json
+    if not ret_due("wiki_e2e_held", force=force):
+        return {}
+    cut = ret_trash_cut()
+    due = ("FROM {t} v JOIN wiki_spaces s ON (v.org_id IS NOT NULL AND s.org_id=v.org_id) OR "
+           "(v.org_id IS NULL AND s.org_id IS NULL AND s.owner_id=v.owner_id) WHERE v.wkx_held_at IS NOT NULL AND v.wkx_held_at<? "
+           "AND s.e2e IS NOT NULL")
+    with system_ctx(c):  # housekeeping over every space: rows are only deleted, nothing is handed to a person
+        n = c.execute(f"DELETE FROM wiki_versions WHERE id IN (SELECT v.id {due.format(t='wiki_versions')})", (cut,)).rowcount
+        files = c.execute(f"SELECT v.id, v.path {due.format(t='wiki_files')} AND v.deleted_at IS NOT NULL ORDER BY v.id LIMIT 500",
+                          (cut,)).fetchall()
+        if files:  # like wka_tick: row, scan / text marks, the stored file after the commit
+            ids = [r["id"] for r in files]
+            q = ",".join("?" * len(ids))
+            c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({q})", ids)
+            c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({q})", ids)
+            c.execute(f"DELETE FROM wiki_files WHERE id IN ({q})", ids)
+        ret_report(c, "trash", {"versions": n, "files": len(files)}, True, run="wiki_e2e_held")
+        for s in c.execute("SELECT id, org_id, owner_id, wkx_holds FROM wiki_spaces WHERE wkx_holds<>'{}'").fetchall():
+            w, a = _wkx_where(s["org_id"], s["owner_id"])
+            live = {r[0] for r in c.execute(f"SELECT wkx_held_at FROM wiki_versions WHERE {w} AND wkx_held_at IS NOT NULL UNION "
+                                            f"SELECT wkx_held_at FROM wiki_files WHERE {w} AND wkx_held_at IS NOT NULL", [*a, *a])}
+            try:
+                holds = json.loads(s["wkx_holds"])
+            except ValueError:
+                holds = {}
+            keep = {k: v for k, v in holds.items() if k in live}
+            if keep != holds:
+                c.execute("UPDATE wiki_spaces SET wkx_holds=? WHERE id=?", (json.dumps(keep), s["id"]))
+    c.commit()
+    unlink_files([r["path"] for r in files])
+    return {"versions": n, "files": len(files)}
 
 
 def wkh_move(c, rows, to, uid, keep=True):
@@ -218,6 +311,13 @@ def wkh_move(c, rows, to, uid, keep=True):
         c.execute(f"DELETE FROM wiki_versions WHERE page_id IN ({q})", ids)
         return
     owner = None if to else uid
+    src = {r["id"]: r for r in rows}
+    for v in c.execute(f"SELECT id, page_id, wkx_held_at FROM wiki_versions WHERE page_id IN ({q}) AND wkx_held_at IS NOT NULL",
+                       ids).fetchall():  # 2.528.0 D (#4306): held at a lock -- along only when the mover could read the space then
+        if wkx_may_see(c, src[v["page_id"]], v["wkx_held_at"], uid):
+            c.execute("UPDATE wiki_versions SET wkx_held_at=NULL WHERE id=?", (v["id"],))
+        else:
+            c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
     for v in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_versions WHERE page_id IN ({q})", ids).fetchall():
         c.execute("UPDATE wiki_versions SET org_id=?, owner_id=?, body=? WHERE id=?",
                   (to, owner, wkh_seal(c, to, owner, _vbody(c, v), WKH_VCTX), v["id"]))
@@ -305,9 +405,9 @@ def _page(pid, write=False):
     return c, r, bool(wke_page_mode(c, r)) or _locked(r)
 
 
-def _version(c, pid, vid):
+def _version(c, pid, vid, r=None):
     v = c.execute("SELECT * FROM wiki_versions WHERE id=? AND page_id=?", (vid, pid)).fetchone()
-    if not v:
+    if not v or (r is not None and not wkx_may_see(c, r, v["wkx_held_at"], me())):  # 2.528.0 D (#4306): held at a lock
         raise Denied(404)
     return v
 
@@ -319,8 +419,12 @@ def wkh_list(pid):
     c, r, locked = _page(pid)
     if locked:
         return jsonify(versions=[], e2e=True)
-    rows = c.execute("SELECT id, org_id, owner_id, path, body, size, created_by, created_at, updated_at FROM wiki_versions "
+    rows = c.execute("SELECT id, org_id, owner_id, path, body, size, created_by, created_at, updated_at, wkx_held_at FROM wiki_versions "
                      "WHERE page_id=? ORDER BY id DESC LIMIT ?", (pid, WKH_KEEP)).fetchall()
+    seen = {}  # 2.528.0 D (#4306): held at a lock -- only for who could read the space then (one look per hold)
+    for h in {x["wkx_held_at"] for x in rows if x["wkx_held_at"]}:
+        seen[h] = wkx_may_see(c, r, h, me())
+    rows = [x for x in rows if not x["wkx_held_at"] or seen[x["wkx_held_at"]]]
     names = user_names(c, {x["created_by"] for x in rows})
     try:  # 2.126.2 B (#2358): an unreadable page still lists its history (no version is marked current)
         cur = wkh_body(c, r)
@@ -347,7 +451,7 @@ def wkh_get(pid, vid):
     c, r, locked = _page(pid)
     if locked:
         raise Denied(404)
-    v = _version(c, pid, vid)
+    v = _version(c, pid, vid, r)
     from .wkfolder import wkf_shown_path
     # 2.200.0 F (#2747, review B3): the path from the share down
     return jsonify(id=v["id"], path=wkf_shown_path(c, me(), r, path=v["path"]), body=_vbody(c, v), size=v["size"], created_at=v["created_at"], updated_at=v["updated_at"],
@@ -364,7 +468,7 @@ def wkh_restore(pid, vid):
     c, r, locked = _page(pid, write=True)
     if locked:
         raise wke_denied("wiki_e2e")
-    v = _version(c, pid, vid)
+    v = _version(c, pid, vid, r)
     uid = me()
     exp = body().get("expect_updated_at")
     if exp and exp != r["updated_at"]:

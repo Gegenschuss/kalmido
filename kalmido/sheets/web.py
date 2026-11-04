@@ -16,6 +16,13 @@ from .core import (SH_ROWS_MAX, ShBook, sh_add_col, sh_add_rows, sh_brief, sh_ch
                    sh_col_dict, sh_create, sh_dict, sh_freeze, sh_index, sh_list_bound, sh_may_rebind, sh_need, sh_need_cell, sh_option_ops, sh_options, sh_presence_set, sh_reload, sh_rev_conflict,
                    sh_set_cells, sh_set_name, sh_touch, sh_undo_batch, sh_vars)
 from .core import sh_cell_dicts, sh_eval, _select_raw  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names  # 2.528.0 (#4305 A12)
+from ..core.i18n import N_  # 2.528.0 (#4306 B22): the trash of tables
+from ..core.db import bump
+from ..core.retention import ret_on, ret_trash_days
+from ..core.serializers import unlink_files
+from ..accounts.orgs import is_org_admin
+from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
 
 
 def _int(v, what):
@@ -209,20 +216,57 @@ def _need_col(c, sid, col_id, deleted=False):
     return x
 
 
+SHX_COL_PREV = ("title", "kind", "color_mode", "width", "pos")
+
+
+def shx_col_prev(old, b):
+    """2.528.0 (#4305 A12): b without the fields whose stored value differs from b["_prev"][field] (changed elsewhere since the
+    writer read the column) unless it already is the new value, like the lists' _prev (lists.py lp_prev_conflicts) -> (b,
+    conflicts [{field, server, mine}]). Without _prev: b unchanged (older clients, agents)."""
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid value: {0}", "body"))
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    b, out = {k: v for k, v in b.items() if k != "_prev"}, []
+    if not prev:
+        return b, out
+    for k, was in prev.items():
+        if k not in SHX_COL_PREV or k not in b:
+            continue
+        cur = old[k]
+        same = (lambda x, y: (x is None and y is None) or (x is not None and y is not None and str(x) == str(y))) if k != "pos" else (
+            lambda x, y: isinstance(y, (int, float)) and not isinstance(y, bool) and float(x) == float(y))
+        if not same(cur, was) and not same(cur, b[k]):
+            out.append({"field": k, "server": cur, "mine": b[k]})
+            del b[k]
+    return b, out
+
+
+def shx_order_moved(live, prev):
+    """2.528.0 (#4305 A12): True when the rows the writer saw (prev, in order) are no longer in that order or one of them is gone;
+    rows added since do not count. prev None = no check (older clients); BadInput for a malformed prev."""
+    if prev is None:
+        return False
+    if not isinstance(prev, list) or len(prev) > SH_ROWS_MAX or any(isinstance(x, bool) or not isinstance(x, int) for x in prev):
+        raise BadInput(tr("Invalid value: {0}", "prev"))
+    seen = set(prev)
+    return [x for x in live if x in seen] != prev
+
+
 @app.patch("/api/sheets/<int:sid>/columns/<int:col_id>")
 def sheets_col_patch(sid, col_id):
     """{title?, kind?, options?, options_ops?, color_mode?, width?, pos?} -- a select column takes typed labels over as its options'
     ids. 2.270.0 B (#3021): options_ops = single add / rename / remove (sh_option_ops) -> also {added: ids, conflicts}."""
     c = db()
     r = _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     old = _need_col(c, sid, col_id)
-    b = body()
+    b, cf = shx_col_prev(old, body())  # 2.528.0 (#4305 A12): a field changed elsewhere since the writer read it stays (conflicts)
     f = sh_clean_col(b, partial=True)
-    added, cf = [], []
+    added = []
     if b.get("options_ops") is not None:  # 2.270.0 B (#3021): single option changes on the current list, one writer per sheet
-        write_lock(c, "sheet:" + str(sid))
         cur = c.execute("SELECT options FROM sheet_columns WHERE id=?", (col_id,)).fetchone()["options"]
-        opts, added, cf = sh_option_ops(sh_options(cur), b["options_ops"])
+        opts, added, ocf = sh_option_ops(sh_options(cur), b["options_ops"])
+        cf += ocf
         if json.dumps(opts, ensure_ascii=False) != cur:
             f["options"] = json.dumps(opts, ensure_ascii=False)
     if "pos" in b:
@@ -255,6 +299,7 @@ def sheets_col_delete(sid, col_id):
     """To the trash (formulas pointing at it show "ref"; Undo: .../restore)."""
     c = db()
     _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_col(c, sid, col_id)
     c.execute("UPDATE sheet_columns SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), col_id))
     sh_touch(c, sid, me())
@@ -265,6 +310,7 @@ def sheets_col_delete(sid, col_id):
 def sheets_col_restore(sid, col_id):
     c = db()
     _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_col(c, sid, col_id, deleted=True)
     c.execute("UPDATE sheet_columns SET deleted_at=NULL WHERE id=?", (col_id,))
     sh_touch(c, sid, me())
@@ -297,6 +343,7 @@ def _need_row(c, sid, rid, deleted=False):
 def sheets_row_delete(sid, rid):
     c = db()
     _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_row(c, sid, rid)
     c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), rid))
     sh_touch(c, sid, me())
@@ -307,6 +354,7 @@ def sheets_row_delete(sid, rid):
 def sheets_row_restore(sid, rid):
     c = db()
     _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
     _need_row(c, sid, rid, deleted=True)
     c.execute("UPDATE sheet_rows SET deleted_at=NULL WHERE id=?", (rid,))
     sh_touch(c, sid, me())
@@ -315,12 +363,20 @@ def sheets_row_restore(sid, rid):
 
 @app.post("/api/sheets/<int:sid>/rows/order")
 def sheets_rows_order(sid):
-    """{ids: [row ids in the new order]} -- sorting for good (rows not named keep their order behind)."""
+    """{ids: [row ids in the new order], prev?: [the row ids in the order the writer saw]} -- sorting for good (rows not named
+    keep their order behind). 2.528.0 (#4305 A12): under the sheet's lock; with prev a sorting / moving elsewhere since (or a
+    row of it deleted) gives 409 {error, rows: the current order, rev} instead of a silent overwrite (rows added since: fine)."""
     c = db()
     _need_w(c, sid)
-    ids = body().get("ids")
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): one writer per sheet, also for rows / columns
+    b = body()
+    ids = b.get("ids")
     live = [x[0] for x in c.execute("SELECT id FROM sheet_rows WHERE sheet_id=? AND deleted_at IS NULL ORDER BY pos, id", (sid,))]
     lset = set(live)
+    if shx_order_moved(live, b.get("prev")):
+        r = sh_reload(c, sid)
+        name = user_names(c, [r["updated_by"]]).get(r["updated_by"]) or "?"
+        return jsonify(error=tr("Changed in the meantime by {0}", name), rows=live, rev=r["rev"]), 409
     if not isinstance(ids, list) or len(ids) > len(live) or any(isinstance(x, bool) or x not in lset for x in ids) or len(set(ids)) != len(ids):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     given = set(ids)
@@ -359,5 +415,145 @@ def sheets_batch_undo(sid, batch):
     r = _need_w(c, sid)
     if not c.execute("SELECT 1 FROM sheet_changes WHERE sheet_id=? AND batch=? LIMIT 1", (sid, batch[:80])).fetchone():
         raise Denied(404)
-    n = sh_undo_batch(c, r, batch[:80], me())
-    return _done(c, sid, {"undone": n})
+    kept = {}  # 2.528.0 (#4306 B24): rows / columns / the table a person typed into since stay
+    n = sh_undo_batch(c, r, batch[:80], me(), kept=kept)
+    return _done(c, sid, {"undone": n, "kept": kept})
+
+
+# ---------------------------------------------------------------- 2.528.0 (#4306 B22): the trash of tables, like knowledge
+SHX_TRASH_MAX = 500
+SHX_ADMIN_ONLY = N_("Only admins of the organisation can empty its trash.")
+
+
+def shx_may_empty(c, uid, oid):
+    """Empty a whole space's table trash (or several at once): the private one its person, an organisation's only its admins
+    (like knowledge, wiki/pages.py _wkp_may_empty)."""
+    return not oid or is_org_admin(c, uid, oid)
+
+
+def shx_trashed(c, uid, oid):
+    """The tables of space oid in the trash uid may restore (newest first): through the space or its project, never through a
+    share or a folder (like restoring, _need_w deleted=True)."""
+    w, a = ("org_id=?", (oid,)) if oid else ("org_id IS NULL AND owner_id=?", (uid,))
+    rows = c.execute(f"SELECT * FROM sheets WHERE deleted_at IS NOT NULL AND book_id IS NULL AND {w} "
+                     f"ORDER BY deleted_at DESC, id DESC LIMIT {SHX_TRASH_MAX}", a).fetchall()
+    return [r for r in rows if sh_may(c, uid, r, share=False, fold=False)]
+
+
+@app.get("/api/sheets/trash")
+def sheets_trash_list():
+    """?space=private|org:<id> -- the tables of the space in the trash with their files' count / size, the trash period and
+    whether the person may empty it. Restore: POST /api/sheets/<id>/restore; for good: POST /api/sheets/purge."""
+    c = db()
+    uid = me()
+    oid = sh_space(c, uid, request.args.get("space") or "private")
+    rows = shx_trashed(c, uid, oid)
+    ids = [r["id"] for r in rows]
+    files = {}
+    if ids:
+        q = ",".join("?" * len(ids))
+        for x in c.execute(f"SELECT COALESCE(s.book_id, s.id) AS t, COUNT(f.id) AS n, COALESCE(SUM(f.size), 0) AS size FROM sheet_files f "
+                           f"JOIN sheets s ON s.id=f.sheet_id WHERE s.id IN ({q}) OR s.book_id IN ({q}) GROUP BY COALESCE(s.book_id, s.id)",
+                           [*ids, *ids]).fetchall():
+            files[x["t"]] = (x["n"], int(x["size"]))
+    return jsonify(space=sh_space_key(oid), days=ret_trash_days(), purge_on=ret_on("trash"), may_empty=shx_may_empty(c, uid, oid),
+                   sheets=[{"id": r["id"], "title": r["title"], "deleted_at": r["deleted_at"], "list_title": sh_list_title(c, r, uid),
+                            "files": files.get(r["id"], (0, 0))[0], "size": files.get(r["id"], (0, 0))[1],
+                            "can_write": sh_may(c, uid, r, write=True, share=False, fold=False)} for r in rows])
+
+
+def shx_preview(c, sheet_row, book, cells, n=3):
+    """A few of the inputs of a trashed row / column as words (formulas in the display form, a choice by its label; files,
+    people and ticks left out) so the person recognises it."""
+    out = []
+    for x in cells:
+        raw = (x["raw"] or "").strip()
+        col = book.col_all.get(x["col_id"])
+        if not raw or not col or col["kind"] in ("file", "person", "checkbox"):
+            continue
+        if col["kind"] == "select" and not raw.startswith("="):
+            raw = next((o.get("label") or "" for o in sh_options(col["options"]) if o.get("id") == raw), raw)
+        elif raw.startswith("="):
+            raw = sh_to_display(c, sheet_row, raw, book)
+        if raw:
+            out.append(raw[:60])
+        if len(out) >= n:
+            break
+    return out
+
+
+@app.get("/api/sheets/<int:sid>/trash")
+def sheets_sheet_trash(sid):
+    """The rows, columns and further sheets of a table in the trash (reading = seeing the table), each with a few of its inputs;
+    restore: .../rows/<id>/restore, .../columns/<id>/restore, POST /api/sheets/<tab>/restore (the right to write)."""
+    c = db()
+    r = sh_need(c, sid)
+    book = ShBook(c, r)
+    book.col_all = {x["id"]: x for x in c.execute("SELECT * FROM sheet_columns WHERE sheet_id=?", (sid,)).fetchall()}
+    by_row, by_col = {}, {}
+    for x in sorted(book.cells.values(), key=lambda x: (x["row_id"], x["col_id"])):
+        by_row.setdefault(x["row_id"], []).append(x)
+        by_col.setdefault(x["col_id"], []).append(x)
+    rows = c.execute(f"SELECT id, deleted_at FROM sheet_rows WHERE sheet_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC "
+                     f"LIMIT {SHX_TRASH_MAX}", (sid,)).fetchall()
+    cols = [x for x in sorted(book.col_all.values(), key=lambda x: (x["deleted_at"] or "", x["id"]), reverse=True) if x["deleted_at"]]
+    tabs = []
+    if not r["book_id"]:  # the first sheet: its further sheets in the trash (a further sheet is opened through its table)
+        tabs = c.execute("SELECT id, tab_name, title, deleted_at FROM sheets WHERE book_id=? AND deleted_at IS NOT NULL "
+                         "ORDER BY deleted_at DESC, id DESC", (sid,)).fetchall()
+    return jsonify(days=ret_trash_days(), purge_on=ret_on("trash"), can_write=sh_may(c, me(), r, write=True),
+                   rows=[{"id": x["id"], "deleted_at": x["deleted_at"], "values": shx_preview(c, r, book, by_row.get(x["id"], []))} for x in rows],
+                   columns=[{"id": x["id"], "title": x["title"], "kind": x["kind"], "deleted_at": x["deleted_at"],
+                             "values": shx_preview(c, r, book, by_col.get(x["id"], []))} for x in cols[:SHX_TRASH_MAX]],
+                   tabs=[{"id": x["id"], "name": x["tab_name"] or x["title"], "deleted_at": x["deleted_at"]} for x in tabs])
+
+
+def shx_purge(c, ids):
+    """Tables ids (first sheets in the trash) for good, as the trash run does (files/trashpurge.py tp_tick): the stored files
+    of their file cells (also of their further sheets) with their scan / text rows, their folder nodes; the rest cascades.
+    -> stored paths to unlink after the commit."""
+    if not ids:
+        return []
+    q = ",".join("?" * len(ids))
+    fr = c.execute(f"SELECT f.id, f.path FROM sheet_files f JOIN sheets s ON s.id=f.sheet_id WHERE s.id IN ({q}) OR s.book_id IN ({q})",
+                   [*ids, *ids]).fetchall()
+    for i in range(0, len(fr), 500):
+        fids = [x["id"] for x in fr[i:i + 500]]
+        fq = ",".join("?" * len(fids))
+        c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({fq})", fids)
+        c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({fq})", fids)
+    c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN ({q})", ids)
+    c.execute(f"DELETE FROM sheets WHERE book_id IN ({q})", ids)
+    c.execute(f"DELETE FROM sheets WHERE id IN ({q}) AND deleted_at IS NOT NULL", ids)
+    return [x["path"] for x in fr]
+
+
+@app.post("/api/sheets/purge")
+def sheets_purge_many():
+    """{space, ids} -- these tables of the trash for good; {space, all: true} -- empty the space's table trash. Rights as
+    restoring (the right to write through the space); several / all of an organisation only its admins. -> {ids, skipped}"""
+    need_feat("sheets")
+    c = db()
+    uid = me()
+    b = body()
+    oid = sh_space(c, uid, b.get("space") or "private")
+    ids = b.get("ids")
+    if b.get("all") is not True and (not isinstance(ids, list) or len(ids) > SHX_TRASH_MAX
+                                     or any(isinstance(x, bool) or not isinstance(x, int) for x in ids)):
+        raise BadInput(tr("Invalid value: {0}", "ids"))
+    mine = [r["id"] for r in shx_trashed(c, uid, oid) if sh_may(c, uid, r, write=True, share=False, fold=False)]
+    if b.get("all") is not True:
+        want = set(ids)
+        mine = [x for x in mine if x in want]
+    if oid and (b.get("all") is True or len(mine) > 1) and not shx_may_empty(c, uid, oid):
+        raise Denied(403, tr(SHX_ADMIN_ONLY))  # one's own single table stays allowed (like knowledge)
+    paths = shx_purge(c, mine)
+    if mine:
+        if oid:  # the organisation's admins see it in the history of its projects (no table names)
+            c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) "
+                      "VALUES(?,?,?,?,?,?,?,?,?)", (oid, None, f"Tables ({len(mine)})", "purge", uid, None, None, iso_ms(now_utc()),
+                                                    json.dumps({"kind": "sheet", "sheets": len(mine)})))
+        bump(c)
+    c.commit()
+    unlink_files(paths)  # after the commit: a failed commit keeps the rows and their files
+    return jsonify(ok=True, ids=mine, skipped=[x for x in (ids or []) if x not in set(mine)])

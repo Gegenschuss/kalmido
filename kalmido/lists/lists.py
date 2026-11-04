@@ -411,6 +411,10 @@ def list_update(lid):
     role = need_list(c, lid, write=False)
     if qn_is(c, lid) and qn_shares(b):  # 2.477.0 (#3881): the list "Notes" stays private (no workspace, folder, agents, family)
         qn_private(c, lid)
+    pz_has, pz_prev, pz_out = False, None, {}  # 2.528.0 B (#4305, A10): the properties merged key by key (oxb_props_merge)
+    if "props" in b and isinstance(b.get("_prev"), dict) and "props" in b["_prev"]:
+        pz_has, pz_prev = True, b["_prev"]["props"]
+        b = {**b, "_prev": {k: v for k, v in b["_prev"].items() if k != "props"}}
     b, conflicts = lp_prev_conflicts(c, lid, role, b)  # 2.270.0 A (#3019): before anything is written (was: only LIST_FIELDS, late)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
@@ -501,9 +505,15 @@ def list_update(lid):
     if "props" in b:  # 2.412.0 (#3552): the properties switched by hand against the project type (owner / project admins)
         if role not in MANAGE_ROLES:
             return err(tr("Only the owner and project admins can change this setting"), 403)
-        from ..lists.templates import props_clean
+        from ..lists.templates import oxb_props_merge, props_clean
         try:
-            c.execute("UPDATE lists SET props=? WHERE id=?", (props_clean(b["props"]), lid))
+            if pz_has:
+                pz_text, pz_cf = oxb_props_merge(c, lid, pz_prev, b["props"])
+                conflicts += pz_cf
+                pz_out = {"props": pz_text}  # the merged value: the client takes it
+            else:
+                pz_text = props_clean(b["props"])
+            c.execute("UPDATE lists SET props=? WHERE id=?", (pz_text, lid))
         except BadInput as e:
             return err(str(e))
         b = {k: v for k, v in b.items() if k != "props"}
@@ -636,7 +646,7 @@ def list_update(lid):
         pt_out = {**pt_out, **({"move_ended": ended} if ended else {}), **({"move_restored": back} if back else {})}
     bump(c)
     c.commit()
-    return jsonify(ok=True, conflicts=conflicts, **pt_out)
+    return jsonify(ok=True, conflicts=conflicts, **pt_out, **pz_out)
 
 
 @app.post("/api/lists/reorder")

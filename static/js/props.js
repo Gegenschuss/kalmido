@@ -73,7 +73,13 @@ async function pz_set(id, o, label) {
   const l = listById(id); if (!l) return;
   const was = typeof l.props === 'string' ? l.props : pz_text(pz_own(l)), v = pz_text(o);
   if (was === v) return;
-  try { await optWrite(optSet(() => listById(id), {props: v}), () => api('PATCH', '/api/lists/' + id, {props: o})); } catch { return; }
+  // 2.528.0 B (#4305, A10): with the deviations this device saw (_prev): the server merges key by key; a key changed elsewhere
+  // meanwhile stays (said), the ones changed elsewhere that this did not touch stay too; the screen takes the merged value
+  const seen = {...pz_own(l)};
+  let r;
+  try { r = await optWrite(optSet(() => listById(id), {props: v}), () => api('PATCH', '/api/lists/' + id, {props: o, _prev: {props: seen}})); } catch { return; }
+  if (typeof r?.props === 'string') { const x = listById(id); if (x) x.props = r.props; }
+  if (r?.conflicts?.some(c => String(c.field).startsWith('props:'))) toast(tr('Changed elsewhere in the meantime') + ': ' + r.conflicts.filter(c => String(c.field).startsWith('props:')).map(c => pz_name(c.field.slice(6))).join(', '));
   render(); if (S.sel) renderDetail();
   const go = to => async () => { await api('PATCH', '/api/lists/' + id, {props: to}); await load(); render(); return {skipped: []}; };
   offerUndo(label, histAdd({label: tr('Properties of {0}', qn(lname(l))), undo: go(was), redo: go(v), lids: [id]}));

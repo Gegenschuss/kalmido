@@ -842,6 +842,7 @@ ROUTES = {
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "GET /api/sheets/folders": "sheets", "POST /api/sheets/folders": "sheets",  # 2.199.0 C (#2742): p2199_c_sheets_test.py
+    "GET /api/sheets/trash": "sheets", "GET /api/sheets/{}/trash": "sheets", "POST /api/sheets/purge": "sheets",  # 2.528.0 (#4306 B22): p2528_c_sheets_test.py
     "GET /api/contacts/folders": "pim", "POST /api/contacts/folders": "pim",  # 2.351.0 B (#2749): p2351_b_contacts_tree_test.py
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a person without an organisation adds, renames, moves,
     # deletes and restores sheets of her private table; API v1 through the agents of the same test)
@@ -1564,7 +1565,6 @@ PUT /api/folders/playbook
 PUT /api/folders/public-links
 PUT /api/life/karakeep
 PUT /api/lists/{}/bell
-PUT /api/lists/{}/favorite
 PUT /api/lists/{}/folder-repo
 PUT /api/lists/{}/header
 PUT /api/lists/{}/icon

@@ -878,7 +878,7 @@ async function wkeDlg(sp) {
       const a = b.dataset.wkd, uid = +b.dataset.uid;
       try {
         if (a === 'setup') { if (typeof e2eEnsure === 'function') await e2eEnsure(); box._wkeDraw(); }
-        else if (a === 'start') { if (!$('#wke-ack', box)?.checked) return; b.disabled = true; wkeRun(sp, 'start').finally(() => box._wkeDraw()); draw(); }
+        else if (a === 'start') { if (!$('#wke-ack', box)?.checked) return; b.disabled = true; if (!await wkxHeldAsk(j.held)) { b.disabled = false; return; } wkeRun(sp, 'start').finally(() => box._wkeDraw()); draw(); }
         else if (a === 'resume') { wkeRun(sp, 'resume').finally(() => box._wkeDraw()); draw(); }
         else if (a === 'stop') { await wkeStopDlg(sp); box._wkeDraw(); }
         else if (a === 'release' || a === 'release-all') {
@@ -891,6 +891,16 @@ async function wkeDlg(sp) {
       } catch (x) { if (x?.message) toast(x.message); b.disabled = false; }
     });
   }});
+}
+// 2.528.0 D (#4306, B26): before switching on -- the earlier versions and the files in the trash are not deleted at once: they
+// stay on the server until the trash period ends (or the retention rule of the instance deletes them), unseen while locked
+async function wkxHeldAsk(h) {
+  const nv = +h?.versions || 0, nf = +h?.files || 0;
+  if (!nv && !nf) return true;
+  const what = [nv ? trn('{0} earlier version of the pages', '{0} earlier versions of the pages', nv) : '', nf ? trn('{0} file in the trash', '{0} files in the trash', nf) : ''].filter(Boolean);
+  // review 2.528 (Fable 1): they go after the period also with the instance's retention switch off (wkhist.wkx_tick)
+  const why = tr('They stay readable on the server until the trash period ends ({0} days) and are deleted then. While the workspace is encrypted nobody sees them; switched off again before that, only the people who could read the pages before see them again.', h.days);
+  return askConfirm(tr('Old versions and the trash'), '', {html: `<ul class="wkxheld">${what.map(x => `<li>${esc(x)}</li>`).join('')}</ul><p class="muted">${esc(why)}</p>`, ok: tr('Encrypt')});
 }
 // the way back: only who manages the space, with the account password (like the lists)
 async function wkeStopDlg(sp) {

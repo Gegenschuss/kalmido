@@ -256,7 +256,7 @@ def wkm_free(path, taken):
     return n
 
 
-def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths):
+def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths, strict=True):
     """Pages rows of space oid / owner go into uid's private space: a name taken there gets " (2)", the links between these
     pages follow, their files and history are sealed for it, their shares end. -> [(row, new path)]. The caller commits.
     2.508.0 (#4301): also from another person's private space (their account is deleted)."""
@@ -271,7 +271,7 @@ def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths):
     ren, ids, ts = {r["path"].lower(): n for r, n in moves if r["path"] != n}, [r["id"] for r in rows], iso_ms(now_utc())
     for r, n in moves:
         c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
-    wka_move_files(c, ids, None, uid, new_paths, old_paths)
+    wka_move_files(c, ids, None, uid, new_paths, old_paths, strict=strict)  # 2.528.0 (#4306 B25): strict = a broken file stops it
     wsh_end_moved(c, oid, owner, [r["path"] for r in rows])
     wkh_move(c, rows, None, uid)
     for r, n in moves:

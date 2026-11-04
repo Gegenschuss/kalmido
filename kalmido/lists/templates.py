@@ -5,7 +5,7 @@ from datetime import date, timedelta
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import lang, N_, tr
 from ..core.db import body, bump, db, err, inbox_default, iso, local_now, now_utc, uset, usettings
@@ -802,6 +802,38 @@ def props_clean(v):
         raise BadInput(tr("Invalid value: {0}", "props"))
     out = {k: int(v[k]) for k in PROP_KEYS if v.get(k) is not None}
     return json.dumps(out, sort_keys=True) if out else ""  # the format of lp_norm (the `_prev` check)
+
+
+def _oxb_props_obj(v):
+    """lists.props as {key: 0 | 1} (a stored text, an object of a request; anything else = none)."""
+    try:
+        return json.loads(props_clean(v) or "{}")
+    except (BadInput, ValueError):
+        return {}
+
+
+def oxb_props_merge(c, lid, prev, new):
+    """2.528.0 B (#4305, A10): a change of lists.props with `_prev` (the deviations the device saw) is merged key by key under
+    the list's lock: only the keys this device changed are written; one another device changed meanwhile to another value
+    stays (conflict "props:<key>"); the keys it did not touch keep the server's value. Returns (stored text, conflicts).
+    BadInput for an invalid value. Without `_prev` the caller stores the whole value as before (the undo, agents, old clients)."""
+    props_clean(new)  # BadInput on an invalid value
+    mine, seen = _oxb_props_obj(new), _oxb_props_obj(prev)
+    write_lock(c, f"list-props-{lid}")  # the read and the write see no other change in between
+    r = c.execute("SELECT props FROM lists WHERE id=?", (lid,)).fetchone()
+    cur = _oxb_props_obj(r["props"] if r else "")
+    out, conflicts = dict(cur), []
+    for k in set(mine) | set(seen):
+        if mine.get(k) == seen.get(k):
+            continue  # not changed here: the server's value stays
+        if cur.get(k) != seen.get(k) and cur.get(k) != mine.get(k):
+            conflicts.append({"field": f"props:{k}", "server": cur.get(k), "mine": mine.get(k)})
+            continue
+        if k in mine:
+            out[k] = mine[k]
+        else:
+            out.pop(k, None)
+    return props_clean(out), conflicts
 
 
 def props_for_type(cur, k):

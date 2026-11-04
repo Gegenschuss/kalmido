@@ -20,11 +20,11 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import IntegrityError, system_ctx
+from ..core.retention import ret_on, ret_trash_days  # 2.528.0 D (#4306)
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.liste2e import (LE2EDenied, _LE2A_CIPHER, _LE2A_OLD, _LE2A_PLAIN, le2e_is_cipher, le2e_parse, le2e_writer_ok)
 from ..core.orgcrypt import oc_is_enc  # 2.149.0 G (#2517): pulled up from functions
-from ..core.serializers import unlink_files  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .pages import WIKI_BODY_MAX, wiki_space_key, wiki_space, WIKI_PATH_MAX, wiki_clean_path, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
@@ -282,7 +282,16 @@ def wke_info(c, oid, uid):
             "gen": int(sp["e2e_gen"] or 0) if sp else 0, "rotate": int(sp["e2e_rotate"] or 0) if sp else 0,
             "reenc": int(sp["e2e_reenc"] or 0) if sp else 0, "by": sp["e2e_by"] if sp else None, "at": sp["e2e_at"] if sp else None,
             "can_manage": wke_can_manage(c, oid, uid), "keys": keys, "pending": wke_pending(c, sp, people), "members": people,
-            "left": left}
+            "left": left, "held": _wkx_held_info(c, oid, uid, mode)}
+
+
+def _wkx_held_info(c, oid, uid, mode):
+    """2.528.0 D (#4306, B26): for the question before switching on -- {versions, files, days, purge_on} the switch holds (only
+    while the space is open; None otherwise)."""
+    if mode:
+        return None
+    from .wkhist import wkx_counts
+    return {**wkx_counts(c, oid, None if oid else uid), "days": ret_trash_days(), "purge_on": ret_on("trash")}
 
 
 # ---------------------------------------------------------------- routes
@@ -404,16 +413,18 @@ def wke_start():
     for p in people:
         if p["user_id"] not in given:
             c.execute("INSERT INTO wiki_key_pending(space_id,user_id,since) VALUES(?,?,?) ON CONFLICT DO NOTHING", (sp["id"], p["user_id"], ts))
-    from .wikiatt import wka_drop_trashed
-    gone = wka_drop_trashed(c, oid, uid)  # 2.99.0 (#2182, review M2): no plain file in the trash of an encrypted space
-    from .wkhist import wkh_drop_space
-    wkh_drop_space(c, oid, None if oid else uid)  # 2.123.0 A (#2102, #2106): no history / word index of a locked space
+    # 2.528.0 D (#4306, B26): the history and the files in the trash are held until the trash period ends (wkhist.wkx_tick,
+    # the trash runs), seen again only by the people of the space now and only once the lock is off; the word index goes.
+    # Was (2.99.0 #2182 review M2, 2.123.0 A #2102): both deleted here at once. The browser asked before (wke_info "held").
+    from .wkhist import wkx_hold_space
+    held = wkx_hold_space(c, sp, {p["user_id"] for p in people} | {uid}, ts)
     from .wkfolder import wkf_drop_space
     wkf_drop_space(c, uid, oid)  # 2.200.0 A (#2747, review 3): no tree with plain names of a locked space
     bump(c)
     c.commit()
-    unlink_files(gone)
-    return jsonify(wke_info(c, oid, uid))
+    out = wke_info(c, oid, uid)
+    out["held"] = held
+    return jsonify(out)
 
 
 @app.get("/api/wiki/e2e/todo")

@@ -166,8 +166,8 @@ def _sheets(c, items, new_paths, old_paths):
         c.execute("DELETE FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, heir))
         c.execute("UPDATE sheets SET owner_id=?, list_id=? WHERE id=?", (heir, lid if lid and list_role(c, lid, heir) else None, sid))
         shf_after_move(c, sid)
-        shk_move_files(c, sid, None, heir, new_paths, old_paths)
-        shb_move(c, sid, None, heir, new_paths, old_paths)
+        shk_move_files(c, sid, None, heir, new_paths, old_paths, strict=False)  # 2.528.0 (#4306 B25): a broken file never stops the deletion
+        shb_move(c, sid, None, heir, new_paths, old_paths, strict=False)
         for u, role in x["others"].items():
             c.execute("""INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,NULL,?,?,?,?)
                          ON CONFLICT (sheet_id, user_id) DO UPDATE SET role=excluded.role, revoked_at=NULL WHERE sheet_shares.revoked_at IS NOT NULL""",
@@ -191,7 +191,7 @@ def _wiki(c, uid, items, new_paths, old_paths):
         if not rows:
             continue
         wkh_drop_unreadable(c, [r["id"] for r in rows])
-        wkm_place(c, None, uid, heir, rows, new_paths, old_paths)
+        wkm_place(c, None, uid, heir, rows, new_paths, old_paths, strict=False)  # 2.528.0 (#4306 B25)
         WKF_SEEN.pop(f"u{int(heir)}", None)  # a deletion tried before and rolled back left this very state noted, without its nodes
         wkf_sync(c, heir, None)
         for pid, who in others.items():

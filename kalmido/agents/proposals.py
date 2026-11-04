@@ -6,7 +6,7 @@ from datetime import timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock  # 2.528.0 (#4305 A8): write_lock
 from ..core.i18n import N_, lang, tr
 from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
@@ -804,6 +804,8 @@ def prop_run(c, j, sel, ed, extra):
         rec["list"] = lid
         return rec
     if kind == "dayplan":  # 2.10.0 (#440): planned start (2.11.0, never due / deadline) + duration of the person's own tasks
+        stale = []  # 2.528.0 (#4305 A8): tasks changed since the proposal
+        oxa_prop_locks(c, prop)
         for key in sel:
             tid, want = dayplan_want(prop, inp, key, edits.get(key, {}))
             if not tid or str(tid) in rec["changes"]:
@@ -815,14 +817,21 @@ def prop_run(c, j, sel, ed, extra):
             cur = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
             if cur["deleted_at"] or cur["status"] != 0:
                 continue
+            st = oxa_prop_stale(c, prop, tid)
+            if st is not None:
+                stale.append(st)
+                continue
             before = {k: cur[k] for k in want}
             msg = apply_update(c, tid, dict(want))
             if msg:
                 raise BadInput(msg)
             log_act(c, tid, "proposal", {"agent": aid})
             rec["changes"][str(tid)] = {"before": before, "after": want}
+        oxa_prop_refuse(stale)
         return rec
     # triage: moves / edits of the person's inbox items (normal changes: apply_update checks every move)
+    stale = []  # 2.528.0 (#4305 A8): tasks changed since the proposal
+    oxa_prop_locks(c, prop)
     for i, it in enumerate(prop["items"]):
         if str(i) not in selected:
             continue
@@ -830,6 +839,10 @@ def prop_run(c, j, sel, ed, extra):
         try:
             need_task(c, tid)
         except Denied:
+            continue
+        st = oxa_prop_stale(c, prop, tid)
+        if st is not None:
+            stale.append(st)
             continue
         e = edits.get(str(i), {})
         want = {}
@@ -859,7 +872,55 @@ def prop_run(c, j, sel, ed, extra):
             raise BadInput(msg)
         log_act(c, tid, "proposal", {"agent": aid})
         rec["changes"][str(tid)] = {"before": before, "after": want}
+    oxa_prop_refuse(stale)
     return rec
+
+
+OXA_PROP_FIELDS = ("title", "list_id", "section_id", "due", "priority", "plan_start", "duration")  # what triage / day plan write
+# review 2.528 (Fable 2): each kind compares only what it writes (a day plan is not refused for a new title)
+OXA_PROP_KIND = {"triage": ("title", "list_id", "section_id", "due", "priority"), "dayplan": ("plan_start", "duration")}
+
+
+def oxa_prop_base(c, kind, p):
+    """2.528.0 (#4305 A8): the fields a triage / day plan proposal may change, of every task it names, as they stood when the
+    proposal was stored (the person reviews these): p["base"] = {task id: {field: value}}. The base of the decision
+    "Vorschlag annehmen mit base_updated_at wie tidy", compared by value: updated_at has whole seconds, a change in the
+    proposal's own second would slip through (tags are added to the current ones anyway)."""
+    if kind not in ("triage", "dayplan") or not isinstance(p, dict):
+        return p
+    ids = sorted({int(it["task_id"]) for it in p.get("items") or [] if isinstance(it, dict) and isinstance(it.get("task_id"), int)})
+    fields = OXA_PROP_KIND[kind]
+    p["base"] = {str(r["id"]): {k: r[k] for k in fields} for r in c.execute(
+        f"SELECT id, {', '.join(fields)} FROM tasks WHERE id IN ({','.join('?' * len(ids))})", ids)} if ids else {}
+    return p
+
+
+def oxa_prop_locks(c, prop):
+    """Review 2.528 (Fable 3): the row locks of every task the proposal names, in id order before the first change (two
+    applies over the same tasks never cross; write_lock holds per transaction, oxa_prop_stale takes it again)."""
+    base = prop.get("base") if isinstance(prop.get("base"), dict) else {}
+    for tid in sorted(int(x) for x in base if str(x).isdigit()):
+        write_lock(c, f"task-{tid}")
+
+
+def oxa_prop_stale(c, prop, tid):
+    """2.528.0 (#4305 A8): the person changed one of these fields since the proposal -> the task's title, else None. The
+    task's row lock is taken first (the check and apply_update see no other edit in between). Proposals stored before 2.528
+    carry no base: applied as before."""
+    base = prop.get("base").get(str(tid)) if isinstance(prop.get("base"), dict) else None
+    if not isinstance(base, dict):
+        return None
+    write_lock(c, f"task-{tid}")
+    r = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    return r["title"] if r and any(k in r.keys() and r[k] != v for k, v in base.items()) else None
+
+
+def oxa_prop_refuse(stale):
+    """2.528.0 (#4305 A8): a selected task changed since the proposal is never overwritten silently: the whole apply is refused
+    (409, like tidy; the caller rolls back) and names the tasks - deselect them or ask again."""
+    if stale:
+        raise Denied(409, tr("Task was changed since the proposal: {0}", ", ".join(f"“{t[:60]}”" for t in stale[:5])
+                                                                           + (" …" if len(stale) > 5 else "")))
 
 
 def prop_notify_agent(c, j, action, state, extra=None):
@@ -1211,7 +1272,7 @@ def v1_agent_job_proposal(jid):
         raise Denied(409, tr("This proposal was already applied or discarded"))
     if len(request.data or b"") > PROP_MAX_BYTES:
         return v1_err(413, tr("The proposal is too large (at most {0} KB)", PROP_MAX_BYTES // 1024))
-    p = prop_validate(j["kind"], v1_json(), json.loads(j["input"] or "{}"))
+    p = oxa_prop_base(c, j["kind"], prop_validate(j["kind"], v1_json(), json.loads(j["input"] or "{}")))  # 2.528.0 (#4305 A8)
     first = j["prop_state"] != "ready"
     ts = iso(now_utc())
     c.execute("UPDATE agent_jobs SET proposal=?, prop_state='ready', state='waiting', updated_at=? WHERE id=?",

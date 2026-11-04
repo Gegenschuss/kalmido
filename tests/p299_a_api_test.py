@@ -260,7 +260,8 @@ check(r.ok and all(Ca.get(B + f["url"]).content == before[f["id"]] for f in mf),
 # ---------------------------------------------------------------- a locked space (encrypted in the browser)
 r = Ca.post(B + "/api/wiki/e2e/start", json={"space": SP2, "keys": []})
 check(r.status_code == 409 and "have files" in r.json().get("error", ""), "#2182: a space with files cannot be locked yet " + r.text[:200])
-# review M2: files in the trash do not block the lock (they are deleted for good when it is switched on)
+# review M2: files in the trash do not block the lock
+# 2.528.0 (#4306): they are held when it is switched on, no longer deleted at once (tests/p2528_d_wiki_held_test.py)
 allf = [f["id"] for p in Ca.get(B + "/api/wiki", params={"space": SP2}).json()["pages"]
         for f in Ca.get(B + f"/api/wiki/pages/{p['id']}").json().get("files", [])]
 r = Ca.post(B + "/api/wiki/trash", json={"ids": [], "files": allf})

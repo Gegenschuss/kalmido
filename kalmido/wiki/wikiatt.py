@@ -41,6 +41,7 @@ from .wikie2e import wke_page_mode  # 2.369.5 (#2517): pulled up from functions
 
 WKA_LANG = threading.local()  # 2.177.0 (#2685): the language of the person a background import (wkimport.py) works for
 WKA_TOO_LARGE = N_("The archive is too large")
+WKA_MOVE_FILE_FAIL = N_("A file could not be copied into the other workspace; nothing was moved")  # 2.528.0 (#4306 B25)
 
 
 def tr(key, *a, lg=None):
@@ -302,32 +303,38 @@ def wka_bulk(c, uid, ids, trash):
             pg = wiki_need(c, f["page_id"], write=True)  # 2.200.0 A (#2747): edit on the page
             if wka_locked(c, pg):
                 raise Denied(404)
+            from .wkhist import wkx_may_see  # 2.528.0 D (#4306): a file held at a lock only for who could read the space then
+            if not trash and not wkx_may_see(c, pg, f["wkx_held_at"], uid):
+                raise Denied(404)
         except Denied:
             skipped.append(fid)
             continue
-        c.execute("UPDATE wiki_files SET deleted_at=? WHERE id=?", (ts if trash else None, fid))
+        if trash:
+            c.execute("UPDATE wiki_files SET deleted_at=? WHERE id=?", (ts, fid))
+        else:  # back from the trash: an ordinary file of the page again (2.528.0 D, #4306)
+            c.execute("UPDATE wiki_files SET deleted_at=NULL, wkx_held_at=NULL WHERE id=?", (fid,))
         done.append(fid)
     return done, skipped
 
 
+def wkx_files_back(c, uid, page):
+    """2.528.0 D (#4306, B26): page comes back from the trash -- its files held when the lock was switched on (trashed with the
+    page or later) come back with it only when the space is open again and uid could read it then; else they stay in the
+    trash (their period runs on). The caller commits."""
+    if wka_locked(c, page):
+        return
+    from .wkhist import wkx_may_see
+    for f in c.execute("SELECT id, wkx_held_at FROM wiki_files WHERE page_id=? AND deleted_at>=? AND wkx_held_at IS NOT NULL",
+                       (page["id"], page["deleted_at"])).fetchall():
+        if wkx_may_see(c, page, f["wkx_held_at"], uid):
+            c.execute("UPDATE wiki_files SET deleted_at=NULL, wkx_held_at=NULL WHERE id=?", (f["id"],))
+
+
 def wka_space_has_files(c, oid, uid):
-    """A file (not in the trash) in the space: the lock cannot be switched on (wikie2e.wke_start; the trashed ones go then)."""
+    """A file (not in the trash) in the space: the lock cannot be switched on (wikie2e.wke_start; the trashed ones are held
+    then, 2.528.0 D #4306: wkhist.wkx_hold_space)."""
     w, a = wiki_space_sql(oid, uid)
     return bool(c.execute(f"SELECT 1 FROM wiki_files WHERE deleted_at IS NULL AND {w} LIMIT 1", a).fetchone())
-
-
-def wka_drop_trashed(c, oid, uid):
-    """Review M2: switching the lock on deletes the space's files in the trash for good (no plain file stays behind in an
-    encrypted space); -> their paths, unlinked by the caller after the commit."""
-    w, a = wiki_space_sql(oid, uid)
-    rows = c.execute(f"SELECT id, path FROM wiki_files WHERE deleted_at IS NOT NULL AND {w}", a).fetchall()
-    if rows:
-        ids = [r["id"] for r in rows]
-        q = ",".join("?" * len(ids))
-        c.execute(f"DELETE FROM upload_scan WHERE kind='wiki' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM file_text WHERE kind='wiki' AND ref_id IN ({q})", ids)
-        c.execute(f"DELETE FROM wiki_files WHERE id IN ({q})", ids)
-    return [r["path"] for r in rows]
 
 
 def wka_user_files(c, uid):
@@ -340,11 +347,13 @@ def wka_org_files(c, oid):
     return [r[0] for r in c.execute("SELECT path FROM wiki_files WHERE org_id=?", (oid,))]
 
 
-def wka_move_files(c, page_ids, to, uid, new_paths, old_paths):
+def wka_move_files(c, page_ids, to, uid, new_paths, old_paths, strict=True):
     """2.99.0 (#2182 x 2.96.0 #1941): pages moved between the private space and an organisation take their files along (also
     the ones in the trash): row org / owner as the page, the stored file sealed with the target's key. The caller commits.
     2.363.3 (#3133): into a new stored file as files/fsmove.py does: new_paths (removed on an error) and old_paths (removed
-    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was."""
+    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was.
+    2.528.0 (#4306 B25): a file that cannot be copied stops the move (Denied 409, the caller rolls back); strict=False (an
+    account's deletion handing its pages on) leaves it as it is instead."""
     ids = [int(x) for x in page_ids]
     if not ids:
         return 0
@@ -352,11 +361,16 @@ def wka_move_files(c, page_ids, to, uid, new_paths, old_paths):
     space = int(to) if to else oc_user_space(uid)
     for r in rows:
         rel = os.path.join(os.path.dirname(r["path"]), f"{uuid.uuid4().hex[:12]}-{os.path.basename(r['path']).partition('-')[2]}")
+        if not os.path.isfile(os.path.join(ATT_DIR, r["path"])):
+            continue  # a missing file: nothing to seal (the storage check reports it)
+        new_paths.append(rel)  # 2.528.0 (#4306 B25): before the copy, so a half-written file goes with the rollback
         try:
             oc_copy_file(c, os.path.join(ATT_DIR, r["path"]), os.path.join(ATT_DIR, rel), space)  # review 2 L1: plain bytes that look sealed get an outer layer
-        except (OSError, OrgCryptError):
-            continue  # a missing / unreadable file stays as it is (the storage check reports it)
-        new_paths.append(rel)
+        except (OSError, OrgCryptError):  # 2.528.0 (#4306 B25): never a file with the old key in the new space: the whole move stops
+            if strict:
+                raise Denied(409, tr(WKA_MOVE_FILE_FAIL)) from None
+            new_paths.pop()
+            continue
         c.execute("UPDATE wiki_files SET path=? WHERE id=?", (rel, r["id"]))
         old_paths.append(r["path"])
     if rows:

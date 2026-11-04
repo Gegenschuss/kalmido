@@ -711,7 +711,10 @@ def wiki_bulk(trash):
                 c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (ts if trash else None, pid))
                 if not trash and r["deleted_at"]:  # 2.272.0 A (#3026): its files trashed with it (or later) come back too;
                     # a file deleted on its own before the page stays in the trash
-                    c.execute("UPDATE wiki_files SET deleted_at=NULL WHERE page_id=? AND deleted_at>=?", (pid, r["deleted_at"]))
+                    c.execute("UPDATE wiki_files SET deleted_at=NULL WHERE page_id=? AND deleted_at>=? AND wkx_held_at IS NULL",
+                              (pid, r["deleted_at"]))
+                    from .wikiatt import wkx_files_back
+                    wkx_files_back(c, uid, r)  # 2.528.0 D (#4306): files held at a lock only for who could read the space then
             done.append(pid)
         except IntegrityError:
             skipped.append(pid)

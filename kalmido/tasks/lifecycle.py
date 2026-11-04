@@ -75,6 +75,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
                 continue
             if k == "tags":
                 cur = my_tags(c, tid)
+            elif k == "ltags":  # 2.528.0 B (#4305): the list tags too (the online PATCH sends their whole list)
+                from ..collab.reactions import ltag_names
+                cur = ltag_names(c, tid)
             elif k == "snippets" and k in row.keys():  # 2.35.0 (#1095): compared by their content (ids, language, path, line, code)
                 from ..tasks.snippets import snip_sig
                 cur, old, mine = snip_sig(row[k]), snip_sig(old), snip_sig(b[k])
@@ -684,13 +687,22 @@ def task_undo(tid):
 
 @app.post("/api/tasks/<int:tid>/skip")
 def task_skip(tid):
-    """'Skip this occurrence': move a recurring task to its next date without a done copy."""
+    """'Skip this occurrence': move a recurring task to its next date without a done copy.
+    {expect?} (2.528.0 #4305 B1) = the due date the client saw: when it no longer matches (skipped / moved on another device,
+    a replay of the offline queue) nothing is skipped a second time: 409 {error, code: skip_stale, task}. A repeat with the
+    same Idempotency-Key gets the first answer (core/idem.py)."""
     c = db()
     need_task(c, tid)
     need_live(c, tid)  # 2.126.0 D (#1992 A3)
+    write_lock(c, f"task-{tid}")  # 2.528.0 (#4305 B1): the expect check and the move see no other skip / edit in between
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t["repeat"] or not t["due"]:
         return err(tr("Not a recurring task"))
+    b = body()
+    exp = b.get("expect") if isinstance(b, dict) else None
+    if exp and str(exp)[:10] != t["due"][:10]:
+        return jsonify(error=tr("This occurrence was already skipped or moved meanwhile, nothing was skipped"), code="skip_stale",
+                       task=one_task(c, tid)), 409
     e = lock_problem(c, t, {"due": ""})  # 2.36.0 (#1118): skipping moves the date, which a locked task keeps (app writes)
     if e:
         return err(e)

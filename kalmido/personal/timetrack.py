@@ -9,6 +9,8 @@ from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import IntegrityError, insert_id, Row
+from ..core.pg import write_lock  # 2.528.0 (#4305)
+from ..core.conflict import Conflict  # 2.528.0 (#4305)
 from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso, usettings
 from ..core.usertz import hm_text, tz_of_s
@@ -490,15 +492,62 @@ def time_create():
     return jsonify(one_entry(c, eid))
 
 
+OXB_TIME_KEYS = ("start", "end", "minutes", "note", "task_id", "list_id", "billable")
+
+
+def _oxb_tnorm(k, v):
+    """One field of a time entry in a comparable form (times as instants, ids as numbers, the note trimmed)."""
+    if v in (None, ""):
+        return None
+    if k in ("start", "end"):
+        try:
+            return parse_iso(str(v)).timestamp()
+        except (TypeError, ValueError):
+            return str(v)
+    if k in ("task_id", "list_id", "minutes"):
+        try:
+            return int(v)
+        except (TypeError, ValueError):
+            return str(v)
+    if k == "billable":
+        return v in (True, 1, "1", "true")
+    return str(v).strip()
+
+
+def oxb_time_prev(c, eid, r, b):
+    """2.528.0 B (#4305, A13): b['_prev'] = {field: the value the device saw} (start, end, minutes, note, task_id, list_id,
+    billable). Under the entry's lock: a field whose value changed elsewhere meanwhile (and is not already the new one) ->
+    409 with the current entry (key "entry"), nothing is written. Without _prev: r unchanged (API v1, old clients).
+    Returns the row read under the lock."""
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if not prev:
+        return r
+    write_lock(c, f"time-{eid}")  # the check and the write see no other change in between
+    r = c.execute("SELECT * FROM time_entries WHERE id=?", (eid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    cur = one_entry(c, eid)
+    have = {**cur, "minutes": (cur["seconds"] or 0) // 60 if cur.get("end") else None}
+    for k, old in prev.items():
+        if k not in OXB_TIME_KEYS or k not in b:
+            continue
+        now, mine = _oxb_tnorm(k, have.get(k)), _oxb_tnorm(k, b[k])
+        if now != _oxb_tnorm(k, old) and now != mine:
+            raise Conflict("entry", cur)
+    return r
+
+
 @app.patch("/api/time/entries/<int:eid>")
 def time_update(eid):
-    """My entry: {start?, end?, minutes?, note?, task_id? | list_id?}. A running timer: start / note / task only."""
+    """My entry: {start?, end?, minutes?, note?, task_id? | list_id?, _prev?}. A running timer: start / note / task only.
+    2.528.0 B (#4305): _prev = what the device saw; changed elsewhere meanwhile = 409 {error, entry} (oxb_time_prev)."""
     need_time()
     b = body()
     c = db()
     r = need_entry(c, eid)
     if not isinstance(r, Row):
         return r
+    r = oxb_time_prev(c, eid, r, b)
     from .timesheet import tsl_check, tz_of
     zone = tz_of(c, r["user_id"])
     tsl_check(c, r["user_id"], r["start"], zone=zone)  # 2.125.0 B (#2119): nothing changes in a closed month

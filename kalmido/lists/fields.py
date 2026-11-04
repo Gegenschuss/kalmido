@@ -7,7 +7,7 @@ from datetime import date
 from flask import g, has_app_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape
+from ..core.pg import insert_id, like_escape, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, pvis, task_visible, vis_sql
@@ -270,6 +270,7 @@ def tb_fields_module_on(c, lid):
     r = c.execute("SELECT owner_id FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or not r[0]:
         return []
+    write_lock(c, f"usettings-{int(r[0])}")  # 2.528.0 B (#4305, A11): the owner's modules read-change-write like PATCH /api/settings
     fs = [x for x in (usettings(c, r[0]).get("features") or "").split(",") if x]
     if "fields" in fs:
         return []

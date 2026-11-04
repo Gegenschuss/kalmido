@@ -84,7 +84,7 @@ from ..files.fsref import fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_reg
 from ..files.fsroots import fs_area_root, fs_area_rule
 from ..files.store import ROLE_RANK, _now, fs_chain, fs_deleted, fs_log_add, fs_role
 from .pages import WIKI_BAD_CHARS, WIKI_DEPTH, wiki_clean_path, wiki_relink, wiki_space, wiki_space_sql
-from .wikie2e import wke_mode, wke_open_sql, wke_page_mode
+from .wikie2e import _wke_free_path, wke_mode, wke_open_sql, wke_page_mode
 from .wkhist import wkh_body
 from .wkshare import wsh_repath
 
@@ -200,8 +200,9 @@ def _content(c, uid, rid):
 
 def _on_trash(c, uid, rid, restore):
     """A folder of the tree went into the file store's trash (restore False) / came back: its pages into the knowledge trash
-    and back -- back only a page this mark still names (not one deleted on its own before or after), and only when its name
-    is still free (else it stays in the trash)."""
+    and back -- back only a page this mark still names (not one deleted on its own before or after). 2.528.0 D (#4306, B27):
+    a name taken meanwhile no longer leaves it in the trash, it comes back as "Name (2)" ...; without the area's edit right
+    it stays and says so ("stays": the folder's restore tells the person, as for tables)."""
     r = _row(c, rid)
     if r is None or bool(r["deleted_at"]) != bool(restore) or wkf_locked(c, r):
         return
@@ -209,13 +210,20 @@ def _on_trash(c, uid, rid, restore):
     if restore:
         m = c.execute("SELECT detail FROM fs_log WHERE node_id=? AND action='trash' AND detail ILIKE 'area:%' ORDER BY id DESC LIMIT 1",
                       (n["id"],)).fetchone() if n is not None else None
-        if not m or m[0] != f"area:{r['deleted_at']}" or wkf_base(c, uid, r) != "edit":
+        if not m or m[0] != f"area:{r['deleted_at']}":
             return
+        if wkf_base(c, uid, r) != "edit":
+            return "stays"
         try:
             with c.savepoint():
                 c.execute("UPDATE wiki_pages SET deleted_at=NULL WHERE id=?", (r["id"],))
-        except IntegrityError:
-            return  # its name was taken meanwhile: it stays in the knowledge trash
+        except IntegrityError:  # its name was taken meanwhile: back with a free one (2.528.0 D, #4306)
+            path = _wke_free_path(c, r["org_id"], r["owner_id"], r["id"], r["path"])
+            try:
+                with c.savepoint():
+                    c.execute("UPDATE wiki_pages SET deleted_at=NULL, path=? WHERE id=?", (path, r["id"]))
+            except IntegrityError:
+                return "stays"
     else:
         ts = iso_ms(now_utc())
         c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (ts, r["id"]))

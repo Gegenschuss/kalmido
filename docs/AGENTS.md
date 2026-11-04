@@ -2971,6 +2971,9 @@ and projects, one of them tracked with a status. Nothing is sent or booked; you 
 4. The person reviews: every entry has a checkbox, title / date / section / assignee (notes) / project (inbox) can be
    edited, *Apply* creates or changes the selected entries; *Discard* rejects it. The agent gets a `job` event:
    `approve` with `proposal: {state: "applied", created, changed, list_id}`, or `reject` with `discarded`.
+   2.528.0: `triage` and `dayplan` proposals keep `base` (the changed fields of each named task as they stood when you
+   submitted it); a task the person changed since in one of them is never overwritten: *Apply* is refused (409, naming the
+   task) until it is unticked or the proposal is submitted again.
 
 **Who may ask which agent.** Per agent, the admin sets *Proposals for* (Settings > Agents > the agent;
 `proposals` in `PATCH /api/admin/agents/{id}`): `shared` (default) = people who share at least one project with the
@@ -4078,7 +4081,9 @@ Every value is calculated with the agent's visibility: a project / client not sh
 **One call = one batch.** Every write call of an agent is one batch (its id comes back as `batch`); the cells carry the
 agent and the batch, the people see "changed by <agent>" and take the whole call back with one click (or the agent with
 `sheet_undo_batch`): cells get their former input unless someone changed them since, added rows / columns go to the trash,
-a table the call created too. A wrong formula changes nothing (400 with the reason).
+a table the call created too. Rows, columns or a table a person has typed values into since stay (only the call's own
+cells are taken back); the answer lists them in `kept` (`rows`, `cols`, `sheet`). A wrong formula changes nothing (400
+with the reason).
 
 | What | Endpoint | MCP | Scope |
 |---|---|---|---|

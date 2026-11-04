@@ -235,9 +235,10 @@ def v1_sheet_undo(sid, batch):
         raise Denied(404)
     if not _agent():
         need_feat("sheets")
-    n = sh_undo_batch(c, r, batch, me())
+    kept = {}  # 2.528.0 (#4306 B24): rows / columns / the table a person typed into since stay
+    n = sh_undo_batch(c, r, batch, me(), kept=kept)
     c.commit()
-    return jsonify(ok=True, undone=n, rev=sh_reload(c, sid)["rev"])
+    return jsonify(ok=True, undone=n, kept=kept, rev=sh_reload(c, sid)["rev"])
 
 
 def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
@@ -348,10 +349,13 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         | errs("403", "404"), [sid, q("q", "Filter")], scope="sheets:read",
         desc="Only projects / lists / clients you see and that lie in the table's space.")}
     paths["/sheets/{id}/batches/{batch}/undo"] = {"post": op(
-        "Take back one call's changes (2.89.0)", T, ok({"type": "object", "properties": {"undone": {"type": "integer"}, "rev": {"type": "integer"}}})
+        "Take back one call's changes (2.89.0)", T, ok({"type": "object", "properties": {"undone": {"type": "integer"}, "rev": {"type": "integer"},
+        "kept": {"type": "object", "description": "2.528.0: what stayed because a person typed values into it since: rows (ids), cols (ids), "
+                 "sheet (true = the table the call created stays, only the call's own cells were emptied)"}}})
         | errs("403", "404", "409"), [sid, {"name": "batch", "in": "path", "required": True, "description": "The batch of the call", "schema": {"type": "string"}}],
         scope="sheets:write",
         desc="Cells get their former input unless someone changed them since; added rows / columns go to the trash, a table the call "
-             "created too. An agent may take back only its own calls.")}
+             "created too -- except rows / columns / a table a person has typed values into since: they stay (kept). An agent may "
+             "take back only its own calls.")}
     shb_spec(paths, schemas, op, ok, errs, ref, pid, q, inputs, col_in, write)  # 2.124.0 E (#2116): the sheets of a table
 

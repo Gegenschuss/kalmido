@@ -708,11 +708,13 @@ def v1_task_batch():
 @app.post("/api/v1/tasks/<int:tid>/skip")
 @v1_view
 def v1_task_skip(tid):
-    """Skip this occurrence of a repeating task: it moves to its next date without a completed copy."""
+    """Skip this occurrence of a repeating task: it moves to its next date without a completed copy.
+    {expect_due?} (2.528.0 #4305 B1): the due date you read; moved on meanwhile = 409, nothing skipped twice."""
     v1_args(())
+    b = _v1_body({"expect_due"})
     c = db()
     _v1_live(c, tid)
-    j = v1_call(task_skip, tid, body={})
+    j = v1_call(task_skip, tid, body={"expect": b["expect_due"]} if b.get("expect_due") else {})
     return jsonify({**v1_one(c, tid), "next_due": j.get("next_due")})
 
 
@@ -1374,8 +1376,11 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                     desc="One transaction; tasks you may not change are skipped (errors). delete / restore also need the "
                                          f"scope delete. Agents: {APPROVAL_BATCH_MIN} or more tasks wait for a person's approval (202). The answer: "
                                          "count, errors, conflicts [{id, title, field, server, mine}]. Without _prev / expect nothing is compared.")},
-        "/tasks/{id}/skip": {"post": op("Skip this occurrence of a repeating task", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
-                                        scope="tasks:write")},
+        "/tasks/{id}/skip": {"post": op("Skip this occurrence of a repeating task", T, ok(ref("Task")) | errs("400", "403", "404", "409"), [pid()],
+                                        scope="tasks:write",
+                                        body={"type": "object", "properties": {"expect_due": {"type": "string", "format": "date", "description":
+                                              "2.528.0: the due date you read; moved on since (skipped elsewhere) = 409, nothing is skipped twice"}}},
+                                        desc="Send an Idempotency-Key: a retry of the same call gets the first answer.")},
         "/tasks/{id}/restore": {"post": op("Restore a task from the trash", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="delete")},
         "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this project", {"type": "integer"}),
                                                                                             q("limit", "Page size"), q("cursor", "next_cursor")]),

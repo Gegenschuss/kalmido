@@ -275,8 +275,12 @@ function entryModal(e, preset = {}) {
     if (!e || fmtClock(tm.start) !== fmtClock(s) || ds(tm.start) !== ds(s) || (!run && (!en || fmtClock(tm.end) !== fmtClock(en) || ds(tm.end) !== ds(en)))) {
       body.start = iso(tm.start); if (!run) body.end = iso(tm.end);
     }
+    // 2.528.0 B (#4305): with what this dialog showed (_prev): changed elsewhere meanwhile = 409, the dialog stays with its input
+    // and says so; Reload opens it again with the saved version (as the life dialogs, life.js lifeConflict)
+    if (e) body._prev = Object.fromEntries(Object.keys(body).map(k => [k, k === 'billable' ? e.billable !== false : e[k] ?? null]));
     let j;
-    try { j = e ? await api('PATCH', `/api/time/entries/${e.id || 0}`, body) : await api('POST', '/api/time/entries', {...target, ...body, client_id: newCid()}); } catch { return; }  // 2.143.0 C (#2153): sent again from the outbox = one entry
+    try { j = e ? await api('PATCH', `/api/time/entries/${e.id || 0}`, body) : await api('POST', '/api/time/entries', {...target, ...body, client_id: newCid()}); }  // 2.143.0 C (#2153): sent again from the outbox = one entry
+    catch (er) { if (er.status === 409 && er.data?.entry && e) oxbTeStale(md, er.data.entry); return; }
     md.remove();
     toast(j.queued ? tr('Will be sent as soon as the server is reachable') : e ? tr('Saved') : tr('Time added: {0}', hmm(j.seconds)));
     await timeChanged(j);
@@ -288,6 +292,14 @@ function entryModal(e, preset = {}) {
   });
   md.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') $('[data-m="save"]', md).click(); });
   if (!isTouch()) setTimeout(() => $(e ? '#te-note' : run ? '#te-from' : '#te-dur', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
+}
+// 2.528.0 B (#4305): the entry changed elsewhere while its dialog was open (the words of life.js lifeConflict, which may not be
+// loaded here): Reload = the dialog again with the saved version
+function oxbTeStale(md, x) {
+  let h = $('.oxbte', md);
+  if (!h) { h = document.createElement('div'); h.className = 'shint oxbte'; h.setAttribute('role', 'alert'); $('.foot', md).before(h); }
+  h.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-oxb-reload>${tr('Reload')}</button>`;
+  $('[data-oxb-reload]', h).addEventListener('click', ev => { ev.stopPropagation(); md.remove(); entryModal(x); });
 }
 async function teDelete(id) {
   const e = findEntry(id); if (!e) return;

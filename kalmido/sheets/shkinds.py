@@ -21,7 +21,7 @@ from ..core.access import Denied, list_people, need_feat
 from ..core.config import ATT_DIR, MAX_FILE_MB, app
 from ..core.db import db, err, insert_id, iso_ms, now_utc, body
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..core.orgcrypt import OrgCryptError, oc_copy_file, oc_user_space, oc_write_file
 from ..core.serializers import unlink_files
 from ..accounts.session import me
@@ -39,6 +39,7 @@ SHK_FILE_RE = re.compile(r"file:(\d{1,15})")
 SHK_LINK_MAX = 2000
 SHK_TRASH_DAYS = 30  # 2.272.0 A (#3026): the run uses ret_trash_cut (KALMIDO_TRASH_DAYS); kept for older callers
 SHK_FREEZE_ROWS, SHK_FREEZE_COLS = 50, 20
+SHX_MOVE_FILE_FAIL = N_("A file could not be copied into the other workspace; nothing was moved")  # 2.528.0 (#4306 B25)
 
 
 # ---------------------------------------------------------------- people of a sheet
@@ -353,21 +354,28 @@ def shk_tick(c, force=False):
     unlink_files([r["path"] for r in rows])
 
 
-def shk_move_files(c, sid, to, uid, new_paths, old_paths):
+def shk_move_files(c, sid, to, uid, new_paths, old_paths, strict=True):
     """A table moved between the private space and an organisation (sheets/shmove.py) takes its files along (also the ones
     in the trash): row org / owner as the sheet, the stored file sealed with the target's key. The caller commits.
     2.363.3 (#3133): into a new stored file as files/fsmove.py does: new_paths (removed on an error) and old_paths (removed
-    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was."""
+    after the commit; both for unlink_files) go to the caller, so a failed commit leaves the old file as it was.
+    2.528.0 (#4306 B25): a file that cannot be copied stops the move (Denied 409, the caller rolls back); strict=False (an
+    account's deletion handing its tables on) leaves it as it is instead."""
     rows = c.execute("SELECT id, path FROM sheet_files WHERE sheet_id=?", (sid,)).fetchall()
     space = int(to) if to else oc_user_space(uid)
     for r in rows:
         full = os.path.join(ATT_DIR, r["path"])
         rel = os.path.join(os.path.dirname(r["path"]), f"{uuid.uuid4().hex[:12]}-{os.path.basename(r['path']).partition('-')[2]}")
+        if not os.path.isfile(full):
+            continue  # a missing file: nothing to seal (the storage check reports it)
+        new_paths.append(rel)  # 2.528.0 (#4306 B25): before the copy, so a half-written file goes with the rollback
         try:
             oc_copy_file(c, full, os.path.join(ATT_DIR, rel), space)
-        except (OSError, OrgCryptError):
-            continue  # a missing / unreadable file stays as it is (the storage check reports it)
-        new_paths.append(rel)
+        except (OSError, OrgCryptError):  # 2.528.0 (#4306 B25): never a file with the old key in the new space: the whole move stops
+            if strict:
+                raise Denied(409, tr(SHX_MOVE_FILE_FAIL)) from None
+            new_paths.pop()
+            continue
         c.execute("UPDATE sheet_files SET path=? WHERE id=?", (rel, r["id"]))
         old_paths.append(r["path"])
     if rows:

@@ -112,14 +112,23 @@ async function meApply(k, fn, lab) {
   const one = new Set(Object.values(items).map(x => JSON.stringify(x))).size === 1;
   const snaps = ids.flatMap(withKids);
   let j;
-  try { j = await api('POST', '/api/tasks/batch', one ? {ids, action: 'patch', data: items[ids[0]]} : {ids, action: 'patch_each', data: {items}}); } catch { meRender(); return; }
+  // 2.528.0 B (#4305): with what each task showed here (prev / _prev): a field changed elsewhere meanwhile stays, into the dialog
+  const pv = Object.fromEntries(ids.map(i => [i, oxbSeen(S.tasks.get(i), items[i])]));
+  try { j = await api('POST', '/api/tasks/batch', one ? {ids, action: 'patch', data: {...items[ids[0]], prev: pv}} : {ids, action: 'patch_each', data: {items: Object.fromEntries(ids.map(i => [i, {...items[i], _prev: pv[i]}]))}}); } catch { meRender(); return; }
   if (j?.errors?.length) toast(j.errors[0]);
+  for (const c of j?.conflicts || []) addConflicts(c.id, [c], c.title);
   await load(); render();
   if (j?.errors?.length && !j.count) return;
   const pairs = snaps.filter(b => ids.includes(b.id)).map(b => [b, snapTask(S.tasks.get(b.id))]);
   const e = histFields(trn('{1}: {0} task changed', '{1}: {0} tasks changed', ids.length, lab), pairs, {res: j, fields: [...UNDO_FIELDS, 'tags', 'ltags', 'fields']});
   const msg = [trn('{0} task changed', '{0} tasks changed', ids.length), lk.length ? trn('{0} locked task skipped', '{0} locked tasks skipped', lk.length) : ''].filter(Boolean).join(' · ');
   if (e) offerUndo(msg, e); else toast(msg);
+}
+// 2.528.0 B (#4305): {field: the value task t showed here} for the fields of change d (tags as a list, custom fields per id)
+function oxbSeen(t, d) {
+  if (!t || !d) return {};
+  return Object.fromEntries(Object.keys(d).filter(k => !k.startsWith('_') && k !== 'add_tags' && k !== 'sort' && (k in t || k === 'tags')).map(k => [k,
+    k === 'tags' ? [...(t.tags || [])] : k === 'fields' ? Object.fromEntries(Object.keys(d.fields || {}).map(f => [f, oxbField(t, f)])) : typeof t[k] === 'boolean' ? +t[k] : t[k] ?? null]));
 }
 // tags: add to all / remove from all. A list tag of a task's list goes into its list tags, any other name is a personal tag
 const meHas = (t, g) => hasTag(t, g);

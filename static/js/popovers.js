@@ -830,7 +830,8 @@ function taskMenu(anchor, id, o = {}) {
     ...(inPanel ? [] : [quickDueRow(id), {label: tr('New date…'), icon: 'clock', keys: 's', fn: () => snoozeSheet(id, anchor)}]),
     ...(t.repeat && t.due && open ? [{label: tr('Skip this occurrence'), icon: 'skip', fn: async () => {
       const b0 = snapTask(t);
-      const j = await api('POST', `/api/tasks/${id}/skip`);
+      // 2.528.0 (#4305 B1): the date seen + one key per press; skipped elsewhere already = the current date (the server's hint shows)
+      const j = await api('POST', `/api/tasks/${id}/skip`, {expect: t.due, _idem: outKey()}).catch(e => { if (e.data?.code === 'skip_stale' && e.data.task) { putTask(e.data.task); render(); if (S.sel === id) renderDetail(); } throw e; });
       putTask(j); render(); if (S.sel === id) renderDetail();
       if (j.next_due) histFields(tr('Skipped an occurrence of {0}', qn(t.title.slice(0, 40))), [[b0, snapTask(S.tasks.get(id)), ['due', 'start', 'repeat']]], {res: j});
       toast(j.next_due ? tr('Skipped, next occurrence: {0}', dayLabel(j.next_due)) : tr('Will be sent as soon as the server is reachable'));

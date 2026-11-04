@@ -26,6 +26,7 @@ from ..core.state import visible_lists, visible_sections  # 2.149.0 G (#2517): p
 from ..collab.news import news_add
 from ..agents.core import is_agent, agent_ids, list_sections, JOB_TITLE_MAX, job_dict  # 2.369.5 (#2517): pulled up from functions
 from ..agents.proposals import PROP_OPEN_MAX, PROP_TAGS_MAX, PROP_TAG_MAX, PROP_MAX_ITEMS, PROP_NOTES_MAX, PROP_SUMMARY_MAX, PROP_TITLE_MAX, PROP_TEXT_MAX, prop_validate  # 2.369.5 (#2517): pulled up from functions
+from ..agents.proposals import oxa_prop_base  # 2.528.0 (#4305 A8)
 from ..agents.usage import AUDIT_DAYS  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import MENTION_RE, user_names, collab_user  # 2.369.5 (#2517): pulled up from functions
@@ -400,6 +401,7 @@ def asst_dayplan_input(c, uid, day, shared):
 def asst_job(c, uid, kind, pkind, inp, prop, task_id=None, list_id=None):
     """A ready proposal job of the person themself + the News card (no push: the person just asked and sees it)."""
     ts = iso(now_utc())
+    oxa_prop_base(c, pkind, prop)  # 2.528.0 (#4305 A8): the tasks' state the person reviews (never overwritten silently)
     title = tr("Assistant: {0}", tr(ASST_KIND_NAMES[kind]))
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)
                        VALUES(?,?,?,?,'waiting','',?,?,?,?,'ready',?,?)""",

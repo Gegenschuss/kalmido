@@ -112,7 +112,7 @@ KINDS = {
                        "p2177_a_api_test.py: the large ZIP import (another organisation's space 404, another person's upload 404)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
-    "sheet": ("matrix", "p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
+    "sheet": ("matrix", "p2528_c_sheets_test.py (the trash of tables), p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.124.0 C (#2113): one table shared with single people / agents (sheets/shshare.py): only people / agents of the table's
     # workspace, a stranger and a stranger's agent 404, an agent of another organisation never, leaving / moving ends the share
@@ -1077,6 +1077,8 @@ ROUTES = {
     "POST /api/sheets/{}/columns/{}/restore": "sheet", "POST /api/sheets/{}/rows": "sheet", "DELETE /api/sheets/{}/rows/{}": "sheet",
     "POST /api/sheets/{}/rows/{}/restore": "sheet", "POST /api/sheets/{}/rows/order": "sheet", "POST /api/sheets/{}/presence": "sheet",
     "GET /api/sheets/{}/vars": "sheet", "POST /api/sheets/{}/batches/{}/undo": "sheet",
+    # 2.528.0 (#4306 B22): the trash of tables (p2528_c_sheets_test.py: another organisation's / person's trash 404 or nothing)
+    "GET /api/sheets/trash": "sheet", "GET /api/sheets/{}/trash": "sheet", "POST /api/sheets/purge": "sheet",
     # 2.124.0 B (#2110 #2111 #2112): people of a person cell, files of file cells, rows / columns kept in view, the history (p2124_b_api_test.py)
     "GET /api/sheets/{}/people": "sheet", "POST /api/sheets/{}/files": "sheet", "GET /api/sheets/{}/files/{}": "sheet", "GET /api/sheets/{}/files/{}/{}": "sheet",
     "POST /api/sheets/{}/fixed": "sheet", "GET /api/sheets/{}/history": "sheet", "GET /api/sheets/{}/cells/{}/history": "sheet",

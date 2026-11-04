@@ -20,6 +20,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..core.serializers import unlink_files
 from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import write_lock  # review 2.528 (Fable 3)
 
 
 @app.delete("/api/attachments/<int:aid>")
@@ -208,6 +209,9 @@ def task_batch():
         conflicts.append({"id": tid, "title": title if title is not None else t[0] if t else "", "field": field, "server": server, "mine": mine})
     def back():  # 2.126.0 D (#1992 A8): a task that fails is left as it was (not half changed)
         c.execute("ROLLBACK TO SAVEPOINT batch_one")
+    if action in ("patch", "patch_each"):  # review 2.528 (Fable 3): the row locks in id order first, two batches never cross
+        for tid in sorted(set(ids)):
+            write_lock(c, f"task-{tid}")
     for n, tid in enumerate(ids):
         if n:
             c.execute("RELEASE SAVEPOINT batch_one")

@@ -34,6 +34,8 @@ from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an o
 from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n, org_self_name_taken  # 2.369.5 (#2517): pulled up from functions
 from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
+from ..core.conflict import ccf_check  # 2.528.0 (#4305 A3)
+from .model import oxa_settings_at  # 2.528.0 (#4305 A3)
 
 
 @app.get("/api/office/settings")
@@ -55,6 +57,7 @@ def office_settings_get():
     rights = ofr_mine(c, uid, oid)  # 2.187.0 A (#2476): menu, tabs and buttons follow the office rights
     if not sees:  # 2.86.0 (N15): members never get the bank lines and the DATEV master data (admins only); 2.187.0 A (#2476): + a group that manages the settings
         s, cf = h6c_member_settings(s), {k: ("" if k in H6C_BANK_COLS else v) for k, v in cf.items()}
+    s = {**s, "updated_at": oxa_settings_at(c, oid)}  # 2.528.0 (#4305 A3): the version the page sends back (expect_updated_at)
     return jsonify(settings=s, company_fields=cf, org_id=oid, role=role, bank_accounts=bka_count(c, oid) if sees else 0, pack=office_pack_info(pack, s), procdoc=procdoc,
                    rights={**{k: rights[k] for k in ("levels", "specials", "manager", "legacy")},
                            "adm": [k for k, v in AREA_LEGACY.items() if v == "admin"]},  # the areas that were the admins' before
@@ -177,7 +180,9 @@ def _industry(s):
 @app.put("/api/office/settings")
 def office_settings_put():
     """Org admin. Partial body with the keys of office_settings.data (logo: see POST /api/office/logo); 2.36.2:
-    company_fields = the structured company data (office_company, partial)."""
+    company_fields = the structured company data (office_company, partial). 2.528.0 (#4305 A3): expect_updated_at = the
+    settings' updated_at the page loaded (settings.updated_at): moved on since = 409 {error, settings: the current ones},
+    nothing saved; without it as before (other callers, old clients)."""
     c, uid, oid = _ctx(admin=True)
     b = body()
     if not isinstance(b, dict):
@@ -185,6 +190,7 @@ def office_settings_put():
     if "pack" in b or "industry_packs" in b or "home_currency" in b:  # 2.76.0 review (N8): the pack choice and an uninstall never interleave; 2.189.0 (#2475): nor two home currency changes
         write_lock(c, f"office_packs_{int(oid)}")
     office_settings_lock(c, oid)  # 2.269.0 B (#3014): two saves with different keys both stay (after the packs lock)
+    ccf_check(b, oxa_settings_at(c, oid), "settings", lambda: {**office_settings(c, oid), "updated_at": oxa_settings_at(c, oid)})  # 2.528.0 (#4305 A3)
     cur = office_settings(c, oid)
     fresh = "pack" in b and of_pack_choice(c, oid, "admin", None)["pack_choose"]  # 2.147.0 (#2462): the first choice of the country
     new = office_settings_clean(c, oid, b, cur)
@@ -205,7 +211,8 @@ def office_settings_put():
         ofx_log(c, oid, "update", target="settings", detail=diff)
     c.commit()
     s2 = office_settings(c, oid)
-    return jsonify(settings=s2, company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]),  # 2.118.0 A (#2265)
+    return jsonify(settings={**s2, "updated_at": oxa_settings_at(c, oid)},  # 2.528.0 (#4305 A3): + the new version
+                   company_fields=ofx_company(c, oid), number_preview=onc_preview(c, oid, new, new["offer_scheme"]),  # 2.118.0 A (#2265)
                    features=office_features(s2), pack=office_pack_info(office_pack_for(s2), s2),  # 2.147.0 (#2460)
                    home_locked=of_home_locked(c, oid, office_pack_for(s2)))  # 2.189.0 (#2475)
 

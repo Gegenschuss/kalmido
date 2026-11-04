@@ -867,6 +867,8 @@ def _watchdog_tick(c):
     _wd_section(c, "wiki files", wka_tick)  # 2.99.0 (#2182): files in the trash for good after 30 days
     from ..wiki.pages import wiki_trash_tick
     _wd_section(c, "wiki trash", wiki_trash_tick)  # 2.143.0 B (#2211): pages in the trash for good after the trash period of tasks
+    from ..wiki.wkhist import wkx_tick
+    _wd_section(c, "wiki held versions", wkx_tick)  # 2.528.0 D (#4306): versions held at a lock, after the trash period
     from ..sheets.shkinds import shk_tick
     _wd_section(c, "table files", shk_tick)  # 2.124.0 B (#2110): files no cell holds any more, for good after 30 days
     _wd_section(c, "admin alerts", aa_tick)

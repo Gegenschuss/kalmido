@@ -473,7 +473,7 @@ async function shvReload() { if (SHV.sh) await shvLoad(SHV.sh.id, true); }
 // structural steps: one request, a reload, Undo by the counterpart request
 async function shvStep(label, doFn, undoFn, msg, redoFn) {  // redoFn(res): the way forward again (restore), else doFn once more
   const sid = SHV.sh?.id; if (!sid) return;
-  let res; try { res = await doFn(); } catch (e) { if (e.message !== 'auth') toast(e.message); return; }
+  let res; try { res = await doFn(); } catch (e) { if (e.message !== 'auth') toast(e.message); if (e.status === 409) await shvLoad(sid, true); return; }  // 2.528.0 (#4305 A12): changed elsewhere: show the current state
   await shvLoad(sid, true);
   const e = histAdd({label, ids: [], snaps: [], lids: [],
     undo: async () => { await undoFn(res); if (SHV.sh?.id === sid) await shvLoad(sid, true); return {skipped: []}; },
@@ -543,7 +543,7 @@ async function shvRowAdd(afterId, above) {
   const doIt = async () => {
     await rawFetch('POST', `/api/sheets/${sid}/rows`, above ? {} : {after_row_id: afterId ?? sh.rows[sh.rows.length - 1]?.id ?? null, count: 1});
     const j = await rawFetch('GET', '/api/sheets/' + sid); const ids = (j.rows || []).map(r => r.id).filter(x => !before.has(x));
-    if (above && ids.length) { const o = order0.slice(); o.splice(Math.max(0, o.indexOf(afterId)), 0, ...ids); await rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: o}); }
+    if (above && ids.length) { const o = order0.slice(); o.splice(Math.max(0, o.indexOf(afterId)), 0, ...ids); await rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: o, prev: (j.rows || []).map(r => r.id)}); }
     return ids;
   };
   const res = await shvStep(tr('Row added'), doIt, async ids => { for (const x of ids || []) await rawFetch('DELETE', `/api/sheets/${sid}/rows/${x}`); }, null,
@@ -570,7 +570,8 @@ async function shvSort(cid, dir) {
   }).map(x => x[0]);
   if (ids.join() === old.join()) return;
   SHV.sorted = {sid, c: cid, dir};
-  await shvStep(tr('Sorted by {0}', col.title || col.letter), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids}), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: old}), tr('Sorted by {0}', col.title || col.letter));
+  // 2.528.0 (#4305 A12): prev = the order this device saw: a sorting elsewhere meanwhile is refused (409), not overwritten
+  await shvStep(tr('Sorted by {0}', col.title || col.letter), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids, prev: old}), () => rawFetch('POST', `/api/sheets/${sid}/rows/order`, {ids: old, prev: ids}), tr('Sorted by {0}', col.title || col.letter));
 }
 // columns
 async function shvColDel(cid) {
@@ -583,7 +584,9 @@ async function shvColPatch(cid, body, label) {
   const sh = SHV.sh, col = sh?._col.get(cid); if (!col) return;
   const sid = sh.id, old = {}; for (const k of Object.keys(body)) old[k] = col[k] ?? null;
   if (JSON.stringify(old) === JSON.stringify(body)) return;
-  await shvStep(label || tr('Column changed'), () => rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, body), () => rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, old));
+  // 2.528.0 (#4305 A12): _prev = what this device saw; a field changed elsewhere meanwhile stays as it is there (conflicts)
+  const send = async (b, p) => { const r = await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, {...b, _prev: p}); if (r?.conflicts?.length) toast(tr('Changed elsewhere in the meantime') + ': ' + (col.title || col.letter)); return r; };
+  await shvStep(label || tr('Column changed'), () => send(body, old), () => send(old, body));
 }
 // 2.270.0 B (#3021): the dialog of a select column sends only its own option changes (add / rename / remove), the server applies
 // them to the current options; Undo sends the counterparts (rename checks the option is still as this step left it)
@@ -603,8 +606,8 @@ async function shvColOpts(col, body, label) {
   const old = {}; for (const k of Object.keys(rest)) old[k] = col[k] ?? null;
   if (!ops.length && JSON.stringify(old) === JSON.stringify(rest)) return;
   const send = async (b, o) => {
-    const r = await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, {...b, options_ops: o});
-    if (r?.conflicts?.length) toast(tr('Changed elsewhere in the meantime') + ': ' + tr('Options'));
+    const r = await rawFetch('PATCH', `/api/sheets/${sid}/columns/${cid}`, {...b, options_ops: o, _prev: b === rest ? old : rest});  // 2.528.0 (#4305 A12)
+    if (r?.conflicts?.length) toast(tr('Changed elsewhere in the meantime') + ': ' + (r.conflicts.some(x => x.id) ? tr('Options') : (col.title || col.letter)));
     return r;
   };
   let added = [];
@@ -682,11 +685,18 @@ async function shvName(c, name) {
   const e = histAdd({label: name ? tr('Name {0}', name) : tr('Name removed'), ids: [], snaps: [], lids: [], undo: async () => { await set(old); return {skipped: []}; }, redo: async () => { await set(name); return {skipped: []}; }});
   histToast(name ? tr('Cell named {0}: usable in formulas', name) : tr('Name removed'), e);
 }
+function shxUndoKeptText(k) {  // 2.528.0 (#4306 B24): what stayed at the agent Undo because someone typed into it since
+  const out = [tr('Changes taken back')];
+  if (k?.sheet) out.push(tr('The table stays because someone has typed values into it since; only the agent\'s entries were removed.'));
+  if (k?.rows?.length) out.push(trn('{0} row stays because someone has typed values into it since.', '{0} rows stay because someone has typed values into them since.', k.rows.length));
+  if (k?.cols?.length) out.push(trn('{0} column stays because someone has typed values into it since.', '{0} columns stay because someone has typed values into them since.', k.cols.length));
+  return out.join('. ').replace(/\.\. /g, '. ');
+}
 async function shvBatchUndo(batch) {
   const sh = SHV.sh; if (!sh) return;
-  if (!await askConfirm(tr('Take back the changes of this agent call?'), tr('The cells get the values from before; a table the agent created goes to the trash.'), {ok: tr('Take back')})) return;
-  try { await rawFetch('POST', `/api/sheets/${sh.id}/batches/${encodeURIComponent(batch)}/undo`); } catch (e) { toast(e.message); return; }
-  toast(tr('Changes taken back'));
+  if (!await askConfirm(tr('Take back the changes of this agent call?'), tr('The cells get the values from before; rows and a table the agent created go to the trash, unless someone has typed values into them since.'), {ok: tr('Take back')})) return;
+  let res; try { res = await rawFetch('POST', `/api/sheets/${sh.id}/batches/${encodeURIComponent(batch)}/undo`); } catch (e) { toast(e.message); return; }
+  toast(shxUndoKeptText(res?.kept));
   for (const d of Object.values(SHV.idx)) d.v = -1;
   await shvLoad(sh.id, true);
 }
@@ -1114,3 +1124,79 @@ SHV_HOOKS.menu.push(sh => sh_smvItems(sh));
   return `<section class="shvsec shvsmv"><p class="muted">${ic('brief', 's')} ${esc(tr('Moved out of {0}', m.from_name || (m.from ? shvSpaceName(m.from) : tr('Organisation'))))} · ${esc(fmtWhen(m.at))}${m.by_name ? ' · ' + esc(m.by_name) : ''}</p></section>`;
 });
 if (typeof sbb_sync === 'function') sbb_sync('sheets');  // 2.152.3 B: loaded later than the panel was drawn (lazyload.js): its panel now
+
+// ---- 2.528.0 (#4306 B22): the trash of tables, like knowledge (wiki.js wk_trashDlg). The overview's menu: the tables of a
+// workspace in the trash (restore, delete one for good, empty it -- an organisation's whole trash only its admins); a table's
+// menu: its rows, columns and sheets in the trash, each with a few of its inputs, back with one tap. The trash period below.
+SHV_HOOKS.overview.push((space, lid) => lid ? [] : [{label: tr('Trash'), icon: 'trash', fn: () => shxTrashDlg(space && space !== 'all' ? space : shvNewSpace())}]);
+SHV_HOOKS.menu.push(sh => sh && !sh.shared_in ? [{label: tr('Deleted rows and columns'), icon: 'trash', fn: () => shxSheetTrashDlg(sh)}] : []);
+const shxWhen = d => tr('Moved to the trash on {0}', fmtWhen(d));
+async function shxTrashDlg(sp) {
+  const sps = shvSpaces(); if (!sps.includes(sp)) sp = sps[0];
+  const sel = sps.length > 1 ? `<label class="shx-sp">${tr('Workspace')} <select data-shx-sp aria-label="${esc(tr('Workspace'))}">${sps.map(s => `<option value="${esc(s)}" ${s === sp ? 'selected' : ''}>${esc(shvSpaceName(s))}</option>`).join('')}</select></label>` : '';
+  const md = modal(`<h3>${tr('Trash')} · ${tr('Tables')}</h3>${sel}<div class="shx-trash"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><button type="button" class="btn danger hidden" data-shx="empty">${ic('trash', 's')} ${tr('Empty trash')}</button><span class="spacer"></span><button type="button" class="btn" data-shx="close">${tr('Close')}</button></div>`);
+  md.classList.add('shx-dlg');
+  let items = [];
+  const draw = async () => {
+    const box = $('.shx-trash', md);
+    let j; try { j = await rawFetch('GET', '/api/sheets/trash?space=' + encodeURIComponent(sp)); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Tables are only available online.') : e.message)}</div>`; return; }
+    items = j.sheets || [];
+    $('[data-shx="empty"]', md).classList.toggle('hidden', !items.length || !j.may_empty);
+    box.innerHTML = (items.length ? `<div class="members">${items.map(x => `<div class="mrow shx-row" data-shxid="${x.id}"><span class="n"><b>${esc(x.title || tr('Untitled table'))}</b><small class="muted">${esc([shxWhen(x.deleted_at), x.list_title, x.files ? trn('{0} file', '{0} files', x.files) + ' · ' + fmtBytes(x.size) : ''].filter(Boolean).join(' · '))}</small></span>`
+      + (x.can_write ? `<span class="oadmb"><button type="button" class="btn sm" data-shx="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button><button type="button" class="btn sm danger" data-shx="purge">${ic('trash', 's')}<span>${tr('Delete permanently…')}</span></button></span>` : '') + '</div>').join('')}</div>`
+      : `<div class="muted mhint">${tr('Trash is empty.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Tables in the trash are deleted for good after {0} days, with their files.', j.days || 30), j.purge_on === false))}</div>`;
+  };
+  md.addEventListener('change', e => { if (e.target.matches?.('[data-shx-sp]')) { sp = e.target.value; draw(); } });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-shx]'); if (!b) return;
+    const k = b.dataset.shx, id = +b.closest('[data-shxid]')?.dataset.shxid, x = items.find(y => y.id === id);
+    if (k === 'close') { modalClose(md); return; }
+    b.disabled = true;
+    try {
+      if (k === 'restore' && x) { await rawFetch('POST', `/api/sheets/${id}/restore`); shvAfterIdx(id); toast(tr('Restored')); }
+      if (k === 'purge' && x) {
+        if (!await askConfirm(tr('Delete “{0}” permanently?', x.title || tr('Untitled table')), tr('The table and its files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+        await rawFetch('POST', '/api/sheets/purge', {space: sp, ids: [id]});
+      }
+      if (k === 'empty') {
+        if (!await askConfirm(tr('Empty the trash permanently?'), tr('All tables in the trash and their files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Empty trash')})) return;
+        await rawFetch('POST', '/api/sheets/purge', {space: sp, all: true});
+      }
+      await draw();
+    } catch (er) { toast(er.message); } finally { b.disabled = false; }
+  });
+  await draw();
+}
+async function shxSheetTrashDlg(sh) {
+  const sid = sh.id;  // the shown sheet: its rows and columns (the first sheet also lists its further sheets)
+  const md = modal(`<h3>${tr('Deleted rows and columns')} · ${esc(sh.title || tr('Untitled table'))}</h3><div class="shx-trash"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-shx="close">${tr('Close')}</button></div>`);
+  md.classList.add('shx-dlg');
+  const draw = async () => {
+    const box = $('.shx-trash', md);
+    let j; try { j = await rawFetch('GET', `/api/sheets/${sid}/trash`); } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e instanceof Offline ? tr('Tables are only available online.') : e.message)}</div>`; return; }
+    const vals = x => x.values?.length ? x.values.join(' · ') : tr('empty');
+    const row = (kind, id, label, sub) => `<div class="mrow shx-row" data-shxk="${kind}" data-shxid="${id}"><span class="n"><b>${esc(label)}</b><small class="muted">${esc(sub)}</small></span>`
+      + (j.can_write ? `<span class="oadmb"><button type="button" class="btn sm" data-shx="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button></span>` : '') + '</div>';
+    const parts = [
+      [tr('Rows'), (j.rows || []).map(x => row('row', x.id, vals(x), shxWhen(x.deleted_at)))],
+      [tr('Columns'), (j.columns || []).map(x => row('col', x.id, x.title || tr('Column'), [vals(x), shxWhen(x.deleted_at)].join(' · ')))],
+      [tr('Sheets'), (j.tabs || []).map(x => row('tab', x.id, x.name || tr('Sheet'), shxWhen(x.deleted_at)))]].filter(p => p[1].length);
+    box.innerHTML = (parts.length ? parts.map(([h, xs]) => `<h4 class="shx-h">${esc(h)}</h4><div class="members">${xs.join('')}</div>`).join('')
+      : `<div class="muted mhint">${tr('Nothing of this table is in the trash.')}</div>`) + `<div class="shint">${esc(trashNote(tr('Deleted rows and columns are removed for good after {0} days.', j.days || 30), j.purge_on === false))}</div>`;
+  };
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-shx]'); if (!b) return;
+    if (b.dataset.shx === 'close') { modalClose(md); return; }
+    const r = b.closest('[data-shxid]'), id = +r?.dataset.shxid, k = r?.dataset.shxk; if (!id) return;
+    b.disabled = true;
+    try {
+      await rawFetch('POST', k === 'row' ? `/api/sheets/${sid}/rows/${id}/restore` : k === 'col' ? `/api/sheets/${sid}/columns/${id}/restore` : `/api/sheets/${id}/restore`);
+      toast(tr('Restored'));
+      shvAfterIdx(sid); if (SHV.sh?.id === sh.id) await shvLoad(sh.id, true);
+      await draw();
+    } catch (er) { toast(er.message); } finally { b.disabled = false; }
+  });
+  await draw();
+}

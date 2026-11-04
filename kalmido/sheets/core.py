@@ -1032,6 +1032,7 @@ def sh_clean_col(b, partial=False):
 def sh_add_col(c, sheet_row, b, uid, after_col_id=None, agent_id=None, batch=None):
     """A new column (after a column or at the end) -> its id."""
     sid = sheet_row["id"]
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): rows / columns under the sheet's lock like its cells (#3021)
     f = sh_clean_col(b)
     n = c.execute("SELECT COUNT(*) FROM sheet_columns WHERE sheet_id=? AND deleted_at IS NULL", (sid,)).fetchone()[0]
     if n >= SH_COLS_MAX:
@@ -1066,6 +1067,7 @@ def sh_add_rows(c, sheet_row, rows, uid, after_row_id=None, agent_id=None, batch
     """New rows (after a row or at the end): rows = a count of empty rows or a list of rows, each a list of inputs in the order
     of the columns (formulas in the display form). -> [row ids]"""
     sid = sheet_row["id"]
+    write_lock(c, "sheet:" + str(sid))  # 2.528.0 (#4305 A12): rows / columns under the sheet's lock like its cells (#3021)
     data = None
     if isinstance(rows, bool) or not isinstance(rows, (int, list)):
         raise BadInput(tr("Invalid value: {0}", "rows"))
@@ -1347,7 +1349,7 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
     return sid
 
 
-def sh_undo_batch(c, sheet_row, batch, uid):
+def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
     """Takes back exactly the changes of one agent call (newest first): cells get their former input when nobody changed them
     since, added rows / columns go to the trash, a sheet the call created goes to the trash. -> number of changes undone."""
     rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND undone_at IS NULL ORDER BY id DESC",
@@ -1360,6 +1362,10 @@ def sh_undo_batch(c, sheet_row, batch, uid):
                 continue  # changed again since: the newer input stays
             c.execute("UPDATE sheet_cells SET raw=?, frozen=0, frozen_value=NULL, updated_by=?, updated_at=?, agent_id=NULL, agent_batch=NULL "
                       "WHERE id=?", (r["old_raw"] or "", uid, ts, r["cell_id"]))
+        elif r["kind"] in ("row", "col", "create") and shx_undo_keeps(c, sheet_row, r, batch, uid, ts, kept):
+            c.execute("UPDATE sheet_changes SET undone_at=? WHERE id=?", (ts, r["id"]))  # 2.528.0 (#4306 B24): stays, see kept
+            sh_touch(c, sheet_row["id"], uid)
+            continue
         elif r["kind"] == "row":
             c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, r["row_id"]))
         elif r["kind"] == "col":
@@ -1371,6 +1377,47 @@ def sh_undo_batch(c, sheet_row, batch, uid):
     if n:
         sh_touch(c, sheet_row["id"], uid)
     return n
+
+
+def shx_undo_people(c, sid, where="", args=()):
+    """2.528.0 (#4306 B24): the live cells of a sheet (narrowed by where: one row / column) that hold a person's input --
+    not empty and without an agent mark (a person's write clears agent_id; an agent's write and its rows / sheet carry it)."""
+    return c.execute("SELECT x.id, x.row_id, x.col_id, k.kind FROM sheet_cells x JOIN sheet_rows w ON w.id=x.row_id "
+                     "JOIN sheet_columns k ON k.id=x.col_id WHERE x.sheet_id=? AND w.deleted_at IS NULL AND k.deleted_at IS NULL "
+                     "AND x.agent_id IS NULL AND x.raw<>''" + where, (sid,) + tuple(args)).fetchall()
+
+
+def shx_undo_keeps(c, sheet_row, ch, batch, uid, ts, kept):
+    """2.528.0 (#4306 B24): True when the agent's row / column / sheet of this change stays at its Undo because a person has
+    typed values into it since (the agent's own cells of it were taken back before: newest change first). A sheet that stays
+    loses the agent's cells nobody overwrote (file cells stay: their file must not be orphaned) and its rows without a
+    person's input go to the trash. What stayed lands in kept {rows, cols, sheet}."""
+    sid = sheet_row["id"]
+    k = kept if kept is not None else {}
+    if ch["kind"] == "row":
+        if not shx_undo_people(c, sid, " AND x.row_id=?", (ch["row_id"],)):
+            return False
+        k.setdefault("rows", []).append(ch["row_id"])
+        return True
+    if ch["kind"] == "col":
+        if not shx_undo_people(c, sid, " AND x.col_id=?", (ch["col_id"],)):
+            return False
+        k.setdefault("cols", []).append(ch["col_id"])
+        return True
+    people = shx_undo_people(c, sid)
+    if not people:
+        return False
+    k["sheet"] = True
+    filled = {x["row_id"] for x in c.execute("SELECT DISTINCT row_id FROM sheet_cells WHERE sheet_id=? AND agent_batch=? AND raw<>''",
+                                             (sid, batch)).fetchall()}
+    c.execute("UPDATE sheet_cells SET raw='', frozen=0, frozen_value=NULL, updated_by=?, updated_at=?, agent_id=NULL, agent_batch=NULL "
+              "WHERE sheet_id=? AND agent_batch=? AND raw<>'' AND col_id NOT IN (SELECT id FROM sheet_columns WHERE sheet_id=? AND kind='file')",
+              (uid, ts, sid, batch, sid))
+    still = {x["row_id"] for x in c.execute("SELECT DISTINCT row_id FROM sheet_cells WHERE sheet_id=? AND raw<>''", (sid,)).fetchall()}
+    for rid in sorted(filled - still):  # the agent's rows nobody typed into: to the trash (restorable), empty rows stay
+        c.execute("UPDATE sheet_rows SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, rid))
+    k.setdefault("rows", [])
+    return True
 
 
 def sh_set_name(c, sheet_row, cell_row, name, uid):

@@ -1360,7 +1360,7 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/sheets/{_id(a, 'sheet_id')}/vars", _pick(a, ("q",)))),
     ("sheet_undo_batch", "2.89.0 (scope sheets:write): take back one of YOUR calls on a table (its batch from the answer): cells get "
                          "their former input unless someone changed them since, added rows / columns go to the trash, a table the call "
-                         "created too.",
+                         "created too; rows / columns / a table a person typed values into since stay (listed in kept, 2.528.0).",
      _obj({"sheet_id": S_ID, "batch": {"type": "string"}}, ["sheet_id", "batch"]),
      lambda api, a: api.call("POST", f"/sheets/{_id(a, 'sheet_id')}/batches/{_q(a['batch'])}/undo")),
     # 2.124.0 E (#2116): several sheets in one table
