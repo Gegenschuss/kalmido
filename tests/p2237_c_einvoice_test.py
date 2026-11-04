@@ -189,7 +189,8 @@ r = Fr.post(B + "/api/me/tokens", json={"name": "Skript", "scopes": ["read"]})
 check(r.ok, f"setup: an ordinary token {r.status_code} {r.text[:160]}")
 TOK = (r.json().get("token") or "") if r.ok else ""
 check(requests.get(V + "/documents/upload-target", headers=bearer(K1)).ok, "the scan key works before")
-r = Fr.patch(B + "/api/me", json={"password": "password456", "current_password": kt.PASSWORD})
+# 2.539.0 (#4375): without the tick "end all app passwords and API tokens" (revoke_tokens false) ordinary tokens stay
+r = Fr.patch(B + "/api/me", json={"password": "password456", "current_password": kt.PASSWORD, "revoke_tokens": False})
 check(r.ok, f"frida changes her password {r.status_code} {r.text[:160]}")
 check(requests.get(V + "/documents/upload-target", headers=bearer(K1)).status_code == 401, "#2865: after the change the scan key is revoked (401)")
 check(kt.dbx("SELECT id FROM api_tokens WHERE id IN (?,?)", (K1ID, K2ID)) == [], "both scan keys are gone")

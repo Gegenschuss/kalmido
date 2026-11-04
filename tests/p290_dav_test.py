@@ -187,7 +187,10 @@ check(r.status_code == 403, f"token API: read + write alone creates no app passw
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write", "calendar", "contacts"]}).json()["token"]
 th = {"Authorization": "Bearer " + tok}
 r = requests.post(V + "/me/app-passwords", headers=th, json={"name": "Thunderbird"})
-check(r.status_code == 201 and r.json().get("password"), "token API: create an app password")
+# 2.539.0 (#4375): app passwords are made only in the web app, also a token with calendar + contacts gets 403
+check(r.status_code == 403 and len(A.get(B + "/api/me/app-passwords").json()["items"]) == 1, f"#4375: token API: no app password from a token {r.status_code}")
+r = A.post(B + "/api/me/app-passwords", json={"name": "Thunderbird"})
+check(r.status_code == 201 and r.json().get("password"), "web app: a second app password")
 TBPW, TBID = r.json()["password"], r.json()["id"]
 r = requests.post(V + "/me/app-passwords", headers=th, json={"name": "x", "bogus": 1})
 check(r.status_code == 400 and r.json()["error"]["code"] == "unknown_field", "token API: unknown field 400")

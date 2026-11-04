@@ -726,6 +726,11 @@ def me_update():
         ses_end(c, u["id"], keep=_token_hash(tok) if tok else None)  # 2.190.0 A (#1991): with their push subscriptions
         from ..docs.scankeys import sk_revoke_all  # 2.237.0 C (#2865): the scan inbox keys go (a new setup code is made)
         sk_revoke_all(c, u["id"])
+        # 2.539.0 B (#4375): the dialog's tick "end all app passwords and API tokens" (set by default); without the field
+        # (API) they end too - the safe default. An agent account's own tokens stay, as with the reset.
+        if b.get("revoke_tokens", True) is not False:
+            c.execute("DELETE FROM app_passwords WHERE user_id=?", (u["id"],))
+            c.execute("DELETE FROM api_tokens WHERE user_id IN (SELECT id FROM users WHERE id=? AND COALESCE(kind, 'user')<>'agent')", (u["id"],))
     bump(c)
     c.commit()
     if "password" in b:  # 2.266.0 (#2963)

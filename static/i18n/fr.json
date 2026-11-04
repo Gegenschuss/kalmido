@@ -13162,7 +13162,6 @@
   "Project duplicated": "Projet dupliqué",
   "Duplicate project…": "Dupliquer le projet…",
   "A copy of this project with its sections, tasks and notepads": "Une copie de ce projet avec ses sections, tâches et blocs-notes",
-  "Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password": "Seul un jeton pour tous les projets avec les droits « Calendrier » et « Contacts » peut créer un mot de passe d’application",
   "The header of a project or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.": "Le bandeau d’un projet ou d’un dossier se règle dans ses paramètres et est le même pour tous. Ici, tu choisis seulement si cet appareil l’affiche.",
   "A slim band on top of the project, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.": "Une fine bande en haut du projet, la même pour tous ses membres. Une image : JPEG, PNG ou WebP, 2 Mo au plus.",
   "A locked project has no own header picture": "Un projet verrouillé n’a pas d’image de bandeau propre",
@@ -15066,7 +15065,6 @@
   "Sign-in with an OIDC provider": "Connexion via un fournisseur OIDC",
   "{0} person is linked to the provider.": ["{0} utilisateur est lié au fournisseur.", "{0} utilisateurs sont liés au fournisseur."],
   "Create accounts on the first OIDC sign-in": "Créer les comptes à la première connexion OIDC",
-  "Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.": "Désactivé : seuls les utilisateurs créés par un admin peuvent se connecter ; la première connexion les lie par nom d'utilisateur ou e-mail vérifié. Activé : toute personne que le fournisseur laisse passer obtient un compte.",
   "A safety backup of the current state is made first. Everyone else is signed out.": "Une sauvegarde de sécurité de l'état actuel est d'abord effectuée. Toutes les autres personnes sont déconnectées.",
   "The sign-in has expired, please sign in again": "La connexion a expiré, reconnecte-toi",
   "{0} signed in with a recovery code ({1} left).": "{0} s'est connecté avec un code de récupération (encore {1}).",
@@ -16257,5 +16255,10 @@
   "The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.": "La description du projet, la note du statut du projet et les notes des saisies de temps ne peuvent pas être chiffrées : elles n'y sont pas disponibles, et celles qui existent sont supprimées définitivement à l'activation.",
   "The list of former off-site backups (bko_former) is unreadable: the target stays, its backups' names are kept.": "La liste des anciennes sauvegardes externes (bko_former) est illisible : la cible reste, les noms de ses sauvegardes sont conservés.",
   "{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.": "{0} a vu la clé de récupération de {1} et n’y est plus administrateur : créez une nouvelle clé de récupération sous Données de l’organisation.",
-  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Quiconque a vu la clé de récupération peut ouvrir cette archive, y compris d’anciens administrateurs. Si un administrateur est parti, créez d’abord une nouvelle clé de récupération."
+  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Quiconque a vu la clé de récupération peut ouvrir cette archive, y compris d’anciens administrateurs. Si un administrateur est parti, créez d’abord une nouvelle clé de récupération.",
+  "App passwords are created only in the web app (Settings > Account > App passwords)": "Les mots de passe d'application se créent uniquement dans l'application web (Paramètres > Compte > Mots de passe d'application)",
+  "This account can only be linked by its verified e-mail. Please ask the admin to enter the e-mail address you use at the sign-in provider in your account.": "Ce compte ne peut être lié que par son adresse e-mail vérifiée. Demande à l'administrateur d'indiquer dans ton compte l'adresse que tu utilises chez le fournisseur de connexion.",
+  "End all app passwords and API tokens": "Révoquer tous les mots de passe d'application et jetons d'API",
+  "Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).": "Coché : les applications d'agenda et de contacts ainsi que les scripts devront être reconnectés ensuite (nouveau mot de passe d'application, nouveau jeton).",
+  "Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.": "Désactivé : seuls les utilisateurs créés par un administrateur peuvent se connecter ; la première connexion les lie par leur adresse e-mail vérifiée. Activé : toute personne que le fournisseur laisse passer obtient un compte, et les comptes créés pour l'authentification unique sont aussi liés par nom d'utilisateur."
 }

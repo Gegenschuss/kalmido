@@ -897,7 +897,7 @@ function signinHtml(hint) {
     row(tr('Admin e-mail domains'), o.admin_domains) +
     hint(tr('The client secret is {0}.', o.secret_set ? tr('set') : tr('not set (public client with PKCE)')) + ' ' +
       trn('{0} person is linked to the provider.', '{0} people are linked to the provider.', o.linked || 0)) +
-    `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-oidcauto" ${o.autocreate ? 'checked' : ''}><span>${tr('Create accounts on the first OIDC sign-in')}<small class="muted">${tr('Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.')}</small></span></label></div>`;
+    `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-oidcauto" ${o.autocreate ? 'checked' : ''}><span>${tr('Create accounts on the first OIDC sign-in')}<small class="muted">${tr('Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.')}</small></span></label></div>`;
   if (o.error) h += `<div class="shint cnote">${tr('Last problem with the provider: {0}', esc(o.error))}</div>`;
   return h + oidcForm(o, hint);
 }

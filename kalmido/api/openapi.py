@@ -645,7 +645,8 @@ def openapi_spec():
                            "description": "Shown only this once; Kalmido keeps only a hash"}}}]}, "Created", "201") | errs("400", "403", "409"),
                        body={"type": "object", "required": ["name"], "additionalProperties": False,
                              "properties": {"name": {"type": "string", "maxLength": 60, "description": "e.g. the device: iPhone, Thunderbird"}}},
-                       scope="write", desc=f"At most {APPPW_MAX} per person. Log in to /dav/ with your user name and this password (HTTP Basic, HTTPS)."),
+                       scope="write", desc=f"2.539.0: always 403 with a token -- app passwords are created only in the web app "
+                                           f"(Settings > Account > App passwords; at most {APPPW_MAX} per person). Listing and revoking stay here."),
         },
         "/me/app-passwords/{id}": {"delete": op("Revoke an app password (the calendar app using it stops at once)", "Account",
                                                 ok({"type": "object", "properties": {"ok": {"type": "boolean"}}}) | errs("403", "404"),

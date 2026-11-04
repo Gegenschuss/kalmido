@@ -175,7 +175,18 @@ s, r = oidc_login({"sub": "sub-kai", "preferred_username": "kai"})
 check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='kai'")[0][0] is None, "M3: a local account (password) by user name alone -> link, not linked")
 assert A.post(B + "/api/users", json={"username": "ssoonly"}).ok
 s, r = oidc_login({"sub": "sub-ssoonly", "preferred_username": "ssoonly"})
-check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='ssoonly'")[0][0] == ISS + "|sub-ssoonly", "M3: an account made for SSO (no password, no e-mail) still links by user name")
+# 2.539.0 (#4375): an account made for SSO (no password, no e-mail) links by the user name only with auto-create on;
+# off (here): refused with its own text, nothing linked
+check(err_of(r) == "link_name" and dbx("SELECT oidc_subject FROM users WHERE username='ssoonly'")[0][0] is None,
+      "#4375: auto-create off: an SSO account is not linked by the user name alone -> link_name")
+check("link_name" in requests.get(B + "/api/auth/info").json()["login_errors"], "#4375: the login screen knows the text")
+assert A.patch(B + "/api/admin/settings", json={"password": "password123", "oidc_autocreate": True}).ok
+s, r = oidc_login({"sub": "sub-ssoonly", "preferred_username": "ssoonly"})
+check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='ssoonly'")[0][0] == ISS + "|sub-ssoonly", "M3 / #4375: with auto-create on it links by user name as before")
+assert A.patch(B + "/api/admin/settings", json={"oidc_autocreate": False}).ok
+assert A.post(B + "/api/users", json={"username": "ssoeve", "email": "ssoeve@example.test"}).ok
+s, r = oidc_login({"sub": "sub-ssoeve", "preferred_username": "ssoeve", "email": "ssoeve@example.test", "email_verified": True})
+check(err_of(r) == "ok" and dbx("SELECT oidc_subject FROM users WHERE username='ssoeve'")[0][0] == ISS + "|sub-ssoeve", "#4375: auto-create off: an SSO account with the same verified e-mail links")
 s, r = oidc_login({"sub": "sub-hank3", "preferred_username": "hank", "email": "mallory@example.test", "email_verified": True})
 check(err_of(r) == "link" and dbx("SELECT oidc_subject FROM users WHERE username='hank'")[0][0] is None, "M3: user name with another verified e-mail -> link")
 s, r = oidc_login({"sub": "sub-alice-x", "preferred_username": "alice"})

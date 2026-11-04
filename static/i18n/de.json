@@ -13161,7 +13161,6 @@
   "Project duplicated": "Projekt dupliziert",
   "Duplicate project…": "Projekt duplizieren…",
   "A copy of this project with its sections, tasks and notepads": "Eine Kopie dieses Projekts mit Abschnitten, Aufgaben und Notizblöcken",
-  "Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password": "Nur ein Token für alle Projekte mit den Rechten „Kalender“ und „Kontakte“ darf ein App-Passwort anlegen",
   "The header of a project or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.": "Den Kopfstreifen eines Projekts oder eines Ordners legst du in dessen Einstellungen fest; er ist für alle gleich. Hier wählst du nur, ob dieses Gerät ihn zeigt.",
   "A slim band on top of the project, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.": "Ein schmaler Streifen oben im Projekt, für alle im Projekt gleich. Ein Bild: JPEG, PNG oder WebP, höchstens 2 MB.",
   "A locked project has no own header picture": "Ein verschlüsselte Projekt hat kein eigenes Kopfbild",
@@ -15064,7 +15063,6 @@
   "Sign-in with an OIDC provider": "Anmelden über einen OIDC-Anbieter",
   "{0} person is linked to the provider.": ["{0} Person ist mit dem Anbieter verknüpft.", "{0} Personen sind mit dem Anbieter verknüpft."],
   "Create accounts on the first OIDC sign-in": "Konten bei der ersten OIDC-Anmeldung anlegen",
-  "Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.": "Aus: Nur Personen, die ein Admin angelegt hat, können sich anmelden; die erste Anmeldung verknüpft sie über Benutzername oder bestätigte E-Mail. An: Alle, die der Anbieter durchlässt, bekommen ein Konto.",
   "A safety backup of the current state is made first. Everyone else is signed out.": "Vorher wird eine Sicherheitskopie des aktuellen Stands angelegt. Alle anderen werden abgemeldet.",
   "The sign-in has expired, please sign in again": "Die Anmeldung ist abgelaufen, bitte neu anmelden",
   "{0} signed in with a recovery code ({1} left).": "{0} hat sich mit einem Wiederherstellungscode angemeldet (noch {1}).",
@@ -16257,5 +16255,10 @@
   "The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.": "Projektbeschreibung, Notiz zum Projektstatus und Notizen von Zeiteinträgen lassen sich nicht verschlüsseln: Es gibt sie darin nicht, und vorhandene werden beim Einschalten endgültig gelöscht.",
   "The list of former off-site backups (bko_former) is unreadable: the target stays, its backups' names are kept.": "Die Liste der früheren Off-Site-Sicherungen (bko_former) ist nicht lesbar: Das Ziel bleibt, die Namen seiner Sicherungen bleiben erhalten.",
   "{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.": "{0} hat den Wiederherstellungsschlüssel von {1} gesehen und ist dort kein Admin mehr: Erstelle unter Daten der Organisation einen neuen Wiederherstellungsschlüssel.",
-  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Wer den Wiederherstellungsschlüssel gesehen hat, kann dieses Archiv öffnen, auch frühere Admins. Ist ein Admin ausgeschieden, erstelle zuerst einen neuen Wiederherstellungsschlüssel."
+  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Wer den Wiederherstellungsschlüssel gesehen hat, kann dieses Archiv öffnen, auch frühere Admins. Ist ein Admin ausgeschieden, erstelle zuerst einen neuen Wiederherstellungsschlüssel.",
+  "App passwords are created only in the web app (Settings > Account > App passwords)": "App-Passwörter werden nur in der Web-App angelegt (Einstellungen > Konto > App-Passwörter)",
+  "This account can only be linked by its verified e-mail. Please ask the admin to enter the e-mail address you use at the sign-in provider in your account.": "Dieses Konto lässt sich nur über die bestätigte E-Mail-Adresse verknüpfen. Bitte den Admin, die E-Mail-Adresse, die du beim Anmeldedienst nutzt, in deinem Konto einzutragen.",
+  "End all app passwords and API tokens": "Alle App-Passwörter und API-Tokens beenden",
+  "Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).": "Mit Haken: Kalender- und Kontakte-Apps sowie Skripte müssen danach neu verbunden werden (neues App-Passwort, neues Token).",
+  "Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.": "Aus: Nur Personen, die ein Admin angelegt hat, können sich anmelden; die erste Anmeldung verknüpft sie über ihre bestätigte E-Mail-Adresse. An: Jede Person, die der Anbieter durchlässt, bekommt ein Konto, und für Single Sign-on angelegte Konten werden auch über den Benutzernamen verknüpft."
 }

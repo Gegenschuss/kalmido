@@ -138,7 +138,8 @@ A.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done
 ids = {}
 for u, n, pw in (("sven", "Sven Single", None), ("ed", "Ed Editor", "password123"), ("mia", "Mia Second", "password123"),
                   ("max", "Max Manager", "password123")):
-    r = A.post(B + "/api/users", json={"username": u, "display_name": n, **({"password": pw, "email": f"{u}@example.com"} if pw else {})})
+    # 2.539.0 (#4375): sven (single sign-on only) has his e-mail too: without auto-create an SSO account links by the verified e-mail
+    r = A.post(B + "/api/users", json={"username": u, "display_name": n, "email": f"{u}@example.com", **({"password": pw} if pw else {})})
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
@@ -197,7 +198,7 @@ r = sess().get(B + "/api/auth/oidc/start", params={"stepup": "show", "org": 1}, 
 check(r.status_code == 303 and r.headers.get("Location") == "/#rck-stepup-error=session", f"#2387: a step-up without a session {r.status_code} {r.headers.get('Location')}")
 
 # ---- an organisation admin who signs in only with single sign-on
-Sv, _ = oidc_login({"sub": "sub-sven", "preferred_username": "sven"})
+Sv, _ = oidc_login({"sub": "sub-sven", "preferred_username": "sven", "email": "sven@example.com", "email_verified": True})  # 2.539.0 (#4375)
 check(Sv.get(B + "/api/me").json().get("username") == "sven", "#2387: sven is signed in through OIDC")
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Nordwind", "admin_id": ids["sven"]}).json()["id"]
 Sv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})

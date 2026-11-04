@@ -13162,7 +13162,6 @@
   "Project duplicated": "Proyecto duplicado",
   "Duplicate project…": "Duplicar proyecto…",
   "A copy of this project with its sections, tasks and notepads": "Una copia de este proyecto con sus secciones, tareas y blocs de notas",
-  "Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password": "Solo un token para todos los proyectos con los permisos «Calendario» y «Contactos» puede crear una contraseña de aplicación",
   "The header of a project or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.": "La cabecera de un proyecto o carpeta se define en sus ajustes y es igual para todos. Aquí solo eliges si este dispositivo la muestra.",
   "A slim band on top of the project, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.": "Una franja estrecha encima del proyecto, igual para todos en él. Una imagen: JPEG, PNG o WebP, como máximo 2 MB.",
   "A locked project has no own header picture": "Un proyecto bloqueado no tiene imagen de cabecera propia",
@@ -15066,7 +15065,6 @@
   "Sign-in with an OIDC provider": "Inicio de sesión con un proveedor OIDC",
   "{0} person is linked to the provider.": ["{0} usuario está vinculado al proveedor.", "{0} usuarios están vinculados al proveedor."],
   "Create accounts on the first OIDC sign-in": "Crear cuentas en el primer inicio de sesión OIDC",
-  "Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.": "Desactivado: solo pueden iniciar sesión los usuarios creados por un administrador; el primer inicio de sesión los vincula por nombre de usuario o correo verificado. Activado: cualquiera a quien el proveedor deje pasar obtiene una cuenta.",
   "A safety backup of the current state is made first. Everyone else is signed out.": "Antes se hace una copia de seguridad del estado actual. Se cerrará la sesión de todos los demás.",
   "The sign-in has expired, please sign in again": "El inicio de sesión ha caducado, vuelve a iniciar sesión",
   "{0} signed in with a recovery code ({1} left).": "{0} ha iniciado sesión con un código de recuperación (quedan {1}).",
@@ -16257,5 +16255,10 @@
   "The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.": "La descripción del proyecto, la nota del estado del proyecto y las notas de los registros de tiempo no se pueden cifrar: no están disponibles en él y las existentes se eliminan definitivamente al activarlo.",
   "The list of former off-site backups (bko_former) is unreadable: the target stays, its backups' names are kept.": "La lista de copias de seguridad externas anteriores (bko_former) no se puede leer: el destino se queda y se conservan los nombres de sus copias.",
   "{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.": "{0} vio la clave de recuperación de {1} y ya no es administrador allí: crea una nueva clave de recuperación en Datos de la organización.",
-  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Quien haya visto la clave de recuperación puede abrir este archivo, también antiguos administradores. Si un administrador se ha ido, crea primero una nueva clave de recuperación."
+  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Quien haya visto la clave de recuperación puede abrir este archivo, también antiguos administradores. Si un administrador se ha ido, crea primero una nueva clave de recuperación.",
+  "App passwords are created only in the web app (Settings > Account > App passwords)": "Las contraseñas de aplicación solo se crean en la aplicación web (Ajustes > Cuenta > Contraseñas de aplicación)",
+  "This account can only be linked by its verified e-mail. Please ask the admin to enter the e-mail address you use at the sign-in provider in your account.": "Esta cuenta solo se puede vincular mediante su correo electrónico verificado. Pide al administrador que introduzca en tu cuenta la dirección que usas en el proveedor de inicio de sesión.",
+  "End all app passwords and API tokens": "Revocar todas las contraseñas de aplicación y tokens de API",
+  "Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).": "Marcado: después habrá que volver a conectar las aplicaciones de calendario y contactos y los scripts (nueva contraseña de aplicación, nuevo token).",
+  "Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.": "Desactivado: solo pueden iniciar sesión los usuarios creados por un administrador; el primer inicio de sesión los vincula por su correo electrónico verificado. Activado: cualquiera a quien el proveedor deje pasar obtiene una cuenta, y las cuentas creadas para el inicio de sesión único también se vinculan por nombre de usuario."
 }

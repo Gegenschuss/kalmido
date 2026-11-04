@@ -339,6 +339,8 @@ def apppw_get():
 
 @app.post("/api/me/app-passwords")
 def apppw_post():
+    if g.get("auth_via") not in ("session", "proxy"):  # 2.539.0 B (#4375): only from the web app's sign-in, never a token / app password
+        raise Denied(403, tr("App passwords are created only in the web app (Settings > Account > App passwords)"))
     row, pw = apppw_create(db(), g.user, body().get("name"))
     return jsonify({**row, "password": pw}), 201
 

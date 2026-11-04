@@ -71,7 +71,9 @@ OIDC_ERRORS = {"no_account": N_("There is no account for this sign-in yet. Pleas
                "taken": N_("The user name from the sign-in provider is already used by another account."),
                "failed": N_("The sign-in with the provider failed. Please try again or ask the admin."),
                # 2.79.0 (#476 M3)
-               "link": N_("This account is not linked to the sign-in provider yet. Sign in with your password first, then use the provider's button once in the same browser.")}
+               "link": N_("This account is not linked to the sign-in provider yet. Sign in with your password first, then use the provider's button once in the same browser."),
+               # 2.539.0 B (#4375)
+               "link_name": N_("This account can only be linked by its verified e-mail. Please ask the admin to enter the e-mail address you use at the sign-in provider in your account.")}
 
 
 def oidc_seal(secret):
@@ -344,8 +346,11 @@ def oidc_link_ok(c, u, how, email, sess_uid):
     if how == "email" or bool(email and (u["email"] or "").strip().lower() == email):
         return True
     # an account an admin made for single sign-on (no password, no e-mail: README "New user (SSO login = ...)") is linked
-    # by its user name as before; it cannot log in any other way, so there is no session to link it from
-    return not u["password_hash"] and not (u["email"] or "").strip()
+    # by its user name as before; it cannot log in any other way, so there is no session to link it from.
+    # 2.539.0 B (#4375): only while "Create accounts on the first OIDC sign-in" is on (the provider decides who gets in
+    # anyway); with it off, a name somebody picked at the provider would take over the account made for another person,
+    # so it is linked by the verified e-mail only (the caller tells "link_name")
+    return not u["password_hash"] and not (u["email"] or "").strip() and gsetting(c, "oidc_autocreate") == "1"
 
 
 def _oidc_account(c, claims, sess_uid=None):
@@ -399,7 +404,9 @@ def _oidc_account(c, claims, sess_uid=None):
     if how != "subject" and not oidc_link_ok(c, u, how, email, sess_uid):
         msg = N_("A sign-in with the OIDC provider matched {0} by {1} but was not linked (admin, second factor or no matching verified e-mail).")
         aa_now("security", f"oidc:nolink:{u['username']}", msg, [u["username"], {"t": N_("user name") if how == "username" else N_("e-mail")}])
-        raise OidcError("link", u["username"])
+        sso_made = how == "username" and not u["password_hash"] and not (u["email"] or "").strip() and u["kind"] == "user" \
+            and not u["kid"] and not u["is_admin"] and not twofa_methods(c, u)  # 2.539.0 B (#4375): no password to link from
+        raise OidcError("link_name" if sso_made else "link", u["username"])
     if how != "subject":
         c.execute("UPDATE users SET oidc_subject=? WHERE id=?", (subject, u["id"]))
         aa_now("security", f"oidc:link:{u['username']}", N_("{0} was linked to the OIDC provider (matched by {1})."),
@@ -541,7 +548,7 @@ def oidc_callback():
         u = oidc_account(c, claims, _oidc_sess_uid(c))
     except OidcError as e:
         c.rollback()
-        if e.code in ("no_account", "disabled", "group", "taken", "link"):
+        if e.code in ("no_account", "disabled", "group", "taken", "link", "link_name"):
             print("OIDC login refused:", e.code, e.detail, flush=True)
             aa_count("security", "logins", client_ip(), user="oidc:" + e.code)
             return _oidc_fail_redirect(e.code)

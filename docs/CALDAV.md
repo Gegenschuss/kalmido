@@ -14,7 +14,7 @@ Kalmido 2.9.0 is a CalDAV server for tasks. Every project you can see appears as
 
 ## For users
 
-1. **Settings › Account › App passwords › New app password.** Give it the name of the device. The password is shown once. Each device gets its own password, so you can revoke a lost phone without touching the others.
+1. **Settings › Account › App passwords › New app password.** Give it the name of the device. The password is shown once. Each device gets its own password, so you can revoke a lost phone without touching the others. App passwords are made only here in the web app (2.539.0), never with an API token. Changing your password ends them all unless you untick "End all app passwords and API tokens" (2.539.0); a reset always ends them.
 2. **Settings › Integrations › Calendar apps (CalDAV)** shows three things: the server, the CalDAV address (`https://your-server/dav/`) and your user name. It also has step-by-step guides.
 3. Log in with your **Kalmido user name** and the **app password**. Your account password never works for CalDAV, and neither does single sign-on.
 
@@ -445,11 +445,12 @@ This should answer `207 Multi-Status` with `current-user-principal`. A `302` to 
 
 ### API
 
-App passwords can also be managed with a personal access token (`read` to list them, `write` to create or revoke). See [API.md](API.md):
+App passwords can also be listed and revoked with a personal access token (`read` to list them, `write` to revoke). See [API.md](API.md).
+2.539.0: they are created only in the web app (*Settings › Account › App passwords*); `POST` with a token answers 403.
 
 - `GET /api/v1/me/app-passwords`
-- `POST /api/v1/me/app-passwords` with `{"name": "..."}` (2.79.0: only a token for all lists with `calendar` and `contacts`;
-  an app password opens CalDAV / CardDAV without the token's limits)
+- `POST /api/v1/me/app-passwords` with `{"name": "..."}`: 2.539.0 always 403 (before: a token for all lists with `calendar`
+  and `contacts`; an app password opens CalDAV / CardDAV without the token's limits)
 - `DELETE /api/v1/me/app-passwords/{id}`
 
 Agents' tokens get 403.

@@ -42,7 +42,7 @@ from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_r
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
-from ..calendars.caldav import apppw_create, apppw_delete, apppw_list, dav_info
+from ..calendars.caldav import apppw_delete, apppw_list, dav_info
 from ..integrations.importers import imp_request, imp_undo
 from ..notify.alerts import _env_int, aa_count, aa_now, fx2_mask_ip
 from ..admin.backup import BK_ON_ENV
@@ -669,12 +669,10 @@ def v1_apppw_create():
     b = v1_json()
     reject_unknown(b, ("name",))
     v1_person()
-    if token_lists() is not None or not {"calendar", "contacts"} <= set(g.scopes):  # 2.79.0 (#476 M1): an app password
-        # opens CalDAV / CardDAV without any limit, so only a token that may already do all of that creates one
-        return v1_err(403, tr("Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password"),
-                      required_scope="contacts")
-    row, pw = apppw_create(db(), g.user, b.get("name"))
-    return jsonify({**row, "password": pw}), 201
+    # 2.539.0 B (#4375): an app password opens CalDAV / CardDAV without any limit and outlives a password change made
+    # without the tick, so it is made only in the web app (a signed-in session), never with a token (2.79.0 #476 M1 had
+    # allowed a token for all projects with calendar + contacts). Listing and revoking stay here.
+    return v1_err(403, tr("App passwords are created only in the web app (Settings > Account > App passwords)"))
 
 
 @app.delete("/api/v1/me/app-passwords/<int:pid>")

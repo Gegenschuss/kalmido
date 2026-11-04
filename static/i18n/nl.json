@@ -13162,7 +13162,6 @@
   "Project duplicated": "Project gedupliceerd",
   "Duplicate project…": "Project dupliceren…",
   "A copy of this project with its sections, tasks and notepads": "Een kopie van dit project met secties, taken en notitieblokken",
-  "Only a token for all projects with the permissions “Calendar” and “Contacts” may create an app password": "Alleen een token voor alle projecten met de rechten ‘Agenda’ en ‘Contacten’ mag een app-wachtwoord aanmaken",
   "The header of a project or folder is set in its settings and is the same for everyone. Here you only choose whether this device shows it.": "De kop van een project of map stel je in bij de instellingen ervan; hij is voor iedereen gelijk. Hier kies je alleen of dit apparaat hem toont.",
   "A slim band on top of the project, the same for everyone in it. A picture: JPEG, PNG or WebP, at most 2 MB.": "Een smalle band boven het project, voor iedereen in het project gelijk. Een afbeelding: JPEG, PNG of WebP, hoogstens 2 MB.",
   "A locked project has no own header picture": "Een vergrendeld project heeft geen eigen kopafbeelding",
@@ -15066,7 +15065,6 @@
   "Sign-in with an OIDC provider": "Inloggen met een OIDC-provider",
   "{0} person is linked to the provider.": ["{0} gebruiker is gekoppeld aan de provider.", "{0} gebruikers zijn gekoppeld aan de provider."],
   "Create accounts on the first OIDC sign-in": "Accounts aanmaken bij de eerste OIDC-login",
-  "Off: only users an admin created can sign in; the first sign-in links them by user name or verified e-mail. On: anyone the provider lets through gets an account.": "Uit: alleen gebruikers die een beheerder heeft aangemaakt, kunnen inloggen; de eerste login koppelt ze via gebruikersnaam of geverifieerd e-mailadres. Aan: iedereen die de provider doorlaat, krijgt een account.",
   "A safety backup of the current state is made first. Everyone else is signed out.": "Eerst wordt een veiligheidsback-up van de huidige stand gemaakt. Alle anderen worden uitgelogd.",
   "The sign-in has expired, please sign in again": "De login is verlopen, log opnieuw in",
   "{0} signed in with a recovery code ({1} left).": "{0} heeft ingelogd met een herstelcode (nog {1} over).",
@@ -16257,5 +16255,10 @@
   "The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.": "De projectbeschrijving, de notitie bij de projectstatus en de notities van tijdregistraties kunnen niet worden versleuteld: ze zijn er niet beschikbaar, en bestaande worden bij het inschakelen definitief verwijderd.",
   "The list of former off-site backups (bko_former) is unreadable: the target stays, its backups' names are kept.": "De lijst met eerdere externe back-ups (bko_former) is niet leesbaar: het doel blijft, de namen van zijn back-ups blijven bewaard.",
   "{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.": "{0} heeft de herstelsleutel van {1} gezien en is daar geen beheerder meer: maak een nieuwe herstelsleutel aan onder Gegevens van de organisatie.",
-  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Wie de herstelsleutel heeft gezien, kan dit archief openen, ook voormalige beheerders. Is een beheerder vertrokken, maak dan eerst een nieuwe herstelsleutel aan."
+  "Whoever has seen the recovery key can open this archive, former admins too. After an admin has left, make a new recovery key first.": "Wie de herstelsleutel heeft gezien, kan dit archief openen, ook voormalige beheerders. Is een beheerder vertrokken, maak dan eerst een nieuwe herstelsleutel aan.",
+  "App passwords are created only in the web app (Settings > Account > App passwords)": "App-wachtwoorden worden alleen in de web-app aangemaakt (Instellingen > Account > App-wachtwoorden)",
+  "This account can only be linked by its verified e-mail. Please ask the admin to enter the e-mail address you use at the sign-in provider in your account.": "Dit account kan alleen via het geverifieerde e-mailadres worden gekoppeld. Vraag de beheerder het e-mailadres dat je bij de aanmeldprovider gebruikt in je account in te vullen.",
+  "End all app passwords and API tokens": "Alle app-wachtwoorden en API-tokens beëindigen",
+  "Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).": "Aangevinkt: agenda- en contacten-apps en scripts moeten daarna opnieuw worden verbonden (nieuw app-wachtwoord, nieuw token).",
+  "Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.": "Uit: alleen gebruikers die een beheerder heeft aangemaakt kunnen zich aanmelden; de eerste aanmelding koppelt ze via hun geverifieerde e-mailadres. Aan: iedereen die de provider doorlaat krijgt een account, en accounts die voor single sign-on zijn aangemaakt worden ook via de gebruikersnaam gekoppeld."
 }

@@ -4,6 +4,7 @@
    urn:kalmido:user:<id> of a stranger -> no attendee row with that user (the address stays as a plain address), no News
    item / invitation for the stranger; a person of the own organisation is still invited by id
  - M1 (#1887): POST /api/v1/me/app-passwords only with a token for all lists that has calendar + contacts
+   (2.539.0 #4375: never with a token any more; created only in the web app)
  - M2 (#1888): an admin token with read + admin-read cannot write PUT /api/v1/admin/announcement; with account it can
  - M4 (#1890): ~100 wrong invitation tokens from many addresses do not lock the links of everybody (per address only)
  - M5 (#1891): a child account has no API and no CalDAV; making an account a child removes its tokens and app passwords
@@ -111,7 +112,8 @@ check(r.status_code == 403, f"M1: a token limited to lists: 403 {r.status_code} 
 n_pw = dbx("SELECT COUNT(*) FROM app_passwords WHERE user_id=1")[0][0]
 check(n_pw == 0, "M1: no app password was created by the refused requests")
 r = requests.post(V + "/me/app-passwords", headers=tok(A, ["read", "account", "calendar", "contacts"]), json={"name": "Phone"})
-check(r.status_code == 201 and r.json().get("password"), f"M1: a full token with calendar + contacts: 201 {r.status_code} {r.text[:200]}")
+# 2.539.0 (#4375): a full token with calendar + contacts is refused too - app passwords come only from the web app
+check(r.status_code == 403 and not dbx("SELECT 1 FROM app_passwords WHERE user_id=1"), f"#4375: a full token with calendar + contacts: 403 {r.status_code} {r.text[:200]}")
 
 # ============================================================ M2: admin routes need their own scope too
 r = requests.put(V + "/admin/announcement", headers=tok(A, ["read", "admin-read"]), json={"text": "Maintenance", "level": "maintenance"})
@@ -134,7 +136,7 @@ check(r.status_code == 429, f"M4: the address that failed 5 times is still limit
 # ============================================================ M5: child accounts: no API, no CalDAV
 KT = tok(Ki, ["read", "write"])
 check(requests.get(V + "/lists", headers=KT).ok, "M5: before: the token works")
-KPW = requests.post(V + "/me/app-passwords", headers=tok(Ki, ["read", "account", "calendar", "contacts"]), json={"name": "Phone"}).json().get("password")
+KPW = Ki.post(B + "/api/me/app-passwords", json={"name": "Phone"}).json().get("password")  # 2.539.0 (#4375): from the web session
 check(bool(KPW), "M5: before: an app password exists")
 dav = lambda pw: requests.request("PROPFIND", B + "/dav/", auth=("kiddo", pw), headers={"Depth": "0", "X-Forwarded-Proto": "https"})  # noqa: E731
 check(dav(KPW).status_code == 207, f"M5: before: CalDAV works {dav(KPW).status_code}")

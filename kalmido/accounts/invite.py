@@ -226,7 +226,8 @@ def invite_accept():
         return err(tr("Password: at least {0} characters", MIN_PASSWORD))
     c.execute("UPDATE users SET password_hash=? WHERE id=?", (generate_password_hash(pw), u["id"]))
     c.execute("UPDATE user_invites SET used_at=? WHERE user_id=?", (iso(now_utc()), u["id"]))
-    c.execute("UPDATE users SET email_proved=lower(coalesce(email,'')) WHERE id=?", (u["id"],))  # 2.360.2 (#2561): the link came to this address
+    if r["sent_at"]:  # 2.539.0 B (#4375): only a link that went out by mail proves the address (a copied link / QR code does not)
+        c.execute("UPDATE users SET email_proved=lower(coalesce(email,'')) WHERE id=?", (u["id"],))  # 2.360.2 (#2561): the link came to this address
     from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): sessions end with their push subscriptions
     ses_end(c, u["id"])
     # 2.190.0 A (#2496): a reset also revokes the app passwords (CalDAV/CardDAV). 2.360.0 A (#2496): and the person's own

@@ -117,7 +117,8 @@ function accountHtml() {
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
     <div class="row avrow"><label>${tr('Profile picture')}</label><div class="avpick" id="a-avpick">${avPickHtml()}</div></div>
     <div class="row"><label id="a-col-h">${tr('Colour')}</label><div class="pfcol" id="a-col" role="group" aria-labelledby="a-col-h">${ac_pickHtml((S.colors || {})[m.id] || '', 'me')}</div></div>
-    ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>` : ''}
+    ${pw ? `<div class="row"><label for="a-cur">${tr('Password')}</label><input type="text" class="cfhid" hidden tabindex="-1" aria-hidden="true" autocomplete="username" value="${esc(S.me?.username || '')}" readonly><input type="password" id="a-cur" placeholder="${tr('current password')}" autocomplete="current-password"><input type="password" id="a-new" placeholder="${tr('new password')}" autocomplete="new-password"><button class="btn sm" data-acc="pw">${tr('Change')}</button></div>
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="a-pwrev" checked><span>${tr('End all app passwords and API tokens')}<small class="muted">${tr('Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).')}</small></span></label></div>` : ''}
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
@@ -368,7 +369,7 @@ function accountWire(md) {
       if (a === 'pw') {
         const nw = $('#a-new', md).value;
         if (nw.length < 8) { toast(tr('Password: at least {0} characters', 8)); return; }
-        await api('PATCH', '/api/me', {current_password: $('#a-cur', md).value, password: nw});
+        await api('PATCH', '/api/me', {current_password: $('#a-cur', md).value, password: nw, revoke_tokens: $('#a-pwrev', md)?.checked !== false});  // 2.539.0 B (#4375)
         $('#a-cur', md).value = ''; $('#a-new', md).value = ''; toast(tr('Password changed'));
       }
       if (a === 'logout') logout();

@@ -103,12 +103,25 @@ def sec_mail(c, uid, ev, *args, to=None, also=None):
         return False
 
 
+def sec_net(ip):
+    """2.539.0 B (#4375): the network of an address for the device mark: IPv4 /24, IPv6 /64 ("" = none / unreadable)."""
+    try:
+        a = ipaddress.ip_address(str(ip or "").strip())
+    except ValueError:
+        return ""
+    a = a.ipv4_mapped or a if a.version == 6 else a
+    return str(ipaddress.ip_network(f"{a}/{24 if a.version == 4 else 64}", strict=False))
+
+
 def sec_login(c, uid, via, ua, ip):
     """start_session: a sign-in from a browser not among the account's last SEC_DEVICES -> mail "login". Never raises."""
     try:
         if via == "restore" or not ua:
             return
-        h = hashlib.sha256(ua.encode("utf-8", "replace")).hexdigest()[:20]
+        # 2.539.0 B (#4375): the mark is the browser AND its network (/24, /64): the same browser from another network is
+        # a new device (a stolen cookie or password used elsewhere with a copied User-Agent gets a mail)
+        h = hashlib.sha256((ua + "\n" + sec_net(ip)).encode("utf-8", "replace")).hexdigest()[:20]
+        h_old = hashlib.sha256(ua.encode("utf-8", "replace")).hexdigest()[:20]
         try:
             known = json.loads(usettings(c, uid).get("sec_devices") or "[]")
             known = [x for x in known if isinstance(x, str)] if isinstance(known, list) else []
@@ -116,6 +129,8 @@ def sec_login(c, uid, via, ua, ip):
             known = []
         if known and known[0] == h:
             return
+        if h_old in known:  # a mark from before 2.539.0 (browser only): taken over once without a mail, then gone
+            known = [h if x == h_old else x for x in known]
         with c.savepoint():  # a database error here never aborts the sign-in
             uset(c, uid, "sec_devices", json.dumps(([h] + [x for x in known if x != h])[:SEC_DEVICES]))
         if known and h not in known:
