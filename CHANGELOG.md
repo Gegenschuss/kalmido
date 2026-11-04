@@ -14,7 +14,58 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.502.0] - 2026-11-04
+## [2.506.0] - 2026-11-04
+
+Package 2.506 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Undo of an account or organisation import no longer removes work done since the import (#4299): every table is now treated like the tasks. Habits (with days logged since), filters, templates, time entries, journal days, bookmarks, files, knowledge pages, tables, mails, video sign-offs and office rows stay when they changed since the import or got something new below them, also a file laid or moved into an imported folder. The result message counts them ("N entries changed since the import stay").
+- Files, knowledge pages and tables of an undone import go into their trash instead of being deleted, with their stored files, and can be restored from there; the message names how many. Their labels and custom fields wait for them; the top folder of an area stays, empty. The other unchanged rows are deleted as before. The 24 hour limit of the undo is unchanged.
+- An import that only invited people now has its record, so its undo can withdraw them, and the sharing step no longer loses the file's source keys, so the next import of the same file does not take everything over a second time (#4299).
+
+Package 2.500 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- Support access (hosted): a support session now reads and edits contents only. A positive list of write ways replaces the old list of blocked ones: app connections (OAuth consent, page and form), new agents, public links, shares, members, invitations, webhooks, keys, feeds, office settings, sending and deleting for good answer 403 (#4070).
+- Support access: the writes of a support session stand on the grant's log, refused ones included, so the customer sees them under Settings > Account > Support access (#4070).
+- Office rights: a cash book entry on an invoice books (and its cancellation takes back) a payment only with quotes edit and the special "pay"; cash without an invoice stays free (#4072).
+- Office rights: bank matching of kind card needs credit cards edit, kind payout needs receipts edit (#4072).
+- Office rights: the tax forms as CSV / PDF and the original files of the booking archive need the special "export"; their buttons are hidden without it (#4072).
+
+### Fixed
+- Office: a click in the office's navigation (sidebar, start list, tabs, tree) no longer opens the e-mail signature editor; it opens only with "Edit" in a send dialog (#4058).
+
+### Changed
+- Tests: suites whose flakiness task is closed and that stayed green on repeated runs are back in the run; tests/skip.txt loses their lines (#4083).
+
+Package 2.505 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Offline changes: being removed from an organisation no longer empties the offline queue without a word. Private tasks, notes and knowledge texts go out as usual; a change the server refuses waits in the conflicts dialog with its text (#4298).
+- Agents: opening *Projects* on an agent card makes only that card longer. The card next to it keeps its size and layout (#4325).
+- Restore: deleted entries an older off-site backup still holds can no longer come back for good. The list of what was deleted for good now also waits for the backups kept on the off-site target (#4302).
+
+### Changed
+- Settings > Users > Whole server > Backups, restore dialog: it now shows what was deleted for good since this backup and would be deleted again (number per kind, time span). You choose between *Delete them again* (default) and *Keep everything in the backup*. The choice is in the admin alert and the log (`keep_purged` on `POST /api/admin/backups/restore`, `GET /api/admin/backups/purged-preview`) (#4302).
+- Self-hosting and OIDC docs follow the code: what stays readable with browser encryption, that the trash is not in the organisation export, what stays behind in a move (the household budget), the key change, and smaller corrections (#4314).
+
+Package 2.504 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- "All workspaces" has no colour of its own and no grey any more (#4222): tasks and lists wear the colour of their workspace, everything else Kalmido's accent. On a phone: in All workspaces the stripe and dot are the accent colour; progress and selection of a row in Today, Inbox or Kanban, and the buttons and ticks of an open task or list, show the workspace's colour, while the navigation, plus button and search stay in the accent colour. An open list's own colour still wins there, a workspace with "No colour" uses the accent, and with "Interface in the colour of the workspace" off nothing changes.
+
+### Fixed
+- Tests: every jsdom window has `CSS.escape` and `CSS.supports` from `tests/boot.js`, the hand-made shims are gone; p2440_a_ui and p2435_a_ui run again (#4084).
+- Tests: the undo suites wait for the recorded history step and the undone state instead of a fixed pause; p284_a_ui, p297_c_ui, p271_a_ui, p2365_2_b_ui, p2115_a_ui and p21121_b_ui run again (#4085). p2147_a_ui stays skipped: one switch makes two undo steps (#4343).
+- Tests: p2130_ui checks that sending with real taps opens no menu (#4230, a regression test only; the reported menu is not reproduced yet).
+
+Package 2.394 (Zwei-Wege-Abgleich GitHub/GitLab, Import aus Linear und GitHub).
+### Added
+- Import from Linear: Settings > Data > Import > "Linear" takes a personal Linear API key (used for this one run, never stored) or Linear's CSV export; teams become projects with status, priority, estimate (story points), labels, type, cycle (sprint), due date, parent issues, assignee and comments; preview and 24 h undo as for the other imports (#3377).
+- GitHub / GitLab issues can be taken over once: Project settings > Repository > "..." > "Import issues", with a preview (count, already imported, first titles), the option to skip closed issues and undo. Text, labels (as project tags), open / closed, assignee (matching project member), comments with author and date and the link back are kept; pull requests are skipped, nothing is written to the repository (#3377).
+- Two-way sync of issues per repository (GitHub and GitLab): Project settings > Repository > "Sync issues both ways" (off by default, project admins only). Title, text, open / closed, labels and comments follow each other; new issues land as tasks in the Backlog section; "Create new tasks as issues" (off by default) sends new tasks to the repository. When both sides changed the same field, the newer change wins and the other version stays in the task's history - nothing is overwritten silently. Locked notes, attachments, custom fields, personal tags and encrypted projects never leave Kalmido; a token without write access keeps the sync read-only and the settings say so (#3377).
+### Changed
+- Jira CSV import takes over the issue type (Bug / Story / Task), story points and the sprint of open issues instead of writing them into the notes; imported projects switch on story points, ticket types and sprints when the data has them, and the undo removes the sprints an import created (#3377).
 
 Package 2.502 (Bündel: Büro: Peppol-UBL und XML-Neuaufbau nehmen den Zahl, Büro: Gemeinsamer Zähler (#3597) - Datums-Chronolo, Büro: Reverse Charge bei Kun).
 
@@ -929,5 +980,10 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.502.0...HEAD
+## [2.502.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.506.0.
+
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.506.0...HEAD
+[2.506.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.506.0
 [2.502.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.502.0
