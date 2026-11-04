@@ -209,7 +209,7 @@ ROUTES = {
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
     "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
     "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
-    "POST /api/admin/backups/restore": "admin",
+    "POST /api/admin/backups/restore": "admin", "GET /api/admin/backups/purged-preview": "admin",
     # 2.143.0 B (#2152): the off-site target of the backups (instance admins, p2143_b_api_test.py)
     "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
     "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",
