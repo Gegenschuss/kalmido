@@ -503,17 +503,17 @@ function sbb_fit() {
     n.classList.remove('srcut'); n.style.fontSize = '';
     const box = n.clientWidth; if (!box) continue;
     let need = wide(n);
-    if (!(need > box + .5)) continue;
+    if (need <= box + .5) continue;
     let px = parseFloat(getComputedStyle(n).fontSize) * box / need;
     for (let i = 0; i < 12 && px >= 9; i++) {
       n.style.fontSize = `${px.toFixed(1)}px`;
       need = wide(n);
-      if (!(need > box + .5)) break;
+      if (need <= box + .5) break;
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = 1; continue; }
-      n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
+      n.style.fontSize = '';
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = 1; } else { n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent; }
     }
   }
   if (far) {
