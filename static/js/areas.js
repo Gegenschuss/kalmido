@@ -496,8 +496,8 @@ function sbb_render(hid) {
 // #4047: phone: never cut or split: a word too wide in 9 px: each column as wide as its names need; if that is too wide, the row scrolls
 function sbb_fit() {
   const row = $('#side .sbmr');
-  if (row) { row.style.gridTemplateColumns = row.style.overflowX = row.style.overflowY = ''; }
-  let tooWide = false;
+  if (row) { row.style.gridTemplateColumns = row.style.overflow = ''; }
+  let far = false;
   const wide = n => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
@@ -512,14 +512,14 @@ function sbb_fit() {
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide = true; continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = true; continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
-  if (tooWide) {
-    const cols = parseInt(row.style.getPropertyValue('--sbmc')) || 5, w = Array(cols).fill(0);
-    [...row.children].forEach((b, i) => { const n = $('.srbn', b); if (n) w[i % cols] = Math.max(w[i % cols], Math.ceil(wide(n)) + 4); });
-    row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflowX = 'auto'; row.style.overflowY = 'hidden';
+  if (far) {
+    const c = +row.style.getPropertyValue('--sbmc'), w = Array(c).fill(0);
+    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c], Math.ceil(wide(n)) + 4); });
+    row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
   }
 }
 window.addEventListener('resize', () => requestAnimationFrame(sbb_fit));
