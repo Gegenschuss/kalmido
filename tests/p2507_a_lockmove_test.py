@@ -33,6 +33,16 @@ def one(sql, args=()):
     return r[0][0] if r else None
 
 
+def in_trash(nid):
+    """The node or a folder above it is in the trash (the trash marks only the top of what went in)."""
+    while nid:
+        r = dbx("SELECT parent_id, deleted_at FROM fs_nodes WHERE id=?", (nid,))
+        if not r or r[0][1]:
+            return bool(r)
+        nid = r[0][0]
+    return False
+
+
 def b64(n):
     return base64.b64encode(os.urandom(n)).decode()
 
@@ -273,7 +283,10 @@ check(one("SELECT aad_folder FROM fs_locks WHERE node_id=?", (I_SAFE,)) == SAFE,
 check(tuple(dbx("SELECT aad_r, aad_w, wrapped_by FROM fs_lock_keys WHERE node_id=?", (I_SAFE,))[0]) == (GINA, GINA, IVAN), "second move: the copy gina wrapped")
 r = Iv.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok, "undo " + r.text[:160])
-check(not dbx("SELECT 1 FROM fs_locks WHERE node_id=?", (I_SAFE,)) and not dbx("SELECT 1 FROM fs_lock_keys WHERE node_id=?", (I_SAFE,)), "undo: lock and key are gone with the folder")
+# 2.506.0 (#4299): the undo puts the folder into the trash; its lock and key stay on it, so a restore brings it back locked
+check(in_trash(I_SAFE), "undo: the folder is in the trash (with the folder above it)")
+check(bool(dbx("SELECT 1 FROM fs_locks WHERE node_id=?", (I_SAFE,))) and bool(dbx("SELECT 1 FROM fs_lock_keys WHERE node_id=?", (I_SAFE,))),
+      "undo: lock and key stay with the folder in the trash")
 
 # ---------------------------------------------------------------- organisation export
 r = A.post(B + "/api/users", json={"username": "lena", "display_name": "Lena Lock", "password": "password123", "email": "lena@example.com"})
