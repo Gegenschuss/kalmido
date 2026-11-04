@@ -6,7 +6,7 @@
    - The libraries ship with Kalmido (static/vendor/katex, static/vendor/mermaid: MIT, README with version and source) and
      are loaded only for the kind of block a page has (KaTeX for formulas, Mermaid for diagrams), never from a CDN and not
      in the service worker's precache. No network / a broken block: the source stays as a code block with a short hint.
-   - Mermaid runs with securityLevel "strict" (its own sanitizer), no HTML labels, no click callbacks; the SVG is cleaned
+   - Mermaid runs with securityLevel "strict" (its own sanitizer), no HTML labels (locked against the diagram text, #4170), no click callbacks; the SVG is cleaned
      once more (no script, no on… attributes, no javascript: links) before it goes into the page. Light / dark follows the
      app's theme. KaTeX: throwOnError off (an error shows as red source), trust off, limits on size and macro expansion.
    Classic script sharing the global scope with the others. */
@@ -14,6 +14,8 @@
 
 /** @type {any} */
 const DGM = {k: null, m: null, seen: new Map(), n: 0, q: Promise.resolve(), obs: null, light: null};
+// config keys a diagram's own %%{init}%% / ---config--- may not change (Mermaid's defaults + ours, #4170)
+const DGM_SECURE = ['secure', 'securityLevel', 'startOnLoad', 'maxTextSize', 'suppressErrorRendering', 'maxEdges', 'htmlLabels', 'dompurifyConfig', 'themeCSS', 'fontFamily'];
 const DGM_SEL = '.wkmd pre[data-lang="math"]:not([data-dg]), .wkmd pre[data-lang="mermaid"]:not([data-dg]), .wkmd .wkimath:not([data-dg])';
 function dg_script(src) {
   return new Promise((ok, no) => {
@@ -54,7 +56,11 @@ async function dg_svg(src) {
   const light = dg_light(), key = (light ? 'l' : 'd') + src;
   if (DGM.seen.has(key)) return DGM.seen.get(key);
   const mm = await dg_mermaid();
-  mm.initialize({startOnLoad: false, securityLevel: 'strict', theme: light ? 'neutral' : 'dark', htmlLabels: false, flowchart: {htmlLabels: false}, fontFamily: 'inherit', suppressErrorRendering: true});
+  // 2.522.0 (#4170): Mermaid only locks its own default keys against a %%{init: …}%% in the diagram text; htmlLabels,
+  // dompurifyConfig, themeCSS and fontFamily are locked too (also nested, e.g. flowchart.htmlLabels). The list replaces
+  // Mermaid's default, so the defaults stay in it.
+  mm.initialize({startOnLoad: false, securityLevel: 'strict', theme: light ? 'neutral' : 'dark', htmlLabels: false, flowchart: {htmlLabels: false}, fontFamily: 'inherit', suppressErrorRendering: true,
+    secure: DGM_SECURE});
   const id = 'dgmm' + (++DGM.n);
   try {
     const {svg} = await mm.render(id, src);
