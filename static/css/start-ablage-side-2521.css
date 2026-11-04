@@ -1,0 +1,13 @@
+/* 2.521.0 (#4397, #4400): the folder "…" left of the sidebar arrow; the file store's select box in the symbol's column on hover */
+/* 2.521.0 (#4400): on hover the box takes the place of the row's symbol (the symbol is hidden, the row does not move): the box is
+   exactly the symbol's column (a list row: 1 rem after the .75 rem padding of .abopen; a knowledge row: after the arrow column) */
+.ablist:not(.abselon) .abrow>.absel{left:.75rem;width:var(--ic);flex:none;background:none;border-radius:0}
+.wkrow:not(.wkselrow)>.absel{left:.5rem;width:var(--ic-s);flex:none;background:none;border-radius:0}
+.wkrow:not(.wkselrow):has(>details)>.absel,.wktree:has(>li>details)>.wkrow:not(.wkselrow):not(:has(>details))>.absel{left:1.75rem}
+.absel input{flex:none}
+@media (hover:hover) and (pointer:fine){
+  .ablist:not(.abselon) .abrow:hover>.abopen>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>.wkitem>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>details>summary>.wkitem>svg:first-child{visibility:hidden}
+}
+/* 2.521.0 (#4397): the "…" of a folder stands LEFT of the fold arrow (in the flow), never over it; the arrow stays visible and clickable */
+#side .sbbt.lfh>.fmenu{order:1;position:static;transform:none;margin-left:auto}
+#side .sbbt.lfh:has(>.fmenu)>.sbbtar{margin-left:0}

@@ -8346,17 +8346,8 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
    the row's start, without moving the row; phones start with a long press. The knowledge rows (.wkrow) the same. */
 .ablist:not(.abselon) .abrow,.wkrow:not(.wkselrow){position:relative}
 .ablist:not(.abselon) .absel,.wkrow:not(.wkselrow)>.absel{position:absolute;left:0;top:0;bottom:0;z-index:1;min-height:0;opacity:0;pointer-events:none;background:var(--bg2);border-radius:var(--radius)}
-/* 2.521.0 (#4400): on hover the box takes the place of the row's symbol (the symbol is hidden, the row does not move): the box is
-   exactly the symbol's column (a list row: 1 rem after the .75 rem padding of .abopen; a knowledge row: after the arrow column) */
-.ablist:not(.abselon) .abrow>.absel{left:.75rem;width:var(--ic);flex:none;background:none;border-radius:0}
-.wkrow:not(.wkselrow)>.absel{left:.5rem;width:var(--ic-s);flex:none;background:none;border-radius:0}
-.wkrow:not(.wkselrow):has(>details)>.absel,.wktree:has(>li>details)>.wkrow:not(.wkselrow):not(:has(>details))>.absel{left:1.75rem}
-.absel input{flex:none}
 @media (hover:hover) and (pointer:fine){ .ablist:not(.abselon) .abrow:hover .absel,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>.absel{opacity:1;pointer-events:auto} }
 .wkrow:not(.wkselrow)>.absel{bottom:auto;height:2.5rem}
-@media (hover:hover) and (pointer:fine){
-  .ablist:not(.abselon) .abrow:hover>.abopen>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>.wkitem>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>details>summary>.wkitem>svg:first-child{visibility:hidden}
-}
 @media (hover:none),(pointer:coarse){ .ablist:not(.abselon) .absel,.wkrow:not(.wkselrow)>.absel{display:none} }
 /* 2.102.0 B (#2206): while choosing, room below the list as high as the floating bar, so the last row stays tappable */
 .ablist.abselon{padding-bottom:7.5rem}
@@ -8661,9 +8652,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #side .sbbt.lfh>.sbbtar{order:2;margin-left:auto}
 #side .sbbt.lfh>:not(.sbbtn,.c,.sbbtar,.fmenu){order:3}
 #side .sbbt.lfh>.fmenu{order:4}
-/* 2.521.0 (#4397): the "…" of a folder stands LEFT of the fold arrow (in the flow), never over it; the arrow stays visible and clickable */
-#side .sbbt.lfh>.fmenu{order:1;position:static;transform:none;margin-left:auto}
-#side .sbbt.lfh:has(>.fmenu)>.sbbtar{margin-left:0}
 @media (min-width:900px) and (hover:hover){ #side .fhead:not(.sbbt):not(:has(.sbc-sl)){padding-right:2rem} }  /* no share column: room for the "…" shown on hover */
 #side .fbody .srow,#side .fhead.fsub{padding-left:calc(1.125rem - 1px)}
 #side .fsubw .fbody .srow{padding-left:calc(1.75rem - 2px)}
