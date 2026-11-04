@@ -13,7 +13,7 @@ from ..core.db import usettings, uset  # 2.356.0 B (#2932)
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop, acx_warm_register, acx_lists_sql, joined_lists_sql, dlg_gone, plists, pvis, qn_private, token_lists
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.orgcrypt import oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_send_file, oc_write_file, rck_admin_gone, rck_org_admins  # 2.149.0 G (#2517): pulled up from functions; 2.539.0 (#4373): rck_*
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
@@ -742,7 +742,7 @@ def _set_members(c, oid, ids):
             org_join_or_add(c, oid, u)  # 2.306.0 D1 (#2875): hosted: an invitation
     # 2.36.2 (#1142): the people taken out leave the organisation the same way as with an organisation admin (org_leave):
     # they leave its lists, calendars and address books; their lists of this workspace go to an admin who stays
-    _members_gone(c, oid, sorted(set(roles) - set(ids)))
+    _members_gone(c, oid, sorted(set(roles) - set(ids)), {u for u, r in roles.items() if r == "admin"})  # 2.539.0 (#4373): admins
 
 
 def _ids_arg(b, k):
@@ -779,10 +779,12 @@ def _member_ops(c, oid, b):
     for u in ops.get("admins_remove", []):  # only an admin becomes a member; guest / read-only / accounting keep their role (#2151)
         if c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND user_id=? AND role='admin'", (oid, u)).rowcount:
             org_role_news(c, oid, u, "member")
+            rck_admin_gone(c, oid, u)  # 2.539.0 (#4373)
     gone = [u for u in ops.get("members_remove", []) if c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, u)).fetchone()]
+    was = set(rck_org_admins(c, oid)) if gone else set()  # 2.539.0 (#4373)
     for u in gone:
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, u))
-    _members_gone(c, oid, gone)
+    _members_gone(c, oid, gone, was)
     keep_own_admin(c, oid, had)  # 2.306.0 Fix-1 (#2875 review): hosted: demoting the last admin is refused too
     acx_drop()
     return True
@@ -896,8 +898,9 @@ def org_heir_lift(c, oid, heir):
         acx_drop()
 
 
-def _members_gone(c, oid, gone):
-    """The people taken out of organisation oid leave it (org_leave); no admin left: the operator takes over."""
+def _members_gone(c, oid, gone, admins=()):
+    """The people taken out of organisation oid leave it (org_leave); no admin left: the operator takes over. 2.539.0 (#4373):
+    admins = who of them was an admin before their membership rows went (rck_admin_gone)."""
     if gone:
         own = c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' "
                         "AND u.disabled=0 AND u.kind!='agent' ORDER BY m.user_id LIMIT 1", (oid,)).fetchone()
@@ -912,6 +915,8 @@ def _members_gone(c, oid, gone):
             org_heir_lift(c, oid, heir)  # 2.538.0 (#4371): an operator in it as guest / read-only takes over as admin
         for u in gone:
             org_leave(c, oid, u, heir)
+            if u in admins:
+                rck_admin_gone(c, oid, u)  # 2.539.0 (#4373)
 
 
 def op_org_public(c, r):
@@ -1094,9 +1099,12 @@ def org_update(oid):
                 return err(tr("Invalid value: {0}", "admins"))
             # 2.143.0 A (#2151): only former admins become members; guest / read-only / accounting keep their role
             had = org_own_admin(c, oid)
+            was = set(rck_org_admins(c, oid))  # 2.539.0 (#4373)
             c.execute("UPDATE org_members SET role='member' WHERE org_id=? AND role='admin'", (oid,))
             for x in b["admins"]:
                 c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND user_id IN (SELECT id FROM users WHERE kind!='agent')", (oid, x))
+            for x in sorted(was - set(rck_org_admins(c, oid))):  # 2.539.0 (#4373): demoted by the whole set
+                rck_admin_gone(c, oid, x)
             keep_own_admin(c, oid, had)  # 2.306.0 Fix-1 (#2875 review): hosted: the organisation keeps an admin of its own
             acx_drop()  # 2.143.0 A (#2151, review): the request's cached roles follow
         bump(c)
@@ -1483,6 +1491,8 @@ def org_member_put(oid):
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
         if cur["role"] != role:
             org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
+            if cur["role"] == "admin":
+                rck_admin_gone(c, oid, uid)  # 2.539.0 (#4373)
     elif uid != me() and (not g.user["is_admin"] or _operator_apart()):  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation (2.306.0 D1, #2875: also the operator's)
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
@@ -1560,6 +1570,7 @@ def org_leave(c, oid, uid, heir, back=None):
     if heir and heir != uid:
         ws_check_owner(c, oid, heir)  # 2.538.0 (#4371): every caller's heir is a member / admin of the organisation (409)
     snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
+    was_admin = c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=? AND role='admin'", (oid, uid)).fetchone()  # 2.539.0 (#4373)
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():
         if lr["brought_by"] == uid and not lr["deleted_at"]:
@@ -1622,6 +1633,8 @@ def org_leave(c, oid, uid, heir, back=None):
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
         c.execute("DELETE FROM doc_fetchers WHERE org_id=? AND user_id=?", (oid, uid))  # 2.425.0 (#3453 review): their receipt fetchers end (coming back = no old key)
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
+    if was_admin:  # 2.539.0 (#4373): an admin who saw the recovery key leaves: the other admins are asked to renew it
+        rck_admin_gone(c, oid, uid)
     # 2.351.0 D (#3214): their read marks in the organisation's channels and list conversations go too (tchat_sig_q
     # counts the marks of every room with a mark of mine: the reading in rooms left would stay visible); 2.373.0 (#3337):
     # groups have no organisation and the person stays a member there -- their marks stay

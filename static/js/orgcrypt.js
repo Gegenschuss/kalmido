@@ -27,6 +27,7 @@ function ocStateHtml(j) {
 function ocNewsText(d, who, q) {
   const org = q(d.org || tr('Organisation'));
   if (d.action === 'rotated') return tr('The key of {0} was renewed on the server. Earlier recovery keys no longer work.', org);
+  if (d.action === 'renew') return tr('{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.', q(d.by_name || tr('An admin')), org);  // 2.539.0 (#4373)
   return d.action === 'new' ? tr('{0} made a new recovery key for {1}', who, org) : tr('{0} looked at the recovery key of {1}', who, org);
 }
 async function ocLoad(box) {

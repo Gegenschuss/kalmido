@@ -1294,6 +1294,48 @@ def rck_tell(c, oid, actor, action):
     return n
 
 
+def rck_admin_gone(c, oid, uid):
+    """2.539.0 (#4373, audit #2482 F3): uid is no longer an active admin of organisation oid (taken out, left, demoted, locked
+    or deleted). Did uid show (or make) the organisation's recovery key since the key was last renewed (org_keys.rotated_at;
+    the office log, oc_route_recovery), the remaining admins get the News item "orgkey" with action renew: the person may
+    still hold a recovery key that opens later data copies of the organisation. Nothing is rotated here -- a new recovery key
+    must be shown and kept by an admin. Call it before an account is deleted (the log loses the user id then). Caller
+    commits. Returns the number of admins told."""
+    with system_ctx(c):  # orgcrypt: key rows, the office log's showing entries and who administers (structure, no values)
+        k = c.execute("SELECT recovery_shown_at, rotated_at FROM org_keys WHERE org_id=?", (int(oid),)).fetchone()
+        if not k or not k["recovery_shown_at"]:
+            return 0  # never shown, or renewed on the server since (rotation clears it): nobody holds a valid one
+        if not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND user_id=? AND action='recovery_key' AND at>=? LIMIT 1",
+                         (int(oid), int(uid), k["rotated_at"] or "")).fetchone():
+            return 0
+        org = c.execute("SELECT name, personal_of FROM orgs WHERE id=?", (int(oid),)).fetchone()
+        if not org or org["personal_of"]:
+            return 0
+        a = c.execute("SELECT display_name, username FROM users WHERE id=?", (int(uid),)).fetchone()
+        by = (a["display_name"] or a["username"]) if a else ""
+        ids = [r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
+                                       "AND m.role='admin' AND u.kind!='agent' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id",
+                                       (int(oid), int(uid)))]
+        for x in ids:  # actor_id NULL: the account may be deleted next (the name stays in the item)
+            c.execute("INSERT INTO notifications(user_id,kind,task_id,list_id,actor_id,comment_id,data,created_at) VALUES(?,?,?,?,?,?,?,?)",
+                      (x, "orgkey", None, None, None, None,
+                       json.dumps({"org_id": int(oid), "org": org["name"], "action": "renew", "by_name": by}, ensure_ascii=False),
+                       iso_ms(now_utc())))
+    return len(ids)
+
+
+def rck_admin_orgs(c, uid):
+    """2.539.0 (#4373): the organisations uid is an admin of (before a change that ends that, rck_admin_gone)."""
+    with system_ctx(c):  # membership structure
+        return [r[0] for r in c.execute("SELECT org_id FROM org_members WHERE user_id=? AND role='admin' ORDER BY org_id", (int(uid),))]
+
+
+def rck_org_admins(c, oid):
+    """2.539.0 (#4373): the admins of organisation oid (before a whole-set change of the admins, rck_admin_gone)."""
+    with system_ctx(c):  # membership structure
+        return [r[0] for r in c.execute("SELECT user_id FROM org_members WHERE org_id=? AND role='admin' ORDER BY user_id", (int(oid),))]
+
+
 @app.get("/api/orgs/<int:oid>/encryption")
 def oc_route_status(oid):
     """Organisation admins: {enabled (server key set), active (new data is encrypted), has_key, key_ok, migrated_at,

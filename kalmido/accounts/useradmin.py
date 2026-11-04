@@ -7,15 +7,15 @@ from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import N_, tr
-from ..core.db import body, db, err, now_utc, parse_iso, USER_DEFAULTS
+from ..core.db import body, db, err, iso, now_utc, parse_iso, USER_DEFAULTS
 from ..core.pg import like_escape, system_ctx
 from ..core.rls import org_tables
 from ..core.access import Denied, list_role, my_inbox
 from ..accounts.session import me, user_public
 from .orgretain import _until  # 2.186.0 A (#2566)
-from .orgs import op_apart_deny, op_foreign_account  # 2.399.0 (#2687)
+from .orgs import _operator_apart, op_apart_deny, op_foreign_account  # 2.399.0 (#2687); 2.539.0 (#4374): _operator_apart
 from ..accounts.orgs import org_role, user_orgs, visible_people, need_visible  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.users import om_admin_all, need_admin, user_update  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.users import _op_foreign, om_admin_all, need_admin, op_account_brief, user_update  # 2.539.0 (#4374): _op_foreign, op_account_brief; 2.369.5 (#2517): pulled up from functions
 
 
 UA8_FILTERS = ("people", "active", "disabled", "admin", "invited", "pending", "agents", "all")
@@ -24,20 +24,50 @@ UA8_MAX_BULK = 200
 UA8_PRIVATE = N_("The account still has things in its private workspace (projects, basket, calendars, files ...): only a server admin can delete it. You can remove it from your organisation.")
 
 
-def ua8_where(q, flt):
-    """SQL condition + args of the user management's search (name, user name, e-mail) and filter."""
+def ua8_where(q, flt, own=None):
+    """SQL condition + args of the user management's search (name, user name, e-mail) and filter. 2.539.0 (#4374): own = the
+    ids whose name and e-mail address the search may match (hosted: ua8_op_own; None = every account, self-hosted)."""
     cond, args = [], []
     if q:
         p = "%" + like_escape(q.strip()) + "%"
-        cond.append("(username ILIKE ? ESCAPE '\\' OR COALESCE(display_name,'') ILIKE ? ESCAPE '\\' "
-                    "OR COALESCE(email,'') ILIKE ? ESCAPE '\\')")
-        args += [p, p, p]
+        if own is None:
+            cond.append("(username ILIKE ? ESCAPE '\\' OR COALESCE(display_name,'') ILIKE ? ESCAPE '\\' "
+                        "OR COALESCE(email,'') ILIKE ? ESCAPE '\\')")
+            args += [p, p, p]
+        else:  # a client's account: its user name only (no oracle over the clients' addresses and names)
+            ids = sorted(own) or [0]
+            cond.append(f"(username ILIKE ? ESCAPE '\\' OR (id IN ({','.join('?' * len(ids))}) AND "
+                        "(COALESCE(display_name,'') ILIKE ? ESCAPE '\\' OR COALESCE(email,'') ILIKE ? ESCAPE '\\')))")
+            args += [p, *ids, p, p]
     if flt != "agents" and flt != "all":
         cond.append("COALESCE(kind,'user')!='agent'")
     cond.append({"active": "disabled=0 AND COALESCE(signup,'')!='pending'", "disabled": "disabled=1", "admin": "is_admin=1",
                  "invited": "id IN (SELECT user_id FROM user_invites WHERE used_at IS NULL)", "pending": "signup='pending'",
                  "agents": "kind='agent'"}.get(flt, "1=1"))
     return " AND ".join(cond), args
+
+
+def ua8_op_own(c):
+    """2.539.0 (#4374): hosted, the ids of the accounts that are no client's (users.op_foreign_account false) in a fixed number
+    of queries: the operator itself, the members of the organisations it administers, the accounts it made that never signed
+    in and the accounts that granted support access; an agent follows its owner (only one's own) or its organisation (a
+    server agent without both: the operator's). Leaves out rather than adds: an agent of a client that granted access."""
+    if not _operator_apart():
+        return None
+    mine = me()
+    with system_ctx(c):  # membership structure and grants, no content
+        adm = {r[0] for r in c.execute("SELECT m.org_id FROM org_members m JOIN orgs o ON o.id=m.org_id WHERE m.user_id=? "
+                                       "AND m.role='admin' AND o.retired_at IS NULL", (mine,))}
+        people = {r[0] for r in c.execute("SELECT b.user_id FROM org_members a JOIN org_members b ON b.org_id=a.org_id "
+                                          "JOIN orgs o ON o.id=a.org_id WHERE a.user_id=? AND a.role='admin' "
+                                          "AND o.retired_at IS NULL", (mine,))}
+        people |= {r[0] for r in c.execute("SELECT id FROM users WHERE op_made_by=?", (mine,))}
+        people |= {r[0] for r in c.execute("SELECT user_id FROM support_grants WHERE org_id IS NULL AND ended_at IS NULL "
+                                           "AND ends_at>?", (iso(now_utc()),))}
+        agents = {r[0]: (r[1], r[2]) for r in c.execute("SELECT user_id, owner_id, org_id FROM agents")}
+    own = {mine} | (people - set(agents))
+    own |= {a for a, (o, oid) in agents.items() if (o == mine if o else (not oid or oid in adm))}
+    return own
 
 
 def ua8_admin_dicts(c, rows):
@@ -75,6 +105,7 @@ def ua8_admin_dicts(c, rows):
                 f"SELECT user_id, COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q}) GROUP BY user_id"):  # 2.363.3 (#3134)
         for uid, n in c.execute(sql, ids):  # admin/hosting._user_bytes, per account
             used[uid] = used.get(uid, 0) + int(n or 0)
+    hosted_ = _operator_apart()
     out = []
     for u in rows:
         uid = u["id"]
@@ -97,6 +128,10 @@ def ua8_admin_dicts(c, rows):
                     "parents": parents.get(uid, []) if u["kid"] else [], "invite": invite.get(uid),
                     "signup": u["signup"] or "", "kid": bool(u["kid"]), **st,
                     "storage": {"used": used.get(uid, 0), "quota_mb": u["storage_quota_mb"]}})
+        if hosted_:  # 2.539.0 (#4374): like user_admin_dict -- a client's account (apart) reduced, an open support access named
+            out[-1].update(_op_foreign(c, uid))
+            if out[-1].get("apart"):
+                out[-1] = op_account_brief(out[-1])
     return out
 
 
@@ -111,7 +146,8 @@ def ua8_users_page(c):
     flt = request.args.get("filter") or "people"
     if flt not in UA8_FILTERS:
         return err(tr("Invalid value: {0}", "filter"))
-    where, args = ua8_where((request.args.get("q") or "")[:100], flt)
+    q = (request.args.get("q") or "")[:100]
+    where, args = ua8_where(q, flt, ua8_op_own(c) if q.strip() else None)  # 2.539.0 (#4374)
     total = c.execute(f"SELECT COUNT(*) FROM users WHERE {where}", args).fetchone()[0]
     rows = c.execute(f"SELECT * FROM users WHERE {where} ORDER BY lower(COALESCE(display_name, username)), id LIMIT ? OFFSET ?",
                      args + [limit, offset]).fetchall()
@@ -319,8 +355,7 @@ def ua8_delete_info(uid):
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
     foreign = by == "instance" and op_foreign_account(c, uid)  # 2.480.0 (#3944, F4): hosted: a client's account
     if by != "instance" or foreign:  # an organisation admin: nothing about the person's private office (privat bleibt privat)
-        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "chat_files", "no_heir",
-                                                          "shared")}  # 2.533.0 (#4318) B42: + chat_files (a number)
+        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "no_heir", "shared")}
         purge["shared"] = {**purge["shared"], "names": []}  # 2.508.0 (#4301): numbers only, no names of a private circle
     info = ua8_list_info(c, lists, by)
     if foreign:  # 2.480.0 (#3944, F4): the operator sees numbers only -- no names of the people the lists are shared with

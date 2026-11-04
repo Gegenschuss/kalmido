@@ -23,7 +23,7 @@ from ..accounts.sessions import ses_end  # 2.190.0 A (#1991)
 from ..core.access import collab_all, Denied, joined_lists_sql, list_role, need_list, vis_sql
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput
-from ..core.orgcrypt import oc_drop_key, oc_list_org, oc_send_file, oc_write_file  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import oc_drop_key, oc_list_org, oc_send_file, oc_write_file, rck_admin_gone, rck_admin_orgs  # 2.149.0 G (#2517): pulled up from functions; 2.539.0 (#4373): rck_*
 from ..core.tokenhash import tkh_set_drop  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import USER_DEFAULTS  # 2.369.5 (#2517): pulled up from functions
 from .colors import ac_valid  # 2.369.5 (#2517): pulled up from functions
@@ -55,6 +55,25 @@ def user_forget_conns(c, uid):
 
 def user_admin_dict(c, u):
     from ..family.family import kid_parents
+    d = _user_admin_full(c, u, kid_parents)
+    return op_account_brief(d) if d.get("apart") else d  # 2.539.0 (#4374)
+
+
+# 2.539.0 (#4374, audit #2482 F4 + F8): what the operator of a hosted instance (an instance admin) sees of a client's account
+# (users._op_foreign: apart) -- the states it manages and a number, never the client's e-mail address, name, photo, sign-in
+# methods, organisation ids, parents or invitation (the operator console's promise). Self-hosted: never apart, unchanged.
+OP_BRIEF_KEYS = ("id", "username", "kind", "is_admin", "disabled", "signup", "storage", "apart")
+
+
+def op_account_brief(d):
+    out = {k: d[k] for k in OP_BRIEF_KEYS if k in d}
+    out.update(display_name=d["username"], avatar="", org_count=len(d.get("orgs") or []))
+    if d.get("agent"):
+        out["agent"] = True
+    return out
+
+
+def _user_admin_full(c, u, kid_parents):
     return {**user_public(u), "kind": u["kind"] or "user", "is_admin": bool(u["is_admin"]), "disabled": bool(u["disabled"]),
             "has_password": bool(u["password_hash"]), "proxy_login": u["proxy_login"] or "",
             "created_at": u["created_at"],
@@ -365,6 +384,9 @@ def user_update(uid):
         c.execute("UPDATE users SET disabled=? WHERE id=?", (1 if b["disabled"] else 0, uid))
         if b["disabled"]:
             ses_end(c, uid)  # 2.190.0 A (#1991): with the push subscriptions made in them
+            if not u["disabled"]:  # 2.539.0 (#4373): a locked admin who saw an organisation's recovery key
+                for o in rck_admin_orgs(c, uid):
+                    rck_admin_gone(c, o, uid)
     if "password" in b:  # reset ('' = remove the built-in login)
         pw = b["password"] or ""
         if pw and len(pw) < MIN_PASSWORD:
@@ -547,6 +569,8 @@ def _user_purge(c, uid, made):
     from ..accounts.orgretain import upg_personal, upg_rest
     from ..admin.backup import bkr_journal
     bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)
+    for o in rck_admin_orgs(c, uid):  # 2.539.0 (#4373): an admin who saw an organisation's recovery key goes (before the log forgets the id)
+        rck_admin_gone(c, o, uid)
     # 2.152.0 A (#2164): the personal office is dismantled with its files, or retired when it keeps invoices / receipts by
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)
@@ -852,6 +876,9 @@ def avatar_get(uid, tok):
     if not u or u["avatar"] != "u:" + tok or not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", tok):
         raise Denied(404)
     admin_ok = bool(g.user["is_admin"])  # 2.46.0 (#1592): the user management shows every account, with its photo
+    if admin_ok and uid != me():  # 2.539.0 (#4374): hosted, not the photo of a client's account (the list shows none)
+        from ..accounts.orgs import op_foreign_account
+        admin_ok = not op_foreign_account(c, uid, note=False)
     if uid != me() and not admin_ok and not c.execute(
             f"""SELECT 1 FROM lists WHERE id IN {vis_sql()} AND id IN {joined_lists_sql()}
                 LIMIT 1""", (me(), me(), uid, uid)).fetchone():
