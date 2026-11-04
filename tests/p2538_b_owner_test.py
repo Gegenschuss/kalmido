@@ -10,6 +10,8 @@ invented names only, addresses @example.com.
    409 (the asker is an organisation admin, who sees the roles; an account from outside stays 400 as in #4076), member ok
  - the heir when the last admin is taken out by the instance admin (_members_gone): an instance admin who is only a guest
    of the organisation takes over as admin, never as a guest owning the projects
+ - the same through the user dialog (PATCH /api/users/<uid> orgs, users.py; review 2646 finding 8): the instance admin, a guest
+   there, becomes admin first instead of a 409 halfway through
  - a person without an organisation (freelancer-matrix: lists): no handover in somebody else's organisation, an own folder
    still hands over nothing to an unknown person (404)
 usage: p2538_b_owner_test.py <datadir>      (P2538B_NOSTART=1: a running server on KALMIDO_TEST_PORT)"""
@@ -22,6 +24,7 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import FEATURES, freelancer, org_join  # noqa: E402
+import dbx as dbxm  # noqa: E402
 
 DATA = sys.argv[1] if len(sys.argv) > 1 else os.path.join(N, ".data")
 B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
@@ -44,6 +47,16 @@ for u in ("bob", "carol", "dave", "gina", "rita"):
     assert r.ok, r.text
     ids[u] = r.json()["id"]
 BOB, CAROL, DAVE, GINA, RITA = (ids[u] for u in ("bob", "carol", "dave", "gina", "rita"))
+
+
+def dbx(sql, args=()):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        return c.execute(sql, args).fetchall()
+    finally:
+        c.close()
+
+
 MSG = "Only a member or admin of the organisation can own its projects"
 
 r = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": BOB})
@@ -139,6 +152,29 @@ check(r.ok, f"the instance admin takes Bob, the only admin, out ({r.status_code}
 org = next((o for o in A.get(B + "/api/admin/orgs").json().get("orgs", []) if o["id"] == ORG), {})
 check(ALICE in org.get("admins", []), f"the heir took over as admin, not as a guest ({org.get('admins')})")
 check(owner_of(L5) == ALICE, f"Bob's project went to Alice, now an admin ({owner_of(L5)})")
+
+# ---- 2.538.0 (#4371, review 2646 finding 8): the instance admin takes a person out in the user dialog (users.py, PATCH
+# /api/users/<uid> orgs) and is the heir (no other admin) while only a guest there: admin first, no 409 halfway
+r = A.post(B + "/api/users", json={"username": "omar", "display_name": "Omar", "password": "password123", "email": "omar@example.com"})
+assert r.ok, r.text
+OMAR = r.json()["id"]
+r = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": OMAR})
+assert r.status_code == 201, r.text
+BETA = r.json()["id"]
+Om = sess("omar")
+Om.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "workspace": f"org:{BETA}", "features": FEATURES})
+SESS[OMAR] = Om
+check(A.patch(B + f"/api/admin/orgs/{BETA}", json={"members_add": [ALICE]}).ok, "setup: Alice joins Beta")
+check(Om.put(B + f"/api/orgs/{BETA}/members", json={"user_id": ALICE, "role": "guest"}).ok, "setup: Omar makes Alice a guest of Beta")
+r = Om.post(B + "/api/lists", json={"name": "Omars last", "org_id": BETA})
+assert r.ok, r.text
+L6 = r.json()["id"]
+r = A.patch(B + f"/api/users/{OMAR}", json={"orgs": [], "_prev": {"orgs": [BETA]}})
+check(r.ok, f"user dialog: Omar, Beta's only admin, taken out by the instance admin (a guest there): ok ({r.status_code} {r.text[:160]})")
+org = next((o for o in A.get(B + "/api/admin/orgs").json().get("orgs", []) if o["id"] == BETA), {})
+check(ALICE in org.get("admins", []) and OMAR not in org.get("admins", []), f"user dialog: Alice took over Beta as admin ({org.get('admins')})")
+own6 = dbx("SELECT owner_id FROM lists WHERE id=?", (L6,))[0][0]
+check(own6 == ALICE, f"user dialog: Omar's project went to Alice, now an admin ({own6})")
 
 # ---- freelancer-matrix: lists
 FID, Fr = freelancer(B, A)

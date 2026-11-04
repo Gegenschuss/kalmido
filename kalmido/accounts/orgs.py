@@ -887,6 +887,15 @@ def org_join_or_add(c, oid, uid, role="member"):
     return False
 
 
+def org_heir_lift(c, oid, heir):
+    """2.538.0 (#4371): the heir of a leaving person is only ever an admin or member (ws_check_owner): an instance admin who
+    takes over while in organisation oid as guest / read-only / accounting becomes its admin first, like org_member_remove
+    (review 2646 finding 8: before, org_leave refused with 409 halfway through). Not a member: unchanged. The caller commits."""
+    if c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND role NOT IN ('admin','member')",
+                 (oid, heir)).rowcount:
+        acx_drop()
+
+
 def _members_gone(c, oid, gone):
     """The people taken out of organisation oid leave it (org_leave); no admin left: the operator takes over."""
     if gone:
@@ -899,9 +908,8 @@ def _members_gone(c, oid, gone):
                 or c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
         if heir and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, heir)).fetchone():
             org_member_add(c, oid, heir, "admin")  # no admin stays: the operator takes over (like org_member_remove)
-        elif heir and c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND role NOT IN ('admin','member')",
-                                (oid, heir)).rowcount:
-            acx_drop()  # 2.538.0 (#4371): the heir is only ever an admin or member -- an operator in it as guest / read-only takes over as admin
+        elif heir:
+            org_heir_lift(c, oid, heir)  # 2.538.0 (#4371): an operator in it as guest / read-only takes over as admin
         for u in gone:
             org_leave(c, oid, u, heir)
 

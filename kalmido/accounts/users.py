@@ -299,7 +299,7 @@ def user_update(uid):
     if "orgs" in b and instance_mode(c) == "workspaces":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
             return err(tr("Invalid value: {0}", "orgs"))
-        from ..accounts.orgs import _operator_apart, org_join_or_add, org_leave, org_own_admin
+        from ..accounts.orgs import _operator_apart, org_heir_lift, org_join_or_add, org_leave, org_own_admin
         with system_ctx(c):  # 2.37.0 (#1150): the instance admin moves the account between organisations (structure)
             have = {r[0]: r[1] for r in c.execute("SELECT org_id, role FROM org_members WHERE user_id=?", (uid,))}
         if any(op_foreign_org(c, o, grant=False) for o in set(have) ^ set(b["orgs"])):  # 2.485.0 (#3939): not through support access  # 2.399.0 (#2687): hosted: in or out of a customer's organisation
@@ -314,7 +314,10 @@ def user_update(uid):
                     org_leave(c, o, uid, heir)
                     continue
                 heir = (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (o, uid)).fetchone() or [me()])[0]
-                org_leave(c, o, uid, heir if heir != uid else me())
+                heir = heir if heir != uid else me()
+                if heir == me():
+                    org_heir_lift(c, o, heir)  # 2.538.0 (#4371, review 2646 finding 8): in it as guest / read-only: admin first, no 409 halfway
+                org_leave(c, o, uid, heir)
             for o in b["orgs"]:
                 if o not in have:
                     if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (o,)).fetchone():
