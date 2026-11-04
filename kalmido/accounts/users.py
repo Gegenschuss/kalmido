@@ -544,6 +544,8 @@ def _user_purge(c, uid):
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)
     files += upg_rest(c, uid)
+    from ..admin.purgeshare import ush_hand_on
+    files += ush_hand_on(c, uid)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
     from ..team.clients import cl_user_purge
     cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
     from ..admin.acctexport import umz_forget

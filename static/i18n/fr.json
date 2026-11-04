@@ -16114,5 +16114,9 @@
   "Conflict with {0} ({1}): the change in the repository was newer. The version here was: {2}": "Conflit avec {0} ({1}) : la modification du dépôt était plus récente. La version ici était : {2}",
   "here {0}, in the repository {1}": "ici {0}, dans le dépôt {1}",
   "here {0}, in the repository {1} (last change of the issue)": "ici {0}, dans le dépôt {1} (dernière modification de l’issue)",
-  "Sync with {0}: the repository refuses the change ({1}); it is tried again with the next change of the task": "Synchronisation avec {0} : le dépôt refuse la modification ({1}) ; nouvel essai à la prochaine modification de la tâche"
+  "Sync with {0}: the repository refuses the change ({1}); it is tried again with the next change of the task": "Synchronisation avec {0} : le dépôt refuse la modification ({1}) ; nouvel essai à la prochaine modification de la tâche",
+  "{0} folder or file": ["{0} dossier ou fichier", "{0} dossiers ou fichiers"],
+  "Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.": "Partagés avec d'autres, ils restent et passent à la personne autorisée depuis le plus longtemps à les modifier ({1}) : {0}.",
+  "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Partagés avec d'autres, ils restent et passent à la personne autorisée depuis le plus longtemps à les modifier : {0}.",
+  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Partagés avec d'autres, mais personne d'autre ne peut les reprendre : ils disparaissent avec le compte : {0}."
 }

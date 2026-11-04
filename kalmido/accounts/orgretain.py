@@ -615,6 +615,8 @@ def upg_info(c, uid):
                                 "AND a!=b AND last_at IS NOT NULL", (int(uid), int(uid))).fetchone()[0]
     content = odl_content(c, poid) if poid else {}
     info["no_heir"] = tr(UPG_NO_HEIR) if upg_heirless(c, uid) else ""  # 2.360.4 (#3243): said in the dialog, not by the 409 afterwards
+    from ..admin.purgeshare import ush_info
+    info["shared"] = ush_info(c, uid)  # 2.508.0 (#4301): private shared calendars, address books, tables, knowledge pages
     info.update(office="keep" if ret["until"] else ("delete" if content else None), office_counts=content,
                 kept=ret["counts"], kept_until=ret["until"])
     return info

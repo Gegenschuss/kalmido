@@ -980,9 +980,17 @@ function olvNoticeWire(md, o) {
 }
 // the account's delete dialog: its personal office (deleted with its files, or retired by law), agents, organisation
 // calendars, time entries and direct messages
+// 2.508.0 (#4301): the private shared objects of the account: who takes them over, what goes because nobody else may write
+const UA8_SHARED = {calendars: n => trn('{0} calendar', '{0} calendars', n), books: n => trn('{0} address book', '{0} address books', n),
+  sheets: n => trn('{0} table', '{0} tables', n), wiki: n => trn('{0} knowledge page', '{0} knowledge pages', n),
+  folders: n => trn('{0} folder or file', '{0} folders or files', n)};
+const ua8SharedCounts = c => Object.entries(c || {}).filter(([k, n]) => n && UA8_SHARED[k]).map(([k, n]) => UA8_SHARED[k](n)).join(', ');
 function ua8PurgeHtml(p) {
   const rows = [];
   p = p || {};
+  const to = ua8SharedCounts(p.shared?.to), gone = ua8SharedCounts(p.shared?.gone);
+  if (to) rows.push([false, p.shared.names?.length ? tr('Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.', to, p.shared.names.join(', ')) : tr('Shared with others, these stay and go to the longest-standing person who may change them: {0}.', to)]);
+  if (gone) rows.push([true, tr('Shared with others, but nobody else may take them over, so these go with the account: {0}.', gone)]);
   if (p.office === 'keep') rows.push([true, tr('The personal office keeps {0} by law until {1}: it is retired and goes for good after that date, nobody can export it any more (the person can download the retention export in the office before). Everything else of the account goes.', odlCounts(p.kept), fmtDate(p.kept_until))]);
   else if (p.office === 'delete') rows.push([false, tr('The personal office goes with its files: {0}.', odlCounts(p.office_counts))]);
   if (p.agents) rows.push([false, trn('{0} own agent is deleted with its access keys.', '{0} own agents are deleted with their access keys.', p.agents)]);

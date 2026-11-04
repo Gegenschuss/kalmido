@@ -256,11 +256,12 @@ def wkm_free(path, taken):
     return n
 
 
-def wkm_home(c, oid, uid, rows, new_paths, old_paths):
-    """2.365.1 (#3395): pages rows (wkm_home_rows) go back into uid's private space: what wiki_move_space does, without the
-    dialog; a name taken there gets " (2)" and the links between these pages follow. The caller commits."""
+def wkm_place(c, oid, owner, uid, rows, new_paths, old_paths):
+    """Pages rows of space oid / owner go into uid's private space: a name taken there gets " (2)", the links between these
+    pages follow, their files and history are sealed for it, their shares end. -> [(row, new path)]. The caller commits.
+    2.508.0 (#4301): also from another person's private space (their account is deleted)."""
     from .wikiatt import wka_move_files
-    from .wkfolder import wkf_drop, wkf_sync
+    from .wkfolder import wkf_drop
     from .wkhist import wkh_body, wkh_move, wkh_seal
     from .wkshare import wsh_end_moved
     w, a = wiki_space_sql(None, uid)
@@ -271,15 +272,25 @@ def wkm_home(c, oid, uid, rows, new_paths, old_paths):
     for r, n in moves:
         c.execute("UPDATE wiki_pages SET org_id=NULL, owner_id=?, path=?, updated_by=?, updated_at=?, brought_by=NULL WHERE id=?", (uid, n, uid, ts, r["id"]))
     wka_move_files(c, ids, None, uid, new_paths, old_paths)
-    wsh_end_moved(c, oid, None, [r["path"] for r in rows])
+    wsh_end_moved(c, oid, owner, [r["path"] for r in rows])
     wkh_move(c, rows, None, uid)
     for r, n in moves:
         nb = wkm_relink(plain[r["id"]], ren)
         c.execute("UPDATE wiki_pages SET body=? WHERE id=?", (wkh_seal(c, None, uid, nb), r["id"]))
         wiki_set_links(c, r["id"], nb)
+    wkf_drop(c, ids)
+    return moves
+
+
+def wkm_home(c, oid, uid, rows, new_paths, old_paths):
+    """2.365.1 (#3395): pages rows (wkm_home_rows) go back into uid's private space: what wiki_move_space does, without the
+    dialog (wkm_place). The caller commits."""
+    from .wkfolder import wkf_sync
+    moves = wkm_place(c, oid, None, uid, rows, new_paths, old_paths)
+    ts = iso_ms(now_utc())
+    for r, n in moves:
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('wiki',?,?,NULL,?,?,?)",
                   (r["id"], oid, uid, ts, json.dumps({"from": r["path"], "to": n}, ensure_ascii=False)))
-    wkf_drop(c, ids)
     wkf_sync(c, uid, None)
 
 

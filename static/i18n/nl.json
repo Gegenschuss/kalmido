@@ -16114,5 +16114,9 @@
   "Conflict with {0} ({1}): the change in the repository was newer. The version here was: {2}": "Conflict met {0} ({1}): de wijziging in de repository was nieuwer. De versie hier was: {2}",
   "here {0}, in the repository {1}": "hier {0}, in de repository {1}",
   "here {0}, in the repository {1} (last change of the issue)": "hier {0}, in de repository {1} (laatste wijziging van de issue)",
-  "Sync with {0}: the repository refuses the change ({1}); it is tried again with the next change of the task": "Synchronisatie met {0}: de repository weigert de wijziging ({1}); opnieuw geprobeerd bij de volgende wijziging van de taak"
+  "Sync with {0}: the repository refuses the change ({1}); it is tried again with the next change of the task": "Synchronisatie met {0}: de repository weigert de wijziging ({1}); opnieuw geprobeerd bij de volgende wijziging van de taak",
+  "{0} folder or file": ["{0} map of bestand", "{0} mappen of bestanden"],
+  "Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.": "Gedeeld met anderen, deze blijven en gaan naar wie ze het langst mag wijzigen ({1}): {0}.",
+  "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Gedeeld met anderen, deze blijven en gaan naar wie ze het langst mag wijzigen: {0}.",
+  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Gedeeld met anderen, maar niemand anders kan ze overnemen, dus ze verdwijnen met het account: {0}."
 }

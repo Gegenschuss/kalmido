@@ -431,6 +431,7 @@ ORDER = (
     "agents.lyprop",  # 2.55.0 B (#1066): agents propose arrangements of views (the person accepts)
     "admin.exportleft", "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive)
     "admin.retexport",  # 2.146.0 D (#2468): the retention export before deleting an account / organisation
+    "admin.purgeshare",  # 2.508.0 (#4301): what an account shares privately passes on when it is deleted (no routes)
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
     "admin.wkimport",  # 2.177.0 (#2685): large ZIP imports of knowledge pages in pieces, unpacked in the background with progress
