@@ -38,8 +38,15 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(!d.querySelector('.txdnext'), 'nothing switched on: no preview');
 
   // change: monthly VAT
+  // CI of 2.506.0: a load of the tax dates begun before the change (the page's own txdLoad) answered after the save and put the
+  // old state back for good. Here that load is made slow on purpose: its answer comes after the save's and must be dropped.
+  await w.eval(`(() => { window.__api0 = api; api = async (m, u, ...a) => { const r = await __api0(m, u, ...a);
+    if (m === 'GET' && u === '/api/office/tax-dates' && !window.__slowDone) { window.__slowDone = 1; await new Promise(f => setTimeout(f, 2500)); } return r; };
+    TXD.loading = false; window.__slow = txdLoad(); return 1; })()`);
   const sel = d.querySelector('#txd-ustva'); sel.value = 'month';
   sel.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await w.eval('window.__slow'); w.eval('api = __api0');
+  check(await until(() => w.eval("TXD.data?.ustva === 'month'")), 'a load begun before the save does not put the old state back');
   check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'month', 40), 'saved at once on change');
   // CI of 2.496.1: the server has saved before the page got the answer, and mount() draws from the page's copy (TXD.data)
   check(await until(() => w.eval("TXD.data?.ustva === 'month'")), 'the page has the answer');

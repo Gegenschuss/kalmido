@@ -1,9 +1,13 @@
 // 2.90.0 C (#1922): tax dates as tasks (section in the bookkeeping tab; 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes)
-const TXD = {data: null, loading: false};
+const TXD = {data: null, loading: false, gen: 0};  // gen: 2.506.1 (#1922): counts the saves, a load begun before one is dropped
 async function txdLoad() {
   if (TXD.loading) return;
   TXD.loading = true;
-  try { TXD.data = await api('GET', '/api/office/tax-dates'); } catch (x) { TXD.data = null; }
+  const gen = TXD.gen;
+  // 2.506.1 (#1922, CI red of 2.506.0): a load still under way while a change is saved answered with the old state after the
+  // save's answer and put it back for good (the page showed "None" although "Monthly" was saved)
+  let d = null; try { d = await api('GET', '/api/office/tax-dates'); } catch (x) { d = null; }
+  if (gen === TXD.gen) TXD.data = d;
   TXD.loading = false;
   if (typeof ofcDraw === 'function') ofcDraw();
 }
@@ -35,7 +39,10 @@ document.addEventListener('change', async e => {
   let v = t.type === 'checkbox' ? (t.checked ? 1 : 0) : (k === 'ustva' ? t.value : +t.value);
   if (k === 'lead_days') v = Math.max(0, Math.min(30, Math.round(v) || 0));
   const put = async b => {
-    TXD.data = await api('PUT', '/api/office/tax-dates', b);
+    const gen = ++TXD.gen;
+    const d = await api('PUT', '/api/office/tax-dates', b);
+    if (gen !== TXD.gen) return;  // a later change has answered or is under way: its answer counts
+    TXD.data = d;
     const st = typeof OFC === 'object' && OFC.info?.settings;  // 2.122.0 D (#2315): the VAT period of the bookkeeping follows
     if (st) st.tax_dates = Object.assign({}, st.tax_dates, {ustva: TXD.data.ustva});
     if ('ustva' in b && typeof BK === 'object') BK.period = null;  // the bookkeeping picks its period anew
