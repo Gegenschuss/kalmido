@@ -84,6 +84,7 @@ from ..core.orgcrypt import oc_plain_size  # 2.369.5 (#2517): pulled up from fun
 # while it streams; check / restore read the shared files from the store (SHA-256 checked like the members).
 BK_ON_ENV = env_bool("KALMIDO_BACKUPS", True)
 BK_DIR = os.path.abspath(os.environ.get("KALMIDO_BACKUP_DIR", "").strip() or os.path.join(os.path.dirname(os.path.abspath(DB)), "backups"))
+BK_DROPPED_FKS = os.path.join(BK_DIR, ".dropped-fks.json")  # 2.510.0 (#4286): see _fks_note
 BK_PASS_ENV = os.environ.get("KALMIDO_BACKUP_PASSPHRASE", "")
 BK_TICK = _env_int("KALMIDO_BACKUP_TICK", 60)                          # s between schedule checks
 BK_MAX_BYTES = _env_int("KALMIDO_BACKUP_MAX_MB", 4096) * 1024 * 1024   # restore: upload size and unpacked total
@@ -1474,6 +1475,71 @@ def _pool_renew():
         p.drain()
 
 
+def _q(name):
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _fk_list(c):
+    """[(table, key, its definition)] of the foreign keys in the database (caller in system_ctx)."""
+    return c.execute("""SELECT r.relname, k.conname, pg_get_constraintdef(k.oid) FROM pg_constraint k JOIN pg_class r ON r.oid=k.conrelid -- pg-ok: pg_catalog oid
+                        JOIN pg_namespace n ON n.oid=r.relnamespace WHERE k.contype='f' AND n.nspname='public'""").fetchall()
+
+
+def _fks_note(dropped):
+    """2.510.0 (#4286): the keys _pg_restore takes away, on disk: nothing else knows them after a hard stop (fk_ensure and the
+    column migrations only bring their own). A second call (the way back) adds to the list."""
+    if not dropped:
+        return
+    try:
+        with open(BK_DROPPED_FKS, encoding="utf-8") as f:
+            dropped = json.load(f) + dropped
+    except (OSError, ValueError):
+        pass
+    tmp = BK_DROPPED_FKS + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(dropped, f)
+        f.flush()
+        os.fsync(f.fileno())
+    os.replace(tmp, BK_DROPPED_FKS)
+
+
+def bk_fks_back():
+    """2.510.0 (#4286): after a restore and at a server start: the keys _fks_note names come back unless the database has them
+    (under this name or the same definition). Rows an older backup left without their target must not stop it: such a key
+    holds for new rows only (NOT VALID) and the log says so. The caller makes sure no restore runs."""
+    try:
+        with open(BK_DROPPED_FKS, encoding="utf-8") as f:
+            fks = json.load(f)
+    except FileNotFoundError:
+        return
+    except (OSError, ValueError) as e:
+        print("restore: the list of dropped foreign keys cannot be read:", type(e).__name__, flush=True)
+        return
+    c = _pg.connect_direct(DATABASE_URL)
+    try:
+        with _pg.system_ctx(c):
+            have = {x for t, k, d in _fk_list(c) for x in ((t, k), (t, d))}
+        c.commit()
+        for t, k, d in fks:
+            if (t, k) in have or (t, d) in have:
+                continue
+            for how in ("", " NOT VALID"):
+                try:
+                    with _pg.system_ctx(c):
+                        c.execute(f"ALTER TABLE {_q(t)} ADD CONSTRAINT {_q(k)} {d}{how}")
+                    c.commit()
+                    if how:
+                        print(f"restore: foreign key {t}.{k} back for new rows only: older rows have no target", flush=True)
+                    break
+                except Exception as e:  # a table or column this version no longer has, rows without a target
+                    c.rollback()
+                    if how:
+                        print(f"restore: foreign key {t}.{k} did not come back:", db_log_err(e), flush=True)
+    finally:
+        c.close()
+    os.unlink(BK_DROPPED_FKS)
+
+
 def _pg_restore(dump):
     """pg_restore --clean of a checked dump into the running database, in ONE transaction (an error leaves it as it was),
     with the filtered table of contents only (bk_toc: no code from the dump; init_db creates it afterwards). Tables of this
@@ -1485,7 +1551,7 @@ def _pg_restore(dump):
         raise BackupError("format")
     # 2.510.0 (#4286): --clean only knows the foreign keys of the dump. One added since (a backup of an older version) would stop
     # it dropping the key it points at ("cannot drop constraint users_pkey"): such a backup could not be restored at all.
-    # These go first like those of the tables the dump lacks; the dump brings its own, init_db the rest (on an error: the way back)
+    # These go first like those of the tables the dump lacks; the dump brings its own, BK_DROPPED_FKS the rest (bk_fks_back)
     dump_fks = {(m.group(1), m.group(2)) for m in re.finditer(r"^\d+; \d+ \d+ FK CONSTRAINT public (\S+) (\S+) ", toc, re.M)}
     c = _pg.connect_direct(DATABASE_URL)
     try:
@@ -1493,10 +1559,13 @@ def _pg_restore(dump):
             c.execute("SET LOCAL statement_timeout = 0")
             extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
                      if r[0] not in tables]
-            for t, k in c.execute("""SELECT r.relname, k.conname FROM pg_constraint k JOIN pg_class r ON r.oid=k.conrelid -- pg-ok: pg_catalog oid
-                                     JOIN pg_namespace n ON n.oid=r.relnamespace WHERE k.contype='f' AND n.nspname='public'""").fetchall():
+            dropped = []
+            for t, k, d in _fk_list(c):
                 if t in extra or (t, k) not in dump_fks:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
-                    c.execute('ALTER TABLE "' + t.replace('"', '""') + '" DROP CONSTRAINT IF EXISTS "' + k.replace('"', '""') + '"')
+                    if t not in extra:  # (the tables the dump lacks are built anew)
+                        dropped.append([t, k, d])
+                    c.execute(f"ALTER TABLE {_q(t)} DROP CONSTRAINT IF EXISTS {_q(k)}")
+            _fks_note(dropped)  # before the commit: a key noted and still there costs nothing
         c.commit()
     finally:
         c.close()
@@ -1795,14 +1864,25 @@ def bk_leftovers():
 
 def bk_leftovers_alert():
     """At the start of the server: an admin alert when such folders lie around (Backups in the settings names them too)."""
-    # 2.510.0 (#4286): the work folder of a restore or check a hard stop left: the database as a plain dump, also next to encrypted
-    # backups. No restore runs while a server starts (it needs a single process)
-    for p in glob.glob(glob.escape(BK_DIR) + "/.restore-*") + glob.glob(glob.escape(BK_DIR) + "/.verify-*"):
-        shutil.rmtree(p, ignore_errors=True)
     left = [os.path.basename(p) for p, _ in bk_leftovers()]
     if left:
         print("restore: folders left from a restore:", ", ".join(left), flush=True)
         aa_now("storage", "restore:leftover", BK_LEFTOVER_NOTE, [", ".join(left)])
+
+
+def bk_start_clean():
+    """2.510.0 (#4286): what a hard stop of a restore or check left, from the server's own start only (app.py, never on the import:
+    a helper such as `app.py set-password` also imports the package, beside a running restore): the keys it took away
+    (bk_fks_back) and its work folder, the database as a plain dump, also next to encrypted backups. No restore runs while a server
+    starts (it needs a single process); a check may on another process, so with several processes only one a day old goes."""
+    from .worker import WRK_REPLICAS, WRK_ROLE
+    single, day_ago = WRK_ROLE == "all" and WRK_REPLICAS == 1, time.time() - 86400
+    for p in glob.glob(glob.escape(BK_DIR) + "/.restore-*"):
+        shutil.rmtree(p, ignore_errors=True)
+    for p in glob.glob(glob.escape(BK_DIR) + "/.verify-*"):
+        if single or os.path.getmtime(p) < day_ago:
+            shutil.rmtree(p, ignore_errors=True)
+    bk_fks_back()
 
 
 def bk_leftovers_clean(listed):
@@ -1928,7 +2008,7 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
             if omoved:
                 os.rename(off_old, OFFICE_DIR)
             if back_failed:  # 2.510.0 (#4286): without init_db the tables have no rights, policies and triggers: nothing may run on them
-                GATE.broken = (BK_ERR["rollback"], safety)  # (the gate stays shut and /api/health says so, a restart ends it)
+                GATE.broken = True  # (the gate stays shut and /api/health says so, a restart ends it and brings bk_fks_back)
                 raise BackupError("rollback", safety) from None
             raise
         bk_leftovers_clean(man["_listed"])  # 2.148.1 C (#2482): files outside the archive format stay in the folder of before; 2.370.2 (#2779): also older leftovers
@@ -1952,6 +2032,10 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
         raise BackupError("restore", str(e)[:300] if type(e).__name__ == "MigError" else type(e).__name__) from None
     finally:
         if gate and not GATE.broken:
+            try:
+                bk_fks_back()
+            except Exception as e:  # the answer of the restore stands; the list stays for the next start
+                print("restore: foreign keys not back yet:", db_log_err(e), flush=True)
             GATE.end()
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(att_new, ignore_errors=True)

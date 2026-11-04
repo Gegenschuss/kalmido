@@ -190,7 +190,7 @@ class _Gate:
         self.active = 0
         self.maint = False
         self.held = threading.local()  # 2.370.2 (#2779): how often this thread is inside (going in again never waits for itself)
-        self.broken = None  # 2.510.0 (#4286): (message, safety backup) of a restore whose way back failed: maintenance until a restart
+        self.broken = False  # 2.510.0 (#4286): a restore whose way back failed: maintenance until a restart
 
     def enter(self, block):
         with self.cond:
@@ -271,7 +271,7 @@ def maint_gate():
     if request.path == "/api/health" or request.path.startswith("/static/"):
         return None
     if not GATE.enter(False):
-        return jsonify(error=tr(*GATE.broken, lg=_accept_lang()) if GATE.broken else tr("The server is restoring a backup, please try again in a minute", lg=_accept_lang()),
+        return jsonify(error=tr("A restore failed and the server stayed closed. An administrator has to restart it.", lg=_accept_lang()) if GATE.broken else tr("The server is restoring a backup, please try again in a minute", lg=_accept_lang()),
                        maint=True), 503
     g.gate = True
     # 2.360.2 L (#2561): signing in stays open, it seals nothing with an organisation's key. The header tells the client to

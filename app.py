@@ -69,6 +69,8 @@ if __name__ == "__main__":
     bgj_on_term()  # 2.370.3 (#2760): a stop (SIGTERM) puts this process' running queue rows back at once
     if WRK_ROLE == "worker":  # 2.102.0 D (#1997): kalmido/admin/worker.py
         sys.exit(wrk_main())
+    from kalmido.admin.backup import bk_start_clean
+    bk_start_clean()  # 2.510.0 (#4286): what a hard stop of a restore left; here, not on the import (helpers import the package too)
     from kalmido.accounts.setupcode import sh_code_startup
     sh_code_startup()  # 2.45.0 (#1515): a server without users prints its one-time setup code
     from kalmido.core.db import skfp_warn_changed
