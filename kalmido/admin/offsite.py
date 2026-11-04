@@ -792,6 +792,7 @@ def offsite_set():
     conf, sec = bko_conf(c), bko_secrets(c)
     if b.get("remove") is True:  # "Remove target": the addresses, the sealed credentials and the SFTP key pair go
         _save(c, {}, {})
+        gset(c, "bko_remote", "")  # 2.505.0 (#4302, review): its old backups no longer hold back the clean-up of the purge list
         c.commit()
         _BKO.update({"for": "", "tries": 0, "next": 0.0})
         return jsonify(bko_state(c))

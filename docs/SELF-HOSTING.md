@@ -694,7 +694,7 @@ choice is in the admin alert and the log, and what is kept leaves the list. Dele
 way. What lay in a trash in the backup goes again when its trash period is over, so take it out of the trash right away.
 The list follows the backups' period in the log clean-up and counts the backups named on the off-site target too, so an
 older off-site backup does not bring deleted entries back for good; with an off-site target whose list of backups cannot
-be read, nothing leaves the list. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
+be read, nothing leaves the list; removing the target ends that. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 

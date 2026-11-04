@@ -65,7 +65,8 @@ def restore(name, **kw):
 FR, Fr = freelancer(B, A, "frieda")  # a person without an organisation: their entries as everybody's
 L = Fr.post(B + "/api/lists", json={"name": "Old project"}).json()["id"]
 T_OLD, T_REC, T_BEFORE = (Fr.post(B + "/api/tasks", json={"title": t, "list_id": L}).json()["id"] for t in ("Old task", "Recent task", "Gone before the backup"))
-sql("UPDATE tasks SET created_at=? WHERE id IN (?,?,?)", (ago(100), T_OLD, T_REC, T_BEFORE), write=True)
+T_SUB = Fr.post(B + "/api/tasks", json={"title": "Subtask, goes with its parent", "list_id": L, "parent_id": T_OLD}).json()["id"]
+sql("UPDATE tasks SET created_at=? WHERE id IN (?,?,?,?)", (ago(100), T_OLD, T_REC, T_BEFORE, T_SUB), write=True)
 sql("DELETE FROM tasks WHERE id=?", (T_BEFORE,), write=True)
 BK = json.loads([x for x in py("from kalmido.admin import backup as bk\nprint(json.dumps({'name': bk.bk_create('manual')}))").splitlines() if x.startswith("{")][-1])["name"]
 T_AFTER = Fr.post(B + "/api/tasks", json={"title": "Made after the backup", "list_id": L}).json()["id"]
@@ -73,21 +74,21 @@ sql("UPDATE tasks SET created_at=? WHERE id=?", (ago(30), T_AFTER), write=True)
 for t in (T_OLD, T_REC, T_AFTER):
     sql("DELETE FROM tasks WHERE id=?", (t,), write=True)
 OLD = ago(40)
-for t, at in ((T_BEFORE, ago(90)), (T_OLD, OLD), (T_AFTER, ago(20)), (T_REC, ago(1))):
+for t, at in ((T_BEFORE, ago(90)), (T_OLD, OLD), (T_SUB, OLD), (T_AFTER, ago(20)), (T_REC, ago(1))):
     sql("UPDATE purged_rows SET at=? WHERE tbl='tasks' AND ref_id=?", (at, t), write=True)
 
 # ------ the preview, as for a backup written 60 days ago (the times above stand around that day)
 p = A.get(B + "/api/admin/backups/purged-preview", params={"since": ago(60)}).json()
-check(p.get("kinds") == {"tasks": 1} and p.get("total") == 1, f"preview: what went before the backup or was made after it does not count {p}")
+check(p.get("kinds") == {"tasks": 2} and p.get("total") == 2, f"preview: what went before the backup or was made after it does not count {p}")
 check(p.get("first") == OLD and p.get("last") == OLD, f"preview: the time span {p}")
 check(p.get("recent") == 1 and p.get("recent_days") == 7, f"preview: what went in the last days apart {p}")
-check(A.get(B + "/api/admin/backups/purged-preview").json().get("total") == 3, "preview: an archive without a date: every row older than the last days")
+check(A.get(B + "/api/admin/backups/purged-preview").json().get("total") == 4, "preview: an archive without a date: every row older than the last days")
 check(Fr.get(B + "/api/admin/backups/purged-preview").status_code in (401, 403, 404), "preview: admins only")
 
 # ------ the default: deleted again, the choice in the log
 ag = restore(BK).get("deleted_again") or {}
 A = sess("alice")
-check(ag.get("entries") == 1 and ag.get("entries_recent") == 1 and not ag.get("entries_kept"), f"default: the numbers of the result {ag}")
+check(ag.get("entries") == 2 and ag.get("entries_recent") == 1 and not ag.get("entries_kept"), f"default: the same number as the preview, what went along counts {ag}")
 check(not sql("SELECT 1 FROM tasks WHERE id=?", (T_OLD,)), "default: an entry deleted earlier is gone again")
 check("(choice: delete again)" in log(), "default: the choice is in the log")
 
@@ -95,10 +96,10 @@ check("(choice: delete again)" in log(), "default: the choice is in the log")
 j = restore(BK, keep_purged=True)
 A = sess("alice")
 ag = j.get("deleted_again") or {}
-check(ag.get("entries") == 0 and ag.get("entries_kept") == 2, f"keep: the numbers of the result {ag}")
+check(ag.get("entries") == 0 and ag.get("entries_kept") == 3, f"keep: the numbers of the result {ag}")
 check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T_OLD,))), "keep: the entry deleted earlier is back")
 check(not sql("SELECT 1 FROM purged_rows WHERE tbl='tasks' AND ref_id IN (?,?)", (T_OLD, T_REC)), "keep: what came back left the list")
-check("2 kept (choice: keep everything)" in log(), "keep: the choice is in the log")
+check("3 kept (choice: keep everything)" in log(), "keep: the choice is in the log")
 check(any("trash" in n for n in j.get("notes") or []), f"keep: the note about the trash period {j.get('notes')}")
 restore(BK)
 A = sess("alice")
@@ -130,6 +131,9 @@ setting("bko_remote", None)
 setting("bko_conf", json.dumps({"on": True, "type": "s3"}))
 check("cut None" in py(CUT), "off-site: a target switched on without a list: nothing goes")
 setting("bko_conf", None)
+setting("bko_remote", json.dumps(["kalmido-backup-20200102-033000-auto.zip.enc"]))
+r = A.patch(B + "/api/admin/backups/offsite", json={"remove": True})
+check(r.ok, f"off-site: remove the target {r.status_code} {r.text[:160]}")
 out = py(CUT)
 check("cut None" not in out and "cut 2020" not in out, "no off-site target: the local rule " + out[-200:])
 print(f"p2505_restore_purged: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

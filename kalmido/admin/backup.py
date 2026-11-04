@@ -1701,6 +1701,7 @@ def bkr_purged_after(c, rows, keep=False):
                     recent += 1
                     continue
                 if not c.execute(f"SELECT 1 FROM {tbl} WHERE id=?", (rid,)).fetchone():  # went with one before it
+                    gone += 1  # 2.505.0 (#4302, review): counted as the dialog's preview did
                     continue
                 try:
                     with c.savepoint():
