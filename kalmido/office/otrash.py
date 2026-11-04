@@ -25,6 +25,7 @@ from ..core.retention import ret_days
 from .ledger import ofx_log
 from .model import office_ctx, office_role
 from .rights import ofr_admin_or
+from .travel import rk_trash_check
 
 OTB_REFS = {}  # table -> [(child table, column, 'c' cascade | 'n' set null)]
 OTB_DEPTH = 3
@@ -171,7 +172,6 @@ def otb_restore_route(tid):
     t0 = c.execute("SELECT deleted_at FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     kind, ref = otb_restore(c, oid, tid)
     if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
-        from .travel import rk_trash_check
         rk_trash_check(c, oid, kind, ref)
     if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
         since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
