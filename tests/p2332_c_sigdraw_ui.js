@@ -39,7 +39,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const getJ = url => `fetch('${url}', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json())`;
   const clk = sel => `(() => { const x = document.querySelector('${sel}'); if (!x) return 0; x.click(); return 1; })()`;
-  const pad = `(() => { const c = document.querySelector('.modal canvas.lt-pad'); if (!c) return null; const r = c.getBoundingClientRect(); return {x: r.left, y: r.top, w: r.width, h: r.height, iw: c.clientWidth, cw: c.width, ta: getComputedStyle(c).touchAction, dpr: window.devicePixelRatio}; })()`;
+  // CI red of 2.529.0: on the CI's phone the dialog was taller (canvas at y 1150 of 844): a finger scrolls to the field first
+  const pad = `(() => { const c = document.querySelector('.modal canvas.lt-pad'); if (!c) return null; c.scrollIntoView({block: 'center'}); const r = c.getBoundingClientRect(); return {x: r.left, y: r.top, w: r.width, h: r.height, iw: c.clientWidth, cw: c.width, ta: getComputedStyle(c).touchAction, dpr: window.devicePixelRatio}; })()`;
   // the saved picture: PNG, its size, the alpha of the corners and whether any pixel is drawn
   const pic = `${getJ('/api/office/letters/profile')}.then(p => new Promise(res => { if (!p.image) return res({has: false}); const im = new Image(); im.onload = () => {
       const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0); const d = x.getImageData(0, 0, im.width, im.height).data;
@@ -106,7 +107,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs';
     await nav(B + '#office/letters');
     check(await ready(ev, `!!document.querySelector('[data-lt="profile"]')`, 80), 'phone: the signature button');
     const p = await openDraw(ev);
-    check(p && p.w > 150 && p.x >= 0 && p.x + p.w <= 391, 'phone: the canvas fits the screen ' + JSON.stringify(p));
+    check(p && p.w > 150 && p.x >= 0 && p.x + p.w <= 391 && p.y >= 0 && p.y + p.h <= 845, 'phone: the canvas fits the screen ' + JSON.stringify(p));
     await drag(p.x + 20, p.y + 40, Math.min(200, p.w - 40), 30, 'touch');
     await shot('p2332-c-touch.png');
     check(await saved(ev, 'finger'), 'phone: the finger-drawn picture saved');
