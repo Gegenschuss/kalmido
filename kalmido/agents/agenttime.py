@@ -19,7 +19,7 @@ from ..core.i18n import tr
 from ..core.db import bump, db, iso, local_now, now_utc, parse_iso, usettings
 from ..core.access import Denied, list_role, need_feat, need_time, task_visible
 from ..accounts.session import me
-from ..personal.timetrack import local_bounds, mt_time_on, time_target
+from ..personal.timetrack import local_bounds, mt_time_on, time_target, tt_note_check
 from ..core.errors import BadInput
 from ..core.usertz import tz_of_s
 from ..api.common import v1_args, v1_err, v1_feature, v1_json, v1_view
@@ -355,6 +355,7 @@ def atm_prop_run(c, j, sel, ed, rec):
         a, b = atm_when(x["date"], x["start"], x["end"], _zone(c, me()))
         tsl_check(c, me(), a)  # 2.125.0 B (#2119): no entry into a closed month (409 month_closed)
         tid, lid, title = time_target(c, {"task_id": x["task_id"]} if x["task_id"] else {"list_id": x["list_id"]})
+        tt_note_check(c, lid, x["note"])  # 2.538.0 (#4372, review 2646 finding 2): no plain note into a locked project (409)
         row = (me(), tid, lid, title, iso(a), iso(b), int((b - a).total_seconds()), x["note"], "manual", ts, ts)
         rec["made"].append(insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,
                                           created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)""", row))
@@ -386,6 +387,9 @@ def atm_prop_undo(c, j, rec, back=True):
         made, ts = [], iso(now_utc())
         for row in rec.get("removed") or []:
             tsl_check(c, me(), row[4])  # 2.125.0 B (#2119): redo into a closed month: 409
+            # 2.538.0 (#4372): nor a note into a project locked since (the task's list of now, it may have moved)
+            t = c.execute("SELECT list_id FROM tasks WHERE id=?", (row[1],)).fetchone() if row[1] else None
+            tt_note_check(c, t["list_id"] if t else row[2], row[7])
             made.append(insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,
                                        created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (*row[:9], ts, ts)))
             n += 1

@@ -1343,6 +1343,17 @@ def init_db(guard=True, load=None):
                           "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value WHERE user_settings.value=''",  # the start fills in defaults first
                           (",".join(areas), uid))
             gset(c, "migr_tours2466", "1")
+        if gsetting(c, "migr_e2efree4372") != "1":  # 2.538.0 (#4372, review 2646 finding 1): one way -- a project locked before
+            # 2.538 loses its time notes, status notes and descriptions as a project locked now does (le2b_scrub). Only 'on': one
+            # still 'encrypting' gets the whole scrub at its finish, one 'decrypting' shows its texts again
+            from ..collab.liste2eguard import le2b_scrub_free
+            n = {}
+            for r in c.execute("SELECT id FROM lists WHERE e2e='on' ORDER BY id").fetchall():
+                for k, v in le2b_scrub_free(c, r[0]).items():
+                    n[k] = n.get(k, 0) + v
+            gset(c, "migr_e2efree4372", "1")
+            if any(n.values()):
+                print("locked projects: plain texts emptied " + ", ".join(f"{k} {v}" for k, v in sorted(n.items())), flush=True)
         from .fkeys import fk_ensure
         fk_ensure(c)  # 2.152.0 C (#2174): the missing foreign keys (orphans cleaned first), every start, idempotent
         clk("fk_ensure")

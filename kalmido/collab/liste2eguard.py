@@ -296,13 +296,7 @@ def le2b_scrub(c, lid):
     n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))]))
     n["time_entries"] = c.execute(f"UPDATE time_entries SET task_title='' WHERE task_title!='' AND (list_id=? OR task_id IN ({tq}))",
                                   (lid, lid)).rowcount
-    # 2.538.0 (#4372): the three free texts the lock cannot encrypt go for good: the time entries' notes, the project's status
-    # note (also in its status history) and its description (also the earlier ones kept for "bring back")
-    n["time_notes"] = c.execute(f"UPDATE time_entries SET note='' WHERE note<>'' AND (list_id=? OR task_id IN ({tq}))", (lid, lid)).rowcount
-    n["list_texts"] = c.execute("UPDATE lists SET status_note='', description='' WHERE id=? AND (status_note<>'' OR COALESCE(description, '')<>'')",
-                                (lid,)).rowcount
-    n["list_status"] = c.execute("UPDATE list_status SET note='' WHERE list_id=? AND note<>''", (lid,)).rowcount
-    n["desc_history"] = c.execute("DELETE FROM list_activity WHERE list_id=? AND kind='desc'", (lid,)).rowcount
+    n.update(le2b_scrub_free(c, lid))  # 2.538.0 (#4372)
     n["shop_memory"] = c.execute("DELETE FROM shop_memory WHERE list_id=?", (lid,)).rowcount
     n["mail_tokens"] = c.execute("DELETE FROM mail_tokens WHERE list_id=?", (lid,)).rowcount
     n["notifications"] = 0
@@ -423,6 +417,21 @@ def le2b_net(s, lg=None):
     if not isinstance(s, str) or "e2e1:" not in s:
         return s
     return LE2B_CIPHER_RE.sub(lambda _m: le2e_neutral(lg), s)  # 2.64.2 D (#1817): in the recipient's language
+
+
+def le2b_scrub_free(c, lid):
+    """2.538.0 (#4372): the three free texts the lock cannot encrypt go for good: the time entries' notes (of the project and
+    its tasks), the project's status note (also in its status history) and its description (also the earlier ones kept for
+    "bring back"). Part of le2b_scrub; core/db.py runs it once for the projects locked before 2.538 (review 2646, finding 1).
+    Idempotent, the caller commits. Returns {what: rows}."""
+    tq = "SELECT id FROM tasks WHERE list_id=?"
+    return {
+        "time_notes": c.execute(f"UPDATE time_entries SET note='' WHERE note<>'' AND (list_id=? OR task_id IN ({tq}))", (lid, lid)).rowcount,
+        "list_texts": c.execute("UPDATE lists SET status_note='', description='' WHERE id=? AND (status_note<>'' OR COALESCE(description, '')<>'')",
+                                (lid,)).rowcount,
+        "list_status": c.execute("UPDATE list_status SET note='' WHERE list_id=? AND note<>''", (lid,)).rowcount,
+        "desc_history": c.execute("DELETE FROM list_activity WHERE list_id=? AND kind='desc'", (lid,)).rowcount,
+    }
 
 
 def le2b_scrub_tasks(c, ids):

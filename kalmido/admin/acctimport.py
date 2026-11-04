@@ -144,7 +144,10 @@ def _umz_delivery(t):
 UMZ_DROP = {
     "lists": {"is_inbox", "family", "agent_tidy", "agent_listen", "agent_members", "agent_peers", "agent_followup", "tidy_agent",
               "org_visibility", "org_edit", "git_folder_off", "icon",
-              "header_file"},  # 2.459.0 (#3849): a token of the old server (orgimport.oi_pictures makes a new one with the picture)
+              "header_file",  # 2.459.0 (#3849): a token of the old server (orgimport.oi_pictures makes a new one with the picture)
+              # 2.538.0 (#4372, review 2646 finding 3): a locked project never moves along (umz_write); an archive whose e2e is
+              # set but empty ("") would bring one in locked, with its plain texts: the lock state never comes from a file
+              "e2e", "e2e_gen", "e2e_rotate", "e2e_reenc", "e2e_at"},
     "tasks": {"rotation", "approval", "fam", "tt_id", "nag_at", "wait_fired",
               "irreversible_yes_at", "acceptance_of"},  # 2.392.0 C (#3370): a yes is given here, an environment id means nothing here
     "comments": {"mentions", "suggestion", "choices", "choice", "ext_name", "client_ref"},  # 2.370.2 (#3088): client_ref like the notes'
