@@ -300,23 +300,22 @@
     }
   }
 
-  # --- override (image, port, network fallback); the tracked docker-compose.yml publishes 127.0.0.1:3040 ---
-  function Write-Override([bool]$bridge) {
+  # --- override (image, port); the tracked docker-compose.yml publishes 127.0.0.1:3040 ---
+  function Write-Override {
     if ((Test-Path $Override) -and -not ((Get-Content $Override -TotalCount 1) -like "$Marker*")) {
       Warn 'Keeping your own docker-compose.override.yml (not written by this installer).'
       if ($Port -ne '3040') { Warn "KALMIDO_PORT=$Port is ignored; set the port in that file yourself." }
       if ($script:Image) { Warn 'Building locally instead of using the prebuilt image (set KALMIDO_IMAGE in .env to use it).'; $script:Image = '' }
       return
     }
-    if (-not $bridge -and (Test-Path $Override) -and (Select-String -Path $Override -Pattern '^    network_mode: bridge' -Quiet)) { $bridge = $true }
-    if ($Port -eq '3040' -and -not $bridge -and -not $script:Image) { Remove-Item -Force $Override -ErrorAction SilentlyContinue; return }
+    # 2.513.0 (#4358): this file is written anew on every run, so the network_mode line of an older installer goes away with it
+    if ($Port -eq '3040' -and -not $script:Image) { Remove-Item -Force $Override -ErrorAction SilentlyContinue; return }
     $o = @("$Marker (safe to edit: remove the first line and it is left alone)", 'services:', '  kalmido:')
     if ($script:Image) { $o += "    image: $($script:Image)" }
     if ($Port -ne '3040') { $o += '    ports: !override'; $o += "      - `"127.0.0.1:${Port}:3040`"" }
-    if ($bridge) { $o += '    network_mode: bridge' }
     [IO.File]::WriteAllText($Override, (($o -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
   }
-  Write-Override $false
+  Write-Override
 
   # --- pull (or build) and start ---
   $upArgs = @('up', '-d', '--build')
@@ -326,7 +325,7 @@
     else {
       Warn 'The prebuilt image could not be downloaded. Building it locally instead (takes a minute).'
       $script:Image = ''
-      Write-Override $false
+      Write-Override
     }
   }
   Step 'Starting'
@@ -334,10 +333,9 @@
   Push-Location $Dir
   try {
     $rc = Compose $upArgs $log
+    # 2.513.0 (#4358): no fallback: network_mode cannot stand beside the networks of docker-compose.yml, Compose refuses the pair
     if ($rc -ne 0 -and (Select-String -Path $log -Pattern 'address pool' -Quiet)) {
-      Warn "Docker has no free address range for a new network. Retrying on Docker's default bridge network (written to docker-compose.override.yml)."
-      Write-Override $true
-      $rc = Compose $upArgs $log
+      Fail "Docker has no free address range for a new network. Either remove the networks no container uses:`n  docker network prune`nor give Docker more addresses: add this in Docker Desktop under Settings > Docker Engine`n  `"default-address-pools`": [{`"base`": `"10.200.0.0/16`", `"size`": 24}]`nand restart Docker. Then run this installer again."
     }
     if ($rc -ne 0 -and (Select-String -Path $log -Pattern 'address already in use|port is already allocated|access permissions' -Quiet)) {
       Fail "Port $Port is already in use. Pick another one, for example: `$env:KALMIDO_PORT = '3050'"
