@@ -163,6 +163,13 @@ check(tuple(count()) == tuple(before), f"refused: no entry written, no number us
 check(not kt.dbx("SELECT 1 FROM office_payments WHERE doc_id=?", (I1,)), "refused: no payment on the invoice")
 r = CASH.post(B + ENTRIES, json={**body, "invoice_id": None})
 check(r.status_code == 201, "the same cash without the invoice is booked " + r.text[:200])
+# 2.538.0 (#4368): choosing the invoice while editing books its payment since #4337 - the same right, before the UPDATE
+E0 = r.json().get("id")
+r = CASH.patch(B + f"{O}/cash-entries/{E0}", json={"invoice_id": I1})
+check(r.status_code == 403 and "book the cash without the invoice" in r.json().get("error", ""),
+      f"cash book without pay: an invoice chosen while editing refused with the message {r.status_code} {r.text[:200]}")
+check(kt.dbx("SELECT invoice_id FROM office_cash_entries WHERE id=?", (E0,))[0][0] is None and not kt.dbx("SELECT 1 FROM office_payments WHERE doc_id=?", (I1,)),
+      "refused edit: the entry keeps no invoice, no payment on it")
 r = CASHPAY.post(B + ENTRIES, json=body)
 check(r.status_code == 201 and status(A, I1) == "paid", f"with pay: the payment is booked {r.status_code} {status(A, I1)}")
 E1 = r.json().get("id")
