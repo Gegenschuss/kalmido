@@ -359,6 +359,17 @@ const o3a_privOnly = mod => O3A_PRIV.includes(mod) || (mod === 'life' && !o3a_li
 // offers the other spaces in its own picker, rd_pick), never a mixed view
 const rd_space = (own = '') => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : own && wsOptions().includes(own) && own !== 'all' ? own : 'private'; };
 const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && wsOptions().length > 2 ? `<select ${attr} aria-label="${esc(tr('Workspace'))}">${wsOptions().filter(w => w !== 'all').map(w => `<option value="${w}" ${w === cur ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
+// ---- 2.540.0 (#4575 #4588): the overview of the spaces under "All workspaces", shared by the file store (ablage.js),
+// the views of Reading and later other areas (as Knowledge does it, wiki.js wk_spacesHtml): one row per space, a tap opens
+// it, the address carries it, the path above an open space leads back (spo_crumbHtml). to = where a tap leads: a route
+// ('ablage' -> #ablage/s/<space>) or a function space -> hash without '#'; rows = [[space, name, icon html]] (any spaces:
+// Private, organisations, Shared with me, the trash ...); o.title = the heading (default "All workspaces"), o.label = the
+// list's name for screen readers (default "Workspaces")
+const spo_href = (to, sp) => '#' + (typeof to === 'function' ? to(sp) : to + '/s/' + sp);
+const spo_html = (to, rows, o = {}) => `<section class="spov" aria-label="${esc(o.label || tr('Workspaces'))}"><h3 class="spovt">${esc(o.title || tr('All workspaces'))}</h3><ul class="spovl">${rows.map(([sp, name, icon]) => `<li><a href="${esc(spo_href(to, sp))}" class="spovr" data-spov="${esc(sp)}">${icon}<span>${esc(name)}</span></a></li>`).join('')}</ul></section>`;
+// the path back above an open space: "All workspaces /" (spo_upHtml, the file store puts its own path after it) + its name
+const spo_upHtml = route => `<a href="#${route}" class="linkbtn" data-spovup="1">${esc(tr('All workspaces'))}</a><span class="abcsep" aria-hidden="true">/</span>`;
+const spo_crumbHtml = (route, name) => `<nav class="abcrumbs spovc" aria-label="${esc(tr('Path'))}">${spo_upHtml(route)}<span class="abccur" aria-current="page">${esc(name)}</span></nav>`;
 // 2.490.0 C (#4025): where a link is saved to (Read later / a bookmark) is picked, not the shown workspace: Private, then
 // every organisation the person may add to (member or admin, Reading on there for the person). "(Team)" says that all its
 // members see it. Used by the share question (agentchat.js shareDest) and the bookmark button (bookmarks.js

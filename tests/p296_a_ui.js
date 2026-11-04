@@ -49,7 +49,7 @@ const confirmMove = async w => {
   const A1 = await upload(CK, 'eins.txt', 'erste Datei'), A2 = await upload(CK, 'zwei.txt', 'zweite Datei');
 
   // ================= the row menu + the dialog + undo
-  const w = await boot({user: 'alice', hash: 'ablage', ls: {abSpace: '"private"'}}), d = w.document;
+  const w = await boot({user: 'alice', hash: 'ablage/s/private', ls: {abSpace: '"private"'}}), d = w.document;  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
   const row = await until(() => d.querySelector(`.abrow[data-abid="${KISTE}"]`));
   check(row, 'the folder "Kiste" in My files');
   const labels = row ? await menuLabels(w, row) : [];

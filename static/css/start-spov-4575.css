@@ -1,0 +1,8 @@
+/* 2.540.0 (#4575 #4588): the overview of the spaces under "All workspaces" (areas.js spo_html / spo_crumbHtml: the file
+   store, the views of Reading, later other areas). A start file: the views using it load in different modules. */
+.spov{max-width:48rem}
+.spovt{margin:.25rem 0 .5rem;font-size:var(--fs-l)}
+.spovl{list-style:none;margin:0;padding:0;border-top:1px solid var(--line)}
+.spovr{display:flex;align-items:center;gap:.625rem;min-height:2.75rem;padding:.25rem .75rem;border-bottom:1px solid var(--line);color:inherit;text-decoration:none}
+.spovr:hover,.spovr:focus-visible{background:var(--bg3)}
+.spovc{margin-top:0}

@@ -1488,6 +1488,7 @@ function parseHash() {
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
   if (a === 'l' && listById(+b)?.life === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): a budget list opens its budget
   if (a === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): budget/<list id> (budget.js reads the id)
+  if (b === 's' && ['ablage', 'reading', 'bookmarks', 'feeds', 'life'].includes(a)) return {mod: a, key: a, nid: null, wsp: h.split('/')[2] || ''};  // 2.540.0 (#4575 #4588): <view>/s/<space>, the space open under "All workspaces" (areas.js spo_html)
   if (a === 'feeds') return {mod: 'feeds', key: 'feeds'};  // 2.85.0 B (#1162)
   if (a === 'bookmarks') return {mod: 'bookmarks', key: 'bookmarks'};  // 2.97.0 A (#1950)
   if (a === 'reading') return {mod: 'reading', key: 'reading'};  // 2.172.0 B (#2679): read later (readlater.js)
@@ -1537,7 +1538,7 @@ async function route() {
   wsv_leave();  // 2.397.0 (#3404): the page being left stays its workspace's view
   if (r.mod === 'tasks' && wsOn()) wsFollow(r.key);  // 2.49.0 (#1770): a list of another workspace switches the filter along
   if (!r.task) S.bellBack = false;
-  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid, ...(r.aus ? {aus: r.aus} : {})} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
+  S.route = {mod: r.mod, key: r.key, ...(r.agent ? {agent: r.agent} : {}), ...(r.review ? {review: true} : {}), ...(r.client ? {client: r.client} : {}), ...(r.mod === 'office' ? {tab: r.tab, id: r.id} : {}), ...(r.mod === 'ablage' ? {nid: r.nid, ...(r.aus ? {aus: r.aus} : {})} : r.mod === 'docs' ? {id: r.id} : {}), ...(r.mod === 'wiki' ? {wid: r.wid, ...(r.wdir != null ? {wdir: r.wdir} : {}), ...(r.wtag != null ? {wtag: r.wtag} : {}), ...(r.wsp ? {wsp: r.wsp} : {})} : {}), ...(r.wsp && r.mod !== 'wiki' ? {wsp: r.wsp} : {}), ...(r.mod === 'sheets' ? {sh: r.sh, shl: r.shl, shf: r.shf} : {}), ...(r.mod === 'msv' ? {sid: r.sid, lid: r.lid} : {}), ...(r.mod === 'contacts' && (r.ctf || r.ctb) ? {ctf: r.ctf, ctb: r.ctb} : {})};  // 2.36.1 (#1021): office/<tab>/<id>; 2.48.0 (#1207, #1111): ablage/<id>, docs/<id>; 2.49.0 (#1199): wiki/<id>; 2.351.0 B (#2749): contacts/f|b/<id>
   sbb_seen(r);  // 2.152.2 (#2622): the area keeps this page (sidebar B, areas.js)
   wsv_seen();  // 2.397.0 (#3404): and its workspace (workspace.js)
   if (r.mod === 'team') teamRoute(r.rid || null); else if (S.tc.rid) teamRoute(null);  // 2.17.0

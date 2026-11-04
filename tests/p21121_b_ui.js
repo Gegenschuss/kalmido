@@ -36,7 +36,7 @@ const upload = async (ck, name, text, form) => {
   const KUNDE = (await call('POST', '/api/files/folders', {name: 'Kunde Nord', space: 'private'})).id;
   await upload(CK, 'angebot.txt', 'Angebot', {parent_id: KUNDE});
 
-  const w = await boot({user: 'alice', hash: 'ablage', ls: {abSpace: '"private"'}}), d = w.document;
+  const w = await boot({user: 'alice', hash: 'ablage/s/private', ls: {abSpace: '"private"'}}), d = w.document;  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
   const row = await until(() => d.querySelector(`.abrow[data-abid="${KUNDE}"]`));
   check(row, 'the folder "Kunde Nord" in My files');
   row?.querySelector('[data-ab="menu"]').click();
@@ -123,7 +123,7 @@ const upload = async (ck, name, text, form) => {
     await shot('p21121-b-password-phone.png');
     await nav(B + 'static/icon.svg');  // the public page's CSP allows no fetch
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
-    await nav(B + '#ablage');
+    await nav(B + '#ablage/s/private');  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
     check(await ready(ev, `typeof ab_details === 'function' && !!document.querySelector('.abrow[data-abid="${KUNDE}"]')`, 80), 'phone: the file store');
     await ev(`(() => { ab_details(${KUNDE}); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.abdlg .xl-row')`, 60), 'phone: the details list the link');

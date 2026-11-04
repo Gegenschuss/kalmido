@@ -7,7 +7,22 @@
 
 const AB = {space: LS.get('abSpace', ''), key: '', dkey: '', data: null, err: '', loading: false, seq: 0, sel: new Set(), drag: null};
 const ab_spaces = () => { const w = wsCur(); return [...(w === 'all' || w === 'private' || !wsOn() ? ['private'] : []), ...(wsOn() ? (S.me?.workspaces || []).filter(o => w === 'all' || w === 'org:' + o.id).map(o => 'org:' + o.id) : []), 'shared', 'trash']; };
-const ab_curSpace = () => { const sp = ab_spaces(); return sp.includes(AB.space) ? AB.space : sp[0]; };
+// 2.540.0 (#4575): "All workspaces" with more than one space of one's own (Private + an organisation): the top of the file
+// store is the overview of the spaces (areas.js spo_html, + Shared with me and the trash), the open one is in the address
+// (#ablage/s/<space>, ab_home). AB.space (LS 'abSpace') is only kept and used while one workspace is shown; under "All"
+// AB.allSp = the space opened last (in memory: a collection ablage/aus-<key> of it, the panel's highlight)
+const ab_all = () => wsCur() === 'all' && ab_spaces().filter(s => s === 'private' || s.startsWith('org:')).length > 1;
+const ab_curSpace = () => {
+  const sp = ab_spaces(), r = S.route;
+  if (!ab_all()) return sp.includes(AB.space) ? AB.space : sp[0];
+  if (r.mod === 'ablage' && sp.includes(r.wsp)) return (AB.allSp = r.wsp);
+  return sp.includes(AB.allSp) ? AB.allSp : sp[0];
+};
+const ab_ovr = () => ab_all() && S.route.mod === 'ablage' && !S.route.nid && !S.route.aus && !ab_spaces().includes(S.route.wsp);
+const ab_home = s => ab_all() && s ? 'ablage/s/' + s : 'ablage';
+const ab_pick = s => { if (ab_all()) AB.allSp = s; else { AB.space = s; LS.set('abSpace', s); } };
+// the space a node lies in (the top of it under "All": its space's page)
+const ab_nodeSp = n => n?.space || (n?.org_id ? 'org:' + n.org_id : n?.role === 'owner' ? 'private' : 'shared');
 const ab_url = (n, dl, v) => `/api/files/nodes/${n.id}/content?${[dl ? 'dl=1' : '', v ? 'v=' + v : ''].filter(Boolean).join('&')}`;
 const ab_isImg = n => /^image\/(png|jpe?g|gif|webp|avif)$/.test(n.mime || '');
 const ab_isPdf = n => n.mime === 'application/pdf';
@@ -24,6 +39,7 @@ const ab_icon = n => n.kind === 'folder' ? ic(n.agent_id ? 'bot' : 'folder') : n
 // ---- loading
 const ab_key = r => r.nid ? 'n:' + r.nid : r.aus ? 'c:' + r.aus + ':' + ab_curSpace() : 's:' + ab_curSpace();  // 2.429.0 (#3580): + a collection
 async function ab_load() {
+  if (ab_ovr()) return;  // 2.540.0 (#4575): the overview loads nothing
   const r = S.route, key = ab_key(r), seq = ++AB.seq;
   AB.key = key; AB.loading = true;
   if (r.aus) {  // 2.429.0 (#3580): a collection "From <area>" (read-only, grouped by its object)
@@ -42,7 +58,7 @@ async function ab_load() {
   } catch (x) {
     if (seq !== AB.seq) return;
     if (r.nid) {  // a file: open its folder and the file's details
-      try { const n = await api('GET', `/api/files/nodes/${r.nid}`); if (n.kind !== 'folder') { AB.loading = false; go(n.parent_id ? 'ablage/' + n.parent_id : 'ablage'); setTimeout(() => ab_details(n.id), 50); return; } } catch { /* below */ }
+      try { const n = await api('GET', `/api/files/nodes/${r.nid}`); if (n.kind !== 'folder') { AB.loading = false; go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(ab_nodeSp(n))); setTimeout(() => ab_details(n.id), 50); return; } } catch { /* below */ }
     }
     AB.data = null; AB.dkey = ''; AB.err = x.message || tr('unknown');
   }
@@ -59,7 +75,13 @@ function viewAblage() {
   if (!ab_on()) return `<div class="empty">${tr('The file store is off (Settings > Modules)')}</div>`;
   if (typeof dt_abOn !== 'function' && typeof ld_later === 'function') ld_later('tagsel');  // 2.122.0 B (#2099 #2295): tags, Shift ranges
   if (typeof abd_cardsHtml !== 'function' && feat('docs') && typeof ld_later === 'function') ld_later('docs');  // 2.353.0 D (#2759): cards, recognition (abdocs.js)
-  const r = S.route, key = ab_key(r);
+  const r = S.route;
+  if (ab_ovr()) {  // 2.540.0 (#4575): "All workspaces": the spaces first (also with the panel folded on a tablet); the search spans all of them
+    AB.selHere = false;
+    const search = typeof ftxtBox === 'function' ? ftxtBox() : '', found = search && ftxtActive();
+    return `<div class="abview abovr ${typeof sbb_on === 'function' && sbb_on() ? 'abdesk' : ''}"><div class="abmain">${search}${found ? `<h3 class="abtitle">${tr('Search results')}</h3>${ftxtResults()}` : spo_html('ablage', ab_spaces().map(s => [s, ab_spaceName(s), ab_spaceIcon(s)]))}</div></div>`;
+  }
+  const key = ab_key(r);
   if (AB.key !== key && !AB.loading) setTimeout(ab_load, 0);
   const d = AB.dkey === key ? AB.data : null, sp = r.nid ? (d?.space || '') : ab_curSpace();
   // the tree: the spaces; below the open one the path down to the open folder and its subfolders (desktop; phones: the path on top)
@@ -69,7 +91,7 @@ function viewAblage() {
   const spaces = `<nav class="abspaces" aria-label="${esc(tr('File store'))}">${ab_spaces().map(s => `<button type="button" class="abspace ${!r.nid && s === sp ? 'on' : ''}" data-ab="space" data-sp="${esc(s)}" ${!r.nid && s === sp ? 'aria-current="page"' : ''}>${ab_spaceIcon(s)}<span>${esc(ab_spaceName(s))}</span></button>${r.nid && s === (sp || 'shared') ? treeHtml : ''}`).join('')}${typeof abd_navHtml === 'function' ? abd_navHtml(true) : ''}</nav>`;  // 2.353.0 D (#2759): + the saved filters
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
-  const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;
+  const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
   const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
   AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
@@ -105,7 +127,7 @@ async function ab_ptLoad(key) {
 const ab_ptGet = key => { const e = AB.pt[key]; if (!e || e.stale) ab_ptLoad(key); return e?.items || null; };
 function ab_ptStale() { for (const e of Object.values(AB.pt)) e.stale = true; if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 function ab_panelHtml() {
-  const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid && !r.aus ? ab_curSpace() : '';
+  const a = mg_area('ablage'), r = S.route, on = r.mod === 'ablage', cur = on && !r.nid && !r.aus && !ab_ovr() ? ab_curSpace() : '';  // 2.540.0 (#4575): the overview marks none
   const real = ab_spaces().filter(s => s === 'private' || s.startsWith('org:'));
   const path = on && r.nid && AB.dkey === 'n:' + r.nid ? (AB.data?.crumbs || []).map(c => c.id) : [];  // the open folder's path stays open
   // 2.199.0 A (#2742): dragged to move / sort, a menu (sbb_treeReg('ab') below)
@@ -115,7 +137,7 @@ function ab_panelHtml() {
   // 2.429.0 (#3580): a space's collections "From <area>" after its folders (read-only: no drag, no drop, no menu)
   const collNodes = s => (AB.pt['s:' + s]?.coll || []).map(x => ({k: 'ab:c:' + s + ':' + x.key, name: x.name, go: 'ablage/aus-' + x.key, on: on && r.aus === x.key && ab_curSpace() === s, icon: AB_COLL_ICON[x.key] || 'folder', battrs: `data-absp="${esc(s)}"`, kids: false}));
   const withColl = (s, it) => it && [...it.map(node), ...collNodes(s)];
-  const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: 'ablage', on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
+  const spaceNode = s => ({k: 'ab:s:' + s, name: ab_spaceName(s), go: ab_home(s) /* 2.540.0 (#4575) */, on: cur === s, icon: s === 'private' ? 'home' : s === 'shared' ? 'users' : s === 'trash' ? 'trash' : 'folder', battrs: `data-absp="${esc(s)}"`,
     kids: real.includes(s) && (AB.pt['s:' + s]?.items?.length !== 0 || !!AB.pt['s:' + s]?.coll?.length), open: !!path.length && AB.data?.space === s, sub: () => withColl(s, ab_ptGet('s:' + s))});
   const files = () => {
     const one = real.length === 1, top = one ? ab_ptGet('s:' + real[0]) : [];
@@ -148,7 +170,7 @@ sbb_treeReg('ab', {
   order: (id, pos) => { const n = ab_ptItem(id); if (n) ab_order(n, pos); },
   menu: id => { const n = ab_ptItem(id); return n ? ab_menuItems(n, true) : []; }});
 // a space in the panel: picked before the click's data-go opens #ablage (capture: ahead of the router's click)
-document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { AB.space = b.dataset.absp; LS.set('abSpace', AB.space); AB.key = ''; } }, true);
+document.addEventListener('click', e => { const b = e.target.closest?.('#side [data-absp]'); if (b) { ab_pick(b.dataset.absp); AB.key = ''; } }, true);  // 2.540.0 (#4575): ab_pick
 // 2.429.0 (#3580): the file store shows only its own folders; what hangs on the other areas' objects (files of knowledge
 // pages, project files, files left in an area's folders) is a read-only collection "From <area>" at the top of the space,
 // grouped by its object (route ablage/aus-<key>, the space shown: AB.space). Open / download only; deleting stays on the
@@ -156,7 +178,7 @@ document.addEventListener('click', e => { const b = e.target.closest?.('#side [d
 const AB_COLL_ICON = {wiki: 'book', sheets: 'sheet', office: 'brief', lists: 'proj', contacts: 'user'};
 const ab_collRow = x => `<div class="abrow abcoll" role="listitem" data-abcoll="${esc(x.key)}"><button type="button" class="abopen" data-go="ablage/aus-${esc(x.key)}">${ic(AB_COLL_ICON[x.key] || 'folder')}<span class="abtxt"><span class="abname">${esc(x.name)}</span><span class="abmeta2 muted">${esc(tr('Read only'))}</span></span></button><span class="abmeta muted">${esc(tr('Read only'))}</span><span class="abbadges"><span class="abbadge" title="${esc(tr('Read only'))}">${ic('lock', 's')}</span></span></div>`;
 function ab_collHtml(d, sp) {
-  const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}"><button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span><span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
+  const crumbs = `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button><span class="abcsep" aria-hidden="true">/</span><span class="abccur" aria-current="page">${esc(d?.name || '')}</span></nav>`;
   if (AB.err && !d) return crumbs + `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="${esc(sp)}">${esc(ab_spaceName(sp))}</button></div>`;
   if (!d) return `<p class="muted lempty">${tr('Loading…')}</p>`;
   const note = `<p class="muted abhint abcollnote">${esc(d.key === 'wiki' ? tr('Files of knowledge pages, read only. Delete them on the page itself.') : d.key === 'lists' ? tr('Files of projects, read only. Delete them in the project itself.') : d.key === 'sheets' ? tr('Files of tables, read only. Delete them in the table itself.') : tr('Files of this area, read only.'))}</p>`;
@@ -282,7 +304,7 @@ async function ab_moveDlg(n) {
 }
 async function ab_delete(n) {
   let r; try { r = await api('DELETE', `/api/files/nodes/${n.id}`); } catch { return; }
-  if (S.route.nid === n.id) go(n.parent_id ? 'ablage/' + n.parent_id : 'ablage'); else ab_reload();
+  if (S.route.nid === n.id) go(n.parent_id ? 'ablage/' + n.parent_id : ab_home(AB.data?.space || ab_nodeSp(n))); else ab_reload();
   offerUndo([tr('“{0}” moved to the trash', n.name), fs_keptText(r?.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Delete “{0}”', n.name), undo: () => ab_req('POST', `/api/files/nodes/${n.id}/restore`), redo: () => ab_req('DELETE', `/api/files/nodes/${n.id}`)}));
 }
 async function ab_restore(n) {
@@ -393,7 +415,7 @@ const ab_share = (id, opts) => fs_shareDialog(id, opts);
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-ab]'); if (!b || !b.closest('.abview, #pop')) return;
   const n = ab_item(b.dataset.id), a = b.dataset.ab;
-  if (a === 'space') { AB.space = b.dataset.sp; LS.set('abSpace', AB.space); AB.key = ''; if (S.route.nid || S.route.aus) go('ablage'); else ab_load(); return; }  // 2.429.0 (#3580): + from a collection
+  if (a === 'space') { ab_pick(b.dataset.sp); AB.key = ''; if (ab_all()) go(ab_home(b.dataset.sp)); else if (S.route.nid || S.route.aus) go('ablage'); else ab_load(); return; }  // 2.540.0 (#4575): under "All" its address  // 2.429.0 (#3580): + from a collection
   if (a === 'new-folder') { ab_newFolder(); return; }
   if (a === 'upload') { $('#ab-file')?.click(); return; }
   if (a === 'scan') { abm_scan(); return; }  // 2.112.1 A (#2058)

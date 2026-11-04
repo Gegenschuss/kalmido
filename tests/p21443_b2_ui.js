@@ -36,7 +36,7 @@ const upload = async (ck, name, text) => {
   for (let i = 0; i < 25; i++) ids.push(await upload(CK, `datei${i}.txt`, `inhalt ${i}`));
 
   // ================= 25 files: busy button + progress bar + one undo
-  const w = await boot({user: 'alice', hash: 'ablage', ls: {abSpace: '"private"'}}), d = w.document;
+  const w = await boot({user: 'alice', hash: 'ablage/s/private', ls: {abSpace: '"private"'}}), d = w.document;  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
   await until(() => d.querySelector(`.abrow[data-abid="${ids[0]}"]`));
   w.eval(`AB.selOn = true; AB.sel = new Set(${JSON.stringify(ids)}); ab_smvSpace(AB.data.items.filter(x => AB.sel.has(x.id)))`);
   const md = await until(() => d.querySelector('.smv-dlg'));
@@ -62,7 +62,7 @@ const upload = async (ck, name, text) => {
   w.close();
 
   // ================= few items: busy button only, no bar
-  const w2 = await boot({user: 'alice', hash: 'ablage', ls: {abSpace: '"private"'}}), d2 = w2.document;
+  const w2 = await boot({user: 'alice', hash: 'ablage/s/private', ls: {abSpace: '"private"'}}), d2 = w2.document;  // 2.540.0 (#4575): under "All workspaces" #ablage is the overview of the spaces; the private space has its address
   await until(() => d2.querySelector(`.abrow[data-abid="${ids[0]}"]`));
   w2.eval(`ab_smvSpace(AB.data.items.filter(x => x.id === ${ids[0]}))`);
   const md2 = await until(() => d2.querySelector('.smv-dlg'));
