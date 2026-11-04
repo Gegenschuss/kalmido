@@ -12,10 +12,22 @@ kalmido.example.com {
 	encode zstd gzip
 	# restoring a backup from a file: one request up to KALMIDO_BACKUP_MAX_MB (default 4096), and the restore runs inside
 	# its request. Raise both when you raise that variable
+	@upload path /api/admin/backups/upload
+	handle @upload {
+		request_body {
+			max_size 4096MiB
+		}
+		reverse_proxy 127.0.0.1:3040 {
+			transport http {
+				read_timeout 1h
+			}
+		}
+	}
+	# the other backup paths: normal size, but a restore from an archive on the server takes as long
 	@backups path /api/admin/backups /api/admin/backups/*
 	handle @backups {
 		request_body {
-			max_size 4096MiB
+			max_size 200MiB
 		}
 		reverse_proxy 127.0.0.1:3040 {
 			transport http {

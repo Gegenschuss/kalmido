@@ -21,7 +21,7 @@ What every proxy needs:
 - **Upload size:** one request may carry files up to 4 x `TASKS_MAX_FILE_MB` (default 50 MB, so 200 MB).
 - **Restoring a backup from a file:** one request up to `KALMIDO_BACKUP_MAX_MB` (default 4096 MB) to
   `/api/admin/backups/upload`, and the restore itself runs inside its request. The Caddy and nginx templates allow that
-  size and an hour for the paths below `/api/admin/backups`, the 120 s stay for everything else. If a proxy gives up on a
+  size on this path only and an hour on the paths below `/api/admin/backups`, the 120 s stay for everything else. If a proxy gives up on a
   long restore, the restore goes on on the server: wait, then reload the page; do not start it again. A larger
   `KALMIDO_BACKUP_MAX_MB` needs the same value in your proxy.
 - **Paths:** with the built-in login everything goes to Kalmido unchanged. With a login proxy (single sign-on) in front,

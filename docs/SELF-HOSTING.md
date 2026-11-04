@@ -208,8 +208,9 @@ for anybody.
 ## Reverse proxy and network
 
 Templates for Caddy, nginx and Traefik: [examples/](../examples/). Restoring a backup from a file is one request up to
-`KALMIDO_BACKUP_MAX_MB` (default 4096 MB) that runs until the restore is done: your proxy must allow that size and time on
-`/api/admin/backups` (the Caddy and nginx templates do; for Traefik see its template).
+`KALMIDO_BACKUP_MAX_MB` (default 4096 MB) that runs until the restore is done: your proxy must allow that size on
+`/api/admin/backups/upload` and that time on the paths below `/api/admin/backups` (the Caddy and nginx templates do; for
+Traefik see its template).
 
 **Let CardDAV past the login, too.** Besides `/dav` and `/.well-known/caldav`, contact apps look for
 `/.well-known/carddav`. Behind a login proxy add it to the paths that bypass the login, for example in Caddy:
