@@ -139,7 +139,7 @@ VARS = (
     _v("KALMIDO_SMTP_INSECURE", "0", "Switch: do not check the certificate of the admin mail server (SMTP and IMAP; warned at start).", "mail"),
     _v("KALMIDO_MAIL_FROM", "", "Sender address (empty = KALMIDO_MAIL_ADDRESS).", "mail"),
     _v("KALMIDO_MAIL_ADDRESS", "", "Address of the mailbox that turns incoming mails into tasks.", "mail"),
-    _v("KALMIDO_MAIL_AUTHSERV_ID", "", "Name of the own mail server in Authentication-Results headers that are believed.", "mail"),
+    _v("KALMIDO_MAIL_AUTHSERV_ID", "", "Name of the own mail server in Authentication-Results headers that are believed; empty = no sender counts as confirmed (2.539).", "mail"),
     _v("KALMIDO_IMAP_HOST", "", "IMAP server of that mailbox.", "mail"),
     _v("KALMIDO_IMAP_PORT", "0", "IMAP port (0 = the default of the TLS mode).", "mail"),
     _v("KALMIDO_IMAP_USER", "", "IMAP user.", "mail"),
