@@ -561,7 +561,9 @@ docker compose up -d kalmido
   restore left behind; the next successful restore removes them unless they hold files the archive does not cover. The
   attachments and office folders must not be mounts of their own (a restore swaps them by renaming, which cannot cross a
   mount): such a restore is refused before anything changes, mount the data folder as a whole. While a restore runs,
-  the background queue and the pushes after a request wait; the off-site upload does not.
+  the background queue and the pushes after a request wait; the off-site upload does not. When a restore fails and its way
+  back fails too, the message names the safety backup and the server stays closed (every request answers 503, `/api/health`
+  too) until you restart it: the start completes the database (2.510). A start that cannot do so stops with the reason in the log.
   2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
   the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
   `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the
@@ -1267,7 +1269,7 @@ A short checklist for a new server:
   `cap_drop: [ALL]` with `no-new-privileges` on the proxy too, not only on Kalmido.
 - **A maintenance page.** Let the proxy answer 502 / 503 / 504 with a short "back in a minute" page (Caddy
   `handle_errors`, nginx `error_page`) instead of a bare error during updates.
-- **Monitoring.** `GET /api/health` needs no login, contains no data and answers `{"ok": true}` after a database query;
+- **Monitoring.** `GET /api/health` needs no login, contains no data and answers `{"ok": true}` after a database query (503 and `{"ok": false}` after a failed restore, see above);
   point your uptime monitor at it (let it pass a login proxy).
 - **Raspberry Pi and small boards:** run from an SSD, not an SD card; some USB-to-NVMe bridges drop out under load (pick
   one known to work, or one with a quirk setting); a busy USB 3 port can disturb 2.4 GHz Wi-Fi and Bluetooth nearby.

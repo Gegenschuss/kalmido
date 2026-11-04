@@ -654,6 +654,8 @@ def sw_manifest():
 
 @app.get("/api/health")
 def health():
+    if GATE.broken:  # 2.510.0 (#4286): a restore whose way back failed: the database answers, the server is not whole
+        return jsonify(ok=False), 503
     db().execute("SELECT 1").fetchone()
     return jsonify(ok=True)
 

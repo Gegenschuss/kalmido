@@ -1958,7 +1958,6 @@
   "Type {0} to confirm.": "Escribe {0} para confirmar.",
   "The server is still busy; the restore did not start. Please try again.": "El servidor sigue ocupado; la restauración no ha empezado. Inténtalo de nuevo.",
   "The restore failed ({0}); nothing was changed.": "La restauración ha fallado ({0}); no se ha cambiado nada.",
-  "The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.": "La restauración falló y también la vuelta atrás: puede que la base de datos esté incompleta. Restaura ahora la copia de seguridad {0}.",
   "{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again.": "{0} tareas en segundo plano en espera no se restauraron (una copia de seguridad nunca las contiene): vuelve a iniciar lo que aún haga falta.",
   "Devices that still hold unsent changes send them after reloading: they can meet the restored state as conflicts or come back as new items. Check recent work on those devices.": "Los dispositivos con cambios aún no enviados los envían al recargar: pueden chocar con el estado restaurado como conflictos o volver como elementos nuevos. Revisa el trabajo reciente en esos dispositivos.",
   "{0} file missing": ["Falta {0} archivo", "Faltan {0} archivos"],
@@ -16118,5 +16117,6 @@
   "{0} folder or file": ["{0} carpeta o archivo", "{0} carpetas o archivos"],
   "Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.": "Compartidos con otras personas, se conservan y pasan a quien lleva más tiempo pudiendo modificarlos ({1}): {0}.",
   "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Compartidos con otras personas, se conservan y pasan a quien lleva más tiempo pudiendo modificarlos: {0}.",
-  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Compartidos con otras personas, pero nadie más puede hacerse cargo, así que se eliminan con la cuenta: {0}."
+  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Compartidos con otras personas, pero nadie más puede hacerse cargo, así que se eliminan con la cuenta: {0}.",
+  "The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore.": "La restauración falló y también la vuelta atrás: puede que la base de datos esté incompleta, por lo que el servidor permanece cerrado. Reinícialo: el arranque completa la base de datos. La copia de seguridad {0} contiene el estado anterior a la restauración."
 }

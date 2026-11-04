@@ -1958,7 +1958,6 @@
   "Type {0} to confirm.": "Typ {0} om te bevestigen.",
   "The server is still busy; the restore did not start. Please try again.": "De server is nog bezig; het herstel is niet gestart. Probeer het opnieuw.",
   "The restore failed ({0}); nothing was changed.": "Het herstel is mislukt ({0}); er is niets gewijzigd.",
-  "The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now.": "Het herstel is mislukt en de weg terug ook: de database is mogelijk onvolledig. Zet nu de veiligheidsback-up {0} terug.",
   "{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again.": "{0} wachtende achtergrondtaken zijn niet hersteld (een back-up bevat ze nooit): start opnieuw wat nog nodig is.",
   "Devices that still hold unsent changes send them after reloading: they can meet the restored state as conflicts or come back as new items. Check recent work on those devices.": "Apparaten met nog niet verzonden wijzigingen sturen die na het herladen: ze kunnen als conflict op de herstelde stand stuiten of als nieuwe items terugkomen. Controleer het recente werk op die apparaten.",
   "{0} file missing": ["{0} bestand ontbreekt", "{0} bestanden ontbreken"],
@@ -16118,5 +16117,6 @@
   "{0} folder or file": ["{0} map of bestand", "{0} mappen of bestanden"],
   "Shared with others, these stay and go to the longest-standing person who may change them ({1}): {0}.": "Gedeeld met anderen, deze blijven en gaan naar wie ze het langst mag wijzigen ({1}): {0}.",
   "Shared with others, these stay and go to the longest-standing person who may change them: {0}.": "Gedeeld met anderen, deze blijven en gaan naar wie ze het langst mag wijzigen: {0}.",
-  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Gedeeld met anderen, maar niemand anders kan ze overnemen, dus ze verdwijnen met het account: {0}."
+  "Shared with others, but nobody else may take them over, so these go with the account: {0}.": "Gedeeld met anderen, maar niemand anders kan ze overnemen, dus ze verdwijnen met het account: {0}.",
+  "The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore.": "Het herstel is mislukt en de weg terug ook: de database is mogelijk onvolledig, daarom blijft de server gesloten. Start hem opnieuw: de start maakt de database compleet. De veiligheidsback-up {0} bevat de stand van voor het herstel."
 }

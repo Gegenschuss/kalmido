@@ -176,7 +176,7 @@ BK_ERR = {"busy": N_("Another backup or restore is running, please try again in 
           "procs": N_("A restore needs a single server process (KALMIDO_ROLE=all, KALMIDO_REPLICAS=1). Stop the other processes first, see SELF-HOSTING.md."),
           "restore": N_("The restore failed ({0}); nothing was changed."),
           # 2.273.0 A (#3050): the way back to the state before failed too
-          "rollback": N_("The restore failed and so did the way back: the database may be incomplete. Restore the safety backup {0} now."),
+          "rollback": N_("The restore failed and so did the way back: the database may be incomplete, so the server stays closed. Restart it: the start completes the database. The safety backup {0} holds the state from before the restore."),
           # 2.432.0 (#3584): the shared files of a backup (bkstore.py)
           "shared_missing": N_("{0} shared files of this backup are missing in the backup folder. Download the backup from the server that made it (a complete file), or put the shared files back."),
           "old_passphrase": N_("This backup was encrypted with an earlier passphrase. Enter that passphrase to check, restore or download it.")}
@@ -1923,7 +1923,8 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
                 os.rename(OFFICE_DIR, off_new)
             if omoved:
                 os.rename(off_old, OFFICE_DIR)
-            if back_failed:
+            if back_failed:  # 2.510.0 (#4286): without init_db the tables have no rights, policies and triggers: nothing may run on them
+                GATE.broken = (BK_ERR["rollback"], safety)  # (the gate stays shut and /api/health says so, a restart ends it)
                 raise BackupError("rollback", safety) from None
             raise
         bk_leftovers_clean(man["_listed"])  # 2.148.1 C (#2482): files outside the archive format stay in the folder of before; 2.370.2 (#2779): also older leftovers
@@ -1946,7 +1947,7 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
         print("restore failed:", db_log_err(e), flush=True)
         raise BackupError("restore", str(e)[:300] if type(e).__name__ == "MigError" else type(e).__name__) from None
     finally:
-        if gate:
+        if gate and not GATE.broken:
             GATE.end()
         shutil.rmtree(work, ignore_errors=True)
         shutil.rmtree(att_new, ignore_errors=True)
