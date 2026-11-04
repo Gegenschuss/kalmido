@@ -372,9 +372,6 @@ async function evCalsModal() {
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
     $('#evc-body', md).innerHTML = tl + own + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
   };
-  await cvxCals(true).catch(() => {});
-  draw();
-  loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
   const redraw = () => { cvxRedraw(); draw(); };
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('change', async e => {
@@ -431,6 +428,11 @@ async function evCalsModal() {
       refresh();
     }
   });
+  // 2.520.0 (#3506): the buttons are in the dialog from the start, so the handlers come before the wait for the calendars (a click
+  // in that gap was lost: CI of 2.520.0, p2365_2_b_ui "On the phone…")
+  await cvxCals(true).catch(() => {});
+  draw();
+  loadModule('calabs').then(() => { abc_wire(md, draw); draw(); }).catch(() => {});  // 2.155.0 B (#2076): holidays + absences
 }
 function evShareModal(c, users, done) {
   const md = modal(`<h3>${tr('Share {0}', esc(c.name))}</h3><div class="shws"></div><div id="evs-list"></div>
