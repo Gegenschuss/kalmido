@@ -37,7 +37,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     check(Math.abs(cx - bcx) <= 1.5 && Math.abs(cy - bcy) <= 1.5, '#4400: the box sits centred on the symbol\'s place ' + JSON.stringify({cx, cy, bcx, bcy}));
     check(await ev(`(() => { const e = document.elementFromPoint(${cx}, ${cy}); return !!e.closest('.absel'); })()`), '#4400: the point of the symbol hits the box');
     check(Math.abs(b.nm - a.nm) < .5, '#4400: the name does not move ' + a.nm + ' / ' + b.nm);
-  }, true);
+  }, false);
   console.log(`${ok} passed, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.log('CRASH', e); process.exit(1); });

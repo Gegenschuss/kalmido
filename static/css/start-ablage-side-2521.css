@@ -9,5 +9,7 @@
   .ablist:not(.abselon) .abrow:hover>.abopen>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>.wkitem>svg:first-child,.wkrow:not(.wkselrow):hover:not(:has(.wkrow:hover))>details>summary>.wkitem>svg:first-child{visibility:hidden}
 }
 /* 2.521.0 (#4397): the "…" of a folder stands LEFT of the fold arrow (in the flow), never over it; the arrow stays visible and clickable */
-#side .sbbt.lfh>.fmenu{order:1;position:static;transform:none;margin-left:auto}
-#side .sbbt.lfh:has(>.fmenu)>.sbbtar{margin-left:0}
+@media (min-width:768px) and (hover:hover){
+  #side .sbbt.lfh>.fmenu{order:1;position:static;transform:none;margin-left:auto}
+  #side .sbbt.lfh:has(>.fmenu)>.sbbtar{margin-left:0}
+}
