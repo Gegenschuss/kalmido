@@ -32,6 +32,9 @@ async function open(jar) {  // the app with a cookie jar of its own (the setup r
       w.confirm = () => true; w.prompt = () => null;
       require('./boot').dialogBridge(w);
     }});
+  // #3506 (CI red of 2.532.0): a poll awaiting /api/version when a step closes its window resumes without a document
+  // (staleDraw: reading 'hidden'); like boot() the late rejection of a closed window is the harness (boot.js lateAppError)
+  require('./boot').trackClose(dom.window);
   await sleep(1500);
   return dom.window;
 }

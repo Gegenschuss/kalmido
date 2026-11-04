@@ -70,9 +70,13 @@ const FEAT = 'cal,comments,collab';
     const n0 = sent().length;
     await ev(`(() => { document.querySelector('[data-act="c-send"]').click(); return 1; })()`);
     let out = [];
-    for (let i = 0; i < 80 && !out.length; i++) { out = sent().slice(n0); if (!out.length) await sleep(250); }
+    // #3375 (CI red of 2.532.0): only the mails to the reporter count - the Firefox sign-in is a new device for frida, its
+    // security mail to frida@example.com goes out in the background and, on a slow runner, lands in this window too
+    const toRep = () => sent().slice(n0).filter(m => /^To: rita@example\.com/m.test(m));
+    for (let i = 0; i < 80 && !out.length; i++) { out = toRep(); if (!out.length) await sleep(250); }
+    await sleep(1000); out = toRep();  // a second answer to the reporter would show here
     check(out.length === 1 && /^To: rita@example\.com/m.test(out[0]) && /^Subject: Re: Printer is broken/m.test(out[0]) && out[0].includes('We replaced the toner.'),
-      'the comment goes to the reporter by mail ' + (out[0] || '').slice(0, 300));
+      'the comment goes to the reporter by mail (' + out.length + ' to rita) ' + (out[0] || '').slice(0, 300));
     check(await ready(ev, `[...document.querySelectorAll('#d-tl-items .cm')].some(c => c.textContent.includes('We replaced the toner.'))`, 40), 'the comment is in the timeline');
     check(await ready(ev, `document.querySelector('#c-mrep [data-mrep="switch"]')?.checked === false`, 40), 'the switch is off again after sending');
     await shot('p23932b-sent.png');
