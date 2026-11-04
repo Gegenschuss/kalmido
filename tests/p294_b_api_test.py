@@ -10,6 +10,8 @@
    button only, POST confirms -> event (customer as attendee) + contact (taken again for the same address) + lead (part A,
    tolerant until it is merged) + mail with the cancel link; the customer cancels (event deleted, time free again); the
    person cancels (mail with the reason)
+ - 2.540.0 (#4349): the search over all bookings (name / e-mail, also older than 30 days), deleting a confirmed or cancelled
+   booking (event, contact and lead stay, no mail, the time is free, the cancel link answers 404), open ones 409, others 404
  - spam protection: at most 3 open bookings per address, unconfirmed bookings expire after 30 minutes, the same 404 for
    unknown and switched-off pages and tokens, the rate limit per client address
  - a freelancer without an organisation: own calendar, own contacts, the lead in the personal office
@@ -365,6 +367,51 @@ check(row[0] == "confirmed" and dbx("SELECT k.owner_id FROM events e JOIN ev_cal
 check(bool(row[3]) and dbx("SELECT org_id FROM office_deals WHERE id=?", (row[3] or 0,))[0][0] == DPO, "the lead in her personal office")
 check(not any(b["email"] == MD for b in A.get(B + AP + "/bookings").json()["bookings"]), "alice does not see dora's bookings")
 check(Do.post(B + f"{AP}/bookings/{B2}/cancel", json={}).status_code == 404, "dora cannot reach alice's booking")
+
+# ================================================================== 2.540.0 (#4349): search over all bookings, delete confirmed / cancelled ones
+_old = (testclock.now().astimezone(ZoneInfo("UTC")) - timedelta(days=90)).replace(microsecond=0)
+dbx("UPDATE appt_bookings SET start=?, \"end\"=? WHERE id=?", (_old.isoformat(), (_old + timedelta(minutes=30)).isoformat(), B1))  # older than 30 days
+check(not any(b["id"] == B1 for b in A.get(B + AP + "/bookings").json()["bookings"]), "#4349: the list leaves the old booking out")
+r = A.get(B + AP + "/bookings", params={"q": "KUNDE.eins@"}).json()
+check({B1, B2} <= {b["id"] for b in r["bookings"]} and all(b["email"] == M1 for b in r["bookings"]) and r["bookings"][-1]["id"] == B1 and r["more"] is False,
+      "#4349: the search finds the old booking by e-mail (any case, newest first) " + str([(b["id"], b["start"]) for b in r["bookings"]]))
+check(any(b["id"] == B1 for b in A.get(B + AP + "/bookings", params={"q": "kunde eins"}).json()["bookings"]), "#4349: ... and by name")
+check(A.get(B + AP + "/bookings", params={"q": "%"}).json()["bookings"] == [] and A.get(B + AP + "/bookings", params={"q": "_"}).json()["bookings"] == [],
+      "#4349: % and _ are plain characters in the search")
+check(Ca.get(B + AP + "/bookings", params={"q": "Kunde"}).json()["bookings"] == [], "#4349: another person's search finds none of alice's")
+EV1, CO1, DL1 = dbx("SELECT event_id, contact_id, deal_id FROM appt_bookings WHERE id=?", (B1,))[0]
+PEND = dbx("SELECT id FROM appt_bookings WHERE user_id=? AND status='pending' ORDER BY id LIMIT 1", (ALICE,))
+check(PEND and A.delete(B + f"{AP}/bookings/{PEND[0][0]}").status_code == 409, "#4349: an open booking cannot be deleted (409)")
+check(A.delete(B + f"{AP}/bookings/{B3}").status_code == 409, "#4349: an expired booking cannot be deleted (409)")
+check(Ca.delete(B + f"{AP}/bookings/{B1}").status_code == 404 and Do.delete(B + f"{AP}/bookings/{B1}").status_code == 404
+      and dbx("SELECT 1 FROM appt_bookings WHERE id=?", (B1,)), "#4349: another person cannot delete alice's booking (404)")
+if KID:
+    check(sess("tim").delete(B + f"{AP}/bookings/{B1}").status_code == 403, "#4349: a kid account: 403")
+n1 = len(mails(M1))
+r = A.delete(B + f"{AP}/bookings/{B1}")
+check(r.ok and not dbx("SELECT 1 FROM appt_bookings WHERE id=?", (B1,)), "#4349: the person deletes the cancelled old booking for good " + r.text[:200])
+check(dbx("SELECT 1 FROM events WHERE id=?", (EV1,)) and dbx("SELECT 1 FROM contacts WHERE id=? AND deleted_at IS NULL", (CO1,))
+      and (not DL1 or dbx("SELECT 1 FROM office_deals WHERE id=?", (DL1,))), "#4349: its event, contact and lead stay")
+check(A.delete(B + f"{AP}/bookings/{B1}").status_code == 404, "#4349: deleted twice: 404")
+check(A.delete(B + f"{AP}/bookings/{B2}").ok, "#4349: a booking the person cancelled can be deleted too")
+r = Do.get(B + AP + "/bookings", params={"q": "vier"}).json()["bookings"]
+check([b["email"] for b in r] == [MD], "#4349: the freelancer's search finds her booking " + str(r)[:200])
+# the freelancer deletes a confirmed, coming booking whose event is gone (ON DELETE SET NULL): its time becomes free, the cancel link is gone
+DB4, DEV4, DCO4, DDL4 = dbx("SELECT id, event_id, contact_id, deal_id FROM appt_bookings WHERE email=? AND status='confirmed'", (MD,))[0]
+CXD = link_in(wait_mail(MD, 2)[1], "x") if len(wait_mail(MD, 2)) > 1 else None
+dbx("UPDATE events SET deleted_at=created_at WHERE id=?", (DEV4,))
+dbx("UPDATE appt_bookings SET event_id=NULL WHERE id=?", (DB4,))
+check(f"{K}T1000" not in slots(pub.get(f"{B}/s/b/dora-frei/{DT}?w={MON}").text, "dora-frei", DT), "#4349: a confirmed booking without event holds its time")
+check(bool(CXD) and pub.get(f"{B}/s/b/x/{CXD}").status_code == 200, "#4349: before: the cancel link works")
+nd = len(mails(MD))
+check(Do.delete(B + f"{AP}/bookings/{DB4}").ok and not dbx("SELECT 1 FROM appt_bookings WHERE id=?", (DB4,)), "#4349: the freelancer deletes her confirmed booking")
+check(f"{K}T1000" in slots(pub.get(f"{B}/s/b/dora-frei/{DT}?w={MON}").text, "dora-frei", DT), "#4349: its time is free again (apb_busy)")
+check(dbx("SELECT 1 FROM contacts WHERE id=? AND deleted_at IS NULL", (DCO4,)) and dbx("SELECT 1 FROM office_deals WHERE id=?", (DDL4,)), "#4349: her contact and lead stay")
+r = pub.get(f"{B}/s/b/x/{CXD}")
+check(r.status_code == 404 and "Link not available" in r.text and "Traceback" not in r.text, "#4349: the cancel link then says 'not available' " + str(r.status_code))
+r = pub.post(f"{B}/s/b/x/{CXD}", data={"f": "0" * 64, "reason": "x"})
+check(r.status_code == 404, "#4349: posting to it too " + str(r.status_code))
+check(len(mails(M1)) == n1 and len(mails(MD)) == nd, "#4349: deleting sends no mail")
 
 # ================================================================== the rate limit per client address
 codes = []

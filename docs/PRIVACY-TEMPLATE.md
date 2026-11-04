@@ -50,7 +50,7 @@ Kalmido's defaults (the operator can change them with the variables named; see [
 | Activity / project / file / table change log | 400 days | `KALMIDO_LOG_DAYS` |
 | Cell history of tables | the newest 200 entries of a table within 90 days | – |
 | Office log | changes stay for good (bookkeeping); reads (open, preview, PDF, XML) 90 days | – |
-| Bookings of a booking page | never confirmed: 7 days after they expired; cancelled and never confirmed: 30 days. Confirmed ones (also when cancelled later) have no period and no delete button: they stay until the account of the page's owner is deleted | – |
+| Bookings of a booking page | never confirmed: 7 days after they expired; cancelled and never confirmed: 30 days. Confirmed ones (also when cancelled later) have no period: the owner of the page deletes them in the app (search by name or e-mail over all bookings), otherwise they stay until the owner's account is deleted | – |
 | E-mails deleted in a workspace mailbox | the mail leaves the list, but its `.eml` and attachments stay readable in the file store for those who could read it. Only the trash run, when switched on, removes the mail and moves its folder to the file store's trash; without that switch they stay. To remove the content at once, delete the folder *E-Mails / ...* too | `KALMIDO_TRASH_DAYS`, `KALMIDO_PURGE_TRASH` |
 | Admin alerts, sign-in addresses seen by admins | 365 days | – |
 | News feed entries | 90 days | `TASKS_NEWS_DAYS` |
@@ -182,8 +182,9 @@ for access or erasure go to that controller:
 - **Questionnaires:** the answers and the sender's address stand in the task the form makes, so everyone who sees that task
   reads them and the project's agents get it. They go with the task, or with the form.
 - **Bookings:** the person gets a link to cancel by e-mail. The owner of the booking page sees the bookings, and they are in that
-  person's export. A confirmed booking cannot be deleted in the app yet, and its event, contact and lead are separate
-  entries; to answer an erasure request, the operator removes the booking from the database.
+  person's export. To answer an erasure request, the owner finds the booking by name or e-mail and deletes a confirmed or
+  cancelled booking in the app (no e-mail goes out, the cancel link stops working). Its event, contact and lead are separate
+  entries and stay; they are deleted on their own where needed.
 - **Polls:** a person changes their own vote in the same browser (cookie, see section 5). The poll's owner sees
   names, e-mails and answers; they go with the poll.
 - **Online payment:** the payment stays with the invoice for the legal period (section 3). For what Stripe keeps, name Stripe

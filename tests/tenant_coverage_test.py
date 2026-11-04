@@ -508,7 +508,7 @@ ROUTES = {
     # 2.94.0 B (#1929): appointment booking settings and bookings of the person (p294_b_api_test.py)
     "GET /api/appt/page": "calendar", "PUT /api/appt/page": "calendar", "GET /api/appt/types": "calendar", "POST /api/appt/types": "calendar",
     "PATCH /api/appt/types/{}": "calendar", "DELETE /api/appt/types/{}": "calendar", "POST /api/appt/types/{}/restore": "calendar",
-    "GET /api/appt/bookings": "calendar", "POST /api/appt/bookings/{}/cancel": "calendar",
+    "GET /api/appt/bookings": "calendar", "POST /api/appt/bookings/{}/cancel": "calendar", "DELETE /api/appt/bookings/{}": "calendar",  # 2.540.0 (#4349)
     "GET /s/b/{}": "calendar", "GET /s/b/{}/{}": "calendar", "GET /s/b/{}/{}/{}": "calendar", "POST /s/b/{}/{}/{}": "calendar",
     "GET /s/b/c/{}": "calendar", "POST /s/b/c/{}": "calendar", "GET /s/b/x/{}": "calendar", "POST /s/b/x/{}": "calendar",
     # 2.51.0 (#1348, #1350): agents in the office (drafts only) and the switches / payment suggestions of people (p251_a_api_test.py)

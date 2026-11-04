@@ -1022,7 +1022,7 @@ ROUTES = {
     "DELETE /api/appt/types/{}": "pim", "GET /api/appt/bookings": "pim", "GET /api/appt/page": "pim", "GET /api/appt/types": "pim",
     "GET /api/office/deals/{}/convert": "office", "GET /api/v1/office/leads": "office", "GET /s/b/c/{}": "link",
     "GET /s/b/x/{}": "link", "GET /s/b/{}": "link", "GET /s/b/{}/{}": "link", "GET /s/b/{}/{}/{}": "link",
-    "PATCH /api/appt/types/{}": "pim", "PATCH /api/v1/office/leads/{}": "office", "POST /api/appt/bookings/{}/cancel": "pim",
+    "PATCH /api/appt/types/{}": "pim", "PATCH /api/v1/office/leads/{}": "office", "POST /api/appt/bookings/{}/cancel": "pim", "DELETE /api/appt/bookings/{}": "pim",
     "POST /api/appt/types": "pim", "POST /api/appt/types/{}/restore": "pim", "POST /api/office/deals/{}/convert": "office",
     "POST /api/office/deals/{}/unconvert": "office", "POST /api/office/leads/import": "office",
     "POST /api/office/leads/import/undo": "office", "POST /api/v1/office/leads": "office", "POST /s/b/c/{}": "link",

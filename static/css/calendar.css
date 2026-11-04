@@ -107,3 +107,4 @@ button.cyd:hover{background:var(--bg2)}
 @media (max-width:23rem){ .cyear{grid-template-columns:minmax(0,1fr)} }
 /* 2.155.0 B (#2076): public holidays / absences in the month and week views: a quiet outlined chip (calendar.js abcX) */
 .cal .cev.cevx,.week .cev.cevx{background:transparent;border-style:dashed;color:var(--text2)}
+.apb-bsearch{margin:.25rem 0 .5rem}.apb-bsearch input{width:100%;box-sizing:border-box}  /* 2.540.0 (#4349): the booking search */

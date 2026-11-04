@@ -2,6 +2,7 @@
 // switched on), Firefox (desktop + phone width). Invented names only.
 // - the Calendars dialog has "Booking page…"; it opens the settings: the address, title, weekly hours, saving makes the page
 //   and shows its link; the switch turns it on; a new appointment type through its dialog shows in the list; Undo of saving
+// - 2.540.0 (#4349): the booking search finds an old booking, the bin deletes it after a question
 // - the public page /s/b/<address> lists the type, its free times are links with large targets; on a phone nothing sticks out
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -65,6 +66,27 @@ if (!process.env.P294B_NOSTART) {
     check(await ready(ev, `/^Saved/.test(document.querySelector('#toast')?.textContent || '') && !!document.querySelector('#toast button')`), 'the Saved toast with Undo');
     await ev(`(() => { const b = document.querySelector('#toast button'); if (b) b.click(); return !!b; })()`);
     check(await ready(ev, `fetch('/api/appt/page', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.page.title === 'Termine bei Alice')`), 'Undo brings the old title back');
+    // 2.540.0 (#4349): an old confirmed booking (older than 30 days) is not in the list; the search finds it, the bin deletes it
+    // after a question that says event, contact and lead stay and no mail goes out
+    { const [DBC, DBN] = require('fs').readFileSync(path.join(DATA, '.kalmido-db'), 'utf8').trim().split(/\s+/);
+      const t0 = new Date(Date.now() - 90 * 864e5), iso = d => d.toISOString().replace(/\.\d+Z$/, '+00:00');
+      execFileSync('docker', ['exec', DBC, 'psql', '-U', 'kalmido', '-d', DBN, '-Atqc', `INSERT INTO appt_bookings(user_id, start, "end", name, email, status, created_at, confirmed_at)
+        SELECT id, '${iso(t0)}', '${iso(new Date(t0.getTime() + 18e5))}', 'Kundin Alt', 'kundin.alt@example.com', 'confirmed', '${iso(t0)}', '${iso(t0)}' FROM users WHERE username='alice'`]); }
+    check(await ev(`!/Kundin Alt/.test(document.querySelector('.apb-dlg .apb-bwrap')?.textContent || '') && !!document.querySelector('.apb-dlg #apb-q')`), '#4349: the old booking is not in the list, a search field is');
+    await ev(`(() => { const q = document.querySelector('#apb-q'); q.focus(); q.value = 'kundin.ALT'; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    check(await ready(ev, `/Kundin Alt/.test(document.querySelector('.apb-dlg .apb-books')?.textContent || '') && !!document.querySelector('.apb-books [data-apbrm]') && !document.querySelector('.apb-books [data-apbcancel]')`),
+      '#4349: the search finds the old booking, with a bin and without "Call off"');
+    check(await ev(`document.activeElement?.id === 'apb-q'`), '#4349: the search field keeps the focus while the hits come in');
+    await shot('p294-b-booking-search.png');
+    await ev(`(() => { document.querySelector('.apb-books [data-apbrm]').click(); return 1; })()`);
+    check(await ready(ev, `/Kundin Alt/.test(document.querySelector('#cdlg-t')?.textContent || '') && /lead stay/.test(document.querySelector('#cdlg-b')?.textContent || '') && /no e-mail/.test(document.querySelector('#cdlg-b')?.textContent || '')`),
+      '#4349: the question names the client and says event, contact and lead stay, no mail');
+    await shot('p294-b-booking-delete.png');
+    await ev(`(() => { document.querySelector('[data-cd="yes"]').click(); return 1; })()`);
+    check(await ready(ev, `fetch('/api/appt/bookings?q=kundin', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.bookings.length === 0)`), '#4349: the booking is deleted');
+    check(await ready(ev, `/No booking found/.test(document.querySelector('.apb-dlg .apb-bwrap')?.textContent || '') && document.querySelector('#apb-q')?.value === 'kundin.ALT'`), '#4349: the list shows no hit any more, the search stays');
+    await ev(`(() => { const q = document.querySelector('#apb-q'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    check(await ready(ev, `/No bookings yet/.test(document.querySelector('.apb-dlg .apb-bwrap')?.textContent || '')`), '#4349: an empty search shows the coming bookings again');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await sleep(400);
     check(await ev(noSide('.apb-dlg .card')), 'on a phone the settings stay inside the screen');

@@ -26,7 +26,7 @@ from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
 from ..collab.comments import lang_of  # 2.367.5 (#2980)
 from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
-from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.pg import insert_id, like_escape, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.bgjobs import bgj_add, bgj_fn
@@ -58,6 +58,7 @@ APB_PAGE_HOUR = 30           # booking attempts per page, client address and hou
 APB_MAIL_DAY = 60            # 2.148.1 D (#2485): confirmation mails a booking page sends per day (own quota)
 APB_BAD_LIMIT = 30           # unknown pages / tokens per address within the fail window (shared with the list links)
 APB_TYPES_MAX = 30
+APB_SEARCH_MAX = 100        # 2.540.0 (#4349): hits of the booking search
 APB_WEEKS = 8                # the first page view looks this many weeks ahead for the first free time
 SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-]{1,38}[a-z0-9]")
 SLOT_RE = re.compile(r"(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})")
@@ -420,11 +421,21 @@ def apb_booking_out(r, tnames):
 
 @app.get("/api/appt/bookings")
 def apb_bookings_list():
-    """The coming bookings and those of the last 30 days (confirmed, open and cancelled; expired ones are not shown)."""
+    """The coming bookings and those of the last 30 days (confirmed, open and cancelled; expired ones are not shown).
+    2.540.0 (#4349): ?q= searches name and e-mail over all bookings of the page (also older ones, newest first), so that an
+    old booking can be found for a deletion request."""
     c = db()
     uid = apb_gate(c)
     apb_expire(c, uid)
     c.commit()
+    q = (request.args.get("q") or "").strip()[:EMAIL_MAX]
+    if q:
+        pat = "%" + like_escape(q) + "%"
+        rows = c.execute("SELECT * FROM appt_bookings WHERE user_id=? AND status IN ('pending','confirmed','cancelled') "
+                         "AND (name ILIKE ? ESCAPE '\\' OR email ILIKE ? ESCAPE '\\') ORDER BY start DESC, id DESC LIMIT ?",
+                         (uid, pat, pat, APB_SEARCH_MAX + 1)).fetchall()
+        tnames = {r[0]: r[1] for r in c.execute("SELECT id, name FROM appt_types WHERE user_id=?", (uid,))}
+        return jsonify(bookings=[apb_booking_out(r, tnames) for r in rows[:APB_SEARCH_MAX]], more=len(rows) > APB_SEARCH_MAX)
     rows = c.execute("SELECT * FROM appt_bookings WHERE user_id=? AND status IN ('pending','confirmed','cancelled') AND \"end\">=? "
                      "ORDER BY start, id LIMIT 300", (uid, iso(now_utc() - timedelta(days=30)))).fetchall()
     tnames = {r[0]: r[1] for r in c.execute("SELECT id, name FROM appt_types WHERE user_id=?", (uid,))}
@@ -451,6 +462,26 @@ def apb_booking_cancel(bid):
         bgj_add("mail:apptbook", *mail)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
     tnames = {x[0]: x[1] for x in c.execute("SELECT id, name FROM appt_types WHERE user_id=?", (uid,))}
     return jsonify(apb_booking_out(c.execute("SELECT * FROM appt_bookings WHERE id=?", (bid,)).fetchone(), tnames))
+
+
+@app.delete("/api/appt/bookings/<int:bid>")
+def apb_booking_delete(bid):
+    """2.540.0 (#4349): the person deletes a confirmed or cancelled booking for good (e.g. on a deletion request of the booked
+    person). Only the booking row goes: the event, the contact and the lead it made stay their own entries, no mail goes out,
+    the person's links then answer like an unknown link. A confirmed booking without an event frees its time (apb_busy)."""
+    c = db()
+    uid = apb_gate(c)
+    write_lock(c, f"appt:{uid}")
+    r = c.execute("SELECT id, status FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid)).fetchone()
+    if not r:
+        raise Denied(404)
+    if r["status"] not in ("confirmed", "cancelled"):
+        return err(tr("Only confirmed or cancelled bookings can be deleted"), 409)
+    c.execute("DELETE FROM appt_bookings WHERE id=? AND user_id=?", (bid, uid))
+    bump(c)
+    c.commit()
+    print("apptbook booking deleted", bid, flush=True)
+    return jsonify(ok=True, id=bid)
 
 
 def apb_cancel(c, r, by, reason=""):
@@ -1000,6 +1031,9 @@ def apb_confirm(token):
     uid = r["user_id"]
     write_lock(c, f"appt:{uid}")
     r = c.execute("SELECT * FROM appt_bookings WHERE id=?", (r["id"],)).fetchone()
+    if not r:  # 2.540.0 (#4349): gone meanwhile
+        c.rollback()
+        return apb_bad_token()
     if r["status"] != "pending" or apb_expired(r):
         c.rollback()
         return redirect(APB_PREFIX + "c/" + token, 303)
@@ -1101,6 +1135,9 @@ def apb_cancel_guest(token):
         return pub_limited(lg)
     write_lock(c, f"appt:{r['user_id']}")
     cur = c.execute("SELECT * FROM appt_bookings WHERE id=?", (r["id"],)).fetchone()
+    if not cur:  # 2.540.0 (#4349): the person deleted the booking meanwhile
+        c.rollback()
+        return apb_bad_token()
     if cur["status"] != "confirmed" or parse_iso(cur["start"]) <= now_utc():
         c.rollback()
         return apb_msg(c, p, lg, tr("This appointment can no longer be cancelled here", lg=lg), [tr("Please reply to the confirmation e-mail.", lg=lg)], code=410)

@@ -1,10 +1,10 @@
 /* Kalmido web client: 2.94.0 B (#1929) the booking page ("Terminbuchung"): customers book an appointment on a public page
    without an account (/s/b/<address>, server-rendered). Here the person sets it up: on / off, the link, title and text, the
    calendar the bookings go into, the office area that gets a lead per booking, the weekly hours, the appointment types and
-   the list of bookings (cancel). Opened from the Calendars dialog (calevents.js). Lazy module "calendar" (lazyload.js). */
+   the list of bookings (cancel; 2.540.0 #4349: search over all bookings, delete confirmed / cancelled ones). Opened from the Calendars dialog (calevents.js). Lazy module "calendar" (lazyload.js). */
 'use strict';
 
-const APB = {data: null, types: [], bookings: [], md: null};
+const APB = {data: null, types: [], bookings: [], md: null, q: '', found: null, more: false};  // 2.540.0 (#4349): q / found = the booking search
 const APB_DAYS = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
 
 async function apbLoad() {
@@ -19,8 +19,21 @@ async function apbOpen() {
   apbDraw();
   md.addEventListener('click', apbClick);
   md.addEventListener('change', e => { if (e.target.id === 'apb-on') apbToggle(e.target); if (e.target.matches('[data-apbday]')) apbDayRow(e.target); });
+  md.addEventListener('input', e => { if (e.target.id === 'apb-q') apbSearchSoon(e.target.value); });
 }
-function apbReload() { return apbLoad().then(apbDraw).catch(() => {}); }
+function apbReload() { return apbLoad().then(apbSearch).then(apbDraw).catch(() => {}); }
+
+// 2.540.0 (#4349): search name or e-mail over all bookings of the page (also old ones), e.g. for a deletion request
+let apbSearchT = 0;
+function apbSearchSoon(v) { clearTimeout(apbSearchT); apbSearchT = setTimeout(() => { APB.q = v.trim(); apbSearch().then(apbDrawBooks); }, 250); }
+async function apbSearch() {
+  const q = APB.q;
+  if (!q) { APB.found = null; APB.more = false; return; }
+  try {
+    const j = await api('GET', '/api/appt/bookings?q=' + encodeURIComponent(q));
+    if (q === APB.q) { APB.found = j.bookings || []; APB.more = !!j.more; }
+  } catch { /* the list stays as it was */ }
+}
 
 const apbWhen = iso => { const d = new Date(iso); return `${WDL[d.getDay()]}, ${fmtStamp(d)}`; };
 // 2.94.1 (#1929): the app's own time picker (ux1: no native time inputs); the hidden input keeps data-apbhm
@@ -45,13 +58,6 @@ function apbDraw() {
   const types = APB.types.length ? `<ul class="apb-list">${APB.types.map(t => `<li class="${t.active ? '' : 'off'}"><button class="apb-main" data-apbtype="${t.id}"><b>${esc(t.name)}</b><span class="muted">${esc(apbTypeSub(t))}</span></button>
       <button class="iconbtn" data-apbdel="${t.id}" aria-label="${esc(tr('Delete {0}', t.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button></li>`).join('')}</ul>`
     : `<p class="muted">${tr('No appointment type yet. Clients choose one of them first.')}</p>`;
-  const now = Date.now();
-  const bk = APB.bookings.filter(b => new Date(b.end).getTime() >= now).slice(0, 100);
-  const books = bk.length ? `<ul class="apb-list apb-books">${bk.map(b => `<li class="${b.status}"><div class="apb-main"><b>${esc(apbWhen(b.start))}</b>
-      <span>${esc(b.type_name || '')} · ${esc(b.name)}</span><span class="muted">${esc(b.email)}${b.phone ? ' · ' + esc(b.phone) : ''}</span>
-      ${b.status !== 'confirmed' ? `<span class="apb-st">${esc(b.status === 'pending' ? tr('Waiting for the client to confirm') : b.cancelled_by === 'guest' ? tr('Cancelled by the client') : tr('Cancelled'))}</span>` : ''}</div>
-      ${b.status === 'confirmed' || b.status === 'pending' ? `<button class="btn sm" data-apbcancel="${b.id}">${tr('Call off…')}</button>` : ''}</li>`).join('')}</ul>`
-    : `<p class="muted">${tr('No bookings yet.')}</p>`;
   el.innerHTML = `${warn ? `<p class="apb-warn" role="note">${esc(warn)}</p>` : ''}
     <label class="mmain apb-onrow"><span class="swc"><input type="checkbox" id="apb-on" ${p.enabled ? 'checked' : ''} ${warn && !p.enabled ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span></span>
       <span><b>${tr('Clients can book appointments')}</b>${APB.types.length ? '' : `<small class="muted">${tr('A public page without sign-in: free times come from your calendars, every booking is confirmed by e-mail.')}</small>`}</span></label>
@@ -69,8 +75,23 @@ function apbDraw() {
     <div class="apb-save"><button class="btn pri" data-apb="save">${tr('Save')}</button></div>
     <h4>${tr('Appointment types')}</h4>${types}
     <div class="apb-save"><button class="btn" data-apb="newtype">${ic('plus', 's')} ${tr('New appointment type')}</button></div>
-    <h4>${tr('Bookings')}</h4>${books}`;
+    <h4>${tr('Bookings')}</h4>
+    <div class="apb-bsearch"><input id="apb-q" type="search" maxlength="200" autocomplete="off" spellcheck="false" value="${esc(APB.q)}" placeholder="${esc(tr('Search by name or e-mail'))}" aria-label="${esc(tr('Search by name or e-mail'))}"></div>
+    <div class="apb-bwrap">${apbBooksHtml()}</div>`;
 }
+// the coming bookings, or with a search the hits over all bookings (newest first); confirmed / cancelled ones can be deleted
+function apbBooksHtml() {
+  const now = Date.now(), found = APB.found;
+  const bk = found || APB.bookings.filter(b => new Date(b.end).getTime() >= now).slice(0, 100);
+  if (!bk.length) return `<p class="muted">${found ? tr('No booking found.') : tr('No bookings yet.')}</p>`;
+  return `<ul class="apb-list apb-books">${bk.map(b => { const past = new Date(b.end).getTime() < now; return `<li class="${b.status}${past ? ' past' : ''}" data-apbbk="${b.id}"><div class="apb-main"><b>${esc(apbWhen(b.start))}</b>
+      <span>${esc(b.type_name || '')} · ${esc(b.name)}</span><span class="muted">${esc(b.email)}${b.phone ? ' · ' + esc(b.phone) : ''}</span>
+      ${b.status !== 'confirmed' ? `<span class="apb-st">${esc(b.status === 'pending' ? tr('Waiting for the client to confirm') : b.cancelled_by === 'guest' ? tr('Cancelled by the client') : tr('Cancelled'))}</span>` : ''}</div>
+      ${!past && (b.status === 'confirmed' || b.status === 'pending') ? `<button class="btn sm" data-apbcancel="${b.id}">${tr('Call off…')}</button>` : ''}
+      ${b.status === 'confirmed' || b.status === 'cancelled' ? `<button class="iconbtn" data-apbrm="${b.id}" aria-label="${esc(tr('Delete {0}', b.name))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>` : ''}</li>`; }).join('')}</ul>`
+    + (found && APB.more ? `<p class="muted">${esc(tr('Only the {0} newest hits are shown.', found.length))}</p>` : '');
+}
+function apbDrawBooks() { const w = APB.md && $('.apb-bwrap', APB.md); if (w) w.innerHTML = apbBooksHtml(); }
 const apbTypeSub = t => [tr('{0} min', t.duration_min), t.buffer_min ? tr('{0} min buffer', t.buffer_min) : '', t.location, t.active ? '' : tr('inactive')].filter(Boolean).join(' · ');
 
 function apbRead() {
@@ -130,8 +151,11 @@ async function apbClick(e) {
   if (t) { apbTypeDlg(APB.types.find(x => x.id === +t.dataset.apbtype)); return; }
   const d = e.target.closest('[data-apbdel]');
   if (d) { apbTypeDelete(APB.types.find(x => x.id === +d.dataset.apbdel)); return; }
+  const apbBk = id => (APB.found || []).find(x => x.id === id) || APB.bookings.find(x => x.id === id);
   const c = e.target.closest('[data-apbcancel]');
-  if (c) apbCancel(APB.bookings.find(x => x.id === +c.dataset.apbcancel));
+  if (c) { apbCancel(apbBk(+c.dataset.apbcancel)); return; }
+  const rm = e.target.closest('[data-apbrm]');
+  if (rm) apbDelete(apbBk(+rm.dataset.apbrm));
 }
 
 // ---- appointment types
@@ -189,5 +213,20 @@ async function apbCancel(b) {
   if (reason === null || reason === undefined) return;
   try { await api('POST', `/api/appt/bookings/${b.id}/cancel`, {reason: reason || ''}); } catch { return; }
   toast(tr('Appointment cancelled'));
+  apbReload();
+}
+
+// 2.540.0 (#4349): the person deletes a confirmed or cancelled booking for good (deletion requests); the event, the contact and
+// the lead stay, the client gets no e-mail -- the dialog says so, there is no Undo
+async function apbDelete(b) {
+  if (!b) return;
+  const coming = b.status === 'confirmed' && new Date(b.end).getTime() >= Date.now();
+  const ok = await askConfirm(tr('Delete the booking of {0}?', b.name),
+    tr('The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.')
+    + (coming ? ' ' + tr('The appointment is still coming up: the client\'s cancel link stops working. Call it off first if it should not take place.') : ''),
+    {ok: tr('Delete'), cancel: tr('Back'), danger: true});
+  if (!ok) return;
+  try { await api('DELETE', `/api/appt/bookings/${b.id}`); } catch { return; }
+  toast(tr('Booking deleted'));
   apbReload();
 }

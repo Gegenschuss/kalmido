@@ -16230,5 +16230,12 @@
   "Entertainment (30 % not deductible)": "Bewirtung (30 % nicht abziehbar)",
   "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Bewirtung: {0} (30 %) sind nicht abziehbar und stehen nicht in den Ausgaben.",
   "Date by": "Datum nach",
-  "Recently chosen": "Zuletzt gewählt"
+  "Recently chosen": "Zuletzt gewählt",
+  "Search by name or e-mail": "Nach Name oder E-Mail suchen",
+  "No booking found.": "Keine Buchung gefunden.",
+  "Only the {0} newest hits are shown.": "Es werden nur die {0} neuesten Treffer gezeigt.",
+  "Delete the booking of {0}?": "Buchung von {0} löschen?",
+  "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "Die Buchung mit Name, E-Mail und Nachricht wird endgültig gelöscht. Der Termin in deinem Kalender, der Kontakt und der Lead bleiben, wie sie sind. Die Person bekommt keine E-Mail.",
+  "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "Der Termin steht noch bevor: Der Absage-Link der Person funktioniert danach nicht mehr. Sag ihn zuerst ab, wenn er nicht stattfinden soll.",
+  "Only confirmed or cancelled bookings can be deleted": "Nur bestätigte oder abgesagte Buchungen lassen sich löschen"
 }

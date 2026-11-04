@@ -16231,5 +16231,12 @@
   "Entertainment (30 % not deductible)": "Rappresentanza (30 % non deducibile)",
   "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Rappresentanza: {0} (30 %) non sono deducibili e non figurano tra le spese.",
   "Date by": "Data secondo",
-  "Recently chosen": "Scelti di recente"
+  "Recently chosen": "Scelti di recente",
+  "Search by name or e-mail": "Cerca per nome o e-mail",
+  "No booking found.": "Nessuna prenotazione trovata.",
+  "Only the {0} newest hits are shown.": "Vengono mostrati solo i {0} risultati più recenti.",
+  "Delete the booking of {0}?": "Eliminare la prenotazione di {0}?",
+  "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "La prenotazione con nome, e-mail e messaggio viene eliminata definitivamente. L'appuntamento nel tuo calendario, il contatto e il lead restano come sono. La persona non riceve alcuna e-mail.",
+  "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "L'appuntamento deve ancora avvenire: il link di disdetta della persona non funzionerà più. Disdicilo prima se non deve avere luogo.",
+  "Only confirmed or cancelled bookings can be deleted": "Si possono eliminare solo prenotazioni confermate o annullate"
 }

@@ -16230,5 +16230,12 @@
   "Entertainment (30 % not deductible)": "Representatie (30 % niet aftrekbaar)",
   "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Representatie: {0} (30 %) is niet aftrekbaar en staat niet bij de uitgaven.",
   "Date by": "Datum volgens",
-  "Recently chosen": "Onlangs gekozen"
+  "Recently chosen": "Onlangs gekozen",
+  "Search by name or e-mail": "Zoeken op naam of e-mail",
+  "No booking found.": "Geen boeking gevonden.",
+  "Only the {0} newest hits are shown.": "Alleen de {0} nieuwste resultaten worden getoond.",
+  "Delete the booking of {0}?": "Boeking van {0} verwijderen?",
+  "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "De boeking met naam, e-mail en bericht wordt definitief verwijderd. De afspraak in je agenda, het contact en de lead blijven zoals ze zijn. De persoon krijgt geen e-mail.",
+  "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "De afspraak moet nog plaatsvinden: de annuleringslink van de persoon werkt daarna niet meer. Zeg hem eerst af als hij niet moet doorgaan.",
+  "Only confirmed or cancelled bookings can be deleted": "Alleen bevestigde of geannuleerde boekingen kunnen worden verwijderd"
 }
