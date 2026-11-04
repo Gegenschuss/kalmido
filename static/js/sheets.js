@@ -71,6 +71,8 @@ async function shvLoad(id, force) {
   let changed = false;
   try {
     const sh = await rawFetch('GET', '/api/sheets/' + id);
+    // 2.517.0 (#3714): a load that comes back after the route moved on does not replace the sheet of the route
+    if (S.route.mod === 'sheets' && S.route.sh && S.route.sh !== id && SHV.sh?.id === S.route.sh) return;
     if (SHV.sh?.id !== id) { SHV.cur = SHV.anc = null; SHV.ed = null; }
     changed = !SHV.sh || SHV.sh.id !== id || SHV.sh.rev !== sh.rev || JSON.stringify(SHV.sh.presence || []) !== JSON.stringify(sh.presence || []) || shvKalSig(SHV.sh) !== shvKalSig(sh);
     shvPrep(sh); sh._v = S.v; SHV.sh = sh; SHV.err = ''; SHV.errFor = null;

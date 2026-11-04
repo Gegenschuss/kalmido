@@ -22,8 +22,11 @@ function shb_barHtml(sh) {
 async function shbReq(m, url, b) { return await rawFetch(m, url, b); }
 async function shbAfter(go) {  // reload the open sheet (its bar) and the overview (the number of sheets)
   for (const d of Object.values(SHV.idx)) d.v = -1;
-  if (go && go !== SHV.sh?.id) { shbOpen(go); return; }
-  if (SHV.sh) await shvLoad(SHV.sh.id, true);
+  // 2.517.0 (#3714): by the route, not by the drawn sheet - an Undo right after "+" came while the new sheet still loaded,
+  // reloaded the old sheet under the new route and the view stayed on the deleted sheet
+  if (go && !(S.route.mod === 'sheets' && S.route.sh === go)) { shbOpen(go); return; }
+  const id = go || SHV.sh?.id;
+  if (id) await shvLoad(id, true);
 }
 const shbTabs = () => SHV.sh?.tabs || [];
 const shbName = id => shbTabs().find(t => t.id === id)?.name || '';

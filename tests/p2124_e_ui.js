@@ -60,12 +60,27 @@ const FEAT = 'collab,comments,sheets';
   check(!m1.includes('Delete sheet') && m1.includes('Move right'), 'the first sheet: no delete ' + m1.join(' | '));
   w.eval('closePop()');
   // Undo of the new sheet: one step
+  // 2.517.0 (#3714): Undo waits for the step of the new sheet (was a fixed 300 ms pause)
+  let h0 = await w.eval('HIST.undo.length');
   d.querySelector('#view [data-shb="add"]')?.click();
   check(await until(async () => (await call('GET', `/api/sheets/${S.id}/tabs`)).tabs?.length === 3), 'a third sheet');
-  await sleep(300);
+  check(await until(() => w.eval('HIST.undo.length') > h0), 'the new sheet is an Undo step');
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', `/api/sheets/${S.id}/tabs`)).tabs?.length === 2), 'Undo: the third sheet is gone (one step)');
   check(await until(() => d.querySelectorAll('#view .shbtab').length === 2), 'the bar shows two sheets again');
+  // 2.517.0 (#3714): the flake under load - Undo came while the new sheet still loaded; the view stayed on the deleted sheet.
+  // Its load is held on purpose until the Undo is through.
+  check(await until(() => w.location.hash === '#sheets/' + S.id && d.querySelector('#view .shbtab.on')?.textContent.trim() === 'Sheet 1'), 'Undo opens the first sheet again ' + w.location.hash);
+  await w.eval(`window.__rf1 = rawFetch; window.__held = []; window.__hold = true; rawFetch = (m, u, b) => (window.__hold && m === 'GET' && /^\/api\/sheets\/\d+$/.test(u) && u !== '/api/sheets/${S.id}') ? new Promise(r => window.__held.push(r)).then(() => __rf1(m, u, b)) : __rf1(m, u, b)`);
+  h0 = await w.eval('HIST.undo.length');
+  d.querySelector('#view [data-shb="add"]')?.click();
+  const t4 = await until(async () => { const x = await call('GET', `/api/sheets/${S.id}/tabs`); return x.tabs?.length === 3 && x.tabs.find(t => t.id !== S.id && t.id !== t2)?.id; });
+  check(t4 && await until(() => w.location.hash === '#sheets/' + t4 && w.eval('window.__held.length') > 0 && w.eval('HIST.undo.length') > h0), '#3714: the new sheet is open and its load is held');
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => (await call('GET', `/api/sheets/${S.id}/tabs`)).tabs?.length === 2), '#3714: Undo while loading: the sheet is gone');
+  await w.eval(`window.__hold = false; window.__held.splice(0).forEach(r => r())`);
+  check(await until(() => w.location.hash === '#sheets/' + S.id && d.querySelectorAll('#view .shbtab').length === 2 && d.querySelector('#view .shbtab.on')?.textContent.trim() === 'Sheet 1'), '#3714: Undo while loading goes back to the first sheet with two sheets ' + w.location.hash);
+  await w.eval(`rawFetch = __rf1`);
   // the overview
   w.location.hash = 'sheets'; await sleep(300);
   check(await until(() => /2 sheets/.test(d.querySelector(`#view .shvcard[data-id="${S.id}"]`)?.textContent || '')), 'the overview: 2 sheets');
