@@ -14,11 +14,11 @@ Family, home & life, and reading (read later, feeds, bookmarks).
   Nextcloud, iCloud, Radicale, mailbox.org …) once a day: `BDAY`, `ANNIVERSARY` and Apple's anniversary dates become
   yearly tasks and follow changes; nothing is written back, the address and the password are stored encrypted (like a
   calendar subscription's), each date keeps the contact's UID so a change updates it instead of adding a second one, and
-  a birthday you deleted is not created again. Internal servers need the admin's allow-list (*Settings > Administration > Advanced*).
+  a birthday you deleted is not created again. Internal servers need the admin's allow-list (*Settings > Server > Server > Advanced*).
 - **Household chores that take turns**: in a repeating task of a shared project, *Take turns* in the task panel: pick who
   (people of the project, children too) and whether the next person comes after each completion or every week. The next
   person gets a push; Undo puts the turn back; *Whose turn* in the Family view.
-- **Children**: an admin makes an account a **child account** (*Settings > Users > Edit*) and picks its parents. A child
+- **Children**: an admin makes an account a **child account** (*Settings > Organisation > People*) and picks its parents. A child
   sees a simple view with big buttons: its own tasks only (in shared projects a child always takes part as a participant:
   only what is assigned to it, or where it comes along), its stars and the rewards. Each task it completes gives 1 star
   (or what the task says under *Stars for a child*); parents give stars by hand, set rewards (once or again and again),

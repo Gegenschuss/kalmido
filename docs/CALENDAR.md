@@ -89,8 +89,7 @@ five, never from https to http, to another host only for links without a passwor
 runs through the same check. XML from CalDAV servers with a DTD or entities is refused.
 
 **Your own server at home:** a Radicale, Nextcloud or other calendar server in your own network (a LAN or VPN
-address) is blocked by that guard until an admin allows its host: *Settings > Administration > Advanced > Allowed
-internal hosts* (`host` or `host:port`, comma-separated), or `KALMIDO_CALENDAR_ALLOW_HOSTS` in the environment. Only
+address) is blocked by that guard until an admin allows its host: *Settings > Server > Server > Advanced > Allowed internal hosts* (`host` or `host:port`, comma-separated), or `KALMIDO_CALENDAR_ALLOW_HOSTS` in the environment. Only
 list servers you trust: every user can then subscribe to calendars on them. `KALMIDO_CALENDARS=0` turns the whole
 feature off.
 

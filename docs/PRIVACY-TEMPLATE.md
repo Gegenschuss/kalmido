@@ -6,7 +6,7 @@ Kalmido server stores, how long, and which outside services it can talk to, so y
 the parts that apply to your server, replace every `<…>`, and check it against your contracts.
 
 Link the finished statement in the app: set `KALMIDO_PRIVACY_URL` / `KALMIDO_IMPRINT_URL` (see [ENV.md](ENV.md)) or the
-two fields under Settings > Administration > Server > Privacy and imprint. The links then show on the login page (also
+two fields under Settings > Server > Server > Privacy and imprint. The links then show on the login page (also
 before anyone signs in) and under Settings > Help. Empty = no link. For the optional built-in assistant there is a
 separate block: [PRIVACY-ASSISTANT-TEMPLATE.md](PRIVACY-ASSISTANT-TEMPLATE.md).
 
@@ -58,7 +58,7 @@ Kalmido's defaults (the operator can change them with the variables named; see [
 | Agent usage records / agent audit log | 400 / 90 days | `KALMIDO_USAGE_DAYS` / `KALMIDO_AUDIT_DAYS` |
 | Sessions | 1 day, or 30 days with "Stay logged in"; then a new sign-in | `AUTH_SESSION_DAYS` |
 | Account export / import archives | 24 hours | – |
-| Backups | every backup of the last 24 hours, one a day for 14 days, one a week for 8 weeks (at most 104 weeks, whatever is set; 52 with the retention switch) | Administration > Server > Backups |
+| Backups | every backup of the last 24 hours, one a day for 14 days, one a week for 8 weeks (at most 104 weeks, whatever is set; 52 with the retention switch) | Settings > Organisation > Data > Backups |
 | Safety backups (made before updates and restores) | 30 days | `KALMIDO_SAFETY_BACKUP_DAYS` |
 | Database copies made by `update.sh` / `update.ps1` (installer only; `data/backups/kalmido-*.dump`, **not encrypted**) | the last 10, however old they are | delete them by hand |
 | Journal of deleted accounts (salted hashes of user name and e-mail, no plain text) | until no backup can hold the account any more: older than 104 weeks and older than every backup on the server | `KALMIDO_PURGE_LOGS` |
@@ -95,7 +95,7 @@ The **server** connects to other services only for what follows. Keep the rows y
 | Push services of the browsers (Google `fcm.googleapis.com`, Mozilla `push.services.mozilla.com`, Apple `push.apple.com`, Microsoft `notify.windows.com`) | a person allows notifications on a device | the notification, encrypted end to end (RFC 8291); the service sees only that a message goes to a device | on (`KALMIDO_WEBPUSH`) |
 | ntfy (`NTFY_URL`, default `https://ntfy.sh`) | a person chooses ntfy for notifications or a share inbox (an own ntfy server also gets a message no device took on Web Push; the public ntfy.sh only with ntfy chosen) | title and text of the notification, **not encrypted** | off per person |
 | E-mail (`KALMIDO_SMTP_*`) | invitations, password links, reminders and notifications by e-mail | address, name, task or project titles in the text | only when configured |
-| GitHub (`api.github.com`) | update check for admins, a few times a day | the installed version and the server's address | on (`KALMIDO_UPDATE_CHECK`, switch in Administration) |
+| GitHub (`api.github.com`) | update check for admins, a few times a day | the installed version and the server's address | on (`KALMIDO_UPDATE_CHECK`, switch in Settings > Server > Server) |
 | Calendar subscriptions (ICS / CalDAV) and address books (CardDAV) | a person adds one | sign-in to that server, appointments / contacts to sync | per subscription |
 | Contact import (Google contacts) | a person imports contacts with photos | the photo addresses are fetched from Google's image server | per import |
 | Bookmarks, feeds, read later (Karakeep) | the module is on and a person saves a link / feed | the link is fetched for a preview / the articles | module off |
@@ -168,7 +168,7 @@ for access or erasure go to that controller:
 
 - **Reports:** the reporter sees every own report of the same space by signing in to the portal with the e-mail link,
   and can turn the mails off on the status page. In the app, people who may change the task see the name, the e-mail and
-  the status link in the task; the organisation's export (Settings > Organisation > Export the organisation) holds all
+  the status link in the task; the organisation's export (Settings > Organisation > Data > Export the organisation) holds all
   reports of the organisation. To erase a report, delete the task: the reporter's data goes with it when the trash is
   emptied (see section 3).
 - **Approvals:** the admins of the office (for an acceptance: the owner of the project) see the full record in the

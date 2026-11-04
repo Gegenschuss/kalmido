@@ -37,10 +37,10 @@ the app has not yet been tested by people who use a screen reader every day (see
   nearest tone. An open project takes its colour as the accent of its view and tasks show it as a thin edge on boards, in
   the calendar and in the collected views (the priority keeps its own marks); *Settings > Appearance > List colours only
   as a dot* turns accent and edges off. An organisation has a colour of its own (8 tones, set by its admins in
-  *Settings > Workspaces*): its lists show a stripe in the header and the sidebar and a frame around the input fields,
+  *Settings > Organisation > People*): its lists show a stripe in the header and the sidebar and a frame around the input fields,
   and the header's sign names the organisation in words; Private stays without colour. Moving a task or project from
   Private into an organisation says so in the message ("Will be visible to everyone in …", with Undo).
-- **Your own workspace colours (2.57.0).** In *Settings > Workspaces > Your colour per workspace* everybody picks a
+- **Your own workspace colours (2.57.0).** In *Settings > Organisation > People > Your colour per workspace* everybody picks a
   colour for Private and for each of their organisations from the same 12 tones, or *No color*; *Default* keeps the
   colour the organisation's admins chose. Only you see your choice, on every device. The shown workspace tints the
   sidebar lightly (also the phone drawer; never under *All workspaces*), the switch and its menu show a dot in front of

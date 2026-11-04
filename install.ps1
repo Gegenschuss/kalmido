@@ -464,9 +464,9 @@
   }
   Say "Folder:     $Dir (settings in .env, your data in data\)"
   Say "Server key: $Dir\secret\kalmido.key  (keep a copy somewhere safe, it is not part of the backups)"
-  Say 'Backups:    daily into data\backups\ (Settings > Users > Whole server > Backups); copy them to another disk too'
+  Say 'Backups:    daily into data\backups\ (Settings > Organisation > Data > Backups); copy them to another disk too'
   if ($script:Image) { Say "Image:      $($script:Image) (prebuilt)" } else { Say 'Image:      kalmido:local (built on this computer)' }
-  Say "Update:     powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"  (backs up the database first; admins also see new versions in Settings > Help)"
+  Say "Update:     powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"  (backs up the database first; admins also see new versions in Settings > Server > Server)"
   $prevFile = Join-Path $Dir '.kalmido-version.prev'
   if ($Update -and (Test-Path $prevFile)) {  # 2.359.2 (#2897)
     $prev = "$(Get-Content $prevFile -TotalCount 1)".Trim()

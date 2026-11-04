@@ -47,7 +47,7 @@ Proposals open in the same dialog as the proposals of agents (named "Assistant")
 
 ## Switch it on
 
-Settings > **Assistant** (the section only shows when the operator configured an assistant):
+Settings > **Agents** > **Assistant** (the section only shows when the operator configured an assistant):
 
 1. *Use the assistant*: on. The line below it says to which provider and host your texts go, and the model.
 2. *Projects the assistant may read*: tick the projects it may use. The basket is not in the project: basket items go only when
@@ -76,7 +76,7 @@ on your data) applies.
 
 Settings > Agents > *Built-in assistant* > *Log* (2.489.0: a tab of Agents, before its own section *Assistant*) lists every call: time, kind, status (done, error, took too long, refused, shortened) and
 duration. Texts are not kept, neither the question nor the answer. Admins see the number of calls and errors per day in
-Settings > Administration > Server.
+Settings > Server > Server.
 
 ## Built-in assistant or your own agent?
 

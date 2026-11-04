@@ -25,7 +25,7 @@ folder's owner connects it; the token stays sealed.
   (`KALMIDO_GIT_POLL`), with ETags (unchanged answers cost GitHub no rate limit), pauses when the rate limit runs low
   and backs off while a repository fails (up to an hour). So it works on a server that GitHub cannot reach (behind a
   VPN, in the office LAN). A background thread does it, a few repositories at a time: requests never wait on it.
-  Internal Git servers need the host on the admin allow-list (*Settings > Administration > Advanced*, or
+  Internal Git servers need the host on the admin allow-list (*Settings > Server > Server > Advanced*, or
   `KALMIDO_CALENDAR_ALLOW_HOSTS`), the same SSRF guard as calendar subscriptions.
 - **Matching** (tasks of the connected project only): `#123` (the task number, in the address `#t/123`) in a commit
   message, a pull request title or description, or a branch named `kalmido-123` (also `kalmido-123-…`), `task-123-…` or `123-…`.

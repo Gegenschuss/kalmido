@@ -228,7 +228,7 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   `[[link]]` to a page that is not shared shows as plain text, task numbers stay text. Optional *Valid until*; several links
   per page are possible (one per customer). *Turn off* ends a link at once; Undo brings the same link back. Unknown,
   expired and turned-off links all answer "Link not available". The pages are `noindex`, never cached, rate limited like
-  the public list links, and the server switch for public links (*Settings > Users > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
+  the public list links, and the server switch for public links (*Settings > Server > Server > Whole server*, `KALMIDO_PUBLIC_LINKS=0`)
   turns these off too. Only the SHA-256 of a token is looked up; the token itself is kept sealed so you can copy it again.
 - Renaming a page or a folder takes its shares along; a page in the trash is not shared (Undo brings it back), and a share
   of a page belongs to exactly that page (2.360.0): a new page of the same name is not shared by it; moving pages

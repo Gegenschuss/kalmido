@@ -270,7 +270,7 @@ The most used helpers:
 | `team/v1.py` | Clients, workload, approvals, forms: the REST API v1 (+ MCP) and its OpenAPI part. |
 | `accounts/signup.py` | Self-registration on the login page and sign-in links (QR) for people without e-mail. |
 | `admin/hosting.py` | Running Kalmido for others (2.24.0): storage quota per person, the notice / maintenance banner, daily e-mail limits, the "agent joined" notice, `KALMIDO_HOSTED`. |
-| `admin/clientip.py` | 2.33.0 (#834): does the client's address arrive? Private sign-in addresses (14 days), the warning when many accounts sign in from one private address (log + Administration > Server), "Your IP". |
+| `admin/clientip.py` | 2.33.0 (#834): does the client's address arrive? Private sign-in addresses (14 days), the warning when many accounts sign in from one private address (log + Settings > Server > Server), "Your IP". |
 | `admin/supporter.py` | 2.74.0 (#338): the supporter licence (self-hosted only): Ed25519 keys checked offline, server / personal licence, the badge and the yearly admin hint; unlocks nothing. |
 | `startup.py` | Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git). |
 
@@ -338,7 +338,7 @@ registering the ones of its area.
 | `vlist.js` | Long lists (2.65.0): a view with more than 300 rows draws only the rows near the visible part (see below). |
 | `calendar.js` | Kanban, the calendar events' data and what other views show of the calendar. |
 | `swimlanes.js` | Kanban swimlanes (2.138.0): lanes by person, priority or a custom field, the drop into a lane. |
-| `calview.js` | 2.65.0 (#1823): the calendar views month / week / day and Settings > Calendars. Loaded on demand (module `calendar`). |
+| `calview.js` | 2.65.0 (#1823): the calendar views month / week / day and Settings > Integrations > Calendars. Loaded on demand (module `calendar`). |
 | `timeline.js` | The timeline (Gantt). |
 | `depchain.js` | The chain moving along: drag preview, the not-moved note, "Pull the chain in" (2.67.0). |
 | `roadmap.js` | The roadmap. |
@@ -353,7 +353,7 @@ registering the ones of its area.
 | `miniwin.js` | 2.39.1: a list in its own small browser window (double / middle click in the sidebar, list menu); the window (`/?mini=1#l/<id>`) shows only the list and keeps its UI state to itself. 2.43.0 (#1500): a task in its own window too (`/?mini=1#t/<id>`, middle click on the row, task menu, button in the task panel). 2.145.0 (#2424): an own window starts from the state of the open main window (BroadcastChannel `kalmido-mini-state`, same person only, serialised like the offline cache: ciphers of encrypted lists only, no keys), draws at once and fetches the full state behind it; no answer within 200 ms = the normal start. |
 | `chatwins.js` | 2.47.1 (#1720): several chats at once in the chat side panel, one above the other (agents, team chats, direct messages): Ctrl / Cmd + click or *Open in split window*, a divider between them, fold, close, reorder, remembered per device; one window holds the usual ids and state (`S.chat` / `S.tc`), the others are parked. Phones: a row of the open chats above the chat. |
 | `favorites.js` | 2.40.0: favourite lists (#1361): the star, the *Favourites* section of the sidebar, *Only favourites* and the favourites filter of views. |
-| `sideviews.js` | 2.156.0 D (#2186): saved views of the sidebar (`side_views` / `side_view`), loaded on demand (favtiles.js has the stand-ins): the view tiles apart from the favourites, "Others (N)" for what a view hides, folding inside a view only for now ("Update view"), the editor and the list in Settings > Sidebar. |
+| `sideviews.js` | 2.156.0 D (#2186): saved views of the sidebar (`side_views` / `side_view`), loaded on demand (favtiles.js has the stand-ins): the view tiles apart from the favourites, "Others (N)" for what a view hides, folding inside a view only for now ("Update view"), the editor and the list in Settings > Appearance > Sidebar. |
 | `favtiles.js` | 2.57.0 (#1798): favourites of every kind (lists, folders, views, areas, filters, tags, people, groups, agents) as icon tiles in the sidebar's fixed head: the star in the row menus, one order (`fav_items`), the tile menu (Move left / right) and dragging. 2.441.0 (#3592): the row moved into the head bar (`#kbar .fv2bar`, phones `#favrow`, page `#favorites`) and takes anything with an address (`fv2_hashKey`, `GET /api/favorites/targets`), with +N, dividers, an own look (`fav_meta`) and the workspace's dot. |
 | `mineorder.js` | 2.40.0: your own order of *My tasks* (#1344), kept per person on the server (`user_task_order`). |
 | `mdtitle.js` | 2.40.0: inline Markdown in task titles (`mdTitle`) and the plain text for attributes, tabs and notifications (`mdPlain`). |
@@ -398,7 +398,7 @@ registering the ones of its area.
 | `pinboard.js` | 2.43.0 (#1346): project page as a pinboard: a colour per block and notepads (Markdown) for everyone in the project. |
 | `lysets.js` | 2.55.0 (#1069, #1068): several saved arrangements per view (switch in the header, manage, save as; server `kalmido/accounts/layoutsets.py`, table `view_layouts`) and arrangements sent to people as templates (`view_layout_offers`, News item `lytpl`). |
 | `projtime.js` | 2.43.0 (#1434): tracked time of a project in a window (by person and task, period, CSV) and deleting all of its times with Undo. |
-| `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Tasks by e-mail. |
+| `dashboard.js` | News bundled per task, the view builder (2.32.0: blocks per view, "Customize", project page standard + own arrangement; server side `kalmido/accounts/layouts.py`), the start page (dashboard) and Settings > Integrations > Tasks by e-mail. |
 | `family.js` | The module "Family". |
 | `calevents.js` | Events (module "events"): the editor and popover, the agenda, creating in the week grid, calendars, the phone setup. |
 | `contacts.js` | Contacts (module "contacts"): the view, the editor, the card, import / export. Loaded on demand (2.53.0). |
@@ -609,7 +609,7 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | Module | Files | Opens with |
 |---|---|---|
 | `agentchat` | `agentchat.js`, `agentsetup.js` | the agent chat, Settings (needs `integrations`) |
-| `calendar` | `calview.js` (month / week / day, Settings > Calendars), `caldrag.js`, `calgest.js` (swipe / pinch, 2.164.0; sideways pinch = 1 to 14 days, 2.290.0) | the calendar view, Settings |
+| `calendar` | `calview.js` (month / week / day, Settings > Integrations > Calendars), `caldrag.js`, `calgest.js` (swipe / pinch, 2.164.0; sideways pinch = 1 to 14 days, 2.290.0) | the calendar view, Settings |
 | `stats` | `stats.js` (the statistics view; the charts stay in `templates.js`) | the statistics view |
 | `wiki`, `mindmap` | `wiki.js`, `mindmap.js` | knowledge pages (need `mindmap`), a list as mind map, a task's "Mentioned in" |
 | `diagram` | `diagram.js` (2.382.0, #3153: formulas with `static/vendor/katex`, Mermaid diagrams with `static/vendor/mermaid`, each library only for its kind of block) | a knowledge page with a formula / diagram (`wiki.js` `wk_dgNeed`), a shared page with one |

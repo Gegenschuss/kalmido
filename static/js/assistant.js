@@ -104,7 +104,7 @@ function asst_extract(tid, b) {  // target = the task's list when shared, else o
   const t = taskById(tid), own = t && asst_shared(t.list_id) ? t.list_id : null;
   if (own) { asst_go({kind: 'extract', task_id: tid, list_id: own}, b); return; }
   const ls = (S.assistant?.list_ids || []).map(listById).filter(asst_canList);
-  if (!ls.length) { toast(tr('Share a project with the assistant first: Settings > Assistant')); return; }
+  if (!ls.length) { toast(tr('Share a project with the assistant first: Settings > Agents > Assistant')); return; }
   if (ls.length === 1) { asst_go({kind: 'extract', task_id: tid, list_id: ls[0].id}, b); return; }
   menu(b, [{head: tr('New tasks go to')}, ...ls.map(l => ({label: l.name, lic: l, fn: () => asst_go({kind: 'extract', task_id: tid, list_id: l.id}, b)}))], null, null, tr('Extract tasks'));
 }

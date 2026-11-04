@@ -5,7 +5,7 @@ every other language is one JSON file in [`static/i18n/`](static/i18n/). German
 ([`de.json`](static/i18n/de.json)) is the reference translation; French, Spanish, Italian and Dutch (2.11.0) are
 machine-translated and marked beta (`"beta": true` in `_meta`): reviews and fixes by native speakers are welcome, see
 [CONTRIBUTING.md](CONTRIBUTING.md#translations). Adding a language needs no code changes:
-drop in a file and it shows up under *Settings > Language*.
+drop in a file and it shows up under *Settings > General > Language*.
 
 ## Add a language
 
@@ -27,7 +27,7 @@ drop in a file and it shows up under *Settings > Language*.
 
    It must report `100%`, no missing keys, no errors and no unused keys (exit code 0). `python3 tests/i18n_test.py`
    checks every language at once (keys, unused keys, placeholders, plurals, HTML tags, `_meta`).
-5. Rebuild and run (`docker compose up -d --build`), open *Settings > Language* and pick your language.
+5. Rebuild and run (`docker compose up -d --build`), open *Settings > General > Language* and pick your language.
    Click through the views (today, calendar, matrix, habits, focus, settings, a task's detail panel) and
    check that nothing is cut off or reads oddly.
 6. Open a pull request with the new file. Mention anything you were unsure about.

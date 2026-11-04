@@ -17,7 +17,7 @@ https://<your Kalmido address>/api/auth/oidc/callback
 
 It is built from `PUBLIC_URL`, so set that first.
 
-You can set the provider up in **Settings › Administration › Sign-in › Set up the provider**, or with environment variables. The two can be mixed: a variable that is set **always wins** for its field, and the settings show that field locked. The client secret entered in the settings is stored encrypted with `KALMIDO_SECRET_KEY` (32 random bytes, base64). Without that key, the secret can only come from the environment.
+You can set the provider up in **Settings › Server › Sign-in › Set up the provider**, or with environment variables. The two can be mixed: a variable that is set **always wins** for its field, and the settings show that field locked. The client secret entered in the settings is stored encrypted with `KALMIDO_SECRET_KEY` (32 random bytes, base64). Without that key, the secret can only come from the environment.
 
 | Setting | Variable | Default | Meaning |
 | --- | --- | --- | --- |
@@ -31,7 +31,7 @@ You can set the provider up in **Settings › Administration › Sign-in › Set
 | Admin group | `KALMIDO_OIDC_ADMIN_GROUP` | – | Members become admins; leaving the group removes admin rights. |
 | Admin e-mail domains | `KALMIDO_OIDC_ADMIN_DOMAINS` | – | Comma-separated. A **verified** e-mail of one of these domains makes the person an admin, like the admin group, and it works together with the group. |
 | Button label | `KALMIDO_OIDC_BUTTON_LABEL` | `OpenID Connect` | The text on the login button. |
-| – | `KALMIDO_OIDC_ALLOW_HOSTS` | – | Internal provider hosts (`host` or `host:port`). Kalmido only talks to public addresses unless a host is listed here, or in the internal hosts of the calendar subscriptions (Settings › Administration). |
+| – | `KALMIDO_OIDC_ALLOW_HOSTS` | – | Internal provider hosts (`host` or `host:port`). Kalmido only talks to public addresses unless a host is listed here, or in the internal hosts of the calendar subscriptions (Settings › Server › Server › Advanced). |
 
 **Admin rights.** When an admin group or admin domains are set up, each OIDC login sets the admin flag: admin if either rule matches, otherwise not. The last active admin is never demoted.
 
@@ -49,9 +49,9 @@ password: 403 with `password_needed` until the request carries `{"password": ...
 
 - An account linked to the provider's subject (`issuer|sub`) logs in directly.
 - Otherwise the **first** login links one existing account not linked yet: the one whose user name equals the user name claim, or else the one whose e-mail equals the **verified** e-mail claim (`email_verified: true`; for Microsoft Entra also `xms_edov`). The user name goes first: when it matches an account that may not be linked (next point), the login is refused and the e-mail is not tried. Accounts are never linked any other way.
-- 2.79.0: a match by **user name** links only when the account's e-mail equals the provider's verified e-mail too (a provider where people choose their own user name cannot take over a local account), or when the account was made for single sign-on (no password and no e-mail, as created under *Administration > Users > New user*). **Admins**, accounts with a **second factor** (authenticator app, passkey) and child accounts are never linked by such a match: log in with the password first, then press the provider's button once **in the same browser** - the open session links the account. The login page shows "This account is not linked to the sign-in provider yet ..." in these cases. With `KALMIDO_HOSTED=1` every first link goes this way, from the account's own open session. Accounts already linked are not affected.
+- 2.79.0: a match by **user name** links only when the account's e-mail equals the provider's verified e-mail too (a provider where people choose their own user name cannot take over a local account), or when the account was made for single sign-on (no password and no e-mail, as created under *Settings > Organisation > People > New user*). **Admins**, accounts with a **second factor** (authenticator app, passkey) and child accounts are never linked by such a match: log in with the password first, then press the provider's button once **in the same browser** - the open session links the account. The login page shows "This account is not linked to the sign-in provider yet ..." in these cases. With `KALMIDO_HOSTED=1` every first link goes this way, from the account's own open session. Accounts already linked are not affected.
 - Nobody matches: "no account". The exception is when **Create accounts on the first OIDC sign-in** is on, in which case the person gets a new account. When the user name claim is not a valid Kalmido user name (Google sends none, Entra sends `anna@corp.example`), the new account is named after the local part of the verified e-mail. That name is used only for creating, never for matching an existing account. A name that is already taken, or no usable name at all, refuses the sign-in: no number is added.
-- Unlink an account under Settings › Administration › Users › edit. The next login links it again by the rules above.
+- Unlink an account under Settings › Organisation › People › edit. The next login links it again by the rules above.
 
 Calendar apps (CalDAV) do not use OIDC: every person creates an app password (see [CALDAV.md](CALDAV.md)).
 
@@ -163,7 +163,7 @@ PocketID logs in with passkeys only, so Kalmido accounts that use it need no pas
 
 ## Troubleshooting
 
-- **"The sign-in with the provider failed"**: the reason is under Settings › Administration › Sign-in ("Last problem with the provider") and in the container log. Common causes:
+- **"The sign-in with the provider failed"**: the reason is under Settings › Server › Sign-in ("Last problem with the provider") and in the container log. Common causes:
   - The issuer differs from the one in the provider's discovery document (a trailing slash does not matter).
   - The provider signs with HS256 (Authentik without a signing key).
   - An internal provider is not on the allow-list (`KALMIDO_OIDC_ALLOW_HOSTS`).

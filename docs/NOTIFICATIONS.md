@@ -67,7 +67,7 @@ Things that need an admin's eye go to the admins over their own notification cha
 the alerts on their subscribed devices, and none at all until they subscribe a device under *Settings > Notifications*
 (the alerts are then only listed in the settings); the channels *ntfy* / *Both* send them to the admin's own topic. With
 your own ntfy server (`NTFY_URL` elsewhere) each admin's own topic gets them whatever channel they use, as before.
-*Settings > Administration > Whole server > Admin alerts* shows where they go per admin and can set one shared admin
+*Settings > Server > Log & errors > Admin alerts* shows where they go per admin and can set one shared admin
 topic instead (or `KALMIDO_ADMIN_TOPIC` fixes it), the priority (default *High*, 4) and *Send test alert* (labelled
 "Kalmido test alert").
 Regular users never get them. Each alert comes in the admin's language.

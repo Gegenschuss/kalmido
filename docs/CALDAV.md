@@ -187,7 +187,7 @@ stay; read-only address books keep theirs). Each change is one undo step; the ph
 
 ## Writing into subscribed calendars
 
-Calendars of other services that you subscribed to under **Settings › Calendars** are read-only at first. For a
+Calendars of other services that you subscribed to under **Settings › Integrations › Calendars** are read-only at first. For a
 calendar added as a **CalDAV account** (iCloud, Nextcloud, Fastmail, mailbox.org, Radicale, Baïkal …) you can switch on
 **Allow writing** in its edit window (pencil next to the calendar):
 

@@ -202,7 +202,7 @@ right-click on a point: *Hide from menu*), on a phone the pen on top of the menu
 **Settings > Navigation**. Each row has a Minus (hide) and a grip (drag; on the grip the arrow keys move it), hidden
 points stay under **Hidden** with a Plus. Hiding only takes a point out of the menu: its data, function and rights stay
 and the search still finds it. The arrangement is the person's and the same on phone and computer (user setting
-`nav_menus`). In an organisation its admins switch menu points off for every member (Settings > Workspaces >
+`nav_menus`). In an organisation its admins switch menu points off for every member (Settings > Organisation > People >
 *Menu points in this organisation*, `orgs.nav_off`); those are not in any member's menu there, not even under Hidden.
 Without an organisation the person is the own admin and arranges everything.
 
@@ -235,7 +235,7 @@ the office groups; receipts keep the receipts lock and stay in place while their
 *Since 2.113.*
 
 Office & finance > Settings > General shows its fields in six **areas**, with the same strip of tabs as
-Settings > Administration: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
+Settings > Company & office: **Company** (company data, logo, brand colour, master data file), **Documents** (documents,
 invoices, invoice from parts, closing texts, calculation rules, default texts), **Packs** (country pack, packs list),
 **Functions** (the functions of the country pack, 2.147, see below), **Data** (DATEV inbox and booking export, legacy import, moving a personal office into an organisation) and **Access**
 (agents' read access, access log). Only one area is shown; the last one chosen is remembered on the device. On a phone the
@@ -293,7 +293,7 @@ person may open is in the menu or under **Hidden** of the menu's editor (2.418.0
 **Choosing the country.** A new office area (no saved settings, no documents) shows its admin the question *Where is your
 office?* on top of the office, with a suggestion (the company's country when a pack exists for it, otherwise the
 international base pack; without a company country the language: German -> `DE`). Offices from before never see it and
-stay `DE`. **Changing** the country under Settings > Packs asks first and says what changes (`GET /api/office/pack-switch?code=XX`:
+stay `DE`. **Changing** the country under Settings > Company & office > Packs asks first and says what changes (`GET /api/office/pack-switch?code=XX`:
 hidden / new functions, open documents recalculated with the new rates and texts, finalised documents that keep their
 state). `DE -> XX -> DE` loses nothing.
 
@@ -551,7 +551,7 @@ operator of the server names in `KALMIDO_PACKS_CATALOG`; without it the list sho
 
 ## Import and export of master data
 
-Settings > Office & finance > "Export" downloads one JSON file with the settings and all master data (no documents, no
+Settings > Company & office > Data > "Export" downloads one JSON file with the settings and all master data (no documents, no
 logo file, no client ids). "Import" (organisation admin) reads the same shape back - also a hand-written file, for
 example a service catalogue converted from a spreadsheet. The import is additive: rows are matched by name (services:
 `name_de`; equipment, sets, contracts: `name`; text blocks: `kind` + `key`) and existing ones are left alone unless
@@ -583,7 +583,7 @@ closing_en, rates {service_id: rate}, note, archived), `settings` (the keys of t
 
 *Since 2.39.1.*
 
-Settings > "Import legacy data" (organisation admins only) takes over what an office kept in a spreadsheet and old PDF
+Settings > Company & office > Data > "Import legacy data" (organisation admins only) takes over what an office kept in a spreadsheet and old PDF
 documents. It is a function of the app: the person uploads the files, sees a preview, corrects it and confirms. Nothing
 is guessed in the background and no language model is involved.
 
@@ -790,8 +790,7 @@ Since 2.141 a workspace can bring its **own mailbox** and Kalmido can **send** f
   Each field saves itself when it is left (while the set is incomplete the dialog says what is missing);
   *Check connection* logs in to both (nothing is sent) and says what failed - never with the server's own words. The
   passwords are stored encrypted with the server key and never shown again: an empty field keeps them, another server or
-  port needs them again. A server in the local network needs the admin's *Allowed internal hosts* (Settings >
-  Administration > Advanced, the same list as calendar subscriptions and webhooks).
+  port needs them again. A server in the local network needs the admin's *Allowed internal hosts* (Settings > Server > Server > Advanced, the same list as calendar subscriptions and webhooks).
 - **Receiving**: the mailbox is fetched with the server's mail round (`KALMIDO_IMAP_INTERVAL`, *Fetch now* in the dialog);
   each mail is marked as read and goes to the e-mail filing of **this workspace only**: a client's / project's address of
   the same workspace files there, an answer to a filed mail (In-Reply-To / References) joins that mail's client or project,
@@ -914,7 +913,7 @@ follow-up day; a day that has come is marked in the accent colour, the toolbar c
 Leads never count in the open sum, the weighted sum or the forecast. *Convert into a client* makes a client of the area
 from company / person / e-mail / phone (the person as its contact person) - or takes an existing client with the same
 e-mail or company name, which is offered - and moves the deal to *Inquiry*; the undo moves it back and removes a client
-made by the conversion as long as nothing else uses it. *Import CSV* (since 2.122.3 under Settings > Import legacy data) reads a file with columns such as name, company,
+made by the conversion as long as nothing else uses it. *Import CSV* (since 2.122.3 under Settings > Company & office > Data > Import legacy data) reads a file with columns such as name, company,
 e-mail, phone, source, next step, follow-up, note, value (German, English, Spanish, French, Italian and Dutch headers;
 at most 1000 rows): a preview first, then the rows without errors are taken over; e-mails already in the pipeline or
 earlier in the file are skipped as duplicates. An import is one undo step (its leads go into the bin). A confirmed
@@ -972,7 +971,7 @@ not part of the approval) with a line which version counts; everyone who may edi
 undo step takes it back, the office log records it. Freelancers without an organisation have the same in their personal
 office.
 
-**Import from Excel** (since 2.122.3 under Settings > Import legacy data, section "Fixed costs from a spreadsheet"): "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
+**Import from Excel** (since 2.122.3 under Settings > Company & office > Data > Import legacy data, section "Fixed costs from a spreadsheet"): "Download template" gives an .xlsx with the header row and three example rows. The first sheet is
 read below its header row: `Name`, `Betrag (netto)` (also `Betrag`, `netto`, `Amount (net)`), `fällig Monat` (also
 `Monat`, `Due month`); optional `Kategorie`, `USt`, `Wiederholung`. A row with a name but no amount is a group row: its
 name is the category of the rows below. Month 0 = monthly from 1 January 2026, 1-12 = yearly in that month (on the 1st);
@@ -1074,7 +1073,7 @@ in the suggestion line of the receipt. The document says "E-invoice" and offers 
 or one beyond the limits (5 MB, nesting, number of elements) stays an ordinary file.
 
 **Accounts per category (2.121):** with the DATEV export set up, a receipt's sheet shows under the category the account of the
-chart SKR03 or SKR04 (Settings → DATEV) it is booked on - the default the export finds for the category (e.g. Software 4964 /
+chart SKR03 or SKR04 (Settings → Company & office → Data) it is booked on - the default the export finds for the category (e.g. Software 4964 /
 6837), or your own. **Change account** sets your own account for this category (empty = the default again; one undo step); the
 DATEV batch and the lines of the income/expense statement use the same account.
 
@@ -2206,7 +2205,7 @@ lists the receipt categories with their default and own account and the travel a
 
 *Since 2.148.*
 
-Settings → DATEV → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
+Settings → Company & office → Data → **Read DATEV data** (admins; a personal office: its owner) takes a DATEV file the tax advisor sends
 (EXTF, Windows-1252 or UTF-8 with / without BOM, semicolons, CRLF; at most 10 MB and 20 000 rows). The columns are read by
 their names in line 2, not by position. A preview comes first (new / updated / skipped with the reason, the first 20
 rows); nothing is stored until **Take over**. Every import is a run with **Undo** (the toast, and the list on the import
@@ -2306,9 +2305,8 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 
 *Since 2.113.*
 
-*Settings > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per document language (de, en,
-nl, fr, es, it; 2.460) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes
-them (removing
+*Settings > Company & office > Company > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per language (German,
+English) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes them (removing
 is one undo step); members see and open them. Each file is stored once by its content (`terms-<lang>-<hash>.pdf` in the
 office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
 out with a quotation stays readable.
@@ -2349,7 +2347,7 @@ on for quotations). A document's answer carries `terms` (`{lang, date, sha256, n
 
 ## Company fields
 
-Settings > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
+Settings > Company & office > Company holds the company as single fields: name, street, postcode, city, country (ISO code), e-mail, phone,
 tax number, VAT ID, bank, IBAN (check digits are verified), BIC, register court, register number, managing directors
 (table `office_company`, key `company_fields` of `GET/PUT /api/office/settings`). The printed lines are made from them
 group by group (address, contact, register, bank and tax); the free lines of the settings stay as the fallback for a group
@@ -2418,7 +2416,7 @@ and per link, a form check value of its own) and *Approve* / *Request changes*; 
 
 *Since 2.120.0.*
 
-*Settings > Invoices > Show documents in the customer portal* (off by default) lets clients see their sent quotations,
+*Settings > Company & office > Data > Show documents in the client portal* (off by default) lets clients see their sent quotations,
 invoices with the payment state and credit notes in the customer portal; *Send portal link* in the client's menu mails them
 the sign-in link. Details: [TEAM.md](TEAM.md) *The customer portal*.
 
@@ -2563,9 +2561,8 @@ reference line and the signature picture are encrypted at rest in areas with enc
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
 what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
 PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
-minutes are written once. Read entries (open, preview, PDF, XML) are deleted after 90 days, all others stay.
-Organisation admins see the history of a document in its editor ("History") and the latest
-entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
+minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
+entries under Settings > Company & office > Access > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
 
 ## Letters and incoming documents: reference, history, deadlines
@@ -2697,7 +2694,7 @@ writer has no SVG renderer). The folder is part of the backups and restores like
 
 *Since 2.120.*
 
-Settings -> Letterhead takes a PDF that goes behind every quotation, invoice, credit note, reminder and every later
+Settings > Company & office > Company > Letterhead takes a PDF that goes behind every quotation, invoice, credit note, reminder and every later
 document kind: its page 1 behind the first page, its page 2 behind the following pages (a one-page PDF goes behind all
 of them). A portrait page of the office's paper size (A4 by default), up to 10 MB. The pages are copied into the
 document as they are (vector graphics, pictures and
@@ -2781,7 +2778,7 @@ address only), then `GET ...?t=<ticket>`; a `GET` without a ticket answers 403.
 
 New tables, all additive and keyed by `org_id` with `ON DELETE CASCADE`: `office_settings`, `office_services`,
 `office_equipment`, `office_sets`, `office_texts`, `office_contracts`, `office_numbers`, `office_docs`,
-`office_doc_items`. A backup (Settings > Administration > Backup) contains them; an older release runs on with them.
+`office_doc_items`. A backup (Settings > Organisation > Data > Backups) contains them; an older release runs on with them.
 Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`, `locked_by`, `sender`,
 `recipient_snapshot`, `tax_snapshot`, `pack_version`, `service_from`, `service_to` of `office_docs`, `org_id`,
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and

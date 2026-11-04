@@ -47,6 +47,24 @@ with tempfile.TemporaryDirectory() as d:
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_links.py"), bad], capture_output=True, text=True)
     check(r.returncode == 1 and "bad.md:3: code block is never closed" in r.stdout, "check_links.py reports a block open at the end: " + r.stdout)
 
+# 2.512.0 (#4175): the menu paths: green on the repository (docs, app texts, translations), red on the old menu, other apps' paths are no finding
+r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_menupaths.py"), "-v"], capture_output=True, text=True)
+check(r.returncode == 0, "check_menupaths.py is green on the repository: " + r.stdout[-600:])
+with tempfile.TemporaryDirectory() as d:
+    bad = os.path.join(d, "bad.md")
+    with open(bad, "w", encoding="utf-8") as f:
+        f.write("*Settings > Workspaces* and Settings > Administration > Agents, *Settings >\nUsers*, Administration > Server,\n"
+                "Settings > Server > Backups, *Users may create their own agents*.\n")
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_menupaths.py"), bad], capture_output=True, text=True)
+    for word in ("Settings > Workspaces", "Settings > Administration", "Settings > Users", "Administration > S", "Settings > Server > Backups", "Users may create"):
+        check(r.returncode == 1 and word in r.stdout, f"check_menupaths.py reports {word}: {r.stdout[-300:]}")
+    good = os.path.join(d, "good.md")
+    with open(good, "w", encoding="utf-8") as f:
+        f.write("*Settings > Organisation > People*, Settings > Server > Log & errors, *Settings > Modules* shows.\n"
+                "On the iPhone: Settings > Apps > Calendar. Mac: System Settings > Internet Accounts. Office > Settings > Packs.\n")
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_menupaths.py"), good], capture_output=True, text=True)
+    check(r.returncode == 0, f"check_menupaths.py passes today's menu and other apps' paths: {r.stdout[-300:]}")
+
 # the MCP server reports the app's version, not a fixed 2.21.0
 spec = importlib.util.spec_from_file_location("kalmido_mcp_f", os.path.join(ROOT, "mcp", "kalmido_mcp.py"))
 mod = importlib.util.module_from_spec(spec)

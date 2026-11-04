@@ -43,7 +43,7 @@ With one mailbox set up (`KALMIDO_MAIL_ADDRESS` + `KALMIDO_IMAP_*`, see *Configu
 address** for new tasks: Settings > Integrations > *Tasks by e-mail* (`tasks+<token>@example.com` lands in your basket,
 an address per project lands in that project while you may change it). The subject becomes the title, the text the
 description, attachments become files, "Fwd:" / "WG:" are dropped, the same message never twice. *New address* makes the
-old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Users) to the plain address go to your basket
+old one stop working. Optionally, mails from your own address (an admin stores it under Settings > Organisation > People) to the plain address go to your basket
 too (off by default: sender addresses can be forged). The mailbox must deliver plus addresses (`+…`) to it, which most
 providers do. With `KALMIDO_SMTP_*` the **daily summary** (Settings > Notifications, *Daily digest at*) also comes by
 e-mail: overdue, today, tomorrow, what waits for you and what is unread; *Send now* tries it.

@@ -152,9 +152,8 @@ if you edited them, tasks you added yourself stay, and so does their project.
 **Server key and backups (2.45.0).** Without `KALMIDO_SECRET_KEY` in `.env` the server creates its key on the first
 start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` always wins. It encrypts stored tokens
 and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
-data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Administration >
-Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
-`./data/backups`; *Settings > Users > Whole server > Backups*); copy that folder to another disk too. The backup page warns when the
+data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Settings > Server > Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
+`./data/backups`; *Settings > Organisation > Data > Backups*); copy that folder to another disk too. The backup page warns when the
 disk has room for fewer than three more archives; set a passphrase (see `docs/SELF-HOSTING.md`, "Disk space and passphrase").
 
 The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
@@ -260,19 +259,19 @@ Back up first (*Back up now*, see *Backups and restore*). The database migrates 
 `mkdir secret && sudo chown 1000 secret`. If `KALMIDO_SECRET_KEY` is already set in `.env`, it stays in charge and the folder
 stays empty. Otherwise the server creates a key once and from then on encrypts organisation data with it: keep a copy of
 `secret/kalmido.key` apart from the backups of `./data` - a backup without its key cannot be read
-(*Administration > Whole server* reminds you).
+(*Settings > Server > Server > Whole server* reminds you).
 
 **Update check:** every 6 hours the server asks the GitHub API for the latest release and compares it with its own
-version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
+version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Server > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
-no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:X.Y.Z` and its GitHub release appear after the CI of that version is green; the image `:latest` and the latest release follow after its device test.
+no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Server > Server > Whole server* or
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
 
 </details>
 
 ## Backups and restore
 
-*Settings > Administration > Whole server > Backups* (admins):
+*Settings > Organisation > Data > Backups* (admins):
 
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
   (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido

@@ -106,7 +106,7 @@ function umzImpHtml(j) {
   if (j.state === 'checking') return bar(0, 0, tr('Checking the file…'));
   if (j.state === 'preview') return umzPreviewHtml(j);
   if (j.state === 'key') return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${tr('Organisation export of {0}', esc(j.preview?.org || ''))}</b></div>
-    <div class="shint">${tr('The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Encryption).')}</div>
+    <div class="shint">${tr('The file is encrypted. Enter the recovery key of the organisation (on the old server: Settings > Organisation > Data > Encryption).')}</div>
     ${j.error ? `<div class="shint keep" role="alert">${ic('alert', 's')} ${esc(j.error)}</div>` : ''}
     <div class="row"><label for="s-umz-key">${tr('Recovery key')}</label><input id="s-umz-key" type="password" autocomplete="off" spellcheck="false" autocapitalize="characters"></div>
     <div class="row"><button type="button" class="btn sm pri" data-umz="key">${tr('Open')}</button><button type="button" class="btn sm" data-umz="cancel">${tr('Cancel')}</button></div></div>`;

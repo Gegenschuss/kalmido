@@ -108,11 +108,11 @@ already have data keep starting without a key as before (with the warning).
 The key must not live in the data folder: the in-app backups contain the data folder, and a backup that carries its
 own key protects nothing. A key file inside the data or backup folder is therefore refused (warning in the log and in
 the app). Keep a copy of the key apart from the backups (a password manager): backup + key restore everything, the
-backup alone does not reveal the encrypted data. Without any key *Administration > Server* shows a red warning, no
+backup alone does not reveal the encrypted data. Without any key *Settings > Server > Server* shows a red warning, no
 token can be stored and organisation data stays unencrypted.
 
 **An existing server without a key (#2510)** keeps starting, because a refusal would lock it out with an update:
-*Settings > Administration* shows the warning, and at every start the admins get an alert (none with
+*Settings > Server > Server* shows the warning, and at every start the admins get an alert (none with
 `KALMIDO_NO_SECRET_KEY=1`, which says you decided so). The image sets no key path of its own on purpose: a path inside the
 container would be gone with the container, so without Compose the way stays the volume at `/secret` described above.
 
@@ -147,7 +147,7 @@ before: give the folders to user 1000 once (`sudo chown -R 1000:1000 data secret
 
 Every server works the same way: each person has a private space, and organisations are shared workspaces with their own
 admins. A new server has no organisation; the first-run setup creates one when you give it a name (you become its admin),
-and an instance admin creates further ones under *Settings > Administration > Organisations*. Since 2.422 a person creates a
+and an instance admin creates further ones under *Settings > Organisation > People > Organisations*. Since 2.422 a person creates a
 company of her own too (the workspace menu > *Add an organisation*, `POST /api/orgs {name}`): she becomes its admin, at most
 3 such companies per person; their e-mail domains are set only by an instance admin, and they do not count as the server's
 organisations for open registration. Nobody joins an organisation by themselves: an admin picks it when adding a person, a registration joins one only through its e-mail domains (and only
@@ -157,25 +157,24 @@ once there is one, people see the members of their organisations and the people 
 reach anybody else by e-mail address.
 
 **Private accounts without an invitation (2.422).** A server with an organisation allows open registration ("Anyone with a
-confirmed e-mail address") only with the switch *Private accounts register without an invitation* (*Settings > Users >
-Registration on the login page*, `PATCH /api/admin/settings {signup_private}`, off by default, switching it on asks for the
+confirmed e-mail address") only with the switch *Private accounts register without an invitation* (*Settings > Server > Sign-in > Registration on the sign-in page*, `PATCH /api/admin/settings {signup_private}`, off by default, switching it on asks for the
 password). Such a registration is a private account: it never joins an organisation, not even by its e-mail domain; a
 company's admin invites the person. Switched off again, the mode falls back to off.
 
-**Activity per organisation (2.143).** Instance admins see under *Settings > Administration > Organisation* one table with, per
+**Activity per organisation (2.143).** Instance admins see under *Settings > Organisation > People > Organisations* one table with, per
 organisation, the members, the date of the last sign-in, the storage used, and the numbers of projects and tasks, plus a row
 "Without organisation" (the private spaces of people who belong to none). Numbers only: no people, no contents. The same data is
 `GET /api/v1/admin/orgs/activity` (scope `admin-read`).
 
 **Projects of the organisation (2.35, 2.56).** Organisation admins find the organisation's shared projects under *Settings >
-Organisation > Projects of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
+Organisation > People > Projects of the organisation*: names, owners and numbers, never the contents. They can archive, restore, delete
 from the archive and hand a project over to another member; since 2.56 also *Edit* its name, icon (emoji or picture) and
 colour, without needing a role in the project. That is all: tasks, sections, members and settings stay with the owner and the
 project's admins. Private projects are never shown or changed, agents cannot use these functions, every change lands in the
 dialog's history (old and new value) and the owner and the members get a News entry.
 
 **Inviting by e-mail (2.115).** An organisation's admin can invite somebody who has no account yet: *Settings >
-Organisation > Invite by e-mail* (address and role). Kalmido creates an account without a password (the user name is made
+Organisation > People > Invite people* (address and role). Kalmido creates an account without a password (the user name is made
 from the address) and mails the invitation link, valid for two weeks; the link goes to an organisation admin only by mail,
 an instance admin also gets it on the screen when no mail went. An address that already has an account is added as with
 *Add by e-mail address*. Since 2.453 a person with a new account joins like one with an existing account: by accepting the
@@ -183,7 +182,7 @@ invitation in their News (after choosing a password), in the chosen role, so the
 An instance admin still adds directly (on a hosted instance the operator invites, too). Open invitations are listed below
 with *Resend* (a new link and two more weeks, the old link stops working) and *Withdraw* (deletes the account, only while it
 never signed in and belongs to this organisation alone). Limits: 20 new invitations per inviting person and
-day, plus the daily mail budget. Instance admins switch it off under *Settings > Users > Registration on the login page*
+day, plus the daily mail budget. Instance admins switch it off under *Settings > Server > Sign-in > Registration on the sign-in page*
 (*Organisation admins may invite new people by e-mail*, on by default); adding existing accounts stays possible.
 
 **Active sessions (2.115).** *Settings > Account > Active sessions* lists every browser and app a person is signed in with:
@@ -263,13 +262,11 @@ services:
 
 Then set `KALMIDO_TRUSTED_PROXIES` to the address Kalmido sees the proxy at (see the table above) and nothing else.
 
-**Check it in the app (2.33).** *Administration > Server > Your IP* shows the address the server sees for your own
-request, and the proxy it came through (trusted or not). From outside your network it must be your public address, with
-the proxy's address under *Via proxy*, *trusted*. A private address like `172.18.0.1` there, and no *Via proxy*, means
-Kalmido does not believe the proxy: that address is the one to add. Kalmido also watches successful sign-ins: when several accounts (default 3,
+**Check it in the app (2.33).** *Settings > Server > Server > Your IP* shows the address the server sees for your own
+request, and the proxy it came through (trusted or not). From outside your network it must be your public address, not
+a private one like `172.18.0.1`. Kalmido also watches successful sign-ins: when several accounts (default 3,
 `KALMIDO_IP_WARN_ACCOUNTS`) sign in from exactly one private address within 7 days, it warns in the server log
-(`WARNING client addresses do not arrive ...`, at the start and when it first happens) and under *Administration >
-Server* ("Client addresses do not arrive - check the proxy"). Only private sign-in addresses are kept for this, for 14
+(`WARNING client addresses do not arrive ...`, at the start and when it first happens) and under *Settings > Server > Server* ("Client addresses do not arrive - check the proxy"). Only private sign-in addresses are kept for this, for 14
 days; public addresses are never stored. A small office or family behind one NAT address on the same LAN can trigger it
 too: then the warning is expected and harmless.
 
@@ -468,7 +465,7 @@ deleted from `docker-compose.yml`, which every update restored). Needs Docker Co
 
   Without that role row-level security cannot be enforced. With several organisations (or `KALMIDO_INSTANCE_MODE=workspaces`
   set) Kalmido then refuses to start (exit code 3, the log says what to do); with at most one it starts, but raises a
-  security alert on every start and shows a notice under *Settings > Users > Whole server > Admin alerts*.
+  security alert on every start and shows a notice under *Settings > Server > Log & errors > Admin alerts*.
 - **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
   server share it, which is fine (the policies depend on the session, not on the role).
 
@@ -478,7 +475,7 @@ deleted from `docker-compose.yml`, which every update restored). Needs Docker Co
 itself, in one transaction, and checks the result (row counts and checksums per table) before it commits. Plan a short
 maintenance window: the app is offline while it copies (seconds for a family instance, a few minutes for large ones).
 
-1. **Back up first.** In the app: *Back up now* (Settings > Users > Whole server > Backups) and copy the zip off the
+1. **Back up first.** In the app: *Back up now* (Settings > Organisation > Data > Backups) and copy the zip off the
    server. Then stop Kalmido and keep a plain copy of the database file:
 
    ```bash
@@ -619,15 +616,10 @@ docker compose up -d kalmido
   the passphrase was entered again).
 
 - **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
-  archive holds the database and the small files; attachments and office files from 64 KiB on (`KALMIDO_BACKUP_SHARED_MIN`)
-  lie once in the hidden folder `backups/.store`, however many archives refer to them (2.432.0). **An archive alone is
-  not complete:** without its shared files the larger attachments are missing. A complete file comes from *Download* or
-  from `bkstore.py assemble` (see [A copy of the backup folder elsewhere](#database-postgresql)); copy the folder only with
-  `.store`. With the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of
-  every restore, so plan the size of the attachments once plus roughly 22 times the database (the backup page shows the
-  size of each archive and the free space). A restore takes at most `KALMIDO_BACKUP_MAX_MB` (default 4096 MB, upload and
-  unpacked, shared files included) and refuses a larger backup with a message; set it higher on the restoring server.
-  On a small disk keep fewer of them (Settings > Administration > Whole server > Backups > *Keep*) or put the backup folder on another
+  archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
+  the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of every restore,
+  so plan roughly 22 times the size of one backup (the backup page shows the size of each archive and the free space).
+  On a small disk keep fewer of them (Settings > Organisation > Data > Backups > *Keep*) or put the backup folder on another
   disk with `KALMIDO_BACKUP_DIR`; the backup page warns once less than about three more archives fit. Without *Encrypt
   backups* the archives are plain zips: anyone who can read the backup folder (or a copy of it) reads every task, file and
   account. Set a passphrase (or `KALMIDO_BACKUP_PASSPHRASE`) as soon as the archives leave the server, and keep it
@@ -656,7 +648,7 @@ docker compose up -d kalmido
   example with clevis / tang), so a stolen disk alone is unreadable.
 - **Offsite backups by pull.** Let a second machine pull the backup folder **with `.store`** (the server cannot delete them), encrypt them
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
-- **Off-site target (2.143.0).** Settings > Administration > Server > *Off-site backup*: one target per server --
+- **Off-site target (2.143.0).** Settings > Server > Server > *Off-site backup*: one target per server --
   S3-compatible storage (endpoint, region, bucket, folder, access key and secret key; requests signed with Signature V4;
   path-style addresses by default, switch them off for `bucket.s3.example.com`), WebDAV (an `https://` address -- plain
   `http://` only to `localhost` --, user name, password) or
@@ -702,7 +694,7 @@ docker compose up -d kalmido
 Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
 the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
 last result of every run as numbers only (no content) with `GET /api/admin/retention` (instance admins), and in the server
-log (`retention: trash would delete (dry run): files=3, wiki=1`), and under Administration > Server > Deletion runs
+log (`retention: trash would delete (dry run): files=3, wiki=1`), and under Settings > Organisation > Data > Deletion runs
 (per kind: deletes or counts only, the number of the last pass, the switch).
 
 *Since 2.223.3:* `docker-compose.yml` passes `KALMIDO_RETENTION_PURGE` through (default `0`). The installer writes
@@ -786,7 +778,7 @@ Since 2.42 the server encrypts the sensitive data of every organisation **at res
 Nothing changes for the people: whoever may see a value or a file (also an agent through the API) sees it as before;
 only the database and the data folder hold ciphertext.
 
-At a glance (the same two lists as in Settings > Administration > Organisation, since 2.46.1):
+At a glance (the same two lists as in Settings > Organisation > People > Organisations, since 2.46.1):
 
 | Encrypted (with `KALMIDO_SECRET_KEY`) | Not encrypted |
 |---|---|
@@ -812,13 +804,13 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   from attachments (`textcache/`, at most 30 days) is sealed with a key derived from the master key.
 - **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
   stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
-  encrypted (everything as before); *Settings > Organisation > Encryption* says so.
+  encrypted (everything as before); *Settings > Organisation > Data > Encryption* says so.
 - **Existing data** is encrypted by a background pass five minutes after the start, so an update that fails its health check
-  is rolled back before anything changes (idempotent, in batches; the log says `orgcrypt: encrypted at rest: ...`). The instance admin can pause it (*Settings > Administration > Organisation >
+  is rolled back before anything changes (idempotent, in batches; the log says `orgcrypt: encrypted at rest: ...`). The instance admin can pause it (*Settings > Organisation > Data >
   Encrypt organisation data*): then new data is stored unencrypted, encrypted data stays readable.
 - **Keep the master key apart from the backups.** A backup contains the wrapped organisation keys but never
   `KALMIDO_SECRET_KEY`: backup + master key restore everything; a backup alone does not reveal the encrypted data.
-- **Recovery key.** An organisation's admins can show its recovery key in *Settings > Organisation > Encryption*
+- **Recovery key.** An organisation's admins can show its recovery key in *Settings > Organisation > Data > Encryption*
   (2.138: `R2-` and 13 groups of four characters). It is not the organisation's key itself but a separate secret that
   unlocks a copy of that key stored in the database, so it works with any master key. Showing it asks for a second
   step: the password and, when set up, the authenticator app code or the passkey; accounts without a password
@@ -1034,7 +1026,7 @@ offline tool that opens it; the keys exist only in the members' browsers.
 
 ## Organisation export
 
-Since 2.42 an admin of an organisation can export it as one encrypted archive: *Settings > Organisation > Export the
+Since 2.42 an admin of an organisation can export it as one encrypted archive: *Settings > Organisation > Data > Export the
 organisation*. The server builds it in the background (one at a time per organisation) and keeps the file for 24 hours
 in the data folder (`exports/`, not part of the backups); after that, or with *Delete now*, it is removed. Every export
 and download is written to the office log (who, when, size). Since 2.278 only the admin who started the export can
@@ -1085,7 +1077,7 @@ relies on the session).
   export, and projects encrypted in the browser are not taken over by the import. Locked folders of the file store:
   see "Moving locked folders of the file store" above.
 - **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
-  recovery key that was valid when the archive was made (*Settings > Organisation > Encryption*; the archive carries
+  recovery key that was valid when the archive was made (*Settings > Organisation > Data > Encryption*; the archive carries
   the copy of the key that this recovery key unlocks, a later *New recovery key* does not open it) and the tool `tools/kalmido_export_decrypt.py` from the
   repository (Python 3.8+ and the package `cryptography`):
 
@@ -1333,7 +1325,7 @@ A short checklist for a new server:
 
 *Since 2.489.0.*
 
-*Settings > Administration > Whole server > Allow public links* is the switch for every link without an account; below it
+*Settings > Server > Server > Whole server > Allow public links* is the switch for every link without an account; below it
 each kind can be switched off on its own: projects and folders, files, upload links, booking pages and polls, sign-off and
 signature, wiki pages, forms, the client portal and online payment. Off works like the main switch did for everything:
 no new link of that kind can be made (`409`), existing ones stop answering, nothing is deleted. The main switch off (or
@@ -1346,8 +1338,7 @@ a security alert. API (instance admins): `PATCH /api/admin/settings {"public_lin
 
 Uptime monitoring tells you when the app is down, not when someone got in while it keeps running. Two layers help.
 
-**In the app (2.36.2).** Kalmido reports security events through the admin alerts (*Settings > Users > Whole server >
-Admin alerts*, kind *Security events*, can be switched off like the other kinds; same cooldown and hourly cap):
+**In the app (2.36.2).** Kalmido reports security events through the admin alerts (*Settings > Server > Log & errors > Admin alerts*, kind *Security events*, can be switched off like the other kinds; same cooldown and hourly cap):
 
 - a new instance admin, however the flag was set (a role change, a new account, single sign-on group sync, a change in
   the database)
@@ -1393,7 +1384,7 @@ Trigger every alert once on purpose after setting it up, the dead man's switch t
 *Since 2.102.*
 
 An unexpected error in the web app (an unhandled script error or a rejected promise) can become a bug ticket, so it
-does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Administration > Server >
+does not vanish in a browser console nobody opens. Off until an admin picks a list: *Settings > Server > Server >
 Errors in the browser > Report to* offers the projects the admin manages that have **error reports** switched on
 (list dialog > Repository > Error reports). Switching error reports off in that list, or choosing *Off*, stops it at once;
 the browsers then send nothing.
@@ -1431,7 +1422,7 @@ the browsers then send nothing.
 - **Sender domain:** for the daily summary over SMTP, set up SPF, DKIM and DMARC for the sender domain, or the mails land
   in spam.
 - **Forgot your password? (2.49):** the login page shows the link only when outgoing mail (SMTP) is set up. A person
-  enters their e-mail address or user name and gets the same one-time link an admin can send (*Settings > Users >
+  enters their e-mail address or user name and gets the same one-time link an admin can send (*Settings > Organisation > People >
   Send a link to set a new password*): valid for 7 days, used once, only its hash is stored, built from `PUBLIC_URL`
   (never from the request's host). The page answers the same whether the account exists or not, at most one link per
   account in five minutes, rate limited per address and sender. Kid accounts, agents, disabled accounts and accounts
@@ -1473,7 +1464,7 @@ published). ClamAV needs **about 1 to 1.5 GB of RAM**; `freshclam` inside the co
   2.360.0: a locked document also shows no recognised text and leaves the search. The office's letterhead and terms go
   out with every document and have no later scan of their own: while the scanner cannot check them their upload is
   refused (503, "try again in a few minutes").
-  *Settings > Users > Whole server* shows the scanner's state and how many files wait or are locked.
+  *Settings > Server > Server > Whole server* shows the scanner's state and how many files wait or are locked.
 - Files encrypted in the browser (end-to-end) cannot be read by the server and are not scanned.
 - Independent of the scanner, the server looks at the first bytes of every upload: a program or HTML page that claims to be a
   picture or PDF is stored as a plain download (never shown inline).
@@ -1619,7 +1610,7 @@ Paperless-ngx…* and *Connect Paperless-ngx*.
   closed), only the upload of an export ZIP needs the window open; optionally *Bring in new documents automatically* every
   15 minutes up to once a day (only Paperless-ngx -> Kalmido).
 - **Network:** http/https only, timeouts, no redirects, at most `TASKS_MAX_FILE_MB` per file. An instance in the local
-  network is an internal address: allow its host under *Settings > Administration > Advanced* (or
+  network is an internal address: allow its host under *Settings > Server > Server > Advanced* (or
   `KALMIDO_CALENDAR_ALLOW_HOSTS=paperless.example.com:8000`), the same allow-list as for calendar subscriptions.
 - The token is always stored sealed with a key derived from `KALMIDO_SECRET_KEY` (also when the encryption of
   organisation data is off) and never shown again. Without a server key the connection cannot be set up.
@@ -1784,8 +1775,8 @@ itself never calls a language model or an outside service for this.
    120 MB; the container needs about 0.6 GB RAM, one CPU thread).
 2. Set `KALMIDO_EMBED_URL=http://embed:8090` in `.env` and restart Kalmido (`docker compose up -d`).
    A service on another host (https) is only used with `KALMIDO_EMBED_EXTERNAL=1`: task titles and descriptions then
-   leave this server, and *Administration > Server* names the host.
-3. *Settings > Administration > Server > Related tasks* shows whether the service answers, the model and how many tasks
+   leave this server, and *Settings > Server > Server* names the host.
+3. *Settings > Server > Server > Related tasks* shows whether the service answers, the model and how many tasks
    are computed. The first start computes every task in the background, throttled (a few minutes per thousand tasks on a
    small 4-core server); then only new or changed tasks.
 
@@ -1827,7 +1818,7 @@ and no server needs to trust another one.
   can be restored for 30 days; then its stored token is wiped and the account has to be connected anew.
 - **Network.** Every request goes through the same guard as calendar subscriptions: public addresses only, no
   redirects, every resolved address is checked (no DNS rebinding). A **self-hosted** server reaches internal servers only
-  when they are on the allow-list of internal hosts (*Settings > Administration > Advanced*, or
+  when they are on the allow-list of internal hosts (*Settings > Server > Server > Advanced*, or
   `KALMIDO_CALENDAR_ALLOW_HOSTS`), and uses `http://` only for those: the token never crosses the internet unencrypted. A **hosted** server (`KALMIDO_HOSTED=1`) connects to `https://` addresses only and
   never to an internal one.
 - **Agents** see nothing of it: there is no `/api/v1` route, no MCP tool and no event for it; an agent only ever works on
@@ -2109,7 +2100,7 @@ stay blocked until you allow them.
 - **A newer PostgreSQL (#2945).** `pg_dump` refuses a server of a newer major version, so `postgresql-client` has to move
   along with the server: the image carries version 17. Before every backup Kalmido compares the major versions of
   `pg_dump` and the server. Is `pg_dump` older, the backup stops with a clear message instead of failing later,
-  *Settings > Administration* names it and the admins get an alert. Upgrade the database server only together with a
+  *Settings > Server > Server* names it and the admins get an alert. Upgrade the database server only together with a
   Kalmido image that has the matching client (`postgresql-client-<major>` in the `Dockerfile`).
 - **Back to 2.147 or older after a DATEV import (2.188.0, #2498).** 2.148 added the DATEV import of the office area; its
   runs are kept in the import history for undo. Versions before 2.148 do not know these runs: their *Undo* of such a run
@@ -2148,7 +2139,7 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
   - `PUT /api/operator/notice`: `{level: "maintenance" | "info", text, minutes?}` sets the notice every client shows
     (for a planned maintenance); an empty `text` clears it. It sends no push.
   - `PUT /api/operator/quota-default`: `{storage_quota_mb}` sets the default storage per person in MB, as in Settings >
-    Administration (`null` = `KALMIDO_STORAGE_QUOTA_MB`, `0` = unlimited). *Since 2.485.*
+    Server > Server (`null` = `KALMIDO_STORAGE_QUOTA_MB`, `0` = unlimited). *Since 2.485.*
 - **One customer's account** (*since 2.485*). The same handles the instance's user management has, so a hoster can act
   on a support request without an account in the instance. The answers carry numbers and states only (account number,
   locked, server admin, created, last active day, number of organisations and own projects, storage used, own and
@@ -2174,7 +2165,7 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
 ### The instance admin on a hosted instance
 
 *Since 2.399.* On a server with `KALMIDO_HOSTED=1` the hoster's own accounts may still be instance admins (Settings >
-Administration), but they run the server, not the customers' organisations. Every instance-admin way into an organisation
+Server), but they run the server, not the customers' organisations. Every instance-admin way into an organisation
 the admin does not administer itself answers 403:
 
 - **Organisations:** no new organisation with somebody else as its admin (customers create theirs themselves, *New
@@ -2309,7 +2300,7 @@ Administration > Server says so. That is normal while you work through the SSH t
 **Built-in (default):** username and password (hashed with scrypt), an HttpOnly `SameSite=Lax` session cookie
 ("stay logged in" = 30 days), failed logins are rate-limited per user name and address (5), per address (20, which slows sign-ins down instead of refusing them; names known at that address for 30 days are not slowed down) and per user
 name from all addresses (100, against slow distributed guessing) within 15 minutes, so one attacker cannot lock a person out.
-*Administration > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
+*Settings > Server > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
 `172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
 Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
 default only loopback: [which address to add](#reverse-proxy-and-network)). Upgrading from the single-user
@@ -2317,7 +2308,7 @@ version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give
 `docker exec -it kalmido python app.py set-password admin`.
 
 **Single sign-on via your reverse proxy:** set `AUTH_PROXY_HEADER` (e.g. `Remote-User`) and
-`AUTH_TRUSTED_PROXIES`, then enter each person's proxy user name as *SSO login* in *Settings > Administration*. A logged-in
+`AUTH_TRUSTED_PROXIES`, then enter each person's proxy user name as *SSO login* in *Settings > Organisation > People*. A logged-in
 proxy user without an Kalmido account sees a "no account, ask the admin" page. Without the header (or from an
 untrusted address) Kalmido falls back to its own login page.
 
@@ -2367,10 +2358,10 @@ For accounts with a password (the built-in login). *Settings > Account > Two-fac
 - **Recovery codes:** 10 one-time codes, shown once when the first method is set up (copy / download). Only their
   SHA-256 is stored. *New codes* replaces them. Logging in with one tells the admins (admin alert).
 - Setting up a method needs the current password; turning the app off needs the password and a code; the first
-  method ends your other sessions. Lost phone and codes: an admin can *reset* two-factor in *Settings > Administration* (the
+  method ends your other sessions. Lost phone and codes: an admin can *reset* two-factor in *Settings > Organisation > People* (the
   user's sessions end).
 
-**Admin policy:** *Settings > Administration > Whole server > Require two-factor authentication for built-in logins*. Users
+**Admin policy:** *Settings > Server > Sign-in > Require two-factor authentication for built-in logins*. Users
 without a second factor must set one up at their next login (before they get a session); the last method cannot be
 removed while the policy is on. Logins through the proxy header or OIDC are not affected: two-factor is the job of
 your login proxy / identity provider there, and the account page says so. Wrong codes count against the same limits as
@@ -2379,7 +2370,7 @@ never reveal whether an account exists or has two-factor on.
 
 ### OpenID Connect (Authentik, Keycloak, Authelia, PocketID, Google, Microsoft Entra, ...)
 
-A *Log in with ...* button on the login page. Set it up in *Settings > Administration > Sign-in* (2.9.0: the client
+A *Log in with ...* button on the login page. Set it up in *Settings > Server > Sign-in* (2.9.0: the client
 secret is stored encrypted with `KALMIDO_SECRET_KEY`, *Check connection* tests the discovery; the sign-in is a draft until the check passed and it is switched on) or with environment
 variables; a variable that is set always wins for its field (the settings show it locked). Step-by-step guides per
 provider (redirect URI, scopes, group claims): [docs/OIDC.md](OIDC.md).
@@ -2417,7 +2408,7 @@ Register Kalmido at the provider as a confidential client with the redirect URI 
 ```
 
 **Accounts:** by default only users an admin created can log in. The first OIDC login links a user whose user name
-equals the username claim, or whose e-mail (optional field in *Settings > Administration*) equals the provider's **verified**
+equals the username claim, or whose e-mail (optional field in *Settings > Organisation > People*) equals the provider's **verified**
 e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
 needs the same verified e-mail as well (accounts made for SSO, without password and e-mail, link as before), and admins, accounts with a second factor and child accounts are linked only from
 their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
@@ -2430,7 +2421,7 @@ signature against the provider's JWKS (RSA, RSA-PSS, ECDSA, Ed25519; never `none
 fetched again for an unknown key id), `iss`, `aud`, `azp`, `exp`, `iat`, `nbf`, `nonce`. Extra claims come from the
 userinfo endpoint (only with the same `sub`). Every request to the provider goes through the same SSRF guard as the
 calendar subscriptions: public addresses and https only, unless the host is allowed (`KALMIDO_OIDC_ALLOW_HOSTS` or the
-internal hosts list under *Settings > Administration > Advanced*), which you need for a provider in your own network. The
+internal hosts list under *Settings > Server > Server > Advanced*), which you need for a provider in your own network. The
 client secret, codes and tokens are never logged or shown. Two-factor for OIDC logins is the provider's job.
 
 ## Reverse proxy
@@ -2498,8 +2489,8 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
-| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy on the host in front of Kalmido's published port arrives from the gateway of its Compose network, a proxy container in one network with Kalmido from its own address: [which address to add](#reverse-proxy-and-network). 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
-| `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Administration > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
+| `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Settings > Server > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared project or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |
 | `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
@@ -2526,7 +2517,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
 | `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |
 | `KALMIDO_ORG_NAME` | *(empty)* | the name of the organisation the first-run setup creates (else asked once in the setup); 2.46.0: never renames an existing one |
-| `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Administration > Server* |
+| `KALMIDO_STORAGE_QUOTA_MB` | `0` | 2.24.0: storage per person in MB (0 = unlimited); admins can change it in *Settings > Server > Server* |
 | `KALMIDO_UPLOAD_HOURLY_MB` | `1024` | Uploads per person and hour in MB (0 = off); above it a clear 429 message |
 | `KALMIDO_SUPPORT_EMAIL` | *(empty)* | 2.24.0: where *Contact support* writes to when storage is full (else the admin setting, else the first admin's address) |
 | `KALMIDO_HOSTED` | `0` | 2.24.0: `1` = a server run as a service for others: integrations only reach public HTTPS addresses |
@@ -2553,7 +2544,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `KALMIDO_TENANT_CHECK_HOUR` | `3` | 2.30.0 (#1036): hour of the nightly workspace boundary check (memberships across organisations / private; admin alert when the count changes) |
 | `KALMIDO_TIDY_QUIET_S` | `120` | 2.27.0: seconds a new task must be left alone before its agent gets the `tidy` event (and nobody may have it open in a field); `0` = at once |
 | `KALMIDO_AUDIT_DAYS` | `90` | 2.2.1: days the agents' activity log is kept (see *AI agents*); `0` = no log |
-| `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the project under *Settings > Administration > Advanced*) |
+| `KALMIDO_CALENDAR_ALLOW_HOSTS` | | Internal hosts calendar subscriptions may reach, comma list of `host` or `host:port` (in addition to the project under *Settings > Server > Server > Advanced*) |
 | `KALMIDO_CALENDAR_MAX_MB` | `10` | Largest calendar download (ICS file or CalDAV answer) in MB |
 | `KALMIDO_CALENDAR_MAX_EVENTS` | `5000` | Occurrences kept per calendar (the ones closest to today) |
 | `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per user within 15 minutes |
@@ -2563,7 +2554,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `KALMIDO_BACKUP_MAX_MB` | `4096` | Largest backup a restore accepts (upload size and unpacked total) |
 | `KALMIDO_WEBAUTHN_RP_ID` | host of the page | Passkeys: relying party ID, e.g. `example.com` to use passkeys on several subdomains |
 | `KALMIDO_WEBAUTHN_ORIGINS` | | Passkeys: extra origins (comma list, e.g. `https://tasks.example.net`) besides `PUBLIC_URL` |
-| `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on. 2.9.0: also settable in *Settings > Administration > Sign-in*; a set variable wins per field |
+| `KALMIDO_OIDC_ISSUER`, `KALMIDO_OIDC_CLIENT_ID`, `KALMIDO_OIDC_CLIENT_SECRET` | | OpenID Connect login (see *Login > OpenID Connect*); issuer + client id turn it on. 2.9.0: also settable in *Settings > Server > Sign-in*; a set variable wins per field |
 | `KALMIDO_OIDC_ADMIN_DOMAINS` | | Comma list of e-mail domains: a verified e-mail of one of them makes the person an admin (like `KALMIDO_OIDC_ADMIN_GROUP`) |
 | `KALMIDO_OIDC_SCOPES` | `openid profile email` | Scopes requested from the provider |
 | `KALMIDO_OIDC_USERNAME_CLAIM`, `KALMIDO_OIDC_GROUPS_CLAIM` | `preferred_username`, `groups` | Claims for the user name and the groups |
@@ -2582,4 +2573,4 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `KALMIDO_PUBLIC_BURST` | `300` | Views of one public link within 10 minutes that trigger an admin alert |
 | `KALMIDO_IMAGE` | `kalmido:local` | Image for `docker compose`; set `ghcr.io/gegenschuss/kalmido:<version>` to use the prebuilt one |
 
-Everything else (language, reminder defaults, digest time, pomodoro lengths, which modules are shown) is set per user in the app under *Settings*; the switches for the whole server (collaboration, time tracking, public links, update check, sign-in policy, OIDC, backups, admin alerts, allowed internal hosts) are under *Settings > Administration > Whole server*.
+Everything else (language, reminder defaults, digest time, pomodoro lengths, which modules are shown) is set per user in the app under *Settings*; the switches for the whole server (collaboration, time tracking, public links, update check, sign-in policy, OIDC, backups, admin alerts, allowed internal hosts) are under *Settings > Server > Server > Whole server*.

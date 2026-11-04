@@ -71,7 +71,7 @@ characters, the permissions, the expiry and when it was last used; its lock butt
 addresses later (`PATCH /api/me/tokens/{id}` `{scopes?, allowed_ips?, name?}`). Revoking works immediately. A disabled or deleted user's
 tokens stop working at once.
 
-An admin can **limit** what personal tokens and agents may get at all (Settings > Administration > Agents > Permission limit,
+An admin can **limit** what personal tokens and agents may get at all (Settings > Organisation > Agents > Permission limit,
 `PUT /api/admin/agent-policy` `{scope_limit: {agents?, tokens?}}`); a scope outside the limit stops counting at once for
 every token and comes back when it is allowed again. `GET /api/v1/me` shows `token.effective_scopes` (what counts now).
 
@@ -1040,7 +1040,7 @@ area** (private calendars, own files, the personal office, private projects); wh
 organisation's webhooks (below). A person without an organisation gets all of them from their own area.
 
 **Webhooks of an organisation (2.115.0).** Admins of an organisation add up to 10 webhooks under **Settings >
-Organisation > Webhooks** (`GET/POST /api/orgs/{id}/webhooks`, `PATCH/DELETE /api/orgs/{id}/webhooks/{wid}`, `.../secret`,
+Organisation > People > Webhooks** (`GET/POST /api/orgs/{id}/webhooks`, `PATCH/DELETE /api/orgs/{id}/webhooks/{wid}`, `.../secret`,
 `.../test`, `.../log`; members get 403). Same events, payloads, signature, retries and URL rules as a personal webhook,
 but for everything the organisation owns: its projects (as the admin who set it up sees them), calendars, files, office and
 the time booked on its projects -- **never** anything of a member's private area. The admin who set it up (or switched it on
@@ -1135,7 +1135,7 @@ a *Send test* button.
 **Which URLs are allowed.** Only `https://` to public addresses. Every address the host name resolves to is checked when
 connecting (so DNS tricks do not help): private networks (RFC 1918), loopback, link-local
 (169.254.x, cloud metadata), CGNAT (100.64.0.0/10, e.g. VPN overlays), IPv6 unique-local and similar are refused. Servers in your
-own network work once an admin lists them under *Settings > Administration > Advanced > Allowed internal hosts*, line
+own network work once an admin lists them under *Settings > Server > Server > Advanced > Allowed internal hosts*, line
 *Webhooks* (since 2.380 one line per service: a host allowed for calendars does not open webhooks; the update copied the
 former single list into every line) or in `KALMIDO_WEBHOOK_ALLOW_HOSTS`; only those may also use plain `http://`. The admin
 API: `PATCH /api/admin/settings {"allow_hosts_by_purpose": {"webhooks": "host, host:port"}}` (purposes `calendar`, `carddav`,
@@ -1714,10 +1714,10 @@ folder and file `recog_on` (own switch: `recog`), each document `doc: {state, re
 
 A scan inbox is a key with the one scope `docs:upload` ("Only upload documents"), bound to one place: a person's own
 documents or an organisation's, optionally one folder of it. People make and revoke it in Documents > Settings > *Scans from
-your computer* (web session only, never an agent); it shows in Settings > Access too (revocable there, its permissions
+your computer* (web session only, never an agent); it shows in Settings > Access > API tokens too (revocable there, its permissions
 cannot be changed). It counts against the 20 tokens per person. `docs:upload` is never offered for ordinary tokens
 (`POST /api/me/tokens` answers `400`) and never for agents (agents upload with `files:write`). An admin's limit for personal
-tokens (Administration > Agents) can untick it; a limit saved before 2.207 leaves it allowed. Rate limit, address
+tokens (Settings > Organisation > Agents) can untick it; a limit saved before 2.207 leaves it allowed. Rate limit, address
 restriction and audit are those of every token.
 
 The key has no `read` and reaches exactly two routes; every other route answers `403` ("This key may only upload documents"):

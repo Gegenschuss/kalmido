@@ -414,7 +414,7 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
-    ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
+    ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
     <h4 id="s-mcpr-h">${tr('Hosted MCP access')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-mcpr" ${S.about?.mcp_remote ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Apps may connect to agents with a sign-in (OAuth)')}</span></label></div>
     ${hint(tr('On: apps with an MCP connector connect to this server at /mcp; a signed-in person chooses one of their agents, and the app gets exactly its permissions (revocable under Settings > Agents). Off: /mcp and the sign-in addresses do not exist.'))}
@@ -603,7 +603,7 @@ const wsDataHtml = hint => `<h4 id="s-wsdata-h">${tr('Organisation data')}</h4>$
 function orgAgentsHtml(hint) {
   if (!S.api?.enabled) return '';
   return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
-    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.')} ${tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Workspaces), in the private area each person themselves.')}</small></span></label></div>`;
+    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.')} ${tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.')}</small></span></label></div>`;
 }
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
 function hostHtml(hint) {

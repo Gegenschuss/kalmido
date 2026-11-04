@@ -44,5 +44,5 @@ sites and read their new articles in one list. Switch it on under *Settings > Mo
 - Feeds are never visible to agents, neither private nor an organisation's (no REST API, no MCP tool). There are no
   notifications for new articles.
 - Privacy and safety: Kalmido loads no pictures and no scripts of the feeds (no tracking); only the text is kept. The
-  server only fetches public addresses (an admin can allow internal hosts under *Settings > Administration > Advanced*,
+  server only fetches public addresses (an admin can allow internal hosts under *Settings > Server > Server > Advanced*,
   like for calendar subscriptions), at most 2 MB per feed, and refuses feeds with a DTD.

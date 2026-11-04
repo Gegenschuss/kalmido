@@ -568,9 +568,9 @@ main() {
   address_note
   say "Folder:     $DIR (settings in .env, your data in data/)"
   say "Server key: $DIR/secret/kalmido.key  (keep a copy somewhere safe, it is not part of the backups)"
-  say "Backups:    daily into data/backups/ (Settings > Users > Whole server > Backups); copy them to another disk too"
+  say "Backups:    daily into data/backups/ (Settings > Organisation > Data > Backups); copy them to another disk too"
   if [ -n "$IMAGE" ]; then say "Image:      $IMAGE (prebuilt)"; else say "Image:      kalmido:local (built on this computer)"; fi
-  say "Update:     \"$DIR/update.sh\"  (backs up the database first; admins also see new versions in Settings > Help)"
+  say "Update:     \"$DIR/update.sh\"  (backs up the database first; admins also see new versions in Settings > Server > Server)"
   prev=$(head -n 1 "$DIR/.kalmido-version.prev" 2>/dev/null || true)  # 2.359.2 (#2897)
   if [ -n "$UPDATE" ] && [ -n "$prev" ] && [ "$prev" != "$VERSION" ]; then
     say "Previous:   $prev  (back to it: KALMIDO_VERSION=$prev \"$DIR/update.sh\"${DBCOPY:+; the database of before: $DBCOPY})"

@@ -127,8 +127,8 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 Besides the **team agents** an admin creates, people can run their **own personal agent** (for example Claude Code on
 their laptop). **Who allows it (2.361.4):** each workspace decides. In the private area the person is their own admin: a
 person without an organisation creates one without asking anybody. In an organisation its admins decide with the switch
-*Members may have their own agents* (*Settings > Workspaces*, the organisation's entry; `PATCH /api/orgs/{id}
-{"member_agents": true}`, off by default); its admins themselves always may. The server switch *Users may create their own
+*Members may have their own agents* (*Settings > Organisation > People*, the organisation's entry; `PATCH /api/orgs/{id}
+{"member_agents": true}`, off by default); its admins themselves always may. The server switch *People may create their own
 agents* (below) allows it for everyone in every workspace. A server without organisations has only the server switch.
 
 **Who is responsible (2.24.0):** a personal agent is connected by the person themselves, with their own AI provider, key
@@ -144,7 +144,7 @@ A bot without AI can be switched to plain *Agent* in its settings (*AI assistant
 goes out (an agent's letter draft, a public link to a wiki page it created or changed last) the app shows a quiet note once
 per document with *Insert label* ("Created with AI support"); nothing is blocked. Agents need not do anything for it.
 
-- **Admin policy**, *Settings > Organisation > Agents* (server admins): *Users may create their own agents* (off by default: then
+- **Admin policy**, *Settings > Organisation > Agents* (server admins): *People may create their own agents* (off by default: then
   each workspace decides, see above), the limit per person (default 2, at most 20) and optional usage limits that every
   new personal agent gets.
 
@@ -473,7 +473,7 @@ hook in `%USERPROFILE%\agent\.claude\settings.json` uses forward slashes:
 
 ### Guide B: a personal agent on your own computer (users)
 
-1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Workspaces*:
+1. **Allowed?** In your private area you decide yourself. In an organisation its admins allow it (*Settings > Organisation > People*:
    *Members may have their own agents*), or a server admin for everyone (*Settings > Organisation > Agents*). If *Create agent* is
    missing in *Settings > Agents > Set up*, personal agents are off on this server: ask a server admin.
 2. **Create it**: *Settings > Agents > Set up > Your personal agents > Create agent*: a username (e.g. `alice-claude`), a display name. Copy
@@ -764,7 +764,7 @@ Since 2.83.0 a member who has not joined can be assigned a task of such a projec
 edit it (`org_edit`; in a read-only project only project people as before); the tasks assigned to them appear in their Today /
 All, calendar feed and CalDAV without joining, the project's other tasks only after joining. Agents are never assigned this way.
 
-Since 2.35.0 the admins of an organisation manage its projects in the app (2.39.1: Settings > Organisation > *Projects of the
+Since 2.35.0 the admins of an organisation manage its projects in the app (2.39.1: Settings > Organisation > People > *Projects of the
 organisation*, grouped by owner, only projects shared with at least one more person): they see name, owner, folder and numbers
 (never contents) and may archive, restore, hand over or -- from the archive, confirmed with the project's name -- delete a project
 of the organisation, also one of another person. Private projects, private sharing and inboxes stay out of reach. Since 2.39.1
@@ -3800,7 +3800,7 @@ workspace (or the project into another organisation) drops the links that would 
 an editor or any client that speaks MCP over HTTP connects to **`https://tasks.example.com/mcp`** and signs in with OAuth.
 Kalmido starts no agent and runs no model; it only answers the tool calls of the client.
 
-- **Switch.** An instance admin turns it on under *Settings > Administration > Agents > Hosted MCP access* (off by
+- **Switch.** An instance admin turns it on under *Settings > Organisation > Agents > Hosted MCP access* (off by
   default; switching it on asks for the password). Off: `/mcp`, every `/oauth/...` address and the OAuth metadata answer 404.
   The REST API must be on as well (`KALMIDO_API`).
 - **Connect.** Enter the address `/mcp` of your server as the connector (*Settings > Agents* shows it under *Connected
@@ -4298,7 +4298,7 @@ With the project's switch on, a marked task without a yes cannot be completed, t
 
 Agents are external programs (Claude Code, Codex, n8n, a local model, a script) that work in Kalmido like a team
 member: an admin creates them under *Settings > Agents* (or turns an existing user into an agent), shares projects
-with them and gives them a token. When an admin allows it (*Settings > Administration > Agents > Users may create their own
+with them and gives them a token. When an admin allows it (*Settings > Organisation > Agents > People may create their own
 agents*, off by default, a limit per person), everyone can create **personal agents** (2.7.2): owned by their creator,
 seeing only the projects the creator shares with them, chatting only with the creator, never admins. Since 2.28.0 (#965)
 **admins reach agents like everyone** -- only through projects they are in (as the owner / a project admin, or where *Members

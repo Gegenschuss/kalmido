@@ -416,7 +416,7 @@ project files, chat, documents, mail and sharing into Kalmido); profile pictures
   its size and everything else stay as they were.
 - The switch *Remove location data from photos* (on by default) also removes camera details and capture time. For your
   private files it sits in *Settings > Data > Photos*; files of an organisation follow the organisation's switch in
-  *Settings > Workspaces*, which only its admins change. Off: photos are stored exactly as uploaded.
+  *Settings > Organisation > People*, which only its admins change. Off: photos are stored exactly as uploaded.
 - Documents: the capture date is read before the metadata go (also with the switch off) and shown in the document's
   detail (*Taken on …*). When the recognised text has no date, the document gets the day the photo was taken, marked
   *automatic* like other recognised values. The place is never stored.
@@ -452,14 +452,13 @@ once, as before. Route: `POST /api/lists/{id}/move-space {to, dry: 1}` (only the
 files and folders, tables, contacts (single or several at once) and *Save as task* from a channel of the organisation
 leave it -- into the private space or another organisation -- only through an admin of that organisation; everybody else
 gets "Only organisation admins can move data out of the organisation." Each such move is written to the organisation's
-project history (*Settings > Workspaces > Projects*) and the other admins find it in their News. Moving something from the
+project history (*Settings > Organisation > People > Projects of the organisation*) and the other admins find it in their News. Moving something from the
 private space into an organisation and moving inside one organisation work as before; a person without an organisation
 moves freely in the own private space.
 
 **The way back for members (2.361.2).** Whoever brought something into an organisation or made it there (a project they own,
 a table, file / folder, knowledge page, office client or draft, video sign-off they made, a poll or bookmark of theirs) and is no admin gets *Ask an admin* instead of a plain refusal -- in the move dialog
-and in the message. The organisation's admins get a News item and find the request at the top of *Settings > Workspaces >
-Projects of the organisation*: *Release* or *Decline* is one click. After a release the member moves that one thing into
+and in the message. The organisation's admins get a News item and find the request at the top of *Settings > Organisation > People > Projects of the organisation*: *Release* or *Decline* is one click. After a release the member moves that one thing into
 their private space with the usual dialog (which still lists what the move ends) within 14 days; the release is used up
 by that move. Knowledge pages, office clients and drafts, video sign-offs, polls and bookmarks no longer let their
 maker take them out without an admin (before 2.361.2 they did, unlogged). Releases, declines and the move itself are in the project history; nothing goes back silently. The dry run
@@ -487,7 +486,7 @@ In its menu: **Extend by 14 days**, **Stop the link** (it stops at once; *Open a
 each is one undo step. A link also stops when its folder goes into the trash or into another workspace, or when whoever
 asked can no longer add files there. Unknown, expired and stopped links get the same answer. Limits per address and
 link (sends per minute and hour, a daily volume per link: `KALMIDO_FILE_REQUEST_MB_DAY`, default 1000 MB) keep a
-link in the open from filling the disk. Public links have to be on (Settings > Administration); a person without an
+link in the open from filling the disk. Public links have to be on (Settings > Server > Server > Whole server); a person without an
 organisation uses requests in the own folders the same way.
 
 Whoever asked gets one News item (and a push) per request when files arrive; more files within ten minutes raise its
@@ -526,7 +525,7 @@ Only who may share the item (its owner, an organisation's admins) makes a link; 
 linked task files and items in the trash cannot be shared outside. A link stops working at once when it expires, is
 revoked, the item or a folder above it goes into the trash or into another workspace, the person who made it can no
 longer share it (left the organisation, no longer admin), the organisation's admin turns off **Allow external share
-links** (Settings > Workspaces; nothing is deleted, turning it on brings the links back) or the server's admin turns off
+links** (Settings > Organisation > People; nothing is deleted, turning it on brings the links back) or the server's admin turns off
 public links. Every view and download through a link shows up in the item's history, without the visitor's address;
 the page is never indexed or cached, and guessing addresses or passwords is limited per address. A person without an
 organisation shares from the private space the same way (only the server's switch applies).
@@ -586,7 +585,7 @@ notification settings still apply); everyone else sees the thread line without a
 
 **Read by**: under your own latest message that someone has read a small grey line says *Read* (a direct message) or
 *Read by 3* with small pictures (groups, channels, the chat of a project); a tap lists who read it and who did not yet. There
-are no ticks at every message. *Settings > Chat > Send read receipts* switches it off: then nobody sees when you read,
+are no ticks at every message. *Settings > Notifications > Team chat > Send read receipts* switches it off: then nobody sees when you read,
 and you see nobody's read state either.
 
 ## The customer portal
@@ -618,7 +617,7 @@ form does not put reports into that person's list; 2.360). Nobody needs an accou
 
 *Since 2.120.0.*
 
-With *Settings > Company & office > Data > Show documents in the customer portal* (off by default; the office's admin, or the
+With *Settings > Company & office > Data > Show documents in the client portal* (off by default; the office's admin, or the
 person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
 *Review and approve* while an approval link is open), invoices with their payment state (open, partly paid with the open
 amount, overdue, paid; the due date; with online payment on, the button *Pay now* while something is open) and credit notes. Each opens as the PDF that was sent. The customer is every client
@@ -690,8 +689,8 @@ workspace).
 *Since 2.87.9.*
 
 An organisation's symbol was an emoji only. Its admins can now use an own picture instead, like a profile picture:
-*Settings > Workspaces*, the organisation, *Symbol > Upload a picture…*; the picture is cropped square in the app and
-stored re-encoded without metadata. It shows wherever the emoji showed (the workspace switch, *Settings > Workspaces*,
+*Settings > Organisation > People*, the organisation, *Symbol > Upload a picture…*; the picture is cropped square in the app and
+stored re-encoded without metadata. It shows wherever the emoji showed (the workspace switch, *Settings > Organisation > People*,
 the server's organisation project for its members).
 
 - Only admins of the organisation set or remove it (*Remove the picture*); setting an emoji later replaces the picture.
@@ -703,7 +702,7 @@ the server's organisation project for its members).
 
 *Since 2.88.0.*
 
-*Settings > Administration > Users* is built for hundreds of accounts:
+*Settings > Organisation > People* is built for hundreds of accounts:
 
 - **Search and filter:** the field above the project finds people by name, user name or e-mail address; the filter next to
   it shows *People*, *Active*, *Disabled*, *Admins*, *Invited*, *Waiting for approval* or *Agents*. The project shows 50
@@ -719,7 +718,7 @@ the server's organisation project for its members).
   handed over, never deleted along (receipts are kept). A project with the lock whose key nobody else holds is pointed out:
   after a handover its content can no longer be read. Projects of an organisation you do not belong to show neither their
   name nor the organisation's and can only be handed over. The security log notes the deletion.
-- **Organisation admins** (*Settings > Workspaces*) can delete the account of a member who belongs to their organisation
+- **Organisation admins** (*Settings > Organisation > People*) can delete the account of a member who belongs to their organisation
   alone, is no server admin and whose private space is empty (no private projects, nothing in the basket, no private
   calendars, address books, files, pages, mails, habits or time entries, and since 2.148.1 no personal office, private
   clients, bookmarks, news feeds, journal, booking page, polls, videos, agent chats or direct messages -- deleting the
@@ -739,7 +738,7 @@ owns projects still gets 409), `POST /api/users/bulk {ids, action: disable | ena
 
 *Since 2.138.3.*
 
-*Settings > Administration > Organisation*, the pencil of an organisation: its members are a project like *Settings > Administration > Users*, with a
+*Settings > Organisation > People > Organisations*, the pencil of an organisation: its members are a project like *Settings > Organisation > People*, with a
 search (name, user name, e-mail), the filter *Members* / *All* and a counter. Each person has a *Member* and an *Admin*
 box; *Admin* only works for members, and taking someone out of the organisation also ends their admin role. The project
 scrolls inside the dialog, *Save* stays in view. The symbol field shows the organisation's picture or an app icon.
@@ -748,7 +747,7 @@ scrolls inside the dialog, *Save* stays in view. The symbol field shows the orga
 
 *Since 2.143.*
 
-Besides *Member* and *Admin* an organisation admin can give a person one of three limited roles (*Settings > Workspaces*,
+Besides *Member* and *Admin* an organisation admin can give a person one of three limited roles (*Settings > Organisation > People*,
 the role next to each member, and in *Invite by e-mail*; *What the roles mean* explains them in the app):
 
 - **Read-only**: sees everything a member sees and changes nothing in the organisation: projects and tasks (also projects shared
@@ -783,7 +782,7 @@ noted in the server log).
 
 *Since 2.148.1, for new addresses too since 2.453.*
 
-An organisation admin who adds an existing account (by e-mail address under *Settings > Workspaces*, or with *Invite by
+An organisation admin who adds an existing account (by e-mail address under *Settings > Organisation > People*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
 the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
 in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
@@ -843,7 +842,7 @@ The group no longer grows with every person you share a project with:
 - **Kept by law:** finalised invoices and archive entries (books, 10 years), booked receipts and receipts of trips taken
   into DATEV, and the logbook (8 years), each counted from the end of its calendar year. A personal office or an
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
-  more, the server admins see it in *Settings > Administration > Organisations* as "kept until ..." (its delete
+  more, the server admins see it in *Settings > Organisation > People > Organisations* as "kept until ..." (its delete
   button shows the period), nobody can change it. Since 2.186.0 only the people who were its admins when it was retired
   export it (*Settings > Organisation* lists it with the export), other server admins do not, with one exception: when no
   former admin is left (or it was retired before 2.186.0), the server admins may download the retention export (the records
@@ -919,11 +918,11 @@ Notifications can also go to a chat service, as a short text with the link to th
 - **What stays in the app** (since 2.240.0): nothing of a health, budget or read-later project, nor of an organisation's trip,
   reaches your own channels. From an organisation's projects only a short note with the link arrives ("New notification in
   …", no title, no comment), unless an admin of the organisation switches on *Send the content of our projects to personal
-  forwardings* (*Settings > Workspaces > the organisation*, off by default). Private projects, your own office without an
+  forwardings* (*Settings > Organisation > People > the organisation*, off by default). Private projects, your own office without an
   organisation, habits and family: the full text as before. A notification that belongs to nothing known (and a direct message
   between members of an organisation) arrives as the short note too; the daily summary only with its numbers, no titles. The
   channels of a disabled account stay quiet; an organisation's forwarding set up by a disabled account shows it as the reason it is off.
-- **The organisation's channels:** *Settings > Workspaces > the organisation > Channels* (its admins). They get what happens in
+- **The organisation's channels:** *Settings > Organisation > People > the organisation > Channels* (its admins). They get what happens in
   the organisation's projects that **every member sees** (*Everyone in the organisation*): new task, completed, assigned, comment.
   Never a project shared only with some people, never a private area, never another organisation; a project with end-to-end
   encryption shows only the neutral word. When the admin who set a channel up is no admin any more, it turns itself off; an
@@ -938,7 +937,7 @@ Notifications can also go to a chat service, as a short text with the link to th
   get a News item and a push (event *Integrations* in the notification settings). Switching it on again starts the count anew. Quiet hours hold back your own
   channel messages (urgent ones excepted).
 - **Addresses:** `https://` only. Addresses in your own network and plain `http://` only for hosts an admin allowed
-  (*Settings > Administration > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.
+  (*Settings > Server > Server > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.
 - Server settings: `KALMIDO_CHANNELS=0` turns channels off; `KALMIDO_CHANNEL_FAILS` (default 5) failures in a row before a
   channel turns off; `KALMIDO_TELEGRAM_API` another Telegram Bot API server (default `https://api.telegram.org`).
 
@@ -977,11 +976,11 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
 
 <p align="center"><img src="share.png" width="760" alt="The Share dialog of a project: people with their roles open, groups, agents, the public link and the owner folded with their state"></p>
 
-- **Accounts:** admins manage users under *Settings > Administration* (username, display name, optional password,
+- **Accounts:** admins manage users under *Settings > Organisation > People* (username, display name, optional password,
   optional SSO login, admin flag, ntfy topic, disable / delete). Everyone can change their own display name and
   password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
-  under *Settings > Administration*; agents are listed there too (with the *Agent* badge) and open their own dialog
+  under *Settings > Organisation > People*; agents are listed there too (with the *Agent* badge) and open their own dialog
   (*Managed under Agents*). A user who still owns projects cannot be deleted (delete the projects or
   disable the user instead); deleting removes their inbox, habits, filters and focus history.
 - **Private per user:** inbox, habits, focus sessions, filters, folders and sidebar order, tags (two people can tag
@@ -1015,7 +1014,7 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
   project as a **project admin**, where it was in their sidebar. Every transfer is noted under *Owner* in the Share dialog ("Ownership
   transferred from X to Y"). Agents never become owners and never transfer; baskets cannot be transferred.
   **Admins take over** projects whose owner is an agent or a disabled user, which nobody could manage otherwise (agents
-  cannot share, disabled users cannot log in): *Settings > Administration > Projects owned by agents or disabled users >
+  cannot share, disabled users cannot log in): *Settings > Organisation > People > Projects owned by agents or disabled users >
   Take over* (for themselves or another person), or *Take over…* in the Share dialog when they are in the project. An
   agent that owned the project stays in it as a *Member* (agents are never project admins). API:
   `POST /api/v1/lists/{id}/owner` with `{"user_id": …}` (scope structure; agent tokens get 403).
@@ -1053,7 +1052,7 @@ assignees, tags, files, custom fields or anything from other projects; task note
 - Only the owner creates and manages the link; the basket cannot be shared. The page loads no scripts and nothing
   external, is marked `noindex`, is never cached, and has a strict Content-Security-Policy. Views, ticks, unknown links
   and wrong passwords are rate-limited per address; an unusual number of views of one link sends the admins an alert.
-- Admins can turn public links off for everyone (*Settings > Administration > Whole server*; existing links then stop working
+- Admins can turn public links off for everyone (*Settings > Server > Server > Whole server*; existing links then stop working
   but are kept); `KALMIDO_PUBLIC_LINKS=0` turns them off for good.
 
 ### Show completed at the bottom
@@ -1211,7 +1210,7 @@ address book of a server with an organisation goes into its owner's organisation
 *Family* / *Home*, address books mirrored from an outside account and those with a member who does not fit (they stay
 private; nobody loses access). A **nightly boundary check** counts every membership across the workspace boundary
 (projects, calendars, address books, groups, agents), raises an admin alert when the count changes and shows it under
-*Administration > Organisations*.
+*Settings > Organisation > People > Organisations*.
 
 ## Organisations and invitations
 
@@ -1240,7 +1239,7 @@ a private project by e-mail address (the answer never says whether the address h
   start any more. `KALMIDO_INSTANCE_MODE=organisation` is ignored (a log line says so); `shared` (no organisations, people
   see only their own contacts) still works when set explicitly.
 
-**Registration** (*Settings > Administration > Sign-in*, off by default): *Create account* on the login page for addresses
+**Registration** (*Settings > Server > Sign-in*, off by default): *Create account* on the login page for addresses
 of certain e-mail domains, for anyone after an admin approves it, or (shared servers) for anyone with a confirmed
 address. With e-mail (SMTP) people confirm their address with a link and choose their password; without it only
 "after an admin approves" works. New accounts start without access to projects, never as admins or child accounts; the

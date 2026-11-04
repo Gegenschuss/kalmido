@@ -15,9 +15,10 @@ What every proxy needs:
   requests of up to 60 seconds (long polling), so the proxy's read timeout must be longer (the templates use 120 s).
   Proxies that upgrade WebSocket connections anyway do no harm.
 - **Forwarded headers:** `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host`. Kalmido only believes them from
-  the addresses in `KALMIDO_TRUSTED_PROXIES` (default: only localhost, which fits none of these templates). Until the right
-  address is in there the app seems to run normally, but the session cookie has no `Secure` flag behind HTTPS, there is no
-  HSTS, and every client seems to have the same address, so failed logins slow down everyone. See the table below.
+  the addresses in `KALMIDO_TRUSTED_PROXIES` (default: localhost and Docker's default bridge). Through Docker's port
+  publishing, or from a proxy container on another Docker network, requests arrive from that network's gateway: add it
+  (`docker network inspect <network>`, field `Gateway`). Under *Settings > Server > Server* Kalmido warns when client
+  addresses do not arrive.
 - **Upload size:** one request may carry files up to 4 x `TASKS_MAX_FILE_MB` (default 50 MB, so 200 MB).
 - **Restoring a backup from a file:** one request up to `KALMIDO_BACKUP_MAX_MB` (default 4096 MB) to
   `/api/admin/backups/upload`, and the restore itself runs inside its request. The Caddy and nginx templates allow that

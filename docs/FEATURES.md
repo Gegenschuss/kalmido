@@ -113,7 +113,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
   for any period, rounding, hourly rates, CSV export and a printable timesheet
 - **Time sum in the project header** (2.7.0): a project with time tracking (and a folder of them) shows its tracked time in hours and in
   working days, e.g. *12.5 h · 1.6 days*. The length of a day / shift is one value for the whole server
-  (*Settings > Administration*, 8 h by default) that a project can override in its dialog, the same for everyone in it. A
+  (*Settings > Server > Server > Time sums*, 8 h by default) that a project can override in its dialog, the same for everyone in it. A
   number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
 
 **Together**
@@ -215,7 +215,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
   `429` until the next day / month or a higher limit). A Claude Code Stop hook ([mcp/claude_usage_hook.py](../mcp/claude_usage_hook.py))
   reports a session's usage by itself, and as SubagentStop hook (2.11.0) the usage of its subagents too
 - **Activity log** (2.2.1): every API request an agent makes (route, status, task / project, duration; never content) in
-  *Settings > Administration > Agents* for admins (2.46.6; before *Settings > Agents > Log*), filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
+  *Settings > Organisation > Agents* for admins (2.46.6; before *Settings > Agents > Log*), filtered by agent, status and day, event polling hidden by default, denied calls marked, CSV export;
   kept `KALMIDO_AUDIT_DAYS` days (default 90)
 - **Git integration** (2.2.0, 2.18.0): connect a project to GitHub, GitLab, Gitea / Forgejo or Bitbucket Cloud; pull requests (state, CI), commits
   and branches show up at their tasks (`#123`, `kalmido-123`), `fixes #123` in a merged pull request completes the
