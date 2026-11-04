@@ -197,6 +197,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PDF_PARALLEL` | `2` | PDFs read at the same time. |
 | `KALMIDO_PDF_TIMEOUT_S` | `20` | Seconds for reading the text of one PDF. |
 | `KALMIDO_PHOTO_MAX_PIXELS` | `40000000` | Largest photo (pixels) that is re-encoded when it is turned. |
+| `KALMIDO_SPLIT_PAGES` | `100` | Pages of a scanned stack at most that are split into letters (2-500). |
 | `KALMIDO_WIKI_FILE_MAX_MB` | `100` | Largest PDF or picture in MB of a knowledge page (upload and ZIP import), 2.177.0. |
 | `KALMIDO_WIKI_IMPORT_MAX_FILES` | `10000` | Entries of a ZIP of knowledge pages at most, 2.177.0. |
 | `KALMIDO_WIKI_IMPORT_MAX_MB` | `4096` | Size in MB of a ZIP of knowledge pages that can be imported (and of everything unpacked from it), 2.177.0. |
@@ -313,13 +314,21 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_CHAT_KEEP_DAYS` | `0` | Days agent chat messages are kept (0 = no day limit, only the count limit). |
 | `KALMIDO_HOSTED` | `0` | Switch: a server run as a service for others; integrations may only reach public HTTPS addresses, the instance admin stays out of the customers' organisations and accounts (2.399). |
 | `KALMIDO_IMPRINT_URL` | `(empty)` | Address (http/https) of the operator's imprint (legal notice), linked like the privacy statement. |
+| `KALMIDO_LOG_DAYS` | `400` | Days activity and change logs are kept (office logs stay for the legal period). |
 | `KALMIDO_OPERATOR_TOKEN_FILE` | `(empty)` | File with the token of the hosting operator interface (empty = off). |
+| `KALMIDO_ORPHAN_DAYS` | `1` | Days a file without a record must be old before the sweep removes it. |
 | `KALMIDO_PRIVACY_EMAIL` | `(empty)` | Address of the operator's privacy contact, shown on public pages (forms, portal, approvals, bookings) next to the privacy link. Administration > Server overrides it. |
 | `KALMIDO_PRIVACY_URL` | `(empty)` | Address (http/https) of the operator's privacy statement, linked on the login page and in Settings > Help; the field in Administration > Server wins. |
+| `KALMIDO_PURGE_BACKUPS` | `(empty)` | Switch for the safety backups only; empty = KALMIDO_RETENTION_PURGE. |
+| `KALMIDO_PURGE_CHAT` | `(empty)` | Switch for agent chat messages only; empty = KALMIDO_RETENTION_PURGE. |
+| `KALMIDO_PURGE_FILES` | `(empty)` | Switch for files without a record only; empty = KALMIDO_RETENTION_PURGE. |
+| `KALMIDO_PURGE_LOGS` | `(empty)` | Switch for the logs only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |
+| `KALMIDO_SAFETY_BACKUP_DAYS` | `30` | Days the safety backups taken before a restore or an update are kept. |
 | `KALMIDO_STORAGE_QUOTA_MB` | `(empty)` | Storage per person in MB (empty / 0 = unlimited; admins can set it in the app). |
 | `KALMIDO_SUPPORT_EMAIL` | `(empty)` | Support address shown when the storage is full. |
 | `KALMIDO_SUPPORT_URL` | `(empty)` | Support page shown in Settings > Help. |
@@ -347,6 +356,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
 | `KALMIDO_TEST_PG_DUMP_VERSION` | `(empty)` | Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945). |
+| `KALMIDO_TEST_RATE_WINDOW_S` | `60` | Test containers only (with KALMIDO_TEST=1): seconds of the request rate window instead of a minute. |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |
 | `KALMIDO_TEST_TIMING_ALL` | `(empty)` | Tests: Server-Timing for every account, not only instance admins (1). |
 | `KALMIDO_TEST_UMZ_END_DELAY` | `(empty)` | Test containers only (with KALMIDO_TEST=1): seconds an account or wiki import's worker waits before it ends (2.308.0, #3261; 2.363.0, #3280). |

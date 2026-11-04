@@ -8,7 +8,7 @@
 
 Static only (no app start, no imports of the app): reads kalmido/**/*.py and app.py as text. A read is os.environ.get /
 os.getenv / os.environ[...] / "X" in os.environ with a literal name, or a helper call with "env" in its name and a literal
-UPPER_CASE name as first argument (env_bool("X"), _env_int("X", ...)). A name built with an f-string
+UPPER_CASE name as first argument (env_bool("X"), _env_int("X", ...), also through a module: O._env_int("X", ...)). A name built with an f-string
 (os.environ.get(f"KALMIDO_PURGE_{kind}")) needs at least one declared variable with that prefix. Names that only appear in
 a lookup table (OIDC_FIELDS) are declared by hand; the check cannot see them and does not complain about them."""
 import ast
@@ -31,7 +31,8 @@ READS = [
     re.compile(r"(?<![\w.])os\.environ\[\s*[\"']" + NAME + r"[\"']\s*\]"),
     re.compile(r"(?<![\w.])os\.environ\.setdefault\(\s*[\"']" + NAME + r"[\"']"),
     re.compile(r"[\"']" + NAME + r"[\"']\s+(?:not\s+)?in\s+os\.environ\b"),
-    re.compile(r"(?<![\w.])[A-Za-z_][A-Za-z0-9_]*env[A-Za-z0-9_]*\(\s*[\"']" + NAME + r"[\"']"),
+    # 2.522.0 (#4180): also through a module (O._env_int("KALMIDO_SPLIT_PAGES", ...) in docs/split.py was not seen)
+    re.compile(r"(?<![\w.])(?:[A-Za-z_][A-Za-z0-9_]*\.)?[A-Za-z_][A-Za-z0-9_]*env[A-Za-z0-9_]*\(\s*[\"']" + NAME + r"[\"']"),
 ]
 FSTR = re.compile(r"(?<![\w.])os\.(?:environ\.get|getenv)\(\s*f[\"']([A-Z][A-Z0-9_]*)\{")
 

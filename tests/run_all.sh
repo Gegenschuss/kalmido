@@ -28,7 +28,7 @@
 # 2.501.0 (#4296): green says what it left out - before the last line "SKIPPED suites (N): a b" (skip.txt) and "PARTLY SKIPPED
 #                                suites (N): c d" (passed, but their output has a skip line, SKIP_RE: Firefox part, no pwsh, a missing
 #                                tool); each passed suite with such a line prints the first three under its "== x: passed".
-#                                The last line stays "ALL SUITES PASSED" / "FAILED suites: ..." (kalmido-mactest.sh, kalmido-livezug.py).
+#                                The last line stays "ALL SUITES PASSED" / "FAILED suites: ..." (the test runner and the release tooling read it).
 set -u
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$HERE"
@@ -87,7 +87,7 @@ if [[ ${#PLAN[@]} -gt 0 && -z "$PLAN_STAGE" ]]; then
   done
 fi
 # 2.358.0 (#3281): ONLY with a name the list does not know (a suite of another package, a typo) is an error - it used to end
-# after a second with "ALL SUITES PASSED" (kalmido-mactest.sh run SUITE)
+# after a second with "ALL SUITES PASSED" (a runner that names one suite)
 for s in ${ONLY:-}; do
   grep -qE "^(now [^;]*; *)?(fresh;)?[ \t]*run $s " <<< "$LIST" \
     || { echo "run_all.sh: ONLY: unknown suite $s (not in tests/suites.txt, no kalmido-suite marker)"; exit 2; }
@@ -118,7 +118,7 @@ PY
 mine() {
   if [[ "${FUNCNAME[1]:-}" == fresh ]]; then
     _group_end; GI=$((GI + 1)); GT0=$(_ms)
-    # 2.358.0 (#2784): KALMIDO_TEST_NOW_FORCE (kalmido-mactest.sh KMT_TEST_NOW) = a probe: every group at that time, also the
+    # 2.358.0 (#2784): KALMIDO_TEST_NOW_FORCE (set by a test runner) = a probe: every group at that time, also the
     # ones with their own `now` (not `now real`) - the DST night probe of p270_api / admin_alerts sits in `now wed 10:00` groups
     [[ -n "${KALMIDO_TEST_NOW_FORCE:-}" && "$NEXT_NOW" != real ]] && NEXT_NOW=$KALMIDO_TEST_NOW_FORCE
     if [[ "$NEXT_NOW" == real ]]; then unset KALMIDO_TEST_NOW KALMIDO_TEST_NOW_AT  # 2.206.0 A (#2512): real time, also under a run-wide test time
@@ -144,7 +144,7 @@ run() {  # run <name> <cmd...>: prints the summary line, remembers failures
   # ONLY="a b" tests/run_all.sh: just these suites (2.7.2; the containers of their groups are still started, 2.180.0: before the first one that runs)
   [[ -n "${ONLY:-}" && " $ONLY " != *" $name "* ]] && return 0
   # #1315: a proven flaky suite is skipped until the date of its line in skip.txt (tests/skip_test.py: CI red after it);
-  # a run naming it (ONLY, kalmido-mactest.sh run SUITE) runs it - that is how it gets fixed
+  # a run naming it (ONLY=SUITE) runs it - that is how it gets fixed
   [[ -z "${ONLY:-}" && "$SKIPS" == *" $name "* ]] && { SKIPPED+=("$name"); echo "== $name: SKIPPED (wackelt, tests/skip.txt)"; return 0; }
   [[ -n "${KALMIDO_LIST_ONLY:-}" ]] && { echo "$name"; return 0; }
   [[ -n "${FRESH_DUE:-}" ]] && _fresh_start "$name"

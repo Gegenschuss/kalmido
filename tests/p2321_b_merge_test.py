@@ -78,7 +78,7 @@ check("const LAZY = ['/static/js/l1.js', '/static/js/p1.js', '/static/js/p2.js']
       "const LAZY_CSS = ['/static/css/l1.css', '/static/css/p2.css'];" in rd(r, "static/sw.js") and
       "const SHELL = ['/', '/static/app.css', '/static/js/a.js', '/static/js/p1.js'];" in rd(r, "static/sw.js"), f"sw.js lists: entry union\n{rd(r, 'static/sw.js')}")
 check(rd(r, "tests/skip.txt") == "x 2026-11-01 #1 ev\np1_ui 2026-11-01 #2 ev\np2_ui 2026-11-01 #3 ev\n", "skip.txt: the lines of both")
-# rebase (what kalmido-livezug.py landen does): a third package built on the old base
+# rebase (what the release tooling does): a third package built on the old base
 base2 = git(r, "rev-parse", "main~2").stdout.strip()
 git(r, "checkout", "-q", "-b", "p3", base2)
 put(r, "static/i18n/de.json", I18N.replace('"A": "a"', '"A": "a-new"').replace('  "B": "b"\n', '  "B": "b",\n  "P3": "p3"\n'))

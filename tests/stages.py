@@ -605,7 +605,7 @@ def ci_base():
         # without the train's release push: always every suite
         return "full", "hotfix branch (fast lane): full run", None
     if ev == "push" and os.environ.get("GITHUB_REF", "").startswith("refs/heads/job/"):
-        # 2.321 (#1368): a package branch before it lands on main (kalmido-livezug.py landen): the push stage against the
+        # 2.321 (#1368): a package branch before it lands on main (the release tooling): the push stage against the
         # merge base with origin/main (ci.yml checks out the full history and fetches main); no base = the full run
         if git_ok("rev-parse", "--verify", "-q", "origin/main^{commit}") is None:
             git_ok("fetch", "--no-tags", "origin", "main:refs/remotes/origin/main")
@@ -666,7 +666,7 @@ def main(argv=None):
             ap.error("give --changed BASE [HEAD], --ci or changed files")
     if a.touched and not a.ci:  # 2.181.0 (#2696)
         order, why, unmapped = touched(repo, files, base, head)
-        for u in unmapped:  # #3505: a fixed prefix - kalmido-mactest.sh passes stderr on, the train's check parses it
+        for u in unmapped:  # #3505: a fixed prefix - the test runner passes stderr on, the release check parses it
             print(f"UNMAPPED: {u}", file=sys.stderr)
         if a.unmapped_out:
             with open(a.unmapped_out, "w", encoding="utf-8") as f:

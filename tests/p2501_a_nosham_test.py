@@ -5,7 +5,7 @@
    with a reason stand in ALLOWED with it. A status list that takes success and refusal (`in (201, 409)`) is frozen: MIXED_OLD
    may only shrink, a new one fails here. A check that passes either way says nothing.
  - the Firefox question lives in tests/ff.js only; without Firefox a check fails, KALMIDO_SKIP_FIREFOX=1 gives a skip line
- - tests/run_all.sh writes SKIPPED / PARTLY SKIPPED suites before its last line, which stays what kalmido-mactest.sh reads
+ - tests/run_all.sh writes SKIPPED / PARTLY SKIPPED suites before its last line, which stays what a test runner reads
 usage: p2501_a_nosham_test.py"""
 import os
 import re

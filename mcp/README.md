@@ -81,7 +81,7 @@ computer. Details: [docs/AGENTS.md, Hosted MCP](../docs/AGENTS.md#hosted-mcp) an
 
 Projects are called lists in the API (`list_id`, `/api/v1/lists`, `kind=list|project`); `kind=project` is the switch "Progress and status".
 
-The server offers about 320 tools, one or more for nearly every REST route of the agent API. This page is only an overview;
+The server offers about 370 tools, one or more for nearly every REST route of the agent API. This page is only an overview;
 the complete, tested lists are elsewhere:
 
 - [`CLAUDE.template.md`](CLAUDE.template.md): every tool with its parameters, written for the agent (the file an agent reads).
@@ -91,7 +91,7 @@ the complete, tested lists are elsewhere:
 
 ### Toolsets (`--toolsets`, `KALMIDO_TOOLSETS`)
 
-A model that sees 320 tool descriptions spends a lot of context on them. Start the server with the packages the agent needs:
+A model that sees some 370 tool descriptions spends a lot of context on them. Start the server with the packages the agent needs:
 
 ```sh
 python3 mcp/kalmido_mcp.py --toolsets tickets,code        # or KALMIDO_TOOLSETS=tickets,code in the environment / the agent env file

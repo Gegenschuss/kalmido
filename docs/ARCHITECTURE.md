@@ -12,7 +12,7 @@ project in the app, and this document keeps the technical name.
  browser (PWA)                          server (one container)                      outside (optional)
  ---------------------------            -------------------------------------       ------------------------
  static/index.html                      app.py  (entry point)                       ntfy / Web Push services
- static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~80 modules)  --->    Git hosts, Karakeep,
+ static/js/*.js   (web client)  --->    kalmido/  (Flask app, ~500 modules) --->    Git hosts, Karakeep,
  static/sw.js     (offline)     <---    PostgreSQL 17 (own container)               calendars, IMAP / SMTP,
  static/i18n/*.json                     background threads (watchdog ...)           webhooks, OIDC provider
                                               ^

@@ -17,3 +17,5 @@ tests/.demo/
 tests/.demo-quick/
 tests/.demo-office/
 tools/eslint_globals.json
+# 2.522.0 (#4180): editor / tool backup files (a stray static/icon-512.png-…~ sat here since 2.39.1)
+*~

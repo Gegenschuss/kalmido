@@ -63,7 +63,7 @@ Kalmido itself and only loaded when a page has a formula or a diagram; the brows
 - brotli (MIT), packs JS and CSS ahead of time while the image is built, not part of the image itself
 - Dependencies installed along with the above: Jinja2, MarkupSafe, itsdangerous, blinker, cffi, pycparser, six (BSD-3-Clause / MIT)
 
-The version of every package is pinned in the `Dockerfile`; each package carries its license file in the image.
+The version of every package is pinned with its hashes in `tools/requirements.lock`; each package carries its license file in the image.
 
 ## System packages in the image (Debian)
 

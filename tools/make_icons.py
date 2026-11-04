@@ -144,7 +144,7 @@ def render(src_svg, size, out, tmp, extra=()):
         f.write(src_svg)
     subprocess.run(["rsvg-convert", "-w", str(size), "-h", str(size), sp, "-o", rp], check=True)
     subprocess.run(["magick", rp, *extra, *STRIP, out], check=True)
-    # the same pass kalmido-export.sh runs over static/*.png: after it the file is a fixed point, so the export copies
+    # the same pass the export to the public repository runs over static/*.png: after it the file is a fixed point, so the export copies
     # the bytes unchanged and `--check` also holds in the public repo
     subprocess.run(["magick", "mogrify", *STRIP, out], check=True)
 

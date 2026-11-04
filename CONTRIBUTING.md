@@ -25,7 +25,7 @@ Layout (the full map, the data flow and how to add a route or a file: [docs/ARCH
 | Path | |
 |---|---|
 | `app.py` | the entry point (`python app.py`, `set-password`, `import`) |
-| `kalmido/` | the server: one module per area (Flask routes, SQLite schema + migrations, background threads), loaded in the order of `kalmido/__init__.py` |
+| `kalmido/` | the server: one module per area (Flask routes, PostgreSQL schema + migrations, background threads), loaded in the order of `kalmido/__init__.py` |
 | `static/js/*.js` | the web app (vanilla JavaScript, no framework, no build step): classic scripts loaded in the order of `static/index.html` |
 | `static/i18n.js`, `static/i18n/*.json` | translation helpers and translations (English is the source language in the code) |
 | `static/app.css`, `static/sw.js` | styles, service worker (offline app shell) |

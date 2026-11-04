@@ -174,6 +174,7 @@ VARS = (
     _v("KALMIDO_OCR_PAGE_S", "60", "Seconds per page at most.", "files"),
     _v("KALMIDO_OCR_PARALLEL", "1", "Documents recognised at the same time.", "files"),
     _v("KALMIDO_OCR_MEM_MB", "1024", "Memory in MB of one recognition tool.", "files"),
+    _v("KALMIDO_SPLIT_PAGES", "100", "Pages of a scanned stack at most that are split into letters (2-500).", "files"),  # 2.522.0 (#4180)
     _v("KALMIDO_PDF_TIMEOUT_S", "20", "Seconds for reading the text of one PDF.", "files"),
     _v("KALMIDO_PDF_PARALLEL", "2", "PDFs read at the same time.", "files"),
     _v("KALMIDO_PDF_MEM_MB", "512", "Memory in MB of the PDF reader.", "files"),
@@ -304,12 +305,22 @@ VARS = (
     _v("KALMIDO_TRASH_DAYS", "30", "Days items stay in the trash.", "hosting"),
     _v("KALMIDO_RETENTION_PURGE", "0", "Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env.", "hosting"),  # 2.223.3 A (#2877)
     _v("KALMIDO_PURGE_TRASH", "", "Switch for the trash only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
+    # 2.522.0 (#4180): the retention periods and switches core/retention.py reads through its tables RET_ENV / f"KALMIDO_PURGE_{kind}"
+    _v("KALMIDO_LOG_DAYS", "400", "Days activity and change logs are kept (office logs stay for the legal period).", "hosting"),
+    _v("KALMIDO_SAFETY_BACKUP_DAYS", "30", "Days the safety backups taken before a restore or an update are kept.", "hosting"),
+    _v("KALMIDO_ORPHAN_DAYS", "1", "Days a file without a record must be old before the sweep removes it.", "hosting"),
+    _v("KALMIDO_CHAT_KEEP_DAYS", "0", "Days agent chat messages are kept (0 = no day limit, only the count limit).", "hosting"),
+    _v("KALMIDO_PURGE_LOGS", "", "Switch for the logs only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
+    _v("KALMIDO_PURGE_BACKUPS", "", "Switch for the safety backups only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
+    _v("KALMIDO_PURGE_FILES", "", "Switch for files without a record only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
+    _v("KALMIDO_PURGE_CHAT", "", "Switch for agent chat messages only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
 
     # ---- tests and development
     _v("KALMIDO_TEST_TIMING_ALL", "", "Tests: Server-Timing for every account, not only instance admins (1).", "test"),  # 2.360.2 (#2561)
     _v("KALMIDO_TEST_ROT_ABORT", "", "Tests: stop the key rotation right after the switch (1).", "test"),
     _v("KALMIDO_TEST", "0", "Switch: marks a test container (set by tests/start.sh); only then KALMIDO_TEST_NOW and KALMIDO_TEST_RATE_WINDOW_S work. Never on a real server.", "test"),
     _v("KALMIDO_TEST_NOW", "", "Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there.", "test"),
+    _v("KALMIDO_TEST_RATE_WINDOW_S", "60", "Test containers only (with KALMIDO_TEST=1): seconds of the request rate window instead of a minute.", "test"),  # 2.522.0 (#4180)
     _v("KALMIDO_TEST_NOW_AT", "", "Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock).", "test"),
     _v("KALMIDO_TEST_MODE", "0", "Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored.", "test"),
     _v("KALMIDO_TEST_FSREF", "0", "Test containers only (with KALMIDO_TEST=1): registers the test kind 'probe' of the folder references (2.199.0, files/fsref.py).", "test"),

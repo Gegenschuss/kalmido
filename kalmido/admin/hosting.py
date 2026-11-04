@@ -229,7 +229,7 @@ def my_storage():
 # ---- #907: announcement / maintenance banner. One notice at a time (admin setting "announce", JSON): text, level
 # info | maintenance, optional from / until (UTC ISO). Every client shows it above the app while it is current (a person
 # can hide it; a changed notice comes back). Optional: a push to everyone once when saved. Scripts set it before a planned
-# restart: `python app.py announce "text" --minutes 30` (kalmido-app-update.sh) or PUT /api/v1/admin/announcement.
+# restart: `python app.py announce "text" --minutes 30` (an update script) or PUT /api/v1/admin/announcement.
 ANN_TEXT_MAX = 500
 
 
