@@ -102,9 +102,9 @@ print(json.dumps(out))
 j = py(DRIP)
 for k, what in (("wh_head", "webhook, headers dripping"), ("wh_body", "webhook, body dripping"), ("chn", "notification channel"),
                 ("git", "git API call"), ("nwl", "newsletter API call"), ("cal", "cal_http(until) after the move into cal_until")):
-    check(j.get(k) == "timeout" and (j.get(k + "_s") or 99) < 6,
+    check(j.get(k) == "timeout" and j.get(k + "_s", 99) < 6,
           f"#4379: {what}: ends at the total limit of 2 s ({j.get(k)}, {j.get(k + '_s')} s)")
-check(j.get("wh_ok") == [True, 200] and (j.get("wh_ok_s") or 99) < 2, f"#4379: a fast server still answers ({j.get('wh_ok')})")
+check(j.get("wh_ok") == [True, 200] and j.get("wh_ok_s", 99) < 2, f"#4379: a fast server still answers ({j.get('wh_ok')}, {j.get('wh_ok_s')} s)")
 check(j.get("stack") == [], f"#4379: no watchdog stays registered ({j.get('stack')})")
 
 # ---------------------------------------------------------------- 2. #4379: one slow target per tick, the others go on

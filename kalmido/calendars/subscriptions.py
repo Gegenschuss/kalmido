@@ -270,12 +270,20 @@ class _CalHTTPConnection(http.client.HTTPConnection):
         self._create_connection = _cal_connector(cal_allow)
         _cal_watch(self)
 
+    def connect(self):
+        super().connect()
+        self._cal_sock = self.sock  # 2.539.0 (#4379): urllib drops conn.sock after the headers, the body is read from it
+
 
 class _CalHTTPSConnection(http.client.HTTPSConnection):
     def __init__(self, *a, cal_allow=frozenset(), **k):
         super().__init__(*a, **k)
         self._create_connection = _cal_connector(cal_allow)  # then TLS with server_hostname = the host name
         _cal_watch(self)
+
+    def connect(self):
+        super().connect()
+        self._cal_sock = self.sock  # 2.539.0 (#4379): the TLS socket the body is read from (see _CalHTTPConnection)
 
 
 class _CalHTTPHandler(urllib.request.HTTPHandler):
@@ -369,11 +377,13 @@ def _cal_cut(conns, cut):
     """The watchdog of cal_http(until=...): shuts the sockets of its connections down (a blocked read returns)."""
     cut.set()
     for conn in list(conns):
-        try:
-            if conn.sock is not None:
-                conn.sock.shutdown(socket.SHUT_RDWR)
-        except OSError:
-            pass
+        # 2.539.0 (#4379): also the socket of the response (urllib closes conn.sock after the headers, the response keeps
+        # reading from it: a body sent drop by drop)
+        for sk in {id(x): x for x in (conn.sock, getattr(conn, "_cal_sock", None)) if x is not None}.values():
+            try:
+                sk.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
 
 
 def _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until):
