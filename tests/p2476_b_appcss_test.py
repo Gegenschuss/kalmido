@@ -87,12 +87,13 @@ with tempfile.TemporaryDirectory() as tmp:
     rc, out = run("perf_budget.py", "--root", root, "--json")
     first = lambda o: json.JSONDecoder().raw_decode(o.strip())[0]  # noqa: E731  (over the budget: the messages follow)
     before = first(out)["measured"]["start_css_bytes"]
-    put(os.path.join(css, "start-zz-p2476.css"), ".zz { color: red; }\n" * 40000)
+    # 2.521.0 (#4391): the check is the gzip ceiling now, so the extra style file must not compress away
+    put(os.path.join(css, "start-zz-p2476.css"), "".join(f".zz{os.urandom(8).hex()} {{ color: red; }}\n" for _ in range(40000)))
     rc, out = run("perf_budget.py", "--root", root, "--json")
     after = first(out)["measured"]["start_css_bytes"]
     check(after - before > 700000, f"perf_budget counts the start style files ({before} -> {after})")
     rc, out = run("perf_budget.py", "--root", root)
-    check(rc == 1 and "Budget exceeded: start_css_bytes" in out, "a big start style file goes over the start CSS budget: " + out)
+    check(rc == 1 and "Budget exceeded: decke_css_gzip" in out, "a big start style file goes over the start CSS ceiling: " + out)  # 2.521.0 (#4391)
 
 rc, out = run("perf_budget.py")
 check(rc == 0, "the tree stays within the budget (the start style files counted): " + out)

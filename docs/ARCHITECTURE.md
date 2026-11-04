@@ -731,16 +731,15 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
 
 `python tools/perf_budget.py` measures, statically from `static/index.html`, what the browser loads before the app shows
 anything: every script tag (raw and gzip size, count) and the stylesheets, and lists the files loaded on demand (`LAZY` /
-`LAZY_CSS` in `static/sw.js`) for comparison. The limits are in `tools/perf_budget.json` (`start_js_bytes`, `start_js_gzip`,
-`start_css_bytes`, `start_css_gzip`, `start_i18n_bytes`, `start_i18n_gzip` (the language core of `de`), `start_scripts`, and `start_ms`, the load time until the list shows, which
-`tests/perf_ui.js` checks in the browser). CI runs the tool in the lint job; a value over its limit prints
-`Budget exceeded: <key> <actual> > <limit>` and fails the build. `tests/perf_budget_test.py` proves that an oversized state fails.
-
-The limits only stay low when they cannot be raised in passing: `--ratchet [BASE]` compares them with the base (in CI: the commit
-before the push, the merge base with main on `job/**` and `hotfix/**`, the parent in a pull request; no base = red; a nightly or
-manual run prints that it did not compare). The sums of the gzip limits and of the byte limits and `start_scripts` must not
-grow, so a limit rises only when the same change lowers another by as much, and the lowered one still has to hold the normal
-check. Make room by moving code into a module loaded on demand (see "Modules loaded on demand"). `--json` prints
+`LAZY_CSS` in `static/sw.js`) for comparison, and the language core of `de` the server sends at start. Since 2.521.0
+(#4391) the CI is red only over a ceiling in `tools/perf_budget.json`: `decke_js_gzip` (start JS gzip), `decke_css_gzip`
+(start CSS gzip), `decke_i18n_gzip` (language core gzip) and `decke_scripts` (number of start scripts). Over one it prints
+`Budget exceeded: <ceiling> (<value> <actual> > <ceiling>)` and fails the build; the bytes are measured and printed, but have
+no limit. Only the project owner raises a ceiling; the start gets smaller by loading code on demand (see "Modules loaded on
+demand") or by moving texts out of the language core, never by cutting code. The growth of each package is measured by the
+release train against main and reported, it holds nothing; there is no growth check in the CI (the `--ratchet` of 2.501.0
+is gone). `start_ms`, the load time until the list shows, is checked by `tests/perf_ui.js` in the browser.
+`tests/perf_budget_test.py` proves that a state over a ceiling fails. `--json` prints
 machine-readable output, `--budget FILE` and `--root DIR` are for tests.
 
 ## Browser demo (rebuilt per release since 2.74.0)
