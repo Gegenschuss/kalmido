@@ -2171,7 +2171,7 @@ a receipt (the office route answers `403` to an agent token), so do not offer it
 *Since 2.51.0.*
 
 An agent can prepare quotations, invoices and reminders in *Office & finance* and suggest incoming payments, **as drafts
-only**: a person reserves the number, finalises, sends, deletes and books. Three things must be on, all **off by default**:
+only**: a person reserves the number, finalises, sends, deletes and books. Three things must be on, all **off by default** (since 2.187.0 the second one is a place in an office rights group, see below; the switch counts only for an agent that is in no group):
 
 - the scope `office` of the agent's token (Settings > Agents > Permissions: *Office drafts*);
 - the agent's switch **May draft office documents** (in its settings dialog; set by an admin of its office area, in a

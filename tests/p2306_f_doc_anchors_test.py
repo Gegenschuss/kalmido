@@ -125,10 +125,22 @@ check("which one tidies it up" not in guide.replace("so that agent is the one th
 api = read("docs", "API.md")
 agents = read("docs", "AGENTS.md")
 check("`files:read` / `files:write` | on |" in agents, "AGENTS.md: the file store is on by default")
-check("starts with *Read*, *Tasks* and *Comments*;" not in guide and "*Read files* and *Add files*" in guide, "AGENT-SETUP.md: the default set names the file store")
+# 2.525.0 (#4179): the labels of the app (api/scopes.py SCOPE_LABELS), not "Read files" / "Add files"
+check("starts with *Read*, *Tasks* and *Comments*;" not in guide and "*Read the file store* and *Write to the file store*" in guide, "AGENT-SETUP.md: the default set names the file store")
 check("`office`, `pinboard`, `layouts`, `import`, `sheets:*`" in api, "API.md: legacy write leaves out the sensitive scopes")
 check("| `POST /tasks/{id}/tidy` | tasks:write |" in api, "API.md: tidy needs tasks:write")
 check("`propose_contract_notice` | agent (no scope) |" in agents, "AGENTS.md: the notice proposal needs no scope")
 check("one exception" in read("docs", "AGENT-SECURITY.md").lower() and "exception to \"only what is shared\"" in agents, "the office exception is named in the security page and in AGENTS.md")
+
+# 2.525.0 (#4179): the agent pages follow the server's enforcement (agents/control.py, core/access.py list_other_agent)
+sec = read("docs", "AGENT-SECURITY.md")
+check("approve_all" in pf and "control level" in pf.lower(), "the setup prompt has a step for the control level (a new agent starts with approve_all)")
+check("A new agent starts with `approve_all`" in guide and "step 1, point 14" in guide, "AGENT-SETUP.md: the control level is chosen before the test checklist")
+check(agents.count("A new agent starts with `approve_all`") >= 2, "AGENTS.md: guides A and B name the control level of a new agent")
+check("**Control level (2.235.0).**" in sec and "**Data lock (2.235.0).**" in sec, "AGENT-SECURITY.md: control level and data lock are listed as enforced")
+check("One exception, on purpose (2.352.0)" in sec and "two
+  agents cannot hand each other text" not in sec, "AGENT-SECURITY.md: the folder-share exception to one agent per project")
+check("Keys are kept for 14 days" in agents and "Keys are kept for 3 days" not in agents, "AGENTS.md: idempotency keys live 14 days (core/idem.py)")
+check("Users may create their own agents" not in agents, "AGENTS.md: the switch is called People may create their own agents")
 
 sys.exit(done("p2306_f_doc_anchors"))

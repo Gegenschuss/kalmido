@@ -52,6 +52,11 @@ folder's owner connects it; the token stays sealed.
   (`GET /api/v1/lists/{id}/build-status`).
 - **Releases** (2.18.0): a new tag like `v2.18.0` completes the open milestone "2.18.0" or "Release 2.18.0" of the project
   once, with *Undo*; tags that existed before the connection never do.
+- **Release pass** (2.392.0): a project can switch on that the poll also completes its open tasks that are still open
+  although their version field or their code is released (the *stale* tasks of the build state), once per task and
+  version, with *Undo*. It is off for every project until someone switches it on. A task marked as done only in part
+  (finished up to a later version) waits for that version; a parked task is never completed. Webhooks and agents get
+  `task.completed` with `via: "release"` and no actor. It only reads what the poll stored and never writes to Git.
 - **Error reports** (2.18.0): *Error reports > Turn on* gives the project a secret URL (shown once; *New URL*, *Turn off*).
   Point a Sentry webhook (an internal integration with issue / alert webhooks) or any service that sends JSON
   `{title, body, url, fingerprint, level}` at it: a new error becomes a bug ticket with the details and the link, the same

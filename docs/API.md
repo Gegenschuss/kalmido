@@ -1576,8 +1576,8 @@ counts, the status dots of projects and the share marks. Only the web app's disp
 
 *Since 2.51.0.*
 
-Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with their switch *May draft
-office documents* and the area's privacy switch *Agents may read office data* on (else `403`). `requested_by` (query or
+Scope `office` (never in the legacy `write` or a new agent's default). Agents only, and only with office access (since 2.187.0 an office rights group; the switch *May draft
+office documents* only for an agent in no group) and the area's privacy switch *Agents may read office data* on (else `403`). `requested_by` (query or
 body) = the person the agent acts for (default: its owner; a team agent must name one). Drafts only: no route sets a
 number, a status, finalises, sends, deletes or books. Details: [AGENTS.md](AGENTS.md#office-drafts-only).
 

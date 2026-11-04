@@ -20,7 +20,7 @@ assistants with a token) reach the module only through `/api/v1/office` and only
 | Organisation roles *Read-only* and *Accounting* | at most reading and the exports; every change is refused (Accounting uploads receipts in the documents area) |
 | Organisation role *Guest* | nothing |
 | Owner of a personal office | everything an organisation admin may, in the own personal office |
-| Agents | with three switches on: read master data and documents, drafts of quotations / invoices / reminders, payment suggestions (2.51.0) |
+| Agents | with office access on (scope, office rights group or the agent's switch, and the privacy switch): read master data and documents, drafts of quotations / invoices / reminders, payment suggestions (2.51.0) |
 | Children | nothing (403) |
 
 Which office you work in follows the workspace switch at the top of the sidebar: an organisation's workspace (`org:<id>`)
@@ -2598,7 +2598,7 @@ documents). A letter links only documents of its office's documents space that t
 
 *Since 2.51.0.*
 
-An agent prepares, a person decides. Three things must be on (all off by default): the token's scope `office`, the
+An agent prepares, a person decides. Three things must be on (all off by default; since 2.187.0 the second is a place in an office rights group, the switch counts only for an agent in no group, see [AGENTS.md](AGENTS.md#office-drafts-only)): the token's scope `office`, the
 agent's switch **May draft office documents** (its settings dialog; an admin of its office area sets it, in a personal
 office the person) and the area's privacy switch **Agents may read office data** (Settings > Agents, admins; the hint
 says that client and price data go to the agent's AI model). Then the agent may read services (never purchase prices),
