@@ -44,6 +44,7 @@ e-mails, addresses, web links, birthday and anniversary (also without the year),
 - **Tasks**: *People and dates* in a task's panel links a contact (*Waiting on*, *Responsible*, *About*).
 - **Birthdays** (module Family): an address book's birthdays and anniversaries become yearly tasks of a project you pick.
   An address book connected under *Family > From contacts…* is also copied into an address book of its own.
+- **Newsletter** (2.55.0, *Contacts > More > Newsletter…*): Kalmido sends no newsletters itself. It keeps the contacts, segments and consent and syncs them with a newsletter service you run or use (listmonk; Brevo and CleverReach as a preview). The service sends the mails and runs the double opt-in, the unsubscribe link and the bounces; unsubscriptions, bounces and confirmed opt-ins come back to the contacts. One connection per workspace (an organisation: its admins; your own space: you). The access data are never shown again. Consents from a CSV file can be imported in the same dialog.
 - **Import / export**: vCard files (3.0 and 4.0); **on the phone** each address book is an address book in the phone's
   contacts app (CardDAV), both ways.
 

@@ -439,6 +439,9 @@ Out of an organisation only an organisation admin moves something (2.148.1; befo
 a person without an organisation has no other workspace and does not see the action. Agents never move data between
 workspaces. Receipts the cash book or the equipment list points to stay in their workspace.
 
+**A task into a project of another workspace** (2.455.0). The project picker for moving a task (also for a selection, and in the command palette) lists the projects of the workspace the task is in. At the top, *Move to another workspace…* lets you pick the workspace first and then the project there; moving
+across always asks once (*Move to another workspace*), and Undo stays. A task in the Basket belongs to the workspace shown now. Without an organisation there is only one workspace and no such entry.
+
 **A project into the other workspace (2.401).** Changing *Workspace* in the project dialog checks first: when the move ends
 something, takes something along or leaves something behind, the same move dialog lists it before anything moves -- the
 client of the old workspace and "also in" links across the boundary end (Undo brings both back), the customer reports of
@@ -1008,6 +1011,13 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
   pushes, reminders, the REST API, webhooks), not only hidden in the app; sections show only when they hold one of
   their tasks. Changing a role takes effect at once. Projects shared before 1.10.0 keep their meaning: *Can edit* is now
   *Member*, *View only* is *Viewer*. Members can leave a project; the basket cannot be shared.
+- **Delegate to an agent and watch a task** (2.473.0): in a task's detail, under the assignee, *Delegate to an agent* picks one
+  agent of the project (only agents that are open to you in this project). The person stays the assignee; the agent gets the
+  task like an assignment and it counts in the agent's queue. A delegation needs the right to assign the task. *Watch* (the
+  eye) makes you a watcher: comments and status changes of the task reach you, like for someone who commented (the same
+  notification rows as before, nothing new to switch). Everyone who may see the task with its comments can watch it;
+  the link *N watchers* lists them, and only the project's owner and admins add or remove other people. A watcher who loses
+  access to the project or the task hears nothing more.
 - **Transfer ownership:** the owner hands a project to another person in the Share dialog (*Owner > Transfer ownership…*)
   (a member or anyone they could share with; confirmed twice). The new owner gets it in the same folder and place
   where they had it as a member (otherwise at the end of their sidebar) and a News item; the old owner stays in the
@@ -1279,8 +1289,8 @@ group) and **one channel per shared project** for everyone who sees the whole pr
 channel: they read along and answer when you @mention them. Messages are Markdown, `@Name` mentions a member, a message
 can link a task, shows 👍 👎 ❤️ under every message (one tap adds or removes yours, 2.18.0; "+" for any other emoji,
 2.19.0), and you edit or delete your own (project owners and admins delete
-any in their channel). *Team chat* in the sidebar shows the unread count; a direct message and a mention push to your
-devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the sidebar, the tab bar,
+any in their channel). The **Chat** area (its own icon in the bar of the areas, with the unread count; 2.479.0) holds all conversations; a direct message and a mention push to your
+devices (notification row *Team chat*; muting a conversation leaves only mentions). Find it in the **Chat** area, the tab bar on a phone,
 the project menu (*Team chat*) and a project's overview. The REST API and the MCP server have it too (`/team/...`, see
 docs/API.md); agents cannot open direct messages.
 

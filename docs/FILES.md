@@ -18,6 +18,10 @@ finds date, due date and amount, and sorts in sender, type, tags and folder by y
 corrections; what it is unsure about waits in *To review*. Search finds words from the content. Text and amounts are
 stored encrypted. Self-hosters can import an existing Paperless-ngx instance (#1152).
 
+**Leafing through documents** (2.476.0): an open document shows "3 of 48" and two arrow buttons above the preview, and the arrow keys step through the list as it is shown (filtered and sorted). On a phone a swipe sideways on the preview turns to the next or previous document; at the end of the loaded part the next page loads, at the real end the page springs back. A preview enlarged with two fingers moves with one finger instead; at normal size it swipes again.
+
+**Receipt fetcher** (2.425.0): a helper program on your own computer fetches invoices from web portals (an online shop, a phone company) and hands them to the documents. You sign in to the portals only in the helper: Kalmido never stores passwords, cookies or logins. Connect one in *Settings > Integrations > Receipt fetcher* with a setup code (for people with the office); switch each portal on or off in Kalmido. The documents arrive like an upload and are recognised the same way; a new error ("please sign in again") tells you once. Details: [API.md](API.md#receipt-fetcher).
+
 **PDF preview** (#1367): PDFs open inside Kalmido (pages, zoom, swipe), also in the Android app. **Lock a note**
 (#1642): the lock in a task's note encrypts it with your own password in your own, unshared projects; without the
 password and the recovery code it cannot be recovered, not even by the operator.

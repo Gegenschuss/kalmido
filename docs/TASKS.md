@@ -30,6 +30,12 @@ in your language (German: Anfrage / Konzept / Umsetzung …). A type switches th
 so. Types are templates: change anything afterwards. API: `POST /api/v1/lists {"project_type": "agency" | "software" |
 "private", "sections": true}`.
 
+**Software type with a bug inbox** (2.473.0). For the type *Software* the dialog offers **With a bug inbox**. Kalmido then
+makes a second project, *<name> – Bugs*, next to the build project. New tasks in it are bugs, and the project has a custom
+field *Release* and a rule: as soon as *Release* is filled, the task moves to the build project (into its first section, if
+it has sections). The rule runs with your rights, so only a person can switch this on, not an agent. API: `bug_inbox: true`
+in `POST /lists` with `project_type` `software` (the answer has `bug_list_id`).
+
 **Ticket types.** A project setting (*Ticket types*, in the project dialog of a project; on for Software / AI dev): tasks
 get a type, *Bug*, *Feature* or *Task*, shown as a small chip with an icon, set in the task panel or in quick add
 with `!bug`, `!feature`, `!task` (German `!fehler`, `!funktion`, `!aufgabe`), and filterable in saved filters. A new
@@ -260,3 +266,9 @@ Every project has **notes**: Markdown documents next to the tasks for meeting no
 moves to another project, and is found by the command field. Everyone who sees the whole project reads its notes (participants
 do not), owner, project admins and members write them; when someone else changed a note while you were typing, Kalmido shows
 both versions. API: `/lists/{id}/notes`, `/notes` (docs/API.md), MCP tools `list_notes`, `search_notes`, `create_note` ….
+
+**Quick notes** (2.477.0): *New note* in the command palette (Ctrl/Cmd+K) or the key `M` opens an empty note at once. In the
+notes of one project it lands in that project; otherwise (the **Notes** area in the bar of the areas, or any other page) it
+lands in your private list *Notes*, which only you see. Sharing such a note means moving it into a project; Kalmido first
+says who will see it there. The Notes area shows the notes of all projects of the shown workspace plus your private ones,
+pinned first, with a filter by project and a search in title and text.
