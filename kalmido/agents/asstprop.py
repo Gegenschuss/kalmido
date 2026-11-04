@@ -55,6 +55,7 @@ from ..docs import store as S  # 2.369.5 (#2517): pulled up from functions
 from ..agents.proposals import prop_agent_ok  # 2.369.5 (#2517): pulled up from functions
 from ..office.docs import doc_row, doc_public  # 2.369.5 (#2517): pulled up from functions
 from ..docs.web import doc_json  # 2.369.5 (#2517): pulled up from functions
+from ..docs.split import sp_view  # 2.522.0 (#4468)
 from ..lists.report import project_status, report_period, status_markdown, time_allowed, _time_of  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2eguard import le2b_net, le2b_list_locked, le2b_off  # 2.369.5 (#2517): pulled up from functions
 from ..api.scopes import need_scope  # 2.369.5 (#2517): pulled up from functions
@@ -134,7 +135,6 @@ def ast_doc_agents(c, uid, nid, area="offers"):
     m = S.meta_row(c, nid) if n["kind"] == "file" else None
     if not m:
         raise Denied(404)
-    from ..docs.split import sp_view
     if area == "receipts" and (sp_view(m) or {}).get("stack"):  # 2.522.0 (#4468): no reading of a stack waiting to be split
         return [], n
     return [a for a in ast_office_agents(c, uid, _doc_area(c, uid, n), area) if fs_role(c, nid, uid=a["user_id"])], n

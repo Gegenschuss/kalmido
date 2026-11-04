@@ -19,6 +19,7 @@ from ..core.access import Denied
 from ..accounts.session import me
 from ..files.store import fs_log_add
 from ..docs import store as S
+from ..docs.split import sp_view  # 2.522.0 (#4468)
 from .suggest import rc_office_need  # 2.237.0
 from .suggest import rc_set, rc_vat_clean  # 2.369.5 (#2517): pulled up from functions
 from ..docs.web import _doc, _no_agent, doc_json, doc_update  # 2.369.5 (#2517): pulled up from functions
@@ -123,7 +124,6 @@ def rx_post(nid):
         return err(tr("Invalid value: {0}", "do"))
     if not det and act not in ("nodup", "dup"):
         raise Denied(404)
-    from ..docs.split import sp_view
     if act == "apply" and (sp_view(m) or {}).get("stack"):  # 2.522.0 (#4468): a stack waiting for the decision mixes letters
         return err(tr("Amounts and numbers are recognised per letter after splitting."), 409)
     fl, bf0 = b.get("fields") or RX_FIELDS, b.get("before") if isinstance(b.get("before"), dict) else {}

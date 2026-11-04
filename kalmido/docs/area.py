@@ -40,6 +40,7 @@ from ..accounts.spacemove import smv_refuse_agent
 from ..files.store import fs_log_add, need_node
 from ..files.fsmove import _rm, fsm_apply, fsm_plan
 from ..office.model import OFFICE_FEAT
+from ..office.rights import ofr_allows  # review 2.522 (4)
 from . import store as S
 from .ingest import doc_after
 from .split import sp_view
@@ -73,7 +74,6 @@ def ar_office(c, uid):
         return None  # several organisations, none chosen: office_where asks; nothing is sorted
     if org_role_key(c, uid, oid) in (None, *AR_NO_WRITE):
         return None
-    from ..office.rights import ofr_allows
     with system_ctx(c):  # review 2.522 (4): the office groups must let the person work on receipts (office_org would say 403)
         if not ofr_allows(c, uid, oid, "receipts", "edit"):
             return None
