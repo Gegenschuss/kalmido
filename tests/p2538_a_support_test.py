@@ -12,6 +12,9 @@ tenant-matrix: support
  - a member of an organisation (cara): a new project without org_id lands privately, with org_id of the organisation 403,
    a task into the organisation's project (POST / PATCH list_id) 403; her own session puts it there; once the organisation's
    admin grants support access for it, the support session may
+ - 2.538.0 (#4365): the office of her workspace (org:CO): a draft 403 without the organisation's grant, 201 with it and in her
+   own office; reminder fee, master data import, fixed costs / trips deleted 403; a reminder draft stays; /api/state and /api/me
+   say support_session
 usage: p2538_a_support_test.py <datadir>"""
 import os
 import sys
@@ -81,7 +84,12 @@ WAYS = (
     ("office move", "post", "/api/office/move", {"name": "Ops", "confirm": True}), ("office move into an organisation", "post", "/api/office/move/org", {}),
     ("office trash for good", "delete", "/api/office/trash/1", None), ("trial delete-all", "post", "/api/office/trial/delete-all", {}),
     ("time delete-all", "post", f"/api/lists/{LID}/time/delete-all", {}), ("purge-done", "post", "/api/tasks/purge-done", {}),
-    ("project deleted", "delete", f"/api/lists/{LID}", None))
+    ("project deleted", "delete", f"/api/lists/{LID}", None),
+    # 2.538.0 (#4365): the reminder fee changes a finalised reminder, the master data import the office's structure, the import
+    # undos delete for good
+    ("reminder fee", "post", "/api/office/docs/1/fee", {"state": "waived"}), ("master data import", "post", "/api/office/import", {}),
+    ("fixed costs deleted", "post", "/api/office/fixed-costs/delete", {"ids": [999999]}),
+    ("trips deleted", "post", "/api/office/trips/delete", {"ids": [999999]}))
 for what, meth, path, body in WAYS:
     r = getattr(X, meth)(B + path, **({"json": body} if body is not None else {}))
     check(refused(r), f"support session: {what} ({meth.upper()} {path}) -> 403 support_session, {r.status_code} {r.text[:100]}")
@@ -93,6 +101,14 @@ check(kt.dbx("SELECT COUNT(*) FROM lists WHERE id=?", (LID,)) == [(1,)] and kt.d
       "the project and its task are still there")
 r = X.post(B + "/api/office/docs/1/status", json={"status": "sent"})
 check(not refused(r), f"support session: a status other than paid is no booking {r.status_code}")
+r = X.post(B + "/api/office/docs/reminder", json={"doc_ids": [999999], "level": 1})
+check(not refused(r) and r.status_code < 500, f"support session: a reminder draft is no booking {r.status_code} {r.text[:100]}")
+r = X.post(B + "/api/office/docs", json={"project_title": "Support draft"})
+check(r.status_code == 201, f"support session: a draft in her own office (person without an organisation) {r.status_code} {r.text[:100]}")
+check(X.get(B + "/api/state").json()["me"].get("support_session") is True and X.get(B + "/api/me").json().get("support_session") is True,
+      "support session: /api/state and /api/me say support_session (the app hides the HTTP Shortcuts download)")
+check(Fr.get(B + "/api/state").json()["me"].get("support_session") is False and Fr.get(B + "/api/me").json().get("support_session") is False,
+      "frida's own session: support_session false")
 r = X.get(B + "/api/me/share/httpshortcuts.zip", headers=SAME)
 check(refused(r), f"support session: GET httpshortcuts.zip (a new upload token) 403, {r.status_code}")
 r = Fr.get(B + "/api/me/share/httpshortcuts.zip", headers=SAME)
@@ -116,7 +132,7 @@ assert r.ok, r.text
 CID = r.json()["id"]
 Ca, Cc = login(B, "carl"), login(B, "cara")
 for s in (Ca, Cc):
-    assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done"}).ok
+    assert s.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": "cal,comments,collab,clients,office"}).ok
 r = Ca.post(B + "/api/orgs", json={"name": "Client Studio"})
 assert r.status_code == 201, r.text
 CO = r.json()["id"]
@@ -143,11 +159,25 @@ check(refused(r), f"support session: PATCH list_id onto the organisation's proje
 check(kt.dbx("SELECT list_id FROM tasks WHERE id=?", (PT,)) == [(PL,)], "the task stayed where it was")
 r = Cc.patch(B + f"/api/tasks/{PT}", json={"list_id": OL})
 check(r.ok, f"cara's own session moves it there {r.status_code} {r.text[:100]}")
+# 2.538.0 (#4365): the office takes its organisation from the workspace (org:CO): no write there without the organisation's grant
+r = Cc.post(B + "/api/office/docs", json={"project_title": "Studio job"})
+check(r.status_code == 201, f"cara's own session: a draft in the organisation's office {r.status_code} {r.text[:100]}")
+r = Y.post(B + "/api/office/docs", json={"project_title": "Studio help"})
+check(refused(r), f"support session: a draft in the organisation's office without its own support access 403, {r.status_code} {r.text[:100]}")
+check(kt.dbx("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND project_title='Studio help'", (CO,)) == [(0,)], "no draft was made there")
+r = Y.get(B + "/api/office/docs")
+check(r.ok, f"support session: reading the organisation's office stays {r.status_code}")
 assert Ca.post(B + "/api/support-access", json={"hours": 1, "org_id": CO}).ok
+r = Y.post(B + "/api/office/docs", json={"project_title": "Studio help"})
+check(r.status_code == 201, f"with the organisation's own support access: a draft in its office {r.status_code} {r.text[:100]}")
 r = Y.post(B + "/api/tasks", json={"title": "Into the studio", "list_id": OL})
 check(r.status_code in (200, 201), f"with the organisation's own support access: a task into its project {r.status_code} {r.text[:100]}")
 r = Y.post(B + "/api/lists", json={"name": "Help, org", "org_id": CO})
 check(r.status_code in (200, 201), f"with the organisation's own support access: a project with its org_id {r.status_code} {r.text[:100]}")
+
+assert Y.patch(B + "/api/settings", json={"workspace": "private"}).ok  # her own office (the personal office of the account)
+r = Y.post(B + "/api/office/docs", json={"project_title": "Private help"})
+check(r.status_code == 201, f"support session (member): a draft in her own office {r.status_code} {r.text[:100]}")
 
 print(f"p2538_a: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
