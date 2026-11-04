@@ -39,7 +39,22 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
       : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : []), ...extra];
   fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  const start = port => spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${port}`, 'about:blank'], {stdio: 'ignore'});
+  // CI of 2.496.1: three starts of p2151_ui stayed without a connection and nothing said why: Firefox's messages go to a file in
+  // the profile, each start notes how it ended, and the FAIL line carries it all (run_all.sh shows only FAIL lines)
+  const errFile = path.join(prof, 'firefox-stderr.txt'), tries = [];
+  const start = port => {
+    const err = fs.openSync(errFile, 'a'), t = {at: performance.now(), end: 'still running'};
+    const c = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${port}`, 'about:blank'], {stdio: ['ignore', 'ignore', err]});
+    fs.closeSync(err);
+    c.on('error', e => { t.end = `start failed: ${e.message}`; });
+    c.on('exit', (code, sig) => { t.end = `ended after ${Math.round((performance.now() - t.at) / 1000)} s (${sig || 'exit ' + code})`; });
+    tries.push(t);
+    return c;
+  };
+  const why = () => {
+    let err = ''; try { err = fs.readFileSync(errFile, 'utf8').replace(/\s+/g, ' ').trim().slice(-400); } catch { /* none */ }
+    return `tries: ${tries.map(t => t.end).join('; ')}; load ${os.loadavg()[0].toFixed(1)} on ${os.cpus().length} CPUs, ${Math.round(os.freemem() / 1048576)} MB free; stderr: ${err || '(empty)'}`;
+  };
   let PORT = await freePort(), ff = start(PORT);
   let ws, seq = 0; const pend = new Map();
   const connect = async () => {
@@ -52,7 +67,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       if (attempt) { try { ff.kill(); } catch { /* gone */ } await sleep(1000); PORT = await freePort(); ff = start(PORT); }
       await connect();
     }
-    if (!ws) { check(false, 'no WebDriver BiDi connection to Firefox'); return; }
+    if (!ws) { check(false, `no WebDriver BiDi connection to Firefox (${why()})`); return; }
     const onmsg = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
     ws.onmessage = onmsg;
     // 2.27.0: a command that never answers (a hung page, a promise that never settles) fails after 120 s with its name and
