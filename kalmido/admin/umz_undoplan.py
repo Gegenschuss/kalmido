@@ -19,7 +19,13 @@ from ..core.access import Denied
 from ..core.db import iso_ms, now_utc
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
+from ..files.fsref import fs_ref_subtree, fs_ref_trashed
+from ..files.store import READ_ACTIONS, fs_log_add
 from ..integrations.importers import imp_undo_after
+from ..office.periodlock import pl_tree_need_open
+from ..sheets.shfolder import SHF_KIND
+from ..team.clients import cl_trash
+from ..wiki.wkfolder import WKF_KIND
 from .acctimport import umz_cols
 
 _CHUNK = 500
@@ -209,7 +215,6 @@ def _refs(c, table):
 def _kid_filter(ct):
     if ct != "fs_log":
         return "", ()
-    from ..files.store import READ_ACTIONS  # an agent's reading is noted too, and changes nothing
     acts = sorted(READ_ACTIONS)
     return f" AND action NOT IN ({_qs(acts)})", tuple(acts)
 
@@ -258,8 +263,6 @@ def _spread(plan):
 
 def _keep_nodes_of_kept(c, plan):
     """A page or table that stays keeps the folder its reference node lies in (the folder's trash would take it along)."""
-    from ..sheets.shfolder import SHF_KIND
-    from ..wiki.wkfolder import WKF_KIND
     grew = False
     for table, kind in (("wiki_pages", WKF_KIND), ("sheets", SHF_KIND)):
         for part in _chunks(plan.of(table, plan.keep)):
@@ -312,11 +315,6 @@ def undo_plan(c, cr, since, tracked, space_cols):
 def _trash_node(c, uid, n, ts):
     """Node n (a row) with its subtree into the file store's trash; its pages and tables into their own, marked for the folder's
     restore. A receipt of a locked month inside: False, it stays where it is."""
-    from ..files.fsref import fs_ref_subtree, fs_ref_trashed
-    from ..files.store import fs_log_add
-    from ..office.periodlock import pl_tree_need_open
-    from ..sheets.shfolder import SHF_KIND
-    from ..wiki.wkfolder import WKF_KIND
     try:
         with c.savepoint():
             pl_tree_need_open(c, n["id"])
@@ -332,9 +330,6 @@ def _trash_node(c, uid, n, ts):
 
 def undo_trash(c, uid, plan):
     """The roots of the plan into their trash, before the rest is deleted."""
-    from ..sheets.shfolder import SHF_KIND
-    from ..team.clients import cl_trash
-    from ..wiki.wkfolder import WKF_KIND
     ts = iso_ms(now_utc())
     for nid in plan.of("fs_nodes", plan.roots):
         n = c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at IS NULL", (nid,)).fetchone()
