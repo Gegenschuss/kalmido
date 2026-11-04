@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.0.5 API tests. #310 emptying the trash: instance admins also delete for good what is trashed in shared lists of
+"""2.0.5 API tests. #310 emptying the trash: instance admins (2.530.0 #4316: only with ?all=1) also delete for good what is trashed in shared lists of
 other owners where they may edit (here: a list owned by an agent user), everyone else keeps the owner rule; the answer
 counts {deleted, kept}, the trash view marks what stays (keep). #311 closing notifications handled on another device:
 tag per task (t-<id>) tracked per device, completing / opening (/seen, /api/push/handled) / reading the News item marks it
@@ -145,17 +145,25 @@ check(r.ok and r.json().get("deleted") == 1 and r.json().get("kept") == 3, f"bob
 check(alive(TA, TA1, TB) == {TA, TA1, TB} and not alive(TBO), "bob: Dev items still there, his own gone")
 ta = {t["id"]: t for t in A.get(B + "/api/tasks?scope=trash").json()["tasks"]}
 check(set(ta) == {TA, TA1, TB, TM}, f"alice's trash (no view-only list): {sorted(ta)}")
-check(not any(t.get("keep") for t in ta.values()), "alice (admin + edit member): nothing marked keep")
+# 2.530.0 (#4316): an instance admin empties only the own trash by default; the other owners' trash only with ?all=1
+# (the dialog asks a second time with the number: others)
+pg = A.get(B + "/api/tasks?scope=trash").json()
+check(all(ta[t].get("keep") for t in (TA, TA1, TB)) and not ta[TM].get("keep") and pg.get("others") == 3,
+      f"#4316 alice (admin + edit member): the other owner's items marked keep, others=3: {pg.get('others')}")
 r = A.delete(B + "/api/trash")
-check(r.ok and r.json().get("deleted") == 4 and r.json().get("kept") == 0, f"alice empties: {{deleted: 4, kept: 0}}: {r.text}")
-check(not alive(TA, TA1, TB, TM), "admin: shared list of the agent emptied too (incl. subtask)")
+check(r.ok and r.json().get("deleted") == 1 and r.json().get("kept") == 3 and r.json().get("others") == 3,
+      f"#4316 alice empties her own trash only: {{deleted: 1, kept: 3, others: 3}}: {r.text}")
+check(alive(TA, TA1, TB) == {TA, TA1, TB} and not alive(TM), "#4316 admin: the agent's shared list keeps its trash by default")
+r = A.delete(B + "/api/trash?all=1")
+check(r.ok and r.json().get("deleted") == 3 and r.json().get("kept") == 0, f"alice empties with all=1: {{deleted: 3, kept: 0}}: {r.text}")
+check(not alive(TA, TA1, TB, TM), "admin with all=1: shared list of the agent emptied too (incl. subtask)")
 check(alive(TV) == {TV}, "a list where the admin only views: its trash is untouched")
 check(A.get(B + "/api/tasks?scope=trash").json()["tasks"] == [], "alice: trash empty now")
 # an admin who is not a member at all: nothing of the list
 TB2 = Bo.post(B + "/api/tasks", json={"title": "Bob again", "list_id": DEV}).json()["id"]
 Bo.delete(B + f"/api/tasks/{TB2}")
 A.delete(B + f"/api/lists/{DEV}/members/{ids['alice']}")
-r = A.delete(B + "/api/trash")
+r = A.delete(B + "/api/trash?all=1")  # 2.530.0 (#4316): also with all=1
 check(r.ok and r.json()["deleted"] == 0 and alive(TB2) == {TB2}, "admin without membership: the list's trash stays")
 # a subtask in a list the admin may not purge survives (detached) when its parent is deleted for good
 P = A.post(B + "/api/tasks", json={"title": "Parent", "list_id": MINE}).json()["id"]

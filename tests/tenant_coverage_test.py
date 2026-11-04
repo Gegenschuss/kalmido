@@ -332,6 +332,7 @@ ROUTES = {
     "GET /api/dayplan": "aggregate", "GET /api/dayplan/review": "aggregate", "GET /api/v1/dayplan": "aggregate",
     "GET /api/v1/dayplan/review": "aggregate", "GET /api/deps": "aggregate", "POST /api/tasks/purge-done": "aggregate",
     "DELETE /api/trash": "aggregate", "GET /api/roadmap": "aggregate",
+    "GET /api/trash/purge-info": "aggregate",  # 2.530.0 D (#4316): the numbers before "Empty" / ?hard=1 / a project for good (p2530_d_cascade_test.py)
     # 2.102.0 A (#1988): the list trash -- only lists the person may restore (otr_can: owner / list admin / the org's admins,
     # members only), by id the same 404 for every other list (p2102_a_api_test.py)
     "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",

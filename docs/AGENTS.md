@@ -106,7 +106,9 @@ needs no permission; 2.190.0: a token that may only read (no permission beyond *
 - **Trash period (2.138.1).** A task in the trash (`delete_task`, `list_trash`) is deleted for good by the server after the
   trash period (`KALMIDO_TRASH_DAYS`, 30 days, when the operator has the retention switch on); restore it before then.
   `empty_trash` (`DELETE /api/v1/trash`) with more than 200 tasks answers at once with `queued: true` and deletes them in the
-  background within seconds (2.281.0); `list_trash` shows the rest until then.
+  background within seconds (2.281.0); `list_trash` shows the rest until then. 2.530.0: it empties only the trash of the
+  projects the token's account owns (instance admins too; the other owners' trash only from the app with its own question),
+  tasks of a project kept by law stay until its end, and the video sign-offs at the deleted tasks go to the video trash.
 - Optional: **Only from** limits the agent's token to IP addresses / networks; a new token can **expire** (30 / 90 / 365
   days, never by default). Every request is in the [audit log](#audit-log) with the permission it needed.
 - **Only these projects (2.30.0).** An agent (its dialog; a personal agent: the permissions dialog) and every personal API

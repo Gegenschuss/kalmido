@@ -267,6 +267,9 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.530.0 D (#4316): the numbers of the app's delete dialogs before deleting for good (customer reports, form entries, video "
+     "reviews, kept by law, an instance admin's other owners) -- an agent's empty_trash waits for a person's approval with its number",
+     ("=GET /api/trash/purge-info",)),
     ("2.477.0 (#3881): the private list Notes of the app's quick note is made by the app's grip for the person; agents never "
      "see it and cannot be given it (a token makes notes in any list with POST /lists/{}/notes)",
      ("=POST /api/notes/quick-list",)),

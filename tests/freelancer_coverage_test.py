@@ -733,6 +733,7 @@ ROUTES = {
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",
     "DELETE /api/tasks/{}/links/{}": "tasks", "DELETE /api/tasks/{}/note-lock": "tasks",
     "DELETE /api/tasks/{}/waiting": "tasks", "DELETE /api/trash": "tasks",
+    "GET /api/trash/purge-info": "tasks",  # 2.530.0 D (#4316): the numbers before deleting for good (p2530_d_cascade_test.py, freelancer-matrix: tasks)
     # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
     "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
     "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)

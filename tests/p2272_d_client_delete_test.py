@@ -152,6 +152,9 @@ check(sql("SELECT COUNT(*) FROM office_privacy_sheets WHERE client_id=?", (CID,)
       and sql("SELECT COUNT(*) FROM office_client_contacts WHERE client_id=?", (CID,))[0][0] == 0,
       "run: data protection sheet, mail-in address and contact person go with it")
 check(sql("SELECT COUNT(*) FROM lists WHERE id=?", (LID,))[0][0] == 1, "run: the project stays")
+# 2.530.0 (#4316, audit B18): the client's video review is not taken along by the cascade: it lies in its own trash, without a client
+vr = sql("SELECT client_id, deleted_at FROM video_reviews WHERE id=?", (VR,))
+check(vr and vr[0][0] is None and vr[0][1], f"#4316 run: the video review goes to the video trash, not with the client {vr} {out[-300:]}")
 
 # a person deletes a client in the trash for good
 C2 = Fr.post(B + "/api/clients", json={"name": "Beta Test"}).json()["id"]

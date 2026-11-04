@@ -6,7 +6,7 @@
 // #311 the service worker closes notifications by tag (dismiss push, piggybacked dismiss), the app closes its own
 // notification when a task is opened and tells the server (POST /api/push/handled with X-Kalmido-Device).
 const fs = require('fs'), path = require('path'), vm = require('vm');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, until} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -144,9 +144,14 @@ async function swTests() {
   check(rows().length === 2 && !d.querySelector('[data-act="trash-empty"]'), 'only the kept ones remain, no "Empty" when nothing can be deleted');
   w.close();
   w = await boot({user: 'alice', hash: 'trash'}); d = w.document; await sleep(600);
-  check(rows().length === 2 && !d.querySelector('#view .tkeep') && !d.querySelector('#view .trkeep'), 'admin: nothing marked');
-  click(w, d.querySelector('[data-act="trash-empty"]')); await sleep(1500);
-  check(!rows().length && /Trash is empty/.test(d.querySelector('#view').textContent), 'admin empties the shared trash');
+  // 2.530.0 (#4316): an instance admin's own trash is empty here; the other owner's items are marked like for everyone, and
+  // "Empty" asks a second, explicit question with their number before it deletes them too (?all=1)
+  check(rows().length === 2 && d.querySelectorAll('#view .tkeep').length === 2 && d.querySelector('#view .trkeep'), '#4316 admin: the other owner\'s items marked');
+  asked = '';
+  w.confirm = m => { asked = m; return true; };
+  click(w, d.querySelector('[data-act="trash-empty"]'));
+  check(await until(() => !rows().length && /Trash is empty/.test(d.querySelector('#view').textContent)), 'admin empties the shared trash after the second question');
+  check(/other owners/.test(asked) && /2 tasks of other owners/.test(asked), '#4316 admin: the question names the other owners and the number: ' + asked);
   w.close();
 
   // ================= #311 opening a task: own notification closed, server told with the device header
