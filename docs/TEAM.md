@@ -831,6 +831,11 @@ The group no longer grows with every person you share a project with:
   with their access keys. What belongs to others stays: time entries in projects of an organisation (without the
   person's name), calendars of an organisation (to an admin of the organisation, as when leaving it), direct
   conversations (for the other person). Mentions of the person read "@Deleted user"; the histories keep no id of it.
+- **What the account shares privately stays (2.508):** before an account is deleted, its private calendars, address books, tables
+  and the knowledge pages somebody else may write go to the person who has had the right to write them longest (a share of a
+  folder they lie in counts; never an agent, a child account or a disabled account). Others keep their shares; read-only shares
+  and public links of a moved knowledge page end. Without such a person the object goes with the account, and the delete dialog
+  counts both beforehand. Shared folders and files of the file store still go with the account.
 - **Kept by law:** finalised invoices and archive entries (books, 10 years), booked receipts and receipts of trips taken
   into DATEV, and the logbook (8 years), each counted from the end of its calendar year. A personal office or an
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any

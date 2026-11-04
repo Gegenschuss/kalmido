@@ -530,13 +530,17 @@ def user_purge(c, uid, gated=False):
     from ..admin.hosting import hosted
     from ..office.olock import OLK_BYPASS
     tok = OLK_BYPASS.set(bool(gated) and hosted())  # 2.152.0 (#2164, review A2): the hosted instance keeps no booked receipts (rx_gate passed)
+    made = []
     try:
-        return _user_purge(c, uid)
+        return _user_purge(c, uid, made)
+    except BaseException:
+        unlink_files(made)  # 2.508.0 (#4301): the caller rolls back: the sealed copies of what was to be handed on go
+        raise
     finally:
         OLK_BYPASS.reset(tok)
 
 
-def _user_purge(c, uid):
+def _user_purge(c, uid, made):
     from ..accounts.orgretain import upg_personal, upg_rest
     from ..admin.backup import bkr_journal
     bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)
@@ -545,7 +549,7 @@ def _user_purge(c, uid):
     files = upg_personal(c, uid)
     files += upg_rest(c, uid)
     from ..admin.purgeshare import ush_hand_on
-    files += ush_hand_on(c, uid)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
+    files += ush_hand_on(c, uid, made)  # 2.508.0 (#4301): what it shares privately goes to who may write it, before its tree and key go
     from ..team.clients import cl_user_purge
     cl_user_purge(c, uid)  # 2.223.3 B (#2878): its private clients (kept ones with the retired office, anonymised)
     from ..admin.acctexport import umz_forget

@@ -22,7 +22,6 @@ from ..contacts.orgbooks import obk_hand_on
 from ..core.access import list_role
 from ..core.db import iso, iso_ms, now_utc
 from ..core.pg import insert_id, system_ctx
-from ..core.serializers import unlink_files
 from ..files.fsref import fs_ref_node
 from ..files.store import fs_chain, fs_deleted
 from ..sheets.core import sh_touch
@@ -31,8 +30,8 @@ from ..sheets.shfolder import SHF_KIND, shf_after_move
 from ..sheets.shkinds import shk_move_files
 from ..sheets.shshare import shs_drop_cache
 from ..wiki.wikie2e import wke_mode
-from ..wiki.wkfolder import WKF_KIND, wkf_node_of, wkf_sync
-from ..wiki.wkhist import wsb_body_or
+from ..wiki.wkfolder import WKF_KIND, WKF_SEEN, wkf_node_of, wkf_sync
+from ..wiki.wkhist import wkh_drop_unreadable, wsb_body_or
 from ..wiki.wkmove import wkm_place
 from ..wiki.wkshare import wsh_covers, wsh_rows
 
@@ -72,13 +71,13 @@ def _folder_shares(c, uid, ref_kind, rid):
                                         (*[x["id"] for x in chain], iso(now_utc()))).fetchall()]
 
 
-def _item(c, uid, oid, rid, direct, folder, write, fallback=None):
+def _item(c, uid, oid, rid, direct, folder, write, fallback=None, fits=None):
     """What happens to one object: {id, heir, others: {person: role through a folder}, shared: anybody else had it}; None when
-    no other person has it (and no fallback takes it)."""
+    no other person has it (and no fallback takes it). fits(person): may this one hold it at all."""
     rows = sorted(list(direct) + list(folder), key=lambda x: (x[0] or "", x[1]))
     who = _accounts(c, [x[1] for x in rows] + [fallback])
     people = [x for x in rows if x[1] != uid and _person(who.get(x[1]))]
-    can = lambda u: not who[u]["kid"] and _org_ok(c, oid, u)  # noqa: E731
+    can = lambda u: not who[u]["kid"] and _org_ok(c, oid, u) and (fits is None or fits(u))  # noqa: E731
     heir = next((u for _, u, role in people if role in (write, "edit") and can(u)), None)
     if heir is None and fallback and fallback != uid and _person(who.get(fallback)) and can(fallback):
         heir = fallback
@@ -125,7 +124,8 @@ def ush_plan(c, uid):
             shares = [r for r in wsh_rows(c, None, uid) if r["kind"] == "person" and r["user_id"]]
             for p in c.execute("SELECT id, path FROM wiki_pages WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL", (uid,)).fetchall():
                 read = [(r["created_at"], r["user_id"], "view") for r in shares if wsh_covers(r, p["path"], p["id"])]
-                out["wiki"].append(_item(c, uid, None, p["id"], read, _folder_shares(c, uid, WKF_KIND, p["id"]), "edit"))
+                out["wiki"].append(_item(c, uid, None, p["id"], read, _folder_shares(c, uid, WKF_KIND, p["id"]), "edit",
+                                         fits=lambda u: not wke_mode(c, None, u)[0]))  # review: never into a space with the lock (the text would lie open there)
     return {k: [x for x in v if x] for k, v in out.items()}
 
 
@@ -190,7 +190,9 @@ def _wiki(c, uid, items, new_paths, old_paths):
             others[x["id"]] = x["others"]
         if not rows:
             continue
+        wkh_drop_unreadable(c, [r["id"] for r in rows])
         wkm_place(c, None, uid, heir, rows, new_paths, old_paths)
+        WKF_SEEN.pop(f"u{int(heir)}", None)  # a deletion tried before and rolled back left this very state noted, without its nodes
         wkf_sync(c, heir, None)
         for pid, who in others.items():
             n = wkf_node_of(c, pid)
@@ -198,22 +200,18 @@ def _wiki(c, uid, items, new_paths, old_paths):
                 insert_id(c, "INSERT INTO fs_shares(node_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?)", (n["id"], u, role, heir, iso(now_utc())))
 
 
-def ush_hand_on(c, uid):
+def ush_hand_on(c, uid, new_paths):
     """The deletion of account uid (users._user_purge, after the lists are settled, before its file store and its key go):
-    everything of ush_plan with a heir passes to it. -> the stored files to remove after the commit. The caller commits;
-    on an error the files copied so far go and the error stands (the caller rolls back)."""
+    everything of ush_plan with a heir passes to it. -> the stored files to remove after the commit. new_paths: the sealed
+    copies made here are added, for the caller to remove if the deletion fails later on. The caller commits."""
     uid = int(uid)
     plan = {k: [x for x in v if x["heir"]] for k, v in ush_plan(c, uid).items()}
-    new_paths, old_paths = [], []
+    old_paths = []
     with system_ctx(c):  # the rows of both people, whoever deletes the account
-        try:
-            _calendars(c, plan["calendars"])
-            _books(c, plan["books"])
-            _sheets(c, plan["sheets"], new_paths, old_paths)
-            _wiki(c, uid, plan["wiki"], new_paths, old_paths)
-        except BaseException:
-            unlink_files(new_paths)
-            raise
+        _calendars(c, plan["calendars"])
+        _books(c, plan["books"])
+        _sheets(c, plan["sheets"], new_paths, old_paths)
+        _wiki(c, uid, plan["wiki"], new_paths, old_paths)
     n = sum(len(v) for v in plan.values())
     if n:
         print(f"account deletion: {n} shared object(s) handed on (#4301)", flush=True)

@@ -223,6 +223,19 @@ def wkh_move(c, rows, to, uid, keep=True):
                   (to, owner, wkh_seal(c, to, owner, _vbody(c, v), WKH_VCTX), v["id"]))
 
 
+def wkh_drop_unreadable(c, ids):
+    """2.508.0 (#4301): versions of pages ids nobody can open any more (their key is gone) would stop wkh_move, and with it an
+    account's deletion; they cannot be read by anyone, so they go."""
+    if not ids:
+        return
+    q = ",".join("?" * len(ids))
+    for v in c.execute(f"SELECT id, org_id, owner_id, body FROM wiki_versions WHERE page_id IN ({q})", ids).fetchall():
+        try:
+            _vbody(c, v)
+        except WikiUnreadable:
+            c.execute("DELETE FROM wiki_versions WHERE id=?", (v["id"],))
+
+
 # ---- the passes (admin/orgcrypt_cli.py) ---------------------------------------------------------------------------------
 def wkh_settle(c, plain=None, stop=None):
     """Seal every plain text of pages and versions of spaces without the lock where sealing is on (plain None), or open

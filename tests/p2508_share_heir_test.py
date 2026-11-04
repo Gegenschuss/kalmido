@@ -23,6 +23,16 @@ PDF = b"%PDF-1.4 a small manual"
 DAY = "2030-03-04"
 
 
+def write(q, args=()):
+    c = dbxm.connect(os.path.join(kt.DATA, "tasks.db"))
+    c.execute(q, args)
+    c.commit()
+    c.close()
+
+
+write("INSERT INTO settings(key, value) VALUES('wiki_encrypt', '1') ON CONFLICT (key) DO UPDATE SET value='1'")  # page texts sealed too
+
+
 def person(name):
     r = A.post(B + "/api/users", json={"username": name, "display_name": name.title(), "password": "password123",
                                        "email": f"{name}@example.com", "orgs": []})
@@ -91,10 +101,7 @@ B1 = book(An, "Friends")
 for who, role in ((DORA, "view"), (CARA, "edit"), (BERT, "edit")):
     assert An.put(B + f"/api/books/{B1}/members", json={"user_id": who, "role": role}).ok
 # within one second the lower id wins: cara's share is made the older one, so the date is what decides here
-c = dbxm.connect(os.path.join(kt.DATA, "tasks.db"))
-c.execute("UPDATE book_members SET added_at='2020-01-01T00:00:00Z' WHERE book_id=? AND user_id=?", (B1, CARA))
-c.commit()
-c.close()
+write("UPDATE book_members SET added_at='2020-01-01T00:00:00Z' WHERE book_id=? AND user_id=?", (B1, CARA))
 r = Be.post(B + "/api/contacts", json={"book_id": B1, "fn": "Olaf Example"})
 check(r.ok, "bert enters a contact " + r.text[:120])
 CT = r.json().get("id") or r.json().get("contact", {}).get("id")
@@ -151,6 +158,21 @@ check(sh["to"] == {"calendars": 1, "books": 2, "sheets": 2, "wiki": 2}, f"the di
 check(sh["gone"] == {"calendars": 1, "books": 1, "sheets": 1, "wiki": 1}, f"and what goes because nobody may write: {sh['gone']}")
 check(set(sh["names"]) == {"Bert", "Cara"}, f"and names who takes over: {sh['names']}")
 
+# ---------------------------------------------------------------- a deletion that fails later leaves no copies behind (review)
+stored = lambda: sorted(os.listdir(os.path.join(kt.DATA, "attachments", "sheets", str(S1))))  # noqa: E731
+BEFORE = stored()
+write(f"""CREATE FUNCTION p2508_no() RETURNS trigger AS $$ BEGIN RAISE EXCEPTION 'no'; END $$ LANGUAGE plpgsql;
+          CREATE TRIGGER p2508_no BEFORE DELETE ON users FOR EACH ROW WHEN (OLD.id={ANNA}) EXECUTE FUNCTION p2508_no()""")
+r = A.delete(B + f"/api/users/{ANNA}")
+check(r.status_code >= 500, f"the deletion fails at its last step ({r.status_code})")
+check(owner("ev_cals", C1) == ANNA and owner("sheets", S1) == ANNA, "nothing changed hands")
+check(stored() == BEFORE, f"and no sealed copy stays on the disk: {BEFORE} -> {stored()}")
+write("DROP TRIGGER p2508_no ON users; DROP FUNCTION p2508_no()")
+
+# an old state of a page nobody can open any more does not stop the deletion (review)
+write("""INSERT INTO wiki_versions(page_id, owner_id, path, body, created_at, updated_at)
+         VALUES(?, ?, 'Team/Plan', 'kenc1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA', '2020-01-01', '2020-01-01')""", (P1, ANNA))
+
 # ---------------------------------------------------------------- the deletion
 r = A.delete(B + f"/api/users/{ANNA}")
 check(r.ok, "the account goes " + r.text[:200])
@@ -195,7 +217,28 @@ check(r.ok and r.json().get("body") == "Notes by everybody, bert too", "the text
 r = Ca.get(B + f"/api/wiki/shared/pages/{P2}")
 check(r.ok and r.json().get("role") == "view", "cara still reads it " + r.text[:120])
 check(owner("wiki_pages", P3) is None and owner("wiki_pages", P4) is None, "read-only and unshared pages go")
+r = dbx("SELECT body FROM wiki_pages WHERE id=?", (P2,))[0][0]
+check(r.startswith("kenc1:"), "the text is sealed for its new owner, not lying open")
+check(not dbx("SELECT 1 FROM wiki_versions WHERE page_id=? AND body LIKE 'kenc1:AAAA%'", (P1,)), "the unreadable old state went")
 check(not dbx("SELECT 1 FROM users WHERE id=?", (ANNA,)), "and the account is gone")
+
+# ---------------------------------------------------------------- never into a knowledge space with the lock (review)
+JANA, Ja = person("jana")
+IVO, Iv = person("ivo")
+KURT, Ku = person("kurt")
+LF1 = fid(Ja.post(B + "/api/wiki/folders", json={"space": "private", "name": "Both"}))
+LF2 = fid(Ja.post(B + "/api/wiki/folders", json={"space": "private", "name": "Only ivo"}))
+L1 = page(Ja, "Both/One", "For ivo and kurt")
+L2 = page(Ja, "Only ivo/Two", "For ivo")
+for f, who in ((LF1, IVO), (LF1, KURT), (LF2, IVO)):
+    assert Ja.post(B + f"/api/files/nodes/{f}/shares", json={"user_id": who, "role": "edit"}).ok
+write("DELETE FROM wiki_spaces WHERE owner_id=?", (IVO,))
+write("INSERT INTO wiki_spaces(owner_id, e2e, e2e_gen) VALUES(?, 'on', 1)", (IVO,))
+sh = A.get(B + f"/api/users/{JANA}/delete-info").json()["purge"]["shared"]
+check(sh["to"] == {"wiki": 1} and sh["gone"] == {"wiki": 1}, f"the dialog counts it so: {sh}")
+assert A.delete(B + f"/api/users/{JANA}").ok
+check(owner("wiki_pages", L1) == KURT, "the next person with the right takes it")
+check(owner("wiki_pages", L2) is None, "nobody else: it goes")
 
 # ---------------------------------------------------------------- an agent never takes over
 FA, Fa = person("fina")
