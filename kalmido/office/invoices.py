@@ -447,7 +447,8 @@ def _lines_eur(c, oid, r):
     2.189.0 (#2475): in the home currency of the office (EUR for every office of before)."""
     from .docs import _calc_doc, doc_items
     s = office_settings(c, oid)
-    pack = office_pack_for(s)
+    from .calc import calc_tax_day
+    pack = office_pack_for(s, calc_tax_day(dict(r)))  # 2.531.0 (#4498)
     d = _calc_doc(r, hc_home(s))
     d["currency"] = d["home"]
     return office_calc(d, doc_items(c, r["id"], oid), pack)["lines"]

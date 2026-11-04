@@ -7,18 +7,26 @@
   "currency": "EUR",
   "lang": "de",
   "tax": {
-    "standard": 19,
-    "reduced": 7,
+    "standard": [
+      {"valid_from": "1970-01-01", "rate": 19},
+      {"valid_from": "2020-07-01", "rate": 16},
+      {"valid_from": "2021-01-01", "rate": 19}
+    ],
+    "reduced": [
+      {"valid_from": "1970-01-01", "rate": 7},
+      {"valid_from": "2020-07-01", "rate": 5},
+      {"valid_from": "2021-01-01", "rate": 7}
+    ],
     "exempt": 0,
     "labels": {
       "de": {
-        "standard": "19 % MwSt.",
-        "reduced": "7 % MwSt.",
+        "standard": "{rate} % MwSt.",
+        "reduced": "{rate} % MwSt.",
         "exempt": "steuerfrei"
       },
       "en": {
-        "standard": "19 % VAT",
-        "reduced": "7 % VAT",
+        "standard": "{rate} % VAT",
+        "reduced": "{rate} % VAT",
         "exempt": "tax exempt"
       }
     },

@@ -20,7 +20,7 @@ from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_item_store, oc_json_load, oc_json_store
 from ..core.errors import BadInput
-from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
+from .calc import RAW_MODES, TAX_KEYS, calc_cur, calc_tax_day, calc_lang, dec, fmt_money, fmt_qty, fmt_rate, label, money, office_calc, pack_tax, unit_text, _num
 from .homecur import hc_home  # 2.189.0 (#2475)
 from .doclang import doc_txt
 from .model import PARTS_TITLE_FILM, UNITS, office_role, office_settings
@@ -375,7 +375,7 @@ def tp_recalc(c, oid, r, pack=None):
         return
     if pack is None:
         s = office_settings(c, oid)
-        pack = office_pack_for(s)
+        pack = office_pack_for(s, calc_tax_day(dict(r)))  # 2.531.0 (#4498)
     nets = {}
     for p in parts:
         t = tp_part_calc(c, oid, r, p, pack)
@@ -496,7 +496,7 @@ def tp_public(c, oid, r, admin, totals=None):
 def _shoot_calc_public(c, oid, r, p, admin):
     """The shoot calculation of part p for the editor (C's dk_calc_public strips the purchase side for members)."""
     s = office_settings(c, oid)
-    pack = office_pack_for(s)
+    pack = office_pack_for(s, calc_tax_day(dict(r)))  # 2.531.0 (#4498)
     t = tp_part_calc(c, oid, r, p, pack)
     calc = dict(t.get("sheet_calc") or {})
     pub = _dk("dk_calc_public")
@@ -613,7 +613,7 @@ def tp_inv_items(c, oid, r, mode=None, title=None):
     if not tp_has_parts(c, oid, r["id"]):
         return None
     s = office_settings(c, oid)
-    pack = office_pack_for(s)
+    pack = office_pack_for(s, calc_tax_day(dict(r)))  # 2.531.0 (#4498)
     mode = mode or s.get("parts_invoice_mode") or "full"
     if mode not in INVOICE_MODES:
         raise BadInput(tr("Invalid value: {0}", "mode"))

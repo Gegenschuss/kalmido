@@ -25,6 +25,7 @@ Money is Decimal, rounded half up to 2 places at every step the template rounds;
 import os
 import re
 import json
+from datetime import date as _date
 from decimal import Decimal, ROUND_HALF_UP, InvalidOperation
 try:  # 2.263.0 (#2976): the one reader of typed numbers; calc.py loaded on its own (tests/office_calc_test.py) reads a comma as decimal
     from ..core.numtext import num_text, user_dec
@@ -135,10 +136,37 @@ def half_days(x):
     return ((dec(x) / 5).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) * 5).normalize() + Decimal(0)
 
 
-def pack_tax(pack, key):
-    """The percentage of a tax key from the pack (tax: {standard: 19} or {standard: {pct: 19}}), the DE defaults otherwise."""
+def tax_rate_on(v, day=None):
+    """2.531.0 (#4498): the rate a pack's tax value v gives on day ("YYYY-MM-DD", None = today): a number (or {pct}) as it is; of
+    a list [{valid_from, rate}, ...] (ascending, packs.pack_tax_problems) the last one whose valid_from is not after day,
+    before the first one the first one; None for an empty list."""
+    if not isinstance(v, list):
+        return v
+    rows = [x for x in v if isinstance(x, dict) and isinstance(x.get("valid_from"), str)]
+    if not rows:
+        return None
+    d = str(day)[:10] if day else _date.today().isoformat()
+    hit = rows[0]
+    for x in rows:
+        if x["valid_from"] <= d:
+            hit = x
+    return hit.get("rate")
+
+
+def calc_tax_day(doc):
+    """2.531.0 (#4498): the day whose rates document doc uses: the end of its period of service, else its date (None = today)."""
+    for k in ("service_to", "date"):
+        v = (doc or {}).get(k)
+        if isinstance(v, str) and re.match(r"^\d{4}-\d{2}-\d{2}", v):
+            return v[:10]
+    return None
+
+
+def pack_tax(pack, key, day=None):
+    """The percentage of a tax key from the pack (tax: {standard: 19} or {standard: {pct: 19}}), the DE defaults otherwise.
+    2.531.0 (#4498): a list of rates with valid_from gives the one valid on day (calc_tax_day of the document)."""
     t = (pack or {}).get("tax") or {}
-    v = t.get(key)
+    v = tax_rate_on(t.get(key), day)
     if isinstance(v, dict):
         v = v.get("pct", v.get("rate"))
     if v is None:
@@ -278,7 +306,7 @@ def office_calc(doc, items, pack=None):
     prod_on = True if prod_on is None else _flag(prod_on)
     share = doc.get("producing_mode") == "amount"  # 2.113.1 (#2251): share by amount (prod_quotient = the factor)
     hu_pct, mk_pct = dec(doc.get("handling_pct"), "0"), dec(doc.get("markup_pct"), "0")  # 2.113.1 (#2252)
-    rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
+    rates = {k: (Decimal(0) if novat else pack_tax(pack, k, calc_tax_day(doc))) for k in TAX_KEYS}  # 2.531.0 (#4498): by the day of service
 
     def conv(rate):  # the rate in the document's currency; 2.354.0 A (#2831): unrounded (was money(): 1000 x 0.125 = 130)
         r = dec(rate)
@@ -515,7 +543,7 @@ def inv_calc(doc, items, pack=None):
     lang = calc_lang(doc.get("lang"))  # 2.185.0 C (#2520)
     home, currency, fx, foreign = calc_cur(doc)  # 2.189.0 (#2475)
     novat = str(doc.get("vat_mode") or "vat") == "novat"
-    rates = {k: (Decimal(0) if novat else pack_tax(pack, k)) for k in TAX_KEYS}
+    rates = {k: (Decimal(0) if novat else pack_tax(pack, k, calc_tax_day(doc))) for k in TAX_KEYS}  # 2.531.0 (#4498): by the day of service
 
     def conv(rate):  # 2.354.0 A (#2831): unrounded, the position is money(qty x rate x fx) (was money(rate) first)
         r = dec(rate)

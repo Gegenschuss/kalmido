@@ -176,5 +176,22 @@ t = inv_calc({"lang": "de", "vat_mode": "novat"}, RE663)
 check(t["tax_lines"] == [] and t["tax"] == "0.00" and t["gross"] == "34422.90" and t["vat_note"], "novat invoice: gross = net, note text")
 check(dstr("1234.5") == "1234.50" and dstr(0) == "0.00" and dstr("-0.004") == "0.00" or dstr("-0.004") == "-0.00", f"dstr: {dstr('1234.5')} {dstr(0)}")
 
+# ---------------------------------------------------------------- 2.531.0 (#4498): rates with a validity, by the day of service
+# an invented pack: standard 20 % until 2030-06-30, 22 % from 2030-07-01; reduced stays one number (the old form)
+DATED = {"code": "QQ", "tax": {"standard": [{"valid_from": "1970-01-01", "rate": 20}, {"valid_from": "2030-07-01", "rate": 22}],
+                               "reduced": 10, "exempt": 0}}
+pct = lambda doc, f=office_calc, tax="standard": f(doc, [it("A", 1, 100, tax=tax)], DATED)["tax_lines"][0]["pct"]  # noqa: E731
+check(pct({**DOC, "date": "2030-06-30"}) == 20, "#4498: the day before the change: the old rate")
+check(pct({**DOC, "date": "2030-07-01"}) == 22, "#4498: from the day of the change: the new rate")
+check(pct({**DOC, "date": "2030-07-15", "service_to": "2030-06-20"}) == 20, "#4498: the end of the period of service wins over the date")
+check(pct({**DOC, "date": "2030-06-15", "service_to": "2030-07-02"}) == 22, "#4498: ... also the other way round")
+check(pct({**DOC, "date": "2030-07-15"}, tax="reduced") == 10, "#4498: a plain number is valid always (old form)")
+check(float(pct({"lang": "de", "currency": "EUR", "date": "2030-06-30"}, inv_calc)) == 20
+      and float(pct({"lang": "de", "currency": "EUR", "service_to": "2030-07-01"}, inv_calc)) == 22, "#4498: the invoice calculator too")
+check(pct({**DOC, "date": "1960-01-01"}) == 20, "#4498: before the first entry: the first rate")
+check(calc.tax_rate_on([{"valid_from": "1970-01-01", "rate": 19}, {"valid_from": "2020-07-01", "rate": 16}, {"valid_from": "2021-01-01", "rate": 19}], "2020-12-31") == 16
+      and calc.tax_rate_on(7, "2020-12-31") == 7 and calc.tax_rate_on([], "2020-01-01") is None, "#4498: tax_rate_on: list, number, empty list")
+check(calc.calc_tax_day({"date": "2030-01-02", "service_to": ""}) == "2030-01-02" and calc.calc_tax_day({}) is None, "#4498: the day of a document")
+
 print(f"office_calc_test: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

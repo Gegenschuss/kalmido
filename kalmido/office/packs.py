@@ -111,11 +111,7 @@ def office_pack_validate(d):
         bad.append("tax: object required")
     else:
         for k in PACK_TAX_KEYS:
-            v = tax.get(k)
-            if not isinstance(v, (int, float)) or isinstance(v, bool) or v < 0 or v > 100:
-                bad.append(f"tax.{k}: number 0..100")
-        if tax.get("exempt") not in (0, 0.0):
-            bad.append("tax.exempt: must be 0")
+            bad += pack_tax_problems(k, tax.get(k))  # 2.531.0 (#4498): a number or a list of rates with valid_from
         labels = tax.get("labels")
         if not isinstance(labels, dict) or any(not isinstance(labels.get(lg), dict) or any(not isinstance(labels[lg].get(k), str) for k in PACK_TAX_KEYS) for lg in PACK_LANGS):
             bad.append("tax.labels: de/en with standard/reduced/exempt")
@@ -272,19 +268,85 @@ def pack_retention(pack, s=None):
     return rt
 
 
-def office_pack_for(s):
+# 2.531.0 (#4498): a tax key of a pack is a number (valid always, as before) or a list of rates with the day they are valid
+# from, [{"valid_from": "1970-01-01", "rate": 19}, {"valid_from": "2020-07-01", "rate": 16}, ...]: ascending, no day twice, the
+# first one from PACK_TAX_START (no gap at the start); each one is valid until the next one begins.
+PACK_TAX_START = "1970-01-01"
+_DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _rate_ok(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100
+
+
+def pack_tax_problems(k, v):
+    """2.531.0 (#4498): what is wrong with tax key k of a pack (number or list of rates with valid_from) -> list of problems."""
+    if not isinstance(v, list):
+        if not _rate_ok(v):
+            return [f"tax.{k}: number 0..100"]
+        return ["tax.exempt: must be 0"] if k == "exempt" and v != 0 else []
+    if not v:
+        return [f"tax.{k}: list of {{valid_from, rate}} must not be empty"]
+    bad, prev = [], None
+    for i, x in enumerate(v):
+        day = x.get("valid_from") if isinstance(x, dict) else None
+        if not isinstance(day, str) or not _DAY_RE.match(day) or not _day_ok(day):
+            bad.append(f"tax.{k}[{i}].valid_from: date YYYY-MM-DD")
+            continue
+        if not _rate_ok(x.get("rate")):
+            bad.append(f"tax.{k}[{i}].rate: number 0..100")
+        elif k == "exempt" and x["rate"] != 0:
+            bad.append("tax.exempt: must be 0")
+        if i == 0 and day > PACK_TAX_START:
+            bad.append(f"tax.{k}: the first rate must be valid from {PACK_TAX_START} (gap at the start)")
+        if prev is not None and day <= prev:
+            bad.append(f"tax.{k}[{i}].valid_from: must lie after the one before (ascending, no day twice)")
+        prev = day
+    return bad
+
+
+def _day_ok(day):
+    from datetime import date
+    try:
+        date.fromisoformat(day)
+    except ValueError:
+        return False
+    return True
+
+
+def pack_rate_for(pack, key, day=None):
+    """2.531.0 (#4498): the rate of tax key key in pack on day (date or "YYYY-MM-DD"; None = today): a number as it is, of a
+    list the last rate whose valid_from is not after day (before the first one: the first one). None when the pack has none."""
+    from .calc import tax_rate_on
+    return tax_rate_on(((pack or {}).get("tax") or {}).get(key), _day_text(day))
+
+
+def _day_text(day):
+    if day is None or day == "":
+        from ..core.db import local_now
+        return local_now().date().isoformat()
+    return day.isoformat() if hasattr(day, "isoformat") else str(day)[:10]
+
+
+def office_pack_for(s, day=None):
     """2.147.0 (#2461): the country pack an office area with settings s works with (DE when its pack is gone, as before).
     A pack with tax.editable (the neutral base pack) takes the office's own rates (settings tax_rates {standard, reduced});
-    its tax labels may hold {rate}. Documents finalised before keep their snapshot (ledger.ofx_finalize)."""
+    its tax labels may hold {rate}. Documents finalised before keep their snapshot (ledger.ofx_finalize).
+    2.531.0 (#4498): rates with a validity (lists) come as the number valid on day (calc.calc_tax_day of a document; None =
+    today), so every reader sees numbers as before; the labels' {rate} is filled in every pack that has such a list."""
     pack = office_pack((s or {}).get("pack")) or office_pack("DE")
     if not pack:
         return pack
     tax = pack.get("tax") or {}
-    if not tax.get("editable"):
+    dated = any(isinstance(tax.get(k), list) for k in PACK_TAX_KEYS)
+    if not tax.get("editable") and not dated and "{rate}" not in json.dumps(tax.get("labels") or {}):
         return pack
-    own = (s or {}).get("tax_rates") or {}
+    own = ((s or {}).get("tax_rates") or {}) if tax.get("editable") else {}
     p = json.loads(json.dumps(pack))
     t = p["tax"]
+    for k in PACK_TAX_KEYS:
+        if isinstance(t.get(k), list):
+            t[k] = pack_rate_for(pack, k, day)
     for k in ("standard", "reduced"):
         v = own.get(k) if isinstance(own, dict) else None
         if isinstance(v, (int, float)) and not isinstance(v, bool) and 0 <= v <= 100:
