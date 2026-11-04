@@ -278,7 +278,7 @@ def ofb_chain_plan(s, label):
         check(s.post(B + f"{D}/{q}/cashflow", json={"cashflow": "yes"}).ok, f"{label} #4525: cashflow yes")
     got = plan()
     check(got == {q1: Decimal("11660.00"), q2: Decimal("11660.00") - pg}, f"{label} #4525: two versions count, the progress invoice is deducted once {got}")
-    # review 2.533.0 (#4525): a newer version smaller than the progress invoices of the chain stands with 0, not negative
+    # review 2.533.0 (#4525): a newer version smaller than the progress invoices of the chain is not a negative income (put() drops it)
     for q in (q1, q2):
         check(s.post(B + f"{D}/{q}/cashflow", json={"cashflow": "auto"}).ok, f"{label} #4525: cashflow auto")
     r = s.post(B + f"{D}/{q2}/duplicate")

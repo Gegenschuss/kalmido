@@ -390,9 +390,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
             continue
         k = cf8_key(r)
         gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home) - (prog.get(k, 0) if ofb_at.get(k) == r["id"] else 0)
-        # review 2.533.0 (#4525): a counting version smaller than the progress invoices of its chain stands with 0, never
-        # as a negative income (the progress invoices are in the plan by themselves)
-        gross = max(gross, dec(0))
+        # review 2.533.0 (#4525): smaller than the progress invoices of its chain: put() leaves a non-positive amount out
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
         put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", res=gross * netf(r), number=r["number"], doc_id=r["id"],
             open_offer=r["status"] == "sent")
