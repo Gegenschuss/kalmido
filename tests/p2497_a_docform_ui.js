@@ -88,6 +88,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     check(await ready(ev, `!!document.querySelector('.rc-slot [data-rc="open:0"]')`), '#4433: moved into the office, it offers "Record as receipt"');
     const inOffice = await call(CA, 'GET', '/api/docs?ws=all&area=office&facets=0');
     check((inOffice.docs || []).some(d => d.id === P.id), '#4433: the office list has the moved document');
+    check(await open(nav, ev, L) && await ready(ev, `!!document.querySelector('.rc-slot [data-rc="open:0"]')`), 'the letter again');  // 2.522.0 (#4433): the steps below are the letter's
     await shot('p2497-a-letter-desktop.png');
     let rows = JSON.parse(await ev(GRID));
     check(rows.length >= 6, 'the fields of the document ' + rows.length);
