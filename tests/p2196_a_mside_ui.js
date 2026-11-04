@@ -132,6 +132,7 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await ev(`(() => { route(); return 1; })()`);
     await sleep(600);
     check(!(await ev(`!!document.querySelector('#side.open') || !!history.state?.side`)), `${tag}: #4344: a later route() does not reopen the drawer`);
+    await open(ev);
     await ev(tap('#side .sbmr .srb[data-sbb="office"]'));
     await ready(ev, `S.route.mod === 'office'`, 30);
     await ev(tap('#side .sbmr .srb[data-sbb="cal"]'));
