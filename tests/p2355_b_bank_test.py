@@ -352,6 +352,22 @@ for who, s in (("org", A), ("freelancer", Fr)):
     check(s.patch(B + f"{O}/cash-entries/{E}", json={"text": "Barzahlung Licht Rechnung"}).ok, p + "its text can")
     r = s.post(B + f"{O}/cash-entries/{E}/cancel", json={})
     check(r.status_code == 201 and status(s, I4) != "paid", p + f"the cancellation takes the payment back {r.status_code} {status(s, I4)}")
+    # 2.533.0 (#4337): an invoice chosen while editing books the payment like a new entry (was: the entry carried the
+    # invoice, the invoice stayed open); also when the entry turns from out to in; the org's encryption is on here
+    for k, (first, change) in enumerate(((dict(dir="in"), dict(invoice_id=None)), (dict(dir="out"), dict(dir="in")))):
+        I7 = invoice(s, cl, f"Nachtrag {k}", 50)  # 59.50 gross
+        r = s.post(B + f"{O}/cashbooks/{CB}/entries", json={"day": TD, "amount": "59.50", "text": f"Bar {k}", "vat_pct": "19", **first})
+        E7 = r.json().get("id")
+        check(r.status_code == 201 and status(s, I7) != "paid" and not r.json().get("paid"), p + f"#4337 an entry without the invoice {k} {r.text[:200]}")
+        r = s.patch(B + f"{O}/cash-entries/{E7}", json={**{x: v for x, v in change.items() if v}, "invoice_id": I7})
+        pays = payments(s, I7)
+        check(r.ok and r.json().get("paid") and status(s, I7) == "paid" and [(x["method"], x["amount"]) for x in pays] == [("cash", "59.50")],
+              p + f"#4337 edited {list(change)} + invoice: the invoice is paid in cash {r.status_code} {status(s, I7)} {pays} {r.text[:200]}")
+        check(s.patch(B + f"{O}/cash-entries/{E7}", json={"amount": "60.00"}).status_code == 409, p + "#4337 then its amount is fixed")
+        check(s.patch(B + f"{O}/cash-entries/{E7}", json={"text": f"Bar {k} b"}).ok and len(payments(s, I7)) == 1,
+              p + "#4337 a later edit books no second payment")
+        r = s.post(B + f"{O}/cash-entries/{E7}/cancel", json={})
+        check(r.status_code == 201 and status(s, I7) != "paid", p + f"#4337 its cancellation takes the payment back {r.status_code}")
 
 # ======================================================================== #2847 take an import back while matching it
 for rnd in range(6):

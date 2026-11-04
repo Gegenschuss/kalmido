@@ -100,6 +100,12 @@ check(kt.dbx("SELECT COUNT(*) FROM office_cash_entries WHERE book_id=?", (CB,))[
 check(not kt.dbx("SELECT 1 FROM office_payments WHERE doc_id=?", (I1,)), "(a) refused: no payment on the invoice")
 r = CASH.post(B + ENTRIES, json={"day": TD, "dir": "out", "amount": "5.00", "text": "Porto", "vat_pct": "0"})
 check(r.status_code == 201, "(a) cash without an invoice stays free " + r.text[:160])
+EP = r.json().get("id")
+# 2.533.0 (#4337): choosing the invoice while editing books the payment too, so it needs the same right
+r = CASH.patch(B + f"{O}/cash-entries/{EP}", json={"dir": "in", "invoice_id": I1})
+row = kt.dbx("SELECT dir, invoice_id FROM office_cash_entries WHERE id=?", (EP,))[0]
+check(r.status_code == 403 and tuple(row) == ("out", None) and status(A, I1) != "paid",
+      f"(a) #4337 cash book edit alone: editing an entry onto an invoice 403, nothing changed {r.status_code} {tuple(row)} {r.text[:160]}")
 r = CASHPAY.post(B + ENTRIES, json=body)
 check(r.status_code == 201 and status(A, I1) == "paid", f"(a) quotes edit + pay: books the payment {r.status_code} {status(A, I1)}")
 E1 = r.json().get("id")

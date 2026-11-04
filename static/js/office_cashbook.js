@@ -170,8 +170,10 @@ async function cbEntryModal(e) {
       const body = {dir: val('#cb-edir'), amount: amount == null ? '' : String(amount), text: val('#cb-etext'), day: val('#cb-eday'), vat_pct: val('#cb-evat') || null,
         category: val('#cb-ecat'), node_id: +val('#cb-enode') || null, invoice_id: +val('#cb-einv') || null};
       const old = {dir: e.dir, amount: e.amount, text: e.text, day: e.day, vat_pct: e.vat_pct, category: e.category, node_id: e.node_id, invoice_id: e.invoice_id};
-      await api('PATCH', `/api/office/cash-entries/${e.id}`, body); md.remove(); cbReload(true);
-      toast(tr('Saved'), async () => { await api('PATCH', `/api/office/cash-entries/${e.id}`, old); cbReload(true); });
+      const j = await api('PATCH', `/api/office/cash-entries/${e.id}`, body); md.remove(); cbReload(true);
+      // 2.533.0 (#4337): an entry that booked its invoice's payment just now has no undo (its amount / day / invoice are fixed: cancel it)
+      if (j?.paid && !e.paid) toast(tr('Saved'));
+      else toast(tr('Saved'), async () => { await api('PATCH', `/api/office/cash-entries/${e.id}`, old); cbReload(true); });
     } catch (x) { const el = cb$('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }

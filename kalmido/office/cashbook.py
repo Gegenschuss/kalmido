@@ -376,7 +376,8 @@ def cb_public(c, oid, uid, rows, d, last, bal=None, names=None):
     return dict(_vals(d), id=d["id"], no=d["no"], book_id=d["book_id"], node=node, invoice=inv, storno_of=d.get("storno_of"),
                 storno_of_no=so["no"] if so else None, cancelled_by=canc["id"] if canc else None, cancelled_by_no=canc["no"] if canc else None,
                 locked=bool(last and d["day"] <= last), balance=dstr(bal) if bal is not None else None,
-                by=(names or {}).get(d.get("created_by"), ""), created_at=d["created_at"], updated_at=d["updated_at"])
+                by=(names or {}).get(d.get("created_by"), ""), created_at=d["created_at"], updated_at=d["updated_at"],
+                paid=bool(d.get("payment_id")))  # 2.533.0 (#4337): it booked a payment on its invoice
 
 
 def _names(c, ids):
@@ -529,10 +530,14 @@ def cb_entry_patch(eid):
         if "node_id" in prev and cur.get("node_id"):  # 2.360.3 (#2733): taking the receipt off the entry keeps its lock
             from ..receipts.suggest import olk_rc_keep
             olk_rc_keep(c, cur["node_id"])
+        plain = dict(cur, **row)  # 2.533.0 (#4337): the clear values for _cb_pay (row is encrypted below)
         row["updated_at"] = iso(now_utc())
         row = oc_enc_fields(c, oid, "office_cash_entries", row)
         c.execute(f"UPDATE office_cash_entries SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [eid, oid])
         _log(c, oid, bid, eid, "change", prev, uid)
+        # 2.533.0 (#4337): an invoice chosen while editing (or out -> in) books the payment like a new entry, same rights
+        if not cur.get("payment_id") and set(prev) & {"day", "dir", "amount", "invoice_id"}:
+            _cb_pay(c, oid, uid, eid, plain, cur["no"])
         bump(c)
         c.commit()
     return jsonify(_one(c, oid, uid, eid))
