@@ -9,7 +9,12 @@ const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 // every request that leaves the window [method, path, body]; w.__offline = the network is gone
-const stub = w => { const calls = [], of = w.fetch; w.fetch = (u, o = {}) => { const m = (o.method || 'GET').toUpperCase(), p = new URL(String(u), B).pathname; if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); calls.push([m, p, o.body]); return of(u, o); }; return calls; };
+const stub = (w, fake) => { const calls = [], of = w.fetch; w.fetch = (u, o = {}) => { const m = (o.method || 'GET').toUpperCase(), p = new URL(String(u), B).pathname; if (w.__offline) return Promise.reject(new TypeError('Failed to fetch')); calls.push([m, p, o.body, !!o.keepalive]); const r = fake && fake(m, p, o); return r ? Promise.resolve(r) : of(u, o); }; return calls; };
+const jres = (st, j) => new Response(JSON.stringify(j), {status: st, headers: {'content-type': 'application/json'}});
+const clone = v => v === undefined ? v : JSON.parse(JSON.stringify(v));
+// the wiki copy's store (window.__wkoStore, as tests/p2169_a_ui.js), shared by the windows of one browser
+const wkoStore = () => { const db = new Map(); return {db, get: async k => clone(db.get(k)), put: async v => { db.set(v.k, clone(v)); }, del: async k => { db.delete(k); },
+  all: async () => [...db.values()].map(clone), pre: async x => [...db.values()].filter(r => r.k.startsWith(x)).map(clone), clear: async () => { db.clear(); }, close: async () => {}}; };
 const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatchEvent(new w.Event('online')); };
 
 (async () => {
@@ -52,6 +57,88 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   w.eval("S.conflicts = []; LS.set('conflicts', [])");
 
   w.close();
+
+  // ================= A2 + A18: the knowledge page (a person without an organisation)
+  await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
+  const CF = await login('frida');
+  const stf = await call('GET', '/api/state', null, CF);
+  check(!(stf.me.workspaces || []).length, 'setup: frida has no organisation');
+  const feats = [...new Set([...(stf.settings.features || '').split(',').filter(Boolean), 'wiki'])].join(',');
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats}, CF);
+  const W1 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Notes/Plan', body: 'Old plan'}, CF)).id;
+  const store = wkoStore(), wopt = {user: 'frida', hash: 'wiki/' + W1, shared: {store: {}, wins: []}, setup: x => { x.__wkoStore = store; }, ls: {'tasks.wkSpace': JSON.stringify('private')}};
+  const edit = async (ww, text) => {
+    if (!ww.document.querySelector('#wk-body')) ww.document.querySelector('#view [data-wk="mode"][data-m="edit"]')?.click();
+    const ta = await until(() => ww.document.querySelector('#wk-body'));
+    ta.value = text; ta.dispatchEvent(new ww.Event('input', {bubbles: true}));
+    return ta;
+  };
+  let ww = await boot(wopt);
+  check(await until(() => ww.eval(`WK.pg?.id === ${W1}`)), 'A2: the page is open');
+  let wc = stub(ww);
+  await edit(ww, 'Plan typed in the last second');
+  ww.dispatchEvent(new ww.Event('pagehide'));
+  // right away, without waiting: the queue has it and it went out with keepalive (the page is gone a moment later)
+  const qn = ww.eval(`JSON.stringify(OUT.q.filter(x => x.url === '/api/wiki/pages/${W1}'))`);
+  check(/Plan typed in the last second/.test(qn), 'A2: pagehide: the text is in the queue at once ' + qn);
+  const ka = wc.filter(([m, p, , k]) => m === 'PATCH' && p === '/api/wiki/pages/' + W1 && k);
+  check(ka.length === 1 && /Plan typed in the last second/.test(ka[0][2] || ''), 'A2: pagehide: sent with keepalive ' + JSON.stringify(wc.map(c => c[0] + ' ' + c[1] + (c[3] ? ' keepalive' : ''))));
+  check(await until(async () => (await call('GET', '/api/wiki/pages/' + W1, null, CF)).body === 'Plan typed in the last second'), 'A2: the server has the text');
+  ww.close();
+  // the queued copy goes at the next start under the same key: applied once, nothing in the conflicts dialog
+  ww = await boot(wopt);
+  check(await until(() => ww.eval('OUT.q.length') === 0 && !ww.eval('OUT.flushing'), {timeout: 20000}), 'A2: the queued copy went at the next start');
+  check((await call('GET', '/api/wiki/pages/' + W1, null, CF)).body === 'Plan typed in the last second' && !ww.eval('S.conflicts.length') && !store.db.has('x:' + W1), 'A2: applied once, no conflict');
+
+  // an encrypted space (the lock stood in for: the cipher is a marked text): the pagehide takes the cipher made while typing
+  check(await until(() => ww.eval(`WK.pg?.id === ${W1}`)), 'A2 e2e: the page is open');
+  ww.eval(`window.__wke = [wkeOn, wkeReady, wkeSeal]; wkeOn = sp => sp === 'private'; wkeReady = sp => sp === 'private'; wkeSeal = async (sp, b) => ({...b, body: b.body == null ? b.body : 'SEALED[' + b.body.split('').reverse().join('') + ']'}); 1`);
+  wc = stub(ww);
+  await edit(ww, 'Secret plan');
+  check(await until(() => ww.eval('WK.seal?.plain') === 'Secret plan'), 'A2 e2e: the cipher is made while typing');
+  ww.dispatchEvent(new ww.Event('pagehide'));
+  const qe = ww.eval(`JSON.stringify(OUT.q.filter(x => x.url === '/api/wiki/pages/${W1}'))`);
+  check(/SEALED\[nalp terceS\]/.test(qe), 'A2 e2e: pagehide: the cipher is in the queue at once ' + qe);
+  const kae = wc.filter(([m, p, , k]) => m === 'PATCH' && p === '/api/wiki/pages/' + W1 && k);
+  check(kae.length === 1 && /SEALED/.test(kae[0][2] || ''), 'A2 e2e: pagehide: the cipher went with keepalive');
+  check(!wc.some(([, , b]) => /Secret plan/.test(b || '')) && !/Secret plan/.test(JSON.stringify(ww.__store)), 'A2 e2e: the text in clear never left the page nor went into storage');
+  ww.close();
+
+  // ================= A18: a text the server refuses (413) waits at the page as a draft
+  ww = await boot(wopt);
+  check(await until(() => ww.eval(`WK.pg?.id === ${W1}`) && ww.eval('OUT.q.length') === 0 && !ww.eval('OUT.flushing'), {timeout: 20000}), 'A18: the page is open');
+  wc = stub(ww, (m, p) => m === 'PATCH' && p === '/api/wiki/pages/' + W1 ? jres(413, {error: 'Text too large'}) : null);
+  await edit(ww, 'A very long plan');
+  await ww.eval('wk_flush()');
+  check(wc.some(([m, p]) => m === 'PATCH' && p === '/api/wiki/pages/' + W1), 'A18: the save was tried');
+  const dr = await until(() => store.db.get('x:' + W1));
+  check(dr && dr.mine === 'A very long plan' && /too large/i.test(dr.why || ''), 'A18: the refused text is kept as a draft of the page ' + JSON.stringify(dr));
+  // the page opened again (a reload keeps the sign-in; a boot here would be a new sign-in, which empties the copy on purpose):
+  // the draft comes from the copy's store, not from memory
+  ww.eval(`WKO.cf = {}; WK.edit = false; WK.dirty = false; 1`);
+  await ww.eval(`wk_loadPage(${W1}, true)`);
+  check(ww.eval(`WKO.cf[${W1}]?.mine`) === 'A very long plan', 'A18: opened again, the draft is read from the copy');
+  if (!ww.document.querySelector('#view .wkocf')) ww.eval('renderView(); 1');
+  const bar = await until(() => ww.document.querySelector('#view .wkocf'), {timeout: 20000});
+  check(bar && /not saved \(Text too large\)/.test(bar.textContent) && bar.querySelector('[data-wk="cfshow"]'), 'A18: the page shows the draft with Compare ' + (bar?.textContent || ''));
+  ww.close();
+
+  // ================= A20: the account switch keeps the conflict copies as a download
+  const bob = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'})).id;
+  const asked = [], blobs = [], names = [];
+  const cfl = [{tid: T1, title: 'Cut the hedge', field: 'title', server: 'Cut the hedge', mine: 'Cut the hedge on Friday', at: Date.now()}];
+  const ent = [{method: 'PATCH', url: `/api/tasks/${T2}`, body: {title: 'Water the roses twice'}, uid: bob, k: 'bobk1'}];
+  const wb = await boot({user: 'alice', hash: 'l/' + P, ls: {'tasks.uid': String(bob), 'tasks.outbox': JSON.stringify(ent), 'tasks.conflicts': JSON.stringify(cfl)},
+    setup: x => { x.confirm = t => { asked.push(t); return true; }; const OB = x.Blob; x.Blob = class extends OB { constructor(parts, o) { super(parts, o); this.__txt = (parts || []).join(''); } }; x.URL.createObjectURL = b => { blobs.push(b); return 'blob:x'; }; x.URL.revokeObjectURL = () => {}; x.HTMLAnchorElement.prototype.click = function () { if (this.download) names.push(this.download); }; }});
+  check(await until(() => asked.length > 0), 'A20: another account: asked first');
+  check(/downloaded as a text file/.test(asked.join(' ')), 'A20: the question says a copy is downloaded ' + asked[0]);
+  check(await until(() => names.length > 0), 'A20: "Delete and continue" downloads a file ' + JSON.stringify(names));
+  check(/^kalmido-conflicts-\d{4}-\d{2}-\d{2}\.txt$/.test(names[0] || ''), 'A20: named kalmido-conflicts-<date>.txt ' + names[0]);
+  const txt = blobs[0]?.__txt || '';
+  check(/Cut the hedge on Friday/.test(txt) && /Water the roses twice/.test(txt), 'A20: the file holds the conflict copy and the waiting change ' + JSON.stringify(txt.slice(0, 300)));
+  check(await until(() => !/Cut the hedge on Friday/.test(wb.__store['tasks.conflicts'] || '')), 'A20: then the local data of the previous account goes as before');
+  wb.close();
+
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   console.log(`p2527_4304_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

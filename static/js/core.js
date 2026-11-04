@@ -992,10 +992,24 @@ async function userSwitchAsk(id, n) {
   if (typeof bootDone === 'function') bootDone();
   try { await i18nLoad(uiLang()); } catch { /* English */ }
   const ok = await askConfirm(trn('{0} change of the previous account on this device is not synced yet', '{0} changes of the previous account on this device are not synced yet', n),
-    tr('Signing in with another account deletes them. Cancel signs out again: the previous account can then sign in and send them.'), {ok: tr('Delete and continue'), danger: true});
-  if (ok) { userSwitch(id); return; }
+    tr('Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.'), {ok: tr('Delete and continue'), danger: true});
+  if (ok) { try { cfDownload(id); } catch (e) { console.warn('conflict copies: download failed', e); } userSwitch(id); return; }  // 2.527.0 (#4304 A20)
   try { await fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}); } catch { /* offline */ }
   location.reload();
+}
+// 2.527.0 (#4304 A20): the conflict copies and the changes still waiting of the previous account are not deleted silently at
+// the switch: they leave as a text file (downloaded) first - each with its task, field, the saved and the own version
+function cfDownload(uid) {
+  for (const e of outSync().filter(x => x.uid !== uid)) outReject(e, {message: tr('Not synced yet')});
+  const list = S.conflicts || []; if (!list.length) return false;
+  const val = (f, v) => { try { return fmtVal(f, v); } catch { return typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''); } };
+  const txt = [`${APP_NAME} · ${new Date().toLocaleString()}`, ''].concat(...list.map(c => c.field === 'rejected'
+    ? [`== ${c.title || '?'} · ${tr('Offline change not saved')}`, `${tr('reason')}: ${c.server || ''}`, `${tr('your version')}:`, String(c.mine ?? ''), '']
+    : [`== ${c.title || '?'} · ${histFieldName(c.field)}`, `${tr('saved')}: ${val(c.field, c.server)}`, `${tr('your version')}: ${val(c.field, c.mine)}`, ''])).join('\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain'}));
+  a.download = `${APP_NAME.toLowerCase()}-conflicts-${new Date().toISOString().slice(0, 10)}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  return true;
 }
 // another user than last time in this browser: drop everything local of the previous one, then the app loads again
 function userSwitch(id) {
