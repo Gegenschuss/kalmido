@@ -34,6 +34,7 @@ from .pdf import pdf_date  # 2.296.0 B (#3175)
 from .model import _num, office_settings  # 2.369.5 (#2517): pulled up from functions
 from .packs import office_pack_for  # 2.369.5 (#2517): pulled up from functions
 from .calc import pack_tax  # 2.369.5 (#2517): pulled up from functions
+from .calc import calc_tax_day  # 2.531.0 (#4498)
 
 ABS_TYPES = ("", "progress", "final")
 ABS_TYPE_CODE = {"progress": "326", "final": "380"}  # UNTDID 1001: 326 partial invoice (XRechnung + EN 16931 accept it)
@@ -348,6 +349,7 @@ def abs_deductions(c, oid, offer, lang, cur, fin=None):
     ids, out = [], []
     for x in rows:
         ids.append(x["id"])
+        xpack = office_pack_for(s, calc_tax_day(dict(x)))  # 2.531.0 (#4498): the rates of the progress invoice's own day of service
         t = _j(x["totals"], {})
         taxes = {tl.get("rate_key"): tl for tl in t.get("tax_lines") or []}
         nets = {}
@@ -355,8 +357,8 @@ def abs_deductions(c, oid, offer, lang, cur, fin=None):
             if ln.get("kind") in ("item", "discount") and ln.get("tax") in TAX_KEYS:
                 nets.setdefault(ln["tax"], Decimal(0))
                 nets[ln["tax"]] += dec(ln.get("net") or ln.get("total") or 0)
-        eur = _eur_bases(doc_items(c, x["id"], oid), pack)
-        cn, ce, ct = _credited(c, oid, x["id"], pack, doc_items)  # 2.354.0 B (#2836): the deduction = net per rate less the credit notes on it
+        eur = _eur_bases(doc_items(c, x["id"], oid), xpack)
+        cn, ce, ct = _credited(c, oid, x["id"], xpack, doc_items)  # 2.354.0 B (#2836): the deduction = net per rate less the credit notes on it
         for k in ce:
             eur[k] = eur.get(k, Decimal(0)) - ce[k]
         mf = inv_money_fields(x, pm)
@@ -373,7 +375,7 @@ def abs_deductions(c, oid, offer, lang, cur, fin=None):
             if ffx is not None and k in nets and (hc_code(x["currency"]) or home) == fcur and net > 0:  # 2.523.0 (#4082)
                 rate = net / ffx
             tax = dec((taxes.get(k) or {}).get("amount") or 0) - ct.get(k, Decimal(0))
-            pct = (taxes.get(k) or {}).get("pct") or (dstr(pack_rate(pack, k)) if x["vat_mode"] != "novat" else "0")
+            pct = (taxes.get(k) or {}).get("pct") or (dstr(pack_rate(xpack, k)) if x["vat_mode"] != "novat" else "0")
             out.append({"kind": "discount", "service_id": None, "title": _t("deduct", lang, num=x["number"], date=dtext),
                         "detail": _t("deduct_detail", lang, net=fmt_money(net, lang, cur), pct=_pct_text(pct, lang), tax=fmt_money(tax, lang, cur),
                                      gross=fmt_money(net + tax, lang, cur), paid=paid),

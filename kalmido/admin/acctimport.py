@@ -213,7 +213,7 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
 # 2.531.0 (#4317) F5: the parts of UMZ_LEFT are never read: they count against neither size limit (a long history of a person
-# made a file that exports but never imports); their checksum is still checked (preview), their rows counted from the manifest
+# made a file that exports but never imports); their checksum is checked when the import runs, their rows counted from the manifest
 UMZ_LEFT_PARTS = frozenset(p for _w, ps in UMZ_LEFT for p in ps) - UMZ_READ
 # 2.531.0 (#4317) F11: the area a refused row of a table is named under in the result (else its technical name)
 UMZ_REFUSED_AREA = {

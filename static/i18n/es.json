@@ -16326,5 +16326,6 @@
   "Check: chain intact": "Comprobar: cadena intacta",
   "Chain intact: {0} finalised document checked.": ["Cadena intacta: {0} documento finalizado comprobado.", "Cadena intacta: {0} documentos finalizados comprobados."],
   "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} documento finalizado aún no está encadenado (se añade en la próxima finalización).", "{0} documentos finalizados aún no están encadenados (se añaden en la próxima finalización)."],
-  "Chain broken: document {0} differs from what was finalised.": "Cadena rota: el documento {0} difiere de lo que se finalizó."
+  "Chain broken: document {0} differs from what was finalised.": "Cadena rota: el documento {0} difiere de lo que se finalizó.",
+  "Chain broken: a document before {0} is missing.": "Cadena rota: falta un documento anterior a {0}."
 }

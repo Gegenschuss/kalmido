@@ -782,7 +782,7 @@ function ofcChainHtml() {
   if (!k) return `<div class="ofc-chain">${btn}</div>`;
   const pend = k.pending ? ` ${esc(trn('{0} finalised document is not chained yet (it is added at the next finalising).', '{0} finalised documents are not chained yet (they are added at the next finalising).', k.pending))}` : '';
   const msg = k.ok ? esc(trn('Chain intact: {0} finalised document checked.', 'Chain intact: {0} finalised documents checked.', k.count)) + pend
-    : esc(tr('Chain broken: document {0} differs from what was finalised.', k.first_bad.number || '#' + k.first_bad.id)) + ` <a href="#office/offers/${+k.first_bad.id}">#${+k.first_bad.id}</a>`;
+    : esc(tr(k.first_bad.reason === 'gap' ? N_('Chain broken: a document before {0} is missing.') : N_('Chain broken: document {0} differs from what was finalised.'), k.first_bad.number || '#' + k.first_bad.id)) + ` <a href="#office/offers/${+k.first_bad.id}">#${+k.first_bad.id}</a>`;
   return `<div class="ofc-chain">${btn} <p class="${k.ok ? 'muted' : 'bad'}" role="status">${msg}</p></div>`;
 }
 async function ofcSaveSettings(form) {

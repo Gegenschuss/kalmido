@@ -114,8 +114,18 @@ sql("UPDATE office_docs SET date=? WHERE id=?", ("2026-01-02" if dt != "2026-01-
 k = check_chain()
 check(k.get("ok") is False and (k.get("first_bad") or {}).get("id") == I2 and (k.get("first_bad") or {}).get("number"),
       f"#4497: the date of the second invoice changed in the database: it is named (id and number) {k}")
+check((k.get("first_bad") or {}).get("reason") == "data", f"#4497 (review job/2606): the reason is the data {k}")
 sql("UPDATE office_docs SET date=? WHERE id=?", (dt, I2))
 check(check_chain().get("ok") is True, "#4497: taken back: intact again")
+# review job/2606: a document gone from the middle (its place emptied) is a gap before the next one, not "differs"
+sq2 = chain_row(I2)
+sql("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE id=?", (I2,))
+k = check_chain()
+check(k.get("ok") is False and (k.get("first_bad") or {}).get("id") == I3 and (k.get("first_bad") or {}).get("reason") == "gap",
+      f"#4497 (review job/2606): the second one gone: a gap before the third {k}")
+sql("UPDATE office_docs SET chain_key=?, chain_seq=?, chain_prev=?, chain_hash=? WHERE id=?",
+    (sq2["chain_key"], sq2["chain_seq"], sq2["chain_prev"], sq2["chain_hash"], I2))
+check(check_chain().get("ok") is True, "#4497: the place back: intact again")
 net = sql("SELECT net FROM office_doc_items WHERE doc_id=?", (I1,))[0]["net"]
 sql("UPDATE office_doc_items SET net=? WHERE doc_id=?", ("99.00", I1))
 k = check_chain()
@@ -125,6 +135,7 @@ la = sql("SELECT locked_at FROM office_docs WHERE id=?", (I2,))[0]["locked_at"]
 sql("UPDATE office_docs SET locked_at=NULL WHERE id=?", (I2,))
 k = check_chain()
 check(k.get("ok") is False and (k.get("first_bad") or {}).get("id") == I2, f"#4497: unlocked in the database: named {k}")
+check((k.get("first_bad") or {}).get("reason") == "unlocked", f"#4497 (review job/2606): the reason is the missing lock {k}")
 sql("UPDATE office_docs SET locked_at=? WHERE id=?", (la, I2))
 check(check_chain().get("ok") is True, "#4497: all taken back: intact")
 
@@ -155,9 +166,14 @@ OID = sql("SELECT org_id FROM office_docs WHERE id=?", (I1,))[0]["org_id"]
 sql("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE org_id=?", (OID,))
 k = check_chain()
 check(k.get("ok") is True and k.get("count") == 0 and k.get("pending") == k0.get("count"), f"#4497: emptied columns = pending, not broken {k} (was {k0})")
+# review job/2606: an older version after a rollback copied the chain columns of the first invoice into a draft (duplicate)
+sql("UPDATE office_docs SET chain_key=?, chain_seq=?, chain_prev=?, chain_hash=? WHERE id=?",
+    (before[I1]["chain_key"], before[I1]["chain_seq"], before[I1]["chain_prev"], before[I1]["chain_hash"], RN))
 if fresh(MODE, keep=True):
     Fr = login(B, "frida")
     k = check_chain()
+    check(chain_row(RN).get("chain_seq") is None and chain_row(RN).get("chain_hash") == "",
+          f"#4497 (review job/2606): the start frees a place copied into a draft {chain_row(RN)}")
     check(k.get("ok") is True and k.get("count") == k0.get("count") and k.get("pending") == 0, f"#4497: the start chains them again {k}")
     after = {i: chain_row(i) for i in (I1, I2, I3, CR, R20, R21)}
     check(after == before, f"#4497: in the order they were finalised, with the same hashes {after} vs {before}")

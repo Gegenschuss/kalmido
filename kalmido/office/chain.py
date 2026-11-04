@@ -122,13 +122,15 @@ def hch_check(c, oid):
         prev, want = "", 1
         for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND chain_key=? AND chain_seq IS NOT NULL ORDER BY chain_seq, id", (oid, key)).fetchall():
             count += 1
-            ok = int(r["chain_seq"]) == want and (r["chain_prev"] or "") == prev and bool(r["locked_at"])
-            try:
-                ok = ok and hch_hash(prev, hch_canon(c, oid, r)) == (r["chain_hash"] or "")
-            except Exception:  # noqa: BLE001 -- a value that cannot be read (decryption) is a break as well
-                ok = False
-            if not ok:
-                bad.append({"id": r["id"], "number": r["number"] or "", "chain": key, "seq": int(r["chain_seq"])})
+            # review job/2606: why it breaks - gap (a document before it is gone), link, unlocked or data
+            why = "gap" if int(r["chain_seq"]) != want else "link" if (r["chain_prev"] or "") != prev else "unlocked" if not r["locked_at"] else ""
+            if not why:
+                try:
+                    why = "" if hch_hash(prev, hch_canon(c, oid, r)) == (r["chain_hash"] or "") else "data"
+                except Exception:  # noqa: BLE001 -- a value that cannot be read (decryption) is a break as well
+                    why = "data"
+            if why:
+                bad.append({"id": r["id"], "number": r["number"] or "", "chain": key, "seq": int(r["chain_seq"]), "reason": why})
                 break
             prev, want = r["chain_hash"] or "", want + 1
     first = min(bad, key=lambda b: b["id"]) if bad else None
@@ -139,6 +141,11 @@ def hch_migrate(c):
     """Every start (core/db.py init_db through ledger.ofx_migrate): offices with finalised documents not chained yet (documents
     from before 2.531, an imported office) get them chained in the order they were finalised. Idempotent (only rows without a
     place); an office whose data cannot be read now (decryption) is left for the next start / its next finalising."""
+    # review job/2606: a place copied by an older version (rollback: duplicate / recurring invoice took the chain columns along)
+    # is no place - a draft, or the later of two rows on one place, gets chained anew when it is finalised / at this start
+    c.execute("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE chain_seq IS NOT NULL AND "
+              "(locked_at IS NULL OR EXISTS (SELECT 1 FROM office_docs o WHERE o.org_id=office_docs.org_id AND o.chain_key=office_docs.chain_key "
+              "AND o.chain_seq=office_docs.chain_seq AND o.chain_hash=office_docs.chain_hash AND o.id<office_docs.id))")
     for (oid,) in c.execute("SELECT DISTINCT org_id FROM office_docs WHERE locked_at IS NOT NULL AND chain_seq IS NULL AND kind<>'offer' "
                             "AND COALESCE(trial, 0)=0").fetchall():
         try:

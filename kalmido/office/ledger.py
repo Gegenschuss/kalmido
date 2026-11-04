@@ -440,7 +440,11 @@ def ofx_finalize(c, oid, uid, did):
     if r["kind"] != "offer":  # 2.38.0: status issued, a credit note settles its invoice, the stored PDF / XML (F2)
         inv_after_finalize(c, oid, uid, doc_row(c, oid, did))
     from .chain import hch_append
-    hch_append(c, oid, did, s)  # 2.531.0 (#4497): its place in the hash chain of its series (not a quotation / trial document)
+    try:  # review job/2606: data that cannot be read now (decryption) never undoes the finalising - it stays "pending"
+        with c.savepoint():
+            hch_append(c, oid, did, s)  # 2.531.0 (#4497): its place in the hash chain of its series (not a quotation / trial document)
+    except Exception as e:  # noqa: BLE001
+        app.logger.warning("office chain: document %s of office %s not chained yet: %s", did, oid, type(e).__name__)
     return doc_row(c, oid, did)
 
 
