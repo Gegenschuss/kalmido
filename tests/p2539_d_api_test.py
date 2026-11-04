@@ -184,4 +184,19 @@ check(j.get("unset") == [False, False], f"#4381: without KALMIDO_MAIL_AUTHSERV_I
 check(j.get("set") == [True, False, False, False],
       f"#4381: with it only that server's pass for the domain counts (own pass / other server / own fails / other domain: {j.get('set')})")
 
+# ---------------------------------------------------------------- 4. review 2.539.0 (#4379): nested cal_until blocks
+NEST = r"""
+import json, time, app
+from kalmido.calendars import subscriptions as S
+with S.cal_until(time.monotonic() + 30):
+    outer = S._CAL_WATCH.stack[-1]
+    with S.cal_until(time.monotonic() + 30):
+        pass
+    same = len(S._CAL_WATCH.stack) == 1 and S._CAL_WATCH.stack[-1] is outer
+print(json.dumps({"same": same, "left": len(S._CAL_WATCH.stack)}))
+"""
+j = py(NEST)
+check(j.get("same") is True and j.get("left") == 0,
+      f"#4379: an inner cal_until leaves the outer block's watch in place and nothing behind ({j})")
+
 sys.exit(done("p2539_d_api"))

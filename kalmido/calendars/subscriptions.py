@@ -252,7 +252,7 @@ def cal_until(until):
         yield cut
     finally:
         dog.cancel()
-        stack.remove(conns)
+        stack.pop()  # review 2.539.0 (#4379): blocks nest LIFO; remove() compared by == and could take an equal outer list
 
 
 def cal_left(until, timeout):
