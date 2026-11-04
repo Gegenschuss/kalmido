@@ -292,14 +292,17 @@ function wsPaneWire(md) {
       else if (b.dataset.wsrm) {
         const uid = +b.dataset.wsrm, self = uid === S.me?.id, o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === oid), m = o?.members.find(x => x.id === uid);
         const li = await api('GET', `/api/orgs/${oid}/leave-info${self ? '' : '?uid=' + uid}`).catch(() => null);  // 2.361.0 (#2922): what goes where
-        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li ? {html: olvLeaveHtml(li, self)} : {})})) return;  // 2.273.0 B (#3042): + what ends
-        await api('DELETE', `/api/orgs/${oid}/members/${uid}`); toast(self ? tr('You left the organisation') : tr('Removed'));
+        const nq = self ? outOrgEntries(oid).length : 0;  // 2.538.0 (#4369): unsent changes of this organisation wait in this device's queue
+        if (!await askConfirm(self ? tr('Leave the organisation “{0}”?', o?.name || '') : tr('Remove {0} from the organisation?', m?.name || ''), li ? '' : (self ? tr('Your projects of this workspace go to one of its admins and you leave every project of the organisation.') : tr('The person’s projects of this workspace come to you and the person leaves every project of the organisation.')) + ' ' + tr('Tasks of the organisation assigned to them are unassigned and they no longer come along to any; joining again within 24 hours brings that back for the tasks they can see then.'), {ok: self ? tr('Leave') : tr('Remove'), danger: true, ...(li || nq ? {html: (li ? olvLeaveHtml(li, self) : '') + outOrgWarnHtml(nq)} : {})})) return;  // 2.273.0 B (#3042): + what ends
+        await api('DELETE', `/api/orgs/${oid}/members/${uid}`); if (self) outOrgDrop(oid); toast(self ? tr('You left the organisation') : tr('Removed'));  // 2.538.0 (#4369): its queue entries go with it
       }
       await load(); render();
     } catch { /* api() showed it */ }
     wsPaneDraw(md);
   });
 }
+// 2.538.0 (#4369): the line in the leave dialog when unsent changes of the organisation wait on this device
+const outOrgWarnHtml = n => n ? `<div class="shint keep olvrow warn">${ic('alert', 's')} ${esc(trn('{0} change of this organisation has not been sent yet; it is discarded when you leave.', '{0} changes of this organisation have not been sent yet; they are discarded when you leave.', n))}</div>` : '';
 // 2.361.0 (#2922): the leave / remove dialog lists every area: back to the private space, to an admin, stays, ends
 function olvLeaveHtml(j, self) {
   const rows = [], th = j.to_heir || {};
@@ -1176,7 +1179,8 @@ async function setupChoices(el, logo) {
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
   const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
-    ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d])];
+    ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d]),
+    ['import', N_('Import from another app'), 'download', N_('Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away')]];  // 2.538.0 (#4361)
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
   // 2.144.2 A (#2369): preset '' (modules fit no purpose) matches nothing, so "Start" switches nothing extra off
   const matches = k => !!SETUP_PRESETS[k] && all.every(x => picked.has(x) === !SETUP_PRESETS[k].off.includes(x));
@@ -1231,8 +1235,9 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || httpErrText(r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: suMods(), sample: start === 'sample', ...(start && start !== 'sample' ? {project_type: start} : {}), ...(suPurpose() ? {purpose: suPurpose()} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: suMods(), sample: start === 'sample', ...(start && start !== 'sample' && start !== 'import' ? {project_type: start} : {}), ...(suPurpose() ? {purpose: suPurpose()} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
+      if (start === 'import') { try { sessionStorage.setItem('kalmido-suimport', '1'); LS.set('settingsSec', 'data'); } catch { /* private mode: the card only starts empty */ } }  // 2.538.0 (#4361): main.js opens Settings > Data > Import
       location.replace('/');
     } catch (err) { $('#su-err', el).textContent = err.message || tr('Server not reachable.'); }
   });

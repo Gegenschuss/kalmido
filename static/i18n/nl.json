@@ -16246,5 +16246,8 @@
   "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Afschrijving zonder gekoppeld bonnetje: {0}. Koppel het aankoopbonnetje aan het apparaat, anders telt het mogelijk dubbel.",
   "A support session books nothing in the office and deletes nothing for good: the client does that": "Een supportsessie boekt niets in het kantoor en verwijdert niets definitief: dat doet de klant zelf",
   "A support session puts nothing into an organisation that has not granted support access": "Een supportsessie zet niets in een organisatie die geen supporttoegang heeft gegeven",
-  "Not possible in a support session": "Niet mogelijk in een supportsessie"
+  "Not possible in a support session": "Niet mogelijk in een supportsessie",
+  "Import from another app": "Overnemen uit een andere app",
+  "Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away": "Todoist, Trello, Asana, Notion en meer: je begint leeg en de import opent meteen",
+  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} wijziging van deze organisatie is nog niet verzonden; ze wordt verworpen als je de organisatie verlaat.", "{0} wijzigingen van deze organisatie zijn nog niet verzonden; ze worden verworpen als je de organisatie verlaat."]
 }

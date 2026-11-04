@@ -158,7 +158,10 @@ function bootDone() {
   if (S.settings.onboard === 'pending') {
     try { const j = await api('POST', '/api/onboarding', {touch: isTouch(), mac: IS_MAC}); if (j?.created) { await load(); render(); } } catch { /* offline: next start */ }
   }
-  if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourAuto, 400);  // 2.223.0 A (#2821): once per session, only in Projects
+  // 2.538.0 (#4361): "Start with: Import from another app" in the setup: the import (Settings > Data) opens right away; the welcome tour waits for the next start
+  let suImp = ''; try { suImp = sessionStorage.getItem('kalmido-suimport') || ''; sessionStorage.removeItem('kalmido-suimport'); if (suImp) sessionStorage.setItem('kalmido-tour-' + S.me?.id, '1'); } catch { /* private mode */ }
+  if (suImp && S.me?.is_admin && !S.capturePage) { setTimeout(() => { if (!$('.modal')) settingsModal('data'); }, 400); setTimeout(tourModAuto, 600); }
+  else if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourAuto, 400);  // 2.223.0 A (#2821): once per session, only in Projects
   else if (!new URLSearchParams(location.search).get('share')) setTimeout(tourModAuto, 400);  // 2.466.0 (#3314): an area opened directly
   setTimeout(quipsLoad, 1500);
 })();

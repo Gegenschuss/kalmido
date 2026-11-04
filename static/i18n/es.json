@@ -16246,5 +16246,8 @@
   "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Amortización sin justificante vinculado: {0}. Vincula el justificante de compra en el equipo; si no, puede contar dos veces.",
   "A support session books nothing in the office and deletes nothing for good: the client does that": "Una sesión de soporte no contabiliza nada en la oficina ni borra nada definitivamente: eso lo hace el cliente",
   "A support session puts nothing into an organisation that has not granted support access": "Una sesión de soporte no coloca nada en una organización que no ha concedido acceso de soporte",
-  "Not possible in a support session": "No es posible en una sesión de soporte"
+  "Not possible in a support session": "No es posible en una sesión de soporte",
+  "Import from another app": "Importar desde otra app",
+  "Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away": "Todoist, Trello, Asana, Notion y más: empiezas vacío y la importación se abre enseguida",
+  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} cambio de esta organización aún no se ha enviado; se descarta al salir de la organización.", "{0} cambios de esta organización aún no se han enviado; se descartan al salir de la organización."]
 }

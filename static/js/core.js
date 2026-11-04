@@ -719,6 +719,26 @@ function outKeep(method, url, body) {
   if (!/\/-\d+(?=[/?]|$)/.test(url)) keepSend(method, url, body, e.k);
   return e;
 }
+// 2.538.0 (#4369): the queue entries of one organisation (its projects, their tasks, /api/orgs/<id>/..., org_id in the body), also
+// what hangs on a task created offline in one of its projects; entries on their way (sending) are left to the flush
+function outOrgEntries(oid) {
+  const lists = new Set(S.lists.filter(l => l.org_id === oid).map(l => l.id)), tasks = new Set();
+  for (const t of S.tasks.values()) if (lists.has(t.list_id)) tasks.add(t.id);
+  const tmps = new Set(), mine = e => {
+    const u = String(e.url || ''), m = u.match(/^\/api\/(tasks|lists)\/(-?\d+)/), b = e.body && typeof e.body === 'object' ? e.body : {};
+    return u.startsWith(`/api/orgs/${oid}/`) || b.org_id === oid || lists.has(b.list_id) || (!!m && (m[1] === 'lists' ? lists.has(+m[2]) : tasks.has(+m[2]) || tmps.has(+m[2])));
+  };
+  const out = [];
+  for (const e of outSync()) if (!e.done && !e.sending && mine(e)) { out.push(e); if (e.tmp) tmps.add(+e.tmp); }
+  return out.length ? outSync().filter(e => !e.done && !e.sending && (out.includes(e) || mine(e))) : out;
+}
+function outOrgDrop(oid) {
+  const gone = new Set(outOrgEntries(oid));
+  if (!gone.size) return 0;
+  outSave(() => { OUT.q = OUT.q.filter(x => !gone.has(x)); });
+  if (typeof renderTop === 'function' && S.booted) renderTop();
+  return gone.size;
+}
 // ------------------------------------------------------------------ kept input (2.527.0 #4304 A5 + A6)
 // Input that is not on the server yet and has no offline queue behind it (a dialog, a comment, a setting, a letter) is kept
 // in this browser (localStorage, per account, the "tasks." prefix: gone at logout / another account) until the server has
