@@ -48,7 +48,7 @@ from ..core.pg import insert_id, system_ctx
 from ..core.errors import BadInput  # 2.273.0 A (#3030)
 from ..accounts.settings import clean_look_pref, clean_setting  # 2.273.0 A (#3030); 2.363.4 (#3127): clean_setting
 from ..tasks.snippets import snip_clean  # 2.273.0 A (#3030)
-from ..core.i18n import lang, LANGS, N_, stored_join, tr as _tr_base, tr_stored
+from ..core.i18n import lang, LANGS, N_, short_day, stored_join, tr as _tr_base, tr_stored  # 2.531.0 (#4317): + short_day
 from ..core.access import Denied, ROLES, list_role, my_inbox, my_max_sort, WRITE_ROLES
 from ..accounts.session import me
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_drop, bgj_fn  # 2.370.3 (#2760)
@@ -64,7 +64,7 @@ from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzW
                          umz_user_conn, umz_write_state)
 from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
-from ..life.model import jr_seal  # 2.306.0 A (#2885)
+from ..life.model import JOURNAL_MAX, jr_open, jr_seal  # 2.306.0 A (#2885); 2.531.0 (#4317): + JOURNAL_MAX, jr_open
 from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import _pub, e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
 from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
@@ -212,6 +212,27 @@ UMZ_LEFT = (  # (name, parts): the first part counts, the others only when it is
     (N_("Stars"), ("kid_stars",)), (N_("Received notifications"), ("notifications",)), (N_("Sign-ins"), ("sessions",)),
     (N_("Push devices"), ("push_devices",)), (N_("Agent chat settings"), ("agent_chat_prefs",)),
 )
+# 2.531.0 (#4317) F5: the parts of UMZ_LEFT are never read: they count against neither size limit (a long history of a person
+# made a file that exports but never imports); their checksum is still checked (preview), their rows counted from the manifest
+UMZ_LEFT_PARTS = frozenset(p for _w, ps in UMZ_LEFT for p in ps) - UMZ_READ
+# 2.531.0 (#4317) F11: the area a refused row of a table is named under in the result (else its technical name)
+UMZ_REFUSED_AREA = {
+    "lists": N_("Projects"), "sections": N_("Sections"), "list_fields": N_("Custom fields"), "list_tags": N_("Project tags"),
+    "list_milestones": N_("Milestones"), "sprints": N_("Sprints"), "tasks": N_("Tasks"), "task_deps": N_("Dependencies"),
+    "task_field_values": N_("Custom fields"), "task_tags": N_("Tags"), "task_list_tags": N_("Project tags"),
+    "task_note_locks": N_("Encrypted notes"), "task_enc_notes": N_("Encrypted notes"), "notes": N_("Project notes"),
+    "comments": N_("Comments"), "attachments": N_("Attachments"), "list_files": N_("Files"), "time_entries": N_("Time entries"),
+    "habits": N_("Habits"), "habit_logs": N_("Habits"), "filters": N_("Saved filters"), "templates": N_("Templates"),
+    "template_files": N_("Templates"), "books": N_("Address books"), "contacts": N_("Contacts"), "ev_cals": N_("Calendars"),
+    "events": N_("Events"), "event_attendees": N_("Events"), "journal": N_("Journal"), "bookmarks": N_("Bookmarks"),
+    "pomos": N_("Focus sessions"), "contact_care": N_("Staying in touch"), "list_rules": N_("Rules"),
+}
+# 2.531.0 (#4317) F6: the person columns of a task besides the assignee -> the role named when it does not come along
+UMZ_TASK_ROLES = (("approver_id", N_("Approver")), ("reviewer_id", N_("Reviewer")), ("review_by", N_("Reviewer")),
+                  ("wait_by", N_("Waiting on")), ("delegate_agent_id", N_("Delegated agent")), ("assignee_group_id", N_("Group")))
+UMZ_ROLE_LOST = N_("Role on tasks not taken over (the person is not on this server or was not chosen): {0}")
+UMZ_AREAS_LEFT = N_("These areas stay on the old server: {0}")
+UMZ_WARN_MAX = 50  # the result names at most this many warnings, the ones a run must always name (run.must) on top and first
 
 _UMI = {}  # user id -> running check / import thread (of this process; 2.370.3 (#2760): the queue row tells it for every process)
 _UMI_START = {}  # 2.308.0 (#3261): user id -> steps waiting for that worker's end before they start their own
@@ -337,6 +358,16 @@ def _read_entry(zf, zi, limit, sha=None):
     return bytes(out)
 
 
+def _sum_entry(zf, zi, sha):
+    """2.531.0 (#4317) F5: the checksum of a part that is never read, streamed (no size limit, nothing kept in memory)."""
+    h = hashlib.sha256()
+    with zf.open(zi) as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    if h.hexdigest() != sha:
+        raise UmzBad(N_("Checksum wrong: {0}. The file is damaged or was changed."), zi.filename)
+
+
 def _json(raw, what):
     try:
         return json.loads(raw.decode("utf-8"))
@@ -415,11 +446,20 @@ def umz_open(path, key, size, full=True):
             if zi.file_size != f["size"] or sums.get(p) not in (None, f["sha256"]):
                 raise UmzBad(N_("Checksum wrong: {0}. The file is damaged or was changed."), p[:120])
             files[p] = (zi, f["sha256"])
-        data = {}
-        if sum(zi.file_size for p, (zi, _s) in files.items() if p.startswith("data/")) > UMZ_JSON_TOTAL:
+        data, unread = {}, {}
+
+        def left(p):  # 2.531.0 (#4317) F5: a part of UMZ_LEFT, never read
+            return p.startswith("data/") and p.endswith(".json") and p[5:-5] in UMZ_LEFT_PARTS
+        if sum(zi.file_size for p, (zi, _s) in files.items() if p.startswith("data/") and not left(p)) > UMZ_JSON_TOTAL:
             raise UmzBad(N_("The file contains a part that is too large: {0}"), "data/")
+        rows_of = man.get("tables") if isinstance(man.get("tables"), dict) else {}
         for p, (zi, sha) in files.items():
-            if p.startswith("data/") and p.endswith(".json") and "/" not in p[5:]:
+            if left(p):
+                n = rows_of.get(p[5:-5])
+                unread[p[5:-5]] = n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
+                if full:
+                    _sum_entry(zf, zi, sha)
+            elif p.startswith("data/") and p.endswith(".json") and "/" not in p[5:]:
                 rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, sha), p)
                 if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
                     raise UmzBad(N_("The file contains a broken part: {0}"), p)
@@ -428,6 +468,7 @@ def umz_open(path, key, size, full=True):
                 data[p[5:-5]] = rows
             elif full:
                 _read_entry(zf, zi, MAX_FILE_MB * 1024 * 1024 * 4, sha)
+        man["_unread"] = unread  # 2.531.0 (#4317) F5: {part: rows of the manifest} for umz_left
         return zf, man, files, data
     except UmzBad:
         zf.close()
@@ -633,11 +674,13 @@ def umz_find_login(c, uid, login):
     return r if r and (vis is None or r["id"] in vis) else None
 
 
-def umz_left(data):
+def umz_left(data, unread=None):
     """2.273.0 A (#3030): what of an account export stays on the old server -> [{"what": name, "count": n}]: every part of
     the file the import does not read (UMZ_LEFT names them, an unknown part keeps its technical name), the settings that
-    do not move and the tasks in the trash. 2.454.0 (#3808): name = the key, translated for who reads it (umz_areas_tr)."""
+    do not move and the tasks in the trash. 2.454.0 (#3808): name = the key, translated for who reads it (umz_areas_tr).
+    2.531.0 (#4317) F5: unread = {part: rows} of the parts umz_open did not read (man["_unread"])."""
     n = {k: len(v) for k, v in data.items() if isinstance(v, list)}
+    n.update({k: v for k, v in (unread or {}).items() if isinstance(v, int)})
     out, known = {}, set(UMZ_READ)
     for what, parts in UMZ_LEFT:
         known.update(parts)
@@ -702,7 +745,7 @@ def umz_preview(c, uid, man, data, can_invite):
     for what, n in (man.get("org_skipped") or {}).items():  # an organisation export: the areas that do not move
         skipped.append({"what": what, "count": n})
     if not org_kind:  # 2.273.0 A (#3030): every part of the file the import does not read (was a fixed list)
-        skipped += umz_left(data)
+        skipped += umz_left(data, man.get("_unread"))
     office = man.get("personal_office") if isinstance(man.get("personal_office"), dict) else {}  # 2.362.2 (#3099)
     if not org_kind and isinstance(office.get("rows"), int) and office["rows"]:
         skipped.append({"what": tr(N_("Office")), "count": office["rows"]})
@@ -915,7 +958,9 @@ def umz_billed(run, src, d, ts):
     return d
 
 
-def umz_insert(c, table, d, rid=True):
+def umz_insert(c, table, d, rid=True, told=False):
+    """The row in a savepoint -> new id (rid) / True, None when the database refuses it. 2.531.0 (#4317) F11: a refusal is
+    counted per table for the run of this thread (umz_refused); told = the caller names this row in a warning of its own."""
     names = list(d)
     sql = f"INSERT INTO {table}({','.join(chr(34) + n + chr(34) for n in names)}) VALUES({','.join('?' * len(names))})"
     args = [d[n] for n in names]
@@ -926,7 +971,22 @@ def umz_insert(c, table, d, rid=True):
             c.execute(sql, args)
             return True
     except (IntegrityError, DataError):  # a duplicate or a value the column refuses: this row is skipped
+        rej = getattr(_L, "rej", None)
+        if rej is not None and not told:
+            rej[table] = rej.get(table, 0) + 1
         return None
+
+
+def umz_refused(run):
+    """2.531.0 (#4317) F11: the rows the database refused in this run, one warning per area, and the counting ends."""
+    rej, _L.rej = getattr(_L, "rej", None) or {}, None
+    by = {}
+    for table, n in rej.items():
+        area = UMZ_REFUSED_AREA.get(table, table)
+        by[area] = by.get(area, 0) + n
+    for area, n in by.items():
+        run.warning(N_("{1} entries in {0} were refused by this server and not taken over"),
+                    (area,) if area in UMZ_REFUSED_AREA.values() else area, n)
 
 
 # 2.362.3 (#3098): what a second import of the same source into the same target skips, row by row: kind of _Run.put -> (table, column, kind of the
@@ -1119,6 +1179,8 @@ class _Run:
                         "books": [], "time_entries": [], "journal": [], "settings": {}, "files": [], "template_files": []}
         self.stats = {}
         self.warn = {}
+        self.must = set()  # 2.531.0 (#4317) F4: the keys of warn the result always names, first and outside UMZ_WARN_MAX
+        self._old = {}  # 2.531.0 (#4317) F16: kind -> the new ids of the rows of an earlier import (umz_have)
         self.done, self.total, self.tick = 0, max(1, total), 0
         self.task_list, self.field_list, self.list_org = {}, {}, {}
         self.sprint_list = {}  # 2.455.0 (#3469): new sprint id -> its list
@@ -1150,9 +1212,24 @@ class _Run:
     def count(self, k, n=1):
         self.stats[k] = self.stats.get(k, 0) + n
 
-    def warning(self, text, *a):
+    def warning(self, text, *a, must=False):
         k = (text, *a)
         self.warn[k] = self.warn.get(k, 0) + 1
+        if must:
+            self.must.add(k)
+
+    def warnings(self):
+        """2.531.0 (#4317) F4: the warnings of the result: the ones that must be named first, then at most UMZ_WARN_MAX others."""
+        first = [k for k in self.warn if k in self.must]
+        rest = [k for k in self.warn if k not in self.must][:UMZ_WARN_MAX]
+        return [{"text": list(k), "count": self.warn[k]} for k in first + rest]
+
+    def old(self, kind, new):
+        """2.531.0 (#4317) F16: new is a row of an earlier import of this source (run.there found it): what hangs on it came
+        along with that import, a second run must not add it again."""
+        if kind not in self._old:
+            self._old[kind] = set(self.have.get(kind, {}).values())
+        return bool(new) and new in self._old[kind]
 
     def step(self):
         self.done += 1
@@ -1186,7 +1263,7 @@ def umz_list_parts(c, run, uid, inbox, data, who):
     for r in data.get("task_links", []):
         run.step()
         tid, lid = run.m("tasks", r.get("task_id")), run.m("lists", r.get("list_id"))
-        if not tid or not lid or lid == inbox or lid == run.task_list.get(tid):
+        if not tid or not lid or lid == inbox or lid == run.task_list.get(tid) or run.old("tasks", tid):  # 2.531.0 (#4317) F16
             continue
         both = c.execute("SELECT org_id, life FROM lists WHERE id IN (?,?)", (lid, run.task_list.get(tid))).fetchall()  # the app's rule (ml_add)
         if len(both) < 2 or both[0][0] != both[1][0] or any(x[1] in ("health", "budget") for x in both):
@@ -1390,6 +1467,54 @@ def umz_undo_templates(c, uid, cr, plan):
     return paths
 
 
+UMZ_JOURNAL_SEP = "\n\n---\n"
+
+
+def umz_journal_add(c, run, uid, r, here):
+    """2.531.0 (#4317) F7: the file's entry of a journal day that has an entry here already: below the text of here, after a
+    line and the date of the file's entry, counted and named in the result. The same text found there already (a second
+    import) is skipped. The undo cuts it off again while the day was not written on since (created["journal_add"])."""
+    src = _txt(r.get("text"), JOURNAL_MAX).strip()
+    if not src:
+        return
+    cur = jr_open(c, uid, here)
+    old = cur.get("text") or ""
+    if src in old:
+        run.count("skipped")
+        return
+    at = parse_iso(r["updated_at"]) if _iso_ts(r.get("updated_at")) else None
+    when = short_day(at.date() if at else datetime.strptime(here["day"], "%Y-%m-%d").date(), lg=getattr(_L, "lg", None), year=True)
+    text = f"{old}{UMZ_JOURNAL_SEP}{tr(N_('From the import (entry of {0})'), when)}\n{src}"
+    if len(text) > JOURNAL_MAX:  # the journal keeps at most JOURNAL_MAX characters a day (journal_set): never cut silently
+        text = text[:JOURNAL_MAX]
+        run.warning(N_("A journal day was too long to add the entry of the file in full: {0}"), here["day"])
+    st, sm, se = jr_seal(c, uid, text, cur.get("mood"))
+    ts = iso_ms(now_utc())
+    if c.execute("UPDATE journal SET text=?, mood=?, mood_enc=?, updated_at=? WHERE user_id=? AND day=? AND updated_at=?",
+                 (st, sm, se, ts, uid, here["day"], here["updated_at"])).rowcount:
+        run.created.setdefault("journal_add", []).append([here["day"], len(old), here["updated_at"], ts])
+        run.count("journal_added")
+        run.warning(N_("Journal: the entry of the file was added below a day that already had an entry here"))
+
+
+def umz_task_roles(c, run, t, who):
+    """2.531.0 (#4317) F6: approver, reviewer, who waits and the delegated agent of a task from the file like its assignee:
+    the person who came along (an agent only as an agent), else empty with a warning naming the role. A group of the old
+    server has no match here: always empty with a warning."""
+    out = {}
+    for col, role in UMZ_TASK_ROLES:
+        if not _oid(t.get(col)):
+            continue
+        new = None if col == "assignee_group_id" else who(t.get(col))
+        if new and col == "delegate_agent_id" and not c.execute(
+                "SELECT 1 FROM users WHERE id=? AND COALESCE(kind,'user')='agent'", (new,)).fetchone():
+            new = None
+        out[col] = new
+        if not new:
+            run.warning(UMZ_ROLE_LOST, (role,))
+    return out
+
+
 def umz_write(c, run, uid, man, zf, files, data, people):
     """Creates everything in the open transaction (the caller commits). people: {old user id: new user id} for authors
     and assignees (only people ticked for sharing). 2.362.4 (#3100): the files come last: a full storage stops only them."""
@@ -1430,7 +1555,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
         d = umz_row(c, "lists", L, {"owner_id": uid, "org_id": lorg, "is_inbox": 0, "sort": sort, "folder": folder,
                                      "name": _txt(L.get("name"), LIST_NAME_MAX).strip() or tr("Import"),
                                      "header_style": hst if hst in HEAD_STYLES and hst != "image" else ""}, ts)
-        lid = umz_insert(c, "lists", d) if d else None
+        lid = umz_insert(c, "lists", d, told=True) if d else None
         if not lid:
             run.warning(N_("A project could not be taken over: {0}"), _txt(L.get("name"), 80))
             continue
@@ -1482,14 +1607,15 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.warning(N_("Assignment not taken over (the person is not on this server or was not chosen)"))
         spr = run.m("sprints", t.get("sprint_id"))  # 2.455.0 (#3469): of the same list, else the backlog
         spr = spr if run.sprint_list.get(spr) == lid else None
-        d = umz_row(c, "tasks", t, {
+        roles = umz_task_roles(c, run, t, who)  # 2.531.0 (#4317) F6
+        d = umz_row(c, "tasks", t, {**roles,
             **({} if spr or man.get("kind") == "org" else {"sprint_at": None}), "sprint_id": spr,  # an organisation export: oi_write
             "list_id": lid, "section_id": sid, "title": _txt(t.get("title"), TITLE_MAX) or "…",
             "content": _txt(t.get("content"), CONTENT_MAX), "status": status, "milestone_id": run.m("list_milestones", t.get("milestone_id")),
             "created_by": uid, "completed_by": uid if status else None, "assignee_id": aid, "assigned_by": uid if aid else None,
             "tt_id": f"kalmido:{eid[:16]}:{_oid(t.get('id')) or 0}", "parent_id": None, "updated_at": ts,
             **_umz_delivery(t)}, ts)
-        tid = umz_insert(c, "tasks", d) if d else None
+        tid = umz_insert(c, "tasks", d, told=True) if d else None
         if not tid:
             run.warning(N_("A task could not be taken over: {0}"), _txt(t.get("title"), 80))
             continue
@@ -1517,11 +1643,13 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     # what hangs on a task
     for r in data.get("task_deps", []):
         a, b = run.m("tasks", r.get("task_id")), run.m("tasks", r.get("blocker_id"))
+        if run.old("tasks", a) and run.old("tasks", b):  # 2.531.0 (#4317) F16: came along with the earlier import
+            continue
         if a and b and a != b and umz_insert(c, "task_deps", {"task_id": a, "blocker_id": b, "created_by": uid, "created_at": ts}, rid=False):
             run.count("task_deps")
     for r in data.get("task_field_values", []):
         tid, fid = run.m("tasks", r.get("task_id")), run.m("list_fields", r.get("field_id"))
-        if tid and fid and run.field_list.get(fid) == run.task_list.get(tid):
+        if tid and fid and run.field_list.get(fid) == run.task_list.get(tid) and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             val = _coerce(r.get("value"), "text") or ""
             if run.field_type.get(fid) in ("person", "task"):  # 2.362.4 (#3100): the value is an id of the old server
                 val = who(val) if run.field_type[fid] == "person" else run.m("tasks", val.strip().lstrip("#"))
@@ -1531,22 +1659,22 @@ def umz_write(c, run, uid, man, zf, files, data, people):
     for r in data.get("task_tags", []):
         tid = run.m("tasks", r.get("task_id"))
         tag = _txt(r.get("tag"), 100).strip()
-        if tid and tag and _oid(r.get("user_id")) == me_old:
+        if tid and tag and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             umz_insert(c, "task_tags", {"task_id": tid, "user_id": uid, "tag": tag}, rid=False)
     for r in data.get("task_list_tags", []):
         tid, gid = run.m("tasks", r.get("task_id")), run.m("list_tags", r.get("tag_id"))
-        if tid and gid:
+        if tid and gid and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             umz_insert(c, "task_list_tags", {"task_id": tid, "tag_id": gid}, rid=False)
     for r in data.get("task_note_locks", []):  # browser-encrypted with my note password: only my own
         tid = run.m("tasks", r.get("task_id"))
-        if tid and _oid(r.get("user_id")) == me_old:
+        if tid and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             d = umz_row(c, "task_note_locks", r, {"task_id": tid, "user_id": uid, "legacy_aad": umz_legacy_aad(  # 2.278.0 C (#3091)
                 "kalmido-locknote:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
             if d:
                 umz_insert(c, "task_note_locks", d, rid=False)
     for r in data.get("task_enc_notes", []):  # 2.362.0 (#3090): browser-encrypted with my content key: only my own
         tid = run.m("tasks", r.get("task_id"))
-        if tid and _oid(r.get("user_id")) == me_old:
+        if tid and _oid(r.get("user_id")) == me_old and not run.old("tasks", tid):  # 2.531.0 (#4317) F16
             d = umz_row(c, "task_enc_notes", r, {"task_id": tid, "user_id": uid, "legacy_aad": umz_legacy_aad(
                 "kalmido-note:v1", r.get("legacy_aad"), r.get("task_id"), me_old)}, ts)
             if d and umz_insert(c, "task_enc_notes", d, rid=False):
@@ -1655,7 +1783,7 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.count(src)
     for r in data.get("habit_logs", []):
         hid = run.m("habits", r.get("habit_id"))
-        if hid:
+        if hid and not run.old("habits", hid):  # 2.531.0 (#4317) F16: the check-ins came along with the earlier import
             d = umz_row(c, "habit_logs", r, {"habit_id": hid}, ts)
             if d:
                 umz_insert(c, "habit_logs", d, rid=False)
@@ -1691,7 +1819,11 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             run.put("event_attendees", r.get("id"), umz_insert(c, "event_attendees", d) if d else None)
     for r in data.get("journal", []):
         day = _txt(r.get("day"), 10)
-        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) and not c.execute("SELECT 1 FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone():
+        here = c.execute("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? AND day=?",
+                         (uid, day)).fetchone() if re.fullmatch(r"\d{4}-\d{2}-\d{2}", day) else None
+        if here:  # 2.531.0 (#4317) F7: a day written here already keeps its text, the file's entry is added below it
+            umz_journal_add(c, run, uid, r, here)
+        elif re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
             d = umz_row(c, "journal", r, {"user_id": uid, "day": day, "updated_at": ts}, ts)
             if d:  # 2.306.0 A (#2885): sealed for the importing person like a new entry
                 d.pop("mood_enc", None)
@@ -2016,11 +2148,13 @@ def umz_run(uid, iid, opts):
             if run.kind == "org":  # 2.137.0 (#2344): the personal office for office parts going into the private space
                 from .orgimport import oi_prepare
                 oi_prepare(c, run, uid, data)
+            _L.rej = {}  # 2.531.0 (#4317) F11: umz_insert counts the refused rows of the run
             umz_write(c, run, uid, man, zf, files, data, people)
+            umz_refused(run)
             # 2.273.0 A (#3030): what stays on the old server, in the result and the import's report too
-            left = [{"what": w, "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data)
-            if left:  # 2.454.0 (#3808): as stored texts, umz_view translates the names too
-                run.warning(N_("These areas stay on the old server: {0}"), stored_join(("{0} ({1})", (x["what"],), x["count"]) for x in left))
+            left = [{"what": w, "count": n} for w, n in (man.get("org_skipped") or {}).items()] if run.kind == "org" else umz_left(data, man.get("_unread"))
+            if left:  # 2.454.0 (#3808): as stored texts, umz_view translates the names too; 2.531.0 (#4317) F4: always named
+                run.warning(UMZ_AREAS_LEFT, stored_join(("{0} ({1})", (x["what"],), x["count"]) for x in left), must=True)
             if run.stats.get("skipped"):  # 2.362.3 (#3098)
                 run.warning(N_("Already here from an earlier import, skipped: {0} entries"), run.stats["skipped"])
             report = {**run.stats, "export_id": eid, "src": src, "target": run.org, "tasks": run.stats.get("tasks", 0), "not_taken": left}
@@ -2062,7 +2196,7 @@ def umz_run(uid, iid, opts):
             zf.close()
         result = {"created": run.stats, "people": shared, "import_id": iid_db,
                   "undo_until": iso(umz_undo_until(now_utc())) if iid_db else None,
-                  "warnings": [{"text": list(k), "count": n} for k, n in list(run.warn.items())[:50]]}  # 2.448.0 (#3765): key + values, umz_view translates
+                  "warnings": run.warnings()}  # 2.448.0 (#3765): key + values, umz_view translates; 2.531.0 (#4317) F4: the must ones first
         if run.stopped == "quota":
             result["stopped"] = [N_("Your storage is full: some files were left out, everything else came over. The import can be undone.")]
         _set(uid, iid, state="stopped" if run.stopped else "done", result=result, progress=None)
@@ -2090,6 +2224,7 @@ def umz_run(uid, iid, opts):
                 os.remove(p)  # the upload is gone as soon as the run is over
         except OSError:
             pass
+        _L.rej = None  # 2.531.0 (#4317) F11: a failed run's thread counts nothing more
         c.close()
         with _UMI_LOCK:
             _UMI.pop(int(uid), None)
@@ -2435,6 +2570,17 @@ def umz_undo(c, uid, r):
             kept_rows += 1
             continue
         c.execute("DELETE FROM journal WHERE user_id=? AND day=?", (uid, day))
+    for x in cr.get("journal_add") or []:  # 2.531.0 (#4317) F7: the entry added below a day here, cut off while not written on since
+        if not (isinstance(x, list) and len(x) == 4 and isinstance(x[0], str) and isinstance(x[1], int)):
+            continue
+        j = c.execute("SELECT day, text, mood, mood_enc, updated_at FROM journal WHERE user_id=? AND day=?", (uid, x[0])).fetchone()
+        if not j or j["updated_at"] != x[3]:
+            kept_rows += bool(j)
+            continue
+        cur = jr_open(c, uid, j)
+        st, sm, se = jr_seal(c, uid, (cur.get("text") or "")[:x[1]], cur.get("mood"))
+        c.execute("UPDATE journal SET text=?, mood=?, mood_enc=?, updated_at=? WHERE user_id=? AND day=? AND updated_at=?",
+                  (st, sm, se, x[2], uid, x[0], x[3]))
     for mid in cr.get("hub_mailboxes") or []:  # 2.144.5 B (#2410): a mailbox the import set up (not changed since: no password yet)
         # 2.144.5 A2 (#2410, review R7): + still error "password" (saving it in the settings clears that, even without a password)
         gone = c.execute("DELETE FROM hub_mailboxes WHERE id=? AND created_by=? AND secret='' AND error='password'", (int(mid), uid)).rowcount

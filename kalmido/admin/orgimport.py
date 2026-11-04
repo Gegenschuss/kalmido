@@ -308,7 +308,7 @@ def oi_write(c, run, uid, man, zf, files, data, who):
             enc_space = space or (oc_user_space(uid) if spec.enc == "user" else None)
             if spec.enc and enc_space:
                 d = oc_enc_fields(c, enc_space, spec.table, d)
-            nid = umz_insert(c, spec.table, d, rid=spec.rid)
+            nid = umz_insert(c, spec.table, d, rid=spec.rid, told=bool(spec.label))  # 2.531.0 (#4317) F11: a label warns below
             if not nid:
                 if spec.label:
                     run.warning(N_("A row could not be taken over: {0}"), (spec.label,))  # #3808: the key, read in the reader's language

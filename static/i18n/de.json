@@ -16315,5 +16315,12 @@
   "links between tables and tasks": "Verknüpfungen zwischen Tabellen und Aufgaben",
   "remembered shopping items": "gemerkte Einkaufsartikel",
   "spaces of knowledge pages": "Bereiche der Wissensseiten",
-  "history of knowledge pages": "Verlauf der Wissensseiten"
+  "history of knowledge pages": "Verlauf der Wissensseiten",
+  "Approver": "Freigeber",
+  "Delegated agent": "Beauftragter Agent",
+  "Role on tasks not taken over (the person is not on this server or was not chosen): {0}": "Rolle an Aufgaben nicht übernommen (die Person ist nicht auf diesem Server oder wurde nicht gewählt): {0}",
+  "{1} entries in {0} were refused by this server and not taken over": "{1} Einträge in {0} hat dieser Server abgelehnt, sie wurden nicht übernommen",
+  "From the import (entry of {0})": "Aus dem Import (Eintrag vom {0})",
+  "A journal day was too long to add the entry of the file in full: {0}": "Ein Journal-Tag war zu lang, um den Eintrag der Datei vollständig anzuhängen: {0}",
+  "Journal: the entry of the file was added below a day that already had an entry here": "Journal: Der Eintrag der Datei wurde unter einem Tag angehängt, der hier schon einen Eintrag hatte"
 }

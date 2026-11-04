@@ -92,7 +92,7 @@ def _care(c, run, uid, data, ts):
     for r in data.get("contact_care") or []:
         run.step()
         cid = run.m("contacts", r.get("contact_id")) if isinstance(r, dict) else None
-        if not cid:
+        if not cid or run.old("contacts", cid):  # 2.531.0 (#4317) F16: came along with an earlier import of the contact
             continue
         d = umz_row(c, "contact_care", r, {"user_id": uid, "contact_id": cid, "updated_at": ts}, ts)
         if d and umz_insert(c, "contact_care", d, rid=False):
@@ -119,8 +119,8 @@ def _layouts(c, run, uid, data, ts):
     for r in data.get("list_layouts") or []:
         run.step()
         lid = run.m("lists", r.get("list_id")) if isinstance(r, dict) else None
-        if not lid:
-            continue
+        if not lid or run.old("lists", lid) or c.execute("SELECT 1 FROM list_layouts WHERE list_id=? AND user_id=?", (lid, uid)).fetchone():
+            continue  # 2.531.0 (#4317) F16: came along with an earlier import (the inbox: an arrangement of its own here)
         try:
             lay = clean_layout(r.get("layout") if isinstance(r.get("layout"), str) else None)
         except BadInput:
@@ -136,7 +136,7 @@ def _bells(c, run, uid, me_old, data, ts):
     for r in data.get("task_bell") or []:
         run.step()
         tid = run.m("tasks", r.get("task_id")) if isinstance(r, dict) else None
-        if not tid or r.get("level") not in TBL_LEVELS or (_oid(r.get("set_by")) and _oid(r.get("set_by")) != me_old):
+        if not tid or run.old("tasks", tid) or r.get("level") not in TBL_LEVELS or (_oid(r.get("set_by")) and _oid(r.get("set_by")) != me_old):
             continue
         d = {"task_id": tid, "user_id": uid, "org_id": run.list_org.get(run.task_list.get(tid)), "level": r["level"],
              "until": r.get("until") if _iso_ts(r.get("until")) else None, "set_by": uid if r.get("set_by") else None,
@@ -146,7 +146,7 @@ def _bells(c, run, uid, me_old, data, ts):
     for r in data.get("task_watchers") or []:
         run.step()
         tid = run.m("tasks", r.get("task_id")) if isinstance(r, dict) else None
-        if tid and umz_insert(c, "task_watchers", {"task_id": tid, "user_id": uid,
+        if tid and not run.old("tasks", tid) and umz_insert(c, "task_watchers", {"task_id": tid, "user_id": uid,
                                                      "created_at": r.get("created_at") if _iso_ts(r.get("created_at")) else ts}, rid=False):
             _more(run, "task_watchers", {"task_id": tid})
 
