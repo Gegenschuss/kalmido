@@ -97,7 +97,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files,reading,sheets';
       await ev(`(() => { document.querySelector('.modal [data-frq="close"]')?.click(); return 1; })()`);
 
       // ---- #2367: bookmarks
-      await nav(B + '#bookmarks');
+      await nav(B + '#bookmarks/s/private');  // 2.540.0 (#4588): under "All workspaces" #bookmarks is the overview of the spaces (alice is in Nordwind)
       check(await ready(ev, `document.querySelectorAll('.bmtag').length > 0`, 80), `${u}: the bookmark tags`);
       check(await ev(`[...document.querySelectorAll('.bmtag')].every(b => b.getBoundingClientRect().height >= 43.5)`), `${u}: #2367 the tag targets are 44 px ` + await hOf(ev, '.bmtag'));
       await ev(`(() => { bm_detail(${data[u].bm}); return 1; })()`);

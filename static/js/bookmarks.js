@@ -8,11 +8,11 @@
 // (life/bookmarks.py) -- while one is pending the view looks again a few times. Everything comes as plain text (always esc()),
 // links only http(s); the picture is the app's own copy (/api/bookmarks/<id>/image). A bookmark lives in a space like a
 // table: private, or an organisation's (every member reads it, its owner / the organisation's admins change it).
-const BM = {items: [], more: false, tags: [], count: 0, q: '', tag: '', state: '', space: null, done: false, loading: false, seq: 0,
+const BM = {items: [], more: false, tags: [], count: 0, q: '', tag: '', state: '', done: false, loading: false, seq: 0,
   busy: false, at: 0, polls: 0, pollT: 0};
 const bm_href = u => /^https?:\/\//i.test(u || '') ? u : '';
 const bm_view = () => LS.get('bmView', 'cards') === 'list' ? 'list' : 'cards';
-const bm_sp = () => rd_space(BM.space);  // 2.172.0 B (#2679): the shown workspace only (under "All workspaces": Private or the picked one), no mixed view
+const bm_sp = () => rd_space();  // 2.172.0 B (#2679): the shown workspace only, no mixed view; 2.540.0 (#4588): under "All workspaces" the one opened from the overview
 const bm_addSp = () => { const s = bm_sp(); return s === 'all' ? 'private' : s; };
 const bm_spOrg = sp => sp && sp !== 'private' ? +sp.slice(4) : null;
 const BM_STATES = [['', N_('Unread and read')], ['unread', N_('Unread')], ['read', N_('Read|bookmark')], ['archived', N_('Archived')], ['all', N_('All')]];
@@ -22,6 +22,7 @@ async function bm_load(more) {
   const seq = ++BM.seq; BM.loading = true;
   try {
     const sp = bm_sp(), q = new URLSearchParams({space: sp});
+    if (BM.sp && sp !== BM.sp) BM.tag = '';  // 2.540.0 (#4588): another space opened (was the picker's change): its own tags
     if (BM.q) q.set('q', BM.q);
     if (BM.tag) q.set('tag', BM.tag);
     if (BM.state) q.set('state', BM.state);
@@ -29,7 +30,7 @@ async function bm_load(more) {
     const j = await api('GET', '/api/bookmarks?' + q);
     if (seq !== BM.seq) return;
     BM.items = more ? BM.items.concat(j.items) : j.items; BM.more = j.more; BM.tags = j.tags; BM.count = j.count; BM.sp = sp;
-  } catch (e) { if (seq === BM.seq && e.status === 404) BM.space = null; }
+  } catch (e) { if (seq === BM.seq && e.status === 404 && rd_open()) go('bookmarks'); }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== BM.seq) return;
   BM.loading = false; BM.done = true; BM.at = Date.now();
   bm_draw();
@@ -50,18 +51,18 @@ function bm_poll() {
 
 // ---- the view
 function viewBookmarks() {
+  if (rd_ovr()) return `<div class="bmview">${rd_ovrHtml('bookmarks')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if (!BM.loading && (!BM.done || Date.now() - BM.at > 60000 || BM.sp !== bm_sp())) setTimeout(bm_reload, 0);  // 2.172.0 B (#2679): + another workspace shown
-  const spSel = rd_pick(bm_sp(), 'data-bm-space');  // 2.172.0 B (#2679)
   const add = `<form class="bmadd" data-bm-form><label class="sr" for="bm-url">${tr('Link')}</label><input id="bm-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link'))}" maxlength="2000"><button type="submit" class="btn pri" ${BM.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
   const menu = `<details class="bgmenu bmmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
     <button type="button" role="menuitem" data-bm="bmlet">${ic('bookmark', 's')}<span>${tr('Bookmark button for the browser')}</span></button>
     <button type="button" role="menuitem" data-bm="kk">${ic('link', 's')}<span>${tr('Karakeep…')}</span></button></div></details>`;
   const view = bm_view();
   const bar = `<div class="bmbar"><input type="search" class="bmq" data-bm-q value="${esc(BM.q)}" placeholder="${esc(tr('Search bookmarks'))}" aria-label="${esc(tr('Search bookmarks'))}">
-    <select data-bm-state aria-label="${esc(tr('Show'))}">${BM_STATES.map(([k, n]) => `<option value="${k}" ${k === BM.state ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>${spSel}
+    <select data-bm-state aria-label="${esc(tr('Show'))}">${BM_STATES.map(([k, n]) => `<option value="${k}" ${k === BM.state ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select>
     <span class="seg bmseg" role="group" aria-label="${esc(tr('View'))}"><button type="button" data-bm="cards" class="${view === 'cards' ? 'on' : ''}" aria-pressed="${view === 'cards'}" title="${esc(tr('Cards'))}" aria-label="${esc(tr('Cards'))}">${ic('grid', 's')}</button><button type="button" data-bm="list" class="${view === 'list' ? 'on' : ''}" aria-pressed="${view === 'list'}" title="${esc(tr('List'))}" aria-label="${esc(tr('List'))}">${ic('list', 's')}</button></span></div>`;
   const tags = BM.tags.length ? `<div class="bmtags" role="group" aria-label="${esc(tr('Tags'))}">${BM.tags.slice(0, 40).map(t => `<button type="button" class="bmtag ${t.tag === BM.tag ? 'on' : ''}" data-bm-tag="${esc(t.tag)}" aria-pressed="${t.tag === BM.tag}">#${esc(t.tag)} <span class="muted">${t.n}</span></button>`).join('')}</div>` : '';
-  const head = `<div class="bmhead">${add}${menu}</div>${bar}${tags}`;
+  const head = `${rd_crumb('bookmarks')}<div class="bmhead">${add}${menu}</div>${bar}${tags}`;
   if (!BM.done) return `<div class="bmview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   if (!BM.items.length) {
     const filtered = BM.q || BM.tag || BM.state;
@@ -206,8 +207,7 @@ function bm_bookmarkletHelp() { settingsModal('bookmarklet'); }
 async function bm_shareSave(url, title, space = 'private') {
   if (!feat('reading')) { toast(tr('Bookmarks are part of the module “Read later” (Settings > Modules)')); return; }
   space = space || 'private';
-  BM.space = space;  // under "All workspaces" the view shows where it went
-  go('bookmarks');
+  go(rd_home('bookmarks', space));  // under "All workspaces" the view shows where it went (2.540.0 #4588: its address)
   const t = (title || '').trim();
   const b = await bm_add(url, {space, ...(t && t !== url ? {title: t.slice(0, 300)} : {})}, wsOn() ? wsName(space) : '');
   if (b) bm_detail(b.id);
@@ -243,7 +243,6 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches?.('[data-bm-state]')) { BM.state = e.target.value; bm_reload(); }
-  else if (e.target.matches?.('[data-bm-space]')) { BM.space = e.target.value; BM.tag = ''; bm_reload(); }
 });
 document.addEventListener('click', async e => {
   const l = e.target.closest?.('[data-bm-link]');

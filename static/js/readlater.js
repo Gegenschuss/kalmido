@@ -7,11 +7,12 @@
 
 // 2.172.0 B (#2679): an entry is a task (title + link) of the space's read-later project (life/reading.py): private = the
 // person's "Read later" projects, an organisation's = its own project open to every member. The view asks the server for
-// ONE space (rd_space: the shown workspace; under "All workspaces" Private or the one picked here), never a mixed view.
+// ONE space (rd_space: the shown workspace; under "All workspaces" the one opened from the overview, 2.540.0 #4588),
+// never a mixed view.
 // Everything comes as plain text (always esc()), links only http(s).
-const RDL = {items: [], more: false, count: 0, doneN: 0, list: null, space: '', sp: '', done: false, loading: false, at: 0, seq: 0,
+const RDL = {items: [], more: false, count: 0, doneN: 0, list: null, sp: '', done: false, loading: false, at: 0, seq: 0,
   busy: false, ticked: false};
-const rdl_sp = () => rd_space(RDL.space);
+const rdl_sp = () => rd_space();
 const rdl_href = u => /^https?:\/\//i.test(u || '') ? u : '';
 
 // ---- loading
@@ -25,7 +26,7 @@ async function rdl_load(more) {
     const j = await api('GET', '/api/reading?' + q);
     if (seq !== RDL.seq) return;
     RDL.items = more ? RDL.items.concat(j.items) : j.items; RDL.more = j.more; RDL.count = j.count; RDL.doneN = j.done_count; RDL.list = j.list_id; RDL.sp = sp;
-  } catch (e) { if (seq === RDL.seq && e.status === 404) RDL.space = ''; }
+  } catch (e) { if (seq === RDL.seq && e.status === 404 && rd_open()) go('reading'); }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== RDL.seq) return;
   RDL.loading = false; RDL.done = true; RDL.at = Date.now();
   rdl_draw();
@@ -39,12 +40,12 @@ const rdl_item = id => RDL.items.find(x => x.id === id);
 
 // ---- the view
 function viewReading() {
+  if (rd_ovr()) return `<div class="bmview rlview">${rd_ovrHtml('reading')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if (!RDL.loading && (!RDL.done || Date.now() - RDL.at > 60000 || RDL.sp !== rdl_sp())) setTimeout(rdl_reload, 0);
-  const spSel = rd_pick(rdl_sp(), 'data-rl-space');
   const add = `<form class="bmadd" data-rl-form><label class="sr" for="rl-url">${tr('Link')}</label><input id="rl-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link to read later'))}" maxlength="2000"><button type="submit" class="btn pri" ${RDL.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
   const seg = `<div class="seg bmseg rlseg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rl="open-list" class="${RDL.ticked ? '' : 'on'}" aria-pressed="${!RDL.ticked}">${tr('To read')}${RDL.count ? ` <span class="muted">${RDL.count}</span>` : ''}</button><button type="button" data-rl="done-list" class="${RDL.ticked ? 'on' : ''}" aria-pressed="${RDL.ticked}">${tr('Read|done')}${RDL.doneN ? ` <span class="muted">${RDL.doneN}</span>` : ''}</button></div>`;
   const proj = RDL.list ? `<a class="btn sm" href="#l/${RDL.list}">${ic('list', 's')}<span>${tr('Show as project')}</span></a>` : '';
-  const head = `<div class="bmhead">${add}</div><div class="bmbar">${seg}${spSel}<span class="spacer"></span>${proj}</div>`;
+  const head = `${rd_crumb('reading')}<div class="bmhead">${add}</div><div class="bmbar">${seg}<span class="spacer"></span>${proj}</div>`;
   if (!RDL.done) return `<div class="bmview rlview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   if (!RDL.items.length) return `<div class="bmview rlview">${head}<div class="empty nempty">${ic('book')}<span>${RDL.ticked ? tr('Nothing ticked off yet.') : tr('Nothing to read later. Save a link above, from a feed or with the share button of your phone.')}</span></div></div>`;
   const row = x => {
@@ -95,8 +96,8 @@ async function rdl_shareSave(url, title, space = 'private') {
   const u = rdl_href(url); if (!u) return;
   const t = (title || '').trim();
   let j; try { j = await rdl_save(u, t && t !== u ? t : '', true, space || 'private'); } catch { return; }  // api() showed the reason
-  RDL.space = j?.space || space || ''; RDL.done = false;  // under "All workspaces" the view shows where it went
-  go('reading');
+  RDL.done = false;
+  go(rd_home('reading', j?.space || space || 'private'));  // under "All workspaces" the view shows where it went (2.540.0 #4588: its address)
 }
 
 document.addEventListener('submit', async e => {
@@ -104,10 +105,6 @@ document.addEventListener('submit', async e => {
   e.preventDefault();
   const inp = /** @type {HTMLInputElement} */ ($('#rl-url', /** @type {any} */ (f))), v = inp.value.trim(); if (!v || RDL.busy) return;
   if (await rdl_add(v)) { const i = /** @type {HTMLInputElement|null} */ ($('#rl-url')); if (i) i.value = ''; } else $('#rl-url')?.focus();
-});
-document.addEventListener('change', e => {
-  const el = /** @type {HTMLSelectElement} */ (e.target);
-  if (el.matches?.('[data-rl-space]')) { RDL.space = el.value; RDL.items = []; rdl_reload(); }
 });
 document.addEventListener('click', async e => {
   const a = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-rl]')); if (!a || a.disabled) return;

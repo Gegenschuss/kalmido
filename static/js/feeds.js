@@ -8,11 +8,11 @@
 // summaries come as plain text (always esc()), links only http(s); no pictures, no foreign HTML. Feeds are the person's own
 // (never shared, never an agent's). "Read later" makes a task in the reading list, once per article.
 // 2.172.0 B (#2677): feeds live in a space -- the view shows the feeds of the shown workspace only (rd_space: Private or an
-// organisation; under "All workspaces" Private or the one picked here); an organisation's sources are managed by its admins
+// organisation; under "All workspaces" the one opened from the overview, 2.540.0 #4588); an organisation's sources are managed by its admins
 // (manage), every member reads them with an own read mark. "Read later" lands in the article's space.
 const RSS = {feeds: null, items: [], more: false, unread: 0, feed: 0, only: false, loading: false, done: false, seq: 0, busy: false, at: 0,  // at: when loaded (older than a minute = again on the next draw)
-  space: '', sp: '', manage: true};  // 2.172.0 B (#2677): space = picked under "All workspaces", sp = the space loaded
-const rss_sp = () => rd_space(RSS.space);
+  sp: '', manage: true};  // 2.172.0 B (#2677): sp = the space loaded
+const rss_sp = () => rd_space();
 const rss_href = u => /^https?:\/\//i.test(u || '') ? u : '';
 const rss_when = s => { if (!s) return ''; const d = new Date(s); if (isNaN(d)) return ''; const n = Math.round((Date.now() - d) / 60000); return n < 60 ? trn('{0} min ago', '{0} min ago', Math.max(1, n)) : n < 1440 ? trn('{0} h ago', '{0} h ago', Math.round(n / 60)) : fmtDateLoc(rss_day(d)); };
 const rss_day = d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -32,7 +32,7 @@ async function rss_load(more) {
     if (f) { RSS.feeds = f.feeds; RSS.max = f.max; RSS.manage = f.manage !== false; }
     RSS.sp = sp;
     RSS.items = more ? RSS.items.concat(j.items) : j.items; RSS.more = j.more; RSS.unread = j.unread;
-  } catch (e) { if (seq === RSS.seq && e.status === 404) { RSS.feed = 0; RSS.space = ''; } }
+  } catch (e) { if (seq === RSS.seq && e.status === 404) { RSS.feed = 0; if (rd_open() && S.route.mod === 'feeds') go('feeds'); } }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== RSS.seq) return;
   RSS.loading = false; RSS.done = true; RSS.at = Date.now();
   rss_draw();
@@ -51,21 +51,21 @@ function rss_homeCard() {
   const top = RSS.items.filter(x => !x.read).slice(0, 4);
   const body = !RSS.done ? `<p class="muted">${tr('Loading…')}</p>`
     : !(RSS.feeds || []).length ? `<p class="muted">${tr('Follow blogs and news sites: their new articles show up here.')}</p>`
-    : top.length ? `<ul class="flist">${top.map(x => `<li><a href="#feeds" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc([x.feed, rss_when(x.published)].filter(Boolean).join(' · '))}</span></span></a></li>`).join('')}</ul>`
+    : top.length ? `<ul class="flist">${top.map(x => `<li><a href="#${esc(rd_home('feeds'))}" class="frow"><span class="ft"><b>${esc(x.title)}</b><span class="muted">${esc([x.feed, rss_when(x.published)].filter(Boolean).join(' · '))}</span></span></a></li>`).join('')}</ul>`
     : `<p class="muted">${tr('Nothing new to read.')}</p>`;
-  return `<section class="dcard fcard lcard lc-feeds" aria-labelledby="lh-feeds"><h2 id="lh-feeds">${ic('news', 's')}<span>${esc(tr('Feeds|panel'))}</span>${n ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}<div class="fcfoot"><a class="btn sm" href="#feeds">${ic('news', 's')}<span>${tr('Open')}</span></a></div></section>`;
+  return `<section class="dcard fcard lcard lc-feeds" aria-labelledby="lh-feeds"><h2 id="lh-feeds">${ic('news', 's')}<span>${esc(tr('Feeds|panel'))}</span>${n ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}<div class="fcfoot"><a class="btn sm" href="#${esc(rd_home('feeds'))}">${ic('news', 's')}<span>${tr('Open')}</span></a></div></section>`;
 }
 
 // ---- the view
 function viewFeeds() {
+  if (rd_ovr()) return `<div class="rssview">${rd_ovrHtml('feeds')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if (rss_stale()) setTimeout(rss_reload, 0);
-  const spSel = rd_pick(rss_sp(), 'data-rss-space');  // 2.172.0 B (#2677): only under "All workspaces"
   const add = !RSS.manage ? `<p class="muted rssro">${ic('lock', 's')} ${esc(tr('The admins of the organisation choose its feeds.'))}</p>` : `<form class="rssadd" data-rss-form><label class="sr" for="rss-url">${tr('Feed address')}</label><input id="rss-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Feed address'))}" maxlength="2000"><button type="submit" class="btn pri" data-rss-addbtn ${RSS.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Follow')}</span></button></form>`;
   const imp = RSS.manage ? `<label class="rssmi" role="menuitem" tabindex="0">${ic('upload', 's')}<span>${tr('Import OPML file')}</span><input type="file" accept=".opml,.xml,text/xml,application/xml,text/x-opml" data-rss-opml hidden></label>` : '';
   const exp = (RSS.feeds || []).length ? `<a role="menuitem" href="/api/feeds/opml?space=${encodeURIComponent(rss_sp())}" download="kalmido-feeds.opml">${ic('download', 's')}<span>${tr('Export OPML file')}</span></a>` : '';
   const menu = imp || exp ? `<details class="bgmenu rssmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
     ${imp}${exp}</div></details>` : '';
-  const head = `<div class="rsshead">${spSel}${add}${menu}</div>`;
+  const head = `${rd_crumb('feeds')}<div class="rsshead">${add}${menu}</div>`;
   if (!RSS.done) return `<div class="rssview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const feeds = RSS.feeds || [];
   if (!feeds.length) return `<div class="rssview">${head}<div class="empty nempty">${ic('news')}<span>${RSS.manage ? tr('No feeds yet. Paste an address above or import OPML.') : tr('No feeds in this organisation yet.')}</span></div></div>`;
@@ -157,7 +157,6 @@ document.addEventListener('submit', async e => {
 });
 document.addEventListener('change', e => {
   if (e.target.matches?.('[data-rss-feed]')) { RSS.feed = +e.target.value || 0; RSS.items = []; rss_reload(); }
-  else if (e.target.matches?.('[data-rss-space]')) { RSS.space = e.target.value; RSS.feed = 0; RSS.items = []; rss_reload(); }  // 2.172.0 B (#2677)
   else if (e.target.matches?.('[data-rss-opml]') && e.target.files.length) { const fl = e.target.files[0]; e.target.closest('details')?.removeAttribute('open'); e.target.value = ''; rss_opml(fl); }
 });
 document.addEventListener('keydown', e => {  // the label of the file input acts as a button

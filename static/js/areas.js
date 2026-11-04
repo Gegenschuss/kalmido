@@ -355,10 +355,19 @@ const O3A_PRIV = ['family', 'budget', 'habits'];  // 2.85.0 B (#1162): + feeds; 
 const O3A_LIFE_ORG = ['travel', 'care'];
 const o3a_lifeOrg = () => O3A_LIFE_ORG.some(m => feat(m));
 const o3a_privOnly = mod => O3A_PRIV.includes(mod) || (mod === 'life' && !o3a_lifeOrg());
-// 2.172.0 B (#2677 #2679): the space a view of Reading shows -- the shown workspace; under "All workspaces" Private (the view
-// offers the other spaces in its own picker, rd_pick), never a mixed view
-const rd_space = (own = '') => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : own && wsOptions().includes(own) && own !== 'all' ? own : 'private'; };
-const rd_pick = (cur, attr) => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && wsOptions().length > 2 ? `<select ${attr} aria-label="${esc(tr('Workspace'))}">${wsOptions().filter(w => w !== 'all').map(w => `<option value="${w}" ${w === cur ? 'selected' : ''}>${esc(wsName(w))}</option>`).join('')}</select>` : '';
+// 2.172.0 B (#2677 #2679): the space a view of Reading shows -- the shown workspace, never a mixed view.
+// 2.540.0 (#4588): under "All workspaces" (more than one space) the top of each view of Reading (Read later, Bookmarks,
+// Feeds, Home & life) is the overview of the spaces (spo_html, like Knowledge); the open one is in the address
+// (#<view>/s/<space>, rd_home). The picker of #2677 (Private by default) is gone; where a new link is saved (#4025) stays.
+const rd_spaces = () => wsOptions().filter(w => w !== 'all');
+const rd_all = () => typeof wsCur === 'function' && wsCur() === 'all' && wsOn() && rd_spaces().length > 1;
+const rd_open = () => rd_all() && rd_spaces().includes(S.route.wsp) ? S.route.wsp : null;  // null under "All" = the overview
+const rd_space = () => { const w = typeof wsCur === 'function' ? wsCur() : 'all'; return w !== 'all' ? w : rd_open() || 'private'; };
+const rd_ovr = () => rd_all() && !rd_open();
+const rd_home = (mod, sp = rd_open()) => rd_all() && sp ? mod + '/s/' + sp : mod;
+// the overview of a view of Reading and, inside a space under "All", the path back to it
+const rd_ovrHtml = mod => spo_html(mod, rd_spaces().map(w => [w, wsName(w), wsIcon(w)]));
+const rd_crumb = mod => rd_open() ? spo_crumbHtml(mod, wsName(rd_open())) : '';
 // ---- 2.540.0 (#4575 #4588): the overview of the spaces under "All workspaces", shared by the file store (ablage.js),
 // the views of Reading and later other areas (as Knowledge does it, wiki.js wk_spacesHtml): one row per space, a tap opens
 // it, the address carries it, the path above an open space leads back (spo_crumbHtml). to = where a tap leads: a route

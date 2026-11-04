@@ -10,10 +10,10 @@
 // /api/state); the review has its own view with the private journal.
 // 2.65.0 (#1823): LIFE_MODS, lifeOn and fmtMoney are in lazyload.js (this file loads on demand, module life)
 // 2.173.0 A (#2680): travel and staying in touch exist per space (Private or an organisation, like Reading): the view
-// shows the shown workspace's (rd_space; under "All workspaces" Private or the one picked here), in an organisation only
+// shows the shown workspace's (rd_space; under "All workspaces" the one opened from the overview, 2.540.0 #4588), in an organisation only
 // these two; contracts, devices, health, budget and family stay private
-const LF = {data: null, loading: false, seq: 0, space: '', sp: ''};  // space = picked under "All workspaces", sp = the space loaded
-const lf_sp = () => rd_space(LF.space);
+const LF = {data: null, loading: false, seq: 0, sp: ''};  // sp = the space loaded
+const lf_sp = () => rd_space();
 const lf_org = () => lf_sp().startsWith('org:');
 // may the person add in the shown organisation (guests, read-only and accounting do not)
 const lf_ro = () => lf_org() && ['readonly', 'guest', 'accounting'].includes(wsOrg(lf_sp().slice(4))?.role);
@@ -31,7 +31,7 @@ async function lifeLoad() {
   LF.loading = true;
   const sp = lf_sp();
   try { const j = await api('GET', '/api/life?space=' + encodeURIComponent(sp)); if (seq === LF.seq) { LF.data = j; LF.sp = sp; } }
-  catch (e) { if (seq === LF.seq) { LF.data = LF.data || {modules: []}; LF.sp = sp; if (e.status === 404) LF.space = ''; } }
+  catch (e) { if (seq === LF.seq) { LF.data = LF.data || {modules: []}; LF.sp = sp; if (e.status === 404 && rd_open() && S.route.mod === 'life') go('life'); } }  // 2.540.0 (#4588): a space not open to me: the overview
   LF.loading = false;
   if (S.route.mod === 'life' && seq === LF.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('life', viewLife()))); }
 }
@@ -39,12 +39,13 @@ const lifeReload = () => { LF.data = null; return lifeLoad(); };
 
 // ---- the view "Home & life"
 function viewLife() {
+  if (rd_ovr()) return `<div class="dash life">${rd_ovrHtml('life')}</div>`;  // 2.540.0 (#4588): "All workspaces": the spaces first
   if ((!LF.data || LF.sp !== lf_sp()) && !LF.loading) setTimeout(lifeLoad, 0);  // 2.173.0 A (#2680): another space shown
   const d = LF.data, org = lf_org(), ro = lf_ro();
   const card = (k, icon, title, body, acts = '', n = '') => `<section class="dcard fcard lcard lc-${k}" aria-labelledby="lh-${k}"><h2 id="lh-${k}">${ic(icon, 's')}<span>${esc(title)}</span>${n !== '' ? `<span class="dcn">${n}</span>` : ''}<span class="spacer"></span></h2>${body}${acts ? `<div class="fcfoot">${acts}</div>` : ''}</section>`;
   const btn = (act, icon, label, extra = '') => `<button type="button" class="btn sm" data-act="${act}" ${extra}>${ic(icon, 's')}<span>${esc(label)}</span></button>`;
   const open = id => `href="#t/${id}"`;
-  if (!d) return `<div class="dash life"><p class="muted lempty">${tr('Loading…')}</p></div>`;
+  if (!d) return `<div class="dash life">${rd_crumb('life') /* 2.540.0 (#4588) */}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   const cards = [];
   if (d.contracts) {
     const c = d.contracts, its = c.items;
@@ -87,14 +88,13 @@ function viewLife() {
     const body = (r.items.length ? `<ul class="flist">${r.items.slice(0, 8).map(x => `<li class="frow"><a ${open(x.task_id)} class="ft"><b>${esc(x.title)}</b>${x.url ? `<span class="muted lurl">${esc(x.url.replace(/^https?:\/\/(www\.)?/, '').slice(0, 60))}</span>` : ''}</a>${x.url ? `<a class="iconbtn" href="${esc(x.url)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}</li>`).join('')}</ul>${r.count > 8 ? `<p class="muted">${esc(trn('and {0} more', 'and {0} more', r.count - 8))}</p>` : ''}`
       : `<p class="muted">${tr('Nothing to read yet. Links you add to a “Read later” project, or bookmarks from Karakeep, show up here.')}</p>`)
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
-    const acts = `<a class="btn sm" href="#reading">${ic('book', 's')}<span>${tr('Open')}</span></a>`  // 2.172.0 B (#2679): the view Read later (area Reading)
-      + `<a class="btn sm" href="#bookmarks">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
+    const acts = `<a class="btn sm" href="#${esc(rd_home('reading'))}">${ic('book', 's')}<span>${tr('Open')}</span></a>`  // 2.172.0 B (#2679): the view Read later (area Reading)
+      + `<a class="btn sm" href="#${esc(rd_home('bookmarks'))}">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
       + (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
   }
-  const spSel = rd_pick(lf_sp(), 'data-lf-space');  // 2.173.0 A (#2680): only under "All workspaces"
-  const head = spSel ? `<div class="bmbar lfbar"><span class="spacer"></span>${spSel}</div>` : '';
+  const head = rd_crumb('life');  // 2.540.0 (#4588): under "All workspaces" the path back to the overview (was the picker of #2680)
   if (!cards.length) return `<div class="dash life">${head}<div class="empty nempty eact">${ic('home')}<span>${org ? tr('Switch on travel or staying in touch under Settings > Modules.') : tr('Switch on the parts of Home & life you want under Settings > Modules.')}</span><button type="button" class="btn" data-act="life-mods">${tr('Modules')}</button></div></div>`;
   return `<div class="dash fam life">${head}<div class="dgrid">${cards.join('')}</div></div>`;
 }
@@ -375,7 +375,6 @@ document.addEventListener('change', e => {
   const el = e.target;
   if (el.id === 'ct-care') careSet(+el.dataset.cid, {every_days: +el.value});
   else if (el.id === 'ct-cnote') careSet(+el.dataset.cid, {note: el.value});
-  else if (el.matches?.('[data-lf-space]')) { LF.space = el.value; LF.data = null; lifeLoad(); }  // 2.173.0 A (#2680)
 });
 
 // ---- the review: the day or week, the journal
