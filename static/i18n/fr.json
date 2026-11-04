@@ -16261,9 +16261,9 @@
   "End all app passwords and API tokens": "Révoquer tous les mots de passe d'application et jetons d'API",
   "Ticked: calendar and contacts apps and scripts must be connected again afterwards (new app password, new token).": "Coché : les applications d'agenda et de contacts ainsi que les scripts devront être reconnectés ensuite (nouveau mot de passe d'application, nouveau jeton).",
   "Off: only users an admin created can sign in; the first sign-in links them by their verified e-mail. On: anyone the provider lets through gets an account, and accounts made for single sign-on are also linked by user name.": "Désactivé : seuls les utilisateurs créés par un administrateur peuvent se connecter ; la première connexion les lie par leur adresse e-mail vérifiée. Activé : toute personne que le fournisseur laisse passer obtient un compte, et les comptes créés pour l'authentification unique sont aussi liés par nom d'utilisateur.",
-  "Too easy to guess. Use a longer passphrase, for example four or more words that do not belong together.": "Trop facile à deviner. Choisissez une phrase secrète plus longue, par exemple quatre mots ou plus sans rapport entre eux.",
+  "Too easy to guess. Use a longer passphrase, for example four or more words that do not belong together.": "Trop facile à deviner. Choisis une phrase secrète plus longue, par exemple quatre mots ou plus sans rapport entre eux.",
   "Strong enough": "Assez robuste",
-  "You give the key to these people for the first time. Compare each safety number with the person (in person or by phone); release only when it is the same on both devices.": "Vous donnez la clé à ces personnes pour la première fois. Comparez chaque numéro de sécurité avec la personne (en personne ou par téléphone) ; ne la partagez que s’il est identique sur les deux appareils.",
-  "Check the key first": "Vérifiez d’abord la clé",
+  "You give the key to these people for the first time. Compare each safety number with the person (in person or by phone); release only when it is the same on both devices.": "Tu donnes la clé à ces personnes pour la première fois. Compare chaque numéro de sécurité avec la personne (en personne ou par téléphone) ; ne la partage que s’il est identique sur les deux appareils.",
+  "Check the key first": "Vérifie d’abord la clé",
   "Numbers match, release": "Les numéros correspondent, partager"
 }
