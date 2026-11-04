@@ -27,7 +27,7 @@ from ..core.pg import system_ctx
 from ..core.access import Denied
 from .session import me
 from .orgretain import Nn_
-from .orgs import _need_admin, _need_org_admin, _no_change, _operator_apart, instance_mode, org_role  # orgs imports this module only in functions
+from .orgs import _need_admin, _need_org_admin, _no_change, _operator_apart, instance_mode, org_heir_to, org_role  # orgs imports this module only in functions
 
 
 # what of person uid stays in organisation oid when they leave it (and goes when it is deleted): (key, words, count query);
@@ -127,8 +127,10 @@ def olv_leave_info(oid):
     heir = me() if uid != me() else (c.execute(
         "SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 "
         "AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
-    if uid != me() and request.args.get("to", "").isdigit():  # review: the admin hands the lists to another member (?to=, as the removal)
-        heir = int(request.args["to"])
+    if uid != me() and request.args.get("to"):  # review: the admin hands the lists to another member (?to=, as the removal)
+        heir = org_heir_to(c, oid, uid, request.args["to"])  # 2.512.0 (#4076): never the name of an account from outside
+        if heir is None:
+            return err(tr("The projects can only go to another active person of the organisation"), 400)
     if heir is None and not _operator_apart():  # review: the only admin leaves: the operator takes over (as org_member_remove)
         heir = (c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' AND id!=? ORDER BY id LIMIT 1",
                           (uid,)).fetchone() or [None])[0]

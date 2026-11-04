@@ -974,6 +974,22 @@ def org_create():
 ORG_SELF_MAX = 3
 
 
+def org_heir_to(c, oid, uid, raw):
+    """2.512.0 (#4076, was in org_member_remove): the ?to= of removing uid from organisation oid as a user id, when that
+    is the removing admin or another active person of the organisation; None for anybody else, so that neither the removal
+    nor its preview (leave-info) ever takes or names an account from outside."""
+    try:
+        to = int(raw)
+    except ValueError:
+        return None
+    if not 0 < to < 2 ** 63:
+        return None
+    if to == me() or c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
+                                  AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+        return to
+    return None
+
+
 def org_self_made_n(c, uid):
     """The companies uid created herself (2.422.0, #2937; review: also the ones she left or handed over)."""
     return c.execute("SELECT COUNT(*) FROM orgs WHERE self_made=? AND personal_of IS NULL AND retired_at IS NULL", (uid,)).fetchone()[0]
@@ -1598,14 +1614,9 @@ def org_member_remove(oid, uid):
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
     if uid != me() and request.args.get("to"):  # 2.88.0 (#1980): the admin hands the person's lists to another active member
-        try:
-            to = int(request.args["to"])
-        except ValueError:
-            to = 0
-        if to != me() and not c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
-                                           AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+        heir = org_heir_to(c, oid, uid, request.args["to"])
+        if heir is None:
             return err(tr("The projects can only go to another active person of the organisation"), 400)
-        heir = to
     operator = None
     if heir is None and _operator_apart():  # 2.306.0 D1 (#2875): a hosted instance's operator never takes a customer's organisation over
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)

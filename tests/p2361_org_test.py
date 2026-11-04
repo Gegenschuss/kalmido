@@ -95,6 +95,14 @@ check((j.get("stays") or {}).get("tables") == 1 and "table" in (j.get("stays_tex
 check(Bo.get(B + f"/api/orgs/{ORG}/leave-info", params={"uid": CAROL}).json().get("back") == ["Carols own"], "leave-info: the admin sees it for a member")
 check(Da.get(B + f"/api/orgs/{ORG}/leave-info", params={"uid": CAROL}).status_code == 403, "leave-info: another member may not look at carol's")
 check(sess("erin").get(B + f"/api/orgs/{ORG}/leave-info").status_code == 404, "leave-info: 404 for a person not in the organisation")
+# 2.512.0 (#4076): ?to= is checked like the removal: no name of an account from outside the organisation
+for to, what in ((ERIN, "an account of no organisation here"), (CAROL, "the person who goes"), ("nobody", "not a number"), (99999999999999999999, "out of range"), (0, "no account")):
+    r = Bo.get(B + f"/api/orgs/{ORG}/leave-info", params={"uid": CAROL, "to": to})
+    check(r.status_code == 400 and "Erin" not in r.text, f"leave-info: ?to= {what}: 400, no name ({r.status_code} {r.text[:120]})")
+j = Bo.get(B + f"/api/orgs/{ORG}/leave-info", params={"uid": CAROL, "to": DAVE}).json()
+check(j.get("heir") == "Dave", f"leave-info: ?to= another member names them ({j.get('heir')})")
+check(Bo.get(B + f"/api/orgs/{ORG}/leave-info", params={"uid": CAROL, "to": BOB}).json().get("heir") == "Bob", "leave-info: ?to= the admin themself")
+check(Bo.delete(B + f"/api/orgs/{ORG}/members/{CAROL}", params={"to": ERIN}).status_code == 400, "the removal refuses the same ?to= (same check)")
 # freelancer-matrix: orgadmin
 FID, Fr = freelancer(B, A)
 check(Fr.get(B + f"/api/orgs/{ORG}/leave-info").status_code == 404, "freelancer: no leave preview of somebody else's organisation")

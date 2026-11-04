@@ -93,6 +93,12 @@ Ol = sess("olga")
 OLGA = sql("SELECT id FROM users WHERE username='olga'")[0][0]
 ORG0 = A.post(B + "/api/admin/orgs", json={"name": "Nordlicht Example", "admin_id": OLGA, "domains": "nordlicht.example, other.example"}).json()["id"]
 dom0 = lambda: sql("SELECT domains FROM orgs WHERE id=?", (ORG0,))[0][0]  # noqa: E731
+# 2.512.0 (#4076): her own company and a second account are no way to read the names of the server's accounts
+assert A.patch(B + f"/api/admin/orgs/{OID}", json={"members_add": [ALICE]}).ok
+r = Fr.get(B + f"/api/orgs/{OID}/leave-info", params={"uid": ALICE, "to": OLGA})
+check(r.status_code == 400 and "Olga" not in r.text, f"(#4076) the leave preview names no account from outside: 400 ({r.status_code} {r.text[:120]})")
+check(Fr.get(B + f"/api/orgs/{OID}/leave-info", params={"uid": ALICE}).ok, "(#4076) the preview without ?to= still answers")
+assert A.patch(B + f"/api/admin/orgs/{OID}", json={"members_remove": [ALICE]}).ok
 r = Ol.patch(B + f"/api/orgs/{ORG0}", json={"domains": "gmail.example"})
 check(r.status_code == 403, f"(#3898) an organisation admin sets a domain: 403 ({r.status_code} {r.text[:120]})")
 check(dom0() == "nordlicht.example, other.example", f"(#3898) the value stays ({dom0()})")
