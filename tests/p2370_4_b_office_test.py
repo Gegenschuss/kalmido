@@ -158,6 +158,9 @@ check(Fr.post(B + f"/api/clients/{CL}/restore").ok and "sigok True" in box(SIGOK
 C5 = Fr.post(B + "/api/clients", json={"name": "Imported Echo", "contacts": [{"name": "Eva Example"}]}).json()["id"]
 K5 = one("SELECT id FROM office_client_contacts WHERE client_id=?", (C5,))
 BK = Fr.post(B + "/api/books", json={"name": "Imported book"}).json()["id"]
+# 2.506.0 (#4299): rows born after an import stay at its undo: these are the import's, so older than it
+run("UPDATE clients SET created_at=?, updated_at=? WHERE id=?", (ago(hours=2), ago(hours=2), C5))
+run("UPDATE office_client_contacts SET created_at=?, updated_at=? WHERE id=?", (ago(hours=2), ago(hours=2), K5))
 cr = {"oi": [["clients", C5, None], ["office_client_contacts", K5, None]], "books": [BK]}
 IID = run("INSERT INTO imports(user_id, source, file_name, created, report, created_at) VALUES(?,?,?,?,?,?) RETURNING id",
           (FID, "Kalmido", "p23704b.kalmido-export", json.dumps(cr), "{}", ago(hours=1)))[0][0]

@@ -1993,10 +1993,17 @@ def umz_run(uid, iid, opts):
                 if o in people:
                     names[people[o]] = _txt(p.get("name"), 100)
             umz_fix_people(c, run, uid, names)
-            if iid_db:  # 2.360.2 M (#2561): org_joins, made by the sharing, after the import was recorded
+            if iid_db or run.created.get("org_joins"):  # 2.360.2 M (#2561): org_joins, made by the sharing, after the import was recorded
                 from .orgimport import oi_prints
                 run.created["prints"] = oi_prints(c, run.created)  # 2.506.0 (#4299): the state the undo compares with, now that all is written
-                c.execute("UPDATE imports SET created=? WHERE id=?", (json.dumps({**run.created, "src": run.src}), iid_db))
+                # 2.506.0 (#4299): + src, this update lost it: the next import of the file took everything over a second time. And
+                # a run that only invited people (nothing new, the rest already here) gets its record, or the undo cannot withdraw them
+                done = json.dumps({**run.created, "src": run.src})
+                if iid_db:
+                    c.execute("UPDATE imports SET created=? WHERE id=?", (done, iid_db))
+                else:
+                    iid_db = insert_id(c, "INSERT INTO imports(user_id,source,file_name,created,report,created_at) VALUES(?,?,?,?,?,?)",
+                                       (uid, UMZ_SOURCE, _txt(st.get("name"), 200), done, json.dumps(report), iso(now_utc())))
             bump(c)
             c.commit()
         finally:

@@ -231,8 +231,10 @@ check((one("SELECT org_access FROM fs_nodes WHERE id=?", (root_of(f"o{GAM}", "wi
       "the new knowledge root carries org_access edit")
 r = A.post(B + f"/api/imports/{IMP}/undo")
 check(r.ok, "undo " + r.text[:160])
-check(not dbx("SELECT 1 FROM fs_nodes WHERE org_id=?", (GAM,)) and not dbx("SELECT 1 FROM fs_area_roots WHERE ws=?", (f"o{GAM}",)),
-      "undo removes the tree and the marks")
+# 2.506.0 (#4299): into the trash; the top folder of an area stays with its mark, empty, as the app never lets it go
+TOPS = "id IN (SELECT node_id FROM fs_area_roots WHERE node_id IS NOT NULL)"
+check(not dbx(f"SELECT 1 FROM fs_nodes WHERE org_id=? AND parent_id IN (SELECT id FROM fs_nodes WHERE {TOPS}) AND deleted_at IS NULL", (GAM,)),
+      "undo takes the tree out of the top folders")
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- into an organisation with its own knowledge root
@@ -282,8 +284,8 @@ r = Fr.get(B + "/api/wiki", params={"space": "private"})
 check(r.ok and root_of(f"u{FID}", "wiki") == fr, "freelancer: the index keeps the root")
 check(Bo.get(B + f"/api/files/nodes/{fk.get('Handbuch', {}).get('id') or 0}").status_code in (403, 404), "bob does not see it")
 r = Fr.post(B + f"/api/imports/{FIMP}/undo")
-check(r.ok and not dbx("SELECT 1 FROM fs_nodes WHERE owner_id=?", (FID,)) and not dbx("SELECT 1 FROM fs_area_roots WHERE ws=?", (f"u{FID}",)),
-      "freelancer: undo removes it again")
+check(r.ok and not dbx(f"SELECT 1 FROM fs_nodes WHERE owner_id=? AND parent_id IN (SELECT id FROM fs_nodes WHERE {TOPS}) AND deleted_at IS NULL", (FID,)),
+      "freelancer: undo takes it out again (2.506.0 #4299)")
 
 if FAILS:
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
