@@ -196,7 +196,26 @@ function rcp_tabHtml() {
   if (!ofcAdmin()) return OFC.info?.submit ? rsb_tabHtml() : ofcLockedHtml();  // 2.356.0 D (#3129, #3006): members hand in receipts
   const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
   const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
-  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in
+  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${rcn_html()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office
+}
+
+// ---- 2.522.0 (#4433): "New in the office" -- the documents the general input sorted into the office (or a person moved there)
+// that nobody recorded as a receipt yet (GET /api/docs?area=office&unbooked=1, docs/area.py); a row opens the document sheet
+// (record as receipt, "Wrong area"). Nothing becomes a receipt by itself.
+const RCN = {key: '', rows: null, loading: false};
+async function rcn_load(key) {
+  RCN.loading = true;
+  try { const j = await api('GET', '/api/docs?ws=all&area=office&unbooked=1&facets=0&limit=50'); if (RCN.key === key) RCN.rows = j.docs || []; }
+  catch { if (RCN.key === key) RCN.rows = []; }
+  RCN.loading = false; ofcDraw();
+}
+function rcn_html() {
+  const key = String(OFC.info?.org_id || '');
+  if (RCN.key !== key) Object.assign(RCN, {key, rows: null});
+  if (RCN.rows === null) { if (!RCN.loading) setTimeout(() => rcn_load(key), 0); return ''; }
+  if (!RCN.rows.length) return '';
+  return `<section class="rcn" aria-labelledby="rcn-h"><h3 class="ofcgrp" id="rcn-h">${tr('New in the office')}</h3>
+    <ul class="ofclist rcn-list" role="list">${RCN.rows.map(d => `<li class="ofcrow rcn-row"><a href="#docs/${d.id}" class="ofcn"><b>${esc(d.sender?.name || d.name)}</b><small class="muted">${esc([d.date ? fmtDateLoc(d.date) : '', d.amount ? curMoney(d.amount, d.currency) : ''].filter(Boolean).join(' · '))}</small></a></li>`).join('')}</ul></section>`;
 }
 
 // ---- 2.356.0 D (#3129): "Submit receipt" (#office/receipts, rcp_tabHtml) for the people who may hand in a receipt but do not see the

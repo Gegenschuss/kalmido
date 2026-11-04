@@ -302,7 +302,7 @@ def cc_upload(cid):
     if c.execute("SELECT 1 FROM office_cc_statements WHERE org_id=? AND card_id=? AND month=? AND deleted_at IS NULL LIMIT 1", (oid, cid, mo)).fetchone():
         raise Denied(409, tr("This card already has a statement for this month"))
     ws = bk_ws(c, oid)
-    nid = docs_ingest(c, uid, None if ws[0] == "u" else oid, f.filename or "statement.pdf", data, "application/pdf", "upload", dedup=True, info={})
+    nid = docs_ingest(c, uid, None if ws[0] == "u" else oid, f.filename or "statement.pdf", data, "application/pdf", "upload", dedup=True, info={}, area="office")  # 2.522.0 (#4433)
     fs_log_add(c, nid, "upload")
     total = r["total"]  # none printed that the reader finds: the person types it, the sum check never compares the positions with themselves
     row = oc_enc_fields(c, oid, "office_cc_statements", {"org_id": oid, "card_id": cid, "month": mo, "day": day, "total": dstr(total) if total is not None else "", "currency": _home(c, oid), "node_id": nid,

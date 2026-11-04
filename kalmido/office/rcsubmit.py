@@ -75,7 +75,7 @@ def rsb_ingest(c, uid, org, f, name, info):
     """One uploaded file into the office's documents -> its node id; ValueError with a readable text (also no space left)."""
     from ..admin.hosting import QuotaExceeded
     try:
-        return docs_ingest(c, uid, org, name, h6d_read(f), f.mimetype, "upload", dedup=True, info=info)
+        return docs_ingest(c, uid, org, name, h6d_read(f), f.mimetype, "upload", dedup=True, info=info, area="office")  # 2.522.0 (#4433)
     except QuotaExceeded:
         raise ValueError(tr("{0}: no space left in your storage", name)) from None
 

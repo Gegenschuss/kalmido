@@ -60,6 +60,7 @@ function dc_params() {
   for (const k of ['tag', 'from', 'to']) if (DC.f[k]) p.set(k, DC.f[k]);
   dc_fParams(p);  // 2.122.0 B (#2294): several values, more filters
   if (DC.f.review) p.set('review', '1');
+  if (dc_ws() === 'all' || dc_ws() === 'private') p.set('area', 'private');  // 2.522.0 (#4433): the file store shows no receipts (no office: no filter)
   if (DC.under) p.set('under', DC.under);  // 2.199.0 B (#2742): a folder of the panel's tree (with its subfolders)
   const so = dc_sort(); if (so.k !== 'date' || so.d !== 'desc') { p.set('sort', so.k); p.set('dir', so.d); }  // 2.428.0 (#3579)
   return p;
@@ -191,6 +192,7 @@ async function dc_upload(files, ws, source) {
   const fd = new FormData();
   for (const f of files.slice(0, 50)) fd.append('files', f, f.name);
   fd.append('ws', ws || dc_upWs());
+  if ((ws || dc_upWs()) === 'private') fd.append('sort', '1');  // 2.522.0 (#4433): the general input sorts (office / private; no office: nothing)
   if (source) fd.append('source', source);
   let j;
   try { j = await api('POST', '/api/docs', fd); } catch { return []; }

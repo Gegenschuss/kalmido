@@ -228,7 +228,7 @@ def v1_fetcher_upload():
     known = c.execute("SELECT node_id FROM doc_meta WHERE ws=? AND ext_id=?", (S.doc_ws(oid, uid), ext)).fetchone() if ext else None
     try:
         with c.savepoint():
-            nid = docs_ingest(c, uid, oid, name, data, "application/pdf", "abholer", meta, dedup=True, info=info)
+            nid = docs_ingest(c, uid, oid, name, data, "application/pdf", "abholer", meta, dedup=True, info=info, area="office")  # 2.522.0 (#4433): bound
             dup = bool(known) or bool(info.get("dup"))
             if not dup:
                 fs_log_add(c, nid, "upload")

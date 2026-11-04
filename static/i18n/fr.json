@@ -16150,5 +16150,13 @@
   "Locked folders taken over: {0}. They open with your passphrase from before.": "Dossiers verrouillés repris : {0}. Ils s’ouvrent avec ta phrase secrète d’avant.",
   "{0} locked folder arrives without its encrypted content, its key does not fit your encryption keys here: unlock it on the old server before the export.": ["{0} dossier verrouillé arrive sans son contenu chiffré, sa clé ne correspond pas à tes clés ici : déverrouille-le sur l’ancien serveur avant l’export.", "{0} dossiers verrouillés arrivent sans leur contenu chiffré, leurs clés ne correspondent pas à tes clés ici : déverrouille-les sur l’ancien serveur avant l’export."],
   "The encrypted content of these locked folders stays out, the folder key in the export does not fit your encryption keys here: {0}. The folders arrive without the lock. Unlock them on the old server and export again, or import into an account with the same keys.": "Le contenu chiffré de ces dossiers verrouillés reste en dehors, la clé de dossier de l’export ne correspond pas à tes clés ici : {0}. Les dossiers arrivent sans le verrou. Déverrouille-les sur l’ancien serveur et exporte à nouveau, ou importe dans un compte ayant les mêmes clés.",
-  "Amounts and numbers are recognised per letter after splitting.": "Les montants et numéros sont reconnus par lettre après la séparation."
+  "Amounts and numbers are recognised per letter after splitting.": "Les montants et numéros sont reconnus par lettre après la séparation.",
+  "Move to office": "Déplacer vers le bureau",
+  "Sorted into the office.": "Classé dans le bureau.",
+  "Sorted into your own documents.": "Classé dans tes propres documents.",
+  "Wrong area": "Mauvais espace",
+  "Moved to office": "Déplacé vers le bureau",
+  "Moved to your own documents": "Déplacé vers tes propres documents",
+  "New in the office": "Nouveau au bureau",
+  "This document is not in your office or your own documents": "Ce document n'est ni dans ton bureau ni dans tes propres documents"
 }

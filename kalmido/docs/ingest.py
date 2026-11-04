@@ -38,6 +38,7 @@ MAIL_UNPACKED = 50   # 2.146.0 B (#2453): files out of one ZIP / winmail.dat of 
 # with the database, first = this process has not taken up the cut-off runs yet (docs_take_up)
 _Q = {"thread": None, "scan": 0.0, "recent": [], "lost": None, "first": True}
 doc_on_done = []     # 2.48.0 (#1356): hooks f(c, nid, first) after a recognition run (receipts: the event document_added)
+doc_after = []       # 2.522.0 (#4433): hooks f(c, nid) after a recognition run was committed (each commits itself; docs/area.py sorts)
 _WAKE = threading.Event()
 _LOCK = threading.Lock()
 
@@ -47,14 +48,17 @@ from ..office.einvoice_in import ei_is  # 2.369.5 (#2517): pulled up from functi
 from ..files.store import _free_name  # 2.369.5 (#2517): pulled up from functions
 
 
-def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None, dedup=False, info=None):
+def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=None, parent_id=None, dedup=False, info=None, area=None):
     """Store a new document of account uid in the workspace org_id (None: uid's own) and queue its recognition. meta:
     fields given by the caller (an import) -- date, due, amount, currency, sender, type, tags [names], text, ext_id; they
     are taken as they are ("import"), the recognition fills in the rest. An ext_id already present in the workspace
     returns that document instead of a second copy. Returns the node id; the caller commits (then docs_kick()). Raises
     what fs_put raises (Denied, ValueError, hosting.QuotaExceeded). parent_id: 2.122.0 (#2098) a folder the API puts it in
     (needs 'edit' there; default: the workspace's documents folder). dedup: 2.146.0 B (#2452) the same bytes already in the
-    workspace (a document uid may see) return that document; info (a dict) then gets dup = True."""
+    workspace (a document uid may see) return that document; info (a dict) then gets dup = True.
+    area: 2.522.0 (#4433, docs/area.py) "sort" = the general input (own space, no folder): sorted into the office or the private
+    space after the recognition; "office" = an office's own input (the receipt upload of the bookkeeping, the receipt
+    fetcher): the office's document in the own space of a personal office; None = as before (a bound input)."""
     from .dups import dup_same_file, raw_sha
     meta = dict(meta or {})
     ext = str(meta.pop("ext_id", "") or "")[:200] or None
@@ -81,6 +85,10 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
     if up.get("taken_at"):
         c.execute("UPDATE doc_meta SET taken_at=? WHERE node_id=?", (str(up["taken_at"])[:40], nid))
     c.execute("UPDATE doc_meta SET raw_sha=? WHERE node_id=?", (sha, nid))  # 2.146.0 B (#2452)
+    if area == "sort" and not org_id and not parent_id:  # 2.522.0 (#4433): only the general input is sorted
+        c.execute("UPDATE doc_meta SET area_sort='pending' WHERE node_id=?", (nid,))
+    elif area == "office" and not org_id:
+        c.execute("UPDATE doc_meta SET area='office' WHERE node_id=?", (nid,))
     return nid
 
 
@@ -220,6 +228,12 @@ def docs_run_once():
                     for f in doc_on_done:  # 2.48.0 (#1356): f(c, nid, first) after a recognition run (first = the first one)
                         f(c, nid, first)
             c.commit()
+            for f in doc_after if st != "wait" else ():  # 2.522.0 (#4433): after the commit, each on its own
+                try:
+                    f(c, nid)
+                except Exception as e:  # noqa: BLE001 -- the recognised document stays as it is
+                    c.rollback()
+                    print("docs: after recognition", nid, type(e).__name__, e, flush=True)
         except Exception as e:  # noqa: BLE001 -- one broken document must not stop the others
             print("docs: recognition", nid, type(e).__name__, e, flush=True)
             _Q["lost"] = nid  # 2.521.0 E (#4475): the database may be gone (OOM restart): the next step resets the row
@@ -380,6 +394,9 @@ def docs_mail_import(c, msg, raw, pre=None):
         if org and int(org) not in acx_of(c, uid).org_ids:
             return 0  # no longer a member: nothing goes in
         mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
+        # 2.522.0 (#4433): the person's own general document address sorts; an organisation's address and the answer
+        # address of a letter are bound (they land where they belong)
+        sort = "sort" if r and not org and letter is None else None
         _text, files = mail_text(msg, att_images=True)
         first, made, cand = 0, [], False
         for _i, parts in _mail_parts(files, ei_is, mid):
@@ -387,7 +404,7 @@ def docs_mail_import(c, msg, raw, pre=None):
             for pname, pmime, pdata, pext in parts:
                 try:
                     with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
-                        nid = docs_ingest(c, uid, org, pname, pdata, pmime, "mail", {"ext_id": pext}, dedup=True)
+                        nid = docs_ingest(c, uid, org, pname, pdata, pmime, "mail", {"ext_id": pext}, dedup=True, area=sort)
                     first = first or nid
                     made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:
@@ -402,7 +419,7 @@ def docs_mail_import(c, msg, raw, pre=None):
             for k, pname, pdata in got:
                 try:
                     with c.savepoint():
-                        nid = docs_ingest(c, uid, org, pname, pdata, "application/pdf", "mail", {"ext_id": f"mail:{mid}:link:{k}"}, dedup=True)
+                        nid = docs_ingest(c, uid, org, pname, pdata, "application/pdf", "mail", {"ext_id": f"mail:{mid}:link:{k}"}, dedup=True, area=sort)
                     first = first or nid
                     made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:
@@ -416,7 +433,7 @@ def docs_mail_import(c, msg, raw, pre=None):
                     meta["tags"] = [tag]
                 try:
                     with c.savepoint():
-                        nid = docs_ingest(c, uid, org, ml_mail_name(msg), raw, "message/rfc822", "mail", meta, dedup=True)
+                        nid = docs_ingest(c, uid, org, ml_mail_name(msg), raw, "message/rfc822", "mail", meta, dedup=True, area=sort)
                     first = first or nid
                     made.append(nid)
                 except (Denied, ValueError, QuotaExceeded) as e:

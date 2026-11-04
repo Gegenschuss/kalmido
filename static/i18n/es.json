@@ -16150,5 +16150,13 @@
   "Locked folders taken over: {0}. They open with your passphrase from before.": "Carpetas bloqueadas recuperadas: {0}. Se abren con tu frase de contraseña anterior.",
   "{0} locked folder arrives without its encrypted content, its key does not fit your encryption keys here: unlock it on the old server before the export.": ["{0} carpeta bloqueada llega sin su contenido cifrado, su clave no coincide con tus claves de aquí: desbloquéala en el servidor antiguo antes de exportar.", "{0} carpetas bloqueadas llegan sin su contenido cifrado, sus claves no coinciden con tus claves de aquí: desbloquéalas en el servidor antiguo antes de exportar."],
   "The encrypted content of these locked folders stays out, the folder key in the export does not fit your encryption keys here: {0}. The folders arrive without the lock. Unlock them on the old server and export again, or import into an account with the same keys.": "El contenido cifrado de estas carpetas bloqueadas se queda fuera, la clave de carpeta de la exportación no coincide con tus claves de aquí: {0}. Las carpetas llegan sin el bloqueo. Desbloquéalas en el servidor antiguo y exporta de nuevo, o importa en una cuenta con las mismas claves.",
-  "Amounts and numbers are recognised per letter after splitting.": "Los importes y números se reconocen por carta después de separar."
+  "Amounts and numbers are recognised per letter after splitting.": "Los importes y números se reconocen por carta después de separar.",
+  "Move to office": "Mover a la oficina",
+  "Sorted into the office.": "Clasificado en la oficina.",
+  "Sorted into your own documents.": "Clasificado en tus propios documentos.",
+  "Wrong area": "Área equivocada",
+  "Moved to office": "Movido a la oficina",
+  "Moved to your own documents": "Movido a tus propios documentos",
+  "New in the office": "Nuevo en la oficina",
+  "This document is not in your office or your own documents": "Este documento no está ni en tu oficina ni en tus propios documentos"
 }

@@ -20,6 +20,7 @@ from ..files.scan import sc_guard  # 2.306.0: pulled up from functions (layers b
 from ..files.store import fs_log_add, fs_role, fs_visible_ids, fs_visible_sql, fs_version_row, need_node
 from . import store as S
 from .ingest import docs_ingest, docs_kick
+from .area import ar_sql, ar_view  # 2.522.0 (#4433)
 from .maillink import ml_token_new  # 2.424.0 B (#3450)
 from .ocr import ocr_available
 from ..core.pages import new_inbox_task  # 2.149.0 G (#2517): pulled up from functions
@@ -162,6 +163,8 @@ def doc_json(c, m, node, full=False, role=None):
         ast_doc_extra(c, d, m)  # 2.126.1 A (#2123): the summary a person took over from an agent
         from .fields import df_json
         d["custom_fields"] = df_json(c, m)  # 2.153.0 (#2179)
+        if acx_of(c, me()).role != "agent":  # 2.522.0 (#4433): office or private space, "Move to office" / "Wrong area"
+            d["area"] = ar_view(c, dict(node, role=role or "view"), m, me())
     return d
 
 
@@ -210,6 +213,12 @@ def doc_query(c, uid, args):
     elif re.fullmatch(r"org:\d+", ws):
         where.append("n.org_id = ?")
         params.append(int(ws[4:]))
+    ar = ar_sql(c, uid, str(args.get("area") or ""))  # 2.522.0 (#4433): ?area=office | private (a person with an office)
+    if ar:
+        where.append(ar[0])
+        params += ar[1]
+        if args.get("unbooked") == "1":  # put into the office, no receipt yet (Office > Receipts "New in the office")
+            where.append("d.area='office' AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id)")
     base_where, base_params = list(where), list(params)
     # 2.122.0 B (#2294): several tags (every one / one of them / not), several senders and types, both dates, folder, file
     # type, "without ...", and the search syntax of the search field (docs/dsearch.py)
@@ -324,6 +333,8 @@ def docs_upload():
         return err(tr("No file"))
     ids, errors, dups = [], [], []
     unzip = request.form.get("unzip") == "1"
+    # 2.522.0 (#4433): area=office = the office's own upload (bookkeeping, bank); sort=1 = the general upload of the file store
+    area = "office" if request.form.get("area") == "office" else ("sort" if request.form.get("sort") == "1" else None)
     src = "share" if request.form.get("source") == "share" else "upload"
     for f in files[:50]:
         data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (refused in fs_put)
@@ -337,7 +348,7 @@ def docs_upload():
             info = {}
             try:
                 with c.savepoint():
-                    nid = docs_ingest(c, uid, org, name, pdata, pmime, src, dedup=True, info=info)
+                    nid = docs_ingest(c, uid, org, name, pdata, pmime, src, dedup=True, info=info, area=area)
                     if not info.get("dup"):
                         fs_log_add(c, nid, "upload")
                 if info.get("dup"):

@@ -287,7 +287,7 @@ function bkDups(dups) {
 async function bkUpload(files) {
   const fd = new FormData();
   for (const f of files) fd.append('files', f, f.name || 'receipt.jpg');
-  fd.append('ws', BK.info?.upload_ws || (OFC.info?.personal ? 'private' : `org:${OFC.info?.org_id}`)); fd.append('unzip', '1');  // 2.276.0 A (#3039): Receipts loads no BK.info
+  fd.append('ws', BK.info?.upload_ws || (OFC.info?.personal ? 'private' : `org:${OFC.info?.org_id}`)); fd.append('unzip', '1'); fd.append('area', 'office');  // 2.276.0 A (#3039): Receipts loads no BK.info
   let j; try { j = await api('POST', '/api/docs', fd); } catch (x) { toast(x.message || tr('unknown')); return; }
   for (const e of j.errors || []) toast(e);
   const ids = j.ids || [], dups = j.dups || [];

@@ -460,6 +460,7 @@ ORDER = (
     "docs.batch",  # 2.122.0 B (#2294): the chosen documents at once (tags / type / sender) and as one ZIP
     "docs.fields",  # 2.153.0 (#2179): custom fields of documents (definitions + routes; values via docs.web)
     "docs.split",  # 2.154.0 A (#1111): a stack scan split into documents by its archive number codes / separator sheets
+    "docs.area",  # 2.522.0 (#4433): office and private file store apart: the general input sorts, "Move to office", "Wrong area"
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.scankeys",  # 2.207.0 A (#2763): scan inboxes (upload-only keys) + the folder watcher downloads

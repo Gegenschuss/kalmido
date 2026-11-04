@@ -16150,5 +16150,13 @@
   "Locked folders taken over: {0}. They open with your passphrase from before.": "Vergrendelde mappen overgenomen: {0}. Ze openen met je eerdere wachtzin.",
   "{0} locked folder arrives without its encrypted content, its key does not fit your encryption keys here: unlock it on the old server before the export.": ["{0} vergrendelde map komt aan zonder de versleutelde inhoud, de sleutel past niet bij je sleutels hier: ontgrendel die vóór de export op de oude server.", "{0} vergrendelde mappen komen aan zonder de versleutelde inhoud, hun sleutels passen niet bij je sleutels hier: ontgrendel ze vóór de export op de oude server."],
   "The encrypted content of these locked folders stays out, the folder key in the export does not fit your encryption keys here: {0}. The folders arrive without the lock. Unlock them on the old server and export again, or import into an account with the same keys.": "De versleutelde inhoud van deze vergrendelde mappen blijft buiten, de mapsleutel in de export past niet bij je sleutels hier: {0}. De mappen komen aan zonder vergrendeling. Ontgrendel ze op de oude server en exporteer opnieuw, of importeer in een account met dezelfde sleutels.",
-  "Amounts and numbers are recognised per letter after splitting.": "Bedragen en nummers worden na het splitsen per brief herkend."
+  "Amounts and numbers are recognised per letter after splitting.": "Bedragen en nummers worden na het splitsen per brief herkend.",
+  "Move to office": "Naar kantoor verplaatsen",
+  "Sorted into the office.": "In het kantoor gesorteerd.",
+  "Sorted into your own documents.": "In je eigen documenten gesorteerd.",
+  "Wrong area": "Verkeerd gebied",
+  "Moved to office": "Naar kantoor verplaatst",
+  "Moved to your own documents": "Naar je eigen documenten verplaatst",
+  "New in the office": "Nieuw in het kantoor",
+  "This document is not in your office or your own documents": "Dit document staat niet in je kantoor en niet in je eigen documenten"
 }

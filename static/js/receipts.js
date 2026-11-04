@@ -36,11 +36,16 @@ function rc_html() {
   const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Take over as receipt')}</button></div>` : '';
   // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
   // recognised invoice values; any other document (a letter) gets the button "Record as receipt" that shows them
-  if (!rc_isReceipt(d) && RC.open !== RC.id) {
-    if (typeof DC !== 'undefined' && DC.doc?.id === RC.id && DC.doc.split?.stack) return '';  // 2.522.0 (#4468): a stack becomes no receipt
-    return w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '';
+  // 2.522.0 (#4433): a person with an office records receipts only in the office; the private space offers "Move to office"
+  const ar = rc_area(), wrong = rc_wrongHtml(ar);
+  if (ar?.area === 'private' && !d.receipt?.is_receipt) {
+    return wrong || (ar.can_move ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="area:office">${ic('receipt', 's')} ${tr('Move to office')}</button></div>` : '');
   }
-  return `<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
+  if (!rc_isReceipt(d) && RC.open !== RC.id) {
+    if (typeof DC !== 'undefined' && DC.doc?.id === RC.id && DC.doc.split?.stack) return wrong;  // 2.522.0 (#4468): a stack becomes no receipt
+    return wrong + (w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '');
+  }
+  return `${wrong}<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
     <div class="row dc-f"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
     <div class="row dc-f"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
     <div class="row dc-f"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
@@ -49,7 +54,26 @@ function rc_html() {
 // invoice; a gross amount alone is no sign (a fee in an official letter), such a document gets the button
 function rc_isReceipt(d) {
   const x = typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.extracted : null;
+  if (rc_area()?.area === 'private') return !!d.receipt?.is_receipt;  // 2.522.0 (#4433): in the private space only an old receipt
   return !!(d.receipt?.is_receipt || d.suggestions?.length || d.einvoice_offer || (x && (x.net || x.vat_pct || x.invoice_no)));
+}
+// 2.522.0 (#4433): the area of the open document (docs/area.py ar_view: null = no office, everything as before)
+const rc_area = () => (typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.area : null) || null;
+// "Wrong area" of a document the general input sorted (in the office: back to the private space, and the other way round)
+const rc_wrongHtml = ar => ar?.wrong && ar.can_move ? `<div class="rc-sug rc-area" role="group"><span class="muted">${esc(ar.area === 'office' ? tr('Sorted into the office.') : tr('Sorted into your own documents.'))}</span><button type="button" class="btn sm" data-rc="area:${ar.area === 'office' ? 'private' : 'office'}">${ic('undo', 's')} ${tr('Wrong area')}</button></div>` : '';
+// one click, one undo step: POST /api/docs/<id>/area, then the sheet and the list anew (the document may be in another workspace now)
+async function rc_areaMove(id, to, b) {
+  const from = to === 'office' ? 'private' : 'office';
+  const go = (t, undo) => async () => {
+    await api('POST', `/api/docs/${id}/area`, undo ? {to: t, undo: true} : {to: t});
+    if (typeof dc_c168Refresh === 'function') await dc_c168Refresh(id);
+    if (typeof dc_load === 'function' && typeof DC !== 'undefined' && DC.docs) dc_load();
+    if (RC.id === id) { RC.id = null; const el = $('.rc-slot'); if (el && typeof DC !== 'undefined' && DC.doc?.id === id) el.outerHTML = rc_slot(DC.doc); }
+    return {};
+  };
+  try { await go(to, false)(); } catch { if (b) b.disabled = false; return; }
+  const label = to === 'office' ? tr('Moved to office') : tr('Moved to your own documents');
+  histToast(label, histAdd({label, undo: go(from, true), redo: go(to, false)}));
 }
 // 2.154.0 A (#1356): "Suggested by <agent>, confirmed by <person>" while the assignment is the one taken over
 const rc_confHtml = d => d?.confirmed ? `<p class="muted rc-conf">${ic('check', 's')} ${esc(tr('Suggested by {0}, confirmed by {1}', d.confirmed.agent?.name || tr('an agent'), d.confirmed.by?.name || ''))}</p>` : '';
@@ -115,6 +139,7 @@ document.addEventListener('click', async e => {
   const [act, sid] = b.dataset.rc.split(':'), id = RC.id;
   b.disabled = true;
   if (act === 'einv') { rc_einvTake(id, b); return; }
+  if (act === 'area') { rc_areaMove(id, sid, b); return; }  // 2.522.0 (#4433): "Move to office" / "Wrong area"
   if (act === 'open') { RC.open = id; rc_draw(); $('#rc-proj')?.focus(); return; }  // 2.497.0 A (#4046): show the receipt fields
   const body = act === 'accept' ? rc_accBody(b) : undefined;
   try { await rc_post(id, +sid, act, body); } catch { b.disabled = false; return; }
