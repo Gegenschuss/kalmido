@@ -5,7 +5,10 @@
 #
 # Source of this script: install.sh in the Kalmido repository. Every GitHub release carries it as an asset, and
 # kalmido.com/install.sh forwards to the asset of the latest release (2.277, #2914): the website holds no copy of its own.
-# Release versions are checked against the release's SHA256SUMS (source archive and image digest).
+# What is checked (2.527.0, #4312): for a release version the prebuilt image is pinned to the digest of the release, and that
+# digest is checked against the release's SHA256SUMS. The source is checked against SHA256SUMS only on the tarball way (no git
+# on the machine, or an install folder not made by git); with git the tag is fetched from GitHub over HTTPS, without that check.
+# If the checksum list of a release (2.277 and newer) cannot be fetched, the installer stops. Branches are not checked.
 #
 # Installs (or updates) Kalmido from GitHub and starts it with Docker Compose. Release versions use
 # the prebuilt image ghcr.io/gegenschuss/kalmido:<version> (amd64 / arm64); if that cannot be pulled,
@@ -122,6 +125,8 @@ fetch_code() {
         || die "Could not clone '$VERSION' from GitHub. Is it an existing tag or branch?"
     fi
     REV=$(git -C "$DIR" rev-parse --short HEAD)
+    # 2.527.0 (#4312): say what was (not) checked
+    [ -z "$SUMS" ] || say "Source from git over HTTPS (not compared with SHA256SUMS; the image digest is)"
   else
     step "Downloading Kalmido $VERSION (tarball)"
     command -v tar >/dev/null 2>&1 || die "Neither git nor tar is available."
@@ -156,7 +161,7 @@ sha256_of() {
 }
 
 # 2.277 (#2914): a release (2.277 and newer) carries SHA256SUMS, the source archive kalmido-X.Y.Z.tar.gz and
-# image-digest.txt. SUMS is the downloaded list ("" for branches and older releases: they work as before, unchecked).
+# image-digest.txt. SUMS is the downloaded list ("" for branches and releases before 2.277: they work as before, unchecked).
 TMPD=""
 tmpdir() {
   if [ -z "$TMPD" ]; then
@@ -169,11 +174,23 @@ release_assets() {
   SUMS=""
   printf '%s' "$VERSION" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || return 0
   tmpdir
-  if curl -fsSL "$GH/releases/download/$VERSION/SHA256SUMS" -o "$TMPD/SHA256SUMS" 2>/dev/null && [ -s "$TMPD/SHA256SUMS" ]; then
+  # 2.527.0 (#4312): only a release from before 2.277 may go on unchecked, and only when GitHub says the list is not there (404);
+  # any other failure (no network, a proxy, a server error, an empty file) stops instead of switching the check off
+  code=$(curl -sSL -o "$TMPD/SHA256SUMS" -w '%{http_code}' "$GH/releases/download/$VERSION/SHA256SUMS" 2>/dev/null) || code=000
+  if [ "$code" = 200 ] && [ -s "$TMPD/SHA256SUMS" ]; then
     SUMS="$TMPD/SHA256SUMS"
-  else
+  elif [ "$code" = 404 ] && release_before_sums "$VERSION"; then
     warn "Release $VERSION has no checksum list (older release): the download is not checked."
+  else
+    die "Could not fetch the checksum list of release $VERSION (answer: ${code:-none}). Nothing was changed.
+Is $VERSION an existing release? Otherwise try again later."
   fi
+}
+# releases before 2.277 carry no SHA256SUMS (#2914)
+release_before_sums() {
+  v="${1#v}"; vmaj="${v%%.*}"; v="${v#*.}"; vmin="${v%%.*}"
+  case "$vmaj$vmin" in *[!0-9]*|"") return 1 ;; esac
+  [ "$vmaj" -lt 2 ] || { [ "$vmaj" -eq 2 ] && [ "$vmin" -lt 277 ]; }
 }
 # download asset $1 of the release into $2 and compare it with SHA256SUMS; stops on a mismatch
 fetch_checked() {

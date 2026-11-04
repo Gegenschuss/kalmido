@@ -4,7 +4,10 @@
 #
 # Source of this script: install.ps1 in the Kalmido repository. Every GitHub release carries it as an asset, and
 # kalmido.com/install.ps1 forwards to the asset of the latest release (2.277, #2914): the website holds no copy of its own.
-# Release versions are checked against the release's SHA256SUMS (source archive and image digest).
+# What is checked (2.527.0, #4312): for a release version the prebuilt image is pinned to the digest of the release, and that
+# digest is checked against the release's SHA256SUMS. The source is checked against SHA256SUMS only on the zip way (no git
+# on the machine, or an install folder not made by git); with git the tag is fetched from GitHub over HTTPS, without that check.
+# If the checksum list of a release (2.277 and newer) cannot be fetched, the installer stops. Branches are not checked.
 #
 # Installs (or updates) Kalmido from GitHub and starts it with Docker Compose. Release versions use
 # the prebuilt image ghcr.io/gegenschuss/kalmido:<version>; if that cannot be pulled, it is built locally.
@@ -73,13 +76,22 @@
   if ($Version -notmatch '^[A-Za-z0-9._/][A-Za-z0-9._/-]*$') { Fail 'KALMIDO_VERSION must be a tag or branch name.' }
 
   # 2.277 (#2914): a release (2.277 and newer) carries SHA256SUMS, the source archive kalmido-X.Y.Z.zip and
-  # image-digest.txt; branches and older releases work as before, unchecked
+  # image-digest.txt; branches and releases before 2.277 work as before, unchecked
   $Sums = $null
   if ($Version -match '^v\d+\.\d+\.\d+$') {
     $sf = Join-Path ([IO.Path]::GetTempPath()) ('kalmido-sums-' + [Guid]::NewGuid().ToString('N'))
-    try { Invoke-WebRequest -UseBasicParsing -Uri "$GH/releases/download/$Version/SHA256SUMS" -OutFile $sf; $Sums = [IO.File]::ReadAllText($sf) } catch { }
+    # 2.527.0 (#4312): only a release from before 2.277 may go on unchecked, and only when GitHub says the list is not there (404);
+    # any other failure (no network, a proxy, a server error, an empty file) stops instead of switching the check off
+    $sumsCode = 0
+    try { Invoke-WebRequest -UseBasicParsing -Uri "$GH/releases/download/$Version/SHA256SUMS" -OutFile $sf; $Sums = [IO.File]::ReadAllText($sf); $sumsCode = 200 }
+    catch { try { if ($_.Exception.Response) { $sumsCode = [int]$_.Exception.Response.StatusCode } } catch { } }
     finally { Remove-Item -Force $sf -ErrorAction SilentlyContinue }
-    if (-not $Sums) { Warn "Release $Version has no checksum list (older release): the download is not checked." }
+    $beforeSums = ($Version -match '^v(\d+)\.(\d+)\.') -and (([int]$Matches[1] -lt 2) -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 277))
+    if (-not "$Sums".Trim()) {
+      $Sums = $null
+      if ($sumsCode -eq 404 -and $beforeSums) { Warn "Release $Version has no checksum list (older release): the download is not checked." }
+      else { Fail "Could not fetch the checksum list of release $Version (answer: $sumsCode). Nothing was changed.`nIs $Version an existing release? Otherwise try again later." }
+    }
   }
   function Get-Checked([string]$name, [string]$out) {
     try { Invoke-WebRequest -UseBasicParsing -Uri "$GH/releases/download/$Version/$name" -OutFile $out }
@@ -207,6 +219,8 @@
       }
     }
     $Rev = (& git -C $Dir rev-parse --short HEAD)
+    # 2.527.0 (#4312): say what was (not) checked
+    if ($Sums) { Say 'Source from git over HTTPS (not compared with SHA256SUMS; the image digest is)' }
   } else {
     Step "Downloading Kalmido $Version (zip)"
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('kalmido-' + [Guid]::NewGuid().ToString('N'))
