@@ -453,13 +453,7 @@ function tvListsMenu(anchor) {
     $$('[data-l]', p).forEach(c => { c.checked = c.dataset.l === 'all' ? !S.tv.lists.length : S.tv.lists.includes(+c.dataset.l); });
   };
 }
-async function openTaskById(id) {  // a task from the report may be completed long ago (not in the state)
-  if (!taskById(id)) {
-    try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${id}`)); }
-    catch (e) { toast(e instanceof Offline ? tr('Only available online.') : tr('Task not found')); return; }
-  }
-  openDetail(id);
-}
+function openTaskById(id) { openDetail(id); }  // a task from the report may be completed long ago: 2.509.0 (#4324): openDetail fetches it
 // printable timesheet ("Stundennachweis") of the current report; the browser's print dialog saves it as PDF
 function timesheet() {
   const j = S.tv.data; if (!j) return;

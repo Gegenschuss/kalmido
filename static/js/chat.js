@@ -1264,8 +1264,7 @@ function chatSaveTitle(text) {
   return t.length > 120 ? t.slice(0, 119).trimEnd() + '…' : t;
 }
 async function chatSaveOpen(tid) {
-  if (!taskById(tid)) { try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${tid}`)); } catch { toast(tr('Task not found')); return; } }
-  openDetail(tid);
+  openDetail(tid);  // 2.509.0 (#4324): fetches a task that is not loaded
 }
 const chatSavedMark = m => m.saved_task_id ? `<button type="button" class="csaved" data-act="csave-open" data-tid="${m.saved_task_id}" title="${esc(tr('Saved as a task: open it'))}">${ic('bookmark', 's')}<span>${tr('Saved')}</span></button>` : '';
 function chatSaveModal(kind, m, done) {

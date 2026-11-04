@@ -42,6 +42,5 @@ function ftsPalItems(q, shown) {
 async function ftsOpen(h) {
   const tid = h.task.id;
   if (h.where === 'comment' && h.comment_id) return window.msgJump?.({art: 'c', id: h.comment_id, task: tid});  // opens + shows the comment
-  if (!taskById(tid)) { try { (S.extra ||= []).push(await rawFetch('GET', `/api/tasks/${tid}`)); } catch { return; } }
-  openDetail(tid);
+  openDetail(tid);  // 2.509.0 (#4324): fetches a task that is not loaded
 }

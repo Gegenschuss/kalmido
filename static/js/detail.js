@@ -616,7 +616,7 @@ function renderDetail0() {
   if (!t) {  // 2.369.2 (#3136): a task of a list not loaded yet: its list comes; 2.509.0 (#4324): or the task alone, never an empty panel (liveparts.js)
     if (lzSel(S.sel, true)) {
       $('#detail').classList.remove('dsplit', 'dsfold');
-      setHtml($('#detail'), `<div class="dtop"><button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button><button class="iconbtn dclose" data-act="close-detail" title="${tr('Close (Esc)')}" aria-label="${tr('Close (Esc)')}">${ic('x')}</button></div><div class="dbody"><div class="empty">${esc(tr('Loading…'))}</div></div>`);
+      setHtml($('#detail'), `<div class="dtop"><button class="iconbtn back" data-act="close-detail" aria-label="${tr('Back')}">${ic('back')}</button><button class="iconbtn dclose" data-act="close-detail" aria-label="${tr('Close (Esc)')}">${ic('x')}</button></div><div class="dbody"><div class="empty">${esc(tr('Loading…'))}</div></div>`);
     }
     return;
   }

@@ -90,15 +90,23 @@ async function tapRow(w, d, label, T, title) {
   await w.eval(`patchTask(${T}, {title: 'Rolled out'})`); await idle(w);
   await w.eval('load().then(render)'); await idle(w);
   check(w.eval(`taskById(${T}).title`) === 'Rolled out' && panelShows(d, 'Rolled out'), 'an edit stays after the next reload');
-  // an answer that is no task (a proxy's page with status 200): a hint, no loop of requests
+  // an answer that is no task (no JSON, status 200: rawFetch answers {}): a hint, no loop of requests
   w.eval('closeDetail()'); await idle(w);
   const real = w.fetch; let asked = 0;
-  w.fetch = (u, o) => /\/api\/tasks\/\d+/.test(String(u)) ? (asked++, Promise.resolve(new w.Response('<html>', {status: 200, headers: {'Content-Type': 'text/html'}}))) : real(u, o);
+  w.fetch = (u, o) => /\/api\/tasks\/\d+/.test(String(u)) ? (asked++, Promise.resolve(new Response('no json', {status: 200, headers: {'Content-Type': 'text/plain'}}))) : real(u, o);
   w.eval(`S.extra = null`); w.location.hash = '#t/' + G;
   check(!!(await until(() => /Task not found/.test(d.body.textContent))), 'no task in the answer: says so');
   await idle(w);
   check(noPanel(w, d), 'no task in the answer: no panel');
+  check(asked <= 3, 'no task in the answer: no loop of requests ' + asked);
   w.fetch = real;
+  w.eval('closeDetail()'); await idle(w);
+  // #4324: the other ways to a task that is not loaded go the same way (time report, saved chat message, full text search)
+  w.eval(`S.extra = null; openTaskById(${G})`);
+  check(!!(await until(() => panelShows(d, 'Gone later'))), 'openTaskById opens a completed task');
+  w.eval('closeDetail()'); await idle(w);
+  w.eval(`S.extra = null; chatSaveOpen(${G})`);
+  check(!!(await until(() => panelShows(d, 'Gone later'))), 'chatSaveOpen opens a completed task');
   w.eval('closeDetail()'); await idle(w);
   // a task that leaves the state while it is open still closes (2.369.2, #3136): no fetch brings it back
   w.eval(`S.lz = null`);
