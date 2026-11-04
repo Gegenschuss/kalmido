@@ -192,20 +192,31 @@ def bko_retire(c):
     """2.538.0 (#4367): the target goes (removed, or another type / address): the names of the backups kept there move to
     bko_former ("formerly off-site"). The old target still holds them and nothing here deletes them any more, so a restore
     of one can still bring back what was deleted since: the journal of deleted accounts counts them (lgc_journal_cut) and
-    is not cut too early. An unreadable bko_former stays as it is (the journal then keeps everything)."""
+    is not cut too early. An unreadable bko_former stays as it is (the journal then keeps everything). -> False (nothing
+    changed) when the target still holds backups and bko_former is unreadable: their names would be lost (review F7), the
+    caller refuses the change (BKO_FORMER_BAD)."""
     try:
         names = json.loads(gsetting(c, "bko_remote") or "[]")
     except ValueError:
         names = []
+    names = [n for n in names if isinstance(n, str)] if isinstance(names, list) else []
     try:
         old = json.loads(gsetting(c, "bko_former") or "[]")
     except ValueError:
         old = None
-    if isinstance(old, list) and isinstance(names, list):
+    if not isinstance(old, list):
+        if names:
+            return False
+    else:
         keep = sorted({n for n in (*old, *names) if isinstance(n, str)})
         if keep:
             gset(c, "bko_former", json.dumps(keep))
     gset(c, "bko_remote", "")
+    return True
+
+
+# 2.538.0 (#4367, review F7)
+BKO_FORMER_BAD = N_("The list of former off-site backups (bko_former) is unreadable: the target stays, its backups' names are kept.")
 
 
 # ---- validation of the form
@@ -830,7 +841,9 @@ def offsite_set():
     was_target = _where(conf)  # 2.538.0 (#4367)
     if b.get("remove") is True:  # "Remove target": the addresses, the sealed credentials and the SFTP key pair go
         _save(c, {}, {})
-        bko_retire(c)  # 2.538.0 (#4367): its backups stay "formerly off-site" (was: forgotten, 2.505.0 #4302 review)
+        if not bko_retire(c):  # 2.538.0 (#4367): its backups stay "formerly off-site" (was: forgotten, 2.505.0 #4302 review)
+            c.rollback()
+            return err(tr(BKO_FORMER_BAD), 409)
         c.commit()
         _BKO.update({"for": "", "tries": 0, "next": 0.0})
         return jsonify(bko_state(c))
@@ -898,7 +911,9 @@ def offsite_set():
             c.rollback()
             return err(tr("Fill in the target completely and test the connection first ({0}).", ", ".join(bko_missing(conf, sec))))
     if was_target and was_target != _where(conf):
-        bko_retire(c)  # 2.538.0 (#4367): another target: the backups at the old one stay "formerly off-site"
+        if not bko_retire(c):  # 2.538.0 (#4367): another target: the backups at the old one stay "formerly off-site"
+            c.rollback()
+            return err(tr(BKO_FORMER_BAD), 409)
     _save(c, conf, sec)
     c.commit()
     return jsonify(bko_state(c))

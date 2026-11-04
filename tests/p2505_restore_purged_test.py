@@ -8,6 +8,8 @@ the clean-up of the list. Invented names only, addresses @example.com.
  off-site: an older backup on the target holds the list back; a target without a readable list: nothing goes
  2.538.0 (#4367): a removed / replaced target's backups stay "formerly off-site" and hold the list back too; on without an
    upload = upload_pending (the backup page's hint); the keep note says accounts excepted
+ 2.538.0 (#4367, review F7): with an unreadable formerly-off-site list, removing / replacing a target that holds backups is
+   refused (409), its names stay
 usage: p2505_restore_purged_test.py <datadir>
 freelancer-matrix: admin (the restore is the instance's; the entries are those of a person without an organisation)"""
 import json
@@ -162,6 +164,19 @@ check("cut 2020-03-04" in py(CUT), "another address: the old target's backups ho
 check(A.patch(OFF, json={"keep": 5}).ok and "cut 2020-03-04" in py(CUT), "the count kept is no other target")
 setting("bko_former", "not json")
 check("cut None" in py(CUT), "an unreadable formerly-off-site list: nothing goes")
+# 2.538.0 (#4367, review F7): an unreadable formerly-off-site list: removing / replacing the target is refused, the names of
+# its backups stay (was: bko_remote emptied, the names lost)
+setting("bko_remote", json.dumps(["kalmido-backup-20200506-033000-auto.zip.enc"]))
+conf = sql("SELECT value FROM settings WHERE key='bko_conf'")[0][0]
+for what, body in (("remove", {"remove": True}), ("another address", {"webdav": {**DAV, "url": "https://dav3.example.com/backups"}, "password": PW})):
+    r = A.patch(OFF, json=body)
+    check(r.status_code == 409 and "bko_former" in r.text, f"unreadable formerly-off-site list: {what} refused {r.status_code} {r.text[:160]}")
+    check("20200506" in sql("SELECT value FROM settings WHERE key='bko_remote'")[0][0], f"{what}: the target keeps its backups' names")
+    check(sql("SELECT value FROM settings WHERE key='bko_former'")[0][0] == "not json", f"{what}: the unreadable list stays as it was")
+    check(sql("SELECT value FROM settings WHERE key='bko_conf'")[0][0] == conf, f"{what}: the target stays as it was")
+setting("bko_remote", None)
+r = A.patch(OFF, json={"remove": True})
+check(r.ok, f"unreadable formerly-off-site list, no backups on the target: removing goes {r.status_code} {r.text[:160]}")
 setting("bko_former", None)
 print(f"p2505_restore_purged: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
