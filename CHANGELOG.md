@@ -14,6 +14,42 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.532.0] - 2026-11-04
+
+Package 2.521 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Documents: a "Read" view with a large preview, a narrow list and paging in the full-screen view (#4476, #4399): on a computer the button "Read" next to Filter / Sort turns the list into a narrow column and the preview fills the height (all pages, zoom with + / - or Ctrl + wheel), the properties beside or below and foldable; arrow up / down page through the documents, also in "To review"; in the full-screen "Show" the arrows left / right and the buttons go to the previous / next document without closing; view and widths are kept per device. The width of the documents' side pane can be dragged (double click = default). Phones and narrow windows stay as before.
+- Filter dialog as condition rows: "+ Condition", then What / Comparison / Value per row, one AND / OR for all, a live count "N tasks match"; folders include their subfolders, "is none of" always applies on top (also with OR); saved filters are converted and match the same tasks (#4479, #4478).
+- `docker-compose.yml`: the database's memory settings as variables `KALMIDO_PG_MAX_CONNECTIONS`, `KALMIDO_PG_SHARED_BUFFERS`, `KALMIDO_PG_WORK_MEM`, `KALMIDO_PG_MAINTENANCE_WORK_MEM` (defaults fit a 1 GB limit), table for 512 MB / 1 GB / 2 GB in docs/SELF-HOSTING.md (#4475).
+### Changed
+- The database pool defaults to threads + 16 connections (was threads x 3 + 8) and closes idle connections after 30 s; the compose default `max_connections` is 60. Set `KALMIDO_DB_POOL_MAX` if you raised the threads a lot (#4475).
+- Start budget: the CI is red only over a ceiling (`decke_*` in tools/perf_budget.json: start JS, CSS and language core gzip, start scripts); the per-package limits and the `--ratchet` are gone (#4391).
+- Sidebar: with the favourites in the head bar there is no "Favourites" section in the sidebar any more; "Only favourites" is in the head bar's favourites menu (#4396).
+### Fixed
+- Chat: replying to an older message while scrolled up keeps the view where it is ("Sent" and the "New message" pill; tap jumps to the end); an agent's answer does not pull you down while you read further up. Agent chat, team rooms and threads (#4393).
+- Sidebar: a folder's "…" appears left of the fold arrow on hover, the arrow stays visible and clickable (#4397).
+- File store: a tag filter keeps the cards view instead of switching to the list (#4398).
+- File store and knowledge rows: on hover the select box replaces the symbol in the same place, the name does not move (#4400).
+- Documents: a recognition cut off by a database restart is taken up again within seconds instead of after 30 minutes (#4475).
+- Test p2350_c_pins_race_ui counts only the fetches of the tested load() (#4087).
+
+### Fixed
+- main: CI red of 2.529.0 - four tests followed the app: the import undo test ages its address book too (#4366), the pins race test waits for the queue's own reload, the signature test scrolls to the drawing field on a phone, the invoice series test waits for the loaded series before "Make now".
+
+Package 2.503 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- Support access (hosted servers): Settings > Account > Support access now says exactly what is recorded (time, method, route and status, never contents) and its limits: the same reading or refused request within 10 minutes counts once, at most 300 entries, the latest 20 shown (#4307).
+- Documentation: docs/OFFICE.md and docs/PACKS.md match the code again for final invoices, travel allowances, the GoBD export, tax categories, depreciation, entertainment receipts, card fees and timesheets; new section "Office rights". Behaviour unchanged (#4178).
+### Fixed
+- Support access: what the operator does in a session started with a sign-in link is now on the customer's log, the sign-in included; before only the making of the link was. A path without a route no longer appears in the log (#4307).
+- Agents: "Pause with a reason" now also holds the reference starter: no run starts, events stay in its queue and run after Resume, the reason is no longer overwritten by "working" or "idle" (#4309).
+- Clients: an organisation admin who may delete a client can now merge it too and undo the merge; the error text promised this already (#4322).
+
+Package 2.507 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Fixed
+- Moving an account or an organisation no longer silently loses locked folders of the file store (#4300): the export carries the lock and the exporting person's own folder key, the import restores the lock, and names and files still open with the passphrase from before. If the key does not fit the keys on the target, the import preview (Settings > Account > Import) and its result name the folder and its encrypted content stays out, instead of files that could never be read.
+
 ## [2.529.0] - 2026-11-04
 
 Package 2.499 (Bündel: Sicherheit: mitgelieferte HEIC-Bibliotheken in pi-, Doku Sicherung: Format 3 (2.432) überall nachziehe, Push: Rückfall von Web Push ).
@@ -1082,7 +1118,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.529.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.532.0...HEAD
+[2.532.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.532.0
 [2.529.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.529.0
 [2.520.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.520.0
 [2.518.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.518.0
