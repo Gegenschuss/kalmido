@@ -1,7 +1,10 @@
 """2.43.0 (#1434): "Delete all times of this project" (preview, delete, restore for Undo).
 Owner and list admins delete every entry of the list, other members only their own. Entries an invoice already bills stay
 (an invoice made from the time of a client's project covers the entry's day and carries the project's name). Running timers stay.
-Agent accounts: 403. Restore is the Undo step: the client sends back what the delete returned; the same rights apply."""
+Agent accounts: 403. Restore is the Undo step: the client sends back what the delete returned; the same rights apply.
+2.530.0 B (#4315): the deleted entries are kept on the server too (time_wipes, one row per delete): Undo names that row
+(wipe), so it works after the tab was closed until the trash period ends; then the trash run (files/trashpurge.py) deletes
+the row. The preview names the newest such row of the person (undo)."""
 import hashlib
 import hmac
 import json
@@ -97,13 +100,21 @@ def n43_restore_ids(c, owner, e):
     return cid, pid
 
 
+def tz_wipe_row(c, lid, uid, wid=None):
+    """2.530.0 B (#4315): the person's newest Undo copy of this list (or the one named), None = none (any more)."""
+    q = "SELECT * FROM time_wipes WHERE list_id=? AND user_id=?" + (" AND id=?" if wid is not None else "") + " ORDER BY id DESC LIMIT 1"
+    return c.execute(q, (lid, uid) + ((wid,) if wid is not None else ())).fetchone()
+
+
 @app.get("/api/lists/<int:lid>/time/delete-all")
 def tz_delete_all_preview(lid):
     need_time()
     tz_no_agent()
     c = db()
     _, admin = tz_scope(c, lid)
-    return jsonify(tz_preview(c, lid, me(), admin))
+    w = tz_wipe_row(c, lid, me())
+    return jsonify({**tz_preview(c, lid, me(), admin),
+                    "undo": {"wipe": w["id"], "count": w["n"], "seconds": w["seconds"], "at": w["deleted_at"]} if w else None})
 
 
 @app.post("/api/lists/<int:lid>/time/delete-all")
@@ -130,7 +141,6 @@ def tz_delete_all(lid):
         c.execute(f"DELETE FROM time_entries WHERE id IN ({','.join('?' * len(part))})", part)
     if ids:
         bump(c)
-    c.commit()
     # 2.63.0 (#1523): every column comes back, so Undo restores the timer's device id, the focus link and the flags as they were
     back = [{"user_id": r["user_id"], "task_id": r["task_id"], "list_id": lid, "task_title": r["task_title"], "start": r["start"],
              "end": r["end"], "seconds": r["seconds"], "note": r["note"], "source": r["source"], "client_id": r["client_id"],
@@ -138,7 +148,12 @@ def tz_delete_all(lid):
              "created_at": r["created_at"], "updated_at": r["updated_at"]} for r in rows]
     for e in back:
         e["sig"] = h6b_sig(c, lid, e)  # 2.86.0 (N10)
-    return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back)
+    wid = None
+    if back:  # 2.530.0 B (#4315): the Undo copy on the server, in the same transaction as the delete
+        wid = insert_id(c, "INSERT INTO time_wipes(user_id,list_id,entries,n,seconds,deleted_at) VALUES(?,?,?,?,?,?)",
+                        (uid, lid, json.dumps(back, ensure_ascii=False), len(back), sum(int(r["seconds"] or 0) for r in rows), iso(now_utc())))
+    c.commit()
+    return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back, wipe=wid)
 
 
 @app.post("/api/lists/<int:lid>/time/restore")
@@ -148,7 +163,18 @@ def tz_restore(lid):
     c = db()
     uid = me()
     _, admin = tz_scope(c, lid)
-    ents = body().get("entries")
+    b = body()
+    w = None
+    if "wipe" in b:  # 2.530.0 B (#4315): the Undo copy on the server (only the person who deleted)
+        wid = b.get("wipe")
+        if not isinstance(wid, int) or isinstance(wid, bool):
+            raise Denied(400, tr("Invalid value: {0}", "wipe"))
+        w = tz_wipe_row(c, lid, uid, wid)
+        if not w:
+            raise Denied(404)
+        ents = json.loads(w["entries"] or "[]")
+    else:
+        ents = b.get("entries")
     if not isinstance(ents, list) or len(ents) > TZ_MAX_RESTORE:
         raise Denied(400, tr("Invalid value: {0}", "entries"))
     ts, n = iso(now_utc()), 0
@@ -191,6 +217,16 @@ def tz_restore(lid):
                    1 if e.get("reminded") in (1, True) else 0, 1 if e.get("auto_stopped") in (1, True) else 0,
                    n43_iso(e.get("created_at")) or ts, ts))
         n += 1
+    if w:
+        c.execute("DELETE FROM time_wipes WHERE id=?", (w["id"],))  # 2.530.0 B (#4315): its way back is used
+    else:  # 2.530.0 B (#4315): the answer's copy came back (an older window): the server's copy of that delete is used up too
+        sigs = {e.get("sig") for e in ents if isinstance(e, dict) and isinstance(e.get("sig"), str)}
+        for r in c.execute("SELECT id, entries FROM time_wipes WHERE list_id=? AND user_id=?", (lid, uid)).fetchall() if sigs else []:
+            try:
+                if sigs & {x.get("sig") for x in json.loads(r["entries"] or "[]") if isinstance(x, dict)}:
+                    c.execute("DELETE FROM time_wipes WHERE id=?", (r["id"],))
+            except ValueError:
+                continue
     if n:
         bump(c)
     c.commit()

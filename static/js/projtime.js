@@ -73,11 +73,13 @@ function tz_toModule(ids, per, from, to) {
 async function tz_wipe(lid, name) {
   let pv;
   try { pv = await rawFetch('GET', `/api/lists/${lid}/time/delete-all`); } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
+  if (!pv.count && pv.undo) { tz_wipeUndoAsk(lid, pv.undo); return; }  // 2.530.0 B (#4315): the last delete can still come back
   if (!pv.count) { toast(pv.billed ? tr('Nothing to delete: {0} already billed, they stay', pv.billed) : tr('No time tracked in this project.')); return; }
   const md = modal(`<h3>${tr('Delete all times of this project')}</h3>
     <p>${pv.all ? tr('{0} entries ({1}) of everybody in {2} will be deleted.', pv.count, fmtDur(pv.seconds), esc(name)) : tr('Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.', pv.count, fmtDur(pv.seconds), esc(name))}</p>
     ${pv.billed ? `<p class="muted">${trn('{0} entry is already billed and stays.', '{0} entries are already billed and stay.', pv.billed)}</p>` : ''}
-    <p class="muted">${tr('Save a CSV first: it is the only copy afterwards.')} <a href="/api/time/export.csv?${esc(tz_query([lid], 'all', '', ''))}" download>CSV</a></p>
+    <p class="muted">${tr('The entries stay restorable until the trash period ends (Undo, or here again).')} <a href="/api/time/export.csv?${esc(tz_query([lid], 'all', '', ''))}" download>CSV</a></p>
+    ${pv.undo ? `<p class="muted tz-undo">${tr('Last deleted ({0}): {1} entries ({2}).', fmtWhen(pv.undo.at), pv.undo.count, fmtDur(pv.undo.seconds))} <button class="btn sm" data-m="undo">${tr('Restore')}</button></p>` : ''}
     <label class="shint keep">${tr('Type the project name to confirm')}<input type="text" id="tz-conf" autocomplete="off" placeholder="${esc(name)}"></label>
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" data-m="go" disabled>${tr('Delete')}</button></div>`);
   const inp = $('#tz-conf', md), go_ = $('[data-m=go]', md);
@@ -86,6 +88,7 @@ async function tz_wipe(lid, name) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('button[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') return modalClose(md);
+    if (b.dataset.m === 'undo') { modalClose(md); await tz_wipeRestore(lid, pv.undo.wipe); return; }
     if (go_.disabled) return;
     go_.disabled = true;
     let r;
@@ -94,8 +97,20 @@ async function tz_wipe(lid, name) {
     await timeChanged(r);
     const back = r.entries, msg = tr('{0} time entries deleted', r.deleted);
     const x = histAdd({label: msg, res: r, lids: [lid],
-      undo: async h => { const j = await rawFetch('POST', `/api/lists/${lid}/time/restore`, {entries: back}); await timeChanged(j); return {q: j?._q || null}; },
-      redo: async h => { const j = await rawFetch('POST', `/api/lists/${lid}/time/delete-all`, {confirm: name}); await timeChanged(j); return {q: j?._q || null}; }});
+      // 2.530.0 B (#4315): Undo takes the server's copy (wipe), the copy in the answer only from an older server
+      undo: async h => { const j = await rawFetch('POST', `/api/lists/${lid}/time/restore`, h.wipe ? {wipe: h.wipe} : {entries: back}); await timeChanged(j); return {q: j?._q || null}; },
+      redo: async h => { const j = await rawFetch('POST', `/api/lists/${lid}/time/delete-all`, {confirm: name}); h.wipe = j?.wipe || null; await timeChanged(j); return {q: j?._q || null}; }});
+    x.wipe = r.wipe || null;
     offerUndo(msg, x);
   });
+}
+// 2.530.0 B (#4315): the last "Delete all times" of this project back from the server's copy (also after the tab was closed)
+async function tz_wipeRestore(lid, wipe) {
+  let j;
+  try { j = await rawFetch('POST', `/api/lists/${lid}/time/restore`, {wipe}); } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); return; }
+  await timeChanged(j);
+  toast(tr('{0} time entries restored', j.restored || 0));
+}
+async function tz_wipeUndoAsk(lid, u) {
+  if (await askConfirm(tr('Restore deleted times?'), tr('Last deleted ({0}): {1} entries ({2}).', fmtWhen(u.at), u.count, fmtDur(u.seconds)), {ok: tr('Restore')})) await tz_wipeRestore(lid, u.wipe);
 }

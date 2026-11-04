@@ -83,8 +83,10 @@ def remind_columns(b):
     return {}
 
 
-def need_habit(c, hid):
-    if not c.execute("SELECT 1 FROM habits WHERE id=? AND user_id=?", (hid, me())).fetchone():
+def need_habit(c, hid, trashed=False):
+    """The caller's own habit; 2.530.0 B (#4315): one in the trash only with trashed=True (restore), else 404 like a gone one."""
+    if not c.execute("SELECT 1 FROM habits WHERE id=? AND user_id=? AND deleted_at IS " + ("NOT NULL" if trashed else "NULL"),
+                     (hid, me())).fetchone():
         raise Denied(404)
 
 
@@ -125,10 +127,29 @@ def habit_update(hid):
 def habit_delete(hid):
     c = db()
     need_habit(c, hid)
-    c.execute("DELETE FROM habits WHERE id=?", (hid,))
+    # 2.530.0 B (#4315): into the trash -- the logs stay; restorable until the trash period ends, then the trash run
+    # (files/trashpurge.py TP_PLAIN "habits") deletes it with its logs
+    c.execute("UPDATE habits SET deleted_at=? WHERE id=?", (iso(now_utc()), hid))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, trashed=True)
+
+
+@app.post("/api/habits/<int:hid>/restore")
+def habit_restore(hid):
+    """2.530.0 B (#4315): a habit back from the trash (with every tick and note), at the end of the list."""
+    c = db()
+    need_habit(c, hid, trashed=True)
+    c.execute("UPDATE habits SET deleted_at=NULL WHERE id=?", (hid,))
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+def habits_trash(c, uid):
+    """2.530.0 B (#4315): the person's habits in the trash (newest first), for the habits view."""
+    return [dict(r) for r in c.execute("SELECT id, name, color, deleted_at FROM habits WHERE user_id=? AND deleted_at IS NOT NULL "
+                                       "ORDER BY deleted_at DESC, id DESC LIMIT 200", (uid,))]
 
 
 @app.post("/api/habits/<int:hid>/log")

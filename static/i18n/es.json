@@ -600,7 +600,6 @@
   "Archive": "Archivar",
   "Cancel": "Cancelar",
   "Save": "Guardar",
-  "Delete “{0}” including its history?": "¿Eliminar «{0}» con su historial?",
   "Short break": "Pausa corta",
   "Long break": "Pausa larga",
   "Stopwatch": "Cronómetro",
@@ -2351,7 +2350,6 @@
   "Its events disappear from Kalmido; the calendar itself does not change.": "Sus eventos desaparecen de Kalmido; el calendario en sí no cambia.",
   "Changed setting: {0}": "Ajuste cambiado: {0}",
   "day off": "día libre",
-  "Every tick and note of this habit is deleted. Archive it instead to keep the history.": "Se eliminarán todas las marcas y notas de este hábito. Archívalo en su lugar para conservar el historial.",
   "Turn the open checklist items into subtasks": "Convertir los elementos pendientes de la lista de verificación en subtareas",
   "{0} checklist item of {1} is now a subtask": ["{0} elemento de la lista de verificación de {1} es ahora una subtarea", "{0} elementos de la lista de verificación de {1} son ahora subtareas"],
   "{0} subtask added": ["{0} subtarea añadida", "{0} subtareas añadidas"],
@@ -6739,7 +6737,6 @@
   "No time tracked in this project.": "En este proyecto no hay tiempo registrado.",
   "{0} entries ({1}) of everybody in {2} will be deleted.": "Se eliminarán {0} entradas ({1}) de todos en {2}.",
   "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Se eliminarán tus {0} entradas ({1}) en {2}. Las de otros se quedan.",
-  "Save a CSV first: it is the only copy afterwards.": "Guarda antes un CSV: después no habrá otra copia.",
   "Type the project name to confirm": "Escribe el nombre del proyecto para confirmar",
   "{0} time entries deleted": "{0} entradas de tiempo eliminadas",
   "Not available for agent accounts": "No disponible para cuentas de agente",
@@ -16171,5 +16168,11 @@
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Como administrador de la instancia también puedes eliminar definitivamente {0} tarea de otros propietarios: está en la papelera de sus proyectos donde puedes editar. También desaparecería de su papelera. No se puede deshacer.", "Como administrador de la instancia también puedes eliminar definitivamente {0} tareas de otros propietarios: están en la papelera de sus proyectos donde puedes editar. También desaparecerían de su papelera. No se puede deshacer."],
   "Empty theirs too": "Vaciar también la suya",
   "{0} video review (goes to the trash of the video reviews)": ["{0} revisión de vídeo (pasa a la papelera de las revisiones de vídeo)", "{0} revisiones de vídeo (pasan a la papelera de las revisiones de vídeo)"],
-  "Delete a comment": "Eliminar un comentario"
+  "Delete a comment": "Eliminar un comentario",
+  "The habit goes into the trash with every tick and note and can be restored there until the trash period ends.": "El hábito va a la papelera con todas sus marcas y notas y se puede restaurar allí hasta que termine el plazo de la papelera.",
+  "Delete the habit “{0}”": "Eliminar el hábito «{0}»",
+  "Restore deleted times?": "¿Restaurar los tiempos eliminados?",
+  "{0} time entries restored": "{0} registros de tiempo restaurados",
+  "Last deleted ({0}): {1} entries ({2}).": "Última eliminación ({0}): {1} registros ({2}).",
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "Los registros se pueden restaurar hasta que termine el plazo de la papelera (Deshacer, o aquí de nuevo)."
 }

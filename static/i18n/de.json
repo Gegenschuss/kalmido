@@ -599,7 +599,6 @@
   "Archive": "Archivieren",
   "Cancel": "Abbrechen",
   "Save": "Speichern",
-  "Delete “{0}” including its history?": "„{0}“ samt Verlauf löschen?",
   "Short break": "Kurze Pause",
   "Long break": "Lange Pause",
   "Stopwatch": "Offene Runde",
@@ -2342,7 +2341,6 @@
   "Its events disappear from Kalmido; the calendar itself does not change.": "Seine Termine verschwinden aus Kalmido; der Kalender selbst ändert sich nicht.",
   "Changed setting: {0}": "Einstellung geändert: {0}",
   "day off": "frei",
-  "Every tick and note of this habit is deleted. Archive it instead to keep the history.": "Alle Häkchen und Notizen dieser Gewohnheit werden gelöscht. Archivieren behält den Verlauf.",
   "Turn the open checklist items into subtasks": "Offene Checklisten-Punkte in Unteraufgaben umwandeln",
   "{0} checklist item of {1} is now a subtask": ["{0} Checklisten-Punkt von {1} ist jetzt eine Unteraufgabe", "{0} Checklisten-Punkte von {1} sind jetzt Unteraufgaben"],
   "{0} subtask added": ["{0} Unteraufgabe hinzugefügt", "{0} Unteraufgaben hinzugefügt"],
@@ -6721,7 +6719,6 @@
   "No time tracked in this project.": "In diesem Projekt ist keine Zeit erfasst.",
   "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} Einträge ({1}) von allen in {2} werden gelöscht.",
   "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Deine {0} Einträge ({1}) in {2} werden gelöscht. Einträge anderer bleiben.",
-  "Save a CSV first: it is the only copy afterwards.": "Lade vorher eine CSV-Datei herunter: danach gibt es keine andere Kopie.",
   "Type the project name to confirm": "Zur Bestätigung den Projektnamen eintippen",
   "{0} time entries deleted": "{0} Zeiteinträge gelöscht",
   "Not available for agent accounts": "Für Agenten-Konten nicht verfügbar",
@@ -16171,5 +16168,11 @@
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Als Admin der Instanz darfst du auch {0} Aufgabe anderer Besitzer endgültig löschen: Sie liegt im Papierkorb ihrer Projekte, in denen du bearbeiten darfst. Sie fehlt dann auch in deren Papierkorb. Das lässt sich nicht rückgängig machen.", "Als Admin der Instanz darfst du auch {0} Aufgaben anderer Besitzer endgültig löschen: Sie liegen im Papierkorb ihrer Projekte, in denen du bearbeiten darfst. Sie fehlen dann auch in deren Papierkorb. Das lässt sich nicht rückgängig machen."],
   "Empty theirs too": "Auch deren leeren",
   "{0} video review (goes to the trash of the video reviews)": ["{0} Video-Freigabe (kommt in den Papierkorb der Video-Freigaben)", "{0} Video-Freigaben (kommen in den Papierkorb der Video-Freigaben)"],
-  "Delete a comment": "Einen Kommentar löschen"
+  "Delete a comment": "Einen Kommentar löschen",
+  "The habit goes into the trash with every tick and note and can be restored there until the trash period ends.": "Die Gewohnheit kommt mit allen Häkchen und Notizen in den Papierkorb und lässt sich dort bis zum Ende der Papierkorb-Frist wiederherstellen.",
+  "Delete the habit “{0}”": "Die Gewohnheit „{0}“ löschen",
+  "Restore deleted times?": "Gelöschte Zeiten wiederherstellen?",
+  "{0} time entries restored": "{0} Zeiteinträge wiederhergestellt",
+  "Last deleted ({0}): {1} entries ({2}).": "Zuletzt gelöscht ({0}): {1} Einträge ({2}).",
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "Die Einträge bleiben bis zum Ende der Papierkorb-Frist wiederherstellbar (Rückgängig, oder hier erneut)."
 }

@@ -27,7 +27,7 @@ from ..tasks.tasks import (
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.281.0 A (#3112): 'Empty trash' in the background
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
-from ..lists.listtrash import otr_err_task  # 2.369.5 (#2517): pulled up from functions
+from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
 
 
 def _norm(v):

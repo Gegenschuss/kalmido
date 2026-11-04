@@ -10,7 +10,7 @@ from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usetti
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
 from ..core.access import collab_all, list_role, my_max_sort, time_all, WRITE_ROLES
-from ..core.serializers import attachment_files, unlink_files
+from ..core.serializers import unlink_files
 from ..tasks.validation import log_act
 from ..tasks.tasks import set_tags
 
@@ -259,36 +259,63 @@ def sample_create(c, uid):
     return lid
 
 
+def sample_edited(c, ids):
+    """2.530.0 B (#4315): the sample tasks of ids the person changed since: a later change (updated_at), a comment written
+    after the task was made (the sample's own comment is older), a file."""
+    if not ids:
+        return set()
+    q = ",".join("?" * len(ids))
+    return {r[0] for r in c.execute(f"""SELECT t.id FROM tasks t WHERE t.id IN ({q}) AND (t.updated_at<>t.created_at
+                                         OR EXISTS (SELECT 1 FROM comments m WHERE m.task_id=t.id AND m.created_at>t.created_at)
+                                         OR EXISTS (SELECT 1 FROM attachments a WHERE a.task_id=t.id))""", ids)}
+
+
 def sample_remove(c, uid):
-    """Removes what the sample created (caller commits; returns (counts, files to unlink))."""
-    from ..lists.projects import list_row_purge
+    """Removes what the sample created (caller commits; returns (counts, files to unlink)).
+    2.530.0 B (#4315): nothing goes for good at once any more -- the sample tasks go into the trash (trash_task, restorable
+    there until the trash period ends), a sample project left without live tasks goes into the projects' trash with what the
+    person added to it (files, notes, chat); the sample's time entry goes only while neither it nor its task was changed,
+    else it stays. Fields and sections stay while a live task uses them (as before; a sample task restored from the trash
+    comes back without a sample section / field that went)."""
+    from ..tasks.lifecycle import otr_trash, trash_task  # one upward import (lists/listtrash.py otr_trash through lifecycle)
     rows = lambda kind: [r[0] for r in c.execute("SELECT item_id FROM sample_items WHERE user_id=? AND kind=?", (uid, kind))]  # noqa: E731
-    mine = [t["id"] for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({','.join('?' * len(rows('task'))) or 'NULL'})",
-                                       rows("task")).fetchall()
+    mine = [t["id"] for t in c.execute(f"SELECT id, list_id, parent_id FROM tasks WHERE deleted_at IS NULL AND "
+                                       f"id IN ({','.join('?' * len(rows('task'))) or 'NULL'})", rows("task")).fetchall()
             if list_role(c, t["list_id"], uid) in WRITE_ROLES]
     q = ",".join("?" * len(mine)) or "NULL"
     # tasks the user added below a sample task stay (as main tasks)
     kept = c.execute(f"UPDATE tasks SET parent_id=NULL WHERE parent_id IN ({q}) AND id NOT IN ({q})", mine + mine).rowcount
-    files = attachment_files(c, mine)
-    c.execute(f"DELETE FROM tasks WHERE id IN ({q})", mine)
+    edited = sample_edited(c, mine)
     te = rows("time")
-    c.execute(f"DELETE FROM time_entries WHERE user_id=? AND id IN ({','.join('?' * len(te)) or 'NULL'})", [uid] + te)
-    for fid in rows("field"):  # a field stays while a task of the user still has a value in it
-        c.execute("DELETE FROM list_fields WHERE id=? AND NOT EXISTS (SELECT 1 FROM task_field_values WHERE field_id=?)", (fid, fid))
+    if te:  # unchanged entries of unchanged tasks only (updated_at = created_at: the sample's own)
+        ex = f" AND (task_id IS NULL OR task_id NOT IN ({','.join('?' * len(edited))}))" if edited else ""  # NOT IN (NULL) holds never
+        c.execute(f"DELETE FROM time_entries WHERE user_id=? AND id IN ({','.join('?' * len(te))}) AND updated_at=created_at{ex}",
+                  [uid] + te + sorted(edited))
+    mset = set(mine)
+    for tid in [r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({q}) AND (parent_id IS NULL OR parent_id NOT IN ({q}))",
+                                        mine + mine)]:
+        trash_task(c, tid)  # its sample subtasks go along (do_delete)
+    for tid in mset - {r[0] for r in c.execute(f"SELECT id FROM tasks WHERE id IN ({q}) AND deleted_at IS NOT NULL", mine)}:
+        trash_task(c, tid)  # a sample subtask in another list the parent's trash left behind
+    for fid in rows("field"):  # a field stays while a live task of the user still has a value in it
+        c.execute("DELETE FROM list_fields WHERE id=? AND NOT EXISTS (SELECT 1 FROM task_field_values v JOIN tasks t ON t.id=v.task_id "
+                  "WHERE v.field_id=? AND t.deleted_at IS NULL)", (fid, fid))
     for sid in rows("section"):
-        c.execute("DELETE FROM sections WHERE id=? AND NOT EXISTS (SELECT 1 FROM tasks WHERE section_id=?)", (sid, sid))
+        c.execute("DELETE FROM sections WHERE id=? AND NOT EXISTS (SELECT 1 FROM tasks WHERE section_id=? AND deleted_at IS NULL)", (sid, sid))
     lists = kept_lists = 0
-    gone = []
     for lid in rows("list"):
-        if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=?", (lid, uid)).fetchone():
-            if c.execute("SELECT 1 FROM tasks WHERE list_id=?", (lid,)).fetchone():
+        if c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? AND deleted_at IS NULL", (lid, uid)).fetchone():
+            if c.execute("SELECT 1 FROM tasks WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone():
                 kept_lists += 1
-            else:
-                lists += list_row_purge(c, lid, gone)  # 2.7.2: its project files leave the disk too
+            else:  # into the projects' trash (archived, as a delete in the app): it comes back there with its tasks
+                c.execute("UPDATE lists SET archived=1 WHERE id=?", (lid,))
+                ts = otr_trash(c, lid, uid)
+                c.execute("UPDATE tasks SET deleted_at=? WHERE list_id=? AND id IN (" + q + ")", [ts, lid] + mine)  # restored with it
+                lists += 1
     c.execute("DELETE FROM sample_items WHERE user_id=?", (uid,))
-    files += [p for _, _, ps in gone for p in ps]
-    g.purge_icons = [(lid, icon) for lid, icon, _ in gone] if has_request_context() else []
-    return {"tasks": len(mine), "lists": lists, "kept_lists": kept_lists, "kept_tasks": kept}, files
+    if has_request_context():
+        g.purge_icons = []
+    return {"tasks": len(mine), "lists": lists, "kept_lists": kept_lists, "kept_tasks": kept}, []
 
 
 @app.post("/api/sample")

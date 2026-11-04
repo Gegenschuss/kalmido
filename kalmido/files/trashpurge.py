@@ -56,6 +56,9 @@ TP_PLAIN = (
     ("polls", "sched_polls", ""),
     ("appt_types", "appt_types", ""),
     ("file_requests", "fs_upload_requests", ""),
+    # 2.530.0 B (#4315): deleted habits (their logs cascade) and the Undo copies of "Delete all times of this project"
+    ("habits", "habits", ""),
+    ("time_wipes", "time_wipes", ""),
 )
 
 

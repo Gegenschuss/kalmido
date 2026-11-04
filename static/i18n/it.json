@@ -600,7 +600,6 @@
   "Archive": "Archivia",
   "Cancel": "Annulla",
   "Save": "Salva",
-  "Delete “{0}” including its history?": "Eliminare “{0}” con tutta la cronologia?",
   "Short break": "Pausa breve",
   "Long break": "Pausa lunga",
   "Stopwatch": "Cronometro",
@@ -2351,7 +2350,6 @@
   "Its events disappear from Kalmido; the calendar itself does not change.": "I suoi eventi scompaiono da Kalmido; il calendario in sé non cambia.",
   "Changed setting: {0}": "Impostazione modificata: {0}",
   "day off": "libero",
-  "Every tick and note of this habit is deleted. Archive it instead to keep the history.": "Ogni spunta e nota di questa abitudine viene eliminata. Archiviala invece per mantenere la cronologia.",
   "Turn the open checklist items into subtasks": "Trasforma le voci aperte della checklist in sottoattività",
   "{0} checklist item of {1} is now a subtask": ["{0} voce della checklist di {1} è ora una sottoattività", "{0} voci della checklist di {1} sono ora sottoattività"],
   "{0} subtask added": ["{0} sottoattività aggiunta", "{0} sottoattività aggiunte"],
@@ -6739,7 +6737,6 @@
   "No time tracked in this project.": "Nessun tempo registrato in questo progetto.",
   "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} voci ({1}) di tutti in {2} verranno eliminate.",
   "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Le tue {0} voci ({1}) in {2} verranno eliminate. Quelle degli altri restano.",
-  "Save a CSV first: it is the only copy afterwards.": "Salva prima un CSV: dopo non ci sarà un'altra copia.",
   "Type the project name to confirm": "Digita il nome del progetto per confermare",
   "{0} time entries deleted": "{0} voci di tempo eliminate",
   "Not available for agent accounts": "Non disponibile per gli account agente",
@@ -16172,5 +16169,11 @@
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trova nel cestino dei loro progetti dove puoi modificare. Sparirebbe anche dal loro cestino. Non si può annullare.", "Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trovano nel cestino dei loro progetti dove puoi modificare. Sparirebbero anche dal loro cestino. Non si può annullare."],
   "Empty theirs too": "Svuota anche il loro",
   "{0} video review (goes to the trash of the video reviews)": ["{0} revisione video (va nel cestino delle revisioni video)", "{0} revisioni video (vanno nel cestino delle revisioni video)"],
-  "Delete a comment": "Eliminare un commento"
+  "Delete a comment": "Eliminare un commento",
+  "The habit goes into the trash with every tick and note and can be restored there until the trash period ends.": "L’abitudine finisce nel cestino con tutte le spunte e le note e può essere ripristinata lì fino alla scadenza del cestino.",
+  "Delete the habit “{0}”": "Eliminare l’abitudine «{0}»",
+  "Restore deleted times?": "Ripristinare i tempi eliminati?",
+  "{0} time entries restored": "{0} registrazioni di tempo ripristinate",
+  "Last deleted ({0}): {1} entries ({2}).": "Ultima eliminazione ({0}): {1} registrazioni ({2}).",
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "Le registrazioni restano ripristinabili fino alla scadenza del cestino (Annulla, o di nuovo qui)."
 }

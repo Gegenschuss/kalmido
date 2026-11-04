@@ -117,7 +117,7 @@ function habitStats(h) {
 const weekProg = (h, mon) => { const n = weekDone(h, mon); return `<span class="hprog ${n >= h.per_week ? 'hit' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="${h.per_week}" aria-valuenow="${Math.min(n, h.per_week)}" aria-label="${esc(tr('{0} of {1} this week', n, h.per_week))}">${[...Array(h.per_week)].map((_, i) => `<i class="${i < n ? 'on' : ''}"></i>`).join('')}</span>`; };
 function viewHabits() {
   const hs = S.habits.filter(h => !h.archived);
-  if (!S.habits.length) return `<div class="empty nempty eact">${ic('habit')}<span>${tr('No habits yet.')}</span><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>`;
+  if (!S.habits.length) return `<div class="empty nempty eact">${ic('habit')}<span>${tr('No habits yet.')}</span><button class="btn pri" data-act="habit-new">${ic('plus', 's')} ${tr('Create habit')}</button></div>` + hab_trashHtml();
   const mon = weekOf(today()), t0 = today();
   // U10: the last 7 days up to today (yesterday can always be ticked, also on a Monday)
   const days = [...Array(7)].map((_, i) => addDays(t0, i - 6));
@@ -136,7 +136,26 @@ function viewHabits() {
   const arch = S.habits.filter(x => x.archived);
   h += `<button class="iconbtn hnew" data-act="habit-new" style="margin:.5rem 0 0 -.25rem">${ic('plus', 's')} ${tr('New habit')}</button>`;  // U26: a labelled button, like "+ Section"
   if (arch.length) h += `<div class="ghead" style="margin-top:1rem">${tr('Archived')}</div>` + arch.map(x => `<div class="srow" data-act="habit-open" data-id="${x.id}"><span class="sw" style="background:${cssColor(x.color) || HCOLORS[0]}"></span><span class="n muted">${esc(x.name)}</span></div>`).join('');
+  h += hab_trashHtml();  // 2.530.0 B (#4315)
   return h;
+}
+// 2.530.0 B (#4315): deleted habits lie in the trash (S.habitsTrash) until the trash period ends: Undo toast, restore below the list
+function hab_trashHtml() {
+  const tr_ = S.habitsTrash || [];
+  if (!tr_.length) return '';
+  return `<div class="ghead hab-trash" style="margin-top:1rem">${tr('Trash')}</div>` + tr_.map(x => `<div class="srow hab-trash"><span class="sw" style="background:${cssColor(x.color) || HCOLORS[0]}"></span><span class="n muted">${esc(x.name)}</span><button class="btn sm" data-act="habit-restore" data-id="${x.id}">${tr('Restore')}</button></div>`).join('');
+}
+async function hab_delete(id, name) {
+  await api('DELETE', '/api/habits/' + id); await load(); render();
+  const msg = tr('“{0}” moved to the trash', name);
+  const x = histAdd({label: msg, ids: [],
+    undo: async () => { await api('POST', `/api/habits/${id}/restore`); await load(); render(); return {}; },
+    redo: async () => { await api('DELETE', '/api/habits/' + id); await load(); render(); return {}; }});
+  offerUndo(msg, x);
+}
+async function hab_restore(id) {
+  try { await api('POST', `/api/habits/${id}/restore`); } catch (e) { toast(e.message); return; }
+  await load(); render(); toast(tr('Restored'));
 }
 // 2.140.0 C (#2135): up to six reminder times; the old single time (remind_at) is the first one
 const HREM_MAX = 6;
@@ -215,7 +234,8 @@ function habitModal(id) {
       md.remove(); await load(); render();
     }
     if (act === 'arch') { await api('PATCH', '/api/habits/' + id, {archived: x.archived ? 0 : 1}); md.remove(); await load(); render(); }
-    if (act === 'del' && await askConfirm(tr('Delete “{0}” including its history?', x.name), tr('Every tick and note of this habit is deleted. Archive it instead to keep the history.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', '/api/habits/' + id); md.remove(); await load(); render(); }
+    // 2.530.0 B (#4315): into the trash with its history, Undo in the toast, restorable below the list until the trash period ends
+    if (act === 'del' && await askConfirm(tr('Delete “{0}”?', x.name), tr('The habit goes into the trash with every tick and note and can be restored there until the trash period ends.'), {ok: tr('Delete'), danger: true})) { md.remove(); await hab_delete(id, x.name); }
   });
   md.addEventListener('input', e => {
     if (e.target.id !== 'h-note' || !selDay || !id) return;

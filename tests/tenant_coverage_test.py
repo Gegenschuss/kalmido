@@ -825,7 +825,7 @@ ROUTES = {
     "PUT /api/life/karakeep": "own", "DELETE /api/life/karakeep": "own", "GET /api/life/karakeep/lists": "own",
     "POST /api/life/karakeep/sync": "own", "POST /api/filters": "own", "PATCH /api/filters/{}": "own",
     "DELETE /api/filters/{}": "own", "POST /api/habits": "own", "PATCH /api/habits/{}": "own",
-    "DELETE /api/habits/{}": "own", "POST /api/habits/{}/log": "own", "POST /api/pomo/start": "own",
+    "DELETE /api/habits/{}": "own", "POST /api/habits/{}/restore": "own", "POST /api/habits/{}/log": "own", "POST /api/pomo/start": "own",  # 2.530.0 B (#4315): restore
     "POST /api/pomo/{}/{}": "own", "POST /api/time/start": "own", "POST /api/time/stop": "own",
     "POST /api/time/entries": "own", "PATCH /api/time/entries/{}": "own", "DELETE /api/time/entries/{}": "own",
     "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own", "GET /api/time/export.xlsx": "own",

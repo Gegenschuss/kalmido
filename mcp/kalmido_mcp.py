@@ -1809,7 +1809,7 @@ TOOLS += [
     ("create_habit", "Create a habit.", _obj(HABIT_PROPS, ["name"]), lambda api, a: api.call("POST", "/habits", body=a)),
     ("update_habit", "Change a habit (archived = true to archive).", _obj({"habit_id": S_ID, **HABIT_PROPS, "archived": {"type": "boolean"}}, ["habit_id"]),
      lambda api, a: api.call("PATCH", f"/habits/{_id(a, 'habit_id')}", body=_without(a, "habit_id"))),
-    ("delete_habit", "Delete a habit with its history.", _obj({"habit_id": S_ID}, ["habit_id"]),
+    ("delete_habit", "Delete a habit: it goes into the trash with its history (restorable in the app until the trash period ends); waits for an approval.", _obj({"habit_id": S_ID}, ["habit_id"]),
      lambda api, a: api.call("DELETE", f"/habits/{_id(a, 'habit_id')}")),
     ("check_in_habit", "Check in a habit (date YYYY-MM-DD, default today; count = absolute count, default one more; note).",
      _obj({"habit_id": S_ID, "date": {"type": "string"}, "count": {"type": "integer", "minimum": 0}, "note": {"type": "string"}}, ["habit_id"]),

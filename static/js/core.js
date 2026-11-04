@@ -1094,7 +1094,7 @@ function applyState(j) {
     const rw = LS.get('rcWarn', null);  // logged in with a recovery code, only a few left
     if (rw !== null) { LS.del('rcWarn'); setTimeout(() => toast(trn('Only {0} recovery code left: create new ones under Settings > Account.', 'Only {0} recovery codes left: create new ones under Settings > Account.', +rw), null, 8000), 1500); }
   }
-  S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.pomo = j.pomo;
+  S.lists = j.lists; S.inboxNames = j.inbox_names || []; S.sections = j.sections; S.habits = j.habits; S.habitsTrash = j.habits_trash || []; S.pomo = j.pomo;
   S.notes = j.notes || []; S.team = j.team || {enabled: false, unread: 0};  // 2.17.0 (#442 #419)
   S.pomoToday = j.pomo_today; S.avatars = j.avatars || {}; S.colors = j.colors || {}; S.share = j.share || null; S.settings = j.settings; S.mineOrder = moFromState(j); S.languages = j.languages || [{code: 'en', name: 'English'}]; LS.set('lang', j.settings.lang || 'en'); document.documentElement.lang = j.settings.lang || 'en'; S.counts = j.counts; S.v = j.v; S.ntfyUrl = j.ntfy_url;
   S.trashPurge = j.trash_purge !== false;  // 2.223.3 A (#2877)

@@ -734,6 +734,7 @@ document.addEventListener('click', async e => {
     case 'cal-today': S.calMonth = today().slice(0, 7); S.calSel = today(); S.tlStart = addDays(weekStartOf(today()), -7); renderView(); an_calSlide(0); break;
     case 'habit-new': habitModal(); break;
     case 'habit-open': habitModal(id); break;
+    case 'habit-restore': hab_restore(id); break;  // 2.530.0 B (#4315)
     case 'habit-tick': {
       const h = S.habits.find(x => x.id === id), d = a.dataset.day, c = h.logs[d] || 0;
       const n = c >= h.goal ? 0 : c + 1;

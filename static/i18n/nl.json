@@ -600,7 +600,6 @@
   "Archive": "Archiveren",
   "Cancel": "Annuleren",
   "Save": "Opslaan",
-  "Delete “{0}” including its history?": "“{0}” met de hele geschiedenis verwijderen?",
   "Short break": "Korte pauze",
   "Long break": "Lange pauze",
   "Stopwatch": "Stopwatch",
@@ -2351,7 +2350,6 @@
   "Its events disappear from Kalmido; the calendar itself does not change.": "De afspraken ervan verdwijnen uit Kalmido; de agenda zelf verandert niet.",
   "Changed setting: {0}": "Instelling gewijzigd: {0}",
   "day off": "vrij",
-  "Every tick and note of this habit is deleted. Archive it instead to keep the history.": "Elk vinkje en elke notitie van deze gewoonte wordt verwijderd. Archiveer haar liever om de geschiedenis te bewaren.",
   "Turn the open checklist items into subtasks": "Open checklistitems omzetten in subtaken",
   "{0} checklist item of {1} is now a subtask": ["{0} checklistitem van {1} is nu een subtaak", "{0} checklistitems van {1} zijn nu subtaken"],
   "{0} subtask added": ["{0} subtaak toegevoegd", "{0} subtaken toegevoegd"],
@@ -6739,7 +6737,6 @@
   "No time tracked in this project.": "In dit project is geen tijd geregistreerd.",
   "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} registraties ({1}) van iedereen in {2} worden verwijderd.",
   "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Je {0} registraties ({1}) in {2} worden verwijderd. Die van anderen blijven.",
-  "Save a CSV first: it is the only copy afterwards.": "Bewaar eerst een CSV: daarna is er geen andere kopie.",
   "Type the project name to confirm": "Typ de projectnaam om te bevestigen",
   "{0} time entries deleted": "{0} tijdregistraties verwijderd",
   "Not available for agent accounts": "Niet beschikbaar voor agentaccounts",
@@ -16171,5 +16168,11 @@
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Als beheerder van de instantie mag je ook {0} taak van andere eigenaren definitief verwijderen: die ligt in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnt dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt.", "Als beheerder van de instantie mag je ook {0} taken van andere eigenaren definitief verwijderen: die liggen in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnen dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt."],
   "Empty theirs too": "Ook die van hen legen",
   "{0} video review (goes to the trash of the video reviews)": ["{0} videobeoordeling (gaat naar de prullenbak van de videobeoordelingen)", "{0} videobeoordelingen (gaan naar de prullenbak van de videobeoordelingen)"],
-  "Delete a comment": "Een opmerking verwijderen"
+  "Delete a comment": "Een opmerking verwijderen",
+  "The habit goes into the trash with every tick and note and can be restored there until the trash period ends.": "De gewoonte gaat met alle vinkjes en notities naar de prullenbak en kan daar worden hersteld tot de bewaartermijn van de prullenbak afloopt.",
+  "Delete the habit “{0}”": "De gewoonte ‘{0}’ verwijderen",
+  "Restore deleted times?": "Verwijderde tijden herstellen?",
+  "{0} time entries restored": "{0} tijdregistraties hersteld",
+  "Last deleted ({0}): {1} entries ({2}).": "Laatst verwijderd ({0}): {1} registraties ({2}).",
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "De registraties blijven herstelbaar tot de bewaartermijn van de prullenbak afloopt (Ongedaan maken, of hier opnieuw)."
 }

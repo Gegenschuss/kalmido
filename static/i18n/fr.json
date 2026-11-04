@@ -600,7 +600,6 @@
   "Archive": "Archiver",
   "Cancel": "Annuler",
   "Save": "Enregistrer",
-  "Delete “{0}” including its history?": "Supprimer « {0} » avec son historique ?",
   "Short break": "Pause courte",
   "Long break": "Pause longue",
   "Stopwatch": "Chronomètre",
@@ -2351,7 +2350,6 @@
   "Its events disappear from Kalmido; the calendar itself does not change.": "Ses événements disparaissent de Kalmido ; le calendrier lui-même ne change pas.",
   "Changed setting: {0}": "Paramètre modifié : {0}",
   "day off": "repos",
-  "Every tick and note of this habit is deleted. Archive it instead to keep the history.": "Toutes les coches et notes de cette habitude seront supprimées. Archivez-la plutôt pour conserver l'historique.",
   "Turn the open checklist items into subtasks": "Transformer les éléments ouverts de la checklist en sous-tâches",
   "{0} checklist item of {1} is now a subtask": ["{0} élément de checklist sur {1} est maintenant une sous-tâche", "{0} éléments de checklist sur {1} sont maintenant des sous-tâches"],
   "{0} subtask added": ["{0} sous-tâche ajoutée", "{0} sous-tâches ajoutées"],
@@ -6739,7 +6737,6 @@
   "No time tracked in this project.": "Aucun temps enregistré dans ce projet.",
   "{0} entries ({1}) of everybody in {2} will be deleted.": "{0} entrées ({1}) de tous dans {2} seront supprimées.",
   "Your {0} entries ({1}) in {2} will be deleted. Entries of others stay.": "Tes {0} entrées ({1}) dans {2} seront supprimées. Celles des autres restent.",
-  "Save a CSV first: it is the only copy afterwards.": "Enregistrez d'abord un CSV : il n'y aura pas d'autre copie.",
   "Type the project name to confirm": "Saisissez le nom du projet pour confirmer",
   "{0} time entries deleted": "{0} entrées de temps supprimées",
   "Not available for agent accounts": "Indisponible pour les comptes d'agent",
@@ -16171,5 +16168,11 @@
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["En tant qu’admin de l’instance, tu peux aussi supprimer définitivement {0} tâche d’autres propriétaires : elle se trouve dans la corbeille de leurs projets où tu peux modifier. Elle disparaîtrait aussi de leur corbeille. Action irréversible.", "En tant qu’admin de l’instance, tu peux aussi supprimer définitivement {0} tâches d’autres propriétaires : elles se trouvent dans la corbeille de leurs projets où tu peux modifier. Elles disparaîtraient aussi de leur corbeille. Action irréversible."],
   "Empty theirs too": "Vider aussi la leur",
   "{0} video review (goes to the trash of the video reviews)": ["{0} validation vidéo (va dans la corbeille des validations vidéo)", "{0} validations vidéo (vont dans la corbeille des validations vidéo)"],
-  "Delete a comment": "Supprimer un commentaire"
+  "Delete a comment": "Supprimer un commentaire",
+  "The habit goes into the trash with every tick and note and can be restored there until the trash period ends.": "L’habitude va dans la corbeille avec toutes ses coches et notes et peut y être restaurée jusqu’à la fin du délai de la corbeille.",
+  "Delete the habit “{0}”": "Supprimer l’habitude « {0} »",
+  "Restore deleted times?": "Restaurer les temps supprimés ?",
+  "{0} time entries restored": "{0} saisies de temps restaurées",
+  "Last deleted ({0}): {1} entries ({2}).": "Dernière suppression ({0}) : {1} saisies ({2}).",
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "Les saisies restent restaurables jusqu’à la fin du délai de la corbeille (Annuler, ou ici à nouveau)."
 }

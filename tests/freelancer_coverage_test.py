@@ -882,7 +882,7 @@ ROUTES = {
     "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
     "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
     # ---- time (28)
-    "DELETE /api/habits/{}": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",
+    "DELETE /api/habits/{}": "time", "POST /api/habits/{}/restore": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",  # 2.530.0 B (#4315): restore
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",
     "GET /api/time/export.csv": "time", "GET /api/time/export.xlsx": "time", "GET /api/workload/export.xlsx": "tasks",  # 2.125.0 C (#2122)
     "GET /api/time/gaps": "time", "GET /api/time/report": "time",
@@ -1169,7 +1169,6 @@ DELETE /api/filters/{}
 DELETE /api/folders/agents
 DELETE /api/folders/groups/{}
 DELETE /api/forms/{}
-DELETE /api/habits/{}
 DELETE /api/hubmail/address
 DELETE /api/layouts/saved/{}
 DELETE /api/life/karakeep
@@ -1202,7 +1201,6 @@ DELETE /api/paperless/zip
 DELETE /api/push/subs/{}
 DELETE /api/repos/{}
 DELETE /api/rules/{}
-DELETE /api/sample
 DELETE /api/servers/{}
 DELETE /api/servers/{}/tasks/{}
 DELETE /api/supporter/{}
@@ -1225,7 +1223,6 @@ DELETE /api/v1/family/rewards/{}
 DELETE /api/v1/fields/{}
 DELETE /api/v1/filters/{}
 DELETE /api/v1/forms/{}
-DELETE /api/v1/habits/{}
 DELETE /api/v1/lists/{}
 DELETE /api/v1/lists/{}/files/{}
 DELETE /api/v1/lists/{}/groups/{}
@@ -1343,7 +1340,6 @@ POST /api/folders/owner
 POST /api/folders/playbook/restore
 POST /api/folders/rename
 POST /api/folders/repos
-POST /api/habits/{}/log
 POST /api/hubmail/mailbox/check
 POST /api/hubmail/mails/{}/assign
 POST /api/ical
@@ -1438,7 +1434,6 @@ POST /api/push/handled
 POST /api/push/test
 POST /api/push/unsubscribe
 POST /api/rules/{}/restore
-POST /api/sample
 POST /api/servers
 POST /api/servers/code
 POST /api/servers/move

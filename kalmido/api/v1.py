@@ -1674,7 +1674,7 @@ def v1_habit(c, h):
 def v1_habits():
     v1_args(())
     c = db()
-    return jsonify(data=[v1_habit(c, h) for h in c.execute("SELECT * FROM habits WHERE user_id=? ORDER BY archived, sort, id", (me(),))],
+    return jsonify(data=[v1_habit(c, h) for h in c.execute("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL ORDER BY archived, sort, id", (me(),))],
                    next_cursor=None)
 
 

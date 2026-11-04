@@ -279,7 +279,7 @@ def state():
     from ..notify.caps import notif_ask_state
     from ..lists.groups import groups_for, grp_of_user
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
-    from ..personal.habits import pomo_stats
+    from ..personal.habits import habits_trash, pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
     from ..accounts.onboarding import sample_state
     from ..lists.fields import field_dict
@@ -313,11 +313,11 @@ def state():
     tasks = load_tasks(c, base + (" AND id = ANY(CAST(? AS BIGINT[]))" if lz else "") + " ORDER BY id",
                        (*bargs, st_ids(sorted(lz["ids"]))) if lz else bargs,
                        lean_notes=True)  # 2.280.0 A (#3108): long notes come with the detail
-    habits = [dict(r) for r in c.execute("SELECT * FROM habits WHERE user_id=? ORDER BY archived, sort, id", (uid,))]
+    habits = [dict(r) for r in c.execute("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL ORDER BY archived, sort, id", (uid,))]
     since = (local_now().date() - timedelta(days=400)).isoformat()
     logs, notes = {}, {}
     for r in c.execute("""SELECT l.habit_id, l.day, l.count, l.note FROM habit_logs l JOIN habits h ON h.id=l.habit_id
-                          WHERE h.user_id=? AND l.day>=?""", (uid, since)):
+                          WHERE h.user_id=? AND h.deleted_at IS NULL AND l.day>=?""", (uid, since)):
         if r["count"]:
             logs.setdefault(r["habit_id"], {})[r["day"]] = r["count"]
         if r["note"]:
@@ -352,6 +352,7 @@ def state():
                                                     (uid, uid)).fetchall()],  # 2.43.0 (#1328): c = formula text with names
         tasks=tasks,
         habits=habits,
+        habits_trash=habits_trash(c, uid),  # 2.530.0 B (#4315): deleted habits until the trash period ends
         pomo=running_pomo(c),
         pomo_today=pomo_stats(c, days=1),
         counts=dict(

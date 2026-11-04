@@ -1348,6 +1348,8 @@ Some changes by an agent never happen at once, whatever its permissions:
   form on, a new link for it) and deleting a whole address book (`DELETE /address-books/{id}`)
 - 2.530.0: deleting a comment (`DELETE /comments/{id}`, also one of your own). A deleted comment goes into the trash with its
   files for the trash period; a person restores it in the app (Undo)
+- 2.530.0: deleting a habit (`DELETE /habits/{id}`, `delete_habit`); the habit goes into the trash with its history, the person
+  restores it in the app until the trash period ends
 
 The API answers `202` with `{approval_required: true, job, message}`: the request is stored as a **waiting job** with
 a readable title ("Delete the project “Old” for good"). The same request again returns the same job (do not repeat it).

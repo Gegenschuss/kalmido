@@ -1134,7 +1134,7 @@ def _wd_pomo(c, p, users, S, LG):
 def _wd_habits(c, users, S, LG, now):
     # habit reminders
     today = now.date().isoformat()
-    for h in c.execute("SELECT * FROM habits WHERE archived=0 AND (remind_at!='' OR remind_times!='') "
+    for h in c.execute("SELECT * FROM habits WHERE archived=0 AND deleted_at IS NULL AND (remind_at!='' OR remind_times!='') "
                        "AND NOT (reminded_on=? AND reminded_hm='')", (today,)).fetchall():
         try:
             _wd_habit(c, h, users, S, LG, now)

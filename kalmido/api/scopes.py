@@ -31,7 +31,7 @@ from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_
 from ..tasks.batch import attachment_delete, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
 from ..collab.news import news_add, news_list, news_read, news_read_job
-from ..personal.habits import habit_create, habit_delete, habit_update
+from ..personal.habits import habit_create, habit_delete, habit_update, need_habit
 from ..personal.timetrack import time_delete, time_running, time_start, time_stop, time_update
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..accounts.settings import export_json
@@ -1207,7 +1207,11 @@ def v1_habit_update(hid):
 @app.delete("/api/v1/habits/<int:hid>")
 @v1_view
 def v1_habit_delete(hid):
+    """2.530.0 B (#4315): into the trash (restorable in the app until the trash period ends); an agent waits for an approval."""
     v1_args(())
+    c = db()
+    need_habit(c, hid)
+    need_approval(c, N_("Delete the habit “{0}”"), (c.execute("SELECT name FROM habits WHERE id=?", (hid,)).fetchone()[0][:100],))
     v1_call(habit_delete, hid, body={})
     return Response(status=204)
 
@@ -1509,7 +1513,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                                "days": {"type": "string"}, "per_week": {"type": "integer"},
                                                                "remind_at": {"type": "string"}, "archived": {"type": "boolean"},
                                                                "remind_times": {"type": "array", "maxItems": 6, "items": {"type": "string"}}}}),
-            "delete": op("Delete a habit", "Habits", nobody | errs("404"), [pid("id", "Habit id")], scope="delete")},
+            "delete": op("Delete a habit (into the trash)", "Habits", nobody | acc | errs("404"), [pid("id", "Habit id")], scope="delete",
+                         desc="2.530.0: the habit goes into the trash with its history (restorable in the app until the trash period ends). Agents: waits for approval (202).")},
         "/time/timer": {
             "get": op("The running timer", "Time tracking", ok(obj) | errs("403")),
             "post": op("Start the timer", "Time tracking", ok(obj, "Created", "201") | errs("400", "403", "404", "409"), scope="time",

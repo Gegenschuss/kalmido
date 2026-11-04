@@ -164,7 +164,8 @@ done = A.get(B + "/api/tasks?scope=done&limit=500").json()
 done = done.get("tasks", done) if isinstance(done, dict) else done
 check(not any(t["title"] == "Weekly status call with the client" for t in done), "the done copy of the repeating task is gone")
 te = A.get(B + "/api/time/entries?scope=mine").json()
-check(not any(e.get("note") == "First draft of the treatment" for e in te.get("entries", [])), "time entry removed")
+# 2.530.0 (#4315): the sample tasks go into the trash; the time entry of a task the person changed ("Treatment v2") stays
+check(any(e.get("note") == "First draft of the treatment" for e in te.get("entries", [])), "time entry of the changed task stays")
 check(A.delete(B + "/api/sample").status_code == 404, "second remove: 404")
 
 # ---- again, and without the project modules: simpler version, no errors

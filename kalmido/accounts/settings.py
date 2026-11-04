@@ -804,8 +804,8 @@ def umz_export_queries(uid):
         "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),
         "task_tags": ("SELECT * FROM task_tags WHERE user_id=?", (uid,)),
-        "habits": ("SELECT * FROM habits WHERE user_id=?", (uid,)),
-        "habit_logs": ("SELECT * FROM habit_logs WHERE habit_id IN (SELECT id FROM habits WHERE user_id=?)", (uid,)),
+        "habits": ("SELECT * FROM habits WHERE user_id=? AND deleted_at IS NULL", (uid,)),  # 2.530.0 B (#4315): not the trash
+        "habit_logs": ("SELECT * FROM habit_logs WHERE habit_id IN (SELECT id FROM habits WHERE user_id=? AND deleted_at IS NULL)", (uid,)),
         "pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),
         "filters": ("SELECT * FROM filters WHERE user_id=?", (uid,)),
         "attachments": (f"SELECT * FROM attachments WHERE task_id IN {task_ids}", (uid,)),
