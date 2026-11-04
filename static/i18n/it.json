@@ -16229,5 +16229,6 @@
   "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Le spese di rappresentanza contano da Ufficio > Spese di rappresentanza. Una fattura del ristorante presente anche tra le Ricevute conta due volte: tienila in un solo posto.",
   "Entertainment (70 % deductible)": "Rappresentanza (70 % deducibile)",
   "Entertainment (30 % not deductible)": "Rappresentanza (30 % non deducibile)",
-  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Rappresentanza: {0} (30 %) non sono deducibili e non figurano tra le spese."
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Rappresentanza: {0} (30 %) non sono deducibili e non figurano tra le spese.",
+  "Date by": "Data secondo"
 }

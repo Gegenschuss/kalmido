@@ -16228,5 +16228,6 @@
   "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Los comprobantes de atenciones cuentan desde Oficina > Comprobantes de atenciones. Una factura de restaurante que también está en Recibos cuenta dos veces: guárdala en un solo lugar.",
   "Entertainment (70 % deductible)": "Atenciones (70 % deducible)",
   "Entertainment (30 % not deductible)": "Atenciones (30 % no deducible)",
-  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Atenciones: {0} (30 %) no son deducibles y no figuran en los gastos."
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Atenciones: {0} (30 %) no son deducibles y no figuran en los gastos.",
+  "Date by": "Fecha según"
 }

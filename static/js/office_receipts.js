@@ -72,14 +72,14 @@ function rclFiltersHtml() {
   const f = RCL.f, d = RCL.data || {}, all = tr('All');
   const opt = (list, cur, name) => { const o = list.map(x => [String(x.id ?? x), x.name ?? x]); if (cur && !o.some(([v]) => v === String(cur))) o.push([String(cur), name ?? String(cur)]); return o; };
   const n = ['category', 'supplier', 'project', 'q'].filter(k => f[k]).length + (f.novat ? 1 : 0) + (f.hints ? 1 : 0) + (f.status !== 'all' ? 1 : 0) + (f.checked && f.checked !== 'all' ? 1 : 0);
-  const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : k === 'checked' ? 'Checked' : 'Day'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
+  const seg = (k, opts) => `<div class="seg" role="group" aria-label="${esc(tr(k === 'status' ? 'Status' : k === 'checked' ? 'Checked' : 'Date by'))}">${opts.map(([v, t]) => `<button type="button" data-rcl="${k}" data-v="${v}" class="${f[k] === v ? 'on' : ''}" aria-pressed="${f[k] === v}">${esc(t)}</button>`).join('')}</div>`;
   return `<details class="rcl-filters" ${RCL.open ? 'open' : ''}><summary>${ic('filter', 's')}<span>${tr('Filters')}</span>${n ? `<span class="rotag">${n}</span>` : ''}</summary>
     <div class="rcl-grid">
       <label class="rcl-f"><span class="muted">${tr('Period')}</span>${ofcSel('rcl-per', f.per, RCL_PERIODS.map(([k, t]) => [k, tr(t)]))}</label>
       ${f.per === 'custom' ? `<span class="rcl-f rcl-days"><span class="muted">${tr('From')}</span>${dateIn('rcl-from', f.from, {label: tr('From'), clear: false})}<span class="muted">${tr('To')}</span>${dateIn('rcl-to', f.to, {label: tr('To'), clear: false})}</span>` : ''}
       <span class="rcl-f"><span class="muted">${tr('Status')}</span>${seg('status', [['all', all], ['paid', tr('Paid')], ['open', tr('Not paid')]])}</span>
       <span class="rcl-f rcl-chkf"><span class="muted">${tr('Checked')}</span>${seg('checked', [['all', all], ['yes', tr('Checked')], ['no', tr('Not checked')]])}</span>
-      <span class="rcl-f"><span class="muted">${tr('Day')}</span>${seg('by', [['doc', tr('Receipt date')], ['paid', tr('Payment date')]])}</span>
+      <span class="rcl-f"><span class="muted">${tr('Date by')}</span>${seg('by', [['doc', tr('Receipt date')], ['paid', tr('Payment date')]])}</span>
       <label class="rcl-f"><span class="muted">${tr('Category')}</span>${ofcSel('rcl-cat', f.category, opt(d.categories || [], f.category), all)}</label>
       <label class="rcl-f"><span class="muted">${tr('Supplier')}</span>${ofcSel('rcl-sup', f.supplier, opt(d.suppliers || [], f.supplier, tr('(none in this period)')), all)}</label>
       <label class="rcl-f"><span class="muted">${tr('Project')}</span>${ofcSel('rcl-pro', f.project, opt(d.projects || [], f.project, tr('(none in this period)')), all)}</label>

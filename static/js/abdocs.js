@@ -94,7 +94,7 @@ function abd_navHtml(inAb) {
   if (!abd_on() || (typeof sbb_on === 'function' && sbb_on())) return '';
   const r = S.route, rv = DC.review ? ` <span class="dc-count">${DC.review}</span>` : '';
   const b = (go, icon, name, on, after = '') => `<button type="button" class="abspace abfilt ${on ? 'on' : ''}" data-go="${go}" ${on ? 'aria-current="page"' : ''}>${ic(icon, 's')}<span>${esc(name)}</span>${after}</button>`;
-  const fs = b('docs', 'file', tr('Documents'), r.mod === 'docs' && !r.review) + b('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, rv);
+  const fs = b('docs', 'file', tr('Documents'), r.mod === 'docs' && !r.review) + (inAb ? b('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, rv) : '');  // 2.540.0 (#4472): in the documents' view the switch of the bar is the only "To review"
   return inAb ? fs : `<nav class="abspaces abdnav" aria-label="${esc(tr('File store'))}">${b('ablage', 'folder', tr('Files'), false)}${fs}</nav>`;
 }
 

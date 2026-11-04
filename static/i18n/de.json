@@ -16228,5 +16228,6 @@
   "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Bewirtungsbelege zählen aus Büro > Bewirtungsbelege. Liegt dieselbe Restaurantrechnung auch unter Belege, zählt sie doppelt: führe sie nur an einer Stelle.",
   "Entertainment (70 % deductible)": "Bewirtung (70 % abziehbar)",
   "Entertainment (30 % not deductible)": "Bewirtung (30 % nicht abziehbar)",
-  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Bewirtung: {0} (30 %) sind nicht abziehbar und stehen nicht in den Ausgaben."
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Bewirtung: {0} (30 %) sind nicht abziehbar und stehen nicht in den Ausgaben.",
+  "Date by": "Datum nach"
 }

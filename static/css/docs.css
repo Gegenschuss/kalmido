@@ -335,3 +335,21 @@
     .dc-rd>.dc-props{flex:0 0 var(--dc-ew,24rem);min-width:0;overflow-y:auto;overscroll-behavior:contain;padding-right:.25rem}
   }
 }
+
+/* 2.540.0 (#4472): the toolbar of the documents: one height (--tb-h) for search, switch, filter, sort and buttons; the switch is framed once */
+.dc-bar{--bh:var(--tb-h)}
+.dc-bar .ctsearch,.dc-bar .btn,.dc-bar .iconbtn,.dc-bar .dc-up,.dc-bar .dc-sortb{min-height:var(--bh);height:var(--bh);box-sizing:border-box}
+.dc-bar .iconbtn{width:var(--bh)}
+.dc-bar .dc-seg{height:var(--bh);box-sizing:border-box;align-items:stretch}
+.dc-bar .dc-seg button{min-height:0;height:auto}
+.dc-up,.dc-acts2 [data-dc="scan"],.dc-sortb{min-height:var(--tb-h)}
+.dc-seg button{min-height:0}
+.dc-filters select,.dc-filters input{min-height:var(--tb-h)}
+@media (max-width:767px) {
+  .dc-bar .ctsearch{flex:1 1 100%}
+  .dc-bar .dc-seg{flex:1 1 100%}
+  .dc-bar .dc-seg button{flex:1;justify-content:center}
+  .dc-acts2{flex:1 1 100%;margin-left:0;justify-content:flex-end}
+  .dc-bar .dc-up,.dc-bar .btn{padding:0;width:var(--bh);justify-content:center}
+  .dc-bar [data-dc="more"]{width:auto;padding:0 .75rem}
+}

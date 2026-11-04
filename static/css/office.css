@@ -1148,3 +1148,27 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.460.0 (#3767): the language tabs over the own texts of a form; a filled language in bold */
 .ofclts{margin:.25rem 0 .5rem}.ofclts .seg{flex-wrap:wrap;margin-bottom:.5rem}.ofclts .seg button.ltfill{font-weight:600}
 .ostpl{display:flex;align-items:center;justify-content:space-between;gap:.75rem}
+
+/* 2.540.0 (#4472): the toolbars of the office lists and the receipt filters: one height (--tb-h); phones: two equal columns, sub tabs scroll */
+.ofdbar .ctsearch,.ofdbar select,.ofdbar .btn,.ofcbar .ctsearch,.ofcbar .btn,.ofcbar select{min-height:var(--tb-h);height:var(--tb-h);box-sizing:border-box}
+.ofcbar .chkl{min-height:var(--tb-h)}
+.rcl-f select,.rcl-f input[type=search],.rcl-f .dpbtn,.rcl-f .dpw input{min-height:var(--tb-h);box-sizing:border-box}
+.rcl-f .seg{height:var(--tb-h);box-sizing:border-box;align-items:stretch}
+.rcl-f .seg button{min-height:0}
+.rcl-exp .btn{min-height:var(--tb-h)}
+.rcl-filters>summary{min-height:var(--tb-h)}
+.rcl-novat,.rcl-hints{min-height:var(--tb-h);display:inline-flex;align-items:center;gap:.5rem}
+.rcl-grid{align-items:flex-end}
+.ofdkinds{height:var(--tb-h);box-sizing:border-box;align-items:stretch}
+.ofdkinds button{min-height:0}
+@media (max-width:767px) {
+  .ofdkinds{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none}
+  .ofdkinds button{flex:none;white-space:nowrap}
+  .ofdbar .ctsearch{flex:1 1 100%}
+  .ofdbar select{flex:1 1 calc(50% - .25rem);width:auto;min-width:0;max-width:none}
+  .ofdbar .spacer{display:none}
+  .ofdbar .btn{padding:0;width:var(--tb-h);justify-content:center}
+  .ofdbar .btn span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}
+  .rcl-f:has(select),.rcl-f:has(.dpw){flex:1 1 calc(50% - .5rem)}
+  .rcl-f select{width:100%}
+}

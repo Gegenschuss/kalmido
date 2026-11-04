@@ -16228,5 +16228,6 @@
   "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Les frais de réception comptent depuis Bureau > Frais de réception. Une facture de restaurant aussi rangée sous Justificatifs compte deux fois : garde-la à un seul endroit.",
   "Entertainment (70 % deductible)": "Frais de réception (70 % déductibles)",
   "Entertainment (30 % not deductible)": "Frais de réception (30 % non déductibles)",
-  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Frais de réception : {0} (30 %) ne sont pas déductibles et ne figurent pas dans les dépenses."
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Frais de réception : {0} (30 %) ne sont pas déductibles et ne figurent pas dans les dépenses.",
+  "Date by": "Date selon"
 }
