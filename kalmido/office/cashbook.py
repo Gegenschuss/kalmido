@@ -538,6 +538,10 @@ def cb_entry_patch(eid):
     prev = {k: before[k] for k in CB_FIELDS if before[k] != after[k]}
     if cur.get("payment_id") and set(prev) & {"day", "dir", "amount", "invoice_id"}:  # 2.355.0 B (#2843)
         raise _locked(N_("This entry booked a payment on the invoice: cancel it and enter it anew."))
+    nxt = dict(cur, **row)  # 2.538.0 (#4368): an invoice chosen while editing books its payment (#4337): the right before the UPDATE
+    if (not cur.get("payment_id") and set(prev) & {"day", "dir", "amount", "invoice_id"} and nxt.get("dir") == "in"
+            and nxt.get("invoice_id") and not cb_may_pay(c, uid, oid)):
+        raise Denied(403, tr(CB_PAY_DENIED))
     if prev:
         if "day" in prev:
             _day_rules(c, book, row["day"])
