@@ -41,6 +41,8 @@ B = "http://127.0.0.1:" + os.environ.get("KALMIDO_TEST_PORT", "3048")
 H = {"X-Requested-With": "kalmido"}
 KEY = base64.b64encode(os.urandom(32)).decode()
 from kt import FAILS, OKS, check, sess, su_get  # 2.192.0 (#2514): shared helpers (tests/kt.py)
+from kt import docker_logs_on_first_fail  # noqa: E402
+docker_logs_on_first_fail()  # #4086: a 500 shows the server's traceback in the output (twice its cause was missing from the log)
 FEAT = "cal,comments,collab,office,clients,docs,files,budget"
 O = "/api/office"
 CBS = O + "/cashbooks"
