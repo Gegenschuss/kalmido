@@ -1265,7 +1265,10 @@ async function loadExtra() {
     if (S.hist.k !== k) return;
     Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, others: j.others ?? 0, days: j.days ?? null, purge_on: j.purge_on ?? null});  // 2.116.0 A (#2063): + trash period; 2.223.3 A (#2877): + whether it deletes
     S.extra = j.tasks;
-  } else if (S.route.mod !== 'news' && S.route.mod !== 'time') S.extra = null;  // News / time reports: tasks fetched on demand stay
+  } else if (S.route.mod !== 'news' && S.route.mod !== 'time') {  // News / time reports: tasks fetched on demand stay
+    const o = (S.extra || []).filter(t => t.id === S.sel);  // 2.509.0 (#4324): elsewhere only the open one, a reload does not close it
+    S.extra = o.length ? o : null;
+  }
 }
 async function histMore(b) {
   const k = S.hist.k; if (!S.hist.next || !k) return;

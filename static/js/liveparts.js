@@ -264,13 +264,27 @@ async function lzLoad(want) {
   return true;
 }
 // the open task is not loaded (an address, a notification): its list comes first
+// 2.509.0 (#4324): opening = true (renderDetail0): a task in no loaded list either (completed long ago) comes alone (S.extra);
+// not there or offline: a hint and the panel closes. Without it (render, the task left the state) the panel closes as before
 const lzSelBusy = new Set();
-function lzSel(id) {
-  if (!S.lz?.pending.size || !(id > 0)) return false;
+function lzSel(id, opening) {
+  if (!(id > 0)) return false;
   if (lzSelBusy.has(id)) return true;
+  if (!opening && !S.lz?.pending.size) return false;
   lzSelBusy.add(id);
-  api('GET', `/api/tasks/${id}`).then(t => t?.list_id ? lzLoad([t.list_id]) : false).catch(() => false)
-    .then(ok => { lzSelBusy.delete(id); if (ok && S.tasks.has(id)) render(); else if (S.sel === id && !S.tasks.has(id)) closeDetail(); });
+  rawFetch('GET', `/api/tasks/${id}`).then(async t => {
+    if (t?.list_id) await lzLoad([t.list_id]).catch(() => false);
+    lzSelBusy.delete(id);
+    if (S.tasks.has(id)) render();
+    else if (S.sel !== id) return;
+    else if (!opening || !t) closeDetail();
+    else { (S.extra ||= []).push(t); renderDetail(); }
+  }, e => {
+    lzSelBusy.delete(id);
+    if (S.sel !== id || S.tasks.has(id)) return;
+    closeDetail();
+    if (opening) toast(e instanceof Offline ? tr('Only available online.') : tr('Task not found'));
+  });
   return true;
 }
 // counts(): a list the server counts (pending, not one where only my own tasks show)
