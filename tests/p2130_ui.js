@@ -537,7 +537,7 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
     L = await ev(LAY);
     check(L.full && L.panel === -1 && L.draft === 'Entwurf beim Drehen' && L.focus === 'chat-in' && L.gap <= 2, 'rotated to 904x1200: a full page, draft + focus + newest message kept ' + JSON.stringify(L));
     await shot('p2130-rotate-904-full.png');
-    await vp(1200, 904); await fu(`(() => { const L = ${LAY}; return L.panel > 0 && !L.full; })()`);
+    await vp(1200, 904); await fu(`(() => { const L = ${LAY}; return L.panel > 0 && !L.full && L.mainR <= L.panel + 1; })()`);  // 2.505.0: + the main area beside the panel (it follows a moment later: the third red of this check, CI 2.493, 2.494)
     L = await ev(LAY);
     check(L.panel > 0 && !L.full && L.mainR <= L.panel + 1 && L.draft === 'Entwurf beim Drehen', 'rotated back to 1200x904: the panel again, the draft kept ' + JSON.stringify(L));
   }, true);
