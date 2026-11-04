@@ -93,6 +93,10 @@ def about_info(c, u):
         from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
         d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
         d.update(backup_tools_problem=gsetting(c, "bk_tools_problem"))  # 2.359.3 (#2945): "<pg_dump>|<server>", else empty
+        # 2.513.0 (#4356): Administration > Server compares them with the address the page was opened on
+        from ..accounts.login import WA_ORIGINS_ENV
+        from ..core.config import PUBLIC_URL
+        d.update(public_url=PUBLIC_URL, public_url_also=WA_ORIGINS_ENV)
         from ..accounts.signup import signup_admin
         d.update(signup_admin(c))  # 2.23.0 (#711)
         from ..admin.hosting import hosting_admin

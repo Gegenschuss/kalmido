@@ -16124,5 +16124,7 @@
   "This server cannot read HEIC photos at the moment. Please send the photo as JPEG.": "Questo server al momento non può leggere le foto HEIC. Invia la foto come JPEG.",
   "Web Push to {0} device.": ["Web Push a {0} dispositivo.", "Web Push a {0} dispositivi."],
   "Not delivered: no device accepted it": "Non consegnata: nessun dispositivo l'ha accettata",
-  "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} push non è stato consegnato perché nessun dispositivo dell'utente l'ha accettato: {1}", "{0} push non sono stati consegnati perché nessun dispositivo degli utenti li ha accettati: {1}"]
+  "{0} push was not delivered because none of the user's devices accepted it: {1}": ["{0} push non è stato consegnato perché nessun dispositivo dell'utente l'ha accettato: {1}", "{0} push non sono stati consegnati perché nessun dispositivo degli utenti li ha accettati: {1}"],
+  "This address differs from PUBLIC_URL": "Questo indirizzo è diverso da PUBLIC_URL",
+  "Links in e-mails, push messages and password resets use {0}, but this page is open on {1}. If people use {1}, set PUBLIC_URL to it in .env and restart (SELF-HOSTING.md, From localhost to your own address).": "I link nelle e-mail, nelle notifiche push e nel ripristino della password usano {0}, ma questa pagina è aperta su {1}. Se tutti usano {1}, imposta PUBLIC_URL su questo valore in .env e riavvia (SELF-HOSTING.md, From localhost to your own address)."
 }

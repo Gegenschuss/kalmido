@@ -3,7 +3,9 @@
 docker and id on the PATH; install.ps1 (no PowerShell in the test environment) is checked as text.
 - #4358: no network_mode fallback: Compose refuses it beside the networks of docker-compose.yml; the override of an older
   installer loses the line on the next run, a clear message names the two ways out.
-- #4355: the latest version comes from the forward of github.com (no API limit); no answer = a clear stop, main only when named."""
+- #4355: the latest version comes from the forward of github.com (no API limit); no answer = a clear stop, main only when named.
+- #4356: over SSH the ready ssh -L command instead of "Open it now"; KALMIDO_URL sets PUBLIC_URL in a new and an existing .env, a
+  wrong one stops before anything changes; the note names what the links use; the docs no longer advise editing docker-compose.yml."""
 # kalmido-suite: nodata
 import os
 import shutil
@@ -121,6 +123,66 @@ check(rc == 0 and "VERSION=v2.500.0" in out, f"#4355: a named version works as b
 for name, txt in (("install.sh", SH), ("install.ps1", PS)):
     check("api.github.com" not in txt and "no release found" not in txt, f"#4355: {name} does not ask the API, no silent main")
 check("AllowAutoRedirect = $false" in PS and "$Version = 'main'" not in PS and "Fail \"Could not find the latest release" in PS, "#4355: install.ps1 reads the forward and stops without an answer")
+# ------------------------------------------------------------------ #4356
+rc, out, _ = run('PORT=3040; ssh_tunnel; echo "<"', SSH_CONNECTION="203.0.113.9 50000 198.51.100.7 22")
+check(rc == 0 and out.startswith("ssh -L 3040:127.0.0.1:3040 ") and out.rstrip("<\n").endswith("@198.51.100.7"), f"#4356: the tunnel command over SSH: {out}")
+rc, out, _ = run('PORT=3050; ssh_tunnel; echo "<"', SSH_CONNECTION="203.0.113.9 50000 198.51.100.7 2222")
+check(out.startswith("ssh -L 3050:127.0.0.1:3050 -p 2222 "), f"#4356: own port and SSH port: {out}")
+rc, out, _ = run('PORT=3040; t=$(ssh_tunnel); echo "[$t]"')
+check(rc == 0 and out.strip() == "[]", f"#4356: not over SSH: no command: {out}")
+
+ok_urls = ("https://tasks.example.com", "https://tasks.example.com/", "http://192.0.2.5:8080", "https://[2001:db8::1]:8443")
+for u in ok_urls:
+    rc, out, err = run('check_url; echo "URL=$URL"', KALMIDO_URL=u)
+    check(rc == 0 and "URL=" + u.rstrip("/") in out, f"#4356: KALMIDO_URL {u} is taken ({rc} {err[:200]})")
+for u in ("tasks.example.com", "ftp://x.example", "https://x.example/sub", "https://x|y.example", "https://x.example/a&b"):
+    rc, _, err = run("check_url", KALMIDO_URL=u)
+    check(rc == 1 and "KALMIDO_URL must be" in err, f"#4356: KALMIDO_URL {u} is refused ({rc})")
+main_body = SH[SH.index("main() {"):]
+check(main_body.index("check_url") < main_body.index("check_docker") and main_body.index("check_url") < main_body.index("backup_db"), "#4356: KALMIDO_URL is checked before anything changes")
+
+ENVX = "TZ=UTC\nPUBLIC_URL=https://kalmido.example.com\nPOSTGRES_PASSWORD=x\nCOMPOSE_PROFILES=localdb\n"
+
+
+def env_after(env_text, example=True, **env):
+    d = folder()
+    if example:
+        with open(os.path.join(d, ".env.example"), "w", encoding="utf-8") as f:
+            f.write(ENVX)
+    if env_text is not None:
+        with open(os.path.join(d, ".env"), "w", encoding="utf-8") as f:
+            f.write(env_text)
+    rc, out, err = run('DIR="%s"; PORT=3040; check_url; write_env' % d, **env)
+    with open(os.path.join(d, ".env"), encoding="utf-8") as f:
+        return rc, out + err, f.read()
+
+
+rc, out, t = env_after(None)
+check(rc == 0 and "PUBLIC_URL=http://localhost:3040\n" in t, f"#4356: a new .env without KALMIDO_URL: localhost ({rc} {out[:200]})")
+rc, out, t = env_after(None, KALMIDO_URL="https://tasks.example.com/")
+check(rc == 0 and "PUBLIC_URL=https://tasks.example.com\n" in t and "localhost" not in t, f"#4356: a new .env with KALMIDO_URL ({rc} {t})")
+OLDENV = "TZ=UTC\nPUBLIC_URL=http://localhost:3040\nPOSTGRES_PASSWORD=secret\nCOMPOSE_PROFILES=localdb\nX=1\n"
+rc, out, t = env_after(OLDENV, KALMIDO_URL="https://tasks.example.com")
+check(rc == 0 and t == OLDENV.replace("http://localhost:3040", "https://tasks.example.com"), f"#4356: an existing .env changes only that line: {t}")
+rc, out, t = env_after(OLDENV)
+check(rc == 0 and t == OLDENV and "Set PUBLIC_URL" not in out, "#4356: an existing .env without KALMIDO_URL stays as it is")
+rc, out, t = env_after("POSTGRES_PASSWORD=secret\nCOMPOSE_PROFILES=localdb\n", KALMIDO_URL="https://tasks.example.com")
+check(rc == 0 and "\nPUBLIC_URL=https://tasks.example.com\n" in t, f"#4356: an .env without the line gets it: {t}")
+
+for env_text, want in ((OLDENV, "Your own address"), ("PUBLIC_URL=https://tasks.example.com\n", "reverse proxy")):
+    d = folder()
+    with open(os.path.join(d, ".env"), "w", encoding="utf-8") as f:
+        f.write(env_text)
+    rc, out, _ = run('DIR="%s"; PORT=3040; address_note' % d)
+    check(rc == 0 and want in out, f"#4356: the note after the install says '{want}': {out}")
+for name, txt in (("install.sh", SH), ("install.ps1", PS)):
+    check("KALMIDO_URL" in txt and "ssh -L" in txt and "SSH_CONNECTION" in txt and "From localhost to your own address" in txt, f"#4356: {name} has the option, the tunnel and the pointer")
+    check(not any("Open it now and" in line for line in txt.splitlines()), f"#4356: {name} says 'Open it now' only when that is possible")
+check("-cnotmatch '^https?://" in PS and "$PubUrl" in PS and "[regex]::Replace($envText, '(?m)^PUBLIC_URL=.*$'" in PS, "#4356: install.ps1 checks KALMIDO_URL and sets it in an existing .env")
+with open(os.path.join(ROOT, "docs", "SELF-HOSTING.md"), encoding="utf-8") as f:
+    DOC = f.read()
+check("## From localhost to your own address" in DOC and "(#from-localhost-to-your-own-address)" in DOC and "KALMIDO_URL=https://tasks.example.com ./update.sh" in DOC, "#4356: the docs have the section")
+check("change the port line in `docker-compose.yml`" not in DOC and "ports: !override" in DOC, "#4356: the docs no longer advise a change that the next update overwrites")
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2513_installer: {OKS[0]} ok, {len(FAILS)} failed")

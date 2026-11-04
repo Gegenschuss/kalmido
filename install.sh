@@ -20,6 +20,8 @@
 #   KALMIDO_PORT     port on 127.0.0.1                     (default: 3040)
 #   KALMIDO_VERSION  release tag (vX.Y.Z) or branch        (default: the latest release; main only when named)
 #   KALMIDO_BUILD=1  always build locally instead of pulling the prebuilt image
+#   KALMIDO_URL      the address people open, https://...  (goes into PUBLIC_URL of .env, new or existing;
+#                                                           default: a new .env says http://localhost:<port>)
 #
 # The script never uses sudo. Source: https://github.com/Gegenschuss/kalmido (AGPL-3.0)
 
@@ -307,21 +309,41 @@ ensure_compose_profiles() {
   say "Added COMPOSE_PROFILES=$prof to .env (which optional services run)"
 }
 
+# 2.513.0 (#4356): KALMIDO_URL, checked before anything changes: links in mails, push messages and password resets are built from it
+check_url() {
+  URL="${KALMIDO_URL:-}"
+  URL="${URL%/}"
+  [ -z "$URL" ] || printf '%s' "$URL" | grep -Eq '^https?://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:[0-9]+)?$' \
+    || die "KALMIDO_URL must be the address people open, like https://tasks.example.com (without a path)."
+}
+
+set_public_url() {
+  [ -n "$URL" ] || return 0
+  if grep -q '^PUBLIC_URL=' "$DIR/.env"; then
+    sed -i.bak "s|^PUBLIC_URL=.*|PUBLIC_URL=$URL|" "$DIR/.env" && rm -f "$DIR/.env.bak"
+  else
+    printf '\nPUBLIC_URL=%s\n' "$URL" >> "$DIR/.env"
+  fi
+  chmod 600 "$DIR/.env"
+  say "Set PUBLIC_URL=$URL in .env"
+}
+
 write_env() {
   if [ -f "$DIR/.env" ]; then
     say "Keeping your existing .env"
+    set_public_url
     ensure_pg_password
     ensure_compose_profiles
     return
   fi
   tz=$(detect_tz)
-  sed -e "s|^TZ=.*|TZ=$tz|" -e "s|^PUBLIC_URL=.*|PUBLIC_URL=http://localhost:$PORT|" \
+  sed -e "s|^TZ=.*|TZ=$tz|" -e "s|^PUBLIC_URL=.*|PUBLIC_URL=${URL:-http://localhost:$PORT}|" \
     "$DIR/.env.example" > "$DIR/.env"
   # 2.223.3 (#2877): a new installation has nothing old in its trash: the deletion runs delete after their periods from the
   # start. Only here, never in an existing .env (there the admin switches them on after reading the counts)
   printf '\n# Deletion runs: 1 = trash, old logs and old safety backups are deleted for good after their periods (0 = count only)\nKALMIDO_RETENTION_PURGE=1\n' >> "$DIR/.env"
   chmod 600 "$DIR/.env"
-  say "Created .env (TZ=$tz, PUBLIC_URL=http://localhost:$PORT)"
+  say "Created .env (TZ=$tz, PUBLIC_URL=${URL:-http://localhost:$PORT})"
   ensure_pg_password
   ensure_compose_profiles
 }
@@ -443,10 +465,32 @@ detect_port() {
   return 0
 }
 
+# 2.513.0 (#4356): installed over SSH: the browser is on the other computer. The ready tunnel command ("" = not over SSH).
+# SSH_CONNECTION = client address, client port, server address, server port
+ssh_tunnel() {
+  set -- ${SSH_CONNECTION:-}
+  [ $# = 4 ] || return 0
+  case "$4" in 22) sp="" ;; *) sp=" -p $4" ;; esac
+  printf 'ssh -L %s:127.0.0.1:%s%s %s@%s' "$PORT" "$PORT" "$sp" "$(id -un)" "$3"
+}
+
+# 2.513.0 (#4356): what the installation's links use, and how to change it
+address_note() {
+  pub=$(sed -n 's/^PUBLIC_URL=//p' "$DIR/.env" 2>/dev/null | tail -n 1)
+  case "$pub" in
+    ""|*://localhost*|*://127.0.0.1*)
+      say "Address:    ${pub:-not set}: links in mails, push messages and password resets use it and work only on this computer."
+      say "            Your own address: KALMIDO_URL=https://tasks.example.com \"$DIR/update.sh\" (docs/SELF-HOSTING.md, From localhost to your own address)" ;;
+    *)
+      say "Address:    $pub (links in mails and push messages use it); let your reverse proxy forward it to 127.0.0.1:$PORT" ;;
+  esac
+}
+
 main() {
   command -v curl >/dev/null 2>&1 || die "curl is required."
   [ -n "${HOME:-}" ] || die "HOME is not set."
   DIR="${KALMIDO_DIR:-$HOME/kalmido}"
+  check_url
   resolve_version
   release_assets
   detect_port
@@ -487,15 +531,24 @@ main() {
 
   url="http://localhost:$PORT"
   printf '\n\033[1;32mKalmido is running:\033[0m \033[1m%s\033[0m  (version %s)\n\n' "$url" "$REV"
+  tunnel=$(ssh_tunnel)
+  how="Open it now"
+  if [ -n "$tunnel" ]; then
+    say "You are connected over SSH and Kalmido answers only on this server. On your own computer, run:"
+    printf '\n    \033[1m%s\033[0m\n\n' "$tunnel"
+    say "(if you reach this server under another address, use that one) and keep it open."
+    how="Then open $url there"
+  fi
   code=$(setup_code)
   if [ -n "$code" ]; then
-    say "Open it now and create the first account (it becomes the admin) with this one-time setup code:"
+    say "$how and create the first account (it becomes the admin) with this one-time setup code:"
     printf '\n    \033[1m%s\033[0m\n\n' "$code"
     say "(It is also in the log of the running container: cd \"$DIR\" && docker compose logs kalmido. Only the newest Setup code line counts; a restart prints a new one.)"
   else
-    say "Open it now and log in."
+    say "$how and log in."
   fi
   say ""
+  address_note
   say "Folder:     $DIR (settings in .env, your data in data/)"
   say "Server key: $DIR/secret/kalmido.key  (keep a copy somewhere safe, it is not part of the backups)"
   say "Backups:    daily into data/backups/ (Settings > Users > Whole server > Backups); copy them to another disk too"

@@ -16,6 +16,8 @@
 #   $env:KALMIDO_PORT     port on 127.0.0.1                     (default: 3040)
 #   $env:KALMIDO_VERSION  release tag (vX.Y.Z) or branch        (default: the latest release; main only when named)
 #   $env:KALMIDO_BUILD=1  always build locally instead of pulling the prebuilt image
+#   $env:KALMIDO_URL      the address people open, https://...  (goes into PUBLIC_URL of .env, new or existing;
+#                                                                default: a new .env says http://localhost:<port>)
 #
 # Source: https://github.com/Gegenschuss/kalmido (AGPL-3.0)
 
@@ -52,6 +54,9 @@
   }
 
   $Dir = if ($env:KALMIDO_DIR) { $env:KALMIDO_DIR } else { Join-Path $env:USERPROFILE 'kalmido' }
+  # 2.513.0 (#4356): KALMIDO_URL, checked before anything changes: links in mails, push messages and password resets are built from it
+  $PubUrl = "$env:KALMIDO_URL".TrimEnd('/')
+  if ($PubUrl -and $PubUrl -cnotmatch '^https?://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:[0-9]+)?$') { Fail 'KALMIDO_URL must be the address people open, like https://tasks.example.com (without a path).' }
   # default: the latest GitHub release. 2.513.0 (#4355): the tag from the forward of github.com/.../releases/latest (the API allows
   # 60 requests an hour per address); never main by accident: unreleased code, and a migration on it
   $Version = $env:KALMIDO_VERSION
@@ -237,6 +242,13 @@
   $envFile = Join-Path $Dir '.env'
   if (Test-Path $envFile) {
     Say 'Keeping your existing .env'
+    if ($PubUrl) {
+      $envText = [IO.File]::ReadAllText($envFile)
+      if ($envText -match '(?m)^PUBLIC_URL=') { $envText = [regex]::Replace($envText, '(?m)^PUBLIC_URL=.*$', "PUBLIC_URL=$PubUrl") }
+      else { $envText = $envText.TrimEnd("`n") + "`n`nPUBLIC_URL=$PubUrl`n" }
+      [IO.File]::WriteAllText($envFile, $envText, (New-Object Text.UTF8Encoding($false)))
+      Say "Set PUBLIC_URL=$PubUrl in .env"
+    }
   } else {
     $tz = 'UTC'
     try {
@@ -257,14 +269,14 @@
     } catch { }
     $lines = Get-Content (Join-Path $Dir '.env.example') | ForEach-Object {
       if ($_ -match '^TZ=') { "TZ=$tz" }
-      elseif ($_ -match '^PUBLIC_URL=') { "PUBLIC_URL=http://localhost:$Port" }
+      elseif ($_ -match '^PUBLIC_URL=') { "PUBLIC_URL=$(if ($PubUrl) { $PubUrl } else { "http://localhost:$Port" })" }
       else { $_ }
     }
     # 2.223.3 (#2877): a new installation deletes after the periods from the start (an existing .env is never changed)
     $lines = @($lines) + @('', '# Deletion runs: 1 = trash, old logs and old safety backups are deleted for good after their periods (0 = count only)', 'KALMIDO_RETENTION_PURGE=1')
     # UTF-8 without BOM and LF line endings, as Docker expects
     [IO.File]::WriteAllText($envFile, (($lines -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-    Say "Created .env (TZ=$tz, PUBLIC_URL=http://localhost:$Port)"
+    Say "Created .env (TZ=$tz, PUBLIC_URL=$(if ($PubUrl) { $PubUrl } else { "http://localhost:$Port" }))"
     if ($tz -eq 'UTC') { Warn "Time zone set to UTC. Change TZ in $envFile if needed, then run the installer again." }
   }
   # 2.37: PostgreSQL needs a password in .env (new and existing installations); generated once, never shown
@@ -382,6 +394,18 @@
   Write-Host ''
   Write-Host "Kalmido is running: $url  (version $Rev)" -ForegroundColor Green
   Write-Host ''
+  # 2.513.0 (#4356): installed over SSH: the browser is on the other computer. SSH_CONNECTION = client address, client port, server address, server port
+  $how = 'Open it now'
+  $sc = "$env:SSH_CONNECTION" -split ' '
+  if ($sc.Count -eq 4) {
+    $sp = if ($sc[3] -ne '22') { " -p $($sc[3])" } else { '' }
+    Say 'You are connected over SSH and Kalmido answers only on this computer. On your own computer, run:'
+    Write-Host ''
+    Write-Host "    ssh -L ${Port}:127.0.0.1:${Port}$sp $env:USERNAME@$($sc[2])" -ForegroundColor White
+    Write-Host ''
+    Say '(if you reach this computer under another address, use that one) and keep it open.'
+    $how = "Then open $url there"
+  }
   # the one-time setup code the server printed (only while no account exists)
   $code = ''
   Push-Location $Dir
@@ -393,13 +417,23 @@
     if ($m) { $code = $m.Matches[0].Groups[1].Value }
   } catch { } finally { Pop-Location }
   if ($code) {
-    Say 'Open it now and create the first account (it becomes the admin) with this one-time setup code:'
+    Say "$how and create the first account (it becomes the admin) with this one-time setup code:"
     Write-Host ''
     Write-Host "    $code" -ForegroundColor White
     Write-Host ''
     Say "(It is also in the log of the running container: cd `"$Dir`"; docker compose logs kalmido. Only the newest Setup code line counts; a restart prints a new one.)"
-  } else { Say 'Open it now and log in.' }
+  } else { Say "$how and log in." }
   Say ''
+  # 2.513.0 (#4356): what the installation's links use, and how to change it
+  $pub = ''
+  $pm = Select-String -Path $envFile -Pattern '^PUBLIC_URL=(.*)$' | Select-Object -Last 1
+  if ($pm) { $pub = $pm.Matches[0].Groups[1].Value }
+  if (-not $pub -or $pub -match '://(localhost|127\.0\.0\.1)') {
+    Say "Address:    $(if ($pub) { $pub } else { 'not set' }): links in mails, push messages and password resets use it and work only on this computer."
+    Say "            Your own address: `$env:KALMIDO_URL = 'https://tasks.example.com'; then update.ps1 (docs\SELF-HOSTING.md, From localhost to your own address)"
+  } else {
+    Say "Address:    $pub (links in mails and push messages use it); let your reverse proxy forward it to 127.0.0.1:$Port"
+  }
   Say "Folder:     $Dir (settings in .env, your data in data\)"
   Say "Server key: $Dir\secret\kalmido.key  (keep a copy somewhere safe, it is not part of the backups)"
   Say 'Backups:    daily into data\backups\ (Settings > Users > Whole server > Backups); copy them to another disk too'

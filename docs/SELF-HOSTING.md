@@ -12,6 +12,7 @@ addresses and paths to your setup.
 - [Requirements](#requirements)
 - [First setup and the server key](#first-setup-and-the-server-key)
   - [Organisations and private spaces (2.46)](#organisations-and-private-spaces)
+- [From localhost to your own address](#from-localhost-to-your-own-address)
 - [Reverse proxy and network](#reverse-proxy-and-network)
 - [Installed app (PWA) and push](#installed-app-pwa-and-push)
 - [Database (PostgreSQL)](#database-postgresql)
@@ -2219,15 +2220,54 @@ No proxy needed for a quick look. After the quick start above, open **http://loc
 Everything works there, including installing it as an app and offline mode (browsers treat `localhost` as secure).
 Push notifications and `/drop` stay off until you configure them.
 
-To try it from your phone or another device on your network, change the port line in `docker-compose.yml` to
-`"3040:3040"`, run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
+To try it from your phone or another device on your network, publish the port on all addresses. An update replaces
+`docker-compose.yml`, so do it in `docker-compose.override.yml` (remove the first line of a file the installer wrote, then it
+leaves the file alone):
+
+```yaml
+services:
+  kalmido:
+    ports: !override
+      - "3040:3040"
+```
+
+Run `docker compose up -d` again and open `http://<your-computer's-ip>:3040`. Over plain HTTP the
 app works, but it cannot be installed and has no offline mode.
 
 > [!WARNING]
 > Over plain HTTP your password travels unencrypted through your network. Fine for a test at home; for daily
-> use put it behind a reverse proxy with HTTPS (next section) and switch the port back.
+> use put it behind a reverse proxy with HTTPS (see [Reverse proxy and network](#reverse-proxy-and-network)) and remove the
+> port lines again.
 
 To remove the test again: `docker compose down` and delete the folder (your test data is in `./data`).
+
+## From localhost to your own address
+
+The installer binds Kalmido to `127.0.0.1` and writes `PUBLIC_URL=http://localhost:3040` into `.env`. On a rented server or a
+Raspberry Pi without a browser that is only the first step:
+
+1. **Reach it through SSH.** Installed over SSH, the installer prints the ready command. On your own computer:
+
+   ```bash
+   ssh -L 3040:127.0.0.1:3040 you@your-server
+   ```
+
+   Keep it open, open `http://localhost:3040` there and create the first account with the setup code. Nobody else can reach
+   the server yet.
+2. **Put a reverse proxy with HTTPS in front.** It forwards your name to `127.0.0.1:3040`; templates for Caddy, nginx and
+   Traefik are in `examples/`, details in [Reverse proxy and network](#reverse-proxy-and-network).
+3. **Tell Kalmido its address.** In the install folder:
+
+   ```bash
+   KALMIDO_URL=https://tasks.example.com ./update.sh
+   ```
+
+   This sets `PUBLIC_URL` in `.env` and restarts (a new installation takes `KALMIDO_URL` the same way). By hand: change
+   `PUBLIC_URL` in `.env`, then `docker compose up -d`.
+
+`PUBLIC_URL` matters: links in mails and push messages, password resets, passkeys and calendar feeds are built from it. With
+the old value they point at `localhost` and work for nobody. As long as the address you opened differs from `PUBLIC_URL`,
+Administration > Server says so. That is normal while you work through the SSH tunnel.
 
 ## Login
 
