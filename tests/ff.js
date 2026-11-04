@@ -4,7 +4,9 @@
 //   const firefox = require('./ff')({tag: 'p272', check, shots: 'P272_SHOTS'});
 //   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle}) => { ... }, touch);
 // touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
-// A Firefox that does not answer within 45 s (seen on CI runners) gets one more try on another port (2.7.1, first in p221).
+// A Firefox that does not answer in time (seen on CI runners) gets new tries on another port with a new profile (2.7.1, first in
+// p221; #4346: connectS, the seconds each try waits). Every Firefox has really ended before the next one starts and before its
+// folder goes; a Firefox that ended by itself with an error costs no wait.
 const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path'), net = require('net');
 const WS = globalThis.WebSocket || require('ws');
@@ -39,22 +41,27 @@ const noFirefox = (tag, check) => {
 // prefs: extra Firefox preferences for one suite (2.13.0)
 // 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
 // suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
-module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async function firefox(fn, touch) {
+module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS = [45, 60, 90]}) => async function firefox(fn, touch) {
   if (noFirefox(tag, check)) return;
-  const prof = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
+  const base = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
     ...(touch === true ? [['ui.primaryPointerCapabilities', 1], ['ui.allPointerCapabilities', 1], ['dom.w3c_touch_events.enabled', 1]]
       : touch === false ? [['ui.primaryPointerCapabilities', 6], ['ui.allPointerCapabilities', 6]] : []), ...extra];
-  fs.writeFileSync(path.join(prof, 'user.js'), prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n');
-  // CI of 2.496.1: three starts of p2151_ui stayed without a connection and nothing said why: Firefox's messages go to a file in
-  // the profile, each start notes how it ended, and the FAIL line carries it all (run_all.sh shows only FAIL lines)
-  const errFile = path.join(prof, 'firefox-stderr.txt'), tries = [];
+  const userJs = prefs.map(([k, v]) => `user_pref("${k}", ${JSON.stringify(v)});`).join('\n') + '\n';
+  // CI of 2.496.1: three starts of p2151_ui stayed without a connection and nothing said why: Firefox's messages go to a file, each
+  // start notes how it ended, and the FAIL line carries it all (run_all.sh shows only FAIL lines)
+  const errFile = path.join(base, 'firefox-stderr.txt'), tries = [];
   const start = port => {
-    const err = fs.openSync(errFile, 'a'), t = {at: performance.now(), end: 'still running'};
+    // #4346: an own profile per start: a Firefox that hangs still holds the lock of its profile, the next one on it gave up at once
+    const prof = path.join(base, `profile-${tries.length}`);
+    fs.mkdirSync(prof); fs.writeFileSync(path.join(prof, 'user.js'), userJs);
+    const err = fs.openSync(errFile, 'a'), t = {at: performance.now(), end: 'still running', failed: false};
     const c = spawn('firefox', ['--headless', '--no-remote', '--profile', prof, `--remote-debugging-port=${port}`, 'about:blank'], {stdio: ['ignore', 'ignore', err]});
     fs.closeSync(err);
-    c.on('error', e => { t.end = `start failed: ${e.message}`; });
-    c.on('exit', (code, sig) => { t.end = `ended after ${Math.round((performance.now() - t.at) / 1000)} s (${sig || 'exit ' + code})`; });
+    c.ended = new Promise(res => {
+      c.on('error', e => { t.end = `start failed: ${e.message}`; t.failed = true; res(); });
+      c.on('exit', (code, sig) => { t.end = `ended after ${Math.round((performance.now() - t.at) / 1000)} s (${sig || 'exit ' + code})`; t.failed = code !== 0; res(); });
+    });
     tries.push(t);
     return c;
   };
@@ -62,17 +69,27 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     let err = ''; try { err = fs.readFileSync(errFile, 'utf8').replace(/\s+/g, ' ').trim().slice(-400); } catch { /* none */ }
     return `tries: ${tries.map(t => t.end).join('; ')}; load ${os.loadavg()[0].toFixed(1)} on ${os.cpus().length} CPUs, ${Math.round(os.freemem() / 1048576)} MB free; stderr: ${err || '(empty)'}`;
   };
+  // #4346: wait until this Firefox has really ended. One that hangs ignores SIGTERM, keeps its memory and CPU for the next start
+  // (and the rest of the shard) and writes into a folder that is going away. hard: it never answered, nothing to shut down cleanly.
+  const stop = async (c, hard = false) => {
+    const gone = ms => new Promise(res => { const k = setTimeout(() => res(false), ms); c.ended.then(() => { clearTimeout(k); res(true); }); });
+    if (!hard) { try { c.kill(); } catch { /* gone */ } if (await gone(5000)) return; }
+    try { c.kill('SIGKILL'); } catch { /* gone */ }
+    await gone(5000);
+  };
   let PORT = await freePort(), ff = start(PORT);
   let ws, seq = 0; const pend = new Map();
-  const connect = async () => {
-    for (let i = 0; i < 90 && !ws; i++) {
+  const connect = async (s = connectS[0]) => {
+    const end = performance.now() + s * 1000, t = tries[tries.length - 1];
+    while (!ws && !t.failed && performance.now() < end) {
       try { const w = new WS(`ws://127.0.0.1:${PORT}/session`); await new Promise((res, rej) => { w.onopen = res; w.onerror = rej; }); ws = w; } catch { await sleep(500); }
     }
   };
+  const restart = async () => { await stop(ff, true); PORT = await freePort(); ff = start(PORT); };
   try {
-    for (let attempt = 0; attempt < 2 && !ws; attempt++) {
-      if (attempt) { try { ff.kill(); } catch { /* gone */ } await sleep(1000); PORT = await freePort(); ff = start(PORT); }
-      await connect();
+    for (let attempt = 0; attempt < connectS.length && !ws; attempt++) {
+      if (attempt) await restart();
+      await connect(connectS[attempt]);
     }
     if (!ws) { check(false, `no WebDriver BiDi connection to Firefox (${why()})`); return; }
     const onmsg = m => { const j = JSON.parse(m.data); if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); j.type === 'error' ? p.rej(new Error(p.method + ': ' + j.error + ' ' + j.message)) : p.res(j.result); } };
@@ -89,8 +106,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       if (!/Maximum number of active sessions/.test(e.message)) throw e;
       console.log(`ff: port ${PORT} answered with another Firefox's session, a new Firefox on another port`);
       try { ws.close(); } catch { /* gone */ }
-      try { ff.kill(); } catch { /* gone */ }
-      ws = null; PORT = await freePort(); ff = start(PORT);
+      ws = null; await restart();
       await connect();
       if (!ws) throw e;
       ws.onmessage = onmsg;
@@ -161,8 +177,8 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
     await fn({cmd, ev, nav, ctx, shot, drag, until, idle});
   } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
     try { ws && ws.close(); } catch { /* gone */ }
-    try { ff.kill(); } catch { /* gone */ }
-    await sleep(500); fs.rmSync(prof, {recursive: true, force: true});
+    await stop(ff);
+    fs.rmSync(base, {recursive: true, force: true, maxRetries: 3});
   }
 };
 
