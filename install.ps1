@@ -57,6 +57,8 @@
   }
 
   $Dir = if ($env:KALMIDO_DIR) { $env:KALMIDO_DIR } else { Join-Path $env:USERPROFILE 'kalmido' }
+  # 2.527.0 (#4312): a relative KALMIDO_DIR as a full path (the update script and the compose calls run from other folders)
+  $Dir = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir))   # Combine keeps a full path as it is
   # 2.513.0 (#4356): KALMIDO_URL, checked before anything changes: links in mails, push messages and password resets are built from it
   $PubUrl = "$env:KALMIDO_URL".TrimEnd('/')
   if ($PubUrl -and $PubUrl -cnotmatch '^https?://([A-Za-z0-9.-]+|\[[0-9A-Fa-f:]+\])(:[0-9]+)?$') { Fail 'KALMIDO_URL must be the address people open, like https://tasks.example.com (without a path).' }
@@ -143,6 +145,14 @@
   function Compose([string[]]$a, [string]$log) {
     if ($ComposeV2) { return Invoke-Native 'docker' (@('compose') + $a) $log }
     return Invoke-Native 'docker-compose' $a $log
+  }
+  # 2.527.0 (#4312): the same Compose 2.20 floor as install.sh (the profiles of docker-compose.yml need depends_on ... required: false)
+  $cv = ''
+  try { $cv = if ($ComposeV2) { "$(& docker compose version --short 2>$null)" } else { "$(& docker-compose version --short 2>$null)" } } catch { }
+  if ($cv -match '^v?(\d+)\.(\d+)') {
+    if ([int]$Matches[1] -lt 2 -or ([int]$Matches[1] -eq 2 -and [int]$Matches[2] -lt 20)) {
+      Fail "Docker Compose $cv is too old: Kalmido needs Compose 2.20 or newer. Update Docker Desktop, then run this installer again."
+    }
   }
   Say 'Docker is running.'
 

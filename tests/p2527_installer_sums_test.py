@@ -5,6 +5,7 @@ environment) is checked as text.
 - release 2.277 and newer: SHA256SUMS fetched -> checked; no network, a server error, a 404 or an empty file -> a clear stop
 - release before 2.277: only a 404 goes on unchecked (with a note); any other failure stops as well
 - branches: no fetch at all
+- install.ps1: the Compose 2.20 floor of install.sh, a relative KALMIDO_DIR becomes a full path
 - the header of both installers no longer promises a source check on the git way, and the git way says so"""
 # kalmido-suite: nodata
 import os
@@ -83,6 +84,8 @@ for name, src in (("install.sh", SH), ("install.ps1", PS)):
 check("$sumsCode -eq 404 -and $beforeSums" in PS and "Could not fetch the checksum list of release $Version" in PS
       and "catch { }\n    finally" not in PS.split("SHA256SUMS\" -OutFile $sf")[1][:400],
       "#4312: install.ps1 goes on unchecked only on a 404 of a release before 2.277, else stops")
+check("Kalmido needs Compose 2.20 or newer" in PS and "compose version --short" in PS, "#4312: install.ps1 has the Compose 2.20 floor of install.sh")
+check("[IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Dir))" in PS, "#4312: install.ps1 turns a relative KALMIDO_DIR into a full path")
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2527_installer_sums: {OKS[0]} ok, {len(FAILS)} failed")
