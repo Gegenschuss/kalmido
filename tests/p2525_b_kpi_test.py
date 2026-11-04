@@ -175,6 +175,10 @@ check(r1.ok and r2.ok and r1.json() == r2.json(), "the tile answers twice the sa
 n1, n2 = nstmt(r1), nstmt(r2)
 check(0 < n2 < n1, f"#4187 the second call comes from the short cache: {n1} -> {n2} statements")
 print(f"PERF kpi statements first {n1}, cached {n2}")
+# 2.525.0 review (#4187): saving the office settings (home currency, tax reserve) bumps no data version - the cache sees them too
+check(Fr.put(B + "/api/office/settings", json={"tax_reserve_pct": 33}).ok, "setup: the office settings saved (default reserve 0 -> 33)")
+r3 = Fr.get(B + "/api/office/kpi")
+check(r3.ok and nstmt(r3) > n2, f"#4187 review: after the office settings changed the tile is worked out again ({nstmt(r3)} statements, cached {n2})")
 open0 = r2.json()["invoices"]["open"]
 pay(OLD_OPEN, TODAY, "19.00")
 j = Fr.get(B + "/api/office/kpi").json()

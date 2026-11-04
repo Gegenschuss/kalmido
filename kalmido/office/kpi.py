@@ -199,12 +199,14 @@ _KPI_CACHE = {}
 
 
 def kpi_mark(c, oid):
-    """The fingerprint of kpi_cached: one query over small columns (no texts, no totals JSON)."""
+    """The fingerprint of kpi_cached: one query over small columns (no texts, no totals JSON). 2.525.0 review (#4187): also the
+    office settings (a new home currency or tax reserve is not served from the cache; saving them bumps no data version)."""
     r = c.execute("SELECT (SELECT value FROM settings WHERE key='version'), "
                   "(SELECT md5(string_agg(id || ':' || status || ':' || COALESCE(locked_at, '') || ':' || updated_at || ':' || date, ',' ORDER BY id)) "
                   "FROM office_docs WHERE org_id=?), "
-                  "(SELECT md5(string_agg(id || ':' || doc_id || ':' || amount || ':' || date, ',' ORDER BY id)) FROM office_payments WHERE org_id=?)",
-                  (oid, oid)).fetchone()
+                  "(SELECT md5(string_agg(id || ':' || doc_id || ':' || amount || ':' || date, ',' ORDER BY id)) FROM office_payments WHERE org_id=?), "
+                  "(SELECT md5(data) FROM office_settings WHERE org_id=?)",  # 2.525.0 review (#4187): home currency, tax reserve
+                  (oid, oid, oid)).fetchone()
     return tuple(str(x) for x in r)
 
 
