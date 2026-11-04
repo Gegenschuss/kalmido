@@ -165,6 +165,8 @@ function repoWire(md, lid, folder) {
       iss = null; draw(); $(`[data-rid="${rid}"] [data-rp="menu"]`, box)?.focus();
     } else if (k === 'iss-go') {
       if (!iss || iss.busy) return;
+      const pl = listById(lid);  // 2.506.1 (#3377, #2934): the issues go into this project (gis_import: the connection's list)
+      if (!await importTargetConfirm({what: tr('the issues'), ws: wsOf(pl), place: pl ? lname(pl) : ''}) || !iss || iss.busy) return;
       iss.busy = true; draw();
       let x; try { x = await api('POST', `/api/repos/${iss.id}/issues/import`, {completed: iss.skip ? 'skip' : 'import'}); } catch { if (iss) { iss.busy = false; draw(); } return; }
       iss = null; draw();
