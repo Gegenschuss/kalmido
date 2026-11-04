@@ -34,7 +34,7 @@ from .model import ofx_name1, office_gate, office_org, office_settings
 from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
 from .invoices import inv_pay_add, inv_pay_del  # 2.355.0 B (#2843)
-from .rights import ofr_need_area  # 2.500.0 (#4072)
+from .rights import ofr_allows, ofr_need_area  # 2.500.0 (#4072); 2.538.0 (#4368): ofr_allows
 from ..core.db import local_now  # 2.369.5 (#2517): pulled up from functions
 from .books import bk_ws, bk_receipts, _year, bk_csv_cell as cell  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
@@ -193,18 +193,31 @@ def cb_books_get():
                    note=tr(CB_NOTE), today=_today())
 
 
+# 2.538.0 (#4368): cash in for an invoice books a payment on it, which needs the special "pay" of the offers area (#4072):
+# checked before the entry is written, with a message that says what to do (no half booking, no bare "no right")
+CB_PAY_DENIED = N_("Cash for an invoice books a payment on it, and your office rights do not include payments on invoices: book the cash without the invoice or ask an administrator.")
+CB_UNPAY_DENIED = N_("This entry booked a payment on an invoice; cancelling it takes the payment back, and your office rights do not include payments on invoices. Ask an administrator.")
+
+
+def cb_may_pay(c, uid, oid):
+    """2.538.0 (#4368): may uid book (and take back) the payment that cash for an invoice is?"""
+    return ofr_allows(c, uid, oid, "offers", "edit", "pay")
+
+
 @app.get("/api/office/cashbooks/links")
 def cb_links_get():
     """-> {receipts (the last 13 months the person sees: node_id, title, date, amount), invoices (issued: id, number, date,
-    client)}: what an entry may point at."""
+    client), invoices_allowed}: what an entry may point at. 2.538.0 (#4368): without the right to book payments on
+    invoices no invoices and invoices_allowed false (the dialog hides the choice)."""
     c, uid, oid = _ctx()
+    may = cb_may_pay(c, uid, oid)
     to = date.fromisoformat(_today())
     rcs = bk_receipts(c, oid, (to - timedelta(days=400)).isoformat(), (to + timedelta(days=1)).isoformat(), uid)
     rcs = [{"node_id": r["node_id"], "title": r["title"], "date": r["date"], "amount": dstr(r["amount"])} for r in reversed(rcs)][:300]
     inv = [{"id": r["id"], "number": r["number"], "date": r["date"], "client": r["name"] or ""} for r in c.execute(
         "SELECT d.id, d.number, d.date, cl.name FROM office_docs d LEFT JOIN clients cl ON cl.id=d.client_id "
-        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))]
-    return jsonify(receipts=rcs, invoices=inv)
+        "WHERE d.org_id=? AND d.kind='invoice' AND d.status<>'draft' AND d.trial=0 ORDER BY d.date DESC, d.id DESC LIMIT 300", (oid,))] if may else []
+    return jsonify(receipts=rcs, invoices=inv, invoices_allowed=may)
 
 
 def _book_clean(b, cur=None):
@@ -454,6 +467,8 @@ def cb_entry_post(bid):
     _book(c, oid, bid)
     b = _body()
     row = _entry_clean(c, oid, uid, b)
+    if row.get("dir") == "in" and row.get("invoice_id") and not cb_may_pay(c, uid, oid):  # 2.538.0 (#4368): before the INSERT
+        raise Denied(403, tr(CB_PAY_DENIED))
     write_lock(c, f"office_cash_{bid}")
     # 2.269.0 D (#3046): sent again with the same client_ref (double press, the answer got lost) = the entry booked the
     # first time (200), never a second number
@@ -560,6 +575,8 @@ def cb_entry_cancel(eid):
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
         raise _locked(N_("This entry is cancelled already or is itself a cancellation."))
+    if cur.get("payment_id") and cur.get("invoice_id") and not cb_may_pay(c, uid, oid):  # 2.538.0 (#4368): before the INSERT
+        raise Denied(403, tr(CB_UNPAY_DENIED))
     if day < cur["day"]:
         day = cur["day"]
     _day_rules(c, book, day)

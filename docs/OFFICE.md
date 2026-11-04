@@ -1051,6 +1051,19 @@ counts on the day of the payment it takes back); with the yearly tax dates setti
 bookkeeping links there). A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
+**Reverse charge and the client's country** (2.502, 2.538). The VAT return and the DATEV export take the tax case of a
+reverse charge document from the client's country (the one stored when it was finalised, else the client's current one):
+the own country = section 13b at home (field 60, DATEV 8337), another EU country = field 21 (8336), a country outside the
+EU = not taxable domestically (field 45, 8338). This is worked out each time the figures are shown, not stored, so it
+also applies to **older documents**: since 2.502 a reverse charge invoice to a client outside the EU (finalised before
+that version refused it) counts in field 45 / account 8338 instead of field 21 / 8336, and since 2.538 one to a client in
+Monaco counts in field 21 / 8336 instead of field 45 / 8338. If you show the VAT return or export DATEV again for a period
+you have already filed, the figures can differ from what you filed then: compare before you correct anything. Monaco
+belongs to the French VAT area (Art. 7 of Directive 2006/112/EC) and counts as an EU country. Areas outside the EU's VAT
+area that have no country code of their own (the Canary Islands, Ceuta and Melilla, Mount Athos, Heligoland, Büsingen,
+Livigno, Campione d'Italia) cannot be told apart by the country: for a client there choose the VAT note *not taxable
+domestically* yourself. Since 2.538 a reverse charge invoice cannot be finalised without the client's country.
+
 **What the statement and the VAT figures leave out, and what can count twice.** Check this before you rely on them:
 
 - **Equipment**: a device with a purchase date and a net price brings its depreciation into the statement (unless its
@@ -1440,6 +1453,9 @@ stays.
   at an **issued invoice** paid in cash. Cash in then books a payment on the invoice, but only when the entry is created
   with the invoice. Linking an invoice to an existing entry records no payment (cancel the entry and book it anew), and an
   invoice paid already or with less open than the cash gets none either: the entry stays as booked, the invoice stays open.
+  Booking (and cancelling) that payment needs the right to record payments on invoices (2.500); without it the entry
+  dialog offers no invoice and an entry with one is refused before anything is written, with a message saying to book the
+  cash without the invoice (2.538).
 - **Nothing is deleted.** An entry is taken back only by **cancelling**: a counter entry with a new number that names the
   original ("Cancels no. X"); the original shows "Cancelled by no. Y", both stay. The undo of a booking is such a
   cancellation. Entries of an open day can still be changed; every change is logged with the values before ("History").

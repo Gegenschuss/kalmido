@@ -321,6 +321,10 @@ def inv_missing(c, oid, r, s, pack, items):
         # 2.502.0 (#4081): field 21 / category AE are for the EU only; a correction inherits its invoice's note and must stay possible
         if fk_third_country(ctry, co.get("country") or "DE") and not _col(r, "cancels_id"):
             miss.append([N_("for a client in a third country the VAT note not taxable domestically instead of reverse charge")])
+        # 2.538.0 (#4368): without the client's country the tax case is a guess (the books would count it as section 13b at
+        # home, field 60) -> refused; a correction inherits its invoice's note and must stay possible
+        if not str(ctry or "").strip() and not _col(r, "cancels_id"):
+            miss.append([N_("the client's country (reverse charge)")])
         if not (co.get("vat_id") or (case != "eu" and co.get("tax_number"))):
             miss.append([N_("your VAT ID (reverse charge)")])
         if (case == "eu" or (office_feature(c, oid, "docs.einvoice", s) and not _col(r, "trial"))) and not (

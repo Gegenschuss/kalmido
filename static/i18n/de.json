@@ -16249,5 +16249,8 @@
   "Not possible in a support session": "In einer Support-Sitzung nicht möglich",
   "Import from another app": "Aus einer anderen App übernehmen",
   "Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away": "Todoist, Trello, Asana, Notion und mehr: du startest leer und der Import öffnet sich gleich",
-  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} Änderung dieser Organisation wurde noch nicht gesendet; sie wird verworfen, wenn du die Organisation verlässt.", "{0} Änderungen dieser Organisation wurden noch nicht gesendet; sie werden verworfen, wenn du die Organisation verlässt."]
+  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} Änderung dieser Organisation wurde noch nicht gesendet; sie wird verworfen, wenn du die Organisation verlässt.", "{0} Änderungen dieser Organisation wurden noch nicht gesendet; sie werden verworfen, wenn du die Organisation verlässt."],
+  "Cash for an invoice books a payment on it, and your office rights do not include payments on invoices: book the cash without the invoice or ask an administrator.": "Bargeld zu einer Rechnung bucht eine Zahlung auf sie, und deine Büro-Rechte umfassen keine Zahlungen auf Rechnungen: buche das Bargeld ohne Rechnung oder frag eine Administratorin oder einen Administrator.",
+  "This entry booked a payment on an invoice; cancelling it takes the payment back, and your office rights do not include payments on invoices. Ask an administrator.": "Dieser Eintrag hat eine Zahlung auf eine Rechnung gebucht; das Stornieren nimmt die Zahlung zurück, und deine Büro-Rechte umfassen keine Zahlungen auf Rechnungen. Frag eine Administratorin oder einen Administrator.",
+  "the client's country (reverse charge)": "Land des Kunden (Reverse Charge)"
 }

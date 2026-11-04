@@ -16249,5 +16249,8 @@
   "Not possible in a support session": "Niet mogelijk in een supportsessie",
   "Import from another app": "Overnemen uit een andere app",
   "Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away": "Todoist, Trello, Asana, Notion en meer: je begint leeg en de import opent meteen",
-  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} wijziging van deze organisatie is nog niet verzonden; ze wordt verworpen als je de organisatie verlaat.", "{0} wijzigingen van deze organisatie zijn nog niet verzonden; ze worden verworpen als je de organisatie verlaat."]
+  "{0} change of this organisation has not been sent yet; it is discarded when you leave.": ["{0} wijziging van deze organisatie is nog niet verzonden; ze wordt verworpen als je de organisatie verlaat.", "{0} wijzigingen van deze organisatie zijn nog niet verzonden; ze worden verworpen als je de organisatie verlaat."],
+  "Cash for an invoice books a payment on it, and your office rights do not include payments on invoices: book the cash without the invoice or ask an administrator.": "Contant geld voor een factuur boekt een betaling op die factuur, en je kantoorrechten omvatten geen betalingen op facturen: boek het geld zonder de factuur of vraag het een beheerder.",
+  "This entry booked a payment on an invoice; cancelling it takes the payment back, and your office rights do not include payments on invoices. Ask an administrator.": "Deze boeking heeft een betaling op een factuur geboekt; annuleren neemt de betaling terug, en je kantoorrechten omvatten geen betalingen op facturen. Vraag het een beheerder.",
+  "the client's country (reverse charge)": "het land van de klant (btw verlegd)"
 }

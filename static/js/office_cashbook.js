@@ -133,6 +133,7 @@ async function cbEntryModal(e) {
   const inv = links.invoices.map(i => [i.id, [i.number, i.client, fmtDateLoc(i.date)].filter(Boolean).join(' · ')]);
   if (e.invoice && !inv.some(i => i[0] === e.invoice.id)) inv.unshift([e.invoice.id, e.invoice.number]);
   const dis = ro ? 'disabled' : '';
+  const noInv = !ro && links.invoices_allowed === false;  // 2.538.0 (#4368): no right to book payments on invoices = no choice
   const md = modal(`<h3>${tr('Cash entry no. {0}', e.no)}</h3>
     ${ro ? `<p class="muted">${esc([e.locked ? tr('The day is closed: the entry cannot change any more; cancel it instead.') : '', cbRef(e)].filter(Boolean).join(' · '))}</p>` : ''}
     <fieldset class="cb-fs" ${dis}>
@@ -143,7 +144,7 @@ async function cbEntryModal(e) {
     ${ofcRowF('cb-evat', tr('VAT rate'), ofcSel('cb-evat', e.vat_pct || '', [['19', '19 %'], ['7', '7 %'], ['0', '0 %']], tr('unknown')))}
     ${ofcRowF('cb-ecat', tr('Category'), ofcIn('cb-ecat', e.category, {max: 60, list: 'cb-cats2'}))}<datalist id="cb-cats2">${CB.base.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist>
     ${ofcRowF('cb-enode', tr('Receipt'), ofcSel('cb-enode', e.node?.id || '', rcs, tr('none')))}
-    ${ofcRowF('cb-einv', tr('Invoice paid in cash'), ofcSel('cb-einv', e.invoice?.id || '', inv, tr('none')))}</fieldset>
+    ${noInv ? (e.invoice ? `<p class="muted">${esc(tr('Invoice') + ' ' + e.invoice.number)}</p>` : '') : ofcRowF('cb-einv', tr('Invoice paid in cash'), ofcSel('cb-einv', e.invoice?.id || '', inv, tr('none')))}</fieldset>
     <p class="muted">${esc(tr('Balance after this entry: {0}', ofcMoney(e.balance)))} · ${esc(e.by)}</p>
     <div class="aerr" role="alert"></div>
     <div class="foot cb-foot">${!e.cancelled_by && !e.storno_of ? `<button class="btn danger" data-m="cancel">${tr('Cancel entry')}</button>` : ''}<button class="btn" data-m="log">${ic('clock', 's')}<span>${tr('History')}</span></button>
@@ -168,8 +169,8 @@ async function cbEntryModal(e) {
       }
       const amount = ofcNum(val('#cb-eamount'));
       const body = {dir: val('#cb-edir'), amount: amount == null ? '' : String(amount), text: val('#cb-etext'), day: val('#cb-eday'), vat_pct: val('#cb-evat') || null,
-        category: val('#cb-ecat'), node_id: +val('#cb-enode') || null, invoice_id: +val('#cb-einv') || null};
-      const old = {dir: e.dir, amount: e.amount, text: e.text, day: e.day, vat_pct: e.vat_pct, category: e.category, node_id: e.node_id, invoice_id: e.invoice_id};
+        category: val('#cb-ecat'), node_id: +val('#cb-enode') || null, ...(noInv ? {} : {invoice_id: +val('#cb-einv') || null})};
+      const old = {dir: e.dir, amount: e.amount, text: e.text, day: e.day, vat_pct: e.vat_pct, category: e.category, node_id: e.node_id, ...(noInv ? {} : {invoice_id: e.invoice_id})};
       const j = await api('PATCH', `/api/office/cash-entries/${e.id}`, body); md.remove(); cbReload(true);
       // 2.533.0 (#4337): an entry that booked its invoice's payment just now has no undo (its amount / day / invoice are fixed: cancel it)
       if (j?.paid && !e.paid) toast(tr('Saved'));

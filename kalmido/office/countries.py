@@ -71,14 +71,22 @@ def fk_country_label(code, home):
     return str(names.get(c) or c).upper()
 
 
-# 2.296.0 F (#3168): the 27 member states (ISO codes; GR, not EL) -- reverse charge text and the client's VAT id
-FK_EU = frozenset("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK".split())
+# 2.296.0 F (#3168): the 27 member states (ISO codes; GR, not EL) -- reverse charge text and the client's VAT id.
+# 2.538.0 (#4368): the EU's VAT territory, not only its member states: Monaco (MC) counts as France (Art. 7 (1) of
+# Directive 2006/112/EC; a business there has a French VAT id), so a client in Monaco is an EU case (field 21), no third
+# country. Parts of member states outside the VAT territory (Art. 6) are told apart only where they have a code of their
+# own: Aland (AX), the French overseas departments (GF GP MQ RE YT), the Channel Islands (GG JE) are third countries here.
+# The Canary Islands, Ceuta / Melilla, Mount Athos, Heligoland, Buesingen, Livigno and Campione d'Italia have no code of
+# their own (ES / GR / DE / IT): the code cannot tell them, the user picks "not taxable domestically" by hand there.
+FK_EU = frozenset("AT BE BG CY CZ DE DK EE ES FI FR GR HR HU IE IT LT LU LV MT NL PL PT RO SE SI SK MC".split())
+FK_VAT_AREA = {"MC": "FR"}  # 2.538.0 (#4368): Monaco and France are one VAT territory (a sale between them is domestic)
 
 
 def fk_reverse_case(client, home):
     """'domestic' (client in the sender's country or without one), 'eu' (another member state) or 'other' (CH, GB, US ...)."""
     cc = fk_country_code(client) or str(client or "").strip().upper()
     h = fk_country_code(home) or str(home or "").strip().upper() or "DE"
+    cc, h = FK_VAT_AREA.get(cc, cc), FK_VAT_AREA.get(h, h)  # 2.538.0 (#4368)
     if cc in ("", h):
         return "domestic"
     return "eu" if cc in FK_EU and h in FK_EU else "other"
@@ -89,4 +97,5 @@ def fk_third_country(client, home):
     is no country code says nothing.) Reverse charge stops there: a service to CH / GB / US is not taxable domestically."""
     cc = fk_country_code(client)
     h = fk_country_code(home) or str(home or "").strip().upper() or "DE"
+    cc, h = FK_VAT_AREA.get(cc, cc), FK_VAT_AREA.get(h, h)  # 2.538.0 (#4368)
     return bool(cc) and cc != h and cc not in FK_EU
