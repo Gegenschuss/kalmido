@@ -2,20 +2,17 @@
 # One line per suite: <suite> <until YYYY-MM-DD, at most 14 days ahead> #<task> <evidence>. Proven = red and green on the same
 # code (CI or two Mac runs). tests/skip_test.py (CI lint) is red once a date has passed: fix the suite (its task), delete the line.
 
-p284_a_ui 2026-11-12 #3571 Vorprüfung 2.409.0; Mac red 20261029-054702 + volllauf 89874abedc44 s16, green 20261029-060845 (same code)
 p2331_a_ui 2026-11-12 #3586 main-rot pruefen main 88f9c5bb1150 (#1779): red run 1 main-rot.log, run 3 main-rot.log; green run 2 main-rot.log (same code)
 p2124_e_ui 2026-11-13 #3714 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p2200_a_wiki_tree_ui 2026-11-13 #3715 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p2223_a_tour_ui 2026-11-13 #3716 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p285_b_ui 2026-11-13 #3717 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
-p297_c_ui 2026-11-13 #3718 rot in der Vorprüfung über 1767415e, zweimal grün auf dem Mac 1767415e53cc (#1814): red 30.10.2026 11:23; green Mac 20261030-112319-s1, Mac 20261030-112512-s1 (same code)
 p1_ui 2026-11-16 #4012 main-rot pruefen main 548f7cc9d237 (#1779): red Mac 20261102-181010-1667496-s2; green Mac 20261102-182646-1714591-s1 (same code)
-p2147_a_ui 2026-11-17 #4039 rot in der Vorprüfung über a19ce221, zweimal grün auf dem Mac a19ce22175d6 (#1814): red 03.11.2026 02:58; green Mac 20261103-025833-3928134-s1, Mac 20261103-030237-3941090-s1 (same code)
 p2425_c_ui 2026-11-17 #4042 rot in der Vorprüfung über b2d93cd9, zweimal grün auf dem Mac b2d93cd97eaf (#1814): red 03.11.2026 06:29; green Mac 20261103-062913-463670-s1, Mac 20261103-063251-483045-s1 (same code)
-p2115_a_ui 2026-11-17 #4044 rot in der Vorprüfung über 47d912c1, zweimal grün auf dem Mac 47d912c18b7e (#1814): red 03.11.2026 09:35; green Mac 20261103-093600-1348713-s1, Mac 20261103-093754-1368334-s1 (same code)
 p21383_b_ui 2026-11-17 #4045 rot in der Vorprüfung über 47d912c1, zweimal grün auf dem Mac 47d912c18b7e (#1814): red 03.11.2026 09:35; green Mac 20261103-093600-1348713-s1, Mac 20261103-093754-1368334-s1 (same code)
 p2190_family_ui 2026-11-17 #4049 rot in der Vorprüfung über 0b37b164, zweimal grün auf dem Mac 0b37b1640ce9 (#1814): red 03.11.2026 12:37; green Mac 20261103-123757-2663693-s1, Mac 20261103-124250-2678506-s1 (same code)
 p23672_notify 2026-11-17 #4050 rot in der Vorprüfung über 0b37b164, zweimal grün auf dem Mac 0b37b1640ce9 (#1814): red 03.11.2026 12:37; green Mac 20261103-123757-2663693-s1, Mac 20261103-124250-2678506-s1 (same code)
 p21445_b_api 2026-11-17 #4053 rot in der Vorprüfung über 1e5692b2, zweimal grün auf dem Mac 1e5692b256a0 (#1814): red 03.11.2026 14:24; green Mac 20261103-142413-3444633-s1, Mac 20261103-142648-3477515-s1 (same code)
 p2451_a_office_rows_ui 2026-11-17 #4054 rot in der Vorprüfung über 1e5692b2, zweimal grün auf dem Mac 1e5692b256a0 (#1814): red 03.11.2026 14:24; green Mac 20261103-142413-3444633-s1, Mac 20261103-142648-3477515-s1 (same code)
 p2151_ui 2026-11-18 #4348 rot und grün in der CI auf gleichem Code 652dee86da2d: red CI v2.496.1; green Nachtlauf 2026-11-04
+p2147_a_ui 2026-11-17 #4039 rot in der Vorprüfung über a19ce221, zweimal grün auf dem Mac a19ce22175d6 (#1814): red 03.11.2026 02:58; green Mac 20261103-025833-3928134-s1, Mac 20261103-030237-3941090-s1 (same code); cause: app makes two undo steps, #4343
