@@ -15,7 +15,7 @@ const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p2534_a_breite_ui', check, shots: 'P2534A_SHOTS'});
-const FEAT = 'office,contacts,kanban';
+const FEAT = 'office,contacts,kanban,collab';  // collab: the team chat
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
 execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -30,7 +30,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
   check(!((await call('GET', '/api/state')).me.workspaces || []).length, 'alice: no organisation (person on her own)');
   const BOB = (await call('POST', '/api/users', {username: 'bob', display_name: 'Bob Baker', password: 'password123'})).id;
   const CB = await login('bob');
-  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done'}, CB);
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab'}, CB);
 
   const L = (await call('POST', '/api/lists', {name: 'Website relaunch', kind: 'project'})).id;
   const K = (await call('POST', '/api/lists', {name: 'Shoot plan', kind: 'project'})).id;
@@ -40,6 +40,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await call('POST', '/api/tasks', {title: t + ' (board)', list_id: K});
   }
   await call('PATCH', `/api/lists/${K}`, {view: 'kanban'});
+  await call('PUT', `/api/lists/${L}/members`, {user_id: BOB, role: 'edit'});  // a direct chat needs someone I work with
   const dm = await call('POST', '/api/team/dm', {user_id: BOB}), RID = dm.id || dm.room?.id;
   check(!!RID, 'a direct chat with Bob');
   for (let i = 0; i < 4; i++) {
@@ -73,13 +74,13 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
         await nav(B + '?w=' + vw + hash);
         const m = await until(`!!S.booted && !!document.querySelector(${JSON.stringify(sel)}) && (${MEASURE(sel)})`);
         if (!m) { check(false, `${vw}px ${name}: ${sel} shows`); continue; }
-        const lim = kind === 'seite' ? Math.min(m.area, 96 * m.rem) : m.area;
-        check(Math.abs(m.w - lim) <= 2, `${vw}px ${name}: width ${kind} = ${Math.round(lim)} px ` + JSON.stringify(m));
+        const lim = kind === 'seite' ? Math.min(m.area, 96 * m.rem) : m.area;  // the phone's board runs out to the screen edges (as before)
+        check(kind === 'voll' ? m.w >= lim - 2 : Math.abs(m.w - lim) <= 2, `${vw}px ${name}: width ${kind} = ${Math.round(lim)} px ` + JSON.stringify(m));
         check(Math.abs(m.l - m.r) <= 2, `${vw}px ${name}: in the middle (left = right) ` + JSON.stringify(m));
         check(m.over <= 1, `${vw}px ${name}: no sideways overflow ` + JSON.stringify(m));
         if (vw === 3840 && kind === 'seite') check(m.w > 96 * m.rem - 2 && m.area - m.w > 2, `${vw}px ${name}: limited (narrower than the content area) ` + JSON.stringify(m));
         if (vw >= 1440) for (const theme of ['light', 'dark']) {
-          await ev(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return 1; })()`);
+          await ev(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1)))); })()`);  // painted before the shot
           await shot(`p2534a-${name}-${vw}-${theme}.png`);
         }
       }
@@ -95,7 +96,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
         check(Math.abs(c.l - c.r) <= 2, `${vw}px team chat: the reading column in the middle ` + JSON.stringify(c));
       } else check(c.l >= 0 && c.r >= 0 && c.room - c.spread < 3 * c.rem, `${vw}px team chat: a narrow room keeps the messages at its edges as before ` + JSON.stringify(c));
       if (vw >= 1440) for (const theme of ['light', 'dark']) {
-        await ev(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return 1; })()`);
+        await ev(`(() => { document.documentElement.dataset.theme = ${JSON.stringify(theme)}; return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(1)))); })()`);  // painted before the shot
         await shot(`p2534a-chat-${vw}-${theme}.png`);
       }
     }
