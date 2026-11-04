@@ -4,6 +4,7 @@
  - vat_note eu_goods = category K (intra-Community supply), exemption code VATEX-EU-IC, both VAT ids, the deliver-to
    country (BT-80, BR-IC-12) in CII (ShipToTradeParty) and UBL (Delivery/DeliveryLocation)
  - vat_note export = category G, VATEX-EU-G, the seller's VAT id (BR-G-02); abroad (a service) stays O with a register number
+ - 2.523.0 (#4082): UBL with sub-cent prices keeps the quantity (price up to six places, else a line charge / allowance)
  - writes p2355c-*.xml to tests/.data/einvoice/ for the KoSIT validator (CI job einvoice: tools/einvoice_validate.sh)
 usage: p2355_c_einvoice_test.py            (KALMIDO_SRC = the source tree, default ../ next to tests/)"""
 import importlib.util
@@ -112,6 +113,45 @@ write("p2355c-g-ubl.xml", ein.ein_ubl_build(fixture("export", US), "en16931"))
 x = ein.ein_build(fixture("abroad", US), "zugferd")
 check(ct(x, tax + "ram:CategoryCode") == "O", "CII: a service abroad stays O")
 write("p2355c-o-zugferd.xml", x)
+
+# ---------------------------------------------------------------- 2.523.0 (#4082): sub-cent prices in UBL
+# 1,000 minutes x 0.125 EUR x rate 1.085 = 0.135625 USD: six places keep quantity and price of the PDF (was qty 1 / price = net);
+# when even six places do not fit, the quantity stays and the rounding gap goes as a line charge / allowance (R120 exact).
+def subcent(lines):
+    m = fixture("abroad", US)
+    m["currency"], m["lines"] = "USD", lines
+    net = sum(Decimal(ln["net"]) for ln in lines)
+    m["totals"] = {"net": str(net), "tax": "0.00", "gross": str(net), "paid": "0.00", "tax_lines": []}
+    return ein.ein_ubl_build(m, "en16931")
+
+
+def uline(x, i):
+    return ET.fromstring(x).findall("cac:InvoiceLine", U)[i]
+
+
+xs = subcent([{"kind": "item", "pos": 1, "title": "Minuten", "qty": 1000, "unit": "minute", "rate": "0.135625", "tax_pct": 0, "net": "135.63"},
+              {"kind": "item", "pos": 2, "title": "Minuten (ohne Satz)", "qty": 1000, "unit": "minute", "tax_pct": 0, "net": "135.63"}])
+for i, price in ((0, "0.135625"), (1, "0.135630")):
+    li = uline(xs, i)
+    check(li.findtext("cbc:InvoicedQuantity", "", U) == "1000" and li.findtext("cac:Price/cbc:PriceAmount", "", U) == price
+          and li.find("cac:AllowanceCharge", U) is None, f"UBL sub-cent line {i + 1}: quantity 1000, price {price}, no line charge")
+check(ein.ein_ubl_check(xs) == [], f"UBL sub-cent: own check {ein.ein_ubl_check(xs)}")
+write("p2355c-subcent-ubl.xml", xs)
+
+xg = subcent([{"kind": "item", "pos": 1, "title": "Abrufe", "qty": 123457, "tax_pct": 0, "net": "4321.01"},
+              {"kind": "item", "pos": 2, "title": "Abrufe", "qty": 123457, "tax_pct": 0, "net": "4320.99"}])
+for i, (ind, amt) in enumerate((("true", "0.01"), ("false", "0.01"))):
+    li = uline(xg, i)
+    kids = [e.tag.split("}")[1] for e in li]
+    ac = li.find("cac:AllowanceCharge", U)
+    check(li.findtext("cbc:InvoicedQuantity", "", U) == "123457" and li.findtext("cac:Price/cbc:PriceAmount", "", U) == "0.0350"
+          and ac is not None and ac.findtext("cbc:ChargeIndicator", "", U) == ind and ac.findtext("cbc:Amount", "", U) == amt
+          and ac.findtext("cbc:AllowanceChargeReason", "", U) and ac.find("cbc:Amount", U).get("currencyID") == "USD"
+          and kids.index("LineExtensionAmount") < kids.index("AllowanceCharge") < kids.index("Item"),
+          f"UBL gap line {i + 1}: quantity kept, price 4 places, line {'charge' if ind == 'true' else 'allowance'} {amt} in schema order")
+check(ein.ein_ubl_check(xg) == [], f"UBL gap: own check {ein.ein_ubl_check(xg)}")
+check(ut(xg, "cac:LegalMonetaryTotal/cbc:LineExtensionAmount") == "8642.00", "UBL gap: BT-106 = sum of the line nets")
+write("p2355c-subcent-gap-ubl.xml", xg)
 
 print(f"p2355_c_einvoice: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
