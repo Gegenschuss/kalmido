@@ -13,7 +13,9 @@ counts as none). The same checks as the import today: a reply by In-Reply-To alo
 the import takes (a personal / list token), a reply address only with a valid signature. Then only the reporter's address or a
 person (no agent, not disabled) who sees the task and its comments by the account's e-mail address; a list with the lock takes
 nothing. The comment is in the person's name only when it came through the signed reply address (a notification mail of theirs);
-by In-Reply-To alone it carries the sender's address like the reporter's. Everything else goes on as today (a new task where the address leads), with the note "Reply to #N, sender not allowed".
+by In-Reply-To alone it carries the sender's address like the reporter's. 2.539.0 (#4381): in the person's name also only when the
+receiving mail server confirmed the sender's domain (hub/hubmail.py hbm_from_verified, KALMIDO_MAIL_AUTHSERV_ID); else the
+comment carries the address ("By e-mail from ...") without the account. Everything else goes on as today (a new task where the address leads), with the note "Reply to #N, sender not allowed".
 The comment shows the sender ("By e-mail from ..."), the quoted part below the usual separator lines is cut off, files become files
 of the comment. Sender addresses can be forged: the signed reply address and the membership check are the two locks; an outsider
 who knows a Message-ID and forges a member's address is the case mail_from_me accepts today too.
@@ -155,6 +157,10 @@ def tmr_take(c, msg, mid, uid, how_to=None):
     if not tid:
         return None, ""
     ok, who = tmr_who(c, tid, sender, tu)
+    if who:  # 2.539.0 (#4381, audit #2483 M5): in a person's name only when the receiving server confirmed the sender's domain
+        from ..hub.hubmail import hbm_from_verified  # (KALMIDO_MAIL_AUTHSERV_ID); else "By e-mail from <address>", no account
+        if not hbm_from_verified(msg, sender):
+            who = None
     # 2.393.2 F (#3375): review 1 - by In-Reply-To alone only when the account of the address the mail went to sees the task (the
     # reporter answers to the address their mail went to): an address of another account never leads into a task it does not see.
     # #4071: only a token in the address counts; "from" (mail_from_me) comes from the sender's address, which anyone can forge

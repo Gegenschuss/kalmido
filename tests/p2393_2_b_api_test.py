@@ -23,6 +23,8 @@ freelancer-matrix: mail
    names the account; 5 the quote patterns stay fast on a long line; 6 only well-formed Message-IDs are stored; 7 the mail to
    the reporter keeps paragraphs; 8 a reply whose file cannot be stored stays in the mailbox (MailKept)
  - #4071: a forged From of a person with "mails from me" on, without a token in the address, is no comment (a note task instead)
+ - 2.539.0 (#4381): through a person's signed reply address in her name only when the receiving server (KALMIDO_MAIL_AUTHSERV_ID)
+   confirmed her domain; without that proof (none, another server's pass, a failing own header) "By e-mail from <address>"
 usage: p2393_2_b_api_test.py <datadir>"""
 import email
 import email.message
@@ -45,7 +47,9 @@ from kt import B, CT, DATA, H, check, dbx, done, until  # noqa: E402
 MAILENV = {"KALMIDO_MAIL_ADDRESS": "tasks@example.test", "KALMIDO_IMAP_HOST": "127.0.0.1", "KALMIDO_IMAP_PORT": "1143",
            "KALMIDO_IMAP_SSL": "0", "KALMIDO_IMAP_USER": "kalmido", "KALMIDO_IMAP_PASSWORD": "secret", "KALMIDO_IMAP_INTERVAL": "600",
            "KALMIDO_SMTP_HOST": "127.0.0.1", "KALMIDO_SMTP_PORT": "1025", "KALMIDO_SMTP_TLS": "none",
-           "KALMIDO_MAIL_FROM": "kalmido@example.test"}
+           "KALMIDO_MAIL_FROM": "kalmido@example.test",
+           "KALMIDO_MAIL_AUTHSERV_ID": "mx.example.test"}  # 2.539.0 (#4381): in a person's name only with the receiving server's proof
+AR_BEA = "mx.example.test; dkim=pass header.d=example.com; spf=pass smtp.mailfrom=bea@example.com"  # 2.539.0 (#4381)
 kt.fresh(MAILENV)
 os.makedirs(os.path.join(DATA, "mail", "in"), exist_ok=True)
 shutil.copy(os.path.join(N, "stub_mail.py"), DATA)
@@ -75,10 +79,12 @@ def addr_of(s):
     return r.json()["address"]
 
 
-def mail(frm, to, subject, text, mid, reply=None, files=()):
-    """One mail into the stub mailbox, then a poll; -> its Message-ID."""
+def mail(frm, to, subject, text, mid, reply=None, files=(), auth=()):
+    """One mail into the stub mailbox, then a poll; -> its Message-ID. auth: Authentication-Results headers, topmost first."""
     NEXT[0] += 1
     m = email.message.EmailMessage()
+    for a in auth:  # 2.539.0 (#4381)
+        m["Authentication-Results"] = a
     m["From"], m["To"], m["Subject"], m["Message-ID"] = frm, to, subject, mid
     m["Date"] = "Mon, 02 Nov 2026 10:00:00 +0100"
     if reply:
@@ -191,7 +197,8 @@ check(len(cm) == 3 and cm[-1][1] is None and "By e-mail from bea@example.com" in
       f"a member's mail by In-Reply-To: a comment with her address, signature cut off {cm[-1:]}")
 RB = reply_addr(T1, "bea@example.com", BU)
 check(f"r{T1}u{BU}x" in RB, f"a person's reply address names the account {RB!r}")
-M6b = mail("Bea <bea@example.com>", RB, "Re: Printer", "Toner arrives Friday.", "<p23932b-6b@example.org>")
+M6b = mail("Bea <bea@example.com>", RB, "Re: Printer", "Toner arrives Friday.", "<p23932b-6b@example.org>",
+           auth=[AR_BEA])  # 2.539.0 (#4381): in her name only with the receiving server's proof of her domain
 poll(lambda: len(comments(T1)) == 4)
 cm = comments(T1)
 check(len(cm) == 4 and cm[-1][1] == BU and "Toner arrives Friday." in cm[-1][2], f"a member's mail to her signed address: her comment {cm[-1:]}")
@@ -277,6 +284,16 @@ n1 = len(comments(T1))
 M13 = mail("Bea <bea@example.com>", reply_addr(T1, "bea@example.com", CU), "Re: Printer", "Wrong account.", "<p23932b-13@example.org>")
 poll(seen_all)
 check(len(comments(T1)) == n1, f"review 4: the comment never goes to an account the address was not made for {comments(T1)[n1:]}")
+# 2.539.0 (#4381, audit #2483 M5): her signed reply address without the receiving server's proof (none, or a pass written by
+# another server, e.g. the forger) is a comment "By e-mail from" her address, never in her name
+for k, auth in (("none", ()), ("other server", ("mail.evil.example; dkim=pass header.d=example.com",)),
+                ("own server fails", ("mx.example.test; dkim=fail header.d=example.com", AR_BEA))):
+    n1 = len(comments(T1))
+    mail("Bea <bea@example.com>", RB, "Re: Printer", f"Unproven {k}.", f"<p23932b-4381-{k.replace(' ', '')}@example.org>", auth=auth)
+    poll(lambda: len(comments(T1)) == n1 + 1)
+    cm = comments(T1)[n1:]
+    check(len(cm) == 1 and cm[0][1] is None and "By e-mail from bea@example.com" in cm[0][2] and f"Unproven {k}." in cm[0][2],
+          f"#4381: signed address, sender not confirmed ({k}): a comment with her address, not in her name {cm}")
 # 5: a long line of "Am ... schrieb" without a colon is checked quickly; a short quote line is still cut off
 r = py("import time\nfrom kalmido.integrations.taskmail import tmr_trim\nt = time.time()\n"
        "x = tmr_trim('Hi\\n' + 'Am ' + ' schrieb' * 2500 + '\\nend')\n"

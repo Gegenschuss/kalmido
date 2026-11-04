@@ -1427,6 +1427,14 @@ the browsers then send nothing.
   `KALMIDO_SMTP_*`).
 - **Deliver directly, do not forward.** Many forwarding rules drop the plus part of an address (`tasks+token@…`), and
   then Kalmido cannot tell whose task it is.
+- **Sender check: set `KALMIDO_MAIL_AUTHSERV_ID` (2.539).** A sender address can be forged. Kalmido believes it only when the
+  mail server that receives for this mailbox confirmed the sender's domain in its own `Authentication-Results` header
+  (DKIM, DMARC or SPF pass), and it reads only the header whose first word is the value of `KALMIDO_MAIL_AUTHSERV_ID` (the
+  authserv-id of that server, e.g. `mx.example.com`; look at the topmost `Authentication-Results` line of a mail in the
+  mailbox). Without the setting nothing counts as confirmed: a forwarded mail of a person stays *Not assigned* in the hub,
+  and a reply through a person's signed reply address becomes a comment "By e-mail from <address>" without the account
+  (before 2.539 the topmost header counted, which a sender can write themselves when the server adds none). The server
+  must add that header to every incoming mail; a mailbox without it leaves both on the safe side.
 - **E-mails at clients and projects (2.84):** the same mailbox also takes the addresses of clients, projects and the
   personal e-mail inboxes (docs/OFFICE.md); nothing else to set up. The mails go into the database (table `hub_mails`), their
   `.eml` and attachments into the file store, so they count against the storage limit and go through the virus scan.
@@ -2542,7 +2550,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `KALMIDO_UPDATE_CHECK` | `1` | `0` turns the update check off completely (see *Updating*) |
 | `KALMIDO_MAIL_ADDRESS` | | 2.17.0: the address new tasks are sent to (plus addresses `local+token@domain` are the personal / project addresses) |
 | `KALMIDO_IMAP_HOST`, `KALMIDO_IMAP_PORT`, `KALMIDO_IMAP_SSL`, `KALMIDO_IMAP_USER`, `KALMIDO_IMAP_PASSWORD`, `KALMIDO_IMAP_FOLDER`, `KALMIDO_IMAP_INTERVAL` | `993`, `1`, `INBOX`, `60` | The mailbox Kalmido polls for new tasks (unread mails; deleted after a complete import, `KALMIDO_IMAP_KEEP=1` only marks them read) |
-| `KALMIDO_MAIL_AUTHSERV_ID` | *(empty)* | 2.86: the hub takes a mail from a person's own address as forwarded (the original sender picks the client) only when the receiving mail server confirmed that domain (DKIM / DMARC / SPF pass in its `Authentication-Results`); set its authserv-id (the first word of that header, e.g. `mx.example.com`) to read only its header, empty = the topmost one. Without the proof the mail stays *Not assigned* |
+| `KALMIDO_MAIL_AUTHSERV_ID` | *(empty)* | 2.86: the hub takes a mail from a person's own address as forwarded (the original sender picks the client) only when the receiving mail server confirmed that domain (DKIM / DMARC / SPF pass in its `Authentication-Results`); set its authserv-id (the first word of that header, e.g. `mx.example.com`): only its header counts. 2.539 (#4381): empty = nothing is confirmed (before: the topmost header); a reply through a person's signed reply address is in their name only with that proof, else "By e-mail from <address>". Without the proof the mail stays *Not assigned* |
 | `KALMIDO_SMTP_HOST`, `KALMIDO_SMTP_PORT`, `KALMIDO_SMTP_TLS`, `KALMIDO_SMTP_INSECURE`, `KALMIDO_SMTP_USER`, `KALMIDO_SMTP_PASSWORD`, `KALMIDO_MAIL_FROM` | `587`, `starttls` | Sending the daily summary by e-mail (`TLS`: `starttls`, `ssl` or `none`) |
 | `KALMIDO_IOS_SHORTCUT_URL` | empty | Link to a signed generic iOS shortcut for *Share from your phone* (asks for address and token on import); empty = the button is hidden |
 | `KALMIDO_INSTANCE_MODE` | *(empty)* | 2.46.0: only `shared` (no organisations, people see only their own contacts) is still read; everything else, `organisation` included, means organisations + private spaces (2.23.0-2.45: `organisation` / `workspaces`) |

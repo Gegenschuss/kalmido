@@ -767,14 +767,16 @@ def hbm_from_verified(msg, addr):
     """Audit I4: did the receiving mail server confirm the domain of addr for this mail? Only the Authentication-Results
     it added itself count -- the one with KALMIDO_MAIL_AUTHSERV_ID, else the topmost (a sender's own headers sit below
     it): dkim=pass with header.d (or header.i), dmarc=pass with header.from or spf=pass with smtp.mailfrom of that domain.
-    No such header (a server that adds none) = not confirmed."""
+    No such header (a server that adds none) = not confirmed. 2.539.0 (#4381, audit #2483 M2): without
+    KALMIDO_MAIL_AUTHSERV_ID never confirmed -- a server that adds no header of its own leaves the sender's forged one
+    on top. Also used for the replies to a task (integrations/taskmail.py)."""
     dom = (addr or "").rpartition("@")[2].strip().lower()
-    if not dom:
+    if not dom or not HBM_AUTHSERV:
         return False
     for h in msg.get_all("Authentication-Results") or []:
         h = re.sub(r"\([^()]*\)", " ", re.sub(r"\s+", " ", str(h)))  # comments may carry ";"
         sid = (h.split(";", 1)[0].split() or [""])[0].lower()
-        if HBM_AUTHSERV and sid != HBM_AUTHSERV:
+        if sid != HBM_AUTHSERV:
             continue
         for part in h.split(";")[1:]:
             m = _AR_RE.match(part)

@@ -743,7 +743,8 @@ e-mail* (the server's mailbox, see SELF-HOSTING.md "Mail"); without it the addre
   contacts linked to them - only clients of the same workspace that the recipient sees. A mail the person forwards (or
   sends a copy of) counts with the original sender of the forwarding header, else with To / Cc, but only when the
   receiving mail server
-  confirms your domain for this mail (`Authentication-Results`: DKIM, DMARC or SPF pass; see `KALMIDO_MAIL_AUTHSERV_ID`);
+  confirms your domain for this mail (`Authentication-Results`: DKIM, DMARC or SPF pass; see `KALMIDO_MAIL_AUTHSERV_ID`,
+  without that setting nothing counts as confirmed, 2.539);
   without that confirmation the mail waits under *Not assigned*. No match or several
   clients: the mail waits under *Not assigned* (only its recipient sees it) until it is assigned by hand. A client's or
   project's address files without matching; a project's mail names the project's client as well.

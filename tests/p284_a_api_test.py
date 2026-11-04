@@ -4,8 +4,9 @@
  - the mail input (the stub IMAP server of the tests, POST /api/admin/mail/poll): client / project address = fixed; the hub
    inbox matches the sender (client e-mail, contact person) inside the recipient's workspace only, a forwarded mail of the
    person themselves takes the sender of the forwarding header -- audit I4: only with the receiving server's
-   Authentication-Results passing for the own domain (the topmost header; a forged one below, another domain, none = the
-   mail is "Not assigned" with its From as it stands); no / unknown match = "Not assigned"; doubles dropped
+   Authentication-Results passing for the own domain (the header of KALMIDO_MAIL_AUTHSERV_ID; a forged one below, another
+   domain, none, 2.539.0 (#4381) a pass from another authserv-id = the mail is "Not assigned" with its From as it stands);
+   no / unknown match = "Not assigned"; doubles dropped
  - texts sealed with the organisation's key; the .eml + attachments in the file store ("E-Mails / <client> / ..."), a virus
    find left out with a note, scanner gone = "unchecked"
  - visibility: client mail = who sees the client, project mail = who sees the list, not assigned = the recipient;
@@ -31,7 +32,8 @@ CT = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
 MAILENV = ["-e", "KALMIDO_MAIL_ADDRESS=tasks@example.test", "-e", "KALMIDO_IMAP_HOST=127.0.0.1", "-e", "KALMIDO_IMAP_PORT=1143",
            "-e", "KALMIDO_IMAP_SSL=0", "-e", "KALMIDO_IMAP_USER=kalmido", "-e", "KALMIDO_IMAP_PASSWORD=secret", "-e", "KALMIDO_IMAP_INTERVAL=600",
            "-e", "KALMIDO_SECRET_KEY=AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
-           "-e", "KALMIDO_CLAMD=127.0.0.1:3310", "-e", "KALMIDO_CLAMD_DOWN_S=1", "-e", "KALMIDO_CLAMD_TICK_S=1"]
+           "-e", "KALMIDO_CLAMD=127.0.0.1:3310", "-e", "KALMIDO_CLAMD_DOWN_S=1", "-e", "KALMIDO_CLAMD_TICK_S=1",
+           "-e", "KALMIDO_MAIL_AUTHSERV_ID=mx.example.com"]  # 2.539.0 (#4381): without it no sender counts as confirmed
 FEAT = "cal,collab,comments,events,contacts,clients"
 EICAR = "X5O!P%@AP[4\\PZX54(P^)7CC)7}$" + "EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
 
@@ -197,6 +199,8 @@ M15 = mail(IN_B, "Bob <bob@example.com>", "WG: Zahlung offen 3", FWD2, mid="<hub
            auth=["mx.example.com; dkim=pass header.d=evil.example; dmarc=fail header.from=example.com"])
 M16 = mail(IN_B, "Bob <bob@example.com>", "Kopie an Acme", "Meine Mail an Acme.", cc="acme@example.com")  # unproven copy
 M17 = mail(IN_B, "Bob <bob@example.com>", "Kopie an Acme 2", "Meine Mail an Acme.", cc="acme@example.com", auth=[AR_OK])
+# 2.539.0 (#4381): a pass written by another server (the sender) is no proof, only the header of KALMIDO_MAIL_AUTHSERV_ID counts
+M18 = mail(IN_B, "Bob <bob@example.com>", "WG: Zahlung 3", FWD2, auth=[AR_OK.replace("mx.example.com;", "mail.evil.example;", 1)])
 M3 = mail(IN_B, "stranger@example.org", "Unknown sender", "Wer bin ich?")
 M4 = mail(A_ACME, "anyone@example.org", "Direct to Acme", "Kundenadresse.")
 M5 = mail(A_P, "anyone@example.org", "Project mail", "Zum Launch.")
@@ -206,7 +210,7 @@ M8 = mail(IN_E, "Solo <solo@example.com>", "Freelance", "Privat.")
 M9 = mail(IN_D, "acme@example.com", "Forged Acme", "Gefälscht?")  # dave's inbox: only Beta's clients count
 M10 = mail(IN_B, "Mixed <mixed@example.org>", "Two clients", "Cc both", cc="acme@example.com")  # sender unknown -> not assigned
 M11 = mail("tasks+guessedtoken0000@example.test", "a@example.org", "Guessed", "Nobody")
-check(poll(14), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")
+check(poll(15), f"the mails were filed ({len(dbx('SELECT id FROM hub_mails'))})")  # 2.539.0 (#4381): 15 with M18
 time.sleep(1)
 R = {k: row(v) for k, v in {"m1": M1, "m2": M2, "m3": M3, "m4": M4, "m5": M5, "m7": M7, "m8": M8, "m9": M9, "m10": M10, "m11": M11}.items()}
 check(R["m1"] and R["m1"]["client_id"] == ACME and R["m1"]["org_id"] == ORG and R["m1"]["owner_id"] == BOB, f"inbox: a contact person's mail -> Acme ({R['m1']})")
@@ -226,7 +230,8 @@ d = Bo.get(B + f"/api/hubmail/mails/{R['m2']['id']}").json()
 check(d.get("subject") == "Rechnung 17" and d.get("from_addr") == "acme@example.com", f"forwarded: subject without WG:, original sender ({d.get('subject')}, {d.get('from_addr')})")
 # audit I4: a From with bob's own address is a forward only when the receiving server confirmed his domain
 for k, mid, what in (("m13", M13, "no Authentication-Results"), ("m14", M14, "the topmost header fails, a forged pass below"),
-                     ("m15", M15, "a pass for another domain"), ("m16", M16, "an unproven copy with Acme in Cc")):
+                     ("m15", M15, "a pass for another domain"), ("m16", M16, "an unproven copy with Acme in Cc"),
+                     ("m18", M18, "a pass from another authserv-id (2.539.0, #4381)")):
     rr = row(mid)
     check(rr and rr["client_id"] is None and rr["list_id"] is None, f"I4: {what}: not assigned ({rr and rr['client_id']})")
     if rr:
@@ -258,7 +263,7 @@ check("virus" in (d7.get("note") or ""), f"the note names the find ({d7.get('not
 open(os.path.join(DATA, "clamd.off"), "w").close()
 time.sleep(1.5)
 M12 = mail(A_ACME, "x@example.org", "Unchecked", "Scanner down", files=[("later.txt", b"later", "octet-stream")])
-check(poll(15), "the mail with the scanner gone was filed")
+check(poll(16), "the mail with the scanner gone was filed")  # 2.539.0 (#4381): one more mail (M18)
 time.sleep(0.5)
 d12 = Bo.get(B + f"/api/hubmail/mails/{row(M12)['id']}").json()
 check(any(a["name"] == "later.txt" and a["scan"] == "unchecked" for a in d12.get("attachments", [])), f"scanner gone: unchecked ({d12.get('attachments')})")

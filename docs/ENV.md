@@ -143,7 +143,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMAP_USER` | `(empty)` | IMAP user. |
 | `KALMIDO_INVITE_MAIL_DAY` | `2000` | Calendar invitation mails of the whole server per day (each person: 200). |
 | `KALMIDO_MAIL_ADDRESS` | `(empty)` | Address of the mailbox that turns incoming mails into tasks. |
-| `KALMIDO_MAIL_AUTHSERV_ID` | `(empty)` | Name of the own mail server in Authentication-Results headers that are believed. |
+| `KALMIDO_MAIL_AUTHSERV_ID` | `(empty)` | Name of the own mail server in Authentication-Results headers that are believed; empty = no sender counts as confirmed (2.539). |
 | `KALMIDO_MAIL_FROM` | `(empty)` | Sender address (empty = KALMIDO_MAIL_ADDRESS). |
 | `KALMIDO_OFFICE_MAILS_DAY_ADDRESS` | `20` | Office documents sent by mail per organisation, receiving address and day. |
 | `KALMIDO_OFFICE_MAILS_DAY_ORG` | `300` | Office documents sent by mail per organisation and day. |
