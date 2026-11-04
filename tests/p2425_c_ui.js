@@ -64,7 +64,7 @@ const report = (key, portals) => fetch(B + 'api/v1/fetcher/status', {method: 'PU
   cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await (await fetch(B + 'api/v1/fetcher', {headers: {Authorization: 'Bearer ' + key}})).json()).portals?.[0]?.enabled === false),
     'switched off: the helper reads enabled false');
-  check(d.querySelector('#s-fetch .fx-portal').classList.contains('off'), 'the row shows it is off');
+  check(await until(() => d.querySelector('#s-fetch .fx-portal')?.classList.contains('off')), 'the row shows it is off');
   // the News text
   const items = (await call('GET', '/api/news', null, CF)).items || [];
   const it = items.find(x => x.kind === 'fetcherr');
