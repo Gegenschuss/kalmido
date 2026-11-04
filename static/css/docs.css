@@ -62,7 +62,10 @@
 /* 2.430.0 (#3582): the list left, the open document in a pane right of it (computer); the card of the open one marked */
 .dc-wrap.dc-paneon{display:flex;align-items:flex-start;gap:1rem;max-width:100rem;margin:0 auto}
 .dc-wrap.dc-paneon>.dc-view{flex:1 1 0;min-width:0;max-width:none;margin:0}
-.dc-pane{position:sticky;top:.5rem;flex:0 0 clamp(20rem,42%,36rem);max-height:calc(100dvh - 7rem);overflow-y:auto;margin-top:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-sizing:border-box;overscroll-behavior:contain}
+.dc-pane{position:sticky;top:.5rem;flex:0 0 clamp(20rem,42%,36rem);max-height:calc(var(--dc-vh,100dvh - 7rem) - 2rem);overflow-y:auto;margin-top:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-sizing:border-box;overscroll-behavior:contain}
+/* 2.519.0 (#4467): a sticky box stays only inside its parent; the parent .dc-wrap now reaches down over the bottom room of
+   #view (7.5rem, 6rem on touch screens), so the pane stays below the page head also when the list is scrolled to its end */
+@media (min-width:768px){ .dc-wrap.dc-paneon{margin-bottom:-6rem} .dc-wrap.dc-paneon>.dc-view{padding-bottom:11rem} }
 .dc-paneon .dc-grid{grid-template-columns:repeat(auto-fill,minmax(9.5rem,1fr))}
 .dc-paneon .dc-th{height:9rem}
 .dc-card.dc-cur>button:not(.dc-selmark){border-color:var(--accent);box-shadow:0 0 0 .125rem var(--accent)}

@@ -247,7 +247,11 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
 }
 // 2.430.0 (#3582): the pane. Its remove() closes it (the sheet's callers -- Close, Delete, a split, a workspace switch -- call
 // md.remove() on either); a redraw of the view that built it anew gets its content back here
-function dc_paneHook(p) { if (p && !p._dcRm) { p._dcRm = true; p.remove = () => dc_paneClose(p); } }
+function dc_paneHook(p) { dc_paneFit(p); if (p && !p._dcRm) { p._dcRm = true; p.remove = () => dc_paneClose(p); } }
+// 2.519.0 (#4467): the pane is as high as the visible part of the scroll box #view (below the page head), so it can stay
+// stuck at its top with the title and the close button in view, however far the list is scrolled
+function dc_paneFit(p) { const v = $('#view'); if (p && v && v.clientHeight) p.style.setProperty('--dc-vh', v.clientHeight + 'px'); }
+window.addEventListener('resize', () => dc_paneFit($('.dc-pane')));
 function dc_paneFill() {
   const p = $('.dc-pane'); if (!p) return;
   dc_paneHook(p);
