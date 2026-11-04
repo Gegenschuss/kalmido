@@ -118,11 +118,18 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false}) => async
       // 2.501.0 (#4296): a module that does not load is red (the suite's later calls would only fail by chance); a page that
       // went away while it loaded (its own redirect or reload) is no load error. On purpose without the modules: lazy: true
       if (!lazy) {
-        const e = await ev(`typeof ld_all === 'function' ? ld_all().then(() => '', e => String(e && e.message || e)) : ''`).catch(x => {
-          if (/^JS: |no answer within/.test(x.message)) return x.message;
-          console.log(`ff: ${String(url).slice(0, 120)} went away during ld_all: ${x.message}`); return '';
-        });
-        if (e) check(false, `${tag}: ld_all failed on ${String(url).slice(0, 120)}: ${e}`);
+        // under load a script fetch breaks off now and then (full run of 2.501: 19 suites, their own checks fine, alone green):
+        // only a load that fails again, on a page that has settled, is a real one (a failed module may be retried, lazyload.js)
+        for (let k = 0; ; k++) {
+          const e = await ev(`typeof ld_all === 'function' ? ld_all().then(() => '', e => String(e && e.message || e)) : ''`).catch(x => {
+            if (/^JS: |no answer within/.test(x.message)) return x.message;
+            console.log(`ff: ${String(url).slice(0, 120)} went away during ld_all: ${x.message}`); return '';
+          });
+          if (!e) break;
+          if (k >= 2) { check(false, `${tag}: ld_all failed on ${String(url).slice(0, 120)}: ${e}`); break; }
+          console.log(`ff: ld_all on ${String(url).slice(0, 120)}: ${e}, once more`);
+          for (let i = 0; i < 100 && !await ev(`document.readyState === 'complete'`).catch(() => false); i++) await sleep(100);
+        }
       }
       return r;
     };
