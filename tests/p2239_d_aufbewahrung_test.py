@@ -194,7 +194,7 @@ check(not sql("SELECT 1 FROM rss_feeds WHERE id=?", (F2,)) and not sql("SELECT 1
 
 # ================================================================== the hosted bypass only after the retention gate
 out = box("import kalmido.admin.hosting as HO\nimport kalmido.accounts.users as U\nfrom kalmido.office.olock import OLK_BYPASS\n"
-          "HO.hosted = lambda: True\nseen = []\nU._user_purge = lambda c, uid: seen.append(OLK_BYPASS.get()) or []\n"
+          "HO.hosted = lambda: True\nseen = []\nU._user_purge = lambda c, uid, made: seen.append(OLK_BYPASS.get()) or []\n"
           "U.user_purge(c, 0)\nU.user_purge(c, 0, gated=True)\nprint('bypass', seen, OLK_BYPASS.get())")
 check("bypass [False, True] False" in out, f"account: hosted bypass only for the gated deletion {out[-300:]}")
 
