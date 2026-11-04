@@ -207,4 +207,4 @@ check(r.ok and until(lambda: not lock_free(), 15), f"a second download holds the
 r.close()
 open(GATE, "w").close()
 check(until(lock_free, 30), "the client went away: the lock is free again")
-done()
+sys.exit(done("p2525_a_backup"))
