@@ -5,8 +5,8 @@ docs_ingest stores the file with the file store (fs_put) in the folder "Dokument
 row (state 'wait'); the queue -- one thread in the server process, started with the first request -- takes the waiting
 documents one by one (text, OCR, preview, date / amount, sorting, index; docs/store.py process). The state lives in
 doc_meta: after a restart the queue simply goes on (a run that was cut off is taken up again after RUN_STALE minutes, at
-most TRIES times). The same thread looks into the inbox folders ("Dokumente/Eingang") every SCAN_EVERY seconds: a file put
-there becomes a document. Mails to a person's / an organisation's document address (plus address with a doc_mail token)
+most TRIES times; 2.521.0 E (#4475): one this process lost to a database restart at its next step, docs_take_up). The
+same thread looks into the inbox folders ("Dokumente/Eingang") every SCAN_EVERY seconds: a file put there becomes a document. Mails to a person's / an organisation's document address (plus address with a doc_mail token)
 become documents (their attachments), see docs_mail_import."""
 import os
 import threading
@@ -28,11 +28,15 @@ from .maillink import ML_TAG, ml_budget, ml_collect, ml_links, ml_mail_name  # 2
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
-RUN_STALE = 30       # min after which a run that was cut off (restart) is taken up again
+RUN_STALE = 30       # min after which a run that was cut off (restart) is taken up again. 2.521.0 E (#4475): only the fallback
+                     # (a replica gone for good; longer than the longest run, docs/ocr.py 30 pages x 60 s): a run this process lost to
+                     # a database restart is taken up at its next step, and the first step of the only queue process takes up every one
 TRIES = 3            # runs of one document at most
 MAIL_FILES = 20      # attachments of one mail at most
 MAIL_UNPACKED = 50   # 2.146.0 B (#2453): files out of one ZIP / winmail.dat of a mail at most
-_Q = {"thread": None, "scan": 0.0, "recent": []}  # 2.360.0 B (#2496): recent = workspaces served, longest ago first
+# 2.360.0 B (#2496): recent = workspaces served, longest ago first; 2.521.0 E (#4475): lost = the node whose run broke off
+# with the database, first = this process has not taken up the cut-off runs yet (docs_take_up)
+_Q = {"thread": None, "scan": 0.0, "recent": [], "lost": None, "first": True}
 doc_on_done = []     # 2.48.0 (#1356): hooks f(c, nid, first) after a recognition run (receipts: the event document_added)
 _WAKE = threading.Event()
 _LOCK = threading.Lock()
@@ -171,6 +175,7 @@ def docs_run_once():
                 inbox_scan(c)
                 S.redo_purge(c)  # 2.363.3 (#3134)
             c.commit()
+        docs_take_up(c)
         stale = iso(now_utc() - timedelta(minutes=RUN_STALE))
         with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
             r = None
@@ -216,15 +221,36 @@ def docs_run_once():
                         f(c, nid, first)
             c.commit()
         except Exception as e:  # noqa: BLE001 -- one broken document must not stop the others
-            c.rollback()
             print("docs: recognition", nid, type(e).__name__, e, flush=True)
+            _Q["lost"] = nid  # 2.521.0 E (#4475): the database may be gone (OOM restart): the next step resets the row
+            c.rollback()
             with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
                 c.execute("UPDATE doc_meta SET state=CASE WHEN tries >= ? THEN 'failed' ELSE 'wait' END, error='failed', updated_at=? "
                           "WHERE node_id=?", (TRIES, _now(), nid))
             c.commit()
+            _Q["lost"] = None
         return 1
     finally:
         c.close()
+
+
+def docs_take_up(c):
+    """2.521.0 E (#4475): runs cut off by a restart go back to wait at once instead of after RUN_STALE minutes: the one this
+    thread lost when the database went away (an OOM restart of Postgres ends every connection; only this process ran it),
+    and at the first step of a process that is the only one with a docs queue (KALMIDO_REPLICAS 1) every running row (the
+    process before it is gone). A failure leaves the marks for the next step."""
+    from ..admin.worker import WRK_REPLICAS  # here: admin/worker.py imports this module
+    every = _Q["first"] and WRK_REPLICAS == 1
+    lost = _Q["lost"]
+    if not every and not lost:
+        return
+    with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
+        if every:
+            c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE state='run'", (_now(),))
+        else:
+            c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE node_id=? AND state='run'", (_now(), lost))
+    c.commit()
+    _Q["first"], _Q["lost"] = False, None
 
 
 def _after(c, nid):
