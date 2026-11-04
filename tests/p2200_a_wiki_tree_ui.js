@@ -85,6 +85,19 @@ function dnd(w, from, to, y) {  // a mouse drag of node from onto node to at hei
   if (md) { md.querySelector('#cdlg-in').value = 'Made here'; md.querySelector('form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true})); }
   check(await until(async () => ((await idx()).folders || []).some(f => f.path === 'Processes/Made here')), 'the new folder lies in the open folder');
   check(await until(() => [...d.querySelectorAll('#view #wk-res .wkrow')].some(r => r.textContent.includes('Made here'))), 'the list shows the new (empty) folder');
+  // 2.519.0 (#3715): a load of the index that is on its way while a folder is made (its answer is older) no longer counts as the
+  // newest - the folder shows. The answer is held here until the folder exists, the app has marked the change (wk_after) and
+  // the live change has raised the app's data version (S.v) - before, the old answer then took the new version and stayed.
+  { let rel, held = 0; const hold = new Promise(r => { rel = r; }), f0 = w.fetch;
+    w.fetch = (u, o) => { const p = f0(u, o); if (!held && /api\/wiki\?space=private/.test(String(u))) { held = 1; return p.then(r => hold.then(() => r)); } return p; };
+    w.eval("wk_after('private')");
+    check(await until(() => held), '#3715: a load of the index is on its way');
+    const pid = ((await idx()).folders || []).find(f => f.path === 'Processes')?.id, sv = w.eval('S.v');
+    const fl = await call('POST', '/api/wiki/folders', {space: 'private', name: 'Made late', parent_id: pid});
+    w.eval("wk_after('private')");  // as wk_newFolder does after its POST
+    check(await until(() => w.eval('S.v') > sv), '#3715: the live change arrived while the old answer is on its way');
+    rel(); w.fetch = f0;
+    check(fl.http === 201 && await until(() => [...d.querySelectorAll('#view #wk-res .wkrow')].some(r => r.textContent.includes('Made late'))), '#3715: the older answer does not hide the folder made meanwhile ' + fl.http); }
   w.close();
 
   // ================= a phone
