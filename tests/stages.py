@@ -18,7 +18,7 @@ test files and the changed files, nothing is started; Python standard library on
                      write a state file they read (*ids.json) and
                      the route guards for a new route and (2.381.0, #2853) the static guards ALWAYS_SUITES (never "full":
                      2.501.0 (#4016): core files, start files, translations and server files without a route get a small
-                     fixed set, TOUCHED_FIXED; what is left (CI basics, test helpers, "too broad") goes to stderr as
+                     fixed set, TOUCHED_FIXED; what is left (CI basics, test helpers, "too broad" with no suite naming it, 2.533.0 #4332) goes to stderr as
                      `UNMAPPED: FILE (reason)` lines, #3505: the train's check reads them - a package with such files is
                      "not checked", never green);
                      prints the suites in run order, exit 3 when none; --why lists the reasons on stderr
@@ -518,6 +518,21 @@ def touched_fixed(repo, p, why, base=None, head=None):
     return out
 
 
+def smc_broad_hits(repo, p):
+    """2.533.0 (#4332): {suite: why} for a file that maps to more suites than TOUCHED_BROAD: the at most TOUCHED_HITS_MAX suites
+    whose own test file names its routes or names least often (rare_hits, as touched_fixed). {} when nothing names it."""
+    skip = repo.skipped()
+    toks = []
+    if p.startswith("kalmido/") and p.endswith(".py"):
+        mod = py_module(p)
+        pkg, name = mod.rsplit(".", 1) if "." in mod else ("", mod)
+        text = repo.text(p)
+        toks = sorted(t for t in routes(text) if t.count("/") >= 3) + [p, mod, f"from {pkg} import {name}"] + sorted(TOUCHED_PY_DEF_RE.findall(text))
+    elif p.startswith("static/js/") and p.endswith(".js"):
+        toks = sorted(js_tokens(repo.text(p), os.path.splitext(os.path.basename(p))[0]))
+    return {s: f"too broad, rarest names: {tok[:40]} (#4332)" for s, tok in rare_hits(repo, toks, skip).items()}
+
+
 def touched(repo, files, base=None, head=None):
     """--touched (2.181.0, #2696, the Mac runner's small runs): only the suites of the changed files, each with the suites
     before it in its group that write a state file it reads (calendars_ui after calendars), plus the route guards when a
@@ -542,6 +557,9 @@ def touched(repo, files, base=None, head=None):
                 res = own
         if kind == "suites" and len(res) > TOUCHED_BROAD:  # a helper most areas use: that is the CI's full run
             kind, res = "full", f"too broad: {len(res)} suites"
+            hits = smc_broad_hits(repo, f)  # 2.533.0 (#4332): the rarest-named suites instead of nothing
+            if hits:
+                kind, res = "suites", hits
         if kind == "full":  # 2.501.0 (#4016): a small fixed set instead of no suite at all
             fixed = touched_fixed(repo, f, res, base, head)
             if fixed:

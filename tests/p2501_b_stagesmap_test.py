@@ -9,6 +9,7 @@ container. Invented texts only.
  - a changed translation adds the suites that name the changed text; a text many suites name does not
  - a server module without a route takes the suites that name it, at most TOUCHED_HITS_MAX
  - a name only in a helper (nearly) every suite loads (tests/boot.js ...) does not pick the suites
+ - 2.533.0 (#4332): a file that maps to too many suites takes the rarest-named ones (at most 10) instead of UNMAPPED
  - the CI basics and test helpers stay UNMAPPED (the CI's full run), the push stage still says full for all of them
  - a suite on tests/skip.txt stays out of the set"""
 import json
@@ -50,6 +51,16 @@ for f in ("kalmido/core/schema.py", "static/app.css", "static/js/core.js", "kalm
 for f in ("Dockerfile", "tests/ff.js", "tests/kt.py", "tests/run_all.sh", "VERSION"):
     _, _, unm = stages.touched(repo, [f])
     check(len(unm) == 1 and unm[0].startswith(f + " ("), f"{f}: stays unmapped: {unm}")
+
+# 2.533.0 (#4332): a file that is too broad takes the (at most TOUCHED_HITS_MAX) suites with the rarest hits instead of UNMAPPED
+for f in ("kalmido/lists/projects.py", "kalmido/collab/comments.py", "kalmido/accounts/session.py", "static/js/settings.js"):
+    if not os.path.exists(os.path.join(ROOT, f)):
+        continue
+    order, why, unm = stages.touched(repo, [f])
+    own = {s for s, w in why.items() if "(#4332)" in w}
+    check(unm == [], f"{f}: too broad but not unmapped any more: {unm}")
+    check(1 <= len(own) <= stages.TOUCHED_HITS_MAX, f"{f}: the rarest-named suites, at most {stages.TOUCHED_HITS_MAX}: {len(own)}")
+    check(own <= set(order), f"{f}: they run")
 
 # the group of a stylesheet / module is only taken for the reason classify() gives
 check(stages.touched_group("static/js/somemodule.js", "too broad: 80 suites") is None, "a client module that is too broad stays unmapped")
