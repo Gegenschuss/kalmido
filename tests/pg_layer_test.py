@@ -93,8 +93,9 @@ check(seen is not None, "the same pooled server connection came back within 200 
 check(seen == ("", "", "system"), f"a reused pooled connection starts as system ({seen})")
 
 # 2.37.0 Part 2 (W-1 / W-3): pool size and the session limits (pooled and direct connections)
-# 2.391.0 (#3360): the default follows the web threads (WEB_THREADS x 3 + 8, 80 at 24 threads)
-check(pg.POOL_MAX == max(4, int(os.environ.get("KALMIDO_DB_POOL_MAX") or os.environ.get("KALMIDO_POOL_MAX") or pg.WEB_THREADS * 3 + 8)) and pg.POOL_MIN == 4,
+# 2.391.0 (#3360): the default follows the web threads. 2.521.0 (#4475): WEB_THREADS + 16 (40 at 24 threads; was x 3 + 8)
+check(pg.POOL_MAX == max(4, int(os.environ.get("KALMIDO_DB_POOL_MAX") or os.environ.get("KALMIDO_POOL_MAX") or pg.WEB_THREADS + 16)) and pg.POOL_MIN == 4
+      and pg.POOL_IDLE_S == 30,
       f"pool 4..{pg.POOL_MAX}")
 for kind, cc in (("pooled", pg.connect_pooled(DATABASE_URL)), ("direct", pg.connect_direct(DATABASE_URL))):
     lim = (cc.execute("SHOW statement_timeout").fetchone()[0], cc.execute("SHOW idle_in_transaction_session_timeout").fetchone()[0])

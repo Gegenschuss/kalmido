@@ -480,8 +480,15 @@ try:
 except ValueError:
     print("warning: KALMIDO_THREADS is not a number; using 24", flush=True)
     WEB_THREADS = 24
+# 2.521.0 E (#4475): the default is threads + 16 (40 at 24 threads; was threads x 3 + 8 = 80). Every Postgres connection is a
+# process with its own caches (some 10-20 MB with ~270 tables); 80 of them do not fit a database limited to 512 MB - 1 GB
+# (the OOM restarts of 04.11.2026). A request holds one connection (a few borrow a second one for a moment, a long-poll gives
+# its one back while it waits), the background loops one each, so threads + 16 leaves room; a pool wait is logged
+# (pool_timeout_warn) and counted in /api/admin/health. Idle connections above POOL_MIN close after POOL_IDLE_S (one per
+# interval, psycopg_pool), so a burst does not keep its processes for hours (the pool's default: 10 min each).
 POOL_MIN = 4
-POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "") or WEB_THREADS * 3 + 8))
+POOL_MAX = max(POOL_MIN, int(os.environ.get("KALMIDO_DB_POOL_MAX", "") or os.environ.get("KALMIDO_POOL_MAX", "") or WEB_THREADS + 16))
+POOL_IDLE_S = 30
 POOL_WAIT_S = 30
 _POOL_TO = {"n": 0, "last": 0.0}  # 2.102.0 D (#1994): pool waits that ran out (the health check shows them, the log warns)
 # Every session: no statement runs longer than 30 s, no transaction idles longer than 5 min (a hung network call inside a
@@ -505,7 +512,7 @@ def pool(url):
         p = _POOL["p"]
         if p is None:
             # check: a cheap test of every borrowed connection, so a database restart costs no failed requests
-            p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=POOL_WAIT_S, open=False, configure=_configure,
+            p = ConnectionPool(url, min_size=POOL_MIN, max_size=POOL_MAX, timeout=POOL_WAIT_S, max_idle=POOL_IDLE_S, open=False, configure=_configure,
                                kwargs={**_new_conn_kwargs(), "context": _ctx_for_adapters()},
                                check=_check_borrowed,
                                reset=lambda pg: pg.rollback() if pg.info.transaction_status != TransactionStatus.IDLE else None)

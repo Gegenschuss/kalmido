@@ -13,7 +13,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `DATABASE_URL` | `(empty)` | PostgreSQL connection (postgresql://user:password@host:5432/db). Required. |
 | `KALMIDO_ACX_TTL` | `10` | Seconds the access context of a person (roles, organisations) is cached per process (0 = off). |
 | `KALMIDO_ALLOW_DOWNGRADE` | `0` | Switch: start on a database (or restore a backup) that a newer minor version of Kalmido wrote. Only for an emergency; the older version may not understand newer data. |
-| `KALMIDO_DB_POOL_MAX` | `(empty)` | Largest number of pooled database connections per process (empty = threads x 3 + 8). |
+| `KALMIDO_DB_POOL_MAX` | `(empty)` | Largest number of pooled database connections per process (empty = threads + 16). |
 | `KALMIDO_DB_STATEMENT_TIMEOUT` | `30` | Seconds one database statement of a request may run (0 = no limit). |
 | `KALMIDO_DB_WAIT` | `60` | Seconds the start waits for the database to answer. |
 | `KALMIDO_INSTANCE_MODE` | `(empty)` | Older switch of the instance mode (shared / workspaces); since 2.46 only read for the row-level security check. |

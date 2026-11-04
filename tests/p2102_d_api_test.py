@@ -132,8 +132,9 @@ check(j.get("ok") is True and j.get("version") and j.get("role") == "all", f"#19
 th, pl, cn = j.get("threads") or {}, j.get("pool") or {}, j.get("connections") or {}
 check(th.get("configured") == 24 and th.get("busy", 0) >= 1 and th.get("peak", 0) >= th.get("busy", 0),
       f"#1994: 24 threads by default (2.391.0 #3360, was 16), this request counts as busy {th}")
-check(pl.get("max") == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 80) and pl.get("min") == 4 and pl.get("timeouts") == 0
-      and "pool_size" in pl and "requests_waiting" in pl, f"#1994: the pool's counters (4..80 = 24 x 3 + 8; 2.391.0 #3360) {pl}")
+# 2.521.0 (#4475): the default pool is threads + 16 (was threads x 3 + 8 = 80)
+check(pl.get("max") == int(os.environ.get("KALMIDO_DB_POOL_MAX") or 40) and pl.get("min") == 4 and pl.get("timeouts") == 0
+      and "pool_size" in pl and "requests_waiting" in pl, f"#1994: the pool's counters (4..40 = 24 + 16; 2.521.0 #4475) {pl}")
 check(cn.get("max_connections", 0) >= 100 and cn.get("replicas") == 1 and cn.get("need") == pl.get("max", 0) + 6 and cn.get("ok") is True,
       f"#1994: the connection budget {cn}")
 check(all(isinstance(v, (int, float)) for v in pl.values()), "#1994: pool = numbers only")
@@ -225,8 +226,9 @@ check(health(A).get("loops", {}).get("watchdog") == "running", "#1997: the first
 start(keep=True, extra=" -e KALMIDO_THREADS=6")
 A = sess("alice")
 j = health(A)
-check((j.get("threads") or {}).get("configured") == 6 and (j.get("pool") or {}).get("max") == 26,
-      f"#1994: KALMIDO_THREADS=6 -> 6 threads, pool 6 x 3 + 8 = 26 {j.get('threads')} {j.get('pool', {}).get('max')}")
+# 2.521.0 (#4475): pool = threads + 16 (was 6 x 3 + 8 = 26)
+check((j.get("threads") or {}).get("configured") == 6 and (j.get("pool") or {}).get("max") == 22,
+      f"#1994: KALMIDO_THREADS=6 -> 6 threads, pool 6 + 16 = 22 {j.get('threads')} {j.get('pool', {}).get('max')}")
 start(keep=True, extra=" -e KALMIDO_DB_POOL_MAX=300 -e KALMIDO_REPLICAS=2")
 A = sess("alice")
 j = health(A)

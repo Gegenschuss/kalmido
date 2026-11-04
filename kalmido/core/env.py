@@ -23,7 +23,7 @@ VARS = (
     _v("TASKS_DB", "/data/tasks.db", "Names the data directory (its folder holds attachments, office files, backups and the marker file) and an old SQLite file from before 2.37 that is moved to PostgreSQL on the first start.", "core"),
     _v("DATABASE_URL", "", "PostgreSQL connection (postgresql://user:password@host:5432/db). Required.", "core"),
     _v("KALMIDO_DB_WAIT", "60", "Seconds the start waits for the database to answer.", "core"),
-    _v("KALMIDO_DB_POOL_MAX", "", "Largest number of pooled database connections per process (empty = threads x 3 + 8).", "core"),
+    _v("KALMIDO_DB_POOL_MAX", "", "Largest number of pooled database connections per process (empty = threads + 16).", "core"),
     _v("KALMIDO_POOL_MAX", "", "Older name of KALMIDO_DB_POOL_MAX (used when that one is not set).", "core"),
     _v("KALMIDO_DB_STATEMENT_TIMEOUT", "30", "Seconds one database statement of a request may run (0 = no limit).", "core"),
     _v("KALMIDO_THREADS", "24", "Web server threads per process (2-256).", "core"),

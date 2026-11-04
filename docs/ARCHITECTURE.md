@@ -658,8 +658,9 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   of the existing SQL (literals, comments and `$$` bodies are left alone), returns rows that behave like before (index,
   name, `keys()`, `dict()`), and offers `insert_id()` (`RETURNING id`), `write_lock()` (advisory lock for check-then-write),
   `savepoint()`, `heal()` (rollback after an aborted transaction), `like_escape()` and `system_ctx()`.
-  `db()` / `connect()` in `core/db.py` lend a connection from a pool (4 to 80 with the default 24 threads, `KALMIDO_DB_POOL_MAX`; every lend is
-  checked, so a restarted database costs no errors). 2.102: the pool follows `KALMIDO_THREADS` (threads x 3 + 8), a
+  `db()` / `connect()` in `core/db.py` lend a connection from a pool (4 to 40 with the default 24 threads, `KALMIDO_DB_POOL_MAX`; every lend is
+  checked, so a restarted database costs no errors). 2.102: the pool follows `KALMIDO_THREADS` (2.521: threads + 16, was
+  threads x 3 + 8; idle connections above 4 close after 30 s one by one, #4475), a
   wait that runs out is logged with the pool's counters, `GET /api/admin/health` shows them (`admin/worker.py`).
 - **Migrations (2.102).** `MIGRATIONS` in `core/schema.py` stays a list of additive steps (append at the end). Each step
   gets a stable id from table + column (`tasks.pinned`, a second step for the same column `lists.tap_done#2`), so its
