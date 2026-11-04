@@ -272,13 +272,33 @@ check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{GAM}",)), "2.137.1 (#2399
 check(dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"o{ORG}",)), "the source's document settings stay")
 # 2.352.0 A (#2748): a list is a node of the file store (below the area root "Projects"); the undo puts the lists into the
 # trash (2.272.0 C, restorable), their nodes stay with them
-LFN = "(ref_kind='list' OR id IN (SELECT node_id FROM fs_area_roots WHERE area='lists' AND node_id IS NOT NULL))"
-left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND NOT {LFN}" if t == "fs_nodes" else ""), (GAM,))[0]["n"]
-        for t in ("fs_nodes", "doc_meta", "doc_senders", "doc_types", "doc_tags", "doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
+# 2.506.0 (#4299): the top folder of any area stays (empty), as the app never lets it go into the trash
+# 2.506.0 (#4299): files, pages and tables lie in their trash, with what hangs on them (restorable); so: nothing of it live
+def live_nodes(where, args):
+    """Nodes neither in the trash themselves nor below a folder in it (and not the area top folders / list nodes)."""
+    rows = dbx(f"SELECT id, parent_id, deleted_at, COALESCE(ref_kind, '') AS rk, id IN (SELECT node_id FROM fs_area_roots WHERE node_id IS NOT NULL) AS top FROM fs_nodes WHERE {where}", args)
+    by = {r["id"]: r for r in rows}
+
+    def gone(r):
+        while r is not None:
+            if r["deleted_at"]:
+                return True
+            r = by.get(r["parent_id"])
+        return False
+    return [r["id"] for r in rows if not gone(r) and r["rk"] != "list" and not r["top"]]
+
+
+LIVE = {"wiki_pages": "deleted_at IS NULL", "sheets": "deleted_at IS NULL",
+        "wiki_files": "page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL)",
+        "wiki_versions": "page_id IN (SELECT id FROM wiki_pages WHERE deleted_at IS NULL)", "sheet_files": "sheet_id IN (SELECT id FROM sheets WHERE deleted_at IS NULL)"}
+LN = live_nodes("org_id=?", (GAM,))
+left = {t: dbx(f"SELECT COUNT(*) AS n FROM {t} WHERE org_id=?" + (f" AND {LIVE[t]}" if t in LIVE else ""), (GAM,))[0]["n"]
+        for t in ("doc_rules", "wiki_pages", "wiki_files", "wiki_versions", "sheets",
                   "sheet_files", "video_reviews", "video_versions", "video_comments")}
-check(not any(left.values()), f"undo removes every taken-over row {left} "
-      f"{[dict(r) for r in dbx('SELECT id, kind, name, parent_id, ref_kind, deleted_at FROM fs_nodes WHERE org_id=?', (GAM,))] if left.get('fs_nodes') else ''}")
-check(not dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "and the versions")
+check(not any(left.values()) and not LN, f"undo takes every taken-over row out {left} {LN}")
+check(dbx("SELECT 1 FROM fs_versions WHERE node_id=?", (NF,)), "2.506.0 (#4299): the versions stay with their node in the trash")
+check(dbx("SELECT 1 FROM doc_senders WHERE org_id=?", (GAM,)) and dbx("SELECT 1 FROM doc_tags WHERE org_id=?", (GAM,)),
+      "2.506.0 (#4299): the labels wait for their document in the trash")
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- a person without an organisation imports it privately
@@ -313,8 +333,9 @@ fv = one("SELECT id, org_id, owner_id FROM video_reviews WHERE owner_id=?", (FID
 check(fv and fv["org_id"] is None, "freelancer: the sign-off is private")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id=?", (FID,)), "freelancer: still in no organisation")
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not dbx(f"SELECT 1 FROM fs_nodes WHERE owner_id=? AND NOT {LFN}", (FID,)) and not dbx("SELECT 1 FROM sheets WHERE owner_id=?", (FID,)),
-      "freelancer: undo removes it again")
+check(r.ok and not live_nodes("owner_id=?", (FID,))
+      and not dbx("SELECT 1 FROM sheets WHERE owner_id=? AND deleted_at IS NULL", (FID,)),
+      "freelancer: undo takes it out again (2.506.0 #4299: into the trash)")
 check(not dbx("SELECT 1 FROM doc_cfg WHERE ws=?", (f"u{FID}",)), "2.137.1 (#2399): freelancer: undo removes the private document settings")
 
 if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)

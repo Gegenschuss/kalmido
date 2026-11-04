@@ -147,7 +147,9 @@ check(len(gs) == 1 and Gi.get(B + f"/api/sheets/{gs[0][1]}/files/{gs[0][0]}").co
 cell = one("SELECT raw FROM sheet_cells WHERE sheet_id=? AND raw LIKE 'file:%'", (gs[0][1] if gs else 0,))
 check(cell == f"file:{gs[0][0] if gs else 0}", f"#3470 the file cell points at the new file {cell}")
 check(IMP and Gi.post(B + f"/api/imports/{IMP}/undo", json={}).ok, "the undo")
-check(not kt.dbx("SELECT 1 FROM fs_nodes WHERE id=?", (GN,)) and not kt.dbx("SELECT 1 FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE p.owner_id=? AND f.deleted_at IS NULL", (GID,)),
+# 2.506.0 (#4299): into the trash (the file with its folder), the bytes stay for a restore
+check(one("SELECT deleted_at FROM fs_nodes WHERE id=(SELECT parent_id FROM fs_nodes WHERE id=?)", (GN,))
+      and not kt.dbx("SELECT 1 FROM wiki_files f JOIN wiki_pages p ON p.id=f.page_id WHERE p.owner_id=? AND p.deleted_at IS NULL", (GID,)),
       "#3470 the undo takes the files away again")
 
 # ---------------------------------------------------------------- the space check before the run

@@ -267,7 +267,8 @@ check(r.ok, "undo " + r.text[:160])
 check(not sql("SELECT 1 FROM office_letters WHERE org_id=?", (GAM,)) and not sql("SELECT 1 FROM office_letter_blocks WHERE org_id=?", (GAM,)),
       "undo removes the letters and text blocks")
 gf = [x[0] for x in sql("SELECT name FROM doc_fields WHERE ws=?", (f"o{GAM}",))]
-check(gf == ["Stand"], f"undo removes the field it made, the target's own stays {gf}")
+# 2.506.0 (#4299): the field it made waits for the document in the trash that has a value in it
+check(sorted(gf) == ["Aktenzeichen", "Stand"], f"undo keeps the field while a document in the trash has a value in it, the target's own stays {gf}")
 # 2.369.0 (#2734): the option the import added goes again, the target's stay
 go = [o["name"] for o in json.loads(one("SELECT options FROM doc_fields WHERE id=?", (GFS,))[0])["options"]]
 check(go == ["Offen", "Später"], f"undo takes back the option the import added {go}")
@@ -279,7 +280,8 @@ code = (f"from kalmido.core.db import connect, col_present\nfrom kalmido.core.ac
         "col_present(c, 'ALTER TABLE users ADD COLUMN IF NOT EXISTS id INT, ADD COLUMN IF NOT EXISTS zz INT'))\nc.close()")
 ct = subprocess.run(["docker", "exec", os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test"), "python3", "-c", code], capture_output=True, text=True)
 check(ct.stdout.split() == ["denied", "True", "False"], f"undo right + col_present {ct.stdout} {ct.stderr[-300:]}")
-check(not sql("SELECT 1 FROM doc_field_values WHERE ws=?", (f"o{GAM}",)), "undo removes the values")
+check(sql("SELECT 1 FROM doc_field_values WHERE ws=?", (f"o{GAM}",)) and sql("SELECT 1 FROM fs_nodes WHERE org_id=? AND deleted_at IS NOT NULL", (GAM,)),
+      "2.506.0 (#4299): the values stay with their document in the trash")
 A.delete(B + f"/api/account/import/{iid}")
 
 # ---------------------------------------------------------------- a person without an organisation imports it privately
@@ -309,8 +311,7 @@ names = zip_names(Fr, "/api/retention/me/export.zip")
 check("letters/letters.csv" in names and any(n.startswith("letters/") and n.endswith(".pdf") for n in names),
       f"#2628 freelancer: the retention ZIP has the letter {[n for n in names if n.startswith('letters/')]}")
 r = Fr.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
-check(r.ok and not sql("SELECT 1 FROM office_letters WHERE org_id=?", (PB,)) and not sql("SELECT 1 FROM doc_fields WHERE ws=?", (f"u{FID}",)),
-      "freelancer: undo removes the letters and the fields")
+check(r.ok and not sql("SELECT 1 FROM office_letters WHERE org_id=?", (PB,)), "freelancer: undo removes the letters")  # 2.506.0 (#4299): the fields as above
 
 # #3506 (CI 2.496.0: "asks for the recovery key failed The import was interrupted"): the run ends between two looks at its row. The
 # status reads the state again after the look that found no row, so only a run that really ended without its end says "interrupted"
