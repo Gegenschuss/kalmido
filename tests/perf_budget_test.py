@@ -42,7 +42,8 @@ rc, out = run("--ratchet")
 check(rc == 2 and "gone" in out, "(a) 2.521.0 (#4391): --ratchet is refused, not passed silently: " + out)
 ci = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
 steps = [ln for ln in ci.splitlines() if "tools/perf_budget.py" in ln and "run:" in ln]
-check(steps and not [ln for ln in steps if "--ratchet" in ln] and "CI_BEFORE" not in ci, "(a) 2.521.0 (#4391): the CI step has no ratchet: " + repr(steps))
+step = ci[ci.index("- name: Performance budget"):][:400].split("\n      - ")[0] if "- name: Performance budget" in ci else ""
+check(steps and not [ln for ln in steps if "--ratchet" in ln] and step and "CI_BEFORE" not in step, "(a) 2.521.0 (#4391): the CI step has no ratchet: " + repr(steps))
 
 with tempfile.TemporaryDirectory() as tmp:
     small = os.path.join(tmp, "small.json")
