@@ -58,8 +58,9 @@ migrates itself.
 - `semgrep` flags SQL built with f-strings: the interpolated parts are fixed SQL fragments or `?`
   placeholder lists, never user input; values always go through parameters.
 - `semgrep` / `bandit` flag `urllib` requests with a URL from configuration: server-side requests only go to
-  the ntfy servers, Git hosts and calendar servers the admin or users configure and to the GitHub releases API, through a wrapper that
-  allows http/https only and same-host redirects.
+  the services in the [list of outgoing connections](docs/SELF-HOSTING.md#outgoing-connections), through a wrapper that
+  allows http/https only and same-host redirects, or, for addresses people give (calendars, feeds, invoice links in mails),
+  a guard that connects to public addresses only.
 - ZAP reports the `style-src 'unsafe-inline'` part of the Content-Security-Policy: scripts are strictly
   `'self'`; inline styles are used for user-chosen list colours (validated hex values).
 

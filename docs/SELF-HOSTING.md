@@ -1680,8 +1680,9 @@ Kalmido calls no language model itself -- except the built-in assistant, and onl
 OpenAI-compatible chat-completions endpoint (`POST <base>/chat/completions`): a local model (Ollama, vLLM, LocalAI) or a
 provider of your choice. Nothing is wired in; without the two variables below the assistant does not exist (no menu, no
 routes, nothing in `/api/state`). Each person switches it on for themselves (*Settings > Agents > Built-in assistant*) and shares single projects
-with it; only those projects, basket items they pick and texts they type are sent, as a summary, a draft or a proposal they
-apply or discard (nothing is changed directly). Locked notes, health lists, attachments, files and office documents are never
+with it; only those projects, basket items they pick and texts they type are sent (plus, for a day plan, the times of the
+person's calendar events as *Busy*, no titles; when tasks are made from a text, the project's name, its sections and the
+names of its members), as a summary, a draft or a proposal they apply or discard (nothing is changed directly). Locked notes, health lists, attachments, files and office documents are never
 sent. Every call leaves a log row with numbers only (no texts), kept `KALMIDO_AUDIT_DAYS` days; admins see the daily counts.
 
 | Variable | Default | Purpose |
@@ -1971,7 +1972,7 @@ or a person sets the function up.
 | --- | --- | --- | --- |
 | Update check | Request to the GitHub API for the latest release (your server's address, no data of yours) | every 6 hours | `KALMIDO_UPDATE_CHECK=0` or the admin switch |
 | Image pull and `update.sh` | Image from ghcr.io; `update.sh` downloads the installer (`install.sh`) of the latest release | at install and at every update you start | do not run `update.sh`; pull a pinned image yourself |
-| Built-in assistant | Task texts, notes and comments of the list the person picked, to the service in `KALMIDO_AI_BASE_URL` | per call of the person | off while `KALMIDO_AI_BASE_URL` is empty (default) |
+| Built-in assistant | Task texts, notes and comments of the list the person picked, texts they type, for a day plan their busy times, to the service in `KALMIDO_AI_BASE_URL` | per call of the person | off while `KALMIDO_AI_BASE_URL` is empty (default) |
 | Similarity service | Titles and descriptions of tasks, to the service in `KALMIDO_EMBED_URL` | in the background | off while `KALMIDO_EMBED_URL` is empty (default) |
 | Agents you connect | What the agent reads, to the AI provider you connected it with | when the agent works | do not connect agents; see [AGENT-SECURITY.md](AGENT-SECURITY.md) |
 | ntfy push | Title and text of a notification, in plain text, to `NTFY_URL` (default ntfy.sh) | per notification, once a person picked a topic | do not set a topic; set `NTFY_URL` to your own server |
@@ -1985,6 +1986,8 @@ or a person sets the function up.
 | Newsletter services | E-mail address and name of subscribers to listmonk, Brevo or CleverReach | when the office newsletter module is used | leave the newsletter module off |
 | Paperless | Requests to the Paperless server of the person | per use | do not connect Paperless |
 | E-invoice (Peppol) | The invoice with customer data to Storecove or your own endpoint | when you send an invoice that way | do not set up Peppol |
+| Online payment (Stripe) | Amount, currency, invoice number as title and return address to `api.stripe.com`; fees of a payout are fetched. Stripe calls back at `/api/hooks/pay/...` | when a customer starts a payment; when a payout is matched | do not set up online payment in the office |
+| Invoice links in mails | A download link in a mail to a document address is fetched once (https, public addresses only, no sign-in) | when such a mail has no file of its own | do not give out a document address |
 | Git connections | Requests to GitHub, GitLab, Bitbucket or your own server | per connection | remove the connection |
 | Webhooks | Task data and comment text to the address of the hook | per event | `KALMIDO_WEBHOOKS=0` or remove the hook |
 | Channels | Slack, Telegram, Matrix or Signal: title, names and a comment excerpt of up to 280 characters | per event | remove the channel |

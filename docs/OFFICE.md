@@ -2239,9 +2239,10 @@ A sent quotation gets an **approval link** (block *Approval by the customer* in 
 older one), `GET /api/office/docs/<id>/signoffs` (newest first, with the protocol), `POST /api/office/signoffs/<sid>/revoke`.
 The customer opens `/s/q/<token>` without an account: the quotation as a summary (positions, totals) and as PDF, types a
 name (e-mail optional), ticks *I accept the quotation* and presses *Accept bindingly*, or declines with an optional
-reason. Stored in `office_signoffs` and in the office log (`signoff_accepted` / `signoff_declined` with the detail): name,
-e-mail, time (UTC), client address, user agent and the SHA-256 of the quotation's printed content when the link was
-made (`doc_hash`). The quotation is set to accepted / declined through the same code as the status change in the app
+reason. Stored in `office_signoffs`: name, e-mail, reason, time (UTC), client address, user agent and the SHA-256 of the
+quotation's printed content when the link was made (`doc_hash`). The office log (`signoff_accepted` / `signoff_declined`)
+names only the record, the signer's name, the time, the hash and the state of the terms, never e-mail, address or device
+(since 2.148.1). The quotation is set to accepted / declined through the same code as the status change in the app
 (`odoc_set_status`: purchase, sales pipeline). Afterwards the link shows only the confirmation; a second decision is
 impossible. A quotation that changes after the link was made voids the link. The person who made the link gets a push
 (notification switch *Approval requests*). Token: 256 bits, looked up by its SHA-256 (a sealed copy lets the creator copy
@@ -2405,7 +2406,7 @@ reference line and the signature picture are encrypted at rest in areas with enc
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
 what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
 PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
-minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
+minutes are written once. Reads (open, preview, PDF, XML) are kept for 90 days, all other entries stay. Organisation admins see the history of a document in its editor ("History") and the latest
 entries under Settings > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
 

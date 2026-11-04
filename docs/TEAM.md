@@ -213,7 +213,9 @@ questions stays the classic form.
   "Client unknown". **Unknown address: create a new client** (off by default) creates one there instead (at most 20 per
   form and day).
 - **Submissions**: the form dialog lists the tasks the form made with their answers (only those still in its project and
-  not deleted) and downloads them as CSV, a column per question. Only the people who manage the form see them.
+  not deleted) and downloads them as CSV, a column per question. This list and the CSV are for the people who manage the
+  form. The answers and the sender's address also stand in the task: everyone who sees the task reads them, and the project's
+  agents get the task.
 - Moving the project into the other workspace takes its forms and their questions along; a client of the old workspace is
   then no longer named in the submissions.
 
@@ -357,9 +359,11 @@ control*: it opens in a new tab and its comments carry no timecode.
   organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
   workspace. Undo brings it back to its old place. Since 2.122.4 the records stay bound to the sign-off and show again
   when it comes back; in the new workspace they never show.
-- Deleting for good: a sign-off in the trash is deleted for good after 30 days with its versions, comments and customer
-  records. A task, project or client that is deleted for good takes its video sign-offs with it, including the customer's
-  recorded decision (like the approval records of documents).
+- Deleting for good: a sign-off in the trash is deleted for good after 30 days with its versions and comments. A task,
+  project or client that is deleted for good takes its video sign-offs with it. The customer's approval records **stay**: name,
+  e-mail, reason, address, device and the decision, without the link to the video. The admins of the organisation and the
+  creator see and delete them; a decided record of an organisation or a personal office only after its legal period (6 years,
+  to the end of the year).
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
 
@@ -617,7 +621,7 @@ form does not put reports into that person's list; 2.360). Nobody needs an accou
 With *Settings > Company & office > Data > Show documents in the customer portal* (off by default; the office's admin, or the
 person in their own personal office) the portal also lists the client's **documents**: sent quotations (with the button
 *Review and approve* while an approval link is open), invoices with their payment state (open, partly paid with the open
-amount, overdue, paid; the due date) and credit notes. Each opens as the PDF that was sent. The customer is every client
+amount, overdue, paid; the due date; with online payment on, the button *Pay now* while something is open) and credit notes. Each opens as the PDF that was sent. The customer is every client
 of the same organisation (or the same personal office) whose e-mail or e-mail for invoices is the signed-in address.
 
 - **Getting in.** In the client's menu (*More*) **Send portal link** mails the client the same one-time sign-in link
@@ -841,8 +845,9 @@ The group no longer grows with every person you share a project with:
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
   more, the server admins see it in *Settings > Administration > Organisations* as "kept until ..." (its delete
   button shows the period), nobody can change it. Since 2.186.0 only the people who were its admins when it was retired
-  export it (*Settings > Organisation* lists it with the export), other server admins do not; the retired personal office
-  of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same. After the date the retention run deletes it
+  export it (*Settings > Organisation* lists it with the export), other server admins do not, with one exception: when no
+  former admin is left (or it was retired before 2.186.0), the server admins may download the retention export (the records
+  kept by law), never the full export; the retired personal office of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same. After the date the retention run deletes it
   for good (only when the server's retention switch is on; until then it is counted, see SELF-HOSTING.md).
 - **Deleting an organisation** asks first when it would take knowledge pages, tables or office data along: the dialog
   names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one its former
