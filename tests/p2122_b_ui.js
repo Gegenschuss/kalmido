@@ -84,6 +84,14 @@ const tagsOf = async id => ((await call('GET', `/api/files/nodes/${id}/tags`)).t
   }
   click(w, d.querySelector('[data-dtabx="Steuer"]'));
   check(await until(() => !d.querySelector('.tsfbar') && d.querySelector(`.abrow[data-abid="${R[0]}"]`) && d.querySelector(`.abrow[data-abid="${K}"]`)), 'taking the filter out: the folder again');
+  // 2.521.0 (#4398): a tag filter never changes the chosen view: the space shown as cards stays cards while filtered
+  await w.eval(`(async () => { if (typeof abd_cardsOn !== 'function' && typeof ld_later === 'function') ld_later('docs'); for (let i = 0; i < 40 && typeof abd_cardsHtml2 !== 'function'; i++) await new Promise(r => setTimeout(r, 150)); S.settings.ab_cards = JSON.stringify([ab_key(S.route)]); ab_draw(); return 1; })()`);
+  click(w, d.querySelector('[data-dtab="filter"]'));
+  const fm2 = await until(() => d.querySelector('.modal.tsdlg [data-dtf="Steuer"]') && d.querySelector('.modal.tsdlg'));
+  if (fm2) { click(w, fm2.querySelector('[data-dtf="Steuer"]')); click(w, fm2.querySelector('[data-m="close"]')); }
+  check(await until(() => d.querySelector('.tsfbar [data-dtabx="Steuer"]') && d.querySelector('ul.abcards') && !d.querySelector('.ablist .abrow')), '#4398: tag filter in the cards view: the cards stay (no switch to the list)');
+  click(w, d.querySelector('[data-dtabx="Steuer"]'));
+  await w.eval(`(() => { S.settings.ab_cards = '[]'; ab_draw(); return 1; })()`);
 
   // ================= #2295 the file store: Shift ranges
   const box = id => d.querySelector(`[data-absel="one"][data-id="${id}"]`);
