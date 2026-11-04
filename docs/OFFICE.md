@@ -2327,8 +2327,13 @@ out with. This applies to organisation offices and to the personal office alike.
   cannot be read as a PDF leave the quotation PDF unchanged (a log line, no error).
 - **Sending**: finalised quotations can be mailed too (status `sent`). A quotation goes out as ONE PDF with the terms
   inside (the send dialog says so instead of offering a tick); only when the terms cannot be joined they go along as their
-  own file as before; `terms: false` in the send body has no effect for a quotation any more, except in that case (no own
-  file then, although the PDF says "see attachment"). Invoices, credit notes and reminders have the tick *Attach terms
+  own file as before; `terms: false` in the send body has no effect for a quotation any more, except in that case. Since
+  2.534 (#4339) a mail never goes out silently without terms that are due: when a quotation's terms could neither be
+  joined nor go along (`terms: false`), or the terms file of the document is gone, `POST /api/office/docs/<id>/send`
+  answers `409` with `{"code": "terms_missing", "reason": "join" | "gone", "terms": {lang, date}, "field":
+  "agb_ok_without", "error": <the reason in plain words>}`. The send dialog shows that text and asks: pages that could
+  not be joined go again as their own file (`terms: true`), a missing file goes without terms (`agb_ok_without: true`
+  in the body); Cancel sends nothing. Invoices, credit notes and reminders have the tick *Attach terms
   and conditions* (unticked) when the
   document's language has terms. The own file is named `AGB-Stand-<date>.pdf` / `Terms-<date>.pdf`; the log entry "send"
   names the state (language, date, SHA-256) and the document's history shows "with terms and conditions as of ...". The

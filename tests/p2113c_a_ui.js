@@ -3,6 +3,7 @@
 //   their name and date with Show / Replace / Remove, the English row offers Upload; Remove is one undo step
 // - the send dialog of a finalised quotation has the tick "Attach terms and conditions", ticked; an invoice's is unticked;
 //   a quotation in a language without terms has no tick
+// - 2.534.0 (#4339): terms that cannot go along (409 terms_missing) ask the sender before the mail is sent again
 // Invented companies and files only.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -72,6 +73,20 @@ const FEAT = 'cal,comments,collab,office,clients';
   await until(() => d.querySelector('#ofd-s-terms-in'), 40);
   const tk = d.querySelector('#ofd-s-terms-in');
   check(tk && !d.querySelector('#ofd-s-terms') && /last pages of the PDF/.test(tk.textContent || ''), 'quotation: the note "terms are the last pages of the PDF", no tick');
+  // 2.534.0 (#4339): a 409 terms_missing asks the sender (the confirm dialog names why); yes = sent again with the field,
+  // pages not joined = again with terms: true; Cancel sends nothing more
+  const seen = [], sent = [];
+  w.confirm = m => { seen.push(m); return seen.length === 1; };
+  const miss = (reason, x) => { sent.push(x); return sent.length % 2 ? {terms_missing: {code: 'terms_missing', reason, field: 'agb_ok_without'}, message: 'Invented reason ' + reason} : {id: 7}; };
+  const r1 = await w.eval('ofcSendTerms')(async x => miss('gone', x));
+  check(/Terms and conditions missing/.test(seen[0] || '') && /Invented reason gone/.test(seen[0] || ''), '#4339: the question names why: ' + seen[0]);
+  check(r1?.id === 7 && sent.length === 2 && sent[1].agb_ok_without === true, '#4339: yes = sent again with agb_ok_without ' + JSON.stringify(sent));
+  sent.length = 0;
+  const r2 = await w.eval('ofcSendTerms')(async x => miss('join', x));
+  check(r2 === null && sent.length === 1 && seen.length === 2, '#4339: Cancel = nothing sent again');
+  w.confirm = () => true; sent.length = 0;
+  const r3 = await w.eval('ofcSendTerms')(async x => miss('join', x));
+  check(r3?.id === 7 && sent[1]?.terms === true && !sent[1].agb_ok_without, '#4339: pages not joined: yes = sent again as a separate file (terms: true)');
   w.close();
   w = await boot({hash: 'office/offers/' + inv.id}); d = w.document;
   await until(() => d.querySelector('[data-ofd="send"]'), 60);

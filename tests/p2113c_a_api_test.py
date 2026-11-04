@@ -7,6 +7,8 @@ in mode workspaces, organisation encryption on, the SMTP sink of stub_mail.py. I
  - freezing: finalising a quotation keeps the state of its language (office_docs.terms); replacing the terms later leaves
    the finalised one, its PDF line and its mail attachment as they were; a draft follows the current state; a copy takes
    none along; terms in the other language only = no line, no attachment
+ - 2.534.0 (#4339): due terms that cannot go along (pages not joined + terms=false, or the file gone) answer 409
+   terms_missing; agb_ok_without: true sends without them
  - sending: a quotation attaches them by default ("AGB-Stand-<date>.pdf"), terms=false leaves them out, an invoice only on
    request; the log entry "send" names the state (lang, date, sha256)
  - approval link: /s/q/<token>/terms serves the state of the link's quotation (noindex, no-referrer), a wrong token and
@@ -211,9 +213,38 @@ lg = A.get(B + f"{D}/{Q}/log").json()["log"]
 snd = [x for x in lg if x["action"] == "send"]
 check(snd and (snd[0].get("detail") or {}).get("terms", {}).get("sha256") == SHA1 and "AGB-Stand-2026-10-01.pdf" in snd[0]["detail"].get("files", []),
       f"the log names the terms state {snd[:1]}")
+# 2.534.0 (#4339): terms=false on a quotation whose pages cannot be joined (the invented terms are no real PDF) used to send
+# silently without them although its PDF says "see attachment" - now 409 with the reason, sent only after agb_ok_without
 r = A.post(B + f"{D}/{Q}/send", json={"to": "kunde@example.com", "terms": False})
+j = r.json() if r.status_code == 409 else {}
+check(r.status_code == 409 and j.get("code") == "terms_missing" and j.get("reason") == "join" and j.get("field") == "agb_ok_without"
+      and (j.get("terms") or {}).get("date") == "2026-10-01" and "01.10.2026" in (j.get("error") or ""),
+      f"#4339: terms=false, pages not joined: 409 terms_missing (join) {r.status_code} {r.text[:200]}")
+check(len(mails()) == n0 + 1, "#4339: the refused send mails nothing")
+r = A.post(B + f"{D}/{Q}/send", json={"to": "kunde@example.com", "terms": False, "agb_ok_without": True})
 m = mails()[n0 + 1:]
-check(r.ok and len(m) == 1 and "AGB-Stand" not in m[0]["raw"], "terms=false: without the terms")
+check(r.ok and len(m) == 1 and "AGB-Stand" not in m[0]["raw"], "terms=false + agb_ok_without: without the terms")
+# 2.534.0 (#4339): the frozen terms file of a finalised quotation is gone -> 409 (reason gone), then only with agb_ok_without
+QG = A.post(B + D, json={"kind": "offer", "client_id": CL, "items": [{"title": "Licht", "qty": 1, "rate": 200}]}).json()["id"]
+check(A.post(B + f"{D}/{QG}/finalize").ok, "setup: a second quotation finalised")
+_c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+try:
+    _fz = json.loads(_c.execute("SELECT terms FROM office_docs WHERE id=?", (QG,)).fetchone()[0] or "{}")
+    _c.execute("UPDATE office_docs SET terms=? WHERE id=?", (json.dumps({**_fz, "file": "terms-de-0000000000000000.pdf"}), QG))
+    _c.commit()
+finally:
+    _c.close()
+check(_fz.get("file"), "setup: the quotation froze its terms")
+n3 = len(mails())
+r = A.post(B + f"{D}/{QG}/send", json={"to": "kunde@example.com"})
+j = r.json() if r.status_code == 409 else {}
+check(r.status_code == 409 and j.get("code") == "terms_missing" and j.get("reason") == "gone" and "15.10.2026" in (j.get("error") or ""),
+      f"#4339: the terms file is gone: 409 terms_missing (gone) {r.status_code} {r.text[:200]}")
+r = Bo.post(B + f"{D}/{QG}/send", json={"to": "kunde@example.com", "agb_ok_without": True})
+m = mails()[n3:]
+check(r.ok and len(m) == 1 and "AGB-Stand" not in m[0]["raw"], f"#4339: agb_ok_without: sent without the terms {r.status_code} {r.text[:160]}")
+snd = [x for x in A.get(B + f"{D}/{QG}/log").json()["log"] if x["action"] == "send"]
+check(snd and not (snd[0].get("detail") or {}).get("terms"), f"#4339: the log names no terms {snd[:1]}")
 r = A.post(B + D, json={"kind": "invoice", "client_id": CL, "service_from": "2026-10-01", "items": [{"title": "Schnitt", "qty": 1, "rate": 100}]})
 INV = r.json()["id"]
 r = A.post(B + f"{D}/{INV}/finalize")
@@ -305,6 +336,12 @@ check(Fr.post(B + f"{D}/{FQ}/finalize").ok, "freelancer: finalises")
 n2 = len(mails())
 r = Fr.post(B + f"{D}/{FQ}/send", json={"to": "client@example.com"})
 check(r.ok and "Terms-2026-09-30.pdf" in (mails()[n2:] or [{"raw": ""}])[0]["raw"], "freelancer: the mail carries Terms-2026-09-30.pdf")
+# 2.534.0 (#4339): the same as a person without an organisation (their invented terms cannot be joined either)
+r = Fr.post(B + f"{D}/{FQ}/send", json={"to": "client@example.com", "terms": False})
+check(r.status_code == 409 and r.json().get("code") == "terms_missing", f"freelancer: terms=false without joined pages: 409 {r.status_code} {r.text[:160]}")
+n4 = len(mails())
+r = Fr.post(B + f"{D}/{FQ}/send", json={"to": "client@example.com", "terms": False, "agb_ok_without": True})
+check(r.ok and "Terms-2026" not in (mails()[n4:] or [{"raw": "Terms-2026"}])[0]["raw"], "freelancer: agb_ok_without sends without the terms")
 r = Fr.delete(B + f"{T}/en")
 check(r.ok and Fr.post(B + f"{T}/en/restore", json=r.json()["removed"]).ok and Fr.get(B + T).json()["terms"]["en"], "freelancer: remove + undo")
 check(Fr.get(B + f"{D}/{Q}/terms").status_code == 404, "freelancer: a document of an organisation is 404")
