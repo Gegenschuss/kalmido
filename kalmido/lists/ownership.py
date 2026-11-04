@@ -198,9 +198,8 @@ def list_owner_set(lid):
         return err(tr("{0} already owns this project", u["display_name"] or u["username"]))
     from ..accounts.orgs import ws_check_member
     ws_check_member(c, lid, new)  # 2.28.0 (#935): an organisation's list stays inside the organisation (409)
-    from ..accounts.orgroles import org_writes
-    if lr["org_id"] and not org_writes(c, new, lr["org_id"]):  # 2.143.0 A (#2151, review): guest / read-only / accounting own no list
-        return err(tr("Only a member or admin of the organisation can own its projects"), 409)
+    from ..accounts.orgs import ws_check_owner
+    ws_check_owner(c, lr["org_id"], new)  # 2.143.0 A (#2151, review): guest / read-only / accounting own no list; 2.538.0 (#4371): shared rule
     old, nname = owner_transfer(c, lr, new)
     if mode == "takeover":
         own_takeover_log(c, lr, old, nname)

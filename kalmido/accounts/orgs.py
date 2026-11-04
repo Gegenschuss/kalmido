@@ -451,6 +451,15 @@ def ws_check_member(c, lid, uid, org_id=None):
         raise Denied(409, p)
 
 
+def ws_check_owner(c, oid, uid):
+    """2.538.0 (#4371): Denied(409) when uid may not own a project of organisation oid -- the rule of list_owner_set for every
+    way a project changes hands (handover by an organisation admin, a folder, an heir when someone leaves): only a member or
+    an admin (org_writes); a guest / read-only / accounting person never becomes the owner (the role cap #2151)."""
+    from .orgroles import org_writes
+    if oid and not org_writes(c, uid, oid):
+        raise Denied(409, tr("Only a member or admin of the organisation can own its projects"))
+
+
 def _orgs_w(c, uid):
     """2.143.0 A (#2151): uid's organisations in which they may add content (member / admin)."""
     from .orgroles import user_orgs_full
@@ -890,6 +899,9 @@ def _members_gone(c, oid, gone):
                 or c.execute("SELECT id FROM users WHERE is_admin=1 AND disabled=0 AND kind!='agent' ORDER BY id LIMIT 1").fetchone() or [None])[0]
         if heir and not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, heir)).fetchone():
             org_member_add(c, oid, heir, "admin")  # no admin stays: the operator takes over (like org_member_remove)
+        elif heir and c.execute("UPDATE org_members SET role='admin' WHERE org_id=? AND user_id=? AND role NOT IN ('admin','member')",
+                                (oid, heir)).rowcount:
+            acx_drop()  # 2.538.0 (#4371): the heir is only ever an admin or member -- an operator in it as guest / read-only takes over as admin
         for u in gone:
             org_leave(c, oid, u, heir)
 
@@ -995,6 +1007,7 @@ def org_heir_to(c, oid, uid, raw):
         return None
     if to == me() or c.execute("""SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=?
                                   AND m.user_id!=? AND u.disabled=0 AND COALESCE(u.kind,'user')!='agent'""", (oid, to, uid)).fetchone():
+        ws_check_owner(c, oid, to)  # 2.538.0 (#4371): only to a member / admin (409); asked by an organisation admin, who sees the roles
         return to
     return None
 
@@ -1536,6 +1549,8 @@ def org_leave(c, oid, uid, heir, back=None):
     The caller commits. Returns the number of lists transferred."""
     from ..lists.ownership import owner_transfer
     from .orgleave import OLV_AREAS, olv_memo, olv_snap
+    if heir and heir != uid:
+        ws_check_owner(c, oid, heir)  # 2.538.0 (#4371): every caller's heir is a member / admin of the organisation (409)
     snap = olv_snap(c, oid, uid)  # 2.363.3 (#3133): what the end of the membership takes away, for coming back within a day
     n, priv = 0, []
     for lr in c.execute("SELECT * FROM lists WHERE owner_id=? AND org_id=? AND is_inbox=0", (uid, oid)).fetchall():

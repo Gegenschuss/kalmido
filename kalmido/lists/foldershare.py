@@ -262,7 +262,7 @@ def sh_folder_owner():
     with the rules of "Transfer ownership" (a list of an organisation only inside it). I stay in them as list admin.
     -> {moved, skipped: [{id, name, reason}]}"""
     from ..agents.core import is_agent, need_person
-    from ..accounts.orgs import ws_check_member
+    from ..accounts.orgs import ws_check_member, ws_check_owner
     need_collab()
     need_person(403)
     c, b = db(), body()
@@ -286,6 +286,7 @@ def sh_folder_owner():
         try:
             with c.savepoint():
                 ws_check_member(c, r["id"], new)
+                ws_check_owner(c, lr["org_id"], new)  # 2.538.0 (#4371): as list_owner_set -- this list is skipped with the reason
                 owner_transfer(c, lr, new)
             moved += 1
         except Denied as e:

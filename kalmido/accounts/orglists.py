@@ -23,7 +23,7 @@ from ..accounts.pictures import list_icon_url
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import ov_open  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.pictures import list_icon_drop_file, LIST_ICON_PRESETS  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgs import ws_check_member, org_role  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ws_check_member, ws_check_owner, org_role  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import list_icon_store  # 2.369.5 (#2517): pulled up from functions
 
 OL_LOG_MAX = 50
@@ -216,6 +216,7 @@ def oadm_owner(oid, lid):
     if new == lr["owner_id"]:
         return err(tr("{0} already owns this project", u["display_name"] or u["username"]))
     ws_check_member(c, lid, new)
+    ws_check_owner(c, oid, new)  # 2.538.0 (#4371): a guest / read-only / accounting person never owns a project (409, as list_owner_set)
     _ol_log(c, oid, lr, "owner", to_id=new)
     old, nname = owner_transfer(c, lr, new)
     _ol_news(c, oid, {"id": lid, "name": lr["name"], "owner_id": old}, "owner", to_name=nname)
