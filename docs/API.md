@@ -1148,9 +1148,10 @@ Redirects are never followed. `KALMIDO_WEBHOOKS=0` turns webhooks off.
 
 2.10.0: Kalmido believes `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host` only from the proxies in
 `KALMIDO_TRUSTED_PROXIES` (2.79.0: default loopback only, `127.0.0.1,::1`). Then rate limits, failed-login
-lockouts, logs and admin alerts see the client's real address. A proxy in another container on its own Docker network
-arrives from that network's gateway: add it (see the README's settings table). A proxy on the host that reaches a port
-published on Docker's default bridge arrives from the docker bridge gateway 172.17.0.1, which was trusted by default up to
+lockouts, logs and admin alerts see the client's real address. Which address to add depends on the setup: a proxy on the
+host in front of the published port arrives from the gateway of Kalmido's Compose network, a proxy container in one network
+with Kalmido from its own address (commands: [SELF-HOSTING.md](SELF-HOSTING.md#reverse-proxy-and-network)). On Docker's
+default bridge a proxy on the host arrives from the docker bridge gateway 172.17.0.1, which was trusted by default up to
 2.78: set `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1` for that setup.
 
 If your proxy puts a login (Authelia, Authentik, oauth2-proxy, ...) in front of Kalmido, API clients cannot pass it:

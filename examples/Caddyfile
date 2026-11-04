@@ -1,16 +1,38 @@
 # Kalmido behind Caddy 2 (built-in login). Caddy gets the certificate itself and sends
 # X-Forwarded-For / -Proto / -Host on its own. WebSockets are not needed (Caddy would pass them anyway).
 # Caddy on the same host as docker-compose.yml (Kalmido published on 127.0.0.1:3040).
+#
+# Then let Kalmido believe Caddy. Through the published port Caddy arrives from the gateway of Kalmido's Compose network,
+# not from 127.0.0.1. Run this (the network is named after the install folder, "docker network ls" lists them):
+#   docker network inspect kalmido_default --format '{{(index .IPAM.Config 0).Gateway}}'
+# put the address into .env and restart Kalmido (docker compose up -d kalmido):
+#   KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,<that address>
+# Check: under Administration > Server > Your IP you must see your public address, and that address as "Via proxy", trusted.
 kalmido.example.com {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:3040 {
-		# long polling: agents and open apps wait up to 60 s for news
-		transport http {
-			read_timeout 120s
+	# restoring a backup from a file: one request up to KALMIDO_BACKUP_MAX_MB (default 4096), and the restore runs inside
+	# its request. Raise both when you raise that variable
+	@backups path /api/admin/backups /api/admin/backups/*
+	handle @backups {
+		request_body {
+			max_size 4096MiB
+		}
+		reverse_proxy 127.0.0.1:3040 {
+			transport http {
+				read_timeout 1h
+			}
 		}
 	}
-	# uploads: 4 x TASKS_MAX_FILE_MB (default 200 MB)
-	request_body {
-		max_size 200MB
+	handle {
+		# uploads: 4 x TASKS_MAX_FILE_MB (default 200 MB)
+		request_body {
+			max_size 200MiB
+		}
+		reverse_proxy 127.0.0.1:3040 {
+			# long polling: agents and open apps wait up to 60 s for news
+			transport http {
+				read_timeout 120s
+			}
+		}
 	}
 }

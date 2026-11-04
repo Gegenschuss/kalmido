@@ -101,6 +101,13 @@ check("reverse_proxy 127.0.0.1:3040" in read("examples", "Caddyfile"), "Caddyfil
 ng = read("examples", "nginx.conf")
 check("proxy_read_timeout 120s" in ng and "X-Forwarded-Proto" in ng and "client_max_body_size" in ng, "nginx.conf: timeout, headers, body size")
 tr = read("examples", "traefik.docker-compose.override.yml")
+# 2.511.0 (#4311): each template names its own address for KALMIDO_TRUSTED_PROXIES and the size of a restored backup
+for f, t4311 in (("Caddyfile", read("examples", "Caddyfile")), ("nginx.conf", ng)):
+    check("docker network inspect kalmido_default" in t4311 and ".Gateway" in t4311, f"{f}: the gateway of the Compose network as the trusted proxy")
+    check("/api/admin/backups" in t4311 and "4096" in t4311, f"{f}: a larger limit for the backup restore")
+check("docker network inspect proxy" in tr and ".Subnet" in tr and ".Gateway" not in tr, "traefik override: the network's range, not its gateway")
+check("readTimeout=1h" in tr, "traefik override: the read timeout covers the upload")
+check("http2 on;" not in re.sub(r"(?m)^\s*#.*$", "", ng), "nginx.conf: no 'http2 on' line, nginx before 1.25.1 refuses it")
 ty = load_yaml(tr)
 if ty is not None:
     labels = ty["services"]["kalmido"]["labels"]

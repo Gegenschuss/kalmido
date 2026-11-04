@@ -415,5 +415,5 @@
   Say "Uninstall:  cd `"$Dir`"; docker compose down; docker image rm $img"
   Say '            then delete the folder (this deletes your tasks)'
   Say 'Use it from other devices: put it behind a reverse proxy with HTTPS, see'
-  Say "            $GH#reverse-proxy (templates for Caddy, nginx, Traefik in examples\)"
+  Say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples\)"
 }
