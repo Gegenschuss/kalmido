@@ -169,11 +169,15 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     check(await ev(`!document.querySelector('.shmodal #sh-agwrap') || /Not available in encrypted projects/.test(document.querySelector('.shmodal #sh-agwrap').textContent)`), '#1817: agents greyed out with the reason');
     check(!(await unnamed('.shmodal button, .shmodal select')).length, '#1817: every button of the share dialog has a name ' + JSON.stringify(await unnamed('.shmodal button, .shmodal select')));
     await sleep(900); await shot('p264a-d-members.png');
+    // 2.539.0 (#4394): the release click ends with its own load() + render(); under load that load() landed after the
+    // setList below and reset the list (no e2e), so the "Understood" redraw returned early - count the finished loads
+    await ev(`(window.__ld0 = window.__ld0 || load, window.__ld = 0, load = async (...a) => { try { return await __ld0(...a); } finally { __ld++; } }, 1)`);
     await ev(`(document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="release"]').click(), 1)`);
     check(await waitFor(`__c.some(c => c[0] === 'release' && c[1] === ${L} && c[2].length === 1 && c[2][0] === ${BOB})`), '#1817: "Release" hands the key to the waiting person (le2eRelease)');
     await ev(`(document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="safety"]')?.click(), 1)`);
     check(await waitFor(`/12345 67890/.test(document.querySelector('.cdlg')?.textContent || '')`), '#1817: the safety number dialog');
     await ev(`(document.querySelector('.cdlg [data-cd="no"]')?.click(), 1)`); await sleep(200);
+    check(await waitFor(`__ld >= 1`), '#4394: the load() after the release has finished');
     await ev(`(document.querySelectorAll('.modal').forEach(m => m.remove()), 1)`);
     // a key change: the warning, "Understood"
     await ev(`(window.le2eKeyChanged = uid => uid === ${BOB}, 1)`);
@@ -181,6 +185,8 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     await ev(`(shareModal(${L}), 1)`);
     check(await waitFor(`/The key of Bob has changed/.test(document.querySelector('.shmodal .le2uchg')?.textContent || '')`), '#1817 H4: a warning when the key of a person changed');
     check(await ev(`!document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="release"]')`), '#1817 H4: no release to a changed key before it is accepted');
+    // 2.539.0 (#4394): click only once the button is drawn (a real state, not a time)
+    check(await waitFor(`!!document.querySelector('.shmodal .le2uchg [data-le2us="accept"]') && listById(${L}).e2e === 'on'`), '#4394: the "Understood" button is drawn');
     await ev(`(document.querySelector('.shmodal .le2uchg [data-le2us="accept"]').click(), 1)`);
     check(await waitFor(`__c.some(c => c[0] === 'accept' && c[1] === ${BOB}) && !document.querySelector('.shmodal .le2uchg')`), '#1817 H4: "Understood" accepts the new key');
     await ev(`(document.querySelectorAll('.modal').forEach(m => m.remove()), 1)`);
