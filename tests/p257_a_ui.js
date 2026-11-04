@@ -126,17 +126,20 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(await until(async () => !(await items()).includes('tag:errand')) && await until(() => !d.querySelector('.fv2bar .fv2-tile[data-fv2="tag:errand"]')), 'Remove from favourites: gone');
 
   // ================= "Only favourites" stays for lists
-  const onlyBtn = () => d.querySelector('#side .sg-favs [data-fav-only]');
-  check(onlyBtn(), '"Only favourites" is offered while a list is starred');
-  click(w, onlyBtn());
+  // 2.521.0 (#4396): the switch is an entry of the tile menu in the head bar (the sidebar has no section "Favourites" then)
+  const onlyBtn = async () => { rclick(w, favTile()); return await until(() => menuItem(d, /^Only favourites/)); };
+  const favTile = () => d.querySelector('.fv2bar .fv2-tile');
+  check(!d.querySelector('#side .sg-favs [data-fav-only]'), '#4396: no empty "Favourites" heading in the sidebar');
+  check(await onlyBtn(), '"Only favourites" is offered while a list is starred');
+  click(w, await onlyBtn());
   await until(() => d.querySelector('#side .sg-lists .sfavmore'));
   check(d.querySelector('#side .sg-lists .sfavmore') && !d.querySelector(`#side .sg-lists .srow[data-list="${HOME}"]`), '"Only favourites" folds the other lists');
   check(d.querySelector(`#side .srow[data-go="f/${FLT}"]`) && d.querySelector('#side .srow[data-go="today"]'), '"Only favourites" leaves filters and Plan alone');
-  click(w, onlyBtn()); await sleep(300);
+  click(w, await onlyBtn()); await sleep(300);
   rclick(w, d.querySelector('.fv2bar .fv2-tile[data-fv2="l:' + TEAM + '"]'));
   click(w, await until(() => menuItem(d, /^Remove from favourites/)));
   check(await until(async () => (await call('GET', '/api/state')).settings.fav_lists === ''), 'removing a list tile removes its star');
-  check(await until(() => !onlyBtn() && d.querySelector('.fv2bar .fv2-tile')), 'without a starred list no "Only favourites" button, the other tiles stay');  // 2.441.0 (#3592): the tiles live in the head bar
+  check(await until(() => !w.eval('favAny()') && d.querySelector('.fv2bar .fv2-tile')), 'without a starred list no "Only favourites" button, the other tiles stay');  // 2.441.0 (#3592): the tiles live in the head bar
 
   // ================= targets the person cannot see now: left out, kept
   await call('PUT', `/api/lists/${HOME}/favorite`, {});

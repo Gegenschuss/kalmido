@@ -75,22 +75,23 @@ const ORGNAME = 'Northwind Trading Company';
   check((await call('GET', '/api/state', null, await login('bob'))).settings.fav_lists === '', '#1361: bob (member of Team) notices nothing');
   w.eval(`listMenuItems(${PRJ}).find(x => x.label === 'Add to favourites').fn()`);
   check(await until(async () => (await settings()).fav_lists === `${TEAM},${PRJ}`), '#1361: the list menu (also the sidebar context menu) sets it');
-  const favs = await until(() => d.querySelector('#side .sg-favs'));
-  const groups = [...d.querySelectorAll('#side .sgroup')];
-  check(favs && groups[0] === favs, '#1361: the section "Favourites" is the first group of the sidebar');
+  // 2.521.0 (#4396): with the head bar the sidebar has no section "Favourites" (no empty heading); "Only favourites" is in the bar's menu
+  await until(() => d.querySelector('.fv2bar .fv2-tile'));
+  check(!d.querySelector('#side .sg-favs') && !d.querySelector('#side [data-fav-only]'), '#4396: no section "Favourites" in the sidebar next to the head bar');
+  const onlyToggle = () => w.eval(`fv2_onlyItem().find(x => x.label === 'Only favourites').fn()`);
   // 2.57.0 (#1798): the favourites are icon tiles now (data-fv2 = "l:<id>"), no list rows
   check([...d.querySelectorAll('.fv2bar .fv2-tile[data-fv2]')].map(x => x.dataset.fv2).join() === `l:${TEAM},l:${PRJ}`, '#1361: both favourites in the row');  // 2.441.0 (#3592): the row of the head bar
   check(w.eval(`listMenuItems(${TEAM}).some(x => x.label === 'Remove from favourites')`), '#1361: the menu offers to remove it');
   // Only favourites
   const lists = () => d.querySelector('#side .sg-lists');
-  click(w, favs.querySelector('[data-fav-only]'));
+  onlyToggle();
   check(await until(async () => (await settings()).fav_only === '1'), '#1361: "Only favourites" is stored');
   const more = await until(() => lists()?.querySelector('.sfavmore'));
   // 2.152.2 (#2624): project instead of list
   check(more && /More projects \(1\)/.test(more.textContent) && !lists().querySelector(`.srow[data-list="${HOME}"]`), '#1361: the other lists fold under "More lists (1)" ' + more?.textContent);
   click(w, more);
   check(await until(() => lists()?.querySelector(`.srow[data-list="${HOME}"]`)), '#1361: a tap opens them');
-  click(w, d.querySelector('#side .sg-favs [data-fav-only]'));
+  onlyToggle();
   check(await until(async () => (await settings()).fav_only === '0') && await until(() => !lists()?.querySelector('.sfavmore')), '#1361: off again: every list as before');
   // Only favourites per view: Today
   w.eval('go("today")'); await sleep(300);
