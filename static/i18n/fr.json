@@ -16144,5 +16144,7 @@
   "Remove condition": "Retirer la condition",
   "Conditions": "Conditions",
   "“is none of” always applies on top, also with OR.": "« n’est aucun de » s’applique toujours en plus, même avec OU.",
-  "{0} task matches": ["{0} tâche correspond", "{0} tâches correspondent"]
+  "{0} task matches": ["{0} tâche correspond", "{0} tâches correspondent"],
+  "Reading view: a large preview beside a narrow list": "Vue de lecture : un grand aperçu à côté d’une liste étroite",
+  "This file cannot be shown here. You can download it.": "Ce fichier ne peut pas être affiché ici. Tu peux le télécharger."
 }

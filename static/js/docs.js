@@ -152,7 +152,7 @@ function viewDocs() {
     <div class="dc-bar">
       <div class="ctsearch">${ic('search', 's')}<input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(tr('Search in the documents…'))}" aria-label="${esc(tr('Search in the documents'))}" autocomplete="off"></div>
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} ${tr('Filter')}${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcr_btnHtml === 'function' ? dcr_btnHtml() : '' /* 2.521.0 (#4476): Read */}
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
@@ -167,7 +167,9 @@ function viewDocs() {
   // as the whole page instead of closing it); filled by dc_mdDraw, a redraw of the list keeps its content (data-fl-fill)
   const pane = DC.paneId ? `<aside class="dc-md dc-pane" data-k="dcpane" data-fl-fill aria-labelledby="dc-h"></aside>` : '';
   if (pane) setTimeout(dc_paneFill, 0);
-  return `<div class="dc-wrap${pane ? ' dc-paneon' : ''}"><div class="dc-view">${typeof abd_navHtml === 'function' ? abd_navHtml() : ''}${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>${pane}</div>`;
+  // 2.521.0 (#4476, #4399): the reading view and the kept widths (docread.js), a grip between the list and the pane
+  const rd = typeof dcr_wrapAttr === 'function', grip = rd ? dcr_paneGrip(pane) : '';
+  return `<div class="dc-wrap${pane ? ' dc-paneon' : ''}${rd ? dcr_wrapAttr(pane) : ''}"><div class="dc-view">${typeof abd_navHtml === 'function' ? abd_navHtml() : ''}${head}${body}<div class="dc-drop" aria-hidden="true"><span>${ic('plus')} ${tr('Drop to add as documents')}</span></div></div>${grip}${pane}</div>`;
 }
 function dc_card(d) {
   const thumb = d.thumb ? `<img src="/api/docs/${d.id}/thumb?v=${esc(d.updated_at || '')}" alt="" loading="lazy">` : `<span class="dc-ph">${ic(dc_isPdf(d) ? 'file' : 'picture')}</span>`;
@@ -222,6 +224,7 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   if (!DC.set || DC.set.ws !== ws) { const s = await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }
   DC.opening = null;
   DC.doc = d;
+  const ni = dc_navIdx(d); if (ni >= 0) DC.navAt = ni;  // 2.521.0 (#4476): where it stands in the list (it may leave it: checked, filtered)
   if (pane) {
     DC.paneId = id;
     if (dc_hashId() !== id) history.replaceState(null, '', `#docs/${id}`);
@@ -253,6 +256,7 @@ function dc_paneClose(p) {
   if (!DC.paneId) return;
   const was = DC.paneId, back = !document.activeElement || document.activeElement === document.body || !document.activeElement.isConnected;
   DC.paneId = null; DC.doc = null; DC.opening = null;
+  if (typeof dcr_free === 'function') dcr_free();  // 2.521.0 (#4476): the PDF of the reading view
   if (dc_hashId()) history.replaceState(null, '', S.route.review ? '#docs/review' : '#docs');
   setTimeout(() => { dc_draw(); const c = back && $(`.dc-view [data-dco="${was}"]`); if (c) c.focus({preventScroll: true}); }, 0);  // the focus back on its card
 }
@@ -303,7 +307,14 @@ function dc_goTo(id, dir) {
 async function dc_step(dir) {  // true = turned; the real end springs back
   const cur = DC.opening ?? DC.doc?.id;
   let i = (DC.docs || []).findIndex(x => x.id === cur);
-  if (i < 0 || S.route.mod !== 'docs') return false;
+  if (S.route.mod !== 'docs') return false;
+  if (i < 0) {  // 2.521.0 (#4476): the open one left the list ("To review": checked or accepted; a filter): on from where it stood
+    const at = DC.doc?.id === cur && DC.navAt != null && DC.docs ? DC.navAt : -1, n = at < 0 ? null : DC.docs[dir > 0 ? at : at - 1];
+    if (at < 0) return false;
+    if (!n) { dc_bounce(dir); return false; }
+    await dc_goTo(n.id, dir);
+    return true;
+  }
   if (dir > 0 && i + 1 >= DC.docs.length && DC.docs.length < DC.total) { await dc_more(); i = (DC.docs || []).findIndex(x => x.id === cur); }
   const n = i < 0 ? null : DC.docs[i + dir];
   if (!n) { dc_bounce(dir); return false; }
@@ -460,11 +471,13 @@ function dc_mdDraw(md) {
   let body = $('.dc-body', md);
   if (!body) { body = document.createElement('div'); body.className = 'dc-body'; md.appendChild(body); }
   if (body.dataset.id !== String(d.id)) { body.textContent = ''; body.dataset.id = String(d.id); }
-  fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span><button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
-    <div class="dc-top">${dc_navHtml(d)}
-      <button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>
+  // 2.521.0 (#4476): the preview and the properties in two parts (side by side in the wide reading view, docread.js)
+  const rd = typeof dcr_inPane === 'function' && dcr_inPane(md);
+  fl_set(body, `<div class="lhdr"><button class="iconbtn dc-back" data-dc="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button><h3 id="dc-h">${esc(d.name)}</h3><span class="spacer"></span>${rd ? dcr_headBtn(md) : ''}<button class="iconbtn dc-x" data-dc="close" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
+    <div class="dc-main${rd ? ' dc-rd' : ''}${rd && dcr_propsOff() ? ' dc-pcol' : ''}"><div class="dc-top">${dc_navHtml(d)}
+      ${rd ? dcr_prevHtml(d) : `<button type="button" class="dc-prev" data-dc="view" data-fl-fill aria-label="${esc(tr('Show {0}', d.name))}"></button>`}
       <div class="dc-acts">${dc_actsHtml(d, w) /* 2.497.0 A (#4046): grouped, Delete set apart at the end */}
-      </div></div>
+      </div></div>${rd ? dcr_gripHtml('props', tr('Properties')) : ''}<div class="dc-props" id="dc-props">
     <p class="dc-state ${esc(d.state)}" role="status">${esc(tr(DC_STATE[d.state] || d.state))}${d.state === 'failed' && d.error_text ? `: ${esc(d.error_text)}` : ''}${d.method === 'ocr' ? ` · ${tr('text recognition')}` : d.method === 'e-invoice' ? ` · ${tr('E-invoice')}` : ''}
       ${w && (d.state === 'done' || d.state === 'failed') ? `<button type="button" class="linkbtn" data-dc="redo">${tr('Recognise again')}</button>` : ''}</p>
     ${sugHtml}${due}${typeof rx_html === 'function' ? rx_html(d) : ''}${typeof rc_slot === 'function' ? rc_slot(d) : ''}${typeof ltd_slot === 'function' ? ltd_slot(d) : ''}${typeof ast_docSlot === 'function' ? ast_docSlot(d) : '' /* 2.126.1 A (#2123) */}
@@ -481,13 +494,14 @@ function dc_mdDraw(md) {
       ${!ro && (noDue || noAmt) ? `<div class="dc-optbtn" role="group" aria-label="${esc(tr('Add'))}">${noDue ? `<button type="button" class="dc-chip" data-dc="showopt:due">${ic('plus', 's')} ${tr('Due')}</button>` : ''}${noAmt ? `<button type="button" class="dc-chip" data-dc="showopt:amount">${ic('plus', 's')} ${tr('Amount')}</button>` : ''}</div>` : '' /* 2.497.0 A (#4046): one chip per field */}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
-    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details>`);
+    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details></div></div>`);
   dc_pvDraw(md, d);
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
 }
 // 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp
 // to the width (pdf.js of the module pdf, nothing in the file runs); fails = the small picture stays. Once per document and file size.
 async function dc_pvDraw(md, d) {
+  if ($('.dc-rv', md) && typeof dcr_pvDraw === 'function') return dcr_pvDraw(md, d);  // 2.521.0 (#4476): the reading view, every page
   const box = $('.dc-prev', md); if (!box) return;
   const key = `${d.id}:${d.size}`;  // a field saved does not draw it again
   if (box._pv === key && box.firstChild) return;
@@ -592,9 +606,11 @@ async function dc_mdClick(e) {
   }
   if (a === 'space') { if (await dc_smvMove(new Map([[d.id, d.org_id || null]]), `“${d.name}”`)) md.remove(); return; }  // 2.96.0 A (#1941)
   if (a.startsWith('step:')) { dc_step(+a.slice(5)); return; }  // 2.476.0 (#3935): the arrow buttons above the preview
+  if (typeof dcr_click === 'function' && dcr_click(a, md)) return;  // 2.521.0 (#4476): zoom, fold the properties
   if (a === 'view') {
     if (Date.now() - (DCW.end || 0) < 700) return;  // 2.476.0 (#3935): the end of a swipe / zoom on the preview is no tap
     if (d.einvoice?.source === 'xml') { window.open(`/api/docs/${d.id}/einvoice`, '_blank', 'noopener'); return; }  // 2.146.0 A (#2451)
+    if (typeof dcr_full === 'function' && dcr_full(d)) return;  // 2.521.0 (#4476): the full screen leafs through the list
     if (dc_isPdf(d) && typeof pdfView === 'function') pdfView({url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});
     else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') window.open(dc_fileUrl(d), '_blank', 'noopener');
     else window.open(dc_fileUrl(d), '_blank', 'noopener');
@@ -888,6 +904,7 @@ document.addEventListener('click', e => {
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
   else if (a === 'loadmore') dc_more();  // 2.476.0 (#3935)
+  else if (a === 'read' && typeof dcr_toggle === 'function') dcr_toggle();  // 2.521.0 (#4476): the reading view
   else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 });
 document.addEventListener('change', e => {

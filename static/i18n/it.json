@@ -16145,5 +16145,7 @@
   "Remove condition": "Rimuovi condizione",
   "Conditions": "Condizioni",
   "“is none of” always applies on top, also with OR.": "“non è nessuno di” vale sempre in aggiunta, anche con O.",
-  "{0} task matches": ["{0} attività corrisponde", "{0} attività corrispondono"]
+  "{0} task matches": ["{0} attività corrisponde", "{0} attività corrispondono"],
+  "Reading view: a large preview beside a narrow list": "Vista di lettura: un’anteprima grande accanto a un elenco stretto",
+  "This file cannot be shown here. You can download it.": "Questo file non può essere mostrato qui. Puoi scaricarlo."
 }

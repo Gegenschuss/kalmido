@@ -290,3 +290,48 @@
 .abdoc.rev{color:var(--accent)}
 .abdnav{flex-direction:row;flex-wrap:wrap;position:static;margin-bottom:.5rem}
 @media (max-width:640px){.abviewseg span{display:none}}
+/* 2.521.0 (#4399, #4476): the width of the pane set with a grip (kept per device, docread.js); the grip between list and pane */
+.dc-paneon>.dc-pane{flex-basis:var(--dc-pw,clamp(20rem,42%,36rem))}
+.dc-grip{flex:none;align-self:stretch;width:.75rem;margin:.75rem -.875rem 0;padding:0;border:0;background:none;cursor:col-resize;position:relative;touch-action:none;z-index:1}
+.dc-grip::after{content:'';position:absolute;top:0;bottom:0;left:50%;width:2px;margin-left:-1px;border-radius:1px;background:transparent}
+.dc-grip:hover::after,.dc-grip:focus-visible::after,.dc-resizing .dc-grip::after{background:var(--accent)}
+.dc-resizing,.dc-resizing *{cursor:col-resize!important;user-select:none}
+@media (max-width:767px){ .dc-grip{display:none} }
+/* the reading view (computer, 64rem and more): the list a narrow column, the pane takes the rest; no centred width */
+.dc-readb[aria-pressed="true"]{border-color:var(--accent);color:var(--text)}
+.dc-rvbar,.dc-rv,.dc-main>.dc-grip{display:none}
+@media (min-width:64rem){
+  .dc-wrap.dc-read{max-width:none;margin:0}
+  .dc-wrap.dc-read>.dc-view{flex:0 0 var(--dc-rl,22rem);max-width:none;padding-left:0;padding-right:0}
+  .dc-read>.dc-pane{flex:1 1 0;min-width:30rem;height:calc(var(--dc-vh,100dvh - 7rem) - 2rem);max-height:none;padding:.75rem;overflow:hidden;display:flex;flex-direction:column;container:dcpane / inline-size}
+  .dc-read .dc-bar{gap:.375rem}
+  .dc-read .dc-bar .ctsearch{flex-basis:100%}
+  .dc-read .dc-acts2 .btn>span,.dc-read .dc-sortb>span,.dc-read .dc-readb>span{display:none}
+  .dc-read .dc-grid{grid-template-columns:minmax(0,1fr);gap:.25rem}
+  .dc-read .dc-th,.dc-read .dc-tags,.dc-read .dc-shared{display:none}
+  .dc-read .dc-card>button:not(.dc-selmark){border-radius:var(--r-s)}
+  .dc-read .dc-ct{padding:.375rem .625rem;gap:.125rem}
+  .dc-read .dc-pane .dc-body{display:flex;flex-direction:column;flex:1;min-height:0}
+  .dc-read .dc-pane .lhdr{flex:none}
+  .dc-main.dc-rd{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+  .dc-rd .dc-top{height:calc(100% - .5rem);min-height:20rem;margin:0 0 .5rem}
+  .dc-rd .dc-rvbar{display:flex;align-items:center;justify-content:center;gap:.25rem}
+  .dc-rd .dc-rzp{min-width:4.5rem;font-variant-numeric:tabular-nums}
+  .dc-rd .dc-rv{display:flex;flex-direction:column;align-items:center;gap:.75rem;flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:.75rem;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overscroll-behavior:contain}
+  .dc-rd .dc-rv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+  .dc-rpg{flex:none;background:#fff;box-shadow:var(--shadow);border-radius:.125rem;overflow:hidden}
+  .dc-rpg canvas,.dc-rpg img{display:block;width:100%;height:100%}
+  .dc-rimg{background:none}
+  .dc-rd .dc-rv>.dc-ph{flex:1;min-height:10rem}
+  .dc-rd .dc-acts{flex:none}
+  .dc-rd>.dc-grip{display:none}
+  .dc-rd.dc-pcol>.dc-props{display:none}
+  .dc-rd.dc-pcol .dc-top{height:100%}
+  /* a wide pane: the properties as a column beside the preview, each part scrolls on its own */
+  @container dcpane (min-width:52rem){
+    .dc-main.dc-rd{display:flex;gap:1rem;overflow:hidden}
+    .dc-rd .dc-top{flex:1 1 0;min-width:20rem;height:auto;margin:0}
+    .dc-rd>.dc-grip{display:block;margin:0 -.875rem}
+    .dc-rd>.dc-props{flex:0 0 var(--dc-ew,24rem);min-width:0;overflow-y:auto;overscroll-behavior:contain;padding-right:.25rem}
+  }
+}

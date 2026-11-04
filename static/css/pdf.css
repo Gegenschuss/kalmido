@@ -14,6 +14,12 @@
 .pvfail{display:flex;flex-direction:column;align-items:center;gap:.75rem;text-align:center;padding:3rem 1rem;color:var(--text2);max-width:28rem;margin:0 auto}
 .pvfail>svg{width:2.5rem;height:2.5rem;color:var(--muted)}
 .pvfail .btn{display:inline-flex;align-items:center;gap:.375rem}
+/* 2.521.0 (#4476): leafing through the documents in the full screen; an image of the list shown in it as well */
+.pvbar .pvdocs{display:flex;align-items:center;gap:.125rem;flex:none;padding-right:.5rem;margin-right:.25rem;border-right:1px solid var(--line)}
+.pvdno{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:4.5rem;text-align:center;white-space:nowrap}
+.pvdocs [disabled]{opacity:.35}
+.pvimgw{display:flex;justify-content:center;min-height:100%}
+.pvimg{display:block;max-width:100%;height:auto;align-self:flex-start;background:#fff;box-shadow:var(--shadow)}
 @media (max-width:767px) {
   .pvbox{height:100%}
   .pvbar .pvnav{order:8}

@@ -16144,5 +16144,7 @@
   "Remove condition": "Voorwaarde verwijderen",
   "Conditions": "Voorwaarden",
   "“is none of” always applies on top, also with OR.": "„is geen van” geldt altijd extra, ook bij OF.",
-  "{0} task matches": ["{0} taak past", "{0} taken passen"]
+  "{0} task matches": ["{0} taak past", "{0} taken passen"],
+  "Reading view: a large preview beside a narrow list": "Leesweergave: een grote voorvertoning naast een smalle lijst",
+  "This file cannot be shown here. You can download it.": "Dit bestand kan hier niet worden weergegeven. Je kunt het downloaden."
 }

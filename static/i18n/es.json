@@ -16144,5 +16144,7 @@
   "Remove condition": "Quitar condición",
   "Conditions": "Condiciones",
   "“is none of” always applies on top, also with OR.": "«no es ninguno de» se aplica siempre además, también con O.",
-  "{0} task matches": ["{0} tarea coincide", "{0} tareas coinciden"]
+  "{0} task matches": ["{0} tarea coincide", "{0} tareas coinciden"],
+  "Reading view: a large preview beside a narrow list": "Vista de lectura: una vista previa grande junto a una lista estrecha",
+  "This file cannot be shown here. You can download it.": "Este archivo no se puede mostrar aquí. Puedes descargarlo."
 }

@@ -4,7 +4,10 @@
    rendered by the bundled pdf.js (static/vendor/pdfjs, loaded only when a PDF is opened, never from a CDN), page by page
    as they scroll into view; turn pages, zoom (buttons, Ctrl+wheel, pinch), swipe on a phone. Safe: same origin only,
    isEvalSupported off, nothing in the PDF runs (no scripts, no forms, links are not followed). Used by attachments,
-   project files, office documents, archive PDFs and the documents / file areas. */
+   project files, office documents, archive PDFs and the documents / file areas.
+   2.521.0 (#4476): o.step(dir) = leaf through a list without closing (documents: docread.js dcr_fullOpts) - two buttons with
+   o.pos ("3 of 48") and their names o.prevT / o.nextT (texts of the caller's module) and the arrow keys left / right go to the previous / next one (the pages then turn with Page up / down);
+   o.img = an image instead of a PDF, o.kind 'file' = a file that cannot be shown (a hint and Download), both only with o.step. */
 'use strict';
 
 const PV_LIB = '/static/vendor/pdfjs/pdf.min.mjs', PV_WORKER = '/static/vendor/pdfjs/pdf.worker.min.mjs';
@@ -21,13 +24,16 @@ const pv_isPdf = a => a?.mime === 'application/pdf' || /\.pdf$/i.test(String(a?.
 
 async function pdfView(o) {
   $('.lightbox')?.remove();
-  const back = document.activeElement, m = document.createElement('div');
+  const back = o.back || document.activeElement, m = document.createElement('div');
   const url = o.url, dl = o.dlUrl || url;
   let doc = null, pages = [], base = [], fit = 1, zoom = 1, cur = 1, fail = '', io = null, gen = 0;
   m.className = 'lightbox tview pview';
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', o.name || 'PDF');
   m.innerHTML = `<div class="tvbox pvbox"><div class="tvbar pvbar"><div class="tvname"><b>${esc(o.name || 'PDF')}</b><span>${o.size ? fmtSize(o.size) : ''}</span></div>
     <span class="spacer"></span>
+    ${o.step ? `<div class="pvdocs" role="group" aria-label="${esc(o.pos || '')}"><button type="button" class="iconbtn" data-pv="dprev" title="${esc(o.prevT || '')}" aria-label="${esc(o.prevT || '')}"${o.first ? ' disabled' : ''}>${ic('left')}</button>
+      <span class="pvdno">${esc(o.pos || '')}</span>
+      <button type="button" class="iconbtn" data-pv="dnext" title="${esc(o.nextT || '')}" aria-label="${esc(o.nextT || '')}"${o.last ? ' disabled' : ''}>${ic('right')}</button></div>` : '' /* 2.521.0 (#4476) */}
     <div class="pvnav" hidden><button type="button" class="iconbtn" data-pv="prev" title="${esc(tr('Previous page'))}" aria-label="${esc(tr('Previous page'))}">${ic('left')}</button>
       <span class="pvno" aria-live="polite"></span>
       <button type="button" class="iconbtn" data-pv="next" title="${esc(tr('Next page'))}" aria-label="${esc(tr('Next page'))}">${ic('right')}</button></div>
@@ -106,16 +112,32 @@ async function pdfView(o) {
     if (b?.dataset.pv === 'arch') { close(); r81b_archEdit(o.arch); return; }
     if (!b || b.disabled) return;
     const a = b.dataset.pv;
+    if (a === 'dprev' || a === 'dnext') { leaf(a === 'dnext' ? 1 : -1); return; }
     if (a === 'prev') go(cur - 1); else if (a === 'next') go(cur + 1);
     else if (a === 'in') setZoom(+(zoom * 1.25).toFixed(3)); else if (a === 'out') setZoom(+(zoom / 1.25).toFixed(3)); else if (a === 'fit') setZoom(1, false);
   });
+  // 2.521.0 (#4476): the previous / next one of the list in the same place; the one that opened it keeps the focus back
+  let leafing = false;
+  const leaf = async dir => {
+    if (!o.step || leafing) return;
+    leafing = true;
+    const n = await o.step(dir).catch(() => null);
+    leafing = false;
+    if (!n || !m.isConnected) return;
+    const f = document.activeElement?.dataset?.pv;
+    gen++; io?.disconnect(); try { doc?.destroy(); } catch {}
+    pdfView({...n, back});  // its first part (the new box, the focus) runs at once
+    const lb = $('.lightbox.pview'); if (f && lb) $(`[data-pv="${f}"]:not([disabled])`, lb)?.focus();
+  };
   // own keys while the preview has the focus (Esc here also gives the focus back, events.js only removes a lightbox)
   m.addEventListener('keydown', e => {
     if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); return; }
-    if (fail || !doc || e.target.closest?.('input,textarea')) return;
+    if (e.target.closest?.('input,textarea')) return;
     const k = e.key;
-    if (k === 'ArrowRight') { e.preventDefault(); go(cur + 1); }
-    else if (k === 'ArrowLeft') { e.preventDefault(); go(cur - 1); }
+    if (o.step && (k === 'ArrowRight' || k === 'ArrowLeft') && !e.altKey && !e.ctrlKey && !e.metaKey) { e.preventDefault(); leaf(k === 'ArrowRight' ? 1 : -1); return; }
+    if (fail || !doc) return;
+    if (k === 'ArrowRight' || (o.step && k === 'PageDown')) { e.preventDefault(); go(cur + 1); }
+    else if (k === 'ArrowLeft' || (o.step && k === 'PageUp')) { e.preventDefault(); go(cur - 1); }
     else if (k === '+' || k === '=') { e.preventDefault(); setZoom(zoom * 1.25); }
     else if (k === '-') { e.preventDefault(); setZoom(zoom / 1.25); }
     else if (k === '0') { e.preventDefault(); setZoom(1, false); }
@@ -156,6 +178,11 @@ async function pdfView(o) {
   $('[data-pv="x"]', m)?.focus();
   if (o.aid) dpvSumMount(m, o);  // 2.92.0 C (#1926): "Summarise" by an agent (docpreview.js, same module)
   const my = gen;
+  if (o.img || o.kind === 'file') {  // 2.521.0 (#4476): leafing reached an image / a file that is no PDF
+    if (o.img) body.innerHTML = `<div class="pvimgw"><img class="pvimg" src="${esc(o.img)}" alt="${esc(o.name || '')}"></div>`;
+    else showFail(tr('This file cannot be shown here. You can download it.'));
+    return;
+  }
   try {
     if (!navigator.onLine && !o.data) throw new TypeError('offline');
     const r = o.data ? null : await fetch(url, {credentials: 'same-origin'});  // 2.353.0 A (#2758): o.data = bytes decrypted in the browser

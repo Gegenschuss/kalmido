@@ -16144,5 +16144,7 @@
   "Remove condition": "Bedingung entfernen",
   "Conditions": "Bedingungen",
   "“is none of” always applies on top, also with OR.": "„ist keines von“ gilt immer zusätzlich, auch bei ODER.",
-  "{0} task matches": ["{0} Aufgabe passt", "{0} Aufgaben passen"]
+  "{0} task matches": ["{0} Aufgabe passt", "{0} Aufgaben passen"],
+  "Reading view: a large preview beside a narrow list": "Lese-Ansicht: große Vorschau neben einer schmalen Liste",
+  "This file cannot be shown here. You can download it.": "Diese Datei lässt sich hier nicht anzeigen. Du kannst sie herunterladen."
 }
