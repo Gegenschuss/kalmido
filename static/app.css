@@ -2217,8 +2217,7 @@ button.tvr-task:hover{color:var(--accent)}
 .ltcols{display:flex;gap:.375rem;padding:.5rem;flex-wrap:wrap;max-width:14rem}
 .ltcols button{width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid transparent}.ltcols button.on{border-color:var(--text)}
 .agview{max-width:52rem;margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
-/* 2.505 (#4325): align-items / align-content: an opened "Projects" makes only its own card longer; the neighbour keeps its size and layout */
-.agcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.625rem;align-items:start}
+.agcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.625rem;align-items:start}/* 2.505 (#4325): an opened "Projects" makes only its own card longer */
 .agcard{display:flex;align-items:center;align-content:flex-start;gap:.75rem;padding:.75rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);flex-wrap:wrap}
 .agcard.off{opacity:.6}
 .agcard .avatar.lg,.avatar.lg{width:2.5rem;height:2.5rem;font-size:var(--fs-b)}
