@@ -185,7 +185,8 @@ def rc_vat_clean(v):
 def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     """Write the assignment of a receipt (people only); returns the previous (list_id, category). 2.90.0 A (#1921): vat =
     the VAT rate (left as it is when not given); the row stays while a VAT rate or a payment day is set, or with keep (the
-    bookkeeping's receipt sheet: a receipt without category and rate is still a receipt)."""
+    bookkeeping's receipt sheet: a receipt without category and rate is still a receipt). 2.530.0 C (#4316): when the row
+    goes, the lock from its arrival stays (olk_rc_keep arrival=True): "no receipt" never frees it for the trash period run."""
     old = c.execute("SELECT list_id, category, vat_pct, paid_at, billed_doc_id, billed_at FROM rc_receipts WHERE node_id=?", (node["id"],)).fetchone()
     prev = (old["list_id"], old["category"]) if old else (None, "")
     vat = (old["vat_pct"] if old else None) if vat is _KEEP else vat
@@ -193,6 +194,8 @@ def rc_set(c, node, ws, lid, cat, uid, vat=_KEEP, keep=False):
     if old and old["vat_pct"] is not None and vat is None:
         olk_rc_keep(c, node["id"])  # 2.186.0 B (#2600): removing the VAT rate keeps the lock
     if not keep and not lid and not cat and vat is None and not (old and (old["paid_at"] or old["billed_doc_id"] or old["billed_at"])):  # 2.362.0 (#3131): + billed, invoice missing
+        if old:  # 2.530.0 C (#4316, B14): the lock from its arrival (#2845) stays when the row goes (doc_meta.kept_until)
+            olk_rc_keep(c, node["id"], arrival=True)
         c.execute("DELETE FROM rc_receipts WHERE node_id=?", (node["id"],))
     elif old:
         c.execute("UPDATE rc_receipts SET list_id=?, category=?, vat_pct=?, set_by=?, set_at=? WHERE node_id=?",
@@ -561,6 +564,12 @@ def olk_fs_locked(c, node_id, arrival=False):
             ends.append(olk_until(r["doc_date"] or r["billed_at"] or r["set_at"], "receipt"))
     for e in c.execute("SELECT day FROM office_cash_entries WHERE node_id=?", (nid,)):
         ends.append(olk_until(e["day"], "receipt"))
+    # 2.530.0 C (#4316, B31): a received business letter (linked to a letter of the office, office/letterlinks.py) is kept
+    # like a receipt: 6 years from the end of the year it came in (section 257 HGB, RET_LEGAL_YEARS "letter")
+    lk = c.execute("SELECT MIN(created_at) FROM office_letter_links WHERE node_id=?", (nid,)).fetchone()
+    if lk and lk[0]:
+        m = c.execute("SELECT doc_date FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
+        ends.append(olk_until((m and m["doc_date"]) or lk[0], "letter"))
     this_year = now_utc().year
     for a in c.execute("SELECT purchase_date, life_months, archived FROM office_equipment WHERE receipt_node_id=?", (nid,)):
         m = re.match(r"(\d{4})", a["purchase_date"] or (r["doc_date"] if r else "") or "")
@@ -571,7 +580,8 @@ def olk_fs_locked(c, node_id, arrival=False):
 
 def olk_fs_maybe(c, ids):
     """2.360.3 (#2733): those of the nodes ids that olk_fs_locked (without arrival) can find locked at all: kept_until, a
-    booked or billed receipt, a cash book entry, the equipment list. One query for a whole folder."""
+    booked or billed receipt, a cash book entry, the equipment list, 2.530.0 C (#4316): a received business letter. One
+    query for a whole folder."""
     ids = [int(i) for i in ids]
     if not ids:
         return set()
@@ -580,7 +590,8 @@ def olk_fs_maybe(c, ids):
                                         UNION SELECT node_id FROM rc_receipts WHERE node_id IN ({q})
                                           AND (paid_at IS NOT NULL OR vat_pct IS NOT NULL OR billed_doc_id IS NOT NULL)
                                         UNION SELECT node_id FROM office_cash_entries WHERE node_id IN ({q})
-                                        UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})""", ids * 4)}
+                                        UNION SELECT receipt_node_id FROM office_equipment WHERE receipt_node_id IN ({q})
+                                        UNION SELECT node_id FROM office_letter_links WHERE node_id IN ({q})""", ids * 5)}
 
 
 def olk_office_ws(c, ws, org_id):
@@ -633,11 +644,12 @@ def olk_day(v):
         return None
 
 
-def olk_rc_keep(c, nid):
+def olk_rc_keep(c, nid, arrival=False):
     """2.186.0 B (#2600): before the payment day or the VAT rate of receipt nid is removed: the lock running now stays
     (doc_meta.kept_until), so taking the booking back never frees the receipt for deleting. The receipt row itself
-    follows the usual rules (the books count only what is booked now)."""
-    until = olk_fs_locked(c, nid)
+    follows the usual rules (the books count only what is booked now). 2.530.0 C (#4316, B14): arrival=True before its
+    receipt row goes (the assignment emptied, "no receipt"): also the lock from its arrival (#2845) stays."""
+    until = olk_fs_locked(c, nid, arrival=arrival)
     if until:
         c.execute("UPDATE doc_meta SET kept_until=? WHERE node_id=? AND (kept_until IS NULL OR kept_until<?)", (until, int(nid), until))
 
