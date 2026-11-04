@@ -372,13 +372,24 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     # an invoice is left out as a whole (was: the rest after the invoiced part; the invoice is in the plan by itself)
     counting = cf8_counting(docs, cf8_invoiced(inv))
     prog = {}  # 2.120.0 (#2087, review M1): finalised progress invoices per quotation, deducted from its planned amount
+    # 2.533.0 (#4525): per quotation chain (cf8_key of the version the invoice was made from): a progress invoice on an older
+    # version is deducted from the version that counts (was: only from its own version, the plan was too high); with several
+    # versions counting (cashflow yes) only once, from the newest of them
     for x in inv:
         if (x["inv_type"] or "") == "progress" and x["source_doc_id"]:
-            prog[x["source_doc_id"]] = prog.get(x["source_doc_id"], 0) + dec(_j(x["totals"]).get("gross") or 0) / _fx(x, home)
+            src = by_id.get(x["source_doc_id"])
+            k = cf8_key(src) if src is not None and src["kind"] == "offer" else ("doc", x["source_doc_id"])
+            prog[k] = prog.get(k, 0) + dec(_j(x["totals"]).get("gross") or 0) / _fx(x, home)
+    ofb_at = {}  # the chain -> the counting version that carries its progress invoices
+    for r in docs:
+        if r["id"] in counting:
+            k = cf8_key(r)
+            ofb_at[k] = max(ofb_at.get(k, 0), r["id"])
     for r in docs:
         if r["id"] not in counting:
             continue
-        gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home) - prog.get(r["id"], 0)
+        k = cf8_key(r)
+        gross = dec(_j(r["totals"]).get("gross") or 0) / _fx(r, home) - (prog.get(k, 0) if ofb_at.get(k) == r["id"] else 0)
         day = plan_day(r["service_to"] or r["service_from"] or r["date"] or "")
         put(day, "in", "plan", "offer", gross * nf(r), r["project_title"] or "", res=gross * netf(r), number=r["number"], doc_id=r["id"],
             open_offer=r["status"] == "sent")

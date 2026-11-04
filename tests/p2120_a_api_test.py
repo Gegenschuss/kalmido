@@ -251,6 +251,37 @@ cfj = A.get(B + O + f"/cashflow?from={TODAY.isoformat()[:7]}&months=1&basis=gros
 plan = [dd(e["amount"]) for e in cfj.get("entries", []) if e.get("kind") == "offer" and e.get("doc_id") == q_plan]
 check(plan == [Decimal("11660.00") - pg], f"review M1: the quotation stays in the cash flow plan with the rest after the progress invoice {plan} (progress {pg})")
 
+
+def ofb_chain_plan(s, label):
+    """2.533.0 (#4525): a progress invoice on an older version of the quotation is deducted from the version that counts
+    (was: the newer version stood with its full amount in the plan); two versions counting (cashflow yes): deducted once."""
+    q1 = offer(s, client(s, f"Kunde Kette {label} GmbH"))
+    check(s.post(B + f"{D}/{q1}/status", json={"status": "accepted"}).ok, f"{label} #4525: version 1 accepted")
+    r = s.post(B + f"{D}/{q1}/invoice", json={"inv_type": "progress", "pct": 50})
+    check(r.status_code == 201 and s.post(B + f"{D}/{r.json()['id']}/finalize").ok, f"{label} #4525: progress invoice on version 1 finalised")
+    pg = dd(s.get(B + f"{D}/{r.json()['id']}").json()["totals"]["gross"])
+    r = s.post(B + f"{D}/{q1}/duplicate")
+    check(r.status_code == 201, f"{label} #4525: version 2 " + r.text[:200])
+    q2 = r.json()["id"]
+    check(s.post(B + f"{D}/{q2}/status", json={"status": "sent"}).ok, f"{label} #4525: version 2 sent")
+
+    def plan():
+        cf = s.get(B + O + f"/cashflow?from={TODAY.isoformat()[:7]}&months=6&basis=gross").json()
+        out = {}
+        for e in cf.get("entries", []):
+            if e.get("kind") == "offer" and e.get("doc_id") in (q1, q2):
+                out[e["doc_id"]] = out.get(e["doc_id"], 0) + dd(e["amount"])
+        return out
+    got = plan()
+    check(got == {q2: Decimal("11660.00") - pg}, f"{label} #4525: the newest version counts less the progress invoice on version 1 {got} (progress {pg})")
+    for q in (q1, q2):
+        check(s.post(B + f"{D}/{q}/cashflow", json={"cashflow": "yes"}).ok, f"{label} #4525: cashflow yes")
+    got = plan()
+    check(got == {q1: Decimal("11660.00"), q2: Decimal("11660.00") - pg}, f"{label} #4525: two versions count, the progress invoice is deducted once {got}")
+
+
+ofb_chain_plan(A, "org")
+
 # ================================================================== rights
 check(Ev.get(B + f"{D}/{OFF}/progress").status_code == 403, "rights: a member without the office 403")
 check(Ev.post(B + f"{D}/{OFF}/invoice", json={"inv_type": "progress", "pct": 5}).status_code == 403, "rights: no progress invoice without the office")
@@ -271,6 +302,7 @@ check(Fr.post(B + f"{D}/{FFIN}/finalize").ok, "freelancer: final invoice finalis
 fx = xml(Fr, FFIN)
 check(type_code(fx) == "380" and "#SKONTO#TAGE=7#PROZENT=3.00#" in fx, "freelancer: e-invoice of the final invoice with the discount")
 check(A.get(B + f"{D}/{FOFF}/progress").status_code == 404, "freelancer: the organisation's admin does not reach the personal quotation")
+ofb_chain_plan(Fr, "freelancer")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
