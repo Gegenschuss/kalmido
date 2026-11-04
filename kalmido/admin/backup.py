@@ -279,7 +279,9 @@ def bk_decrypt(src, dst, pw):
                 except InvalidTag:
                     continue
             if pt is None:
-                raise BackupError("passphrase")
+                e = BackupError("passphrase")
+                e.first = i == 0  # 2.525.0 (#4303): the very first chunk = another passphrase (bk_old_pass), later = damaged
+                raise e
             total += len(pt)
             if total > BK_MAX_BYTES:
                 raise BackupError("too_large", BK_MAX_BYTES // 1048576)
@@ -704,9 +706,10 @@ def bk_public(x):
 
 def bk_prune(c):
     """Retention: every backup of the last 24 hours, then the newest backup per day for the last keep_daily days that
-    have one, the newest per ISO week for keep_weekly weeks, the last BK_SAFETY_KEEP safety backups. Returns the
-    deleted names. 2.152.0 B (#2172): keep_weekly at most BK_KEEP_WEEKLY_MAX; a safety backup older than ret_days("backups")
-    goes even among the last ones -- only while ret_on("backups"), else it is counted (ret_report; the caller commits)."""
+    have one, the newest per ISO week for keep_weekly weeks, the last BK_SAFETY_KEEP safety backups and (2.525.0, #4303)
+    the last BK_SAFETY_KEEP manual ones. Returns the deleted names. 2.152.0 B (#2172): keep_weekly at most
+    BK_KEEP_WEEKLY_MAX; a safety (2.525.0: or manual) backup older than ret_days("backups") goes even among the last ones
+    -- only while ret_on("backups"), else it is counted (ret_report; the caller commits)."""
     daily = _clamp_int(gsetting(c, "bk_keep_daily"), 1, 365, 14)
     # 2.152.0 review F3: an older setting above the cap is cut to it only with the switch (an update never deletes by surprise)
     weekly = _clamp_int(gsetting(c, "bk_keep_weekly"), 0, BK_KEEP_WEEKLY_MAX if ret_on("backups") else BK_KEEP_WEEKLY_CAP, 8)
@@ -724,11 +727,15 @@ def bk_prune(c):
             weeks.append(w)
             if len(weeks) <= weekly:
                 keep.add(x["name"])
-    last = [x for x in items if x["kind"] == "safety"][:BK_SAFETY_KEEP]
-    old = [x for x in last if local_now() - x["at"] >= timedelta(days=ret_days("backups"))]
-    purge = ret_on("backups")
-    keep.update(x["name"] for x in last if not (purge and x in old))
-    ret_report(c, "backups", {"safety": len(old)}, purge)
+    purge, n_old = ret_on("backups"), {}
+    # 2.525.0 (#4303): a "Back up now" (kind manual) is kept like a safety backup: the last BK_SAFETY_KEEP stay, also when
+    # an automatic one of the same day / week is newer; the older manual ones are in the rotation above as before
+    for kind in ("safety", "manual"):
+        last = [x for x in items if x["kind"] == kind][:BK_SAFETY_KEEP]
+        old = [x for x in last if local_now() - x["at"] >= timedelta(days=ret_days("backups"))]
+        keep.update(x["name"] for x in last if not (purge and x in old))
+        n_old[kind] = len(old)
+    ret_report(c, "backups", n_old, purge)
     keep.update(x["name"] for x in items if x["kind"] != "safety" and local_now() - x["at"] < timedelta(hours=24))
     gone = []
     for x in items:
@@ -753,9 +760,38 @@ def bk_store_gc(c):
     if slock is None:  # a backup is being written (maybe in the worker process): the next clean-up takes it
         return None
     try:
-        return _bk_store_gc(c)
+        rlock = bks.lock(BK_STORE, wait=False, name=bks.READ_LOCK)  # 2.525.0 (#4303): a download / check reads the store
+        if rlock is None:
+            print("backup: shared store not cleaned up now (a download or check reads it; the next rotation does it)", flush=True)
+            return None
+        try:
+            return _bk_store_gc(c)
+        finally:
+            bks.unlock(rlock)
     finally:
         bks.unlock(slock)
+
+
+def bk_read_lock():
+    """2.525.0 (#4303): a download, check or restore that reads files of the shared store holds the readers' lock (shared,
+    across processes): the clean-up (bk_store_gc, after the rotation or a delete) then removes nothing and runs again next
+    time; while a clean-up runs, the reader gets "busy" instead of a file that breaks off. -> a handle for bks.unlock()
+    (None without a store)."""
+    if not os.path.isdir(BK_STORE):
+        return None
+    fd = bks.lock(BK_STORE, wait=False, name=bks.READ_LOCK, shared=True)
+    if fd is None:
+        raise BackupError("busy")
+    return fd
+
+
+def bk_test_gate():
+    """Tests only (2.525.0, #4303): a download waits before its first shared file until the file KALMIDO_TEST_BK_DL_GATE
+    exists (the test deletes the backup meanwhile)."""
+    gate = os.environ.get("KALMIDO_TEST_BK_DL_GATE") if os.environ.get("KALMIDO_TEST") == "1" else ""
+    end = time.monotonic() + 60
+    while gate and not os.path.exists(gate) and time.monotonic() < end:
+        time.sleep(0.05)
 
 
 def _bk_store_gc(c):
@@ -1918,7 +1954,11 @@ def bk_restore(path, pw, admin, via, keep_purged=False):
         os.makedirs(off_new, mode=0o700)  # 2.39.1 (#1210 N8)
         pack_new = os.path.join(work, "packs")  # 2.359.2 (#2895)
         os.makedirs(pack_new, mode=0o755)
-        man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
+        rlock = bk_read_lock()  # 2.525.0 (#4303): no clean-up of the store (worker process) while its shared files are read
+        try:
+            man, dbp = bk_prepare(path, pw, work, att_new, off_new, restore=True, pack_dest=pack_new)
+        finally:
+            bks.unlock(rlock)
         kstate = man.get("key_state", "ok")
         if kstate == "foreign" and not env_bool("KALMIDO_SECRET_KEY_CHANGED", False):  # 2.359.3 (#2893): before anything changes
             raise BackupError("server_key" if SECRET_KEY else "server_key_none")
@@ -2250,6 +2290,8 @@ def backups_download(name):
     p = bk_path(name)
     enc = bool(bk_parse_name(name)["encrypted"])
     fmt3 = bk_meta(p, enc).get("format_version") == 3
+    if fmt3:  # 2.525.0 (#4303): a clean-up of the store runs: "busy" already on the POST (the dialog says it), not a broken file
+        bks.unlock(bk_read_lock())
     e = stepup_download(db(), proxy_ok=True, ticket=(lambda: bk_download_pass(p)) if enc and fmt3 else None)
     if e is not None:
         return e
@@ -2271,9 +2313,7 @@ def bk_download_pass(p):
     try:
         bk_decrypt(p, os.path.join(work, "archive.zip"), pw)
     except BackupError as e:
-        if e.code == "passphrase" and not given:
-            raise BackupError("old_passphrase") from None
-        raise
+        raise bk_old_pass(e, given, True) from None  # 2.525.0 (#4303): the same rule as check and restore
     finally:
         shutil.rmtree(work, ignore_errors=True)
     return {"passphrase": given} if given else {}
@@ -2283,8 +2323,22 @@ def bk_download_assembled(p, name, enc, pw):
     """2.432.0 (#3584): the download of a format-3 backup is ONE complete archive of format 2 (every file inside, as
     every version can restore it), streamed while it is put together: the shared files come out of the store (checked
     against their SHA-256), an encrypted backup is encrypted again with the same passphrase. Nothing lands on the disk
-    but the small zip of the backup (decrypted into a work folder that goes at the end)."""
+    but the small zip of the backup (decrypted into a work folder that goes at the end).
+    2.525.0 (#4303): it holds the readers' lock (bk_read_lock) from the start to the last byte, so the rotation or a
+    delete meanwhile removes none of its store files (that clean-up runs next time); while a clean-up runs: "busy" (409).
+    The lock goes with the end of the stream, an error, or a client that went away (also before the first byte)."""
+    rlock = bk_read_lock()
     work = tempfile.mkdtemp(prefix=".tmp-dl-", dir=BK_DIR)
+    held = {"z": None}
+
+    def release():  # once: from the generator's finally or the response's close, whichever comes first
+        if held.get("done"):
+            return
+        held["done"] = True
+        if held["z"] is not None:
+            held["z"].close()
+        shutil.rmtree(work, ignore_errors=True)
+        bks.unlock(rlock)
     try:
         head = None
         if enc:
@@ -2297,25 +2351,29 @@ def bk_download_assembled(p, name, enc, pw):
                 raise BackupError("old_passphrase" if e.code == "passphrase" else e.code, *e.args_) from None
         else:
             zp = p
-        z = zipfile.ZipFile(zp)
+        z = held["z"] = zipfile.ZipFile(zp)
         man = bk_check_zip(z, space=False)
         key = bk_store_key(man, pw)
         miss = bk_shared_missing(man, key)
         if miss:
             raise BackupError("shared_missing", miss)
     except zipfile.BadZipFile:
-        shutil.rmtree(work, ignore_errors=True)
+        release()
         raise BackupError("format") from None
     except BaseException:
-        shutil.rmtree(work, ignore_errors=True)
+        release()
         raise
+
+    def opener(sha, size):
+        bk_test_gate()
+        return bk_shared_chunks(key, sha, size)
 
     def gen():
         pipe = bks.Pipe()
         try:
             meta = {k: v for k, v in (head or {}).get("meta", {}).items() if k not in ("store", "shared_files", "shared_bytes", "store_new_bytes")}
             sink = bks.EncWriter(pipe, pw, {**meta, "format_version": 2}, {k: head[k] for k in ("n", "r", "p")}) if enc else pipe
-            for _ in bks.assemble(z, man, sink, lambda sha, size: bk_shared_chunks(key, sha, size)):
+            for _ in bks.assemble(z, man, sink, opener):
                 b = pipe.drain()
                 if b:
                     yield b
@@ -2326,10 +2384,11 @@ def bk_download_assembled(p, name, enc, pw):
             print("backup download broken off:", e.text("en"), flush=True)
             raise
         finally:
-            z.close()
-            shutil.rmtree(work, ignore_errors=True)
-    return Response(gen(), mimetype="application/octet-stream", headers={
+            release()
+    resp = Response(gen(), mimetype="application/octet-stream", headers={
         "Content-Disposition": f'attachment; filename="{name}"', "Cache-Control": "no-store"})
+    resp.call_on_close(release)  # a generator that never started has no finally
+    return resp
 
 
 @app.delete("/api/admin/backups/<name>")
@@ -2348,6 +2407,13 @@ def backups_delete(name):
     return jsonify(bk_state(db()))
 
 
+def bk_old_pass(e, given, own):
+    """2.525.0 (#4303): the saved passphrase does not open one of the server's own backups -> "old_passphrase" (it was
+    made with an earlier one; check and restore say it as the download does since #3613). A typed-in passphrase that
+    does not fit, an uploaded archive or a file that breaks off after its first chunk stays "passphrase" (wrong or damaged)."""
+    return BackupError("old_passphrase") if e.code == "passphrase" and getattr(e, "first", False) and not given and own else e
+
+
 def bk_key_warning(man):
     t = BK_KEY_WARN.get(man.get("key_state", "ok"))
     return tr(t) if t else ""
@@ -2361,11 +2427,17 @@ def backups_verify(name):
     if name.startswith("upload-"):
         bk_no_upload_hosted()  # 2.480.0 review (#3944, F6): hosted -> no uploaded archive at all
     p = bk_path(name) if not name.startswith("upload-") else bk_upload_path(name)
-    pw = str(body().get("passphrase") or "") or bk_passphrase(c)
+    given = str(body().get("passphrase") or "")
+    pw = given or bk_passphrase(c)
     work = tempfile.mkdtemp(prefix=".verify-", dir=BK_DIR)
+    rlock = None
     try:
+        rlock = bk_read_lock()  # 2.525.0 (#4303): no clean-up of the store while its shared files are checked
         man, _ = bk_prepare(p, pw, work)
+    except BackupError as e:
+        raise bk_old_pass(e, given, not name.startswith("upload-")) from None
     finally:
+        bks.unlock(rlock)
         shutil.rmtree(work, ignore_errors=True)
     return jsonify(ok=True, created_at=man.get("created_at"), app_version=man.get("app_version"),
                    schema_version=man.get("schema_version"), counts=man.get("counts") or {}, legacy=man["_legacy"],
@@ -2463,16 +2535,17 @@ def backups_restore():
         return e
     up = str(b.get("upload") or "")
     p = bk_upload_path(up) if up else bk_path(str(b.get("name") or ""))
-    pw = str(b.get("passphrase") or "") or bk_passphrase(c)
+    given = str(b.get("passphrase") or "")
+    pw = given or bk_passphrase(c)
     admin, via, keep = g.user["username"], g.auth_via, b.get("keep_purged") is True
     c.close()
     g.pop("db", None)
     try:
         tok, safety, man = bk_restore(p, pw, admin, via, keep_purged=keep)
     except BackupError as e:
-        if e.code == "passphrase":
+        if e.code == "passphrase" and given:  # 2.525.0 (#4303): only a typed-in passphrase counts as a try
             _rate_fail(keys)
-        raise
+        raise bk_old_pass(e, given, not up) from None
     if up:
         with contextlib.suppress(OSError):
             os.remove(p)

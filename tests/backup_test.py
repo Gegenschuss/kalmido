@@ -324,6 +324,8 @@ def expected(names, daily, weekly):
             if len(weeks) <= weekly:
                 keep.add(n)
     keep |= set(sorted((n for n in names if n.endswith("-safety.zip")), key=lambda n: at[n], reverse=True)[:3])
+    # 2.525.0 (#4303): the last 3 manual backups stay as well (here all of today, kept anyway: p2525_a_backup tests it)
+    keep |= set(sorted((n for n in names if n.endswith("-manual.zip")), key=lambda n: at[n], reverse=True)[:3])
     keep |= {n for n in normal if testclock.now().replace(tzinfo=None) - at[n] < timedelta(hours=24)}
     return keep
 

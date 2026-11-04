@@ -687,7 +687,8 @@ docker compose up -d kalmido
 - **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 104 weeks (52 with the deletion runs switched on; a higher
   setting reads as that limit). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
   before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
-  are switched on (see [Deletion periods](#deletion-periods)). Every deleted account is noted in a journal (the account
+  are switched on (see [Deletion periods](#deletion-periods)). The last three manual backups (*Back up now*) are kept the
+  same way (2.525), also when an automatic backup of the same day is newer; older manual ones are in the normal rotation. Every deleted account is noted in a journal (the account
   id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
   deleted again, and one that still owns lists is disabled for the admin to decide (an admin alert gives the numbers). The
   archive now also holds the project header pictures (`attachments/listheads/`). Hosting for others:

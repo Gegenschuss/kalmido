@@ -272,14 +272,18 @@ def chunks(root, key, sha, size):
 
 
 # ---- references + clean-up
-def lock(root, wait=True):
+READ_LOCK = ".read-lock"  # 2.525.0 (#4303)
+
+
+def lock(root, wait=True, name=".lock", shared=False):
     """The store's lock across processes (a worker process writes backups, the web process deletes them): a backup holds
     it from its first store file until its reference file is written, the clean-up only runs when it gets it at once.
-    -> a handle for unlock(), or None (wait=False and taken)."""
+    -> a handle for unlock(), or None (wait=False and taken). 2.525.0 (#4303): name=READ_LOCK = the readers' lock (a
+    download, check or restore reading store files holds it shared, the clean-up takes it exclusively and only at once)."""
     os.makedirs(root, mode=0o700, exist_ok=True)
-    fd = os.open(os.path.join(root, ".lock"), os.O_RDWR | os.O_CREAT, 0o600)
+    fd = os.open(os.path.join(root, name), os.O_RDWR | os.O_CREAT, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX | (0 if wait else fcntl.LOCK_NB))
+        fcntl.flock(fd, (fcntl.LOCK_SH if shared else fcntl.LOCK_EX) | (0 if wait else fcntl.LOCK_NB))
     except BlockingIOError:
         os.close(fd)
         return None

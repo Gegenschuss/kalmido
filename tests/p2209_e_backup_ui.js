@@ -93,6 +93,23 @@ print(json.dumps({"tries": bk.BK_RESTORE_TRIES, "once": case(1, dl), "always": c
   await until(() => clicked.length);
   check(JSON.stringify(sent.map(x => x.passphrase || '')) === '["","wrong one","the older one"]', 'the passphrases sent: ' + JSON.stringify(sent));
   check(clicked[0] === `${DL}?t=tk`, 'the file comes with the ticket: ' + clicked[0]);
+  // ---- 2.525.0 (#4303): the check of a backup of an earlier passphrase asks for it the same way, then checks with it
+  const VF = '/api/admin/backups/older.zip.enc/verify', vsent = [];
+  w.fetch = async (u, o) => {
+    if (!String(u).startsWith(VF)) return fetch0(u, o);
+    const b = JSON.parse(o.body); vsent.push(b);
+    return b.passphrase === 'the older one' ? J(200, {ok: true, counts: {tasks: 7}, attachment_files: 2})
+      : J(400, {code: b.passphrase ? 'passphrase' : 'old_passphrase', error: b.passphrase ? 'Wrong passphrase (check)' : 'An earlier passphrase (check)'});
+  };
+  await w.bkDraw(md, {...box._j, passphrase_set: true, items: [{...st.items[0], name: 'older.zip.enc', encrypted: true}]});
+  const vb = box.querySelector('[data-bkn="older.zip.enc"] [data-bk="verify"]');
+  check(!!vb, 'the check button of the older backup');
+  vb?.click();
+  await answer('An earlier passphrase (check)', 'wrong one');
+  await until(() => vsent.length === 2);
+  await answer('Wrong passphrase (check)', 'the older one');
+  const vok = await until(() => vsent.length === 3 && d.body.textContent.includes('Backup is complete and readable'));
+  check(!!vok && JSON.stringify(vsent.map(x => x.passphrase || '')) === '["","wrong one","the older one"]', 'the check asks for the earlier passphrase and then passes: ' + JSON.stringify(vsent));
   w.fetch = fetch0; w.HTMLAnchorElement.prototype.click = aclick; w.__dialogs = undefined;
   check(!errs.length, 'no script errors: ' + errs.join(' | '));
 

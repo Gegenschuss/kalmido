@@ -730,9 +730,16 @@ function bkWire(md) {
       if (b.dataset.bk === 'now') { await bkDraw(md, await api('POST', '/api/admin/backups')); toast(tr('Backup started')); }
       if (b.dataset.bk === 'del' && item) { if (!await askConfirm(tr('Delete the backup of {0}?', aaWhen(item.created_at)), tr('The file is removed from the server.'), {ok: tr('Delete'), danger: true})) return; await bkDraw(md, await api('DELETE', '/api/admin/backups/' + encodeURIComponent(name))); }
       if (b.dataset.bk === 'verify' && item) {
-        const pass = item.encrypted && !j.passphrase_set ? await askPrompt(tr('Passphrase of this backup'), '', {input: {type: 'password'}}) : '';
+        let pass = item.encrypted && !j.passphrase_set ? await askPrompt(tr('Passphrase of this backup'), '', {input: {type: 'password'}}) : '', r;
         if (pass === null) return;
-        const r = await api('POST', `/api/admin/backups/${encodeURIComponent(name)}/verify`, {passphrase: pass || ''});
+        // 2.525.0 (#4303): made with an earlier passphrase (old_passphrase) or a typed one that does not fit: ask for it, as the download does
+        while (!r) {
+          try { r = await suApi('POST', `/api/admin/backups/${encodeURIComponent(name)}/verify`, {passphrase: pass || ''}, tr('Check'), SU_PASS); } catch (err) {
+            if (!SU_PASS.includes(err.data?.code)) return;
+            pass = await askPrompt(tr('Passphrase of this backup'), '', {body: err.data.error, input: {type: 'password'}});
+            if (!pass) return;
+          }
+        }
         toast(tr('Backup is complete and readable ({0}, {1}).', trn('{0} task', '{0} tasks', r.counts?.tasks || 0), trn('{0} file', '{0} files', r.attachment_files || 0))
           + (r.missing_files ? ' ' + trn('{0} file was missing when it was written (deleted or moved meanwhile).', '{0} files were missing when it was written (deleted or moved meanwhile).', r.missing_files) : '')
           + (r.key_warning ? ' ' + r.key_warning : ''));  // 2.273.0 A (#3050); 2.359.3 (#2893)
