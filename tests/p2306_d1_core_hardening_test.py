@@ -50,14 +50,19 @@ def dbw(q, a=()):
         c.close()
 
 
-def py(code, env=None):
-    """Runs code in a second process of the container (no loops, role web); the last line of its output = JSON."""
+def py(code, env=None, timeout=None):
+    """Runs code in a second process of the container (no loops, role web); the last line of its output = JSON.
+    2.525.0 (#4292): timeout (s): a process that hangs gives {} (a lock that never frees)."""
     extra = []
     for k, v in {"TASKS_WATCHDOG": "0", "KALMIDO_ROLE": "web", **(env or {})}.items():
         extra += ["-e", f"{k}={v}"]
     for _try in range(3):  # the import may meet the running server's start-up DDL (deadlock): try again
-        r = subprocess.run(["docker", "exec", "-w", "/app", *extra, CT, "python", "-c", "import app\n" + code],
-                           capture_output=True, text=True)
+        try:
+            r = subprocess.run(["docker", "exec", "-w", "/app", *extra, CT, "python", "-c", "import app\n" + code],
+                               capture_output=True, text=True, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            print("py: no answer within", timeout, "s", flush=True)
+            return {}
         if "DeadlockDetected" not in r.stdout + r.stderr:
             break
         time.sleep(2)
@@ -157,6 +162,40 @@ print(json.dumps(_rate_blocked([("p2306f:u:dora@203.0.113.9", 5)])))
 """)
 check(a.get("blocked") is False and b.get("tripped") == [[], ["p2306f:u:dora@203.0.113.9"]] and b.get("blocked") is True and c3 is True,
       f"sign-in failures of two processes add up (5th trips the limit, a third process is blocked too) {a} {b} {c3}")
+# 2.525.0 (#4292): the sign-in gate (login_gate / login_wait of the sign-in routes) reads the same shared count: a fresh
+# process (as after a restart, or another web process) refuses the pair after the failures of other processes
+GATE = """
+import json
+from kalmido.accounts.session import _rate_fail, login_gate
+keys = [("p4292:u:erik@203.0.113.7", 5)]
+for _ in range({times}):
+    _rate_fail(keys)
+print(json.dumps(login_gate(keys, "erik")))
+"""
+a = py(GATE.format(times=3))
+b = py(GATE.format(times=2))
+c3 = py(GATE.format(times=0))
+check(a == "ok" and b == "blocked" and c3 == "blocked",
+      f"#4292: the sign-in gate counts the failures of every process (a new process after a restart is still blocked) {a} {b} {c3}")
+# the name ceiling of a known address: this process's own count is full, another process knows the address; the gate
+# asks for the exemption outside its lock (before: h6a_uall_exempt took _fail_lock inside login_gate's _fail_lock = hang)
+KNOWN = """
+import json
+from kalmido.core.config import app as kapp
+from kalmido.accounts.session import _rate_fail, login_gate, rate_key_ip
+from kalmido.core.ratedb import rate_known_add
+keys = [("p4292k:uall:frida", 3)]
+for _ in range(3):
+    _rate_fail(keys)
+rate_known_add("p4292k:uall:frida", rate_key_ip("203.0.113.8"), 30)
+with kapp.test_request_context("/api/login", environ_base={{"REMOTE_ADDR": "203.0.113.8"}}):
+    known = login_gate(keys, "frida", "p4292k:")
+with kapp.test_request_context("/api/login", environ_base={{"REMOTE_ADDR": "203.0.113.{other}"}}):
+    other = login_gate(keys, "frida", "p4292k:")
+print(json.dumps([known, other]))
+"""
+a = py(KNOWN.format(other=99), timeout=120)
+check(a == ["ok", "blocked"], f"#4292: a known address passes the name ceiling, another one is refused, no hang {a}")
 check(not kt.dbx("SELECT 1 FROM rate_hits WHERE k LIKE '%p2306%' OR k LIKE '%dora%'") and kt.dbx("SELECT COUNT(*) FROM rate_hits")[0][0] >= 8,
       "the shared counter stores hashes of the keys only")
 HK = """

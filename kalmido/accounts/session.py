@@ -475,9 +475,15 @@ def login_known(username, pre=""):
 def login_gate(keys, username, pre=""):
     """2.282.0 (#3111): "ok", "slow" (only the address counter is full and the name is not known here) or "blocked"
     (the pair or the name ceiling, as _rate_blocked). For the sign-in routes only; the other _rate_blocked callers keep
-    their address lock."""
+    their address lock.
+    2.525.0 (#4292): reads the failures of every process from the database (core/ratedb.py rate_counts) like _rate_blocked,
+    so the lock holds across web processes and a restart; the process's own count stays the fallback (count failed: None).
+    The address counter's hard ceiling (LOGIN_IP_HARD) only sees up to the shared rows' cap (_rate_fail, 2 x limit) from
+    the database, above that this process's own count. The exemptions (h6a_uall_exempt, login_known) are asked outside
+    _fail_lock: h6a_uall_exempt may ask the database and takes _fail_lock itself (a plain Lock: inside it would hang)."""
+    shared = rate_counts([k for k, _ in keys], FAIL_WINDOW) or {}
     now = time.time()
-    slow = False
+    full = []
     with _fail_lock:
         for k, limit in keys:
             arr = [t for t in _fails.get(k, []) if now - t < FAIL_WINDOW]
@@ -485,14 +491,19 @@ def login_gate(keys, username, pre=""):
                 _fails[k] = arr
             else:
                 _fails.pop(k, None)
-            if len(arr) < limit or h6a_uall_exempt(k, now):
-                continue
-            if k.startswith(pre + "ip:"):
-                if len(arr) >= LOGIN_IP_HARD and not login_known(username, pre):
-                    return "blocked"
-                slow = slow or not login_known(username, pre)
-                continue
-            return "blocked"
+            n = max(len(arr), shared.get(k, 0))
+            if n >= limit:
+                full.append((k, n))
+    slow = False
+    for k, n in full:
+        if h6a_uall_exempt(k, now):
+            continue
+        if k.startswith(pre + "ip:"):
+            if n >= LOGIN_IP_HARD and not login_known(username, pre):
+                return "blocked"
+            slow = slow or not login_known(username, pre)
+            continue
+        return "blocked"
     return "slow" if slow else "ok"
 
 
