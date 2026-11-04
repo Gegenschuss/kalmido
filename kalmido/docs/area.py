@@ -34,7 +34,7 @@ from ..core.i18n import tr
 from ..core.access import Denied
 from ..core.pg import system_ctx
 from ..accounts.session import me
-from ..accounts.orgs import user_orgs
+from ..accounts.orgs import is_org_admin, user_orgs
 from ..accounts.orgroles import org_role_key
 from ..accounts.spacemove import smv_refuse_agent
 from ..files.store import fs_log_add, need_node
@@ -73,6 +73,10 @@ def ar_office(c, uid):
         return None  # several organisations, none chosen: office_where asks; nothing is sorted
     if org_role_key(c, uid, oid) in (None, *AR_NO_WRITE):
         return None
+    from ..office.rights import ofr_allows
+    with system_ctx(c):  # review 2.522 (4): the office groups must let the person work on receipts (office_org would say 403)
+        if not ofr_allows(c, uid, oid, "receipts", "edit"):
+            return None
     return ("org", S.doc_ws(oid, None), oid)
 
 
@@ -175,6 +179,11 @@ def ar_sort_queued(c, nid):
         m = c.execute("SELECT node_id, ws, area_sort, created_by FROM doc_meta WHERE node_id=?", (nid,)).fetchone()
     if not m or m["area_sort"] != "pending":
         return
+    with system_ctx(c):  # review 2.522 (3): claim it -- a person's click in between wins, the queue then does nothing
+        claimed = c.execute("UPDATE doc_meta SET area_sort='sorting' WHERE node_id=? AND area_sort='pending'", (nid,)).rowcount
+    c.commit()
+    if not claimed:
+        return
     uid = m["created_by"]
     with system_ctx(c):  # the person's office (their settings and memberships)
         off = ar_office(c, uid)
@@ -189,6 +198,16 @@ def ar_sort_queued(c, nid):
             _set(c, nid, to, "auto")
         c.commit()
         return
+    with system_ctx(c):
+        back = is_org_admin(c, uid, off[2])
+    if not back:
+        # review 2.522 (1, 2): out of an organisation only its admin moves a file (accounts/orgout.py org_out_ok), so for a
+        # member "Wrong area" could not bring it back, and a stranger's mail to the person's address would decide the tenant:
+        # it stays private, "Move to office" is the person's own click
+        with system_ctx(c):
+            _set(c, nid, "private", "")
+        c.commit()
+        return
     old = []
     prev = c.ctx
     try:
@@ -197,6 +216,8 @@ def ar_sort_queued(c, nid):
             g.user = c.execute("SELECT * FROM users WHERE id=?", (int(uid),)).fetchone()
             try:
                 old = ar_move(c, uid, nid, "office", "auto")
+                fs_log_add(c, nid, "area", "auto:office")  # review 2.522 (5): the server sorted, not the person
+                bump(c)
                 c.commit()
             except Exception as e:  # noqa: BLE001 -- a refused move leaves it private (in doubt private)
                 c.rollback()

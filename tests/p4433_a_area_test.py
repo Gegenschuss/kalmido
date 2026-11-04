@@ -85,7 +85,7 @@ def settled(s, nid, secs=90):
         r = s.get(B + f"/api/docs/{nid}")
         if not r.ok or r.json()["state"] not in ("done", "failed"):
             return None
-        return r.json() if (row(nid) or ("", "pending"))[1] != "pending" else None
+        return r.json() if (row(nid) or ("", "pending"))[1] not in ("pending", "sorting") else None  # review 2.522: + 'sorting' (claimed by the queue)
     return until(one, secs)
 
 
@@ -201,6 +201,19 @@ check(r.ok and r.json()["org_id"] is None and row(a1)[:2] == ("private", "person
 r = area(A, a1, "office", undo=True)
 check(r.ok and r.json()["org_id"] == ORG and row(a1) == ("office", "auto", f"o{ORG}"), f"the undo: into Alpha again {r.text[:200]} {row(a1)}")
 check(area(G, a1, "private").status_code == 404, "another person: 404 on Alpha's document")
+# 2.522.0 review (1, 2): a member who is no admin could not take a file out of the organisation again (org_out_ok), so the
+# server does not move a member's invoice into the organisation: it stays private, "Move to office" is the person's click
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bert", "display_name": "Bert",
+                                   "password": "password123", "email": "bert@example.com"})
+check(r.ok, "setup: bert, a member of Alpha " + r.text[:160])
+Be = kt.sess("bert")
+Be.patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "docs,files,office", "workspace": f"org:{ORG}"})
+b1 = upload(Be, "rechnung-bert.xml", ubl("ER-2026-86", "Beispiel Papier GmbH", "DE123456789"), "application/xml")
+d = settled(Be, b1)
+check(d and d["org_id"] is None and row(b1)[:2] == ("private", ""), f"a member's invoice is not moved into the organisation {d and d['org_id']} {row(b1)}")
+check(d and (d.get("area") or {}).get("wrong") is False and (d.get("area") or {}).get("can_move") is True, f"no 'Wrong area', 'Move to office' offered {d and d.get('area')}")
+r = area(Be, b1, "office")
+check(r.ok and r.json()["org_id"] == ORG, f"'Move to office' by the member: into Alpha {r.status_code} {r.text[:200]}")
 
 print(f"p4433_a_area: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
