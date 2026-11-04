@@ -19,6 +19,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# README.md is written by the release train only: its menu paths come with the notes of package 2.512, then it joins the check
+SKIP = {"CHANGELOG.md", "README.md"}
 SEP = r"\s*(?:>|›|→|->)\s*"
 DECOR = r"[*_`\"“”„]*"
 PATH = re.compile(r"\bSettings" + DECOR + SEP + DECOR + r"(?=(?P<tail>[^\n]*(?:\n[^\n]*)?))")
@@ -107,7 +109,7 @@ def app_text(path):
 def files():
     docs = [os.path.join(ROOT, x) for x in (".env.example", "install.sh", "install.ps1", "docker-compose.yml")]
     for pat in ("*.md", "docs/*.md", "mcp/*.md", "examples/**/*.md"):
-        docs += [p for p in glob.glob(os.path.join(ROOT, pat), recursive=True) if os.path.basename(p) != "CHANGELOG.md"]
+        docs += [p for p in glob.glob(os.path.join(ROOT, pat), recursive=True) if os.path.basename(p) not in SKIP]
     code = glob.glob(os.path.join(ROOT, "static", "js", "*.js")) + glob.glob(os.path.join(ROOT, "kalmido", "**", "*.py"), recursive=True)
     return [p for p in docs if os.path.exists(p)], code
 
