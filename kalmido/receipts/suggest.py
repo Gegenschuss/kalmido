@@ -215,12 +215,28 @@ def rc_state(c, node, m, uid):
     cur["checked_at"] = r["checked_at"] if r else None  # 2.420.0 C (#3448): a person's tick (office/receiptlist.py)
     cur["checked_by"] = _who(c, r["checked_by"]) if r and r["checked_at"] else None
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
-    projects = [{"id": x["id"], "name": x["name"]} for x in c.execute(
-        "SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND org_id IS NOT DISTINCT FROM ? ORDER BY lower(name)",
-        (node["org_id"],)) if list_role(c, x["id"], uid)][:300]
-    return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects,
+    projects, recent = rc_projects(c, node["org_id"], uid)
+    return {"receipt": cur, "suggestions": sugs, "categories": rc_categories(c, m["ws"]), "projects": projects, "recent": recent,
             "can_edit": node["role"] in ("owner", "edit") and rc_office_ok(c, m, uid), "confirmed": rc_confirmed(c, node["id"], r),
             "einvoice_offer": not r and ei_rc_offer(c, m) is not None}  # 2.185.0 A (#2583): "Take over as receipt"
+
+
+def rc_projects(c, org_id, uid):
+    """2.540.0 (#4471): the projects a receipt can go to, the same set as the office's quotations and invoices (dpj_lists):
+    lists of the receipt's area without inbox, archive, health, budget and locked ones; in the private area only the
+    person's own lists (a private list another person shares carries the same name and is no project of hers). recent =
+    the ids of the (up to 5) projects she last chose at receipts of this area, newest first."""
+    rows = c.execute("SELECT id, name FROM lists WHERE is_inbox=0 AND archived=0 AND e2e IS NULL AND life NOT IN ('health', 'budget') "
+                     "AND org_id IS NOT DISTINCT FROM ? AND (org_id IS NOT NULL OR owner_id=?) ORDER BY lower(name)", (org_id, uid))
+    projects = [{"id": x["id"], "name": x["name"]} for x in rows if list_role(c, x["id"], uid)][:300]
+    ids, recent = {p["id"] for p in projects}, []
+    for x in c.execute("SELECT list_id FROM rc_receipts WHERE set_by=? AND list_id IS NOT NULL AND org_id IS NOT DISTINCT FROM ? "
+                       "ORDER BY set_at DESC LIMIT 200", (uid, org_id)):
+        if x["list_id"] in ids and x["list_id"] not in recent:
+            recent.append(x["list_id"])
+            if len(recent) == 5:
+                break
+    return projects, recent
 
 
 def rc_confirmed(c, nid, r):

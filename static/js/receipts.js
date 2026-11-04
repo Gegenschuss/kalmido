@@ -30,8 +30,7 @@ function rc_html() {
       ${s.note ? `<br><span class="muted">${esc(s.note)}</span>` : ''}
       ${rc_money(s, w)}</span>
       ${w ? `<span class="rc-acts"><button type="button" class="btn sm" data-rc="reject:${s.id}">${tr('Reject')}</button><button type="button" class="btn sm pri" data-rc="accept:${s.id}">${tr('Accept|suggestion')}</button></span>` : ''}</div>`).join('');
-  const projOpts = `<option value="">${tr('No project')}</option>` + d.projects.map(p => `<option value="${p.id}" ${r.project?.id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')
-    + (r.project && !d.projects.some(p => p.id === r.project.id) ? `<option value="${r.project.id}" selected>${esc(r.project.name || tr('Project #{0}', r.project.id))}</option>` : '');
+  const projBtn = rc_projBtn(d, w);  // 2.540.0 (#4471): the project picker of quotations and invoices instead of a native select
   // 2.185.0 A (#2583): an e-invoice in the office's documents that is no receipt yet (read before, moved in) -> take it over
   const einv = d.einvoice_offer && w ? `<div class="rc-sug rc-einv" role="group"><span class="muted">${tr('This e-invoice is not a receipt yet.')}</span><button type="button" class="btn sm" data-rc="einv:0">${ic('receipt', 's')} ${tr('Take over as receipt')}</button></div>` : '';
   // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
@@ -46,10 +45,40 @@ function rc_html() {
     return wrong + (w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '');
   }
   return `${wrong}<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
-    <div class="row dc-f"><label for="rc-proj">${tr('Project')}</label><select id="rc-proj" data-rcf="project" ${w ? '' : 'disabled'}>${projOpts}</select></div>
+    <div class="row dc-f"><label for="rc-proj">${tr('Project')}</label>${projBtn}</div>
     <div class="row dc-f"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
     <div class="row dc-f"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
 }
+// 2.540.0 (#4471): the receipt's project as a button with the project's icon and name (office_docproject.js dpj_rowHtml);
+// value = the list id (empty: none). A click opens tch_listPicker over the server's set (rc_state: the area's projects without
+// inbox / archive / health / budget / locked, privately only own lists): No project, the last chosen (up to 5), the rest in
+// the sidebar's order with its folders, a search from 10 entries, a sheet on a phone
+function rc_projBtn(d, w) {
+  const p = d.receipt.project, l = p ? listById(p.id) : null;
+  const cur = l ? `${listIconHtml(l, {cls: 'mlic'}) || ic('list', 's')}<span class="dpjnm">${esc(licName(l))}</span>`
+    : p ? `${ic('list', 's')}<span class="dpjnm">${esc(p.name || tr('Project #{0}', p.id))}</span>` : `<span class="dpjnm muted">${tr('No project')}</span>`;
+  return `<button type="button" class="btn sm dpjpick rcpick" id="rc-proj" data-rcp="pick" value="${p ? p.id : ''}" aria-haspopup="menu" ${w ? '' : 'disabled'}>${cur}${ic('down', 's dpjchev')}</button>`;
+}
+function rc_projPicker(b) {
+  const d = RC.d; if (!d?.can_edit) return;
+  const ids = new Set(d.projects.map(p => p.id)), cur = d.receipt.project?.id || 0;
+  const recent = (d.recent || []).map(listById).filter(l => l && ids.has(l.id));
+  const to = v => { if (v !== (cur || null)) rc_projSet(v); };
+  tch_listPicker(b, {title: tr('Project'), filter: l => ids.has(l.id), on: cur, search: 10,
+    pre: [{label: tr('No project'), icon: 'ban', on: !cur, fn: () => to(null)}],
+    first: recent.length ? {head: tr('Recently chosen'), lists: recent, rest: tr('Other projects')} : null,
+    pick: l => to(l.id)});
+}
+async function rc_projSet(v) {
+  const id = RC.id, from = rc_cur(), to = {...from, project_id: v};
+  try { await rc_put(id, to); } catch { rc_draw(); return; }
+  const label = tr('Changed receipt');
+  histToast(label, histAdd({label, undo: () => rc_put(id, from), redo: () => rc_put(id, to)}));
+}
+document.addEventListener('click', e => {
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('.rc-slot [data-rcp="pick"]');
+  if (b && RC.d) { e.preventDefault(); rc_projPicker(/** @type {HTMLElement} */ (b)); }
+});
 // 2.497.0 A (#4046): is the document a receipt (or about to become one)? DC.doc.extracted = what the recognition read off an
 // invoice; a gross amount alone is no sign (a fee in an official letter), such a document gets the button
 function rc_isReceipt(d) {
@@ -127,8 +156,7 @@ async function rc_post(id, sid, act, body) {
 document.addEventListener('change', async e => {
   const f = e.target.closest('.rc-slot [data-rcf]'); if (!f || !RC.d) return;
   const id = RC.id, from = rc_cur(), to = {...from};
-  if (f.dataset.rcf === 'project') to.project_id = f.value ? +f.value : null;
-  else if (f.dataset.rcf === 'vat') to.vat_pct = f.value || null;
+  if (f.dataset.rcf === 'vat') to.vat_pct = f.value || null;  // 2.540.0 (#4471): the project has its own picker (rc_projPicker)
   else to.category = f.value.trim();
   try { await rc_put(id, to); } catch { rc_draw(); return; }
   const label = tr('Changed receipt');

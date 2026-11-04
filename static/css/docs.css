@@ -119,6 +119,7 @@
 .dc-text[open] .dc-chev{transform:rotate(180deg)}
 .rc-add{margin:.625rem 0}
 .rc-add .btn{min-height:2.5rem}
+.rcpick{min-height:2.5rem;justify-content:flex-start;font-weight:400}.rcpick .lic{width:1rem;flex:none}.rcpick .dpjnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}.rcpick .dpjchev{flex:none;color:var(--muted)}  /* 2.540.0 (#4471): the project picker button (office.css .dpjpick) */
 @media (max-width:30rem){
   /* phones: the label above its field, still one grid for all fields */
   .dc-body .dc-f{grid-template-columns:minmax(0,1fr) auto;gap:.125rem .5rem}
