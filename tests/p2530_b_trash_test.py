@@ -143,6 +143,19 @@ check(r.ok and r.json()["restored"] == 3 and not dbx("SELECT 1 FROM time_wipes W
 check(F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": W1}).status_code == 404
       and dbx("SELECT COUNT(*) FROM time_entries WHERE list_id=?", (L,))[0][0] == 3, "time: no entry comes back twice")
 check(F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": "x"}).status_code == 400, "time: a wipe that is no number 400")
+# 2.530.0 (#4315, review M1): a restore that brings nothing back (the month was closed since) keeps the server's copy
+r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
+WM = r.json()["wipe"]
+mons = sorted({e["start"][:7] for e in __import__("json").loads(dbx("SELECT entries FROM time_wipes WHERE id=?", (WM,))[0][0])})
+for m in mons:
+    dbx("INSERT INTO time_sheets(user_id, month, state, created_at, updated_at) VALUES(?,?,'closed',?,?)", (FID, m, ago(0), ago(0)))
+r = F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": WM})
+check(r.ok and r.json()["restored"] == 0 and r.json().get("left") == 3 and dbx("SELECT n FROM time_wipes WHERE id=?", (WM,)),
+      f"time: nothing came back (closed month), the copy stays {r.text[:150]}")
+dbx("DELETE FROM time_sheets WHERE user_id=?", (FID,))
+r = F.post(B + f"/api/lists/{L}/time/restore", json={"wipe": WM})
+check(r.ok and r.json()["restored"] == 3 and not dbx("SELECT 1 FROM time_wipes WHERE id=?", (WM,)),
+      f"time: once the month is open again the copy brings them back and is used up {r.text[:150]}")
 # the trash run deletes an old copy
 r = F.post(B + f"/api/lists/{L}/time/delete-all", json={"confirm": "Frida film"})
 W2 = r.json()["wipe"]

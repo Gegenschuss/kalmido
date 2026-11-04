@@ -105,6 +105,8 @@ def otb_restore(c, oid, tid):
                     raise Denied(409, tr("Already restored"))
                 if table == "office_docs":
                     if row.get("number") and c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=?", (oid, row["number"])).fetchone():
+                        if row.get("locked_at"):  # 2.530.0 (#4315, review K1): a finalised document never comes back without its number
+                            raise Denied(409, tr("The number {0} is already used", row["number"]))
                         row["number"] = ""  # taken since: the draft comes back without one
                     if row.get("series_id") and c.execute("SELECT 1 FROM office_docs WHERE series_id=? AND series_period IS NOT DISTINCT FROM ?",
                                                           (row["series_id"], row.get("series_period"))).fetchone():

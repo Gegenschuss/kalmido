@@ -177,7 +177,7 @@ def tz_restore(lid):
         ents = b.get("entries")
     if not isinstance(ents, list) or len(ents) > TZ_MAX_RESTORE:
         raise Denied(400, tr("Invalid value: {0}", "entries"))
-    ts, n = iso(now_utc()), 0
+    ts, n, left = iso(now_utc()), 0, []
     for e in ents:
         if not isinstance(e, dict) or not e.get("start") or not e.get("end"):
             continue
@@ -192,6 +192,7 @@ def tz_restore(lid):
                          (owner, lid, str(e["start"])[:40], str(e["end"])[:40])).fetchone():
                 continue
         if not c.execute("SELECT 1 FROM users WHERE id=?", (owner,)).fetchone() or not list_role(c, lid, owner):
+            left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy, may come back later
             continue  # review V1: only people of this list get entries back
         try:  # review V1: real times, end after start, seconds at most the span
             t0, t1 = datetime.fromisoformat(str(e["start"])[:40]), datetime.fromisoformat(str(e["end"])[:40])
@@ -206,6 +207,7 @@ def tz_restore(lid):
             tid = None
         from .timesheet import tsl_is_locked
         if tsl_is_locked(c, owner, str(e["start"])[:40]):
+            left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy
             continue  # 2.125.0 B (#2119): never into a closed month
         cid, pid = n43_restore_ids(c, owner, e)
         insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,client_id,pomo_id,
@@ -217,17 +219,25 @@ def tz_restore(lid):
                    1 if e.get("reminded") in (1, True) else 0, 1 if e.get("auto_stopped") in (1, True) else 0,
                    n43_iso(e.get("created_at")) or ts, ts))
         n += 1
-    if w:
+    if w and left:  # 2.530.0 (#4315, review M1): what could not come back (closed month, left the project) stays for later
+        c.execute("UPDATE time_wipes SET entries=? WHERE id=?", (json.dumps(left), w["id"]))
+    elif w:
         c.execute("DELETE FROM time_wipes WHERE id=?", (w["id"],))  # 2.530.0 B (#4315): its way back is used
     else:  # 2.530.0 B (#4315): the answer's copy came back (an older window): the server's copy of that delete is used up too
         sigs = {e.get("sig") for e in ents if isinstance(e, dict) and isinstance(e.get("sig"), str)}
         for r in c.execute("SELECT id, entries FROM time_wipes WHERE list_id=? AND user_id=?", (lid, uid)).fetchall() if sigs else []:
             try:
-                if sigs & {x.get("sig") for x in json.loads(r["entries"] or "[]") if isinstance(x, dict)}:
-                    c.execute("DELETE FROM time_wipes WHERE id=?", (r["id"],))
+                xs = [x for x in json.loads(r["entries"] or "[]") if isinstance(x, dict)]
+                if sigs & {x.get("sig") for x in xs}:  # 2.530.0 (#4315, review M1): only what really came back is used up
+                    gone = sigs - {x.get("sig") for x in left}
+                    rest = [x for x in xs if x.get("sig") not in gone]
+                    if rest:
+                        c.execute("UPDATE time_wipes SET entries=? WHERE id=?", (json.dumps(rest), r["id"]))
+                    else:
+                        c.execute("DELETE FROM time_wipes WHERE id=?", (r["id"],))
             except ValueError:
                 continue
     if n:
         bump(c)
     c.commit()
-    return jsonify(ok=True, restored=n)
+    return jsonify(ok=True, restored=n, left=len(left))

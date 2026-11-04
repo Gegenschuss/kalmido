@@ -213,4 +213,19 @@ check(r.ok and r.json()["body"] == "Club news", f"freelancer: own message restor
 check(any(m["id"] == FM and m["body"] == "Club news" for m in Fi.get(B + f"/api/team/rooms/{FCH}/messages").json()["messages"]),
       "freelancer: fiona sees it again")
 
+# ================================================================== 2.530.0 (#4315, review K2): the account goes, its kept words too
+r = A.post(B + "/api/users", json={"username": "erin", "display_name": "Erin", "password": "password123", "email": "erin@example.com",
+                                   "orgs": [{"id": ORG, "role": "member"}]})
+assert r.ok, r.text
+ERIN = r.json()["id"]
+assert A.put(B + f"/api/lists/{L}/members", json={"user_id": ERIN, "role": "edit"}).ok
+Er = sess("erin")
+Er.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+EC = Er.post(B + f"/api/tasks/{T}/comments", json={"body": "Heron words"}).json()["id"]
+check(Er.delete(B + f"/api/comments/{EC}").ok and dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (EC,)),
+      "account: erin's deleted comment keeps its text in the trash")
+check(A.delete(B + f"/api/users/{ERIN}").ok, "account: erin deleted")
+check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (EC,)), "account: the kept text went with the account")
+check(A.post(B + f"/api/comments/{EC}/restore").status_code == 404, "account: the owner cannot bring erin's words back (404)")
+
 sys.exit(done("p4315_a_comment_trash"))

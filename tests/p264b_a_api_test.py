@@ -226,8 +226,15 @@ old = dbx("""SELECT x FROM (SELECT title AS x FROM tasks WHERE list_id=? UNION A
              UNION ALL SELECT name FROM sections WHERE list_id=?
              UNION ALL SELECT v.value FROM task_field_values v JOIN tasks t ON t.id=v.task_id WHERE t.list_id=?) q WHERE x<>''""", (L,) * 7)
 check(old and all(gen_of(x[0]) == 2 for x in old), "db: every text of the list on generation 2 " + str([gen_of(x[0]) for x in old]))
+# 2.530.0 (#4315, review M2): a comment deleted during the key change keeps its text in the trash -- the trash is not
+# re-encrypted, so the end of the key change removes the kept text (a restore would bring back an unreadable old one)
+r = A.post(B + f"/api/tasks/{T1}/comments", json={"body": ct(2)})
+CT1 = r.json().get("id") if r.ok else None
+check(CT1 and A.delete(B + f"/api/comments/{CT1}").ok and dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)),
+      "trash: the deleted comment keeps its text until the key change ends " + r.text[:200])
 r = A.post(B + f"/api/lists/{L}/e2e/finish")
 check(r.ok and r.json()["mode"] == "on" and tuple(dbx("SELECT e2e, e2e_reenc FROM lists WHERE id=?", (L,))[0]) == ("on", 0), "finish: re-encryption done " + r.text[:200])
+check(not dbx("SELECT 1 FROM comment_trash_text WHERE comment_id=?", (CT1,)), "finish: the kept text of the trash went with the key change")
 check(A.post(B + f"/api/lists/{L}/e2e/finish").status_code == 409, "finish: only once")
 check(A.get(B + f"/api/lists/{L}/e2e").json()["reenc"] == 0, "info: reenc 0")
 # a plain leftover in 'on' (there should be none): the todo hands it out, bulk encrypts it

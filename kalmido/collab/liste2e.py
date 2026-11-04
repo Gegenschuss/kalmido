@@ -1046,8 +1046,16 @@ def le2a_finish(lid):
             return err(tr("No encryption change is running for this project."), 409)
         c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
                   (lid, uid, "e2e", json.dumps({"reenc": True, "done": True, "gen": int(lr["e2e_gen"] or 0)}), ts))
+        # 2.530.0 (#4315, review M2): the trash was not re-encrypted either -- its files and the kept texts of deleted comments /
+        # channel messages are of the old key generation; a restore would bring back what nobody can read any more
+        from ..tasks.atttrash import atr_purge_list
+        from .cmttrash import ctt_purge_list
+        gone = atr_purge_list(c, lid) + ctt_purge_list(c, lid)
         bump(c)
         c.commit()
+        if gone:
+            from ..files.store import fs_purge_files
+            fs_purge_files([], gone)  # after the commit
         return jsonify(ok=True, mode="on")
     # 2.64.1 review (M1): only from the state this call checked (a stop or another finish in between = 409)
     if not c.execute("UPDATE lists SET e2e=?, e2e_at=? WHERE id=? AND e2e=? AND COALESCE(e2e_gen, 0)=?",

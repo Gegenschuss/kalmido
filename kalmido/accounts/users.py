@@ -619,6 +619,10 @@ def _user_purge(c, uid, made):
                 c.execute("UPDATE bookmarks SET user_id=? WHERE user_id=? AND org_id=?", (h[0], uid, o))
         from ..sheets.shshare import shs_forget
         shs_forget(c, uid)  # 2.453.0 (#3781)
+    # 2.530.0 (#4315, review K2): the kept texts of the person's deleted comments / channel messages go with the account (their
+    # rows keep user_id NULL, nobody may bring the person's words back afterwards; the files go with the trash run)
+    c.execute("DELETE FROM comment_trash_text WHERE comment_id IN (SELECT id FROM comments WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
+    c.execute("DELETE FROM tchat_trash_text WHERE message_id IN (SELECT id FROM tchat_msgs WHERE user_id=? AND deleted_at IS NOT NULL)", (uid,))
     c.execute("DELETE FROM users WHERE id=?", (uid,))  # cascades: settings, memberships, sessions
     return files
 

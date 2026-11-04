@@ -102,6 +102,13 @@ def scenario(S, who, ws, other, member=None):
     lst = S.get(B + O + "/trash").json()
     check(any(x["id"] == tid and x["kind"] == "doc" and x["sub"] == "offer" for x in lst["items"]), f"{who}: the office trash lists it {lst}")
     check(other.post(B + f"{O}/trash/{tid}/restore").status_code in (403, 404), f"{who}: another office cannot restore it")
+    # 2.530.0 (#4315, review K1): its number was given again meanwhile -> 409, never a locked quotation without a number
+    d2 = S.post(B + D, json={"kind": "offer", "lang": "en", "project_title": f"Spot {who}", "client_id": cl}).json()["id"]
+    sql("UPDATE office_docs SET number=? WHERE id=?", (num, d2))
+    r = S.post(B + f"{O}/trash/{tid}/restore")
+    check(r.status_code == 409 and not sql("SELECT 1 FROM office_docs WHERE id=?", (did,)) and sql("SELECT 1 FROM office_trash WHERE id=?", (tid,)),
+          f"{who} K1: the number is taken: 409, the copy stays {r.status_code} {r.text[:200]}")
+    sql("UPDATE office_docs SET number='' WHERE id=?", (d2,))
     r = S.post(B + f"{O}/trash/{tid}/restore")
     d = S.get(B + f"{D}/{did}").json()
     check(r.ok and d.get("number") == num and d.get("locked") is True and [x["title"] for x in d.get("items") or []] == ["Concept"],
