@@ -99,7 +99,8 @@ def main(argv):
     if re.search(r"""['"`]/sw\.js""", app):
         fail("app.js still references /sw.js")
     # 2.125.0 D (#1653): the intro's "Start" (account.js setupChoices) reloads the page itself, not the site's root
-    app = replace(app, "      else return;\n      location.replace('/');", "      else return;\n      location.reload();  /* demo build: the demo page itself */", "app.js")
+    # 2.538.0 (#4361): anchored on the catch after it, the import card sits between "else return;" and the reload now
+    app = replace(app, "      location.replace('/');\n    } catch (err) { $('#su-err', el)", "      location.reload();  /* demo build: the demo page itself */\n    } catch (err) { $('#su-err', el)", "app.js")
     write(os.path.join(st, "app.js"), app)
     js_all = app
     # 2.53.1 (#1410): the modules loaded on demand (LAZY in sw.js, no script tag in index.html) stay own files: loadModule
