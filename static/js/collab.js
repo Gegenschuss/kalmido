@@ -775,7 +775,7 @@ function encodeMentions(text, people) {
 }
 function cattHtml(a, cid, editing) {
   const del = editing ? `<button class="attdel" data-act="catt-del" data-att="${a.id}" title="${tr('Remove')}">${ic('x', 's')}</button>` : '';
-  if (a.enc === 2 && typeof le2eFileHtml === 'function') return le2eFileHtml(a, del, taskById(S.sel)?.list_id);  // 2.64.2 B (#1817)
+  if (a.enc === 2 && typeof le2eFileHtml === 'function') return le2eFileHtml(a, del, taskById(S.sel)?.list_id, S.sel);  // 2.64.2 B (#1817)
   if (upLocked(a)) return scnLockedTile(a, del);  // 2.61.0 (#1818)
   if (isImg(a)) return `<div class="att img"><a href="${attUrl(a)}" data-act="catt-view" data-att="${a.id}" data-cid="${cid}" title="${esc(a.name)}"><img src="${attUrl(a)}" loading="lazy" alt="${esc(a.name)}"></a>${scnImgMark(a)}${del}</div>`;
   return `<div class="att file">${attFileA(a)}${del}</div>`;  // 2.30.0 (#1035): text files open in the viewer
@@ -915,7 +915,7 @@ async function sendComment() {
   let payload = {body: text, ...(rto ? {reply_to: rto} : {}), ...(pub ? {portal: true} : {}), ...(mrep ? {mail_reporter: true} : {})};
   // 2.64.2 B (#1817): in a list with the lock the files go encrypted with the list key (names as list ciphers)
   let lf = null;
-  if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files); } catch (x) { toast(x.message); return; } }
+  if (files.length && typeof le2eFileParts === 'function') { try { lf = await le2eFileParts(taskById(tid)?.list_id, files, tid); } catch (x) { toast(x.message); return; } }
   if (files.length) { payload = new FormData(); payload.append('body', text); if (rto) payload.append('reply_to', rto); if (pub) payload.append('portal', '1'); if (mrep) payload.append('mail_reporter', '1'); if (lf) lf.forEach(p => { payload.append('file', p.blob, 'encrypted.kenc'); payload.append('le2e_name', p.name); }); else files.forEach((f, i) => payload.append('file', f, f.name || `bild-${Date.now()}-${i}.png`)); }
   // 2.370.2 (#3088): the same text sent again after a failed answer = the same comment
   const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});

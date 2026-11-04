@@ -6,6 +6,8 @@
 // - incoming ciphers become plain texts in memory (_enc keeps the ciphers), outgoing texts leave encrypted (task, comment)
 // - H1: offline outbox and every localStorage entry hold ciphers only (sweep for a marker); lock = wipe
 // - moving a task out of a locked list carries its texts, its comments in the target format (le2e_move)
+// - 2.539.0 (#4376): a first-seen key is confirmed once (le2eKeyConfirmed / le2eConfirmKey); "Remember on this device" holds only
+//   for the same sign-in (S.me.sgen) and passphrase bundle
 // With part A's routes also end to end: Bob sets up encryption, Alice switches the lock on (le2eStart), the server
 // keeps ciphers only, Bob reads with his own key, Alice switches it off again (le2eStop) and the texts are plain on the server.
 const path = require('path');
@@ -96,6 +98,45 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
     check(!wr.changedUsed && wr.changedCode === 'list_e2e_keychanged' && wr.flag, 'H4: a changed key of another person is not used, le2eKeyChanged says so');
     check(wr.after, 'H4: after le2eAcceptKey the key is used');
     check(wr.own, 'H4: my own wrap opens with my own key (the server copy of wrapper_pub is ignored)');
+
+    // 2.539.0 (#4376, audit #2482 N4): trust on first use -- a key is confirmed once (safety number) before the first handover
+    const tf = await ev(`(() => {
+      const out = {}, U = 987654, pub = {kty: 'EC', crv: 'P-256', x: 'tofuX', y: 'tofuY'};
+      out.fresh = le2eKeyConfirmed(U); out.me = le2eKeyConfirmed(${ME});
+      out.ok = le2eConfirmKey(U, pub); out.after = le2eKeyConfirmed(U);
+      out.other = le2eConfirmKey(U, {kty: 'EC', crv: 'P-256', x: 'evil', y: 'evil'}); out.still = le2eKeyConfirmed(U) && LS.get('e2eOk:${ME}:' + U, '') === 'tofuX.tofuY';
+      delete LE2E.changed[U];
+      LS.set('e2eSeen:${ME}:' + (U + 1), 'a.b'); out.old = le2eKeyConfirmed(U + 1);  // pinned before 2.539, never confirmed
+      LE2E.changed[U + 1] = 'c.d'; le2eAcceptKey(U + 1); out.accepted = le2eKeyConfirmed(U + 1) && LS.get('e2eSeen:${ME}:' + (U + 1), '') === 'c.d';
+      return out; })()`);
+    check(tf.fresh === false && tf.me === true, '#4376: a key never seen here is not confirmed, my own needs no confirmation ' + JSON.stringify(tf));
+    check(tf.ok === true && tf.after === true, '#4376: confirming pins and confirms the key the number was made of');
+    check(tf.other === false && tf.still === true, '#4376: another key for the same person is not confirmed (H4 stays)');
+    check(tf.old === false, '#4376: a key pinned before (no confirmation yet) is asked once');
+    check(tf.accepted === true, '#4376: "Understood" after a key change confirms the new key');
+
+    // 2.539.0 (#4376, audit #2482 N3): "Remember on this device" belongs to one sign-in (S.me.sgen) and one passphrase bundle
+    const UNL = `await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, ${JSON.stringify(PASS)}))`;
+    const rm = await ev(`(async () => {
+      const out = {}, relock = async () => { E2E.priv = E2E.ckey = E2E.own = null; E2E.st = null; await e2eLoad(true); return e2eUnlocked(); };
+      await e2eLoad(true); await e2eIdbPut();
+      out.same = await relock();
+      const g0 = S.me.sgen; out.hasSgen = typeof g0 === 'string' && g0.length > 8;
+      S.me.sgen = 'x' + g0; out.otherSgen = await relock(); out.goneSgen = !(await e2eIdbGet()); S.me.sgen = g0;
+      ${UNL};
+      await e2eIdbDo('readwrite', s => s.put({priv: E2E.priv, ckey: E2E.ckey, pub: E2E.own.x, own: E2E.own}, 'u' + S.me.id));  // an entry of before 2.539
+      out.old = await relock(); out.goneOld = !(await e2eIdbGet());
+      ${UNL}; await e2eIdbPut();
+      const k = await e2eIdbGet(); k.bp = 'another-bundle'; await e2eIdbDo('readwrite', s => s.put(k, 'u' + S.me.id));  // a new passphrase elsewhere
+      out.otherBundle = await relock();
+      ${UNL}; await e2eIdbDel();
+      out.unlocked = e2eUnlocked();
+      return out; })().catch(e => ({err: e.message}))`);
+    check(rm.same === true && rm.hasSgen, '#4376: the remembered keys open again in the same sign-in ' + JSON.stringify(rm));
+    check(rm.otherSgen === false && rm.goneSgen === true, '#4376: another sign-in (password change, sign-out everywhere) drops the remembered keys');
+    check(rm.old === false && rm.goneOld === true, '#4376: a remembered entry of before (no sign-in mark) is dropped once');
+    check(rm.otherBundle === false, '#4376: a new passphrase (another bundle) drops the remembered keys');
+    check(rm.unlocked === true, '#4376: unlocked again with the passphrase');
 
     await ev(`(histFields('t', [[{id: 1, list_id: ${L}, title: '${M} undo'}, {id: 1, list_id: ${L}, title: 'x'}]], {fields: ['title']}), 1)`);  // an undo step of the locked list
     // incoming: a cipher in the state becomes the plain text in memory, the cipher stays in _enc

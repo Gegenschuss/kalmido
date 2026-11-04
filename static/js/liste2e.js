@@ -124,9 +124,25 @@ function le2eKeyChanged(uid) {
   if (other) LE2E.changed[uid] = other;
   return !!other;
 }
+// 2.539.0 (#4376, audit #2482 N4): the first key seen of a person counts unchecked (TOFU); before the first key handover to it the
+// UI asks once with the safety number (le2u_tofu). LS e2eOk:<me>:<uid> = the fingerprint confirmed here (or accepted with
+// "Understood"); a key seen before 2.539 has no confirmation yet and is asked once, like a new one.
+function le2eKeyConfirmed(uid) {
+  if (!S.me || uid === S.me.id) return true;
+  const seen = LS.get(`e2eSeen:${S.me.id}:${uid}`, '');
+  return !!seen && LS.get(`e2eOk:${S.me.id}:${uid}`, '') === seen;
+}
+// pub (default: the key le2eSafety just fetched, the one the number was made of); confirmed only when it is the remembered one
+// (else it is a changed key: H4, the warning with "Understood")
+function le2eConfirmKey(uid, pub = E2E.peers[uid]) {
+  if (!S.me || !pub || !le2eSeenOk(uid, pub)) return false;
+  LS.set(`e2eOk:${S.me.id}:${uid}`, le2eFp(pub));
+  return true;
+}
 function le2eAcceptKey(uid) {
   const fp = LE2E.changed[uid]; if (!fp) return;
   LS.set(`e2eSeen:${S.me.id}:${uid}`, fp);
+  LS.set(`e2eOk:${S.me.id}:${uid}`, fp);  // 2.539.0 (#4376): "Understood" after the warning is the look at the new key
   delete LE2E.changed[uid]; delete E2E.peers[uid];
   LE2E.tried = {};
   le2eRequeue();

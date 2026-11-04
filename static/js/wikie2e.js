@@ -148,6 +148,8 @@ async function wkePubFor(sp, uid) {
   return pub;
 }
 const wkeBadPub = () => { if (E2E.badPub) throw wkeErr(tr('Your public key on the server does not match your keys. Encrypted messages are blocked.'), 'wiki_e2e_badpub'); };
+// 2.539.0 (#4376): the confirmation of first-seen keys of the lists (liste2eui.js le2u_tofu) for a workspace
+const wkeTofu = (j, ids) => typeof le2u_tofu !== 'function' ? Promise.resolve(true) : le2u_tofu(ids, uid => (j?.members || []).find(m => m.user_id === uid)?.name || '');
 // waiting members get the key: every generation I hold (older texts not re-encrypted yet), the current one is required
 async function wkeRelease(sp, userIds) {
   if (!await e2eEnsure()) return false;
@@ -769,7 +771,7 @@ document.addEventListener('click', async e => {
       const ok = await wkeUnlock(sp);
       if (!ok && WKE.st[sp]?.mine !== false && e2eUnlocked()) toast(tr('The workspace key could not be opened. Compare the safety numbers with the members.'));
     } else if (a === 'resume') wkeRun(sp, 'resume');
-    else if (a === 'release') await wkeReleaseAll(sp);
+    else if (a === 'release') await wkeReleaseAll(sp, true);
     else if (a === 'rotate' || a === 'reenc') {
       if (!await e2eEnsure()) return;
       b.disabled = true;
@@ -779,10 +781,12 @@ document.addEventListener('click', async e => {
     }
   } catch (x) { if (x?.message) toast(x.message); b.disabled = false; }
 }, true);
-async function wkeReleaseAll(sp) {
+// ask: from a button (2.539.0, #4376): a first-seen key is confirmed with its safety number first (le2u_tofu)
+async function wkeReleaseAll(sp, ask) {
   const j = await wkeInfo(sp, true), mem = new Map((j.members || []).map(m => [m.user_id, m]));
   const ids = (j.pending || []).map(p => p.user_id).filter(uid => mem.get(uid)?.has_keys && !le2eKeyChanged(uid));
   if (!ids.length) { toast(tr('Nobody waiting has set up encryption yet')); return 0; }
+  if (ask && !await wkeTofu(j, ids)) return 0;
   const r = await wkeRelease(sp, ids);
   const n = ids.length - (r?.skipped?.length || 0);
   toast(trn('Key released for {0} person', 'Key released for {0} people', n));
@@ -878,12 +882,18 @@ async function wkeDlg(sp) {
       const a = b.dataset.wkd, uid = +b.dataset.uid;
       try {
         if (a === 'setup') { if (typeof e2eEnsure === 'function') await e2eEnsure(); box._wkeDraw(); }
-        else if (a === 'start') { if (!$('#wke-ack', box)?.checked) return; b.disabled = true; if (!await wkxHeldAsk(j.held)) { b.disabled = false; return; } wkeRun(sp, 'start').finally(() => box._wkeDraw()); draw(); }
+        else if (a === 'start') {
+          if (!$('#wke-ack', box)?.checked) return;
+          if (!await wkeTofu(j, (j.members || []).filter(m => m.has_keys && m.kind !== 'agent').map(m => m.user_id))) return;  // 2.539.0 (#4376)
+          b.disabled = true; if (!await wkxHeldAsk(j.held)) { b.disabled = false; return; }
+          wkeRun(sp, 'start').finally(() => box._wkeDraw()); draw();
+        }
         else if (a === 'resume') { wkeRun(sp, 'resume').finally(() => box._wkeDraw()); draw(); }
         else if (a === 'stop') { await wkeStopDlg(sp); box._wkeDraw(); }
         else if (a === 'release' || a === 'release-all') {
           b.disabled = true;
-          if (a === 'release-all') await wkeReleaseAll(sp);
+          if (a === 'release-all') await wkeReleaseAll(sp, true);
+          else if (!await wkeTofu(j, [uid])) { b.disabled = false; return; }  // 2.539.0 (#4376)
           else { const r = await wkeRelease(sp, [uid]); toast(trn('Key released for {0} person', 'Key released for {0} people', 1 - (r?.skipped?.length || 0))); wkeAfter(sp); }
           box._wkeDraw();
         } else if (a === 'safety') { if (typeof le2u_safetyDlg === 'function') le2u_safetyDlg(uid, (j.members || []).find(m => m.user_id === uid)?.name || ''); }

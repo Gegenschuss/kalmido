@@ -113,10 +113,10 @@ def comment_plain(c, text, names=None):
 
 def att_dicts(c, where, args):
     out = {}
-    for a in c.execute(f"SELECT id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE ({where}) AND deleted_at IS NULL ORDER BY id", args):  # 2.272.0 E2 (#3038): not the trash
+    for a in c.execute(f"SELECT id, task_id, comment_id, name, mime, size, created_at, enc, e2e_gen FROM attachments WHERE ({where}) AND deleted_at IS NULL ORDER BY id", args):  # 2.272.0 E2 (#3038): not the trash
         d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
-        if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext)
-            d.update(enc=2, e2e_gen=a["e2e_gen"])
+        if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext); 2.539.0 (#4376): + its task (the file's AAD)
+            d.update(enc=2, e2e_gen=a["e2e_gen"], task_id=a["task_id"])
         out.setdefault(a["comment_id"], []).append(d)
     if out:  # 2.61.0 (#1818): + up (virus scan marks)
         from ..files.scan import sc_up

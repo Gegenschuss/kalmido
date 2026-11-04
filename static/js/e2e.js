@@ -107,7 +107,16 @@ async function e2eIdbDo(mode, fn) {
     return await new Promise((res, rej) => { const tx = db.transaction('keys', mode), q = fn(tx.objectStore('keys')); tx.oncomplete = () => res(q?.result); tx.onerror = () => rej(tx.error); });
   } finally { db.close(); }
 }
-const e2eIdbPut = () => e2eIdbDo('readwrite', s => s.put({priv: E2E.priv, ckey: E2E.ckey, pub: E2E.own.x, own: E2E.own}, 'u' + S.me.id));
+// 2.539.0 (#4376, audit #2482 N3): the remembered keys belong to one sign-in (g = S.me.sgen: session, password state,
+// organisations; like the knowledge pages' copy #2872) and to one passphrase bundle (bp = a hash of bundle_pass): another
+// sign-in, a password change, "sign out everywhere" or a new passphrase (also set on another device, or with the recovery
+// code) -> the entry goes and the passphrase is asked again. Entries of before (no g) go once.
+async function e2eBpMark(bp) {
+  if (!bp) return '';
+  const d = await crypto.subtle.digest('SHA-256', e2eTEnc().encode(typeof bp === 'string' ? bp : JSON.stringify(bp)));
+  return e2eB64(new Uint8Array(d).subarray(0, 12));
+}
+const e2eIdbPut = async () => { const bp = await e2eBpMark(E2E.st?.bundle_pass); return e2eIdbDo('readwrite', s => s.put({priv: E2E.priv, ckey: E2E.ckey, pub: E2E.own.x, own: E2E.own, g: S.me.sgen || '', bp}, 'u' + S.me.id)); };
 const e2eIdbGet = () => e2eIdbDo('readonly', s => s.get('u' + S.me.id));
 const e2eIdbDel = () => e2eIdbDo('readwrite', s => s.delete('u' + S.me.id)).catch(() => {});
 // logout (account.js): every remembered key of this browser goes
@@ -131,7 +140,9 @@ async function e2eLoad(force) {
       // swapped) -> not used: the passphrase unwraps the server's bundle, and e2eAdopt compares its key with the server's copy
       try {
         const k = await e2eIdbGet(), sp = E2E.st.pub;
-        if (k && k.own && k.priv && k.ckey && k.own.x === sp.x && k.own.y === sp.y) { E2E.priv = k.priv; E2E.ckey = k.ckey; e2eOwnSet(k.own); }
+        if (k && k.own && k.priv && k.ckey && k.own.x === sp.x && k.own.y === sp.y && typeof k.g === 'string' && k.g === (S.me.sgen || '')
+          && k.bp && k.bp === await e2eBpMark(E2E.st.bundle_pass)) { E2E.priv = k.priv; E2E.ckey = k.ckey; e2eOwnSet(k.own); }
+        else if (k) await e2eIdbDel();  // 2.539.0 (#4376): another sign-in or passphrase: the remembered keys go
       } catch { /* no IndexedDB */ }
     } else e2eOwnSet(E2E.own);
     E2E.loading = null;
@@ -190,15 +201,50 @@ function e2eUnlockDlg() {
   });
 }
 const e2eWarnHtml = () => `<p class="shint keep">${tr('Passphrase and recovery code lost = your encrypted notes, files and messages are lost. Nobody can restore them, not even the operator.')}</p>`;
-// a new passphrase twice (at least E2E_MIN characters) -> the passphrase or null
+// 2.539.0 (#4376, audit #2482 N2): the passphrase bundle lies on the server (PBKDF2), so a new passphrase must be hard to guess:
+// a rough estimate of its strength in bits (no word list from outside, no server call): the character classes give the bits per
+// character; common words, years, repeated characters and runs like "abc" / "321" count as one guess each. Below E2E_BITS = too weak.
+const E2E_BITS = 50;
+const E2E_COMMON = ['passwort', 'password', 'kennwort', 'geheim', 'secret', 'qwertz', 'qwerty', 'azerty', 'asdf', 'letmein', 'welcome', 'willkommen',
+  'hallo', 'hello', 'admin', 'kalmido', 'iloveyou', 'ichliebedich', 'sommer', 'summer', 'winter', 'monkey', 'dragon', 'sunshine', 'football',
+  'fussball', 'master', 'login', 'test', 'abc', '123', 'contrase', 'motdepasse', 'wachtwoord'];
+function e2ePassBits(p) {
+  const s = String(p || '');
+  const pool = (/[a-z]/.test(s) ? 26 : 0) + (/[A-Z]/.test(s) ? 26 : 0) + (/[0-9]/.test(s) ? 10 : 0) + (/[^a-zA-Z0-9]/.test(s) ? 33 : 0);
+  if (!pool) return 0;
+  let guesses = 0;
+  let r = s.toLowerCase().replace(/(19|20)\d\d/g, () => { guesses++; return ' '; }).replace(/[0@]/g, c => c === '0' ? 'o' : 'a');  // a year; "passw0rt" is "passwort"
+  for (const w of E2E_COMMON) { const n = r.split(w).length - 1; if (n) { guesses += n; r = r.split(w).join(' '); } }
+  let eff = 0, prev = null, step = null;
+  for (const ch of r) {
+    const c = ch.codePointAt(0);
+    if (ch === ' ' && prev === null) { prev = c; continue; }
+    const d = prev === null ? null : c - prev;
+    if (d === 0 || (Math.abs(d) === 1 && (step === null || step === d))) { step = d === 0 ? step : d; prev = c; continue; }  // a repeat or a run
+    eff++; prev = c; step = null;
+  }
+  return Math.round(eff * Math.log2(pool) + guesses * 10);
+}
+const e2ePassWeak = p => e2ePassBits(p) < E2E_BITS;
+const e2ePassWeakMsg = () => tr('Too easy to guess. Use a longer passphrase, for example four or more words that do not belong together.');
+// a new passphrase twice (at least E2E_MIN characters, not too easy to guess) -> the passphrase or null
 function e2ePassFields(md) {
   const a = $('#e2e-p1', md).value, b = $('#e2e-p2', md).value;
   if (a.length < E2E_MIN) return [null, tr('At least {0} characters', E2E_MIN)];
+  if (e2ePassWeak(a)) return [null, e2ePassWeakMsg()];
   if (a !== b) return [null, tr('The two passphrases differ')];
   return [a, ''];
 }
 const e2ePassHtml = () => `<input type="password" id="e2e-p1" placeholder="${esc(tr('New passphrase'))}" aria-label="${esc(tr('New passphrase'))}" autocomplete="new-password" minlength="${E2E_MIN}" required>
-  <input type="password" id="e2e-p2" placeholder="${esc(tr('Repeat the passphrase'))}" aria-label="${esc(tr('Repeat the passphrase'))}" autocomplete="new-password" required>`;
+  <input type="password" id="e2e-p2" placeholder="${esc(tr('Repeat the passphrase'))}" aria-label="${esc(tr('Repeat the passphrase'))}" autocomplete="new-password" required>
+  <div class="muted mhint e2estr" id="e2e-str" aria-live="polite"></div>`;
+// while typing: how strong the new passphrase is (the same rule as e2ePassFields)
+document.addEventListener('input', e => {
+  if (e.target?.id !== 'e2e-p1') return;
+  const v = e.target.value, out = e.target.closest('form')?.querySelector('#e2e-str'); if (!out) return;
+  out.textContent = !v ? '' : v.length < E2E_MIN ? tr('At least {0} characters', E2E_MIN) : e2ePassWeak(v) ? e2ePassWeakMsg() : tr('Strong enough');
+  out.classList.toggle('ok', !!v && v.length >= E2E_MIN && !e2ePassWeak(v));
+});
 function e2eSetupDlg() {
   return new Promise(done => {
     const md = modal(`<h3>${ic('lock', 's')} ${tr('Set up end-to-end encryption')}</h3><form class="e2eform" novalidate>
@@ -291,6 +337,7 @@ async function e2eRewrap(bundle, pass) {
   const password = await e2eAcctPw(); if (password === null) throw new Error(tr('Cancelled|dialog'));
   await rawFetch('PUT', '/api/e2e/keys', {...body, password, ...(E2E.badPub ? {repair: true} : {})});
   E2E.st = {...E2E.st, ...body};
+  await e2eIdbDel();  // 2.539.0 (#4376): a new passphrase = "Remember on this device" is asked again
 }
 function e2ePassDlg() {
   return new Promise(done => {

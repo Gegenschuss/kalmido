@@ -98,6 +98,9 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
       window.le2eSafety = async uid => '12345 67890 11111 22222 33333 44444 55555 66666';
       window.le2eKeyChanged = uid => uid === ${BOB};
       window.le2eAcceptKey = uid => { __c.push(['accept', uid]); };
+      // 2.539.0 (#4376): a first-seen key is confirmed once with its safety number before a handover (le2u_tofu)
+      window.__ok = window.__ok || new Set(); window.le2eKeyConfirmed = uid => uid === S.me.id || __ok.has(uid);
+      window.le2eConfirmKey = uid => { __c.push(['confirm', uid]); __ok.add(uid); return true; };
       window.le2eReady = () => false;
       window.le2eLocked = t => !!t && t.list_id === ${L};
       return 1; })()`, true);
@@ -147,6 +150,12 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     await ev(`(() => { const c = document.getElementById('le2u-ack'); c.checked = true; c.dispatchEvent(new Event('change', {bubbles: true})); return 1; })()`);
     check(await ev(`!document.querySelector('.cdlg [data-cd="yes"]').disabled`), '#1817: "I have read this" enables OK');
     await ev(`(document.querySelector('.cdlg [data-cd="yes"]').click(), 1)`);
+    // 2.539.0 (#4376): switching on hands the key to Bob, whose key was never confirmed here: his safety number first
+    const tofu = await waitFor(`document.querySelector('.cdlg .le2utofu') ? document.querySelector('.cdlg').textContent : ''`);
+    check(/first time/.test(tofu || '') && /Bob/.test(tofu || '') && /12345 67890/.test(tofu || '') && !/Carol/.test(tofu || '') && !(await ev(`__c.some(c => c[0] === 'start')`)),
+      '#4376: before switching on, the safety number of the first-seen key (Bob, not Carol without keys), nothing started yet ' + (tofu || '').slice(0, 200));
+    await ev(`(document.querySelector('.cdlg .le2utofu').closest('.cdlg').querySelector('[data-cd="yes"]').click(), 1)`);
+    check(await waitFor(`__c.some(c => c[0] === 'confirm' && c[1] === ${BOB})`), '#4376: "Numbers match" confirms the key');
     const prog = await waitFor(`document.querySelector('#le2ubar .le2upb') || document.querySelector('#l-e2e .le2upb') ? 1 : 0`);
     check(prog && await ev(`__c.some(c => c[0] === 'start' && c[1] === ${L})`), '#1817: switching on runs le2eStart with a progress bar');
     await sleep(2000);
@@ -174,6 +183,7 @@ for (const f of fs.readdirSync(I18N).filter(x => x.endsWith('.json'))) {
     await ev(`(window.__ld0 = window.__ld0 || load, window.__ld = 0, load = async (...a) => { try { return await __ld0(...a); } finally { __ld++; } }, 1)`);
     await ev(`(document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="release"]').click(), 1)`);
     check(await waitFor(`__c.some(c => c[0] === 'release' && c[1] === ${L} && c[2].length === 1 && c[2][0] === ${BOB})`), '#1817: "Release" hands the key to the waiting person (le2eRelease)');
+    check(await ev(`!document.querySelector('.cdlg .le2utofu')`), '#4376: a key confirmed before is not asked again');
     await ev(`(document.querySelector('.shmodal .mrow[data-uid="${BOB}"] [data-le2us="safety"]')?.click(), 1)`);
     check(await waitFor(`/12345 67890/.test(document.querySelector('.cdlg')?.textContent || '')`), '#1817: the safety number dialog');
     await ev(`(document.querySelector('.cdlg [data-cd="no"]')?.click(), 1)`); await sleep(200);

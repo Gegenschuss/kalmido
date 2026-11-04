@@ -139,7 +139,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         if a["task_id"] in ids:
             d = {k: a[k] for k in ("id", "name", "mime", "size", "created_at")}
             if a["enc"] == 2:  # 2.64.2 B (#1817): a list file (name = list ciphertext, the browser decrypts it)
-                d.update(enc=2, e2e_gen=a["e2e_gen"])
+                d.update(enc=2, e2e_gen=a["e2e_gen"], task_id=a["task_id"])  # 2.539.0 (#4376): + its task (the file's AAD)
             elif a["enc"]:  # 2.42.0 (#828): encrypted in the browser; mine = I uploaded it (only I can open it)
                 d.update(enc=True, enc_mine=bool(viewer) and a["enc_by"] == viewer)
                 if d["enc_mine"] and a["legacy_aad"]:  # 2.278.0 C (#3091): the AAD of the old server, only for the uploader

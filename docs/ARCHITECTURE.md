@@ -861,13 +861,15 @@ and which wrapping it is):
 
 | Wrapping | Key derivation | Stored |
 |---|---|---|
-| passphrase (at least 10 characters) | PBKDF2-SHA256, 16-byte random salt, 600 000 rounds | `e2e_keys.bundle_pass` `{v, kdf, iter, salt, iv, ct}` |
+| passphrase (at least 10 characters, not too easy to guess: a rough strength estimate of at least 50 bits, 2.539.0) | PBKDF2-SHA256, 16-byte random salt, 600 000 rounds | `e2e_keys.bundle_pass` `{v, kdf, iter, salt, iv, ct}` |
 | recovery code (160 random bits, shown once as 8 groups of 4 Base32 characters) | HKDF-SHA256, 16-byte random salt | `e2e_keys.bundle_rec` `{v, kdf, salt, iv, ct}` |
 
 The server also keeps the public key (JWK). It never sees the passphrase, the code, the private key or the content key.
 Unlocking (passphrase) imports the keys as non-extractable `CryptoKey`s that live in the tab; *Remember on this device*
-keeps those non-extractable keys in IndexedDB until logout. Changing the passphrase or resetting it with the code
-re-wraps the same bundle. Removing the keys deletes the person's encrypted notes and switches their encrypted DMs off.
+keeps those non-extractable keys in IndexedDB until logout; since 2.539.0 only for the same sign-in (the server's sign-in
+mark `sgen`: session, password state, organisations) and the same passphrase bundle -- another sign-in, a password change,
+signing out everywhere or a new passphrase (also on another device) drops them and the passphrase is asked again. Changing
+the passphrase or resetting it with the code re-wraps the same bundle. Removing the keys deletes the person's encrypted notes and switches their encrypted DMs off.
 **Passphrase and recovery code lost = the encrypted content is lost**; nobody, not even an admin, can restore it.
 
 **What is encrypted with what.**
@@ -975,7 +977,9 @@ inside a list (repeating tasks) and could therefore swap two of the same field (
 title and a note title, or a comment and a note text, can be swapped the same way (the browser tries both field names).
 Trust on first use: on every device the first public key seen for a member counts unchecked until the safety numbers
 are compared; a server that hands out a forged key (or a forged list key wrapped with it) before that comparison is not
-noticed by the key check. The browser then counts texts that do not open with the list key it holds and says so
+noticed by the key check. Since 2.539.0 the first handover of a key to a person whose key this browser has not confirmed yet
+(release, switching on, in projects and knowledge workspaces) shows that person's safety number once and waits for
+*Numbers match, release*; *Understood* after a key change counts as that look too. The browser then counts texts that do not open with the list key it holds and says so
 ("compare the safety numbers") instead of leaving silent placeholders. A member
 who leaves keeps what they saw; since 2.64.2 the list key changes and the older ciphertexts are encrypted again (below). Exports keep the ciphertexts; they are readable again only in Kalmido with
 a member's passphrase (`tools/kalmido_export_decrypt.py` says so). Going back to a version before 2.64.1 needs every
@@ -1000,7 +1004,9 @@ lock opened first.
   admin writes no history entry (an admin could replace texts unnoticed, as the server could); one call wraps for at most
   200 people.
 - **Files** (`collab/liste2efile.py`). In a list with the lock attachments of tasks and comments are encrypted with the list
-  key: `KENC\x02 | gen | iv | AES-GCM(list key, AAD kalmido-lfile:v1:<list>:<gen>, header {name, type, size} + bytes)`,
+  key: `KENC\x03 | gen | iv | AES-GCM(list key, AAD kalmido-lfile:v2:<list>:<gen>:<task>, header {name, type, size} + bytes)`
+  (2.539.0: bound to its task, so the server cannot pass one task's file off as another's; `KENC\x02` files of before with
+  AAD `kalmido-lfile:v1:<list>:<gen>` stay readable and are rewritten as `\x03` by the next conversion),
   `attachments.enc = 2`, the file name as a list ciphertext. Every other way to add a file there is refused; downloads go
   to people in the web app only (agents and API tokens 404), no text extract, no preview. Switching on, the key change and
   the way back convert existing files in the browser; files encrypted per person (2.42) are converted when their uploader

@@ -13,8 +13,26 @@ const le2u_on = lid => !!le2u_mode(lid);
 // the data layer (part C) by name; typeof works for names that are not declared (yet)
 const le2u_fns = () => ({le2eLocked: typeof le2eLocked, le2eInfo: typeof le2eInfo, le2eUnlock: typeof le2eUnlock, le2eReady: typeof le2eReady,
   le2eStart: typeof le2eStart, le2eStop: typeof le2eStop, le2eResume: typeof le2eResume, le2eRelease: typeof le2eRelease, le2eSafety: typeof le2eSafety,
-  le2eKeyChanged: typeof le2eKeyChanged, le2eAcceptKey: typeof le2eAcceptKey, le2eRotate: typeof le2eRotate, le2eReenc: typeof le2eReenc});
+  le2eKeyChanged: typeof le2eKeyChanged, le2eAcceptKey: typeof le2eAcceptKey, le2eRotate: typeof le2eRotate, le2eReenc: typeof le2eReenc,
+  le2eKeyConfirmed: typeof le2eKeyConfirmed, le2eConfirmKey: typeof le2eConfirmKey});
 const le2u_fn = n => le2u_fns()[n] === 'function';
+// 2.539.0 (#4376, audit #2482 N4): before a key goes to a person whose key this browser has not confirmed yet (trust on first use):
+// once, the safety number of each such person and "Numbers match, release". -> true = go on (also: nobody to ask)
+async function le2u_tofu(uids, nameOf) {
+  if (!le2u_fn('le2eKeyConfirmed') || !le2u_fn('le2eConfirmKey') || !le2u_fn('le2eSafety')) return true;
+  const todo = [...new Set(uids)].filter(u => !le2eKeyConfirmed(u));
+  if (!todo.length) return true;
+  if (typeof e2eEnsure === 'function' && !await e2eEnsure()) return false;
+  const rows = [];
+  for (const uid of todo) { let num = null; try { num = await le2eSafety(uid); } catch { /* offline */ } if (num) rows.push([uid, nameOf(uid) || '?', num]); }
+  if (!rows.length) return true;  // nobody of them has a key: the handover itself says so
+  const html = `<p>${esc(tr('You give the key to these people for the first time. Compare each safety number with the person (in person or by phone); release only when it is the same on both devices.'))}</p>`
+    + rows.map(([uid, n, num]) => `<div class="le2utofu" data-uid="${uid}"><b>${esc(n)}</b> <code class="e2ecode">${esc(num)}</code></div>`).join('');
+  if (!await askDialog({title: tr('Check the key first'), html, ok: tr('Numbers match, release'), cancel: tr('Cancel')})) return false;
+  for (const [uid] of rows) le2eConfirmKey(uid);
+  return true;
+}
+const le2u_pname = (j, uid) => [...(j?.members || []), ...(j?.pending || [])].find(m => m.user_id === uid)?.name || (typeof personName === 'function' ? personName(j?.list_id, uid) : '') || '';
 const le2u_locked = t => !!t && le2u_on(t.list_id) && (le2u_fn('le2eLocked') ? !!le2eLocked(t) : t._le2e === 'locked');
 // a member of a locked list who has no key of the current generation yet (waits for the owner / a list admin)
 const le2u_waiting = lid => { const l = listById(lid); return !!l && l.e2e === 'on' && l.e2e_mine === false; };
@@ -136,6 +154,7 @@ async function le2u_release(lid) {
   let j; try { j = await le2u_info(lid, true); } catch (x) { toast(x?.message || tr('Not possible right now')); return; }
   const ids = (j.pending || []).filter(p => p.has_keys).map(p => p.user_id);
   if (!ids.length) { toast(tr('Nobody waiting has set up encryption yet')); return; }
+  if (!await le2u_tofu(ids, uid => le2u_pname(j, uid))) return;  // 2.539.0 (#4376)
   let r; try { r = await le2eRelease(lid, ids); } catch (x) { if (x?.message) toast(x.message); return; }
   const n = ids.length - (r?.skipped?.length || 0);  // 2.64.1 review: a copy the server kept (skipped) is no new release
   toast(trn('Key released for {0} person', 'Key released for {0} people', n));
@@ -239,7 +258,9 @@ function le2u_listWire(md, lid) {
   box.addEventListener('change', async e => {
     if (e.target.id !== 'l-e2e-sw') return;
     e.stopPropagation(); e.target.checked = false;  // switched on only after the notice
-    if (await le2u_startDlg(lid, box._j)) le2u_run(lid, 'start');
+    // 2.539.0 (#4376): switching on hands the key to every member with keys: the first-seen keys are confirmed first
+    const mem = (box._j?.members || []).filter(m => m.has_keys && m.kind !== 'agent').map(m => m.user_id);
+    if (await le2u_startDlg(lid, box._j) && await le2u_tofu(mem, uid => le2u_pname(box._j, uid))) le2u_run(lid, 'start');
     else le2u_listDraw(md, lid);
   });
   box.addEventListener('click', async e => {
@@ -361,6 +382,7 @@ function le2u_share(md, lid) {
         if (!le2u_fn('le2eRelease')) return;
         const ids = a === 'release' ? [uid] : (md._le2u?.pending || []).filter(p => p.has_keys && !(md._le2uChg || []).some(c => c[0] === p.user_id)).map(p => p.user_id);
         if (!ids.length) return;
+        if (!await le2u_tofu(ids, x => le2u_pname(md._le2u, x))) return;  // 2.539.0 (#4376)
         b.disabled = true;
         try { const r = await le2eRelease(lid, ids); toast(trn('Key released for {0} person', 'Key released for {0} people', ids.length - (r?.skipped?.length || 0))); } catch (x) { if (x?.message) toast(x.message); b.disabled = false; return; }
         md._le2u = null; try { await load(); } catch { /* next sync */ } render(); le2u_share(md, lid);

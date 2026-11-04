@@ -5,9 +5,12 @@
 // format (server kalmido/collab/liste2efile.py): "KENC" 0x02 | gen (u32 big endian) | iv (12) | AES-256-GCM with the list key of gen,
 // AAD "kalmido-lfile:v1:<list>:<gen>", over u32 header length | header JSON {name, type, size} | the file bytes.
 // The attachment row keeps the name as a list cipher (field "file_name"), so the list shows names without loading files.
+// 2.539.0 (#4376, audit #2482 N1): new files are "KENC" 0x03 with AAD "kalmido-lfile:v2:<list>:<gen>:<task>": a file bound to its
+// task (the attachment id does not exist yet when the browser encrypts). The server cannot pass one task's file off as another's;
+// files never move between tasks or lists (le2f_move_guard) and the server copies none. 0x02 files (before 2.539) stay readable.
 const LE2F = {aid: new Map(), tried: new Set(), busy: false};
 const LE2F_HEAD = 9;
-const le2fAad = (lid, g) => `kalmido-lfile:v1:${lid}:${g}`;
+const le2fAad = (lid, g, tid) => tid ? `kalmido-lfile:v2:${lid}:${g}:${tid}` : `kalmido-lfile:v1:${lid}:${g}`;
 const le2fBusy = () => le2eErr(tr('This project is being encrypted. Try again in a moment.'), 'list_e2e_busy');
 
 // the list key of generation g (asks for the passphrase when the browser is still locked)
@@ -18,38 +21,40 @@ async function le2fKey(lid, g) {
   if (!k) throw le2eErr(tr('You do not have the key of this project yet.'), 'list_e2e_key');
   return k;
 }
-// {name, type, data: Uint8Array} (or a File) -> the encrypted bytes of generation gen (default: the list's current one)
-async function le2eFileEnc(lid, file, gen) {
+// {name, type, data: Uint8Array} (or a File) of task tid -> the encrypted bytes of generation gen (default: the list's current one)
+async function le2eFileEnc(lid, file, gen, tid) {
+  if (!(tid > 0)) throw le2eErr(tr('Cannot be decrypted'), 'file');  // 2.539.0 (#4376): never a new file without its task
   const g = gen || listById(lid)?.e2e_gen, key = await le2fKey(lid, g);
   const data = file.data || new Uint8Array(await file.arrayBuffer());
   const head = e2eTEnc().encode(JSON.stringify({name: file.name || 'file', type: file.type || 'application/octet-stream', size: data.length}));
   const plain = new Uint8Array(4 + head.length + data.length);
   new DataView(plain.buffer).setUint32(0, head.length); plain.set(head, 4); plain.set(data, 4 + head.length);
-  const iv = e2eRand(12), ct = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv, additionalData: e2eTEnc().encode(le2fAad(lid, g))}, key, plain));
+  const iv = e2eRand(12), ct = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv, additionalData: e2eTEnc().encode(le2fAad(lid, g, tid))}, key, plain));
   const out = new Uint8Array(LE2F_HEAD + 12 + ct.length);
-  out.set([0x4b, 0x45, 0x4e, 0x43, 0x02]); new DataView(out.buffer).setUint32(5, g); out.set(iv, LE2F_HEAD); out.set(ct, LE2F_HEAD + 12);
+  out.set([0x4b, 0x45, 0x4e, 0x43, 0x03]); new DataView(out.buffer).setUint32(5, g); out.set(iv, LE2F_HEAD); out.set(ct, LE2F_HEAD + 12);
   return out;
 }
-// encrypted bytes -> {name, type, size, data, gen}; throws when the format or the key does not fit
-async function le2eFileDec(lid, buf) {
+// encrypted bytes of a file of task tid -> {name, type, size, data, gen}; throws when the format, the key or the task does not fit
+async function le2eFileDec(lid, buf, tid) {
   const u = new Uint8Array(buf);
-  if (u.length < LE2F_HEAD + 12 + 16 || String.fromCharCode(...u.subarray(0, 4)) !== 'KENC' || u[4] !== 2) throw new Error('format');
+  if (u.length < LE2F_HEAD + 12 + 16 || String.fromCharCode(...u.subarray(0, 4)) !== 'KENC' || (u[4] !== 2 && u[4] !== 3)) throw new Error('format');
+  if (u[4] === 3 && !(tid > 0)) throw new Error('task');
   const g = new DataView(u.buffer, u.byteOffset).getUint32(5), key = await le2fKey(lid, g);
-  const plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: u.subarray(LE2F_HEAD, LE2F_HEAD + 12), additionalData: e2eTEnc().encode(le2fAad(lid, g))}, key, u.subarray(LE2F_HEAD + 12)));
+  const plain = new Uint8Array(await crypto.subtle.decrypt({name: 'AES-GCM', iv: u.subarray(LE2F_HEAD, LE2F_HEAD + 12), additionalData: e2eTEnc().encode(le2fAad(lid, g, u[4] === 3 ? tid : 0))}, key, u.subarray(LE2F_HEAD + 12)));
   const n = new DataView(plain.buffer).getUint32(0), head = JSON.parse(e2eTDec().decode(plain.subarray(4, 4 + n)));
   const data = plain.subarray(4 + n);
   return {name: String(head.name || 'file'), type: String(head.type || 'application/octet-stream'), size: data.length, data, gen: g};
 }
 const le2fBlob = u => new Blob([u], {type: 'application/octet-stream'});
-// files -> [{blob, name}] for a list with the lock (null: the list is open). The names are list ciphers of the same generation.
-async function le2eFileParts(lid, files) {
+// files of task tid -> [{blob, name}] for a list with the lock (null: the list is open). The names are list ciphers of the same generation.
+async function le2eFileParts(lid, files, tid) {
   if (!le2eOn(lid)) return null;
   if (le2eMode(lid) !== 'on') throw le2fBusy();
   const lim = upLimit(files); if (lim) throw le2eErr(lim, 'size');  // 2.363.3 (#3134)
   const out = [];
   for (const [i, f] of files.entries()) {
     const name = f.name || `${tr('Image')}-${Date.now()}-${i}.${(f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')}`;
-    out.push({blob: le2fBlob(await le2eFileEnc(lid, {name, type: f.type, data: new Uint8Array(await f.arrayBuffer())})), name: await le2eFileNameEnc(lid, name)});
+    out.push({blob: le2fBlob(await le2eFileEnc(lid, {name, type: f.type, data: new Uint8Array(await f.arrayBuffer())}, 0, tid)), name: await le2eFileNameEnc(lid, name)});
   }
   return out;
 }
@@ -61,7 +66,7 @@ async function le2eFileUpload(tid, files, commentId, quiet) {
   let parts;
   try {
     if (!quiet) toast(tr('Encrypting…'));
-    parts = await le2eFileParts(lid, files);
+    parts = await le2eFileParts(lid, files, tid);
   } catch (x) { if (quiet) throw x; toast(x.message); return null; }
   if (!parts) return null;
   const fd = new FormData();
@@ -101,9 +106,9 @@ function le2fFill() {
   }, 0);
 }
 document.addEventListener('le2e:change', () => { LE2F.tried.clear(); le2fFill(); });
-function le2eFileHtml(a, del, lid) {
+function le2eFileHtml(a, del, lid, tid) {
   const nm = le2eFileName(a, lid);
-  return `<div class="att file e2eatt le2fatt" data-att="${a.id}"><button type="button" class="attx" data-le2f="open" data-att="${a.id}" data-lid="${lid}" title="${esc(nm || tr('Decrypt and download'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(nm || tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}</span></span></button>${del}</div>`;
+  return `<div class="att file e2eatt le2fatt" data-att="${a.id}"><button type="button" class="attx" data-le2f="open" data-att="${a.id}" data-lid="${lid}" data-tid="${+(a.task_id || tid) || ''}" title="${esc(nm || tr('Decrypt and download'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(nm || tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}</span></span></button>${del}</div>`;
 }
 async function le2fFetch(aid) {
   let r;
@@ -112,9 +117,9 @@ async function le2fFetch(aid) {
   return r;
 }
 // open a list file: decrypt it here; an image in the viewer, everything else as a download
-async function le2eFileOpen(aid, lid) {
+async function le2eFileOpen(aid, lid, tid) {
   let f;
-  try { f = await le2eFileDec(lid, await (await le2fFetch(aid)).arrayBuffer()); }
+  try { f = await le2eFileDec(lid, await (await le2fFetch(aid)).arrayBuffer(), tid); }
   catch (x) { toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.code === 'file' || x.code === 'list_e2e_key' || x.code === 'list_e2e_locked' ? x.message : tr('Cannot be decrypted')); return; }
   const blob = new Blob([f.data], {type: f.type}), a = {id: aid, name: f.name, size: f.size, mime: f.type};
   if (isImg(a) && typeof attLightbox === 'function') {  // 2.306.0 D4 (#2875): a data: URL (the CSP allows img-src 'self' data: only, a blob: URL showed nothing)
@@ -129,7 +134,7 @@ async function le2eFileOpen(aid, lid) {
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-le2f="open"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  le2eFileOpen(+b.dataset.att, +b.dataset.lid);
+  le2eFileOpen(+b.dataset.att, +b.dataset.lid, +b.dataset.tid);
 });
 
 // ------------------------------------------------------------------ conversion (part A's switch: on, key change, way back)
@@ -139,7 +144,7 @@ document.addEventListener('click', e => {
 async function le2eFileConvert(lid, row, mode) {
   const r = await le2fFetch(row.id), buf = await r.arrayBuffer();
   let f;
-  if (row.enc === 2) f = await le2eFileDec(lid, buf);
+  if (row.enc === 2) f = await le2eFileDec(lid, buf, row.task_id);
   else if (row.enc === 1) f = await e2eFileDecrypt(buf, row.task_id, row.legacy_aad);  // 2.278.0 review N2 (#3091)
   else {
     const cd = r.headers.get('content-disposition') || '', m = /filename\*=UTF-8''([^;]+)/i.exec(cd) || /filename="?([^";]+)"?/i.exec(cd);
@@ -150,7 +155,7 @@ async function le2eFileConvert(lid, row, mode) {
     fd.append('file', new Blob([f.data], {type: 'application/octet-stream'}), 'file'); fd.append('name', f.name); fd.append('type', f.type);
   } else {
     if (row.enc !== 2 && le2eIs(f.name)) throw new Error('name');  // never a cipher as a plain name
-    fd.append('file', le2fBlob(await le2eFileEnc(lid, f)), 'encrypted.kenc'); fd.append('name', await le2eFileNameEnc(lid, f.name));
+    fd.append('file', le2fBlob(await le2eFileEnc(lid, f, 0, row.task_id)), 'encrypted.kenc');  // 2.539.0 (#4376): a converted file is bound to its task fd.append('name', await le2eFileNameEnc(lid, f.name));
   }
   try { return await rawFetch('POST', `/api/lists/${lid}/e2e/files/${row.id}`, fd); }
   catch (x) { if (x.status === 409 && !x.data?.code) return {ok: true, id: row.id, skipped: true}; throw x; }  // done meanwhile

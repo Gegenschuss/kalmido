@@ -1,7 +1,9 @@
 // 2.64.2 part B (#1817 stage 2): files of a list with the lock in the web app (static/js/liste2efile.js), own container (start.sh),
 // Firefox (real WebCrypto):
 // - switching the lock on encrypts an existing file (with part A's flow: le2eStart; alone: le2eFileConvert 'on'), the server keeps
-//   KENC\x02 + a name cipher only, the browser opens the same bytes again
+//   KENC\x03 + a name cipher only, the browser opens the same bytes again
+// - 2.539.0 (#4376): a file is bound to its task (AAD v2): opened as another task's file it fails; a KENC\x02 file of before
+//   (AAD v1, no task) is still taken by the server and opens
 // - a file added in the detail (uploadFiles) and a comment file (sendComment) leave encrypted with the list key; the tile shows the
 //   decrypted name; the per-person button of 2.42 is not offered; the head line (le2uAttHead) is there
 // - a second member opens the file with his own key
@@ -46,7 +48,7 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
     const unlock = pass => ev(`(async () => { await e2eLoad(true); await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, ${JSON.stringify(pass)})); return 1; })()`);
     // the bytes of a file as the server keeps them, and opened with the list key
     const raw = aid => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => { const u = new Uint8Array(b); return String.fromCharCode(...u.subarray(0, 5)) + '|' + new TextDecoder('latin1').decode(u).includes('${M}'); })`);
-    const open = aid => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => le2eFileDec(${L}, b)).then(f => f.name + '|' + f.type + '|' + new TextDecoder().decode(f.data), e => 'ERR ' + e.message)`);
+    const open = (aid, tid = T) => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => le2eFileDec(${L}, b, tid)).then(f => f.name + '|' + f.type + '|' + new TextDecoder().decode(f.data), e => 'ERR ' + e.message)`);
     await fn({ev, waitFor, boot, shot, sweep, unlock, raw, open});
   }, false);
 
@@ -71,15 +73,29 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
     }
     a = (await stateAtts()).find(x => x.id === P1);
     check(a?.enc === 2 && a.e2e_gen === 1 && String(a.name).startsWith('e2e1:'), 'the server shows enc 2, generation and a name cipher ' + JSON.stringify(a));
-    check(await raw(P1) === 'KENC\x02|false', 'the server keeps KENC\\x02 bytes without the text ' + JSON.stringify(await raw(P1)));
+    // 2.539.0 (#4376): KENC\x03 = bound to the task
+    check(await raw(P1) === 'KENC\x03|false', 'the server keeps KENC\\x03 bytes without the text ' + JSON.stringify(await raw(P1)));
     check(await open(P1) === `before.txt|text/plain|${M} before`, 'the browser opens the same file again ' + await open(P1));
 
     // a new file in the detail (uploadFiles -> le2eFileUpload)
     await ev(`(async () => { await uploadFiles(${T}, [new File(['${M} hello'], 'notes.txt', {type: 'text/plain'})]); return 1; })()`);
     F1 = ((await stateAtts()).find(x => x.id !== P1) || {}).id;
     check(F1 > 0 && (await stateAtts()).find(x => x.id === F1).enc === 2, 'uploadFiles in a locked list: a list file ' + F1);
-    check(await raw(F1) === 'KENC\x02|false', 'the new file left encrypted');
+    check(await raw(F1) === 'KENC\x03|false', 'the new file left encrypted');
     check(await open(F1) === `notes.txt|text/plain|${M} hello`, 'the new file opens with the list key');
+    // 2.539.0 (#4376): the server passes the file off as another task's: it does not open (AAD v2 carries the task)
+    check(/^ERR /.test(await open(F1, T + 1000)), '#4376: a task file does not open as the file of another task ' + await open(F1, T + 1000));
+    // 2.539.0 (#4376): a file of before (KENC\x02, AAD v1 without the task) is still taken and opens
+    const OLD = await ev(`(async () => { const g = listById(${L}).e2e_gen, key = await le2fKey(${L}, g), data = new TextEncoder().encode('${M} old');
+      const head = new TextEncoder().encode(JSON.stringify({name: 'old.txt', type: 'text/plain', size: data.length}));
+      const plain = new Uint8Array(4 + head.length + data.length); new DataView(plain.buffer).setUint32(0, head.length); plain.set(head, 4); plain.set(data, 4 + head.length);
+      const iv = crypto.getRandomValues(new Uint8Array(12)), ct = new Uint8Array(await crypto.subtle.encrypt({name: 'AES-GCM', iv, additionalData: new TextEncoder().encode('kalmido-lfile:v1:${L}:' + g)}, key, plain));
+      const out = new Uint8Array(9 + 12 + ct.length); out.set([0x4b, 0x45, 0x4e, 0x43, 0x02]); new DataView(out.buffer).setUint32(5, g); out.set(iv, 9); out.set(ct, 21);
+      const fd = new FormData(); fd.append('file', new Blob([out]), 'encrypted.kenc'); fd.append('name', await le2eFileNameEnc(${L}, 'old.txt'));
+      const t = await rawFetch('POST', '/api/tasks/${T}/list-attachments', fd); return Math.max(...t.attachments.map(a => a.id)); })().catch(e => 'ERR ' + e.message)`);
+    check(OLD > 0 && await raw(OLD) === 'KENC\x02|false', '#4376: the server still takes a KENC\\x02 file ' + OLD);
+    check(await open(OLD) === `old.txt|text/plain|${M} old`, '#4376: a file of before (no task in the AAD) still opens ' + await open(OLD));
+    check(await ev(`rawFetch('DELETE', '/api/attachments/${OLD}').then(() => load()).then(() => 1, e => 'ERR ' + e.message)`) === 1, '#4376: the old-format file removed again');
     await ev(`(openDetail(${T}), 1)`);
     check(await waitFor(`[...document.querySelectorAll('.attsec .le2fatt .an')].map(x => x.textContent).sort().join() === 'before.txt,notes.txt'`), 'the tiles show the decrypted names '
       + await ev(`[...document.querySelectorAll('.attsec .le2fatt .an')].map(x => x.textContent).join()`));

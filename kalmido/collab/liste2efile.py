@@ -1,7 +1,7 @@
 """Kalmido: files of lists with the lock, encrypted in the browser with the list key (2.64.2, #1817, stage 2).
 
-Format (static/js/liste2efile.js): b"KENC\\x02" | gen (4 bytes, big endian) | iv (12) | AES-256-GCM(list key of gen,
-AAD "kalmido-lfile:v1:<list_id>:<gen>", u32 header length | header JSON {name, type, size} | file bytes). attachments.enc = 2,
+Format (static/js/liste2efile.js): b"KENC\\x03" | gen (4 bytes, big endian) | iv (12) | AES-256-GCM(list key of gen,
+AAD "kalmido-lfile:v2:<list_id>:<gen>:<task_id>", u32 header length | header JSON {name, type, size} | file bytes). attachments.enc = 2,
 attachments.e2e_gen = gen, attachments.name = the file name as list cipher (field "file_name"), mime application/octet-stream.
 Readable for every member with the list key; no text extract, no preview, no agent access. Upload, conversion when the lock
 goes on / off / after a key change, and the guards of the plain upload ways live here (part B)."""
@@ -25,6 +25,7 @@ from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functi
 from ..tasks.attachments import safe_name  # 2.369.5 (#2517): pulled up from functions
 
 LE2F_MAGIC = b"KENC\x02"
+LE2F_MAGICS = (LE2F_MAGIC, b"KENC\x03")  # 2.539.0 (#4376): 0x03 = bound to its task (AAD v2); 0x02 files of before stay valid
 LE2F_HEAD = len(LE2F_MAGIC) + 4      # magic + generation; then iv (12) and the AES-GCM ciphertext (tag 16)
 LE2F_SLACK = 64 * 1024               # the encrypted header + iv + tag on top of the plain size limit
 LE2F_NAME_MAX = 4000                 # characters of the encrypted file name (150 characters of name, base64 + tag + padding)
@@ -55,7 +56,7 @@ def le2f_plain_skip(c, tid):
 
 def le2f_blob_gen(head):
     """The generation in the head of a list file (None: not a list file)."""
-    if len(head) < LE2F_HEAD or head[:len(LE2F_MAGIC)] != LE2F_MAGIC:
+    if len(head) < LE2F_HEAD or head[:len(LE2F_MAGIC)] not in LE2F_MAGICS:
         return None
     return struct.unpack(">I", head[len(LE2F_MAGIC):LE2F_HEAD])[0]
 

@@ -53,6 +53,15 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   md.querySelector('form').dispatchEvent(new w.Event('submit', {cancelable: true}));
   await sleep(50);
   check(/At least 10/.test(d.querySelector('#e2e-err').textContent), 'set-up: at least 10 characters ' + d.querySelector('#e2e-err').textContent);
+  // 2.539.0 (#4376, audit #2482 N2): long enough but easy to guess (a common word and a year) is refused, with a clear hint
+  type(w, d.querySelector('#e2e-p1'), 'Passwort2026!'); type(w, d.querySelector('#e2e-p2'), 'Passwort2026!');
+  check(/Too easy to guess/.test(d.querySelector('#e2e-str')?.textContent || ''), '#4376: the hint while typing a weak passphrase ' + d.querySelector('#e2e-str')?.textContent);
+  md.querySelector('form').dispatchEvent(new w.Event('submit', {cancelable: true}));
+  await sleep(50);
+  check(/Too easy to guess/.test(d.querySelector('#e2e-err').textContent) && !d.querySelector('#e2e-code'), '#4376: a weak passphrase is refused ' + d.querySelector('#e2e-err').textContent);
+  check(w.eval(`e2ePassWeak('sommer2025abc') && e2ePassWeak('qwertzuiop') && e2ePassWeak('1234567890') && !e2ePassWeak(${JSON.stringify(PASS)}) && !e2ePassWeak('xK9#mP2vLq')`), '#4376: the estimate: common words, runs and years are weak, words or random characters are not');
+  type(w, d.querySelector('#e2e-p1'), PASS);
+  check(/Strong enough/.test(d.querySelector('#e2e-str')?.textContent || ''), '#4376: a good passphrase is "Strong enough" ' + d.querySelector('#e2e-str')?.textContent);
   type(w, d.querySelector('#e2e-p1'), PASS); type(w, d.querySelector('#e2e-p2'), PASS + 'x');
   md.querySelector('form').dispatchEvent(new w.Event('submit', {cancelable: true}));
   await sleep(50);

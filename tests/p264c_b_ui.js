@@ -172,6 +172,13 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   });
   await session('alice', async ({ev, unlock}) => {
     await unlock();
+    // 2.539.0 (#4376): from the button, a key never confirmed here shows its safety number first; "Cancel" releases nothing
+    const ask = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const p = wkeReleaseAll(sp, true);
+      let dlg = null; for (let i = 0; i < 100 && !dlg; i++) { dlg = document.querySelector('.cdlg .le2utofu')?.closest('.cdlg') || null; if (!dlg) await new Promise(r => setTimeout(r, 100)); }
+      const txt = dlg?.textContent || ''; dlg?.querySelector('[data-cd="no"]')?.click();
+      return {txt, n: await p, ok: le2eKeyConfirmed(${CAROL}), pending: (await wkeInfo(sp, true)).pending.map(x => x.user_id)}; })().catch(e => ({err: e.message}))`);
+    check(/first time/.test(ask.txt || '') && /\d{5} \d{5}/.test(ask.txt || '') && ask.n === 0 && ask.ok === false && ask.pending?.includes(CAROL),
+      '#4376: release from the button asks with the safety number, cancel keeps the person waiting ' + JSON.stringify(ask).slice(0, 300));
     const w = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const i = await wkeInfo(sp, true); return {pending: i.pending.map(p => p.user_id), bar: wkeBarHtml(sp), n: await wkeReleaseAll(sp)}; })().catch(e => ({err: e.message}))`);
     check(w.pending?.includes(CAROL) && /waiting for the key/.test(w.bar || '') && w.n === 1, 'Alice sees the waiting person and releases the key ' + JSON.stringify(w).slice(0, 300));
   });
