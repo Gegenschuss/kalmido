@@ -32,7 +32,7 @@ const up = async (url, field, name, text, extra = {}) => {
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call('GET', '/api/state');
-  const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'files', 'docs'])].join(',');
+  const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'files', 'docs', 'office'])].join(',');
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: feats, workspace: 'private'});
   const DOC = ((await up('api/docs', 'files', 'letter-alpha.txt', 'Letter of an invented insurance', {ws: 'private'})).ids || [])[0];
   check(DOC, 'setup: a document');
@@ -62,6 +62,22 @@ const up = async (url, field, name, text, extra = {}) => {
         check(n === 1, `${tag}: "To review" stands only once (${n})`);
       }
       await shot(`p4472-${tag}-docs.png`);
+      // 2.540.0 (#4472): the chosen part of the switch is marked (it was drawn like the other one)
+      check(await ev(`(() => { const [a, b] = document.querySelectorAll('.dc-bar .dc-seg button'); return !!a && a.classList.contains('on') && !b.classList.contains('on') && getComputedStyle(a).backgroundColor !== getComputedStyle(b).backgroundColor; })()`), `${tag}: the chosen part of the switch is marked`);
+      if (!touch) {  // the receipt filters: the labels on one line, the two ticks on one line, "Date by"
+        await o.nav(B + '#office/books/receipts');
+        check(await wait(`!!document.querySelector('.rcl-filters #rcl-novat')`), `${tag}: the receipt filters are drawn`);
+        await ev(`(() => { const d = document.querySelector('.rcl-filters'); if (!d.open) d.open = true; return 1; })()`);
+        await sleep(300);
+        const lab = JSON.parse(await ev(`JSON.stringify([...document.querySelectorAll('.rcl-filters .rcl-f>.muted:first-child')].filter(e => e.getClientRects().length).map(e => [e.textContent, Math.round(e.getBoundingClientRect().top)]))`));
+        check(lab.some(([t]) => t === 'Date by'), `${tag}: the label is "Date by" (${lab.map(x => x[0]).join()})`);
+        const rows = {}; for (const [t, y] of lab) (rows[y] = rows[y] || []).push(t);
+        const cat = lab.find(([t]) => t === 'Category');
+        check(cat && lab.some(([t, y]) => t !== 'Category' && Math.abs(y - cat[1]) <= 1), `${tag}: "Category" stands on the line of the other labels (${JSON.stringify(rows)})`);
+        const ticks = JSON.parse(await ev(`JSON.stringify(['#rcl-novat', '#rcl-hints'].map(s => { const b = document.querySelector(s).getBoundingClientRect(); return Math.round(b.top + b.height / 2); }))`));
+        check(Math.abs(ticks[0] - ticks[1]) <= 1, `${tag}: both ticks on one line (${ticks})`);
+        await shot(`p4472-${tag}-receipts.png`);
+      }
     }
   }, vp[3]);
   await run([1440, 900, '1440', false]);
