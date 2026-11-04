@@ -458,6 +458,9 @@ def dvb_wiki_locked(c, ids):
     in id order) and read again after it: a save of the page in between is never overwritten with the text read before.
     -> {id: row} of the pages still alive (a page trashed in between drops out)."""
     out = {}
+    # review 2.533.0 (#4318 A17): relinks one at a time (a rename takes this before its own page lock, see wiki_update):
+    # two renames of pages linking each other no longer lock in opposite order (deadlock, a 500)
+    write_lock(c, "wiki-relink")
     for i in sorted({int(x) for x in ids}):
         write_lock(c, f"wiki-{i}")
         p = c.execute("SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id=? AND deleted_at IS NULL", (i,)).fetchone()
@@ -533,6 +536,8 @@ def wiki_update(pid):
     """{path?, body?, expect_updated_at? (409 with the current page when someone else saved in between), relink? (default
     true: a new name changes the [[links]] to it in the space)}"""
     c = db()
+    if "path" in (request.get_json(silent=True) or {}):  # review 2.533.0 (#4318 A17): a rename may relink: that lock first
+        write_lock(c, "wiki-relink")
     write_lock(c, f"wiki-{int(pid)}")  # 2.269.0 B (#3034): the expect check and the write see no other save in between
     r = wiki_need(c, pid, write=True)  # 2.200.0 A (#2747): edit on the page (was: the space's write right)
     uid = me()

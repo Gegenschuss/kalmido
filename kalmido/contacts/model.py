@@ -1183,8 +1183,9 @@ def _imp_newer_here(rev, old):
 def dva_imp_changed_here(old):
     """2.533.0 (#4318) B41: a card WITHOUT a REV cannot say it is newer: the stored contact counts as newer when it was changed
     here after its last file import (imp_at), or, never imported from a file, after it was created."""
-    upd = str(old["updated_at"] or "")
-    return upd > str(old["imp_at"] if old["imp_at"] is not None else old["created_at"] or "")
+    if old["imp_at"] is None:  # review 2.533.0: never imported from a file = its values come from here (also unedited ones)
+        return True
+    return str(old["updated_at"] or "") > str(old["imp_at"])
 
 
 DVA_KEPT_NAMES = 20  # 2.533.0 (#4318) B41: contacts named in the answer that kept their newer values

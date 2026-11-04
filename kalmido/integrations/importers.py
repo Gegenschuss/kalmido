@@ -187,10 +187,11 @@ def dva_imp_row_warn(plan, key, row, title=None, *a):
             rs.append(ln)
 
 
-def imp_csv(text, plan=None):
+def imp_csv(text, plan=None, first_ln=1):
     """CSV text -> (lower-case header list, rows as dicts). Delimiter: , ; or tab (whatever the header uses most).
     2.533.0 (#4318) F8: rows are DvaImpRow (row number); with plan, cells beyond the header or under an empty header are
-    named with their row instead of dropped silently."""
+    named with their row instead of dropped silently. first_ln: the file's line number of the header (review 2.533.0: a
+    preamble before it, TickTick)."""
     first = text.split("\n", 1)[0]
     delim = max((",", ";", "\t"), key=first.count)
     try:
@@ -200,7 +201,7 @@ def imp_csv(text, plan=None):
             imp_fail(N_("The file is empty"))
         orig = [imp_line(h, 100) for h in head]
         keys = [h.lower() for h in orig]
-        rows, ln = [], 1
+        rows, ln = [], first_ln
         for r in rd:
             ln += 1
             if not any(x.strip() for x in r):
@@ -1989,7 +1990,7 @@ def parse_ticktick(data, fname, opts, plan):
     m = re.search(r'^"?Folder Name"?', text, re.M)
     if not m:
         imp_fail(N_("Not a TickTick CSV (header 'Folder Name' missing)"))
-    _keys, rows, _orig = imp_csv(text[m.start():], plan)
+    _keys, rows, _orig = imp_csv(text[m.start():], plan, text[:m.start()].count("\n") + 1)
     rows.sort(key=lambda r: tt_int(r.get("order")))  # the task order within a list is TickTick's "Order"
     lists, sec_order = {}, {}
     for n, r in enumerate(rows, 1):

@@ -72,6 +72,12 @@ w = warn(j, "Description longer than 200000")
 check(w and w.get("rows") == [6], f"F8: the cut description is named with its row {w}")
 r = F.post(B + "/api/import/csv", files={"file": ("cp.csv", b"Title\nCaf\xe9 f\xfcr 5 \x80\n")}, data={"dry_run": "1"})
 check(r.ok and warn(r.json(), "The file is not UTF-8"), f"F8: a Windows-1252 file is named, not read silently {r.text[:300]}")
+# review 2.533.0: TickTick's preamble counts: the row number is the file's line (was: counted from the header)
+TT_HEAD = '"Folder Name","List Name","Title","Content","taskId"\n'
+tt = ('"Date: 2026-10-01"\n\n' + TT_HEAD + '"Ordner","TT Liste","Eins","","t1"\n' + '"Ordner","TT Liste","Zwei","","t2","Zusatz"\n')
+r = F.post(B + "/api/import/ticktick", files={"file": ("tt.csv", tt.encode(), "text/csv")}, data={"dry_run": "1"})
+w = warn(r.json(), "Cells without a column header") if r.ok else None
+check(w and w.get("rows") == [5], f"F8: a TickTick row is named with its line in the file (preamble counted) {w} {r.text[:300]}")
 r = F.post(B + "/api/import/csv", files={"file": ("ok.csv", "Title\nGanz normal\n".encode())}, data={"dry_run": "1"})
 check(r.ok and not r.json().get("warnings"), f"F8: a clean UTF-8 file gives no warning {r.text[:300]}")
 
@@ -115,6 +121,15 @@ check(j.get("kept_newer") == 1 and j.get("kept_norev") == 1 and j.get("kept_name
 check(d1["note"] == "neue Notiz hier" and d1["emails"][0]["value"] == "erika@example.com",
       f"B41: the newer values here stay ({d1['note']!r}, {d1['emails']})")
 check(d2["emails"][0]["value"] == "max.neu@example.com", f"B41: an unchanged contact takes the card's values {d2['emails']}")
+# review 2.533.0: a contact made here and never edited nor imported from a file keeps its values too
+r = F.post(B + "/api/contacts", json={"book_id": BID, "fn": "Hanna Hier"})
+check(r.ok, "B41: a contact made here " + r.text[:200])
+C3 = r.json()["id"]
+u3 = dbx("SELECT uid FROM contacts WHERE id=?", (C3,))[0][0]
+j = vimp(F, BID, card(u3, "Hanna Hier", "hanna.alt@example.com", "Notiz der Karte"))
+d3 = F.get(B + f"/api/contacts/{C3}").json()
+check(j.get("kept_norev") == 1 and not d3.get("note") and not d3.get("emails"),
+      f"B41: a card without REV does not overwrite a contact made here (never imported) {j} {d3.get('emails')}")
 
 # ================================================================== F18: export state counts locked files
 FT = F.post(B + "/api/tasks", json={"title": "Mit Anhang 4318"}).json()["id"]

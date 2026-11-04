@@ -44,7 +44,13 @@ def _idem_key():
 
 def dvb_idem_app():
     """2.533.0 A2 (#4318 A14): an app route (not API v1): a committed claim counts as the effect done (see the module text)."""
-    return not request.path.startswith("/api/v1/")
+    if request.path.startswith("/api/v1/"):
+        return False
+    # review 2.533.0 (#4318 A14): a create with client_ref runs again instead -- its duplicate check hands back the existing
+    # row with its id (an answer without id would lose the offline queue's mapping of the temporary id)
+    if request.method == "POST" and isinstance(b := request.get_json(silent=True), dict) and b.get("client_ref"):
+        return False
+    return True
 
 
 def _idem_replay(r):

@@ -245,6 +245,16 @@ r = Fr.patch(B + f"/api/tasks/{T}", json={"title": "Band schneiden zweimal"}, he
 t = [x for x in Fr.get(B + "/api/state").json()["tasks"] if x["id"] == T]
 check(r.ok and r.headers.get("Idempotent-Replayed") == "true" and t and t[0]["title"] == "Band schneiden",
       f"A14: a committed claim without an answer: the repeat is answered as done, not applied again {r.status_code} {r.text[:120]} {t and t[0]['title']}")
+# review 2.533.0: a create with client_ref runs again: its duplicate check hands back the task WITH its id (the offline
+# queue maps its temporary id with it; an {"ok": true} without id lost the mapping)
+ref = "dvb-ref-" + uuid.uuid4().hex[:8]
+T2 = Fr.post(B + "/api/tasks", json={"title": "Offline angelegt", "list_id": LID, "client_ref": ref}).json()["id"]
+k3 = uuid.uuid4().hex[:16]
+sql("INSERT INTO idem_keys(user_id, k, method, path, created_at) VALUES(?,?,?,?,?)", (FID, k3, "POST", "/api/tasks", ago()))
+r = Fr.post(B + "/api/tasks", json={"title": "Offline angelegt", "list_id": LID, "client_ref": ref}, headers={"Idempotency-Key": k3})
+n = [x for x in Fr.get(B + "/api/state").json()["tasks"] if x.get("title") == "Offline angelegt"]
+check(r.ok and r.json().get("id") == T2 and len(n) == 1,
+      f"A14: a repeated create with client_ref answers with the existing task's id, once {r.status_code} {r.text[:160]} {len(n)}")
 k1, k2 = "dvb" + uuid.uuid4().hex[:12], "dvb" + uuid.uuid4().hex[:12]
 for kk, path in ((k1, f"/api/tasks/{T}"), (k2, f"/api/v1/tasks/{T}")):
     sql("INSERT INTO idem_keys(user_id, k, method, path, created_at) VALUES(?,?,?,?,?)", (FID, kk, "PATCH", path, ago()))
