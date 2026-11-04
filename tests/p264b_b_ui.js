@@ -3,7 +3,7 @@
 // - switching the lock on encrypts an existing file (with part A's flow: le2eStart; alone: le2eFileConvert 'on'), the server keeps
 //   KENC\x03 + a name cipher only, the browser opens the same bytes again
 // - 2.539.0 (#4376): a file is bound to its task (AAD v2): opened as another task's file it fails; a KENC\x02 file of before
-//   (AAD v1, no task) is still taken by the server and opens
+//   (AAD v1, no task) is still taken by the server and opens; the tile binds the task it is shown under (review 1), not the row's task_id
 // - a file added in the detail (uploadFiles) and a comment file (sendComment) leave encrypted with the list key; the tile shows the
 //   decrypted name; the per-person button of 2.42 is not offered; the head line (le2uAttHead) is there
 // - a second member opens the file with his own key
@@ -85,6 +85,17 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
     check(await open(F1) === `notes.txt|text/plain|${M} hello`, 'the new file opens with the list key');
     // 2.539.0 (#4376): the server passes the file off as another task's: it does not open (AAD v2 carries the task)
     check(/^ERR /.test(await open(F1, T + 1000)), '#4376: a task file does not open as the file of another task ' + await open(F1, T + 1000));
+    // 2.539.0 (#4376, review 1): the tile binds the task it is shown under, not the task_id the server puts in the row: task A's file
+    // passed off under task B does not open (before: data-tid = the server's task_id, the file opened as B's)
+    const swap = await ev(`(async () => { const t0 = window.toast, msgs = []; window.toast = (...a) => { msgs.push(String(a[0])); };
+      try {
+        const box = document.createElement('div'); box.innerHTML = le2eFileHtml({id: ${F1}, task_id: ${T}, size: 9, name: ''}, '', ${L}, ${T} + 1000); document.body.appendChild(box);
+        const b = box.querySelector('[data-le2f="open"]'), tid = +b.dataset.tid; b.click();
+        for (let i = 0; i < 100 && !msgs.length; i++) await new Promise(r => setTimeout(r, 50));
+        box.remove(); return {tid, msgs, back: +new DOMParser().parseFromString(le2eFileHtml({id: ${F1}, task_id: ${T}, size: 9}, '', ${L}), 'text/html').querySelector('[data-tid]').dataset.tid};
+      } finally { window.toast = t0; } })().catch(e => ({err: e.message}))`);
+    check(swap.tid === T + 1000 && (swap.msgs || []).includes('Cannot be decrypted'), '#4376 review 1: a tile under task B with task A in the row does not open ' + JSON.stringify(swap));
+    check(swap.back === T, '#4376 review 1: without a task context (project overview) the row\'s task stays ' + JSON.stringify(swap));
     // 2.539.0 (#4376): a file of before (KENC\x02, AAD v1 without the task) is still taken and opens
     const OLD = await ev(`(async () => { const g = listById(${L}).e2e_gen, key = await le2fKey(${L}, g), data = new TextEncoder().encode('${M} old');
       const head = new TextEncoder().encode(JSON.stringify({name: 'old.txt', type: 'text/plain', size: data.length}));

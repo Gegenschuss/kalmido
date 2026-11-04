@@ -106,9 +106,11 @@ function le2fFill() {
   }, 0);
 }
 document.addEventListener('le2e:change', () => { LE2F.tried.clear(); le2fFill(); });
+// 2.539.0 (#4376, review 1): the task shown here (tid) is the AAD context, not the server's a.task_id (else a server could show the
+// file of task A under task B); only the project overview (projects.js, no task context) falls back to the row's task_id
 function le2eFileHtml(a, del, lid, tid) {
   const nm = le2eFileName(a, lid);
-  return `<div class="att file e2eatt le2fatt" data-att="${a.id}"><button type="button" class="attx" data-le2f="open" data-att="${a.id}" data-lid="${lid}" data-tid="${+(a.task_id || tid) || ''}" title="${esc(nm || tr('Decrypt and download'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(nm || tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}</span></span></button>${del}</div>`;
+  return `<div class="att file e2eatt le2fatt" data-att="${a.id}"><button type="button" class="attx" data-le2f="open" data-att="${a.id}" data-lid="${lid}" data-tid="${+(tid || a.task_id) || ''}" title="${esc(nm || tr('Decrypt and download'))}">${ic('lock')}<span class="atxt"><span class="an">${esc(nm || tr('Encrypted file'))}</span><span class="as">${esc(fmtSize(a.size || 0))}</span></span></button>${del}</div>`;
 }
 async function le2fFetch(aid) {
   let r;

@@ -200,8 +200,18 @@ const gens = idx => (idx.pages || []).flatMap(p => [p.path, p.body]).filter(v =>
   let PB = '', OLDP = 0;  // 2.64.3 E (#1817): pages checked after switching off
   await session('alice', async ({ev, waitFor, unlock}) => {
     await unlock();
-    const k = await ev(`(async () => { const sp = ${JSON.stringify(SP)}; await wk_load(sp, true); const r = await wkeRotate(sp, true); const e = await wkeReenc(sp); return {r, e, gen: WKE.st[sp].gen}; })().catch(e => ({err: e.message}))`);
-    check(k.r === true && k.e === true && k.gen === 2, 'the key changes and the pages are encrypted again ' + JSON.stringify(k));
+    // 2.539.0 (#4376, review 2): "Change the key now" asks for the safety number of a key not confirmed here (Bob, first seen in
+    // this page) before the new key goes to him; Cancel changes nothing, "Numbers match" confirms and wraps for him
+    const k = await ev(`(async () => { const sp = ${JSON.stringify(SP)}, out = {}; await wk_load(sp, true);
+      const dlg = async () => { let d = null; for (let i = 0; i < 100 && !d; i++) { d = document.querySelector('.cdlg .le2utofu')?.closest('.cdlg') || null; if (!d) await new Promise(r => setTimeout(r, 100)); } return d; };
+      out.conf = le2eKeyConfirmed(${BOB});
+      let p = wkeRotate(sp, true), d = await dlg(); out.txt = d?.textContent || ''; d?.querySelector('[data-cd="no"]')?.click();
+      out.cancel = await p; out.genCancel = (await wkeInfo(sp, true)).gen;
+      p = wkeRotate(sp, true); d = await dlg(); out.asked = !!d; d?.querySelector('[data-cd="yes"]')?.click();
+      out.r = await p; out.e = await wkeReenc(sp); out.gen = WKE.st[sp].gen; out.bob = ((await wkeInfo(sp, true)).members || []).find(m => m.user_id === ${BOB})?.key_gens;
+      return out; })().catch(e => ({err: e.message}))`);
+    check(k.conf === false && /first time/.test(k.txt || '') && k.cancel === false && k.genCancel === 1, '#4376 review 2: the key change asks for the safety number first, Cancel changes nothing ' + JSON.stringify(k).slice(0, 300));
+    check(k.asked && k.r === true && k.e === true && k.gen === 2 && (k.bob || []).includes(2), 'the key changes (Bob confirmed, he gets it) and the pages are encrypted again ' + JSON.stringify(k).slice(0, 300));
     const idx = (await call('GET', '/api/wiki?space=' + SP + '&bodies=1')).j, g = gens(idx);
     check(g.length >= 12 && g.every(x => x === 2), 'every path and text in the new generation ' + JSON.stringify([...new Set(g)]));
     const i = (await call('GET', '/api/wiki/e2e?space=' + SP)).j;

@@ -248,12 +248,15 @@ async function le2eRotate(lid, byHand) {
   // 2.64.2 review (M1): the automatic change does not wrap for a key this device sees for the first time in this page (trust on
   // first use without any look at it): it waits for the button "Change the key now" in the list dialog
   if (!byHand && people.some(m => m.user_id !== S.me.id && LE2E.fresh.has(m.user_id))) return false;
+  // 2.539.0 (#4376, review 2): the button asks for the safety number of every key not confirmed here yet (le2u_tofu); Cancel = no change
+  if (byHand && typeof le2u_tofu === 'function' && !await le2u_tofu(people.map(m => m.user_id).filter(u => u !== S.me.id), uid => people.find(m => m.user_id === uid)?.name || personName(lid, uid) || '')) return false;
   const raw = e2eRand(32), keys = [];
   try {
     if (!people.some(m => m.user_id === S.me.id)) people.unshift({user_id: S.me.id});
     for (const m of people) {
       let pub;
       try { pub = await le2ePubFor(lid, m.user_id); } catch (e) { if (m.user_id === S.me.id) throw e; continue; }  // -> waiting list
+      if (!le2eKeyConfirmed(m.user_id)) continue;  // 2.539.0 (#4376, review 2): an unconfirmed key waits too (release asks for the number)
       keys.push({user_id: m.user_id, wrapped: await le2eWrap(raw, lid, gen, m.user_id, pub)});
     }
     let j;

@@ -7,7 +7,7 @@
 // - H1: offline outbox and every localStorage entry hold ciphers only (sweep for a marker); lock = wipe
 // - moving a task out of a locked list carries its texts, its comments in the target format (le2e_move)
 // - 2.539.0 (#4376): a first-seen key is confirmed once (le2eKeyConfirmed / le2eConfirmKey); "Remember on this device" holds only
-//   for the same sign-in (S.me.sgen) and passphrase bundle
+//   for the same sign-in (S.me.sgen) and passphrase bundle; a key change hands no key to an unconfirmed person (review 2)
 // With part A's routes also end to end: Bob sets up encryption, Alice switches the lock on (le2eStart), the server
 // keeps ciphers only, Bob reads with his own key, Alice switches it off again (le2eStop) and the texts are plain on the server.
 const path = require('path');
@@ -259,8 +259,26 @@ const M = 'ZQXmark';  // every plain text of a locked list carries it: no storag
       check(await ev(`le2eUnlock(${L3})`), 'Bob unlocks the list with his own key');
       check(await waitFor(`S.tasks.get(${TT})?.title === '${M} shared task'`), 'Bob reads the task');
     });
-    await session('alice', async ({ev}) => {
+    await session('alice', async ({ev, waitFor}) => {
       await ev(`(async () => { await e2eLoad(true); await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, ${JSON.stringify(PASS)})); return 1; })()`);
+      // 2.539.0 (#4376, review 2): a key change hands the new key only to people whose key was confirmed here (safety number):
+      // the button asks first (Cancel = no change), the automatic change puts an unconfirmed person on the waiting list
+      const rt = await ev(`(async () => { const lid = ${L3}, out = {}; await le2eInfo(lid, true); LE2E.fresh.delete(${BOB});  // seen in an earlier page, never confirmed
+        out.conf = le2eKeyConfirmed(${BOB});
+        const p = le2eRotate(lid, true); let dlg = null;
+        for (let i = 0; i < 100 && !dlg; i++) { dlg = document.querySelector('.cdlg .le2utofu')?.closest('.cdlg') || null; if (!dlg) await new Promise(r => setTimeout(r, 100)); }
+        out.txt = dlg?.textContent || ''; dlg?.querySelector('[data-cd="no"]')?.click();
+        out.hand = await p; out.genHand = (await rawFetch('GET', '/api/lists/' + lid + '/e2e')).gen;
+        out.auto = await le2eRotate(lid);
+        const j = await rawFetch('GET', '/api/lists/' + lid + '/e2e');
+        out.gen = j.gen; out.bob = (j.members || []).find(m => m.user_id === ${BOB})?.key_gens; out.pending = (j.pending || []).map(x => x.user_id);
+        return out; })().catch(e => ({err: e.message}))`);
+      check(rt.conf === false && /first time/.test(rt.txt || '') && /\d{5} \d{5}/.test(rt.txt || '') && rt.hand === false && rt.genHand === 1,
+        '#4376 review 2: "Change the key now" asks for the safety number first, Cancel changes nothing ' + JSON.stringify(rt).slice(0, 300));
+      check(rt.auto === true && rt.gen === 2 && !(rt.bob || []).includes(2) && (rt.pending || []).includes(BOB),
+        '#4376 review 2: the automatic key change hands nothing to an unconfirmed key, the person waits ' + JSON.stringify(rt).slice(0, 300));
+      const re = await waitFor(`rawFetch('GET', '/api/lists/${L3}/e2e').then(j => !j.reenc && !LE2E.busy[${L3}])`, 120);
+      check(!!re, 'the re-encryption after the key change finished');
       check(await ev(`le2eStop(${L3}, 'password123', () => {}).then(r => !!r)`), 'le2eStop: switched off');
       const st = (await call('GET', '/api/state')).j, row = (st.tasks || []).find(t => t.id === TT);
       check(row?.title === `${M} shared task` && !(st.lists || []).find(x => x.id === L3)?.e2e, 'the texts are plain on the server again');

@@ -67,6 +67,8 @@ const gen = v => typeof v === 'string' && v.startsWith('e2e1:') ? JSON.parse(v.s
     await ev(`le2eUnlock(${L}).then(() => 1)`);
     await sleep(1500);
     check((await call('GET', `/api/lists/${L}/e2e`)).j.gen === 1, 'M1: no automatic key change for keys first seen in this page');
+    // 2.539.0 (#4376, review 2): a key change hands the new key only to a confirmed key; Alice compared Bob's safety number before
+    await ev(`(async () => { await le2eSafety(${U.bob}); return le2eConfirmKey(${U.bob}); })()`);
     await boot('#l/' + L);  // the same device later: the keys are known from before
     await ev(`(window.__prog = [], document.addEventListener('le2e:progress', e => window.__prog.push(e.detail)), 1)`);
     await unlock();

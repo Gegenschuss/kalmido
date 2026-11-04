@@ -186,12 +186,15 @@ async function wkeRotate(sp, byHand) {
   const people = (info.members || []).filter(m => m.has_keys && (m.key_gens || []).includes(cur));
   // like the lists (2.64.2 review M1): the automatic change does not wrap for a key this device sees for the first time
   if (!byHand && people.some(m => m.user_id !== S.me.id && LE2E.fresh.has(m.user_id))) return false;
+  // 2.539.0 (#4376, review 2): the button asks for the safety number of every key not confirmed here yet; Cancel = no change
+  if (byHand && !await wkeTofu(info, people.map(m => m.user_id).filter(u => u !== S.me.id))) return false;
   const raw = e2eRand(32), keys = [];
   try {
     if (!people.some(m => m.user_id === S.me.id)) people.unshift({user_id: S.me.id});
     for (const m of people) {
       let pub;
       try { pub = await wkePubFor(sp, m.user_id); } catch (e) { if (m.user_id === S.me.id) throw e; continue; }  // -> waiting list
+      if (!le2eKeyConfirmed(m.user_id)) continue;  // 2.539.0 (#4376, review 2): unconfirmed waits too
       keys.push({user_id: m.user_id, wrapped: await wkeWrap(raw, sid, gen, m.user_id, pub)});
     }
     let j;
