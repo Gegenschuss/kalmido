@@ -417,6 +417,16 @@ def _oidc_account(c, claims, sess_uid=None):
     return _user(c, u["id"])
 
 
+def _oidc_sess_uid(c):
+    """The person signed in in this browser for linking (oidc_link_ok) and the step-up, None without a session. 2.536.0
+    (#4363): a support session (via 'support', accounts/supportgrant.py) counts as none -- the operator neither links a
+    provider identity to the client's account nor swaps the support session for one sga_close would not end."""
+    if g.get("auth_via") != "session" or g.get("user") is None:
+        return None
+    from .supportgrant import sga_is_support  # later in the module order: its before_request keeps its place
+    return None if sga_is_support(c) else g.user["id"]
+
+
 def _oidc_fail_redirect(code, stepup=False):
     # 2.144.5 A (#2387): a failed step-up goes back to the signed-in app (rck-stepup-error), not to the login page
     resp = redirect(("/#rck-stepup-error=" if stepup else "/#login-error=") + code, 303)
@@ -442,7 +452,7 @@ def oidc_start():
     # 2.144.5 A (#2387): ?stepup=show|new&org=<id>: a real sign-in again before the recovery key of an account without a
     # password is shown (prompt=login, max_age=0; the callback checks auth_time). Only for the person signed in here
     stepup = request.args.get("stepup") if request.args.get("stepup") in ("show", "new", "su") else ""  # 2.223.2 (#2871): + su
-    sess_uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
+    sess_uid = _oidc_sess_uid(c)  # 2.536.0 (#4363): a support session = none (the guard refuses it here already)
     if stepup and sess_uid is None:
         return _oidc_fail_redirect("session", True)
     try:
@@ -489,6 +499,11 @@ def oidc_callback():
     state = request.args.get("state") or ""
     with _OIDC_LOCK:
         st = _OIDC_STATES.pop(state, None) if state else None
+    c = db()
+    if g.get("auth_via") == "session" and g.get("user") is not None and _oidc_sess_uid(c) is None:
+        # 2.536.0 (#4363): a support session never comes back from the provider: no link, no new session in its place
+        print("OIDC callback refused: support session", flush=True)
+        return _oidc_fail_redirect("support", bool(st and st.get("stepup")))
     bind = request.cookies.get(OIDC_COOKIE) or ""
     if not st or st["exp"] < time.time() or not bind or not hmac.compare_digest(st["bind"], _token_hash(bind)):
         return _oidc_fail_redirect("state")
@@ -498,7 +513,6 @@ def oidc_callback():
     code = request.args.get("code") or ""
     if not code or len(code) > 4000:
         return _oidc_fail_redirect("failed", su)
-    c = db()
     try:
         doc = oidc_doc(c)
         form = {"grant_type": "authorization_code", "code": code, "redirect_uri": OIDC_REDIRECT, "code_verifier": st["verifier"]}
@@ -524,7 +538,7 @@ def oidc_callback():
                 print("OIDC userinfo skipped:", e.code, e.detail, flush=True)
         if su:
             return _oidc_stepup_done(c, st, claims)
-        u = oidc_account(c, claims, g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None)
+        u = oidc_account(c, claims, _oidc_sess_uid(c))
     except OidcError as e:
         c.rollback()
         if e.code in ("no_account", "disabled", "group", "taken", "link"):
@@ -553,7 +567,7 @@ def _oidc_stepup_done(c, st, claims):
     linked subject) and only with an auth_time of the last OIDC_STEPUP_AGE seconds (the provider really asked again);
     then this session gets stepup_at (orgcrypt _rck_fresh) and the app opens the recovery key. Nothing is linked or made."""
     tok = request.cookies.get(COOKIE) or ""
-    uid = g.user["id"] if g.get("auth_via") == "session" and g.get("user") is not None else None
+    uid = _oidc_sess_uid(c)
     if not tok or uid is None or uid != st.get("uid"):
         return _oidc_fail_redirect("session", True)
     with system_ctx(c):  # the account of the provider's subject (structure), compared with the signed-in one

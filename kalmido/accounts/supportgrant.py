@@ -164,6 +164,9 @@ SGA_PLAIN = frozenset(("/api/auth/logout", "/api/client-errors", "/api/settings"
 SGA_GUARD_ME = {"password", "email", "username", "current_password", "new_password"}
 SGA_GUARD_SCOPE = {"org_id", "org_visibility", "org_edit"}  # review F2: a PATCH that carries contents out of the account's scope
 SGA_SECRET_READ = frozenset(("public-link", "public-links", "feed", "ext-links"))  # review F1: answers with a working link: it would outlive the grant
+# 2.536.0 (#4363): the OIDC start would link a provider identity to the client's account and swap the support session for one
+# without the mark (sga_close would not end it) -- refused like a write; the callback refuses a support session itself (oidc.py)
+SGA_GET_REFUSED = frozenset(("/api/auth/oidc/start",))
 SGA_REFUSED = N_("Support access does not hand out sign-in data or add people: the client does that")
 
 
@@ -198,7 +201,8 @@ def sga_guard():
         return None
     if request.method in ("GET", "HEAD"):
         p = request.path
-        if p.startswith("/api/") and p.rsplit("/", 1)[-1] in SGA_SECRET_READ and sga_is_support(db()):
+        if ((p in SGA_GET_REFUSED or (p.startswith("/api/") and p.rsplit("/", 1)[-1] in SGA_SECRET_READ))
+                and sga_is_support(db())):
             return jsonify(error=tr(SGA_REFUSED), code="support_session"), 403
         return None
     c = db()
