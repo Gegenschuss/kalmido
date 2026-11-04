@@ -16,12 +16,15 @@ const umzHtml = hint => `<h4 id="s-umz-h">${tr('Move and export everything')}</h
     <li>${tr('Set up your own Kalmido server (see SELF-HOSTING.md, section “Moving from and to app.kalmido.com”).')}</li>
     <li>${tr('There: sign in, Settings > Data > “Take over from a Kalmido export”, check the preview and start.')}</li>
     <li>${tr('Invite the people you work with; your projects are shared with them again once you tick them in the preview. Moving back works the same way.')}</li></ol></details>`;
+// 2.531.0 (#4317 F9/F10): what the file does not hold (the server's list, readable, also the trashes), before and after an export
+const umzLeftHtml = j => (j.not_included || []).length ? `<details class="umzleft"><summary>${esc(tr('What is not in the file ({0})', j.not_included.length))}</summary>
+  <ul class="umzleftl">${j.not_included.map(x => `<li>${esc(x)}</li>`).join('')}</ul></details>` : '';
 function umzExpHtml(j) {
   const start = lbl => `<button type="button" class="btn sm" data-umz="exp">${ic('download', 's')} ${lbl}</button>`;
-  if (j.state === 'running') return `<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>`;
+  if (j.state === 'running') return `<div class="row"><span class="muted">${tr('The export is being created…')}</span></div>${umzLeftHtml(j)}`;
   if (j.state === 'done') return `<div class="row umzdone"><span class="n">${esc(j.file)} <span class="muted">(${esc(fmtSize(j.bytes || 0))}) · ${esc(tr('available until {0}', fmtWhen(j.expires_at)))}</span></span></div>
-    <div class="row"><a class="btn sm pri" href="/api/account/export/file" download data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>${j.missing ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} file could not be read, the manifest in the archive names it', '{0} files could not be read, the manifest in the archive names them', j.missing))}</div>` : ''}${j.locked ? `<div class="shint keep dvaumzlocked">${ic('alert', 's')} ${esc(trn('{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it', '{0} files are not in the archive (locked by the virus scanner or not readable), the manifest names them', j.locked))}</div>` : ''}`;  // 2.533.0 (#4318) F18
-  return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Export everything'))}</div>`;
+    <div class="row"><a class="btn sm pri" href="/api/account/export/file" download data-sudl>${ic('download', 's')} ${tr('Download')}</a><button type="button" class="btn sm" data-umz="exp-del">${ic('trash', 's')} ${tr('Delete now')}</button>${start(tr('Create again'))}</div>${j.missing ? `<div class="shint keep">${ic('alert', 's')} ${esc(trn('{0} file could not be read, the manifest in the archive names it', '{0} files could not be read, the manifest in the archive names them', j.missing))}</div>` : ''}${j.locked ? `<div class="shint keep dvaumzlocked">${ic('alert', 's')} ${esc(trn('{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it', '{0} files are not in the archive (locked by the virus scanner or not readable), the manifest names them', j.locked))}</div>` : ''}${umzLeftHtml(j)}`;  // 2.533.0 (#4318) F18
+  return (j.state === 'failed' ? `<div class="shint keep">${ic('alert', 's')} ${esc(j.error || '')}</div>` : '') + `<div class="row">${start(tr('Export everything'))}</div>${umzLeftHtml(j)}`;
 }
 // 2.360.2 D (#2561): approval records of deleted video reviews: shown here only when there are some
 async function umzSigLoad(md) {

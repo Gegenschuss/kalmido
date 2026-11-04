@@ -178,6 +178,7 @@ UMZ_READ = frozenset((
     # of my own rows directly (admin/umz_more.py)
     "hub_mails", "video_reviews", "video_versions", "video_comments", "list_notepads", "playbooks", "bookmarks", "pomos",
     "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
+    "kid_parents", "conn_links",  # 2.531.0 (#4317 F12): admin/umz_more.py _family
 ))
 # #3470: the private file store, knowledge pages and tables of an account export go through the organisation import's areas
 # (admin/oi_store.py) into my private space: account part -> archive entry of the organisation export
@@ -647,8 +648,14 @@ def umz_left(data):
         if n[t]:
             out[t] = n[t]
     mine = {_oid(L.get("id")) for L in data.get("lists", []) if isinstance(L, dict) and not L.get("e2e")}
+    # 2.531.0 (#4317 F17): comments and files of a task in the trash stay behind with it (umz_write leaves them out), counted on
+    # their own; its time entries come along without the task (list-level entries), so they are not counted here
+    trash = {_oid(t.get("id")) for t in data.get("tasks", []) if isinstance(t, dict) and t.get("deleted_at")} - {None}
+    on_trash = lambda part: sum(1 for r in data.get(part, []) if isinstance(r, dict) and _oid(r.get("task_id")) in trash)  # noqa: E731
     for what, k in ((N_("Other settings"), sum(1 for r in data.get("settings", []) if r.get("key") not in UMZ_SETTINGS_ALL)),
                     (N_("Tasks in the trash"), sum(1 for t in data.get("tasks", []) if t.get("deleted_at"))),
+                    (N_("Comments on tasks in the trash"), on_trash("comments")),
+                    (N_("Files of tasks in the trash"), on_trash("attachments")),
                     # 2.363.4 (#3127): what hangs on a project that is not mine (or encrypted), and a folder's playbook
                     (N_("Notepads"), sum(1 for r in data.get("list_notepads", []) if _oid(r.get("list_id")) not in mine)),
                     (N_("Playbooks"), sum(1 for r in data.get("playbooks", []) if _oid(r.get("list_id")) not in mine))):
@@ -1849,7 +1856,7 @@ def umz_private(c, run, uid, man, zf, files, data, who):
     try:
         if oi:
             oi_write(c, run, uid, man, zf, files, {"oi": oi, "people": data.get("people") or []}, who)
-        umz_more_write(c, run, uid, me_old, data)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ...
+        umz_more_write(c, run, uid, me_old, data, umz_salt(man))  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells ... (2.531.0 #4317: + salt)
     finally:
         run.org = org
     run.created["oi_done"] = True

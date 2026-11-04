@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """2.362.4 (#3107): no table with people's data goes missing from an export silently. Static (bare Python 3.12, no app import, the CI
-lint step): reads kalmido/core/schema.py (CREATE TABLE + the column migrations) and holds every table with a person, organisation,
-list or task column against
+lint step): reads kalmido/core/schema.py (CREATE TABLE + the column migrations) and holds every table (2.531.0 #4317: not only
+those with a person, organisation, list or task column; a table with nobody's data stands in exportleft.py UMZ_FREE_TABLES) against
  - the account export (accounts/settings.py umz_export_queries, admin/acctexport.py umz_extra_queries / umz_mine_queries / umz_build)
    or admin/exportleft.py UMZ_LEFT_TABLES, with the reason why it stays out
  - the organisation export (admin/orgexport.py OX_AREAS) or OX_LEFT (tables with an organisation or a list column); 2.510.0 (#4286):
@@ -136,13 +136,28 @@ def check(root):
     inc = {t for v in parts.values() for t in v} | {t for t in BUILD_PARTS.values() if t} | set(ast.literal_eval(assigned(left_tree, "UMZ_BUILD_TABLES")))
     need = {t for t, c in tables.items() if any(x in c for x in PEOPLE) and t not in FRAME}
     stats["account"] = len(need)
-    for t in sorted(need - inc - set(left)):
-        bad.append(f"{t}: has {'/'.join(x for x in PEOPLE if x in tables[t])} but is neither in the account export nor in UMZ_LEFT_TABLES "
-                   "(kalmido/admin/exportleft.py): export it or name why it stays out")
-    for t in sorted(set(left) - need):
-        bad.append(f"{t}: stale in UMZ_LEFT_TABLES (no such table, or no person / organisation / list / task column)")
+    # 2.531.0 (#4317 F12, audit #2425): every table, not only those with a person column (kid_parents, conn_links went missing):
+    # exported, named in UMZ_LEFT_TABLES (the manifest's not_included) or, holding nobody's data, in UMZ_FREE_TABLES
+    free, later = reasons(left_tree, "UMZ_FREE_TABLES"), reasons(left_tree, "UMZ_LATER_NAMES")
+    for t in sorted(set(tables) - set(FRAME) - inc - set(left) - set(free)):
+        has = "/".join(x for x in PEOPLE if x in tables[t])
+        bad.append(f"{t}: {'has ' + has if has else 'a table'} but is neither in the account export nor in UMZ_LEFT_TABLES "
+                   f"(kalmido/admin/exportleft.py){'' if has else ' nor in UMZ_FREE_TABLES'}: export it or name why it stays out")
+    for t in sorted(set(left) - set(tables)):
+        bad.append(f"{t}: stale in UMZ_LEFT_TABLES (no such table)")
     for t in sorted(set(left) & inc):
         bad.append(f"{t}: in the account export and in UMZ_LEFT_TABLES")
+    for t in sorted(set(free) - set(tables)):
+        bad.append(f"{t}: stale in UMZ_FREE_TABLES (no such table)")
+    for t in sorted(set(free) & (need | inc | set(left))):
+        bad.append(f"{t}: in UMZ_FREE_TABLES but it holds a person's data (a person / organisation / list / task column), is exported "
+                   "or in UMZ_LEFT_TABLES")
+    lt = {t for t in left if left[t] == next((n.value.value for n in left_tree.body if isinstance(n, ast.Assign)
+                                               and getattr(n.targets[0], "id", "") == "_LATER"), None)}  # the tables not yet in it
+    for t in sorted(lt - set(later)):
+        bad.append(f"{t}: not yet in the account export but without a readable name in UMZ_LATER_NAMES (the export page names it)")
+    for t in sorted(set(later) - lt):
+        bad.append(f"{t}: stale in UMZ_LATER_NAMES (not a table that is not yet in the account export)")
     # ---- organisation export
     ox = ast.parse(read(root, *admin, "orgexport.py"))
     areas = {e.elts[0].value: e.elts[1].value for e in assigned(ox, "OX_AREAS").elts}

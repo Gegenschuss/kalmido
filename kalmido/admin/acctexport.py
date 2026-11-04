@@ -52,7 +52,7 @@ from ..accounts.orgout import oo_exported  # 2.362.3 (#3101)
 from ..accounts.pictures import avatar_path
 from ..accounts.session import me
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _Man, _jdef, _safe_part, _under, ox_pb_parts, ox_read_listed
-from .exportleft import UMZ_LEFT_TABLES, left_lines  # 2.362.4 (#3107)
+from .exportleft import UMZ_LATER_NAMES, UMZ_LEFT_TABLES, left_lines  # 2.362.4 (#3107), 2.531.0 (#4317)
 from .offsite import stepup_download  # 2.360.0 A (#2496): the step-up before the download
 from ..core.orgcrypt import OrgCryptError, oc_read_file  # 2.149.0 G (#2517): pulled up from functions
 from ..files.scan import sc_locked_all  # 2.209.0 D (#1856)
@@ -96,6 +96,9 @@ UMZ_NOT_INCLUDED = (
     N_("the office (documents, receipts, cash book) and knowledge pages of an organisation: the organisation export"),
     # 2.455.0 (#3469): agents never move: their keys and tokens stay, an agent is set up anew on the target
     N_("your agents and their keys and tokens (set them up again on the target)"),
+    # 2.531.0 (#4317 F10): the trashes stay behind; the tasks of the trash are in the file, the import leaves them there
+    N_("the trash of your files, knowledge pages, tables, address books, filed e-mails and video reviews (restore what you want to keep before the export)"),
+    N_("tasks in the trash with their comments and files: they are in the file, but an import does not take them over (restore them before the export)"),
 )
 
 # 2.455.0 (#3469): every table with a person column (user_id) that is NOT in the queries of the account export, with the reason (the
@@ -466,6 +469,15 @@ def umz_mine_queries(uid):
                          UNION ALL SELECT 'agent_chat', message_id, emoji, created_at FROM chat_reactions WHERE user_id=?
                          ORDER BY created_at""", (uid, uid, uid)),
         "kid_stars": ("SELECT id, delta, kind, task_id, reward_id, title, at, created_at FROM kid_stars WHERE kid_id=? ORDER BY id", (uid,)),
+        # 2.531.0 (#4317 F12): my family links and my connections: the other person by name and address hash only (umz_build), as on
+        # the people of my lists; role = what the other person is to me (parent | kid)
+        "kid_parents": ("""SELECT CASE WHEN k.kid_id=? THEN 'parent' ELSE 'kid' END AS role, u.id AS user_id,
+                           COALESCE(NULLIF(u.display_name, ''), u.username) AS name, u.email FROM kid_parents k
+                           JOIN users u ON u.id = CASE WHEN k.kid_id=? THEN k.parent_id ELSE k.kid_id END
+                           WHERE k.kid_id=? OR k.parent_id=? ORDER BY u.id""", (uid, uid, uid, uid)),
+        "conn_links": ("""SELECT u.id AS user_id, COALESCE(NULLIF(u.display_name, ''), u.username) AS name, u.email, l.created_at FROM conn_links l
+                          JOIN users u ON u.id = CASE WHEN l.a_id=? THEN l.b_id ELSE l.a_id END
+                          WHERE (l.a_id=? OR l.b_id=?) AND l.deleted_at IS NULL ORDER BY u.id""", (uid, uid, uid)),
         "notifications": ("SELECT id, kind, task_id, list_id, actor_id, comment_id, data, created_at, read_at FROM notifications "
                           "WHERE user_id=? ORDER BY id", (uid,)),
         "sessions": ("SELECT created_at, expires_at, via, last_seen_at, user_agent FROM sessions WHERE user_id=? ORDER BY created_at", (uid,)),
@@ -665,6 +677,8 @@ def umz_build(c, uid, stream, export_id):
                         continue
                     if table == "shared_lists":  # review M1: the owner's address only as a hash
                         d["owner_email_hash"] = umz_email_hash(d.pop("owner_email", ""), salt)
+                    if table in ("kid_parents", "conn_links"):  # 2.531.0 (#4317 F12): the same
+                        d["email_hash"] = umz_email_hash(d.pop("email", ""), salt)
                     if table == "hub_mails":
                         _mail_files(d, files)
                     if table == "templates":  # 2.463.0 (#3860)
@@ -889,12 +903,26 @@ def umz_cleanup(c=None, force=False):
     return n + umz_import_cleanup() + wki_cleanup()
 
 
+def umz_not_included_view(lg=None):
+    """2.531.0 (#4317 F9, audit #2425): what the file does not hold, readable for the export page (before and after an export): the
+    lines of UMZ_NOT_INCLUDED, each other reason of UMZ_LEFT_TABLES once without its table names, and the areas not yet in the
+    export by their names (exportleft.UMZ_LATER_NAMES). The manifest keeps its own lines with the table names (left_lines)."""
+    out = [tr(x, lg=lg) for x in UMZ_NOT_INCLUDED]
+    for r in dict.fromkeys(r.replace(" (not_included)", "") for t, r in sorted(UMZ_LEFT_TABLES.items()) if t not in UMZ_LATER_NAMES):
+        out.append(tr(r, lg=lg))
+    later = sorted({tr(UMZ_LATER_NAMES[t], lg=lg) for t in UMZ_LEFT_TABLES if t in UMZ_LATER_NAMES})
+    if later:
+        out.append(tr(N_("not yet in the file: {0}"), ", ".join(later), lg=lg))
+    return list(dict.fromkeys(out))
+
+
 # ---------------------------------------------------------------- routes (people only)
 @app.get("/api/account/export")
 def umz_get():
-    """The state of my account export: none | running | done (file, bytes, expires_at) | failed (error)."""
+    """The state of my account export: none | running | done (file, bytes, expires_at) | failed (error). 2.531.0 (#4317 F9):
+    + not_included, what the file does not hold (shown before and after the export)."""
     umz_person()
-    return jsonify(keep_hours=UMZ_KEEP_H, **umz_status(me()))
+    return jsonify(keep_hours=UMZ_KEEP_H, not_included=umz_not_included_view(), **umz_status(me()))
 
 
 def umz_private_bytes(c, uid):

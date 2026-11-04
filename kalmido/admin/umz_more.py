@@ -16,10 +16,12 @@ from ..accounts.layoutsets import lyv_key_ok, lyv_save
 from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_STATES, BM_TITLE_MAX, bm_key, bm_norm_url, bm_site, bm_tags
 from ..notify.taskbell import TBL_LEVELS
 from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
-from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_insert, umz_row
+from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_find, umz_insert, umz_row, umz_seen
 
 # the parts written here (each also in acctimport.UMZ_READ)
-UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers")
+UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
+            "kid_parents", "conn_links")  # 2.531.0 (#4317 F12)
+UMZ_NAMES_MAX = 20  # 2.531.0 (#4317 F12): names in one warning, the rest as a number
 
 
 def umz_more_has(data):
@@ -149,19 +151,65 @@ def _bells(c, run, uid, me_old, data, ts):
             _more(run, "task_watchers", {"task_id": tid})
 
 
-def umz_more_write(c, run, uid, me_old, data):
-    """Inside the run's transaction (the caller commits)."""
+def _names(rows):
+    names = sorted({_txt(r.get("name"), 100) or tr("Unknown") for r in rows})
+    more = len(names) - UMZ_NAMES_MAX
+    return ", ".join(names[:UMZ_NAMES_MAX]) + (f" (+{more})" if more > 0 else "")
+
+
+def _family(c, run, uid, data, ts, salt):
+    """2.531.0 (#4317 F12): the family links and connections of the file, the other person found by the address hash among the
+    accounts the person may see (like the people of the preview). A family link hands a parent the care of a child account: only an
+    admin sets it (Users), so the import never makes one and names who it was with. A connection is asked again: an open request
+    the other person confirms (never a connection without them); one that cannot be asked is named."""
+    fam = [r for r in data.get("kid_parents") or [] if isinstance(r, dict)]
+    if fam:
+        run.warning(N_("Family links do not move along, an admin of this server sets them up again: {0}"), _names(fam))
+    links = [r for r in data.get("conn_links") or [] if isinstance(r, dict)]
+    if not links:
+        return
+    me_ = c.execute("SELECT kid, COALESCE(kind,'user') AS kind FROM users WHERE id=?", (uid,)).fetchone()
+    seen = umz_seen(c, uid, salt) if me_ and not me_["kid"] and me_["kind"] == "user" else {}
+    asked, gone = [], []
+    for r in links:
+        run.step()
+        hit = umz_find(c, uid, r.get("email_hash") if isinstance(r.get("email_hash"), str) else "", seen)
+        o = c.execute("SELECT id FROM users WHERE id=? AND disabled=0 AND kind='user' AND kid=0", (hit["id"],)).fetchone() if hit else None
+        if not o:
+            gone.append(r)
+            continue
+        a, b = sorted((uid, o["id"]))
+        if c.execute("SELECT 1 FROM conn_links WHERE a_id=? AND b_id=? AND deleted_at IS NULL", (a, b)).fetchone() or \
+                c.execute("SELECT 1 FROM conn_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=? AND status='open')",
+                          (uid, o["id"], o["id"], uid)).fetchone():
+            continue  # connected or asked already (a request of mine keeps its state, as when asking again by hand)
+        blocked = c.execute("SELECT 1 FROM conn_blocks WHERE user_id=? AND blocked_id=?", (o["id"], uid)).fetchone()
+        rid = umz_insert(c, "conn_requests", {"from_id": uid, "to_id": o["id"], "status": "hidden" if blocked else "open", "created_at": ts})
+        if rid:
+            _more(run, "conn_requests", rid)
+            asked.append(r)
+        else:
+            gone.append(r)
+    if asked:
+        run.warning(N_("Connections asked again, they count once the other person confirms: {0}"), _names(asked))
+    if gone:
+        run.warning(N_("Connections that do not move along (no account here you may see): {0}"), _names(gone))
+
+
+def umz_more_write(c, run, uid, me_old, data, salt=None):
+    """Inside the run's transaction (the caller commits). salt: the export's people_salt (2.531.0 #4317)."""
     ts = iso(now_utc())
     _bookmarks(c, run, uid, data, ts)
     _pomos(c, run, uid, data, ts)
     _care(c, run, uid, data, ts)
     _layouts(c, run, uid, data, ts)
     _bells(c, run, uid, me_old, data, ts)
+    _family(c, run, uid, data, ts, salt)
 
 
 # what the undo removes: always only the importing person's row
 _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care": "contact_id", "list_layouts": "list_id",
-         "task_bell": "task_id", "task_watchers": "task_id"}
+         "task_bell": "task_id", "task_watchers": "task_id", "conn_requests": "id"}
 
 
 def umz_more_undo(c, uid, cr, since, plan):
@@ -176,6 +224,10 @@ def umz_more_undo(c, uid, cr, since, plan):
         col = _UNDO[table]
         v = key.get(col) if isinstance(key, dict) else key
         if not isinstance(v, int):
+            continue
+        if table == "conn_requests":  # 2.531.0 (#4317 F12): a request still waiting goes, one the other person answered stays
+            if c.execute("DELETE FROM conn_requests WHERE id=? AND from_id=? AND status IN ('open','hidden')", (v, uid)).rowcount == 0:
+                kept += 1 if c.execute("SELECT 1 FROM conn_requests WHERE id=? AND from_id=?", (v, uid)).fetchone() else 0
             continue
         if table == "bookmarks":
             if not plan.goes(table, v):

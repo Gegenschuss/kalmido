@@ -9,6 +9,8 @@
  6. a new office table outside the retention export
  7. an area of the organisation export the import neither maps nor names
  8. 2.464.0 (#3841): every reason is a translated key
+ 9. 2.531.0 (#4317): every table counts (a table without a person column in no list, UMZ_FREE_TABLES stale or holding a person's
+    data, an area not yet in the export without its readable name)
 usage: python3 tests/export_tables_lint_test.py"""
 import importlib.util
 import json
@@ -72,6 +74,17 @@ rc, out = with_edit(("admin", "exportleft.py"), "UMZ_LEFT_TABLES = {\n", 'UMZ_LE
 check(rc == 1 and "zz_gone: stale" in out, f"a reason for a table that is gone is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "exportleft.py"), "UMZ_LEFT_TABLES = {\n", 'UMZ_LEFT_TABLES = {\n    "tasks": _SERVER,\n')
 check(rc == 1 and "tasks: in the account export and in UMZ_LEFT_TABLES" in out, f"exported and left out is a finding: {out[-300:]}")
+# 2.531.0 (#4317 F12, audit #2425): every table counts, not only those with a person column
+rc, out = with_edit(SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", "CREATE TABLE IF NOT EXISTS zz_pairs (\n  a_id BIGINT, b_id BIGINT);\nCREATE TABLE IF NOT EXISTS filters (")
+check(rc == 1 and "zz_pairs: a table but is neither" in out and "UMZ_FREE_TABLES" in out, f"a new table without a person column is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "acctexport.py"), "FROM conn_links l", "FROM users l")
+check(rc == 1 and "conn_links: a table but is neither" in out, f"the connections out of the export are a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "exportleft.py"), "UMZ_FREE_TABLES = {\n", 'UMZ_FREE_TABLES = {\n    "zz_gone": "x",\n')
+check(rc == 1 and "zz_gone: stale in UMZ_FREE_TABLES" in out, f"a table with nobody's data that is gone is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "exportleft.py"), "UMZ_FREE_TABLES = {\n", 'UMZ_FREE_TABLES = {\n    "habits": "x",\n')
+check(rc == 1 and "habits: in UMZ_FREE_TABLES but it holds" in out, f"a table with a person's data named as nobody's is a finding: {out[-300:]}")
+rc, out = with_edit(("admin", "exportleft.py"), '"wiki_versions": "history of knowledge pages",', "")
+check(rc == 1 and "wiki_versions: not yet in the account export but without a readable name" in out, f"an area without a readable name is a finding: {out[-300:]}")
 rc, out = with_edit(("accounts", "settings.py"), '    q = {\n        "lists":', '    q = {\n        "zz_part": ("SELECT * FROM habits", ()),\n        "lists":')
 check(rc == 1 and "zz_part" in out, f"a part the import does not know is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "orgexport.py"), '    ("bookmarks.json", "bookmarks", "org_id=?"),\n',
@@ -83,7 +96,9 @@ spec = importlib.util.spec_from_file_location("i18nkeys", os.path.join(ROOT, "ka
 ik = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(ik)
 keys = ik.reason_keys(ROOT)
-check({"not yet in the account export", "credentials", "the trash", "not yet in the export"} <= set(keys) and not any("not_included" in k for k in keys), f"the reasons are read: {sorted(keys)[:5]}")
+# 2.531.0 (#4317): + the readable names of the areas not yet in the account export (UMZ_LATER_NAMES)
+check({"not yet in the account export", "credentials", "the trash", "not yet in the export",
+       "history of knowledge pages"} <= set(keys) and not any("not_included" in k for k in keys), f"the reasons are read: {sorted(keys)[:5]}")
 with open(os.path.join(ROOT, "static", "i18n", "de.json"), encoding="utf-8") as f:
     de = json.load(f)
 check(not [k for k in keys if k not in de], f"every reason is translated: {[k for k in keys if k not in de][:5]}")

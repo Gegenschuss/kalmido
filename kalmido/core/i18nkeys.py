@@ -29,9 +29,10 @@ def key_sources(root):
 
 def reason_keys(root):
     """2.464.0 (#3841): the reasons why a table stays out of an export (admin/exportleft.py left_lines translates them): plain strings
-    in dicts tools/check_export_tables.py reads without the app, so no N_ there. -> {reason: "file:line"}"""
+    in dicts tools/check_export_tables.py reads without the app, so no N_ there; 2.531.0 (#4317): + the readable names of the areas not
+    yet in the account export (UMZ_LATER_NAMES, the export page). -> {reason: "file:line"}"""
     out = {}
-    for rel, dicts in (("kalmido/admin/exportleft.py", ("UMZ_LEFT_TABLES", "RX_LEFT_TABLES")), ("kalmido/admin/orgexport.py", ("OX_LEFT",))):
+    for rel, dicts in (("kalmido/admin/exportleft.py", ("UMZ_LEFT_TABLES", "RX_LEFT_TABLES", "UMZ_LATER_NAMES")), ("kalmido/admin/orgexport.py", ("OX_LEFT",))):
         path = os.path.join(root, *rel.split("/"))
         if not os.path.exists(path):
             continue

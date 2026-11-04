@@ -14,6 +14,7 @@ _ORG = "data of an organisation or an office: the organisation export, a person'
 _SHARE = "who shares what with whom (a share is made anew on the target)"
 _FILES = "the receipt files of household budgets (their entries are included)"
 _LATER = "not yet in the account export"
+_ASK = "open connection requests (ask again on the target)"  # 2.531.0 (#4317 F12)
 _RX_SECRET = "credentials"
 _RX_WORK = "working data of the office (balances, plans, locks, undo steps, the trash), no record of its own"
 _RX_FILES = "costs and choices behind documents and receipts: the documents and receipts themselves are in the export"
@@ -38,6 +39,13 @@ UMZ_LEFT_TABLES = {
     "fs_log": _LATER, "git_branches": _LATER, "git_folders": _LATER, "issue_reports": _LATER, "kid_rewards": _LATER, "life_trip_costs": _LATER,
     "list_rule_runs": _LATER, "section_templates": _LATER, "sheet_links": _LATER, "shop_memory": _LATER,
     "wiki_spaces": _LATER, "wiki_versions": _LATER,
+    # 2.531.0 (#4317 F12): the tables without a person, organisation, list or task column that still hold a person's data
+    "chat_files": _LATER, "kid_pins": _SECRET, "kid_pin_open": _SECRET, "conn_requests": _ASK,
+    "agent_bridges": _AGENT, "agent_events": _AGENT, "sheet_changes": _AGENT,
+    "cal_events": _DERIVED, "cal_dav_res": _DERIVED, "git_commits": _DERIVED, "git_issue_comments": _DERIVED, "git_issue_gone": _DERIVED,
+    "git_prs": _DERIVED, "git_tags": _DERIVED, "wiki_links": _DERIVED, "doc_words": _DERIVED, "file_words": _DERIVED, "hub_words": _DERIVED,
+    "wiki_words": _DERIVED, "doc_node_tags": _ORG, "space_moves": _SERVER, "push_tags": _SERVER, "notify_channel_queue": _SERVER,
+    "webhook_queue": _SERVER, "webhook_log": _SERVER,
     "clients": _ORG, "doc_cfg": _ORG, "doc_fetch_portals": _ORG, "doc_field_values": _ORG, "doc_fields": _ORG, "doc_meta": _ORG, "doc_rules": _ORG,
     "doc_senders": _ORG, "doc_tags": _ORG, "doc_types": _ORG, "hub_bookings": _ORG, "hub_mail_links": _ORG, "nl_consent_log": _ORG,
     "nl_members": _ORG, "nl_suppress": _ORG, "office_agreements": _ORG, "office_archive": _ORG, "office_archive_log": _ORG, "office_bank_balances": _ORG,
@@ -73,6 +81,29 @@ UMZ_LEFT_TABLES = {
     "groups": _SHARE, "sheet_shares": _SHARE, "tchat_members": _SHARE,
     "list_bell": _VIEW, "list_folder_skip": _VIEW, "list_mine_hide": _VIEW, "rss_reads": _VIEW, "task_seen": _VIEW, "tchat_reads": _VIEW,
     "tchat_thread_reads": _VIEW, "user_task_order": _VIEW, "wait_hidden": _VIEW,
+}
+
+# 2.531.0 (#4317 F12): the readable name of every table that is not yet in the account export (_LATER): the export page names
+# these areas (acctexport.umz_not_included_view), tools/check_export_tables.py checks that each _LATER table has one
+UMZ_LATER_NAMES = {
+    "chat_files": "files of agent chats", "chat_saves": "chat messages saved as tasks", "contact_links": "birthday tasks of contacts",
+    "contact_tasks": "links between contacts and tasks", "ctr_notices": "notices of contracts", "folder_heads": "header strips of folders",
+    "folder_props": "defaults of folders", "fs_log": "access history of private files", "git_branches": "branches of connected repositories",
+    "git_folders": "repositories connected to folders", "issue_reports": "error reports of projects", "kid_rewards": "rewards of the family",
+    "life_trip_costs": "costs of trips", "list_rule_runs": "runs of project rules", "section_templates": "section templates",
+    "sheet_links": "links between tables and tasks", "shop_memory": "remembered shopping items", "wiki_spaces": "spaces of knowledge pages",
+    "wiki_versions": "history of knowledge pages",
+}
+
+# 2.531.0 (#4317 F12): the tables that hold nobody's data (no person, organisation, list or task column and no row that belongs
+# to a person): never in an export, never in not_included. tools/check_export_tables.py holds every other table against the
+# exports and UMZ_LEFT_TABLES
+UMZ_FREE_TABLES = {
+    "admin_alerts": "alerts of this server for its admins", "kalmido_meta": "state of this server's database",
+    "kalmido_migrations": "state of this server's database", "settings": "settings of this server", "mail_counts": "limits of this server",
+    "mail_in_seen": "state of this server's mail intake", "oauth_clients": "programs registered with this server", "orgs": "the organisations: the organisation export",
+    "purged_rows": "record of what was deleted for good", "rate_hits": "limits of this server", "rate_known": "limits of this server",
+    "retention_log": "record of the retention runs of this server", "revoked_creds": "record of revoked sign-ins", "sev_known": "security watch of this server",
 }
 
 # the office tables that are not in the retention export (admin/retexport.py RX_TABLES)
