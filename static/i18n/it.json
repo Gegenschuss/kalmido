@@ -13995,7 +13995,6 @@
   "The new task could not be created, the change was not saved": "Non è stato possibile creare la nuova attività, la modifica non è salvata",
   "The new task could not be created": "Non è stato possibile creare la nuova attività",
   "{0} change of the previous account on this device is not synced yet": ["{0} modifica dell'account precedente su questo dispositivo non è ancora sincronizzata", "{0} modifiche dell'account precedente su questo dispositivo non sono ancora sincronizzate"],
-  "Signing in with another account deletes them. Cancel signs out again: the previous account can then sign in and send them.": "Accedere con un altro account le elimina. Annulla esce di nuovo: l'account precedente può allora accedere e inviarle.",
   "Delete and continue": "Elimina e continua",
   "Files not uploaded: {0}": "File non caricati: {0}",
   "Offline: the files are uploaded once the task is synced": "Offline: i file vengono caricati appena l'attività è sincronizzata",
@@ -16159,5 +16158,7 @@
   "Moved to your own documents": "Spostato nei tuoi documenti",
   "New in the office": "Nuovo in ufficio",
   "This document is not in your office or your own documents": "Questo documento non è né nel tuo ufficio né nei tuoi documenti",
-  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Tutto ciò che l'account vede e che nessun altro permesso copre: progetti, attività, commenti, note, registrazioni del tempo, abitudini, ricerca, la chat del team con i messaggi diretti, clienti con ore e importi, chi è assente e quando, famiglia e casa e vita, approvazioni video, e-mail archiviate presso clienti e progetti"
+  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Tutto ciò che l'account vede e che nessun altro permesso copre: progetti, attività, commenti, note, registrazioni del tempo, abitudini, ricerca, la chat del team con i messaggi diretti, clienti con ore e importi, chi è assente e quando, famiglia e casa e vita, approvazioni video, e-mail archiviate presso clienti e progetti",
+  "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Accedere con un altro account le elimina da questo dispositivo, prima ne viene scaricata una copia come file di testo. Annulla esce di nuovo: l'account precedente può allora accedere e inviarle.",
+  "Your change was not saved ({0}): your text waits here": "La tua modifica non è stata salvata ({0}): il tuo testo ti aspetta qui"
 }

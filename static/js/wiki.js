@@ -83,6 +83,7 @@ async function wk_loadPage(id, force) {
     let p; try { p = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(p); }  // 2.64.3 B (#1817)
     catch (e) { if (!(e instanceof Offline) || !(p = await wko_page(id))) throw e; }  // 2.169.0 (#2671): offline = the page from the copy
     p._v = S.v; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.pgLost = null; WK.space = p.space;
+    if (!WKO.cf[id]) await wko_cfLoad(p.space).catch(() => {});  // 2.527.0 (#4304 A18): a page opened directly shows its waiting draft too
   }
   catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgLost = e.data?.code === 'wiki_unreadable' ? id : null;  // 2.139.0 C (#2386): the message names the way out, deleting stays possible
     WK.pgErr = e.status === 404 ? tr('This page does not exist or you cannot see it.') : e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; if (WK.pg?.id === id) WK.pg = null; }
@@ -658,10 +659,40 @@ document.addEventListener('click', e => {
 // 2.350.0 B (#3147): the field one writes in: the plain text editor or the open block of the live preview (wklive.js)
 const wk_ta = () => /** @type {any} */ ($('#wk-body') || $('#wk-blk'));
 const wk_isTa = t => t?.id === 'wk-body' || t?.id === 'wk-blk';
-function wk_queue() { WK.dirty = true; clearTimeout(WK.saveT); WK.saveT = setTimeout(wk_flush, 1000); }
+function wk_queue() { WK.dirty = true; clearTimeout(WK.saveT); WK.saveT = setTimeout(wk_flush, 1000); wk_preseal(); }
+// 2.527.0 (#4304 A2): the page goes away (tab closed, reload): what was typed and not saved yet goes into the queue at once
+// (synchronously, outStash) and out with keepalive under the same key (core.js keepSend; the server applies it once). An
+// encrypted space never stores or sends its text in clear: its cipher is made while typing (wk_preseal, after every seal kept
+// in WK.seal), the pagehide takes the newest one - sealing only at the pagehide would come too late (async, the page is gone).
+const wk_src = p => $('#wk-body') || (typeof wklv_src === 'function' ? wklv_src(p) : null);
+function wk_preseal() {
+  const p = WK.pg; if (!p || !wk_e2e(p.space) || typeof wkeReady !== 'function' || !wkeReady(p.space)) return;
+  clearTimeout(WK.sealT);
+  WK.sealT = setTimeout(async () => {
+    const b = wk_src(p); if (!b || WK.pg !== p) return;
+    const plain = b.value;
+    try { const o = await wkeSeal(p.space, {body: plain}); WK.seal = {id: p.id, plain, c: o.body}; } catch { /* locked meanwhile */ }
+  }, 150);
+}
+function wk_stash() {
+  const p = WK.pg, b = wk_src(p); if (!p || !WK.dirty || !b || b.value === p.body) return;
+  let body = b.value, part = false;
+  if (wk_e2e(p.space)) {
+    const s = WK.seal; if (!s || s.id !== p.id || s.plain === p.body) { wk_flush(true); return; }  // no cipher yet: as before
+    body = s.c; part = s.plain !== b.value;  // the last moment's letters may not be sealed yet: the newest cipher now, the rest below
+  }
+  clearTimeout(WK.saveT);
+  const url = '/api/wiki/pages/' + p.id, e = {method: 'PATCH', url, body: {body, expect_updated_at: p.updated_at}, uid: S.me?.id, k: outKey()};
+  // a change of the page still waiting goes first: then this one waits behind it (sent at the next start, rebased by wkoSent)
+  const behind = outSync().some(x => !x.done && x.url === url);
+  outStash([e]);
+  if (!behind && OUT.online && !p._off) keepSend(e.method, url, e.body, e.k);
+  p.body = part ? WK.seal.plain : b.value;
+  if (part) wk_flush(true); else WK.dirty = false;
+}
 async function wk_flush(hide) {
   clearTimeout(WK.saveT);
-  const p = WK.pg, b = $('#wk-body') || (typeof wklv_src === 'function' ? wklv_src(p) : null); if (!p || !WK.dirty) return;  // 2.350.0 B (#3147): + the live preview
+  const p = WK.pg, b = wk_src(p); if (!p || !WK.dirty) return;  // 2.350.0 B (#3147): + the live preview
   WK.dirty = false;
   if (!b || b.value === p.body) return;
   const patch = {body: b.value, expect_updated_at: p.updated_at}, url = '/api/wiki/pages/' + p.id;
@@ -671,12 +702,21 @@ async function wk_flush(hide) {
     const r = await wkeApi('PATCH', url, patch, p.space);  // 2.501.0 (#4198): wikie2e.js runs first in this module, no way around it  // 2.64.3 B (#1817)
     Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
     wko_keep(p.space, r);
+    if (WKO.cf[p.id]?.why) { wko_del(WKO.cf[p.id].k); delete WKO.cf[p.id]; }  // 2.527.0 (#4304 A18): saved now, the draft goes
     wk_savedHint(tr('Saved'));
   } catch (e) {
     if (e.status === 409 && e.data?.page) { wk_conflict(p, e.data.page, patch); return; }
     if (e instanceof Offline) { await wko_queue(p, patch); return; }
     WK.dirty = true; toast(e.message);
+    if (e.message !== 'auth' && e.status >= 400 && e.status < 500) await wko_draft(p, patch.body, e.message).catch(() => {});  // 2.527.0 (#4304 A18)
   }
+}
+// 2.527.0 (#4304 A18): a text the server refused (403 no right any more, 413 too large, ...) waits at the page as a draft (the
+// copy's waiting record, wko_cfHtml, kept over a reload of the page), not only in the field: an encrypted space keeps its cipher
+async function wko_draft(p, body, why) {
+  const mine = wk_e2e(p.space) ? (await wkeSeal(p.space, {body})).body : body;
+  WKO.cf[p.id] = {k: 'x:' + p.id, id: p.id, sp: p.space, mine, why, at: new Date().toISOString()};
+  await wko_put(WKO.cf[p.id]);
 }
 function wk_savedHint(t) { const s = $('#wk-saved'); if (s) { s.textContent = t; setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 2500); } }
 // true = settled (mine saved or theirs taken), false = mine could not be saved, null = closed without a choice (as before: theirs shown)
@@ -1201,7 +1241,8 @@ async function wkoReject(e, err) {
 async function wko_cfLoad(sp) { for (const r of await wko_pre('x:')) if (r.sp === sp && r.uid === S.me?.id) WKO.cf[r.id] = r; }
 function wko_cfHtml(p) {
   if (!WKO.cf[p.id]) return '';
-  return `<div class="cfbar wkocf" role="status"><span>${esc(tr('Your offline change was not saved: the page was changed elsewhere in the meantime'))}</span><button type="button" class="btn sm" data-wk="cfshow">${tr('Compare')}</button></div>`;
+  const why = WKO.cf[p.id].why;  // 2.527.0 (#4304 A18): refused by the server (wko_draft)
+  return `<div class="cfbar wkocf" role="status"><span>${esc(why ? tr('Your change was not saved ({0}): your text waits here', why) : tr('Your offline change was not saved: the page was changed elsewhere in the meantime'))}</span><button type="button" class="btn sm" data-wk="cfshow">${tr('Compare')}</button></div>`;
 }
 async function wko_cfShow(p) {
   const r = WKO.cf[p.id]; if (!r) return;
@@ -1230,7 +1271,7 @@ async function wko_syncAll() {
 window.addEventListener('online', () => setTimeout(wko_syncAll, 3000));
 // a text typed within the last second is not lost when the tab goes away
 document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_flush(true); });
-window.addEventListener('pagehide', () => { if (WK.dirty) wk_flush(true); });
+window.addEventListener('pagehide', () => { if (WK.dirty) wk_stash(); });  // 2.527.0 (#4304 A2): synchronously, see wk_stash
 // 2.210 B (#2757): a right click / long press on a row of the folder list = its "…" menu (2.200.0 #2747, wk_nodeItems)
 const wk_lpS = cm_bind('#view .wkrow', r => {
   const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (!a) return false;
