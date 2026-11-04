@@ -55,31 +55,51 @@ const until = async (fn, n = 80) => { for (let i = 0; i < n; i++) { const x = aw
   check(m(A, {who: ['me'], text: 'crash'}) && !m(Bt, {who: ['me'], text: 'crash'}) && m(Bt, {op: 'or', who: ['me'], text: 'crash'}), 'AND / OR with the new rules');
   check(m(C, {}) && m(C, {who: [], text: '  '}), 'empty rules match everything');
 
-  // the dialog
+  // the dialog; 2.521.0 (#4479): condition rows (was: one chip row per category) - the same values in the value menus
   w.eval('filterModal()');
-  const md = await until(() => d.querySelector('.modal #f-text') && d.querySelector('.modal'));
-  const vals = k => [...md.querySelectorAll(`.fchips[data-key="${k}"] button`)].map(b => b.dataset.v);
-  check(vals('who').join(',') === 'me,none', `Assignee chips ${vals('who')}`);
-  check(vals('secs').includes(String(SEC)) && vals('secs').at(-1) === 'none', `Column chips ${vals('secs')}`);
-  check(vals('sprints').join(',') === 'cur,none', `Sprint chips ${vals('sprints')}`);
-  check(vals('ms').join(',') === `${M},none`, `Milestone chips ${vals('ms')}`);
-  const h4 = [...md.querySelectorAll('h4')].map(x => x.textContent.trim());
-  check(['Assignee', 'Column', 'Sprint', 'Milestone', 'Text'].every(x => h4.includes(x)), `the headings ${h4}`);
+  const md = await until(() => d.querySelector('.modal #f-conds') && d.querySelector('.modal'));
+  const change = (el, v) => { el.value = v; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
+  const vals = async k => {
+    click(w, md.querySelector('[data-m="cond-add"]'));
+    const r = [...md.querySelectorAll('.fcond')].pop(); change(r.querySelector('.fc-f'), k);
+    click(w, [...md.querySelectorAll('.fcond')].pop().querySelector('.fc-v'));
+    const p = await until(() => d.querySelector('#pop:not(.hidden) [role="menuitemcheckbox"]') && d.querySelector('#pop'));
+    const o = p ? [...p.querySelectorAll('[role="menuitemcheckbox"]')].map(b => b.textContent.trim()) : [];
+    w.eval('closePop()'); click(w, [...md.querySelectorAll('.fcond')].pop().querySelector('.fc-x'));
+    return o;
+  };
+  check((await vals('who')).join(',') === 'Me,Nobody', 'Assignee values');
+  const sv = await vals('sec');
+  check(sv.includes('Product › Doing') && sv.at(-1) === 'No column', `Column values ${sv}`);
+  check((await vals('sprint')).join(',') === 'Current sprint,Backlog', 'Sprint values');
+  check((await vals('ms')).join(',') === 'Release one,No milestone', 'Milestone values');
+  const whats = [...md.querySelectorAll('.fc-f option')].map(x => x.textContent.trim());
+  click(w, md.querySelector('[data-m="cond-add"]'));
+  const wh = [...md.querySelectorAll('.fcond .fc-f option')].map(x => x.textContent.trim());
+  check(!whats.length && ['Assignee', 'Column', 'Sprint', 'Milestone', 'Text'].every(x => wh.includes(x)), `what offers ${wh}`);
   const cnt = () => md.querySelector('#f-count').textContent;
-  click(w, md.querySelector('.fchips[data-key="who"] button[data-v="me"]'));
-  check(md.querySelector('.fchips[data-key="who"] button[data-v="me"]').classList.contains('on') && /\b1 open task\b/.test(cnt()), `a chip: on + count ${cnt()}`);
-  input(w, md.querySelector('#f-text'), 'nothing like this');
-  check(/\b0 open tasks\b/.test(cnt()), `the text narrows the count ${cnt()}`);
-  input(w, md.querySelector('#f-text'), 'crash');
+  change(md.querySelector('.fcond .fc-f'), 'who');
+  click(w, md.querySelector('.fcond .fc-v'));
+  const p1 = await until(() => d.querySelector('#pop:not(.hidden) [role="menuitemcheckbox"]') && d.querySelector('#pop'));
+  click(w, p1 && [...p1.querySelectorAll('[role="menuitemcheckbox"]')].find(b => b.textContent.trim() === 'Me'));
+  w.eval('closePop()');
+  check(/\b1 task matches\b/.test(cnt()), `a value: count ${cnt()}`);
+  click(w, md.querySelector('[data-m="cond-add"]'));
+  change([...md.querySelectorAll('.fcond')].pop().querySelector('.fc-f'), 'text');
+  const tx = () => md.querySelector('.fcond .fc-t');
+  input(w, tx(), 'nothing like this');
+  check(/\b0 tasks match\b/.test(cnt()), `the text narrows the count ${cnt()}`);
+  input(w, tx(), 'crash');
   md.querySelector('#f-name').value = 'Mine';
   click(w, md.querySelector('[data-m="save"]'));
   const f = await until(async () => ((await call('GET', '/api/state')).filters || []).find(x => x.name === 'Mine'));
-  check(f && JSON.stringify(f.rules.who) === '["me"]' && f.rules.text === 'crash', `saved with the new rules ${JSON.stringify(f && f.rules)}`);
+  const cs = (f && f.rules.conds) || [];
+  check(f && JSON.stringify(cs[0]) === '{"f":"who","op":"in","v":["me"]}' && cs[1].f === 'text' && cs[1].v === 'crash', `saved with the new rules ${JSON.stringify(f && f.rules)}`);
   check(await until(() => w.location.hash === '#f/' + (f && f.id)), `the saved filter opens ${w.location.hash}`);
   // reopening shows the choices
   w.eval(`filterModal(${f && f.id})`);
-  const md2 = await until(() => [...d.querySelectorAll('.modal')].find(x => x.querySelector('#f-text')));
-  check(md2 && md2.querySelector('#f-text').value === 'crash' && md2.querySelector('.fchips[data-key="who"] button[data-v="me"]').classList.contains('on'), 'reopened: text and chip kept');
+  const md2 = await until(() => [...d.querySelectorAll('.modal')].find(x => x.querySelector('#f-conds .fc-t')));
+  check(md2 && md2.querySelector('.fc-t').value === 'crash' && /Me/.test(md2.querySelector('.fc-v').textContent), 'reopened: text and value kept');
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   console.log(`${ok} ok, ${F.length} failed`);

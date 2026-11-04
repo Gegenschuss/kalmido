@@ -198,23 +198,30 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   const order = [...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).filter(x => [t1, t2, t3].includes(x));
   check(order.join() === [t1, t2, t3].join(), 'sorted by budget: 99, 1234.5, 5000: ' + order);
 
-  // ================= filter with a custom field
-  w.eval('filterModal()'); await sleep(200);
-  md = lastModal(d);
-  check(md.querySelector(`.fchips[data-cf="${FS.id}"]`) && md.querySelector(`[data-cfnum="${FB.id}"]`), 'filter dialog: custom field conditions');
+  // ================= filter with a custom field; 2.521.0 (#4479): condition rows (was: chips per field)
+  w.eval('filterModal()');
+  md = await until(() => { const m = lastModal(d); return m && m.querySelector('#f-conds') && m; });
+  md.querySelector('[data-m="cond-add"]').click();
+  const fopt = n => [...md.querySelectorAll('.fcond .fc-f option')].find(o => o.textContent === n);
+  check(fopt('Stage') && fopt('Budget'), 'filter dialog: custom field conditions');
   md.querySelector('#f-name').value = 'Doing';
-  md.querySelector(`.fchips[data-cf="${FS.id}"] [data-v="${OPT.Doing}"]`).click();
-  check(/matches 1 open task/.test(md.querySelector('#f-count').textContent), 'filter count: 1');
-  md.querySelector('[data-m="save"]').click(); await sleep(800);
-  check([...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).join() === String(t2), 'filter view: only the task with Stage = Doing');
+  change(w, md.querySelector('.fcond .fc-f'), fopt('Stage').value);
+  md.querySelector('.fcond .fc-v').click();
+  let vp = await until(() => d.querySelector('#pop:not(.hidden) [role="menuitemcheckbox"]') && d.querySelector('#pop'));
+  [...vp.querySelectorAll('[role="menuitemcheckbox"]')].find(b => b.textContent.trim() === 'Doing').click(); w.eval('closePop()');
+  check(/\b1 task matches/.test(md.querySelector('#f-count').textContent), 'filter count: 1');
+  md.querySelector('[data-m="save"]').click(); await until(() => !lastModal(d) || !lastModal(d).querySelector('#f-conds'));
+  check(await until(() => [...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).join() === String(t2)), 'filter view: only the task with Stage = Doing');
   const fl = (await call('GET', '/api/state')).filters[0];
-  check(fl.rules.cf && fl.rules.cf[FS.id].sel[0] === OPT.Doing, 'filter rule stored');
-  w.eval(`filterModal(${fl.id})`); await sleep(200); md = lastModal(d);
-  md.querySelector(`.fchips[data-cf="${FS.id}"] [data-v="${OPT.Doing}"]`).click();
-  change(w, md.querySelector(`[data-cfnum="${FB.id}"]`), 'gt'); input(w, md.querySelector(`[data-cfnumv="${FB.id}"]`), '1000');
-  check(/matches 2 open tasks/.test(md.querySelector('#f-count').textContent), 'number filter > 1000: 2 tasks');
-  md.querySelector('[data-m="save"]').click(); await sleep(800);
-  check([...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).sort().join() === [t2, t3].sort().join(), 'filter view: budget > 1000');
+  check(fl.rules.conds && fl.rules.conds[0].name === 'Stage' && fl.rules.conds[0].v[0] === 'Doing', 'filter rule stored');
+  w.eval(`filterModal(${fl.id})`); md = await until(() => { const m = lastModal(d); return m && m.querySelector('#f-conds .fcond') && m; });
+  md.querySelector('.fcond .fc-x').click();
+  md.querySelector('[data-m="cond-add"]').click();
+  change(w, md.querySelector('.fcond .fc-f'), [...md.querySelectorAll('.fcond .fc-f option')].find(o => o.textContent === 'Budget').value);
+  change(w, md.querySelector('.fcond .fc-op'), 'gt'); input(w, md.querySelector('.fcond .fc-n'), '1000');
+  check(/\b2 tasks match/.test(md.querySelector('#f-count').textContent), 'number filter > 1000: 2 tasks');
+  md.querySelector('[data-m="save"]').click(); await until(() => !lastModal(d) || !lastModal(d).querySelector('#f-conds'));
+  check(await until(() => [...d.querySelectorAll('#view .trow')].map(r => +r.dataset.id).sort().join() === [t2, t3].sort().join()), 'filter view: budget > 1000');
 
   // ================= offline field edit + duplicate + template dialog
   w.location.hash = 'l/' + WORK; await sleep(300);

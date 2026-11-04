@@ -186,8 +186,16 @@ async function firefox(fn) {
   const pq = w.eval(`JSON.stringify(parseQuick('Login broken !bug tomorrow'))`);
   check(JSON.parse(pq).ttype === 'bug' && JSON.parse(pq).title === 'Login broken', 'quick add: !bug');
   check(JSON.parse(w.eval(`JSON.stringify(parseQuick('Neues Menü !funktion'))`)).ttype === 'feature', 'quick add: !funktion');
-  w.eval(`filterModal()`); await sleep(150);
-  check([...d.querySelectorAll('.fchips[data-key="types"] button')].length === 4, 'filter: ticket types');
+  // 2.521.0 (#4479): the dialog has condition rows: Ticket type in "what", its four values in the value menu (was: four chips)
+  w.eval(`filterModal()`);
+  const fmd = await until(() => d.querySelector('.modal [data-m="cond-add"]') && d.querySelector('.modal [data-m="cond-add"]').closest('.modal'));
+  click(w, fmd && fmd.querySelector('[data-m="cond-add"]'));
+  const fsel = fmd && fmd.querySelector('.fcond .fc-f');
+  if (fsel) { fsel.value = 'type'; change(w, fsel); }
+  click(w, fmd && fmd.querySelector('.fcond .fc-v'));
+  const tpop = await until(() => d.querySelector('#pop:not(.hidden) [role="menuitemcheckbox"]') && d.querySelector('#pop'));
+  check(tpop && tpop.querySelectorAll('[role="menuitemcheckbox"]').length === 4, 'filter: ticket types');
+  w.eval('closePop()');
   check(w.eval(`filterMatch(taskById(${BUG}), {types: ['bug']}) && !filterMatch(taskById(${BUG}), {types: ['feature']})`), 'filter matches the type');
   [...d.querySelectorAll('.modal')].forEach(x => x.remove());
   w.close();
