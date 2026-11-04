@@ -32,7 +32,7 @@ from .formula import (SH_BOOLS, SH_FUNCS, SH_RAW_MAX, SH_TEXT_BUDGET, ShErr, ShE
 from .shfuncs import SHF_HELP
 from .vars import (SH_HERE_WORDS, SH_VAR_TYPE, sh_field_key, sh_field_word, sh_fields_of, sh_here_value, sh_here_word, sh_slug_of, sh_id_of,
                    sh_source, sh_var_value, sh_var_word)
-from .shkinds import SHK_KINDS, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
+from .shkinds import SHK_KINDS, _shk_file_swap, shk_plain, shk_raw  # 2.124.0 B (#2110): checkbox, person, link, file
 from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_display, shb_internal, shb_only_books, shb_pairs, shb_rights_row,
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
@@ -1354,12 +1354,19 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
     since, added rows / columns go to the trash, a sheet the call created goes to the trash. -> number of changes undone."""
     rows = c.execute("SELECT * FROM sheet_changes WHERE sheet_id=? AND batch=? AND undone_at IS NULL ORDER BY id DESC",
                      (sheet_row["id"], batch)).fetchall()
-    ts, n = iso_ms(now_utc()), 0
+    ts, n, book = iso_ms(now_utc()), 0, None
     for r in rows:
         if r["kind"] == "cell":
-            x = c.execute("SELECT raw FROM sheet_cells WHERE id=?", (r["cell_id"],)).fetchone()
+            x = c.execute("SELECT x.raw, x.row_id, x.col_id, k.kind FROM sheet_cells x JOIN sheet_columns k ON k.id=x.col_id "
+                          "WHERE x.id=?", (r["cell_id"],)).fetchone()
             if not x or x["raw"] != (r["new_raw"] or ""):
                 continue  # changed again since: the newer input stays
+            if x["kind"] == "file":  # 2.519.0 (#4386): the former file comes back out of the trash, the displaced one goes in
+                book = book or ShBook(c, sheet_row)
+                _shk_file_swap(c, book, x["col_id"], x["row_id"], (r["old_raw"] or "").strip())
+                y = book.at.get((x["row_id"], x["col_id"]))
+                if y is not None:
+                    y["raw"] = r["old_raw"] or ""  # the next change of this call sees the cell as it is now
             c.execute("UPDATE sheet_cells SET raw=?, frozen=0, frozen_value=NULL, updated_by=?, updated_at=?, agent_id=NULL, agent_batch=NULL "
                       "WHERE id=?", (r["old_raw"] or "", uid, ts, r["cell_id"]))
         elif r["kind"] in ("row", "col", "create") and shx_undo_keeps(c, sheet_row, r, batch, uid, ts, kept):
