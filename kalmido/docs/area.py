@@ -198,7 +198,7 @@ def ar_sort_queued(c, nid):
             _set(c, nid, to, "auto")
         c.commit()
         return
-    with system_ctx(c):
+    with system_ctx(c):  # docs queue (no request): the sorting state of the person's own document / their office role
         back = is_org_admin(c, uid, off[2])
     if not back:
         # review 2.522 (1, 2): out of an organisation only its admin moves a file (accounts/orgout.py org_out_ok), so for a
