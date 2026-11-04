@@ -89,6 +89,8 @@ check(r.status_code == 403 and (r.json() if r.headers.get("Content-Type", "").st
 Y = kt.sess(None)
 r, q = start(Y)
 check(bool(q) and Y.cookies.get("kalmido_oidc"), f"another browser starts the sign-in ({r.status_code})")
+for ck in [k for k in X.cookies if k.name == "kalmido_oidc"]:  # only the carried-over binding (no own start before)
+    X.cookies.clear(ck.domain, ck.path, ck.name)
 X.cookies.set("kalmido_oidc", Y.cookies.get("kalmido_oidc"), path="/api/auth/oidc")
 r = X.get(B + "/api/auth/oidc/callback", params={"code": give_code(q, CLAIMS), "state": q.get("state", "")}, allow_redirects=False)
 check(r.status_code == 303 and "login-error=support" in r.headers.get("Location", ""), f"#4363: the callback with the support cookie is refused ({r.status_code} {r.headers.get('Location')})")
