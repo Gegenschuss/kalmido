@@ -1361,7 +1361,9 @@ the browsers then send nothing.
   attached as `.eml`. Off by default.
 - **Replies become comments (2.393.2).** A reply to a mail that made a task (In-Reply-To / References), to a notification
   about one task or to an answer Kalmido sent the reporter becomes a comment of that task instead of a new task, the quoted
-  part cut off. Only the reporter's address or a person who sees the task may comment this way; other senders get a new task
+  part cut off. Only the reporter's address or a person who sees the task may comment this way, and without the signed reply
+  address only through a personal address (`tasks+<token>@…`) whose account sees the task: a sender address alone, as with
+  *mails from me*, can be forged and is no comment (#4071). Other senders get a new task
   with the note "Reply to #N, sender not allowed". The reply address (`tasks+r<id>x<signature>@…`) is signed with the server
   key and bound to its recipient, so the mailbox needs plus addressing as for the personal addresses. In the comment field
   *Also by e-mail to the reporter* sends a comment back (through the workspace mailbox when it has SMTP, else

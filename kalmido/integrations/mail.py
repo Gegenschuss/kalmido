@@ -203,26 +203,26 @@ def mail_text(msg, limit=MAIL_BODY_MAX, att_images=False):
 
 
 def mail_target(c, msg):
-    """(user id, list id or None) the mail is for, or (None, None): a token in To / Cc / Delivered-To / X-Original-To, else
-    (mail_from_me) the sender's address of a person who allowed that."""
+    """(user id, list id or None, how) the mail is for, or (None, None, None): how "token" = a token in To / Cc / Delivered-To /
+    X-Original-To, how "from" = (mail_from_me) the sender's address of a person who allowed that, which anyone can forge."""
     hdrs = " ".join(str(msg.get_all(h, [])) for h in ("To", "Cc", "Delivered-To", "X-Original-To", "Envelope-To"))
     for tok in MAIL_TOKEN_RE.findall(hdrs):
         r = c.execute("SELECT * FROM mail_tokens WHERE token=?", (tok,)).fetchone()
         if r:
             u = c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
             if not u or u["disabled"]:
-                return None, None
+                return None, None, None
             if r["list_id"] and le2b_list_locked(c, r["list_id"]):
-                return None, None  # 2.64.1 B (#1817): a list with the lock takes no mail (like an unknown address)
+                return None, None, None  # 2.64.1 B (#1817): a list with the lock takes no mail (like an unknown address)
             if r["list_id"] and list_role(c, r["list_id"], r["user_id"]) not in WRITE_ROLES:
-                return r["user_id"], None  # no longer allowed in that list: the inbox
-            return r["user_id"], r["list_id"]
+                return r["user_id"], None, "token"  # no longer allowed in that list: the inbox
+            return r["user_id"], r["list_id"], "token"
     sender = email.utils.parseaddr(str(msg.get("From", "")))[1].strip().lower()
     if sender:
         for r in c.execute("SELECT u.id FROM users u JOIN user_settings s ON s.user_id=u.id AND s.key='mail_from_me' AND s.value='1' "
                            "WHERE lower(u.email)=? AND u.disabled=0", (sender,)):
-            return r[0], None
-    return None, None
+            return r[0], None, "from"
+    return None, None, None
 
 
 MAIL_TASK_HOOK = {}  # 2.393.2 B (#3375): integrations/taskmail.py (take = a reply becomes a comment, keep = store a Message-ID)
@@ -264,12 +264,12 @@ def mail_import(c, raw, pre=None):
     mid = str(msg.get("Message-ID", "")).strip()[:300] or ("sha:" + hashlib.sha256(raw).hexdigest())
     if c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("mail:" + mid,)).fetchone():
         return MAIL_DROP
-    uid, lid = mail_target(c, msg)
+    uid, lid, how_to = mail_target(c, msg)
     hint = ""
     if MAIL_TASK_HOOK and not mid.startswith("sha:"):  # 2.393.2 B (#3375): a reply to a task -> its comment (or a note)
         if c.execute("SELECT 1 FROM task_mail WHERE msg_id=? AND kind IN ('src','in')", (mid,)).fetchone():
             return MAIL_DROP
-        how, val = MAIL_TASK_HOOK["take"](c, msg, mid, uid)
+        how, val = MAIL_TASK_HOOK["take"](c, msg, mid, uid, how_to)
         if how == "comment":
             c.commit()
             return val

@@ -22,6 +22,7 @@ freelancer-matrix: mail
    2 a reply never makes its sender the reporter ('src' only); 3 no addresses on 'in' / 'out' rows; 4 a person's reply address
    names the account; 5 the quote patterns stay fast on a long line; 6 only well-formed Message-IDs are stored; 7 the mail to
    the reporter keeps paragraphs; 8 a reply whose file cannot be stored stays in the mailbox (MailKept)
+ - #4071: a forged From of a person with "mails from me" on, without a token in the address, is no comment (a note task instead)
 usage: p2393_2_b_api_test.py <datadir>"""
 import email
 import email.message
@@ -249,6 +250,15 @@ M11 = mail(REP, CA, "Re: Printer is broken", "Forged through another account.", 
 t11 = poll(lambda: task_of(M11))
 check(len(comments(T1)) == n1, f"review 1: an address whose account does not see the task makes no comment {comments(T1)[n1:]}")
 check(bool(t11) and f"Reply to #{T1}, sender not allowed" in (t11[1] or ""), f"review 1: a new task with the note instead {t11}")
+# #4071: a forged From of a person with "mails from me" on (she sees T1), no token in the address, the Message-ID of T1: no
+# comment and no News for the task's people; the import still makes her a task, with the note
+check(Bo.patch(B + "/api/settings", json={"mail_from_me": "1"}).ok, "#4071: mails from me on")
+n1 = len(comments(T1))
+M4071 = mail("Bea <bea@example.com>", "tasks@example.test", "Re: Printer is broken", "Forged, with the id of a mail of the task.", "<p23932b-4071@example.org>", reply=M1)
+t4071 = poll(lambda: task_of(M4071))
+check(len(comments(T1)) == n1, f"#4071: From alone (mail_from_me) makes no comment {comments(T1)[n1:]}")
+check(bool(t4071) and f"Reply to #{T1}, sender not allowed" in (t4071[1] or ""), f"#4071: a new task with the note instead {t4071}")
+Bo.patch(B + "/api/settings", json={"mail_from_me": "0"})
 # 2: a member's reply to a notification about a task made on the web: a comment, but the member never becomes the reporter
 OUT2 = "<p23932b-out2@example.test>"
 wr("INSERT INTO task_mail(task_id,msg_id,sender,kind,created_at) VALUES(?,?,?,?,?)", (Tn, OUT2, "", "out", "2026-11-02T10:00:00Z"))

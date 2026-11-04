@@ -146,18 +146,19 @@ def tmr_who(c, tid, sender, tu=0):
     return sender == tmr_reporter(c, tid), None
 
 
-def tmr_take(c, msg, mid, uid):
+def tmr_take(c, msg, mid, uid, how_to=None):
     """mail_import's step before a new task (mail.py MAIL_TASK_HOOK): ('comment', task id) when the mail became a comment,
     ('note', text) for the new task when it answers a task but may not comment, (None, '') otherwise. uid = the person the
-    import would give the mail to (None = no address the import takes)."""
+    import would give the mail to (None = no address the import takes), how_to = how it found them (mail_target: "token" / "from")."""
     sender = _addr(msg.get("From"))
     tid, signed, tu = tmr_find(c, msg, sender)
     if not tid:
         return None, ""
     ok, who = tmr_who(c, tid, sender, tu)
     # 2.393.2 F (#3375): review 1 - by In-Reply-To alone only when the account of the address the mail went to sees the task (the
-    # reporter answers to the address their mail went to): an address of another account never leads into a task it does not see
-    if ok and (signed or (uid and task_visible(c, tid, uid, full=True))):  # in a person's name only through the signed address
+    # reporter answers to the address their mail went to): an address of another account never leads into a task it does not see.
+    # #4071: only a token in the address counts; "from" (mail_from_me) comes from the sender's address, which anyone can forge
+    if ok and (signed or (uid and how_to == "token" and task_visible(c, tid, uid, full=True))):  # in a person's name only through the signed address
         return "comment", tmr_comment(c, msg, mid, tid, sender, who)
     lg = lang(c, uid) if uid else "en"
     return "note", tr("Reply to #{0}, sender not allowed", tid, lg=lg)

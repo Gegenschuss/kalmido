@@ -275,7 +275,8 @@ raw = "From: someone@example.com\r\nTo: x+tok264c@example.com\r\nSubject: hello\
 dbx("INSERT INTO mail_tokens(token,user_id,list_id,created_at) VALUES(?,?,?,?)", ("tok264c", 1, L, "2026-01-01T00:00:00Z"), write=True)
 rc, out, er = py("from kalmido.integrations.mail import mail_target\nimport email, email.policy\nc=app.connect()\n"
                  f"m=email.message_from_bytes({raw.encode()!r}, policy=email.policy.default)\nprint(mail_target(c, m))")
-check(rc == 0 and out.endswith("(None, None)"), f"mail to the locked list's address: nobody (like an unknown address) {out} {er}")
+# #4071: mail_target also names how it found the person
+check(rc == 0 and out.endswith("(None, None, None)"), f"mail to the locked list's address: nobody (like an unknown address) {out} {er}")
 j = A.get(B + "/api/me/mail").json()
 x = [y for y in j.get("lists") or [] if y.get("list_id") == L]
 check(not x or (x[0].get("e2e") is True and x[0].get("address") == ""), f"mail dialog: the address is off {x}")
