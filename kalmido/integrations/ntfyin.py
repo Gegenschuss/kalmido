@@ -181,8 +181,10 @@ def ni_person(uid):
     """One person on a worker thread, with an own connection: poll, then count success or failure (backoff as before)."""
     c = connect()
     try:
-        r = c.execute("SELECT n.* FROM ntfy_inboxes n JOIN users u ON u.id=n.user_id WHERE n.user_id=? AND n.enabled=1 AND u.disabled=0",
-                      (uid,)).fetchone()
+        with GATE.bg():  # 2.506.1 (#3377): read in the gate and commit: no open transaction (locks) while GATE.bg() below waits for a restore (git_loop)
+            r = c.execute("SELECT n.* FROM ntfy_inboxes n JOIN users u ON u.id=n.user_id WHERE n.user_id=? AND n.enabled=1 AND u.disabled=0",
+                          (uid,)).fetchone()
+            c.commit()
         if not r:
             return
         try:

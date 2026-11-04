@@ -934,13 +934,16 @@ def cal_loop():
         try:
             c = connect()
             try:
-                rows = c.execute("""SELECT s.id, s.tried_at, s.interval, s.fails FROM cal_subs s JOIN users u ON u.id=s.user_id
-                                    WHERE u.disabled=0 ORDER BY s.tried_at IS NOT NULL, s.tried_at""").fetchall()
+                with GATE.bg():  # 2.506.1 (#3377): read in the gate and commit: no open transaction (locks) while GATE.bg() below waits for a restore (git_loop)
+                    rows = c.execute("""SELECT s.id, s.tried_at, s.interval, s.fails FROM cal_subs s JOIN users u ON u.id=s.user_id
+                                        WHERE u.disabled=0 ORDER BY s.tried_at IS NOT NULL, s.tried_at""").fetchall()
+                    c.commit()
                 now = now_utc()
                 for r in rows:
                     if cal_due(r, now):
                         with GATE.bg():
                             cal_sync(c, r["id"])
+                            c.commit()
                 contacts_due(c)  # 2.19.0 (#653): address books, once a day
             finally:
                 c.close()

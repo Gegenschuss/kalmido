@@ -600,6 +600,28 @@ check(sync(A, TK, issue_sync=False).ok, "D8: off")
 r = sync(A, TK, token=TOK_RW, issue_sync=True)
 check(r.ok and (r.json().get("issue_state") or {}).get("rw") == "write", f"D6: the new token is checked: {r.text[:200]}")
 
+# ---- 2.506.1 (CI red of 2.506.0, signin_ui): a restore while the git loop runs every second. The loop read git_conns / lists
+# and then waited at the gate for the restore with that read still open; pg_restore --clean waited for its locks and the
+# server stayed in maintenance (503) for good. Two rounds: the loop meets the restore's window in each (tick 1 s).
+def manual():
+    return [x for x in A.get(B + "/api/admin/backups").json().get("items", []) if x["kind"] == "manual"]
+
+
+for rnd in (1, 2):
+    n0 = len(manual())
+    r = A.post(B + "/api/admin/backups")
+    check(r.status_code == 202, f"restore {rnd}: back up now {r.text[:100]}")
+    # the backup of this round is written and nothing runs any more (else the restore answers "busy")
+    bk = until(lambda: len(manual()) > n0 and not A.get(B + "/api/admin/backups").json().get("running") and manual(), 30) or [{"name": ""}]
+    try:
+        r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "confirm": "RESTORE", "name": bk[0]["name"]}, timeout=120)
+        ok = r.ok and r.json().get("ok")
+    except requests.RequestException as e:
+        r, ok = None, False
+        print("restore", rnd, type(e).__name__)
+    check(ok, f"restore {rnd}: done while the git loop runs (no wait on its locks): {r.text[:200] if r is not None else 'no answer in 120 s'}")
+    check(until(lambda: A.get(B + "/api/state").status_code == 200, 20), f"restore {rnd}: the server answers again (no 503)")
+
 # ---- no token anywhere
 check(not any(t in x for x in SEEN for t in (GHTOK, GLTOK, FTOK, TOK_TRI, TOK_RW)), "no access token in any answer")
 log = subprocess.run(["docker", "logs", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout

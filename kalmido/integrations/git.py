@@ -827,14 +827,22 @@ def git_loop():
         try:
             c = connect()
             try:
-                rows = c.execute("""SELECT k.id FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.next_at<=?
-                                    ORDER BY k.next_at LIMIT ?""", (time.time(), GIT_PER_TICK)).fetchall()
+                # 2.506.1 (#3377, CI red of 2.506.0): no open transaction while waiting at the gate. This SELECT ran outside the
+                # gate and held the locks of git_conns and lists while GATE.bg() below waited for a running restore, and the
+                # restore's pg_restore --clean waited for those locks: the server stayed in maintenance (503) for good. Now the
+                # read is gated too (no read of half-restored tables) and every gated part commits before it leaves the gate.
+                with GATE.bg():
+                    rows = c.execute("""SELECT k.id FROM git_conns k JOIN lists l ON l.id=k.list_id WHERE k.next_at<=?
+                                        ORDER BY k.next_at LIMIT ?""", (time.time(), GIT_PER_TICK)).fetchall()
+                    c.commit()
                 for (cid,) in rows:
                     with GATE.bg():
                         git_poll(c, cid)
+                        c.commit()
                 if "push" in GIT_SYNC:  # 2.394.0 C (#3377): the collected local changes of linked tasks that are due
                     with GATE.bg():
                         GIT_SYNC["push"](c)
+                        c.commit()
             finally:
                 c.close()
         except Exception as e:  # noqa: BLE001
