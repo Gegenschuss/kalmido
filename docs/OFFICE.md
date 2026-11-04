@@ -1052,7 +1052,10 @@ as "Tax reserve" and "Freely available". No tax advice; figures without guarante
 - **Equipment**: a device with a purchase date and a net price brings its depreciation into the statement. A receipt not
   linked to the device still counts in full, so the purchase counts twice (see *Equipment value, depreciation and
   insurance list*).
-- **Entertainment receipts** count in neither of them (see *Entertainment receipts*).
+- **Entertainment receipts** (since 2.534): the approved ones count in both - in the statement 70 % of the net amount as
+  the line *Entertainment (70 % deductible)*, their input tax in full in field 66. They have no link to the receipts: a
+  restaurant bill that also lies under *Receipts* counts twice (the statement says so whenever entertainment receipts
+  count). See *Entertainment receipts*.
 - **Credit cards**: fees, interest and positions marked *No receipt needed* are not in the statement or the cash flow, only
   in the DATEV export and the neutral export (see *Credit cards*).
 - **Cash book and bank bookings** do not count by themselves, only the payments and receipts they lead to.
@@ -1580,10 +1583,22 @@ travel expenses.
 Office -> Money -> **Entertainment receipts** (Bewirtungsbelege, section 4 (5) no. 2 EStG; admins of the office area, a
 person without an organisation in the personal office).
 
-**Not booked:** entertainment receipts are a record of their own. They do not count in the income/expense statement or the
-VAT return figures and are not part of the DATEV, GoBD or neutral bookkeeping exports. Give your tax adviser the
-evaluation below. Do not simply
-book the same bill as an ordinary receipt as well: a receipt counts in full there, not at 70 %.
+**In the bookkeeping (since 2.534, #4333):** the **approved** entertainment receipts (drafts and the trash never) count on
+the day of the meal:
+
+- **Income/expense statement**: the line *Entertainment (70 % deductible)* = 70 % of the net amount (tip included) plus
+  the full input tax; the other 30 % are named below the statement as not deductible. A **small business** deducts no
+  input tax: 70 % of the gross amount, no VAT.
+- **VAT return figures**: their input tax in full in field 66 (listed among the entries as *Entertainment receipt*); a
+  small business has no VAT return figures.
+- **Neutral bookkeeping export** (CSV / ZIP): two rows per meal of the type *Entertainment receipt* - *Entertainment
+  (70 % deductible)* with the input tax and *Entertainment (30 % not deductible)*; the restaurant bill is not in the ZIP.
+  The DATEV and GoBD exports do not carry them yet (DATEV: a task of its own).
+- A currency without an exchange rate in the office settings counts 1:1, as the receipts do.
+
+**Do not book the same bill as an ordinary receipt as well:** the entertainment receipts have no link to *Receipts*, so the
+bill would count twice (and there in full, not at 70 %). The statement shows this hint whenever entertainment receipts
+count. Give your tax adviser the evaluation below as well.
 
 A receipt is entered as a mask:
 
