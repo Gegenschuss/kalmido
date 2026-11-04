@@ -10,7 +10,8 @@ The fragments are plain data, core/db.py frag_load runs them at the start of eve
 literal values, no import, no code.
 
 2.509.0 (#4285): and only additive steps, so the version before can still run on the database and a step cannot fail on rows that
-only the live database has: a MIGRATIONS step adds exactly its column, nullable or with a DEFAULT; AFTER creates indexes only;
+only the live database has: a MIGRATIONS step adds exactly its column, nullable or with a DEFAULT; AFTER creates indexes, or adds a
+column with ADD COLUMN IF NOT EXISTS under the same rules as a step (a table that core/schema.py makes after the steps, #4300);
 SCHEMA only creates. A UNIQUE index on a table the fragment does not create itself can fail on existing rows: it needs the line
 `# unique-ok <index>: <why no two rows can collide>` in the fragment.
 
@@ -126,7 +127,13 @@ def content_findings(n, values, src):
             bad.append(f"{n}:{ml}: step {table}.{col}: {why}")
     after, al = values.get("AFTER", ([], 0))
     for x in after:
-        why = index_finding(x, own, ok)
+        col = ADD_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
+        if col:  # a column on a table made after the steps (#4300): AFTER runs at every start, so IF NOT EXISTS
+            why = step_finding(col.group(1), col.group(2), x)
+            if not why and not re.search(r"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\b", x, re.I):
+                why = "AFTER runs at every start: ADD COLUMN IF NOT EXISTS"
+        else:
+            why = index_finding(x, own, ok)
         if why:
             bad.append(f"{n}:{al}: AFTER: {why}: {x[:60]}")
     return bad
