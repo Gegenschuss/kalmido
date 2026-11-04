@@ -336,6 +336,7 @@ ORDER = (
     "office.oftree",  # 2.351.0 A (#3312): the office's document areas as trees in the panel (folders + 20 newest)
     "office.signoff",  # 2.50.0 C (#1200): approval links with a simple electronic signature (quotations, list acceptance)
     "office.ledger",  # 2.36.2 (#1021, #1142, E): finalising, structured company data, office log
+    "office.chain",  # 2.531.0 (#4497): the hash chain over finalised documents (used by office.ledger)
     "office.olock",  # 2.152.0 C (#2168 #2169): legal retention locks (booked receipts, logbook)
     "office.invoices",  # 2.38.0 (#1021, F1): invoices, credit notes, reminders, payments, sending, DATEV inbox
     "office.peppol",  # 2.154.0 B (#1960): e-invoices over Peppol (own provider account): ids, connection, UBL, send + status

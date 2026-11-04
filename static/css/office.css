@@ -1184,3 +1184,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .rcl-f:has(select),.rcl-f:has(.dpw){flex:1 1 calc(50% - .5rem)}
   .rcl-f select{width:100%}
 }
+/* 2.531.0 A (#4497): the check of the hash chain in the office log */
+.ofc-chain{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.ofc-chain p{margin:0}
+.ofc-chain .bad{color:var(--danger)}
