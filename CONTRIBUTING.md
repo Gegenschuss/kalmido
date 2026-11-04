@@ -31,7 +31,7 @@ Layout (the full map, the data flow and how to add a route or a file: [docs/ARCH
 | `static/app.css`, `static/sw.js` | styles, service worker (offline app shell) |
 | `tools/i18n_check.py`, `tools/check_layout.py` | translation checker, module lists checker |
 | `tests/` | test suites, see [tests/README.md](tests/README.md) |
-| `VERSION` | the released version (semantic versioning) |
+| `VERSION` | the released version |
 
 ## Tests
 
