@@ -660,8 +660,12 @@ def ein_ubl_endpoint(pid):
 
 
 def _ubl_lines(m, cat):
-    """[(line dict, net, pct, qty, price)] like ein_build's loop; price and quantity agree with the net amount
-    (PEPPOL-EN16931-R120: net = quantity x price, rounded to cents) -- else the price gets four places, else qty 1."""
+    """[(line dict, n, net, pct, qty, price, charge)] like ein_build's loop; price and quantity agree with the net amount
+    (PEPPOL-EN16931-R120: net = quantity x price + line charges - line allowances, rounded to cents).
+    2.523.0 (#4082): a price that does not fit with two places gets four, then six places (a foreign currency with
+    sub-cent prices: 1,000 minutes x 0.125 EUR x rate 1.085 = 0.135625 USD). When even six places do not fit, the
+    quantity stays as on the PDF, the price is net / qty with four places and the rounding gap goes as a line charge
+    (charge > 0) or line allowance (charge < 0) -- before 2.523.0 such a line fell back to quantity 1."""
     out = []
     n = 0
     for ln in m.get("lines") or []:
@@ -680,14 +684,31 @@ def _ubl_lines(m, cat):
             rate, qty = -rate, -qty
         elif net < 0 and qty > 0:
             qty = -qty
-        if (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) != net:
-            p4 = (net / qty).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP) if qty else net
-            if p4 >= 0 and (qty * p4).quantize(Q2, rounding=ROUND_HALF_UP) == net:
-                rate = p4
+        charge = Decimal("0")
+        # a given rate with more than six places would be cut when written (_uprice), so it is fitted like an odd one
+        if rate != rate.quantize(Decimal("0.000001")) or (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP) != net:
+            for places in (Decimal("0.0001"), Decimal("0.000001")):
+                p = (net / qty).quantize(places, rounding=ROUND_HALF_UP)
+                if p >= 0 and (qty * p).quantize(Q2, rounding=ROUND_HALF_UP) == net:
+                    rate = p
+                    break
             else:
-                qty, rate = (Decimal("-1"), -net) if net < 0 else (Decimal("1"), net)
-        out.append((ln, n, net, pct, qty, rate))
+                rate = (net / qty).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+                if rate < 0:  # net and qty of opposite sign cannot come here (flipped above); stay safe: qty 1 as before
+                    qty, rate = (Decimal("-1"), -net) if net < 0 else (Decimal("1"), net)
+                else:
+                    charge = net - (qty * rate).quantize(Q2, rounding=ROUND_HALF_UP)
+        out.append((ln, n, net, pct, qty, rate, charge))
     return out
+
+
+def _uprice(rate):
+    """BT-146 as written: two places when it has no more, else up to six (2.523.0 #4082), trailing zeros dropped down to four."""
+    if rate == rate.quantize(Q2):
+        return _m(rate)
+    if rate == rate.quantize(Decimal("0.0001")):
+        return format(rate.quantize(Decimal("0.0001")), "f")
+    return format(rate.quantize(Decimal("0.000001")), "f")
 
 
 def _ubl_party(parent, tag, name, f, home, endpoint=None, email=None, contact=None, legal_id=None, seller=False, party_id=""):
@@ -879,11 +900,16 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         _u(mt, "cbc:PrepaidAmount", _m(paid), currencyID=cur)
     _u(mt, "cbc:PayableAmount", _m(gross - paid), currencyID=cur)
 
-    for ln, n, net, pct, qty, rate in lines:
+    for ln, n, net, pct, qty, rate, charge in lines:
         li = _u(root, "cac:CreditNoteLine" if credit else "cac:InvoiceLine")
         _u(li, "cbc:ID", str(ln.get("pos") or n))
         _u(li, "cbc:CreditedQuantity" if credit else "cbc:InvoicedQuantity", _qty(qty), unitCode=UNIT_CODES.get(str(ln.get("unit") or ""), "C62"))
         _u(li, "cbc:LineExtensionAmount", _m(net), currencyID=cur)
+        if charge:  # 2.523.0 (#4082): the rounding gap of a sub-cent price (BG-27 / BG-28, schema order before cac:Item)
+            ac = _u(li, "cac:AllowanceCharge")
+            _u(ac, "cbc:ChargeIndicator", "true" if charge > 0 else "false")
+            _u(ac, "cbc:AllowanceChargeReason", "Rounding")  # BR-41 / BR-42: a reason or a reason code
+            _u(ac, "cbc:Amount", _m(abs(charge)), currencyID=cur)
         it = _u(li, "cac:Item")
         _ut(it, "cbc:Description", str(ln.get("detail") or "")[:1000])
         _u(it, "cbc:Name", str(ln.get("title") or "")[:200] or ("Position " + str(n)))
@@ -892,7 +918,7 @@ def ein_ubl_build(model, profile="peppol", sender_id="", receiver_id=""):
         if _line_cat(cat, pct) != "O":
             _u(tc, "cbc:Percent", _pct(pct))
         _u(_u(tc, "cac:TaxScheme"), "cbc:ID", "VAT")
-        _u(_u(li, "cac:Price"), "cbc:PriceAmount", _m(rate) if rate == rate.quantize(Q2) else format(rate.quantize(Decimal("0.0001")), "f"), currencyID=cur)
+        _u(_u(li, "cac:Price"), "cbc:PriceAmount", _uprice(rate), currencyID=cur)
     ET.indent(root, space=" ")
     return b'<?xml version="1.0" encoding="UTF-8"?>\n' + ET.tostring(root, encoding="utf-8")
 
@@ -943,6 +969,8 @@ def ein_ubl_check(xml_bytes):
         qe = ln.find("cbc:InvoicedQuantity", q)
         qe = qe if qe is not None else ln.find("cbc:CreditedQuantity", q)
         net, price = _d(ln.findtext("cbc:LineExtensionAmount", "", q)), _d(ln.findtext("cac:Price/cbc:PriceAmount", "", q))
-        if qe is not None and (_d(qe.text) * price).quantize(Q2, rounding=ROUND_HALF_UP) != net:
+        ac = sum((_d(a.findtext("cbc:Amount", "", q)) * (1 if a.findtext("cbc:ChargeIndicator", "", q) == "true" else -1)
+                  for a in ln.findall("cac:AllowanceCharge", q)), Decimal("0"))  # 2.523.0 (#4082): line charges / allowances
+        if qe is not None and (_d(qe.text) * price).quantize(Q2, rounding=ROUND_HALF_UP) + ac != net:
             out.append(f"line {ln.findtext('cbc:ID', '', q)}: net != quantity x price (PEPPOL-EN16931-R120)")
     return out

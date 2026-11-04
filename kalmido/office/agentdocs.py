@@ -46,6 +46,7 @@ from .ledger import ofx_log, ofx_locked, ofx_diff, ofx_items_brief  # 2.369.5 (#
 from .packs import office_feature_on  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _file_response, _render, epdf_name, epdf_out  # 2.369.5 (#2517): pulled up from functions
 from .invoices import inv_offer_invoice, inv_reminder_new, inv_payment_post  # 2.369.5 (#2517): pulled up from functions
+from .invoices import inv_pay_date_check  # 2.523.0 (#4082)
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import cdn_labels  # 2.369.5 (#2517): pulled up from functions
@@ -887,6 +888,7 @@ def v1_office_pp_post():
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadInput(tr("The date must not lie in the future"))
+    inv_pay_date_check(r, d)  # 2.523.0 (#4082): accepting it books through inv_payment_post, which refuses it the same way
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): an agent cannot suggest a payment into a locked month
     conf = b.get("confidence") or "medium"
     if conf not in OFA_CONF:

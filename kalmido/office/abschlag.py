@@ -28,7 +28,7 @@ from ..core.access import Denied
 from ..core.pg import write_lock  # 2.360.0 B (#2496)
 from ..core.errors import BadInput, BadKey
 from .calc import TAX_KEYS, calc_lang, dec, dstr, fmt_money, fmt_qty, inv_calc, label, money
-from .homecur import hc_code, hc_home  # 2.189.0 (#2475)
+from .homecur import hc_code, hc_doc_fx, hc_home  # 2.189.0 (#2475); 2.523.0 (#4082): hc_doc_fx
 from . import invoices as _inv  # 2.355.0 C (#2840); 2.354.0 B (#2836): the module, invoices imports abschlag too (cycle)
 from .pdf import pdf_date  # 2.296.0 B (#3175)
 from .model import _num, office_settings  # 2.369.5 (#2517): pulled up from functions
@@ -102,11 +102,16 @@ def abs_skonto_numbers(r, gross):
 
 
 def abs_skonto_covered(c, oid, r, credits):
-    """True when the payments dated within the cash discount period plus the credit notes reach gross - discount."""
+    """True when the payments dated within the cash discount period plus the credit notes reach gross - discount.
+    2.523.0 (#4082): a reversal line counts on the day of the payment it takes back (BK_PAY_DAY, as the books and the KPIs):
+    olk_pay_reverse dates it today when a DATEV export covers the payment's day, and such a late reversal must still cancel
+    the payment made in time (before, the invoice stayed covered although the money was missing)."""
+    from .books import BK_PAY_DAY  # noqa: PLC0415  books imports this module (cycle)
     sk = abs_skonto_numbers(r, _j(r["totals"], {}).get("gross") or 0)
     if sk is None:
         return False
-    row = c.execute("SELECT SUM(amount) AS s FROM office_payments WHERE org_id=? AND doc_id=? AND date<>'' AND date<=?",
+    row = c.execute(f"SELECT SUM(p.amount) AS s FROM office_payments p LEFT JOIN office_payments o ON o.id=p.reverses_id AND o.org_id=p.org_id "
+                    f"WHERE p.org_id=? AND p.doc_id=? AND {BK_PAY_DAY}<>'' AND {BK_PAY_DAY}<=?",
                     (oid, r["id"], sk["deadline"])).fetchone()
     paid = money(dec(row["s"] if row and row["s"] is not None else 0))
     return paid > 0 and paid + credits >= sk["payable"]
@@ -125,7 +130,9 @@ def abs_skonto_taken(c, oid, r):
     rest = money(dec(_j(r["totals"], {}).get("gross") or 0)) - p["paid"] - p["credits"]
     if rest <= 0 or not abs_skonto_covered(c, oid, r, p["credits"]):
         return None
-    row = c.execute("SELECT MAX(date) AS d FROM office_payments WHERE org_id=? AND doc_id=? AND date<>'' AND date<=? AND amount>0",
+    # 2.523.0 (#4082): a payment taken back by a reversal line is not the day of the discount
+    row = c.execute("SELECT MAX(p.date) AS d FROM office_payments p WHERE p.org_id=? AND p.doc_id=? AND p.date<>'' AND p.date<=? AND p.amount>0 "
+                    "AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.org_id=p.org_id AND x.reverses_id=p.id)",
                     (oid, r["id"], sk["deadline"])).fetchone()
     if not row or not row["d"]:
         return None
@@ -322,11 +329,20 @@ def pack_rate(pack, key):
     return pack_tax(pack, key)
 
 
-def abs_deductions(c, oid, offer, lang, cur):
-    """(ids, position rows) deducting the finalised progress invoices of quotation offer, one per invoice and tax rate."""
+def abs_deductions(c, oid, offer, lang, cur, fin=None):
+    """(ids, position rows) deducting the finalised progress invoices of quotation offer, one per invoice and tax rate.
+    2.523.0 (#4082): fin = the final invoice's row (currency, fx_rate). The deduction is the net per rate that the progress
+    invoice billed in its own document currency (its totals, less its credit notes) when it is in the final invoice's
+    currency; the position's rate (stored in the home currency, as every rate) is that net / the final invoice's rate, so
+    money(qty x rate x fx) gives back exactly the billed amount. Before, the home-currency net x the final invoice's rate was
+    deducted: with another rate than on the progress invoice the deduction differed from what was billed. The home-currency
+    net stays the fallback (no totals per rate, another currency)."""
     from .docs import doc_items
     from .invoices import inv_money_fields, inv_paid_map
     s, pack = _pack(c, oid)
+    home = hc_home(s)
+    fcur = hc_code(cur) or home
+    ffx = hc_doc_fx(fin, home) if fin is not None else None
     rows = abs_progress_of(c, oid, offer["id"], locked_only=True)
     pm = inv_paid_map(c, oid, [x["id"] for x in rows])
     ids, out = [], []
@@ -353,13 +369,31 @@ def abs_deductions(c, oid, offer, lang, cur):
             if eur[k] <= 0:  # 2.354.0 B (#2836): credited in full at this rate (was == 0; abs() made a credit above it a deduction)
                 continue
             net = nets.get(k, eur[k] + ce.get(k, 0)) - cn.get(k, Decimal(0))
+            rate = abs(eur[k])
+            if ffx is not None and k in nets and (hc_code(x["currency"]) or home) == fcur and net > 0:  # 2.523.0 (#4082)
+                rate = net / ffx
             tax = dec((taxes.get(k) or {}).get("amount") or 0) - ct.get(k, Decimal(0))
             pct = (taxes.get(k) or {}).get("pct") or (dstr(pack_rate(pack, k)) if x["vat_mode"] != "novat" else "0")
             out.append({"kind": "discount", "service_id": None, "title": _t("deduct", lang, num=x["number"], date=dtext),
                         "detail": _t("deduct_detail", lang, net=fmt_money(net, lang, cur), pct=_pct_text(pct, lang), tax=fmt_money(tax, lang, cur),
                                      gross=fmt_money(net + tax, lang, cur), paid=paid),
-                        "qty": 1, "unit": "flat", "rate": abs(eur[k]), "tax": k, "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 0})
+                        "qty": 1, "unit": "flat", "rate": rate, "tax": k, "intext": "intern", "cost": 0, "raw_fee": 0, "producing": 0, "discountable": 0})
     return ids, out
+
+
+def abs_refx(c, oid, r):
+    """2.523.0 (#4082): a final invoice draft r whose currency or rate changed (PATCH) gets its deduction rates again, so they
+    keep deducting the billed amounts (abs_deductions) -- else the stale check (_stale_deductions) would refuse finalising
+    with "the progress invoices changed" although only the rate did. Only the lines abs_deductions wrote (title + rate key)."""
+    if r is None or r["kind"] != "invoice" or _col(r, "inv_type") != "final" or not _col(r, "source_doc_id") or r["locked_at"]:
+        return
+    from .docs import doc_items
+    _ids, ded = abs_deductions(c, oid, {"id": r["source_doc_id"]}, r["lang"], r["currency"], r)
+    want = {(x["title"], x["tax"]): x["rate"] for x in ded}
+    for it in doc_items(c, r["id"], oid):
+        k = (it["title"], it["tax"])
+        if it["kind"] == "discount" and k in want:
+            c.execute("UPDATE office_doc_items SET rate=? WHERE id=? AND org_id=?", (float(want[k]), it["id"], oid))
 
 
 def abs_final(c, oid, uid, offer, parts_mode=None, parts_title=None):
@@ -369,7 +403,7 @@ def abs_final(c, oid, uid, offer, parts_mode=None, parts_title=None):
     abs_final_done(c, oid, offer["id"])
     s, pack = _pack(c, oid)
     row = inv_new_row(c, oid, s, "invoice", offer["lang"], offer)
-    ids, ded = abs_deductions(c, oid, offer, offer["lang"], row["currency"])
+    ids, ded = abs_deductions(c, oid, offer, offer["lang"], row["currency"], row)
     items = inv_items_from_offer(c, oid, offer, parts_mode, parts_title)
     if ded:
         items = items + [{"kind": "heading", "title": _t("heading", offer["lang"]), "detail": "", "qty": 1, "unit": "flat", "rate": 0, "tax": "standard",
@@ -394,7 +428,7 @@ def abs_credit_check(c, oid, inv_):
 def _stale_deductions(c, oid, r, items):
     """2.354.0 B (#2836): True when a deduction line of final invoice draft r no longer matches its progress invoice
     (a partial credit note finalised after the draft). Only the lines this module wrote (by their title) are compared."""
-    _ids, ded = abs_deductions(c, oid, {"id": r["source_doc_id"]}, r["lang"], r["currency"])
+    _ids, ded = abs_deductions(c, oid, {"id": r["source_doc_id"]}, r["lang"], r["currency"], r)
     want = {(x["title"], x["tax"]): money(dec(x["rate"])) for x in ded}
     titles = {x["title"] for x in ded}
     have = {(x["title"], x["tax"]): money(dec(x["rate"])) for x in items if x.get("kind") == "discount" and x.get("title") in titles}

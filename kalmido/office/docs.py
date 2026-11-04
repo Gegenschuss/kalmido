@@ -1486,6 +1486,9 @@ def odoc_update(did):
         if diff["after"]:
             ofx_log(c, oid, "update", doc_id=did, detail=diff)
     fd_put_titles(c, oid, did, titles)
+    if "fx_rate" in f or "currency" in f:  # 2.523.0 (#4082): a final invoice's deductions follow its rate (billed amounts)
+        from .abschlag import abs_refx  # noqa: PLC0415
+        abs_refx(c, oid, doc_row(c, oid, did))
     n = doc_row(c, oid, did)  # 2.118.0 A (#2265): a quotation counted per client / project gets its number once it has one
     if n["kind"] == "offer" and not n["number"] and not r["number"] and f:
         s = office_settings(c, oid)

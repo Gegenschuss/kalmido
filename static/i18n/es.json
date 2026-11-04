@@ -16237,5 +16237,6 @@
   "Delete the booking of {0}?": "¿Eliminar la reserva de {0}?",
   "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "La reserva con nombre, correo electrónico y mensaje se elimina definitivamente. La cita en tu calendario, el contacto y el lead se quedan como están. La persona no recibe ningún correo.",
   "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "La cita aún está por llegar: el enlace de cancelación de la persona dejará de funcionar. Anúlala primero si no debe tener lugar.",
-  "Only confirmed or cancelled bookings can be deleted": "Solo se pueden eliminar reservas confirmadas o canceladas"
+  "Only confirmed or cancelled bookings can be deleted": "Solo se pueden eliminar reservas confirmadas o canceladas",
+  "The payment date must not lie before the invoice date ({0})": "La fecha de pago no puede ser anterior a la fecha de la factura ({0})"
 }

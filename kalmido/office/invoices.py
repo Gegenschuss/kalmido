@@ -1512,7 +1512,7 @@ def inv_payment_post(did):
     if not isinstance(b, dict):
         return err(tr("Invalid data"))
     write_lock(c, f"office_doc_{int(did)}")  # 2.269.0 D (#3046): check and booking never in between finalising / sending / another payment
-    if inv_pay_add(c, oid, uid, did, b, ref=ofi_ref(b)) is None:
+    if inv_pay_add(c, oid, uid, did, b, ref=ofi_ref(b), typed=True) is None:
         c.rollback()
         return _answer(c, oid, uid, did)
     bump(c)
@@ -1520,12 +1520,21 @@ def inv_payment_post(did):
     return _answer(c, oid, uid, did, 201)
 
 
-def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None):
+def inv_pay_date_check(r, d):
+    """2.523.0 (#4082, audit N3 of 12.10.): a payment typed in (the dialog, an agent's suggestion) is not dated before the
+    invoice -> 400 (a typo would move the payment, its VAT on cash basis and the cash discount into the wrong period). The
+    bank reconciliation, the cash book and online payments keep the real day of their booking (a prepayment can come first)."""
+    if d and r["date"] and d < str(r["date"])[:10]:
+        raise BadKey(N_("The payment date must not lie before the invoice date ({0})"), str(r["date"])[:10])  # ISO like line 395
+
+
+def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None, typed=False):
     """2.90.0 B (#1921): records payment b {date, amount, method?, note?} on invoice did of area oid (the caller checked the
     admin role) and refreshes its state; returns the payment's id. Also used by the bank reconciliation (office/bank.py).
     2.269.0 D (#3046): ref = the device's client_ref: a payment this person already booked with it -> None (nothing booked;
     on another invoice 409), before the state checks (a retry after the full payment is no error).
-    2.469.0 (#3459): online_ref = the provider's unique payment reference (office/payonline.py), only with method online."""
+    2.469.0 (#3459): online_ref = the provider's unique payment reference (office/payonline.py), only with method online.
+    2.523.0 (#4082): typed = a date a person / an agent typed in (the payments route): not before the invoice date."""
     from .docs import _date, doc_row
     write_lock(c, f"office_pay_{did}")  # 2.38.0 review: check and write of one invoice's payments in one go
     if ref:
@@ -1545,6 +1554,8 @@ def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None):
     d = _date(b.get("date"), "date") or local_now().date().isoformat()
     if d > local_now().date().isoformat():
         raise BadKey(N_("The date must not lie in the future"))
+    if typed and not refund:  # 2.523.0 (#4082); a refund on a credit note is dated by the credit note's own flow
+        inv_pay_date_check(r, d)
     from .periodlock import period_need_open
     period_need_open(c, oid, d)  # 2.148.0 A (#2471): also for the bank reconciliation and the agents' payment proposals
     if refund:
