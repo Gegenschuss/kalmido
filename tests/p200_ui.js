@@ -58,12 +58,15 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   w.eval(`agentById(${CL}).ai = true`);
   check((await call('alice', 'PATCH', `/api/admin/agents/${CL}`, {ai: true})).ai === true && /AI agent/.test(w.eval(`agentBadge(${CL})`)), '#3530: back to "AI agent"');
   check(cm && cm.querySelectorAll('.rx.add').length === 3, 'three reaction buttons (❤️ 👍 👎)');
-  cm.querySelector('[data-act="c-react"][data-e="up"]').click(); await sleep(900);
+  // 2.500.0 (pre-check of package 2.500, red under load): the calls above can redraw the panel: a click on the old element reaches nobody. Fresh element, then the state, not 900 ms
+  d.querySelector(`.cm[data-cid="${k1}"] [data-act="c-react"][data-e="up"]`).click();
+  await require('./boot').until(() => d.querySelector(`.cm[data-cid="${k1}"] [data-e="up"].on .rxn`), {timeout: 30000});
   const cm2 = d.querySelector(`.cm[data-cid="${k1}"]`);
   const up = cm2?.querySelector('[data-e="up"]');
   check(up?.classList.contains('on') && up.querySelector('.rxn')?.textContent === '1' && /Alice/.test(up.title), 'my 👍 shown with count + name');
   check(/Approved/.test(d.querySelector('#toast')?.textContent || d.body.textContent), 'toast: Approved');
   let ev = await events();
+  for (let i = 0; i < 100 && !ev.some(e => e.event === 'reaction' && e.data.approval === 'approved'); i++) { await sleep(150); ev = await events(); }  // 2.500.0: the event, not a moment
   check(ev.some(e => e.event === 'reaction' && e.data.approval === 'approved'), 'agent got the approval');
   d.querySelector(`.cm[data-cid="${k1}"] [data-act="c-react-more"]`).click(); await sleep(300);
   const pk = d.querySelector('#pop .rxpick');
