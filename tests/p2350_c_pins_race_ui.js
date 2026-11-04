@@ -56,6 +56,10 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   const old = JSON.stringify(await w.eval(`api('GET', '/api/state')`));  // the state before pinning Pete
   check(await w.eval(`sbp_pin('side_people', ${P[2]}, true, 'Pete')`), 'pin Pete');
   check(await until(async () => await server() === want(P)), 'the server holds all three');
+  // 2.521.0 (#4087): only the fetches of the tested load() count: the page is in the background meanwhile, so the live poll
+  // (core.js setInterval, load(true) on a new version, which this test's own writes cause) stays quiet; measured 5-6 = 3 + its 2-3
+  Object.defineProperty(w.document, 'hidden', {configurable: true, get: () => true});
+  check(await until(() => w.eval('!td_polling')), 'no live poll is on its way');  // one that started before stays out too
   const f0 = w.fetch; let n = 0, dots = 0;
   w.fetch = async (u, o = {}) => {
     if ((o.method || 'GET') !== 'GET' || !/\/api\/state(\?|$)/.test(String(u))) return f0(u, o);
@@ -65,7 +69,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     return new Response(old, {status: 200, headers: {'Content-Type': 'application/json'}});  // an answer from before Pete's pin
   };
   await w.eval('load()');
-  w.fetch = f0;
+  w.fetch = f0; delete w.document.hidden;
   check(n === 3, 'the reload tried three times ' + n);
   check(want(w.eval(`sbp_ids('side_people')`)) === want(P), 'the own pins win over an answer that predates them ' + w.eval(`S.settings.side_people`));
   check(await server() === want(P), 'the server still holds all three');
