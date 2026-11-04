@@ -59,7 +59,7 @@ const SPLIT = `(sel => [...document.querySelectorAll(sel)].filter(n => n.getClie
       await until(() => ev(`!!document.querySelector('#top .menu') && !!S.booted`));
       await ev(`(() => { if (!document.querySelector('#side.open')) document.querySelector('#top .menu').click(); return 1; })()`);
       check(await until(() => ev(`document.querySelectorAll('#side .sbmr .srbn').length > 3`)), `#3880 ${px} px: the drawer's row is there`);
-      await sleep(250);
+      await until(() => ev(`${SPLIT}('#side .sbmr .srbn').length === 0`));  // 2.499.0 (#4047): the fit runs in a frame after the draw: wait for its result, not a fixed time
       s = await ev(`${SPLIT}('#side .sbmr .srbn')`);
       check(s.length === 0, `#3880 ${px} px: no word split in the drawer: ` + JSON.stringify(s));
       // 2.499.0 (#4047): nothing in the drawer is cut: no "…" class, no text beyond its box in either direction
