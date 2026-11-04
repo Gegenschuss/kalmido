@@ -615,7 +615,7 @@ def insert_id(c, sql, args=()):
 def snapshot_level(c, on=True):
     """2.533.0 (#4318) F15 (account export): on = the next transaction of connection c is REPEATABLE READ (one snapshot for
     every read until it ends; reads so far are committed first); off = rolled back and the pool's default level again (before
-    c goes back to the pool). The driver takes the level only while the connection is idle."""
+    c goes back to the pool). As the session's default_transaction_isolation (SQL, not the driver's attribute)."""
     pgc = c._pg
     if pgc.closed:
         return
@@ -624,7 +624,8 @@ def snapshot_level(c, on=True):
             c.commit()
         else:
             pgc.rollback()
-    pgc.isolation_level = psycopg.IsolationLevel.REPEATABLE_READ if on else None
+    pgc.execute("SET default_transaction_isolation = 'repeatable read'" if on else "RESET default_transaction_isolation")
+    pgc.commit()
 
 
 def write_lock(c, name="kalmido"):
