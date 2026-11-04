@@ -62,7 +62,7 @@ from ..tasks.validation import (DATE_MAX_Y, DATE_MIN_Y, DURATION_MAX, PRIORITIES
 from .orgexport import EXPORT_DIR, OX_SECRET_COLS, _safe_part
 from .acctexport import (UMZ_BLOCK, UMZ_FORMAT, UMZ_HEAD, UMZ_V, UmzReader, UmzWriter, umz_key, umz_person, umz_space_ok,
                          umz_user_conn, umz_write_state)
-from ..core.orgcrypt import oc_user_space, oc_write_file, rck_parse  # 2.149.0 G (#2517): pulled up from functions
+from ..core.orgcrypt import OrgCryptError, oc_user_space, oc_write_file, rck_parse, rck_resolve  # 2.149.0 G (#2517); 2.531.0: + OrgCryptError, rck_resolve pulled up (layer budget)
 from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import JOURNAL_MAX, jr_open, jr_seal  # 2.306.0 A (#2885); 2.531.0 (#4317): + JOURNAL_MAX, jr_open
 from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
@@ -2320,7 +2320,6 @@ def umz_org_decrypt(path, key, size, okey, out):
         prefix = base64.b64decode(h["nonce_prefix"])
         block = int(h["block"])
         if isinstance(okey, tuple):  # 2.138.0 C (#1972): core/orgcrypt.py rck_parse; a recovery key opens the header's copy
-            from ..core.orgcrypt import OrgCryptError, rck_resolve
             try:
                 okey = rck_resolve(okey, int(h["org_id"]), h.get("recovery_wrapped"))
             except OrgCryptError:

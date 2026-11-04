@@ -6,8 +6,6 @@ import os
 import re
 from datetime import date
 
-from ..core.db import local_now  # 2.531.0 (#4498)
-from .calc import tax_rate_on  # 2.531.0 (#4498)
 
 PACK_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "packs")
 PACK_LANGS = ("de", "en")  # document languages a pack must label
@@ -320,11 +318,13 @@ def _day_ok(day):
 def pack_rate_for(pack, key, day=None):
     """2.531.0 (#4498): the rate of tax key key in pack on day (date or "YYYY-MM-DD"; None = today): a number as it is, of a
     list the last rate whose valid_from is not after day (before the first one: the first one). None when the pack has none."""
+    from .calc import tax_rate_on  # local: tests load this module as a single file (check_singlefile)
     return tax_rate_on(((pack or {}).get("tax") or {}).get(key), _day_text(day))
 
 
 def _day_text(day):
     if day is None or day == "":
+        from ..core.db import local_now  # local: single-file loads (check_singlefile)
         return local_now().date().isoformat()
     return day.isoformat() if hasattr(day, "isoformat") else str(day)[:10]
 
