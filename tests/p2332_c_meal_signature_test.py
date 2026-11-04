@@ -116,6 +116,7 @@ check(j.get("sign_image") == 1, f"default on when the approver has a picture: si
 d = pdf(A, m1)
 check(images(d) == 1, f"approved with the picture: one image in the PDF ({images(d)})")
 check("Confirmed digitally by Alice Admin" in text(d) and "Place, date, signature" in text(d), "the digital confirmation and the line stay")
+check("Confirmation of the host" in text(d), "2.533.0 (#4336): the host confirmed herself: the host's heading as before")
 check(images(pdf(Bo, m1)) == 1, "another admin downloading the PDF: still the approver's picture")
 # the switch off
 m2 = meal(A, ALICE)
@@ -126,6 +127,24 @@ m3 = meal(A, ALICE)
 j = approve(Bo, m3, sign_image=1)
 check(j.get("approved_by") == BOB and j.get("sign_image") == 0, f"Bob approves without a picture: sign_image 0 ({j.get('approved_by')}, {j.get('sign_image')})")
 check(images(pdf(A, m3)) == 0 and images(pdf(Bo, m3)) == 0, "Bob approved: no picture of Alice on the receipt")
+# 2.533.0 (#4336): somebody else than the host confirms -> "confirmed by <name>", no I-sentence, never the approver's picture on the host's line
+def flat(d):
+    return " ".join(text(d).split())
+
+
+m4 = meal(A, BOB)
+approve(A, m4, sign_image=1)  # Alice (with a picture) confirms Bob's meal
+d = pdf(A, m4)
+check(images(d) == 0, f"admin confirms another host's receipt: no picture on the host's line ({images(d)})")
+check("Confirmation of the receipt" in flat(d) and "Confirmed by Alice Admin (not by the host)." in flat(d)
+      and "Confirmation of the host" not in flat(d) and "I confirm that the details" not in flat(d),
+      "the PDF names who confirmed instead of the host's I-sentence")
+m5 = meal(A, ALICE)
+r = A.patch(B + f"{M}/{m5}", json={"host": {"name": "Frieda Frei", "extra": "guest of honour"}})
+check(r.ok, f"free-text host saved {r.status_code}")
+approve(A, m5, sign_image=1)
+d = pdf(A, m5)
+check(images(d) == 0 and "Confirmed by Alice Admin (not by the host)." in flat(d), "a free-text host (no id) counts as someone else")
 # undo: the picture leaves the PDF, the log stays
 r = A.post(B + f"{M}/{m1}/unlock", json={"reason": "Typo in the occasion"})
 check(r.ok and r.json().get("status") == "draft" and r.json().get("sign_image") == 0, f"approval undone {r.status_code} {r.text[:200]}")
