@@ -30,7 +30,7 @@ ISS = "http://127.0.0.1:9990"
 KEY = base64.b64encode(os.urandom(32)).decode()
 
 kt.fresh(env={"KALMIDO_SECRET_KEY": KEY, "KALMIDO_HOSTED": "1", "KALMIDO_OIDC_ISSUER": ISS, "KALMIDO_OIDC_CLIENT_ID": "kalmido-test",
-              "KALMIDO_OIDC_CLIENT_SECRET": "s3cret", "KALMIDO_OIDC_BUTTON_LABEL": "TestID"})
+              "KALMIDO_OIDC_CLIENT_SECRET": "s3cret:/x+y", "KALMIDO_OIDC_BUTTON_LABEL": "TestID", "KALMIDO_OIDC_ALLOW_HOSTS": "127.0.0.1:9990"})
 od = os.path.join(DATA, "oidc")
 shutil.rmtree(od, ignore_errors=True)
 os.makedirs(os.path.join(od, "signing"))
@@ -39,7 +39,6 @@ open(os.path.join(od, "signing", "k1.pem"), "wb").write(rsa.generate_private_key
 json.dump({}, open(os.path.join(od, "codes.json"), "w"))
 shutil.copy(os.path.join(N, "stub_oidc.py"), DATA)
 subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_oidc.py"])
-assert kt.until(lambda: kt.sess(None).get(B + "/api/auth/oidc/start", allow_redirects=False).status_code == 302, 20), "the fake provider answers"
 
 
 def query(loc):
@@ -66,6 +65,9 @@ assert kt.sess(None).post(B + "/api/auth/setup", json={"username": "alice", "dis
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
 A = sess("alice")
+ok = kt.until(lambda: kt.sess(None).get(B + "/api/auth/oidc/start", allow_redirects=False).status_code == 302, 20)
+r = kt.sess(None).get(B + "/api/auth/oidc/start", allow_redirects=False)
+assert ok, f"the fake provider answers ({r.status_code} {r.headers.get('Location', '')[:80]} {r.text[:200]})"
 FID, _Fr = freelancer(B, A)
 Fr = login(B, "frida")
 assert Fr.patch(B + "/api/settings", json={"lang": "en", "tour": "done"}).ok
