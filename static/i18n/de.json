@@ -16198,5 +16198,7 @@
   "{0} trip cost": ["{0} Reisekosten-Eintrag", "{0} Reisekosten-Einträge"],
   "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} Datei, die diese Person in Direktnachrichten oder Gruppen geschickt hat, wird endgültig gelöscht: die anderen verlieren sie auch.", "{0} Dateien, die diese Person in Direktnachrichten oder Gruppen geschickt hat, werden endgültig gelöscht: die anderen verlieren sie auch."],
   "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "Die Projekte werden mit allen Aufgaben endgültig gelöscht, auch denen anderer Mitglieder: sie kommen nicht in den Papierkorb.",
-  "Offline changes made before the sign-in were kept and are sent from here": "Offline-Änderungen von vor der Anmeldung wurden behalten und werden von hier gesendet"
+  "Offline changes made before the sign-in were kept and are sent from here": "Offline-Änderungen von vor der Anmeldung wurden behalten und werden von hier gesendet",
+  "Control level": "Kontrollstufe",
+  "Pick the level in Settings > Agents > (agent) > Control before you test. A new agent starts with “Approve everything”: even a comment or a new task waits for an approval card. “Routine free” lets it create tasks, plan, comment and tick off; deleting always needs a card.": "Wähle die Stufe vor dem Test in Einstellungen > Agenten > (Agent) > Kontrolle. Ein neuer Agent startet mit „Alles absegnen“: schon ein Kommentar oder eine neue Aufgabe wartet auf eine Freigabekarte. „Routine frei“ erlaubt ihm, Aufgaben anzulegen, zu planen, zu kommentieren und abzuhaken; Löschen braucht immer eine Karte."
 }
