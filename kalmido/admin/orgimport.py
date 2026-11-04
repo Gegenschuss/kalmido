@@ -448,7 +448,7 @@ def oi_undo(c, uid, cr, since, plan):
                 if m and plan.stays("fs_nodes", m[0]):
                     roots_kept.add(undo_key(item[1]))
     if cr.get("oi_files"):
-        cr["oi_files"] = undo_files_left(c, plan, cr["oi_files"], stayed)
+        cr["oi_files"] = oi_undo_files_left(c, plan, cr, stayed)
     for item in reversed(cr.get("oi") or []):
         if isinstance(item, list) and len(item) == 4 and item[0] == "doc_fields":
             _oi_undo_options(c, *item[1:])
@@ -476,6 +476,15 @@ def oi_undo(c, uid, cr, since, plan):
             n += c.execute(f"DELETE FROM {table} WHERE id=?", (rid,)).rowcount
     _oi_undo_pics(c, cr)
     return n, kept_keys
+
+
+def oi_undo_files_left(c, plan, cr, stayed=()):
+    """2.516.0 (#4364): the stored files of cr["oi_files"] the undo may delete: a file stays while a row it belongs to stays -
+    named in a column (undo_files_left), recorded as its owner (cr["oi_file_rows"]), or an office file of a document that stays
+    (oi_office.oi_office_files_left: the PDF / XML of a finalised invoice, the logo and letterhead copies)."""
+    from .oi_office import oi_office_files_left
+    owners = cr.get("oi_file_rows")
+    return oi_office_files_left(c, plan, undo_files_left(c, plan, cr.get("oi_files") or [], stayed, owners), owners)
 
 
 def _oi_undo_pics(c, cr):
@@ -603,5 +612,5 @@ def oi_undo_files(cr):
                 pass
 
 
-__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files", "oi_undo_plan", "oi_prints",
+__all__ = ["OiT", "OiFix", "OiCtx", "oi_specs", "oi_covers", "oi_write", "oi_pictures", "oi_prepare", "oi_drop_empty_pb", "oi_counts", "oi_undo", "oi_undo_check", "oi_undo_files", "oi_undo_files_left", "oi_undo_plan", "oi_prints",
            "_BAD", "_coerce", "_oid", "_read_entry", "_txt", "umz_cols", "umz_insert", "umz_row"]

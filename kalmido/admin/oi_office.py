@@ -94,6 +94,49 @@ def _oi_put(ctx, old, new, seal=True, mime="", keep=False, strict=False):
     return new
 
 
+def _oi_own(ctx, new, *rows):
+    """2.516.0 (#4364): the rows stored file `new` (below the target's office folder) belongs to: the undo deletes it only once
+    all of them go (umz_undoplan.undo_files_left); its name stands in no column (derived from kind and number) or in a sealed one."""
+    if not new or not isinstance(ctx.space, int):
+        return
+    full = os.path.realpath(os.path.join(_oi_dir(ctx.space), new))
+    have = ctx.run.created.setdefault("oi_file_rows", {}).setdefault(full, [])
+    have.extend([t, int(i)] for t, i in rows if isinstance(i, int) and [t, int(i)] not in have)
+
+
+_OI_DOC_FILE = re.compile(r"doc(\d{1,18})-.+\.(pdf|xml)")  # pdfweb._stored, an accepted quotation: doc<id>-<number>.accepted-<id>.pdf
+_OI_SNAP_FILE = re.compile(r"logo-[0-9a-f]{16}\.png|lhs-[0-9a-f]{16}\.pdf")  # the content-addressed copies a finalised sender names
+
+
+def oi_office_files_left(c, plan, paths, owners=None):
+    """2.516.0 (#4364): of the stored files the undo would delete (paths, after undo_files_left) the office files that still
+    belong to a document that stays: an import from before the owners were recorded (no entry in owners) judges doc<id>-... by
+    the id in its name; the logo and letterhead copies (logo-<hash>.png, lhs-<hash>.pdf, shared by every document finalised with
+    the same sender, also by one finalised in the target after the import) stay while any document of that office that does not
+    go names them in its sender (sealed: read decrypted). Other office files (named in a column) as undo_files_left says."""
+    root = os.path.realpath(OFFICE_DIR) + os.sep
+    owners = owners if isinstance(owners, dict) else {}
+    out, snaps = [], {}
+    for p in paths:
+        rp = os.path.realpath(p) if isinstance(p, str) else ""
+        part = rp[len(root):].split(os.sep) if rp.startswith(root) else []
+        if len(part) != 2 or not part[0].isdigit():
+            out.append(p)
+            continue
+        m = _OI_DOC_FILE.fullmatch(part[1])
+        if _OI_SNAP_FILE.fullmatch(part[1]):
+            snaps.setdefault(int(part[0]), []).append(p)
+        elif not m or p in owners or plan.goes("office_docs", int(m.group(1))):
+            out.append(p)  # named in a column (undo_files_left judged it) or all its rows go
+    for oid, ps in snaps.items():
+        used = ""
+        for r in c.execute("SELECT id, sender FROM office_docs WHERE org_id=? AND sender IS NOT NULL", (oid,)).fetchall():
+            if not plan.goes("office_docs", r["id"]):
+                used += "\0" + str(oc_dec_fields(c, oid, "office_docs", r).get("sender") or "")
+        out.extend(p for p in ps if os.path.basename(p) not in used)
+    return out
+
+
 def _oi_logo_ok(ctx, name):
     """2.137.0 review L4: a content-addressed logo copy only under the name of its own content (never a file that a
     later logo of the target would be taken for). 2.453.0 (#3781): the frozen letterhead (lhs-<sha16>.pdf) likewise."""
@@ -246,14 +289,16 @@ def _a_doc(c, run, src, nid, ctx):
     r_old, r_new = {**src}, {**src, "id": nid}
     for ext, mime in (("pdf", "application/pdf"), ("xml", "application/xml")):
         if src.get(ext + "_sha256"):
-            _oi_put(ctx, f"doc{old}-{epdf_name(r_old)}.{ext}", f"doc{int(nid)}-{epdf_name(r_new)}.{ext}", mime=mime)
+            _oi_own(ctx, _oi_put(ctx, f"doc{old}-{epdf_name(r_old)}.{ext}", f"doc{int(nid)}-{epdf_name(r_new)}.{ext}", mime=mime),
+                    ("office_docs", nid))  # 2.516.0 (#4364)
     snd = _oi_json(src.get("sender"), {})
     if isinstance(snd, dict):
         if isinstance(snd.get("logo"), str) and re.fullmatch(r"logo-[0-9a-f]{16}\.png", snd["logo"]) and _oi_logo_ok(ctx, snd["logo"]):
-            _oi_put(ctx, snd["logo"], snd["logo"], seal=False, mime="image/png", keep=True)
+            _oi_own(ctx, _oi_put(ctx, snd["logo"], snd["logo"], seal=False, mime="image/png", keep=True), ("office_docs", nid))  # 2.516.0 (#4364)
         lh = snd.get("letterhead")
         if isinstance(lh, dict) and isinstance(lh.get("file"), str) and re.fullmatch(r"lhs-[0-9a-f]{16}\.pdf", lh["file"]) and _oi_logo_ok(ctx, lh["file"]):
-            _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True, strict=True)  # 2.453.0 (#3781): strict like the letterhead of the settings
+            _oi_own(ctx, _oi_put(ctx, lh["file"], lh["file"], mime="application/pdf", keep=True, strict=True),  # 2.453.0 (#3781): strict like the letterhead of the settings
+                    ("office_docs", nid))  # 2.516.0 (#4364)
 
 
 def _p_part(c, run, src, d, ctx):
@@ -297,8 +342,9 @@ def _a_signoff(c, run, src, nid, ctx):
     new_doc = run.m("office_docs", src.get("doc_id"))
     if not dsrc or not new_doc or not isinstance(src.get("id"), int):
         return
-    _oi_put(ctx, f"doc{int(dsrc['id'])}-{epdf_name(dsrc)}.accepted-{int(src['id'])}.pdf",
-            f"doc{int(new_doc)}-{epdf_name({**dsrc, 'id': new_doc})}.accepted-{int(nid)}.pdf", mime="application/pdf")
+    _oi_own(ctx, _oi_put(ctx, f"doc{int(dsrc['id'])}-{epdf_name(dsrc)}.accepted-{int(src['id'])}.pdf",
+                         f"doc{int(new_doc)}-{epdf_name({**dsrc, 'id': new_doc})}.accepted-{int(nid)}.pdf", mime="application/pdf"),
+            ("office_docs", new_doc), ("office_signoffs", nid))  # 2.516.0 (#4364)
 
 
 def _p_meal_file(c, run, src, d, ctx):

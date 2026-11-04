@@ -359,11 +359,20 @@ def undo_trash(c, uid, plan):
             cl_trash(c, rid)
 
 
-def undo_files_left(c, plan, paths, extra_rows=()):
+def undo_files_left(c, plan, paths, extra_rows=(), owners=None):
     """The stored files of paths that may go: not the ones a row that stays names (in the trash or kept). Called before the rows
-    go; any text column counts, the names are unique (a random part)."""
+    go; any text column counts, the names are unique (a random part). 2.516.0 (#4364): owners = {path: [[table, id], ...]}, the
+    rows a file belongs to as the import recorded them (a name no column holds, e.g. the PDF of a finalised invoice): such a
+    file stays while one of its rows does not go."""
     if not paths:
         return []
+    owners = owners if isinstance(owners, dict) else {}
+
+    def owned(p):
+        rows = owners.get(p) if isinstance(p, str) else None
+        return isinstance(rows, list) and any(isinstance(x, list) and len(x) == 2 and isinstance(x[0], str) and isinstance(x[1], int)
+                                              and not plan.goes(x[0], x[1]) for x in rows)
+    paths = [p for p in paths if not owned(p)]
     left = set()
     for table in {t for t, _ in plan.exist}:
         if table in _NO_FILES or "id" not in umz_cols(c, table)[0]:
