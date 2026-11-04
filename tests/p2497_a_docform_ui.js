@@ -37,8 +37,10 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,office,clients,docs'});
-  const upload = async (name, lines) => {
-    const fd = new FormData(); fd.append('ws', 'private'); fd.append('files', new Blob([textPdf(lines)], {type: 'application/pdf'}), name + '.pdf');
+  // 2.522.0 (#4433): receipts are recorded only in the office: these documents are the office's (Alice's personal office keeps
+  // them in her own space, area office); a private one (office=false) offers "Move to office" instead of the receipt button
+  const upload = async (name, lines, office = true) => {
+    const fd = new FormData(); fd.append('ws', 'private'); if (office) fd.append('area', 'office'); fd.append('files', new Blob([textPdf(lines)], {type: 'application/pdf'}), name + '.pdf');
     const rr = await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CA}, body: fd});
     const id = ((await rr.json()).ids || [])[0];
     for (let i = 0; i < 120; i++) { const d = await call(CA, 'GET', `/api/docs/${id}`); if (d.state === 'done' || d.state === 'failed') return d; await sleep(250); }
@@ -55,6 +57,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
   const I = await upload('invoice', ['Muster Bau GmbH', 'Rechnung Nr. 4711', 'Datum 03.10.2026', 'Netto 100,00 EUR', 'USt 19 % 19,00 EUR', 'Brutto 119,00 EUR']);
   check(!!I.extracted, 'setup: an invoice has recognised values ' + JSON.stringify(I.extracted));
   const Fee = await upload('fee', ['Stadt Musterstadt', 'Muster GmbH', 'Bescheid', 'Datum 04.10.2026', 'Gesamtbetrag 25,00 EUR']);
+  const P = await upload('private-letter', ['Stadt Musterstadt', 'Bescheid ueber Ihren Antrag', 'Datum 05.10.2026'], false);  // 2.522.0 (#4433)
 
   const ready = async (ev, expr, n = 80) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   // the rows of the grid: left edge of the label and of the field, right edge of the field
@@ -78,6 +81,13 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     check(await open(nav, ev, L), 'the letter opens');
     check(await ready(ev, `!!document.querySelector('.rc-slot [data-rc="open:0"]')`), 'a letter: the button "Record as receipt"');
     check(await ev(`!document.querySelector('#rc-proj') && !document.querySelector('.rc-h')`), 'a letter: no receipt part');
+    // 2.522.0 (#4433): a private document: "Move to office" instead of "Record as receipt"; a click moves it (the office list has it)
+    check(await open(nav, ev, P) && await ready(ev, `!!document.querySelector('.rc-slot [data-rc="area:office"]')`) && await ev(`!document.querySelector('[data-rc="open:0"]')`),
+      '#4433: a private document offers "Move to office", not "Record as receipt"');
+    await ev(`document.querySelector('.rc-slot [data-rc="area:office"]').click()`);
+    check(await ready(ev, `!!document.querySelector('.rc-slot [data-rc="open:0"]')`), '#4433: moved into the office, it offers "Record as receipt"');
+    const inOffice = await call(CA, 'GET', '/api/docs?ws=all&area=office&facets=0');
+    check((inOffice.docs || []).some(d => d.id === P.id), '#4433: the office list has the moved document');
     await shot('p2497-a-letter-desktop.png');
     let rows = JSON.parse(await ev(GRID));
     check(rows.length >= 6, 'the fields of the document ' + rows.length);

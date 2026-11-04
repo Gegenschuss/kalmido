@@ -1139,6 +1139,7 @@ ROUTES = {
     "POST /api/receipt-suggestions/{}/reopen": "receipt", "POST /api/v1/documents/{}/receipt-suggestion": "receipt",
     "POST /api/v1/files": "file", "POST /api/v1/files/{}/versions": "file", "PUT /api/docs/{}/receipt": "receipt",
     "POST /api/docs/{}/receipt/einvoice": "receipt",  # 2.185.0 A (#2583)
+    "POST /api/docs/{}/area": "document",  # 2.522.0 (#4433): office / private space of a document (p4433_a_area_test.py)
     "PUT /api/paperless": "paperless",
     # 2.50.0 A (#1195): absences; (#1194): resources and disposition
     "GET /api/team/absences": "hub", "POST /api/team/absences": "hub", "PATCH /api/team/absences/{}": "hub",
