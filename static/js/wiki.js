@@ -70,19 +70,22 @@ async function wk_load(sp, force) {
   const d = WK.idx[sp] || (WK.idx[sp] = {});
   if (WK.busy['i' + sp] || (!force && d.pages && d.v === S.v)) return;
   WK.busy['i' + sp] = true;
+  const v0 = S.v, mk0 = d.mk;  // 2.519.0 (#3715): what this answer is for - a change marked while it was on its way (wk_after) is not lost
   try { let j = await wko_sync(sp); if (typeof wkeIndex === 'function') j = await wkeIndex(sp, j); d.pages = j.pages; d.folders = j.folders || []; d.root = j.root || null; d.mayWrite = j.may_write; d.style = j.style || ''; d.may_style = !!j.may_style; d.err = ''; d.off = j._off || ''; d.more = !!j.more; }  // 2.64.3 B (#1817): texts of an encrypted space open here; 2.169.0 (#2671): from the offline copy when offline
   catch (e) { if (e.message === 'auth') return; d.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : e.message; d.pages = d.pages || null; if ([403, 404].includes(e.status) && typeof wkeForget === 'function') wkeForget(sp); }  // 2.64.3 E (#1817): no access any more
-  finally { d.v = S.v; WK.busy['i' + sp] = false; }
+  finally { d.v = d.mk !== mk0 ? -1 : v0; WK.busy['i' + sp] = false; }  // 2.519.0 (#3715): an older answer no longer counts as the newest
+  if (d.v !== S.v && d.mk !== mk0) return wk_load(sp, true);  // 2.519.0 (#3715): marked while loading - load once more (it draws then)
   if (S.route.mod === 'wiki') wk_redraw();
   if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B (#2620): the panel's folders
 }
 async function wk_loadPage(id, force) {
   if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || WK.edit))) return;
   WK.busy['p' + id] = true;
+  const v0 = S.v, mk0 = WK.pgMk;  // 2.519.0 (#3715): as wk_load - a page marked while it loads stays marked
   try {
     let p; try { p = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(p); }  // 2.64.3 B (#1817)
     catch (e) { if (!(e instanceof Offline) || !(p = await wko_page(id))) throw e; }  // 2.169.0 (#2671): offline = the page from the copy
-    p._v = S.v; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.pgLost = null; WK.space = p.space;
+    p._v = WK.pgMk !== mk0 ? -1 : v0; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.pgLost = null; WK.space = p.space;
     if (!WKO.cf[id]) await wko_cfLoad(p.space).catch(() => {});  // 2.527.0 (#4304 A18): a page opened directly shows its waiting draft too
   }
   catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgLost = e.data?.code === 'wiki_unreadable' ? id : null;  // 2.139.0 C (#2386): the message names the way out, deleting stays possible
@@ -755,7 +758,7 @@ function wk_made(sp, r) {  // the new page opens for writing, one undo step
     redo: async () => { await rawFetch('POST', '/api/wiki/restore', {ids: [r.id]}); wk_after(sp); return {skipped: []}; }});
   histToast(tr('Page {0} created', qn(wk_base(r.path))), e);
 }
-function wk_after(sp) { if (WK.idx[sp]) WK.idx[sp].v = -1; if (WK.pg) WK.pg._v = -1; if (S.route.mod === 'wiki') renderView(); if (typeof sbb_sync === 'function') sbb_sync('wiki'); }  // 2.152.3 B (#2620): + the panel
+function wk_after(sp) { if (WK.idx[sp]) { WK.idx[sp].v = -1; WK.idx[sp].mk = (WK.idx[sp].mk || 0) + 1; } WK.pgMk = (WK.pgMk || 0) + 1; if (WK.pg) WK.pg._v = -1; if (S.route.mod === 'wiki') renderView(); if (typeof sbb_sync === 'function') sbb_sync('wiki'); }  // 2.152.3 B (#2620): + the panel; 2.519.0 (#3715): + the marks a running load sees (wk_load, wk_loadPage)
 // 2.371.2 (#3151): a template's placeholders, filled here when a page starts from it (one way for every space, a locked one
 // too): {{datum}} / {{date}} today, {{titel}} / {{title}} the page's name, {{ich}} / {{me}} my name, {{cursor}} where
 // writing starts (the first one; every {{cursor}} goes). Other {{…}} stay as they are.
