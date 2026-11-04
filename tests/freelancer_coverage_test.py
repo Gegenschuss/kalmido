@@ -1246,7 +1246,6 @@ PATCH /api/calendars/{}
 PATCH /api/calendars/{}/events
 PATCH /api/comments/{}
 PATCH /api/docs/labels/{}/{}
-PATCH /api/evcals/{}
 PATCH /api/family/rewards/{}
 PATCH /api/filters/{}
 PATCH /api/layouts/saved/{}
