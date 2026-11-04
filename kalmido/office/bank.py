@@ -286,6 +286,15 @@ def _row_out(r):
             ("n", "day", "amount", "currency", "counterpart", "purpose", "iban", "ref", "error", "dup", "file", "pending")}
 
 
+DVA_BNK_SKIPPED = 100  # 2.533.0 (#4318) F14: skipped rows named in an answer (the count stays exact)
+
+
+def dva_bnk_skipped(rows):
+    """2.533.0 (#4318) F14: the rows that are skipped for an error -> [{n, file, error}] (row number of its file + the reason),
+    so the answer names them instead of a bare count."""
+    return [{"n": r.get("n"), "file": r.get("file"), "error": r["error"]} for r in rows if r["error"]][:DVA_BNK_SKIPPED]
+
+
 def _info_out(info):
     return {"files": info["files"], "file_errors": info["file_errors"], "skipped_files": info["skipped_files"][:100],
             "camt052": bool(info.get("camt052"))}  # 2.146.0 C (#2469)
@@ -304,7 +313,7 @@ def bnk_preview():
     ok = [r for r in rows if not r["error"] and not r["pending"]]  # 2.146.0 C (#2469): pending ones counted apart
     return jsonify(fmt=fmt, rows=[_row_out(r) for r in rows], count=sum(1 for r in ok if not r["dup"]),
                    dup_count=sum(1 for r in ok if r["dup"]), pending_count=sum(1 for r in rows if not r["error"] and r["pending"]),
-                   skipped=sum(1 for r in rows if r["error"]), **extra, **_info_out(info))
+                   skipped=sum(1 for r in rows if r["error"]), skipped_rows=dva_bnk_skipped(rows), **extra, **_info_out(info))
 
 
 def _import_public(r):
@@ -313,7 +322,7 @@ def _import_public(r):
 
 @app.post("/api/office/bank/import")
 def bnk_import():
-    """{text, filename?, mapping? (CSV)} -> 201 {import, count, dup_count, skipped}. The file is read again here (the
+    """{text, filename?, mapping? (CSV)} -> 201 {import, count, dup_count, skipped, skipped_rows}. The file is read again here (the
     preview's rows are never taken from the client); duplicates and unreadable rows are skipped."""
     c, uid, oid = _ctx()
     b = _req()  # 2.144.1 B (#2450): or a multipart upload (files, several / a ZIP)
@@ -343,7 +352,7 @@ def bnk_import():
     imp = c.execute("SELECT * FROM office_bank_imports WHERE id=?", (iid,)).fetchone()
     return jsonify({"import": _import_public(imp), "count": len(new), "dup_count": dup,
                     "pending_count": sum(1 for r in rows if not r["error"] and r["pending"]),
-                    "skipped": sum(1 for r in rows if r["error"]), "balances": bal_n, "ruled": ruled["applied"], "ruled_locked": ruled["locked"],
+                    "skipped": sum(1 for r in rows if r["error"]), "skipped_rows": dva_bnk_skipped(rows), "balances": bal_n, "ruled": ruled["applied"], "ruled_locked": ruled["locked"],
                     **_info_out(info)}), 201
 
 

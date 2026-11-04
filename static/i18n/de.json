@@ -16185,5 +16185,6 @@
   "Title longer than {0} characters, shortened": "Titel länger als {0} Zeichen, gekürzt",
   "Description longer than {0} characters, shortened": "Beschreibung länger als {0} Zeichen, gekürzt",
   "Rows without a title were skipped": "Zeilen ohne Titel wurden übersprungen",
-  "Row {1}": ["Zeile {1}", "Zeilen {1}"]
+  "Row {1}": ["Zeile {1}", "Zeilen {1}"],
+  "{0} row will be skipped": ["{0} Zeile wird übersprungen", "{0} Zeilen werden übersprungen"]
 }

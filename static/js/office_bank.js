@@ -152,6 +152,14 @@ function bnkHintHtml() {
 function bnk052Html() {
   return `<p class="shint lhint keep bnk052">${ic('info', 's')} ${tr('These are day reports (CAMT.052). Pending transactions are shown but not imported; a booking that appears in several reports counts once. For the bookkeeping, better export the account statement (CAMT.053).')}</p>`;
 }
+// 2.533.0 (#4318) F14: the rows that are skipped, by number and reason (above the list, not only greyed further down)
+function dvaBnkSkipText(rs, many, max = 10) {
+  return (rs || []).slice(0, max).map(r => tr('Row {0}', r.n) + (many && r.file ? ` (${r.file})` : '') + ': ' + r.error).join(' · ') + ((rs || []).length > max ? ' · …' : '');
+}
+function dvaBnkSkipHtml(p, many) {
+  const rs = p.skipped_rows || [];
+  return rs.length ? `<p class="shint lhint keep dvabnkskip" role="status">${ic('alert', 's')} ${esc(trn('{0} row will be skipped', '{0} rows will be skipped', p.skipped || rs.length))}: ${esc(dvaBnkSkipText(rs, many, 20))}</p>` : '';
+}
 function bnkImpModal(text, name, after) {  // text + name: one statement read already (as before); without them the start step
   const md = modal(''), card = $('.card', md), st = {p: null, mapping: null, rows: null, account: null};  // 2.124.0 D (#2342): account = the name for a CSV balance
   md.classList.add('ofcdlg', 'bnkdlg');
@@ -199,7 +207,7 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
   const rowsView = () => {
     const p = st.p, many = (p.files || 1) > 1;
     card.innerHTML = `<h3>${tr('Import bank statement')}</h3><p class="muted">${esc(label())} · ${esc(tr('Import into: {0}', wsName(ofcWs())))/* 2.356.0 B (#2934) */} · ${esc([many && files.length === 1 ? trn('{0} file', '{0} files', p.files) : '', trn('{0} new', '{0} new', p.count), p.dup_count ? trn('{0} already there', '{0} already there', p.dup_count) : '', p.pending_count ? trn('{0} pending', '{0} pending', p.pending_count) : '', p.skipped ? trn('{0} with an error', '{0} with an error', p.skipped) : ''].filter(Boolean).join(' · '))}</p>
-      ${p.camt052 ? bnk052Html() : ''}${cfb_prevHtml(p.balances)}${filesInfo(p)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup || r.pending ? 'arch' : ''} ${r.pending ? 'pend' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.pending ? tr('pending – not imported') : r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
+      ${p.camt052 ? bnk052Html() : ''}${cfb_prevHtml(p.balances)}${filesInfo(p)}${dvaBnkSkipHtml(p, many)}<ul class="ofclist bnkprev" role="list">${p.rows.slice(0, 200).map(r => `<li class="ofcrow ${r.error || r.dup || r.pending ? 'arch' : ''} ${r.pending ? 'pend' : ''}"><span class="ofcn"><b>${esc(r.counterpart || r.purpose || tr('Row {0}', r.n))}</b><small class="muted">${esc([r.day ? fmtDateLoc(r.day) : '', r.error || (r.pending ? tr('pending – not imported') : r.dup ? tr('already there') : r.purpose), many ? r.file : ''].filter(Boolean).join(' · '))}</small></span>${r.amount != null ? `<span class="bnkamt ${+r.amount > 0 ? 'in' : 'out'}">${esc(bnkAmt(r.amount))}</span>` : ''}</li>`).join('')}</ul>
       ${p.rows.length > 200 ? `<p class="muted">${tr('Showing the first 200 rows')}</p>` : ''}${foot(p.count ? trn('Import {0} booking', 'Import {0} bookings', p.count) : '', p.fmt === 'csv')}`;
   };
   const preview = async mapping => {
@@ -230,7 +238,9 @@ function bnkImpModal(text, name, after) {  // text + name: one statement read al
     try {
       const j = await api('POST', '/api/office/bank/import', form(st.mapping)), iid = j.import.id;
       md.remove(); BNK.state = 'open'; BNK.imports = null; bnkReload(); if (after) after();
-      offerUndo(trn('{0} booking imported', '{0} bookings imported', j.count) + (j.ruled ? ` · ${trn('{0} marked by rule', '{0} marked by rule', j.ruled)}` : ''), histAdd({label: tr('Bank statement imported'),
+      // 2.533.0 (#4318) F14: the skipped rows by number in the message (the preview names them above the list too)
+      const skip = j.skipped_rows?.length ? ` · ${trn('{0} row skipped', '{0} rows skipped', j.skipped)}: ${dvaBnkSkipText(j.skipped_rows, (st.p?.files || 1) > 1, 5)}` : '';
+      offerUndo(trn('{0} booking imported', '{0} bookings imported', j.count) + (j.ruled ? ` · ${trn('{0} marked by rule', '{0} marked by rule', j.ruled)}` : '') + skip, histAdd({label: tr('Bank statement imported'),
         undo: async () => { await api('POST', `/api/office/bank/imports/${iid}/undo`); BNK.imports = null; bnkReload(); },
         redo: async () => { await api('POST', `/api/office/bank/imports/${iid}/restore`); BNK.imports = null; bnkReload(); }}));
     } catch (x) { b.disabled = false; err(x.message); }

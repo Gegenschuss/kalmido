@@ -16185,5 +16185,6 @@
   "Title longer than {0} characters, shortened": "Titel langer dan {0} tekens, ingekort",
   "Description longer than {0} characters, shortened": "Beschrijving langer dan {0} tekens, ingekort",
   "Rows without a title were skipped": "Rijen zonder titel zijn overgeslagen",
-  "Row {1}": ["Rij {1}", "Rijen {1}"]
+  "Row {1}": ["Rij {1}", "Rijen {1}"],
+  "{0} row will be skipped": ["{0} rij wordt overgeslagen", "{0} rijen worden overgeslagen"]
 }
