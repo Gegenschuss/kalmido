@@ -101,6 +101,9 @@ function wk_sameEl(el, html) {
   return !!n && !n.nextElementSibling && el.isEqualNode(n);
 }
 const chatNear = box => box.scrollHeight - box.scrollTop - box.clientHeight <= 3 * remPx();
+// 2.521.0 (#4393): sending a reply (reply_to set) while not at the end of the box keeps the view where it is (agent chat,
+// team chat, threads); without a reply or at the end the box goes to the end as before. near = the box's own "at the end"
+const chatReplyUp = (rto, box, near) => !!rto && !!box && box.scrollHeight > box.clientHeight && !near(box);
 // 2.12.2 (#451): replaces only the children of box that changed, by their key (data-k) or else by position; the box itself,
 // its scroll position and anything focused outside of it stay
 // 2.138.4 B (#2189): a keyed row with an open edit bubble (.tcedit) that is still being edited stays as it is: the agent

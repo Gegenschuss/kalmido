@@ -37,18 +37,18 @@ function cf_comments(box, wasSeen) {
   if (added.length && !wasSeen && !cmtNew()) cf_pill('cm-new', true);
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('#tc-new, #cm-new'); if (!b) return;
+  const b = e.target.closest?.('#tc-new, #tth-new, #cm-new'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
-  if (b.id === 'tc-new') { const box = $('#tc-msgs'); if (box) box.scrollTop = box.scrollHeight; }
+  if (b.id === 'tc-new' || b.id === 'tth-new') { const box = $(b.id === 'tc-new' ? '#tc-msgs' : '#tth-msgs'); if (box) box.scrollTop = box.scrollHeight; }
   else $('#d-tl-items')?.lastElementChild?.scrollIntoView({block: 'nearest', behavior: cf_still() ? 'auto' : 'smooth'});
   b.classList.add('hidden');
 }, true);
 // the pill goes when the end is in view again (scrolled down by hand)
 document.addEventListener('scroll', e => {
   const t = e.target;
-  if (t.id === 'tc-msgs') { if (t.scrollHeight - t.scrollTop - t.clientHeight < 80) cf_pill('tc-new', false); return; }
+  if (t.id === 'tc-msgs' || t.id === 'tth-msgs') { if (t.scrollHeight - t.scrollTop - t.clientHeight < 80) cf_pill(t.id === 'tc-msgs' ? 'tc-new' : 'tth-new', false); return; }  // 2.521.0 (#4393): + the thread
   const p = document.getElementById('cm-new'); if (!p || p.classList.contains('hidden')) return;
   const last = $('#d-tl-items')?.lastElementChild; if (!last || cf_visible(last)) p.classList.add('hidden');
 }, true);
 // a tap on a pill keeps the focus (and the keyboard) where it is
-for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (e.target.closest?.('#tc-new, #cm-new')) e.preventDefault(); });
+for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e => { if (e.target.closest?.('#tc-new, #tth-new, #cm-new')) e.preventDefault(); });

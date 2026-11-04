@@ -168,11 +168,13 @@ function tcMsgsHtml(list = S.tc.msgs, o = {}) {
   }
   return h + (o.root ? '' : csdHtml(ck, list, m => m.user_id === S.me?.id));  // 2.62.0 (#1530): "Sending…"
 }
+// the team chat's "at the end" (80 px, as the pill in cfnew.js)
+const tcNear = box => box.scrollHeight - box.scrollTop - box.clientHeight < 80;
 // patch the open conversation in place (keeps the box, its text and the keyboard)
 function tcPatch(bottom) {
   if (S.tc.th) tth_patch();  // 2.139.0 A (#2127): the open thread shows the same messages' changes
   const box = $('#tc-msgs'); if (!box) return;
-  const near = bottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const near = bottom || tcNear(box);
   setHtml(box, tcMsgsHtml());
   const added = cf_after(box, 't:' + S.tc.rid);  // 2.46.2 (#1660): new messages fade in; scrolled up -> "New message ↓"
   if (near) { box.scrollTop = box.scrollHeight; cf_pill('tc-new', false); }
@@ -202,10 +204,10 @@ async function tcSend() {
   chatSentOnce();
   const hadF = document.activeElement === ta, ck = 't:' + rid; if (csdBusy(ck)) return;  // 2.62.0 (#1530): one send at a time
   const p = csdAdd(ck, text, S.tc.msgs), sb = () => $('[data-act="tc-send"]');  // shown as "Sending…", the box empties at once
-  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); if (sb()) sb().disabled = true; tcPatch(true);
+  const rto = replyTo('t:' + rid), up = chatReplyUp(rto, $('#tc-msgs'), tcNear);  // 2.33.0 (#1076); 2.521.0 (#4393): a reply while scrolled up stays there
+  ta.value = ''; delete S.drafts['team:' + rid]; autosize(ta); if (sb()) sb().disabled = true; tcPatch(!up);
   if (!S.tc.room) { try { await loadRoom(rid); } catch { /* sent without the mention lookup */ } }  // 2.24.0: @names need the members
   let m; const msgs = S.tc.msgs;  // 2.58.0 (#1773): another window may become live during the POST (like chatSend)
-  const rto = replyTo('t:' + rid);  // 2.33.0 (#1076)
   try {
     // 2.42.0 (#909): an encrypted DM sends only the ciphertext (encrypted in this browser)
     // 2.64.2 (#1817): the channel of a list with the lock: the text with its mention tokens, encrypted with the list key
@@ -225,7 +227,8 @@ async function tcSend() {
   if (arr && !arr.some(x => x.id === m.id)) arr.push(m);
   const r = (S.tc.rooms || []).find(x => x.id === rid); if (r) { r.last = {id: m.id, user_id: m.user_id, text: text || files[0]?.name || '', created_at: m.created_at}; r.last_at = m.created_at; }
   if (!live) { if (typeof cw_has === 'function' && cw_has(k)) cw_patch(k); return; }
-  tcPatch(true);
+  tcPatch(!up);
+  if (up) { cf_pill('tc-new', true); toast(tr('Sent')); }  // 2.521.0 (#4393)
   if (kbd_close('team')) ta.blur();  // 2.235.0 D (#2899)
   else if (hadF || !isTouch()) ta.focus({preventScroll: true});
 }
@@ -373,7 +376,7 @@ function tth_html() {
     ${wide ? `<button type="button" class="iconbtn" data-act="tth-close" title="${esc(tr('Close thread'))}" aria-label="${esc(tr('Close thread'))}">${ic('x')}</button>` : ''}${panel && typeof cw_headBtns === 'function' ? cw_headBtns('t:' + rid) : ''}</div>`;
   const comp = room?.archived ? tcx_archivedHtml(room) : room?.closed ? tcx_closedHtml() : th.root?.deleted ? '' : `${replyBarHtml('h:' + th.id)}<div class="chcomp tccomp tthcomp">${typeof rf_btnHtml === 'function' ? rf_btnHtml('tth-in') : '' /* 2.147.1 A (#2523) */}<div class="mpick hidden" role="listbox" aria-label="${esc(tr('Mention someone'))}"></div><textarea id="tth-in" rows="1" name="kalmido-thread-message" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${esc(tr('Reply in thread…'))}" aria-label="${esc(tr('Reply in thread…'))}" enterkeyhint="enter" maxlength="8000">${esc(S.drafts['tth:' + th.id] || '')}</textarea>
     <span class="muted chkh">${esc(chatKeyHintVis())}</span><button type="button" class="btn pri" data-act="tth-send" title="${esc(chatKeyHint())}" aria-label="${esc(tr('Send'))}">${ic('send', 's')}<span>${tr('Send')}</span></button></div>`;
-  return `<div class="tthview" data-root="${th.id}">${panel && typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}<div class="chmsgs tcmsgs tthmsgs" id="tth-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Thread'))}">${tth_msgsHtml(n)}</div>${comp}</div>`;
+  return `<div class="tthview" data-root="${th.id}">${panel && typeof cw_switchHtml === 'function' ? cw_switchHtml('t:' + rid) : ''}${head}<div class="chmsgs tcmsgs tthmsgs" id="tth-msgs" role="log" aria-live="polite" aria-relevant="additions" aria-label="${esc(tr('Thread'))}">${tth_msgsHtml(n)}</div><button type="button" class="chnew hidden" id="tth-new">${tr('New message')} <span aria-hidden="true">↓</span></button>${comp}</div>`;
 }
 function tth_msgsHtml(n) {
   const th = S.tc.th; if (!th) return '';
@@ -383,10 +386,11 @@ function tth_msgsHtml(n) {
 }
 function tth_patch(bottom) {
   const box = $('#tth-msgs'); if (!box || !S.tc.th) return;
-  const near = bottom || box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const near = bottom || tcNear(box);
   setHtml(box, tth_msgsHtml());
-  cf_after(box, 'h:' + S.tc.th.id);  // answers coming in fade in
-  if (near) box.scrollTop = box.scrollHeight;
+  const added = cf_after(box, 'h:' + S.tc.th.id);  // answers coming in fade in
+  if (near) { box.scrollTop = box.scrollHeight; cf_pill('tth-new', false); }
+  else if (added.length) cf_pill('tth-new', true);  // 2.521.0 (#4393): scrolled up -> "New message ↓" as in the room
 }
 // the thread came / went: the team view again, or the chat panel window it lives in (S.cw.lt = a live team window there)
 function tth_draw() {
@@ -445,8 +449,8 @@ async function tth_send() {
   const ta = $('#tth-in'), th = S.tc.th, rid = S.tc.rid; if (!ta || !th || !rid) return;
   const text = ta.value.trim(), ck = 'h:' + th.id; if (!text || csdBusy(ck)) return;
   chatSentOnce();
-  const hadF = document.activeElement === ta, p = csdAdd(ck, text, th.msgs), rto = replyTo(ck);
-  ta.value = ''; delete S.drafts['tth:' + th.id]; autosize(ta); tth_patch(true);
+  const hadF = document.activeElement === ta, rto = replyTo(ck), up = chatReplyUp(rto, $('#tth-msgs'), tcNear), p = csdAdd(ck, text, th.msgs);  // 2.521.0 (#4393)
+  ta.value = ''; delete S.drafts['tth:' + th.id]; autosize(ta); tth_patch(!up);
   let m;
   try {  // like tcSend: an encrypted room sends only the ciphertext
     const lk = le2eChanOn(S.tc.room), ltext = lk ? tcMentions(text) : null;
@@ -463,7 +467,8 @@ async function tth_send() {
   th.read = Math.max(th.read, m.id);
   tth_each(th.id, r => { r.thread_count = (r.thread_count || 0) + 1; r.thread_last_at = m.created_at; r.thread_follow = true; r.thread_users = [m.user_id, ...(r.thread_users || []).filter(u => u !== m.user_id)].slice(0, 3); });
   if (S.tc.th !== th) return;
-  tcPatch(); tth_patch(true);
+  tcPatch(); tth_patch(!up);
+  if (up) { cf_pill('tth-new', true); toast(tr('Sent')); }  // 2.521.0 (#4393)
   if (hadF || !isTouch()) $('#tth-in')?.focus({preventScroll: true});
 }
 // msgJump (collab.js) for a message of the open thread or an answer the main list does not hold: opens its thread

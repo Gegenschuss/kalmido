@@ -894,7 +894,7 @@ function fl_attrs(o, n) {
 }
 // nodes in the middle of an edit are left alone: the row with the inline title field, a table cell with its editor open
 function fl_hold(o) {
-  if (o.id === 'tc-new' || o.id === 'cm-new') return true;  // 2.46.3 (#1660): a shown "New message" pill stays shown on a redraw
+  if (o.id === 'tc-new' || o.id === 'tth-new' || o.id === 'cm-new') return true;  // 2.46.3 (#1660): a shown "New message" pill stays shown on a redraw
   if (o.classList.contains('iedit') && S.ie && o.dataset.id === String(S.ie.id) && o.querySelector('.ttlin')) return true;
   return o.classList.contains('tcon') && o.contains(document.activeElement);
 }
