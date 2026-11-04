@@ -216,6 +216,8 @@ jobs:
         run: python tools/check_links.py -v
       - name: Menu paths in the docs and the app's texts name settings that exist (2.512.0, #4175)
         run: python tools/check_menupaths.py -v
+      - name: One data attribute, one meaning - or a guard in the document click listener (2.525.0, #4281)
+        run: python tools/check_dataattr.py -v
       - name: New tables, columns and indexes in migrations.d, not schema.py (2.475.0, #3478)
         run: python tools/check_migrations.py -v
       - name: Modules a test loads as a single file still load that way (2.493.0, #4041)

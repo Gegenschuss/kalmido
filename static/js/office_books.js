@@ -478,6 +478,7 @@ document.addEventListener('change', e => {
   if (t.id === 'tf-paid' || t.id === 'tf-refund') { tfVatSave(); return; }
 });
 function bkReserve(t) { const n = Math.round(+t.value); if (!Number.isFinite(n) || n < 0 || n > 60) { toast(tr('Invalid value: {0}', tr('Tax reserve'))); t.value = +OFC.info?.settings?.tax_reserve_pct || 0; return; } bkSetUndo('tax_reserve_pct', n); }
+// 2.525.0 (#4281): one-meaning guard: data-bk - office route or .ostax, rc / einv / bill / basis / mode only (account.js: the backups)
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-bk]'); if (!b || (S.route?.mod !== 'office' && !b.closest('.ostax'))) return;  // 2.365.2 D (#2789): + Settings > Company & office
   const k = b.dataset.bk;

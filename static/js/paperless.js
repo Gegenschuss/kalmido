@@ -164,6 +164,7 @@ async function pl_preview(zip) {
     md.remove(); pl_draw(); toast(tr('Import started: it runs in the background'));
   });
 }
+// 2.525.0 (#4281): one-meaning guard: data-pl - its string actions only (render.js: list ids on the sidebar rows)
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-pl]'); if (!b || b.matches('input,select')) return;
   const a = b.dataset.pl, root = b.closest('.pl-slot');

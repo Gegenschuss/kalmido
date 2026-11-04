@@ -102,6 +102,7 @@ async function bka_restore(id) {
     redo: async () => { await api('POST', `${BKA_API}/${id}/restore`); await bka_reload(); }}));
 }
 
+// 2.525.0 (#4281): one-meaning guard: data-bka - its own actions only, else return (office_bookarch.js has other values)
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-bka]'); if (!b) return;
   const a = b.dataset.bka, id = +b.dataset.id;

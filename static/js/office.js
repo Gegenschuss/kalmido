@@ -312,6 +312,7 @@ function ofcLangTabs(fields, o = {}) {
   return `<div class="ofclts"><div class="seg" role="tablist" aria-label="${esc(tr('Language'))}">${ls.map(([lg, n], i) => `<button type="button" role="tab" data-lt="${lg}" aria-selected="${i ? 'false' : 'true'}" class="${i ? '' : 'on'}${fields.some(x => x.val(lg)) ? ' ltfill' : ''}">${esc(n)}</button>`).join('')}</div>
     ${ls.map(([lg], i) => `<div data-ltp="${lg}" role="tabpanel"${i ? ' hidden' : ''}>${fields.map(x => inp(x, lg)).join('')}</div>`).join('')}</div>`;
 }
+// 2.525.0 (#4281): one-meaning guard: data-lt - inside .ofclts only (the language tabs)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-lt]'), box = b?.closest('.ofclts');
   if (!box) return;

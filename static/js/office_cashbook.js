@@ -244,7 +244,9 @@ async function cbBookSet(bid, key, v) {  // autosave of one field of a cash box;
 
 // ---- events
 document.addEventListener('click', e => {
-  const b = /** @type {any} */ (e.target).closest?.('[data-cb]'); if (!b || b.tagName === 'INPUT') return;
+  // 2.525.0 (#4281): the address books dialog (contacts.js, #cb-body) has data-cb="close" too: its X opened the cash book's
+  // "Close day" - clicks inside that dialog are not the cash book's (one-meaning guard: data-cb)
+  const b = /** @type {any} */ (e.target).closest?.('[data-cb]'); if (!b || b.tagName === 'INPUT' || b.closest('.modal')?.querySelector('#cb-body')) return;
   const a = b.dataset.cb;
   if (a === 'open') { const x = (CB.list?.entries || []).find(y => y.id === +b.dataset.id); if (x) cbEntryModal(x); }
   else if (a === 'view') { CB.view = b.dataset.v; ofcDraw(); }

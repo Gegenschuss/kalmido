@@ -201,6 +201,7 @@ async function bkaUndo(id) {
 }
 const bkaSetList = () => { BKA.list = null; BKA.view = 'list'; ofcDraw(); };
 
+// 2.525.0 (#4281): one-meaning guard: data-bka - its own actions only (office_bankacc.js has other values), no preventDefault
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-bka]'); if (!b) return;
   const k = b.dataset.bka;

@@ -72,6 +72,7 @@ function plExportDialog() {
 
 const plMonthShort = m => { try { return new Date(+m.slice(0, 4), +m.slice(5, 7) - 1, 1).toLocaleDateString(LOCALE(), {month: 'short'}); } catch { return m.slice(5, 7); } };
 
+// 2.525.0 (#4281): one-meaning guard: data-pl - its string actions only (render.js: list ids on the sidebar rows)
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-pl]'); if (!b) return;
   if (b.dataset.pl === 'lock') plLockDialog();

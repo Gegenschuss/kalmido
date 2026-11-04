@@ -141,6 +141,7 @@ function pp_modal(x, stage) {
   return md;
 }
 
+// 2.525.0 (#4281): one-meaning guard: data-pp - new / newlead / stage / open only, else return before preventDefault (the proposal dialogs)
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-pp]'); if (!b) return;
   const a = b.dataset.pp;

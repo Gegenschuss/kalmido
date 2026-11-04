@@ -416,6 +416,7 @@ async function ltAsTemplate(d) {
 }
 
 // ---- events
+// 2.525.0 (#4281): one-meaning guard: data-lt - not inside a .modal, the letter actions only (agents.js, office.js use data-lt otherwise)
 document.addEventListener('click', async e => {
   if (!/** @type {any} */ (e.target).closest?.('.lt-rc')) { const s = $('#lt-sug'); if (s && !s.hidden) s.hidden = true; }  // the suggestions close outside
   const b = /** @type {any} */ (e.target).closest?.('[data-lt]'); if (!b || b.tagName === 'INPUT' || b.tagName === 'SELECT') return;

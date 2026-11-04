@@ -442,6 +442,7 @@ document.addEventListener('keydown', e => {
   if (used) { e.preventDefault(); e.stopImmediatePropagation(); }
 }, true);
 document.addEventListener('focusout', e => { if (e.target.id === 'mm-edit' && MM.edit && !e.target.dataset.done) { e.target.dataset.done = '1'; mm_commit(e.target.value); } });
+// 2.525.0 (#4281): one-meaning guard: data-mm - inside .mmwrap only (popovers.js: the calendar's month arrows)
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-mm]'); if (!a || !a.closest('.mmwrap')) return;
   const k = a.dataset.mm;
@@ -454,6 +455,7 @@ document.addEventListener('click', e => {
   else if (k === 'fold') { e.stopPropagation(); if (MM.fold.has(a.dataset.n)) MM.fold.delete(a.dataset.n); else MM.fold.add(a.dataset.n); mm_foldSave(); renderView(); }
 });
 // the outline: a tap selects, a second tap opens the branch's actions
+// 2.525.0 (#4281): one-meaning guard: data-mm - [data-mm] only skips the click here
 document.addEventListener('click', e => {
   const r = e.target.closest?.('.mmoi'); if (!r || e.target.closest('[data-mm]')) return;
   const n = mm_listFind(r.dataset.mmn); if (!n) return;

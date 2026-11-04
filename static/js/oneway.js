@@ -135,6 +135,7 @@ const dv_menuItems = t => t.id > 0 && !ow_ro(t) && t.status === 0 ? [
   {label: dv_state(t) === 'parked' ? tr('Change the parking reason') : tr('Park with a reason'), icon: 'pause', fn: () => dv_park(t.id).catch(() => {})},
   {label: tr('Waiting for…|delivery'), icon: 'clock', fn: () => dv_wait(t.id).catch(() => {})},
   ...(dv_state(t) ? [{label: tr('Clear the delivery state'), icon: 'x', fn: () => dv_put(t.id, null).catch(() => {})}] : [])] : [];
+// 2.525.0 (#4281): one-meaning guard: data-dv - park / wait / clear only (office_datev.js: inputs of its own change handler)
 document.addEventListener('click', async e => {
   const b = e.target.closest?.('[data-dv]'); if (!b) return;
   const id = S.sel;

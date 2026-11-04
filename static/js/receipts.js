@@ -212,9 +212,13 @@ async function rx_post(id, b) {
   if (typeof bkRxAfter === 'function') bkRxAfter(id);
   return j;
 }
+// 2.525.0 (#4281): data-rx means something else elsewhere too (agents.js reaction picker: the reaction key, orgexport.js
+// retention box: its kind) - only the receipt actions with a document id count here (one-meaning guard: data-rx)
+const RX_ACTS = new Set(['copy', 'dismiss', 'apply', 'nodup']);
 document.addEventListener('click', async e => {
   const b = e.target.closest('[data-rx]'); if (!b) return;
   const [act, sid] = b.dataset.rx.split(':'), id = +sid;
+  if (!RX_ACTS.has(act) || !(id > 0)) return;
   if (act === 'copy') {
     const v = b.closest('.rx-no')?.querySelector('.rx-nov')?.textContent || '';
     try { await navigator.clipboard.writeText(v); toast(tr('Copied')); } catch { toast(tr('Copying is blocked in this browser')); }

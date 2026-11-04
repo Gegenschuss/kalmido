@@ -101,7 +101,9 @@ function ccToBox(cid, id) {
 document.addEventListener('click', e => {
   const p = e.target.closest?.('[data-ccpen]');
   if (p) { e.preventDefault(); e.stopPropagation(); ccToBox(+p.dataset.ccpen, p.dataset.ch); return; }
-  const b = e.target.closest?.('[data-cc]'); if (!b || b.disabled) return;
+  // 2.525.0 (#4281): the credit card sheet (office_cards.js) uses data-cc too - only a card's own pick / send with its
+  // comment id count here (one-meaning guard: data-cc)
+  const b = e.target.closest?.('[data-cc]'); if (!b || b.disabled || !b.dataset.cid || (b.dataset.cc !== 'pick' && b.dataset.cc !== 'send')) return;
   e.preventDefault(); e.stopPropagation();
   ccAnswer(+b.dataset.cid, b.dataset.ch, b.dataset.cc === 'send');
 });

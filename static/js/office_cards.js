@@ -170,7 +170,9 @@ async function ccBankLink(tid, fits) {
 }
 const ccLineOf = id => (CC.sheet?.lines || []).find(x => x.id === id);
 document.addEventListener('click', async e => {
-  const b = /** @type {any} */ (e.target).closest?.('[data-cc]'); if (!b) return;
+  // 2.525.0 (#4281): data-cc="pick" / "send" are the choice cards' too (choicecard.js) - only buttons inside the office view
+  // count here (one-meaning guard: data-cc)
+  const b = /** @type {any} */ (e.target).closest?.('[data-cc]'); if (!b || !b.closest('.dash.office')) return;
   const a = b.dataset.cc, id = +b.dataset.id, sid = CC.sid;
   e.preventDefault();
   if (a === 'add') ccCardDlg(null);

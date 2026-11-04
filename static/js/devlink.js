@@ -75,6 +75,7 @@ async function dlOpenEquip(tid) {
   }
 }
 
+// 2.525.0 (#4281): one-meaning guard: data-dl - acts on to-office / open-eq / pull / unlink only (family.js, office_docs.js use data-dl for other things)
 document.addEventListener('click', async e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-dl]'); if (!b || b.disabled) return;
   e.preventDefault();
