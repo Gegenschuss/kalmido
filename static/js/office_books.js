@@ -137,6 +137,7 @@ function bkEuerHtml() {
     <div class="bk-profit"><span>${tr('Profit')}${d.small_business ? ` <small class="muted">(${tr('small business: gross')})</small>` : ''}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
     ${d.tax_reserve_pct ? `<div class="bk-profit bk-res"><span>${tr('Tax reserve for the year ({0} % of the profit)', d.tax_reserve_pct)}</span><b>${ofcMoney(d.tax_reserve)}</b></div>` : ''}
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
+    ${(d.meals?.notes || []).map((n, i) => `<p class="${i ? 'bk-warn' : 'muted ofchint'}" data-bk-meal="${i}">${esc(n)}</p>`).join('')}${''/* 2.534.0 (#4333): the 30 % and the double-count hint */}
     <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>`;
 }
 
@@ -167,6 +168,7 @@ function bkUstvaHtml() {
   return `<section class="bk-sec" id="bk-ustva" aria-labelledby="bk-uh"><h3 class="ofcgrp" id="bk-uh">${tr('VAT return (figures to type in)')}</h3>${bar}${body}</section>`;
 }
 function bkItemRow(it) {
+  if (it.kind === 'meal') return `<li><a class="ofcrow" href="#office/meals"><span class="ofcn"><b>${esc(it.title || tr('Entertainment receipt'))}</b><small class="muted">${esc([fmtDateLoc(it.date), tr('Entertainment receipt')].join(' · '))}</small></span><span class="rksum">${ofcMoney(it.gross)}</span>${ic('chev', 's')}</a></li>`;  // 2.534.0 (#4333)
   const rc = it.kind === 'receipt';
   const t = rc ? (it.title || tr('Receipt')) : `${it.kind === 'credit' ? tr('Credit note') : tr('Invoice')} ${it.number || ''}`;
   const sub = [fmtDateLoc(it.date), rc ? bkVatLabel(it.vat_pct) : it.source === 'payment' ? tr('Payment') : it.source === 'skonto' ? tr('Cash discount') /* 2.355.0 C (#2840) */ : ''].filter(Boolean).join(' · ');

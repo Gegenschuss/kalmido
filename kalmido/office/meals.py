@@ -210,6 +210,20 @@ def bw_calc(lines, tip):
             "deductible": dstr(ded), "not_deductible": dstr(money(net - ded))}
 
 
+def ofc_bw_booked(c, oid, frm, to):
+    """2.534.0 (#4333): the approved meals (not in the trash) of office area oid dated within [frm, to] for the bookkeeping
+    (books.bk_euer / bk_ustva, bkexport.bx_rows): [{id, date, title, currency, calc (bw_calc)}], the whole office (no "own"
+    filter: the bookkeeping is the office admin's). Drafts never count."""
+    out = []
+    for r in c.execute("SELECT id, date, place_name, occasion, amounts, tip, currency FROM office_meals WHERE org_id=? AND status='approved' "
+                       "AND deleted_at IS NULL AND date>=? AND date<=? ORDER BY date, id", (oid, frm, to)).fetchall():
+        d = oc_dec_fields(c, oid, "office_meals", r)
+        title = " - ".join(x for x in (d.get("place_name") or "", d.get("occasion") or "") if x)
+        out.append({"id": d["id"], "date": d["date"], "title": title, "currency": d["currency"] or "",
+                    "calc": bw_calc(_j(d.get("amounts"), []), d.get("tip"))})
+    return out
+
+
 def bw_years(c, oid):
     """2.147.0 (#2459, #2461): the retention of receipts in years of office area oid (its country pack; the neutral base pack:
     the office's own value). DE stays at 8. 2.355.0 B (#2845): never below 8 (a lower value of a pack or the office counts

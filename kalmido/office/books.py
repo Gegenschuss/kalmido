@@ -10,7 +10,9 @@ Sources (nothing is booked twice):
    tax lines; refunds paid on credit notes count negative; a foreign currency through the document's rate
  - expenses = receipts (documents of the office's documents space with a row in rc_receipts and an amount; the VAT rate
    from rc_receipts.vat_pct, unknown counts as 0 % input tax) on their payment day (paid_at, set by the bank
-   reconciliation) or else their document date, and travel receipts (no input tax). Fixed costs and purchases are plans
+   reconciliation) or else their document date, and travel receipts (no input tax); 2.534.0 (#4333): the approved
+   entertainment receipts (office/meals.py) on their day, 70 % of the net amount (a small business: of the gross amount)
+   as an expense, their input tax in full (field 66). Fixed costs and purchases are plans
    (and would double the receipts): not counted.
  - VAT return figures: "ist" (VAT on payment received, the payments of the period) or "soll" (VAT on invoicing: finalised
    invoices by their date, credit notes negative -- the same documents as the DATEV export); input tax from receipts by
@@ -35,7 +37,7 @@ from .einvoice_in import ei_amount, ei_details, ei_rc_offer  # 2.237.0 C (#2865)
 from .homecur import hc_code, hc_doc_fx, hc_home, hc_office_rate
 from .ledger import ofx_company  # 2.355.0 C (#2844)
 from .model import ofx_name1, office_feature, office_gate, office_need_feature, office_org, office_settings, pb_owner
-from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
+from .pdf import pdf_money, pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size; 2.534.0 (#4333): pdf_money
 
 BK_NOTE = N_("No tax advice; figures without guarantee.")
 BK_VAT = ("19", "7", "0")
@@ -323,6 +325,42 @@ def _pay_parts(p, r, home):
     return out
 
 
+OFC_MEAL_TWICE = N_("Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.")
+
+
+def ofc_meals_home(c, oid, frm, to, s):
+    """2.534.0 (#4333): the approved meals of [frm, to] (meals.ofc_bw_booked) in the office currency: [{id, date, title,
+    gross, vat, net, deductible, not_deductible (Decimal), unrated}] -- net and the 70 / 30 split include the tip (bw_calc).
+    A currency without an office rate counts 1:1 (unrated = its code), as the receipts do."""
+    from .meals import ofc_bw_booked
+    out = []
+    for m in ofc_bw_booked(c, oid, frm, to):
+        cur, rate = bk_home_rate(m["currency"], s)
+        f = lambda v: money(dec(v) / rate) if rate else money(dec(v))  # noqa: E731
+        k = m["calc"]
+        net, ded = f(k["net"]), f(k["deductible"])
+        out.append({"id": m["id"], "date": m["date"], "title": m["title"], "gross": f(k["gross"]), "vat": f(k["vat"]), "net": net,
+                    "deductible": ded, "not_deductible": net - ded, "unrated": cur if rate is None else None})
+    return out
+
+
+def ofc_meals_euer(meals, small):
+    """2.534.0 (#4333), bk_euer: (expense line values [net, vat, gross], summary {count, gross, vat, deductible, not_deductible}).
+    70 % of the net amount is an expense, its input tax counts in full (section 4 (5) no. 2 EStG, section 15 UStG); a small
+    business deducts no input tax: 70 % of the gross amount (meals.BW_SHARE)."""
+    from .meals import BW_SHARE
+    z = Decimal(0)
+    gross = sum((m["gross"] for m in meals), z)
+    if small:
+        ded = sum((money(m["gross"] * BW_SHARE) for m in meals), z)
+        vat, nd = z, gross - ded
+    else:
+        ded = sum((m["deductible"] for m in meals), z)
+        vat, nd = sum((m["vat"] for m in meals), z), sum((m["not_deductible"] for m in meals), z)
+    return [ded, vat, ded + vat], {"count": len(meals), "gross": dstr(money(gross)), "vat": dstr(money(vat)),
+                                   "deductible": dstr(money(ded)), "not_deductible": dstr(money(nd))}
+
+
 # ---------------------------------------------------------------- EUeR
 def bk_euer(c, oid, year):
     """The income / expense statement of a year (see the module text); amounts as text with two decimals."""
@@ -375,12 +413,23 @@ def bk_euer(c, oid, year):
     km = lb_allowance_year(c, oid, year)
     if km["count"]:
         exp["km"] = {"label": tr("Mileage allowance"), "v": [km["amount"], Decimal(0), km["amount"]], "count": km["count"]}
+    # 2.534.0 (#4333): the approved entertainment receipts (office/meals.py): 70 % as an expense, the input tax in full
+    meals = ofc_meals_home(c, oid, y0, y1, s)
+    meal_sum, meal_notes = None, []
+    if meals:
+        v, meal_sum = ofc_meals_euer(meals, small)
+        exp["m:"] = {"label": tr("Entertainment (70 % deductible)"), "v": v, "count": len(meals)}
+        unrated |= {m["unrated"] for m in meals if m["unrated"]}
+        meal_notes = [tr("Entertainment: {0} (30 %) are not deductible and are not in the expenses.",
+                         pdf_money(meal_sum["not_deductible"], calc_lang(lang()), home)),
+                      tr(OFC_MEAL_TWICE)]
+        meal_sum["notes"] = meal_notes
     m2 = lambda v: dstr(money(v))  # noqa: E731
     order = lambda k: (0, -int(dec(k[3:]))) if k.startswith("vat") else (1 if k == "exempt" else 2, 0)  # noqa: E731
     income = [{"key": k, "label": _income_label(k), "net": m2(v[0]), "vat": m2(v[1]), "gross": m2(v[2])}
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}
-                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "c:", kv[1]["label"].casefold()))]
+                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "m:", kv[0] == "c:", kv[1]["label"].casefold()))]
     from .catacct import ca_euer
     expenses = ca_euer(c, oid, expenses)  # 2.121.0 (#2093): the account of each receipt category line
     tot = lambda rows, f: sum((dec(r[f]) for r in rows), Decimal(0))  # noqa: E731
@@ -397,8 +446,9 @@ def bk_euer(c, oid, year):
             "notes": [tr(BK_NOTE), tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]
             + ([tr("Mileage allowance from the logbook (business drives with a private car).")] if km["count"] else [])
             # 2.189.0 B (#2475): receipts in a foreign currency without an office rate count 1:1 in the home currency
-            + [tr("Receipts in {0} without an exchange rate in the office settings count as {1}.", x, home) for x in sorted(unrated)],
-            "unrated": sorted(unrated)}
+            + [tr("Receipts in {0} without an exchange rate in the office settings count as {1}.", x, home) for x in sorted(unrated)]
+            + meal_notes,  # 2.534.0 (#4333)
+            "unrated": sorted(unrated), "meals": meal_sum}
 
 
 # ---------------------------------------------------------------- VAT return figures
@@ -484,6 +534,11 @@ def bk_ustva(c, oid, year, period):
         missing += rc["vat_pct"] is None
         items.append({"kind": "receipt", "node_id": rc["node_id"], "title": rc["title"], "date": rc["date"], "gross": dstr(rc["amount"]),
                       "vat": dstr(rc["vat"]), "vat_pct": rc["vat_pct"]})
+    # 2.534.0 (#4333): the input tax of the approved entertainment receipts counts in full (by the day of the meal)
+    for m in ofc_meals_home(c, oid, frm, to, s):
+        kz66 += m["vat"]
+        items.append({"kind": "meal", "meal_id": m["id"], "title": m["title"], "date": m["date"], "gross": dstr(m["gross"]),
+                      "vat": dstr(m["vat"]), "vat_pct": None})
     b = lambda k: sums.get(k, [Decimal(0)] * 2)[0]  # noqa: E731
     kz81, kz86 = _euro_floor(b("vat19")), _euro_floor(b("vat7"))
     others = [k for k in sums if k.startswith("vat") and k not in ("vat19", "vat7")]

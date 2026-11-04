@@ -16224,5 +16224,9 @@
   "The terms and conditions (as of {0}) could not be added to the PDF, which still says \"see attachment\". Send them as a separate file, or send without them.": "Les conditions générales (version du {0}) n'ont pas pu être ajoutées au PDF, qui indique pourtant « voir annexe ». Envoie-les comme fichier séparé ou envoie sans elles.",
   "Terms and conditions missing": "Conditions générales manquantes",
   "Send them as a separate file": "Envoyer comme fichier séparé",
-  "Send without terms": "Envoyer sans conditions"
+  "Send without terms": "Envoyer sans conditions",
+  "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Les frais de réception comptent depuis Bureau > Frais de réception. Une facture de restaurant aussi rangée sous Justificatifs compte deux fois : garde-la à un seul endroit.",
+  "Entertainment (70 % deductible)": "Frais de réception (70 % déductibles)",
+  "Entertainment (30 % not deductible)": "Frais de réception (30 % non déductibles)",
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Frais de réception : {0} (30 %) ne sont pas déductibles et ne figurent pas dans les dépenses."
 }

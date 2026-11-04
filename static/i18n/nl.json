@@ -16224,5 +16224,9 @@
   "The terms and conditions (as of {0}) could not be added to the PDF, which still says \"see attachment\". Send them as a separate file, or send without them.": "De algemene voorwaarden (versie {0}) konden niet aan de pdf worden toegevoegd, terwijl die „zie bijlage” zegt. Verstuur ze als apart bestand of verstuur zonder.",
   "Terms and conditions missing": "Algemene voorwaarden ontbreken",
   "Send them as a separate file": "Als apart bestand versturen",
-  "Send without terms": "Zonder voorwaarden versturen"
+  "Send without terms": "Zonder voorwaarden versturen",
+  "Entertainment receipts count from Office > Entertainment receipts. A restaurant bill that also lies under Receipts counts twice: keep it in one place only.": "Representatiebonnen tellen vanuit Kantoor > Representatiebonnen. Een restaurantrekening die ook onder Bonnen staat, telt dubbel: bewaar die op één plek.",
+  "Entertainment (70 % deductible)": "Representatie (70 % aftrekbaar)",
+  "Entertainment (30 % not deductible)": "Representatie (30 % niet aftrekbaar)",
+  "Entertainment: {0} (30 %) are not deductible and are not in the expenses.": "Representatie: {0} (30 %) is niet aftrekbaar en staat niet bij de uitgaven."
 }

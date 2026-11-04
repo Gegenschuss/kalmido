@@ -2,7 +2,7 @@
 
 A booking list of a period as CSV and, as a ZIP, the same list with the files behind it: the issued invoices / credit notes
 (the stored PDF and e-invoice XML, as mailed) and the receipt files of the office's documents space. One row per tax rate of
-a document, payments received, receipts and travel receipts; amounts in the office currency, signed (income and payments
+a document, payments received, receipts, travel receipts and (2.534.0, #4333) entertainment receipts (70 % / 30 %); amounts in the office currency, signed (income and payments
 received plus, credit notes / refunds, receipts and travel minus), so the rows of a type add up.
 
 Same rights as the bookkeeping: admins of the office area only (a personal office: its owner), agents and kids 403
@@ -36,7 +36,7 @@ from ..files.store import fs_read  # 2.369.5 (#2517): pulled up from functions
 BX_COLS = ("type", "date", "number", "counterparty", "text", "category", "tax_pct", "net", "tax", "gross", "currency", "file")
 BX_DAYS_MAX = 3 * 366  # one export covers at most three years
 BX_TYPES = {"invoice": N_("Invoice"), "credit": N_("Credit note"), "payment": N_("Payment"), "receipt": N_("Receipt"), "travel": N_("Travel expenses"),
-            "card": N_("Credit card")}  # 2.444.0 (#3447): positions of the statements (the total leaves the bank account, office/cardnorc.py)
+            "card": N_("Credit card"), "meal": N_("Entertainment receipt")}  # 2.444.0 (#3447): positions of the statements (the total leaves the bank account, office/cardnorc.py)
 
 
 def _ctx():
@@ -127,6 +127,16 @@ def bx_rows(c, oid, frm, to, gaps=None):
                 rows.append({"type": "travel", "date": day, "number": "", "counterparty": "", "text": it["text"] or tr_.get("purpose") or "",
                              "category": rk_cat_label(it["category"] or "other"), "tax_pct": "", "net": -a, "tax": "", "gross": -a,
                              "currency": home, "file": ""})
+    # 2.534.0 (#4333): the approved entertainment receipts, two rows each: the deductible 70 % with the full input tax and
+    # the 30 % that are not deductible (a small business: 70 / 30 of the gross amount, no input tax) -- gross adds up to the bill
+    from .books import ofc_meals_euer, ofc_meals_home
+    small = bool(s.get("small_business"))
+    for m in ofc_meals_home(c, oid, frm, to, s):
+        v, sm = ofc_meals_euer([m], small)
+        nd = dec(sm["not_deductible"])
+        for cat, net, tax in ((tr("Entertainment (70 % deductible)"), v[0], v[1]), (tr("Entertainment (30 % not deductible)"), nd, dec(0))):
+            rows.append({"type": "meal", "date": m["date"], "number": "", "counterparty": "", "text": m["title"], "category": cat, "tax_pct": "",
+                         "net": -net, "tax": -tax if tax else "", "gross": -(net + tax), "currency": home, "file": ""})
     from .cardnorc import cc_bk_rows
     rows += cc_bk_rows(c, oid, frm, to)  # 2.444.0 (#3447)
     rows.sort(key=lambda x: (x["date"] or "", list(BX_TYPES).index(x["type"]), x["number"]))
