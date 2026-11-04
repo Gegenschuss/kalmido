@@ -350,6 +350,6 @@
   .dc-bar .dc-seg{flex:1 1 100%}
   .dc-bar .dc-seg button{flex:1;justify-content:center}
   .dc-acts2{flex:1 1 100%;margin-left:0;justify-content:flex-end}
-  .dc-bar .dc-up,.dc-bar .btn{padding:0;width:var(--bh);justify-content:center}
-  .dc-bar [data-dc="more"]{width:auto;padding:0 .75rem}
+  .dc-bar .dc-up,.dc-bar .btn{padding:0 .5rem;min-width:var(--bh);justify-content:center}  /* all buttons of the bar: the symbol only (the text stays for screen readers) */
+  .dc-bar .btn>span:not(.dc-count){position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);clip-path:inset(50%)}
 }
