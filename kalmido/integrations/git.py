@@ -31,7 +31,8 @@ from ..core.errors import BadInput, UnknownFields
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count
 from ..collab.integfail import INTEG_FAILS, integ_tell
-from ..calendars.subscriptions import _cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError
+from ..calendars.subscriptions import (_cal_opener, cal_allow, cal_err_text, cal_host_allowed, cal_rate, CAL_TIMEOUT, CalError,
+                                       CAL_SEND_S, cal_left, cal_until)
 from ..agents.core import agent_emit, agent_notify, agent_row, agent_runtime, agent_task_data, git_author_clean, git_author_str, is_agent, list_agents, need_person
 from ..tasks.ticketkey import tk_find, tk_has_key, tk_prefixes, tk_text_pairs, tk_text_re  # 2.390.0 (#3353)
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -326,7 +327,22 @@ def git_ctx(c, r):
 
 def git_http(k, path, etag=None, method="GET", data=None):
     """One GET against the provider's API -> (status, headers, json or None on 304). Raises CalError / GitRate.
-    2.394.0 C (#3377): method / data (a JSON body) for the issue sync's writes (PATCH / PUT / POST)."""
+    2.394.0 C (#3377): method / data (a JSON body) for the issue sync's writes (PATCH / PUT / POST).
+    2.539.0 (#4379): the whole call ends after CAL_SEND_S (a server answering drop by drop: CalError timeout)."""
+    until = time.monotonic() + CAL_SEND_S
+    with cal_until(until) as cut:
+        try:
+            res = _git_http1(k, path, etag, method, data, until)
+        except CalError:
+            if cut.is_set():
+                raise CalError("timeout") from None
+            raise
+    if cut.is_set():  # a body cut off by the watchdog reads like its end
+        raise CalError("timeout")
+    return res
+
+
+def _git_http1(k, path, etag, method, data, until):
     gh = k["provider"] == "github"
     hd = {"User-Agent": f"{APP_NAME}/{APP_VERSION} (git integration)",
           "Accept": "application/vnd.github+json" if gh else "application/json"}
@@ -349,7 +365,7 @@ def git_http(k, path, etag=None, method="GET", data=None):
         if rem is not None and str(rem).isdigit() and int(rem) < GIT_RATE_FLOOR:
             k["low"] = float(reset) if reset and str(reset).isdigit() else time.time() + 900
     try:
-        r = _cal_opener(k["allow"]).open(req, timeout=CAL_TIMEOUT)
+        r = _cal_opener(k["allow"]).open(req, timeout=cal_left(until, CAL_TIMEOUT))
     except urllib.error.HTTPError as e:
         code, h = e.code, e.headers
         e.close()

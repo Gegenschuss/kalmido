@@ -30,7 +30,7 @@ from ..collab.integfail import integ_org_admins, integ_tell
 from ..core.errors import BadInput
 from ..notify.alerts import _env_int, aa_count, aa_now
 from ..calendars.subscriptions import (
-    _cal_opener, cal_allow, cal_allow_parse, CAL_ERR, cal_host_allowed, cal_ip_public, CalError,
+    _cal_opener, cal_allow, cal_allow_parse, CAL_ERR, cal_host_allowed, cal_ip_public, CalError, CAL_SEND_S, cal_left, cal_until,
 )
 from ..api.v1 import task_core, task_for, WH_ON
 from ..api.common import act_via
@@ -44,7 +44,7 @@ from ..accounts.orgs import org_role, _need_org_admin  # 2.369.5 (#2517): pulled
 # batch) and queued after the request succeeded -- one payload per subscribed webhook, built for its owner (their
 # tags, only lists they see at that moment; the collaboration switches apply). A background thread delivers them:
 # POST, JSON, signed with the webhook's secret (X-Kalmido-Signature: t=<unix time>,v1=<hex HMAC-SHA256 of "<t>.<body>">),
-# 10 s timeout, the response body is ignored (at most 4 KB read), no redirects. A failed delivery is retried after
+# 10 s timeout (2.539.0, #4379: 15 s for the whole delivery, CAL_SEND_S), the response body is ignored (at most 4 KB read), no redirects. A failed delivery is retried after
 # 1 min, 5 min, 30 min and 2 h; when the last try fails too the webhook is turned off and the admins get an alert.
 # SSRF guard: the same as calendar subscriptions (every address the host resolves to must be public, checked when
 # connecting); hosts on the admin allow-list (Settings > Users > Whole server) or in KALMIDO_WEBHOOK_ALLOW_HOSTS may be
@@ -133,6 +133,14 @@ def wh_send(url, secret, event, delivery, attempt, body_bytes, allow):
 
 
 def _wh_post(url, secret, event, delivery, attempt, body_bytes, allow):
+    """2.539.0 (#4379): the whole POST ends after CAL_SEND_S (a server answering drop by drop: "timeout")."""
+    until = time.monotonic() + CAL_SEND_S
+    with cal_until(until) as cut:
+        res = _wh_post1(url, secret, event, delivery, attempt, body_bytes, allow, until)
+    return (False, res[1], res[2], "timeout") if cut.is_set() else res
+
+
+def _wh_post1(url, secret, event, delivery, attempt, body_bytes, allow, until):
     t = str(int(time.time()))
     sig = hmac.new(secret.encode(), t.encode() + b"." + body_bytes, hashlib.sha256).hexdigest()
     hd = {"Content-Type": "application/json", "User-Agent": f"{APP_NAME}/{APP_VERSION} (webhook)", "X-Kalmido-Event": event,
@@ -149,7 +157,7 @@ def _wh_post(url, secret, event, delivery, attempt, body_bytes, allow):
         return False, None, 0, "config"
     req = urllib.request.Request(url, data=body_bytes, method="POST", headers=hd)
     try:
-        with _cal_opener(allow).open(req, timeout=WH_TIMEOUT) as r:
+        with _cal_opener(allow).open(req, timeout=cal_left(until, WH_TIMEOUT)) as r:
             r.read(WH_READ_MAX)
             code = r.status
         return 200 <= code < 300, code, ms(), "" if 200 <= code < 300 else "http"
@@ -473,9 +481,14 @@ def wh_tick():
                     r["key"] = None
         finally:
             c.close()
+    slow = set()
     for r in rows:
+        if r["webhook_id"] in slow:  # 2.539.0 (#4379): a target that timed out is not tried again in this tick (its other
+            continue                 # deliveries wait, unchanged, for the next one): one slow server costs a tick CAL_SEND_S
         res = wh_send(r["url"], r["key"], r["event"], r["delivery"], r["attempt"] + 1, r["payload"].encode(), allow) \
             if r["key"] else (False, None, 0, "error")
+        if res[3] in ("timeout", "network"):
+            slow.add(r["webhook_id"])
         with GATE.bg():
             c = connect()
             try:

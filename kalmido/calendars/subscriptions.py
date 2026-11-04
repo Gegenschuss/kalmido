@@ -1,5 +1,6 @@
 """External calendars (read-only subscriptions): SSRF guard, ICS / CalDAV sync, API."""
 import base64
+import contextlib
 import functools
 import hashlib
 import html
@@ -223,12 +224,44 @@ def _cal_connector(allow):
 
 
 _CAL_WATCH = threading.local()  # 2.424.0 B2 (#3450): the connections of a cal_http call with `until` (its watchdog)
+# 2.539.0 (#4379): the whole time of one delivery to an outside server (a webhook, a notification channel, a git API call, a
+# newsletter API call), connect + headers + body: a target sending one byte every 9 s never holds a queue longer than this
+CAL_SEND_S = 15
 
 
 def _cal_watch(conn):
-    w = getattr(_CAL_WATCH, "conns", None)
-    if w is not None:
+    for w in getattr(_CAL_WATCH, "stack", None) or ():  # 2.539.0 (#4379): every open cal_until around this call
         w.append(conn)
+
+
+@contextlib.contextmanager
+def cal_until(until):
+    """2.539.0 (#4379): the watchdog of cal_http(until=...) for any request through _cal_opener in this thread: at the
+    time.monotonic() point `until` the sockets opened inside the block are shut down (a blocked connect / TLS / header /
+    body read returns). Yields an Event, set when it cut; the caller then reports "timeout" (a body cut off reads like its
+    end). The socket timeout of each request stays the caller's (at most the time left: cal_left)."""
+    stack = getattr(_CAL_WATCH, "stack", None)
+    if stack is None:
+        stack = _CAL_WATCH.stack = []
+    conns, cut = [], threading.Event()
+    dog = threading.Timer(max(0.0, until - time.monotonic()), _cal_cut, (conns, cut))
+    dog.daemon = True
+    stack.append(conns)
+    dog.start()
+    try:
+        yield cut
+    finally:
+        dog.cancel()
+        stack.remove(conns)
+
+
+def cal_left(until, timeout):
+    """2.539.0 (#4379): the socket timeout of a request inside cal_until: timeout, at most the time left (CalError
+    timeout when none is)."""
+    left = until - time.monotonic()
+    if left <= 0:
+        raise CalError("timeout")
+    return min(timeout, left)
 
 
 class _CalHTTPConnection(http.client.HTTPConnection):
@@ -320,20 +353,13 @@ def cal_http(url, method="GET", body=None, headers=None, auth=None, allow=frozen
     the open connections down then (CalError timeout). Without it (the calendar subscriptions) nothing changes."""
     if until is None:
         return _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, None)
-    _CAL_WATCH.conns = conns = []
-    cut = threading.Event()
-    dog = threading.Timer(max(0.0, until - time.monotonic()), _cal_cut, (conns, cut))
-    dog.daemon = True
-    dog.start()
-    try:
-        res = _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until)
-    except CalError:
-        if cut.is_set() or time.monotonic() >= until:
-            raise CalError("timeout") from None
-        raise
-    finally:
-        dog.cancel()
-        _CAL_WATCH.conns = None
+    with cal_until(until) as cut:  # 2.539.0 (#4379): the watchdog moved into cal_until (shared with the deliveries)
+        try:
+            res = _cal_http(url, method, body, headers, auth, allow, cross_redirects, max_bytes, timeout, deadline, until)
+        except CalError:
+            if cut.is_set() or time.monotonic() >= until:
+                raise CalError("timeout") from None
+            raise
     if cut.is_set():  # a body cut off by the watchdog reads like its end
         raise CalError("timeout")
     return res

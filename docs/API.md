@@ -1130,7 +1130,7 @@ t=${SIG#t=}; t=${t%%,*}; v1=${SIG##*v1=}
 printf '%s.' "$t" | cat - body.json | openssl dgst -sha256 -hmac "$SECRET" | awk '{print $2}' | grep -qx "$v1" && echo ok
 ```
 
-**Delivery.** Your endpoint should answer with any 2xx status within 10 seconds; the response body is ignored. Anything
+**Delivery.** Your endpoint should answer with any 2xx status within 10 seconds; the response body is ignored. The whole delivery (connecting, headers, body) ends after 15 seconds, also for a server that keeps sending a byte now and then (2.539); a webhook that timed out waits for the next round, its other pending events too. Anything
 else (another status, a redirect, a timeout, a refused connection) counts as a failure and is **retried after 1 minute,
 5 minutes, 30 minutes and 2 hours**. If the fifth attempt fails as well, the webhook is **turned off** (*turned off after
 failed deliveries* in the settings) and the admins get an alert; switch it back on once the receiver works. Deliveries

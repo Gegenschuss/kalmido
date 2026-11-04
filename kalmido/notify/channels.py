@@ -138,7 +138,15 @@ def chn_request(kind, t, text):
 
 def chn_send(kind, t, text, allow):
     """One POST (no database access): (ok, HTTP status or None, error code or '')."""
-    from ..calendars.subscriptions import _cal_opener, cal_host_allowed, CalError
+    from ..calendars.subscriptions import CAL_SEND_S, cal_until
+    until = time.monotonic() + CAL_SEND_S  # 2.539.0 (#4379): the whole send ends after CAL_SEND_S (a server answering drop by drop)
+    with cal_until(until) as cut:
+        res = _chn_send1(kind, t, text, allow, until)
+    return (False, res[1], "timeout") if cut.is_set() else res
+
+
+def _chn_send1(kind, t, text, allow, until):
+    from ..calendars.subscriptions import _cal_opener, cal_host_allowed, cal_left, CalError
     try:
         url, payload = chn_request(kind, t, text)
     except (KeyError, TypeError):
@@ -154,7 +162,7 @@ def chn_send(kind, t, text, allow):
     req = urllib.request.Request(url, data=json.dumps(payload, ensure_ascii=False).encode(), method="POST",
                                  headers={"Content-Type": "application/json", "User-Agent": f"{APP_NAME}/{APP_VERSION} (notifications)"})
     try:
-        with _cal_opener(allow).open(req, timeout=CH_TIMEOUT) as r:
+        with _cal_opener(allow).open(req, timeout=cal_left(until, CH_TIMEOUT)) as r:
             r.read(4096)
             code = r.status
         return 200 <= code < 300, code, "" if 200 <= code < 300 else "http"
@@ -222,12 +230,22 @@ def chn_tick():
             c.commit()
         finally:
             c.close()
-    res = [(r, chn_send(r["kind"], r["t"], r["text"], allow) if r["t"] else (False, None, "config")) for r in rows]
+    res, slow, later = [], set(), []
+    for r in rows:
+        if r["channel_id"] in slow:  # 2.539.0 (#4379): a channel that timed out is not tried again in this tick: its other
+            later.append(r)          # messages go back into the queue as they were (no failure counted)
+            continue
+        res.append((r, chn_send(r["kind"], r["t"], r["text"], allow) if r["t"] else (False, None, "config")))
+        if res[-1][1][2] in ("timeout", "network"):
+            slow.add(r["channel_id"])
     if res:
         with GATE.bg():
             c = connect()
             try:
                 with system_ctx(c):  # background loop: the results of every channel
+                    for r in later:
+                        c.execute("INSERT INTO notify_channel_queue(channel_id,text,created_at,retry_at) VALUES(?,?,?,?)",
+                                  (r["channel_id"], r["text"], r["created_at"], r["retry_at"]))
                     for r, (ok, status, code) in res:
                         if not ok and r["retry_at"]:
                             continue  # 2.367.3 (#2971): its second try: gone now, and one message counts as one failure
@@ -654,7 +672,7 @@ def chn_delete_do(chid, oid=None):
 
 
 def chn_test_do(chid, oid=None):
-    """Sends a test message now (this request waits for it, at most CH_TIMEOUT seconds); counts like any other send."""
+    """Sends a test message now (this request waits for it, at most CAL_SEND_S seconds, 2.539.0 #4379); counts like any other send."""
     from ..accounts.login import unseal
     chn_need_on()
     c = db()

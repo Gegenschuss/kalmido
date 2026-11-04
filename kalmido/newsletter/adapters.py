@@ -16,6 +16,7 @@ them as a preview). Every request goes through the SSRF guard of the calendar su
 internal host only when an admin allowed it), without redirects, with a timeout and a size limit."""
 import base64
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -51,8 +52,23 @@ class _Base:
         return {}
 
     def _req(self, method, path, data=None, headers=None, form=False, ok404=False):
-        """JSON request -> (status, parsed answer). 404 with ok404 -> (404, None)."""
-        from ..calendars.subscriptions import CalError, _cal_opener
+        """JSON request -> (status, parsed answer). 404 with ok404 -> (404, None). 2.539.0 (#4379): the whole request ends
+        after CAL_SEND_S (a server answering drop by drop: NwlError timeout)."""
+        from ..calendars.subscriptions import CAL_SEND_S, cal_until
+        until = time.monotonic() + CAL_SEND_S
+        with cal_until(until) as cut:
+            try:
+                res = self._req1(method, path, data, headers, form, ok404, until)
+            except NwlError:
+                if cut.is_set():
+                    raise NwlError("timeout") from None
+                raise
+        if cut.is_set():  # a body cut off by the watchdog reads like its end
+            raise NwlError("timeout")
+        return res
+
+    def _req1(self, method, path, data, headers, form, ok404, until):
+        from ..calendars.subscriptions import CalError, _cal_opener, cal_left
         hdr = {"Accept": "application/json", "User-Agent": "Kalmido"}
         hdr.update(headers if headers is not None else self._headers())
         body = None
@@ -65,7 +81,7 @@ class _Base:
                 hdr["Content-Type"] = "application/json"
         req = urllib.request.Request(self.url + path, data=body, headers=hdr, method=method)
         try:
-            with _cal_opener(self.allow).open(req, timeout=NWL_TIMEOUT) as resp:
+            with _cal_opener(self.allow).open(req, timeout=cal_left(until, NWL_TIMEOUT)) as resp:
                 raw = resp.read(NWL_JSON_MAX + 1)
                 if len(raw) > NWL_JSON_MAX:
                     raise NwlError("answer")
