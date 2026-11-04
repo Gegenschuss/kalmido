@@ -760,7 +760,7 @@ function personCard(anchor, id) {
     else if (k === 'cwsplit') { if (a) cw_split('a:' + id); else { try { const r = await rawFetch('POST', '/api/team/dm', {user_id: id}); if (!(S.tc.rooms || []).some(x => x.id === r.id)) S.tc.rooms = [{...r, unread: 0, mention: false, muted: false, last: null, last_at: null}, ...(S.tc.rooms || [])]; cw_split('t:' + r.id); } catch (er) { dmWhy('err', er.message, name); } } }  // 2.47.1 (#1720)
     else if (k === 'jobs') go('agents');
     else if (k === 'assign') { patchTask(t.id, {assignee_id: id}); ab2_warnAssign(id, t); }  // 2.50.0 (#1195): warn when away
-    else if (k === 'mention') { const ta = $('#c-input'); if (!ta) return; const add = (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + '@' + name + ' '; ta.value += add; S.drafts[S.sel] = ta.value; ta.closest('.ccomp')?.classList.add('used'); autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+    else if (k === 'mention') { const ta = $('#c-input'); if (!ta) return; const add = (ta.value && !/\s$/.test(ta.value) ? ' ' : '') + '@' + name + ' '; ta.value += add; cmtKeep(S.sel, ta.value); ta.closest('.ccomp')?.classList.add('used'); autosize(ta); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   };
 }
 document.addEventListener('click', e => {  // 2.7.2 (#418): before the row / list / dialog handlers under the picture
@@ -835,8 +835,8 @@ function timelineHtml(t) {
 // 2.0.6: the comment box at the bottom edge of the task panel, visible while scrolling (sticky with the
 // footer); one line until it is used (focus, text or files), then the bar with files and Send
 function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the box above the newest comment
-  const soc = cmSocial(t), used = !!S.drafts[t.id] || !!(S.cfiles[t.id] || []).length;
-  return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(S.drafts[t.id] || '')}</textarea>
+  const soc = cmSocial(t), used = !!cmtDraft(t.id) || !!(S.cfiles[t.id] || []).length;
+  return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(cmtDraft(t.id))}</textarea>
       <div class="mpick hidden"></div>
       <div class="cfiles" id="c-files">${composerFiles(t.id)}</div>
       <div class="cbar"><label class="iconbtn" title="${tr('Attach files')}">${ic('clip', 's')}<input type="file" id="c-file" multiple hidden></label>${typeof rf_btnHtml === 'function' ? rf_btnHtml('c') : '' /* 2.53.0 (#1449) */}<span class="muted chint">${esc(chatKeyHintVis())}</span><span class="spacer"></span><span id="c-ptl">${typeof ptl_switchHtml === 'function' ? ptl_switchHtml(t) : '' /* 2.63.0 B (#1513) */}</span><span id="c-mrep">${typeof mrep_switchHtml === 'function' ? mrep_switchHtml(t) : '' /* 2.393.2 B (#3375) */}</span><button class="btn sm pri" data-act="c-send">${ic('send', 's')} ${tr('Send')}</button></div></div></div>`;
@@ -885,6 +885,14 @@ async function loadTimeline(id) {
   if (pane && !cmtNew()) pane.scrollTop = pane.scrollHeight;
   else if (first && j.comments.some(c => c.id > (j.seen || 0) && c.user_id !== S.me?.id)) setTimeout(() => { if (S.sel === id) $('#d-tl')?.scrollIntoView?.({block: 'start', behavior: reducedMotion() ? 'auto' : 'smooth'}); }, 60);
 }
+// 2.527.0 (#4304 A5): a comment being written is kept in this browser (core.js fdKeep, kind 'fdc') until it is sent: an ended
+// session (401 -> sign-in -> reload) or a closed tab gives it back in the box; a locked list's text stays in memory only
+function cmtKeep(tid, v) {
+  S.drafts[tid] = v;
+  if (!tid || tid < 0 || (typeof le2eOn === 'function' && le2eOn(taskById(tid)?.list_id))) return;
+  if (v) fdKeep('fdc', tid, v); else fdDrop('fdc', tid);
+}
+const cmtDraft = tid => S.drafts[tid] ?? (tid > 0 && !(typeof le2eOn === 'function' && le2eOn(taskById(tid)?.list_id)) ? fdGet('fdc', tid)?.b || '' : '');
 const CMT_REF = {};  // 2.370.2 (#3088): task id -> {text, ref} of a comment whose answer is still missing
 async function capi(method, url, body) {  // comments: never queued, clear message when offline
   try { return await rawFetch(method, url, body); }
@@ -917,7 +925,7 @@ async function sendComment() {
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } if (mrep) { MREP.on[tid] = true; ptl_draw(); } return; }
   finally { if (btn) btn.disabled = false; }
   delete CMT_REF[tid];
-  delete S.drafts[tid]; delete S.cfiles[tid]; replySent('c:' + tid);
+  delete S.drafts[tid]; fdDrop('fdc', tid); delete S.cfiles[tid]; replySent('c:' + tid);
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }
   await loadTimeline(tid);
   const box = $('#d-tl-items'); if (box) (cmtNew() ? box.firstElementChild : box.lastElementChild)?.scrollIntoView({block: 'nearest'});
@@ -963,7 +971,7 @@ function mentionPick(i) {
   const pos = mp.start + p.name.length + 2;
   ta.focus(); ta.setSelectionRange(pos, pos);
   mp.pick.classList.add('hidden'); S.mp = null; mentionAria(ta, '');
-  if (ta.id === 'c-input') S.drafts[S.sel] = ta.value;
+  if (ta.id === 'c-input') cmtKeep(S.sel, ta.value);
   autosize(ta);
 }
 function mentionClose() { if (S.mp) { S.mp.pick.classList.add('hidden'); mentionAria(S.mp.ta, ''); S.mp = null; } }

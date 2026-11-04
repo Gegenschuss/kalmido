@@ -149,6 +149,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   const scIn = $('#cl-sc', md), nmIn = $('#cl-name', md);  // 2.433.0 (#3604): capitals while typing, the automatic code as placeholder
   if (scIn) { scIn.addEventListener('input', () => { scIn.value = scIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }); nmIn?.addEventListener('input', () => { scIn.placeholder = cl_autoCode(nmIn.value); }); }
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
+  fdDialog(md, 'cl.' + (c?.id || 'new'), c?.updated_at || '');  // 2.527.0 (#4304 A5): the input survives an ended session / a closed tab
   const num = numBody;  // 2.263.0 (#2976)
   md.addEventListener('click', async e => {
     const ib = e.target.closest('[data-clico]');

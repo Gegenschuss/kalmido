@@ -195,20 +195,18 @@ async function ltSave(d, quiet) {
 let ltSaveTimer = null;
 const ltSaveSoon = () => { if (LT.cur) ltPend(LT.cur); clearTimeout(ltSaveTimer); ltSaveTimer = setTimeout(() => { const d = LT.pend?.d; if (d) ltSave(d, true); }, 1500); };
 // 2.269.0 C (#3017): the form of draft d as it is now; kept in this browser until the server has it (a sign-in in between)
-const LT_KEEP = id => 'tasks.ltpend.' + (S.me?.id || 0) + '.' + id;  // 2.269.0 review: per account; the 'tasks.' prefix is wiped at logout (clearLocal)
+// 2.527.0 (#4304): kept with the shared helper (core.js fdKeep, kind 'ltpend': the same key tasks.ltpend.<account>.<id> as before)
 function ltPend(d) {
   if (!$('#lt-body') || d.status !== 'draft') return;
   LT.pend = {d, b: ltForm()};
-  try { localStorage.setItem(LT_KEEP(d.id), JSON.stringify({base: d.updated_at || '', b: LT.pend.b})); } catch { /* full or private mode */ }
+  fdKeep('ltpend', d.id, LT.pend.b, d.updated_at || '');
 }
-function lt_keepDrop(id) { try { localStorage.removeItem(LT_KEEP(id)); } catch { /* private mode */ } }
+function lt_keepDrop(id) { fdDrop('ltpend', id); }
 // a draft opened again: input kept from before (the sign-in page, a closed tab) is sent now when nobody saved since, else a hint
 function lt_keepRestore(d) {
-  let k = null; try { k = JSON.parse(localStorage.getItem(LT_KEEP(d.id)) || 'null'); } catch { /* broken */ }
-  if (!k?.b || d.status !== 'draft') { if (k) lt_keepDrop(d.id); return; }
-  if (Object.keys(k.b).every(x => String(k.b[x] ?? '') === String(d[x] ?? ''))) { lt_keepDrop(d.id); return; }  // arrived already
-  if (k.base !== (d.updated_at || '')) { lt_keepDrop(d.id); toast(tr('Changed in the meantime')); return; }
-  LT.pend = {d, b: k.b};
+  if (d.status !== 'draft') { lt_keepDrop(d.id); return; }
+  const b = fdTake('ltpend', d.id, d, d.updated_at || ''); if (!b) return;  // arrived already / saved elsewhere since (with the hint)
+  LT.pend = {d, b};
   ltSave(d, true).then(ok => { if (ok) { toast(tr('Saved')); ofcDraw(); } });
 }
 function lt_conflict(d, cur) {

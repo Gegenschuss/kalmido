@@ -95,5 +95,35 @@ function fgModal(md) {
   return modalGuard(md, () => snap() !== start);
 }
 
+// 2.527.0 (#4304 A5): a dialog's input survives the end of the session (401 -> sign-in -> reload), a closed tab or a crash:
+// kept in this browser while it is typed (core.js fdKeep, kind 'fdf', per account) and put back into the same fields when the
+// same dialog (key) opens again; base = the record's updated_at (saved elsewhere since: dropped with a hint). The dialog
+// leaving the page (saved, discarded, closed) drops it. Call after fgModal, so Cancel asks for what came back.
+function fdDialog(md, key, base = '') {
+  const k = fdTake('fdf', key, undefined, base);
+  if (k && typeof k === 'object') {
+    let n = 0;
+    for (const f of fgFields(md)) {
+      const fk = fgKey(f); if (!(fk in k) || f.disabled) continue;
+      if (typeof k[fk] === 'boolean') f.checked = k[fk]; else f.value = k[fk];
+      n++; const det = f.closest('details'); if (det && !det.open) det.open = true;
+    }
+    if (n) toast(tr('Your unsaved input is back'));
+  }
+  let t = 0, done = false;
+  const keep = () => {
+    clearTimeout(t); if (done) return;
+    const o = {};
+    for (const f of fgFields(md)) { if (f.type === 'password' || f.disabled) continue; const v = fgVal(f); if (v !== fgDef(f)) o[fgKey(f)] = v; }
+    if (Object.keys(o).length) fdKeep('fdf', key, o, base); else fdDrop('fdf', key);
+  };
+  const soon = () => { clearTimeout(t); t = setTimeout(keep, 300); };
+  md.addEventListener('input', soon); md.addEventListener('change', keep);
+  const hide = () => { gone = true; keep(); };  // the page goes (a reload after the sign-in page, a closed tab): kept, not dropped
+  let gone = false;
+  addEventListener('pagehide', hide);
+  onRemove(md, () => { done = true; clearTimeout(t); removeEventListener('pagehide', hide); if (!gone) fdDrop('fdf', key); });
+}
+
 window.addEventListener('beforeunload', e => { if (fgAny()) { e.preventDefault(); e.returnValue = ''; } });
 addEventListener('pagehide', () => { for (const p of FG.pend) { try { p.send(); } catch { /* the next one still goes */ } } });

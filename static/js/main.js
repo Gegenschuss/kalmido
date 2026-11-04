@@ -28,6 +28,9 @@ function bootDone() {
   const i18nBoot = i18nLoad(uiLang());  // last used language (localStorage), in parallel with the state
   try { await outOpen(); await (MW_ON ? mw_bootLoad() : load()); if (!S.lists.length) throw new Error('no state'); } catch (e) { bootDone(); if (e.message === 'auth') return; await i18nBoot; $('#view').innerHTML = botEmpty(navigator.onLine === false ? 'offline' : 'schaut', tr('Server not reachable.'), tr('Reload the page once the server is reachable again.')).replace(/<\/div>$/, `<button type="button" class="btn pri" id="boot-retry">${ic('sync', 's')} ${tr('Try again')}</button></div>`); $('#boot-retry')?.addEventListener('click', () => location.reload()); botStartle(); /* 2.165.0 (#2613) */ return; }
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
+  // 2.527.0 (#4304 A5 + A6): writes kept from before the sign-in go now; a dialog's kept input waits for the dialog
+  setTimeout(fdWriteFlush, 0);
+  if (fdList('fdf').length) setTimeout(() => toast(tr('Unsaved input of a dialog was kept: open the dialog again to finish it')), 1500);
   // 2.145.0 B (#2424): an own window (miniwin.js) shows one list / task / chat: no other servers, no suggestions, no push housekeeping
   if (!MW_ON) setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
   setTimeout(chatFabDraw, 0);  // 2.29.0 (#363)

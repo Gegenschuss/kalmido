@@ -995,15 +995,16 @@ function settingsModal(focus) {
   });
   md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
   // 2.359.0 A (#3024): the page goes away within the 0.9 s of typing: the text fields waiting are sent with keepalive (core.js
-  // keepSend; settings have no queue: a later change elsewhere is not overwritten at the next start)
+  // keepSend). 2.527.0 (#4304 A6): and kept for the next start (core.js fdWrite): sent again after the sign-in should the
+  // keepalive not arrive, unless the setting was changed elsewhere meanwhile (sv = the value this page saw)
   const leave = () => {
     for (const id of [...pend.keys()]) {
       clearTimeout(pend.get(id)); pend.delete(id);
       const el = $('#' + id, md); if (!el) continue;
-      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) keepSend('PATCH', '/api/me', {display_name: v}); continue; }
+      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) fdWrite('PATCH', '/api/me', {display_name: v}, {slot: 'me.name'}); continue; }
       const d = SETS[id], v = d && setVal(el, d[2]);
       if (d && d[2] === 'time' && id === 's-allday' && !v) continue;  // 2.359.0 (review): the same guard as saveEl
-      if (v !== undefined && String(v) !== String(S.settings[d[0]] ?? '')) keepSend('PATCH', '/api/settings', {[d[0]]: v});
+      if (v !== undefined && String(v) !== String(S.settings[d[0]] ?? '')) fdWrite('PATCH', '/api/settings', {[d[0]]: v}, {slot: 'set.' + d[0], sv: {[d[0]]: S.settings[d[0]] ?? null}});
     }
   };
   addEventListener('pagehide', leave);

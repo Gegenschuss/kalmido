@@ -356,7 +356,7 @@ const MO_KEPT = N_('Your order of My tasks was changed on another device: that o
 // to be sent (outbox, conflicts) keep everything as before: they go out after the next login of the same account.
 async function authGone() {
   try { outSync(); } catch { /* storage gone */ }
-  if (OUT.q.length || (S.conflicts || []).length) return;
+  if (OUT.q.length || (S.conflicts || []).length || fdAny()) return;  // 2.527.0 (#4304 A5): + input kept for after the sign-in
   await Promise.race([clearLocal(), new Promise(ok => setTimeout(ok, 1500))]);
 }
 const OUT = {q: LS.get('outbox', []), online: true, flushing: false};
@@ -693,6 +693,60 @@ function outKeep(method, url, body) {
   if (!/\/-\d+(?=[/?]|$)/.test(url)) keepSend(method, url, body, e.k);
   return e;
 }
+// ------------------------------------------------------------------ kept input (2.527.0 #4304 A5 + A6)
+// Input that is not on the server yet and has no offline queue behind it (a dialog, a comment, a setting, a letter) is kept
+// in this browser (localStorage, per account, the "tasks." prefix: gone at logout / another account) until the server has
+// it: it survives the sign-in page of an ended session (401 -> reload), a closed tab and a failed save. The pattern of the
+// letters (2.269.0 C #3017, office_letters.js). kind names the form ('ltpend' letters, 'fdf' dialogs (formguard.js fdDialog),
+// 'fdc' comment drafts, 'fdw' kept writes), id the record; base = the server's updated_at the input builds on.
+const FD_KINDS = ['ltpend', 'fdf', 'fdc', 'fdw'];
+const FD_KEY = (kind, id) => `tasks.${kind}.${S.me?.id || 0}.${id}`;
+function fdKeep(kind, id, b, base = '') { try { localStorage.setItem(FD_KEY(kind, id), JSON.stringify({base: base || '', b, at: Date.now()})); } catch { /* full or private mode */ } }
+function fdGet(kind, id) { try { return JSON.parse(localStorage.getItem(FD_KEY(kind, id)) || 'null'); } catch { return null; } }
+function fdDrop(kind, id) { try { localStorage.removeItem(FD_KEY(kind, id)); } catch { /* private mode */ } }
+// the kept records of a kind of this account: [{id, base, b, at}]
+function fdList(kind) {
+  const pre = FD_KEY(kind, ''), out = [];
+  try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith(pre)) { const r = fdGet(kind, k.slice(pre.length)); if (r) out.push({...r, id: k.slice(pre.length)}); } } } catch { /* no storage */ }
+  return out;
+}
+const fdAny = () => FD_KINDS.some(k => fdList(k).length > 0);
+// the kept input while it is still news: none when the server has it already (cur: every kept field equal) or the record
+// was saved elsewhere since (base differs: dropped, with the hint "Changed in the meantime")
+function fdTake(kind, id, cur, base) {
+  const k = fdGet(kind, id);
+  if (k == null || k.b == null) { if (k) fdDrop(kind, id); return null; }
+  if (cur && typeof k.b === 'object' && Object.keys(k.b).every(x => String(k.b[x] ?? '') === String(cur[x] ?? ''))) { fdDrop(kind, id); return null; }
+  if (base !== undefined && k.base !== (base || '')) { fdDrop(kind, id); toast(tr('Changed in the meantime')); return null; }
+  return k.b;
+}
+// a write that has no queue (settings, a list's dialog): out with keepalive at once AND kept here under the same key, so it is
+// sent again after the next sign-in / start (fdWriteFlush; the server answers a repeat of the key with its first answer).
+// o.sv = {setting: value seen before}: a setting changed elsewhere meanwhile is not overwritten by the kept one; o.slot = the
+// record's name (a newer write of the same form replaces it), o.send = false: only kept (the caller sends it and drops the
+// slot when the server has it). Returns the slot.
+function fdWrite(method, url, body, o = {}) {
+  const k = outKey(), slot = o.slot || k;
+  fdKeep('fdw', slot, {method, url, body, k, ...(o.sv ? {sv: o.sv} : {})});
+  if (o.send !== false) keepSend(method, url, body, k);
+  return slot;
+}
+async function fdWriteFlush() {
+  if (fdWriteFlush.busy || !S.me) return;
+  fdWriteFlush.busy = true;
+  try {
+    for (const r of fdList('fdw').sort((a, b) => a.at - b.at)) {
+      let body = r.b?.body;
+      if (r.b?.sv && body && typeof body === 'object') {  // a setting someone changed elsewhere since stays theirs
+        body = Object.fromEntries(Object.entries(body).filter(([k, v]) => String(S.settings?.[k] ?? '') === String(r.b.sv[k] ?? '') && String(S.settings?.[k] ?? '') !== String(v ?? '')));
+        if (!Object.keys(body).length) { fdDrop('fdw', r.id); continue; }
+      }
+      try { await rawFetch(r.b.method, r.b.url, body, r.b.k || r.id); fdDrop('fdw', r.id); }
+      catch (e) { if (e instanceof Offline || e.message === 'auth') return; if (!(e.status >= 500 || e.status === 429 || e.status === 408)) fdDrop('fdw', r.id); }
+    }
+  } finally { fdWriteFlush.busy = false; }
+}
+window.addEventListener('online', () => setTimeout(fdWriteFlush, 500));
 function enqueue(method, url, body) {
   body = outPrev(method, url, body);
   const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);

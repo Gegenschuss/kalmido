@@ -139,6 +139,64 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   check(await until(() => !/Cut the hedge on Friday/.test(wb.__store['tasks.conflicts'] || '')), 'A20: then the local data of the previous account goes as before');
   wb.close();
 
+  // ================= A5: the session ends while the client dialog / a comment waits (a person without an organisation)
+  const featsC = [...new Set([...feats.split(','), 'clients', 'comments', 'collab'])].join(',');
+  await call('PATCH', '/api/settings', {features: featsC}, CF);
+  const CL = (await call('POST', '/api/clients', {name: 'Acme Testkunde'}, CF)).id;
+  const FP = (await call('POST', '/api/lists', {name: 'Calls'}, CF)).id;
+  const FT = (await call('POST', '/api/tasks', {title: 'Call Acme', list_id: FP}, CF)).id;
+  check(CL && FT, 'A5 setup: a client and a task');
+  const sh = {store: {}, wins: []}, fopt = h => ({user: 'frida', hash: h, shared: sh});
+  const gone = (ww, re) => stub(ww, (m, p) => re.test(m + ' ' + p) ? jres(401, {error: 'Not signed in'}) : null);
+  let wf = await boot(fopt('clients'));
+  const fid = wf.eval('S.me.id');
+  wf.eval(`clientModal(${JSON.stringify(await call('GET', '/api/clients/' + CL, null, CF))})`);
+  let cmd = await until(() => wf.document.querySelector('.modal.cldlg'));
+  const note = cmd?.querySelector('#cl-note');
+  note.value = 'Call back on Monday'; note.dispatchEvent(new wf.Event('input', {bubbles: true}));
+  check(await until(() => /Call back on Monday/.test(wf.__store[`tasks.fdf.${fid}.cl.${CL}`] || '')), 'A5 client: the input is kept while typing ' + Object.keys(wf.__store).filter(k => /fdf/.test(k)));
+  gone(wf, /^PATCH \/api\/clients\//);
+  cmd.querySelector('[data-m="save"]')?.click();
+  await new Promise(r => setTimeout(r, 1500));  // the save met the ended session (401: authGone, then the reload)
+  check((await call('GET', '/api/clients/' + CL, null, CF)).note !== 'Call back on Monday', 'A5 client: the server did not get it');
+  check(/Call back on Monday/.test(wf.__store[`tasks.fdf.${fid}.cl.${CL}`] || ''), 'A5 client: the ended session kept the input (not wiped with the local data)');
+  wf.dispatchEvent(new wf.Event('pagehide'));  // the reload to the sign-in page
+  wf.close();
+  check(/Call back on Monday/.test(sh.store[`tasks.fdf.${fid}.cl.${CL}`] || wf.__store[`tasks.fdf.${fid}.cl.${CL}`] || ''), 'A5 client: still kept after the page went');
+  wf = await boot(fopt('clients'));  // signed in again, the page loads anew
+  wf.eval(`clientModal(${JSON.stringify(await call('GET', '/api/clients/' + CL, null, CF))})`);
+  cmd = await until(() => wf.document.querySelector('.modal.cldlg'));
+  check(cmd?.querySelector('#cl-note')?.value === 'Call back on Monday', 'A5 client: the dialog opened again has the input back');
+  cmd?.querySelector('[data-m="save"]')?.click();
+  check(await until(async () => (await call('GET', '/api/clients/' + CL, null, CF)).note === 'Call back on Monday'), 'A5 client: saved now');
+  check(await until(() => !wf.__store[`tasks.fdf.${fid}.cl.${CL}`]), 'A5 client: saved = the kept input is gone');
+  wf.close();
+
+  // the comment box
+  wf = await boot(fopt('t/' + FT));
+  let ci = await until(() => wf.document.querySelector('#c-input'));
+  check(!!ci, 'A5 comment: the comment box is there');
+  ci.value = 'Asked for the offer'; ci.dispatchEvent(new wf.Event('input', {bubbles: true}));
+  check(/Asked for the offer/.test(wf.__store[`tasks.fdc.${fid}.${FT}`] || ''), 'A5 comment: kept while typing');
+  gone(wf, /^POST \/api\/tasks\/\d+\/comments$/);
+  await wf.eval('sendComment()').catch(() => {});
+  await new Promise(r => setTimeout(r, 1500));
+  check(/Asked for the offer/.test(wf.__store[`tasks.fdc.${fid}.${FT}`] || ''), 'A5 comment: the ended session kept it');
+  wf.close();
+  wf = await boot(fopt('t/' + FT));
+  ci = await until(() => wf.document.querySelector('#c-input'));
+  check(ci?.value === 'Asked for the offer', 'A5 comment: after the sign-in the box has it back ' + JSON.stringify(ci?.value));
+  await wf.eval('sendComment()');
+  check(await until(async () => ((await call('GET', `/api/tasks/${FT}/timeline`, null, CF)).comments || []).some(c => /Asked for the offer/.test(c.body))), 'A5 comment: sent now');
+  check(!wf.__store[`tasks.fdc.${fid}.${FT}`], 'A5 comment: sent = the kept text is gone');
+
+  // A6: a kept write (the list dialog's / the settings' pagehide) goes at the next start, once
+  wf.eval(`fdWrite('PATCH', '/api/lists/${FP}', {name: 'Calls this week', _prev: {name: 'Calls'}}, {slot: 'list.${FP}', send: false}); 1`);
+  check(!!wf.__store[`tasks.fdw.${fid}.list.${FP}`], 'A6: the write is kept');
+  await wf.eval('fdWriteFlush()');
+  check((await call('GET', '/api/state', null, CF)).lists.find(l => l.id === FP)?.name === 'Calls this week' && !wf.__store[`tasks.fdw.${fid}.list.${FP}`], 'A6: sent at the next start and then gone');
+  wf.close();
+
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   console.log(`p2527_4304_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

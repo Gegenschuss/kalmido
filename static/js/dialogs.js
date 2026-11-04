@@ -1084,8 +1084,11 @@ function listModal(id, folder = '', o = {}) {
       }
       if (diff.folder && !folderNames().includes(diff.folder)) await api('PATCH', '/api/settings', {set_delta: {folders: {add: [diff.folder]}}}).catch(() => {});  // 2.269.0 B (#3014): only the new folder
       let cfl = null;
+      // 2.527.0 (#4304 A5): kept until the server has it (the session ends during the save: sent after the sign-in, core.js fdWrite)
+      const fk = fdWrite('PATCH', '/api/lists/' + id, {...diff, _prev: prev}, {slot: 'list.' + id, send: false});
       const e = await listPatch(id, {...diff, _prev: prev}, null, {post: lsync, conflicts: c => { cfl = c; }});
-      if (e === false) { lfail = true; return; }  // 2.359.2 B (#3049): the form keeps what was typed (the next save sends it again)
+      if (e === false) { lfail = true; return; }
+      fdDrop('fdw', fk);  // 2.359.2 B (#3049): the form keeps what was typed (the next save sends it again)
       lfail = false;
       for (const k in diff) lbase[k] = diff[k];
       if (cfl) { for (const c of cfl) lbase[c.field] = c.server; lsync(true); }  // the form shows what stayed
@@ -1100,7 +1103,7 @@ function listModal(id, folder = '', o = {}) {
     if (md._asking) return false;
     md._asking = true;
     const ok = await askConfirm(tr('Discard changes?'), tr('Your changes in this dialog are not saved yet.'), {ok: tr('Discard'), danger: true, cancel: tr('Keep editing')});
-    md._asking = false; return ok;
+    md._asking = false; if (ok) fdDrop('fdw', 'list.' + id); return ok;  // 2.527.0 (#4304): discarded = not sent later either
   };
   if (id) {
     md.addEventListener('input', e => { if (['l-name', 'l-folder', 'l-rate', 'l-dayh'].includes(e.target.id)) later(e.target); if (e.target.id === 'l-name') fl_nameLive(id, formBody().name); });  // 2.46.2 (#1659)
@@ -1114,7 +1117,7 @@ function listModal(id, folder = '', o = {}) {
       const cur = listById(id); if (!cur || !ks.length) return;  // the timers stay: a page kept for "back" saves the rest then
       const body = formBody(), diff = {}, prev = {};
       for (const k of ks) if (k in body && lv(k, lbase[k]) !== lv(k, body[k]) && lv(k, cur[k]) !== lv(k, body[k])) { diff[k] = body[k]; prev[k] = lbase[k] ?? null; }
-      if (Object.keys(diff).length && keepSend('PATCH', '/api/lists/' + id, {...diff, _prev: prev})) for (const k in diff) lbase[k] = diff[k];
+      if (Object.keys(diff).length && fdWrite('PATCH', '/api/lists/' + id, {...diff, _prev: prev}, {slot: 'list.' + id})) for (const k in diff) lbase[k] = diff[k];  // 2.527.0 (#4304 A6): + kept for the next start
     };
     const fgOff = typeof fgPending === 'function' ? fgPending(leave, () => pend.size > 0 || lbusy > 0 || lfail) : () => {};
     onRemove(md, () => { fgOff(); if (pend.size) autosave(); else fl_nameEnd(id); });

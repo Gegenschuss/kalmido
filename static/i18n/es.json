@@ -16159,5 +16159,7 @@
   "This document is not in your office or your own documents": "Este documento no está ni en tu oficina ni en tus propios documentos",
   "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Todo lo que ve la cuenta y que ningún otro permiso cubre: proyectos, tareas, comentarios, notas, registros de tiempo, hábitos, búsqueda, el chat del equipo con los mensajes directos, clientes con horas e importes, quién está ausente y cuándo, familia y hogar y vida, aprobaciones de vídeo, correos archivados en clientes y proyectos",
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Iniciar sesión con otra cuenta los elimina de este dispositivo, antes se descarga una copia como archivo de texto. Cancelar cierra la sesión de nuevo: la cuenta anterior puede entonces iniciar sesión y enviarlos.",
-  "Your change was not saved ({0}): your text waits here": "Tu cambio no se ha guardado ({0}): tu texto te espera aquí"
+  "Your change was not saved ({0}): your text waits here": "Tu cambio no se ha guardado ({0}): tu texto te espera aquí",
+  "Your unsaved input is back": "Tu entrada sin guardar ha vuelto",
+  "Unsaved input of a dialog was kept: open the dialog again to finish it": "Se ha conservado una entrada sin guardar de un diálogo: abre el diálogo de nuevo para terminarla"
 }

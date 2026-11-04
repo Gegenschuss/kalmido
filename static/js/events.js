@@ -870,7 +870,7 @@ document.addEventListener('input', e => {
   if (t.id === 'qinput' || t.id === 'qsheet') updateChips(t);
   if (t.id === 'd-title') { autosize(t); queueSave(S.sel, 'title', t.value.replace(/\n/g, ' ')); }
   if (t.id === 'c-input' && t.value) commentTyping();  // 2.22.0 (#693)
-  if (t.id === 'c-input') { autosize(t); S.drafts[S.sel] = t.value; mentionUpdate(t); t.closest('.ccomp')?.classList.toggle('used', !!t.value || !!(S.cfiles[S.sel] || []).length); }
+  if (t.id === 'c-input') { autosize(t); if (typeof cmtKeep === 'function') cmtKeep(S.sel, t.value); else S.drafts[S.sel] = t.value; mentionUpdate(t); t.closest('.ccomp')?.classList.toggle('used', !!t.value || !!(S.cfiles[S.sel] || []).length); }
   if (t.classList?.contains('c-edit-input')) { autosize(t); mentionUpdate(t); }
   if (t.id === 'd-content') { autosize(t); queueSave(S.sel, 'content', t.value); }
   if (t.id === 'searchq') doSearch(t.value);
