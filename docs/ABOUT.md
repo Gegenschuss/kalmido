@@ -62,9 +62,11 @@ One Kalmido instance is built for one person, a household or a small team. Many 
 - **Tasks:** every device loads all open tasks plus the last 14 days of completed ones (and a year of habit
   history) in one request and re-renders from it. A few thousand open tasks per user feel instant; around
   10,000 open tasks the payload reaches several megabytes and rendering slows down, especially on phones.
-  Completed tasks older than 14 days are not loaded, so a long history costs nothing.
-- **Users:** devices poll for changes every few seconds, and any change makes every active device reload its
-  state. That is fine for a handful of people; with more than roughly 20 to 30 users active at the same time
+  Completed tasks older than 14 days are not loaded, so a long history costs nothing. An account with more than
+  3,000 tasks (`KALMIDO_STATE_LAZY_MIN`) gets a start set first (Today, Upcoming, My tasks, the projects it had open);
+  a project's tasks load when it is opened.
+- **Users:** devices poll for changes every few seconds and fetch only what changed since their last state (a delta),
+  not the whole state again. That is fine for a handful of people; with more than roughly 20 to 30 users active at the same time
   it becomes wasteful.
 - **Database:** PostgreSQL handles hundreds of thousands of tasks without trouble, with a connection pool (up to 56
   connections, `KALMIDO_DB_POOL_MAX`). Attachments are stored as files, not in the database.
