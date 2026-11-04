@@ -491,12 +491,9 @@ function sbb_render(hid) {
   sbb_rove();
   requestAnimationFrame(sbb_fit);
 }
-// 2.458.0 (#3880): an area's name never breaks inside a word (app.css .srbn): a word too wide for its icon takes a smaller
-// type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
-// #3506 (#3405): a smaller type can break a name of several words into other lines, so the width is measured again after
-// each step (and scrollWidth counts too) until it fits; one rule of three left "Reisen & Kontakte" 2 px too wide at 320 px
-// #4047: on the phone (the drawer's row) a name is never cut and never split: when a word is too wide even in 9 px, every column
-// gets the width its names need (short names give room to long ones, all in sight); only what fits in no way lets the row scroll
+// 2.458.0 (#3880): a name never breaks inside a word (app.css .srbn): too wide = a smaller type, down to 9 px; wider still "…" + title
+// #3506 (#3405): a smaller type can break a name into other lines: measured again after each step (scrollWidth too) until it fits
+// #4047: phone: never cut or split: a word too wide in 9 px: each column as wide as its names need; if that is too wide, the row scrolls
 function sbb_fit() {
   const row = $('#side .sbmr');
   if (row) { row.style.gridTemplateColumns = row.style.overflowX = row.style.overflowY = ''; }
