@@ -16188,5 +16188,14 @@
   "Row {1}": ["Zeile {1}", "Zeilen {1}"],
   "{0} row will be skipped": ["{0} Zeile wird übersprungen", "{0} Zeilen werden übersprungen"],
   "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} Karte ohne Änderungsdatum (REV): der Kontakt wurde hier geändert und behält seine Werte, bitte von Hand abgleichen", "{0} Karten ohne Änderungsdatum (REV): die Kontakte wurden hier geändert und behalten ihre Werte, bitte von Hand abgleichen"],
-  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} Datei ist nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie", "{0} Dateien sind nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie"]
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} Datei ist nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie", "{0} Dateien sind nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie"],
+  "{0} resource booking": ["{0} Ressourcen-Buchung", "{0} Ressourcen-Buchungen"],
+  "{0} piece of equipment": ["{0} Inventarstück", "{0} Inventarstücke"],
+  "{0} document template": ["{0} Dokumentvorlage", "{0} Dokumentvorlagen"],
+  "{0} text block": ["{0} Textbaustein", "{0} Textbausteine"],
+  "{0} vehicle": ["{0} Fahrzeug", "{0} Fahrzeuge"],
+  "{0} hospitality receipt": ["{0} Bewirtungsbeleg", "{0} Bewirtungsbelege"],
+  "{0} trip cost": ["{0} Reisekosten-Eintrag", "{0} Reisekosten-Einträge"],
+  "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} Datei, die diese Person in Direktnachrichten oder Gruppen geschickt hat, wird endgültig gelöscht: die anderen verlieren sie auch.", "{0} Dateien, die diese Person in Direktnachrichten oder Gruppen geschickt hat, werden endgültig gelöscht: die anderen verlieren sie auch."],
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "Die Projekte werden mit allen Aufgaben endgültig gelöscht, auch denen anderer Mitglieder: sie kommen nicht in den Papierkorb."
 }

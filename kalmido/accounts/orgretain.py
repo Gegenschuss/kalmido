@@ -100,6 +100,16 @@ ODL_MORE = (
     ("suppliers", Nn_("{0} supplier", "{0} suppliers"), "office_suppliers"),
     ("bookmarks", Nn_("{0} bookmark", "{0} bookmarks"), "bookmarks"),
     ("section_templates", Nn_("{0} section template", "{0} section templates"), "section_templates"),
+    # 2.533.0 (#4318) B44: named in the delete dialog instead of only "other entries"
+    ("absences", Nn_("{0} absence", "{0} absences"), "hub_absences"),
+    ("bookings", Nn_("{0} resource booking", "{0} resource bookings"), "hub_bookings"),
+    ("equipment", Nn_("{0} piece of equipment", "{0} pieces of equipment"), "office_equipment"),
+    ("fixed_costs", Nn_("{0} fixed cost", "{0} fixed costs"), "office_fixed_costs"),
+    ("doc_templates", Nn_("{0} document template", "{0} document templates"), "office_doc_templates"),
+    ("text_blocks", Nn_("{0} text block", "{0} text blocks"), "office_texts"),
+    ("vehicles", Nn_("{0} vehicle", "{0} vehicles"), "office_vehicles"),
+    ("meals", Nn_("{0} hospitality receipt", "{0} hospitality receipts"), "office_meals"),
+    ("trip_costs", Nn_("{0} trip cost", "{0} trip costs"), "life_trip_costs"),
 )
 ODL_MORE_OTHER = Nn_("{0} other entry", "{0} other entries")
 ODL_MORE_SKIP = frozenset((
@@ -613,6 +623,10 @@ def upg_info(c, uid):
                 "sheets_kept": one("SELECT COUNT(*) FROM time_sheets t JOIN orgs o ON o.id=t.org_id WHERE t.user_id=? AND o.personal_of IS NULL")}  # 2.360.2 D (#2561)
         info["dms"] = c.execute("SELECT COUNT(*) FROM tchat_rooms WHERE kind='dm' AND (a=? OR b=?) AND a IS NOT NULL AND b IS NOT NULL "
                                 "AND a!=b AND last_at IS NOT NULL", (int(uid), int(uid))).fetchone()[0]
+        # 2.533.0 (#4318) B42: the files the person sent in direct messages / groups are sealed with their key and go for good
+        # (collab/teamchan.tcx_user_purge, same rows): the dialog says so instead of only the number of conversations
+        info["chat_files"] = c.execute("SELECT COUNT(*) FROM tchat_files f JOIN tchat_rooms r ON r.id=f.room_id "
+                                       "WHERE f.user_id=? AND f.org_id IS NULL AND r.kind!='list'", (int(uid),)).fetchone()[0]
     content = odl_content(c, poid) if poid else {}
     info["no_heir"] = tr(UPG_NO_HEIR) if upg_heirless(c, uid) else ""  # 2.360.4 (#3243): said in the dialog, not by the 409 afterwards
     from ..admin.purgeshare import ush_info

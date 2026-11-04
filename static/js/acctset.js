@@ -867,6 +867,7 @@ async function ua8_delete(u) {
       ${receipts && rhost ? `<div class="shint keep">${tr('Projects with receipts go along at once only after the retention export (the next step). Without it they stay in the trash until the legal retention period ends and are deleted for good after that.')}</div>` : ''}
       <div id="ua8-del" ${cand.length || nodel ? 'hidden' : ''}>
         ${shared ? `<div class="shint keep warn">${ic('alert', 's')} ${esc(trn('{0} of these projects is shared: the other people lose it too.', '{0} of these projects are shared: the other people lose them too.', shared))}</div>` : ''}
+        <div class="shint keep warn dvaua8gone">${ic('alert', 's')} ${esc(tr('The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.'))}</div>${/* 2.533.0 (#4318) B43 */ ''}
         <div class="row"><label for="ua8-conf">${esc(tr('Type {0} to confirm', j.username))}</label><input id="ua8-conf" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
       </div>
     </fieldset>
@@ -998,6 +999,8 @@ function ua8PurgeHtml(p) {
   if (p.time_kept) rows.push([false, trn('{0} time entry in projects of an organisation stays, without the name.', '{0} time entries in projects of an organisation stay, without the name.', p.time_kept)]);
   if (p.sheets_kept) rows.push([false, trn('{0} monthly timesheet of an organisation stays, without the name.', '{0} monthly timesheets of an organisation stay, without the name.', p.sheets_kept)]);  // 2.360.2 D (#2561)
   if (p.dms) rows.push([false, trn('{0} direct conversation stays for the other person.', '{0} direct conversations stay for the other people.', p.dms)]);
+  // 2.533.0 (#4318) B42: the person's files in direct messages and groups are sealed with their key: they go for good
+  if (p.chat_files) rows.push([true, trn('{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.', '{0} files this person sent in direct messages or groups are deleted for good: the other people lose them too.', p.chat_files)]);
   rows.push([false, tr('Messages and comments of this person stay with their text, without the name.')]);  // 2.306.0 C (#2889)
   return rows.map(([w, t]) => `<div class="shint keep ua8purge${w ? ' warn' : ''}">${w ? ic('alert', 's') + ' ' : ''}${esc(t)}</div>`).join('');
 }

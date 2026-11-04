@@ -16188,5 +16188,14 @@
   "Row {1}": ["Fila {1}", "Filas {1}"],
   "{0} row will be skipped": ["Se omitirá {0} fila", "Se omitirán {0} filas"],
   "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} tarjeta sin fecha de cambio (REV): el contacto se cambió aquí y conserva sus valores, compáralo a mano", "{0} tarjetas sin fecha de cambio (REV): los contactos se cambiaron aquí y conservan sus valores, compáralos a mano"],
-  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} archivo no está en el archivo comprimido (bloqueado por el antivirus o ilegible), el manifiesto lo nombra", "{0} archivos no están en el archivo comprimido (bloqueados por el antivirus o ilegibles), el manifiesto los nombra"]
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} archivo no está en el archivo comprimido (bloqueado por el antivirus o ilegible), el manifiesto lo nombra", "{0} archivos no están en el archivo comprimido (bloqueados por el antivirus o ilegibles), el manifiesto los nombra"],
+  "{0} resource booking": ["{0} reserva de recurso", "{0} reservas de recursos"],
+  "{0} piece of equipment": ["{0} equipo", "{0} equipos"],
+  "{0} document template": ["{0} plantilla de documento", "{0} plantillas de documento"],
+  "{0} text block": ["{0} bloque de texto", "{0} bloques de texto"],
+  "{0} vehicle": ["{0} vehículo", "{0} vehículos"],
+  "{0} hospitality receipt": ["{0} justificante de atención", "{0} justificantes de atención"],
+  "{0} trip cost": ["{0} gasto de viaje", "{0} gastos de viaje"],
+  "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} archivo que esta persona envió en mensajes directos o grupos se borra definitivamente: los demás también lo pierden.", "{0} archivos que esta persona envió en mensajes directos o grupos se borran definitivamente: los demás también los pierden."],
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "Los proyectos se borran definitivamente con todas sus tareas, también las de otros miembros: no van a la papelera."
 }

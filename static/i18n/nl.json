@@ -16188,5 +16188,14 @@
   "Row {1}": ["Rij {1}", "Rijen {1}"],
   "{0} row will be skipped": ["{0} rij wordt overgeslagen", "{0} rijen worden overgeslagen"],
   "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} kaart zonder wijzigingsdatum (REV): het contact is hier gewijzigd en houdt zijn waarden, vergelijk met de hand", "{0} kaarten zonder wijzigingsdatum (REV): de contacten zijn hier gewijzigd en houden hun waarden, vergelijk met de hand"],
-  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} bestand zit niet in het archief (geblokkeerd door de virusscanner of onleesbaar), het manifest noemt het", "{0} bestanden zitten niet in het archief (geblokkeerd door de virusscanner of onleesbaar), het manifest noemt ze"]
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} bestand zit niet in het archief (geblokkeerd door de virusscanner of onleesbaar), het manifest noemt het", "{0} bestanden zitten niet in het archief (geblokkeerd door de virusscanner of onleesbaar), het manifest noemt ze"],
+  "{0} resource booking": ["{0} reservering van een middel", "{0} reserveringen van middelen"],
+  "{0} piece of equipment": ["{0} inventarisstuk", "{0} inventarisstukken"],
+  "{0} document template": ["{0} documentsjabloon", "{0} documentsjablonen"],
+  "{0} text block": ["{0} tekstblok", "{0} tekstblokken"],
+  "{0} vehicle": ["{0} voertuig", "{0} voertuigen"],
+  "{0} hospitality receipt": ["{0} representatiebon", "{0} representatiebonnen"],
+  "{0} trip cost": ["{0} reiskostenpost", "{0} reiskostenposten"],
+  "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} bestand dat deze persoon in directe berichten of groepen stuurde, wordt definitief verwijderd: de anderen verliezen het ook.", "{0} bestanden die deze persoon in directe berichten of groepen stuurde, worden definitief verwijderd: de anderen verliezen ze ook."],
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "De projecten worden definitief verwijderd met al hun taken, ook die van andere leden: ze gaan niet naar de prullenbak."
 }

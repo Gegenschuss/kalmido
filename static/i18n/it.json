@@ -16189,5 +16189,14 @@
   "Row {1}": ["Riga {1}", "Righe {1}"],
   "{0} row will be skipped": ["{0} riga verrà saltata", "{0} righe verranno saltate"],
   "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} scheda senza data di modifica (REV): il contatto è stato modificato qui e mantiene i suoi valori, confronta a mano", "{0} schede senza data di modifica (REV): i contatti sono stati modificati qui e mantengono i loro valori, confronta a mano"],
-  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} file non è nell'archivio (bloccato dall'antivirus o illeggibile), il manifesto lo indica", "{0} file non sono nell'archivio (bloccati dall'antivirus o illeggibili), il manifesto li indica"]
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} file non è nell'archivio (bloccato dall'antivirus o illeggibile), il manifesto lo indica", "{0} file non sono nell'archivio (bloccati dall'antivirus o illeggibili), il manifesto li indica"],
+  "{0} resource booking": ["{0} prenotazione di risorsa", "{0} prenotazioni di risorse"],
+  "{0} piece of equipment": ["{0} attrezzatura", "{0} attrezzature"],
+  "{0} document template": ["{0} modello di documento", "{0} modelli di documento"],
+  "{0} text block": ["{0} blocco di testo", "{0} blocchi di testo"],
+  "{0} vehicle": ["{0} veicolo", "{0} veicoli"],
+  "{0} hospitality receipt": ["{0} ricevuta di rappresentanza", "{0} ricevute di rappresentanza"],
+  "{0} trip cost": ["{0} spesa di viaggio", "{0} spese di viaggio"],
+  "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} file che questa persona ha inviato in messaggi diretti o gruppi viene eliminato definitivamente: anche gli altri lo perdono.", "{0} file che questa persona ha inviato in messaggi diretti o gruppi vengono eliminati definitivamente: anche gli altri li perdono."],
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "I progetti vengono eliminati definitivamente con tutte le loro attività, anche quelle di altri membri: non finiscono nel cestino."
 }

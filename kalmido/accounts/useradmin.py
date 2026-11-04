@@ -319,7 +319,8 @@ def ua8_delete_info(uid):
     purge = upg_info(c, uid)  # 2.152.0 A (#2164): personal office (deleted / kept by law until), agents, calendars, time, DMs
     foreign = by == "instance" and op_foreign_account(c, uid)  # 2.480.0 (#3944, F4): hosted: a client's account
     if by != "instance" or foreign:  # an organisation admin: nothing about the person's private office (privat bleibt privat)
-        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "no_heir", "shared")}
+        purge = {k: v for k, v in purge.items() if k in ("calendars", "time_kept", "sheets_kept", "agents", "dms", "chat_files", "no_heir",
+                                                          "shared")}  # 2.533.0 (#4318) B42: + chat_files (a number)
         purge["shared"] = {**purge["shared"], "names": []}  # 2.508.0 (#4301): numbers only, no names of a private circle
     info = ua8_list_info(c, lists, by)
     if foreign:  # 2.480.0 (#3944, F4): the operator sees numbers only -- no names of the people the lists are shared with
