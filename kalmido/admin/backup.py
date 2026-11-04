@@ -1517,7 +1517,7 @@ def bk_fks_back():
         return
     c = _pg.connect_direct(DATABASE_URL)
     try:
-        with _pg.system_ctx(c):
+        with _pg.system_ctx(c):  # the keys span every organisation (row-level security would hide the rows of the others)
             have = {x for t, k, d in _fk_list(c) for x in ((t, k), (t, d))}
         c.commit()
         for t, k, d in fks:
@@ -1525,7 +1525,7 @@ def bk_fks_back():
                 continue
             for how in ("", " NOT VALID"):
                 try:
-                    with _pg.system_ctx(c):
+                    with _pg.system_ctx(c):  # the check of the key reads the rows of every organisation
                         c.execute(f"ALTER TABLE {_q(t)} ADD CONSTRAINT {_q(k)} {d}{how}")
                     c.commit()
                     if how:
