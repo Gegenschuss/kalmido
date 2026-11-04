@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.525.0** (2026-11-04):
-- **Releases**: a new version is published in two steps; `:latest` and the latest release follow only after its device test.
-- **Installer**: `KALMIDO_URL=https://...` sets `PUBLIC_URL`; over SSH it prints the tunnel command.
-- **Agents**: per-agent "Wishes for the replies" in the agent chat.
-- **Security**: HEIC photos are stored but no longer decoded.
+**2.535.0** (2026-11-04):
+- **Documents**: recognised invoices are sorted into the office automatically; "Move to office" and "Wrong area" for the rest.
+- **Installer**: pins the image to the release digest and stops if the checksum list cannot be fetched.
+- **Offline**: conflicts name the right task; unsynced changes are kept across sign-out and account switch.
+- **API**: docs list everything the scope "read" opens.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -59,8 +59,8 @@ Pi advice: [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md#requirements).
 
 **Installer** (macOS, Linux; Windows: `irm https://kalmido.com/install.ps1 | iex`): downloads the latest release,
 uses the prebuilt image (or builds it locally if that is not possible) and starts it on `http://localhost:3040`.
-kalmido.com/install.sh (and `.ps1`) forwards to the installer of the latest GitHub release; it checks the download
-against the release's `SHA256SUMS` and uses the image digest of the release.
+kalmido.com/install.sh (and `.ps1`) forwards to the installer of the latest GitHub release; it pins the prebuilt image
+to the release's digest (checked against `SHA256SUMS`) and checks the source archive against `SHA256SUMS` when it downloads it without git; with git the tag is fetched from GitHub over HTTPS. If the checksum list of a release cannot be fetched, it stops.
 It never uses sudo, writes an `update.sh` into the install folder (`~/kalmido`) and shows the one-time **setup
 code** for the first account at the end. The scripts are in this repository: [install.sh](install.sh),
 [install.ps1](install.ps1).
