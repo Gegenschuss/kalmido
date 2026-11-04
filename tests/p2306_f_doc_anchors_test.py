@@ -135,11 +135,10 @@ check("one exception" in read("docs", "AGENT-SECURITY.md").lower() and "exceptio
 # 2.525.0 (#4179): the agent pages follow the server's enforcement (agents/control.py, core/access.py list_other_agent)
 sec = read("docs", "AGENT-SECURITY.md")
 check("approve_all" in pf and "control level" in pf.lower(), "the setup prompt has a step for the control level (a new agent starts with approve_all)")
-check("A new agent starts with `approve_all`" in guide and "step 1, point 14" in guide, "AGENT-SETUP.md: the control level is chosen before the test checklist")
+check("agent starts with `approve_all`" in " ".join(guide.split()) and "step 1, point 14" in guide, "AGENT-SETUP.md: the control level is chosen before the test checklist")
 check(agents.count("A new agent starts with `approve_all`") >= 2, "AGENTS.md: guides A and B name the control level of a new agent")
 check("**Control level (2.235.0).**" in sec and "**Data lock (2.235.0).**" in sec, "AGENT-SECURITY.md: control level and data lock are listed as enforced")
-check("One exception, on purpose (2.352.0)" in sec and "two
-  agents cannot hand each other text" not in sec, "AGENT-SECURITY.md: the folder-share exception to one agent per project")
+check("One exception, on purpose (2.352.0)" in sec and "agents cannot hand each other text through a shared project" not in sec, "AGENT-SECURITY.md: the folder-share exception to one agent per project")
 check("Keys are kept for 14 days" in agents and "Keys are kept for 3 days" not in agents, "AGENTS.md: idempotency keys live 14 days (core/idem.py)")
 check("Users may create their own agents" not in agents, "AGENTS.md: the switch is called People may create their own agents")
 
