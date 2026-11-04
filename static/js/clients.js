@@ -24,7 +24,6 @@ const clientById = id => (S.clients || []).find(c => c.id === id);
 const cdn_label = c => !c ? '' : c.label || clientById(c.id)?.label || c.display_name || c.name || '';
 const cdn_name = (id, name) => (id && clientById(id)?.label) || name || '';
 const cdn_addrLine = c => { const b = c?.billing || {}; return [b.street, b.address_extra, [b.zip, b.city].filter(Boolean).join(' '), b.country].filter(Boolean).join(', '); };
-const clientOfList = l => l && l.client_id ? clientById(l.client_id) : null;
 // 2.218.0 C (#2804): a client's symbol is an app icon ("ic:" + name, at most 8 characters in all) or, as before, a saved emoji
 const CL_ICONS = ['brief', 'home', 'users', 'bank', 'shop', 'tool', 'bag', 'cart', 'car', 'book', 'globe', 'star', 'heart', 'bulb', 'code', 'film'];
 const clSymHtml = (v, cls = 's') => /^ic:[a-z]+$/.test(v || '') ? ic(v.slice(3), cls) : esc(v || '');

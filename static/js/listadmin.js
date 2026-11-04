@@ -5,7 +5,6 @@
 // only after a confirmation (both directions). Settings > Organisation. "Hide completed": the view's own choice, else the
 // nearest folder default, else the person's default.
 const lmOrgAdmin = l => !!l && !l.is_inbox && !!l.org_id && (S.me?.workspaces || []).some(o => o.id === l.org_id && o.role === 'admin');
-const lmOrgName = oid => (S.me?.workspaces || []).find(o => o.id === oid)?.name || '';
 // the last part of a list menu: what cannot simply be taken back (listMenuSort puts danger: 1 last)
 function lmDangerItems(l, id) {
   if (!l || l.is_inbox) return [];

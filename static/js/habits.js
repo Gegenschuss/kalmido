@@ -236,7 +236,6 @@ function pomoElapsed(p) {
 }
 const pomoRemaining = () => S.pomo ? S.pomo.minutes * 60 - pomoElapsed(S.pomo) : pomoMinutes(pomoKind) * 60;
 const fmtT = s => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600); return h ? `${h}:${pad(Math.floor(s % 3600 / 60))}:${pad(s % 60)}` : fmtMS(s); };
-const isSW = () => S.pomo ? S.pomo.kind === 'stopwatch' : pomoKind === 'stopwatch';
 const pomoDisplay = () => S.pomo?.kind === 'stopwatch' ? fmtT(pomoElapsed(S.pomo)) : fmtMS(pomoRemaining());
 const pomoMinutes = k => +(S.settings['pomo_' + ({focus: 'focus', short: 'short', long: 'long'}[k])] || 25);
 function viewPomo() {
