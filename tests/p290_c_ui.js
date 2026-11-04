@@ -41,6 +41,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const sel = d.querySelector('#txd-ustva'); sel.value = 'month';
   sel.dispatchEvent(new w.Event('change', {bubbles: true}));
   check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'month', 40), 'saved at once on change');
+  // CI of 2.496.1: the server has saved before the page got the answer, and mount() draws from the page's copy (TXD.data)
+  check(await until(() => w.eval("TXD.data?.ustva === 'month'")), 'the page has the answer');
   const j = await call('GET', '/api/office/tax-dates');
   check(!!j.tasks.ustva, 'the task was made');
   mount();
@@ -49,13 +51,13 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // undo
   check(await until(() => /Tax dates saved/.test(d.body.textContent), 30), 'a toast with undo');
   const ub = [...d.querySelectorAll('.toast button, #toast button, .toast .undo, [data-toast-undo]')][0];
-  if (ub) { ub.click(); check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'none', 40), 'undo: back to none, the task ended'); }
+  if (ub) { ub.click(); check(await until(async () => (await call('GET', '/api/office/tax-dates')).ustva === 'none', 40) && await until(() => w.eval("TXD.data?.ustva === 'none'")), 'undo: back to none, the task ended'); }
   else check(true, 'undo button not found by selector (covered by the API test)');
   // lead days
   mount();
   const lead = d.querySelector('#txd-lead'); lead.value = '40';
   lead.dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(await until(async () => (await call('GET', '/api/office/tax-dates')).lead_days === 30, 20), 'lead days above 30 are cut to 30, never stored as 40');
+  check(await until(async () => (await call('GET', '/api/office/tax-dates')).lead_days === 30, 20) && await until(() => w.eval('TXD.data?.lead_days === 30')), 'lead days above 30 are cut to 30, never stored as 40');
   await call('PUT', '/api/office/settings', {small_business: 1});
   await w.eval("(async () => { TXD.data = await api('GET', '/api/office/tax-dates'); })()");
   mount();
