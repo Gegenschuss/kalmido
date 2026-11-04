@@ -131,8 +131,12 @@ def _doc_area(c, uid, node):
 def ast_doc_agents(c, uid, nid, area="offers"):
     """Agents uid may ask for a summary of document nid: office agents of the document's area that see the file themselves."""
     n = need_node(c, nid, write=True)
-    if n["kind"] != "file" or not S.meta_row(c, nid):
+    m = S.meta_row(c, nid) if n["kind"] == "file" else None
+    if not m:
         raise Denied(404)
+    from ..docs.split import sp_view
+    if area == "receipts" and (sp_view(m) or {}).get("stack"):  # 2.522.0 (#4468): no reading of a stack waiting to be split
+        return [], n
     return [a for a in ast_office_agents(c, uid, _doc_area(c, uid, n), area) if fs_role(c, nid, uid=a["user_id"])], n
 
 

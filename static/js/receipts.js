@@ -37,6 +37,7 @@ function rc_html() {
   // 2.497.0 A (#4046): the fields only at a receipt (a row in rc_receipts), an open suggestion, an e-invoice to take over or
   // recognised invoice values; any other document (a letter) gets the button "Record as receipt" that shows them
   if (!rc_isReceipt(d) && RC.open !== RC.id) {
+    if (typeof DC !== 'undefined' && DC.doc?.id === RC.id && DC.doc.split?.stack) return '';  // 2.522.0 (#4468): a stack becomes no receipt
     return w ? `<div class="rc-add"><button type="button" class="btn sm" data-rc="open:0">${ic('receipt', 's')} ${tr('Record as receipt')}</button></div>` : '';
   }
   return `<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
@@ -131,6 +132,9 @@ async function rc_einvTake(id, b) {
 // "Recognised: ..." with Take over / Discard while it would change something (doc.extracted.new); Take over and Discard are
 // one undo step each. The invoice number stays visible (copy button) even after the take-over.
 function rx_html(d) {
+  // 2.522.0 (#4468): a stack waiting for the decision: one line instead of values / hints mixed from several letters (the server
+  // sends none of them, kalmido/docs/web.py); no reading with an agent either
+  if (d?.split?.stack) return `<div class="rx-slot"><p class="muted rx-stack" role="note">${esc(tr('Amounts and numbers are recognised per letter after splitting.'))}</p></div>`;
   const ag = typeof rcr_html === 'function' ? rcr_html(d) : '';  // 2.299.0 E (#3194): read by an agent / "Read with an agent" (asstprop.js)
   if (!d?.extracted && !d?.duplicate_of && !d?.checks && !ag) return '';  // 2.299.0 D (#3193): + the hints of the check
   const x = d.extracted || {};  // 2.146.0 B (#2452): a possible duplicate shows without recognised values too

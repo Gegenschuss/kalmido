@@ -135,13 +135,16 @@ def doc_json(c, m, node, full=False, role=None):
          "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand}
     # 2.210 C (#2761): only a flag whether the document is shared (no names)
     d["shared"] = bool(node["org_access"]) or bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone())
-    if m["dup_of"] and not m["dup_ok"]:  # 2.146.0 B (#2452): an older document that looks like the same invoice
+    from .split import sp_view
+    sp = sp_view(m)  # 2.154.0 A (#1111): a stack waiting to be split / a part of one
+    # 2.522.0 (#4468): a stack waiting for the decision is several letters: no recognised values, hints, duplicate warning
+    # (they would mix two letters); the parts are recognised on their own after "Split stack", "No stack" brings them back
+    stack = bool(sp and sp.get("stack"))
+    if m["dup_of"] and not m["dup_ok"] and not stack:  # 2.146.0 B (#2452): an older document that looks like the same invoice
         from flask import has_request_context
         dv = dup_view(c, m, me()) if has_request_context() and getattr(g, "user", None) else None
         if dv:
             d["duplicate_of"] = dv
-    from .split import sp_view
-    sp = sp_view(m)  # 2.154.0 A (#1111): a stack waiting to be split / a part of one
     if sp:
         d["split"] = sp
     if role:
@@ -149,9 +152,9 @@ def doc_json(c, m, node, full=False, role=None):
     if full:
         d["text"] = S.meta_text_shown(c, m)  # 2.360.0 B (#2496): no text of a file found infected later
         from ..receipts.extracted import rx_doc_view
-        d["extracted"] = rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
+        d["extracted"] = None if stack else rx_doc_view(c, m)  # 2.121.0 A (#2092): what the recognition read off a receipt (a suggestion)
         from ..receipts.rchecks import rck_view
-        d["checks"] = rck_view(c, m)  # 2.299.0 D (#3193): the hints of the fixed check of a receipt (never blocking)
+        d["checks"] = None if stack else rck_view(c, m)  # 2.299.0 D (#3193): the hints of the fixed check of a receipt (never blocking)
         einv = S.meta_json(c, m, "extracted", {}).get("_einv")  # 2.146.0 A (#2451): an e-invoice (its readable view)
         if isinstance(einv, dict):
             d["einvoice"] = {k: einv.get(k) for k in ("format", "kind", "source", "number")}

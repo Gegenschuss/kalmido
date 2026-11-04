@@ -123,6 +123,9 @@ def rx_post(nid):
         return err(tr("Invalid value: {0}", "do"))
     if not det and act not in ("nodup", "dup"):
         raise Denied(404)
+    from ..docs.split import sp_view
+    if act == "apply" and (sp_view(m) or {}).get("stack"):  # 2.522.0 (#4468): a stack waiting for the decision mixes letters
+        return err(tr("Amounts and numbers are recognised per letter after splitting."), 409)
     fl, bf0 = b.get("fields") or RX_FIELDS, b.get("before") if isinstance(b.get("before"), dict) else {}
     vat_in = act == "apply" and det.get("vat_pct") in ("19", "7", "0") and (not isinstance(fl, list) or "vat_pct" in fl)
     if act in ("apply", "restore") and (_rc_row(c, nid) or vat_in or bf0.get("is_receipt") or bf0.get("vat_pct")):
