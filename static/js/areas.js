@@ -497,7 +497,7 @@ function sbb_render(hid) {
 function sbb_fit() {
   const row = $('#side .sbmr');
   if (row) row.style.gridTemplateColumns = row.style.overflow = '';
-  let far = false;
+  let far;
   const wide = n => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
@@ -506,13 +506,13 @@ function sbb_fit() {
     if (!(need > box + .5)) continue;
     let px = parseFloat(getComputedStyle(n).fontSize) * box / need;
     for (let i = 0; i < 12 && px >= 9; i++) {
-      n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
+      n.style.fontSize = `${px.toFixed(1)}px`;
       need = wide(n);
       if (!(need > box + .5)) break;
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = true; continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; far = 1; continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
