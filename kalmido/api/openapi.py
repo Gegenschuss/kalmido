@@ -302,7 +302,7 @@ def openapi_spec():
             "tickets": {"type": "boolean", "description": "Ticket types bug / feature / task on (2.4.0)"},
             "ticket_key": nul("string", description="2.390.0: the project's ticket key (2-6 capitals / digits, a letter first, unique per workspace); "
                               "its tasks get keys like APP-12 (field key of a task); null = none"),
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; owner). Default for a new project: its folder's setting, else on when the creator has the module Time on (2.489.0); new time entries need it; tracked time stays visible when it is switched off"},
             "mail_guests": {"type": "boolean", "description": "2.395.0 (#3380): guests of the project (participant / view) read its filed e-mails (GET /mails); default off, set by the owner / a project admin in the app. Edit roles always read them"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
@@ -344,7 +344,7 @@ def openapi_spec():
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "kind": {"type": "string", "enum": [*LIST_KINDS, *LIST_KIND_ALIASES], "description": "list | project: stored only, no longer evaluated (2.352.0, every list but the inbox is a project); \"checklist\" is a deprecated alias of list + done_at_bottom"},
             "tickets": {"type": "boolean", "description": "Ticket types on (2.4.0)"},
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; owner). Default for a new project: its folder's setting, else on when the creator has the module Time on (2.489.0); new time entries need it; tracked time stays visible when it is switched off"},
             "project_type": {"type": ["string", "null"], "enum": [*PTYPES, "", None], "description": "2.4.0: a project of a built-in type (sections, "
                              "custom fields, view, ticket types; switches the modules it needs on for you); kind / checklist / tickets are ignored. "
                              "2.411.0 (#3516): left out in a folder = the folder's project type (its default, or the type its projects share) with "
@@ -380,7 +380,7 @@ def openapi_spec():
             "group_field": {"type": ["string", "integer", "null"], "description": "2.144.0 (#2414): group the list view by a custom field for every "
                             "member (owner / project admins): \"cf:<field id>\" or the id of a text / select field of this project; \"\" / null = by sections "
                             "again (the sections themselves never change)"},
-            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; default off; owner). New time entries need it; tracked time stays visible when it is switched off"},
+            "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; owner). Default for a new project: its folder's setting, else on when the creator has the module Time on (2.489.0); new time entries need it; tracked time stays visible when it is switched off"},
             "checklist": {"type": "boolean", "deprecated": True, "description": "Deprecated (2.7.2): same as done_at_bottom"},
             "nag": {"type": "string", "enum": list(NAG_VALUES), "description": "Default nag interval of the project's tasks (owner); off / empty = none"},
             "day_hours": nul("number", minimum=1, maximum=24, description="Hours per day / shift (owner); null = the server's value"),
@@ -885,10 +885,17 @@ def openapi_spec():
     _SPEC["s"] = {
         "openapi": "3.1.0",
         "info": {"title": f"{APP_NAME} REST API", "version": API_VERSION,
-                 "description": "Personal access tokens (Settings > Account > API tokens) as `Authorization: Bearer abk_...`. "
+                 "description": "Personal access tokens (Settings > Access) as `Authorization: Bearer abk_...`. "
                                 "Every request acts as the token's user and sees exactly what that user sees. Dates are local dates "
                                 "of the server's time zone (YYYY-MM-DD), times HH:MM, timestamps ISO 8601 in UTC. Projects are called lists in the API (list_id, /lists; kind=list|project is stored but no longer evaluated, tracked projects have a status). Collections come in pages: "
-                                "{data, next_cursor}. Errors: {error: {code, message}}. See docs/API.md for examples and webhooks.",
+                                "{data, next_cursor}. Errors: {error: {code, message}}. "
+                                # 2.527.0 (#4313): what the always-on scope read opens, so nobody takes it for a harmless minimum
+                                "Scopes: every operation names the one it needs in x-kalmido-scope. read is always on and opens every GET no "
+                                "other scope claims, within what the user sees: besides projects, tasks, comments, notes, time and habits also "
+                                "the team chat with direct messages and its files, clients with hours, amounts and budget, who of the "
+                                "organisation is away when, the Family and Home & life modules (health only with private), video sign-offs "
+                                "and the e-mails filed with clients and projects. "
+                                "See docs/API.md for examples and webhooks.",
                  "license": {"name": "AGPL-3.0-only", "identifier": "AGPL-3.0-only"}},
         "servers": [{"url": API_PREFIX.rstrip("/")}],
         "security": [{"bearerAuth": []}],

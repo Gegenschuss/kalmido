@@ -15807,7 +15807,6 @@
   "Created with AI support": "Créé avec l’aide de l’IA",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Créé par un agent IA. Les textes destinés au public doivent l’indiquer, sauf si une personne les a vérifiés et en assume la responsabilité.",
   "Insert label": "Insérer la mention",
-  "Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects": "Projets, tâches, commentaires, entrées de temps, habitudes, recherche, e-mails classés chez les clients et projets",
   "Work the list off": "Traiter la liste",
   "Dry run": "Essai à blanc",
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agent traite l'une après l'autre les listes indiquées sur son ordinateur : dès qu'une place est libre, il lance la tâche suivante et clôt les tâches une fois réalisées. Essai à blanc = il indique seulement ce qu'il ferait.",
@@ -16158,5 +16157,6 @@
   "Moved to office": "Déplacé vers le bureau",
   "Moved to your own documents": "Déplacé vers tes propres documents",
   "New in the office": "Nouveau au bureau",
-  "This document is not in your office or your own documents": "Ce document n'est ni dans ton bureau ni dans tes propres documents"
+  "This document is not in your office or your own documents": "Ce document n'est ni dans ton bureau ni dans tes propres documents",
+  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Tout ce que le compte voit et qu'aucune autre autorisation ne couvre : projets, tâches, commentaires, notes, entrées de temps, habitudes, recherche, le chat d'équipe avec les messages directs, clients avec heures et montants, qui est absent quand, famille et maison & vie, validations vidéo, e-mails classés chez les clients et projets"
 }

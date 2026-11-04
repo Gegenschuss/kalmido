@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check the links between the repository's Markdown pages (2.277, #3055): every relative link points to an existing
-file, every #anchor to a heading (GitHub's anchor rules) or an explicit id / name of that page.
+file, every #anchor to a heading (GitHub's anchor rules) or an explicit id / name of that page; 2.527.0 (#4313): and every
+fenced code block is closed.
 
     python3 tools/check_links.py [-v] [FILE.md ...]      exit 1 on a dead link
 
@@ -22,21 +23,29 @@ HTML = re.compile(r"""(?:href|src)\s*=\s*["']([^"']+)["']""")
 IDS = re.compile(r"""<[a-zA-Z][^>]*?\s(?:id|name)\s*=\s*["']([^"']+)["']""")
 
 
-def prose(text):
-    """The text without fenced code blocks (lines inside them become empty, so line numbers stay)."""
-    out, fence = [], None
-    for line in text.split("\n"):
+def prose(text, problems=None):
+    """The text without fenced code blocks (lines inside them become empty, so line numbers stay). 2.527.0 (#4313): a fence
+    that is never closed swallowed the rest of a page silently; problems (a list) collects [(line, message)] for an opening
+    fence with a language (```bash) inside an open block - the block above lacks its closing fence - and for a block still
+    open at the end of the page."""
+    out, fence, start = [], None, 0
+    for no, line in enumerate(text.split("\n"), 1):
         m = FENCE.match(line)
         if fence:
-            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence) and not line.strip()[len(m.group(1)):]:
-                fence = None
+            if m and m.group(1)[0] == fence[0] and len(m.group(1)) >= len(fence):
+                if not line.strip()[len(m.group(1)):]:
+                    fence = None
+                elif problems is not None:
+                    problems.append((no, f"code block opened at line {start} is not closed before this one"))
             out.append("")
             continue
         if m:
-            fence = m.group(1)
+            fence, start = m.group(1), no
             out.append("")
             continue
         out.append(line)
+    if fence and problems is not None:
+        problems.append((start, "code block is never closed"))
     return out
 
 
@@ -67,8 +76,10 @@ def anchors(path, cache={}):
 
 def check(rel):
     path = os.path.join(ROOT, rel)
-    bad = []
-    for no, line in enumerate(prose(open(path, encoding="utf-8").read()), 1):
+    bad, problems = [], []
+    lines = prose(open(path, encoding="utf-8").read(), problems)
+    bad += [f"{rel}:{no}: {msg}" for no, msg in problems]
+    for no, line in enumerate(lines, 1):
         line = re.sub(r"``[^`]*``|`[^`]*`", "", line)
         for target in LINK.findall(line) + HTML.findall(line):
             if re.match(r"^[a-z][a-z0-9+.-]*:", target, re.I) or target.startswith("//"):
@@ -97,7 +108,7 @@ def main(argv):
     for b in bad:
         print(b)
     if verbose or bad:
-        print(f"check_links: {len(files)} pages, {len(bad)} dead link(s)")
+        print(f"check_links: {len(files)} pages, {len(bad)} problem(s) (dead links, open code blocks)")
     return 1 if bad else 0
 
 

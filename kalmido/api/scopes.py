@@ -95,7 +95,7 @@ SCOPE_LABELS = {"read": N_("Read"), "tasks:write": N_("Tasks"), "comments": N_("
                 "wiki:read": N_("Read knowledge pages"), "wiki:write": N_("Write knowledge pages"),  # 2.200.0 C (#1781)
                 "integrations": N_("Set up integrations"),  # 2.391.0 (#3362)
                 "write": N_("Everything (old token)")}
-SCOPE_HELP = {"read": N_("Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects"),  # 2.483.0 (#1902): + filed e-mails
+SCOPE_HELP = {"read": N_("Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects"),  # 2.483.0 (#1902): + filed e-mails; 2.527.0 (#4313): what read really opens
               "tasks:write": N_("Create, change, complete and move tasks; dependencies, habits"),
               "comments": N_("Write, edit and delete comments, reactions, mark News read"),
               "structure": N_("Projects, sections, custom fields, project tags, templates, filters, folders, project pages"),

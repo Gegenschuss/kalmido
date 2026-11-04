@@ -462,7 +462,9 @@ def atm_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "2.51.0 (#1353): past events without a matching time entry (rows for a time proposal)", T,
         ok({"type": "object", "properties": {"user_id": {"type": "integer"}, "from": {"type": "string"}, "to": {"type": "string"},
                                              "events": {"type": "array", "items": {"type": "object"}}}}) | errs("400", "403", "404"),
-        per, scope="time", desc="Needs the scopes time and calendar. Default period: the last 7 days. start / end = local HH:MM "
+        # 2.527.0 (#4313): its own default is 7 days (atm_period(a, 7)), not the 14 of /time/check
+        [q("from", "First day (YYYY-MM-DD; default: 6 days before to)", {"type": "string", "format": "date"}), *per[1:]],
+        scope="time", desc="Needs the scopes time and calendar. Default period: the last 7 days. start / end = local HH:MM "
                                 "(null for all-day events: ask or propose working hours); task_id / list_id where the person tracks time.")}
     paths["/agent/proposals/time"] = {"post": op(
         "2.51.0 (#1353): propose time entries to a person (they review and apply; you never track time yourself)", "Agents",

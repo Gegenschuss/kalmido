@@ -15807,7 +15807,6 @@
   "Created with AI support": "Creato con il supporto dell’IA",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Creato da un agente IA. I testi per il pubblico devono indicarlo, a meno che una persona li abbia verificati e se ne assuma la responsabilità.",
   "Insert label": "Inserisci indicazione",
-  "Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects": "Progetti, attività, commenti, registrazioni del tempo, abitudini, ricerca, e-mail archiviate presso clienti e progetti",
   "Work the list off": "Smaltire la lista",
   "Dry run": "Prova a secco",
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agente lavora una dopo l'altra le liste indicate sul suo computer: quando un posto è libero avvia il job successivo e chiude le attività una volta fatte. Prova a secco = segnala solo cosa farebbe.",
@@ -16159,5 +16158,6 @@
   "Moved to office": "Spostato in ufficio",
   "Moved to your own documents": "Spostato nei tuoi documenti",
   "New in the office": "Nuovo in ufficio",
-  "This document is not in your office or your own documents": "Questo documento non è né nel tuo ufficio né nei tuoi documenti"
+  "This document is not in your office or your own documents": "Questo documento non è né nel tuo ufficio né nei tuoi documenti",
+  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Tutto ciò che l'account vede e che nessun altro permesso copre: progetti, attività, commenti, note, registrazioni del tempo, abitudini, ricerca, la chat del team con i messaggi diretti, clienti con ore e importi, chi è assente e quando, famiglia e casa e vita, approvazioni video, e-mail archiviate presso clienti e progetti"
 }

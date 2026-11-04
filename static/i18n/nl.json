@@ -15807,7 +15807,6 @@
   "Created with AI support": "Gemaakt met AI-ondersteuning",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Gemaakt door een AI-agent. Teksten voor het publiek moeten dat vermelden, tenzij een mens ze heeft gecontroleerd en ervoor verantwoordelijk is.",
   "Insert label": "Vermelding invoegen",
-  "Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects": "Projecten, taken, opmerkingen, tijdregistraties, gewoonten, zoeken, bij klanten en projecten opgeslagen e-mails",
   "Work the list off": "Lijst afwerken",
   "Dry run": "Proefrun",
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "De agent werkt de op zijn computer genoemde lijsten na elkaar af: is er een plek vrij, dan start hij de volgende job, en gebouwde taken sluit hij af. Proefrun = hij meldt alleen wat hij zou doen.",
@@ -16158,5 +16157,6 @@
   "Moved to office": "Naar kantoor verplaatst",
   "Moved to your own documents": "Naar je eigen documenten verplaatst",
   "New in the office": "Nieuw in het kantoor",
-  "This document is not in your office or your own documents": "Dit document staat niet in je kantoor en niet in je eigen documenten"
+  "This document is not in your office or your own documents": "Dit document staat niet in je kantoor en niet in je eigen documenten",
+  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Alles wat het account ziet en geen ander recht dekt: projecten, taken, opmerkingen, notities, tijdregistraties, gewoonten, zoeken, de teamchat met directe berichten, klanten met uren en bedragen, wie wanneer afwezig is, gezin en huis & leven, videogoedkeuringen, bij klanten en projecten opgeslagen e-mails"
 }

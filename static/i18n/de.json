@@ -15807,7 +15807,6 @@
   "Created with AI support": "Erstellt mit KI-Unterstützung",
   "Created by an AI agent. Texts for the public must be labelled as such, unless a person has checked them and takes responsibility.": "Von einem KI-Agenten erstellt. Bei Texten für die Öffentlichkeit musst du das kennzeichnen, außer ein Mensch hat ihn geprüft und verantwortet ihn.",
   "Insert label": "Kennzeichnung einfügen",
-  "Projects, tasks, comments, time entries, habits, search, e-mails filed with clients and projects": "Projekte, Aufgaben, Kommentare, Zeiteinträge, Gewohnheiten, Suche, bei Kunden und Projekten abgelegte E-Mails",
   "Work the list off": "Liste abarbeiten",
   "Dry run": "Trockenlauf",
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "Der Agent arbeitet die auf seinem Computer genannten Listen nacheinander ab: Ist ein Platz frei, startet er den nächsten Job, und gebaute Aufgaben hakt er ab. Trockenlauf = er meldet nur, was er tun würde.",
@@ -16158,5 +16157,6 @@
   "Moved to office": "Ins Büro verschoben",
   "Moved to your own documents": "In deine eigenen Dokumente verschoben",
   "New in the office": "Neu im Büro",
-  "This document is not in your office or your own documents": "Dieses Dokument liegt weder in deinem Büro noch in deinen eigenen Dokumenten"
+  "This document is not in your office or your own documents": "Dieses Dokument liegt weder in deinem Büro noch in deinen eigenen Dokumenten",
+  "Everything the account sees that no other permission covers: projects, tasks, comments, notes, time entries, habits, search, the team chat with direct messages, clients with hours and amounts, who is away when, family and home & life, video sign-offs, e-mails filed with clients and projects": "Alles, was das Konto sieht und kein anderes Recht abdeckt: Projekte, Aufgaben, Kommentare, Notizen, Zeiteinträge, Gewohnheiten, Suche, der Team-Chat mit Direktnachrichten, Kunden mit Stunden und Beträgen, wer wann abwesend ist, Familie sowie Haus & Leben, Video-Freigaben, bei Kunden und Projekten abgelegte E-Mails"
 }
