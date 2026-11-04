@@ -47,6 +47,7 @@ from ..notify.push import notify, push_prio, WD_TICKS
 from ..agents.core import agent_emit, agent_row, agent_shares, is_agent
 from ..agents.chat import _jload, chat_choices_withdraw, choice_state
 from ..agents.workstyle import ws_need_editor
+from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
 
 CTL_LEVELS = ("approve_all", "routine", "free")
 CTL_ONE_WAY_FIXED = ("delete", "costs", "login", "migration")  # #2900: fixed, cannot be switched off
@@ -718,7 +719,6 @@ def ctl_undo(c, r, undo):
             return tr("The comment is gone already")
         if k["user_id"] != r["agent_id"] or not task_visible(c, k["task_id"], me()):
             return no
-        from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
         cmt_trash(c, k["id"])
         news_forget_comment(c, k["id"])
         c.commit()

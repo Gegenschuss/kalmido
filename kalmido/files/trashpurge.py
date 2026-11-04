@@ -20,6 +20,7 @@ from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..collab.cmttrash import tcx_trash_paths
 
 TP_TICK = {"at": 0.0}
 # 2.239.0 D (#2874): nor a client with a signed data protection sheet (clients_bulk.ms_client_in_use), on top of cl_hold_sql()
@@ -146,7 +147,6 @@ def tp_tick(c, force=False):
                             c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
                                       "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
                         if table == "tchat_msgs":  # 2.530.0 A (#4315): the files kept in the trash with the message
-                            from ..collab.cmttrash import tcx_trash_paths
                             kp += tcx_trash_paths(c, f"deleted_at IS NOT NULL AND deleted_at<?{extra}", (cut,))
                         if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
                             c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "

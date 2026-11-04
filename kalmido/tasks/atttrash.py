@@ -5,6 +5,8 @@ restore it). After the trash period (ret_days("trash"), at least one day) files/
 counts, and while ret_on("trash") is on it deletes the rows for good; the files leave the disk after the commit (the caller
 unlinks the returned paths). A path another row still uses stays on disk (as tasks/tasktrash.py ttp_purge)."""
 
+from ..core.db import now_utc
+
 ATR_TABLES = (("attachments", "attachments"), ("list_files", "list_files"))  # (count key, table)
 # 2.530.0 D (#4316, audit B10): a file of a project kept by law (lists.retain_until today or later, like tasks/tasktrash.py
 # TTP_KEPT) waits for the end of that period, also in the trash; counted as <key>_kept
@@ -23,7 +25,6 @@ def atr_used(c, paths):
 
 def atr_tick(c, cut, purge):
     """Files in the trash since before cut: -> (counts, paths to unlink after the commit). Only counts while purge is off."""
-    from ..core.db import now_utc
     counts, paths, today = {}, [], now_utc().date().isoformat()
     for key, table in ATR_TABLES:
         base = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?"

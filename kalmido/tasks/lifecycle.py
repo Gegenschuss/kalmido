@@ -7,7 +7,7 @@ from datetime import date, datetime
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.pg import insert_id, system_ctx, write_lock, st_ids
 from ..core.schema import MAX_DEPTH
 from ..core.i18n import tr
 from ..core.db import body, bump, connect, db, err, gsetting, iso, local_now, now_utc, parse_iso
@@ -28,6 +28,7 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.281.0 A (#3112): 'Empty trash' in the background
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
 from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
+from ..lists.listtrash import otr_need
 
 
 def _norm(v):
@@ -938,7 +939,6 @@ def tre_cascades(c, ids, list_ids=()):
     deleted for good -- the numbers the dialogs name before: customer reports (portal_tickets) and form entries (form_entries)
     go with them (cascade), video sign-offs go to the video trash (videos/vdrescue.py). System context, numbers only."""
     from ..videos.vdrescue import vdr_doomed_count
-    from ..core.pg import st_ids
     with system_ctx(c):
         if list_ids:
             ids = [*ids, *(r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id = ANY(CAST(? AS BIGINT[]))", (st_ids(list_ids),)))]
@@ -965,7 +965,6 @@ def trash_purge_info():
         out = {"tasks": 0 if kept else 1, "kept": 0, "kept_law": 1 if kept else 0, "others": 0}
         out.update(tre_cascades(c, [] if kept else [tid]))
     elif lid:
-        from ..lists.listtrash import otr_need
         otr_need(c, lid)
         out = {"tasks": c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0], "kept": 0, "kept_law": 0, "others": 0}
         out.update(tre_cascades(c, [], [lid]))

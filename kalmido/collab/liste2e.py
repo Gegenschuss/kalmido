@@ -118,6 +118,7 @@ from ..core.config import app  # noqa: E402
 from ..core.db import body, bump, db, err, iso, now_utc  # noqa: E402
 from ..core.access import Denied, need_list  # noqa: E402
 from ..accounts.session import me  # noqa: E402
+from .cmttrash import ctt_purge_list  # 2.530.0 A (#4315): the kept texts / files of deleted comments and channel messages
 
 LE2A_MANAGE = ("owner", "admin")  # finding M9: who may switch the lock and hand out list keys
 LE2A_BULK_MAX = 200               # values per bulk call (finding M6)
@@ -1049,7 +1050,6 @@ def le2a_finish(lid):
         # 2.530.0 (#4315, review M2): the trash was not re-encrypted either -- its files and the kept texts of deleted comments /
         # channel messages are of the old key generation; a restore would bring back what nobody can read any more
         from ..tasks.atttrash import atr_purge_list
-        from .cmttrash import ctt_purge_list
         gone = atr_purge_list(c, lid) + ctt_purge_list(c, lid)
         bump(c)
         c.commit()
@@ -1064,7 +1064,6 @@ def le2a_finish(lid):
         return err(tr("No encryption change is running for this project."), 409)
     from ..tasks.atttrash import atr_purge_list  # 2.272.0 F (#3038, review E2-H1): the files in the trash were not converted
     gone = atr_purge_list(c, lid)
-    from .cmttrash import ctt_purge_list  # 2.530.0 A (#4315): nor the kept texts / files of deleted comments and channel messages
     gone += ctt_purge_list(c, lid)
     if lr["e2e"] == "encrypting":
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes

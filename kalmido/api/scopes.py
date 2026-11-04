@@ -15,7 +15,7 @@ from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role
+from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role, MANAGE_ROLES
 from ..core.access import qn_private  # 2.477.0 (#3881)
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
@@ -29,7 +29,7 @@ from ..tasks.tasks import task_update
 from ..tasks.lifecycle import task_restore, task_skip, trash_empty, tre_plan  # 2.530.0 D (#4316): tre_plan
 from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_MAX
 from ..tasks.batch import attachment_delete, task_batch
-from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
+from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names, need_live_comment
 from ..collab.news import news_add, news_list, news_read, news_read_job
 from ..personal.habits import habit_create, habit_delete, habit_update, need_habit
 from ..personal.timetrack import time_delete, time_running, time_start, time_stop, time_update
@@ -965,8 +965,6 @@ def v1_comment_delete(cid):
     waits for a person's approval (rights checked first, like deleting a field)."""
     v1_args(())
     c = db()
-    from ..collab.comments import need_live_comment
-    from ..core.access import MANAGE_ROLES
     r, role = need_live_comment(c, cid)
     if r["user_id"] != me() and role not in MANAGE_ROLES:
         raise Denied(403, tr("Only the author or the project owner can delete this comment"))

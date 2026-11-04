@@ -23,6 +23,7 @@ from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_a
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
 from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
+from .cmttrash import tcx_trash, tcx_restore
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -857,7 +858,6 @@ def tchat_delete(mid):
     c = db()
     need_tchat(c)
     m, _r = need_tmsg(c, mid, edit="delete")
-    from .cmttrash import tcx_trash
     tcx_trash(c, mid)
     c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
     c.commit()
@@ -868,7 +868,6 @@ def tchat_delete(mid):
 def tchat_restore(mid):
     """2.530.0 A (#4315): a deleted message back from the trash (within the trash period): whoever could delete it. 404 when
     nothing is kept (deleted before, or the trash run was quicker)."""
-    from .cmttrash import tcx_restore
     c = db()
     need_tchat(c)
     m, _r = need_tmsg(c, mid, edit="delete")

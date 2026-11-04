@@ -21,6 +21,7 @@ from ..tasks.attachments import save_attachments
 from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
+from .cmttrash import cmt_trash, cmt_restore
 
 
 # ---------------------------------------------------------------- comments + activity timeline
@@ -432,7 +433,6 @@ def comment_delete(cid):
     r, role = need_live_comment(c, cid)
     if r["user_id"] != me() and role not in MANAGE_ROLES:
         return err(tr("Only the author or the project owner can delete this comment"), 403)
-    from .cmttrash import cmt_trash
     cmt_trash(c, cid)
     c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='comment' AND source_id=?", (cid,))  # 2.235.0 B2 (#2903): nor its copy in a rule
     from ..collab.news import news_forget_comment
@@ -446,7 +446,6 @@ def comment_delete(cid):
 def comment_restore(cid):
     """2.530.0 A (#4315): a deleted comment back from the trash (within the trash period): the same people who could delete it
     (author, list owner / admins). 404 when nothing is kept (deleted before, or the trash run was quicker)."""
-    from .cmttrash import cmt_restore
     c = db()
     r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NOT NULL", (cid,)).fetchone()
     if not r:
