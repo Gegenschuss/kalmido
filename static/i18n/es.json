@@ -16187,5 +16187,6 @@
   "Rows without a title were skipped": "Se omitieron filas sin título",
   "Row {1}": ["Fila {1}", "Filas {1}"],
   "{0} row will be skipped": ["Se omitirá {0} fila", "Se omitirán {0} filas"],
-  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} tarjeta sin fecha de cambio (REV): el contacto se cambió aquí y conserva sus valores, compáralo a mano", "{0} tarjetas sin fecha de cambio (REV): los contactos se cambiaron aquí y conservan sus valores, compáralos a mano"]
+  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} tarjeta sin fecha de cambio (REV): el contacto se cambió aquí y conserva sus valores, compáralo a mano", "{0} tarjetas sin fecha de cambio (REV): los contactos se cambiaron aquí y conservan sus valores, compáralos a mano"],
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} archivo no está en el archivo comprimido (bloqueado por el antivirus o ilegible), el manifiesto lo nombra", "{0} archivos no están en el archivo comprimido (bloqueados por el antivirus o ilegibles), el manifiesto los nombra"]
 }

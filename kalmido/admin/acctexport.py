@@ -781,11 +781,30 @@ def umz_export_row(uid, export_id):
     umz_run(uid, export_id)
 
 
+def dva_umz_snapshot(c, on=True):
+    """2.533.0 (#4318) F15: the export reads the files and, later, the rows of the same tables; with READ COMMITTED a file
+    added in between came as a row without its file. on: the next transaction of c (the export's own connection) is
+    REPEATABLE READ, one snapshot for every read of the run; off (before c goes back to the pool): rolled back and the
+    pool's default again. The driver takes the level only while the connection is idle."""
+    from psycopg import IsolationLevel
+    from psycopg.pq import TransactionStatus
+    pgc = c._pg
+    if pgc.closed:
+        return
+    if pgc.info.transaction_status != TransactionStatus.IDLE:
+        if on:
+            c.commit()  # only the reads of umz_user_conn so far
+        else:
+            pgc.rollback()
+    pgc.isolation_level = IsolationLevel.REPEATABLE_READ if on else None
+
+
 def umz_run(uid, export_id):
     c = connect()
     part = None
     try:
         umz_user_conn(c, uid)
+        dva_umz_snapshot(c)  # 2.533.0 (#4318) F15: one snapshot for the files and the rows
         key = umz_key(uid, "export")
         part = os.path.join(_udir(uid), secrets.token_hex(8) + ".part")
         with os.fdopen(os.open(part, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as f:
@@ -806,7 +825,8 @@ def umz_run(uid, export_id):
         umz_write_state(_udir(uid), {"state": "done", "started_at": st.get("started_at"), "done_at": iso(done),
                                      "expires_at": iso(done + timedelta(hours=UMZ_KEEP_H)), "file": name, "bytes": w.size,
                                      "sealed": bool(key), "export_id": export_id, "rows": sum(man["tables"].values()),
-                                     "files": sum(1 for x in man["files"] if x["path"].startswith("files/")), "missing": len(man["missing"])})
+                                     "files": sum(1 for x in man["files"] if x["path"].startswith("files/")), "missing": len(man["missing"]),
+                                     "locked": len(man.get("locked_files") or [])})  # 2.533.0 (#4318) F18: the export page says it
         c.rollback()
         print(f"account export of user {uid}: {w.size} bytes", flush=True)
     except Exception as e:  # noqa: BLE001 -- the state says it failed; never content in the message
@@ -820,6 +840,10 @@ def umz_run(uid, export_id):
     finally:
         if part and os.path.exists(part):
             os.remove(part)
+        try:
+            dva_umz_snapshot(c, on=False)  # 2.533.0 (#4318) F15: the pooled connection goes back with the default level
+        except Exception:  # noqa: BLE001 -- a broken connection is dropped by the pool's check
+            pass
         c.close()
         with _UMZ_LOCK:
             _UMZ.pop(int(uid), None)
@@ -835,7 +859,8 @@ def umz_status(uid):
         p = os.path.join(_udir(uid), st.get("file") or "-")
         if not os.path.isfile(p) or st.get("expires_at", "") <= iso(now_utc()):
             st = {"state": "none"}
-    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "rows", "missing") if st.get(k) is not None}
+    out = {k: st.get(k) for k in ("state", "started_at", "done_at", "expires_at", "file", "bytes", "files", "rows", "missing", "locked")
+           if st.get(k) is not None}
     if st.get("state") == "failed":
         out["error"] = tr("The export was interrupted. Please start it again.") if st.get("error") == "interrupted" else \
             tr("The export failed. Please try again later or ask the server admin (server log).")

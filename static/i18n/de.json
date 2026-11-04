@@ -16187,5 +16187,6 @@
   "Rows without a title were skipped": "Zeilen ohne Titel wurden übersprungen",
   "Row {1}": ["Zeile {1}", "Zeilen {1}"],
   "{0} row will be skipped": ["{0} Zeile wird übersprungen", "{0} Zeilen werden übersprungen"],
-  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} Karte ohne Änderungsdatum (REV): der Kontakt wurde hier geändert und behält seine Werte, bitte von Hand abgleichen", "{0} Karten ohne Änderungsdatum (REV): die Kontakte wurden hier geändert und behalten ihre Werte, bitte von Hand abgleichen"]
+  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} Karte ohne Änderungsdatum (REV): der Kontakt wurde hier geändert und behält seine Werte, bitte von Hand abgleichen", "{0} Karten ohne Änderungsdatum (REV): die Kontakte wurden hier geändert und behalten ihre Werte, bitte von Hand abgleichen"],
+  "{0} file is not in the archive (locked by the virus scanner or not readable), the manifest names it": ["{0} Datei ist nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie", "{0} Dateien sind nicht im Archiv (vom Virenscanner gesperrt oder nicht lesbar), das Manifest nennt sie"]
 }
