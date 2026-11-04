@@ -2,7 +2,7 @@
 // #3847 the phone's open drawer stays open when the workspace is switched (with and without a kept view) and shows the new one
 // #3852 at 320 px a member's name in Settings > Organisation gets the whole first line (role choice + buttons below), a receipt
 //       row with labels gives the file name the whole first line; the wide view is unchanged
-// 2.498.0 #3863 tapped through the sheet from a project page: the kept view of the target comes and stays, drawer open or closed
+// 2.498.0 #3863 tapped through the sheet from a project page: the target's page (2.497.0 #4048: a project not there -> Projects) comes and stays, drawer open or closed
 // freelancer-matrix: n/a (no new route; the workspace switch is the same for a person without an organisation)
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -77,7 +77,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     await ev(`(() => { history.back(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('#side.open')`, 20), '#3847: Back closes the drawer after a switch');
 
-    // #3863 real taps (the sheet's Back entry takes part): project page of the organisation -> Private with a kept view
+    // #3863 real taps (the sheet's Back entry takes part): project page of the organisation -> Private lands on Projects (#4048)
     const tap = async sel => {
       const at = `(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].find(x => x.offsetParent); if (!e) return null; const r = e.getBoundingClientRect(); return {x: r.left + r.width / 2, y: r.top + r.height / 2}; })()`;
       await ready(ev, `(() => { const q = ${at}; return !!q && q.x > 0 && q.x < innerWidth && q.y < innerHeight && !document.querySelector('#side').getAnimations().length; })()`, 20);  // the drawer has finished sliding in
@@ -89,21 +89,20 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
     const pick = async label => { check(await ready(ev, `[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => b.textContent.includes(${JSON.stringify(label)}))`, 20), '#3863: the sheet offers ' + label);
       const i = await ev(`[...document.querySelectorAll('#pop [role="menuitem"]')].findIndex(b => b.textContent.includes(${JSON.stringify(label)}))`);
       await tap(`#pop [role="menuitem"][data-i="${await ev(`document.querySelectorAll('#pop [role="menuitem"]')[${i}].dataset.i`)}"]`); };
-    const toProject = async () => {  // in the organisation, on its project page, Private's kept view = the list Home
+    const toProject = async () => {  // in the organisation, on its project page (Private was seen on the list Home before)
       await nav(B + '#today'); await ready(ev, `!!S.booted`, 80);
       await ev(`(async () => { closeSide(); LS.set('wsView', {}); await wsSet('private'); go('l/${HOME}'); return 1; })()`);
       await ready(ev, `S.route.key === 'l:${HOME}'`, 20);
       await ev(`(async () => { await wsSet('org:${ORG}', {keep: true}); go('l/${PROJ}'); return 1; })()`);
       return ready(ev, `S.route.key === 'l:${PROJ}' && wsCur() === 'org:${ORG}'`, 20);
     };
-    const settled = `wsCur() === 'private' && S.route.key === 'l:${HOME}' && location.hash === '#l/${HOME}'`;
+    const settled = `wsCur() === 'private' && location.hash === '#projects' && S.route.key === 'projects'`;
     check(await toProject(), '#3863: drawer open: on the project page');
-    check(await ev(`(LS.get('wsView', {}) || {}).private?.hash === 'l/${HOME}'`), '#3863: Private keeps its view ' + JSON.stringify(await ev(`LS.get('wsView', {})?.private?.hash`)));
     await open(ev);
     await tap('#side .wsbar'); await pick('Private');
     await ready(ev, settled, 20); await sleep(900);
     d = await ev(drawer);
-    check(await ev(settled) && d.open, '#3863: open drawer, tapped: Private with its kept view, it stays ' + JSON.stringify(d));
+    check(await ev(settled) && d.open, '#3863: open drawer, tapped: Private on Projects, it stays ' + JSON.stringify(d));
     check(await toProject(), '#3863: drawer closed: on the project page');
     await ev(`(() => { closeSide(); return 1; })()`);
     await ev(`(() => { render(); return 1; })()`);
