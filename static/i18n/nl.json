@@ -16186,5 +16186,6 @@
   "Description longer than {0} characters, shortened": "Beschrijving langer dan {0} tekens, ingekort",
   "Rows without a title were skipped": "Rijen zonder titel zijn overgeslagen",
   "Row {1}": ["Rij {1}", "Rijen {1}"],
-  "{0} row will be skipped": ["{0} rij wordt overgeslagen", "{0} rijen worden overgeslagen"]
+  "{0} row will be skipped": ["{0} rij wordt overgeslagen", "{0} rijen worden overgeslagen"],
+  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} kaart zonder wijzigingsdatum (REV): het contact is hier gewijzigd en houdt zijn waarden, vergelijk met de hand", "{0} kaarten zonder wijzigingsdatum (REV): de contacten zijn hier gewijzigd en houden hun waarden, vergelijk met de hand"]
 }

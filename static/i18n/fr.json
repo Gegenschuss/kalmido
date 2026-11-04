@@ -16186,5 +16186,6 @@
   "Description longer than {0} characters, shortened": "Description de plus de {0} caractères, raccourcie",
   "Rows without a title were skipped": "Les lignes sans titre ont été ignorées",
   "Row {1}": ["Ligne {1}", "Lignes {1}"],
-  "{0} row will be skipped": ["{0} ligne sera ignorée", "{0} lignes seront ignorées"]
+  "{0} row will be skipped": ["{0} ligne sera ignorée", "{0} lignes seront ignorées"],
+  "{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand": ["{0} carte sans date de modification (REV) : le contact a été modifié ici et garde ses valeurs, compare à la main", "{0} cartes sans date de modification (REV) : les contacts ont été modifiés ici et gardent leurs valeurs, compare à la main"]
 }

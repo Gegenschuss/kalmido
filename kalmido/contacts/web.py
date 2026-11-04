@@ -416,6 +416,10 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
                 res["bad"] = (res.get("bad", []) + part["bad"])[:VC_BAD_MAX]
             if part.get("kept_newer"):       # 2.273.0 C (#3048)
                 res["kept_newer"] = res.get("kept_newer", 0) + part["kept_newer"]
+            if part.get("kept_norev"):       # 2.533.0 (#4318) B41
+                res["kept_norev"] = res.get("kept_norev", 0) + part["kept_norev"]
+            if part.get("kept_names"):
+                res["kept_names"] = (res.get("kept_names", []) + part["kept_names"])[:20]
             _lv_put(st, done=min(i + IMPORT_BATCH, len(cards)), **res)
         if since is not None:  # 2.119.1 A (#2084): the new contacts that look like one already there
             from ..contacts.ctxlist import ctx_import_dupes

@@ -1180,6 +1180,16 @@ def _imp_newer_here(rev, old):
     return upd > old["imp_at"] and rev < upd[:19]
 
 
+def dva_imp_changed_here(old):
+    """2.533.0 (#4318) B41: a card WITHOUT a REV cannot say it is newer: the stored contact counts as newer when it was changed
+    here after its last file import (imp_at), or, never imported from a file, after it was created."""
+    upd = str(old["updated_at"] or "")
+    return upd > str(old["imp_at"] if old["imp_at"] is not None else old["created_at"] or "")
+
+
+DVA_KEPT_NAMES = 20  # 2.533.0 (#4318) B41: contacts named in the answer that kept their newer values
+
+
 def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=None, cards=None, photos=0, before=0):
     """Every vCard of text into the book: the same UID is updated (importing twice changes nothing). -> counts.
     2.41.0 (#1437): the book is counted once, birthdays are synced only where the book keeps them, the book is touched and
@@ -1253,8 +1263,15 @@ def import_vcards(c, uid, book_id, text, src_digest=False, batch=None, progress=
             f = {k: x for k, x in f.items() if k in v["present"] and _imp_differs(k, x, old[k])}
             ext = v["extra"] if v["extra"] and v["extra"] != (old["extra"] or "") else None
             if f or ext is not None:
-                if v.get("rev") and _imp_newer_here(v["rev"], old):
+                # 2.533.0 (#4318) B41: without a REV a contact changed here is not overwritten silently either: it keeps its
+                # values and is named (kept_norev + kept_names), like the one newer than the card's REV
+                norev = not v.get("rev") and dva_imp_changed_here(old)
+                if norev or (v.get("rev") and _imp_newer_here(v["rev"], old)):
                     kept += 1
+                    res["kept_norev"] = res.get("kept_norev", 0) + (1 if norev else 0)
+                    names = res.setdefault("kept_names", [])
+                    if len(names) < DVA_KEPT_NAMES:
+                        names.append((old["fn"] or "")[:100])
                     continue
             else:
                 res["updated"] += 1          # the same values: counted as before, nothing written

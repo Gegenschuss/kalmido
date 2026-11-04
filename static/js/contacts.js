@@ -683,12 +683,18 @@ function ctImpPanel() {
   };
   return {el, set};
 }
+// 2.533.0 (#4318) B41: which contacts kept their values; cards without a date (REV) are not taken over a change made here either
+function dvaCtKept(j) {
+  const names = (j.kept_names || []).filter(Boolean);
+  return (names.length ? ': ' + names.slice(0, 5).join(', ') + (j.kept_newer > Math.min(5, names.length) ? ', …' : '') : '')
+    + (j.kept_norev ? ' · ' + trn('{0} card has no change date (REV): the contact was changed here and keeps its values, please compare by hand', '{0} cards have no change date (REV): the contacts were changed here and keep their values, please compare by hand', j.kept_norev) : '');
+}
 function ctImpRun(bid, f, mapping, noPhotos) {
   const p = ctImpPanel();
   let fi = null;  // 2.146.0 E (#2457): several files / a ZIP: how many were read, which not
   const done = async j => {
     const bad = fi?.errors?.length ? ' · ' + trn('{0} file not read', '{0} files not read', fi.errors.length) + ': ' + fi.errors.slice(0, 3).map(e => e.file).join(', ') : '';
-    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) + (j.bad?.length ? ': ' + j.bad.slice(0, 3).map(b => b.name ? `${b.name} (${b.reason})` : b.reason).join(', ') : '') : '') + (j.over_limit ? ' · ' + trn('{0} card over the limit not imported', '{0} cards over the limit not imported', j.over_limit) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + (j.kept_newer ? ' · ' + trn('{0} contact not overwritten, it is newer here', '{0} contacts not overwritten, they are newer here', j.kept_newer) : '') + bad, null, true);
+    p.set((fi?.files > 1 ? trn('{0} file', '{0} files', fi.files) + ' · ' : '') + tr('Imported: {0} new, {1} updated', j.created, j.updated) + (j.errors ? ' · ' + trn('{0} not readable', '{0} not readable', j.errors) + (j.bad?.length ? ': ' + j.bad.slice(0, 3).map(b => b.name ? `${b.name} (${b.reason})` : b.reason).join(', ') : '') : '') + (j.over_limit ? ' · ' + trn('{0} card over the limit not imported', '{0} cards over the limit not imported', j.over_limit) : '') + (j.dupes ? ' · ' + trn('{0} possible duplicate', '{0} possible duplicates', j.dupes) : '') + (j.kept_newer ? ' · ' + trn('{0} contact not overwritten, it is newer here', '{0} contacts not overwritten, they are newer here', j.kept_newer) + dvaCtKept(j) : '') + bad, null, true);
     if (j.dupes && (j.dupe_groups || []).length) ctx_dupBtn(p.el, j.dupe_groups);  // 2.119.1 A (#2084)
     await load().catch(() => {}); ctLoad();
   };
