@@ -1,0 +1,53 @@
+name: Promote
+
+# 2.513.0 (#4354): the second step of a release. release.yml builds the image :X.Y.Z and the GitHub release without "latest"; the live
+# train pushes the tag latest-ok/X.Y.Z (on the commit of vX.Y.Z, tags are never moved) only after "device test ok" and a healthy live
+# update. Only this workflow moves the image :latest (to the digest the release built) and marks the release as "latest", which the
+# installers, update.sh and the update check read. A blocker or "not testable" = no tag, latest stays on the state of before.
+# No third-party action runs here: the only code in the job with write rights is the script below.
+on:
+  push:
+    tags: ["latest-ok/*.*.*"]
+
+permissions:
+  contents: read
+
+jobs:
+  promote:
+    name: Set the image :latest and the latest release
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Promote
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          ver="${GITHUB_REF_NAME#latest-ok/}"
+          printf '%s' "$ver" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || { echo "::error::$GITHUB_REF_NAME names no version"; exit 1; }
+          tag="v$ver"
+          have=$(gh api "repos/$GH_REPO/commits/$tag" --jq .sha)
+          [ "$have" = "$GITHUB_SHA" ] || { echo "::error::$GITHUB_REF_NAME is on $GITHUB_SHA, $tag on $have"; exit 1; }
+          # release.yml may still be running: its release carries the digest of the image it built
+          i=0
+          until gh release download "$tag" --pattern image-digest.txt --clobber 2>/dev/null; do
+            i=$((i + 1))
+            [ "$i" -lt 100 ] || { echo "::error::release $tag has no image-digest.txt after 50 minutes"; exit 1; }
+            sleep 30
+          done
+          digest=$(tr -d '[:space:]' < image-digest.txt)
+          printf '%s' "$digest" | grep -Eq '^sha256:[0-9a-f]{64}$' || { echo "::error::no usable image digest: $digest"; exit 1; }
+          # a fix of an older line (a tag below the current latest) keeps latest on the higher version
+          cur=$(gh release view --json tagName --jq .tagName 2>/dev/null || true)
+          if [ -n "$cur" ] && [ "$cur" != "$tag" ] && [ "$(printf '%s\n%s\n' "$cur" "$tag" | sort -V | tail -n 1)" = "$cur" ]; then
+            echo "::notice title=not latest::$tag is below the latest release $cur - nothing changes"
+            exit 0
+          fi
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker buildx imagetools create -t ghcr.io/gegenschuss/kalmido:latest "ghcr.io/gegenschuss/kalmido@$digest"
+          gh release edit "$tag" --latest

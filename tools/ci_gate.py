@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""2.309.0 (#3269): the gate of release.yml - the image (:X.Y.Z, :latest) and the GitHub release of a tag come only
+"""2.309.0 (#3269): the gate of release.yml - the image (:X.Y.Z) and the GitHub release of a tag come only
 after a GREEN FULL run of the workflow "CI" on the tagged commit ("the CI is the only gate", #1315). Self-hosters never
-get a red version as "latest".
+get a red version; "latest" comes later still, with promote.yml after the device test (2.513.0, #4354).
 
   python3 tools/ci_gate.py [--sha SHA] [--timeout-min 240] [--poll-s 60] [--no-run-min 20]
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""2.309.0 (#3269): release.yml builds the image (:X.Y.Z, :latest) and the GitHub release of a tag only after a green
+"""2.309.0 (#3269): release.yml builds the image (:X.Y.Z) and the GitHub release of a tag only after a green
 FULL run of the workflow CI on the tagged commit (tools/ci_gate.py). Without a server (CI Lint):
 - release.yml has the job ci-gate (actions: read, runs tools/ci_gate.py on the tagged commit) and the job release
   needs it;

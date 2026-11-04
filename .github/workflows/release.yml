@@ -1,13 +1,14 @@
 name: Release
 
 # A tag vX.Y.Z (pushed by the maintainer's export script) builds the multi-arch image, pushes it to
-# ghcr.io/gegenschuss/kalmido:X.Y.Z and :latest and creates the GitHub release with the notes from
-# CHANGELOG.md. Admins' update check reads that release.
+# ghcr.io/gegenschuss/kalmido:X.Y.Z and creates the GitHub release with the notes from CHANGELOG.md.
+# 2.513.0 (#4354): both WITHOUT "latest": the image :latest and the "latest release" (which admins' update check, the installers and
+# update.sh read) move only with promote.yml, after the device test of the live train passed.
 # 2.277 (#2914): the release also carries the installers, the source archives and SHA256SUMS (with the image digest);
 # kalmido.com/install.sh forwards to releases/latest/download/install.sh, the installer checks the archive and pins the
 # image to the digest. 2.277 (#3054): the notes are made readable with tools/release_notes.py.
 # 2.309.0 (#3269): "the CI is the only gate" (#1315) - the job ci-gate waits for a green FULL run of the workflow CI on the
-# tagged commit (tools/ci_gate.py); red, cancelled, only the push stage or no run = no image, no :latest, no release.
+# tagged commit (tools/ci_gate.py); red, cancelled, only the push stage or no run = no image, no release.
 # 2.360.2 (#2912): actions are pinned to commit hashes (Dependabot keeps them current, tests/p23602_a_api_test.py); only the job
 # release may write packages and it runs third-party actions; only the job publish, without any action but download-artifact, may write contents.
 on:
@@ -41,7 +42,6 @@ jobs:
       packages: write
     outputs:
       version: ${{ steps.v.outputs.version }}
-      latest: ${{ steps.v.outputs.latest }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Version from tag
@@ -50,14 +50,6 @@ jobs:
           ver="${GITHUB_REF_NAME#v}"
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           test "$(cat VERSION)" = "$ver" || { echo "VERSION file ($(cat VERSION)) does not match tag $GITHUB_REF_NAME"; exit 1; }
-          # 2.285.0 (#2830): a fast-lane patch (tag on a hotfix branch, e.g. 2.166.5 after 2.223.1 is tagged) is not the
-          # newest version: it keeps the GitHub release "latest" and the image tag :latest on the highest version
-          top=$(git ls-remote --tags --refs origin 'v*.*.*' | sed 's|.*refs/tags/v||' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
-          latest=true
-          if [ -n "$top" ] && [ "$top" != "$ver" ] && [ "$(printf '%s\n%s\n' "$top" "$ver" | sort -V | tail -1)" = "$top" ]; then
-            latest=false; echo "::notice title=not latest::$ver is below the newest tag v$top - no :latest, release not marked latest"
-          fi
-          echo "latest=$latest" >> "$GITHUB_OUTPUT"
       - name: Release notes from CHANGELOG.md
         run: |
           awk -v v="${{ steps.v.outputs.version }}" '
@@ -82,9 +74,7 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: |
-            ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}
-            ${{ steps.v.outputs.latest == 'true' && 'ghcr.io/gegenschuss/kalmido:latest' || '' }}
+          tags: ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}
           labels: |
             org.opencontainers.image.title=Kalmido
             org.opencontainers.image.description=Self-hosted task manager for households and small teams
@@ -130,5 +120,5 @@ jobs:
             gh release edit "$GITHUB_REF_NAME" --notes-file notes.md
             gh release upload "$GITHUB_REF_NAME" dist/* --clobber
           else
-            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ needs.release.outputs.version }}" --notes-file notes.md --verify-tag --latest="${{ needs.release.outputs.latest }}" dist/*
+            gh release create "$GITHUB_REF_NAME" --title "Kalmido ${{ needs.release.outputs.version }}" --notes-file notes.md --verify-tag --latest=false dist/*
           fi

@@ -4,13 +4,11 @@ branch hotfix/X.Y.Z beside main. Without a server (CI Lint):
 - ci.yml runs on pushes to hotfix/** (besides main) and its concurrency group hangs on github.ref (a hotfix push and a
   push on main never cancel each other); the suite times are still read from main only;
 - tests/stages.py gives a push on a hotfix branch the full stage (a push on main keeps the push stage);
-- release.yml marks a tag below the newest version tag neither as GitHub "latest" nor as image :latest (the newest
-  version keeps both); the comparison is run here with stubbed tags."""
+- 2.513.0 (#4354): "a tag below the newest keeps latest where it is" now lives in promote.yml (tests/p2513_promote_test.py)."""
 import os
 import re
 import subprocess
 import sys
-import tempfile
 
 N = os.path.dirname(os.path.abspath(__file__))
 R = os.path.join(N, "..")
@@ -57,37 +55,7 @@ st, why, _ = ci_base({"GITHUB_EVENT_NAME": "push", "GITHUB_REF": "refs/heads/hot
 check(st is None, "a branch 'hotfixes' is no hotfix branch (%s)" % st)
 
 rel = read(".github", "workflows", "release.yml")
-check("${{ steps.v.outputs.latest == 'true' && 'ghcr.io/gegenschuss/kalmido:latest' || '' }}" in rel,
-      "image tag :latest only for the newest version")
-# 2.360.2 (#2912): the GitHub release is the job publish now
-check('--latest="${{ needs.release.outputs.latest }}"' in rel, "gh release create marks latest only for the newest version")
 check("ghcr.io/gegenschuss/kalmido:${{ steps.v.outputs.version }}" in rel, "the version image tag stays")
-step = re.search(r"- name: Version from tag\n(?:.*\n)*?        run: \|\n((?:          .*\n|\n)+)", rel)
-script = "\n".join(line[10:] for line in step.group(1).splitlines()) if step else ""
-check("ls-remote" in script and "latest=" in script, "release.yml compares the tag with the newest version tag")
-
-
-def latest(ver, tags):
-    """Run the 'Version from tag' step with a stubbed git (tags) and VERSION = ver; the 'latest' output."""
-    with tempfile.TemporaryDirectory() as d:
-        with open(os.path.join(d, "VERSION"), "w") as f:
-            f.write(ver + "\n")
-        out = os.path.join(d, "out")
-        stub = "git() { for t in %s; do printf 'abc\\trefs/tags/%%s\\n' \"$t\"; done; }\n" % " ".join(tags)
-        r = subprocess.run(["bash", "-ec", stub + script], cwd=d, capture_output=True, text=True,
-                           env=dict(os.environ, GITHUB_REF_NAME="v" + ver, GITHUB_OUTPUT=out))
-        if r.returncode:
-            return "rc %d: %s" % (r.returncode, r.stdout + r.stderr)
-        with open(out) as f:
-            return dict(line.split("=", 1) for line in f.read().split()).get("latest")
-
-
-check(latest("2.166.5", ["v2.166.4", "v2.223.1", "v2.9.0"]) == "false", "2.166.5 below v2.223.1 = not latest")
-check(latest("2.223.2", ["v2.166.4", "v2.223.1", "v2.9.0"]) == "true", "2.223.2 above every tag = latest")
-check(latest("2.223.1", ["v2.166.5", "v2.223.1"]) == "true", "the newest tag itself = latest")
-check(latest("2.10.0", ["v2.9.0", "v2.10.0"]) == "true", "version order, not text order (2.10.0 after 2.9.0)")
-check(latest("2.9.1", ["v2.9.0", "v2.10.0"]) == "false", "2.9.1 below 2.10.0 = not latest")
-check(latest("1.0.0", []) == "true", "no tags yet = latest")
 
 print("hotfix_lane: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)
