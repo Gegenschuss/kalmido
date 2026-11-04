@@ -143,5 +143,14 @@ check(r.ok and r.json()["ok"] is True, f"test alert via the own ntfy: {r.text[:2
 m = wait_for(lambda: [x for x in lines("ntfy.log") if x.get("topic") == "t-alice"])
 check(len(m) == 1 and m[0]["title"] == "Kalmido test alert", f"arrived on t-alice: {m}")
 
+# 2.533.0 (#4321): ntfy.sh WITH NTFY_TOKEN is an own server for both places (alerts.py used to say "public", push.py "own")
+start(["-e NTFY_URL=https://ntfy.sh", "-e NTFY_TOKEN=tk_test", "--dns 127.0.0.9"], webpush=True)
+s0 = sess()
+assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
+A = sess("alice")
+ja = A.get(B + "/api/admin/alerts").json()
+jp = A.get(B + "/api/push/subs").json()
+check(ja["ntfy_public"] is False and jp["ntfy_public"] is False, f"ntfy.sh with a token: alerts and push say the same (own server): {ja['ntfy_public']} {jp['ntfy_public']}")
+
 print(f"p252_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
