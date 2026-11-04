@@ -296,6 +296,13 @@ def le2b_scrub(c, lid):
     n.update(le2b_scrub_tasks(c, [r[0] for r in c.execute(tq, (lid,))]))
     n["time_entries"] = c.execute(f"UPDATE time_entries SET task_title='' WHERE task_title!='' AND (list_id=? OR task_id IN ({tq}))",
                                   (lid, lid)).rowcount
+    # 2.538.0 (#4372): the three free texts the lock cannot encrypt go for good: the time entries' notes, the project's status
+    # note (also in its status history) and its description (also the earlier ones kept for "bring back")
+    n["time_notes"] = c.execute(f"UPDATE time_entries SET note='' WHERE note<>'' AND (list_id=? OR task_id IN ({tq}))", (lid, lid)).rowcount
+    n["list_texts"] = c.execute("UPDATE lists SET status_note='', description='' WHERE id=? AND (status_note<>'' OR COALESCE(description, '')<>'')",
+                                (lid,)).rowcount
+    n["list_status"] = c.execute("UPDATE list_status SET note='' WHERE list_id=? AND note<>''", (lid,)).rowcount
+    n["desc_history"] = c.execute("DELETE FROM list_activity WHERE list_id=? AND kind='desc'", (lid,)).rowcount
     n["shop_memory"] = c.execute("DELETE FROM shop_memory WHERE list_id=?", (lid,)).rowcount
     n["mail_tokens"] = c.execute("DELETE FROM mail_tokens WHERE list_id=?", (lid,)).rowcount
     n["notifications"] = 0
@@ -435,7 +442,7 @@ def le2b_scrub_tasks(c, ids):
             if nd != d:
                 c.execute("UPDATE activity SET data=? WHERE id=?", (json.dumps(nd, ensure_ascii=False), r["id"]))
                 n["activity"] += 1
-        c.execute(f"UPDATE time_entries SET task_title='' WHERE task_id IN ({q})", part)
+        c.execute(f"UPDATE time_entries SET task_title='', note='' WHERE task_id IN ({q})", part)  # 2.538.0 (#4372): + the note
         # 2.392.0 C (#3370): the server cannot encrypt them: the reason goes, a decision keeps who and when, its text the neutral word
         c.execute(f"UPDATE tasks SET irreversible_reason='' WHERE irreversible_reason<>'' AND id IN ({q})", part)
         c.execute(f"UPDATE tasks SET delivery_note='' WHERE delivery_note<>'' AND id IN ({q})", part)  # 2.392.2 (#3365): as the reason

@@ -76,7 +76,7 @@ async function statusModal(lid) {
   let sel = l.status || '';
   const md = modal(`<h3>${tr('Project status')} · ${esc(lname(l))}</h3>
     ${can ? `<div class="stchoice">${STATUSES.map(([k, n]) => `<button class="stopt st-${k} ${sel === k ? 'on' : ''}" data-st="${k}"><i></i>${tr(n)}</button>`).join('')}<button class="stopt st-none ${sel ? '' : 'on'}" data-st=""><i></i>${tr('No status')}</button></div>
-      <textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>
+      ${typeof le2eOn === 'function' && le2eOn(lid) ? '' /* 2.538.0 (#4372): not encrypted: no note in a project with the lock */ : `<textarea id="st-note" rows="3" maxlength="500" placeholder="${tr('Short update: what is going on, what is needed?')}">${esc(l.status_note || '')}</textarea>`}
       <div class="shint">${collab() && l.shared ? tr('Everyone in this project gets it as news.') : tr('Shown in the project header, the sidebar and the project status.')}</div>`
     : `<div class="rohint">${ic('eye', 's')}${tr('View only')}</div>`}
     <h4>${tr('History')}</h4><div class="sthist" id="st-hist"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -93,7 +93,7 @@ async function statusModal(lid) {
     if (b.dataset.m === 'close') md.remove();
     if (b.dataset.m === 'save') {
       const was = l.status;
-      try { await api('POST', `/api/lists/${lid}/status`, {status: sel, note: $('#st-note', md).value.trim()}); } catch { return; }
+      try { await api('POST', `/api/lists/${lid}/status`, {status: sel, note: $('#st-note', md)?.value.trim() || ''}); } catch { return; }
       md.remove(); await load(); render(); toast(sel ? tr('Status: {0}', statusLabel(sel)) : tr('Status cleared'));
       if (sel === 'complete' && was !== 'complete') celebrate('project', {name: lname(l)});
     }
@@ -259,14 +259,14 @@ function viewProjOv() {
   const head = `${listHead(l, {noPill: true})}`;  // 2.13.0 (#453 P1): "Set status" only once (in the status section)
   if (!d?.j) return `<div class="pov">${head}<div class="muted mhint">${d?.err ? (d.err === 'offline' ? tr('Only available online.') : esc(d.err)) : tr('Loading…')}</div></div>`;
   const j = d.j, can = !!j.can_edit && !l.archived, t0 = today();
-  // description
+  // description (2.538.0 #4372: none in a project with the lock -- not encrypted, the server refuses it)
   const ed = S.povEdit === l.id, povLong = !ed && mdIsLong(j.description);  // 2.331.0 A (#3310): a long description folds like a task's
   const desc = ed ? `<textarea id="pov-desc-in" rows="8" maxlength="20000" placeholder="${esc(tr('Goal, scope, contacts, where things are…'))}">${esc(S.drafts['pov:' + l.id] ?? j.description)}</textarea>
       <div class="povbar povedit"><button type="button" class="linkbtn" data-pov="md-help">${tr('Formatting')}</button><button class="btn sm" data-pov="desc-hist">${ic('clock', 's')}<span>${tr('Earlier versions')}</span></button><span class="spacer"></span><button class="btn" data-pov="desc-cancel">${tr('Cancel')}</button><button class="btn pri" data-pov="desc-save">${tr('Save')}</button></div>`
     : j.description ? `<div class="md povmd${povLong ? (povMdOpen(l.id) ? '' : ' clamp') : ''}">${renderMd(j.description, false, {lid: l.id}).replace(/<input type="checkbox"/g, '<input type="checkbox" disabled')}</div>${povLong ? `<button type="button" class="linkbtn mdmore" data-pov="md-more" aria-expanded="${povMdOpen(l.id)}">${povMdOpen(l.id) ? tr('Show less') : tr('Show more')}</button>` : ''}`
       : `<div class="muted povempty">${can ? tr('What is this project about, what is the goal?') : tr('No description yet.')}</div>`;
   const P = {}, emp = (c, t) => c ? t : '';
-  P.desc = x => povSec('desc', tr('Description'), !ed && !j.description ? '' : desc, (can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '') + x,
+  if (!(typeof le2eOn === 'function' && le2eOn(l.id))) P.desc = x => povSec('desc', tr('Description'), !ed && !j.description ? '' : desc, (can && !ed ? `<button class="btn sm" data-pov="desc-edit">${ic('edit', 's')}<span>${tr('Edit')}</span></button>` : '') + x,
     emp(!ed && !j.description, can ? tr('What is this project about, what is the goal?') : tr('No description yet.')));
   // status updates (with collaboration: the existing project status + its history)
   if (statusFor(l)) {

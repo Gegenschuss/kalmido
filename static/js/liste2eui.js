@@ -266,6 +266,7 @@ async function le2u_startDlg(lid, j) {
     <ol class="le2unote">
       <li>${esc(tr('Passphrase and recovery code lost = the contents are lost. Nobody can restore them, not even the operator.'))}</li>
       <li>${esc(tr('In this project there are then no agents, no tasks by e-mail, no texts in calendar subscriptions and notifications, and no public link.'))}</li>
+      <li>${esc(tr('The project description, the note of the project status and the notes of time entries cannot be encrypted: they are not available in it, and existing ones are deleted for good when you switch it on.'))}</li>
       <li>${esc(tr('Everyone in the project needs encryption set up:'))}<ul class="le2umem" aria-label="${esc(tr('Members'))}">${rows}</ul></li>
     </ol>
     ${miss.length ? `<p class="shint keep">${esc(tr('{0}: not set up yet. They go on the waiting list and see placeholders until they have set it up and the key is released to them.', miss.map(m => m.name).join(', ')))}</p>` : ''}

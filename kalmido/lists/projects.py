@@ -119,6 +119,8 @@ def list_status_set(lid):
     if st not in LIST_STATUSES + ("",):
         return err(tr("Unknown status"))
     note = str(b.get("note") or "").strip()[:STATUS_NOTE_MAX] if st else ""
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, lid, note)  # 2.538.0 (#4372): not encrypted -- a status without a note in a project with the lock
     ts = iso_ms(now_utc())
     c.execute("UPDATE lists SET status=?, status_note=?, status_by=?, status_at=? WHERE id=?", (st, note, me(), ts, lid))
     c.execute("INSERT INTO list_status(list_id,user_id,status,note,created_at) VALUES(?,?,?,?,?)", (lid, me(), st, note, ts))
@@ -350,6 +352,8 @@ def overview_patch(lid):
         d = d.replace("\r\n", "\n").strip()
         if len(d) > OV_DESC_MAX:
             raise BadInput(tr("The description is too long (at most {0} characters)", OV_DESC_MAX))
+        from ..collab.liste2e import le2a_locked_text
+        le2a_locked_text(c, lid, d)  # 2.538.0 (#4372): not encrypted -- none in a project with the lock (emptying it stays possible)
         r0 = c.execute("SELECT description, description_at FROM lists WHERE id=?", (lid,)).fetchone()
         exp = b.get("expect_updated_at")
         if exp is not None and (exp or None) != (r0["description_at"] or None) and d != (r0["description"] or ""):  # 2.270.0 A (#3019)

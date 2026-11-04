@@ -206,6 +206,7 @@ def tz_restore(lid):
         if tid and not c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (tid, lid)).fetchone():
             tid = None
         from .timesheet import tsl_is_locked
+        from ..collab.liste2e import le2e_mode
         if tsl_is_locked(c, owner, str(e["start"])[:40]):
             left.append(e)  # 2.530.0 (#4315, review M1): stays in the server's copy
             continue  # 2.125.0 B (#2119): never into a closed month
@@ -214,7 +215,7 @@ def tz_restore(lid):
                                                  reminded,auto_stopped,created_at,updated_at)
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                   (owner, tid, lid, str(e.get("task_title") or "")[:500], str(e["start"])[:40], str(e["end"])[:40],
-                   max(0, int(e.get("seconds") or 0)), str(e.get("note") or "")[:500],
+                   max(0, int(e.get("seconds") or 0)), "" if le2e_mode(c, lid) else str(e.get("note") or "")[:500],  # 2.538.0 (#4372)
                    e.get("source") if e.get("source") in ("timer", "manual", "focus") else "manual", cid, pid,
                    1 if e.get("reminded") in (1, True) else 0, 1 if e.get("auto_stopped") in (1, True) else 0,
                    n43_iso(e.get("created_at")) or ts, ts))

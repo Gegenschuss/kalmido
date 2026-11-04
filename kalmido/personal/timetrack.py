@@ -256,6 +256,13 @@ def time_target(c, b):
     return None, lid, ""
 
 
+def tt_note_check(c, lid, note):
+    """2.538.0 (#4372): a time entry's note is never encrypted: none in a project with the lock (409 list_e2e_plain, as the
+    waiting note); an entry without a note stays fine there."""
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, lid, note)
+
+
 def time_running(c, uid):
     r = c.execute(TIME_Q + " WHERE e.user_id=? AND e.\"end\" IS NULL", (uid,)).fetchone()
     if not r:
@@ -368,6 +375,7 @@ def time_start():
     tid, lid, title = time_target(c, b)
     at = time_at(b.get("at"), ref)
     note = str(b.get("note") or "").strip()[:500]
+    tt_note_check(c, lid, note)  # 2.538.0 (#4372)
     stopped, end = None, None
     run = c.execute("SELECT * FROM time_entries WHERE user_id=? AND \"end\" IS NULL", (uid,)).fetchone()
     from .timesheet import tsl_check
@@ -473,6 +481,7 @@ def time_create():
     start, end, sec = entry_times(b, None, None, 0, tz_of(c, uid))
     tsl_check(c, uid, start)  # 2.125.0 B (#2119)
     src = b.get("source") if b.get("source") in TIME_SOURCES else "manual"
+    tt_note_check(c, lid, str(b.get("note") or "").strip())  # 2.538.0 (#4372)
     from ..office.timebill import tbill_billable
     bill = tbill_billable(b["billable"]) if b.get("billable") is not None else 1  # 2.144.6 A (#2053)
     try:
@@ -564,6 +573,10 @@ def time_update(eid):
         tid, lid, title = time_target(c, b)
         sets += ["task_id=?", "list_id=?", "task_title=?"]
         args += [tid, lid, title]
+    else:
+        lid = r["list_id"] or (c.execute("SELECT list_id FROM tasks WHERE id=?", (r["task_id"],)).fetchone() or [None])[0]
+    # 2.538.0 (#4372): the note it has after the change, in the project it is in after the change (moving a noted entry in too)
+    tt_note_check(c, lid, str(b.get("note") or "").strip() if "note" in b else r["note"])
     if r["end"] is None:  # running
         if "start" in b:
             st = parse_when(b.get("start"), zone)

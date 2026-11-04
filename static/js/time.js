@@ -45,7 +45,13 @@ async function timeChanged(j) {
   render();
   if (S.sel) { renderDetail(); loadTaskTime(S.sel); }
 }
+// 2.538.0 (#4372): a time entry's note is never encrypted: none in a project with the lock (the server refuses it, 409)
+function te_locked(target) {
+  const lid = target?.task_id ? taskById(target.task_id)?.list_id : target?.list_id;
+  return !!lid && typeof le2eOn === 'function' && le2eOn(lid);
+}
 async function timerStart(target, note = '') {
+  if (te_locked(target)) note = '';  // 2.538.0 (#4372)
   let j;
   try { j = await api('POST', '/api/time/start', {...target, note, at: new Date().toISOString(), client_id: newCid()}); } catch { return; }
   if (j.timer !== undefined) S.timer = j.timer;
@@ -238,12 +244,18 @@ function entryModal(e, preset = {}) {
     <div class="row"><label>${tr('Date')}</label>${dateIn('te-date', s ? ds(s) : preset.date || ds(new Date()), {max: today(), label: tr('Date'), clear: false})}</div>
     <div class="row"><label>${run ? tr('Started at') : tr('From – to')}</label>${timeIn('te-from', s ? fmtClock(s) : '', {label: run ? tr('Started at') : tr('From'), empty: '–'})}${run ? '' : `<span class="muted">–</span>${timeIn('te-to', en ? fmtClock(en) : '', {label: tr('To'), empty: '–'})}`}</div>
     ${run ? '' : `<div class="row"><label for="te-dur">${tr('or duration')}</label><input id="te-dur" placeholder="${tr('e.g. 1:30, 45m or 1.5')}" inputmode="decimal" autocomplete="off"></div>`}
-    <div class="row"><label for="te-note">${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
+    <div class="row" id="te-noterow"><label for="te-note">${tr('Note')}</label><input id="te-note" value="${esc(e?.note || '')}" maxlength="500" autocomplete="off"></div>
     <div class="row"><label for="te-bill">${tr('Billable')}</label><label class="swc"><input type="checkbox" id="te-bill" ${e?.billable === false ? '' : 'checked'} ${e?.billed ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(tr('Billable'))}</span></label></div>
     ${e?.billed ? `<div class="shint tebill-hint">${esc(e.billed.id ? tr('On invoice {0}: duration, date and task are locked, the note can still change.', e.billed.number || tr('Draft')) : tr('Already billed: duration, date and task are locked, the note can still change.'))}</div>` : ''}
     ${run ? '' : `<div class="shint">${tr('An end before the start means the next day. Only a duration: the entry ends now (today) or starts at 9:00.')}</div>`}
     <div class="foot">${e && !run && !e.billed ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   if (e?.billed) $$('#te-target, #te-date, #te-from, #te-to, #te-dur', md).forEach(x => { x.disabled = true; });  // 2.144.6 A (#2053)
+  const noteSync = () => {  // 2.538.0 (#4372): no note field for a project with the lock (follows the chosen task / project)
+    const [k, v] = $('#te-target', md).value.split(':');
+    $('#te-noterow', md).hidden = te_locked(k === 't' ? {task_id: +v} : {list_id: +v});
+  };
+  noteSync();
+  $('#te-target', md).addEventListener('change', noteSync);
   const times = () => {
     const date = $('#te-date', md).value, from = $('#te-from', md).value, to = $('#te-to', md)?.value, dur = parseDur($('#te-dur', md)?.value);
     if (!date) return null;
@@ -266,7 +278,7 @@ function entryModal(e, preset = {}) {
     if (!tm) { toast(run ? tr('Please enter the start time') : tr('Please enter start and end, or a duration')); return; }
     if (tm.end && tm.end - tm.start < 6e4) { toast(tr('The end is before the start')); return; }
     if (tm.start > new Date()) { toast(tr('Entries cannot lie in the future')); return; }
-    const [k, v] = $('#te-target', md).value.split(':'), body = {note: $('#te-note', md).value.trim()};
+    const [k, v] = $('#te-target', md).value.split(':'), body = {note: $('#te-noterow', md).hidden ? '' : $('#te-note', md).value.trim()};
     const target = k === 't' ? {task_id: +v} : {list_id: +v};
     if (!e || (k === 't' ? +v !== e.task_id : e.task_id || +v !== e.list_id)) Object.assign(body, target);
     const bill = $('#te-bill', md).checked;  // 2.144.6 A (#2053)
