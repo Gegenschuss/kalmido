@@ -1064,7 +1064,7 @@ def umz_filter_cond(run, x, person):
     one by name + type stays as it is."""
     x = dict(x)
     f, v = x.get("f"), x.get("v")
-    if f == "cf" and x.get("fid") is not None:
+    if f == "cf" and x.get("fid"):  # a falsy fid (0, "") is a field by name + type, as the client reads it (Fable review)
         nf = run.m("list_fields", x["fid"])
         if not nf:
             return None

@@ -143,6 +143,8 @@ ok(F.post(B + "/api/filters", json={"name": "Zeilen", "rules": {"op": "or", "con
     {"f": "list", "op": "nin", "v": [LP]}, {"f": "sec", "op": "in", "v": [str(SEC), "none"]}, {"f": "who", "op": "in", "v": [FRIDA, BOB, "none"]},
     {"f": "sprint", "op": "in", "v": ["cur", 77]}, {"f": "cf", "fid": FA, "op": "set", "v": ""}, {"f": "folder", "op": "in", "v": ["Kunden"]},
     {"f": "cf", "name": "Stufe", "ft": "select", "op": "in", "v": ["Neu"]}, {"f": "text", "op": "nhas", "v": "alt"}]}}), "filter with conditions")
+# 2.521.0 (#4479, Fable review): a field condition with a falsy fid is one by name + type and comes along, not dropped
+ok(F.post(B + "/api/filters", json={"name": "Feld null", "rules": {"conds": [{"f": "cf", "fid": 0, "name": "Stufe", "ft": "select", "op": "in", "v": ["Neu"]}]}}), "filter by field name, fid 0")
 ok(F.post(B + "/api/filters", json={"name": "Zeilen weg", "rules": {"conds": [{"f": "list", "op": "nin", "v": [LB]}]}}), "conditions on a list that stays behind")
 ok(F.post(B + "/api/templates", json={"list_id": LP, "name": "Vorlage"}), "template")
 for nm in ("gross1.bin", "gross2.bin"):
@@ -178,7 +180,7 @@ LG = new_list(GINA)
 check(rows("SELECT COUNT(*) FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.list_id=?", (LG,))[0][0] == 1, "the file that no longer fits stayed out")
 check(rows("SELECT COUNT(*) FROM time_entries WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: the time entry after the file came along")
 check(rows("SELECT COUNT(*) FROM habits WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: the habit after the file came along")
-check(rows("SELECT COUNT(*) FROM filters WHERE user_id=?", (GINA,))[0][0] == 2, "#3100: filters after the file came along")  # 2.521.0 (#4479): + Zeilen
+check(rows("SELECT COUNT(*) FROM filters WHERE user_id=?", (GINA,))[0][0] == 3, "#3100: filters after the file came along")  # 2.521.0 (#4479): + Zeilen, Feld null
 check(rows("SELECT COUNT(*) FROM templates WHERE user_id=?", (GINA,))[0][0] == 1, "#3100: templates after the file came along")
 body = rows("SELECT c.body FROM comments c JOIN tasks t ON t.id=c.task_id WHERE t.list_id=?", (LG,))[0]["body"]
 check(f"<@{GINA}>" in body, f"my own mention points at my new account: {body}")
@@ -191,7 +193,8 @@ check(vals.get(f["Bezug"]["id"]) == str(t["Erste"]), f"the task field points at 
 expr = json.loads(f["Summe"]["options"]).get("expr") or ""
 check(f'#{f["Menge"]["id"]}' in expr and f"#{FA}" not in expr, f"the formula names the new fields: {expr}")
 flt = rows("SELECT name, rules FROM filters WHERE user_id=? ORDER BY id", (GINA,))
-check([x["name"] for x in flt] == ["Passt", "Zeilen"], f"a filter on what stayed behind is left out, not widened: {flt}")  # 2.521.0 (#4479): + Zeilen
+check([x["name"] for x in flt] == ["Passt", "Zeilen", "Feld null"], f"a filter on what stayed behind is left out, not widened: {flt}")  # 2.521.0 (#4479): + Zeilen, Feld null
+check(json.loads(flt[2]["rules"])["conds"][0].get("name") == "Stufe", f"#4479: the field condition by name came along: {flt[2]}")
 check("saved filter" in texts(j) and "Nur Bob" in texts(j) and "Zeilen weg" in texts(j), f"and it is named: {texts(j)}")
 ru = json.loads(flt[0]["rules"])
 sec = rows("SELECT id FROM sections WHERE list_id=?", (LG,))[0]["id"]
