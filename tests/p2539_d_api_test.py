@@ -6,7 +6,8 @@ freelancer-matrix: own
  - #4379 (audit #2483 M1): a server inside the container that answers drop by drop (a byte every 0.3 s, far below the
    socket timeouts of 8 / 10 / 20 s) ends at the total limit (CAL_SEND_S, shortened to 2 s here) with "timeout", for
    all four deliveries: a webhook POST (headers dripping and body dripping), a notification channel (Slack-style
-   webhook), a git API call (git_http), a newsletter API call (listmonk check); also cal_http(until) after its watchdog
+   webhook), a git API call (git_http), a newsletter API call (listmonk check), the body dripping too (urllib reads it from
+   a socket the connection no longer holds); also cal_http(until) after its watchdog
    moved into cal_until; a fast server still answers (webhook ok), no watchdog stays registered
  - #4379: the webhook tick tries a webhook that timed out only once per tick (its other deliveries wait unchanged);
    the channel tick likewise (the other messages go back into the queue, one failure counted) - both set up by a
@@ -95,13 +96,16 @@ run("wh_ok", lambda: list(WH._wh_post(U + "/ok", "s3cret", "ping", "d3", 1, b"{}
 run("chn", lambda: CH.chn_send("slack", {"url": U + "/head"}, "Hello", AL)[2])
 run("git", lambda: G.git_http({"provider": "github", "token": "t0ken", "api": U, "allow": AL}, "/repos/a/b")[0])
 run("nwl", lambda: nwl_adapter("listmonk", U, {"user": "u", "token": "t"}, AL).check())
+run("git_body", lambda: G.git_http({"provider": "github", "token": "t0ken", "api": U + "/body", "allow": AL}, "/repos/a/b")[0])
+run("nwl_body", lambda: nwl_adapter("listmonk", U + "/body", {"user": "u", "token": "t"}, AL).check())
 run("cal", lambda: S.cal_http(U + "/head", allow=AL, until=time.monotonic() + 2)[0])
 out["stack"] = getattr(S._CAL_WATCH, "stack", None) or []
 print(json.dumps(out))
 """
 j = py(DRIP)
 for k, what in (("wh_head", "webhook, headers dripping"), ("wh_body", "webhook, body dripping"), ("chn", "notification channel"),
-                ("git", "git API call"), ("nwl", "newsletter API call"), ("cal", "cal_http(until) after the move into cal_until")):
+                ("git", "git API call"), ("nwl", "newsletter API call"), ("git_body", "git API call, body dripping"),
+                ("nwl_body", "newsletter API call, body dripping"), ("cal", "cal_http(until) after the move into cal_until")):
     check(j.get(k) == "timeout" and j.get(k + "_s", 99) < 6,
           f"#4379: {what}: ends at the total limit of 2 s ({j.get(k)}, {j.get(k + '_s')} s)")
 check(j.get("wh_ok") == [True, 200] and j.get("wh_ok_s", 99) < 2, f"#4379: a fast server still answers ({j.get('wh_ok')}, {j.get('wh_ok_s')} s)")
