@@ -2361,6 +2361,12 @@ def fk_archive_address_post():
         # the company found among the clients counts only when the PDF's name led there (not the file name's client_id)
         known = out["client_name"] if out.get("client_id") and out["client_id"] != cid else ""
         out["swap"] = ofb_swap(p, [(out.get("address") or {}).get("name") or "", known], cl)
+        if out["swap"] and cid and out.get("client_id") == cid:
+            # review 2.533.0 (#4499): the client was found only through the file name's (wrong) client_id: read again
+            # without it, so the swapped name gets its own client or the "new client" proposal (was: kept the wrong one)
+            sw = out["swap"]
+            out = fk_pdf_address(c, oid, raw, uid, sw.get("client_id"))
+            out["swap"] = sw
     return jsonify(out)
 
 

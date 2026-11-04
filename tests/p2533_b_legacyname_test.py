@@ -63,8 +63,8 @@ def pdf_to(firm, tag):
                      "54321 Andersstadt", "Angebot Nr.: X-001", "Projekttitel: Beispielfilm"], tag)
 
 
-def address(s, pdf, name=None):
-    data = {"client_id": ""}
+def address(s, pdf, name=None, cid=""):
+    data = {"client_id": str(cid)}
     if name is not None:
         data["file_name"] = name
     r = s.post(B + L + "/archive/address", files={"file": ("a.pdf", pdf, "application/pdf")}, data=data)
@@ -97,6 +97,12 @@ for who, s in (("org", A), ("freelancer", Fr)):
     check(j.get("status") == "ok" and not j.get("swap"), p + f"#4499 the second field is the PDF's company: no swap {j}")
     j = address(s, pdf_to(f"Muster{who} Medien GmbH", f"{who}-3"))
     check(j.get("status") == "ok" and not j.get("swap"), p + f"#4499 without file_name: no swap (as before) {j}")
+    # review 2.533.0 (#4499): the second field hit another client (the file name's client_id), the first field has no client:
+    # after the swap the address does not keep the wrong client, it proposes a new one
+    bh = s.post(B + "/api/clients", json={"name": f"Beteiligung {who} Holding AG", "city": "Andersstadt", "country": "DE"}).json()["id"]
+    j = address(s, pdf_to(f"Neufirma{who} Studio GmbH", f"{who}-4"), f"Neufirma{who}_Beteiligung_KV04_2026-02-01.pdf", bh)
+    check(j.get("status") == "ok" and (j.get("swap") or {}).get("client_name") == f"Neufirma{who}" and j.get("client_id") is None
+          and j.get("new_client") is True, p + f"#4499 swap away from a wrongly matched client: no client_id, new client proposed {j}")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

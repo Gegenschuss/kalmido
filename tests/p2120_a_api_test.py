@@ -278,6 +278,20 @@ def ofb_chain_plan(s, label):
         check(s.post(B + f"{D}/{q}/cashflow", json={"cashflow": "yes"}).ok, f"{label} #4525: cashflow yes")
     got = plan()
     check(got == {q1: Decimal("11660.00"), q2: Decimal("11660.00") - pg}, f"{label} #4525: two versions count, the progress invoice is deducted once {got}")
+    # review 2.533.0 (#4525): a newer version smaller than the progress invoices of the chain stands with 0, not negative
+    for q in (q1, q2):
+        check(s.post(B + f"{D}/{q}/cashflow", json={"cashflow": "auto"}).ok, f"{label} #4525: cashflow auto")
+    r = s.post(B + f"{D}/{q2}/duplicate")
+    check(r.status_code == 201, f"{label} #4525: version 3 " + r.text[:200])
+    q3 = r.json()["id"]
+    check(s.post(B + f"{D}/{q3}/cashflow", json={"cashflow": "auto"}).ok, f"{label} #4525: version 3 cashflow auto")
+    check(s.put(B + f"{D}/{q3}/items", json={"items": [{"title": "Dreh kurz", "qty": 1, "unit": "day", "rate": 1000, "tax": "standard"}]}).ok,
+          f"{label} #4525: version 3 cut down to 1190.00 gross")
+    check(s.post(B + f"{D}/{q3}/status", json={"status": "sent"}).ok, f"{label} #4525: version 3 sent")
+    cf = s.get(B + O + f"/cashflow?from={TODAY.isoformat()[:7]}&months=6&basis=gross").json()
+    neg = [e for e in cf.get("entries", []) if e.get("kind") == "offer" and dd(e["amount"]) < 0]
+    got = {e["doc_id"]: dd(e["amount"]) for e in cf.get("entries", []) if e.get("kind") == "offer" and e.get("doc_id") in (q1, q2, q3)}
+    check(not neg and all(v == 0 for v in got.values()), f"{label} #4525: a cut-down version below the progress invoice stands with 0 {got} {neg}")
 
 
 ofb_chain_plan(A, "org")
