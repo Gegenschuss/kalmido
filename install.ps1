@@ -211,7 +211,8 @@
         ForEach-Object { Remove-Item -Force $_.FullName -ErrorAction SilentlyContinue }
       $script:DbCopy = "data\backups\$name"
     } else {
-      Warn 'No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. Back up your database yourself before you continue.'
+      Warn 'No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. The update goes on in 15 seconds; press Ctrl+C to back up your database first.'
+      Start-Sleep -Seconds 15  # 2.512.0 (#4174): the text promised a pause that was not there
     }
   }
 
@@ -480,5 +481,5 @@
   Say "Uninstall:  cd `"$Dir`"; docker compose down; docker image rm $img"
   Say '            then delete the folder (this deletes your tasks)'
   Say 'Use it from other devices: put it behind a reverse proxy with HTTPS, see'
-  Say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples\)"
+  Say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy (templates for Caddy, nginx, Traefik in examples\)"
 }

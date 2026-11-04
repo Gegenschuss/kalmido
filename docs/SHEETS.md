@@ -66,7 +66,7 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   Anything else is refused. The cell shows the address shortened; the arrow at its end opens it in a new tab.
 - **File.** Enter (or a second tap) on a file cell opens *Upload file…*, *Open*, *Download* and *Remove file*; on a computer a
   file can also be dropped on the cell. The file lies encrypted at rest like task attachments and as large as they may be;
-  only people who may read the table open it. A removed or replaced file can be brought back with Undo; after 30 days it is
+  only people who may read the table open it. A removed or replaced file can be brought back with Undo; after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) it is
   deleted for good. Changing a column's kind keeps every input as it was.
 - **Keep rows / columns in view.** In the menu of a row number or a column title: *Keep rows in view up to here* /
   *Keep columns in view up to here*. Those rows / columns stay put while you scroll (also on a phone), for everyone who

@@ -433,7 +433,7 @@ location ~ ^/(dav|\.well-known/caldav|\.well-known/carddav)(/|$) {
 
 **Traefik.** Add a second router for `PathPrefix(`/dav`) || PathPrefix(`/.well-known/caldav`) || PathPrefix(`/.well-known/carddav`)` on the same host, without the forward-auth middleware, and give it a higher priority than the main router.
 
-The proxy must pass the `Authorization` header and the WebDAV methods `PROPFIND`, `REPORT`, `PROPPATCH`, `PUT`, `DELETE` and `OPTIONS`. Caddy and nginx do this by default. Some web application firewalls block these methods.
+The proxy must pass the `Authorization` header and the WebDAV methods `OPTIONS`, `PROPFIND`, `PROPPATCH`, `REPORT`, `GET`, `HEAD`, `PUT`, `DELETE`, `MKCALENDAR` and `MKCOL`. Caddy and nginx do this by default. Some web application firewalls block these methods.
 
 ### Checking it
 

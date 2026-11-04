@@ -2017,7 +2017,7 @@ Agents read files like this:
 
 **Deleting a file (2.272.0).** `DELETE /api/v1/attachments/{id}` (MCP `delete_attachment`) and
 `DELETE /api/v1/lists/{id}/files/{file_id}` (`delete_project_file`) answer `204` as before, but the file goes to the trash of
-its task / project: a person restores it in the app, it is deleted for good after the trash period (`KALMIDO_TRASH_DAYS`,
+its task / project: a person restores it in the app, it is deleted for good after the trash period (when the operator has the retention switch on; `KALMIDO_TRASH_DAYS`,
 30 days). A file in the trash is `404` for every reader, agents included.
 
 The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files and then wakes the chat agent with one chat run (2.46.6; a job lost by a restart goes on once in its session); task events of projects the agent listens in are bundled into one run.

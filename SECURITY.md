@@ -20,8 +20,8 @@ Kalmido is a young project without a dedicated security team. Realistically:
 
 - an answer within about a week (usually sooner)
 - a fix for serious issues as fast as possible, released as a new patch version with a note in
-  [CHANGELOG.md](CHANGELOG.md) and the GitHub release; admins see the new version in *Settings > Help*
-  (daily update check)
+  [CHANGELOG.md](CHANGELOG.md) and the GitHub release; admins see the new version in *Settings > Server > Server*
+  (update check every 6 hours)
 - credit in the changelog if you like
 
 There is no bug bounty.
@@ -73,7 +73,7 @@ migrates itself.
   recipe for Claude Code. Self-hosting hardening (reverse proxy, firewall, backups, updates): **[docs/SELF-HOSTING.md](docs/SELF-HOSTING.md)**.
 
 - The single sign-on header (`AUTH_PROXY_HEADER`) is a password. Only trust it from your proxy, and make
-  the proxy strip client-supplied copies. See *Login* and *Reverse proxy* in the README.
+  the proxy strip client-supplied copies. See *Login* and *Reverse proxy* in [docs/SELF-HOSTING.md](docs/SELF-HOSTING.md).
 - Use HTTPS for anything beyond your own machine.
 - Lists with the lock (2.64.1, "Encrypted in the browser") rely on trust on first use: each device trusts the first public
   key it sees for a member until the safety numbers are compared, and the ciphertexts are not bound to a task, so the server

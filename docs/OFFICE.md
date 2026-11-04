@@ -358,7 +358,7 @@ mode: not checked yet) keeps its line in the list without the file (2.306.0).
   The signed contract and its addenda can be attached as PDF files in the contract's dialog ("Contract (PDF)": upload,
   open, replace, remove, a date per file; the list shows a paper clip). Only PDFs, the usual upload size limit; stored
   encrypted with the office area's key like the stored quotation PDFs. Members of the office open them, admins change
-  them. Deleting the contract moves its files into the trash; after 30 days they are deleted for good, file included.
+  them. Deleting the contract moves its files into the trash; after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) they are deleted for good, file included.
   API: `GET|POST /api/office/contracts/<id>/files` (multipart `file`, `date?`, `replace?`),
   `GET|PATCH|DELETE /api/office/contracts/<id>/files/<file id>`, `POST .../<file id>/restore`.
 - **Bookkeeping** (admins, 2.90) - income/expense statement, VAT return figures, tax reserve, receipt photo and tax
@@ -1261,7 +1261,7 @@ the next deadline ("Cancel by 12 Mar 2027 · 41 days left", in red from the remi
 - **Document**: choose a document of the office's documents space (the organisation's, or your own in a personal office)
   or upload one there; it is stored encrypted like every document.
 - Cost, number and note are encrypted at rest. Every change is one undo step; a deleted contract can be restored by the
-  undo (it is purged after 30 days).
+  undo (it is purged after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods))).
 
 API (office admins; agents and members 403, another office area 404): `GET /api/office/agreements` (`?archived=1`),
 `POST /api/office/agreements`, `GET|PATCH|DELETE /api/office/agreements/<id>`, `POST /api/office/agreements/<id>/restore`.
@@ -1620,9 +1620,8 @@ A receipt is entered as a mask:
 - **Choice lists**: Office -> Settings -> *Entertainment receipts* lists the places (with address) and people (with
   company / function): rename in place, remove (one undo step), add. Receipts keep the text they have.
 - **Deleting and retention**: a draft that was never approved goes to the trash (undo) and is deleted for good with its
-  bill after 30 days. A receipt that was approved once is kept until the end of the 8th year after the year of its date or
-  its last approval, whichever is later; a country pack can lengthen this, never shorten it (it cannot be deleted
-  before). The organisation export contains the receipts, choices, logs and the bills.
+  bill after the trash period (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)). A receipt that was approved once is kept until the end of the 8th year after its year (it cannot be
+  deleted before). The organisation export contains the receipts, choices, logs and the bills.
 
 Routes (admins of the office area; members 403, another office area 404, agents never): `GET /api/office/meals?year=`,
 `POST /api/office/meals`, `GET/PATCH/DELETE /api/office/meals/<id>`, `POST /api/office/meals/<id>/restore`,
@@ -2227,7 +2226,7 @@ page).
 Routes (admin, never agents): `POST /api/office/datev/import/check` and `POST /api/office/datev/import` (multipart
 `file`), `POST /api/office/datev/import/<run>/undo`, `GET /api/office/datev/suppliers`, `PUT` / `DELETE
 /api/office/datev/suppliers/<id>` (`{name}`), `POST /api/office/datev/suppliers/<id>/restore` (deleted suppliers are
-removed for good after 30 days), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
+removed for good after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods))), `GET /api/office/datev/opening?year=` (`{year, years, items, debit, credit}`). The import
 is in the office log (`import` / `undo`, target `datev_in`).
 
 ### Booking archive: past DATEV years, read-only
@@ -2311,7 +2310,7 @@ is one undo step); members see and open them. Each file is stored once by its co
 office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
 out with a quotation stays readable.
 
-A replaced or removed state is kept for 30 days (the undo step) and then deleted from the disk, unless a document of the office
+A replaced or removed state is kept for 30 days (the undo step) and then deleted from the disk (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)), unless a document of the office
 (the trash included) names it; the current state is never touched. Quotations, invoices and sent documents keep the state they went
 out with. This applies to organisation offices and to the personal office alike.
 

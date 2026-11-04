@@ -359,11 +359,9 @@ control*: it opens in a new tab and its comments carry no timecode.
   organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
   workspace. Undo brings it back to its old place. Since 2.122.4 the records stay bound to the sign-off and show again
   when it comes back; in the new workspace they never show.
-- Deleting for good: a sign-off in the trash is deleted for good after 30 days with its versions and comments. A task,
-  project or client that is deleted for good takes its video sign-offs with it. The customer's approval records **stay**: name,
-  e-mail, reason, address, device and the decision, without the link to the video. The admins of the organisation and the
-  creator see and delete them; a decided record of an organisation or a personal office only after its legal period (6 years,
-  to the end of the year).
+- Deleting for good: a sign-off in the trash is deleted for good after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) with its versions, comments and customer
+  records. A task, project or client that is deleted for good takes its video sign-offs with it, including the customer's
+  recorded decision (like the approval records of documents).
 - Every step can be undone. The players are embedded without loading any script of Vimeo or YouTube (YouTube through
   youtube-nocookie.com); only the two player addresses may be framed (Content-Security-Policy).
 
@@ -878,7 +876,7 @@ and their values, sections, tags, the project's chat) and nothing moves anywhere
 - **Trash > Deleted projects:** name, who deleted it and when, the number of tasks; *Restore* brings the project back into its
   archive in the same place (the same organisation or the private space), *Delete permanently…* removes it for good.
   Right after deleting, *Undo* in the notice does the same as *Restore*.
-- **After 30 days** the project is deleted for good with its tasks, comments, attachments (also the files on disk), fields and
+- **After 30 days** (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) the project is deleted for good with its tasks, comments, attachments (also the files on disk), fields and
   chat. Tracked time stays (without the project) for the bookkeeping.
 - Projects with end-to-end encryption are still deleted for good at once (nobody could read them in the trash).
 

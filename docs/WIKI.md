@@ -182,7 +182,7 @@ See *Exporting encrypted content* in the self-hosting guide for backups, moving 
   the pages there with their files: *Restore*, *Delete permanently…* for one page, *Empty trash* for all (with a
   confirmation). The same people who may delete a page may do this (private space: its owner; an organisation's space:
   its members).
-- After the trash period of tasks (`KALMIDO_TRASH_DAYS`, default 30 days) the server deletes a page in the trash for good,
+- After the trash period of tasks (`KALMIDO_TRASH_DAYS`, default 30 days; only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) the server deletes a page in the trash for good,
   together with its files on disk, their text and scan marks, its history and its word index; the files' space no longer
   counts. A page restored before that keeps everything.
 

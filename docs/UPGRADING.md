@@ -20,8 +20,11 @@ version you pass, and make a backup first. There is no need to stop at each vers
 | 2.37 | PostgreSQL is required: add the database service, set `POSTGRES_PASSWORD` and `DATABASE_URL`. The installer does it. | [Upgrade to 2.37](SELF-HOSTING.md#upgrade-to-237-postgresql-required) |
 | 2.45 | The server key moves into a file on its own folder: `mkdir secret && chown 1000 secret` next to `data`, then restart. The installer does it. | [The server key](SELF-HOSTING.md#first-setup-and-the-server-key) |
 | 2.46 | One kind of server: the instance mode is gone; its variable is only read for the row-level security check (see ENV.md). | CHANGELOG 2.46.0 |
+| 2.79 | Reverse proxy on the host in front of a published Docker port: `KALMIDO_TRUSTED_PROXIES` now defaults to loopback only, the Docker bridge gateway no longer counts: add it (`KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1`). With a virus scanner an upload it could not check is held back (`KALMIDO_CLAMD_STRICT=0`: as before). | CHANGELOG 2.79.0 |
 | 2.149 | `.env` needs a `COMPOSE_PROFILES` line (for example `COMPOSE_PROFILES=localdb,clamav`) and Docker Compose 2.20 or newer. The installer adds the line. | [Update, downgrade and restore](SELF-HOSTING.md#update-downgrade-and-restore) |
-| 2.499 | On the channel *Web Push* nothing goes to the public `ntfy.sh` any more. If you had subscribed to your random topic there as a backup, for example for reminders, switch to the channel *ntfy* under *Settings > Notifications*. An own ntfy server changes nothing. | [Installed app and push](SELF-HOSTING.md#installed-app-pwa-and-push) |
+| 2.182 | The container runs read-only as user 1000. An installation that ran it as root: `sudo chown -R 1000:1000 data secret` once, or keep your own `user:` line. An own compose file needs a writable `/tmp`. | [First setup](SELF-HOSTING.md#first-setup-and-the-server-key) |
+| 2.239 | The server log shortens IP addresses and names accounts by number: fail2ban and the like need `KALMIDO_LOG_FULL_IP=1`. | CHANGELOG 2.239.0 |
+| 2.240 | The mail server is reached with a checked certificate: an own certificate or an IP address as host needs `KALMIDO_SMTP_INSECURE=1`, otherwise no mail goes out. Mails taken in from the instance mailbox are deleted there (`KALMIDO_IMAP_KEEP=1`: only marked read). An embedding service on another host needs `KALMIDO_EMBED_EXTERNAL=1`. | CHANGELOG 2.240.0 |
 
 ## Format limits: going back
 

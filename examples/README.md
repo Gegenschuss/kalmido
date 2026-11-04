@@ -15,7 +15,7 @@ What every proxy needs:
   requests of up to 60 seconds (long polling), so the proxy's read timeout must be longer (the templates use 120 s).
   Proxies that upgrade WebSocket connections anyway do no harm.
 - **Forwarded headers:** `X-Forwarded-For`, `X-Forwarded-Proto` and `X-Forwarded-Host`. Kalmido only believes them from
-  the addresses in `KALMIDO_TRUSTED_PROXIES` (default: localhost and Docker's default bridge). Through Docker's port
+  the addresses in `KALMIDO_TRUSTED_PROXIES` (default: localhost only). Through Docker's port
   publishing, or from a proxy container on another Docker network, requests arrive from that network's gateway: add it
   (`docker network inspect <network>`, field `Gateway`). Under *Settings > Server > Server* Kalmido warns when client
   addresses do not arrive.
@@ -26,7 +26,7 @@ What every proxy needs:
   long restore, the restore goes on on the server: wait, then reload the page; do not start it again. A larger
   `KALMIDO_BACKUP_MAX_MB` needs the same value in your proxy.
 - **Paths:** with the built-in login everything goes to Kalmido unchanged. With a login proxy (single sign-on) in front,
-  some paths must bypass it: see the README, section *Reverse proxy*.
+  some paths must bypass it: see [Reverse proxy](../docs/SELF-HOSTING.md#reverse-proxy).
 
 ## Which address goes into `KALMIDO_TRUSTED_PROXIES`
 

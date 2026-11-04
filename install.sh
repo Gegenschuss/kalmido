@@ -248,7 +248,12 @@ backup_db() {
   db="$DIR/data/tasks.db"
   if [ ! -f "$db" ]; then
     # 2.37+: PostgreSQL in the db service -> pg_dump (custom format) into data/backups/
-    (cd "$DIR" && dc ps -q db 2>/dev/null | grep -q .) || return 0
+    # 2.512.0 (#4174): no copy possible: say so and leave time to stop, never go on in silence
+    (cd "$DIR" && dc ps -q db 2>/dev/null | grep -q .) || {
+      warn "No database service of this installation is running (an external DATABASE_URL, or Kalmido is stopped): no copy of the database was made. The update goes on in 15 seconds; press Ctrl+C to back up your database first."
+      sleep 15
+      return 0
+    }
     step "Backing up your database"
     mkdir -p "$DIR/data/backups"
     name="kalmido-$(date +%Y%m%d-%H%M%S).dump"
@@ -580,7 +585,7 @@ main() {
   say "Uninstall:  cd \"$DIR\" && docker compose down && docker image rm ${IMAGE:-kalmido:local}"
   say "            then delete the folder (this deletes your tasks)"
   say "Use it from other devices: put it behind a reverse proxy with HTTPS, see"
-  say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples/)"
+  say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy (templates for Caddy, nginx, Traefik in examples/)"
 }
 
 main "$@"

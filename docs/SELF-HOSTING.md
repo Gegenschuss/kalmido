@@ -220,22 +220,8 @@ Traefik see its template).
 reverse_proxy @kalmido_dav 127.0.0.1:3040
 ```
 
-**The real client address.** Kalmido believes `X-Forwarded-For` and `X-Forwarded-Proto` only from `KALMIDO_TRUSTED_PROXIES`
-(default only loopback, `127.0.0.1,::1`), and that default fits no proxy in front of a Docker container. The app then seems
-to run normally, but behind HTTPS the session cookie has no `Secure` flag and there is no HSTS, every client has the same
-address in the logs, a few failed logins **slow down everyone's sign-in** at once and a person's own failed logins lock that
-person out from every device (before 2.282.0 even everyone). Which address to add depends on the setup; the commands
-print it, and [examples/README.md](../examples/README.md#which-address-goes-into-kalmido_trusted_proxies) has the same table:
-
-| Your setup | Requests reach Kalmido from | Command |
-| --- | --- | --- |
-| Proxy on the host (Caddy, nginx) or a proxy with host networking, Kalmido's published port | the gateway of Kalmido's Compose network, not `127.0.0.1` | `docker network inspect kalmido_default --format '{{(index .IPAM.Config 0).Gateway}}'` |
-| Proxy in a container, in one network with Kalmido (the Traefik template) | the proxy's container address, not a gateway. It can change on a restart, so name the network's range and keep only containers you trust in it | `docker network inspect proxy --format '{{(index .IPAM.Config 0).Subnet}}'` |
-| Proxy on the host, Kalmido on Docker's default bridge (the installer's fallback `network_mode: bridge`) | the gateway of that bridge | `docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}'` |
-
-`kalmido_default` is named after the folder of `docker-compose.yml` (`docker network ls`), and can come back with another
-address after `docker compose down`. Then, in `.env`: `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,<address>`, and
-`docker compose up -d kalmido`. One more setup goes wrong:
+**The real client address.** Kalmido believes `X-Forwarded-For` only from `KALMIDO_TRUSTED_PROXIES` (default loopback
+only; since 2.79 the Docker bridge gateway no longer counts). Two setups go wrong:
 
 - *The proxy itself only sees the Docker gateway.* When client connections reach a containerised proxy through Docker's
   userland proxy (for example over IPv6 without IPv6 NAT, or from the host itself), the proxy never learns the client's
@@ -678,8 +664,8 @@ docker compose up -d kalmido
     complete: the restore then stops with a message that shared files are missing.
 - **Old snapshots contain plain text.** Filesystem, VM or provider snapshots taken before you switched on encryption
   still hold the data unencrypted: delete them.
-- **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 52 weeks (an older, higher setting
-  reads as 52). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
+- **Backup retention and deleted accounts (2.152).** Weekly backups are kept for at most 104 weeks (52 with the deletion runs switched on; a higher
+  setting reads as that limit). The rotation runs once a day even while the automatic backups are switched off. Safety backups (written
   before every restore) go after `KALMIDO_SAFETY_BACKUP_DAYS` days (30), also among the last three, once the deletion runs
   are switched on (see [Deletion periods](#deletion-periods)). Every deleted account is noted in a journal (the account
   id and salted hashes of its e-mail and user name, no plain text); after a restore, accounts the backup brought back are
@@ -719,7 +705,7 @@ hub mails (with their word index; the mail's folder goes into the file store's t
 deleted rows and columns of a table, pipeline deals, invoice series, the placeholders of deleted team chat messages and
 the emptied rows of deleted comments, absences, disposition bookings, scheduling polls (with the votes of their guests),
 appointment types and file requests (*since 2.223.3*; the files received stay in their folder). The file store's trash names the period. Projects, tasks and events have their own
-trash periods. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
+trash runs with the same period. Legal retention wins: a booked receipt or the logbook is locked until its period ends, never deleted early
 (such a node stays in the trash and is counted as `files_locked`). Deleting an organisation or an account never fails on
 such a file: the organisation is retired until the lock ends, a private file moves into the account's retired office.
 
@@ -1400,8 +1386,8 @@ the browsers then send nothing.
 - **Reports from every workspace** of the server go into this one project, without any person's name. Pick a project only the
   people who look after the server see.
 
-- **Give *Tasks by e-mail* its own mailbox.** Kalmido marks every mail it reads as read and imports it as a task; a
-  mailbox you also use yourself gets mixed up.
+- **Give *Tasks by e-mail* its own mailbox.** Kalmido imports every mail as a task and then **deletes it from the mailbox** (since 2.240; `KALMIDO_IMAP_KEEP=1`: only marks it
+  as read; a mail not taken in whole always stays). A mailbox you also use yourself loses its mail.
 - **Shorten forwarded mails (optional, per person).** Settings > Integrations > *Tasks by e-mail* > *Shorten forwarded mails*: the
   forwarding header becomes one line, signatures, legal notices and older quoted replies are cut, the original mail stays
   attached as `.eml`. Off by default.
@@ -1987,13 +1973,13 @@ owner). Office records (invoices, receipts, bookings, agreements) never go with 
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods); `0` switches the task trash run off |
+| `KALMIDO_TRASH_DAYS` | `30` | the trash period in days (shared with the other trash periods); `0` switches only the task trash run off; every other trash run then uses 1 day (0 never means "everything now") |
 | `KALMIDO_PURGE_TRASH` | (unset) | `1` = the trash runs delete, `0` = they only count; wins over the general switch |
 | `KALMIDO_RETENTION_PURGE` | (unset) | `1` = every retention run deletes |
 
 **Dry run by default:** while neither switch is on, the run only counts what it would delete and writes the numbers
 to the server log (`retention: trash/tasks would delete (dry run): tasks=…`), so an update never deletes anything by
-surprise. Read the counts, then switch it on. The app tells people the period in the trash either way.
+surprise. Read the counts, then switch it on. The trashes in the app say which applies: the period, or that nothing is deleted until the runs are switched on.
 
 **Privacy policy:** if you publish one for your server, name the period, for example: "Tasks you delete stay in the
 trash for 30 days and are then deleted for good, with their comments and attachments."
@@ -2042,7 +2028,8 @@ stay blocked until you allow them.
 ## Production updates
 
 - **Pin the version** (`KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:<version>`, not `latest`), so an update happens when
-  you decide.
+  you decide. With the installer the `image:` line of `docker-compose.override.yml` wins over `KALMIDO_IMAGE`: there you pin with
+  `KALMIDO_VERSION=vX.Y.Z ~/kalmido/update.sh`.
 - **A safe order:** backup, then pull and start, then check `GET /api/health` and a few counts (users, projects, tasks,
   attachments) against the values before. If anything is off, go back by hand, no tool does it for you: see
   [Back to the previous version](#back-to-the-previous-version).
@@ -2065,13 +2052,14 @@ stay blocked until you allow them.
 
   With your own `.env`: set `KALMIDO_IMAGE=ghcr.io/gegenschuss/kalmido:X.Y.Z`, then `docker compose up -d`.
 - **The database copy as well** when you go further back, or when the update damaged data: `update.sh` writes one to
-  `data/backups/kalmido-*.dump` before every update (the last 10 stay). **Everything entered since is lost.** The copy
+  `data/backups/kalmido-*.dump` before every update (the last 10 stay), but only while the `db` service of this
+  installation runs: with an external `DATABASE_URL`, or with Kalmido stopped, there is no copy (`update.sh` warns and waits 15 seconds, then goes on). **Everything entered since is lost.** The copy
   holds no attachments: files added since stay unused in the folder, files removed since do not come back. For those
   restore an in-app backup instead (*Back up now* before the update), on the version that made it.
 
   ```bash
   docker compose stop kalmido
-  docker compose exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < data/backups/kalmido-YYYYMMDD.dump
+  docker compose exec -T db sh -c 'PGOPTIONS="-c app.role=system" pg_restore --clean --if-exists --no-owner --no-privileges --single-transaction --enable-row-security -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < data/backups/kalmido-YYYYMMDD-HHMMSS.dump
   ```
 
   Then set the old version as above and start it.
@@ -2265,7 +2253,7 @@ app works, but it cannot be installed and has no offline mode.
 > use put it behind a reverse proxy with HTTPS (see [Reverse proxy and network](#reverse-proxy-and-network)) and remove the
 > port lines again.
 
-To remove the test again: `docker compose down` and delete the folder (your test data is in `./data`).
+To remove the test again: `docker compose down` and delete the folder (your test data is in `./data` and `./pgdata`).
 
 ## From localhost to your own address
 
@@ -2303,7 +2291,7 @@ name from all addresses (100, against slow distributed guessing) within 15 minut
 *Settings > Server > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
 `172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
 Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
-default only loopback: [which address to add](#reverse-proxy-and-network)). Upgrading from the single-user
+default loopback only). Upgrading from the single-user
 version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give it a password once with
 `docker exec -it kalmido python app.py set-password admin`.
 
@@ -2438,8 +2426,14 @@ except these paths:
 | `/static/shortcuts/*` | Icons of the app shortcuts in the manifest, also fetched without cookies. |
 | `/drop` (and `/drop/drop`) | Upload endpoint for share apps. Protected by each user's own bearer token. `/drop/drop` is an alias for shortcuts that append `/drop` to an address that already ends in it. |
 | `/ical/*` | Calendar subscription. Calendar apps cannot log in; the secret token in the URL protects it. |
-| `/dav`, `/dav/*`, `/.well-known/caldav`, `/.well-known/carddav` | CalDAV (2.9.0) and CardDAV. Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
+| `/dav`, `/dav/*`, `/.well-known/caldav`, `/.well-known/carddav` | CalDAV (2.9.0). Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
 | `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public project links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
+| `/f/*` | Public forms. Visitors have no account; the secret token in the URL protects them. |
+| `/u/*` | File requests: people without an account upload through a secret link. |
+| `/portal`, `/portal/*`, `/p/*` | The client portal with its own sign-in, and the status link of a customer's report. |
+| `/mail/off/*` | The link in a notification mail that turns it off. A mail client has no login. |
+| `/mcp`, `/oauth/*`, `/.well-known/oauth-*` | Hosted MCP access (when switched on): apps bring their own token; the consent page asks for the sign-in itself. |
+| `POST /api/hooks/*` | Incoming webhooks (Git, issues, deploy, payments, tasks). The other service has no login; the token in the header or address protects them. |
 | `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with an Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](API.md#behind-a-reverse-proxy) for nginx and Traefik). |
 
 Example for Caddy with Authelia (single sign-on). The `route` keeps the order: first strip any client-sent
@@ -2461,7 +2455,7 @@ tasks.example.com {
 		# calendar apps (CalDAV): user name + app password, checked by Kalmido
 		@kalmido_dav path /dav /dav/* /.well-known/caldav /.well-known/caldav/* /.well-known/carddav /.well-known/carddav/*
 		reverse_proxy @kalmido_dav 127.0.0.1:3040
-		@gated not path /manifest.json /static/icon-192.png /static/icon-512.png /static/badge-96.png /static/shortcuts/* /drop /drop/drop /ical/* /s/* /static/public.css /static/fonts/* /static/icon.svg
+		@gated not path /manifest.json /static/icon-192.png /static/icon-512.png /static/badge-96.png /static/shortcuts/* /drop /drop/drop /ical/* /s/* /f/* /u/* /portal /portal/* /p/* /mail/off/* /mcp /oauth/* /.well-known/oauth-* /api/hooks/* /static/public.css /static/fonts/* /static/icon.svg
 		forward_auth @gated authelia:9091 {
 			uri /api/authz/forward-auth
 			copy_headers Remote-User Remote-Groups Remote-Email Remote-Name

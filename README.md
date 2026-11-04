@@ -240,7 +240,7 @@ How to update depends on how you installed:
 
 | Installed with | Update |
 |---|---|
-| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: `update.ps1` also makes a `pg_dump` into `data/backups/`), adds a database password to `.env` if missing, then fetches the latest release and restarts |
+| the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: `update.ps1` also makes a `pg_dump` into `data/backups/`; only while the `db` service of this installation runs: with an external `DATABASE_URL`, or with Kalmido stopped, it warns and goes on without a copy), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
 | git + local build | `git fetch --tags && git checkout "$(git tag -l 'latest-ok/*' --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (takes the newest tested version; a `v*` tag can be newer; 2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
 
