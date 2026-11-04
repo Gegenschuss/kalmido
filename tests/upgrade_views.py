@@ -73,8 +73,9 @@ def same(got, exp, what):
 
 
 def data_checks(E, tag):
-    users = {u: sess(u, E["password"]) for u in ("alice", "bob", "frida")}
-    check(True, f"{tag}: the old accounts sign in with their passwords")  # sess() asserts the login
+    users = {u: sess(u, E["password"], soft=True) for u in ("alice", "bob", "frida")}
+    if not check(all(users.values()), f"{tag}: the old accounts sign in with their passwords"):
+        raise SystemExit(f"{tag}: no login for {[u for u, s in users.items() if s is None]}")  # the views below need all three
     for u, s in users.items():
         v = view(s)
         exp = E["users"][u]

@@ -32,7 +32,6 @@ ALLOWED = {
     ("pg_layer_test.py", "check(True, "): "counts the expected exception; the try fails with check(False)",
     ("webpush_test.py", 'check(True, "")'): "after verify(), which raises; the except branch fails",
     ("usage_hook_test.py", 'check(True, "released again'): "StateLock raises when it is not released",
-    ("p2192_c_upgrade_test.py", 'the old accounts sign in'): "after sess(), which asserts the login",
     ("backup_test.py", "== code if code else True"): "not a check of its own: the code is compared when the case names one",
     ("p290_c_api_test.py", "if due30.month != d30.month else True"): "only a due date in another month has this rule",
     ("p2239_d_aufbewahrung_test.py", "list_purge(c, {LID}, None)[0] is None or True"): "a line of Python for the container, it only prints",
