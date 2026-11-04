@@ -53,6 +53,7 @@ from . import model  # 2.369.5 (#2517): pulled up from functions
 from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
+from .otrash import otb_put, otb_restore  # 2.530.0 C (#4315, B17)
 
 
 def rk_cat_label(k, lg=None):
@@ -520,7 +521,6 @@ def rk_trip_delete(tid):
     olk_need_trip_items(c, oid, c.execute("SELECT * FROM office_trip_items WHERE trip_id=? AND org_id=?", (tid, oid)).fetchall())
     old = _one(c, oid, tid)
     # 2.530.0 C (#4315, B17): a copy into the office trash first (restore there or with the undo), then the row goes
-    from .otrash import otb_put  # 2.530.0 C (#4315, B17); here, otrash imports this module
     trash = otb_put(c, oid, uid, "trip", "office_trips", tid, " · ".join(x for x in (old.get("dest"), rk_trash_span(old)) if x))
     c.execute("DELETE FROM office_trips WHERE id=? AND org_id=?", (tid, oid))
     bump(c)
@@ -603,7 +603,6 @@ def rk_item_delete(tid, iid):
     _trip_need_open(c, oid, _trip(c, oid, tid), r["date"], items=False)  # 2.148.0 A (#2471)
     olk_need_trip_items(c, oid, [r])  # 2.152.0 C (#2168): in DATEV / billed on a finalised document -> 409
     old = _item_public(c, oid, r, _docs_map(c, oid))
-    from .otrash import otb_put  # 2.530.0 C (#4315, B17); here, otrash imports this module
     trash = otb_put(c, oid, uid, "trip_item", "office_trip_items", iid, " · ".join(  # 2.530.0 C (#4315, B17): office trash first
         x for x in (tr(dict(RK_CATS).get(r["category"], "")) if dict(RK_CATS).get(r["category"]) else "", r["date"] or "") if x))
     c.execute("DELETE FROM office_trip_items WHERE id=? AND org_id=?", (iid, oid))
@@ -646,7 +645,6 @@ def rk_trash_restore(tid):
         raise Denied(404)
     if t["deleted_by"] != uid and model.office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this workspace can do this"))
-    from .otrash import otb_restore  # 2.530.0 C (#4315, B17); here, otrash imports this module
     kind, ref = otb_restore(c, oid, tid)
     trip = rk_trash_check(c, oid, kind, ref)
     ofx_log(c, oid, "restore", target=kind, detail={"id": ref})

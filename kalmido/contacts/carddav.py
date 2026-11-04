@@ -11,7 +11,7 @@ from datetime import timezone
 from flask import request, Response
 
 from ..core.config import APP_NAME
-from ..core.db import gsetting, parse_iso
+from ..core.db import bump, gsetting, parse_iso
 from ..core.pg import write_lock  # 2.273.0 C (#3048)
 from ..core.access import collab_all
 from ..calendars.caldav import (
@@ -434,7 +434,6 @@ def abdav(m, c, u, p):
         im = request.headers.get("If-Match", "").strip()
         if im and im != "*" and have[1] not in [x.strip() for x in im.split(",")]:
             raise DavError(412, "The resource was changed meanwhile")
-        from ..core.db import bump
         # 2.272.0 E1 (#3038): into the trash as in the app (a device deletes without asking; restore in the address book)
         from ..contacts.bulk import ctt_trash  # 2.58.0 (#1656): its birthday / anniversary tasks go as in the app
         ctt_trash(c, u["id"], [have[0]["id"]])

@@ -594,7 +594,6 @@ def evdav_mkcal(m, c, u, p):
     person like "new calendar" in the app (cal_create: workspace default, limit, colour). The client's name for it stays
     its address (ev_cals.dav_name). Name, colour, description and the components are taken from the body. A calendar
     only for tasks (VTODO without VEVENT) is refused: task lists are created in the app."""
-    from ..core.db import bump
     parts = [x for x in p.split("/") if x]
     if len(parts) != 3 or parts[0] != "calendars" or parts[1].lower() != u["username"]:
         raise DavError(403, "Create calendars in your calendar home", "<D:resource-must-be-null/>")
