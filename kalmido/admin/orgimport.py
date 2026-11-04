@@ -21,6 +21,7 @@ import secrets
 import uuid
 
 from ..accounts.pictures import AVATAR_MAX_MB, LIST_ICON_DIR, ORG_ICON_RE, list_icon_path, list_icon_process, org_icon_path
+from .oilock import oil_prepare  # #4300
 from ..core.config import ATT_DIR, MAX_FILE_MB, OFFICE_DIR
 from ..core.errors import BadInput
 from ..core.i18n import N_
@@ -246,7 +247,6 @@ def oi_write(c, run, uid, man, zf, files, data, who):
     run.created.setdefault("oi", [])
     names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people") or [] if isinstance(p, dict)}
     lates = []
-    from .oilock import oil_prepare  # #4300
     oil_prepare(c, run, uid, oi)
     for spec in oi_specs():
         rows = oi.get(spec.path) or []

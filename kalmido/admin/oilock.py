@@ -4,7 +4,7 @@ the ciphertexts are bound to (fs_locks.aad_folder, fs_lock_keys.aad_r / aad_w). 
 was wrapped for the key pair the person has there. Without it nobody could ever read the ciphertexts, so they stay out -- never as
 nodes with cipher names -- and the preview and the result say which folders. Plain rows of a folder in mid-switch are ordinary files."""
 
-from ..collab.e2e import _pub
+from ..collab.e2e import _pub, e2e_blob
 from ..core.i18n import N_
 
 OIL_NODES, OIL_LOCKS, OIL_KEYS = "store/nodes.json", "store/locks.json", "store/lock_keys.json"
@@ -13,6 +13,9 @@ OIL_NAMES_MAX, OIL_NAME_LEN, OIL_DEPTH_MAX = 5, 100, 200
 
 
 def _int(v):
+    """A positive id, as the import's own mapping reads it (acctimport._oid: a number or its digits) -- a file's rows pass no other way."""
+    if isinstance(v, str) and v.isdecimal() and len(v) < 19:
+        v = int(v)
     return v if isinstance(v, int) and not isinstance(v, bool) and v > 0 else None
 
 
@@ -26,9 +29,20 @@ def oil_plan(nodes, locks, keys, pub):
         if not isinstance(k, dict) or not pub or _pub(k.get("recipient_pub")) != pub:
             continue
         r = locked.get(_int(k.get("node_id")))
-        if r is not None and k.get("gen") == r.get("e2e_gen"):
+        if r is not None and _int(k.get("gen")) and _int(k.get("gen")) == _int(r.get("e2e_gen")):
             fits.add(_int(k.get("node_id")))
-    keep = {i for i in fits if i in rows and rows[i].get("kind") == "folder"}
+
+    def nested(i):  # a lock below a lock (only a crafted file): one lock per chain, the outer one
+        at, n = i, 0
+        while n < OIL_DEPTH_MAX:
+            at, n = _int(rows[at].get("parent_id")), n + 1
+            if at not in rows:
+                return False
+            if at in locked:
+                return True
+        return True
+
+    keep = {i for i in fits if i in rows and rows[i].get("kind") == "folder" and not nested(i)}
     gone, drop = {i for i in locked if i in rows and i not in keep}, set()
 
     def gen(n):
@@ -50,7 +64,7 @@ def oil_plan(nodes, locks, keys, pub):
         if top not in keep:
             drop.add(i)
             gone.add(top)
-    return {"keep": keep, "gone": gone, "drop": drop, "names": [rows[i]["name"][:OIL_NAME_LEN] for i in sorted(gone)
+    return {"keep": keep, "gone": gone, "gens": {i: _int(locked[i].get("e2e_gen")) for i in keep}, "drop": drop, "names": [rows[i]["name"][:OIL_NAME_LEN] for i in sorted(gone)
                                                                 if isinstance(rows[i].get("name"), str) and not rows[i]["name"].startswith("e2e1:")]}
 
 
@@ -75,14 +89,22 @@ def oil_prepare(c, run, uid, oi):
         return None
     p = run.oil = oil_plan(nodes, locks, keys, oil_own_pub(c, uid))
     if p["drop"]:
-        oi[OIL_NODES] = [n for n in nodes if not (isinstance(n, dict) and _int(n.get("id")) in p["drop"])]
+        ups = {_int(n.get("id")): _int(n.get("parent_id")) for n in nodes if isinstance(n, dict)}
+
+        def place(n):  # a plain row of a folder in mid-switch below a ciphertext that stays out: it goes to the nearest folder that comes
+            up, hops = _int(n.get("parent_id")), 0
+            while up in p["drop"] and hops < OIL_DEPTH_MAX:
+                up, hops = ups.get(up), hops + 1
+            return {**n, "parent_id": up} if up != _int(n.get("parent_id")) else n
+
+        oi[OIL_NODES] = [place(n) for n in nodes if isinstance(n, dict) and _int(n.get("id")) not in p["drop"]]
         for path in ("store/versions.json", "store/shares.json", "store/history.json"):
             if oi.get(path):
                 oi[path] = [r for r in oi[path] if not (isinstance(r, dict) and _int(r.get("node_id")) in p["drop"])]
     oi[OIL_LOCKS] = [r for r in locks if isinstance(r, dict) and _int(r.get("node_id")) in p["keep"]]
     oi[OIL_KEYS] = [r for r in keys if isinstance(r, dict) and _int(r.get("node_id")) in p["keep"]]
     if p["gone"]:
-        run.warning(N_("Locked folders that stay out, the folder key in the export does not fit your encryption keys here: {0}. Unlock them on the old server and export again, or import into an account with the same keys."),
+        run.warning(N_("The encrypted content of these locked folders stays out, the folder key in the export does not fit your encryption keys here: {0}. The folders arrive without the lock. Unlock them on the old server and export again, or import into an account with the same keys."),
                     ", ".join(p["names"][:OIL_NAMES_MAX]) or str(len(p["gone"])))
     if p["keep"]:
         run.warning(N_("Locked folders taken over: {0}. They open with your passphrase from before."), str(len(p["keep"])))
@@ -102,10 +124,9 @@ def oil_lock(run, src, d, uid):
 def oil_key(c, run, src, d, uid):
     """prep of a fs_lock_keys row: the copy for the person's key pair, for the person, with the ids of its bindings. A copy another
     person wrapped has no wrapper on the target (wrapped_by NULL), the browser reads wrapper_pub and aad_w."""
-    from ..collab.e2e import e2e_blob
     from ..files.fslock import FSL_WRAP_MAX
     p, sid = getattr(run, "oil", None), _int(src.get("node_id"))
-    if not p or sid not in p["keep"] or _pub(src.get("recipient_pub")) != oil_own_pub(c, uid):
+    if not p or sid not in p["keep"] or _pub(src.get("recipient_pub")) != oil_own_pub(c, uid) or _int(src.get("gen")) != p["gens"].get(sid):
         return False
     wrapped, wpub = e2e_blob(src.get("wrapped"), FSL_WRAP_MAX), _pub(src.get("wrapper_pub"))
     r, w = _int(src.get("aad_r")), _int(src.get("aad_w"))

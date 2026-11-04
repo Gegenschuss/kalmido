@@ -67,6 +67,7 @@ from ..core.schema import MAX_DEPTH  # 2.149.0 G (#2517): pulled up from functio
 from ..life.model import jr_seal  # 2.306.0 A (#2885)
 from ..accounts.orginvite import ojn_drop_later, ojn_invite, ojn_later  # 2.278.0 A (#3095)
 from ..collab.e2e import _pub, e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2.278.0 C (#3091)
+from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
 from .acctexport import umz_email_hash  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..integrations.importers import IMPORT_UNDO_HOURS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
@@ -721,7 +722,6 @@ def umz_enc_preview(c, uid, data, org_kind):
     if not org_kind and data.get("e2e_keys"):
         k0 = data["e2e_keys"][0] if isinstance(data["e2e_keys"], list) and data["e2e_keys"] and isinstance(data["e2e_keys"][0], dict) else {}
         keys = "take" if not e2e_has_keys(c, uid) or e2e_same_keys(c, uid, k0) else "keep"  # review M1: the same pair again = take
-    from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
     oi = data.get("oi") if isinstance(data.get("oi"), dict) else {}
     parts = (oi.get(OIL_NODES), oi.get(OIL_LOCKS), oi.get(OIL_KEYS)) if org_kind else (data.get("private_files"), data.get("private_locks"), data.get("private_lock_keys"))
     pub = _pub(k0.get("pub")) if keys == "take" else None

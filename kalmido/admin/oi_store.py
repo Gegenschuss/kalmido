@@ -186,14 +186,16 @@ def _version(c, run, src, d, ctx):
 
 def _lock(c, run, src, d, ctx):
     """#4300: admin/oilock.py. A folder that went into a root of the target (a crafted file: areas are never locked) gets no lock."""
+    return False if _lock_area(run, src, d, ctx) else oil_lock(run, src, d, ctx.uid)
+
+
+def _lock_area(run, src, d, ctx):
     st = _areas(run, ctx)
-    if d["node_id"] in st["merged"] or st["area_of"].get(_oidi(src.get("node_id"))):
-        return False
-    return oil_lock(run, src, d, ctx.uid)
+    return d["node_id"] in st["merged"] or st["area_of"].get(_oidi(src.get("node_id")))
 
 
 def _lock_key(c, run, src, d, ctx):
-    return oil_key(c, run, src, d, ctx.uid)  # #4300
+    return False if _lock_area(run, src, d, ctx) else oil_key(c, run, src, d, ctx.uid)  # #4300
 
 
 def _share(c, run, src, d, ctx):

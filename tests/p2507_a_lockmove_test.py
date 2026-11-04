@@ -182,7 +182,7 @@ enc = (j.get("preview") or {}).get("encrypted") or {}
 check(enc.get("keys") == "take" and enc.get("locked_folders") == 1 and enc.get("locked_folders_lost") == 0, f"preview: the folder comes along {enc}")
 j = run(Gi, iid)
 check(j.get("state") == "done", f"import into gina {j.get('state')} {j.get('error')}")
-check("Locked folders taken over" in warns(j) and "stay out" not in warns(j), "result: it says the folder came along " + warns(j))
+check("Locked folders taken over" in warns(j) and "stays out" not in warns(j), "result: it says the folder came along " + warns(j))
 G_SAFE = one("SELECT id FROM fs_nodes WHERE owner_id=? AND name='Vertraege' AND deleted_at IS NULL", (GINA,))
 check(G_SAFE and G_SAFE != SAFE, "gina has the folder under a new id")
 row = dbx("SELECT e2e, e2e_gen, e2e_by, aad_folder, org_id FROM fs_locks WHERE node_id=?", (G_SAFE,))
@@ -213,7 +213,7 @@ enc = (j.get("preview") or {}).get("encrypted") or {}
 check(enc.get("keys") == "keep" and enc.get("locked_folders") == 0 and enc.get("locked_folders_lost") == 1 and enc.get("locked_folders_lost_names") == ["Vertraege"],
       f"preview: the folder is named as staying out {enc}")
 j = run(Ha, iid)
-check(j.get("state") == "done" and "stay out" in warns(j) and "Vertraege" in warns(j), "result: the folder is named " + warns(j))
+check(j.get("state") == "done" and "stays out" in warns(j) and "Vertraege" in warns(j), "result: the folder is named " + warns(j))
 check(cipher_nodes(HANK) == 0, "no node with a cipher name at hank")
 check(one("SELECT COUNT(*) FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id WHERE n.owner_id=? AND n.mime='application/octet-stream'", (HANK,)) == 0, "no ciphertext file at hank")
 check("Not taken over because the entry" not in warns(j), "the left-out versions are no second warning " + warns(j))
@@ -225,8 +225,43 @@ iid, j = preview(Jo, OLD)
 enc = (j.get("preview") or {}).get("encrypted") or {}
 check(j.get("state") == "preview" and enc.get("locked_folders_lost") == 1 and enc.get("locked_folders_lost_names") == ["Vertraege"], f"older archive: preview names the folder {j.get('error')} {enc}")
 j = run(Jo, iid)
-check(j.get("state") == "done" and "stay out" in warns(j), "older archive: the result names it " + warns(j))
+check(j.get("state") == "done" and "stays out" in warns(j), "older archive: the result names it " + warns(j))
 check(cipher_nodes(JO) == 0, "older archive: no node with a cipher name")
+
+# ---------------------------------------------------------------- a crafted archive (review of #4300)
+def edited(data, edit):
+    with zipfile.ZipFile(io.BytesIO(data)) as z:
+        parts = {n[5:-5]: json.loads(z.read(n)) for n in z.namelist() if n.startswith("data/") and n.endswith(".json")}
+        files = {n: z.read(n) for n in z.namelist() if n not in ("manifest.json", "checksum.sha256")}
+        man = json.loads(z.read("manifest.json"))
+    edit(parts)
+    files.update({f"data/{k}.json": json.dumps(v).encode() for k, v in parts.items()})
+    man["files"] = [{"path": n, "size": len(b), "sha256": hashlib.sha256(b).hexdigest()} for n, b in files.items()]
+    mb = json.dumps(man).encode()
+    out = io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
+        for n, b in files.items():
+            z.writestr(n, b)
+        z.writestr("manifest.json", mb)
+        z.writestr("checksum.sha256", "\n".join(f"{hashlib.sha256(b).hexdigest()}  {n}" for n, b in [("manifest.json", mb), *files.items()]) + "\n")
+    return out.getvalue()
+
+
+def craft(p):
+    inner = {"id": 990001, "parent_id": SAFE, "kind": "folder", "name": ct(), "e2e_gen": 1, "created_at": "2026-01-01T00:00:00Z", "updated_at": "2026-01-01T00:00:00Z"}
+    p["private_files"].append(inner)
+    p["private_locks"].append({**p["private_locks"][0], "node_id": 990001, "aad_folder": 990001})
+    k = p["private_lock_keys"][0]
+    p["private_lock_keys"] += [{**k, "node_id": 990001}, {**k, "gen": 7}]  # a lock below the lock, a generation that does not exist
+
+
+KK, Kk = freelancer(B, A, "kira")
+iid, j = preview(Kk, edited(EXP, craft))
+j = run(Kk, iid)
+check(j.get("state") == "done", f"crafted archive: imported {j.get('error')}")
+K_SAFE = one("SELECT id FROM fs_nodes WHERE owner_id=? AND name='Vertraege' AND deleted_at IS NULL", (KK,))
+check(one("SELECT COUNT(*) FROM fs_locks l JOIN fs_nodes n ON n.id=l.node_id WHERE n.owner_id=?", (KK,)) == 1, "crafted archive: one lock per chain, the outer one")
+check([r[0] for r in dbx("SELECT gen FROM fs_lock_keys WHERE node_id=?", (K_SAFE,))] == [1], "crafted archive: only the lock's generation")
 
 # ---------------------------------------------------------------- second move, undo
 EXP2 = export_of(Gi)

@@ -617,6 +617,7 @@ def fsl_finish(nid):
         return err(tr("No encryption change is running for this folder."), 409)
     if mode == "decrypting":
         c.execute("DELETE FROM fs_lock_keys WHERE node_id=?", (nid,))
+        c.execute("UPDATE fs_locks SET aad_folder=NULL WHERE node_id=?", (nid,))  # #4300: no ciphertext of the old server is left
     fs_log_add(c, nid, "lock", "done" if mode == "encrypting" else "off")
     bump(c)
     c.commit()

@@ -26,12 +26,12 @@ async function fslKek(pub, lid, gen) {
 const fslWrap = async (raw, lid, gen, uid, pub) => e2eSeal(await fslKek(pub, lid, gen), raw, fslWrapAad(lid, gen, uid, S.me.id));
 const fslName = (lid, uid) => (FSL.info[lid]?.members || []).find(m => m.user_id === uid)?.name || personNameAny?.(uid) || '?';
 // my key of a generation (wrapped by me: my own public key, never the server's copy; by someone else: the key this browser remembered;
-// #4300: wrapped by someone on the old server: no person here to remember it for, first use like a person seen for the first time)
+// #4300: wrapped by someone on the old server: no person here, remembered per copy; fslKeys then wraps it for me, so it is pinned to my own key)
 async function fslRaw(lid, k) {
   const w = k.wrapped_by, me = S.me.id;
   let pub;
   if (w === me) pub = E2E.own;
-  else { pub = k.wrapper_pub; if (w != null && !le2eSeenOk(w, pub)) throw fslErr(tr('The key of {0} has changed. Compare the safety number before you continue.', fslName(lid, w)), 'fs_lock_keychanged'); }
+  else { pub = k.wrapper_pub; if (!le2eSeenOk(w ?? `fsl:${lid}:${k.gen}:${k.aad_w}`, pub)) throw fslErr(tr('The key of {0} has changed. Compare the safety number before you continue.', fslName(lid, w)), 'fs_lock_keychanged'); }
   const wr = typeof k.wrapped === 'string' ? JSON.parse(k.wrapped) : k.wrapped;
   return e2eOpen(await fslKek(pub, lid, k.gen), wr, fslWrapAad(lid, k.gen, k.aad_r ?? me, k.aad_w ?? w));  // #4300: the ids of an imported copy
 }
@@ -51,7 +51,13 @@ async function fslKeys(lid, ask) {
   let info; try { info = await fslInfo(lid, !have[FSL.info[lid]?.gen]); } catch { return have; }
   for (const k of info.keys || []) {
     if (have[k.gen]) continue;
-    try { have[k.gen] = await le2eImport(await fslRaw(lid, k)); } catch { /* a changed key or a broken wrap */ }
+    try {
+      const raw = await fslRaw(lid, k);
+      if (k.wrapped_by == null && k.aad_w != null) {  // #4300: a copy from the old server becomes my own (the server cannot swap its wrapper any more)
+        try { await rawFetch('POST', `/api/files/lock/${lid}/keys`, {keys: [{user_id: S.me.id, gen: k.gen, wrapped: await fslWrap(raw, lid, k.gen, S.me.id, E2E.own)}]}); } catch { /* the next visit tries again, the pin above holds */ }
+      }
+      have[k.gen] = await le2eImport(raw);
+    } catch { /* a changed key or a broken wrap */ }
   }
   return have;
 }
@@ -341,7 +347,7 @@ async function fslRelease(lid, uids) {
   if (!await e2eEnsure()) return false;
   const info = await fslInfo(lid, true), keys = [];
   for (const k of info.keys || []) {
-    const raw = await fslRaw(lid, k);
+    let raw; try { raw = await fslRaw(lid, k); } catch { continue; }  // #4300: a copy that does not open stops only itself
     try { for (const u of uids) keys.push({user_id: u, gen: k.gen, wrapped: await fslWrap(raw, lid, k.gen, u, await fslPubFor(lid, u))}); } finally { raw.fill(0); }
   }
   if (!keys.length) return false;
