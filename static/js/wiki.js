@@ -668,7 +668,7 @@ async function wk_flush(hide) {
   // 2.169.0 (#2671): offline (or with a change of this page still waiting) the text waits in the outbox: closing the tab keeps it
   if (hide || p._off || OUT.q.some(x => x.url === url)) { await wko_queue(p, patch); return; }  // the tab goes: the outbox (IndexedDB) keeps it, a fetch would be cut off
   try {
-    const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', url, patch, p.space) : await rawFetch('PATCH', url, patch);  // 2.64.3 B (#1817)
+    const r = await wkeApi('PATCH', url, patch, p.space);  // 2.501.0 (#4198): wikie2e.js runs first in this module, no way around it  // 2.64.3 B (#1817)
     Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
     wko_keep(p.space, r);
     wk_savedHint(tr('Saved'));
@@ -684,7 +684,7 @@ async function wk_conflict(mine, theirs, patch) {
   let took = false;
   const keep = await askDialog({after: md => md.querySelector('[data-cd="no"]')?.addEventListener('click', () => { took = true; }), title: tr('Changed in the meantime by {0}', theirs.updated_by_name || '?'), html: `<p>${tr('Keep your version or take theirs?')}</p><div class="ntdiff"><div><b>${tr('Yours')}</b><pre>${esc(patch.body)}</pre></div><div><b>${tr('Theirs')}</b><pre>${esc(theirs.body)}</pre></div></div>`, ok: tr('Keep mine'), cancel: tr('Take theirs')});
   let ok = true;
-  if (keep) { try { Object.assign(mine, typeof wkeApi === 'function' ? await wkeApi('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at}, mine.space) : await rawFetch('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at})); } catch (e) { toast(e.message); ok = false; } }
+  if (keep) { try { Object.assign(mine, await wkeApi('PATCH', '/api/wiki/pages/' + mine.id, {...patch, expect_updated_at: theirs.updated_at}, mine.space)); } catch (e) { toast(e.message); ok = false; } }
   else { Object.assign(mine, theirs); if (!took) ok = null; }
   renderView();
   return ok;

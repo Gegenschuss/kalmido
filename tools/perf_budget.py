@@ -138,6 +138,8 @@ def pbg_ratchet_base(root):
         before = os.environ.get("CI_BEFORE", "")
         if not before or set(before) == {"0"}:
             return None, "push without a previous commit", True
+        if not re.fullmatch(r"[0-9a-fA-F]{7,64}", before):  # a commit id or nothing: never an option for git (Fable review)
+            return None, "CI_BEFORE is no commit id", True
         if pbg_git(root, "cat-file", "-e", before + "^{commit}") is None:
             pbg_git(root, "fetch", "--no-tags", "--depth=1", "origin", before)
         return before, "push", True
@@ -194,7 +196,7 @@ def main(argv):
     ratchet, ratchet_base = "--ratchet" in argv, None
     if ratchet:
         i = argv.index("--ratchet")
-        if i + 1 < len(argv) and not argv[i + 1].startswith("--"):
+        if i + 1 < len(argv) and not argv[i + 1].startswith("-"):
             ratchet_base = argv[i + 1]
     budget = os.path.join(HERE, "perf_budget.json")
     root = os.path.dirname(HERE)

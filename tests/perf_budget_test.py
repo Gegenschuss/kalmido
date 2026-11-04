@@ -132,6 +132,8 @@ with tempfile.TemporaryDirectory() as tmp:
     check(rc == 1 and "NOT COMPARED" in out, "(d) CI push without a previous commit red: " + out)
     rc, out = ratchet(root, GITHUB_EVENT_NAME="push", GITHUB_REF="refs/heads/main", CI_BEFORE="1" * 40)
     check(rc == 1 and "NOT COMPARED" in out, "(d) CI push with an unreachable previous commit red: " + out)
+    rc, out = ratchet(root, GITHUB_EVENT_NAME="push", GITHUB_REF="refs/heads/main", CI_BEFORE="--upload-pack=touch-it")
+    check(rc == 1 and "no commit id" in out, "(d) CI_BEFORE that is no commit id: red, never handed to git: " + out)
     rc, out = ratchet(root, GITHUB_EVENT_NAME="push", GITHUB_REF="refs/heads/main", CI_BEFORE=sha2)
     check(rc == 0 and "ok against" in out, "(d) CI push compares with CI_BEFORE: " + out)
     rc, out = ratchet(root, GITHUB_EVENT_NAME="pull_request")

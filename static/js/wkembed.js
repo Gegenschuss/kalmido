@@ -112,7 +112,7 @@ async function wem_tickSave(p) {
   const url = '/api/wiki/pages/' + p.id, patch = {body: p.body, expect_updated_at: p.updated_at};
   if (p._off || OUT.q.some(x => x.url === url)) { await wko_queue(p, patch); return; }
   try {
-    const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', url, patch, p.space) : await rawFetch('PATCH', url, patch);
+    const r = await wkeApi('PATCH', url, patch, p.space);
     Object.assign(p, r, {backlinks: p.backlinks, _v: S.v});
     wko_keep(p.space, r);
     wk_savedHint(tr('Saved'));
@@ -210,7 +210,7 @@ async function wem_swap(p, pairs, fwd) {
   for (const [a, b] of pairs) { const [x, y] = fwd ? [a, b] : [b, a]; const i = ls.indexOf(x); if (i >= 0) { ls[i] = y; n++; } }
   if (!n) return;
   const patch = {body: ls.join('\n'), expect_updated_at: cur.updated_at};
-  const r = typeof wkeApi === 'function' ? await wkeApi('PATCH', url, patch, p.space) : await rawFetch('PATCH', url, patch);
+  const r = await wkeApi('PATCH', url, patch, p.space);
   if (WK.pg?.id === p.id) Object.assign(WK.pg, r, {backlinks: WK.pg.backlinks, _v: S.v});
   if (S.route.mod === 'wiki') viewSafeRender();
 }
