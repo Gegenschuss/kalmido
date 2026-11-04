@@ -12,6 +12,8 @@ tenant-matrix: support
  - a member of an organisation (cara): a new project without org_id lands privately, with org_id of the organisation 403,
    a task into the organisation's project (POST / PATCH list_id) 403; her own session puts it there; once the organisation's
    admin grants support access for it, the support session may
+ - 2.538.0 (#4365, review F4-F6): one trip / fixed cost deleted and the number range jump 403 (person without an organisation);
+   an event, a contact, a notepad into the organisation's calendar / address book / project 403 without its grant, fine with it
  - 2.538.0 (#4365): the office of her workspace (org:CO): a draft 403 without the organisation's grant, 201 with it and in her
    own office; reminder fee, master data import, fixed costs / trips deleted 403; a reminder draft stays; /api/state and /api/me
    say support_session
@@ -89,7 +91,11 @@ WAYS = (
     # undos delete for good
     ("reminder fee", "post", "/api/office/docs/1/fee", {"state": "waived"}), ("master data import", "post", "/api/office/import", {}),
     ("fixed costs deleted", "post", "/api/office/fixed-costs/delete", {"ids": [999999]}),
-    ("trips deleted", "post", "/api/office/trips/delete", {"ids": [999999]}))
+    ("trips deleted", "post", "/api/office/trips/delete", {"ids": [999999]}),
+    # 2.538.0 (#4365, review F4 / F6): one trip / fixed cost deleted has only the client's undo; the next running number is the
+    # bookkeeping's structure
+    ("one trip deleted", "delete", "/api/office/trips/999999", None), ("one fixed cost deleted", "delete", "/api/office/fixed-costs/999999", None),
+    ("number range jump", "post", "/api/office/number-ranges/invoice", {"next": 500, "reason": "Support"}))
 for what, meth, path, body in WAYS:
     r = getattr(X, meth)(B + path, **({"json": body} if body is not None else {}))
     check(refused(r), f"support session: {what} ({meth.upper()} {path}) -> 403 support_session, {r.status_code} {r.text[:100]}")
@@ -167,7 +173,38 @@ check(refused(r), f"support session: a draft in the organisation's office withou
 check(kt.dbx("SELECT COUNT(*) FROM office_docs WHERE org_id=? AND project_title='Studio help'", (CO,)) == [(0,)], "no draft was made there")
 r = Y.get(B + "/api/office/docs")
 check(r.ok, f"support session: reading the organisation's office stays {r.status_code}")
+# 2.538.0 (#4365, review F5): the organisation of a calendar, an address book, a project's notepad decides too
+assert Cc.patch(B + "/api/settings", json={"features": "cal,events,contacts,comments,collab,clients,office"}).ok
+r = Cc.post(B + "/api/evcals", json={"name": "Studio calendar", "org_id": CO})
+assert r.status_code == 201, r.text
+OCAL = r.json()["id"]
+r = Cc.post(B + "/api/books", json={"name": "Studio contacts", "org_id": CO})
+assert r.status_code == 201, r.text
+OBK = r.json()["id"]
+r = Y.post(B + "/api/evcals", json={"name": "Help calendar"})
+check(r.status_code == 201, f"support session (member): a new calendar without org_id {r.status_code} {r.text[:100]}")
+PCAL = r.json()["id"]
+check(kt.dbx("SELECT org_id FROM ev_cals WHERE id=?", (PCAL,)) == [(None,)], "it lands privately")
+r = Y.post(B + "/api/events", json={"title": "Help call", "cal_id": PCAL, "start": "2027-03-01T10:00"})
+check(r.ok, f"support session: an event in her private calendar {r.status_code} {r.text[:100]}")
+PEV = r.json()["id"]
+F5 = (("an event in the organisation's calendar", "post", "/api/events", {"title": "Studio call", "cal_id": OCAL, "start": "2027-03-01T11:00"}),
+      ("an event moved into the organisation's calendar", "patch", f"/api/events/{PEV}", {"cal_id": OCAL}),
+      ("a contact in the organisation's address book", "post", "/api/contacts", {"book_id": OBK, "fn": "Studio Example"}),
+      ("a notepad on the organisation's project", "post", f"/api/lists/{OL}/notepads", {"title": "Studio pad"}))
+for what, meth, path, body in F5:
+    r = getattr(Y, meth)(B + path, json=body)
+    check(refused(r), f"support session: {what} without its own support access 403, {r.status_code} {r.text[:100]}")
+check(kt.dbx("SELECT COUNT(*) FROM events WHERE cal_id=?", (OCAL,)) == [(0,)] and kt.dbx("SELECT COUNT(*) FROM contacts WHERE book_id=?", (OBK,)) == [(0,)]
+      and kt.dbx("SELECT COUNT(*) FROM list_notepads WHERE list_id=?", (OL,)) == [(0,)], "nothing went into the organisation")
+r = Cc.post(B + "/api/events", json={"title": "Studio call", "cal_id": OCAL, "start": "2027-03-01T11:00"})
+check(r.ok and code(r) != "support_session", f"cara's own session: an event in the organisation's calendar {r.status_code} {r.text[:100]}")
+r = Cc.post(B + "/api/contacts", json={"book_id": OBK, "fn": "Studio Example"})
+check(r.ok, f"cara's own session: a contact in the organisation's address book {r.status_code} {r.text[:100]}")
 assert Ca.post(B + "/api/support-access", json={"hours": 1, "org_id": CO}).ok
+for what, meth, path, body in F5:
+    r = getattr(Y, meth)(B + path, json=body)
+    check(r.ok, f"with the organisation's own support access: {what} {r.status_code} {r.text[:100]}")
 r = Y.post(B + "/api/office/docs", json={"project_title": "Studio help"})
 check(r.status_code == 201, f"with the organisation's own support access: a draft in its office {r.status_code} {r.text[:100]}")
 r = Y.post(B + "/api/tasks", json={"title": "Into the studio", "list_id": OL})
