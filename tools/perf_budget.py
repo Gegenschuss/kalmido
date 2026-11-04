@@ -8,9 +8,9 @@ The load time limit `start_ms` is not measured here; tests/perf_ui.js checks it 
 2.191.0 B (#1824): measures the bytes as the server sends them (.js / .css without comments, kalmido/core/strip.py).
 2.476.0 (#3487): app.css counts with the start style files static/css/start-*.css the server sends behind it.
 
-2.521.0 (#4391, rule budget per train, Moritz 04.11.2026): red only over a ceiling (decke_* in tools/perf_budget.json, see
+2.521.0 (#4391, rule budget per train, 04.11.2026): red only over a ceiling (decke_* in tools/perf_budget.json, see
 CEILINGS); the old per-package limits and the ratchet are gone. The growth of each package is measured by the train, not here.
-Only Moritz raises a ceiling.
+Only the project owner raises a ceiling.
 
 usage: python3 tools/perf_budget.py [--json] [--budget FILE] [--root DIR]
 """
@@ -29,7 +29,7 @@ KEYS = ("start_js_bytes", "start_js_gzip", "start_css_bytes", "start_css_gzip", 
 # 2.521.0 (#4391): ceiling in tools/perf_budget.json -> the measured value it caps; nothing else is red
 CEILINGS = (("decke_js_gzip", "start_js_gzip"), ("decke_css_gzip", "start_css_gzip"), ("decke_i18n_gzip", "start_i18n_gzip"),
             ("decke_scripts", "start_scripts"))
-SHRINK_HINT = ("only Moritz raises a ceiling; make the start smaller by loading on demand (static/js/lazyload.js LD_MODS / LD_CALL / "
+SHRINK_HINT = ("only the project owner raises a ceiling; make the start smaller by loading on demand (static/js/lazyload.js LD_MODS / LD_CALL / "
                "LD_VIEW) or by moving texts out of the language core, never by cutting code, comments or names")
 
 

@@ -55,7 +55,7 @@ with tempfile.TemporaryDirectory() as tmp:
     check(rc == 1 and "Budget exceeded" in out, "(b) too small ceilings exit 1: " + out)
     for k in CEIL:
         check(f"Budget exceeded: {k} " in out, "(b) message names " + k)
-    check("only Moritz raises a ceiling" in out and "lazyload.js" in out and "never by cutting" in out, "(b) 2.521.0 (#4391): the message says who raises and how to shrink: " + out)
+    check("only the project owner raises a ceiling" in out and "lazyload.js" in out and "never by cutting" in out, "(b) 2.521.0 (#4391): the message says who raises and how to shrink: " + out)
     # 2.521.0 (#4391): the bytes have no limit any more - old keys left in a file are ignored, never red
     old = dict(lim0, start_js_bytes=10, start_css_bytes=10, start_i18n_bytes=10)
     json.dump(old, open(small, "w"))
