@@ -418,6 +418,8 @@ def user_update(uid):
             c.rollback()
             return err(tr("Invalid value: {0}", "email"))
         c.execute("UPDATE users SET email=? WHERE id=?", (email or None, uid))
+        if (email or None) != (u["email"] or None):  # review 2.539.0 (#4375): a link mailed to the old address proves no new one
+            c.execute("UPDATE user_invites SET sent_at=NULL WHERE user_id=? AND used_at IS NULL", (uid,))
     if "storage_quota_mb" in b:  # 2.24.0 (#910): the person's own storage quota in MB (null = the server's default, 0 = unlimited)
         q = b["storage_quota_mb"]
         if q is not None and (isinstance(q, bool) or not isinstance(q, int) or not 0 <= q <= 10_000_000):

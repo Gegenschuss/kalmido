@@ -172,4 +172,15 @@ check(r.ok, f"setup: a sign-in link {r.status_code} {r.text[:160]}")
 r = requests.post(B + "/api/auth/link", headers=H, json={"token": r.json()["link"].split("#signin/")[1]})
 check(r.ok and proved(SIA) == "", f"#4375: a sign-in link (link / QR code) proves no address {r.status_code} {proved(SIA)!r}")
 
+# review 2.539.0 (#4375): the admin changes the address after the mail went out -> the old mail proves no new address
+r = A.post(B + "/api/users", json={"username": "ria", "display_name": "Ria", "email": "ria@example.com"})
+assert r.ok, r.text
+RIA = r.json()["id"]
+t = link_tok(A, RIA)
+write("UPDATE user_invites SET sent_at=created_at WHERE user_id=?", (RIA,))  # as if the invitation mail went out
+r = A.patch(B + f"/api/users/{RIA}", json={"email": "other@example.com"})
+check(r.ok, f"setup: the admin changes the address {r.status_code} {r.text[:160]}")
+r = requests.post(B + "/api/auth/invite/accept", headers=H, json={"token": t, "password": "password345"})
+check(r.ok and proved(RIA) == "", f"#4375: a link mailed to the old address proves no new one {r.status_code} {proved(RIA)!r}")
+
 sys.exit(kt.done("p2539_b_api"))
