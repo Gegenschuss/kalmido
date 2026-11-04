@@ -19,6 +19,8 @@ from ..core.i18n import N_
 from .orgimport import OiFix, OiT, _txt  # noqa: F401
 from ..core.orgcrypt import oc_item_store, oc_json_store, oc_log_detail  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_dec_fields  # 2.188.0 A (#2498)
+from ..core.orgcrypt import OrgCryptError  # 2.516.0 (#4364)
+from ..core.pg import system_ctx  # 2.516.0 (#4364)
 from ..office.calc import dec  # 2.188.0 A (#2498)
 from ..core.db import insert_id, iso, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
@@ -126,13 +128,19 @@ def oi_office_files_left(c, plan, paths, owners=None):
         m = _OI_DOC_FILE.fullmatch(part[1])
         if _OI_SNAP_FILE.fullmatch(part[1]):
             snaps.setdefault(int(part[0]), []).append(p)
-        elif not m or p in owners or plan.goes("office_docs", int(m.group(1))):
+        elif not m or owners.get(p) or plan.goes("office_docs", int(m.group(1))):
             out.append(p)  # named in a column (undo_files_left judged it) or all its rows go
     for oid, ps in snaps.items():
         used = ""
-        for r in c.execute("SELECT id, sender FROM office_docs WHERE org_id=? AND sender IS NOT NULL", (oid,)).fetchall():
-            if not plan.goes("office_docs", r["id"]):
-                used += "\0" + str(oc_dec_fields(c, oid, "office_docs", r).get("sender") or "")
+        try:
+            with system_ctx(c):  # review: every document of that office, also when the person left it since (reads sender names only)
+                rows = c.execute("SELECT id, sender FROM office_docs WHERE org_id=? AND sender IS NOT NULL", (oid,)).fetchall()
+            for r in rows:
+                if not plan.goes("office_docs", r["id"]):
+                    used += "\0" + str(oc_dec_fields(c, oid, "office_docs", r).get("sender") or "")
+        except OrgCryptError:  # review: a sender that does not open (key missing) - in doubt every copy of that office stays
+            print("orgimport undo: office", oid, "sender not readable, its logo / letterhead copies stay", flush=True)
+            continue
         out.extend(p for p in ps if os.path.basename(p) not in used)
     return out
 
