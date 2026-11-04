@@ -1620,8 +1620,9 @@ A receipt is entered as a mask:
 - **Choice lists**: Office -> Settings -> *Entertainment receipts* lists the places (with address) and people (with
   company / function): rename in place, remove (one undo step), add. Receipts keep the text they have.
 - **Deleting and retention**: a draft that was never approved goes to the trash (undo) and is deleted for good with its
-  bill after the trash period (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)). A receipt that was approved once is kept until the end of the 8th year after its year (it cannot be
-  deleted before). The organisation export contains the receipts, choices, logs and the bills.
+  bill after the trash period (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)). A receipt that was approved once is kept until the end of the 8th year after the year of its date or
+  its last approval, whichever is later; a country pack can lengthen this, never shorten it (it cannot be deleted
+  before). The organisation export contains the receipts, choices, logs and the bills.
 
 Routes (admins of the office area; members 403, another office area 404, agents never): `GET /api/office/meals?year=`,
 `POST /api/office/meals`, `GET/PATCH/DELETE /api/office/meals/<id>`, `POST /api/office/meals/<id>/restore`,
@@ -2304,8 +2305,9 @@ Settings for all of this (`PUT /api/office/settings`): `invoice_scheme`, `credit
 
 *Since 2.113.*
 
-*Settings > Company & office > Company > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per language (German,
-English) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes them (removing
+*Settings > Company & office > Company > Terms and conditions (PDF)* holds the office's terms and conditions as a PDF file per document language (de, en,
+nl, fr, es, it; 2.460) with the date they apply from ("as of"). The admin of the office uploads, replaces and removes
+them (removing
 is one undo step); members see and open them. Each file is stored once by its content (`terms-<lang>-<hash>.pdf` in the
 office folder, sealed like the stored documents, part of the backups); an older state is never overwritten, so what went
 out with a quotation stays readable.
@@ -2560,7 +2562,8 @@ reference line and the signature picture are encrypted at rest in areas with enc
 Every change and every read of documents and master data is written to the office log (`office_doc_log`): who, when,
 what (create, change with the values before and after, positions, number, status, finalise, duplicate, delete, open,
 PDF, preview, export, import, logo) and on which document or master data. Repeated reads of the same person within ten
-minutes are written once. Organisation admins see the history of a document in its editor ("History") and the latest
+minutes are written once. Read entries (open, preview, PDF, XML) are deleted after 90 days, all others stay.
+Organisation admins see the history of a document in its editor ("History") and the latest
 entries under Settings > Company & office > Access > Access log. The log is never part of alerts. An agent token on `/api/office/*` gets `403` without
 content; every request of an agent on `/api/v1/office` is one line in the log (2.51.0).
 

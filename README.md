@@ -266,7 +266,7 @@ stays empty. Otherwise the server creates a key once and from then on encrypts o
 version (after a failed check, e.g. GitHub's rate limit, again after an hour; right after an update at once). Admins then see a dot on the settings gear and, under *Settings > Administration > Server* (since 2.46.6; before *Settings > Help*), "vX.Y.Z installed — vX.Y.Z+1
 available" with a link to the release notes. Nothing is downloaded or installed automatically, the container gets
 no Docker access, and the browser never contacts GitHub. Switch it off under *Settings > Administration > Whole server* or
-for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:latest` and the GitHub release appear only after the CI of that version is green (a few minutes after the tag).
+for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.github.com every 6 hours; an update pulls the image from ghcr.io, and update.sh downloads the installer of the latest release. The image `:X.Y.Z` and its GitHub release appear after the CI of that version is green; the image `:latest` and the latest release follow after its device test.
 
 </details>
 

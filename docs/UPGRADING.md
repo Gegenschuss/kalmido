@@ -25,6 +25,7 @@ version you pass, and make a backup first. There is no need to stop at each vers
 | 2.182 | The container runs read-only as user 1000. An installation that ran it as root: `sudo chown -R 1000:1000 data secret` once, or keep your own `user:` line. An own compose file needs a writable `/tmp`. | [First setup](SELF-HOSTING.md#first-setup-and-the-server-key) |
 | 2.239 | The server log shortens IP addresses and names accounts by number: fail2ban and the like need `KALMIDO_LOG_FULL_IP=1`. | CHANGELOG 2.239.0 |
 | 2.240 | The mail server is reached with a checked certificate: an own certificate or an IP address as host needs `KALMIDO_SMTP_INSECURE=1`, otherwise no mail goes out. Mails taken in from the instance mailbox are deleted there (`KALMIDO_IMAP_KEEP=1`: only marked read). An embedding service on another host needs `KALMIDO_EMBED_EXTERNAL=1`. | CHANGELOG 2.240.0 |
+| 2.499 | On the channel *Web Push* nothing goes to the public `ntfy.sh` any more. If you had subscribed to your random topic there as a backup, for example for reminders, switch to the channel *ntfy* under *Settings > Notifications*. An own ntfy server changes nothing. | [Installed app and push](SELF-HOSTING.md#installed-app-pwa-and-push) |
 
 ## Format limits: going back
 

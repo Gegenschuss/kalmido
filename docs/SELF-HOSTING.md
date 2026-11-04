@@ -220,8 +220,22 @@ Traefik see its template).
 reverse_proxy @kalmido_dav 127.0.0.1:3040
 ```
 
-**The real client address.** Kalmido believes `X-Forwarded-For` only from `KALMIDO_TRUSTED_PROXIES` (default loopback
-only; since 2.79 the Docker bridge gateway no longer counts). Two setups go wrong:
+**The real client address.** Kalmido believes `X-Forwarded-For` and `X-Forwarded-Proto` only from `KALMIDO_TRUSTED_PROXIES`
+(default only loopback, `127.0.0.1,::1`), and that default fits no proxy in front of a Docker container. The app then seems
+to run normally, but behind HTTPS the session cookie has no `Secure` flag and there is no HSTS, every client has the same
+address in the logs, a few failed logins **slow down everyone's sign-in** at once and a person's own failed logins lock that
+person out from every device (before 2.282.0 even everyone). Which address to add depends on the setup; the commands
+print it, and [examples/README.md](../examples/README.md#which-address-goes-into-kalmido_trusted_proxies) has the same table:
+
+| Your setup | Requests reach Kalmido from | Command |
+| --- | --- | --- |
+| Proxy on the host (Caddy, nginx) or a proxy with host networking, Kalmido's published port | the gateway of Kalmido's Compose network, not `127.0.0.1` | `docker network inspect kalmido_default --format '{{(index .IPAM.Config 0).Gateway}}'` |
+| Proxy in a container, in one network with Kalmido (the Traefik template) | the proxy's container address, not a gateway. It can change on a restart, so name the network's range and keep only containers you trust in it | `docker network inspect proxy --format '{{(index .IPAM.Config 0).Subnet}}'` |
+| Proxy on the host, Kalmido on Docker's default bridge (the installer's fallback `network_mode: bridge`) | the gateway of that bridge | `docker network inspect bridge --format '{{(index .IPAM.Config 0).Gateway}}'` |
+
+`kalmido_default` is named after the folder of `docker-compose.yml` (`docker network ls`), and can come back with another
+address after `docker compose down`. Then, in `.env`: `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,<address>`, and
+`docker compose up -d kalmido`. One more setup goes wrong:
 
 - *The proxy itself only sees the Docker gateway.* When client connections reach a containerised proxy through Docker's
   userland proxy (for example over IPv6 without IPv6 NAT, or from the host itself), the proxy never learns the client's
@@ -249,8 +263,9 @@ services:
 Then set `KALMIDO_TRUSTED_PROXIES` to the address Kalmido sees the proxy at (see the table above) and nothing else.
 
 **Check it in the app (2.33).** *Settings > Server > Server > Your IP* shows the address the server sees for your own
-request, and the proxy it came through (trusted or not). From outside your network it must be your public address, not
-a private one like `172.18.0.1`. Kalmido also watches successful sign-ins: when several accounts (default 3,
+request, and the proxy it came through (trusted or not). From outside your network it must be your public address, with
+the proxy's address under *Via proxy*, *trusted*. A private address like `172.18.0.1` there, and no *Via proxy*, means
+Kalmido does not believe the proxy: that address is the one to add. Kalmido also watches successful sign-ins: when several accounts (default 3,
 `KALMIDO_IP_WARN_ACCOUNTS`) sign in from exactly one private address within 7 days, it warns in the server log
 (`WARNING client addresses do not arrive ...`, at the start and when it first happens) and under *Settings > Server > Server* ("Client addresses do not arrive - check the proxy"). Only private sign-in addresses are kept for this, for 14
 days; public addresses are never stored. A small office or family behind one NAT address on the same LAN can trigger it
@@ -602,9 +617,14 @@ docker compose up -d kalmido
   the passphrase was entered again).
 
 - **Disk space and passphrase (2.209.0).** The first setup switches the automatic backups on (daily at 03:30). Every
-  archive is a full copy: the database and *all* attachments and office files, nothing is shared between archives. With
-  the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of every restore,
-  so plan roughly 22 times the size of one backup (the backup page shows the size of each archive and the free space).
+  archive holds the database and the small files; attachments and office files from 64 KiB on (`KALMIDO_BACKUP_SHARED_MIN`)
+  lie once in the hidden folder `backups/.store`, however many archives refer to them (2.432.0). **An archive alone is
+  not complete:** without its shared files the larger attachments are missing. A complete file comes from *Download* or
+  from `bkstore.py assemble` (see [A copy of the backup folder elsewhere](#database-postgresql)); copy the folder only with
+  `.store`. With the defaults (14 daily + 8 weekly) up to 22 archives lie in the backup folder, plus the safety backup of
+  every restore, so plan the size of the attachments once plus roughly 22 times the database (the backup page shows the
+  size of each archive and the free space). A restore takes at most `KALMIDO_BACKUP_MAX_MB` (default 4096 MB, upload and
+  unpacked, shared files included) and refuses a larger backup with a message; set it higher on the restoring server.
   On a small disk keep fewer of them (Settings > Organisation > Data > Backups > *Keep*) or put the backup folder on another
   disk with `KALMIDO_BACKUP_DIR`; the backup page warns once less than about three more archives fit. Without *Encrypt
   backups* the archives are plain zips: anyone who can read the backup folder (or a copy of it) reads every task, file and
@@ -2281,7 +2301,7 @@ Raspberry Pi without a browser that is only the first step:
 
 `PUBLIC_URL` matters: links in mails and push messages, password resets, passkeys and calendar feeds are built from it. With
 the old value they point at `localhost` and work for nobody. As long as the address you opened differs from `PUBLIC_URL`,
-Administration > Server says so. That is normal while you work through the SSH tunnel.
+Settings > Server > Server says so. That is normal while you work through the SSH tunnel.
 
 ## Login
 
@@ -2291,7 +2311,7 @@ name from all addresses (100, against slow distributed guessing) within 15 minut
 *Settings > Server > Server* shows **your IP** as the server sees it (2.33.0): if it shows a Docker gateway such as
 `172.18.0.1` instead of your public address, the proxy hides the clients (see docs/SELF-HOSTING.md).
 Behind a reverse proxy Kalmido takes the client address from `X-Forwarded-For` of a trusted proxy (`KALMIDO_TRUSTED_PROXIES`,
-default loopback only). Upgrading from the single-user
+default only loopback: [which address to add](#reverse-proxy-and-network)). Upgrading from the single-user
 version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give it a password once with
 `docker exec -it kalmido python app.py set-password admin`.
 
@@ -2426,7 +2446,7 @@ except these paths:
 | `/static/shortcuts/*` | Icons of the app shortcuts in the manifest, also fetched without cookies. |
 | `/drop` (and `/drop/drop`) | Upload endpoint for share apps. Protected by each user's own bearer token. `/drop/drop` is an alias for shortcuts that append `/drop` to an address that already ends in it. |
 | `/ical/*` | Calendar subscription. Calendar apps cannot log in; the secret token in the URL protects it. |
-| `/dav`, `/dav/*`, `/.well-known/caldav`, `/.well-known/carddav` | CalDAV (2.9.0). Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
+| `/dav`, `/dav/*`, `/.well-known/caldav`, `/.well-known/carddav` | CalDAV (2.9.0) and CardDAV. Calendar apps cannot log in at a portal; Kalmido checks the user name + app password itself and never reads the proxy header there ([docs/CALDAV.md](CALDAV.md#reverse-proxy-let-dav-past-the-login-proxy)). |
 | `/s/*`, `/static/public.css`, `/static/fonts/*`, `/static/icon.svg` | Public project links and the stylesheet, fonts and icon of their page. Visitors have no account; the secret token in the URL (and an optional password) protects the links; the static files contain no data. |
 | `/f/*` | Public forms. Visitors have no account; the secret token in the URL protects them. |
 | `/u/*` | File requests: people without an account upload through a secret link. |
@@ -2483,7 +2503,7 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `AUTH_PROXY_HEADER` | | Header with the user name from an authenticating proxy (e.g. `Remote-User`); empty = built-in login only |
 | `AUTH_TRUSTED_PROXIES` | | Comma list of IPs / CIDRs whose header is trusted (direct peer) |
 | `AUTH_PROXY_PORT` | | Extra container port; if set, the header is only trusted on it (see *Login*) |
-| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy in another container on its own Docker network arrives from that network's gateway (e.g. `172.18.0.1`): add it. 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
+| `KALMIDO_TRUSTED_PROXIES` | `127.0.0.1,::1` | Reverse proxies (IPs / CIDRs of the direct peer) whose `X-Forwarded-For` / `-Proto` / `-Host` are believed: the real client address for login lockouts, logs and alerts, https for cookies and CalDAV. The `AUTH_TRUSTED_PROXIES` peers count too; `none` = trust nobody. A proxy on the host in front of Kalmido's published port arrives from the gateway of its Compose network, a proxy container in one network with Kalmido from its own address: [which address to add](#reverse-proxy-and-network). 2.79.0: the docker bridge gateway `172.17.0.1` is no longer in the default; a proxy on the host in front of a port published on Docker's default bridge needs `127.0.0.1,::1,172.17.0.1` |
 | `KALMIDO_IP_WARN_ACCOUNTS` | `3` | 2.33.0 (#834): warn in the log and under *Settings > Server > Server* when at least this many accounts sign in from one private address within 7 days (the client addresses do not arrive: check the reverse proxy, see docs/SELF-HOSTING.md); only private addresses are kept, 14 days |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | 2.33.0 (#927): the notification template a newly shared project or folder starts with: `read` (mentions, assignments, direct replies), `work`, `all` |
 | `KALMIDO_TRUSTED_PROXY_COUNT` | `1` | Proxies in a row in front of Kalmido; the client is the entry that many places from the right in `X-Forwarded-For` |

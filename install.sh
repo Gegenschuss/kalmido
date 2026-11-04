@@ -585,7 +585,7 @@ main() {
   say "Uninstall:  cd \"$DIR\" && docker compose down && docker image rm ${IMAGE:-kalmido:local}"
   say "            then delete the folder (this deletes your tasks)"
   say "Use it from other devices: put it behind a reverse proxy with HTTPS, see"
-  say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy (templates for Caddy, nginx, Traefik in examples/)"
+  say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples/)"
 }
 
 main "$@"

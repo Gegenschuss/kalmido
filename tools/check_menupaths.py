@@ -31,7 +31,7 @@ OLD_WORDS = ("Users may create their own agents",)
 FOREIGN = [re.compile(p) for p in (
     r"System" + DECOR + r"\s+Settings" + DECOR + SEP + r"[^\n]*",
     r"(?:Office|finance|Documents)" + DECOR + SEP + DECOR + r"Settings" + DECOR + SEP + r"[^\n]*",  # the settings tab of an area
-    r"(?:Karakeep|calendar\.google\.com|Gmail|Google Calendar|Outlook|Notion|Obsidian|Thunderbird|Trello|Asana|Nextcloud|Jira|Linear|GitHub|GitLab|Forgejo|Gitea|Paperless(?:-ngx)?|Authentik|authentik|Keycloak|Bitwarden|Hetzner|Apple)\b[^\n.;|]*?Settings" + DECOR + SEP + r"[^\n]*",
+    r"(?:Karakeep|calendar\.google\.com|Gmail|Google Calendar|Outlook|Notion|Obsidian|Thunderbird|Trello|Asana|Nextcloud|Jira|Linear|GitHub|GitLab|Forgejo|Gitea|Paperless(?:-ngx)?|Authentik|authentik|Keycloak|Bitwarden|Hetzner|Apple|Docker Desktop)\b[^\n.;|]*?Settings" + DECOR + SEP + r"[^\n]*",
     r"Settings" + SEP + DECOR + r"(?:Apps|Internet Accounts|your calendar|See all settings|Privacy & Security|Synchronization|Calendar" + SEP + r"Shared calendars|Workspace" + SEP + r"Export all workspace|Security & access" + SEP + r"Personal API keys|API keys|Backups" + DECOR + r"\s*(?:\(a ZIP|" + SEP + r"download a backup)|Export" + SEP + r"Markdown & CSV)[^\n]*",
     r"Administration › OIDC Clients[^\n]*",
 )]
