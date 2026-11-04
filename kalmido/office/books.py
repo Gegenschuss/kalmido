@@ -397,6 +397,12 @@ def bk_euer(c, oid, year):
         x = exp.setdefault("a:", {"label": tr("Depreciation"), "v": [Decimal(0)] * 3, "count": 0})
         x["v"] = [x["v"][0] + a_["amount"], x["v"][1], x["v"][2] + a_["amount"]]
         x["count"] += 1
+    # 2.536.0 (#4334): card fees and interest without a receipt, as the DATEV export books them (office/cardnorc.py; no input tax)
+    from .cardnorc import cc_norc_lines
+    for x in cc_norc_lines(c, oid, y0, y1):
+        k = exp.setdefault("k:", {"label": tr("Card fees without receipt"), "v": [Decimal(0)] * 3, "count": 0})
+        k["v"] = [k["v"][0] + x["amount"], k["v"][1], k["v"][2] + x["amount"]]
+        k["count"] += 1
     for t in rk_trips(c, oid, year=str(year)):
         for it in t["items"]:
             day = it["date"] or t["date_from"] or ""

@@ -16238,5 +16238,7 @@
   "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "La réservation avec le nom, l'e-mail et le message est supprimée définitivement. Le rendez-vous dans ton agenda, le contact et le lead restent tels quels. La personne ne reçoit pas d'e-mail.",
   "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "Le rendez-vous est encore à venir : le lien d'annulation de la personne ne fonctionnera plus. Annule-le d'abord s'il ne doit pas avoir lieu.",
   "Only confirmed or cancelled bookings can be deleted": "Seules les réservations confirmées ou annulées peuvent être supprimées",
-  "The payment date must not lie before the invoice date ({0})": "La date de paiement ne peut pas être antérieure à la date de la facture ({0})"
+  "The payment date must not lie before the invoice date ({0})": "La date de paiement ne peut pas être antérieure à la date de la facture ({0})",
+  "Card fees without receipt": "Frais de carte sans justificatif",
+  "Card fee without receipt": "Frais de carte sans justificatif"
 }

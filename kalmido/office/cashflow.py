@@ -7,8 +7,9 @@ In:  payments of invoices on their day (actual); the open rest of finalised invo
      the day of the quotation; past = the current month; planned).
 Out: purchases of accepted quotations (office_purchases, #1649), travel receipts (#1022), fixed costs entered by hand
      (office_fixed_costs, once / monthly / quarterly / yearly) and receipts of the books (2.114.1, #2018: on their payment
-     day, else their document date, as the EUeR; matched to a bank booking = its amount) -- on or before today actual,
-     later planned.
+     day, else their document date, as the EUeR; matched to a bank booking = its amount) and (2.536.0, #4334) credit card fees
+     without a receipt (office/cardnorc.py cc_norc_lines, the position's day; the bank booking of the total is none) -- on or
+     before today actual, later planned.
 Amounts in the office currency (documents in another currency through their rate), gross for documents. The artists'
 social insurance is not booked as an outflow by itself (an open question).
 Every route: office_gate + office_org with the admin of the office area; fixed costs encrypted at rest (orgcrypt)."""
@@ -308,7 +309,7 @@ def cf_docs(c, oid, first, last):
 
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
-    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement|receipt, date, amount,
+    An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement|receipt|card (2.536.0, #4334), date, amount,
     label, number, doc_id | trip_id | fixed_id | agreement_id (2.92.0 A, #1925) | node_id (receipt, 2.114.1 B, #2018), overdue} (kind credit = a refund paid on a credit note, out; kind offer carries
     open_offer: true for a sent quotation not yet accepted, 2.88.0, #1915).
     2.67.0 (#1838): basis gross (default; the start page too) | net. Fixed costs are entered net with a VAT rate: gross adds
@@ -433,6 +434,12 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         g_ = bfb_paid.get(rc["node_id"]) or rc["amount"]
         put(rc["date"], "out", "actual" if rc["date"] <= today else "plan", "receipt", g_ * rc["net"] / rc["amount"] if net and rc["amount"] else g_,
             " · ".join(x for x in (rc["title"], rc["category"]) if x), node_id=rc["node_id"], category=rc["category"])
+    # out: 2.536.0 (#4334): card fees and interest without a receipt on the position's day (as a matched receipt); the bank
+    # booking of the statement's total is no outflow of its own (office/cardnorc.py cc_norc_lines). A refund marked so comes in
+    from .cardnorc import cc_norc_lines
+    for x in cc_norc_lines(c, oid, first, _add_months(last_month, 1) + "-00"):
+        put(x["day"], "out" if x["amount"] > 0 else "in", "actual" if x["day"] <= today else "plan", "card", abs(x["amount"]),
+            " · ".join(v for v in (x["merchant"], f"{x['s_month']} ·· {x['last4']}") if v), statement_id=x["statement_id"])
     # out: fixed costs
     for f in rk_fixed(c, oid):
         for day in rk_fixed_days(f, first, _add_months(last_month, 1) + "-00"):

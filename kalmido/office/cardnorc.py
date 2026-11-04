@@ -207,6 +207,15 @@ def _settled(c, oid, frm, to):
     return out
 
 
+def cc_norc_lines(c, oid, frm, to):
+    """2.536.0 (#4334): the positions without a receipt (fees, interest, marked "no receipt needed") of confirmed statements in
+    [frm, to] as the EUeR and the cash flow count them, like cc_dv_rows books them: [{day, amount (plus = money out), merchant,
+    statement_id, s_node, s_month, last4}]. Private positions are no business expense, matched ones count through their receipt
+    (books.bk_receipts), open ones still wait; the bank booking of the total (_settled) only moves money from the bank to the
+    card account and is no expense of its own."""
+    return [x for x in _lines(c, oid, frm, to) if x["state"] == "noreceipt" and x["amount"]]
+
+
 def cc_bk_rows(c, oid, frm, to, uid=None):
     """The rows of the neutral export (bkexport.py type card): one per position (minus = money out), one without an amount per
     statement of the period with its PDF. _node = the file behind a row (only files the person sees)."""

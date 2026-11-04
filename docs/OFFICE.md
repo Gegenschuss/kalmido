@@ -945,6 +945,10 @@ payment day (set by matching them to a bank booking), else their document date. 
 the booking's amount; net takes the receipt's VAT rate off. A fixed cost or purchase entered for the same thing as a
 receipt counts twice - leave one of them out.
 
+**Credit card fees** (2.536): fees, interest and positions marked *No receipt needed* of a confirmed credit card statement go
+out on the position's day (a refund marked so comes in), the same on both bases; the bank booking of the statement's total
+is no outflow of its own (see *Credit cards*).
+
 **Quotations in the plan** (2.88): sent and accepted quotations count as planned income on the end of their period of
 service (else its start, else their date); a sent one is marked **open quotation** (a dashed entry, the month shows its
 share apart). "Duplicate" on a quotation makes the copy its next **version** (`version_of` = the first quotation of the
@@ -1056,8 +1060,9 @@ as "Tax reserve" and "Freely available". No tax advice; figures without guarante
   the line *Entertainment (70 % deductible)*, their input tax in full in field 66. They have no link to the receipts: a
   restaurant bill that also lies under *Receipts* counts twice (the statement says so whenever entertainment receipts
   count). See *Entertainment receipts*.
-- **Credit cards**: fees, interest and positions marked *No receipt needed* are not in the statement or the cash flow, only
-  in the DATEV export and the neutral export (see *Credit cards*).
+- **Credit cards** (2.536): fees, interest and positions marked *No receipt needed* of a confirmed statement count in the
+  statement (line *Card fees without receipt*, no input VAT) and in the cash flow, as in the DATEV export; private and open
+  positions do not, a position with its receipt counts through that receipt (see *Credit cards*).
 - **Cash book and bank bookings** do not count by themselves, only the payments and receipts they lead to.
 
 **Billing receipts on to a client (2.121):** under the receipts of the month, **Bill receipts on to a client …** (or **Bill on to a
@@ -1389,11 +1394,12 @@ its owner):
   paid on
   the position's day unless it already has a payment day. A different amount is only reported. Or **Upload receipt**:
   filed and matched at once.
-- Fees and interest need no receipt: the statement is the proof. **They do not count in Kalmido's own income/expense
-  statement or cash flow**: only the DATEV export books them (and positions marked *No receipt needed*), the neutral export
-  lists them. Only positions with a matched receipt count there, through that receipt; the bank booking of the total counts
-  neither. If you use the statement directly, enter the fees as a receipt. **Private** marks a position; the statement
-  shows what the holder
+- Fees and interest need no receipt: the statement is the proof. Since 2.536 they count, like positions marked *No receipt
+  needed*, in Kalmido's own income/expense statement (line *Card fees without receipt*, no input VAT) and in the cash flow
+  (kind *Card fee without receipt*, on the position's day; money back marked so lowers the line and comes in), as the DATEV
+  export books them; the neutral export lists them. Only confirmed statements count. A position with a matched receipt
+  counts through that receipt, once; open positions wait for theirs; the bank booking of the total only moves money to the
+  card and counts neither. **Private** marks a position: no business expense; the statement shows what the holder
   pays back.
 - **Match bank booking** (or the bank's own list): the sum is checked, the booking then counts as having its receipt and leaves
   **Without receipt**.

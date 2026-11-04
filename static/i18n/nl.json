@@ -16238,5 +16238,7 @@
   "The booking with name, e-mail and message is deleted for good. The event in your calendar, the contact and the lead stay as they are. The client gets no e-mail.": "De boeking met naam, e-mail en bericht wordt definitief verwijderd. De afspraak in je agenda, het contact en de lead blijven zoals ze zijn. De persoon krijgt geen e-mail.",
   "The appointment is still coming up: the client's cancel link stops working. Call it off first if it should not take place.": "De afspraak moet nog plaatsvinden: de annuleringslink van de persoon werkt daarna niet meer. Zeg hem eerst af als hij niet moet doorgaan.",
   "Only confirmed or cancelled bookings can be deleted": "Alleen bevestigde of geannuleerde boekingen kunnen worden verwijderd",
-  "The payment date must not lie before the invoice date ({0})": "De betaaldatum mag niet vóór de factuurdatum liggen ({0})"
+  "The payment date must not lie before the invoice date ({0})": "De betaaldatum mag niet vóór de factuurdatum liggen ({0})",
+  "Card fees without receipt": "Kaartkosten zonder bonnetje",
+  "Card fee without receipt": "Kaartkosten zonder bonnetje"
 }
