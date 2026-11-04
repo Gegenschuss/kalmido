@@ -48,7 +48,7 @@ const M = 'ZQXfile';  // every plain file text carries it: the server and localS
     const unlock = pass => ev(`(async () => { await e2eLoad(true); await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, ${JSON.stringify(pass)})); return 1; })()`);
     // the bytes of a file as the server keeps them, and opened with the list key
     const raw = aid => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => { const u = new Uint8Array(b); return String.fromCharCode(...u.subarray(0, 5)) + '|' + new TextDecoder('latin1').decode(u).includes('${M}'); })`);
-    const open = (aid, tid = T) => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => le2eFileDec(${L}, b, tid)).then(f => f.name + '|' + f.type + '|' + new TextDecoder().decode(f.data), e => 'ERR ' + e.message)`);
+    const open = (aid, tid = T) => ev(`fetch('/api/attachments/${aid}?dl=1', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.arrayBuffer()).then(b => le2eFileDec(${L}, b, ${tid})).then(f => f.name + '|' + f.type + '|' + new TextDecoder().decode(f.data), e => 'ERR ' + e.message)`);
     await fn({ev, waitFor, boot, shot, sweep, unlock, raw, open});
   }, false);
 
