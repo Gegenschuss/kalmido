@@ -130,8 +130,9 @@ def imp_fail(key, *a):
     raise BadInput(tr(key, *a))
 
 
-def imp_decode(data):
-    """Bytes of a text file -> str: UTF-8 (with / without BOM), UTF-16 (BOM or detected), else Windows-1252."""
+def imp_decode(data, plan=None):
+    """Bytes of a text file -> str: UTF-8 (with / without BOM), UTF-16 (BOM or detected), else Windows-1252 (with a warning in
+    plan since 2.533.0 #4318 F8: an ISO-8859-15 file shows a wrong euro sign)."""
     try:
         if data.startswith(b"\xef\xbb\xbf"):
             s = data[3:].decode("utf-8")
@@ -148,6 +149,8 @@ def imp_decode(data):
                     s = data.decode("utf-8")
                 except UnicodeDecodeError:
                     s = data.decode("cp1252")
+                    if plan is not None:
+                        imp_warn(plan, N_("The file is not UTF-8 and was read as Windows-1252: please check umlauts and the euro sign"))
     except UnicodeDecodeError:
         imp_fail(N_("The text encoding of the file could not be read (UTF-8, UTF-16 or Windows-1252 expected)"))
     if "\x00" in s:
@@ -165,8 +168,29 @@ def imp_textblock(v, n=CONTENT_MAX):
     return s.strip()[:n]
 
 
-def imp_csv(text):
-    """CSV text -> (lower-case header list, rows as dicts). Delimiter: , ; or tab (whatever the header uses most)."""
+class DvaImpRow(dict):
+    """2.533.0 (#4318) F8: one CSV row that knows its row number in the file (the header is row 1, as in a spreadsheet)."""
+    __slots__ = ("ln",)
+
+
+DVA_IMP_ROWS = 50  # row numbers kept per warning (the count stays exact)
+DVA_IMP_NOHEAD = N_("Cells without a column header were not imported (often a separator inside a text without quotation marks)")
+
+
+def dva_imp_row_warn(plan, key, row, title=None, *a):
+    """imp_warn plus the row number of the file (row: a DvaImpRow, an int or None); the answer lists them per warning."""
+    imp_warn(plan, key, title, *a)
+    ln = getattr(row, "ln", row)
+    if isinstance(ln, int) and not isinstance(ln, bool):
+        rs = plan["warn"][(key,) + tuple(str(x) for x in a)].setdefault("rows", [])
+        if len(rs) < DVA_IMP_ROWS and ln not in rs:
+            rs.append(ln)
+
+
+def imp_csv(text, plan=None):
+    """CSV text -> (lower-case header list, rows as dicts). Delimiter: , ; or tab (whatever the header uses most).
+    2.533.0 (#4318) F8: rows are DvaImpRow (row number); with plan, cells beyond the header or under an empty header are
+    named with their row instead of dropped silently."""
     first = text.split("\n", 1)[0]
     delim = max((",", ";", "\t"), key=first.count)
     try:
@@ -176,11 +200,16 @@ def imp_csv(text):
             imp_fail(N_("The file is empty"))
         orig = [imp_line(h, 100) for h in head]
         keys = [h.lower() for h in orig]
-        rows = []
+        rows, ln = [], 1
         for r in rd:
+            ln += 1
             if not any(x.strip() for x in r):
                 continue
-            rows.append({k: (csv_uncell(r[i]) if i < len(r) else "") for i, k in enumerate(keys) if k})  # 2.273.0 D (#3051)
+            row = DvaImpRow({k: (csv_uncell(r[i]) if i < len(r) else "") for i, k in enumerate(keys) if k})  # 2.273.0 D (#3051)
+            row.ln = ln
+            rows.append(row)
+            if plan is not None and any(x.strip() for i, x in enumerate(r) if i >= len(keys) or not keys[i]):
+                dva_imp_row_warn(plan, DVA_IMP_NOHEAD, row)
             if len(rows) > IMPORT_MAX_TASKS * 3:
                 imp_fail(N_("Too many rows (more than {0} tasks)"), IMPORT_MAX_TASKS)
     except csv.Error:
@@ -283,6 +312,8 @@ def imp_task(L, ext, title, **k):
          "completed_at": None, "created_at": None, "url": None, "duration": None, "assignee": None,
          "points": None, "ttype": "", "sprint": None}  # 2.394.0 A (#3377): story points, ticket type, sprint name
     t.update(k)
+    if len(imp_line(title, TITLE_MAX + 1)) > TITLE_MAX:  # 2.533.0 (#4318) F8: imp_clean names the cut
+        t["_tcut"] = True
     if t["section"]:
         t["section"] = imp_line(t["section"], LIST_NAME_MAX) or None
         if t["section"] and t["section"] not in L["sections"]:
@@ -296,7 +327,7 @@ def imp_task(L, ext, title, **k):
 
 
 def imp_addnote(t, text):
-    text = imp_textblock(text)
+    text = imp_textblock(text, CONTENT_MAX + 1)  # 2.533.0 (#4318) F8: one character more, imp_clean names the cut
     if text:
         t["notes"] = (t["notes"] + "\n\n" + text) if t["notes"] else text
 
@@ -626,9 +657,9 @@ def parse_todoist(data, fname, opts, plan):
         if not members:
             imp_fail(N_("No CSV files found in the ZIP file"))
         for name, b in members:
-            _todoist_csv(imp_decode(b), name, opts, plan)
+            _todoist_csv(imp_decode(b, plan), name, opts, plan)
         return
-    text = imp_decode(data)
+    text = imp_decode(data, plan)
     if text.lstrip()[:1] in ("{", "["):
         return _todoist_json(imp_json(text), plan)
     _todoist_csv(text, fname, opts, plan)
@@ -672,7 +703,7 @@ def _todoist_date(t, text, lg, tzname, plan, what="DATE"):
 
 
 def _todoist_csv(text, fname, opts, plan):
-    keys, rows, _ = imp_csv(text)
+    keys, rows, _ = imp_csv(text, plan)
     if "type" not in keys or "content" not in keys:
         imp_fail(N_("This is not a Todoist CSV export (columns TYPE and CONTENT missing)"))
     name = imp_stem(fname) or "Todoist"
@@ -819,7 +850,7 @@ def _todoist_json(j, plan):
 
 # ---- Trello
 def parse_trello(data, fname, opts, plan):
-    j = imp_json(imp_decode(data))
+    j = imp_json(imp_decode(data, plan))
     if not isinstance(j, dict) or not isinstance(j.get("cards"), list) or not isinstance(j.get("lists"), list):
         imp_fail(N_("This is not a Trello board export (JSON with lists and cards expected)"))
     board = imp_line(j.get("name"), LIST_NAME_MAX) or imp_stem(fname) or "Trello"
@@ -923,7 +954,7 @@ ASANA_STD = {"task id", "created at", "completed at", "last modified", "name", "
 
 
 def parse_asana(data, fname, opts, plan):
-    keys, rows, head = imp_csv(imp_decode(data))
+    keys, rows, head = imp_csv(imp_decode(data, plan), plan)
     if "task id" not in keys or "name" not in keys:
         imp_fail(N_("This is not an Asana CSV export (columns Task ID and Name missing)"))
     lists, by_name, extra = {}, {}, [k for k in keys if k and k not in ASANA_STD]
@@ -1002,7 +1033,7 @@ def parse_mstodo(data, fname, opts, plan):
     head = data[:3000].lstrip(b"\xef\xbb\xbf").lstrip()
     if head[:15].upper().startswith(b"BEGIN:VCALENDAR") or b"BEGIN:VCALENDAR" in head.upper()[:200]:
         return parse_ics(data, fname, opts, plan)
-    keys, rows, _ = imp_csv(imp_decode(data))
+    keys, rows, _ = imp_csv(imp_decode(data, plan), plan)
     col = {f: next((k for k in names if k in keys), None) for f, names in MS_COLS.items()}
     if not col["title"]:
         imp_fail(N_("This is not an Outlook / Microsoft To Do CSV (column Subject or Title missing)"))
@@ -1013,7 +1044,8 @@ def parse_mstodo(data, fname, opts, plan):
     g_ = lambda r, f: r.get(col[f]) if col[f] else ""  # noqa: E731
     for r in rows:
         title = imp_line(g_(r, "title"))
-        if not title:
+        if not title:  # 2.533.0 (#4318) F8
+            dva_imp_row_warn(plan, N_("Rows without a title were skipped"), r)
             continue
         ln = imp_line(g_(r, "list"), LIST_NAME_MAX) or imp_stem(fname) or "To Do"
         L = lists.get(ln) or lists.setdefault(ln, imp_list(plan, ln))
@@ -1064,7 +1096,7 @@ def parse_mstodo(data, fname, opts, plan):
 
 # ---- ICS / VTODO
 def parse_ics(data, fname, opts, plan):
-    text = imp_decode(data)
+    text = imp_decode(data, plan)
     if "BEGIN:VCALENDAR" not in text[:5000].upper():
         imp_fail(N_("This is not an iCalendar file (BEGIN:VCALENDAR missing)"))
     try:
@@ -1352,7 +1384,7 @@ IMP_FIELD_NAMES = ("title", "id", "parent", "list", "section", "due", "due_time"
 
 
 def parse_csv(data, fname, opts, plan):
-    keys, rows, head = imp_csv(imp_decode(data))
+    keys, rows, head = imp_csv(imp_decode(data, plan), plan)
     col = imp_colmap(keys)
     if not col["title"]:
         imp_fail(N_("No column with a task title found"))
@@ -1365,7 +1397,8 @@ def parse_csv(data, fname, opts, plan):
     lists, seen, by_id, by_title, rows_t = {}, {}, {}, {}, []
     for r in rows:
         title = imp_line(g_(r, "title"))
-        if not title:
+        if not title:  # 2.533.0 (#4318) F8: named with the row, not dropped silently
+            dva_imp_row_warn(plan, N_("Rows without a title were skipped"), r)
             continue
         ln = imp_line(g_(r, "list"), LIST_NAME_MAX) or imp_stem(fname) or "CSV"
         L = lists.get(ln) or lists.setdefault(ln, imp_list(plan, ln))
@@ -1373,7 +1406,7 @@ def parse_csv(data, fname, opts, plan):
         d, tm = imp_anydate(g_(r, "due"), dmy)
         key = (ln, title, d)
         seen[key] = seen.get(key, 0) + 1
-        t = imp_task(L, ("id:" + rid) if rid else imp_hash(ln, title, d, seen[key]), title, due=d,
+        t = imp_task(L, ("id:" + rid) if rid else imp_hash(ln, title, d, seen[key]), g_(r, "title"), due=d, _row=r.ln,
                      due_time=_imp_hm(g_(r, "due_time")) or tm, section=imp_line(g_(r, "section"), LIST_NAME_MAX) or None,
                      tags=imp_tags(_imp_strip_br(g_(r, "tags"))), created_at=imp_ts(g_(r, "created")) if g_(r, "created") else None)
         if g_(r, "due").strip() and not d:
@@ -1527,7 +1560,7 @@ def _md_parse(text, plan, name, ext0, heads_as_lists=True, src="markdown"):
 
 
 def parse_markdown(data, fname, opts, plan):
-    text = imp_decode(data)
+    text = imp_decode(data, plan)
     if not _md_parse(text, plan, imp_stem(fname) or "Markdown", "md"):
         imp_fail(N_("No tasks found in the file"))
 
@@ -1580,7 +1613,7 @@ def _notion_date(v):
 
 
 def _notion_db(text, path, plan, opts):
-    keys, rows, head = imp_csv(text)
+    keys, rows, head = imp_csv(text, plan)
     if not keys or not rows:
         return {}
     col = imp_colmap(keys)
@@ -1599,7 +1632,8 @@ def _notion_db(text, path, plan, opts):
     seen, idx = {}, {}
     for r in rows:
         title = imp_line(g_(r, "title"))
-        if not title:
+        if not title:  # 2.533.0 (#4318) F8
+            dva_imp_row_warn(plan, N_("Rows without a title were skipped"), r)
             continue
         seen[title] = seen.get(title, 0) + 1
         sd, d, tm = _notion_date(g_(r, "due"))
@@ -1654,13 +1688,13 @@ def parse_notion(data, fname, opts, plan):
     for p, b in csvs:  # newer exports carry "<db>.csv" (the view) next to "<db>_all.csv" (every row): the full one wins
         if not p.lower().endswith("_all.csv") and p[:-4].lower() in have_all:
             continue
-        r = _notion_db(imp_decode(b), p, plan, opts)
+        r = _notion_db(imp_decode(b, plan), p, plan, opts)
         if r:
             dbs.setdefault(_notion_name(p).lower(), []).append(r)
             n += len(r["list"]["tasks"])
     skipped = 0
     for p, b in sorted((x for x in files if not x[0].lower().endswith(".csv")), key=lambda x: x[0].count("/")):
-        text = imp_decode(b)
+        text = imp_decode(b, plan)
         segs = p.split("/")
         owner = _notion_name(segs[-2]).lower() if len(segs) > 1 else ""
         row = None
@@ -1704,9 +1738,9 @@ def parse_gtasks(data, fname, opts, plan):
         pick = [b for p, b in members if p.lower().rsplit("/", 1)[-1] == "tasks.json"] or [b for _, b in members]
         if not pick:
             imp_fail(N_("No Tasks.json found in the ZIP file"))
-        js = [imp_json(imp_decode(b)) for b in pick[:5]]
+        js = [imp_json(imp_decode(b, plan)) for b in pick[:5]]
     else:
-        js = [imp_json(imp_decode(data))]
+        js = [imp_json(imp_decode(data, plan))]
     ok = False
     for j in js:
         if not isinstance(j, dict) or not isinstance(j.get("items"), list):
@@ -1786,13 +1820,14 @@ def _cu_checklists(v):
 
 
 def parse_clickup(data, fname, opts, plan):
-    keys, rows, head = imp_csv(imp_decode(data))
+    keys, rows, head = imp_csv(imp_decode(data, plan), plan)
     if "task name" not in keys:
         imp_fail(N_("This is not a ClickUp CSV export (column Task Name missing)"))
     lists, seen = {}, {}
     for r in rows:
         title = imp_line(r.get("task name"))
-        if not title:
+        if not title:  # 2.533.0 (#4318) F8
+            dva_imp_row_warn(plan, N_("Rows without a title were skipped"), r)
             continue
         ln = imp_line(r.get("list name"), LIST_NAME_MAX) or imp_stem(fname) or "ClickUp"
         fo = imp_line(r.get("folder name"), FOLDER_MAX)
@@ -1865,7 +1900,7 @@ JIRA_POINTS = ("custom field (story points)", "custom field (story point estimat
 
 
 def parse_jira(data, fname, opts, plan):
-    keys, rows = imp_csv_multi(imp_decode(data))
+    keys, rows = imp_csv_multi(imp_decode(data, plan))
     if "summary" not in keys or not ({"issue key", "issue id"} & set(keys)):
         imp_fail(N_("This is not a Jira CSV export (columns Summary and Issue key missing)"))
     one = lambda r, k: (r.get(k) or [""])[0]  # noqa: E731
@@ -1950,11 +1985,11 @@ def parse_ticktick(data, fname, opts, plan):
     """2.363.2 (#3104): TickTick's backup CSV on the shared way (was an own import without preview, undo or rate limit): a few
     lines of preamble, then the header with "Folder Name". The tasks keep their taskId (imp_run also skips the ids the former
     import stored without the source prefix)."""
-    text = imp_decode(data)
+    text = imp_decode(data, plan)
     m = re.search(r'^"?Folder Name"?', text, re.M)
     if not m:
         imp_fail(N_("Not a TickTick CSV (header 'Folder Name' missing)"))
-    _keys, rows, _orig = imp_csv(text[m.start():])
+    _keys, rows, _orig = imp_csv(text[m.start():], plan)
     rows.sort(key=lambda r: tt_int(r.get("order")))  # the task order within a list is TickTick's "Order"
     lists, sec_order = {}, {}
     for n, r in enumerate(rows, 1):
@@ -2012,6 +2047,10 @@ def imp_user_match(c, a, people):
 
 def imp_clean(plan, t):
     """Validates one task of a plan like the app's own input; drops what does not fit (with a warning)."""
+    if t.get("_tcut"):  # 2.533.0 (#4318) F8: cut texts are named, with the row of a CSV file
+        dva_imp_row_warn(plan, N_("Title longer than {0} characters, shortened"), t.get("_row"), t["title"], TITLE_MAX)
+    if len(t["notes"] or "") > CONTENT_MAX:
+        dva_imp_row_warn(plan, N_("Description longer than {0} characters, shortened"), t.get("_row"), t["title"], CONTENT_MAX)
     if t["due"] and not valid_date(t["due"]):
         imp_warn(plan, N_("Invalid date removed"), t["title"])
         t.update(due=None, due_time=None, start=None)
@@ -2265,7 +2304,8 @@ def imp_run(c, uid, plan, opts, dry):
                             "points": t.get("points") if t.get("points") in POINTS else None, "ttype": t.get("ttype") or "",
                             "sprint": t.get("sprint")}
                            for L in plan["lists"] for t in L["tasks"][:IMPORT_SAMPLES]][:IMPORT_SAMPLES],
-               "warnings": [{"text": tr(k[0], *k[1:], lg=lg), "count": w["n"], "examples": w["ex"]}
+               "warnings": [{"text": tr(k[0], *k[1:], lg=lg), "count": w["n"], "examples": w["ex"],
+                             **({"rows": w["rows"]} if w.get("rows") else {})}  # 2.533.0 (#4318) F8: row numbers of the file
                             for k, w in plan["warn"].items()],
                # 2.142.0 B (#2147): any CSV: which column went into which field (unknown columns: the notes)
                **({"columns": plan["columns"]} if plan.get("columns") else {}),

@@ -16179,5 +16179,11 @@
   "On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.": "An: alle auf diesem Server, in jedem Arbeitsbereich. Aus: in einer Organisation entscheiden ihre Admins (Einstellungen > Organisation > Personen), im privaten Bereich jede Person selbst.",
   "Client and project of the file name swapped to match the PDF: client {0}, project {1}": "Kunde und Projekt aus dem Dateinamen passend zur PDF getauscht: Kunde {0}, Projekt {1}",
   "Confirmation of the receipt": "Bestätigung des Belegs",
-  "Confirmed by {0} (not by the host).": "Bestätigt durch {0} (nicht durch den Gastgeber)."
+  "Confirmed by {0} (not by the host).": "Bestätigt durch {0} (nicht durch den Gastgeber).",
+  "The file is not UTF-8 and was read as Windows-1252: please check umlauts and the euro sign": "Die Datei ist nicht UTF-8 und wurde als Windows-1252 gelesen: bitte Umlaute und das Euro-Zeichen prüfen",
+  "Cells without a column header were not imported (often a separator inside a text without quotation marks)": "Zellen ohne Spaltenkopf wurden nicht übernommen (oft ein Trennzeichen in einem Text ohne Anführungszeichen)",
+  "Title longer than {0} characters, shortened": "Titel länger als {0} Zeichen, gekürzt",
+  "Description longer than {0} characters, shortened": "Beschreibung länger als {0} Zeichen, gekürzt",
+  "Rows without a title were skipped": "Zeilen ohne Titel wurden übersprungen",
+  "Row {1}": ["Zeile {1}", "Zeilen {1}"]
 }

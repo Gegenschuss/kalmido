@@ -16179,5 +16179,11 @@
   "On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.": "Aan: iedereen op deze server, in elke werkruimte. Uit: in een organisatie beslissen haar admins (Instellingen > Organisatie > Personen), in het privégedeelte ieder zelf.",
   "Client and project of the file name swapped to match the PDF: client {0}, project {1}": "Klant en project uit de bestandsnaam omgewisseld volgens de pdf: klant {0}, project {1}",
   "Confirmation of the receipt": "Bevestiging van de bon",
-  "Confirmed by {0} (not by the host).": "Bevestigd door {0} (niet door de gastheer)."
+  "Confirmed by {0} (not by the host).": "Bevestigd door {0} (niet door de gastheer).",
+  "The file is not UTF-8 and was read as Windows-1252: please check umlauts and the euro sign": "Het bestand is geen UTF-8 en werd als Windows-1252 gelezen: controleer umlauts en het euroteken",
+  "Cells without a column header were not imported (often a separator inside a text without quotation marks)": "Cellen zonder kolomkop zijn niet geïmporteerd (vaak een scheidingsteken in een tekst zonder aanhalingstekens)",
+  "Title longer than {0} characters, shortened": "Titel langer dan {0} tekens, ingekort",
+  "Description longer than {0} characters, shortened": "Beschrijving langer dan {0} tekens, ingekort",
+  "Rows without a title were skipped": "Rijen zonder titel zijn overgeslagen",
+  "Row {1}": ["Rij {1}", "Rijen {1}"]
 }

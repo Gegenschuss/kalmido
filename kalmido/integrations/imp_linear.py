@@ -225,7 +225,7 @@ LIN_CSV_KEYS = {"team", "cycle name", "cycle number", "parent issue", "estimate"
 
 
 def parse_linear(data, fname, opts, plan):  # noqa: ARG001
-    keys, rows, _head = imp_csv(imp_decode(data))
+    keys, rows, _head = imp_csv(imp_decode(data, plan), plan)  # 2.533.0 (#4318) F8
     if not {"id", "title", "status"} <= set(keys) or not LIN_CSV_KEYS & set(keys):
         imp_fail(N_("This is not a Linear CSV export (columns ID, Title, Status and Team missing)"))
     lists, out = {}, []
