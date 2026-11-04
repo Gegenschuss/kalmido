@@ -1795,6 +1795,10 @@ def bk_leftovers():
 
 def bk_leftovers_alert():
     """At the start of the server: an admin alert when such folders lie around (Backups in the settings names them too)."""
+    # 2.510.0 (#4286): the work folder of a restore or check a hard stop left: the database as a plain dump, also next to encrypted
+    # backups. No restore runs while a server starts (it needs a single process)
+    for p in glob.glob(glob.escape(BK_DIR) + "/.restore-*") + glob.glob(glob.escape(BK_DIR) + "/.verify-*"):
+        shutil.rmtree(p, ignore_errors=True)
     left = [os.path.basename(p) for p, _ in bk_leftovers()]
     if left:
         print("restore: folders left from a restore:", ", ".join(left), flush=True)
