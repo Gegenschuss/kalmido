@@ -614,6 +614,41 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   }, false);
 
   // ---- the sign-in page (P7): 44 px fields, show password, nothing behind it gets the focus
+  // 2.504.0 (#4230): a menu opens only on the person's own tap: sending with real taps leaves #pop, the plus of the box and the drawer
+  // closed, with the keyboard up and down (imitated by the window height, as on Android) and while an answer runs and redraws the head
+  await firefox(async ({cmd, ev, nav, ctx, idle, until: fu}) => {
+    check(await ffLogin({ev, nav}, 'light') === 200, '#4230: login');
+    const size = h => cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: h}});
+    await size(844);
+    const tapAt = async s => { const q = await ev(`(() => { const r = document.querySelector(${JSON.stringify(s)}).getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`);
+      await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 't1', parameters: {pointerType: 'touch'}, actions: [{type: 'pointerMove', x: Math.round(q[0]), y: Math.round(q[1])}, {type: 'pointerDown', button: 0}, {type: 'pause', duration: 40}, {type: 'pointerUp', button: 0}]}]});
+      await cmd('input.releaseActions', {context: ctx}); };
+    const SEND = '.chview .chcomp [data-act="chat-send"]', BOX = '.chview #chat-in';
+    const MENUS = `(() => [!document.querySelector('#pop').classList.contains('hidden') && 'pop', !!document.querySelector('.chcomp.chmore') && 'plus', !!document.querySelector('#side.open') && 'drawer'].filter(Boolean).join())()`;
+    await nav(B + '?p=4230#agents/' + AG); await settle(ev, idle);
+    await fu(`!!document.querySelector(${JSON.stringify(BOX)}) && !document.querySelector(${JSON.stringify(BOX)}).disabled`);
+    for (const [what, kb, busy] of [['keyboard down', false, false], ['keyboard up', true, false], ['keyboard up, an answer running', true, true]]) {
+      if (busy) { await tcall('PUT', '/agent/status', TOK, {status: 'working', text: 'Reading the brief'}); await fu(`chatBusy(agentById(S.chat.aid))`); }
+      for (let i = 0; i < 3; i++) {
+        const n = await ev(`S.chat.msgs.length`), text = `#4230 ${what} ${i}`;
+        await tapAt(BOX); await fu(`document.activeElement?.id === 'chat-in'`);
+        if (kb) { await size(480); await fu(`document.body.classList.contains('kb-open') && document.querySelector(${JSON.stringify(SEND)}).getBoundingClientRect().bottom <= innerHeight`); }
+        await ev(`(() => { const t = document.querySelector(${JSON.stringify(BOX)}); t.value = ${JSON.stringify(text)}; t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+        await tapAt(SEND);
+        await fu(`S.chat.msgs.length > ${n} && !S.chat.sending && S.chat.msgs.some(m => m.body === ${JSON.stringify(text)} && !m.pending)`);
+        if (kb) { await fu(`document.activeElement?.id !== 'chat-in'`); await size(844); await fu(`!document.body.classList.contains('kb-open') && document.querySelector(${JSON.stringify(SEND)}).getBoundingClientRect().bottom > 480`); }
+        await settle(ev, idle);
+        if (busy) await ev(`new Promise(r => setTimeout(r, 1100))`);  // one tick of chatAbortSync, it redraws the ⋯ button
+        const open = await ev(MENUS);
+        check(await ev(`S.chat.msgs.some(m => m.body === ${JSON.stringify(text)})`) && !open, `#4230 ${what} ${i}: the message went out, no menu opened: ${open}`);
+      }
+    }
+    await tcall('PUT', '/agent/status', TOK, {status: 'idle'});
+    // the check above can see a menu: the person's own tap on More of the tab bar opens it
+    await tapAt('#tabs [data-act="tabs-more"]');
+    check(await fu(`!document.querySelector('#pop').classList.contains('hidden')`) && await ev(MENUS) === 'pop', '#4230: a real tap on More opens its menu');
+  }, true);
+
   await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B); await settle(ev, idle);
