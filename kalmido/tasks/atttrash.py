@@ -6,6 +6,10 @@ counts, and while ret_on("trash") is on it deletes the rows for good; the files 
 unlinks the returned paths). A path another row still uses stays on disk (as tasks/tasktrash.py ttp_purge)."""
 
 ATR_TABLES = (("attachments", "attachments"), ("list_files", "list_files"))  # (count key, table)
+# 2.530.0 D (#4316, audit B10): a file of a project kept by law (lists.retain_until today or later, like tasks/tasktrash.py
+# TTP_KEPT) waits for the end of that period, also in the trash; counted as <key>_kept
+ATR_KEPT = {"attachments": "EXISTS (SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=attachments.task_id AND l.retain_until>=?)",
+            "list_files": "EXISTS (SELECT 1 FROM lists l WHERE l.id=list_files.list_id AND l.retain_until>=?)"}
 
 
 def atr_used(c, paths):
@@ -19,13 +23,16 @@ def atr_used(c, paths):
 
 def atr_tick(c, cut, purge):
     """Files in the trash since before cut: -> (counts, paths to unlink after the commit). Only counts while purge is off."""
-    counts, paths = {}, []
+    from ..core.db import now_utc
+    counts, paths, today = {}, [], now_utc().date().isoformat()
     for key, table in ATR_TABLES:
-        w = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?"
+        base = f"FROM {table} WHERE deleted_at IS NOT NULL AND deleted_at<?"
+        counts[key + "_kept"] = c.execute(f"SELECT COUNT(*) {base} AND {ATR_KEPT[table]}", (cut, today)).fetchone()[0]
+        w = f"{base} AND NOT {ATR_KEPT[table]}"
         if not purge:
-            counts[key] = c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
+            counts[key] = c.execute(f"SELECT COUNT(*) {w}", (cut, today)).fetchone()[0]
             continue
-        rows = c.execute(f"SELECT id, path {w} ORDER BY id FOR UPDATE", (cut,)).fetchall()
+        rows = c.execute(f"SELECT id, path {w} ORDER BY id FOR UPDATE", (cut, today)).fetchall()
         for i in range(0, len(rows), 500):
             ids = [r["id"] for r in rows[i:i + 500]]
             q = ",".join("?" * len(ids))

@@ -16162,5 +16162,13 @@
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Se connecter avec un autre compte les supprime de cet appareil, une copie est d’abord téléchargée en fichier texte. Annuler déconnecte à nouveau : le compte précédent peut alors se connecter et les envoyer.",
   "Your unsaved input is back": "Ta saisie non enregistrée est de retour",
   "Unsaved input of a dialog was kept: open the dialog again to finish it": "Une saisie non enregistrée d’une boîte de dialogue a été conservée : rouvre la boîte de dialogue pour la terminer",
-  "An archive import can only be undone within 24 hours of its import.": "Une importation dans l’archive ne peut être annulée que dans les 24 heures qui suivent."
+  "An archive import can only be undone within 24 hours of its import.": "Une importation dans l’archive ne peut être annulée que dans les 24 heures qui suivent.",
+  "{0} report from the client portal is deleted with it.": ["{0} signalement du portail client est supprimé avec.", "{0} signalements du portail client sont supprimés avec."],
+  "{0} form entry is deleted with it.": ["{0} réponse de formulaire est supprimée avec.", "{0} réponses de formulaire sont supprimées avec."],
+  "{0} video review goes to the trash of the video reviews.": ["{0} validation vidéo va dans la corbeille des validations vidéo.", "{0} validations vidéo vont dans la corbeille des validations vidéo."],
+  "{0} task stays: its project keeps receipts by law.": ["{0} tâche reste : son projet conserve des justificatifs par obligation légale.", "{0} tâches restent : leur projet conserve des justificatifs par obligation légale."],
+  "Also empty the trash of other owners?": "Vider aussi la corbeille d’autres propriétaires ?",
+  "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["En tant qu’admin de l’instance, tu peux aussi supprimer définitivement {0} tâche d’autres propriétaires : elle se trouve dans la corbeille de leurs projets où tu peux modifier. Elle disparaîtrait aussi de leur corbeille. Action irréversible.", "En tant qu’admin de l’instance, tu peux aussi supprimer définitivement {0} tâches d’autres propriétaires : elles se trouvent dans la corbeille de leurs projets où tu peux modifier. Elles disparaîtraient aussi de leur corbeille. Action irréversible."],
+  "Empty theirs too": "Vider aussi la leur",
+  "{0} video review (goes to the trash of the video reviews)": ["{0} validation vidéo (va dans la corbeille des validations vidéo)", "{0} validations vidéo (vont dans la corbeille des validations vidéo)"]
 }

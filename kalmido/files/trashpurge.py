@@ -35,7 +35,8 @@ TP_PLAIN = (
     # at it (thread_of has no FK; without the root the replies can no longer be reached) -- it goes once its replies went
     ("chat_tombstones", "tchat_msgs", " AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)"),
     ("comments", "comments", ""),  # body is empty, the files went at the delete; reactions cascade
-    # 2.272.0 D (#3029): clients (contact persons, data protection sheets, video reviews, mail-in addresses cascade; mails,
+    # 2.272.0 D (#3029): clients (contact persons, data protection sheets, mail-in addresses cascade -- video reviews go to their
+    # own trash first, 2.530.0 D #4316; mails,
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD
     # 2.223.3 (#2878): the hold rule is team/clients.py cl_hold_sql() (finalised documents only), filled in at the run
     ("clients", "clients", None),
@@ -144,6 +145,9 @@ def tp_tick(c, force=False):
                         if table == "books":  # 2.272.0 F (#3038, review N7): the merge undo data goes with it, like op_book_purge
                             c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id IN "
                                       f"(SELECT id {w})", (cut,))
+                        if table == "clients":  # 2.530.0 D (#4316, audit B18): their video sign-offs go to the video trash, not by cascade
+                            from ..videos.vdrescue import vdr_rescue
+                            counts["clients_videos"] = vdr_rescue(c, client_ids=[r[0] for r in c.execute(f"SELECT id {w}", (cut,))])
                         counts[key] = c.execute(f"DELETE {w}", (cut,)).rowcount
                         if key in ("sheet_rows", "sheet_columns") and counts[key]:
                             # 2.152.0 (#2165, review C-M2): a file the purged cells held (and no other cell holds) goes to the

@@ -172,7 +172,7 @@ document.addEventListener('click', async e => {
       await api('DELETE', `/api/trash/lists/${id}?confirm=${encodeURIComponent(nm)}`);
       toast(tr('“{0}” deleted', x.name));
     } else {
-      if (!await askConfirm(tr('Delete “{0}” permanently?', x.name), tr('The project, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
+      if (!await trPurgeList(id, x.name)) return;  // 2.530.0 D (#4316): trashui.js names what goes along (reports, form entries, video reviews)
       await api('DELETE', `/api/trash/lists/${id}`);
       toast(tr('“{0}” deleted', x.name));
     }

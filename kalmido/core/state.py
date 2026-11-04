@@ -563,7 +563,7 @@ def ev_links(c, uid, task_ids):
 
 @app.get("/api/tasks")
 def task_query():
-    from ..tasks.lifecycle import purge_lists
+    from ..tasks.lifecycle import tre_plan
     c = db()
     uid = me()
     scope = request.args.get("scope", "done")
@@ -577,13 +577,14 @@ def task_query():
     if scope == "trash":
         rows = load_tasks(c, f"list_id IN {wr_sql()} AND deleted_at IS NOT NULL" + (" AND (deleted_at, id) < (?, ?)" if cur else "")
                           + " ORDER BY deleted_at DESC, id DESC LIMIT ?", (uid, uid, *(cur or ()), limit + 1))
-        ok = purge_lists(c, uid)
+        # 2.530.0 D (#4316): the same plan as "Empty" (lifecycle.tre_plan): own trash only (also instance admins: others =
+        # what their explicit "also the other owners'" would take), projects kept by law stay
+        _ids, ok, cnt = tre_plan(c, uid)
         for t in rows:  # 2.0.5: stays when the trash is emptied (shared list of another owner)
             if t["list_id"] not in ok:
                 t["keep"] = True
         if not cur:  # 2.40.0 (#1432): "Empty" counts the whole trash, not only the loaded page
-            lids = [r[0] for r in c.execute(f"SELECT list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid))]
-            extra = {"deletable": sum(1 for x in lids if x in ok), "kept": sum(1 for x in lids if x not in ok)}
+            extra = {"deletable": cnt["deleted"], "kept": cnt["kept"] + cnt["kept_law"], "others": cnt["others"]}
         from ..tasks.tasktrash import ttp_days
         extra["days"] = ttp_days()  # 2.116.0 A (#2063): the trash period (the client shows the days left per row)
         extra["purge_on"] = ret_on("trash")  # 2.223.3 A (#2877): whether the run really deletes after the period

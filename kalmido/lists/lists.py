@@ -768,6 +768,8 @@ def list_purge(c, lid, inbox):
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     from ..receipts.suggest import olk_keep_project
     olk_keep_project(c, lid)  # 2.239.0 D (#2874): booked receipts keep the project name
+    from ..videos.vdrescue import vdr_rescue
+    vdr_rescue(c, list_ids=[lid])  # 2.530.0 D (#4316): its video sign-offs go to the video trash, not with it by the cascade
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     return icon, lfiles
 

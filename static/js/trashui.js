@@ -132,3 +132,48 @@ async function ck_clearAct(act, id) {
   if (act === 'ck-clear' && dn.length) offerUndo(tr('Done items moved to the trash'), histTrash(trn('{0} done item moved to the trash', '{0} done items moved to the trash', dn.length), dn, snaps, r));
   else toast(act === 'ck-clear' ? tr('Done items moved to the trash') : tr('Everything is back on the list'));
 }
+// 2.530.0 D (#4316, audit #2425 B2/B4/B9): what deleting for good takes along, named before (GET /api/trash/purge-info, j):
+// customer reports and form entries go with the tasks, video sign-offs go to their own trash, a project kept by law keeps its tasks
+function trCascText(j) {
+  if (!j) return '';
+  return [j.tickets ? trn('{0} report from the client portal is deleted with it.', '{0} reports from the client portal are deleted with them.', j.tickets) : '',
+    j.forms ? trn('{0} form entry is deleted with it.', '{0} form entries are deleted with them.', j.forms) : '',
+    j.videos ? trn('{0} video review goes to the trash of the video reviews.', '{0} video reviews go to the trash of the video reviews.', j.videos) : '',
+    j.kept_law ? trn('{0} task stays: its project keeps receipts by law.', '{0} tasks stay: their project keeps receipts by law.', j.kept_law) : ''].filter(Boolean).join(' ');
+}
+async function trPurgeInfo(q) { return api('GET', '/api/trash/purge-info' + q).catch(() => null); }
+// one task in the trash deleted for good (events.js 'purge')
+async function trPurgeTask(id) {
+  const j = await trPurgeInfo('?task=' + id);
+  if (!await askConfirm(tr('Delete permanently?'), [trCascText(j), tr('This cannot be undone.')].filter(Boolean).join(' '), {ok: tr('Delete permanently'), danger: true})) return;
+  try { await api('DELETE', `/api/tasks/${id}?hard=1`); } catch { return; }  // api() said why (409: kept by law)
+  await load(); render();
+}
+// a project in the projects' trash (listadmin.js): true = the person confirmed
+async function trPurgeList(id, name) {
+  const j = await trPurgeInfo('?list=' + id);
+  return askConfirm(tr('Delete “{0}” permanently?', name), [tr('The project, its tasks, comments, files, fields and chat are deleted for good. This cannot be undone.'), trCascText(j)].filter(Boolean).join(' '), {danger: true, ok: tr('Delete permanently')});
+}
+// "Empty" of the task trash (events.js 'trash-empty'): the own trash; an instance admin is asked a second time, with the number,
+// before the other owners' trash in projects they may edit goes too (?all=1)
+async function trEmpty() {
+  const j = await trPurgeInfo('');
+  const n = j ? j.tasks : S.hist?.k === 'trash' && S.hist.deletable != null ? S.hist.deletable : (S.extra || []).filter(t => !t.keep).length;
+  let r = null;
+  if (n > 0) {
+    if (!await askConfirm(tr('Empty the trash permanently?'), [trn('{0} task is deleted for good. This cannot be undone.', '{0} tasks are deleted for good. This cannot be undone.', n), trCascText(j)].filter(Boolean).join(' '), {ok: tr('Empty'), danger: true})) return;
+    try { r = await api('DELETE', '/api/trash'); } catch { return; }
+  }
+  if (j?.others > 0) {
+    const w = await trPurgeInfo('?all=1');
+    const m = (w?.tasks || 0);
+    if (m > 0 && await askConfirm(tr('Also empty the trash of other owners?'), [trn('As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.', 'As an instance admin you may also delete {0} tasks of other owners for good: they lie in the trash of their projects where you may edit. They would lose them from their trash too. This cannot be undone.', m), trCascText(w)].filter(Boolean).join(' '), {ok: tr('Empty theirs too'), danger: true})) {
+      try { r = await api('DELETE', '/api/trash?all=1'); } catch { /* api() said why */ }
+    }
+  }
+  if (!r) return;
+  await load();
+  if (r.queued) { S.extra = (S.extra || []).filter(t => t.keep); if (S.hist?.k === 'trash') Object.assign(S.hist, {deletable: 0, others: 0, next: null}); }  // 2.281.0 A (#3112): a big trash empties in the background
+  render();
+  if (r.kept) toast(trn('{0} item stays: it is in a project of another owner', '{0} items stay: they are in projects of other owners', r.kept), null, 6000);  // 2.0.5 (#310)
+}

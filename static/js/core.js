@@ -1229,7 +1229,7 @@ async function loadExtra() {
     if (S.hist.k !== k) S.hist = {k, n: HIST_PAGE, next: null, deletable: null, kept: null};
     const j = await api('GET', `/api/tasks?scope=${k}&limit=${Math.min(S.hist.n, 2000)}`);
     if (S.hist.k !== k) return;
-    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, days: j.days ?? null, purge_on: j.purge_on ?? null});  // 2.116.0 A (#2063): + trash period; 2.223.3 A (#2877): + whether it deletes
+    Object.assign(S.hist, {next: j.next || null, deletable: j.deletable ?? null, kept: j.kept ?? null, others: j.others ?? 0, days: j.days ?? null, purge_on: j.purge_on ?? null});  // 2.116.0 A (#2063): + trash period; 2.223.3 A (#2877): + whether it deletes
     S.extra = j.tasks;
   } else if (S.route.mod !== 'news' && S.route.mod !== 'time') S.extra = null;  // News / time reports: tasks fetched on demand stay
 }

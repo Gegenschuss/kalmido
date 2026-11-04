@@ -26,7 +26,7 @@ from ..lists.sections import (
 )
 from ..tasks.validation import as_int
 from ..tasks.tasks import task_update
-from ..tasks.lifecycle import task_restore, task_skip, trash_empty
+from ..tasks.lifecycle import task_restore, task_skip, trash_empty, tre_plan  # 2.530.0 D (#4316): tre_plan
 from ..tasks.attachments import attachment_upload, text_attachment_create, TEXT_MAX
 from ..tasks.batch import attachment_delete, task_batch
 from ..collab.comments import collab_user, comment_delete, comment_update, lang_of, user_names
@@ -745,10 +745,10 @@ def v1_task_restore(tid):
 @app.delete("/api/v1/trash")
 @v1_view
 def v1_trash_empty():
-    """Deletes the trash for good: the lists you own (admins: also shared lists they may edit)."""
+    """Deletes the trash for good: the lists you own (2.530.0 D #4316: instance admins too, only their own trash)."""
     v1_args(())
     c = db()
-    n = c.execute(f"SELECT COUNT(*) FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (me(), me())).fetchone()[0]
+    n = tre_plan(c, me())[2]["deleted"]  # 2.530.0 D (#4316): the number this really deletes (own trash, not kept by law)
     need_approval(c, N_("Empty the trash for good ({0} tasks)"), (n,))
     j = v1_call(trash_empty, body={})
     # 2.281.0 A (#3112): queued = more than 200 tasks, deleted in the background within seconds (list_trash shows the rest until then)
@@ -1369,7 +1369,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this project", {"type": "integer"}),
                                                                                             q("limit", "Page size"), q("cursor", "next_cursor")]),
                    "delete": op("Empty the trash for good", T, ok(obj) | acc | errs("403"), scope="delete",
-                                desc="Projects you own (admins: also shared projects they may edit). Agents: waits for approval (202). "
+                                desc="Projects you own (instance admins too: only their own; projects kept by law stay). Agents: waits for approval (202). "
                                      "More than 200 tasks: deleted in the background within seconds (queued: true).")},
         "/tasks/{id}/dependencies": {
             "get": op("What the task waits on and what waits on it", T, ok(ref("Dependencies")) | errs("404"), [pid()]),

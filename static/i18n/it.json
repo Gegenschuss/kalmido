@@ -16163,5 +16163,13 @@
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Accedere con un altro account le elimina da questo dispositivo, prima ne viene scaricata una copia come file di testo. Annulla esce di nuovo: l'account precedente può allora accedere e inviarle.",
   "Your unsaved input is back": "Il tuo input non salvato è di nuovo qui",
   "Unsaved input of a dialog was kept: open the dialog again to finish it": "Un input non salvato di una finestra di dialogo è stato conservato: riapri la finestra per completarlo",
-  "An archive import can only be undone within 24 hours of its import.": "Un’importazione nell’archivio si può annullare solo entro 24 ore dall’importazione."
+  "An archive import can only be undone within 24 hours of its import.": "Un’importazione nell’archivio si può annullare solo entro 24 ore dall’importazione.",
+  "{0} report from the client portal is deleted with it.": ["{0} segnalazione dal portale clienti viene eliminata insieme.", "{0} segnalazioni dal portale clienti vengono eliminate insieme."],
+  "{0} form entry is deleted with it.": ["{0} risposta al modulo viene eliminata insieme.", "{0} risposte al modulo vengono eliminate insieme."],
+  "{0} video review goes to the trash of the video reviews.": ["{0} revisione video va nel cestino delle revisioni video.", "{0} revisioni video vanno nel cestino delle revisioni video."],
+  "{0} task stays: its project keeps receipts by law.": ["{0} attività resta: il suo progetto conserva ricevute per legge.", "{0} attività restano: il loro progetto conserva ricevute per legge."],
+  "Also empty the trash of other owners?": "Svuotare anche il cestino di altri proprietari?",
+  "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trova nel cestino dei loro progetti dove puoi modificare. Sparirebbe anche dal loro cestino. Non si può annullare.", "Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trovano nel cestino dei loro progetti dove puoi modificare. Sparirebbero anche dal loro cestino. Non si può annullare."],
+  "Empty theirs too": "Svuota anche il loro",
+  "{0} video review (goes to the trash of the video reviews)": ["{0} revisione video (va nel cestino delle revisioni video)", "{0} revisioni video (vanno nel cestino delle revisioni video)"]
 }

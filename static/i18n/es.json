@@ -16162,5 +16162,13 @@
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Iniciar sesión con otra cuenta los elimina de este dispositivo, antes se descarga una copia como archivo de texto. Cancelar cierra la sesión de nuevo: la cuenta anterior puede entonces iniciar sesión y enviarlos.",
   "Your unsaved input is back": "Tu entrada sin guardar ha vuelto",
   "Unsaved input of a dialog was kept: open the dialog again to finish it": "Se ha conservado una entrada sin guardar de un diálogo: abre el diálogo de nuevo para terminarla",
-  "An archive import can only be undone within 24 hours of its import.": "Una importación al archivo solo se puede deshacer en las 24 horas siguientes a la importación."
+  "An archive import can only be undone within 24 hours of its import.": "Una importación al archivo solo se puede deshacer en las 24 horas siguientes a la importación.",
+  "{0} report from the client portal is deleted with it.": ["{0} aviso del portal de clientes se elimina con ello.", "{0} avisos del portal de clientes se eliminan con ello."],
+  "{0} form entry is deleted with it.": ["{0} entrada de formulario se elimina con ello.", "{0} entradas de formulario se eliminan con ello."],
+  "{0} video review goes to the trash of the video reviews.": ["{0} revisión de vídeo pasa a la papelera de las revisiones de vídeo.", "{0} revisiones de vídeo pasan a la papelera de las revisiones de vídeo."],
+  "{0} task stays: its project keeps receipts by law.": ["{0} tarea se queda: su proyecto conserva justificantes por ley.", "{0} tareas se quedan: su proyecto conserva justificantes por ley."],
+  "Also empty the trash of other owners?": "¿Vaciar también la papelera de otros propietarios?",
+  "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Como administrador de la instancia también puedes eliminar definitivamente {0} tarea de otros propietarios: está en la papelera de sus proyectos donde puedes editar. También desaparecería de su papelera. No se puede deshacer.", "Como administrador de la instancia también puedes eliminar definitivamente {0} tareas de otros propietarios: están en la papelera de sus proyectos donde puedes editar. También desaparecerían de su papelera. No se puede deshacer."],
+  "Empty theirs too": "Vaciar también la suya",
+  "{0} video review (goes to the trash of the video reviews)": ["{0} revisión de vídeo (pasa a la papelera de las revisiones de vídeo)", "{0} revisiones de vídeo (pasan a la papelera de las revisiones de vídeo)"]
 }

@@ -16162,5 +16162,13 @@
   "Signing in with another account deletes them from this device, a copy is downloaded as a text file first. Cancel signs out again: the previous account can then sign in and send them.": "Aanmelden met een ander account verwijdert ze van dit apparaat, eerst wordt een kopie als tekstbestand gedownload. Annuleren meldt weer af: het vorige account kan zich dan aanmelden en ze versturen.",
   "Your unsaved input is back": "Je niet-opgeslagen invoer is terug",
   "Unsaved input of a dialog was kept: open the dialog again to finish it": "Niet-opgeslagen invoer van een dialoogvenster is bewaard: open het dialoogvenster opnieuw om het af te maken",
-  "An archive import can only be undone within 24 hours of its import.": "Een archiefimport kan alleen binnen 24 uur na de import ongedaan worden gemaakt."
+  "An archive import can only be undone within 24 hours of its import.": "Een archiefimport kan alleen binnen 24 uur na de import ongedaan worden gemaakt.",
+  "{0} report from the client portal is deleted with it.": ["{0} melding uit het klantportaal wordt mee verwijderd.", "{0} meldingen uit het klantportaal worden mee verwijderd."],
+  "{0} form entry is deleted with it.": ["{0} formulierinzending wordt mee verwijderd.", "{0} formulierinzendingen worden mee verwijderd."],
+  "{0} video review goes to the trash of the video reviews.": ["{0} videobeoordeling gaat naar de prullenbak van de videobeoordelingen.", "{0} videobeoordelingen gaan naar de prullenbak van de videobeoordelingen."],
+  "{0} task stays: its project keeps receipts by law.": ["{0} taak blijft: het project bewaart bonnen wettelijk.", "{0} taken blijven: hun project bewaart bonnen wettelijk."],
+  "Also empty the trash of other owners?": "Ook de prullenbak van andere eigenaren legen?",
+  "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Als beheerder van de instantie mag je ook {0} taak van andere eigenaren definitief verwijderen: die ligt in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnt dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt.", "Als beheerder van de instantie mag je ook {0} taken van andere eigenaren definitief verwijderen: die liggen in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnen dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt."],
+  "Empty theirs too": "Ook die van hen legen",
+  "{0} video review (goes to the trash of the video reviews)": ["{0} videobeoordeling (gaat naar de prullenbak van de videobeoordelingen)", "{0} videobeoordelingen (gaan naar de prullenbak van de videobeoordelingen)"]
 }

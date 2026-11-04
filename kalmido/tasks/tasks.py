@@ -21,6 +21,7 @@ from ..tasks.validation import (
 )
 from ..core.errors import BadInput, field_alias, UnknownFields, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..core.orgcrypt import oc_enabled, oc_list_space  # 2.369.5 (#2517): pulled up from functions
+from ..videos.vdrescue import vdr_rescue  # 2.530.0 D (#4316)
 from ..core.access import _org_list_writes  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -112,7 +113,10 @@ def move_subtree(c, tid, lid):
 def hard_delete(c, ids, lists=None):
     """Permanently deletes tasks (subtasks go with them: ON DELETE CASCADE). Subtasks in lists the current
     user does not own (lists: set of list ids where they may, see purge_lists) are detached first and stay with
-    their list. Returns the attachment paths to unlink."""
+    their list. Returns the attachment paths to unlink.
+    2.530.0 D (#4316): the video sign-offs at the deleted tasks (and the subtasks that go with them) go to the video trash
+    first (videos/vdrescue.py), not with them by the cascade."""
+    gone = set(ids)
     for tid in ids:
         done, level, n = {tid}, [tid], 0
         while level and n < MAX_DEPTH + 7:
@@ -128,7 +132,9 @@ def hard_delete(c, ids, lists=None):
                     c.execute("UPDATE tasks SET parent_id=NULL WHERE id=?", (k["id"],))
                 else:
                     nxt.append(k["id"])
+            gone.update(nxt)
             level, n = nxt, n + 1
+    vdr_rescue(c, task_ids=gone)
     files = attachment_files(c, ids)
     for tid in ids:
         c.execute("DELETE FROM tasks WHERE id=?", (tid,))

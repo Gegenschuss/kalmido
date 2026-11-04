@@ -521,8 +521,8 @@ def client_anonymize(cid):
 # ---------------------------------------------------------------- 2.272.0 D (#3029): the clients' trash
 # Deleting a client puts it into the trash (deleted_at): it leaves the client lists, the pickers, the portal and its mail-in
 # addresses; its projects let go of it (their ids in trash_lists, back on restore). The trash run (files/trashpurge.py
-# TP_PLAIN, switch ret_on("trash")) deletes it for good after the trash period: its contact persons, data protection sheets,
-# video reviews and mail-in addresses go with it (cascade), mails, deals, letters ... lose it (set null). A client records
+# TP_PLAIN, switch ret_on("trash")) deletes it for good after the trash period: its contact persons, data protection sheets
+# and mail-in addresses go with it (cascade), its video reviews go to their own trash (2.530.0 D #4316, videos/vdrescue.py), mails, deals, letters ... lose it (set null). A client records
 # point to (CL_HOLD, kept by law) is archived instead, as before.
 CL_HOLD = ("office_docs", "office_contracts", "office_archive", "office_drives", "office_trips")
 # 2.223.3 B (#2878): of these only finalised documents hold a client (not drafts, not trial documents), trips only with
@@ -573,7 +573,7 @@ CL_REF_WORDS = {
     "lists": Nn_("{0} project", "{0} projects"),
     "office_client_contacts": Nn_("{0} contact person", "{0} contact persons"),
     "office_privacy_sheets": Nn_("{0} data protection sheet", "{0} data protection sheets"),
-    "video_reviews": Nn_("{0} video review", "{0} video reviews"),
+    "video_reviews": Nn_("{0} video review (goes to the trash of the video reviews)", "{0} video reviews (go to the trash of the video reviews)"),  # 2.530.0 D (#4316)
     "hub_tokens": Nn_("{0} mail-in address", "{0} mail-in addresses"),
     "hub_mails": Nn_("{0} e-mail", "{0} e-mails"),
     "office_deals": Nn_("{0} deal", "{0} deals"),
@@ -700,7 +700,8 @@ def client_restore(cid):
 @app.delete("/api/clients/<int:cid>/purge")
 def client_purge(cid):
     """2.272.0 D (#3029): deletes client cid in the trash for good (the dialog names the numbers first, GET /api/clients/usage):
-    its contact persons, data protection sheets, video reviews and mail-in addresses go with it. 409 while records point
+    its contact persons, data protection sheets and mail-in addresses go with it, its video reviews into their own trash
+    (2.530.0 D #4316). 409 while records point
     to it (they came since: it is archived and back in the list instead)."""
     c = db()
     uid = me()
@@ -713,6 +714,8 @@ def client_purge(cid):
         bump(c)
         c.commit()
         return err(tr("The client is used in quotations, invoices, contracts or the logbook and was archived instead of deleted."), 409)
+    from ..videos.vdrescue import vdr_rescue
+    vdr_rescue(c, client_ids=[cid])  # 2.530.0 D (#4316): its video sign-offs go to the video trash, not with it by the cascade
     c.execute("DELETE FROM clients WHERE id=? AND deleted_at IS NOT NULL", (cid,))
     bump(c)
     c.commit()

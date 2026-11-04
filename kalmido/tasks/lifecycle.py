@@ -716,6 +716,9 @@ def task_delete(tid):
     if request.args.get("hard") == "1":
         if role != "owner":  # shared list: edit members only move tasks to the trash
             raise Denied(403, tr("Only the project owner can delete tasks permanently"))
+        kept = tre_kept(c, [tid])  # 2.530.0 D (#4316, audit B9): a project kept by law keeps its tasks on every way
+        if kept:
+            return err(tr("This project keeps receipts by law until {0}: it can be deleted for good after that.", kept[0]), 409)
         wh_note(c, tid, "purge")
         files = hard_delete(c, [tid])
     else:
@@ -854,46 +857,129 @@ def purge_done():
     return jsonify(count=n, kept=0 if allx else others)
 
 
-def purge_lists(c, uid=None):
-    """Ids of the lists whose trash the user may empty for good: the lists they OWN; instance admins (2.0.5) also the
-    shared lists of other owners where they may edit (member or list admin). Everyone else's deleted tasks in shared
-    lists stay in the trash: only the list owner deletes them permanently."""
+def purge_lists(c, uid=None, wide=False):
+    """Ids of the lists whose trash the user may empty for good: the lists they OWN. 2.530.0 D (#4316, audit B4): instance
+    admins (2.0.5) reach the shared lists of other owners where they may edit (member or list admin) only with wide=True,
+    the explicit "also the other owners' trash" (DELETE /api/trash?all=1, the dialog names the number first); by default
+    everyone's own trash only. Everyone else's deleted tasks in shared lists stay in the trash for their list owner."""
     uid = uid or me()
-    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()
+    u = c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone() if wide else None
     q, a = (wr_sql(), (uid, uid)) if u and u["is_admin"] else ("(SELECT id FROM lists WHERE owner_id=?)", (uid,))
     return {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN {q}", a)}
 
 
-@app.delete("/api/trash")
-def trash_empty():
-    """Hard-deletes the trash of the lists purge_lists() allows. {deleted, kept}: kept = deleted tasks the user sees in
-    the trash but may not delete for good (shared lists of other owners)."""
-    c = db()
-    uid = me()
-    ok = purge_lists(c, uid)
+def tre_kept(c, ids):
+    """2.530.0 D (#4316, audit B9): the retain_until dates (newest first) of the projects kept by law (lists.retain_until today
+    or later, tasks/tasktrash.py TTP_KEPT) among the lists of tasks ids; [] = none kept."""
+    if not ids:
+        return []
+    q = ",".join("?" * len(ids))
+    return [r[0] for r in c.execute(f"SELECT DISTINCT l.retain_until FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id IN ({q}) "
+                                    "AND l.retain_until>=? ORDER BY l.retain_until DESC", (*ids, now_utc().date().isoformat()))]
+
+
+def tre_kept_lists(c, lids):
+    """2.530.0 D (#4316, audit B9): of the list ids lids those kept by law (retain_until today or later)."""
+    if not lids:
+        return set()
+    q = ",".join("?" * len(lids))
+    return {r[0] for r in c.execute(f"SELECT id FROM lists WHERE id IN ({q}) AND retain_until>=?", (*lids, now_utc().date().isoformat()))}
+
+
+def tre_plan(c, uid, wide=False):
+    """2.530.0 D (#4316): what "Empty trash" takes: (ids, ok, counts). ok = the lists purge_lists allows minus those kept by law
+    (their subtasks elsewhere are detached by hard_delete); counts = {deleted, kept (other owners' projects), kept_law,
+    others (instance admins only: the other owners' trashed tasks only all=1 takes, 0 with wide)}."""
+    ok = purge_lists(c, uid, wide=wide)
+    ok -= tre_kept_lists(c, sorted(ok))
     rows = c.execute(f"SELECT id, list_id FROM tasks WHERE deleted_at IS NOT NULL AND list_id IN {wr_sql()}", (uid, uid)).fetchall()
     ids = [r["id"] for r in rows if r["list_id"] in ok]
+    law = tre_kept_lists(c, sorted({r["list_id"] for r in rows}))
+    kept_law = sum(1 for r in rows if r["list_id"] in law)
+    others = 0
+    if not wide:
+        wide_ok = purge_lists(c, uid, wide=True) - law
+        others = sum(1 for r in rows if r["list_id"] in wide_ok and r["list_id"] not in ok)
+    return ids, ok, {"deleted": len(ids), "kept": len(rows) - len(ids) - kept_law, "kept_law": kept_law, "others": others}
+
+
+def tre_cascades(c, ids, list_ids=()):
+    """2.530.0 D (#4316, audit B2): what goes along with the tasks ids (and their subtasks) or the lists list_ids when they are
+    deleted for good -- the numbers the dialogs name before: customer reports (portal_tickets) and form entries (form_entries)
+    go with them (cascade), video sign-offs go to the video trash (videos/vdrescue.py). System context, numbers only."""
+    from ..videos.vdrescue import vdr_doomed_count
+    from ..core.pg import st_ids
+    with system_ctx(c):
+        if list_ids:
+            ids = [*ids, *(r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id = ANY(CAST(? AS BIGINT[]))", (st_ids(list_ids),)))]
+        alls = [r[0] for r in c.execute(f"""WITH RECURSIVE d(id, lvl) AS (SELECT id, 0 FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) UNION
+                    SELECT t.id, d.lvl + 1 FROM tasks t JOIN d ON t.parent_id=d.id WHERE d.lvl < {MAX_DEPTH + 7})
+                    SELECT DISTINCT id FROM d""", (st_ids(ids),))] if ids else []
+        a, out = st_ids(alls), {"videos": vdr_doomed_count(c, task_ids=alls, list_ids=list_ids)}
+        for k, t in (("tickets", "portal_tickets"), ("forms", "form_entries")):
+            out[k] = c.execute(f"SELECT COUNT(*) FROM {t} WHERE task_id = ANY(CAST(? AS BIGINT[]))", (a,)).fetchone()[0] if alls else 0
+        return out
+
+
+@app.get("/api/trash/purge-info")
+def trash_purge_info():
+    """2.530.0 D (#4316): the numbers before deleting for good. ?task=ID (that task, ?hard=1) | ?list=ID (a project in the
+    projects' trash) | nothing (= "Empty trash", &all=1: also the other owners' trash of an instance admin) ->
+    {tasks, kept, kept_law, others, tickets, forms, videos}."""
+    c, uid = db(), me()
+    tid, lid = request.args.get("task", type=int), request.args.get("list", type=int)
+    if tid:
+        if need_task(c, tid) != "owner":
+            raise Denied(403, tr("Only the project owner can delete tasks permanently"))
+        kept = tre_kept(c, [tid])
+        out = {"tasks": 0 if kept else 1, "kept": 0, "kept_law": 1 if kept else 0, "others": 0}
+        out.update(tre_cascades(c, [] if kept else [tid]))
+    elif lid:
+        from ..lists.listtrash import otr_need
+        otr_need(c, lid)
+        out = {"tasks": c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0], "kept": 0, "kept_law": 0, "others": 0}
+        out.update(tre_cascades(c, [], [lid]))
+    else:
+        ids, _ok, cnt = tre_plan(c, uid, wide=request.args.get("all") == "1")
+        out = {"tasks": cnt["deleted"], "kept": cnt["kept"], "kept_law": cnt["kept_law"], "others": cnt["others"]}
+        out.update(tre_cascades(c, ids))
+    return jsonify(out)
+
+
+@app.delete("/api/trash")
+def trash_empty():
+    """Hard-deletes the trash of the lists purge_lists() allows. {deleted, kept, kept_law, others}: kept = deleted tasks the
+    user sees in the trash but may not delete for good (shared lists of other owners); 2.530.0 D (#4316): kept_law = tasks of
+    projects kept by law (B9), others = what an instance admin's ?all=1 would take in addition (B4: by default only the own
+    trash). The video sign-offs at the tasks go to the video trash (hard_delete)."""
+    c = db()
+    uid = me()
+    wide = request.args.get("all") == "1"
+    ids, ok, cnt = tre_plan(c, uid, wide=wide)
     if len(ids) > TRE_BATCH:  # 2.281.0 A (#3112): a big trash goes in the background (no proxy time-out), in batches
-        bgj_add("trash:empty", uid, ids, sorted(ok), user_id=uid)
-        return jsonify(ok=True, deleted=len(ids), kept=len(rows) - len(ids), queued=True)
+        bgj_add("trash:empty", uid, ids, sorted(ok), wide, user_id=uid)
+        return jsonify(ok=True, **cnt, queued=True)
     files = hard_delete(c, ids, lists=ok)
     bump(c)
     c.commit()
     unlink_files(files)
-    return jsonify(ok=True, deleted=len(ids), kept=len(rows) - len(ids))
+    return jsonify(ok=True, **cnt)
 
 
 TRE_BATCH = 200  # 2.281.0 A (#3112): tasks per transaction of "Empty trash" (more = the background job below)
 
 
 @bgj_fn("trash:empty")
-def tre_run(uid, ids, ok):
+def tre_run(uid, ids, ok, wide=False):
     """2.281.0 A (#3112): "Empty trash" of more than TRE_BATCH tasks, TRE_BATCH per transaction. The rights are read again at
-    the start; each batch checks again that a task is still in the trash (restored meanwhile = it stays); the files after each commit."""
+    the start; each batch checks again that a task is still in the trash (restored meanwhile = it stays); the files after each commit.
+    2.530.0 D (#4316): wide = the admin's ?all=1 (a job queued before 2.530 has none: own trash only); a project kept by law
+    meanwhile is left out."""
     c = connect()
     try:
         with system_ctx(c):  # the request checked the rights; every batch is narrowed to them again here
-            ok, gone = set(ok) & purge_lists(c, uid), False
+            ok, gone = set(ok) & purge_lists(c, uid, wide=wide), False
+            ok -= tre_kept_lists(c, sorted(ok))
             for i in range(0, len(ids), TRE_BATCH):
                 part = ids[i:i + TRE_BATCH]
                 q = ",".join("?" * len(part))

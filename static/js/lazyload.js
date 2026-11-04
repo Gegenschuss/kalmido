@@ -108,7 +108,7 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   polls: ['tpo_list', 'tpo_edit', 'tpo_forClient'], formq: ['fq_clientLink'],  // 2.102.0 C (#2208)
   abscan: ['abm_scanOpen'],  // 2.112.1 (#2058)
   cfkinds: ['cfkTcEdit', 'cfkPick', 'cfkModalExtra'],  // 2.156.0 B (#2069)
-  trashui: ['doneCleanup', 'ms_clTrashAct', 'attRestore', 'attPurge'],  // 2.272.0 G (#3038)
+  trashui: ['doneCleanup', 'ms_clTrashAct', 'attRestore', 'attPurge', 'trEmpty', 'trPurgeTask', 'trPurgeList'],  // 2.272.0 G (#3038); 2.530.0 D (#4316): tr*
   hookin: ['whiMount'],  // 2.115.0 (#2061)
   sectpl: ['sct_open'],  // 2.156.0 C (#2073)
   hubmailbox: ['hmb_dialog', 'hmb_compose'],  // 2.141.0 A (#2141, #2138)
