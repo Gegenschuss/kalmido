@@ -833,7 +833,6 @@
   "Match": "Coincidencia",
   "AND: all conditions": "Y: todas las condiciones",
   "OR: any one": "O: cualquiera",
-  "Currently matches {0} open task. Within a category, “or” applies.": ["Ahora coincide con {0} tarea pendiente. Dentro de una categoría se aplica «o».", "Ahora coincide con {0} tareas pendientes. Dentro de una categoría se aplica «o»."],
   "Folder name": "Nombre de la carpeta",
   "Folder already exists": "La carpeta ya existe",
   "Standalone in {0}": "Independiente en {0}",
@@ -16132,5 +16131,18 @@
   "No tables": "Sin tablas",
   "Reply in English": "Responder en español",
   "e.g. short answers, no tables": "p. ej., respuestas breves, sin tablas",
-  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido transmite estas preferencias al agente con cada uno de tus mensajes."
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido transmite estas preferencias al agente con cada uno de tus mensajes.",
+  "is one of": "es uno de",
+  "is none of": "no es ninguno de",
+  "is empty": "está vacío",
+  "contains": "contiene",
+  "does not contain": "no contiene",
+  "greater than": "mayor que",
+  "less than": "menor que",
+  "equals": "igual a",
+  "Comparison": "Comparación",
+  "Remove condition": "Quitar condición",
+  "Conditions": "Condiciones",
+  "“is none of” always applies on top, also with OR.": "«no es ninguno de» se aplica siempre además, también con O.",
+  "{0} task matches": ["{0} tarea coincide", "{0} tareas coinciden"]
 }

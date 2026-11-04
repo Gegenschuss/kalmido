@@ -830,7 +830,6 @@
   "Match": "Verknüpfung",
   "AND: all conditions": "UND: alle Bedingungen",
   "OR: any one": "ODER: eine reicht",
-  "Currently matches {0} open task. Within a category, “or” applies.": ["Trifft aktuell auf {0} offene Aufgabe zu. Innerhalb einer Kategorie gilt „oder“.", "Trifft aktuell auf {0} offene Aufgaben zu. Innerhalb einer Kategorie gilt „oder“."],
   "Folder name": "Name des Ordners",
   "Folder already exists": "Ordner gibt es schon",
   "Standalone in {0}": "Eigenständig in {0}",
@@ -16132,5 +16131,18 @@
   "No tables": "Keine Tabellen",
   "Reply in English": "Sprache Deutsch",
   "e.g. short answers, no tables": "z. B. Antworten kurz, keine Tabellen",
-  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido gibt diese Wünsche mit jeder deiner Nachrichten an den Agenten weiter."
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido gibt diese Wünsche mit jeder deiner Nachrichten an den Agenten weiter.",
+  "is one of": "ist eines von",
+  "is none of": "ist keines von",
+  "is empty": "ist leer",
+  "contains": "enthält",
+  "does not contain": "enthält nicht",
+  "greater than": "größer als",
+  "less than": "kleiner als",
+  "equals": "gleich",
+  "Comparison": "Vergleich",
+  "Remove condition": "Bedingung entfernen",
+  "Conditions": "Bedingungen",
+  "“is none of” always applies on top, also with OR.": "„ist keines von“ gilt immer zusätzlich, auch bei ODER.",
+  "{0} task matches": ["{0} Aufgabe passt", "{0} Aufgaben passen"]
 }

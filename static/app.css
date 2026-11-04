@@ -1373,10 +1373,6 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .optrow{display:flex;align-items:center;gap:.5rem}
 .optrow input{flex:1}
 .optrow .swc{width:1.375rem;height:1.375rem;border-radius:.375rem;flex:none;border:1px solid var(--line)}
-.cffilters{display:flex;flex-direction:column;gap:.625rem}
-.cfn{font-size:var(--fs-m);color:var(--muted);margin-bottom:.25rem}
-.cfn b{color:var(--text);font-weight:600}
-.cfnumf{display:flex;align-items:center;gap:.5rem}
 #l-fields .mrow svg{color:var(--muted)}
 #l-fields .iconbtn.on{color:var(--accent)}
 /* checkbox rows in dialogs: never stretch the checkbox (.modal .row input{flex:1}) and keep

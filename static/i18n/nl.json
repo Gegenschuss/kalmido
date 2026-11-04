@@ -833,7 +833,6 @@
   "Match": "Voorwaarden",
   "AND: all conditions": "EN: alle voorwaarden",
   "OR: any one": "OF: één is genoeg",
-  "Currently matches {0} open task. Within a category, “or” applies.": ["Komt momenteel overeen met {0} openstaande taak. Binnen een categorie geldt “of”.", "Komt momenteel overeen met {0} openstaande taken. Binnen een categorie geldt “of”."],
   "Folder name": "Mapnaam",
   "Folder already exists": "Map bestaat al",
   "Standalone in {0}": "Zelfstandig in {0}",
@@ -16132,5 +16131,18 @@
   "No tables": "Geen tabellen",
   "Reply in English": "Antwoorden in het Nederlands",
   "e.g. short answers, no tables": "bijv. korte antwoorden, geen tabellen",
-  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido geeft deze wensen bij elk bericht van jou door aan de agent."
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido geeft deze wensen bij elk bericht van jou door aan de agent.",
+  "is one of": "is een van",
+  "is none of": "is geen van",
+  "is empty": "is leeg",
+  "contains": "bevat",
+  "does not contain": "bevat niet",
+  "greater than": "groter dan",
+  "less than": "kleiner dan",
+  "equals": "gelijk aan",
+  "Comparison": "Vergelijking",
+  "Remove condition": "Voorwaarde verwijderen",
+  "Conditions": "Voorwaarden",
+  "“is none of” always applies on top, also with OR.": "„is geen van” geldt altijd extra, ook bij OF.",
+  "{0} task matches": ["{0} taak past", "{0} taken passen"]
 }

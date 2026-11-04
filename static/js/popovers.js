@@ -765,15 +765,15 @@ function tch_listPicker(anchor, o = {}) {
 }
 // 2.435.0 (#3606): a search field above a long menu (like the phone's choice sheet): typing hides the entries without the
 // text and the empty groups, Enter picks the first one left, ↓ goes into the list
-function tch_menuSearch(p) {
+function tch_menuSearch(p) {  // 2.521.0 (#4479): [role^=menuitem] = also the checkbox rows of a value menu (fltdlg.js)
   const ml = p.querySelector('.menu-list'); if (!ml) return;
   ml.insertAdjacentHTML('beforebegin', `<div class="sssearch mqs">${ic('search', 's')}<input id="mq-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" autocomplete="off" enterkeyhint="search"></div>`);
   const q = /** @type {HTMLInputElement} */ (p.querySelector('#mq-q'));
-  const vis = () => [...ml.querySelectorAll('[role="menuitem"]:not([disabled])')].filter(b => !b.closest('[hidden]'));
+  const vis = () => [...ml.querySelectorAll('[role^="menuitem"]:not([disabled])')].filter(b => !b.closest('[hidden]'));
   q.addEventListener('input', () => {
     const v = q.value.trim().toLowerCase();
-    ml.querySelectorAll('[role="menuitem"]').forEach(b => { b.hidden = !!v && !b.textContent.toLowerCase().includes(v); });
-    ml.querySelectorAll('.mgrp').forEach(g => { g.hidden = !!v && !g.querySelector('[role="menuitem"]:not([hidden])'); });
+    ml.querySelectorAll('[role^="menuitem"]').forEach(b => { b.hidden = !!v && !b.textContent.toLowerCase().includes(v); });
+    ml.querySelectorAll('.mgrp').forEach(g => { g.hidden = !!v && !g.querySelector('[role^="menuitem"]:not([hidden])'); });
   });
   q.addEventListener('keydown', e => {
     if (e.key === 'Enter') { e.preventDefault(); vis()[0]?.click(); } else if (e.key === 'ArrowDown') { e.preventDefault(); vis()[0]?.focus(); }

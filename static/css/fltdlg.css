@@ -1,0 +1,10 @@
+/* 2.521.0 (#4479): the filter dialog's condition rows (fltdlg.js): what / comparison / value / x; they wrap on a phone */
+.fconds{display:flex;flex-direction:column;gap:.5rem;margin:.75rem 0 .5rem}
+.fcond{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.fcond select{flex:0 1 auto;min-width:0;max-width:100%}
+.fcond .fc-v,.fcond .fc-t,.fcond .fc-num{flex:1 1 9rem;min-width:0}
+.fcond .fc-v{justify-content:space-between;display:inline-flex;align-items:center;gap:.25rem;text-align:left}
+.fcond .fc-vs{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fcond .fc-v0 .fc-vs{color:var(--muted)}
+.fcond .fc-num{display:inline-flex;align-items:center;gap:.375rem}.fcond .fc-num input{max-width:6.875rem}
+.fcond .fc-vn{flex:1 1 0}

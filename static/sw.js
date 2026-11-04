@@ -62,7 +62,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/cfkinds.js', '/static/js/mineboard.js', '/static/js/sectpl.js', '/static/js/asstprop.js', '/static/js/sheetprop.js',
   '/static/js/sheetfold.js', '/static/js/sheets.js', '/static/js/sheets2.js', '/static/js/sheetsio.js', '/static/js/sheetsize.js',
   '/static/js/sheetshare.js', '/static/js/sheetchart.js', '/static/js/sheetkinds.js', '/static/js/sheetbook.js', '/static/js/fslock.js',
-  '/static/js/tagsel.js', '/static/js/ablage.js', '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fsshare.js',
+  '/static/js/tagsel.js', '/static/js/ablage.js', '/static/js/ablinks.js', '/static/js/family.js', '/static/js/filereq.js', '/static/js/fltdlg.js', '/static/js/fsshare.js',
   '/static/js/videorev.js', '/static/js/abscan.js', '/static/js/pubvideo.js', '/static/js/flow.js', '/static/js/hookin.js', '/static/js/polls.js',
   '/static/js/formq.js', '/static/js/navmenu.js', '/static/js/tourmods.js', '/static/js/office_undo.js', '/static/js/voice.js',
   '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js',
@@ -76,7 +76,7 @@ const LAZY_CSS = ['/static/css/settings.css', '/static/css/contacts.css', '/stat
   '/static/css/pdf.css', '/static/css/mindmap.css', '/static/css/wiki.css', '/static/css/stats.css', '/static/css/calendar.css',
   '/static/css/docs.css', '/static/css/life.css', '/static/css/integrations.css', '/static/css/playbook.css', '/static/css/timeline.css',
   '/static/css/feeds.css', '/static/css/bookmarks.css', '/static/css/sheets.css', '/static/css/videorev.css', '/static/css/tagsel.css',
-  '/static/css/filereq.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css'];
+  '/static/css/filereq.css', '/static/css/fltdlg.css', '/static/css/abscan.css', '/static/css/calabs.css', '/static/css/sideviews.css', '/static/css/navmenu.css'];
 self.addEventListener('install', e => { e.waitUntil(swInstall().then(() => self.skipWaiting())); });
 // 2.149.0 B (#2506): the server names every precached static file with its content hash (/sw-manifest.json). A file is kept
 // under "<url>?v=<hash>" (the address index.html asks for), so an update copies every unchanged file from the old cache and

@@ -54,7 +54,8 @@ const LD_MODS = {
   tagsel: ['tagsel'],  // 2.122.0 B (#2099 #2294 #2295): tag picker, tag filter buttons, Shift ranges (file store + documents); 2.124.2: before videos (polls / formq stay last, p2102_c_ui)
   ablage: ['ablage', 'ablinks'],  // 2.501.0 (#4198): the file store (ablage.js) and its external links, on its first view / panel
   family: ['family'],  // 2.501.0 (#4198): the module Family, on its view, a family list, a task panel while it is on
-  filereq: ['filereq'],  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
+  filereq: ['filereq'],
+  fltdlg: ['fltdlg'],  // 2.521.0 (#4479): the dialog of a saved filter (condition rows)  // 2.122.0 A (#2097): file request links of a folder (dialog on demand)
   fsshare: ['fsshare'],  // 2.199.0 A (#2742): the one Share dialog of folders / files (file store, office, tables)
   videos: ['videorev'],  // 2.99.1 A (#1959): video sign-offs
   abscan: ['abscan'],  // 2.112.1 (#2058): the phone scan dialog of the file store and the documents
@@ -93,6 +94,7 @@ const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook',
 // module's own function declaration replaces the stand-in on window)
 const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation)
   ablage: ['ab_linkFile'],  // 2.501.0 (#4198): the button of a file row in a task / project
+  fltdlg: ['filterModal'],  // 2.521.0 (#4479): the filter dialog (sidebar, palette, a filter's menu)
   family: ['occModal', 'dlModal', 'famPack', 'shopModeOpen', 'paskOpen', 'kd_pinAsk'],  // 2.501.0 (#4198): the palette, the first start, a child's PIN
   contacts: ['ctRoute', 'ctEditor'], filereq: ['frq_open'], fsshare: ['fs_shareDialog'],  // 2.199.0 A (#2742): fsshare
   // 2.65.0 (#1823)
@@ -120,7 +122,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], abscan: ['abscan'], calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)

@@ -103,26 +103,86 @@ function dateMatch(t, d) {
   }
   return false;
 }
-// categories are OR-ed inside ("Heute oder Morgen"), combined with the filter's op (UND / ODER)
+// 2.521.0 (#4479): a filter is a list of conditions, rules = {op: 'and' | 'or', conds: [{f, op, v}]} (the dialog fltdlg.js).
+// f = what (FLT_HAS below, 'text', 'cf' = a custom field: fid = exactly that field, else name + ft = every project's field of that
+// name and type, select values by option name), op = in (one of) | nin (none of) | empty | has / nhas (text) | gt / lt / eq / set
+// (numbers). A "none of" holds always on top, also with OR (#4478). The old rules (one key per category, the values OR-ed inside,
+// the categories combined by op) convert on the fly into the same conditions (flt_conds) and hit exactly the same tasks.
+const FLT_OLD = [['lists', 'list'], ['dates', 'date'], ['prios', 'prio'], ['types', 'type'], ['tags', 'tag'], ['who', 'who'], ['secs', 'sec'], ['sprints', 'sprint'], ['ms', 'ms'], ['dlv', 'dlv']];
+// what -> does the task have this one value; '' = the empty token of that what (op empty)
+const FLT_HAS = {
+  list: (t, x) => t.list_id === x,
+  folder: (t, x) => { const p = listById(t.list_id)?.folder || ''; return x === '' ? !p : fUnder(p, x); },  // a folder holds its subfolders
+  date: (t, x) => dateMatch(t, x),
+  prio: (t, x) => t.priority === x,
+  type: (t, x) => (t.ttype || '') === x,  // 2.4.0 (#340): '' = no type
+  tag: (t, x) => (x === '' ? !(t.tags || []).length && !(t.ltags || []).length : hasTag(t, x)),
+  // 2.390.0 B (#3355): assignee (me | none | user id), column, sprint (cur = the list's active one | none = backlog), milestone
+  who: (t, x) => (x === 'none' ? !t.assignee_id : t.assignee_id === (x === 'me' ? S.me?.id : +x)),
+  sec: (t, x) => (x === 'none' ? !t.section_id : t.section_id === +x),
+  sprint: (t, x) => (x === 'none' ? !t.sprint_id : !!t.sprint_id && spr_active(listById(t.list_id))?.id === t.sprint_id),
+  ms: (t, x) => (x === 'none' ? !t.milestone_id : t.milestone_id === +x),
+  dlv: (t, x) => (dv_state(t) || 'none') === x,  // 2.392.2 (#3365): the delivery state
+};
+const FLT_EMPTY = {folder: '', type: '', tag: '', who: 'none', sec: 'none', sprint: 'none', ms: 'none', dlv: 'none'};
+const FLT_CACHE = new WeakMap();
+function flt_conds(r) {
+  if (!r || typeof r !== 'object') return [];
+  if (Array.isArray(r.conds)) return r.conds;
+  let c = FLT_CACHE.get(r); if (c) return c;
+  c = [];
+  for (const [k, f] of FLT_OLD) if (Array.isArray(r[k]) && r[k].length) c.push({f, op: 'in', v: r[k]});
+  for (const [fid, cr] of Object.entries(r.cf && typeof r.cf === 'object' ? r.cf : {})) {
+    if (!cfRuleOn(cr)) continue;
+    const k = ['sel', 'chk', 'date'].find(x => cr[x]?.length);  // cfMatch's order
+    c.push(k ? {f: 'cf', fid: +fid, k, op: 'in', v: cr[k]} : {f: 'cf', fid: +fid, k: 'num', op: cr.num.op, v: cr.num.v});
+  }
+  const q = (r.text || '').trim(); if (q) c.push({f: 'text', op: 'has', v: q});
+  FLT_CACHE.set(r, c); return c;
+}
+// a custom field condition: the kind of its rule for cfMatch
+const flt_cfKind = ft => (ft === 'select' || ft === 'multiselect' ? 'sel' : ft === 'checkbox' ? 'chk' : ft === 'date' ? 'date' : 'num');
+const flt_cfSame = (fd, c) => fd.type === c.ft && String(fd.name || '').trim().toLowerCase() === String(c.name || '').trim().toLowerCase();
+// a custom field condition is on while its field exists (an old rule's gone field was left out, flt_cond -> null)
+function flt_cfField(t, c) {
+  if (c.fid) { const fd = fieldById(+c.fid); return fd && fd.list_id === t.list_id ? fd : null; }
+  return fieldsAll(t.list_id).find(fd => flt_cfSame(fd, c)) || null;
+}
+function flt_cfTest(t, c) {
+  const fd = flt_cfField(t, c), k = c.k || flt_cfKind(c.fid ? fieldById(+c.fid)?.type : c.ft);
+  if (!fd) return c.op === 'nin';  // a task of a project without the field: none of the values
+  let rule;
+  if (k === 'num') rule = {num: {op: c.op, v: c.v}};
+  else if (c.op === 'empty') rule = k === 'date' ? {date: ['nodate']} : {sel: ['']};
+  else {
+    let v = Array.isArray(c.v) ? c.v : [];
+    if (k === 'sel' && !c.fid) { const n = new Set(v.map(x => String(x).toLowerCase())); v = [...(n.has('') ? [''] : []), ...(fd.options?.options || []).filter(o => n.has(String(o.name || '').toLowerCase())).map(o => o.id)]; }
+    rule = {[k]: v};
+  }
+  const hit = cfMatch(t, fd.id, rule);
+  return c.op === 'nin' ? !hit : hit;
+}
+// one condition -> null (off: no values, an empty text, a gone field) or the test
+function flt_cond(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (c.f === 'text') { const q = String(c.v || '').trim().toLowerCase(); if (!q) return null; const has = t => (t.title || '').toLowerCase().includes(q) || (t.content || '').toLowerCase().includes(q); return c.op === 'nhas' ? t => !has(t) : has; }
+  if (c.f === 'cf') {
+    if (c.fid ? !fieldById(+c.fid) : !(S.fields || []).some(fd => flt_cfSame(fd, c))) return null;
+    if (['in', 'nin'].includes(c.op) && !(Array.isArray(c.v) && c.v.length)) return null;
+    if (['gt', 'lt', 'eq'].includes(c.op) && (c.v === '' || c.v == null)) return null;
+    if (!['in', 'nin', 'empty', 'gt', 'lt', 'eq', 'set'].includes(c.op)) return null;
+    return t => flt_cfTest(t, c);
+  }
+  const has = FLT_HAS[c.f]; if (!has) return null;
+  if (c.op === 'empty') return c.f in FLT_EMPTY ? t => has(t, FLT_EMPTY[c.f]) : null;
+  if (!Array.isArray(c.v) || !c.v.length || !['in', 'nin'].includes(c.op)) return null;
+  return c.op === 'nin' ? t => !c.v.some(x => has(t, x)) : t => c.v.some(x => has(t, x));
+}
 function filterMatch(t, r = {}) {
-  const c = [];
-  if (r.lists?.length) c.push(r.lists.includes(t.list_id));
-  if (r.dates?.length) c.push(r.dates.some(d => dateMatch(t, d)));
-  if (r.prios?.length) c.push(r.prios.includes(t.priority));
-  if (r.types?.length) c.push(r.types.includes(t.ttype || ''));  // 2.4.0 (#340): '' = no type
-  if (r.tags?.length) c.push(r.tags.some(g => hasTag(t, g)));
-  for (const [fid, cr] of Object.entries(r.cf || {})) if (cfRuleOn(cr) && fieldById(+fid)) c.push(cfMatch(t, fid, cr));
-  // 2.390.0 B (#3355): assignee (me | none | user id), column, sprint (cur = the list's active one | none = backlog),
-  // milestone (id | none), text in title or notes
-  if (r.who?.length) c.push(r.who.some(w => (w === 'none' ? !t.assignee_id : t.assignee_id === (w === 'me' ? S.me?.id : +w))));
-  if (r.secs?.length) c.push(r.secs.some(s => (s === 'none' ? !t.section_id : t.section_id === +s)));
-  if (r.sprints?.length) c.push(r.sprints.some(s => (s === 'none' ? !t.sprint_id : !!t.sprint_id && spr_active(listById(t.list_id))?.id === t.sprint_id)));
-  if (r.ms?.length) c.push(r.ms.some(m => (m === 'none' ? !t.milestone_id : t.milestone_id === +m)));
-  if (r.dlv?.length) c.push(r.dlv.includes(dv_state(t) || 'none'));  // 2.392.2 (#3365): the delivery state
-  const q = (r.text || '').trim().toLowerCase();
-  if (q) c.push((t.title || '').toLowerCase().includes(q) || (t.content || '').toLowerCase().includes(q));
-  if (!c.length) return true;
-  return r.op === 'or' ? c.some(Boolean) : c.every(Boolean);
+  const cs = flt_conds(r), soft = [];
+  for (const c of cs) { const fn = flt_cond(c); if (!fn) continue; if (c.op === 'nin') { if (!fn(t)) return false; } else soft.push(fn); }
+  if (!soft.length) return true;
+  return r.op === 'or' ? soft.some(fn => fn(t)) : soft.every(fn => fn(t));
 }
 // 1.5.1: "Show completed" per view (list, filter, smart list, tag), per user and synced (setting show_done_views, a json
 // map route key -> 0/1; not shared with the other members of a shared list). 1.8.1: no global switch any more, a view

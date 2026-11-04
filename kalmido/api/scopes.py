@@ -1112,7 +1112,8 @@ def v1_filters():
 @app.post("/api/v1/filters")
 @v1_view
 def v1_filter_create():
-    """{name, rules}: rules as the app stores them (lists, tags, priority, due, assignee ...; see docs/API.md)."""
+    """{name, rules}: rules as the app stores them ({op, conds: [{f, op, v}]} since 2.521.0, the older keys lists, tags ... still
+    work; see docs/API.md)."""
     v1_args(())
     b = _v1_body(("name", "rules"))
     if "rules" in b and not isinstance(b["rules"], dict):

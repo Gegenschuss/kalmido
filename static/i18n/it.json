@@ -833,7 +833,6 @@
   "Match": "Corrispondenza",
   "AND: all conditions": "E: tutte le condizioni",
   "OR: any one": "O: almeno una",
-  "Currently matches {0} open task. Within a category, “or” applies.": ["Attualmente corrisponde a {0} attività aperta. All'interno di una categoria vale “o”.", "Attualmente corrisponde a {0} attività aperte. All'interno di una categoria vale “o”."],
   "Folder name": "Nome della cartella",
   "Folder already exists": "La cartella esiste già",
   "Standalone in {0}": "Autonoma in {0}",
@@ -16133,5 +16132,18 @@
   "No tables": "Niente tabelle",
   "Reply in English": "Rispondere in italiano",
   "e.g. short answers, no tables": "ad es. risposte brevi, niente tabelle",
-  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido inoltra queste preferenze all’agente con ogni tuo messaggio."
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido inoltra queste preferenze all’agente con ogni tuo messaggio.",
+  "is one of": "è uno di",
+  "is none of": "non è nessuno di",
+  "is empty": "è vuoto",
+  "contains": "contiene",
+  "does not contain": "non contiene",
+  "greater than": "maggiore di",
+  "less than": "minore di",
+  "equals": "uguale a",
+  "Comparison": "Confronto",
+  "Remove condition": "Rimuovi condizione",
+  "Conditions": "Condizioni",
+  "“is none of” always applies on top, also with OR.": "“non è nessuno di” vale sempre in aggiunta, anche con O.",
+  "{0} task matches": ["{0} attività corrisponde", "{0} attività corrispondono"]
 }

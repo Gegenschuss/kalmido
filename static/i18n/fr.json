@@ -833,7 +833,6 @@
   "Match": "Correspondance",
   "AND: all conditions": "ET : toutes les conditions",
   "OR: any one": "OU : une seule suffit",
-  "Currently matches {0} open task. Within a category, “or” applies.": ["Correspond actuellement à {0} tâche ouverte. Au sein d'une catégorie, « ou » s'applique.", "Correspond actuellement à {0} tâches ouvertes. Au sein d'une catégorie, « ou » s'applique."],
   "Folder name": "Nom du dossier",
   "Folder already exists": "Ce dossier existe déjà",
   "Standalone in {0}": "Indépendante dans {0}",
@@ -16132,5 +16131,18 @@
   "No tables": "Pas de tableaux",
   "Reply in English": "Répondre en français",
   "e.g. short answers, no tables": "p. ex. réponses courtes, pas de tableaux",
-  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido transmet ces souhaits à l’agent avec chacun de tes messages."
+  "Kalmido passes these wishes on to the agent with each of your messages.": "Kalmido transmet ces souhaits à l’agent avec chacun de tes messages.",
+  "is one of": "est l’un de",
+  "is none of": "n’est aucun de",
+  "is empty": "est vide",
+  "contains": "contient",
+  "does not contain": "ne contient pas",
+  "greater than": "supérieur à",
+  "less than": "inférieur à",
+  "equals": "égal à",
+  "Comparison": "Comparaison",
+  "Remove condition": "Retirer la condition",
+  "Conditions": "Conditions",
+  "“is none of” always applies on top, also with OR.": "« n’est aucun de » s’applique toujours en plus, même avec OU.",
+  "{0} task matches": ["{0} tâche correspond", "{0} tâches correspondent"]
 }

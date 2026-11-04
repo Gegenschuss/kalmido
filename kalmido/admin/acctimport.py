@@ -1046,7 +1046,43 @@ def umz_filter_rules(run, v, who):
         out["cf"] = {str(run.m("list_fields", k)): x for k, x in r["cf"].items() if run.m("list_fields", k)}
         if not out["cf"]:
             return None
+    if isinstance(r.get("conds"), list):  # 2.521.0 (#4479): the condition rows {f, op, v} of the filter dialog
+        conds = [umz_filter_cond(run, x, person) for x in r["conds"] if isinstance(x, dict)]
+        if any(x is None for x in conds):
+            return None
+        out["conds"] = conds
     return json.dumps(out, ensure_ascii=False)
+
+
+# 2.521.0 (#4479): the values of a condition that are ids of the old server (the other kinds: folder paths, dates, names ...)
+UMZ_COND_IDS = {"list": ("lists", ()), "sec": ("sections", ("none",)), "ms": ("list_milestones", ("none",))}
+
+
+def umz_filter_cond(run, x, person):
+    """One condition of a saved filter with the ids of this server; None when it loses all its values (the filter would show
+    something else). A custom field condition with its own field id follows that field (its option ids are the field's);
+    one by name + type stays as it is."""
+    x = dict(x)
+    f, v = x.get("f"), x.get("v")
+    if f == "cf" and x.get("fid") is not None:
+        nf = run.m("list_fields", x["fid"])
+        if not nf:
+            return None
+        x["fid"] = nf
+        return x
+    if not isinstance(v, list) or not v:
+        return x
+    if f in UMZ_COND_IDS:
+        table, keep = UMZ_COND_IDS[f]
+        fn = (lambda y: y if y in keep else run.m(table, y))
+    elif f == "who":
+        fn = (lambda y: y if y in ("me", "none") else person(y))
+    elif f == "sprint":
+        fn = (lambda y: y if y in ("cur", "none") else None)
+    else:
+        return x
+    x["v"] = list(dict.fromkeys(y for y in map(fn, v) if y is not None))
+    return x if x["v"] else None
 
 
 def umz_template_data(kind, v):
