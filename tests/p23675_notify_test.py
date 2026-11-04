@@ -22,6 +22,7 @@ freelancer-matrix: tasks
  (14) mails name the organisation shared with the sender, none when unclear
  (15) News of an organisation / a list / a connection stay out of an ex-member's feed; being removed stays readable
  (16) a nag cap counts over restarts (the database)
+ (17) 2.540.0 (#4383): News of an organisation are judged by its number where they carry one (names repeat), the name as fallback
 usage: p23675_notify_test.py <datadir>"""
 import json
 import os
@@ -448,6 +449,26 @@ check(("orglist", "My own") in names, "(15) an item of my own list stays")
 dbw("INSERT INTO notifications(user_id,kind,data,created_at) VALUES(?,?,?,?)", (CAROL, "orglist", json.dumps({"action": "archive", "name": "Campaign", "org": "Old Nordwind"}), "2026-10-31T10:00:00.000+00:00"))
 names = [(x["kind"], x.get("data", {}).get("name")) for x in news(Ca2)]
 check(("orglist", "Campaign") in names, "(15) a name no organisation has any more (renamed): the item stays for the members")
+
+# ---- (17) 2.540.0 (#4383): an item that carries org_id is judged by the number (names can repeat, #4077), the name is the fallback
+un = dbw("SELECT data FROM notifications WHERE user_id=? AND kind='unshare' ORDER BY id DESC LIMIT 1", (CAROL,))
+check(un and json.loads(un[0][0]).get("org_id") == OR2, f"(17) the News of being removed carries the organisation's number: {un}")
+DUP = Da.post(B + "/api/orgs", json={"name": "Nordwind"}).json().get("id")
+check(DUP and DUP != OR, f"(17) another person's company with the same name as carol's organisation: {DUP}")
+for nm, d in (("Dup share", {"org": True, "name": "Nordwind", "org_id": DUP, "role": "member", "x": "Dup share"}),
+              ("Own share", {"org": True, "name": "Nordwind", "org_id": OR, "role": "member", "x": "Own share"}),
+              ("Renamed share", {"org": True, "name": "Nordwind alt", "org_id": OR, "role": "member", "x": "Renamed share"}),
+              ("Gone share", {"org": True, "name": "Nordwind", "org_id": 987654, "role": "member", "x": "Gone share"}),
+              ("Old share", {"org": True, "name": "Nordwind", "role": "member", "x": "Old share"})):
+    dbw("INSERT INTO notifications(user_id,kind,data,created_at) VALUES(?,?,?,?)", (CAROL, "share", json.dumps(d), "2026-10-31T10:00:00.000+00:00"))
+dbw("INSERT INTO notifications(user_id,kind,data,created_at) VALUES(?,?,?,?)", (CAROL, "orglist", json.dumps({"action": "delete", "name": "Dup plan", "org": "Nordwind", "org_id": DUP}), "2026-10-31T10:00:00.000+00:00"))
+dbw("INSERT INTO notifications(user_id,kind,data,created_at) VALUES(?,?,?,?)", (CAROL, "orglist", json.dumps({"action": "delete", "name": "Own plan", "org": "Nordwind", "org_id": OR}), "2026-10-31T10:00:00.000+00:00"))
+its = news(sess("carol"))
+xs = {x.get("data", {}).get("x") for x in its if x["kind"] == "share"}
+ls = {x.get("data", {}).get("name") for x in its if x["kind"] == "orglist"}
+check("Dup share" not in xs and "Dup plan" not in ls, f"(17) an item of the other company with the same name stays out of carol's News: {sorted(filter(None, xs))} {sorted(filter(None, ls))}")
+check({"Own share", "Renamed share", "Gone share", "Old share"} <= xs and "Own plan" in ls,
+      f"(17) her own organisation by number (also renamed), a number no organisation has, an old item by name: {sorted(filter(None, xs))}")
 
 # ---- (16) the nag cap
 out = in_app(f"""

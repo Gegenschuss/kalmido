@@ -94,10 +94,10 @@ def _ol_news(c, oid, lr, action, gone=False, to_name="", extra=None):
     oname = (c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0]
     for uid in _ol_people(c, lr):
         if action in ("rename", "restyle") and not gone and f8f_news_join(
-                c, uid, lr["id"], action, {"name": lr["name"], "org": oname, **(extra or {})}):
+                c, uid, lr["id"], action, {"name": lr["name"], "org": oname, "org_id": oid, **(extra or {})}):  # 2.540.0 (#4383): org_id
             continue
         news_add(c, uid, "orglist", list_id=None if gone else lr["id"],
-                 data={"action": action, "name": lr["name"], "org": oname, **({"to": to_name} if to_name else {}), **(extra or {})})
+                 data={"action": action, "name": lr["name"], "org": oname, "org_id": oid, **({"to": to_name} if to_name else {}), **(extra or {})})
 
 
 def _ol_out(c, oid):

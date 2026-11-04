@@ -103,7 +103,7 @@ def oo_note(c, oid, real, kind, name, list_id=None, to="private", back=False, re
     detail = {"kind": kind, "to": to, **({"released": True} if released else {}), **({"back": True} if back else {})}
     c.execute("INSERT INTO org_list_log(org_id,list_id,list_name,action,by_id,owner_id,to_id,created_at,detail) VALUES(?,?,?,?,?,?,?,?,?)",
               (oid, list_id, str(name or "")[:200], "moveout", me(), None, None, iso(now_utc()), json.dumps(detail)))
-    oo_news(c, oo_admins(c, oid, me()), {"action": "moveout", "name": str(name or "")[:200], "org": real, "kind": kind})
+    oo_news(c, oo_admins(c, oid, me()), {"action": "moveout", "name": str(name or "")[:200], "org": real, "org_id": oid, "kind": kind})  # 2.540.0 (#4383)
 
 
 def oo_exported(c, oid, uid, n):
@@ -111,7 +111,7 @@ def oo_exported(c, oid, uid, n):
     names: a list not shared with them stays out of their News; the list history has the rows). Also from a background thread."""
     real = _org_name(c, oid, None)
     if real is not None:
-        oo_news(c, oo_admins(c, oid, uid), {"action": "export", "count": n, "org": real}, actor=uid)
+        oo_news(c, oo_admins(c, oid, uid), {"action": "export", "count": n, "org": real, "org_id": oid}, actor=uid)  # 2.540.0 (#4383)
 
 
 def oo_admins(c, oid, but):

@@ -13,6 +13,8 @@ invitation, a switch per server, default off), own container (start.sh, SMTP sin
  (e) the switch signup_private (default off): "open" refused (409) next to an organisation while off; on (asks for the
      password): open works, a registration with an organisation's e-mail domain stays a private account (never joins
      it); off again: the mode falls back to off
+ (f) 2.540.0 (#4383): the server admin's routes (POST /api/admin/orgs, POST /api/office/move) count no retired organisation
+     when they check a name
 usage: p2422_orgself_test.py <datadir>      (P2422_NOSTART=1: a running server, no start.sh)
 freelancer-matrix: own  tenant-matrix: org"""
 import json
@@ -26,7 +28,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 import dbx as dbxm  # noqa: E402
 import kt  # noqa: E402
-from freelancer_fixture import freelancer  # noqa: E402
+from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, CT, DATA, FAILS, OKS, check, sess, until  # noqa: E402
 
 SMTP = {"KALMIDO_SMTP_HOST": "127.0.0.1", "KALMIDO_SMTP_PORT": "1025", "KALMIDO_SMTP_TLS": "none",
@@ -166,6 +168,32 @@ ab = about()
 check(r.ok and ab.get("signup_private") is False and ab.get("signup_mode") == "off" and ab.get("signup_effective") == "off",
       f"(e) off again: the mode falls back to off ({ab.get('signup_mode')}/{ab.get('signup_effective')})")
 check(sess().post(B + "/api/auth/signup", json={"name": "X", "email": "x@example.org"}).status_code == 404, "(e) registration closed: 404")
+
+# ---------------------------------------------------------------- (f) 2.540.0 (#4383): a retired organisation's name is free again
+def sqlw(q, args=()):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        c.execute(q, args)
+        c.commit()
+    finally:
+        c.close()
+
+
+r = A.post(B + "/api/admin/orgs", json={"name": "Fjord Example"})
+check(r.status_code == 201, f"(f) setup: Fjord Example ({r.status_code} {r.text[:120]})")
+sqlw("UPDATE orgs SET retired_at=created_at WHERE id=?", (r.json().get("id"),))  # as orgretain.odl_retire leaves it (only the stamp counts here)
+r = A.post(B + "/api/admin/orgs", json={"name": "fjord example"})
+check(r.status_code == 201, f"(f) the server admin's route: the name of a retired organisation is free (rollback test: 409 without the fix) ({r.status_code} {r.text[:120]})")
+sqlw("UPDATE orgs SET retired_at=created_at WHERE id=?", (r.json().get("id"),))
+check(A.post(B + "/api/admin/orgs", json={"name": "Alpha example"}).status_code == 409, "(f) an active organisation's name stays taken")
+A.patch(B + "/api/settings", json={"features": FEATURES, "workspace": "private"})
+st = A.get(B + "/api/office/settings").json()
+check(st.get("personal") == 1 and st.get("can_move") == 1, f"(f) setup: alice's personal office offers the move ({ {k: st.get(k) for k in ('personal', 'can_move')} })")
+r = A.post(B + "/api/office/move", json={"name": "Alpha Example", "confirm": True})
+check(r.status_code == 409 and "An organisation with this name exists" in r.text, f"(f) the admin's move: an active name is taken ({r.status_code} {r.text[:120]})")
+A.patch(B + "/api/settings", json={"workspace": "private"})
+r = A.post(B + "/api/office/move", json={"name": "Fjord Example", "confirm": True})
+check(r.ok and r.json().get("org_id"), f"(f) the admin's move takes the name of a retired organisation (rollback test: 409 without the fix) ({r.status_code} {r.text[:160]})")
 
 print(f"p2422_orgself: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -473,19 +473,29 @@ def news_sig_fmt(r):
 
 def news_org_mine(c, uid, data, memo):
     """2.367.5 (#2980): False when a News item names (data.org text, or data.name of an organisation item) an organisation I
-    am not in. The items hold the name only: a name no organisation has any more (renamed, deleted) stays, so a rename hides
-    nothing from the members. memo = my names, read once per feed."""
-    from ..accounts.orgs import org_names
+    am not in. A name no organisation has any more (renamed, deleted) stays, so a rename hides nothing from the members.
+    2.540.0 (#4383): names can repeat (#4077), so an item that also carries data.org_id is judged by that number (an
+    organisation that no longer exists stays shown, like a gone name); the name is only the fallback of older items.
+    memo = [my organisation ids, my names], read once per feed."""
+    from ..accounts.orgs import org_names, user_orgs
     try:
         d = json.loads(data or "{}")
     except ValueError:
+        return True
+    if not isinstance(d, dict):
         return True
     name = d.get("name") if d.get("org") is True else d.get("org")
     if not name or not isinstance(name, str):
         return True
     if not memo:
-        memo.extend(["", *org_names(c, uid)])
-    if name in memo:
+        memo.extend([set(user_orgs(c, uid)), ["", *org_names(c, uid)]])
+    oid = d.get("org_id")
+    if isinstance(oid, int) and not isinstance(oid, bool):
+        if oid in memo[0]:
+            return True
+        with system_ctx(c):  # does that organisation exist at all (nothing of it is shown)
+            return not c.execute("SELECT 1 FROM orgs WHERE id=?", (oid,)).fetchone()
+    if name in memo[1]:
         return True
     with system_ctx(c):  # does an organisation of that name exist at all (nothing of it is shown)
         return not c.execute("SELECT 1 FROM orgs WHERE name=? LIMIT 1", (name,)).fetchone()

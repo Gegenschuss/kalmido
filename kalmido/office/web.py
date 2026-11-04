@@ -455,7 +455,8 @@ def pb_move_post():
         if own:  # 2.512.0 (#4077): as POST /api/orgs, only her own names: nothing about the other customers of the server
             if org_self_name_taken(c, uid, name):
                 return err(tr("You already have a company with this name"), 409)
-        elif c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+        elif c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL AND retired_at IS NULL",  # 2.540.0 (#4383)
+                       (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
         if own and org_self_made_n(c, uid) >= ORG_SELF_MAX:
             return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)

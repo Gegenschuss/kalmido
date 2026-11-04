@@ -232,7 +232,7 @@ def asst_comments_notice(c, oid, actor):
     for (uid,) in c.execute("""SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id
                                WHERE m.org_id=? AND u.kind!='agent' AND u.disabled=0""", (oid,)).fetchall():
         if uid != actor:
-            news_add(c, uid, "orglist", data={"action": "asstcomments", "name": "", "org": r["name"]}, actor=actor)
+            news_add(c, uid, "orglist", data={"action": "asstcomments", "name": "", "org": r["name"], "org_id": oid}, actor=actor)  # 2.540.0 (#4383): org_id
 
 
 def asst_others_comments(c, t):

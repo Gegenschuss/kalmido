@@ -947,7 +947,8 @@ def org_create():
         if instance_mode(c) != "workspaces":
             _no_change()
         name = _clean_name(b.get("name"))
-        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+        # 2.540.0 (#4383): a retired organisation's name is free again
+        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL AND retired_at IS NULL", (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
         oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at) VALUES(?,?,?,?)",
                         (name, _clean_icon(b.get("icon")), _clean_domains(b.get("domains") or ""), iso(now_utc())))
@@ -1460,7 +1461,8 @@ def org_member_put(oid):
     else:
         org_member_add(c, oid, uid, role)
         from ..collab.news import news_add
-        news_add(c, uid, "share", list_id=None, data={"org": True, "name": c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0], "role": role})
+        news_add(c, uid, "share", list_id=None, data={"org": True, "name": c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()[0], "role": role,
+                                                          "org_id": oid})  # 2.540.0 (#4383): news_org_mine compares the number
     bump(c)
     c.commit()
     if b.get("email"):  # 2.148.1 A (#2480): the same answer for every address (account or not, added or invited)
@@ -1639,12 +1641,12 @@ def org_member_remove(oid, uid):
     n = org_leave(c, oid, uid, heir, back=back)  # 2.361.0 (#2922): what the person brought in goes back to their private space
     from ..collab.news import news_add
     if operator:
-        news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n}, actor=uid)
+        news_add(c, operator, "share", list_id=None, data={"org": True, "name": oname, "role": "admin", "handover": n, "org_id": oid}, actor=uid)  # 2.540.0 (#4383)
         print("organisation", oid, "last admin", uid, "left: operator", operator, "took it over,", n, "lists", flush=True)
     if uid != me():
         from ..collab.comments import user_names
         # 2.148.1 A (#2480): the person learns that their lists of the organisation stayed with it (and with whom)
-        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {}),
+        news_add(c, uid, "unshare", list_id=None, data={"org": True, "name": oname, "org_id": oid, **({"lists": n, "to": user_names(c, [heir]).get(heir, "")} if n else {}),
                                                         **({"back": len(back)} if back else {})})  # 2.361.0 (#2922)
     bump(c)
     c.commit()
