@@ -605,24 +605,43 @@ function tfaWire(md) {
     } catch { /* api() showed it */ } finally { b.disabled = false; }
   });
 }
+// 2.505.0 (#4302): before the restore: what was deleted for good since this backup and would go again, and the choice to keep it.
+// The default stays "delete again"; without the numbers (an error) nothing is offered and that default applies.
+const BKR_KINDS = {orgs: N_('Organisations'), lists: N_('Projects'), tasks: N_('Tasks'), fs_nodes: N_('Files'), wiki_pages: N_('Knowledge pages'), events: N_('Events'), sheets: N_('Tables'),
+  contacts: N_('Contacts'), clients: N_('Clients'), hub_mails: N_('E-mails'), office_deals: N_('Pipeline')};
+async function bkrPurged(m, src) {
+  const box = $('#bkr-purged', m);
+  let j; try { j = await rawFetch('GET', '/api/admin/backups/purged-preview?since=' + encodeURIComponent(src.created_at || '')); } catch { return; }
+  if (!box.isConnected) return;
+  const kinds = Object.entries(j.kinds || {}).map(([k, n]) => `${esc(tr(BKR_KINDS[k] || k))}: ${n}`).join(' · ');
+  const when = j.first === j.last ? esc(aaWhen(j.first)) : tr('{0} to {1}', esc(aaWhen(j.first)), esc(aaWhen(j.last)));
+  const also = [j.recent ? trn('{0} entry deleted in the last {1} days stays either way.', '{0} entries deleted in the last {1} days stay either way.', j.recent, j.recent_days) : '',
+    j.accounts ? trn('{0} account deleted since then stays deleted or disabled either way.', '{0} accounts deleted since then stay deleted or disabled either way.', j.accounts) : ''].filter(Boolean).join(' ');
+  box.innerHTML = (j.total ? `<p><b>${tr('Deleted for good since this backup')}</b><br>${kinds}<br><span class="muted">${tr('Deleted: {0}', when)}</span></p>
+      <label class="chkl"><input type="radio" name="bkr-purge" id="bkr-again" checked> ${tr('Delete them again (default, for data protection)')}</label>
+      <label class="chkl"><input type="radio" name="bkr-purge" id="bkr-keep"> ${tr('Keep everything in the backup (recorded in the admin alerts and the log)')}</label>` : '')
+    + (also ? `<p class="muted">${also}</p>` : '');
+}
 function bkRestore(md, src) {
   // src: {name} or {upload}, plus created_at, encrypted, counts, attachment_files
   return new Promise(done => {
     const m = modal(`<h3>${tr('Restore backup')}</h3>
       <p>${tr('This replaces <b>all data on this server</b> (every user’s projects, tasks, files and settings) with the state of {0}.', `<b>${esc(aaWhen(src.created_at) || '?')}</b>`)}</p>
       <p class="muted">${trn('{0} task', '{0} tasks', src.counts?.tasks || 0)}, ${trn('{0} file', '{0} files', src.attachment_files || 0)}, ${trn('{0} person', '{0} people', src.counts?.users || 0)}. ${tr('A safety backup of the current state is made first. Everyone else is signed out.')}</p>
+      <div id="bkr-purged"></div>
       <form class="pwform">${src.encrypted ? `<input type="password" id="bkr-pass" autocomplete="off" data-1p-ignore data-lpignore="true" data-bwignore placeholder="${tr('Passphrase (empty = the saved one)')}">` : ''}
       <label for="bkr-word">${tr('Type {0} to confirm', '<b>' + esc(src.word) + '</b>')}</label><input id="bkr-word" autocomplete="off" autocapitalize="characters" spellcheck="false">
       <div class="aerr" role="alert" id="bkr-err"></div>
       <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button class="btn danger" type="submit" id="bkr-go" disabled>${tr('Restore')}</button></div></form>`);
     m.classList.add('bkrestore');
+    bkrPurged(m, src);  // 2.505.0 (#4302)
     m.addEventListener('input', () => { $('#bkr-go', m).disabled = $('#bkr-word', m).value.trim() !== src.word; });
     m.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) { m.remove(); done(false); } });
     m.querySelector('form').addEventListener('submit', async e => {
       e.preventDefault();
       const go = $('#bkr-go', m); go.disabled = true; go.textContent = tr('Restoring…');
       try {
-        const r = await suApi('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || ''}, tr('Restore'));  // 2.360.0 A (#2496): with the step-up
+        const r = await suApi('POST', '/api/admin/backups/restore', {...(src.upload ? {upload: src.upload} : {name: src.name}), confirm: $('#bkr-word', m).value.trim(), passphrase: $('#bkr-pass', m)?.value || '', keep_purged: !!$('#bkr-keep', m)?.checked}, tr('Restore'));  // 2.360.0 A (#2496): with the step-up
         m.remove(); md.remove();
         clearLocal();
         const notes = [r.key_warning, ...r.notes || []].filter(Boolean);  // 2.359.3 (#2893): the server key first, in red

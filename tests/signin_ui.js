@@ -216,6 +216,26 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   check(md.querySelectorAll('.bkrow').length === 1 && /manual/.test(md.querySelector('.bkrow').textContent), 'back up now: the list shows it');
   const dl = md.querySelector('.bkrow a[download]');
   check(dl && /^\/api\/admin\/backups\/kalmido-backup-\d{8}-\d{6}-manual\.zip\/download$/.test(dl.getAttribute('href')), 'download link');
+  // 2.505.0 (#4302): the numbers of what would go again and the choice, delete again is the default; the choice travels with the restore
+  w.eval(`window.__rf = rawFetch; window.__su = suApi; window.__sent = null;
+    rawFetch = async (m, u, ...r) => /purged-preview/.test(u) ? {kinds: {tasks: 3, lists: 1}, total: 4, first: '2026-01-02T10:00:00+00:00', last: '2026-02-03T10:00:00+00:00', recent: 2, recent_days: 7, accounts: 1} : __rf(m, u, ...r);
+    suApi = async (m, u, b) => { window.__sent = b; throw new Error('stopped by the test'); };`);
+  click(w, md.querySelector('.bkrow [data-bk="restore"]'));
+  const pm = await until(() => d.querySelector('.bkrestore #bkr-keep') && d.querySelector('.bkrestore'));
+  check(!!pm && /Tasks: 3/.test(pm.textContent) && /Projects: 1/.test(pm.textContent), 'restore dialog: what would go again, per kind');
+  check(!!pm && pm.querySelector('#bkr-again').checked && !pm.querySelector('#bkr-keep').checked, 'restore dialog: delete again is the default');
+  check(!!pm && /2 entries deleted in the last 7 days stay/.test(pm.textContent) && /1 account deleted since then/.test(pm.textContent), 'restore dialog: what stays either way');
+  input(w, pm.querySelector('#bkr-word'), 'RESTORE');
+  submit(w, pm.querySelector('form'));
+  await until(() => w.eval('window.__sent'));
+  check(w.eval('window.__sent?.keep_purged') === false, 'restore dialog: the default sends no keep');
+  pm.querySelector('#bkr-keep').checked = true;
+  w.eval('window.__sent = null');
+  submit(w, pm.querySelector('form'));
+  await until(() => w.eval('window.__sent'));
+  check(w.eval('window.__sent?.keep_purged') === true, 'restore dialog: the choice travels with the restore');
+  click(w, pm.querySelector('[data-m="close"]'));
+  w.eval('rawFetch = __rf; suApi = __su;');
   await api(w, 'POST', '/api/tasks', {title: 'made after the backup'});
   click(w, md.querySelector('.bkrow [data-bk="restore"]')); await sleep(300);
   const rm = d.querySelector('.bkrestore');

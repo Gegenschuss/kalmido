@@ -1614,6 +1614,7 @@ def bkr_creds_after(c, creds):
 
 
 BKR_RECENT_DAYS = 7
+BK_KEPT_NOTE = N_("You kept what the backup holds. What lay in a trash in the backup is deleted again when its trash period is over: take it out of the trash now if it is to stay.")  # 2.505.0 (#4302)
 
 
 # ---- 2.360.4 (#3243): organisations and entries deleted for good after the backup was written stay deleted: by the list
@@ -1655,10 +1656,30 @@ def bkr_purged_drop(c, tbl, rid):
     return files
 
 
-def bkr_purged_after(c, rows):
+def bkr_purged_preview(c, since):
+    """2.505.0 (#4302): what a restore of a backup written at `since` would delete again, for the restore dialog (numbers
+    only). A row counts when it went after the backup was written and was made before it (a backup cannot hold anything
+    else); `since` empty (an archive without a date): every row. Caller is in system_ctx."""
+    cut = iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
+    kinds, recent, first, last = {}, 0, "", ""
+    for tbl, _, made, at in bkr_purged_read(c):
+        if since and (at < since or made > since):
+            continue
+        if at >= cut:
+            recent += 1
+            continue
+        kinds[tbl] = kinds.get(tbl, 0) + 1
+        first, last = min(first or at, at), max(last, at)
+    accounts = sum(1 for r in bkr_read(c) if not since or (r[3] or "") >= since)
+    return {"kinds": kinds, "total": sum(kinds.values()), "first": first, "last": last, "recent": recent,
+            "recent_days": BKR_RECENT_DAYS, "accounts": accounts}
+
+
+def bkr_purged_after(c, rows, keep=False):
     """After the accounts (own commits): the list back, then what the backup brought back goes one row at a time.
-    -> (deleted again, kept as deleted recently, could not be deleted)."""
-    gone, recent, stuck, files = 0, 0, 0, []
+    2.505.0 (#4302): keep = the admin's choice in the restore dialog: everything stays and leaves the list (it lives again:
+    a later restore must not take it). -> (deleted again, kept as deleted recently, could not be deleted, kept by choice)."""
+    gone, recent, stuck, files, back = 0, 0, 0, [], []
     cut = iso(now_utc() - timedelta(days=BKR_RECENT_DAYS))
     with _pg.system_ctx(c):  # entries of every organisation; numbers only
         bkr_purged_note(c, rows)
@@ -1671,6 +1692,9 @@ def bkr_purged_after(c, rows):
                 part = ids[i:i + 1000]
                 here += [r[0] for r in c.execute(f"SELECT id, created_at FROM {tbl} WHERE id IN ({','.join('?' * len(part))})", part).fetchall()
                          if r[1] == todo[r[0]][2]]
+            if keep:
+                back += [(tbl, rid) for rid in here]
+                continue
             for rid in here:
                 at = todo[rid][3]
                 if at >= cut:
@@ -1687,10 +1711,13 @@ def bkr_purged_after(c, rows):
                     c.rollback()
                     print("restore: deleting an entry again failed:", tbl, type(e).__name__, flush=True)
                     stuck += 1
-        bkr_purged_note(c, rows)  # the deletions just now noted their own time: the first one counts
+        if back:
+            c.executemany("DELETE FROM purged_rows WHERE tbl=? AND ref_id=?", back)
+        else:
+            bkr_purged_note(c, rows)  # the deletions just now noted their own time: the first one counts
         c.commit()
     unlink_files(files)
-    return gone, recent, stuck
+    return gone, recent, stuck, len(back)
 
 
 def bkr_after_restore(c, rows):
@@ -1780,8 +1807,9 @@ def bk_leftovers_clean(listed):
             shutil.rmtree(p, ignore_errors=True)
 
 
-def bk_restore(path, pw, admin, via):
-    """The whole restore (see the section comment). Returns (new session token or None, safety backup name)."""
+def bk_restore(path, pw, admin, via, keep_purged=False):
+    """The whole restore (see the section comment). Returns (new session token or None, safety backup name).
+    2.505.0 (#4302): keep_purged = what was deleted for good since the backup stays (the admin's choice, bkr_restore_journal)."""
     from .worker import WRK_REPLICAS, WRK_ROLE
     if WRK_ROLE != "all" or WRK_REPLICAS > 1:  # 2.148.1 C (#2482): other processes would keep writing during the swap
         raise BackupError("procs")
@@ -1896,13 +1924,13 @@ def bk_restore(path, pw, admin, via):
         bk_leftovers_clean(man["_listed"])  # 2.148.1 C (#2482): files outside the archive format stay in the folder of before; 2.370.2 (#2779): also older leftovers
         bk_restore_packs(pack_new)  # 2.359.2 (#2895)
         print(f"restore: {os.path.basename(path)} restored by an admin (safety backup {safety})", flush=True)  # 2.239.0 B (#2888): no name in the log
-        man["_again"] = bkr_restore_journal(journal, purged)  # 2.152.0 B (#2172)
+        man["_again"] = bkr_restore_journal(journal, purged, keep_purged, admin)  # 2.152.0 B (#2172)
         if kstate != "ok":  # 2.359.3 (#2893)
             print(f"restore: server key check: {kstate}", flush=True)
             aa_now("security", f"restore-key:{int(time.time())}", BK_KEY_WARN[kstate], [])
         # 2.273.0 A (#3051 p. 12, 13): what a restore cannot bring back, in the result and the log
         man["_notes"] = ([(N_("{0} waiting background jobs were not restored (a backup never holds them): start what is still needed again."), jobs)]
-                         if jobs else []) + [(BK_OFFLINE_NOTE,)]
+                         if jobs else []) + [(BK_OFFLINE_NOTE,)] + ([(BK_KEPT_NOTE,)] if keep_purged else [])  # 2.505.0 (#4302)
         print(f"restore: {jobs} waiting background job(s) not restored; devices may send unsent changes after reloading", flush=True)
         aa_now("security", f"restore:{int(time.time())}", N_("{0} restored a backup from {1} (safety backup of the previous state: {2})."),
                [admin, str(man.get("created_at", "?"))[:16].replace("T", " ") + " UTC", safety])
@@ -1952,14 +1980,15 @@ def bk_restore_packs(src):
     return n
 
 
-def bkr_restore_journal(journal, purged=()):
+def bkr_restore_journal(journal, purged=(), keep=False, admin=""):
     """bkr_after_restore with its own connection, its numbers in the log and as an admin alert; never fails the restore.
-    2.360.4 (#3243): then what purged names (bkr_purged_after), with numbers of its own."""
+    2.360.4 (#3243): then what purged names (bkr_purged_after), with numbers of its own.
+    2.505.0 (#4302): keep = the admin chose to keep what was deleted for good; the choice is in the log and the alert either way."""
     try:
         c = connect()
         try:
             gone, off, recent = bkr_after_restore(c, journal)
-            pgone, precent, pstuck = bkr_purged_after(c, purged)
+            pgone, precent, pstuck, pkept = bkr_purged_after(c, purged, keep)
         finally:
             c.close()
     except Exception as e:  # noqa: BLE001 -- the restore itself is done; the admin learns it from the alert
@@ -1972,14 +2001,19 @@ def bkr_restore_journal(journal, purged=()):
         aa_now("security", f"restore-journal:{int(time.time())}",
                N_("After the restore, {0} accounts deleted earlier were deleted again; {1} that own projects were disabled; {2} deleted in the last {3} days were disabled, in case the restore was meant to bring them back (delete them in the user administration otherwise)."),
                [str(gone), str(off), str(recent), str(BKR_RECENT_DAYS)])
-    if pgone or precent or pstuck:
-        print(f"restore: entries deleted earlier: {pgone} deleted again, {precent} kept (deleted in the last {BKR_RECENT_DAYS} days), "
-              f"{pstuck} could not be deleted", flush=True)
+    if keep:  # 2.505.0 (#4302): also when the backup held none of them: the choice was made
+        print(f"restore: entries deleted earlier: {pkept} kept (choice: keep everything)", flush=True)
         aa_now("security", f"restore-purged:{int(time.time())}",
-               N_("After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log)."),
+               N_("{0} chose to keep everything in the restored backup: {1} organisations and entries deleted earlier came back and stay."),
+               [admin, str(pkept)])
+    elif pgone or precent or pstuck:
+        print(f"restore: entries deleted earlier: {pgone} deleted again, {precent} kept (deleted in the last {BKR_RECENT_DAYS} days), "
+              f"{pstuck} could not be deleted (choice: delete again)", flush=True)
+        aa_now("security", f"restore-purged:{int(time.time())}",
+               N_("After the restore (choice: delete again), {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log)."),
                [str(pgone), str(precent), str(BKR_RECENT_DAYS), str(pstuck)])
     return {"deleted": gone, "disabled": off + recent, "owners": off, "recent": recent,
-            "entries": pgone, "entries_recent": precent, "entries_failed": pstuck}
+            "entries": pgone, "entries_recent": precent, "entries_failed": pstuck, "entries_kept": pkept}
 
 
 # ---- API (admins; CSRF header on every change)
@@ -2306,9 +2340,19 @@ def backups_upload():
                    attachment_files=meta.get("attachment_files"), attachment_bytes=meta.get("attachment_bytes"))
 
 
+@app.get("/api/admin/backups/purged-preview")
+def backups_purged_preview():
+    """2.505.0 (#4302): ?since=<the backup's created_at>: what its restore would delete again (numbers per kind, the time span)."""
+    need_backups()
+    c = db()
+    with _pg.system_ctx(c):
+        return jsonify(bkr_purged_preview(c, str(request.args.get("since") or "")[:40]))
+
+
 @app.post("/api/admin/backups/restore")
 def backups_restore():
-    """{name | upload, confirm: "RESTORE", passphrase?}"""
+    """{name | upload, confirm: "RESTORE", passphrase?, keep_purged?} 2.505.0 (#4302): keep_purged true = what was deleted
+    for good since the backup stays (default: it goes again)."""
     need_backups()
     c, b = db(), body()
     if b.get("upload"):
@@ -2326,11 +2370,11 @@ def backups_restore():
     up = str(b.get("upload") or "")
     p = bk_upload_path(up) if up else bk_path(str(b.get("name") or ""))
     pw = str(b.get("passphrase") or "") or bk_passphrase(c)
-    admin, via = g.user["username"], g.auth_via
+    admin, via, keep = g.user["username"], g.auth_via, b.get("keep_purged") is True
     c.close()
     g.pop("db", None)
     try:
-        tok, safety, man = bk_restore(p, pw, admin, via)
+        tok, safety, man = bk_restore(p, pw, admin, via, keep_purged=keep)
     except BackupError as e:
         if e.code == "passphrase":
             _rate_fail(keys)

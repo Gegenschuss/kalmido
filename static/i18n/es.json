@@ -14708,7 +14708,6 @@
   "Push devices": "Dispositivos push",
   "Agent chat settings": "Ajustes de los chats de agentes",
   "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Al eliminar la cuenta #{0}: {1} archivos conservados por ley quedan a cargo de un administrador de la instancia hasta el fin del plazo.",
-  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Tras la restauración se eliminaron de nuevo {0} organizaciones y entradas borradas antes; {1} de los últimos {2} días permanecen, por si la restauración debía recuperarlas; {3} no se pudieron eliminar de nuevo (véase el registro del servidor).",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Invitación registrada. Con una cuenta en esta dirección, la persona verá la tabla en cuanto pueda recibirla.",
   "The invitation stops working.": "La invitación dejará de funcionar.",
   "The table is full (at most {0} MB)": "La tabla está llena ({0} MB como máximo)",
@@ -16062,5 +16061,13 @@
   "Monthly on the last {0}|fem": "Mensualmente el último {0}",
   "Every {0} months on the last {1}|fem": "Cada {0} meses el último {1}",
   "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "para un cliente de un tercer país, la nota «No sujeto en el país» en lugar de inversión del sujeto pasivo",
-  "Record as receipt": "Registrar como comprobante"
+  "Record as receipt": "Registrar como comprobante",
+  "After the restore (choice: delete again), {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Tras la restauración (elección: eliminar de nuevo) se eliminaron de nuevo {0} organizaciones y entradas borradas antes; {1} de los últimos {2} días permanecen, por si la restauración debía recuperarlas; {3} no se pudieron eliminar de nuevo (véase el registro del servidor).",
+  "{0} chose to keep everything in the restored backup: {1} organisations and entries deleted earlier came back and stay.": "{0} eligió conservar todo lo de la copia restaurada: {1} organizaciones y entradas borradas antes han vuelto y permanecen.",
+  "You kept what the backup holds. What lay in a trash in the backup is deleted again when its trash period is over: take it out of the trash now if it is to stay.": "Has conservado lo que contiene la copia. Lo que estaba en una papelera en la copia se eliminará de nuevo al acabar el plazo de la papelera: sácalo ahora de la papelera si debe permanecer.",
+  "{0} entry deleted in the last {1} days stays either way.": ["{0} entrada eliminada en los últimos {1} días permanece en cualquier caso.", "{0} entradas eliminadas en los últimos {1} días permanecen en cualquier caso."],
+  "{0} account deleted since then stays deleted or disabled either way.": ["{0} cuenta eliminada desde entonces sigue eliminada o desactivada en cualquier caso.", "{0} cuentas eliminadas desde entonces siguen eliminadas o desactivadas en cualquier caso."],
+  "Deleted for good since this backup": "Eliminado definitivamente desde esta copia",
+  "Delete them again (default, for data protection)": "Eliminarlos de nuevo (por defecto, por la protección de datos)",
+  "Keep everything in the backup (recorded in the admin alerts and the log)": "Conservar todo lo de la copia (queda en los avisos de administración y en el registro)"
 }

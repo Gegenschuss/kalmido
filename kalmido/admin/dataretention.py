@@ -9,6 +9,7 @@
   codes are no data of a person any more and go without the switch.
 - orf_tick (kind "files"): see below.
 - ckd_tick (kind "chat", 2.186.0 C #2602): the day limit of the agent chat, daily."""
+import json
 import os
 import time
 from datetime import timedelta
@@ -80,12 +81,14 @@ def lgc_expired(c, now):
     return out
 
 
-def lgc_journal_cut(now):
+def lgc_journal_cut(now, c=None):
     """2.312.0 B (#3264): the time before which a row of deleted_accounts (admin/backup.py bkr_*) is no longer needed. The
     journal only deletes again what a restored backup brings back, so a row goes once no backup can hold that account any
     more: older than the longest backup period (BK_KEEP_WEEKLY_CAP weeks) AND older than every backup still in the backup
     folder (the rotation keeps the newest backup per day / week "that has one", so a rare backup can be older; safety
-    backups count too). None = the folder cannot be read: nothing goes."""
+    backups count too). None = the folder cannot be read: nothing goes.
+    2.505.0 (#4302): the off-site backups count the same (bko_remote, the names kept there after the last upload): an older one
+    must not bring back what was deleted without it going again. An off-site target without a readable list: nothing goes."""
     cut = now - timedelta(weeks=BK_KEEP_WEEKLY_CAP)
     try:
         names = os.listdir(BK_DIR)
@@ -95,6 +98,16 @@ def lgc_journal_cut(now):
         names = []
     except OSError:
         return None
+    if c is not None:
+        try:
+            raw = gsetting(c, "bko_remote")
+            remote = json.loads(raw or "[]")
+            conf = json.loads(gsetting(c, "bko_conf") or "{}")
+            if not isinstance(remote, list) or (not raw and isinstance(conf, dict) and conf.get("on") is True):
+                return None
+        except ValueError:
+            return None
+        names = [*names, *(n for n in remote if isinstance(n, str))]
     for n in names:
         p = bk_parse_name(n)
         if p and p["at"] < cut:
@@ -122,7 +135,7 @@ def lgc_tick(c, force=False):
                     counts[table] = lgc_count_del(c, table, col, cond, cut, kill)
             except Exception as e:  # noqa: BLE001  one table must not stop the others
                 print("retention: logs", table, type(e).__name__, flush=True)
-        cut = lgc_journal_cut(now)  # 2.312.0 B (#3264)
+        cut = lgc_journal_cut(now, c)  # 2.312.0 B (#3264); 2.505.0 (#4302): with the off-site backups
         if cut:
             try:
                 with c.savepoint():

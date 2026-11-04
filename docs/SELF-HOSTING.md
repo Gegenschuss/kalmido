@@ -687,8 +687,14 @@ such a file: the organisation is retired until the lock ends, a private file mov
 **Restoring a backup keeps deletions.** Organisations and entries deleted for good (projects, tasks, files, knowledge
 pages, events, tables, contacts, clients, e-mails, deals) are noted by table and number only, like deleted accounts. A
 restore deletes them again when the backup brings them back. What went in the last 7 days stays, in case the restore was
-meant to bring it back; the admin alert and the log give the numbers. The list follows the backups' period in the log
-clean-up. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
+meant to bring it back; the admin alert and the log give the numbers. The restore dialog shows beforehand what would go
+again (the number per kind and the time span) and offers the choice: *Delete them again* (the default) or *Keep everything
+in the backup*, for rescuing something deleted by mistake (`keep_purged: true` on `POST /api/admin/backups/restore`). The
+choice is in the admin alert and the log, and what is kept leaves the list. Deleted accounts follow their own rule either
+way. What lay in a trash in the backup goes again when its trash period is over, so take it out of the trash right away.
+The list follows the backups' period in the log clean-up and counts the backups named on the off-site target too, so an
+older off-site backup does not bring deleted entries back for good; with an off-site target whose list of backups cannot
+be read, nothing leaves the list. Retiring an organisation also ends its calendars' subscription links and the booking pages that work for it.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 

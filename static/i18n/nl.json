@@ -14708,7 +14708,6 @@
   "Push devices": "Pushapparaten",
   "Agent chat settings": "Instellingen van agentchats",
   "Deleting account #{0}: {1} files kept by law stay with an instance administrator as keeper until their period ends.": "Account #{0} verwijderen: {1} wettelijk bewaarde bestanden blijven tot het einde van de termijn bij een instantiebeheerder.",
-  "After the restore, {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Na het herstel zijn {0} eerder verwijderde organisaties en items opnieuw verwijderd; {1} van de laatste {2} dagen blijven, voor het geval het herstel ze moest terughalen; {3} konden niet opnieuw worden verwijderd (zie het serverlogboek).",
   "Invited. With an account at this address, the person sees the table once they may get it.": "Uitgenodigd. Met een account op dit adres ziet de persoon de tabel zodra die hem mag krijgen.",
   "The invitation stops working.": "De uitnodiging werkt dan niet meer.",
   "The table is full (at most {0} MB)": "De tabel is vol (maximaal {0} MB)",
@@ -16062,5 +16061,13 @@
   "Monthly on the last {0}|fem": "Maandelijks op de laatste {0}",
   "Every {0} months on the last {1}|fem": "Elke {0} maanden op de laatste {1}",
   "for a client in a third country the VAT note not taxable domestically instead of reverse charge": "voor een klant in een derde land de vermelding „Niet belastbaar in het binnenland” in plaats van btw verlegd",
-  "Record as receipt": "Als bon vastleggen"
+  "Record as receipt": "Als bon vastleggen",
+  "After the restore (choice: delete again), {0} organisations and entries deleted earlier were deleted again; {1} deleted in the last {2} days stay, in case the restore was meant to bring them back; {3} could not be deleted again (see the server log).": "Na het herstel (keuze: opnieuw verwijderen) zijn {0} eerder verwijderde organisaties en items opnieuw verwijderd; {1} van de laatste {2} dagen blijven, voor het geval het herstel ze moest terughalen; {3} konden niet opnieuw worden verwijderd (zie het serverlogboek).",
+  "{0} chose to keep everything in the restored backup: {1} organisations and entries deleted earlier came back and stay.": "{0} heeft gekozen alles uit de herstelde back-up te houden: {1} eerder verwijderde organisaties en items zijn terug en blijven.",
+  "You kept what the backup holds. What lay in a trash in the backup is deleted again when its trash period is over: take it out of the trash now if it is to stay.": "Je hebt gehouden wat de back-up bevat. Wat in de back-up in een prullenbak lag, wordt opnieuw verwijderd zodra de termijn van de prullenbak voorbij is: haal het nu uit de prullenbak als het moet blijven.",
+  "{0} entry deleted in the last {1} days stays either way.": ["{0} item dat de laatste {1} dagen is verwijderd, blijft in elk geval.", "{0} items die de laatste {1} dagen zijn verwijderd, blijven in elk geval."],
+  "{0} account deleted since then stays deleted or disabled either way.": ["{0} sindsdien verwijderd account blijft in elk geval verwijderd of uitgeschakeld.", "{0} sindsdien verwijderde accounts blijven in elk geval verwijderd of uitgeschakeld."],
+  "Deleted for good since this backup": "Definitief verwijderd sinds deze back-up",
+  "Delete them again (default, for data protection)": "Opnieuw verwijderen (standaard, voor de gegevensbescherming)",
+  "Keep everything in the backup (recorded in the admin alerts and the log)": "Alles uit de back-up houden (vastgelegd in de beheermeldingen en het logboek)"
 }
