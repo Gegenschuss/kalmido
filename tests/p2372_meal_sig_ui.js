@@ -51,7 +51,9 @@ const FEAT = 'cal,comments,collab,office,clients,docs,travel';
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
     await signIn(ev, 'sam');
     await nav(B + '#office/meals');
-    check(await ready(ev, `typeof BW === 'object' && (BW.data || (BW.loading || bw_load(), false)) && BW.data.my_sig === 0 && BW.data.meals.some(m => m.id === ${meal.id})`, 80), 'the receipts: sam sees the receipt, no picture yet (my_sig 0)');
+    // CI of 2.496.1: bw_html empties BW.data once when it first sees the office area (BW.oid); a load before that was thrown away
+    // between this check and bw_modal below ("BW.data is null"), so only data of the area the tab has already taken count
+    check(await ready(ev, `typeof BW === 'object' && !!OFC.info && BW.oid === OFC.info.org_id && (BW.data || (BW.loading || bw_load(), false)) && BW.data.my_sig === 0 && BW.data.meals.some(m => m.id === ${meal.id})`, 80), 'the receipts: sam sees the receipt, no picture yet (my_sig 0)');
     await ev(`(() => { bw_modal(BW.data.meals.find(m => m.id === ${meal.id})); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.modal [data-bwm="approve"]')`), 'the approve dialog for the host');
     check(await ready(ev, `(() => { const b = document.querySelector('.modal [data-bwm="sigset"]'); return !!b && !b.closest('[hidden]') && !!document.querySelector('.modal .bwsigon[hidden]'); })()`),
