@@ -117,7 +117,8 @@ check("events.sh" not in pf and "BASH_DEFAULT_TIMEOUT_MS" not in pf, "the prompt
 check("--events" in pf, "the prompt runs the launcher with --events")
 app = re.search(r'const AG_PROMPT = "(.*?)";\n', chat, re.S)
 check(bool(app) and app.group(1).replace('\\"', '"').replace("\\n", "\n") == pf, "the app's AG_PROMPT is the prompt file")
-check("(step 3), then run the test checklist (step 10)" in guide, "the guide refers to the prompt's own step numbers")
+# 2.525.0 (#4179): the control level is step 10, the checklist step 11
+check("(step 3), then pick the control level (step 10) and run the test checklist (step 11)" in guide, "the guide refers to the prompt's own step numbers")
 check("which one tidies it up" not in guide.replace("so that agent is the one that tidies it up", ""), "the guide no longer asks which of several agents tidies up")
 
 # scope facts in the docs follow the code (api/v1.py): the default set and the legacy write

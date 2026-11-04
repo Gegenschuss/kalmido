@@ -123,11 +123,12 @@ Steps:
 7. Create the systemd user unit kalmido-agent.service that runs mcp/agent_launcher.sh with --events and the command `claude --mcp-config ~/agent/.mcp.json` (no prompt: the runner starts the agent once per event; runtime settings from Kalmido), enable lingering for <AGENT_USER> and start the unit.
 8. Run the operating system checks from docs/AGENT-SECURITY.md as <AGENT_USER> and show me the results.
 9. Prove the service keeps the agent connected WITHOUT this session: close nothing yet, but stop using the agent's token here; wait 5 minutes; then check that Settings > Agents shows the agent as connected (not "not connected" and not "connected, but no service running") and that a mention gets an answer. The setup is not finished before this works.
-10. Finish with the test checklist from the guide (mention, chat, kill switch, the prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.
+10. Tell me to choose the control level of the agent in Kalmido (Settings > Agents > the agent > Control): a new agent starts with "approve_all", where even a comment or a new task waits for an approval card, so the first test of the checklist would fail. For the test I suggest "routine" (create tasks, plan them, comment and tick off without asking; everything else and every deletion by card); "free" only with a goal. Wait until I confirm that the level is set.
+11. Finish with the test checklist from the guide (mention, chat, kill switch, the prompt-injection cases): tell me what to type in Kalmido for each case and what the expected answer is; I run them and tell you the results.
 ```
 
 Claude Code shows every sudo command before it runs it. Log in to Claude Code as the agent user yourself when it asks
-(step 3), then run the test checklist (step 10) together.
+(step 3), then pick the control level (step 10) and run the test checklist (step 11) together.
 
 **Connecting the agent in Kalmido is not the end of the setup.** An agent that only runs in an open terminal falls
 asleep as soon as nobody types there. Only the service of step 7 (Linux; step 9 of path B), the LaunchAgent (macOS, below) or a scheduled
@@ -210,6 +211,14 @@ Run the commands as a user with sudo unless a step says *as the agent user* (`su
    assigned*, never another organisation's; filing, assigning and sending stay with people
    ([AGENTS.md](AGENTS.md#filed-e-mails)). Share a project of the client only when its mails may go to the agent's model.
    The reference starter needs no change.
+14. **Control level (do this before the test checklist, step 11).** The server checks every write of the agent's token
+   against its control level (*Settings > Agents >* the agent *> Control*, [AGENTS.md](AGENTS.md#control-level)). **A new
+   agent starts with `approve_all`**: it may use its own channel (chat, status, proposals) and read, but every other write
+   - a comment under a mention, a new task, a change - answers `409 approval_required` and waits for an approval card, so
+   the first test of the checklist ("Mention") would not get its comment. For the test pick `routine` (creating tasks,
+   planning them, commenting and ticking off without asking; everything else by card); `free` needs a goal and is a
+   decision for later. Deleting needs a card on every level. An agent made before 2.235.0 has no level and works without
+   this check until one is picked. The rules in step 6 already tell the agent to keep to its level.
 
 ### 2. A Linux user without sudo
 
@@ -706,7 +715,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   listen in) are collected for 2 minutes (`KALMIDO_BUNDLE_S`) and handled in **one** run that only answers, checks or asks on the
   tasks -- never builds. The run carries each task with its description and the latest comments. Pure information (`missed`,
   `playbook_proposal`, a Stop of a job the runner does not know) does not start a run; it waits as a note for the next one. With
-  `KALMIDO_OWNER_IDS=1,5` (user ids) the events of anyone else count as information too. Task events with a task (a comment, a mention)
+  `KALMIDO_OWNER_IDS=1,5` (user ids) the collected task events of anyone else count as information too (a technical filter only for these three; chat messages, mentions and comments of others still start a run, and the ids are there a rule in the rules block of the run, which the model reads). Task events with a task (a comment, a mention)
   also carry the task text. Chat messages are never held back. The collected events live in the state folder (`bundle.json`),
   a restart loses nothing.
 - **Team chat** (2.46.1): a `team_message` (an @mention in a project's channel, also one added to a message later (2.367.5), or -- in a project where the agent listens in -- any
@@ -835,8 +844,8 @@ Usage* then shows it, and the limits in the agent's dialog apply. Optional keys 
 sending: `python3 ~/kalmido/mcp/claude_usage_hook.py --dry-run ~/.config/kalmido/agent.env < /dev/null`.
 
 **Plan usage ring (2.33.0, optional).** The chat header can show how much of the agent's plan is used (Claude's 5-hour and
-weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …* (2.350.0: below
-the warning level the ring and its numbers sit in the chat header's "…" menu as "Usage: …"). Claude Code
+weekly windows) as a ring next to its name: yellow from 75 %, red from your limit with *paused until …* (since 2.407.0 the ring is always
+visible in the chat header, also below the warning level). Claude Code
 hands these values (`rate_limits`) only to a *status line* command, so set one up for the agent's interactive sessions
 (`statusLine` in `~/agent/.claude/settings.json`, script `~/agent/bin/statusline.sh` from
 [docs/AGENTS.md, Plan usage](AGENTS.md#plan-usage-the-ring-in-the-chat-header)); it sends them with
@@ -852,7 +861,7 @@ needs no entry in the agent's allow list.
 
 ### 11. Test checklist
 
-Run it before you let colleagues talk to the agent. Use a **test user** (not an admin) who shares one **test project**
+Run it before you let colleagues talk to the agent. Pick the agent's **control level** first (step 1, point 14): a new agent starts with `approve_all` and would answer the first mention with `409 approval_required`. Use a **test user** (not an admin) who shares one **test project**
 with the agent; delete both afterwards. Watch the answers and *Settings > Organisation > Agents* (the log).
 
 **Basics**
