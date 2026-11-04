@@ -61,7 +61,7 @@ const feats = st => st.settings.features.split(',');
   check([...d.querySelectorAll('[data-su-preset]')].map(b => b.dataset.suPreset).join() === 'me,home,family,team,software,office', '2.19.0: the purposes: For me, (2.22.0) Home, Family, Team, Software projects, (2.36.1) Office & finance');
   check(d.querySelector('[data-su-preset="me"]').classList.contains('on') && d.querySelector('[data-su-preset="me"]').getAttribute('aria-pressed') === 'true' && !d.querySelector('[data-su-preset="team"]').classList.contains('on'), '"For me" preselected');
   check(!d.querySelector('[data-use="comments"]').checked && !d.querySelector('[data-use="collab"]').checked && !d.querySelector('[data-use="a:life"]').checked, 'For me: comments, collaboration + Home (Family) off');  // 2.44.0 (#1187): the areas in the setup
-  check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal');
+  check([...d.querySelectorAll('[data-su-start]')].map(b => b.dataset.suStart).join() === ',sample,agency,software,private,import' && d.querySelector('[data-su-start=""]').classList.contains('on'), 'K21: "Start with": Empty (preselected), Sample, Agency, Software, Personal, Import (2.538.0, #4361)');
   check(!d.querySelector('#su-ptype') && !d.querySelector('[data-su-sample]'), 'K21: no project select, no sample checkbox any more');
   click(w, d.querySelector('[data-su-preset="family"]')); await sleep(100);
   check(d.querySelector('[data-su-preset="family"]').classList.contains('on'), '"Family" picked');
@@ -125,6 +125,18 @@ const feats = st => st.settings.features.split(',');
   click(w, ask.querySelector('[data-m="no"]')); await sleep(400);
   st = await api(jar, 'GET', '/api/state');
   check(st.collab_all === false && !d.querySelector('.modal.collabask'), '"Not now": stays off');
+  w.close();
+
+  // ---- 2b: 2.538.0 (#4361): the card "Import from another app" starts empty (no project type, no sample) and leaves the flag for main.js
+  fresh();
+  jar = {}; w = await open(jar); d = w.document;
+  await step1(w);
+  click(w, d.querySelector('[data-su-start="import"]')); await sleep(100);
+  check(d.querySelector('[data-su-start="import"]').classList.contains('on') && !d.querySelector('[data-su-start=""]').classList.contains('on') && /Todoist/.test(d.querySelector('[data-su-start="import"]').textContent), '#4361: the Import card is marked and names the sources');
+  click(w, d.querySelector('[data-su="go"]')); await sleep(800);
+  st = await api(jar, 'GET', '/api/state');
+  check(st.settings.purpose === 'me' && !(st.error), '#4361: setup with the Import card goes through (no project type "import" sent)');
+  check(w.sessionStorage.getItem('kalmido-suimport') === '1', '#4361: the flag for "open Settings > Data after the reload" is set');
   w.close();
 
   // ---- 3: preset "Team" (everything but Family)

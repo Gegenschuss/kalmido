@@ -2329,7 +2329,7 @@ version: your data is moved to the user `admin` (or `AUTH_BOOTSTRAP_USER`); give
 
 **Single sign-on via your reverse proxy:** set `AUTH_PROXY_HEADER` (e.g. `Remote-User`) and
 `AUTH_TRUSTED_PROXIES`, then enter each person's proxy user name as *SSO login* in *Settings > Organisation > People*. A logged-in
-proxy user without an Kalmido account sees a "no account, ask the admin" page. Without the header (or from an
+proxy user without a Kalmido account sees a "no account, ask the admin" page. Without the header (or from an
 untrusted address) Kalmido falls back to its own login page.
 
 **Two-factor, passkeys, OpenID Connect:** the built-in login can ask for a second factor (authenticator app,
@@ -2466,7 +2466,7 @@ except these paths:
 | `/mail/off/*` | The link in a notification mail that turns it off. A mail client has no login. |
 | `/mcp`, `/oauth/*`, `/.well-known/oauth-*` | Hosted MCP access (when switched on): apps bring their own token; the consent page asks for the sign-in itself. |
 | `POST /api/hooks/*` | Incoming webhooks (Git, issues, deploy, payments, tasks). The other service has no login; the token in the header or address protects them. |
-| `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with an Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](API.md#behind-a-reverse-proxy) for nginx and Traefik). |
+| `/api/v1/*` **with** `Authorization: Bearer abk_...` | REST API. Scripts have a token, not a login cookie. Only let requests with a Kalmido token past the login, and send them to the app port where the proxy header is not trusted (see [docs/API.md](API.md#behind-a-reverse-proxy) for nginx and Traefik). |
 
 Example for Caddy with Authelia (single sign-on). The `route` keeps the order: first strip any client-sent
 `Remote-*` headers, then let `forward_auth` set the real ones:

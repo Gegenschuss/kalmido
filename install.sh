@@ -350,10 +350,23 @@ set_public_url() {
   say "Set PUBLIC_URL=$URL in .env"
 }
 
+# 2.538.0 (#4361): another KALMIDO_PORT on an existing install: a PUBLIC_URL that still is the old localhost address follows it
+# (an own address, KALMIDO_URL or a changed line stays as it is)
+follow_port_url() {
+  [ -z "$URL" ] || return 0
+  cur=$(sed -n 's/^PUBLIC_URL=//p' "$DIR/.env" | tail -n 1)
+  printf '%s' "$cur" | grep -Eq '^http://localhost:[0-9]+$' || return 0
+  [ "$cur" != "http://localhost:$PORT" ] || return 0
+  sed -i.bak "s|^PUBLIC_URL=.*|PUBLIC_URL=http://localhost:$PORT|" "$DIR/.env" && rm -f "$DIR/.env.bak"
+  chmod 600 "$DIR/.env"
+  say "Set PUBLIC_URL=http://localhost:$PORT in .env (it followed the new port)"
+}
+
 write_env() {
   if [ -f "$DIR/.env" ]; then
     say "Keeping your existing .env"
     set_public_url
+    follow_port_url
     ensure_pg_password
     ensure_compose_profiles
     return
@@ -435,7 +448,11 @@ or give Docker more addresses: add this to /etc/docker/daemon.json (Docker Deskt
 and restart Docker. Then run this installer again."
   fi
   if [ "$rc" != 0 ] && grep -qi "address already in use\|port is already allocated" "$log"; then
-    die "Port $PORT is already in use. Pick another one, for example: KALMIDO_PORT=3050"
+    # 2.538.0 (#4361): a command that can be pasted as it is; update.sh exists only after a first successful start
+    if [ -f "$DIR/update.sh" ]; then again="KALMIDO_PORT=3050 \"$DIR/update.sh\""
+    else again="curl -fsSL ${KALMIDO_INSTALLER_URL:-$GH/releases/latest/download/install.sh} | KALMIDO_PORT=3050 sh"; fi
+    die "Port $PORT is already in use. Pick another one and run this again (your data is kept; PUBLIC_URL in .env follows while it still points to localhost):
+  $again"
   fi
   [ "$rc" = 0 ] || die "docker compose up failed (see above, log in $log)."
   rm -f "$log"
@@ -534,7 +551,7 @@ main() {
     UPDATE=1
     say "Existing installation found: updating (your .env and data/ are kept, the database is backed up first)."
   elif [ -e "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
-    die "$DIR exists and is not an Kalmido installation. Choose another folder with KALMIDO_DIR."
+    die "$DIR exists and is not a Kalmido installation. Choose another folder with KALMIDO_DIR."
   fi
 
   step "Checking Docker"
@@ -582,8 +599,11 @@ main() {
   fi
   say "Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs/SELF-HOSTING.md"  # 2.61.0
   say "Stop:       cd \"$DIR\" && docker compose down"
-  say "Uninstall:  cd \"$DIR\" && docker compose down && docker image rm ${IMAGE:-kalmido:local}"
-  say "            then delete the folder (this deletes your tasks)"
+  # 2.538.0 (#4361): down -v also removes the named volumes (virus-scan database, temp); pgdata/ is a folder written by the
+  # database container (user 999 inside the postgres image), so on Linux a plain rm fails on it
+  say "Uninstall:  cd \"$DIR\" && docker compose --profile '*' down -v && docker image rm ${IMAGE:-kalmido:local} postgres:17 clamav/clamav:1.4"
+  say "            (images you never pulled give a harmless \"No such image\"). Then delete the folder: sudo rm -rf \"$DIR\""
+  say "            This deletes all your tasks and cannot be undone: copy data/backups/ and secret/kalmido.key elsewhere first if you want them."
   say "Use it from other devices: put it behind a reverse proxy with HTTPS, see"
   say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples/)"
 }

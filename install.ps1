@@ -129,7 +129,7 @@
   if ($Update) {
     Say 'Existing installation found: updating (your .env and data\ are kept, the database is backed up first).'
   } elseif ((Test-Path $Dir) -and (Get-ChildItem -Force $Dir | Select-Object -First 1)) {
-    Fail "$Dir exists and is not an Kalmido installation. Choose another folder with `$env:KALMIDO_DIR."
+    Fail "$Dir exists and is not a Kalmido installation. Choose another folder with `$env:KALMIDO_DIR."
   }
 
   # --- Docker ---
@@ -277,6 +277,14 @@
       else { $envText = $envText.TrimEnd("`n") + "`n`nPUBLIC_URL=$PubUrl`n" }
       [IO.File]::WriteAllText($envFile, $envText, (New-Object Text.UTF8Encoding($false)))
       Say "Set PUBLIC_URL=$PubUrl in .env"
+    } else {
+      # 2.538.0 (#4361): another KALMIDO_PORT on an existing install: a PUBLIC_URL that still is the old localhost address follows it
+      $envText0 = [IO.File]::ReadAllText($envFile)
+      if ($envText0 -match '(?m)^PUBLIC_URL=http://localhost:\d+\r?$' -and $envText0 -notmatch "(?m)^PUBLIC_URL=http://localhost:$Port\r?$") {
+        $envText0 = [regex]::Replace($envText0, '(?m)^PUBLIC_URL=http://localhost:\d+(\r?)$', "PUBLIC_URL=http://localhost:$Port`$1")
+        [IO.File]::WriteAllText($envFile, $envText0, (New-Object Text.UTF8Encoding($false)))
+        Say "Set PUBLIC_URL=http://localhost:$Port in .env (it followed the new port)"
+      }
     }
   } else {
     $tz = 'UTC'
@@ -384,7 +392,8 @@
       Fail "Docker has no free address range for a new network. Either remove the networks no container uses:`n  docker network prune`nor give Docker more addresses: add this in Docker Desktop under Settings > Docker Engine`n  `"default-address-pools`": [{`"base`": `"10.200.0.0/16`", `"size`": 24}]`nand restart Docker. Then run this installer again."
     }
     if ($rc -ne 0 -and (Select-String -Path $log -Pattern 'address already in use|port is already allocated|access permissions' -Quiet)) {
-      Fail "Port $Port is already in use. Pick another one, for example: `$env:KALMIDO_PORT = '3050'"
+      $again = if (Test-Path (Join-Path $Dir 'update.ps1')) { "`$env:KALMIDO_PORT = '3050'; powershell -ExecutionPolicy Bypass -File `"$Dir\update.ps1`"" } else { "`$env:KALMIDO_PORT = '3050'; and run the install command again" }
+      Fail "Port $Port is already in use. Pick another one and run this again (your data is kept; PUBLIC_URL in .env follows while it still points to localhost):`n  $again"
     }
     if ($rc -ne 0) { Fail "docker compose up failed (see above, log in $log)." }
     Remove-Item -Force $log -ErrorAction SilentlyContinue
@@ -478,8 +487,10 @@
   Say 'Virus scan: ClamAV checks every upload (about 1-1.5 GB RAM); small server: KALMIDO_CLAMD= in .env, see docs\SELF-HOSTING.md'  # 2.61.0
   Say "Stop:       cd `"$Dir`"; docker compose down"
   $img = if ($script:Image) { $script:Image } else { 'kalmido:local' }
-  Say "Uninstall:  cd `"$Dir`"; docker compose down; docker image rm $img"
-  Say '            then delete the folder (this deletes your tasks)'
+  # 2.538.0 (#4361): down -v also removes the named volumes; on Windows the folder (incl. pgdata) is deleted like any other
+  Say "Uninstall:  cd `"$Dir`"; docker compose --profile '*' down -v; docker image rm $img postgres:17 clamav/clamav:1.4"
+  Say "            (images you never pulled give a harmless `"No such image`"). Then delete the folder: Remove-Item -Recurse -Force `"$Dir`""
+  Say '            This deletes all your tasks and cannot be undone: copy data\backups\ and secret\kalmido.key elsewhere first if you want them.'
   Say 'Use it from other devices: put it behind a reverse proxy with HTTPS, see'
   Say "            $GH/blob/main/docs/SELF-HOSTING.md#reverse-proxy-and-network (templates for Caddy, nginx, Traefik in examples\)"
 }

@@ -184,6 +184,32 @@ with open(os.path.join(ROOT, "docs", "SELF-HOSTING.md"), encoding="utf-8") as f:
 check("## From localhost to your own address" in DOC and "(#from-localhost-to-your-own-address)" in DOC and "KALMIDO_URL=https://tasks.example.com ./update.sh" in DOC, "#4356: the docs have the section")
 check("change the port line in `docker-compose.yml`" not in DOC and "ports: !override" in DOC, "#4356: the docs no longer advise a change that the next update overwrites")
 
+# ------------------------------------------------------------------ 2.538.0 (#4361)
+def env_port(env_text, port, **env):
+    d = folder()
+    with open(os.path.join(d, ".env"), "w", encoding="utf-8") as f:
+        f.write(env_text)
+    rc, out, err = run('DIR="%s"; PORT=%s; URL="${KALMIDO_URL:-}"; follow_port_url' % (d, port), **env)
+    with open(os.path.join(d, ".env"), encoding="utf-8") as f:
+        return rc, out + err, f.read()
+
+
+rc, out, t = env_port(OLDENV, 3050)
+check(rc == 0 and t == OLDENV.replace("localhost:3040", "localhost:3050") and "followed the new port" in out, f"#4361: a new port: PUBLIC_URL follows while it is localhost ({rc} {t})")
+rc, out, t = env_port(OLDENV.replace("http://localhost:3040", "https://tasks.example.com"), 3050)
+check(rc == 0 and "https://tasks.example.com" in t and "3050" not in t, f"#4361: an own address stays ({t})")
+rc, out, t = env_port(OLDENV, 3040)
+check(rc == 0 and t == OLDENV, "#4361: the same port changes nothing")
+rc, out, t = env_port(OLDENV, 3050, KALMIDO_URL="https://tasks.example.com")
+check(rc == 0 and t == OLDENV, "#4361: with KALMIDO_URL the port step leaves PUBLIC_URL alone")
+check('write_env' in SH and SH.index("set_public_url\n    follow_port_url") > 0, "#4361: write_env calls follow_port_url for an existing .env")
+check("KALMIDO_PORT=3050 \\\"$DIR/update.sh\\\"" in SH and "$DIR/update.sh" in SH and "run this again" in SH, "#4361: the port message gives a command to paste")
+check("KALMIDO_PORT = '3050'" in PS and "update.ps1" in PS and "PUBLIC_URL in .env follows" in PS, "#4361: install.ps1 gives the command too and moves PUBLIC_URL")
+for name, txt in (("install.sh", SH), ("install.ps1", PS)):
+    check("down -v" in txt and "docker image rm" in txt and "postgres:17" in txt and "cannot be undone" in txt, f"#4361: {name} uninstall text: volumes, images, folder, warning")
+    check("an Kalmido" not in txt, f"#4361: {name} says 'a Kalmido'")
+check("sudo rm -rf" in SH and "sudo" not in PS, "#4361: Linux/macOS need sudo for pgdata (written by the database user), Windows does not")
+
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2513_installer: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

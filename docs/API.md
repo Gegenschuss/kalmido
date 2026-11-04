@@ -911,7 +911,7 @@ action:
       title: "Hang up the laundry"
 ```
 
-For the other direction (Kalmido tells Home Assistant), add a Home Assistant webhook trigger and point an Kalmido
+For the other direction (Kalmido tells Home Assistant), add a Home Assistant webhook trigger and point a Kalmido
 webhook at `https://homeassistant.example.com/api/webhook/<id>`. Home Assistant cannot check the signature, so use a
 long random webhook id.
 
@@ -1154,7 +1154,7 @@ default bridge a proxy on the host arrives from the docker bridge gateway 172.17
 2.78: set `KALMIDO_TRUSTED_PROXIES=127.0.0.1,::1,172.17.0.1` for that setup.
 
 If your proxy puts a login (Authelia, Authentik, oauth2-proxy, ...) in front of Kalmido, API clients cannot pass it:
-they have a token, not a login cookie. Let requests to `/api/v1/` **that carry an Kalmido token** bypass the login, and
+they have a token, not a login cookie. Let requests to `/api/v1/` **that carry a Kalmido token** bypass the login, and
 keep everything else behind it. Send them to the app port where the proxy's user header is **not** trusted (if you use
 `AUTH_PROXY_PORT`, the normal port 3040, not the proxy port), and keep stripping client-sent `Remote-*` headers. The API
 ignores that header and cookies anyway, but this way a mistake in one place does not open anything.
