@@ -384,14 +384,34 @@ version: [Upgrade to 2.37](#upgrade-to-237-postgresql-required).
   break the URL. `POSTGRES_PASSWORD` is only read when `./pgdata` is created; to change it later, also run
   `ALTER ROLE kalmido PASSWORD '...'` inside the database.
 - **Settings of the `db` service.** `POSTGRES_INITDB_ARGS=--data-checksums` (damaged pages are reported, not read
-  silently; only takes effect when `./pgdata` is created), `max_connections=100`, a `pg_isready` health check that
+  silently; only takes effect when `./pgdata` is created), memory settings for a 1 GB limit (see "Memory of the
+  database" below), a `pg_isready` health check that
   Kalmido waits for, and no published port. Keep the image on major version 17 (see "major upgrade" below).
 - **Extensions need the database owner.** `init_db` creates `unaccent` and `pg_trgm` (both trusted extensions in the
   official image). With an external server, the user in `DATABASE_URL` must own the database, or create them once yourself.
-- **Connections.** Kalmido keeps up to 80 connections (`KALMIDO_DB_POOL_MAX`); `max_connections` of the server must be
-  higher (the default 100 is enough for one instance). Since 2.102 the pool follows the web threads (`KALMIDO_THREADS`,
+- **Connections.** Kalmido keeps up to 40 connections (24 threads + 16, `KALMIDO_DB_POOL_MAX`; 80 before 2.521);
+  `max_connections` of the server must be higher (pool + 6 direct ones + a reserve of 5 + the superuser slots: the
+  `db` service sets 60, Postgres' own default 100 is enough too). Since 2.102 the pool follows the web threads (`KALMIDO_THREADS`,
   see [Capacity, health and a worker process](#capacity-health-and-a-worker-process)), and the start warns in the log
   when the containers could open more connections than the server allows.
+- **Memory of the database (2.521).** Every connection is a Postgres process with its own caches (about 10 MB with
+  Kalmido's tables, more on a big instance), on top come `shared_buffers` and, for a moment, `work_mem` per sort / hash
+  and `maintenance_work_mem` per vacuum / index build (up to three autovacuum workers). A container limit (`mem_limit`)
+  that is too small makes the kernel kill a backend: Postgres then ends every connection and restarts them all (the log
+  says `terminated by signal 9` and `reinitializing`), the app is away for seconds and a document being recognised starts
+  again. The `db` service takes its settings from `.env` (a change needs `docker compose up -d db`); Docker sets no
+  limit by default, the values below fit the limit you give it:
+
+  | Limit of the db container | `KALMIDO_PG_SHARED_BUFFERS` | `KALMIDO_PG_WORK_MEM` | `KALMIDO_PG_MAINTENANCE_WORK_MEM` | `KALMIDO_PG_MAX_CONNECTIONS` | Kalmido (`.env`) |
+  |---|---|---|---|---|---|
+  | 512 MB | `64MB` | `2MB` | `32MB` | `45` | `KALMIDO_THREADS=12` (pool 28) |
+  | 1 GB (the defaults) | `128MB` | `4MB` | `64MB` | `60` | - (24 threads, pool 40) |
+  | 2 GB | `256MB` | `8MB` | `128MB` | `100` | - |
+
+  Measured (tests/p2521_e_dbmem_test.py: a stack of 30 parts split and recognised while 30 readers keep every thread busy,
+  limit 512 MB): 32 connections took about 290 MB of the database's own memory, i.e. about 9 MB each. Several Kalmido
+  containers on one database (`KALMIDO_REPLICAS`, a worker) each keep their own pool: `max_connections` must cover all of
+  them, the start warns otherwise.
 - **Timeouts.** A statement may run 30 s (`KALMIDO_DB_STATEMENT_TIMEOUT`, seconds, `0` = no limit; raise it for very
   large instances, for example when deleting a user with many tasks or opening office numbers over many years), a
   transaction may idle 5 minutes. At the start Kalmido waits up to 60 s for the database (`KALMIDO_DB_WAIT`).
@@ -1844,7 +1864,7 @@ instances the numbers can be set and the work can be split:
 | Variable | Default | Meaning |
 |---|---|---|
 | `KALMIDO_THREADS` | `24` | request threads of the web server |
-| `KALMIDO_DB_POOL_MAX` | threads x 3 + 8 (= 56) | database connections per container (`KALMIDO_POOL_MAX` works too) |
+| `KALMIDO_DB_POOL_MAX` | threads + 16 (= 40; 2.521, was threads x 3 + 8) | database connections per container (`KALMIDO_POOL_MAX` works too) |
 | `KALMIDO_REPLICAS` | `1` | how many Kalmido containers share the database: only for the start-up check of `max_connections` |
 | `KALMIDO_ROLE` | `all` | `all` = web + background work, `web` = requests only, `worker` = background work only |
 | `KALMIDO_LOOP_LOCKS` | `1` | `0` = every container runs its background loops (the behaviour before 2.102; only for diagnosis) |

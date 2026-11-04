@@ -84,8 +84,13 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       # page checksums: damaged pages are reported instead of read silently
       POSTGRES_INITDB_ARGS: --data-checksums
-    # Kalmido keeps up to 80 connections (24 threads x 3 + 8) (KALMIDO_DB_POOL_MAX); the server must allow more
-    command: ["postgres", "-c", "max_connections=100"]
+    # 2.521.0 (#4475): memory settings that fit a database limited to 1 GB (mem_limit, if you set one; Docker sets none by
+    # default). Every connection is a process of its own (some 10 MB); Kalmido keeps up to 40 of them (24 threads + 16,
+    # KALMIDO_DB_POOL_MAX), the server must allow more (+ 6 direct ones + a reserve). Other limits (512 MB, 2 GB): set the
+    # variables in .env, the table in docs/SELF-HOSTING.md "Memory of the database".
+    command: ["postgres", "-c", "max_connections=${KALMIDO_PG_MAX_CONNECTIONS:-60}",
+              "-c", "shared_buffers=${KALMIDO_PG_SHARED_BUFFERS:-128MB}", "-c", "work_mem=${KALMIDO_PG_WORK_MEM:-4MB}",
+              "-c", "maintenance_work_mem=${KALMIDO_PG_MAINTENANCE_WORK_MEM:-64MB}"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U kalmido -d kalmido"]
       interval: 5s
