@@ -38,6 +38,7 @@ const hashTo = async (w, h) => { w.location.hash = h; await sleep(500); };
 
   // (1) a link to the calendar: the calendar opens, no tour; back in Projects the tour starts
   let w = await boot({user: 'frida', hash: 'cal'}), d = w.document;
+  await until(() => w.eval('S.route.mod') === 'cal');  // 2.516.0 (#3716): the route first, then the fixed look that no tour appeared
   await sleep(800);
   check(w.eval('S.route.mod') === 'cal' && !tour(d), 'a link to #cal opens the calendar, the tour waits ' + w.eval('S.route.mod'));
   await hashTo(w, 'today');
@@ -46,6 +47,8 @@ const hashTo = async (w, h) => { w.location.hash = h; await sleep(500); };
   // (2) leaving Projects pauses it, keys free; coming back goes on at the same step
   w.eval('tourGo(2)');
   await hashTo(w, 'cal');
+  // 2.516.0 (#3716): wait for the paused state instead of trusting the 500 ms of hashTo (red in the pre-check on a slow place)
+  await until(() => w.eval('S.route.mod') === 'cal' && !shown(d) && w.eval('TOUR.on && TOUR.paused'));
   check(w.eval('S.route.mod') === 'cal' && !shown(d) && w.eval('TOUR.on && TOUR.paused'), 'in the calendar the tour pauses (hidden) ' + w.eval(`JSON.stringify({m: S.route.mod, on: TOUR.on, p: TOUR.paused, h: location.hash, disp: document.querySelector('.tour')?.style.display})`));
   const ev = new w.KeyboardEvent('keydown', {key: 'ArrowRight', bubbles: true, cancelable: true});
   d.body.dispatchEvent(ev);
