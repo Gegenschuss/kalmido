@@ -45,6 +45,8 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   check(await until(() => calls.some(([m, p]) => m === 'PATCH' && p === '/api/tasks/' + T1)), 'A4: "Use mine" patches the right task ' + JSON.stringify(calls.map(c => c[0] + ' ' + c[1])));
   check(!calls.some(([, p]) => /undefined|null/.test(p)), 'A4: never PATCH /api/tasks/undefined');
   check(await until(async () => (await call('GET', '/api/tasks/' + T1)).priority === 5), 'A4: the server has my priority');
+  // the resolved conflict leaves the list (a real state to wait for: the next case counts the entries)
+  check(await until(() => w.eval('S.conflicts.length') === 0), 'A4: "Use mine" resolved the conflict ' + JSON.stringify(w.eval('S.conflicts')));
   md?.remove();
 
   // ================= A4: a batch answer with entries of two tasks (as the service worker hands it over: swres)
