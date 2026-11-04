@@ -6,7 +6,7 @@ OX_KEEP_H hours below the data folder (exports/<org id>/, not in the backups) an
 
 What belongs to the organisation: its lists (lists.org_id, never inboxes) with sections, members, fields, tags, status
 updates, links, milestones, history, project notes, project files, forms, playbooks and customer reports (2.81.0); every
-task of those lists (subtasks, field values, dependencies, people, history, the trash too), their comments and
+task of those lists (subtasks, field values, dependencies, people, history; not the trash), their comments and
 attachments, the time entries on those lists, the team chat channels of those lists, its calendars (ev_cals.org_id) with
 their events, its address books (books.org_id) with their contacts, its clients and the whole office (master data,
 documents with positions, payments, the office log, the archive and every file below OFFICE_DIR/<org id>) and its members
