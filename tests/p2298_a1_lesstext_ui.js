@@ -79,7 +79,12 @@ const SH = !!process.env.P2298A1_SHOTS;
       if (SH) await shot(`p2298a1-${tag}-settings-scheme-focus.png`);
       const before = await ev(`document.querySelector('#os-scheme').value`);
       // a real pointer click on a block (mousedown keeps the focus, the click inserts it)
-      const bb = await ev(`(() => { const b = document.querySelector('#ofc-set .row:has(#os-scheme) + .ofcbb [data-bb="{yy}"]'); b.scrollIntoView({block: 'center'}); const r = b.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)]; })()`);
+      // 2.536.0 (check of job/2634): on a busy machine the page still moves after the scroll; click only where the block
+      // stayed for two looks in a row (a real state, no fixed wait)
+      const BBQ = `document.querySelector('#ofc-set .row:has(#os-scheme) + .ofcbb [data-bb="{yy}"]')`;
+      await ev(`(() => { ${BBQ}.scrollIntoView({block: 'center'}); window.__bbr = ''; return 1; })()`);
+      await ready(ev, `(() => { const r = ${BBQ}?.getBoundingClientRect(); if (!r) return false; const k = [r.x, r.y, r.width].map(Math.round).join(); const same = k === window.__bbr; window.__bbr = k; return same && r.width > 2; })()`);
+      const bb = await ev(`(() => { const r = ${BBQ}.getBoundingClientRect(); return [Math.round(r.x + r.width / 2), Math.round(r.y + r.height / 2)]; })()`);
       await cmd('input.performActions', {context: ctx, actions: [{type: 'pointer', id: 'm', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: bb[0], y: bb[1]}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]});
       check(await ready(ev, `document.querySelector('#os-scheme').value !== ${JSON.stringify(before)} && document.querySelector('#os-scheme').value.includes('{yy}')`), 'number scheme: a click on a block inserts it' + T);
       check(await ev(`document.activeElement?.id === 'os-scheme'`) && await ev(vis('#ofc-set .row:has(#os-scheme) + .ofcbb')), 'number scheme: the focus stays in the field, the blocks stay' + T);
