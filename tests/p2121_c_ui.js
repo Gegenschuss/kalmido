@@ -41,8 +41,10 @@ function textPdf(line) {
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   await call(CA, 'PUT', '/api/office/settings', {lang: 'de', company_fields: {name: 'Studio Beispiel GmbH', street: 'Teststrasse 1', zip: '20000', city: 'Hamburg', country: 'DE'}});
   const cl = await call(CA, 'POST', '/api/clients', {name: 'Kunde Eins GmbH', street: 'Weg 1', zip: '10000', city: 'Berlin', country: 'DE'});
+  // 2.522.0 (#4433): receipts live in the office; the office's own upload (bookkeeping) sends area=office, an upload without it
+  // is a private document and its sheet offers only "Move to office" (no suggestion card)
   const upload = async (name) => {
-    const fd = new FormData(); fd.append('ws', 'private'); fd.append('files', new Blob([textPdf(name)], {type: 'application/pdf'}), name + '.pdf');
+    const fd = new FormData(); fd.append('ws', 'private'); fd.append('area', 'office'); fd.append('files', new Blob([textPdf(name)], {type: 'application/pdf'}), name + '.pdf');
     const rr = await fetch(B + 'api/docs', {method: 'POST', headers: {'X-Requested-With': 'kalmido', Cookie: CA}, body: fd});
     const j = await rr.json(); const id = (j.ids || [])[0];
     for (let i = 0; i < 60; i++) { const d = await call(CA, 'GET', `/api/docs/${id}`); if (d.state !== 'wait' && d.state !== 'run') break; await sleep(500); }
