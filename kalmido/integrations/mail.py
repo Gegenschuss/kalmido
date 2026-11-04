@@ -162,6 +162,47 @@ def _mail_decor(part, name, cids):
     return size < MAIL_DECOR_MAX and (not name or (cid and cid in cids))
 
 
+MAIL_HTML_MAX = 2 * 1024 * 1024  # 2.519.0 B (#4378): the HTML part is cut to this before its tags go
+_MAIL_HTML_NL = re.compile(r"(?i)br\s*/?|/p|/div|/li|/h\d")
+
+
+def mail_html_plain(h):
+    """2.519.0 B (#4378): the text of an HTML mail part in one pass (str.find, no regex over the whole part): <script> / <style>
+    with their content go, <br> </p> </div> </li> </hN> become a line break, every other tag goes; the same text as the regexes
+    before, but linear: a part with 100.000 <script> without an end tag (or 1 MB of "<") took minutes there and held the mail
+    poll and the background gate."""
+    h = h[:MAIL_HTML_MAX]
+    low, out, i, n, gone = h.lower(), [], 0, len(h), set()
+    while i < n:
+        j = h.find("<", i)
+        if j < 0:
+            out.append(h[i:])
+            break
+        out.append(h[i:j])
+        k = h.find(">", j + 1)
+        if k < 0:  # no tag any more: the rest is text (as before)
+            out.append(h[j:])
+            break
+        if k == j + 1:  # "<>" is no tag
+            out.append("<")
+            i = j + 1
+            continue
+        tag = low[j + 1:k]
+        for name in ("script", "style"):
+            if tag.startswith(name) and name not in gone:
+                e = low.find("</" + name + ">", k + 1)
+                if e < 0:
+                    gone.add(name)  # no end tag after here: never searched again (a plain tag from now on)
+                else:
+                    k = e + len(name) + 2
+                    tag = ""
+                break
+        if tag and _MAIL_HTML_NL.fullmatch(tag):
+            out.append("\n")
+        i = k + 1
+    return "".join(out)
+
+
 def mail_text(msg, limit=MAIL_BODY_MAX, att_images=False):
     """(text, [(name, mime, bytes)]) of an email.message.EmailMessage: text/plain preferred, else HTML without tags.
     2.84.0 (#1198): limit = characters kept (the hub files longer texts). att_images (2.424.0 B2, #3450, the documents
@@ -194,10 +235,7 @@ def mail_text(msg, limit=MAIL_BODY_MAX, att_images=False):
         elif ctype == "text/html" and html_ is None:
             html_ = txt
     if plain is None and html_:
-        t = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", "", html_)
-        t = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</li>|</h\d>", "\n", t)
-        t = re.sub(r"<[^>]+>", "", t)
-        plain = html.unescape(t)
+        plain = html.unescape(mail_html_plain(html_))
     text = re.sub(r"\n{3,}", "\n\n", (plain or "").replace("\r\n", "\n")).strip()
     return text[:limit], files
 
@@ -392,6 +430,8 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False, prefet
                 continue
         typ, parts = M.uid("FETCH", u, "(RFC822)")
         raw = next((p[1] for p in parts if isinstance(p, tuple) and len(p) > 1), None)
+        if raw:  # 2.519.0 B (#4378): seen before it is handled: a mail whose import is cut off (time over, the connection
+            M.uid("STORE", u, "+FLAGS", "(\\Seen)")  # closed) does not come back in every round (a failed one stays seen as before)
         done = False
         pre = None
         if raw and prefetch:
