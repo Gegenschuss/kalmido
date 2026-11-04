@@ -16,6 +16,7 @@ from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
 from ..core.access import collab_all, Denied, list_people, list_role, MANAGE_ROLES, need_feat, need_task, task_visible, pvis
 from ..core.serializers import unlink_files
 from ..tasks.tasks import WEB_COMMENT
+from ..tasks.validation import ACT_NOTES  # 2.394.0 C (#3377)
 from ..tasks.attachments import save_attachments
 from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
@@ -370,6 +371,9 @@ def comment_create(tid):
     wh_note(c, tid, "comment", cid=cid)
     from ..notify.channels import chn_note
     chn_note(c, tid, "comment", cid=cid)  # 2.142.0 A (#2145): organisation channels / channels of own lists
+    if not portal and not sug and not chs:  # 2.394.0 C (#3377): a comment of a linked task goes to its issue
+        for f in ACT_NOTES:
+            f(c, tid, "comment", cid)
     bump(c)
     c.commit()
     send_pushes(pushes)

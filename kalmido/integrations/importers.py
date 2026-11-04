@@ -26,7 +26,7 @@ from ..core.serializers import csv_uncell
 from ..core.pages import valid_url
 from ..lists.lists import FOLDER_MAX, folder_seg, LIST_NAME_MAX
 from ..tasks.validation import (
-    as_int, clean_reminders, clean_task, CONTENT_MAX, depth, DURATION_MAX, PRIORITIES,
+    as_int, clean_reminders, clean_task, CONTENT_MAX, depth, DURATION_MAX, POINTS, PRIORITIES, TICKET_TYPES,
     REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, TITLE_MAX, valid_date, valid_hm,
 )
 from ..tasks.tasks import set_tags
@@ -108,9 +108,21 @@ IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "m
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
                   "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown",
                   "ticktick": "TickTick"}  # 2.363.2 (#3104): the shared way (preview, undo, limits)
+IMPORT_SOURCES["linear"] = "Linear"  # 2.394.0 A (#3377): API key or CSV export (integrations/imp_linear.py)
 IMPORT_OPTS = ("dry_run", "target", "mode", "archived", "completed", "list_name", "priority_scale", "space")
+IMPORT_OPTS += ("api_key",)  # 2.394.0 A (#3377): a source's own API key, for this one request (never stored, IMPORT_FETCHERS)
+# 2.394.0 A (#3377): sources that can fetch their data with a key instead of a file: {source: fetch(key, opts, plan)}
+# (registered by their module, e.g. integrations/imp_linear.py); the key lives only in this request
+IMPORT_FETCHERS = {}
 IMPORT_SAMPLES = 8
 csv.field_size_limit(max(csv.field_size_limit(), 4 * CONTENT_MAX))
+# 2.394.0 B (#3377): sources that come through a repository connection, not a file (kalmido/integrations/git_issues.py):
+# names for the import record and the history only, no parser, never offered for an upload
+IMPORT_SOURCES_CONN = {"github": "GitHub Issues", "gitlab": "GitLab Issues"}
+
+
+def imp_name(src):
+    return IMPORT_SOURCES.get(src) or IMPORT_SOURCES_CONN.get(src) or src
 _IMP_CTRL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u202a-\u202e\u2066-\u2069]")
 
 
@@ -268,7 +280,8 @@ def imp_warn(plan, key, title=None, *a):
 def imp_task(L, ext, title, **k):
     t = {"ext": str(ext)[:200], "title": imp_line(title), "notes": "", "priority": 0, "status": 0, "due": None, "due_time": None,
          "start": None, "repeat": "", "repeat_from": "due", "reminders": [], "tags": [], "section": None, "parent": None,
-         "completed_at": None, "created_at": None, "url": None, "duration": None, "assignee": None}
+         "completed_at": None, "created_at": None, "url": None, "duration": None, "assignee": None,
+         "points": None, "ttype": "", "sprint": None}  # 2.394.0 A (#3377): story points, ticket type, sprint name
     t.update(k)
     if t["section"]:
         t["section"] = imp_line(t["section"], LIST_NAME_MAX) or None
@@ -286,6 +299,33 @@ def imp_addnote(t, text):
     text = imp_textblock(text)
     if text:
         t["notes"] = (t["notes"] + "\n\n" + text) if t["notes"] else text
+
+
+# 2.394.0 A (#3377): issue types of other trackers -> the built-in ticket types (lower case; unknown ones stay text)
+IMP_TTYPE = {"bug": "bug", "defect": "bug", "fehler": "bug", "story": "feature", "user story": "feature", "epic": "feature",
+             "new feature": "feature", "feature": "feature", "improvement": "feature", "enhancement": "feature",
+             "task": "task", "sub-task": "task", "subtask": "task", "aufgabe": "task", "unteraufgabe": "task"}
+
+
+def imp_ttype(v):
+    """2.394.0 A (#3377): an issue type / a label -> 'bug' | 'feature' | 'task' | '' (not understood)."""
+    return IMP_TTYPE.get(re.sub(r"\s+", " ", str(v or "").strip().lower()), "")
+
+
+def imp_points(t, v, label):
+    """2.394.0 A (#3377): an estimate -> t["points"] when it is one of the story points here (1, 2, 3, 5, 8, 13); another
+    number or text goes into the notes (label: the source's own word)."""
+    s = str(v if v is not None else "").strip().replace(",", ".")
+    if not s:
+        return
+    try:
+        n = float(s)
+    except ValueError:
+        n = None
+    if n is not None and n.is_integer() and int(n) in POINTS:
+        t["points"] = int(n)
+    elif n != 0:
+        imp_addnote(t, f"{label}: {imp_line(s, 100)}")
 
 
 # ---- dates
@@ -1816,10 +1856,12 @@ def parse_clickup(data, fname, opts, plan):
 
 
 # ---- Jira (CSV export of an issue search: "Export > CSV (all fields / current fields)")
-JIRA_NOTE_COLS = (("sprint", N_("Sprint")), ("components", N_("Components")),
+# 2.394.0 A (#3377): sprint and story points are fields now (tasks.sprint_id / points); a value that does not fit stays a note
+JIRA_NOTE_COLS = (("components", N_("Components")),
                   ("fix version/s", N_("Fix version")), ("affects version/s", N_("Affects version")), ("reporter", N_("Reporter")),
-                  ("resolution", N_("Resolution")), ("custom field (story points)", N_("Story points")),
+                  ("resolution", N_("Resolution")),
                   ("custom field (epic link)", N_("Epic")), ("custom field (epic name)", N_("Epic")))
+JIRA_POINTS = ("custom field (story points)", "custom field (story point estimate)")
 
 
 def parse_jira(data, fname, opts, plan):
@@ -1855,8 +1897,18 @@ def parse_jira(data, fname, opts, plan):
             rv = one(r, "resolved")
             rd = imp_anydate(rv) if rv else (None, None)
             t.update(status=st, completed_at=imp_ts(f"{rd[0]} {rd[1] or '12:00'}") if rd[0] else iso(now_utc()))
-        head = " · ".join(x for x in (key, imp_line(one(r, "issue type"), 100)) if x)
+        # 2.394.0 A (#3377): the issue type -> the ticket type (an unknown type stays in the head line), the story points,
+        # the sprint (the last one of a carried-over issue; imp_run puts the task into it or keeps it as a note)
+        ity = imp_line(one(r, "issue type"), 100)
+        t["ttype"] = imp_ttype(ity)
+        head = " · ".join(x for x in (key, "" if t["ttype"] else ity) if x)
         imp_addnote(t, "Jira: " + head if head else "")
+        for k in JIRA_POINTS:
+            if one(r, k).strip():
+                imp_points(t, one(r, k), tr("Story points"))
+                break
+        sprints = [imp_line(x, 100) for x in r.get("sprint") or [] if imp_line(x, 100)]
+        t["sprint"] = sprints[-1] if sprints else None
         imp_addnote(t, one(r, "description"))
         lines = []
         for k, label in JIRA_NOTE_COLS:
@@ -1994,6 +2046,41 @@ def imp_clean(plan, t):
         return clean_task({"title": b["title"], "content": b["content"]})
 
 
+IMP_SPRINT_DAYS = 14  # 2.394.0 A (#3377): length of a sprint the import creates (the file knows only its name)
+
+
+def imp_sprint(c, lid, name, uid, cache, created):
+    """2.394.0 A (#3377): the sprint called `name` of list lid (its own name or "Sprint <n>", any case) -> id; created as a
+    planned sprint right after the list's last one when the list has none of that name. None while sprints are off for the
+    list (the caller keeps the name as a note). cache: {(lid, lower name): id | None} of this run; created: ids it made.
+    Plain SQL like lists/sprints.py (a later module): one write lock per list, num counts up."""
+    k = (lid, name.lower())
+    if k in cache:
+        return cache[k]
+    r = c.execute("SELECT sprint_cfg, is_inbox FROM lists WHERE id=?", (lid,)).fetchone()
+    try:
+        cfg = json.loads(r["sprint_cfg"]) if r and r["sprint_cfg"] else {}
+    except (TypeError, ValueError):
+        cfg = {}
+    if not r or r["is_inbox"] or not isinstance(cfg, dict) or cfg.get("on") is not True:
+        cache[k] = None
+        return None
+    write_lock(c, f"sprints:{lid}")
+    rows = c.execute("SELECT id, num, name, end_day FROM sprints WHERE list_id=? ORDER BY num", (lid,)).fetchall()
+    hit = next((x["id"] for x in rows if (x["name"] or f"Sprint {x['num']}").strip().lower() == name.lower()), None)
+    if not hit:
+        last = max((x["end_day"] for x in rows), default=None)
+        start = date.fromisoformat(last) + timedelta(days=1) if last else local_now().date()
+        weeks = cfg.get("weeks") if cfg.get("weeks") in (1, 2) else 0
+        end = start + timedelta(days=(7 * weeks or IMP_SPRINT_DAYS) - 1)
+        num = (max((x["num"] for x in rows), default=0) or 0) + 1
+        hit = insert_id(c, "INSERT INTO sprints(list_id,num,name,start,end_day,goal,state,created_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)",
+                        (lid, num, name[:100], start.isoformat(), end.isoformat(), "", "planned", iso(now_utc()), uid))
+        created.append(hit)
+    cache[k] = hit
+    return hit
+
+
 def imp_run(c, uid, plan, opts, dry):
     """Writes the plan for user uid in one transaction (dry: executes, then rolls back). -> report dict."""
     lg = lang(c, uid)
@@ -2012,10 +2099,13 @@ def imp_run(c, uid, plan, opts, dry):
         raise Denied(409, le2b_off())
     c.commit()  # a clean transaction: nothing of this import is written before it is complete
     ts, now = iso(now_utc()), local_now()
+    if opts.get("_before"):  # 2.394.0 C (#3377 review of B): the caller's lock + last check in this transaction (may drop tasks)
+        opts["_before"](c, plan)
     src = plan["source"]
-    created = {"lists": [], "sections": [], "tasks": []}
+    created = {"lists": [], "sections": [], "tasks": [], "sprints": []}  # 2.394.0 A (#3377): + sprints
     report_lists, idmap, rows = [], {}, []
-    stats = {"tasks": 0, "subtasks": 0, "done": 0, "skipped": 0, "lists": 0, "sections": 0, "assigned": 0}
+    stats = {"tasks": 0, "subtasks": 0, "done": 0, "skipped": 0, "lists": 0, "sections": 0, "assigned": 0, "sprints": 0}
+    spr_cache = {}
     s_all = usettings(c, uid)
     base_t = s_all.get("allday_time") or "09:00"
     own, space = {}, opts.get("space", False)
@@ -2076,6 +2166,12 @@ def imp_run(c, uid, plan, opts, dry):
                 created["lists"].append(lid)
                 stats["lists"] += 1
                 existing = False
+                # 2.394.0 A (#3377): a new project shows what the file brings: story points, ticket types, sprints
+                ts_ = L["tasks"]
+                c.execute("UPDATE lists SET points_on=?, tickets=?, sprint_cfg=? WHERE id=?",
+                          (1 if any(t.get("points") for t in ts_) else 0, 1 if any(t.get("ttype") for t in ts_) else 0,
+                           json.dumps({"on": True, "weeks": 2, "dow": 0, "carry": True}, separators=(",", ":"))
+                           if any(t.get("sprint") and not t["status"] for t in ts_) else "", lid))
             people = list_people(c, lid) if collab else {uid}
             secs = {r["name"]: r["id"] for r in c.execute("SELECT id, name FROM sections WHERE list_id=?", (lid,))}
             sec_sort = c.execute("SELECT COALESCE(MAX(sort),0) FROM sections WHERE list_id=?", (lid,)).fetchone()[0]
@@ -2116,7 +2212,7 @@ def imp_run(c, uid, plan, opts, dry):
                     who = t["assignee"].get("name") or t["assignee"].get("email") or t["assignee"].get("username")
                     if who:
                         f["content"] = ((f.get("content") or "") + ("\n\n" if f.get("content") else "") +
-                                        tr("Assignee ({0}): {1}", IMPORT_SOURCES[src], who, lg=lg))[:CONTENT_MAX]
+                                        tr("Assignee ({0}): {1}", imp_name(src), who, lg=lg))[:CONTENT_MAX]
                 status = t["status"] if t["status"] in (0, 2, -1) else 0
                 tid = insert_id(c, """INSERT INTO tasks(list_id,section_id,title,content,priority,status,due,due_time,reminders,reminded,repeat,
                        repeat_from,sort,created_at,updated_at,completed_at,tt_id,start,duration,created_by,completed_by,assignee_id,
@@ -2128,16 +2224,29 @@ def imp_run(c, uid, plan, opts, dry):
                 idmap[t["ext"]] = tid
                 created["tasks"].append(tid)
                 rows.append((t, tid, lid))
+                # 2.394.0 A (#3377): story points, ticket type and sprint. Only open tasks go into a sprint (a finished one of
+                # an old sprint would fill a planned sprint with done work); otherwise the sprint stays a note line
+                sname = imp_line(t.get("sprint") or "", 100)  # 2.394.0 review: only control characters = no sprint
+                spr = imp_sprint(c, lid, sname, uid, spr_cache, created["sprints"]) if sname and status == 0 else None
+                if sname and not spr:
+                    c.execute("UPDATE tasks SET content=? WHERE id=?", (((f.get("content") or "") + ("\n\n" if f.get("content") else "") +
+                              f"{tr('Sprint', lg=lg)}: {sname}")[:CONTENT_MAX], tid))
+                pts = t.get("points") if t.get("points") in POINTS else None
+                tt = t.get("ttype") if t.get("ttype") in TICKET_TYPES else ""
+                if pts or tt or spr:
+                    c.execute("UPDATE tasks SET points=?, ttype=?, sprint_id=?, sprint_at=? WHERE id=?",
+                              (pts, tt, spr, ts if spr else None, tid))
                 if t["tags"]:
                     set_tags(c, tid, [x[:100] for x in t["tags"]][:50], uid)
                 c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
-                          (tid, uid, "import", json.dumps({"source": IMPORT_SOURCES[src], **({"via": "api"} if act_via() == "api" else {})}),
+                          (tid, uid, "import", json.dumps({"source": imp_name(src), **({"via": "api"} if act_via() == "api" else {})}),
                            iso_ms(now_utc())))
                 stats["tasks"] += 1
                 stats["done"] += 1 if status else 0
                 stats["assigned"] += 1 if aid else 0
                 rl["tasks"] += 1
             report_lists.append(rl)
+        stats["sprints"] = len(created["sprints"])
         for t, tid, lid in rows:  # second pass: parents (the subtask follows its parent's section)
             p = t.get("_parent")
             if p and p in idmap and idmap[p] != tid:
@@ -2147,11 +2256,14 @@ def imp_run(c, uid, plan, opts, dry):
                     stats["subtasks"] += 1
                 else:
                     imp_warn(plan, N_("Subtask in another project or in a cycle, imported as a main task"), t["title"])
-        rep = {"source": src, "source_name": IMPORT_SOURCES[src], "dry_run": bool(dry), "created": stats, "skipped": stats["skipped"],
+        rep = {"source": src, "source_name": imp_name(src), "dry_run": bool(dry), "created": stats, "skipped": stats["skipped"],
                "lists": report_lists, "import_id": None, "undo_until": None,
                "samples": [{"list": L["name"], "title": t["title"], "section": t["section"], "due": t["due"], "due_time": t["due_time"],
                             "priority": t["priority"], "status": t["status"], "tags": t["tags"][:5], "repeat": t["repeat"],
-                            "subtask": bool(t.get("_parent"))}
+                            "subtask": bool(t.get("_parent")),
+                            # 2.394.0 A (#3377)
+                            "points": t.get("points") if t.get("points") in POINTS else None, "ttype": t.get("ttype") or "",
+                            "sprint": t.get("sprint")}
                            for L in plan["lists"] for t in L["tasks"][:IMPORT_SAMPLES]][:IMPORT_SAMPLES],
                "warnings": [{"text": tr(k[0], *k[1:], lg=lg), "count": w["n"], "examples": w["ex"]}
                             for k, w in plan["warn"].items()],
@@ -2159,6 +2271,8 @@ def imp_run(c, uid, plan, opts, dry):
                **({"columns": plan["columns"]} if plan.get("columns") else {}),
                # compatibility with the TickTick import's answer
                "tasks": stats["tasks"], "new_lists": stats["lists"]}
+        if opts.get("_after"):  # 2.394.0 B (#3377): the caller's own rows in the same transaction (issue links, comments)
+            opts["_after"](c, rows, rep, dry)
         if dry:
             c.rollback()
             return rep
@@ -2220,10 +2334,21 @@ def imp_request(source):
     uid = me()
     opts = imp_opts(request.form, uid)
     f = request.files.get("file")
-    if not f:
+    # 2.394.0 A (#3377): a source with a fetcher takes its API key instead of a file; the key stays in this function's
+    # frame (not in opts, the import record, the log or an answer) and is sent once to the source's fixed address
+    key = str(request.form.get("api_key") or "").strip()
+    if key and (f or source not in IMPORT_FETCHERS):
+        raise BadInput(tr("Invalid value: {0}", "api_key"))
+    if not f and not key:
         raise BadInput(tr("File missing"))
     if hit_limit(f"import:{uid}", IMPORT_RATE, 600):
         raise Denied(429, tr("Too many imports, please wait a few minutes"))
+    if key:
+        opts["_fname"] = ""
+        plan = imp_plan(source)
+        IMPORT_FETCHERS[source](key, opts, plan)
+        del key
+        return imp_run(db(), uid, plan, opts, opts["dry_run"])
     data = f.read(IMPORT_MAX_MB * 1048576 + 1)
     if len(data) > IMPORT_MAX_MB * 1048576:
         raise Denied(413, tr("The file is too large (at most {0} MB)", IMPORT_MAX_MB))
@@ -2271,10 +2396,18 @@ def imp_undo(c, uid, iid):
     back, kept = imp_undo_split(c, uid, mine, since)
     lists, kept_lists, went = imp_undo_lists(c, uid, cr.get("lists") or [], back, since)
     imp_undo_trash(c, [i for i in back if i not in went], back, iid)
+    if r["source"] in IMPORT_SOURCES_CONN:  # 2.394.0 B (#3377): an issue taken back may be imported again
+        for i in range(0, len(back), 500):
+            c.execute(f"DELETE FROM git_issue_links WHERE task_id IN ({','.join('?' * len(back[i:i + 500]))})", back[i:i + 500])
     secs = 0
     for sid in cr.get("sections") or []:  # sections with tasks (also in the trash) stay for the restore
         if not c.execute("SELECT 1 FROM tasks WHERE section_id=?", (sid,)).fetchone():
             secs += c.execute("DELETE FROM sections WHERE id=?", (sid,)).rowcount
+    for sid in cr.get("sprints") or []:  # 2.394.0 A (#3377): a planned sprint of the import with no task left goes
+        if c.execute("SELECT 1 FROM sprints WHERE id=? AND state='planned'", (sid,)).fetchone() and \
+                not c.execute("SELECT 1 FROM tasks WHERE sprint_id=? AND deleted_at IS NULL", (sid,)).fetchone():
+            c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (sid,))
+            c.execute("DELETE FROM sprints WHERE id=?", (sid,))
     c.execute("UPDATE imports SET undone_at=? WHERE id=?", (iso(now_utc()), iid))
     bump(c)
     c.commit()
@@ -2394,7 +2527,7 @@ def imports_list():
     c, out = db(), []
     for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC", (me(),)):  # bounded by imp_prune
         until = parse_iso(r["created_at"]) + timedelta(hours=IMPORT_UNDO_HOURS)
-        out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else IMPORT_SOURCES.get(r["source"], r["source"]),
+        out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else imp_name(r["source"]),
                     "file_name": r["file_name"], "created_at": r["created_at"], "counts": _imp_report(r["report"]),
                     "undone_at": r["undone_at"], "can_undo": not r["undone_at"] and until > now_utc(), "undo_until": iso(until)})
     return jsonify(imports=out, max_mb=IMPORT_MAX_MB, max_tasks=IMPORT_MAX_TASKS)

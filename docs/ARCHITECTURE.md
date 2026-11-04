@@ -177,6 +177,7 @@ The most used helpers:
 | `calendars/icalfeed.py` | The subscribable ICS calendar feed of a user's tasks. |
 | `calendars/caldav.py` | CalDAV server for tasks (VTODO) with app passwords; the /dav/ entry point for event calendars and CardDAV too. |
 | `integrations/importers.py` | Importers: TickTick, Todoist, Trello, Asana, Microsoft To Do, ICS / VTODO, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists (preview, dry run, undo). |
+| `integrations/imp_linear.py` | 2.394.0: Linear import (personal API key, GraphQL, never stored; or the CSV export) into the importers' plan. |
 | `notify/push.py` | Notifications: ntfy, Web Push (RFC 8030 / 8291 / 8292), reminders and nags, the watchdog tick and loop. |
 | `notify/alerts.py` | Admin alerts via ntfy (recording, sending, settings). |
 | `notify/caps.py` | 2.33.0 (#927): the owner's notification template of a list / shared folder (read, work, all, custom; per person), a ceiling for pushes checked in `notif_ok`; the one-time question to owners of lists shared before. |
@@ -202,6 +203,8 @@ The most used helpers:
 | `lists/custview.py` | 2.50.0 (#329): the customer view of a public link (`public_links.cv_show`: what the customer sees, filtered on the server). |
 | `office/signoff.py` | 2.50.0 (#1200): approval links with a simple electronic signature (`office_signoffs`): accept / decline a sent quotation, acceptance of a list, section or milestone; the customer page `/s/q/<token>`. |
 | `integrations/git.py` | Git integration of project lists (GitHub, GitLab, Gitea / Forgejo, Bitbucket) and tickets for agents. |
+| `integrations/git_issues.py` | 2.394.0 (#3377): issues of a repository connection (GitHub, GitLab): fetching and the one-time import (base of the issue sync). |
+| `integrations/git_sync.py` | 2.394.0 (#3377): the two-way issue sync: pull in the git poll, changes noted per request (tasks.validation ACT_NOTES) and sent from the git loop, conflict per field. |
 | `integrations/errorreports.py` | Error reports (Sentry, GlitchTip ...) -> tickets. |
 | `api/projects.py` | The project page in the token API. |
 | `api/scopes.py` | Token scopes, approvals and the complete agent API (the routes the web client has). |

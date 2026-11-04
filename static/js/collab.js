@@ -610,7 +610,7 @@ function actText(a, U) {  // "via API" after lines written through a personal ac
   return actText0(a, U) + (a.data?.via === 'api' ? ` <span class="via">${tr('via API')}</span>` : a.data?.via === 'caldav' ? ` <span class="via">${tr('via CalDAV')}</span>`
     : a.data?.via === 'webhook' ? ` <span class="via">${tr('via webhook')}</span>` : '');  // 2.115.0 A (#2061)
 }
-const viaName = (d, id, U) => d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (client, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
+const viaName = (d, id, U) => d?.gsy ? d.gsy : d?.rule ? tr('Rule {0}', d.rule.name || '') : d?.via === 'public_link' && !id ? (d.ext_name ? tr('{0} (client, via the link)', d.ext_name) : tr('Someone via the public link')) : uname(id, U);  // 2.50.0 (#329): + the customer's name
 function actText0(a, U) {
   const d = a.data || {}, who = `<b>${esc(viaName(d, a.user_id, U))}</b>`, q = x => `<b>${esc(x)}</b>`;
   const due = () => q((d.start && d.start < d.due ? fmtDayAbs(d.start) + ' – ' : '') + fmtDayAbs(d.due) + (d.time ? ', ' + d.time : ''));
@@ -686,6 +686,7 @@ function actText0(a, U) {
     case 'restore': return tr('{0} restored the task', who);
     case 'import': return tr('{0} imported the task from {1}', who, q(d.source || ''));
     case 'git_pr': case 'git_done': return gitActText(a, d, q);  // 2.2.0 (#271)
+    case 'git_sync_lost': case 'git_sync_fail': return gsy_actText(a.kind, d);  // 2.394.0 C (#3377): gitrepo.js
     case 'err_again': return tr('The error happened again ({0}×)', d.n || 2) + (d.level ? ` <span class="muted">· ${esc(d.level)}</span>` : '');  // 2.18.0 (#408)
   }
   return tr('{0} changed the task', who);

@@ -40,7 +40,8 @@ async function dataPane(w) {
   let md = await dataPane(w);
   const src = md.querySelector('#s-imp-src'), inp = md.querySelector('#s-import'), out = () => md.querySelector('#s-imp-out');
   // 2.142.0 (#2147): Notion, Google Tasks, ClickUp, Jira, any CSV and Markdown joined the picker
-  check([...src.options].map(o => o.value).join() === 'todoist,trello,asana,mstodo,notion,gtasks,clickup,jira,ics,csv,markdown,ticktick', 'source picker: twelve sources');
+  // 2.394.0 (#3377): + linear after jira
+  check([...src.options].map(o => o.value).join() === 'todoist,trello,asana,mstodo,notion,gtasks,clickup,jira,linear,ics,csv,markdown,ticktick', 'source picker: thirteen sources');
   check(/Export as a CSV file/.test(md.querySelector('#s-imp-help').textContent) && inp.accept.includes('.zip'), 'Todoist help + file types');
   set(w, src, 'mstodo'); await sleep(50);
   check(/classic Outlook for Windows/.test(md.querySelector('#s-imp-help').textContent) && inp.accept.includes('.ics'), 'Microsoft To Do: recommended export path');

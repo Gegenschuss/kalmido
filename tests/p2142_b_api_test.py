@@ -265,9 +265,11 @@ check(pj["created"]["tasks"] == 3 and pj["created"]["subtasks"] == 1 and pj["cre
 j1, j2, j3 = task("Login bauen", ALICE), task("Passwort vergessen", ALICE), task("Altes Feature", ALICE)
 check(j1 and j1["due"] == "2025-01-31" and j1["due_time"] is None and j1["priority"] == 5 and tags(j1["id"]) == ["auth", "backend"],
       f"Jira: due date (12:00 AM = no time), priority, repeated Labels columns {dict(j1) if j1 else None}")
-check(j1 and str(j1["created_at"]).startswith("2025-01-15") and "APP-1" in j1["content"] and "Story" in j1["content"]
-      and "Sprint 1" in j1["content"] and "Max Muster" in j1["content"] and "Erika Muster" in j1["content"] and j1["assignee_id"] is None,
-      f"Jira: created, key / type / sprint / reporter / assignee (text) in the notes {j1['content'] if j1 else ''}")
+# 2.394.0 (#3377): the issue type and the sprint are fields now (ttype, sprint_id of the new project), no note lines any more
+check(j1 and str(j1["created_at"]).startswith("2025-01-15") and "APP-1" in j1["content"] and "Story" not in j1["content"]
+      and j1["ttype"] == "feature" and "Sprint 1" not in j1["content"] and j1["sprint_id"]
+      and "Max Muster" in j1["content"] and "Erika Muster" in j1["content"] and j1["assignee_id"] is None,
+      f"Jira: created, key / reporter / assignee (text) in the notes, type and sprint as fields {j1['content'] if j1 else ''}")
 check(j2 and j1 and j2["parent_id"] == j1["id"] and j2["status"] == 2 and j2["due"] == "2025-02-05" and j2["priority"] == 3
       and str(j2["completed_at"]).startswith("2025-01-20"), "Jira: sub-task via the parent's issue id, resolved date, ISO due date")
 check(j3 and j3["status"] == -1 and j3["priority"] == 1, f"Jira: resolution Won't Do = cancelled {dict(j3) if j3 else None}")

@@ -499,8 +499,10 @@ def openapi_spec():
             "date": date_s, "count": {"type": "integer", "minimum": 0, "maximum": 1000, "description": "Absolute count for the day; default: one more"},
             "note": {"type": "string", "maxLength": 500}}},
         "HabitPage": page("Habit"),
-        "ImportInput": {"type": "object", "required": ["file"], "properties": {
-            "file": {"type": "string", "format": "binary", "description": f"The export file (at most {IMPORT_MAX_MB} MB, {IMPORT_MAX_TASKS} tasks)"},
+        "ImportInput": {"type": "object", "properties": {  # 2.394.0 A (#3377): file OR api_key (linear)
+            "file": {"type": "string", "format": "binary", "description": f"The export file (at most {IMPORT_MAX_MB} MB, {IMPORT_MAX_TASKS} tasks); required unless api_key is given"},
+            "api_key": {"type": "string", "format": "password", "description": "linear only, instead of a file: a personal Linear API key (read access). Used for this one request "
+                                                                                "(a dry run and the import each need it), never stored or returned"},
             "dry_run": {"type": "boolean", "description": "true = preview only: runs the import and rolls it back"},
             "target": {"type": "string", "description": "new (default: one project per source list; an own project with the same name is reused) or the id of a project you can edit"},
             "mode": {"type": "string", "enum": ["sections", "lists"], "description": "Trello: one project with the Trello lists as sections (default) or one project per Trello list"},
@@ -513,7 +515,7 @@ def openapi_spec():
         "ImportReport": {"type": "object", "properties": {
             "source": {"type": "string"}, "dry_run": {"type": "boolean"}, "import_id": nul("integer", description="For the undo; null for a dry run"),
             "undo_until": nul("string", format="date-time"),
-            "created": {"type": "object", "properties": {k: {"type": "integer"} for k in ("tasks", "subtasks", "done", "skipped", "lists", "sections", "assigned")}},
+            "created": {"type": "object", "properties": {k: {"type": "integer"} for k in ("tasks", "subtasks", "done", "skipped", "lists", "sections", "assigned", "sprints")}},
             "skipped": {"type": "integer", "description": "Already imported earlier (same source ids)"},
             "lists": {"type": "array", "items": {"type": "object", "properties": {"name": {"type": "string"}, "list_id": {"type": "integer"}, "existing": {"type": "boolean"},
                                                                                 "tasks": {"type": "integer"}, "skipped": {"type": "integer"}, "sections": {"type": "integer"}}}},
@@ -771,7 +773,9 @@ def openapi_spec():
                                                 "ics (VTODO), "
                                                 # 2.142.0 B (#2147)
                                                 "notion (export ZIP Markdown & CSV, also a single CSV / Markdown file), gtasks (Google Takeout ZIP or Tasks.json), "
-                                                "clickup (CSV), jira (CSV), csv (any CSV, columns detected, see columns in the answer), markdown (checklists). "
+                                                "clickup (CSV), jira (CSV; issue type, story points and sprint), csv (any CSV, columns detected, see columns in the answer), markdown (checklists), "
+                                                # 2.394.0 A (#3377)
+                                                "linear (a personal API key in api_key, or Linear's CSV export: teams = projects, cycles = sprints). "
                                                 "People in a file are never matched to accounts by these six (their names go into the notes). "
                                                 "Idempotent: tasks imported before are skipped. Nothing inside the file is fetched."),
                                         "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": ref("ImportInput")}}}}},

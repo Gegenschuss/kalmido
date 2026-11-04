@@ -244,6 +244,8 @@ window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {});
 // the module when they are drawn and draw again once it is there
 window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id && vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id))) vdr_redrawTask(t.id); }, () => {}); return ''; };  // 2.96.3: one redraw, focus kept
 window.vdr_projHtml = window.vdr_clientHtml = () => { ld_later('videos'); return ''; };
+// 2.394.0 C (#3377): the history lines of the issue sync (gitrepo.js): the task panel draws again once the module is there
+window.gsy_actText = () => { loadModule('gitrepo').then(() => S.sel && renderDetail(), () => {}); return ''; };
 window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };
 // 2.65.0 (#1823) the PDF preview (pdfview.js, module pdf): its links are drawn at start, a click loads the module (moved here
 // from pdfview.js). A link that should open the preview: <a href="…" data-pview='{"url","name","size","dlUrl"}'>; a modifier

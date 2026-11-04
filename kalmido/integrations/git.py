@@ -99,6 +99,9 @@ GIT_KEY_RE = re.compile(r"(?<![\w-])(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?|erl
 GIT_BRANCH_RE = re.compile(r"^(?:(?:kalmido|task)[-_](\d{1,9})(?:[-_].*)?|(\d{1,9})-[a-z].*)$", re.I)
 GIT_NAME_RE = re.compile(r"[A-Za-z0-9_.-]{1,100}")
 _GIT_WAKE = threading.Event()
+# 2.394.0 C (#3377): the issue sync (integrations/git_sync.py) hooks in here (it imports this module): pull (c, r, k, get) in a
+# poll, push (c) once per loop tick, update (c, r, b) for its two switches, public (c, r) its state for the settings
+GIT_SYNC = {}
 
 
 class GitRate(Exception):
@@ -243,6 +246,8 @@ class GitMatch:
         self.c, self.lids = c, lids
         keys = r.keys() if hasattr(r, "keys") else ()
         self.hash_ok = ("hash_ids" not in keys or bool(r["hash_ids"])) or not tk_has_key(c, lids)
+        if "issue_sync" in keys and r["issue_sync"]:  # 2.394.0 C (#3377): "#12" is the repository's issue 12 there, not task 12
+            self.hash_ok = False
         pre = tk_prefixes(c, lids)
         self.rx, self.brx = tk_text_re(pre), tk_text_re(pre, branch=True)
         alt = "|".join(sorted((re.escape(p) for p in pre), key=len, reverse=True))
@@ -302,9 +307,14 @@ def git_public(c, r, manage=False):
          "status": "error" if r["last_error"] and r["last_error"] != "rate" else "ok" if r["polled_at"] else "new",
          "error": git_err_text(r["last_error"]) if r["last_error"] else "", "polled_at": r["polled_at"],
          "hash_ids": bool(r["hash_ids"]) if "hash_ids" in r.keys() else True,  # 2.390.0 (#3353)
-         "author_name": r["author_name"], "author_email": r["author_email"]}  # 2.396.0 A (#3386): '' = the agent's git author
+         "author_name": r["author_name"], "author_email": r["author_email"],  # 2.396.0 A (#3386): '' = the agent's git author
+         # 2.394.0 B (#3377): the switches of the issue sync (C: integrations/git_sync.py), off by default
+         "issue_sync": bool(r["issue_sync"]) if "issue_sync" in r.keys() else False,
+         "issue_create": bool(r["issue_create"]) if "issue_create" in r.keys() else False}
     if manage:
         d.update(token=bool(r["token"]), hook=bool(r["hook_secret"]), hook_url=f"{PUBLIC_URL.rstrip('/')}/api/hooks/git/{r['id']}")
+        if "public" in GIT_SYNC:  # 2.394.0 C (#3377): the sync's state (read only, last round, error, why it is locked)
+            d["issue_state"] = GIT_SYNC["public"](c, r)
     return d
 
 
@@ -314,8 +324,9 @@ def git_ctx(c, r):
             "path": git_repo_path(r["provider"], r["owner"], r["repo"]), "low": None}
 
 
-def git_http(k, path, etag=None):
-    """One GET against the provider's API -> (status, headers, json or None on 304). Raises CalError / GitRate."""
+def git_http(k, path, etag=None, method="GET", data=None):
+    """One GET against the provider's API -> (status, headers, json or None on 304). Raises CalError / GitRate.
+    2.394.0 C (#3377): method / data (a JSON body) for the issue sync's writes (PATCH / PUT / POST)."""
     gh = k["provider"] == "github"
     hd = {"User-Agent": f"{APP_NAME}/{APP_VERSION} (git integration)",
           "Accept": "application/vnd.github+json" if gh else "application/json"}
@@ -324,7 +335,10 @@ def git_http(k, path, etag=None):
     hd.update(git_auth(k["provider"], k["token"]))  # 2.18.0: per provider (GitLab PRIVATE-TOKEN, Bitbucket Basic / Bearer)
     if etag:
         hd["If-None-Match"] = etag
-    req = urllib.request.Request(k["api"] + path, headers=hd, method="GET")
+    raw = None
+    if data is not None:
+        raw, hd["Content-Type"] = json.dumps(data).encode(), "application/json"
+    req = urllib.request.Request(k["api"] + path, data=raw, headers=hd, method=method)
 
     def rate(h):
         if not h:
@@ -778,6 +792,8 @@ def git_poll(c, cid):
             if ci != p["ci"] or p["ci_sha"] != p["head_sha"]:
                 changed |= ci != p["ci"]
                 c.execute("UPDATE git_prs SET ci=?, ci_sha=? WHERE conn_id=? AND number=?", (ci, p["head_sha"], cid, p["number"]))
+        if r["issue_sync"] and "pull" in GIT_SYNC:  # 2.394.0 C (#3377): the issues changed since the last round (one page)
+            changed |= GIT_SYNC["pull"](c, r, k, get)
         c.execute(f"UPDATE git_conns SET etags=?, polled_at=?, fails=0, last_error='', next_at=? WHERE {same}",
                   (json.dumps(keep), iso(now_utc()), time.time() + GIT_POLL_S, *same_args))
     except GitRate as e:
@@ -816,6 +832,9 @@ def git_loop():
                 for (cid,) in rows:
                     with GATE.bg():
                         git_poll(c, cid)
+                if "push" in GIT_SYNC:  # 2.394.0 C (#3377): the collected local changes of linked tasks that are due
+                    with GATE.bg():
+                        GIT_SYNC["push"](c)
             finally:
                 c.close()
         except Exception as e:  # noqa: BLE001
@@ -1135,12 +1154,18 @@ def git_update(cid):
         t = (t or "").strip()
         if t and not SECRET_KEY:
             return err(git_key_error(), 409)
-        c.execute("UPDATE git_conns SET token=?, etags='{}', fails=0, last_error='', next_at=0 WHERE id=?",
+        # 2.394.0 C (#3377): issue_rw -1 = the new token's write access is checked again with the next round
+        c.execute("UPDATE git_conns SET token=?, etags='{}', fails=0, last_error='', next_at=0, issue_rw=-1 WHERE id=?",
                   (git_seal(cid, "token", t) if t else "", cid))
+        r = c.execute("SELECT * FROM git_conns WHERE id=?", (cid,)).fetchone()  # 2.394.0 D (#3377 review 6): the sync checks the new one
     if "hash_ids" in b:  # 2.390.0 (#3353)
         if b["hash_ids"] not in (True, False, 0, 1) or isinstance(b["hash_ids"], float):
             return err(tr("Invalid value: {0}", "hash_ids"))
         c.execute("UPDATE git_conns SET hash_ids=? WHERE id=?", (1 if b["hash_ids"] else 0, cid))
+    if ("issue_sync" in b or "issue_create" in b) and "update" in GIT_SYNC:  # 2.394.0 C (#3377)
+        e = GIT_SYNC["update"](c, r, b)
+        if e:
+            return e
     if "hook" in b:
         if b["hook"] not in ("on", "off"):
             return err(tr("Invalid value: {0}", "hook"))

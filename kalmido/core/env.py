@@ -241,10 +241,12 @@ VARS = (
     _v("KALMIDO_BOOKMARK_ALLOW_HOSTS", "", "Internal hosts bookmark previews may reach.", "integrations"),
     _v("KALMIDO_GIT_POLL", "180", "Seconds between two polls of a Git connection.", "integrations"),
     _v("KALMIDO_GIT_TICK", "15", "Seconds between two looks at which Git connection is due.", "integrations"),
+    _v("KALMIDO_GIT_SYNC_PUSH", "30", "Seconds the changes of a task linked to a GitHub / GitLab issue are collected before they go out.", "integrations"),  # 2.394.0 C (#3377)
     _v("KALMIDO_NTFYIN_TICK", "20", "Seconds between two rounds of the personal share inboxes.", "integrations"),
     _v("KALMIDO_IMPORT_MAX_MB", "20", "Size in MB of an import file (other task apps).", "integrations"),
     _v("KALMIDO_IMPORT_MAX_TASKS", "20000", "Tasks per import at most.", "integrations"),
     _v("KALMIDO_IMPORT_RATE", "30", "Imports and previews per person in 10 minutes.", "integrations"),
+    _v("KALMIDO_LINEAR_API", "", "Tests only: address of a fake Linear GraphQL API for the Linear import (http://127.0.0.1 or localhost only, anything else is ignored).", "test"),  # 2.394.0 A (#3377)
     _v("KALMIDO_ERROR_REPORTS_PER_HOUR", "30", "New error reports per hour.", "integrations"),
 
     # ---- agents and assistant

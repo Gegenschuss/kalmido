@@ -16,6 +16,7 @@ function repoWire(md, lid, folder) {
   const box = $('#l-repos', md); if (!box) return;
   const isProj = () => !!folder || isProject(lid);
   let j = null, edit = null, secret = null, errUrl = null, errHdr = null, aedit = null;  // aedit: 2.396.0 A (#3386)
+  /** @type {any} */ let iss = null;  // 2.394.0 B (#3377): the issue import of one repository {id, rep, skip, busy}
   const provSel = `<select id="rp-prov" aria-label="${esc(tr('Provider'))}">${GIT_PROV.map(([k, n]) => `<option value="${k}">${n}</option>`).join('')}</select>`;
   const draw = () => {
     if (!md.isConnected) return;
@@ -27,6 +28,8 @@ function repoWire(md, lid, folder) {
         ${j.may ? `<button class="iconbtn" data-rp="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots', 's')}</button>` : ''}</div>
       ${edit === r.id ? `<div class="mrow repoedit"><input id="rp-tok2" type="password" autocomplete="new-password" placeholder="${esc(tr('New access token (empty = remove)'))}" aria-label="${esc(tr('Access token'))}"><button class="btn sm" data-rp="tok-save">${tr('Save')}</button></div>` : ''}
       ${aedit === r.id ? rpAuthorHtml(r) : ''}
+      ${iss && iss.id === r.id ? rpIssHtml(iss) : ''}
+      ${j.may && !folder ? gsyHtml(r) : ''}
       ${secret && secret.id === r.id ? `<div class="shint lhint rpsec">${esc(tr('Webhook: payload URL {0}, content type JSON, secret (shown only now):', r.hook_url))} <code>${esc(secret.s)}</code></div>` : ''}`).join('');
     const add = j.may && j.repos.length < j.max ? `<div class="repoadd">
         <div class="row"><label for="rp-prov">${tr('Provider')}</label>${provSel}</div>
@@ -52,6 +55,16 @@ function repoWire(md, lid, folder) {
     return `<div class="row rpver"><label for="rp-ver">${tr('Version field')}</label>${ctl}</div><div class="shint lhint">${esc(tr('A task whose version is already released but which is still open gets a hint. Automatic: a text field named Package, Version or Release.'))}</div>`
       // 2.392.0 B (#3364): off until someone switches it on
       + `<div class="row rpclose"><label class="chkl"><input type="checkbox" id="rp-close" ${j.close_release ? 'checked' : ''} ${j.may ? '' : 'disabled'}> ${tr('Complete tasks when their package or code is released')}</label></div><div class="shint lhint">${esc(tr('Each task once per version; the history offers Undo. Nothing is written to the repository.'))}</div>`;
+  };
+  // 2.394.0 C (#3377): the two switches of the issue sync with their state (only the project's admins see them)
+  const gsyHtml = r => {
+    const s = r.issue_state; if (!s || r.folder || !(r.provider === 'github' || r.provider === 'gitlab')) return '';
+    const st = !r.issue_sync ? '' : s.error || (s.rw === 'read' ? tr('Read only: the token cannot write issues') : s.synced_at ? tr('Synced {0}', relTime(s.synced_at)) : tr('Waiting for the first sync'));
+    return `<div class="gsy" data-gsy-rid="${r.id}">
+      <div class="row"><label class="chkl"><input type="checkbox" data-gsy="issue_sync" ${r.issue_sync ? 'checked' : ''} ${s.available || r.issue_sync ? '' : 'disabled'}> ${tr('Sync issues both ways')}</label></div>
+      <div class="shint lhint">${esc(s.available ? tr('Title, text, open / closed, labels (as project tags) and comments, in both directions. When both sides changed the same thing, the newer change wins and the other one stays in the task’s history.') : s.block_text)}</div>
+      ${r.issue_sync ? `<div class="row"><label class="chkl"><input type="checkbox" data-gsy="issue_create" ${r.issue_create ? 'checked' : ''} ${s.rw === 'read' ? 'disabled' : ''}> ${tr('Create new tasks as issues')}</label></div>` : ''}
+      ${st ? `<div class="shint lhint gsyst${s.error ? ' rst-error' : ''}" role="status">${esc(st)}</div>` : ''}</div>`;
   };
   // 2.33.0 (#934): the repositories this list takes from its folder
   const repoNames = rs => rs.map(r => r.full_name).join(', ');
@@ -148,10 +161,20 @@ function repoWire(md, lid, folder) {
       aedit = null; await reload();
     } else if (k === 'auth-cancel') {
       aedit = null; draw();
+    } else if (k === 'iss-cancel') {  // 2.394.0 B (#3377)
+      iss = null; draw(); $(`[data-rid="${rid}"] [data-rp="menu"]`, box)?.focus();
+    } else if (k === 'iss-go') {
+      if (!iss || iss.busy) return;
+      iss.busy = true; draw();
+      let x; try { x = await api('POST', `/api/repos/${iss.id}/issues/import`, {completed: iss.skip ? 'skip' : 'import'}); } catch { if (iss) { iss.busy = false; draw(); } return; }
+      iss = null; draw();
+      toast(trn('{0} issue imported', '{0} issues imported', x.created?.tasks || 0), x.import_id ? async () => { await api('POST', `/api/imports/${x.import_id}/undo`); await load(); render(); } : undefined);
+      await load(); render();
     } else if (k === 'menu') {
       const r = j.repos.find(x => x.id === rid); if (!r) return;
       menu(b, [{label: tr('Change access token'), icon: 'lock', fn: () => { edit = rid; secret = null; draw(); $('#rp-tok2', box)?.focus(); }},
         {label: tr('Git author for AI commits'), icon: 'git', fn: () => { aedit = rid; draw(); $('#rp-an', box)?.focus(); }},  // 2.396.0 A (#3386)
+        ...(!folder && !r.folder && (r.provider === 'github' || r.provider === 'gitlab') ? [{label: tr('Import issues'), icon: 'download', fn: () => issPreview(rid, false)}] : []),  // 2.394.0 B (#3377)
         r.hook ? {label: tr('Turn the webhook off'), icon: 'x', fn: async () => { try { await api('PATCH', `/api/repos/${rid}`, {hook: 'off'}); } catch { return; } secret = null; await reload(); }}
           : {label: tr('Turn the webhook on (optional)'), icon: 'zap', title: tr('Only when the Git server can reach this server: it then triggers a check at once'), fn: async () => { let x; try { x = await api('PATCH', `/api/repos/${rid}`, {hook: 'on'}); } catch { return; } secret = {id: rid, s: x.hook_secret}; await reload(); }},
         // 2.390.0 (#3353): with a project key, "#123" counts only while this is on (on for older connections, off for new ones)
@@ -171,7 +194,21 @@ function repoWire(md, lid, folder) {
     const hs = [host($('#rp-name', box)?.value), host($('#rp-base', box)?.value)].filter(Boolean);
     h.hidden = !(($('#rp-prov', box)?.value || 'github') === 'github' && hs.some(x => !/^(github\.com|gitlab\.com|bitbucket\.org)$/.test(x)));
   };
+  // 2.394.0 B (#3377): the preview of an issue import (a dry run: nothing is written), then "Import"
+  const issPreview = async (rid, skip) => {
+    iss = {id: rid, rep: null, skip, busy: true}; draw();
+    let x; try { x = await api('POST', `/api/repos/${rid}/issues/import`, {dry_run: true, completed: skip ? 'skip' : 'import'}); } catch { iss = null; draw(); return; }
+    if (!iss || iss.id !== rid) return;
+    iss = {id: rid, rep: x, skip, busy: false}; draw(); $('#rp-issgo', box)?.focus();
+  };
   box.addEventListener('change', async e => {
+    const gk = e.target.dataset?.gsy;
+    if (gk) {  // 2.394.0 C (#3377)
+      const rid = +e.target.closest('[data-gsy-rid]').dataset.gsyRid;
+      try { await api('PATCH', `/api/repos/${rid}`, {[gk]: e.target.checked}); toast(tr('Saved')); } catch { /* shown */ }
+      await reload(); $(`[data-gsy-rid="${rid}"] [data-gsy="${gk}"]`, box)?.focus(); return;
+    }
+    if (e.target.id === 'rp-issskip' && iss) { issPreview(iss.id, e.target.checked); return; }  // 2.394.0 B (#3377)
     if (e.target.id === 'rp-prov') { provHint(); selfHint(); }
     if (e.target.id === 'rp-ver') {  // 2.151.0 A (#2558)
       const v = e.target.value;
@@ -203,6 +240,24 @@ function folderRepoModal(f, opt = {}) {  // 2.37.0 (#1158): opt.back = a sub-dia
   repoWire(md, 0, f);
   return md;
 }
+// 2.394.0 B (#3377): the preview of an issue import (a dry run of POST /api/repos/<id>/issues/import)
+/** @param {any} st */
+function rpIssHtml(st) {
+  const x = st.rep;
+  if (!x) return `<div class="repoedit rpiss"><div class="muted mhint" role="status">${tr('Reading the issues …')}</div></div>`;
+  const n = x.created?.tasks || 0;
+  const facts = [trn('{0} issue will be imported', '{0} issues will be imported', n), x.already ? tr('already imported: {0}', x.already) : '',
+    x.comments ? trn('{0} comment', '{0} comments', x.comments) : '', x.created?.done ? tr('{0} closed (completed)', x.created.done) : ''].filter(Boolean).join(' · ');
+  const titles = (x.samples || []).slice(0, 5).map(t => `<li>${esc(t.title)}</li>`).join('');
+  const warn = (x.warnings || []).map(w => `<li>${esc(w.text)}${w.count > 1 ? ' (' + w.count + ')' : ''}</li>`).join('');
+  return `<div class="repoedit rpiss" role="group" aria-label="${esc(tr('Import issues'))}">
+    <div class="shint keep lhint" role="status">${esc(facts)}</div>
+    ${titles ? `<ul class="rpnot muted">${titles}</ul>` : ''}
+    ${warn ? `<ul class="rpnot">${warn}</ul>` : ''}
+    <div class="row"><label class="chkl"><input type="checkbox" id="rp-issskip" ${st.skip ? 'checked' : ''} ${st.busy ? 'disabled' : ''}> ${tr('Skip closed issues')}</label></div>
+    <div class="shint lhint">${tr('Labels become tags, comments become comments. Nothing is written to the repository. Undo within 24 hours in Settings > Data.')}</div>
+    <div class="row rprow"><span class="spacer"></span><button class="btn sm" data-rp="iss-cancel">${tr('Cancel')}</button><button class="btn sm pri" id="rp-issgo" data-rp="iss-go" ${n && !st.busy ? '' : 'disabled'}>${tr('Import issues')}</button></div></div>`;
+}
 // 2.396.0 A (#3386): the git author for AI commits in one repository (project level; empty = the agent's own git author)
 const RP_MAIL_RE = /^[^@\s<>,]{1,100}@[^@\s<>,]{1,100}\.[^@\s<>,]{1,60}$/;
 /** @param {any} r */
@@ -213,4 +268,19 @@ function rpAuthorHtml(r) {
     <div class="calerr" role="alert" id="rp-aerr" hidden></div>
     <div class="shint lhint">${tr('Git author for AI commits in this repository. Appears publicly in GitHub with every commit.')}</div>
     <div class="row rprow"><span class="spacer"></span><button class="btn sm" data-rp="auth-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-rp="auth-save">${tr('Save')}</button></div></div>`;
+}
+
+// 2.394.0 C (#3377): the history lines of the issue sync, moved out of the start scripts; lazyload.js has the stand-in
+function gsy_actText(kind, d) {
+  const q = x => `<b>${esc(x)}</b>`;
+  // 2.394.0 D (#3377 review 4)
+  if (kind === 'git_sync_fail') return tr('Sync with {0}: the repository refuses the change ({1}); it is tried again with the next change of the task', q(d.gsy || ''), esc(d.error || '?'));
+  // both sides changed a field, the newer one won; the other version stays here
+  const f = {title: tr('Title'), body: tr('Description'), state: tr('Status'), labels: tr('Project tags')}[d.field] || d.field || '';
+  const v = d.field === 'state' ? (d.value === 'closed' ? tr('closed') : tr('open')) : String(d.value || '').slice(0, 500);
+  // 2.394.0 D (#3377 review 3): both times (the repository's: of the field, else of the whole issue)
+  const at = x => { const t = Date.parse(x || ''); return isNaN(t) ? '–' : fmtStamp(new Date(t)); };
+  const when = d.at_here || d.at_repo ? ` <span class="muted">· ${esc(d.repo_by === 'field' ? tr('here {0}, in the repository {1}', at(d.at_here), at(d.at_repo)) : tr('here {0}, in the repository {1} (last change of the issue)', at(d.at_here), at(d.at_repo)))}</span>` : '';
+  return (d.side === 'repo' ? tr('Conflict with {0} ({1}): the change here was newer. The version in the repository was: {2}', q(d.gsy || ''), esc(f), q(v || '–'))
+    : tr('Conflict with {0} ({1}): the change in the repository was newer. The version here was: {2}', q(d.gsy || ''), esc(f), q(v || '–'))) + when;
 }

@@ -101,6 +101,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)
+    "POST /api/repos/{}/issues/import": "tasks",
     # 2.488.0 (#3363): the hosted MCP access (p2488_mcp_oauth_test.py: the person without an organisation connects her own agent)
     "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
     "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
@@ -1497,7 +1499,6 @@ POST /api/v1/family/rewards/{}/request
 POST /api/v1/filters
 POST /api/v1/folders/delete
 POST /api/v1/folders/rename
-POST /api/v1/import/{}
 POST /api/v1/imports/{}/undo
 POST /api/v1/layouts/proposals
 POST /api/v1/life/contracts

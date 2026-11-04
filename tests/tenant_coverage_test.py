@@ -710,7 +710,7 @@ ROUTES = {
     "PUT /api/lists/{}/repos/close-release": "list", "POST /api/tasks/{}/partial": "task", "POST /api/v1/tasks/{}/partial": "task",  # 2.392.0 B (#3364)
    
     "POST /api/lists/{}/repos": "list", "PATCH /api/repos/{}": "list", "DELETE /api/repos/{}": "list",
-    "POST /api/repos/{}/refresh": "list", "POST /api/lists/{}/fields": "list", "PATCH /api/fields/{}": "list",
+    "POST /api/repos/{}/refresh": "list", "POST /api/repos/{}/issues/import": "list", "POST /api/lists/{}/fields": "list", "PATCH /api/fields/{}": "list",  # 2.394.0 (#3377): issues/import
     "DELETE /api/fields/{}": "list", "GET /api/fields/{}/count": "list", "POST /api/lists/{}/folder-reset": "list", "GET /api/lists/{}/folder-preview": "list", "GET /api/lists/{}/groups": "list",
     "PUT /api/lists/{}/groups/{}": "list", "DELETE /api/lists/{}/groups/{}": "list", "POST /api/lists": "list",
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",

@@ -244,6 +244,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_CALENDAR_TICK` | `60` | Seconds per minute of the refresh interval (tests use 1). |
 | `KALMIDO_ERROR_REPORTS_PER_HOUR` | `30` | New error reports per hour. |
 | `KALMIDO_GIT_POLL` | `180` | Seconds between two polls of a Git connection. |
+| `KALMIDO_GIT_SYNC_PUSH` | `30` | Seconds the changes of a task linked to a GitHub / GitLab issue are collected before they go out. |
 | `KALMIDO_GIT_TICK` | `15` | Seconds between two looks at which Git connection is due. |
 | `KALMIDO_HOOK_IN_PER_DAY` | `1000` | Incoming webhook calls per hook and day. |
 | `KALMIDO_HOOK_IN_PER_MIN` | `60` | Incoming webhook calls per hook and minute. |
@@ -329,6 +330,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 
 | Variable | Default | Meaning |
 |---|---|---|
+| `KALMIDO_LINEAR_API` | `(empty)` | Tests only: address of a fake Linear GraphQL API for the Linear import (http://127.0.0.1 or localhost only, anything else is ignored). |
 | `KALMIDO_PAYONLINE_ALLOW_HOSTS` | `(empty)` | Tests: internal hosts the online payment connection may reach (2.469.0). |
 | `KALMIDO_PAYONLINE_STRIPE_URL` | `(empty)` | Tests: the address of a stand-in for the Stripe API (empty = the real one, 2.469.0). |
 | `KALMIDO_PEPPOL_STORECOVE_URL` | `(empty)` | Tests: the address of a stand-in for the Storecove Peppol API (empty = the real one, 2.154.0). |

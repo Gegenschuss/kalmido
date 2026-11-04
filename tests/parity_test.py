@@ -484,7 +484,8 @@ APP_ONLY = [
     ("repositories: folder repositories, polling now and the release closing are set by people; the API reads them (GET /lists/{id}/repos)", (
         "=POST /api/repos/{}/refresh", "POST /api/hooks/git/", "POST /api/tasks/{}/git-undo",
         "* /api/folders/repos", "PUT /api/lists/{}/folder-repo",
-        "PUT /api/lists/{}/repos/close-release")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
+        "PUT /api/lists/{}/repos/close-release",  # 2.394.0 (#3377), next line: the one-time issue import, project admins in the app only
+        "POST /api/repos/{}/issues/import")),  # 2.151.0 A (#2558): which field holds the version, set with the repository  # 2.33.0 (#934): folder repositories, read through /lists/{id}/repos
     ("2.18.0: the error-report webhook of a list: its secret URL is shown once to people (owner / list admins); the inbound hook "
      "is called by the error service, not by a client", ("* /api/lists/{}/error-hook", "POST /api/hooks/issues/")),
     # 2.115.0 A (#2061): inbound webhooks of a list -- a secret URL shown once to people (owner / list admins), called by the

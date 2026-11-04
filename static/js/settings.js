@@ -801,6 +801,7 @@ function settingsModal(focus) {
       <div class="row"><label for="s-imp-src">${tr('From')}</label><select id="s-imp-src">${IMP_SRC.map(([k, n]) => `<option value="${k}">${esc(tr(n))}</option>`).join('')}</select></div>
       <div class="shelp impHelp" id="s-imp-help">${impHelp('todoist')}</div>
       <div class="row"><label for="s-import">${tr('File')}</label>${fileBtn('s-import', IMP_ACCEPT.todoist)}</div>
+      <div class="row" id="s-imp-keyrow" hidden><label for="s-imp-key">${tr('API key')}</label><input type="password" id="s-imp-key" autocomplete="off" spellcheck="false" maxlength="300"><button class="btn sm" data-imp="key">${tr('Preview')}</button></div>
       <div id="s-imp-out"></div>
       <div class="members" id="s-imp-hist"></div>
       <h4>${tr('Export')}</h4>
@@ -1206,12 +1207,13 @@ function settingsModal(focus) {
 const IMP_SRC = [['todoist', 'Todoist'], ['trello', 'Trello'], ['asana', 'Asana'], ['mstodo', 'Microsoft To Do'],
   // 2.142.0 B (#2147): Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown
   ['notion', 'Notion'], ['gtasks', 'Google Tasks'], ['clickup', 'ClickUp'], ['jira', 'Jira'],
+  ['linear', 'Linear'],  // 2.394.0 A (#3377): API key or CSV export
   ['ics', N_('ICS / VTODO (Apple Reminders, Nextcloud, Thunderbird …)')], ['csv', N_('CSV file (any columns)')], ['markdown', N_('Markdown checklist')],
   ['ticktick', 'TickTick']];
 const IMP_ACCEPT = {todoist: '.csv,.zip,.json,text/csv,application/zip,application/json', trello: '.json,application/json', asana: '.csv,text/csv',
   mstodo: '.csv,.ics,text/csv,text/calendar', ics: '.ics,.ical,.ifb,text/calendar', ticktick: '.csv,text/csv',
   notion: '.zip,.csv,.md,application/zip,text/csv,text/markdown', gtasks: '.zip,.json,application/zip,application/json', clickup: '.csv,text/csv',
-  jira: '.csv,text/csv', csv: '.csv,.tsv,.txt,text/csv,text/tab-separated-values', markdown: '.md,.markdown,.txt,text/markdown,text/plain'};  // 2.142.0 B (#2147)
+  jira: '.csv,text/csv', linear: '.csv,text/csv', csv: '.csv,.tsv,.txt,text/csv,text/tab-separated-values', markdown: '.md,.markdown,.txt,text/markdown,text/plain'};  // 2.142.0 B (#2147)
 function impHelp(src) {
   return {
     todoist: tr('<b>Todoist:</b> open the project > … > Export as a CSV file (one file per project), or Settings > Backups > download a backup (a ZIP with every project). Sections, subtasks, @labels, priorities, dates (English and German date texts, also recurring ones), durations and comments are taken over; attachments stay links. The project is named after the file.'),
@@ -1224,7 +1226,9 @@ function impHelp(src) {
     notion: tr('<b>Notion:</b> Settings > Workspace > Export all workspace content (or … on a page > Export) > Markdown & CSV, include subpages. Choose the ZIP as it is (parts inside it are read too). Every database becomes a project (name, status, date, tags and priority are recognised, other properties go into the notes), pages with checkboxes become projects with tasks. People stay names in the notes.'),
     gtasks: tr('<b>Google Tasks:</b> takeout.google.com > deselect all > select Tasks > create the export, then choose the ZIP (or the Tasks.json inside it). Lists, subtasks, due dates, notes and completion are taken over.'),
     clickup: tr('<b>ClickUp:</b> open the list or space > … > Export > CSV, all columns. Lists (in folders), subtasks, checklists, tags, priorities, start and due dates, estimates and comments are taken over; assignees stay names in the notes.'),
-    jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags, priorities and due dates are kept; the issue key, description, sprint and components go into the notes, assignees stay names.'),
+    // 2.394.0 A (#3377): issue type, story points and sprint are taken over now
+    jira: tr('<b>Jira:</b> Filters > search the issues > Export > Export CSV (all fields). Each Jira project becomes a project; sub-tasks and child issues become subtasks, labels tags; priorities, due dates, issue types (Bug, Story, Task), story points and the sprint of open issues are kept; the issue key, description and components go into the notes, assignees stay names.'),
+    linear: tr('<b>Linear:</b> enter a personal API key (Linear > Settings > Security & access > Personal API keys, read access is enough) - it is used only for this preview and import and never stored. Or choose the CSV export (Settings > Import / export > Export CSV). Each team becomes a project; status, priority, estimate (story points), labels (Bug and Feature set the type), cycle, due date, parent issues and comments are taken over.'),
     csv: tr('<b>Any CSV file</b> (also from a spreadsheet): one row per task. Columns such as Title / Name / Task, Due / Date, Notes / Description, List / Project, Section, Priority, Tags and Done / Status are recognised in English and German; every other column goes into the notes. The preview shows which column went where.'),
     markdown: tr('<b>Markdown checklist</b> (Obsidian, Logseq, a README …): headings become projects (deeper headings sections), - [ ] and - [x] tasks, indented items subtasks, text below a task its notes. Only clear dates (2025-01-15 or 15.01.2025) and #tags are read.'),
   }[src] || '';
@@ -1236,10 +1240,12 @@ document.addEventListener('change', e => {
   const n = document.getElementById(f.id + '-name'); if (n) n.textContent = f.files?.[0]?.name || tr('No file chosen');
 }, true);
 function impInit(md) {
-  const I = {src: 'todoist', file: null, opts: {}, last: null};
-  const out = $('#s-imp-out', md), inp = $('#s-import', md);
+  const I = {src: 'todoist', file: null, key: '', opts: {}, last: null};
+  const out = $('#s-imp-out', md), inp = $('#s-import', md), keyIn = $('#s-imp-key', md);
+  // 2.394.0 A (#3377): a source's API key instead of a file (Linear): sent with the preview and again with the import, never kept
+  const unkey = () => { I.key = ''; if (keyIn) keyIn.value = ''; };
   const form = dry => {
-    const fd = new FormData(); fd.append('file', I.file);
+    const fd = new FormData(); if (I.key) fd.append('api_key', I.key); else fd.append('file', I.file);
     if (dry) fd.append('dry_run', '1');
     for (const [k, v] of Object.entries(I.opts)) if (v !== '' && v != null) fd.append(k, v);
     return fd;
@@ -1266,14 +1272,16 @@ function impInit(md) {
       start: N_('Start date'), notes: N_('Notes'), priority: N_('Priority'), tags: N_('Tags'), done: N_('Done'), done_at: N_('Completed at'), created: N_('Created'),
       assignee: N_('Assignee (as text)'), url: N_('Link')};
     const cols = j.dry_run && j.columns?.length ? `<div class="imptab impcols"><div class="muted">${tr('Columns')}</div>${j.columns.map(c => `<div class="impr" data-field="${esc(c.field)}"><span class="n">${esc(c.column)}</span><span class="muted">${esc(tr(IMP_FIELD[c.field] || c.field))}</span></div>`).join('')}</div>` : '';
-    const sm = j.dry_run && j.samples.length ? `<div class="imptab"><div class="muted">${tr('Examples')}</div>${j.samples.map(t => `<div class="impr${t.subtask ? ' sub' : ''}"><span class="n">${esc(t.title)}</span><span class="muted">${esc([t.section, t.due ? fmtDayAbs(t.due) + (t.due_time ? ' ' + t.due_time : '') : '', t.repeat ? repeatLabel(t.repeat) : '', t.status ? tr('Done') : ''].filter(Boolean).join(' · '))}</span>${prio(t.priority)}${t.tags.map(g => `<span class="tag">#${esc(g)}</span>`).join('')}</div>`).join('')}</div>` : '';
+    const sm = j.dry_run && j.samples.length ? `<div class="imptab"><div class="muted">${tr('Examples')}</div>${j.samples.map(t => `<div class="impr${t.subtask ? ' sub' : ''}"><span class="n">${esc(t.title)}</span><span class="muted">${esc([t.section, t.due ? fmtDayAbs(t.due) + (t.due_time ? ' ' + t.due_time : '') : '', t.repeat ? repeatLabel(t.repeat) : '', t.status ? tr('Done') : '',
+      // 2.394.0 A (#3377): ticket type, story points, sprint
+      t.ttype ? tr(TTYPES.find(x => x[0] === t.ttype)?.[1] || t.ttype) : '', t.points ? tr('Story points: {0}', t.points) : '', t.sprint ? tr('Sprint') + ': ' + t.sprint : ''].filter(Boolean).join(' · '))}</span>${prio(t.priority)}${t.tags.map(g => `<span class="tag">#${esc(g)}</span>`).join('')}</div>`).join('')}</div>` : '';
     const btns = j.dry_run
       ? `<div class="row"><button class="btn sm pri" data-imp="go" ${n ? '' : 'disabled'}>${ic('download', 's')} ${trn('Import {0} task', 'Import {0} tasks', n)}</button><button class="btn sm" data-imp="cancel">${tr('Cancel')}</button></div>`
       : (j.import_id ? `<div class="row"><button class="btn sm" data-imp="undo" data-id="${+j.import_id}">${tr('Undo this import')}</button><span class="muted">${tr('possible for 24 hours')}</span></div>` : '');
     out.innerHTML = `<div class="impbox" role="status"><div class="imphead"><b>${esc(head)}</b></div>${ls}${warns(j.warnings)}${opts}${cols}${sm}${btns}</div>`;
   }
   async function preview() {
-    if (!I.file) return;
+    if (!I.file && !I.key) return;
     out.innerHTML = botBusy(`<div class="muted mhint">${tr('Reading the file…')}</div>`);  // 2.161.2 (#2611): the bot at work
     try { I.last = await api('POST', `/api/import/${I.src}`, form(true)); draw(I.last); }
     catch { out.innerHTML = ''; }
@@ -1286,7 +1294,7 @@ function impInit(md) {
   }
   hist();
   $('#s-imp-src', md).addEventListener('change', e => {
-    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
+    I.src = e.target.value; I.opts = {}; I.file = null; inp.value = ''; unkey(); $('#s-imp-keyrow', md).hidden = I.src !== 'linear'; const fn = $('#s-import-name', md); if (fn) fn.textContent = tr('No file chosen'); inp.accept = IMP_ACCEPT[I.src] || ''; out.innerHTML = '';
     $('#s-imp-help', md).innerHTML = impHelp(I.src);
   });
   inp.addEventListener('change', async e => {
@@ -1294,7 +1302,7 @@ function impInit(md) {
     // 2.87.9 (#1940): new lists go into the workspace shown in the sidebar
     // 2.144.5 B (#2002): "All" = the private space (the dialog offers the first organisation instead)
     const cur = wsCur();
-    I.file = f; I.opts = {space: cur !== 'all' ? cur : 'private'}; await preview();
+    unkey(); I.file = f; I.opts = {space: cur !== 'all' ? cur : 'private'}; await preview();
   });
   out.addEventListener('change', e => {
     const k = e.target.dataset.io; if (!k) return;
@@ -1322,7 +1330,11 @@ function impInit(md) {
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-imp]'); if (!b || !md.contains(b)) return;
     const a = b.dataset.imp;
-    if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; return; }
+    if (a === 'cancel') { out.innerHTML = ''; I.file = null; inp.value = ''; unkey(); return; }
+    if (a === 'key') {  // 2.394.0 A (#3377)
+      const k = keyIn.value.trim(); if (!k) { keyIn.focus(); return; }
+      const cur = wsCur(); I.file = null; inp.value = ''; I.key = k; I.opts = {space: cur !== 'all' ? cur : 'private'}; await preview(); return;
+    }
     if (a === 'undo') { await undo(+b.dataset.id, b.dataset.src); return; }
     if (a === 'go') {
       // 2.87.9 (#1940): where the tasks go, in words; new lists from an organisation can go into the private space instead
@@ -1335,7 +1347,7 @@ function impInit(md) {
       b.disabled = true;
       try {
         const j = await api('POST', `/api/import/${I.src}`, form(false));
-        I.file = null; inp.value = ''; draw(j);
+        I.file = null; inp.value = ''; unkey(); draw(j);
         toast(trn('Imported: {0} task', 'Imported: {0} tasks', j.created.tasks));
         await load(); render(); hist();
       } catch { b.disabled = false; }

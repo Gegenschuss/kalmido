@@ -696,6 +696,19 @@ unknown columns go into the notes) and `markdown` (checklists: headings = projec
 indentation = subtasks). These seven never match people of the file to accounts: their names go into the notes. The body
 is `multipart/form-data` with the file in `file` and these optional fields:
 
+2.394.0: `jira` takes over the issue type (Bug = bug, Story / Epic / Improvement = feature, Task / Sub-task = task), the
+story points (`Custom field (Story Points)` / `(Story point estimate)`, when they are 1, 2, 3, 5, 8 or 13; other values go
+into the notes) and the sprint. `linear` reads Linear's CSV export from `file`, or - instead of a file - fetches the
+issues with a personal Linear API key in the field `api_key` (read access is enough; the key is used for this one request,
+a dry run and the import each need it, and it is never stored or returned). Teams become projects; status, priority,
+estimate, labels (Bug / Feature / Improvement also set the type), cycle, due date, parent issue, assignee (matched to a
+member of the target project by e-mail or name, else a note) and comments (a notes block) are taken over. A wrong key
+answers `400` with a plain text, Linear's rate limit too. Sprints: an open task goes into the sprint (Jira) / cycle
+(Linear) of the same name in its project when that project has sprints on (a missing one is created as a planned sprint
+after the last one); a project the import creates gets sprints, story points and ticket types switched on when the data
+has them; otherwise the sprint stays a line in the notes. The undo removes the planned sprints it created when no task is
+left in them.
+
 | Field | Values | |
 |---|---|---|
 | `dry_run` | `true` | Preview: runs the import and rolls it back; the answer shows exactly what would happen |
@@ -705,15 +718,17 @@ is `multipart/form-data` with the file in `file` and these optional fields:
 | `completed` | `import` (default), `skip` | Completed tasks |
 | `list_name` | text | Name of the new list when the file has only one |
 | `priority_scale` | `auto` (default), `1`, `4` | Todoist CSV: which `PRIORITY` value means p1 |
+| `api_key` | text | 2.394.0, `linear` only and instead of `file`: a personal Linear API key (never stored) |
 | `space` | `private`, `org:<id>` | 2.87.9: workspace of the new lists (an own organisation only, else 400); a list of the same name is reused only inside it. Without it: the default workspace of a new list |
 
 ```sh
 # preview, then import
 curl -s -H "Authorization: Bearer $TOKEN" -F file=@Groceries.csv -F dry_run=true "$KALMIDO/api/v1/import/todoist"
 curl -s -H "Authorization: Bearer $TOKEN" -F file=@board.json -F mode=lists "$KALMIDO/api/v1/import/trello"
+curl -s -H "Authorization: Bearer $TOKEN" -F api_key="$LINEAR_KEY" -F dry_run=true "$KALMIDO/api/v1/import/linear"
 ```
 
-The answer: `created` (`tasks`, `subtasks`, `done`, `lists`, `sections`, `assigned`), `skipped` (already imported
+The answer: `created` (`tasks`, `subtasks`, `done`, `lists`, `sections`, `assigned`, `sprints`), `skipped` (already imported
 before: the same id in the other app), `lists` (per target project: name, id, existing or new, counts), `samples` (the
 first rows), `warnings` (`text`, `count`, `examples`: what could not be mapped exactly and where it went instead),
 `import_id` and `undo_until`; for `csv` also `columns` (`[{column, field}]`: which column of the file went into which
@@ -727,6 +742,37 @@ same way and adds `kept_rows` (entries that stayed because they changed or got s
 knowledge pages and tables moved into their trash).
 Limits: 20 MB and 20,000 tasks per file, 30 imports (previews included) per user within 10 minutes. Nothing inside a
 file is fetched; imports do not send one webhook per task.
+
+**Issues of a repository** (2.394.0): the project owner / project admins import the issues of a connected GitHub or GitLab
+repository once in the app (*Repository > More > Import issues*, `POST /api/repos/{id}/issues/import` with
+`{dry_run, completed: import | skip}`); there is no `/api/v1` route and agents cannot do it (403). The newest 1,000 issues
+(pull requests skipped), up to 100 comments each (of at most 200 issues per run; the rest: a warning): title, text, closed = completed, labels = project tags, the first assignee when a
+project member has that user name or display name (else, like the other assignees, as text in the notes), comments as
+comments with an author line, the issue's address as the task's link. The answer is the import answer above plus `issues`,
+`already` (linked before: never taken twice), `pull_requests` and `comments`; the import history and its undo are the
+same (source `github` / `gitlab`). The token needs read access to issues (GitHub *Issues: read*, GitLab `read_api`).
+
+**Issue sync** (2.394.0): per GitHub / GitLab repository connection two switches, off by default, set in the app by the
+project owner / project admins (`PATCH /api/repos/{id}` with `{issue_sync: bool, issue_create: bool}`; people only, not
+through `/api/v1`, never agents). `GET /api/lists/{id}/repos` carries `issue_sync`, `issue_create` and, for those who
+manage the repository, `issue_state`: `available`, `block` (`e2e`, `private`, `provider`, `folder` or `null`) with
+`block_text`, `rw` (`write`, `read` = the token cannot write issues, the sync only reads, or `null` = not checked yet),
+`synced_at`, `error`. Synced both ways: title, text (the notes; the reference line the import / the sync added stays in
+Kalmido), open / closed, labels <-> project tags, comments (only added, never changed or deleted; nothing comes back as an
+echo). Each poll reads the issues updated since the last one (one page); changes here are collected for 30 s
+(`KALMIDO_GIT_SYNC_PUSH`) and sent from the background, after reading the issue again. When both sides changed a field
+since the last sync, the newer change wins and the other version is a history entry of kind `git_sync_lost`
+(`{field: title | body | state | labels, value, side: here | repo, gsy: "owner/repo#12", at_here, at_repo, repo_by: field |
+issue}`); the repository's time is the field's own one where the provider dates it (GitHub issue events for title, state and
+labels; GitLab state / label events), else the issue's last change. A title goes out cut to 255 characters; a change the
+repository refuses five times in a row is given up (history entry `git_sync_fail` `{gsy, error, n}`) until the task changes
+again. Changes the sync makes carry `gsy` in their history data. New issues (opened after the switch went on) become tasks in the section "Backlog" (else the
+first section); with `issue_create` a new main task becomes an issue. A deleted task or one moved to another project loses
+its link (nothing is deleted in the repository). Never sent: a locked note, attachments, custom fields, personal tags.
+While the sync is on, `#123` in that repository's pull requests and commits is its issue, not task 123 (ticket keys
+`APP-123` still work). Not for end-to-end encrypted projects, lists whose data never leaves the server, folder
+repositories, Gitea / Forgejo or Bitbucket (409 with the reason). Token: GitHub *Issues: read and write*, GitLab `api`
+(Reporter or more).
 
 ## Examples
 

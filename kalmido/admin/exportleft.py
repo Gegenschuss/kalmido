@@ -28,7 +28,8 @@ UMZ_LEFT_TABLES = {
     "agents": _AGENT, "folder_agents": _AGENT, "oauth_codes": _AGENT, "oauth_grants": _AGENT,  # 2.488.0 (#3363): accesses of MCP clients to agents
     "task_mail": _SERVER,  # 2.393.2 B (#3375): Message-IDs of tasks (the reply addresses are signed with this server's key)
     "budget_meta": _DERIVED, "contact_occ": _DERIVED, "dav_meta": _DERIVED, "dav_sync": _DERIVED, "dav_sync2": _DERIVED, "dl_changes": _DERIVED,
-    "doc_models": _DERIVED, "file_text": _DERIVED, "git_closes": _DERIVED, "git_links": _DERIVED, "list_activity": _DERIVED, "list_ticket_seq": _DERIVED,
+    "doc_models": _DERIVED, "file_text": _DERIVED, "git_closes": _DERIVED, "git_links": _DERIVED, "git_issue_links": _DERIVED,  # 2.394.0 B (#3377)
+    "list_activity": _DERIVED, "list_ticket_seq": _DERIVED,
     "rc_suggest": _DERIVED, "rss_items": _DERIVED, "sheet_lastvals": _DERIVED, "task_vectors": _DERIVED,
     "budget_files": _FILES,
     "chat_saves": _LATER, "contact_links": _LATER, "contact_tasks": _LATER, "ctr_notices": _LATER, "folder_heads": _LATER, "folder_props": _LATER,

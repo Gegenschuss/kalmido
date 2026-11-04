@@ -43,6 +43,8 @@ TICKET_TYPES = ("bug", "feature", "task")
 # (typing in the title / description, clicking through dates).
 ACT_MERGE = {"title", "content", "due", "snooze", "priority", "assign", "list", "section", "repeat", "link", "parent", "field"}
 ACT_MERGE_S = 600
+# 2.394.0 C (#3377): more "collect per request" notes, f(c, tid, kind, cid=None) (integrations/git_sync.py: the issue sync)
+ACT_NOTES = []
 
 
 def log_act(c, tid, kind, data=None, uid=None):
@@ -65,6 +67,8 @@ def log_act(c, tid, kind, data=None, uid=None):
         wat_note(c, tid, kind, uid)  # 2.473.0 (#3357): a status change reaches the task's watchers
         from ..notify.channels import chn_note
         chn_note(c, tid, kind)  # 2.142.0 A (#2145): new / completed / assigned -> organisation channels, own list channels
+        for f in ACT_NOTES:
+            f(c, tid, kind, data=data)
     from ..collab.liste2eguard import le2b_act_data
     data = le2b_act_data(c, tid, kind, data)  # 2.64.1 B (#1817): never a text of a list with the lock in the history
     ts, js = iso_ms(now_utc()), json.dumps(data or {}, ensure_ascii=False)

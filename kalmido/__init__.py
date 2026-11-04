@@ -131,6 +131,7 @@ ORDER = (
     "notify.alerts",
     "notify.sev",  # 2.36.2 (#1133)
     "calendars.subscriptions",
+    "integrations.imp_linear",  # 2.394.0 A (#3377): Linear import (API key / CSV), registers into integrations.importers
     "calendars.davwrite",  # 2.52.0 B (#1128): writing into CalDAV subscriptions
     "calendars.apptbook",  # 2.94.0 B (#1929): appointment booking by customers (public page, no login)
     "calendars.polls",  # 2.98.0 A (#1953): scheduling polls (vote through a link, the winning time becomes an event)
@@ -186,6 +187,8 @@ ORDER = (
     "integrations.git",
     "integrations.gitfolder",  # 2.33.0 (#934)
     "integrations.gitbuild",  # 2.151.0 A (#2558)
+    "integrations.git_issues",  # 2.394.0 B (#3377): issue import of a repository connection
+    "integrations.git_sync",  # 2.394.0 C (#3377): two-way issue sync (hooks into git / tasks.validation)
     "integrations.errorreports",
     "api.projects",
     "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
