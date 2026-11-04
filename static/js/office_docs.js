@@ -675,6 +675,7 @@ async function ofd_save1(method, url, body, src) {
   }
   catch (x) {
     if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; OFD.err = ''; return null; }
+    if (x.status === 409 && x.data?.code === 'terms_missing') { OFD.err = ''; return {terms_missing: x.data, message: x.message}; }  // 2.534.0 (#4339): the send dialog asks (ofcSendTerms)
     OFD.err = x.message || tr('unknown'); toast(OFD.err); return null;
   }
   finally { OFD.saving--; OFD.log = null; ofdDraw(); OFD.list = null; }
@@ -1121,6 +1122,17 @@ async function ofdRefCall(key, fn) {
   if (j && OFD_REF[key] === o) delete OFD_REF[key];
   return j;
 }
+// 2.534.0 (#4339): the server refuses a mail whose terms are due but cannot go along (409 terms_missing, terms.ofc_agb_missing):
+// the sender reads why and decides - pages that could not be joined go as a separate file (terms: true), a missing file
+// goes without them (agb_ok_without); Cancel sends nothing. send(extra) = the request with extra body fields.
+async function ofcSendTerms(send) {
+  const j = await send({});
+  if (!j?.terms_missing) return j;
+  const join = j.terms_missing.reason === 'join';
+  if (!await askConfirm(tr('Terms and conditions missing'), j.message, {ok: join ? tr('Send them as a separate file') : tr('Send without terms')})) return null;
+  const k = await send(join ? {terms: true} : {[j.terms_missing.field || 'agb_ok_without']: true});
+  return k?.terms_missing ? (toast(k.message), null) : k;
+}
 async function ofdSendDialog(d) {
   let ms = {smtp: true, datev_email: ''}, tm = null;
   try { ms = await api('GET', '/api/office/mail-status'); } catch {}
@@ -1141,7 +1153,7 @@ async function ofdSendDialog(d) {
     + (d.timesheet_ok ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-ts"> ${tr('Attach the timesheet')}</label></div>` : '')  // 2.120.0 D (#2089)
     + (d.kind !== 'reminder' && d.kind !== 'delivery' && ms.datev_on !== false ? `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="ofd-s-datev" ${ms.datev_email && ms.datev_auto ? 'checked' : ''} ${ms.datev_email && ms.smtp ? '' : 'disabled'}> ${tr('Copy to the DATEV inbox')}${ms.datev_email ? ` <span class="muted">(${esc(ms.datev_email)})</span>` : ` <span class="muted">${tr('(no address in the settings)')}</span>`}</label></div>` : '')
     + (typeof agbSendRow === 'function' ? agbSendRow(tm, ms.smtp) : ''),
-    ms.smtp ? tr('Send|mail') : tr('Download PDF'), async md => { if (!ms.smtp) { const a = document.createElement('a'); a.href = ofdPdfUrl(d.id); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); return; } const j = await ofdSave('POST', `/api/office/docs/${d.id}/send`, {to: $('#ofd-s-to', md).value.trim(), cc: $('#ofd-s-cc', md).value.trim(), subject: $('#ofd-s-subject', md).value, text: $('#ofd-s-text', md).value, datev: !!$('#ofd-s-datev', md)?.checked, timesheet: !!$('#ofd-s-ts', md)?.checked, terms: !!$('#ofd-s-terms', md)?.checked, ...(typeof ofmSendBody === 'function' ? ofmSendBody(md) : {})}); if (!j) return false; toast(j.datev_error || tr('Sent')); });  // 2.269.0 D (#3046): DATEV failed after the mail = a hint, the dialog closes
+    ms.smtp ? tr('Send|mail') : tr('Download PDF'), async md => { if (!ms.smtp) { const a = document.createElement('a'); a.href = ofdPdfUrl(d.id); a.download = ''; document.body.appendChild(a); a.click(); a.remove(); return; } const tk = $('#ofd-s-terms', md); const j = await ofcSendTerms(x => ofdSave('POST', `/api/office/docs/${d.id}/send`, {to: $('#ofd-s-to', md).value.trim(), cc: $('#ofd-s-cc', md).value.trim(), subject: $('#ofd-s-subject', md).value, text: $('#ofd-s-text', md).value, datev: !!$('#ofd-s-datev', md)?.checked, timesheet: !!$('#ofd-s-ts', md)?.checked, ...(tk ? {terms: tk.checked} : {}), ...(typeof ofmSendBody === 'function' ? ofmSendBody(md) : {}), ...x})); if (!j) return false; toast(j.datev_error || tr('Sent')); });  // 2.534.0 (#4339): terms only with the tick (a quotation: the server's default, its terms as pages or a separate file)  // 2.269.0 D (#3046): DATEV failed after the mail = a hint, the dialog closes
 }
 async function ofdReminderDialog() {
   let rows = [];

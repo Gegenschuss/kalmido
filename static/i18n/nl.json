@@ -16219,5 +16219,10 @@
   "Tables in the trash are deleted for good after {0} days, with their files.": "Tabellen in de prullenbak worden na {0} dagen definitief verwijderd, met hun bestanden.",
   "The table and its files are deleted for good. This cannot be undone.": "De tabel en de bestanden ervan worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
   "All tables in the trash and their files are deleted for good. This cannot be undone.": "Alle tabellen in de prullenbak en hun bestanden worden definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
-  "Deleted rows and columns are removed for good after {0} days.": "Verwijderde rijen en kolommen worden na {0} dagen definitief verwijderd."
+  "Deleted rows and columns are removed for good after {0} days.": "Verwijderde rijen en kolommen worden na {0} dagen definitief verwijderd.",
+  "The terms and conditions (as of {0}) cannot go along: their file is missing. Upload them again, or send without them.": "De algemene voorwaarden (versie {0}) kunnen niet mee: het bestand ontbreekt. Upload ze opnieuw of verstuur zonder.",
+  "The terms and conditions (as of {0}) could not be added to the PDF, which still says \"see attachment\". Send them as a separate file, or send without them.": "De algemene voorwaarden (versie {0}) konden niet aan de pdf worden toegevoegd, terwijl die „zie bijlage” zegt. Verstuur ze als apart bestand of verstuur zonder.",
+  "Terms and conditions missing": "Algemene voorwaarden ontbreken",
+  "Send them as a separate file": "Als apart bestand versturen",
+  "Send without terms": "Zonder voorwaarden versturen"
 }

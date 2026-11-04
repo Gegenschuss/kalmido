@@ -16219,5 +16219,10 @@
   "Tables in the trash are deleted for good after {0} days, with their files.": "Las tablas de la papelera se eliminan definitivamente tras {0} días, con sus archivos.",
   "The table and its files are deleted for good. This cannot be undone.": "La tabla y sus archivos se eliminan definitivamente. No se puede deshacer.",
   "All tables in the trash and their files are deleted for good. This cannot be undone.": "Todas las tablas de la papelera y sus archivos se eliminan definitivamente. No se puede deshacer.",
-  "Deleted rows and columns are removed for good after {0} days.": "Las filas y columnas eliminadas se quitan definitivamente tras {0} días."
+  "Deleted rows and columns are removed for good after {0} days.": "Las filas y columnas eliminadas se quitan definitivamente tras {0} días.",
+  "The terms and conditions (as of {0}) cannot go along: their file is missing. Upload them again, or send without them.": "Las condiciones generales (versión del {0}) no se pueden adjuntar: falta su archivo. Súbelas de nuevo o envía sin ellas.",
+  "The terms and conditions (as of {0}) could not be added to the PDF, which still says \"see attachment\". Send them as a separate file, or send without them.": "Las condiciones generales (versión del {0}) no se pudieron añadir al PDF, que sigue diciendo «ver anexo». Envíalas como archivo aparte o envía sin ellas.",
+  "Terms and conditions missing": "Faltan las condiciones generales",
+  "Send them as a separate file": "Enviar como archivo aparte",
+  "Send without terms": "Enviar sin condiciones"
 }
