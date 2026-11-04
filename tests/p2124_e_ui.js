@@ -71,7 +71,7 @@ const FEAT = 'collab,comments,sheets';
   // 2.517.0 (#3714): the flake under load - Undo came while the new sheet still loaded; the view stayed on the deleted sheet.
   // Its load is held on purpose until the Undo is through.
   check(await until(() => w.location.hash === '#sheets/' + S.id && d.querySelector('#view .shbtab.on')?.textContent.trim() === 'Sheet 1'), 'Undo opens the first sheet again ' + w.location.hash);
-  await w.eval(`window.__rf1 = rawFetch; window.__held = []; window.__hold = true; rawFetch = (m, u, b) => (window.__hold && m === 'GET' && /^\/api\/sheets\/\d+$/.test(u) && u !== '/api/sheets/${S.id}') ? new Promise(r => window.__held.push(r)).then(() => __rf1(m, u, b)) : __rf1(m, u, b)`);
+  await w.eval(`window.__rf1 = rawFetch; window.__held = []; window.__hold = true; rawFetch = (m, u, b) => (window.__hold && m === 'GET' && /^[/]api[/]sheets[/][0-9]+$/.test(u) && u !== '/api/sheets/${S.id}') ? new Promise(r => window.__held.push(r)).then(() => __rf1(m, u, b)) : __rf1(m, u, b)`);
   h0 = await w.eval('HIST.undo.length');
   d.querySelector('#view [data-shb="add"]')?.click();
   const t4 = await until(async () => { const x = await call('GET', `/api/sheets/${S.id}/tabs`); return x.tabs?.length === 3 && x.tabs.find(t => t.id !== S.id && t.id !== t2)?.id; });
