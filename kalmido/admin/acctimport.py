@@ -2277,8 +2277,10 @@ def _thread(uid, fn, *args, iid=None, state=None):
                 _UMI_START.pop(int(uid))
 
 
-def umz_undo_parts(c, cr, plan, since):
-    """2.455.0 (#3469): the rows umz_part recorded. 2.506.0 (#4299): the ones unchanged since the import -> how many stay."""
+def umz_undo_parts(c, cr, plan, since, uid):
+    """2.455.0 (#3469): the rows umz_part recorded. 2.506.0 (#4299): the ones unchanged since the import -> how many stay.
+    2.516.0 (#4366): sprints, rules and portal tickets like the tasks only in a list uid may still write (one moved into a list of
+    others since, or whose list uid lost the right to, stays)."""
     kept = 0
     for table, key in reversed(cr.get("parts") or []):
         if table == "task_links":
@@ -2288,6 +2290,10 @@ def umz_undo_parts(c, cr, plan, since):
                 continue
             c.execute("DELETE FROM task_links WHERE task_id=? AND list_id=?", (int(key[0]), int(key[1])))
         elif table in ("sprints", "list_rules", "portal_tickets") and plan.goes(table, int(key)):
+            r = c.execute(f"SELECT list_id FROM {table} WHERE id=?", (int(key),)).fetchone()
+            if r is None or list_role(c, r["list_id"], uid) not in WRITE_ROLES:  # 2.516.0 (#4366)
+                kept += r is not None
+                continue
             if table == "sprints":  # tasks.sprint_id has no foreign key
                 c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (int(key),))
             c.execute(f"DELETE FROM {table} WHERE id=?", (int(key),))
@@ -2319,7 +2325,7 @@ def umz_undo(c, uid, r):
     from .orgimport import oi_undo, oi_undo_files, oi_undo_plan
     plan = oi_undo_plan(c, cr, since)  # 2.506.0 (#4299): before anything goes: only what is unchanged since and has nothing new below it
     n_oi, kept_rows = oi_undo(c, uid, cr, since, plan)  # 2.137.0 (#2344): the areas first (they point at the lists and tasks)
-    kept_rows += umz_undo_parts(c, cr, plan, since)  # 2.455.0 (#3469)
+    kept_rows += umz_undo_parts(c, cr, plan, since, uid)  # 2.455.0 (#3469)
     from .umz_more import umz_more_undo
     kept_rows += umz_more_undo(c, uid, cr, since, plan)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells
     tpl_paths = umz_undo_templates(c, uid, cr, plan)  # 2.464.0 (#3865)
@@ -2347,7 +2353,11 @@ def umz_undo(c, uid, r):
             go = []
             for x in part:
                 rows = c.execute(f"SELECT created_at, updated_at FROM {sub} WHERE {mem}=?", (x,)).fetchall()
+                # 2.516.0 (#4366): + its own changed_at (cal_touch / book_touch): an own event / contact moved in since keeps its
+                # created_at and updated_at, only the calendar / address book it went to says so
+                ch = c.execute(f"SELECT changed_at FROM {table} WHERE id=?", (x,)).fetchone()
                 if any(imp_undo_after(y["created_at"], since) or imp_undo_after(y["updated_at"], since) for y in rows) \
+                        or (ch is not None and imp_undo_after(ch["changed_at"], since)) \
                         or c.execute(f"SELECT 1 FROM {mt} WHERE {mc}=? AND user_id!=?", (x, uid)).fetchone():
                     if c.execute(f"SELECT 1 FROM {table} WHERE id=? AND {col}=?", (x, uid)).fetchone():
                         kept_cals += table == "ev_cals"

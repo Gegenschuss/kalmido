@@ -32,7 +32,8 @@ _CHUNK = 500
 # time columns that do not mean somebody worked on the row: its birth, a date in the future, what background runs write
 _NOT_WORK = frozenset(("created_at", "added_at", "expires_at", "polled_at", "error_at", "synced_at", "fetched_at", "rchk_at", "redo_at",
                        "taken_at", "done_at", "last_seen_at", "last_mail_at", "last_hit_at", "started_at", "ended_at", "installed_at",
-                       "checked_at"))
+                       "checked_at",
+                       "remind_at"))  # 2.516.0 (#4366): habits.remind_at is a time of day (HH:MM), no time stamp (read as "after")
 _EDITED = ("updated_at", "changed_at", "edited_at")
 _BORN = ("created_at", "added_at", "at")
 # append-only: nothing to fingerprint (a new entry shows up as a new row)
