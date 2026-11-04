@@ -760,7 +760,8 @@ At a glance (the same two lists as in Settings > Administration > Organisation, 
   (2.58.0; older ones are sealed by the encryption pass at the next start), stored invoices / credit notes
   (PDF/A-3 and e-invoice XML) and the archived PDFs of the legacy import. A stored PDF stays a PDF/A-3 without a
   password: it is sealed only on disk and served as the original (same checksum). Not encrypted: names, addresses,
-  task texts, logos, profile pictures, the search index. Files in the private space: see the next section (2.64). The cache of texts read
+  task texts, logos, profile pictures, the search index of tasks and comments (documents, files, mails and knowledge pages
+  are searched through keyed hashes of their words). Files in the private space: see the next section (2.64). The cache of texts read
   from attachments (`textcache/`, at most 30 days) is sealed with a key derived from the master key.
 - **The keys.** `KALMIDO_SECRET_KEY` (32 random bytes, base64) is the master key. Each organisation gets a random key,
   stored in the database only wrapped with a key derived from the master key. Without `KALMIDO_SECRET_KEY` nothing is
@@ -864,19 +865,24 @@ shared with others, an agent the project is shared with); the database and the d
   key back into plain text and exits with 0 only when none is left. `encrypt-private` switches it on again and seals
   them. `decrypt-all` (see above) also covers the private files. `status` shows `private_encrypt` and the counts.
 - **There is no recovery key for account keys.** Keep `KALMIDO_SECRET_KEY` safe (a password manager, apart from the
-  backups). If you change it on purpose, keep the earlier key, start once with `KALMIDO_SECRET_KEY_CHANGED=1` (2.190: without
-  it a different key does not start) and rewrap the account keys with the earlier key after the start, then remove the
-  switch:
+  backups). If you change it on purpose, keep the earlier key and first note the recovery key of every organisation:
+  organisation keys come back only with their recovery key (`rewrap`, see above; the earlier server key does not open them),
+  and after the change the server can no longer show it. Start once with `KALMIDO_SECRET_KEY_CHANGED=1` (2.190: without
+  it a different key does not start), run `rewrap` for each organisation and rewrap the account keys with the earlier key
+  after the start, then remove the switch:
 
   ```bash
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli rewrap-accounts --old-key-file - < old-key.txt
   ```
 
   (the earlier key is read from a file or stdin, never from the command line; `status` counts account keys made with
-  another server key as `keys_other_server_key`). Without the master key the private files are lost.
-  Two things stay on the server key itself (2.138.4): the Paperless-ngx API tokens and the search index and previews of
-  private documents. After the rewrap, rebuild the index (texts, labels and files stay; previews that no longer open are
-  made again in the background):
+  another server key as `keys_other_server_key`). Without the master key the private files are lost. Until the rewrap, and
+  without the earlier key for good, new private files of these people are refused with the same error as the old ones
+  (an account key row stays as it is; only `private_encrypt` 0 stores new files plain).
+  Some things stay on the server key itself and no rewrap brings them back (2.138.4): the Paperless-ngx API tokens, the
+  access data of Git connections, of the newsletter service and of other Kalmido servers, the OIDC client secret stored in the
+  settings, and the search index and previews of private documents. After the rewrap, rebuild the index (texts, labels and
+  files stay; previews that no longer open are made again in the background):
 
   ```bash
   docker compose exec -T kalmido python -m kalmido.admin.orgcrypt_cli reindex-private
@@ -884,8 +890,11 @@ shared with others, an agent the project is shared with); the database and the d
 
   and enter the Paperless-ngx tokens again (*Settings > Paperless-ngx* says so for each workspace; `status` counts them in
   `paperless_tokens.unreadable` and shows `docs.private_index`: `current`, `other_server_key` or `unknown` = never rebuilt).
-- **Your own data export** (*Settings > Data > Export*) is JSON and lists the files without their content, as before.
-  To take the files themselves out of the data folder in plain text, run `decrypt-private` first.
+  Enter the other access data again where they were set up (a client secret from the environment is not affected).
+- **Your own data export.** *Settings > Data > Export > Download JSON* lists the files without their content.
+  *Move and export everything* (see [Moving from and to app.kalmido.com](#moving-from-and-to-appkalmidocom)) holds your
+  private files themselves, decrypted: that is the way to take them out. `decrypt-private` is not: it works on the whole
+  server, for every person's files, and switches the encryption of private files off.
 
 **Knowledge pages (2.123).** The text of the knowledge pages and of their history is encrypted at rest as well:
 organisation pages with the organisation's key, private pages with the owner's account key (following `org_encrypt`,
@@ -917,11 +926,11 @@ Kalmido has two kinds of encryption. They are independent and can be used togeth
 
 | | Server-side, per organisation (2.42) | In the browser, per project / project chat / knowledge space (2.64) |
 |---|---|---|
-| Key | derived from `KALMIDO_SECRET_KEY`, one per organisation | a random key per project or space, created in the browser, wrapped for each member with their personal keys |
+| Key | a random key per organisation, stored wrapped with a key derived from `KALMIDO_SECRET_KEY` | a random key per project or space, created in the browser, wrapped for each member with their personal keys |
 | Who can read | the server, so everyone who may see the value (also agents) | only members whose browser is unlocked; not the server, its database, its backups, the operator or administrators |
 | Protects | database leaks, backups, the data folder | the same, and also the operator and the host |
-| Does not protect | an operator or host with access to the running server | members who already saw the content, metadata (dates, assignees, who writes when, text lengths) and a changed script delivered by the server itself |
-| Covers | office data and files of organisations | projects (titles, descriptions, comments, notes, free-text fields), the chat and the files of such a project, and knowledge spaces (page names and texts) |
+| Does not protect | an operator or host with access to the running server | members who already saw the content, what stays readable (below), metadata (who writes when, text lengths) and a changed script delivered by the server itself |
+| Covers | office data and files of organisations | the texts of projects (task titles, descriptions, links, comments, notes, section names, free-text fields), the chat and the files of such a project, and knowledge spaces (page names and texts) |
 
 In the app the second kind is called "Encrypted in the browser". "End-to-end" is only used in the explanation, together with its
 limit: a web app loads its code from the server, so a server whose code was changed could capture the passphrase. Nothing in a
@@ -932,6 +941,9 @@ browser can notice that.
   members need their encryption set up, and the browser converts the existing content with a progress bar. Members without it
   wait on a list ("key pending") until an admin releases the key.
 - **Server settings.** None. The feature needs HTTPS (the browser's WebCrypto) and works with or without `KALMIDO_SECRET_KEY`.
+- **What stays readable on the server** where the lock is on: the project's name and its tags, the status, priority, order
+  and assignees of tasks, dates and time stamps, and custom fields of the types select, number and date. Do not put
+  anything secret there.
 - **What drops out** where the lock is on: agents and API tokens (no texts, no writes), e-mail intake, public links, texts in
   calendar subscriptions, notifications and digests, server-side search (search runs in the browser over the unlocked content),
   and for knowledge spaces export and import on the server (the browser does both).
@@ -951,7 +963,7 @@ offline tool that opens it; the keys exist only in the members' browsers.
 - **Knowledge space.** Unlock the encryption, open the space and use the menu entry to export it as a ZIP. The ZIP is built in
   the browser from the decrypted pages and contains plain Markdown files. This is the way to take a space with you.
 - **Lists, list chat, list files.** Kalmido offers no decrypted export of these. The server's own exports hold ciphertext for
-  them: *Settings > Account > Export > Download JSON* (the data of your own lists) and the backups. What you see in the unlocked app
+  them: *Settings > Data > Export > Download JSON* (the data of your own lists) and the backups. What you see in the unlocked app
   can be copied from there. Plan for it: if you need a plain copy of a list, switch its lock off first (the browser converts the
   content back, the list is then readable on the server again) and export it.
 - **Account export, organisation export, backups.** They contain the ciphertext as stored (the organisation export lists it in the
@@ -974,16 +986,17 @@ in the data folder (`exports/`, not part of the backups); after that, or with *D
 and download is written to the office log (who, when, size). Since 2.278 only the admin who started the export can
 download or delete the archive: it is filtered by that admin's rights (filed mails they may not see stay out). Other
 admins see only that an export of that person exists; they can replace it once that person no longer administers the
-organisation.
+organisation. The download asks for the same second step as showing the recovery key (an admin signed in by a login proxy
+relies on the session).
 
 - **What is in it.** A zip with `manifest.json` (format version, Kalmido version, counts, SHA-256 of every entry), one
   JSON file per area and the files: the organisation's projects (sections, members and roles, fields, tags, status
   updates, links, milestones, history, project notes, project files, forms, playbooks), all tasks of those projects
-  (subtasks, field values, dependencies, history, the trash), comments, attachments, time entries on those projects, the
+  (subtasks, field values, dependencies, history), comments, attachments, time entries on those projects, the
   team chat channels of those projects, the organisation's calendars with their events, its address books with their
   contacts, its clients, the whole office (company data, services, equipment, packages, texts, framework contracts,
   quotations / invoices / credit notes with positions, payments, PDF and XML files, the archive, the office log), its
-  file store (2.48: folders, files with every version, shares, the access history, the trash; `store/*.json`,
+  file store (2.48: folders, files with every version, shares, the access history; `store/*.json`,
   `files/store/`), the customer reports of those lists (2.81: `portal/tickets.json` with the reporter's name and
   address; never the status link, a new server would send new links) and the members with their roles (name, user
   name, e-mail address). Since 2.362 also the organisation's channels of the team chat (the open ones and the ones the
@@ -992,7 +1005,8 @@ organisation.
   the closed months of the logbook, the tasks and events made from filed e-mails, section templates,
   contacts on tasks, the newsletter's suppression list and consent log (address hashes only) and the booking pages the
   office bills plus the exporting admin's own one with their kinds of appointment and bookings (in the archive; the
-  import does not take them over, a booking page belongs to one person). An open channel stays open in the target
+  import does not take them over, a booking page belongs to one person). Also its scheduling polls and bookmarks, its feeds
+  and read-later project and the pictures of the organisation and its projects. An open channel stays open in the target
   organisation: every member there can read its history.
 - **What is not in it.** Projects outside the organisation (the members' private space), other organisations, passwords,
   sessions, tokens, two-factor data, push subscriptions, webhook secrets, connection credentials, and the members'
@@ -1001,11 +1015,13 @@ organisation.
   mails of projects the admin is not part of. Projects of the organisation follow the same rule (2.223.3): only the ones
   the admin sees in the app (shared with at least one more person or open to the organisation, the admin's own and the
   ones shared with them); a member exports a project shared with nobody with the own account export (2.362.3: the other admins get a News with the number of projects, once a day; the list history names them). Deleted items (the
-  trash, undone entries) are not in it, nor in the retention export; removed logbook drives stay (the change log).
+  trash, undone entries) are not in it, nor in the retention export, so they are gone once the organisation is deleted;
+  removed logbook drives stay (the change log).
   Since 2.362 the manifest also names what stays out on purpose: group conversations of the team chat (like direct
   messages they belong to their people), closed channels the admin is not a member of, notification channels,
-  invitations and join requests, the pictures of the organisation and its projects, synchronisation data of calendar
-  and task apps, groups of people, and (not yet) bookmarks, feeds and scheduling polls of the organisation. Every other
+  invitations and join requests, synchronisation data of calendar and task apps, groups of people, household budgets
+  (their owner's account export holds the entries), the articles of feeds and feed addresses that carry an access key, and
+  the links of scheduling polls. Every other
   table with an organisation or project column is either exported or listed with its reason in the code
   (`kalmido/admin/orgexport.py` OX_LEFT; `tests/export_coverage_test.py` fails on a new table that is neither).
 - **Encrypted content.** Fields and files that the server encrypts with the organisation's key are plain text inside
@@ -1035,13 +1051,13 @@ organisation.
   data, documents with items and stored PDFs, payments, series, cash book, trips, meals, contracts, archive, bank data,
   logbook; finalised invoices stay finalised with their numbers), clients, file store with all versions, documents,
   knowledge pages, tables, video sign-offs, team chat, absences, vacation accounts, bookings, filed e-mails, newsletter
-  (connect it again), customer reports and forms (new links), playbooks, notes, rules, sprints, time entries and
-  timesheets. References between the areas point at the new entries, fields and files are sealed again with the
+  (connect it again), customer reports and forms (new links), playbooks, notes, rules, sprints, time entries,
+  timesheets, scheduling polls (new links), bookmarks, feeds and the pictures of the organisation and its projects. References between the areas point at the new entries, fields and files are sealed again with the
   target's key, rows of single people (absences, time entries, shares) come only for the people ticked in the preview,
   and one *Undo* removes it all. A number range, settings or company data the target already has are kept (named in the
   report). Not moved: public links and upload links (new ones are made where needed), open agent proposals, the learnt
   models and word indexes (rebuilt on the target), knowledge pages of a space locked in the browser (export them as
-  Markdown from the unlocked space), scheduling polls and bookmarks (personal).
+  Markdown from the unlocked space).
 - **A personal office** (2.139.1): its owner exports it the same way (*Settings > Company & office > Data > Export the office*: the office and
   the owner's private clients, nothing else); the import of such a file into the private space goes into the personal
   office of the importing person.
@@ -1050,12 +1066,13 @@ organisation.
 
 Since 2.73 every person can take their own data from one Kalmido server to another -- from the hosted app.kalmido.com
 to an own server, back, or between two own servers -- and keep the same file as their copy of their data (GDPR Art. 15
-and 20). Agents and API tokens cannot do this; it is a person's step in the app.
+and 20). Not everything moves, and not everything is in the file: see *What does not move* below (the household budget,
+for one). Agents and API tokens cannot do this; it is a person's step in the app.
 
 1. **Export.** *Settings > Data > Move and export everything > Export everything.* The server builds one ZIP file in the
    background and keeps it for 24 hours (`exports/account/` in the data folder, not part of the backups, sealed with a
    key derived from `KALMIDO_SECRET_KEY` and readable only by the server, mode 0600); *Download* gives you the plain ZIP,
-   *Delete now* removes it at once.
+   *Delete now* removes it at once. The download asks for the same second step as showing a recovery key.
 2. **Set up the other server** (this guide) and sign in there (or ask its admin for an account).
 3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
    checked (every checksum, format and version) and shown as a preview: the counts, the projects with their folders, the
@@ -1063,7 +1080,7 @@ and 20). Agents and API tokens cannot do this; it is a person's step in the app.
    private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
    removes everything the import created.
 4. **People.** Your projects are shared with a person found by e-mail only when you tick them in the preview (an address on
-   another server can belong to somebody else here). The file names other people only by a hash of their address, so
+   another server can belong to somebody else here). The file names the people of your lists only by a hash of their address, so
    the preview shows their name and the account found here, never an address. A server admin can also invite people that
    are missing (an account with an invitation link by e-mail): type their address in the preview -- it must match the
    hash in the file, otherwise nobody is invited; everybody else invites them later as usual. Assignments to people that
@@ -1085,7 +1102,9 @@ their tasks with subtasks, dependencies, field values and your tags, comments, a
 (2.362), time entries, habits, filters, templates (2.463: with their files and what they keep on the server: sprints, key
 links, project tags and your own assignments; other people, and lists and tasks of the old server, stay behind),
 your own calendars with events, your own address books with contacts, the journal and a few plain settings (language,
-work hours, display options, the folder order). Browser-encrypted content (locked notes, your encrypted files) stays
+work hours, display options, the folder order). Your private files with every version, knowledge pages and tables go into your
+private space, also when the rest goes into an organisation; so do your filed e-mails, video sign-offs, bookmarks, focus
+sessions, notepads, playbooks, saved arrangements and task bells. Browser-encrypted content (locked notes, your encrypted files) stays
 encrypted; your key bundle (wrapped in the browser with your passphrase and recovery code) comes along. The import keeps
 the old server's binding of each note and file (`legacy_aad`), so they open again although their ids changed; a note is
 sealed anew the next time you save it. Into an account
@@ -1099,6 +1118,10 @@ access data of connections (calendar and address book subscriptions, Karakeep, n
 set them up again), lists of other people (the file names them and contains your own comments there), the trash, and
 organisation data that is not yours (use the organisation export for a whole organisation).
 
+**The household budget stays behind.** The file holds its categories, recurring items and entries in readable form and the
+receipts by name only: the receipt files are not in the file, and the import takes over none of it. Save the receipts on the
+old server before you give it up.
+
 **Your own office (2.362.2).** With a personal office the file also holds a readable copy of it under `personal-office/`:
 the same parts as *Export the office* in the office settings, with the receipts and filed documents of the office. The
 account import names it as staying behind; to take the office to another server use *Export the office* (that archive now
@@ -1109,13 +1132,13 @@ again; files in the trash or below a browser-locked folder stay out).
 of `data/wiki_files.json` and `sheet_files.json` name them under `file`. A file that does not open is listed under
 `locked_files`, the export goes on.
 
-**2.148.1 (Art. 15):** the file also holds the list of your private files (name, type, size, dates; not their content),
-your private knowledge pages, your chats with agents, what you wrote in direct messages, your absences and timesheets
-(`private_files`, `wiki_pages`, `agent_chats`, `direct_messages`, `absences`, `timesheets`; the import does not take them
-over yet). `not_included` in the manifest names what is still missing (older versions of private files, other people's chat
-messages, the organisation's office).
+**2.148.1 (Art. 15):** the file also holds your private files (`private_files`, `private_versions`; the content under
+`files/private_files/`, older versions under `files/store/`) and your private knowledge pages (`wiki_pages`), both taken over
+by the import, and your chats with agents, what you wrote in direct messages, your absences and timesheets (`agent_chats`,
+`direct_messages`, `absences`, `timesheets`; the import does not take these over). `not_included` in the manifest names what
+is still missing (the history of knowledge pages, other people's chat messages, the organisation's office).
 
-**2.360.2:** also the current content of your private files (`files/private_files/`), your booking page with its
+**2.360.2:** also your booking page with its
 bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses), your private polls (`polls`,
 `poll_options`, `poll_votes`, without voters' e-mail addresses), the forms of your projects with their entries (`forms`,
 `form_entries`) and your holiday allowances (`leave_quota`). The import does not take them over: the preview names them.
@@ -1124,7 +1147,7 @@ bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses
 
 - `manifest.json`: `format` (`kalmido-account`), `v` (1), Kalmido version, `created_at`, `source` (`url`, `hosted`),
   `user` (id, name, e-mail), `tables` (rows per table), `files` (path, size, SHA-256 of every part), `client_encrypted`,
-  `export_id` (an import of the same file twice is pointed out), `not_included`, `locked_files` (2.209.0: files the virus
+  `export_id` (an import of the same file twice is pointed out), `people_salt` (the key of the address hashes), `not_included`, `locked_files` (2.209.0: files the virus
   scanner locked are not in the archive; area, id, name and signature of each are listed here, the organisation export does
   the same; backups keep them, with their lock).
 - `data/<table>.json`: one JSON array per table (the tables of *Download JSON*, plus `list_tags`, `task_list_tags`,
@@ -1136,10 +1159,12 @@ bookings (`appt_pages`, `appt_types`, `appt_bookings`, without network addresses
 - `files/attachments/`, `files/list_files/`: the files (decrypted).
 - `checksum.sha256`: check the file with `sha256sum -c checksum.sha256` after unpacking.
 
-Other people's addresses never leave the server in plain text: `email_hash` is the SHA-256 (hex) of
-`kalmido-people|` followed by the address in lower case without spaces around it; the import compares it with the accounts
-you may see on the new server. Your own address in `manifest.json` stays readable. Files of 2.73 test builds with a plain
-`email` field are still read.
+The addresses of the people of your lists leave the server only as a hash: `email_hash` is the HMAC-SHA256 (hex), keyed with
+`people_salt` of the manifest, of `kalmido-people|` followed by the address in lower case without spaces around it; the import
+compares it with the accounts you may see on the new server. This guards against prepared tables, not against guessing one
+address. Addresses that are your own data stay readable: your own in `manifest.json`, your contacts, and what people
+entered in your booking page, your forms and your customer reports (`appt_bookings`, `form_entries`, `portal_tickets`).
+Older files with the unkeyed SHA-256 or (2.73 test builds) a plain `email` field are still read.
 
 **A whole organisation**: upload its organisation export (see above) the same way and enter the organisation's
 recovery key of the old server. The archive is opened on the server (a wrong key is refused, ten attempts per upload),
@@ -1166,15 +1191,16 @@ for an account import, which carries no invoices). Since 2.362 a billed receipt 
 billed as well ("billed, the invoice did not come along" in the bookkeeping): it cannot be billed a second time; free it
 there only if it was never billed. Rows that cannot be taken over are named in the report with their number per area.
 
-**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file; the data parts may hold at
+**Limits:** `KALMIDO_ACCOUNT_IMPORT_MAX_MB` (default 4096) caps the size of an import file, which may have at most 200000
+entries; the data parts may hold at
 most 32 MB of JSON per table and 96 MB together, and `KALMIDO_ACCOUNT_IMPORT_MAX_ROWS` (default 500000) rows per table
 (also for an organisation export); 2.148.1: at most `KALMIDO_ACCOUNT_IMPORT_PARALLEL` (default 2) checks / imports run at
 once on the whole server, a further one gets `429` (try again later). Taken-over files are scanned like uploads (a file
 the scanner could not check is marked *unchecked* and scanned later; the type is the one found in the content); a file
 counts as browser-encrypted only with the format's header. Comments of other people come over with their name as text,
 never as their account; an export that holds projects of an organisation is noted in its project history; the storage quota of the
-person (hosting) is checked before the upload and for every file during the import -- when it is full, the import stops
-and what came over so far can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
+person (hosting) is checked before the upload and for every file during the import -- when it is full, the files that no
+longer fit stay out, everything else still comes and the import can be undone. The import refuses ZIP files with unsafe names, duplicate parts, encryption,
 extreme compression ratios or wrong checksums; ids, owners, organisations and authors in the file are never taken over
 as they are. Values in a form the app never writes (a date like 2026-99-99, a time 25:99, an unknown priority, a colour
 that is no #rrggbb, a repeat rule the app refuses) are left out, so the default applies.
@@ -1596,7 +1622,7 @@ Newsletter…* an organisation's admin connects the service for the organisation
   contacts, then adds, renames and takes off the list what Kalmido put there and no longer matches. An unsubscribed or
   bounced address is never subscribed again by Kalmido and stays blocked in Kalmido; if the person
   subscribes again through the service's own form, Kalmido leaves that subscription alone. Manually with
-  *Sync now*, or once a day. Every run is logged (numbers and error codes, never addresses or access data).
+  *Sync now*, or once a day with *Sync once a day* switched on. Every run is logged (numbers and error codes, never addresses or access data).
 - **Suppression list (2.152.0):** an unsubscription or bounce is also kept as a hash (SHA-256 of the lower-case address, per
   workspace; never the address itself), so deleting or merging the contact does not make the address mailable again, and a
   new import marked "yes" on that address stays unsubscribed. Consent, confirmation and unsubscription are logged as well
@@ -2066,7 +2092,8 @@ of the instance and **never sees content**: no names, e-mail addresses, titles, 
   locked, server admin, created, last active day, number of organisations and own projects, storage used, own and
   effective quota) - never a name, a display name or an e-mail address. Agents are not reachable here (404).
   - `POST /api/operator/accounts/find`: `{email}` finds the person with this address (the customer names it in the
-    request). The address is neither answered nor logged; unknown = 404.
+    request). The address is neither answered nor logged; unknown = 404, an address of several accounts = 409 with the
+    `code` `ambiguous` and their `count`.
   - `GET /api/operator/accounts/<id>`: the account's numbers.
   - `PUT /api/operator/accounts/<id>`: `{disabled?: bool, storage_quota_mb?: int | null}` locks / unlocks the account
     (locking ends all its sessions and mails the person, as in the app) or sets its own quota (`null` = the default).
@@ -2136,7 +2163,7 @@ servers only; with `KALMIDO_HOSTED=1` the section, the badge and the hint are hi
   about the server, so it keeps working after a move. The key itself is never shown again, logged or exported; the app
   shows the kind, the date and the label.
 - **Remove / Undo.** Removing a licence is one undo step (the server keeps the previous key for that).
-- **The hint.** Admins see a quiet, dismissable line at the top at most once a year, never in the first 30 days of a
+- **The hint.** Admins see a quiet, dismissable line at the top at most once a year, never in the first year of a
   new server, and only while there is neither a server licence nor their own personal licence. No push, no e-mail.
   Settings > Help > Support Kalmido > "Remind me once a year" turns it off. Members never see it.
 - **Payment link.** `KALMIDO_SUPPORT_URL=https://…` shows a "Become a supporter" button in that section. Unset (the
@@ -2286,8 +2313,8 @@ equals the username claim, or whose e-mail (optional field in *Settings > Admini
 e-mail; from then on the provider's subject (issuer + `sub`) decides, even if the name changes. 2.79.0: a user name match
 needs the same verified e-mail as well (accounts made for SSO, without password and e-mail, link as before), and admins, accounts with a second factor and child accounts are linked only from
 their own open session (log in with the password, then use the provider's button once in the same browser). Without a match the
-login page says "no account, ask the admin". *Create accounts on the first OIDC login* (admin switch) creates them
-instead (no admin rights unless the admin group says so, no password). An admin can unlink a user again.
+login page says "no account, ask the admin". *Create accounts on the first OIDC sign-in* (admin switch) creates them
+instead (no admin rights unless the admin group or an admin e-mail domain says so, no password). An admin can unlink a user again.
 
 **Security:** Authorization Code flow with PKCE (S256), `state` (one-time, 10 minutes, bound to the browser by an
 HttpOnly cookie, so nobody can log you into their account) and `nonce`. The ID token is verified by Kalmido itself:

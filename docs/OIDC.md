@@ -5,7 +5,7 @@ Kalmido logs in with any OpenID Connect provider and needs no plugin:
 - Authorization Code flow with PKCE (S256), state and nonce.
 - The ID token is checked against the provider's keys. RSA, RSA-PSS, ECDSA and Ed25519 are accepted; `none` and HMAC never are.
 
-A "Log in with …" button appears next to the password login. Passwords, passkeys and two-factor keep working for accounts that have them.
+A "Sign in with …" button appears next to the password login. Passwords, passkeys and two-factor keep working for accounts that have them. A sign-in through the provider does not ask for Kalmido's own second factor: there the provider's login counts.
 
 ## Setting it up
 
@@ -40,16 +40,18 @@ in effect. **Check connection** fetches the draft provider's discovery document 
 only a draft that passed the check can be switched on (*Sign-in with this provider* / *Use the changed settings for the
 sign-in*), and only then the sign-in uses it. *Discard draft* keeps the settings in effect. Without a draft, **Check
 connection** tests the provider in effect. Scripts can still set the fields directly with `PUT /api/admin/oidc` (in
-effect at once); the draft has `PUT` / `DELETE /api/admin/oidc/draft`, `POST /api/admin/oidc/check {"draft": true}` and
-`POST /api/admin/oidc/draft/apply` (409 until the unchanged draft checked fine).
+effect at once; a field set by a variable answers 409); the draft has `PUT` / `DELETE /api/admin/oidc/draft`, `POST /api/admin/oidc/check {"draft": true}` and
+`POST /api/admin/oidc/draft/apply` (409 until the unchanged draft checked fine). While an admin group or admin domains are set, or
+would be after the change, changing the provider, client ID, groups claim, admin group or admin domains asks for the account
+password: 403 with `password_needed` until the request carries `{"password": ...}` (an account without a password relies on its session).
 
 ### Who may log in
 
 - An account linked to the provider's subject (`issuer|sub`) logs in directly.
-- Otherwise the **first** login links one existing account: the one whose user name equals the user name claim, or the one whose e-mail equals the **verified** e-mail claim (`email_verified: true`; for Microsoft Entra also `xms_edov`). Accounts are never linked any other way.
-- 2.79.0: a match by **user name** links only when the account's e-mail equals the provider's verified e-mail too (a provider where people choose their own user name cannot take over a local account), or when the account was made for single sign-on (no password and no e-mail, as created under *Administration > Users > New user*). **Admins**, accounts with a **second factor** (authenticator app, passkey) and child accounts are never linked by such a match: log in with the password first, then press the provider's button once **in the same browser** - the open session links the account. The login page shows "This account is not linked to the login provider yet ..." in these cases. Accounts already linked are not affected.
-- Nobody matches: "no account". The exception is when **Create accounts on the first OIDC login** is on, in which case the person gets a new account. When the user name claim is not a valid Kalmido user name (Google sends none, Entra sends `anna@corp.example`), the new account is named after the local part of the verified e-mail. That name is used only for creating, never for matching an existing account.
-- Unlink an account under Settings › Administration › Users › edit. The next login links it again.
+- Otherwise the **first** login links one existing account not linked yet: the one whose user name equals the user name claim, or else the one whose e-mail equals the **verified** e-mail claim (`email_verified: true`; for Microsoft Entra also `xms_edov`). The user name goes first: when it matches an account that may not be linked (next point), the login is refused and the e-mail is not tried. Accounts are never linked any other way.
+- 2.79.0: a match by **user name** links only when the account's e-mail equals the provider's verified e-mail too (a provider where people choose their own user name cannot take over a local account), or when the account was made for single sign-on (no password and no e-mail, as created under *Administration > Users > New user*). **Admins**, accounts with a **second factor** (authenticator app, passkey) and child accounts are never linked by such a match: log in with the password first, then press the provider's button once **in the same browser** - the open session links the account. The login page shows "This account is not linked to the sign-in provider yet ..." in these cases. With `KALMIDO_HOSTED=1` every first link goes this way, from the account's own open session. Accounts already linked are not affected.
+- Nobody matches: "no account". The exception is when **Create accounts on the first OIDC sign-in** is on, in which case the person gets a new account. When the user name claim is not a valid Kalmido user name (Google sends none, Entra sends `anna@corp.example`), the new account is named after the local part of the verified e-mail. That name is used only for creating, never for matching an existing account. A name that is already taken, or no usable name at all, refuses the sign-in: no number is added.
+- Unlink an account under Settings › Administration › Users › edit. The next login links it again by the rules above.
 
 Calendar apps (CalDAV) do not use OIDC: every person creates an app password (see [CALDAV.md](CALDAV.md)).
 
@@ -142,7 +144,7 @@ PocketID logs in with passkeys only, so Kalmido accounts that use it need no pas
    - Scopes `openid profile email`.
 4. Google sends no user name and no groups:
    - Create the Kalmido users with their Workspace e-mail; the first login links them by the verified e-mail.
-   - Or switch on "Create accounts on the first OIDC login". The account is named after the e-mail's local part.
+   - Or switch on "Create accounts on the first OIDC sign-in". The account is named after the e-mail's local part (a name already taken refuses the sign-in).
    - For admins, use **Admin e-mail domains** with your Workspace domain. This only makes sense together with the Internal consent screen, because with "External" any Google account could log in.
 
 ### Microsoft Entra ID
@@ -161,10 +163,10 @@ PocketID logs in with passkeys only, so Kalmido accounts that use it need no pas
 
 ## Troubleshooting
 
-- **"The login with the provider failed"**: the reason is under Settings › Administration › Sign-in ("Last problem with the provider") and in the container log. Common causes:
-  - The issuer differs by a trailing slash.
+- **"The sign-in with the provider failed"**: the reason is under Settings › Administration › Sign-in ("Last problem with the provider") and in the container log. Common causes:
+  - The issuer differs from the one in the provider's discovery document (a trailing slash does not matter).
   - The provider signs with HS256 (Authentik without a signing key).
   - An internal provider is not on the allow-list (`KALMIDO_OIDC_ALLOW_HOSTS`).
-- **"There is no account for this login yet"**: create the user first (same user name or e-mail), or switch on auto-create.
-- **"Your account at the login provider is not allowed"**: the person is not in the required group. Check that the groups claim actually arrives (scope `groups`, the claim name).
+- **"There is no account for this sign-in yet"**: create the user first (with the same verified e-mail, or for single sign-on with the same user name and without password and e-mail), or switch on auto-create.
+- **"Your account at the sign-in provider is not allowed to use this app"**: the person is not in the required group. Check that the groups claim actually arrives (scope `groups`, the claim name).
 - **The redirect URI does not match**: `PUBLIC_URL` must be the address the browser uses, including `https://`.
