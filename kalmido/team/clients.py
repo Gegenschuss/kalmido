@@ -112,6 +112,17 @@ def client_lists(c, uid, cid):
     return [r[0] for r in c.execute(f"SELECT id FROM lists WHERE client_id=? AND id IN {vis_sql()} ORDER BY id", (cid, uid, uid))]
 
 
+def client_lists_many(c, uid, cids):
+    """2.525.0 (#4187): {client id: [ids of its lists uid sees]} of the clients cids in one query (client_lists per client)."""
+    out = {int(x): [] for x in cids}
+    if not out:
+        return out
+    q = ",".join("?" * len(out))
+    for r in c.execute(f"SELECT client_id, id FROM lists WHERE client_id IN ({q}) AND id IN {vis_sql()} ORDER BY id", (*out, uid, uid)):
+        out[r[0]].append(r[1])
+    return out
+
+
 def _num(v, what, lo=0.0, hi=1e9):
     if v in (None, ""):
         return None
@@ -221,7 +232,6 @@ def client_stats(c, uid, cid, lids, month=None):
                 "estimated": 0, "open": 0, "done": 0}
     q = ",".join("?" * len(lids))
     csv = ",".join(str(x) for x in lids)
-    tot = time_report(c, uid, {"scope": "all", "lists": csv})["total"]
     today = local_now().date()
     m = month or today.strftime("%Y-%m")
     try:
@@ -229,7 +239,9 @@ def client_stats(c, uid, cid, lids, month=None):
     except ValueError:
         raise BadInput(tr("Invalid value: {0}", "month")) from None
     d2 = date(d1.year + (d1.month == 12), d1.month % 12 + 1, 1).toordinal() - 1
-    mon = time_report(c, uid, {"scope": "all", "lists": csv, "from": d1.isoformat(), "to": date.fromordinal(d2).isoformat()})["total"]
+    # 2.525.0 (#4187): one report, the month as its window (was a second report over the same lists)
+    tot = time_report(c, uid, {"scope": "all", "lists": csv}, window=(d1, date.fromordinal(d2)))["total"]
+    mon = tot["window"]
     est = c.execute(f"""SELECT COALESCE(SUM(duration),0), COUNT(duration), SUM(CASE WHEN status=0 THEN 1 ELSE 0 END), SUM(CASE WHEN status!=0 THEN 1 ELSE 0 END) FROM tasks
                         WHERE list_id IN ({q}) AND deleted_at IS NULL AND ms=0 AND {tvis(c, uid)}""", lids).fetchone()
     return {"seconds": tot["seconds"], "rounded": tot["rounded"], "amount": tot["amount"], "month": m,

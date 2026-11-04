@@ -677,7 +677,10 @@ def time_list():
                    mine=sum(e["seconds"] for e in out if e["mine"]))
 
 
-def time_report(c, uid, a, own=None):
+def time_report(c, uid, a, own=None, window=None):
+    """The time report of filters a (time_rows). 2.525.0 (#4187): window = (first day, last day) adds total["window"]
+    {seconds, rounded, amount} = the total the same report with from / to = window would give (the client card: the month
+    next to all time from one report, was two)."""
     s = usettings(c, uid)
     rm, ref, vis = time_rounding(s), now_utc(), vis_ids(c, uid)
     lists = {l["id"]: l for l in visible_lists(c, uid, light=True)}  # 2.280.0 B (#3116): only names / colours / rates
@@ -687,6 +690,11 @@ def time_report(c, uid, a, own=None):
     zone, split = tz_of_s(s), tz_split_on(s)  # 2.125.0 B (#2120): my time zone; entries over midnight split per day
     L, D, U, entries = {}, {}, {}, []
     tot = {"seconds": 0, "rounded": 0, "amount": 0.0, "count": 0}
+    win = None
+    if window:
+        from .timesheet import tz_of
+        wlo, whi = local_bounds(window[0], window[1], tz_of(c, uid))  # the bounds time_rows sets for from / to
+        win = {"seconds": 0, "rounded": 0, "amount": 0.0}
 
     def add(d, e, amt):
         d["seconds"] += e["seconds"]
@@ -710,6 +718,8 @@ def time_report(c, uid, a, own=None):
         entries.append(e)
         add(tot, e, amt)
         tot["count"] += 1
+        if win is not None and wlo <= r["start"] < whi:
+            add(win, e, amt)
         grp = L.setdefault(lid, {"id": lid, "name": l["name"] if l else "", "is_inbox": bool(l and l["is_inbox"]),
                                "color": l["color"] if l else "", "rate": rate, "seconds": 0, "rounded": 0, "amount": 0.0,
                                "tasks": {}, "users": {}})
@@ -733,6 +743,9 @@ def time_report(c, uid, a, own=None):
             x["users"] = sorted(x["users"].items(), key=lambda kv: -kv[1])
         out_lists.append(grp)
     tot["amount"] = round(tot["amount"], 2)
+    if win is not None:
+        win["amount"] = round(win["amount"], 2)
+        tot["window"] = win
     for d in D.values():
         d.pop("amount", None)
     for u in U.values():

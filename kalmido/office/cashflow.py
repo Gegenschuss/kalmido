@@ -291,6 +291,21 @@ def cf8_chain(c, oid, r):
                           "counts": x["id"] in counting} for x in rows]}
 
 
+# 2.525.0 (#4187): the columns of a document rk_cashflow reads (nf / netf, put, cf8_counting, cf8_invoiced, inv_money_fields)
+CF_COLS = ("id, kind, status, locked_at, totals, currency, fx_rate, due_date, date, number, project_title, source_doc_id, inv_type, "
+           "skonto_pct, version_of, client_id, cashflow, service_from, service_to")
+
+
+def cf_docs(c, oid, first, last):
+    """2.525.0 (#4187): the documents of rk_cashflow for the days [first, last): only the columns it reads (CF_COLS), and of
+    the invoices / credit notes only the finalised ones not drafts / cancelled (its inv) and the ones paid in the period
+    (by_id, a superset of its payment filter); every quotation stays (a chain counts or not as a whole). Was SELECT * of
+    every document of every year."""
+    return c.execute(f"SELECT {CF_COLS} FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit') AND trial=0 AND ("
+                     "kind='offer' OR (kind='invoice' AND locked_at IS NOT NULL AND status NOT IN ('draft', 'cancelled'))"
+                     " OR id IN (SELECT doc_id FROM office_payments WHERE org_id=? AND date>=? AND date<?))", (oid, oid, first, last)).fetchall()
+
+
 def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True):
     """{from, months, currency, today, basis, rows: [{month, in: {actual, plan}, out: {actual, plan}, balance}], entries: [...]}.
     An entry: {month, dir in|out, state actual|plan, kind payment|invoice|offer|series|purchase|trip|fixed|agreement|receipt, date, amount,
@@ -345,7 +360,7 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         return today if not day or day < today else day
 
     # 2.144.10 B (#2576): trial documents never enter the forecast (their payments drop out through by_id)
-    docs = c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('offer', 'invoice', 'credit') AND trial=0", (oid,)).fetchall()
+    docs = cf_docs(c, oid, first, last)
     inv = [r for r in docs if r["kind"] == "invoice" and r["locked_at"] and r["status"] not in ("draft", "cancelled")]
     pm = inv_paid_map(c, oid, [r["id"] for r in inv])
     by_id = {r["id"]: r for r in docs}

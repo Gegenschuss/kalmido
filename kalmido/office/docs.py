@@ -1293,6 +1293,8 @@ def odoc_sorted(rows, k, d):
 
 
 ODOC_PAGE_MAX = 500
+# 2.525.0 (#4187): what the derived states (inv_state, inv_money_fields), odoc_sorted and the cursor read of a row
+ODOC_LIGHT_COLS = "id, kind, status, date, totals, due_date, skonto_pct, project_title, number, recipient"
 
 
 @app.get("/api/office/docs")
@@ -1304,7 +1306,7 @@ def odoc_list():
     kind = request.args.get("kind") or "offer"
     if kind not in DOC_KINDS:
         kind = "offer"
-    sql, args = "SELECT * FROM office_docs WHERE org_id=? AND kind=?", [oid, kind]
+    sql, args = "SELECT {cols} FROM office_docs WHERE org_id=? AND kind=?", [oid, kind]
     st = request.args.get("status")
     if st in STATUSES + ("issued", "paid", "cancelled") and st not in ("partial", "overdue"):
         sql += " AND status=?"
@@ -1356,7 +1358,11 @@ def odoc_list():
             args.append(local_now().date().isoformat())
         elif st == "partial":  # 2.356.0 D (#3007): not for the open items
             sql += " AND EXISTS (SELECT 1 FROM office_payments p WHERE p.doc_id=office_docs.id AND p.org_id=office_docs.org_id)"
-    raw = c.execute(sql + " ORDER BY date DESC, id DESC" + ("" if derived or srt else f" LIMIT {n + 1}"), args).fetchall()
+    # 2.525.0 (#4187): a derived state or a sort needs every row before the page is cut: those read only the columns of the
+    # filter / sort first (ODOC_LIGHT_COLS), the whole rows only for the page shown (was SELECT * of every row)
+    light = derived or srt
+    raw = c.execute(sql.replace("{cols}", ODOC_LIGHT_COLS if light else "*", 1) + " ORDER BY date DESC, id DESC" + ("" if light else f" LIMIT {n + 1}"),
+                    args).fetchall()
     paid = kind in ("invoice", "credit")
     pm = inv_paid_map(c, oid, [r["id"] for r in raw]) if paid and derived else {}
     if derived:
@@ -1365,6 +1371,10 @@ def odoc_list():
         raw = odoc_sorted(raw, srt, request.args.get("dir"))[off:]
     next_cursor = (f"@{off + n}" if srt else f"{raw[n - 1]['date']},{raw[n - 1]['id']}") if len(raw) > n else None
     raw = raw[:n]
+    if light and raw:
+        full = {r["id"]: r for r in c.execute(f"SELECT * FROM office_docs WHERE org_id=? AND id IN ({','.join('?' * len(raw))})",
+                                              [oid, *(r["id"] for r in raw)])}
+        raw = [full[r["id"]] for r in raw if r["id"] in full]
     if paid and not derived:
         pm = inv_paid_map(c, oid, [r["id"] for r in raw])
     lg = lang()

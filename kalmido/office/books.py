@@ -287,11 +287,18 @@ def bk_reverse_key(c, oid, r, memo):
     return "abroad" if fk_third_country(cc, memo["home"]) else "reverse"
 
 
+def bk_pay_docs(c, oid, frm, to):
+    """2.525.0 (#4187): the invoices / credit notes (no trial ones) with a payment in [frm, to] by the filter of bk_payments;
+    was every document of every year."""
+    return c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0 AND id IN "
+                     "(SELECT p.doc_id FROM office_payments p LEFT JOIN office_payments o ON o.id=p.reverses_id AND o.org_id=p.org_id "
+                     f"WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<=?)", (oid, oid, frm, to)).fetchall()
+
+
 def bk_payments(c, oid, frm, to, home):
     """[(payment row, document row)] of invoices / credit notes paid in [frm, to] (ISO days, both included)."""
     # 2.144.10 B (#2576): trial documents never reach the books
-    docs = {r["id"]: r for r in c.execute("SELECT * FROM office_docs WHERE org_id=? AND kind IN ('invoice', 'credit') AND trial=0",
-                                          (oid,))}
+    docs = {r["id"]: r for r in bk_pay_docs(c, oid, frm, to)}
     out = []
     # 2.355.0 C (#2841): a reversal line counts on the day of the payment it takes back (was the day of the correction)
     for p in c.execute(f"SELECT p.id, p.doc_id, {BK_PAY_DAY} AS date, p.amount FROM office_payments p LEFT JOIN office_payments o "
