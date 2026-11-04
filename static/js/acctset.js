@@ -46,7 +46,7 @@ function shareHtml(hint) {
   return `<h4 id="s-share-h">${tr('Share from your phone')}</h4>
     ${hint(tr('Send photos, files, links and text from any app to your basket: each share becomes a task.'))}
     <h5 class="ssub">${ic('phone', 's')}Android</h5>
-    <div class="row"><a class="btn sm" id="s-hszip" href="/api/me/share/httpshortcuts.zip" download="kalmido-http-shortcuts.zip">${ic('download', 's')} ${tr('Download HTTP Shortcuts import')}</a></div>
+    ${S.me?.support_session ? '' /* 2.538.0 (#4365): the download makes a new upload token, a support session gets none */ : `<div class="row"><a class="btn sm" id="s-hszip" href="/api/me/share/httpshortcuts.zip" download="kalmido-http-shortcuts.zip">${ic('download', 's')} ${tr('Download HTTP Shortcuts import')}</a></div>`}
     <details class="shelp sdet"><summary>${tr('How to set it up')}</summary><ol class="slist">
       <li>${tr('Install the free app <b>HTTP Shortcuts</b> (Play Store or F-Droid).')}</li>
       <li>${tr('In HTTP Shortcuts: menu ⋮ > Import / Export > Import from file, choose the downloaded ZIP.')}</li>

@@ -630,6 +630,7 @@ def _user_purge(c, uid, made):
 @app.get("/api/me")
 def me_get():
     from ..accounts.orgs import workspaces_for
+    from ..accounts.supportgrant import sga_is_support
     c = db()
     u = g.user
     return jsonify({**user_public(u), "is_admin": bool(u["is_admin"]), "auth": g.auth_via,
@@ -639,6 +640,7 @@ def me_get():
                     # whether one is set and since when. 2.86.0 (N3): /drop takes no child account
                     "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
                     "ntfy_topic": usettings(c, u["id"])["ntfy_topic"],
+                    "support_session": sga_is_support(c),  # 2.538.0 (#4365): as in /api/state
                     "sgen": session_gen(u, workspaces_for(c, u["id"]))})  # 2.238.0 B (#2872): the sign-in mark (as in /api/state)
 
 

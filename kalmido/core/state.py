@@ -22,6 +22,7 @@ from ..core.pages import inbox_user
 from ..core.instance import about_info, pub_kinds_off
 from ..core.env import env_int  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.supportgrant import sga_is_support  # 2.538.0 (#4365)
 
 
 # ---------------------------------------------------------------- state
@@ -336,7 +337,8 @@ def state():
             # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
             "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
             "workspaces": (ws := workspaces_for(c, uid)), "sgen": session_gen(u, ws),  # 2.28.0 (#935): my organisations [{id, name, icon, role}]; 2.238.0 B (#2872): + the sign-in mark
-            "since": str(u["created_at"] or "")[:10]},  # 2.364.0 B (#3031): the account's first day (Today's review from the second week)
+            "since": str(u["created_at"] or "")[:10],
+            "support_session": sga_is_support(c)},  # 2.538.0 (#4365): the app hides what a support session may not fetch  # 2.364.0 B (#3031): the account's first day (Today's review from the second week)
         workspaces=has_workspaces(c),  # 2.28.0 (#935): lists / agents have a workspace (private | an organisation)
         ws_mismatches={str(k): v for k, v in ws_mismatches(c, uid).items()},  # 2.28.0: agents of another workspace in my lists
         setup_pending=bool(u["is_admin"]) and gsetting(c, "setup_step2") == "pending",  # 2.13.0 (#453 A16)

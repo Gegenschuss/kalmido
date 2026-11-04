@@ -28,6 +28,7 @@ from ..notify.alerts import aa_now  # 2.312.0 C (#3265)
 from ..core.pg import write_lock  # 2.269.0 C (#3017)
 from ..accounts.orgroles import office_allowed  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import org_role, user_orgs, instance_mode, workspaces_for  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.supportgrant import sga_scope_check  # 2.538.0 (#4365)
 from .packs import PACK_FEATURES  # 2.369.5 (#2517): pulled up from functions
 
 OFFICE_FEAT = "office"
@@ -201,8 +202,12 @@ def office_org(c, uid, admin=False, area=None):
     person's own personal office (pb_personal, the person is its admin); "all" with exactly one organisation -> that one
     (as before). Otherwise 400 with a readable text. admin=True also requires the admin role (403).
     2.187.0 (#2476): a member ruled by office groups (office/rights.py) is checked by the level of the request's area
-    (area: given by a caller outside /api/office) instead of the admin role; everybody else exactly as before."""
+    (area: given by a caller outside /api/office) instead of the admin role; everybody else exactly as before.
+    2.538.0 (#4365): a write of a support session into the office of an organisation that is not the person's own office and
+    has no support access of its own answers 403 code support_session (sga_scope_check); reading stays."""
     oid, role = office_where(c, uid)
+    if oid and has_request_context() and request.method not in ("GET", "HEAD", "OPTIONS"):
+        sga_scope_check(c, oid)  # 2.538.0 (#4365): a support session writes into no office of a foreign organisation without its own grant
     if oid and has_request_context():  # 2.380 F (#3411): a point of Money switched off answers 404 (its data stays)
         fk = office_path_feature(request.path)
         if fk and not office_feature_on(office_settings(c, oid), fk):
