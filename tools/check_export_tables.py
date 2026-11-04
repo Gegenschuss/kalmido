@@ -4,7 +4,8 @@ lint step): reads kalmido/core/schema.py (CREATE TABLE + the column migrations) 
 list or task column against
  - the account export (accounts/settings.py umz_export_queries, admin/acctexport.py umz_extra_queries / umz_mine_queries / umz_build)
    or admin/exportleft.py UMZ_LEFT_TABLES, with the reason why it stays out
- - the organisation export (admin/orgexport.py OX_AREAS) or OX_LEFT (tables with an organisation or a list column)
+ - the organisation export (admin/orgexport.py OX_AREAS) or OX_LEFT (tables with an organisation or a list column); 2.510.0 (#4286):
+   a column named like a secret in such a table is dropped (OX_SECRET_COLS) or named here with its reason (SECRET_OK)
  - the retention export (admin/retexport.py RX_TABLES) or exportleft.py RX_LEFT_TABLES (the office tables)
  - the imports: every part of the account export is read (acctimport.py UMZ_READ) or named as staying behind (UMZ_LEFT), every
    area of the organisation export is mapped (UMZ_ORG_MAP), read by an area of admin/oi_*.py or named (UMZ_ORG_SKIP)
@@ -24,6 +25,27 @@ PEOPLE = ("user_id", "owner_id", "created_by", "org_id", "list_id", "task_id")
 ORG_COLS = ("org_id", "list_id")
 # the tables that carry the others (the account's own row, the export's frame): never a finding
 FRAME = ("users",)
+# 2.510.0 (#4286, audit #2427): a column of an OX_AREAS table named like a secret stays out of the export (OX_SECRET_COLS: _clean
+# drops it) or stands here with the reason why it may go along
+SECRET_NAME = re.compile(r"secret|token|hash|passw|key", re.I)
+SECRET_OK = {
+    "bookmarks.url_key": "the normalized address, for finding doubles",
+    "list_notepads.agent_key": "the name of an agent's block ('status')",
+    "lists.ticket_key": "the prefix of the ticket numbers",
+    "nl_consent_log.email_hash": "keyed hash of the address: the proof of the consent moves with the list",
+    "nl_suppress.email_hash": "keyed hash of the address: who unsubscribed stays unsubscribed after a move",
+    "office_bank_rule_nos.key": "the name of a rule's entry",
+    "office_bank_tx.rkeys": "the matching keys of a bank line",
+    "office_bank_tx.key_org": "the organisation the matching key belongs to",
+    "office_bank_tx.hash": "fingerprint of a bank line, against importing it twice",
+    "office_bookarch_files.content_key": "fingerprint of a file's content, against importing it twice",
+    "office_gen_docs.body_hash": "fingerprint of the document's text",
+    "office_signoffs.doc_hash": "fingerprint of the document that was signed off (the proof)",
+    "office_texts.key": "the name of a text block",
+    "portal_tickets.email_hash": "keyed hash of the address, for the sign-in lookup (the token columns stay out)",
+    "sched_poll_votes.edit_hash": "kept empty by _ox_dec_row (a voter's edit key never leaves)",
+    "sched_poll_votes.ip_hash": "kept empty by _ox_dec_row",
+}
 # the parts umz_build writes itself: {part of the file: table}
 BUILD_PARTS = {"people": None, "server_links": "msv_links", "budgets": None}
 
@@ -131,6 +153,12 @@ def check(root):
         bad.append(f"{t}: has an organisation / list column but is neither in OX_AREAS nor in OX_LEFT (kalmido/admin/orgexport.py)")
     for t in sorted(set(ox_left) - onames):
         bad.append(f"{t}: stale in OX_LEFT")
+    secret_cols = strings(assigned(ox, "OX_SECRET_COLS"))  # 2.510.0 (#4286): _rows is SELECT *, _clean only drops these names
+    named = {f"{t}.{c}" for t in set(areas.values()) for c in tables.get(t, ()) if SECRET_NAME.search(c) and c not in secret_cols}
+    for x in sorted(named - set(SECRET_OK)):
+        bad.append(f"{x}: named like a secret, goes along with the organisation export: add it to OX_SECRET_COLS (kalmido/admin/orgexport.py) or to SECRET_OK here with the reason")
+    for x in sorted(set(SECRET_OK) - named):
+        bad.append(f"{x}: stale in SECRET_OK")
     # ---- retention export
     rx = ast.parse(read(root, *admin, "retexport.py"))
     rx_t = {e.elts[1].value for e in assigned(rx, "RX_TABLES").elts}

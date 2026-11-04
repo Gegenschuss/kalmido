@@ -61,6 +61,11 @@ check(rc == 1 and "zz_comment" in out, f"a column after a comment is seen: {out[
 rc, out = with_edit(("accounts", "settings.py"), '"pomos": ("SELECT * FROM pomos WHERE user_id=?", (uid,)),',
                     '"pomos": ("SELECT (SELECT 1 FROM pomos) AS x, * FROM habits WHERE user_id=?", (uid,)),')
 check(rc == 1 and "pomos: has user_id" in out, f"a table only named in a subselect does not count as exported: {out[-300:]}")
+# 2.510.0 (#4286): a secret-like column of an exported table
+rc, out = with_edit(("admin", "orgexport.py"), '"token", "token_hash", ', "")
+check(rc == 1 and ".token_hash: named like a secret" in out, f"a secret-like column that is no longer dropped is a finding: {out[-300:]}")
+rc, out = with_edit(SCHEMA, "CREATE TABLE IF NOT EXISTS office_texts (", "CREATE TABLE IF NOT EXISTS office_texts (\n  zz_api_secret TEXT,")
+check(rc == 1 and "office_texts.zz_api_secret" in out, f"a new secret-like column in an exported table is a finding: {out[-300:]}")
 rc, out = with_edit(SCHEMA, "CREATE TABLE IF NOT EXISTS filters (", TABLE.format("office_zz", "org_id"))
 check(rc == 1 and "office_zz" in out and "RX_LEFT_TABLES" in out, f"a new office table is a finding: {out[-300:]}")
 rc, out = with_edit(("admin", "exportleft.py"), "UMZ_LEFT_TABLES = {\n", 'UMZ_LEFT_TABLES = {\n    "zz_gone": _SERVER,\n')

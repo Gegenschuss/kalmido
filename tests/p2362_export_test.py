@@ -291,6 +291,37 @@ check(ge.status_code == 200 and ge.json().get("legacy_aad") == f"kalmido-note:v1
       f"#3090: greta's encrypted note answers with the old AAD {ge.status_code} {ge.text[:200]}")
 check(not dbx("SELECT 1 FROM org_members WHERE user_id IN (?,?)", (FID, GID)), "freelancer: still in no organisation")
 
+# 2.510.0 (#4286, audit #2427): no OX_AREAS query brings a row of another organisation or a private list (ORGB and the
+# freelancers' lists have data by now); the rows with an org_id or a list_id of their own are read as the export reads them
+ISO = """
+import json, sys
+from kalmido.admin.orgexport import OX_AREAS
+from kalmido.core import pg as _pg
+from kalmido.core.config import DATABASE_URL
+org = int(sys.argv[1])
+c = _pg.connect_direct(DATABASE_URL)
+out = {"bad": [], "seen": 0, "foreign": 0}
+with _pg.system_ctx(c):
+    ours = {r[0] for r in c.execute("SELECT id FROM lists WHERE org_id=?", (org,))}
+    for name, table, where in (*OX_AREAS, ("control", "tasks", "1=1")):  # the control: every task, so the check has something to find
+        rows = c.execute(f"SELECT * FROM {table} WHERE ({where})", (org,) * where.count("?")).fetchall()
+        for r in rows:
+            d = dict(r)
+            out["seen"] += 1
+            if d.get("org_id") not in (None, org) or (d.get("list_id") is not None and table != "lists" and d["list_id"] not in ours):
+                out["bad"].append([name, d.get("id"), d.get("org_id"), d.get("list_id")])
+    out["foreign"] = c.execute("SELECT COUNT(*) FROM lists WHERE org_id IS DISTINCT FROM ?", (org,)).fetchone()[0]
+print(json.dumps(out))
+"""
+ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
+r = subprocess.run(["docker", "exec", "-i", "-e", "TASKS_WATCHDOG=0", ct, "python", "-c", ISO, str(ORG)], capture_output=True, text=True)
+iso = json.loads(r.stdout.strip().splitlines()[-1]) if r.stdout.strip() else {}
+control = [x for x in iso.get("bad", []) if x[0] == "control"]
+check(control, "#4286: the check finds rows of others when a query brings them (the control query)")
+iso["bad"] = [x for x in iso.get("bad", []) if x[0] != "control"]
+check(iso.get("seen", 0) > 20 and iso.get("foreign", 0) >= 2, f"#4286: every export query read, with lists of others on the server {iso.get('seen')} {iso.get('foreign')} {r.stderr[-400:]}")
+check(iso.get("seen") and not iso.get("bad"), f"#4286: no export query brings a row of another organisation or a private list {iso.get('bad')}")
+
 if FAILS:
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
     print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
