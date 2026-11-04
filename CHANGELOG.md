@@ -14,6 +14,69 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.541.0] - 2026-11-05
+
+Package 2.530 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Comments and team chat messages go into the trash with their files: Undo right after deleting, restore until the trash period ends, the trash run removes them for good; also when a list owner deletes someone else's comment and when an agent's comment is undone (#4315).
+- Habits go into the trash with their history: Undo toast and a trash section under the habit list (#4315).
+- "Delete all times": the deleted entries stay on the server; the delete dialog shows the last deletion with a Restore button, also after closing the tab (#4315).
+- Before deleting for good (empty trash, task, project) the dialog names what goes along: customer reports, form entries, video reviews (these now go into the video trash instead of being lost), projects kept by law (#4316).
+### Changed
+- Empty trash as an instance admin empties only the own trash; other owners' trashes only after a second question with the number (#4316).
+- Agents delete comments and habits only after a person's approval (#4315).
+- Undo of a booking archive import works within 24 hours; the files stay until the trash run (#4315).
+- Moving a task keeps watchers and the delegated agent for the way back; the hint names them (#4316).
+### Fixed
+- Removing the sample project, deleting a finalised but never sent quotation and deleting a trip (or a trip receipt line) now go through the trash instead of deleting at once (#4315).
+- "No receipt" keeps the lock from arrival, so the document is not purged before the legal period; received business letters are locked like receipts; kept projects are respected by every delete way, also for attachments (#4316).
+- Undo of a completed recurring task no longer overwrites later changes to the series; the table view asks the server for the number of values before deleting a field (#4316).
+
+### Fixed
+- main: CI red of 2.532.0 - setup_ui registers its own windows for the late-error check of closed windows (a poll answered after the window closed broke the run), p2393_2_b_ui counts only the mails to the reporter (the security mail of the new Firefox sign-in arrived in the same window on the slow runner).
+
+Package 2.512.0 (Audit fixes: names across organisations, menu paths, operations docs).
+
+### Security
+- The leave preview of an organisation no longer names any account of the server: `?to=` is checked like the removal itself, anything but an active person of the organisation answers 400 (#4076).
+- Creating a company of one's own, or moving a personal office into one, no longer tells whether another customer's company has that name: only your own companies count, so the same name can now exist twice. The server admin's route stays server-wide (#4077).
+
+### Changed
+- Hints in the app name today's settings: "Settings > Organisation > People" instead of Workspaces, "Settings > Agents > Assistant", "Settings > Company & office > Data > Import legacy data"; French hints say Paramètres like the menu (#4175).
+- A new CI check compares every "Settings > ..." path in the docs, the app and the translations with the real menu (#4175).
+
+### Fixed
+- Docs: about 100 menu paths follow today's settings (#4175).
+- Operations docs: imported mails are deleted from the mailbox, every deletion period needs `KALMIDO_RETENTION_PURGE=1` (now also in `.env.example`), paths past a login proxy (forms, file requests, portal, MCP, webhooks, CardDAV), default of `KALMIDO_TRUSTED_PROXIES`, pinning the image with the installer, CalDAV methods; `docs/UPGRADING.md` gains 2.79, 2.182, 2.239 and 2.240 (#4174).
+- `update.sh` and `update.ps1`: without a running database service they say that no copy was made and wait 15 seconds so you can stop; the installers' link to the reverse proxy guide works again (#4174).
+
+Package 2.533 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Office > Cash book: choosing an invoice while editing an entry (or switching it from out to in) now books the invoice as paid, like a new entry and with the same rights; the "Saved" toast offers no undo once the payment is booked (#4337).
+- Office > Cash flow: a progress invoice on an older version of a quotation is now deducted from the version that counts in the plan (the newest, or once with several "yes" versions); the plan was too high (#4525).
+- Office > Import > Archive: an invoice file name with one underscore before the date and `_R` (e.g. `657_Client_2026-03-11_R.pdf`) is a recognised invoice; when only the first field of a quotation's file name names the company read from the PDF, client and project are swapped and a hint says so (#4499).
+- Meal receipts: when someone other than the host confirms a receipt, the PDF says who confirmed it and leaves the host's signature line empty (was: the confirming admin appeared as the host) (#4336).
+- Admin > Alerts and push: a ntfy.sh server with a token is judged the same way in both places (#4321).
+- Data safety (#4318): list CSV imports name rows without a title, cells beyond the header, cut texts and a non-UTF-8 file with their row numbers; bank CSV / MT940 imports name skipped rows with number and reason; a vCard without REV no longer overwrites a contact changed here (the names are listed); the account export reads rows and files from one snapshot and counts virus-locked files on the moving page; the undo of an account import counts a mailbox set up since; the delete dialogs say that the account's chat files go for good, that lists deleted along take other members' tasks without trash, and name more organisation areas.
+- Data safety (#4318): the offline queue keeps an entry without a user instead of deleting it (never sent) and shows a hint; a repeated app request after a commit never applies its change twice; renaming a knowledge page relinks the linking pages under their save lock (a save in between is kept); "Delete all completed" writes a history line per task; drafts removed by a table or proposal undo go into the office trash; the old letterhead file is removed only after saving; the terms clean-up keeps files of drafts in the office trash; received e-invoices keep all their file versions.
+### Changed
+- Tests: `tests/stages.py --touched` maps a too-broad file to at most 10 suites with the rarest hits on its routes and names instead of leaving it unmapped (76 recent commits: 24 -> 11 with unmapped files) (#4332).
+
+Package 2.525 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Sign-in lock: the sign-in gate now counts the failed sign-ins of every server process and keeps them across a restart, and a name ceiling check of a known address could hang a server thread (#4292).
+- Clicks of one area no longer trigger another area's action with the same data attribute: the reaction picker and the retention export box sent a request for a receipt "NaN", a choice card's answer reached the credit card sheet, and the X of the address books dialog opened the cash book's "Close day" (#4281).
+- Backups: the last three "Back up now" copies stay through the rotation; checking or restoring a backup made with an earlier passphrase says so (as the download does); a download of a backup with shared files no longer breaks off while the daily clean-up runs - the clean-up waits for the next run, a download during a clean-up says "busy" (#4303).
+### Changed
+- Office figures, cash flow, income statement and the client page read only the documents and columns they need; the Figures tile answers from a short cache that any change invalidates; the client page needs one time report instead of two (#4187).
+- The documents list works out what you may see once per request and loads tags and shares for all rows at once; the mail lists of the hub no longer load the mail texts (#4195).
+- Agent docs: the security page and the setup guides match what the server enforces - a step to choose the control level before the first test, the "one agent per project" exception for folder shares, control level and data lock under "What Kalmido enforces", and many smaller corrections (#4179).
+### Added
+- Lint `tools/check_dataattr.py` in CI: a document-level click listener whose data attribute another file emits must be listed as shared or check its value / area (#4281).
+
+### Fixed
+- main: UI test p2121_c_ui uploads the document for the agent suggestion as an office upload (area=office) since #4433 keeps private documents without a receipt row free of receipt cards.
+
 ## [2.535.0] - 2026-11-04
 
 Package 2.517 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -1150,7 +1213,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.535.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.541.0...HEAD
+[2.541.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.541.0
 [2.535.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.535.0
 [2.532.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.532.0
 [2.529.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.529.0
