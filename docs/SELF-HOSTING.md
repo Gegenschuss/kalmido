@@ -1434,7 +1434,9 @@ the browsers then send nothing.
   mailbox). Without the setting nothing counts as confirmed: a forwarded mail of a person stays *Not assigned* in the hub,
   and a reply through a person's signed reply address becomes a comment "By e-mail from <address>" without the account
   (before 2.539 the topmost header counted, which a sender can write themselves when the server adds none). The server
-  must add that header to every incoming mail; a mailbox without it leaves both on the safe side.
+  must add that header to every incoming mail; a mailbox without it leaves both on the safe side. It must also remove
+  incoming `Authentication-Results` headers that carry its own name (RFC 8601),
+  otherwise a forged one can count. Only the first header with that name is read: put SPF, DKIM and DMARC into one.
 - **E-mails at clients and projects (2.84):** the same mailbox also takes the addresses of clients, projects and the
   personal e-mail inboxes (docs/OFFICE.md); nothing else to set up. The mails go into the database (table `hub_mails`), their
   `.eml` and attachments into the file store, so they count against the storage limit and go through the virus scan.
