@@ -7,6 +7,9 @@ fragment folder made here, the app itself has none yet; invented names only.
  - frag_load: name order, only .py, no folder = nothing
  - tools/check_migrations.py: schema.py as it is passes, a new step / table / index there is a finding, a fragment with code too;
    the checks that read the schema see the fragments (schema_src)
+ - 2.509.0 (#4285): and it reads the statements: only additive steps, indexes in AFTER, UNIQUE on an existing table with a reason;
+   a step that fails in the middle of a start leaves nothing behind and the next start goes through; two starts at once both
+   go through and do the step once
 No routes, no person (freelancer-matrix: n/a).
 usage: p2475_a_api_test.py <datadir>"""
 import json
@@ -32,6 +35,8 @@ CREATE INDEX IF NOT EXISTS p2475_probe_org ON p2475_probe(org_id);
 MIGRATIONS = [("p2475_probe", "note", "ALTER TABLE p2475_probe ADD COLUMN note TEXT NOT NULL DEFAULT ''")]
 AFTER = ["INSERT INTO p2475_probe(id, org_id) VALUES(1, 7) ON CONFLICT DO NOTHING"]
 '''
+# 2.509.0 (#4285): what the lint lets through (STEP above has an INSERT in AFTER on purpose: the start routine runs what it is given)
+LINTED = STEP.replace('["INSERT INTO p2475_probe(id, org_id) VALUES(1, 7) ON CONFLICT DO NOTHING"]', '["CREATE INDEX IF NOT EXISTS p2475_probe_note ON p2475_probe(note)"]')
 SECOND = 'MIGRATIONS = [("p2475_probe", "note", "ALTER TABLE p2475_probe ADD COLUMN note TEXT")]\n'
 RUN = """
 import json, os, tempfile
@@ -75,6 +80,40 @@ two = start({"3478.py": STEP, "3479.py": SECOND})
 check([x[:2] for x in two["mig"]] == [["p2475_probe.note", "again"], ["p2475_probe.note#2", "present"]],
       f"#3478: a second step of the same column in a fragment {two}")
 
+# 2.509.0 (#4285): a step fails in the middle of a start: nothing stays behind, the next start with the step mended goes through
+GOOD = 'MIGRATIONS = [("p2475_probe", "half", "ALTER TABLE p2475_probe ADD COLUMN half TEXT")]\n'
+BROKEN = 'MIGRATIONS = [("p2475_probe", "half2", "ALTER TABLE p2475_probe ADD COLUMN half2 NOSUCHTYPE")]\n'
+PEEK = "SELECT count(*) FROM information_schema.columns WHERE table_name='p2475_probe' AND column_name='half'"
+LOOK = """
+import app  # noqa: F401
+import kalmido.core.db as d
+c = d.connect_direct(d.DATABASE_URL)
+print(c.execute(%r).fetchone()[0], c.execute("SELECT count(*) FROM kalmido_migrations WHERE id='p2475_probe.half'").fetchone()[0])
+"""
+
+
+def starts(frags, n=1):
+    """n starts at the same moment, each in its own process: (exit code, output) of each."""
+    code = RUN % (json.dumps(frags), json.dumps([]))
+    ps = [subprocess.Popen(["docker", "exec", CT, "python3", "-c", code], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) for _ in range(n)]
+    return [(p.wait(timeout=180), p.stdout.read()) for p in ps]
+
+
+def look():
+    r = subprocess.run(["docker", "exec", CT, "python3", "-c", LOOK % PEEK], capture_output=True, text=True, timeout=120)
+    assert r.returncode == 0, r.stdout + r.stderr
+    return r.stdout.split()[-2:]
+
+
+[(rc, out)] = starts({"3478.py": STEP, "3483.py": GOOD, "3484.py": BROKEN})
+check(rc != 0 and "NOSUCHTYPE" in out.upper(), f"#4285: the broken step stops the start {rc} {out[-200:]}")
+check(look() == ["0", "0"], f"#4285: nothing of the steps before it stayed: {look()}")
+both = starts({"3478.py": STEP, "3483.py": GOOD}, 2)
+check([x[0] for x in both] == [0, 0], f"#4285: two starts at once both go through {[(x[0], x[1][-300:]) for x in both if x[0]]}")
+check(look() == ["1", "1"], f"#4285: the step is done and recorded once {look()}")
+notes = [json.loads(x[1].strip().splitlines()[-1])["mig"] for x in both if x[0] == 0]
+check(all(["p2475_probe.half", "applied"] in [m[:2] for m in n] for n in notes), f"#4285: recorded as applied, not again {notes}")
+
 tmp = tempfile.mkdtemp()
 try:
     shutil.copytree(os.path.join(ROOT, "tools"), os.path.join(tmp, "tools"), ignore=shutil.ignore_patterns("demo", "__pycache__"))
@@ -103,7 +142,7 @@ try:
         out = cm.findings(tmp)
         return out, p
 
-    bad, p = frag("3478.py", STEP)
+    bad, p = frag("3478.py", LINTED)
     check(bad == [], f"#3478: a fragment of data passes {bad}")
     check("p2475_probe" in cm.schema_src(tmp) and "p2475_probe.note" in cm.step_ids(cm.schema_src(tmp)),
           "#3478: the schema readers (rls_static, check_layout, the export lists) see the fragment")
@@ -116,6 +155,39 @@ try:
     bad, p = frag("name.py", "")
     check(len(bad) == 1 and "task id" in bad[0], f"#3478: the file name {bad}")
     os.remove(p)
+
+    # 2.509.0 (#4285): the statements
+    def step(ddl, table="events", col="x"):
+        return f"MIGRATIONS = [({table!r}, {col!r}, {ddl!r})]\n"
+    for text in (step("ALTER TABLE events ADD COLUMN IF NOT EXISTS x TEXT"), step("ALTER TABLE events ADD COLUMN x TEXT NOT NULL DEFAULT ''"),
+                 step("ALTER TABLE events ADD COLUMN x NUMERIC(10,2) DEFAULT 0"), step("ALTER TABLE events ADD COLUMN x TEXT DEFAULT 'DROP, a;b'"),
+                 step("ALTER TABLE events ADD COLUMN x BIGINT REFERENCES users(id) ON DELETE SET NULL"),
+                 'AFTER = ["CREATE INDEX IF NOT EXISTS i1 ON events(x) WHERE x IS NOT NULL"]\n',
+                 '# unique-ok u1: the column is new and NULL in every row\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u1 ON events(x)"]\n',
+                 'SCHEMA = """CREATE TABLE IF NOT EXISTS n1 (id BIGINT); CREATE UNIQUE INDEX IF NOT EXISTS u2 ON n1(id);"""\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u3 ON n1(id)"]\n'):
+        bad, p = frag("3481.py", text)
+        check(bad == [], f"#4285: additive passes: {text.strip()[:90]} {bad}")
+        os.remove(p)
+    for text, what in ((step("ALTER TABLE events ADD COLUMN x TEXT NOT NULL"), "NOT NULL without a DEFAULT"),
+                       (step("ALTER TABLE events DROP COLUMN x"), "DROP COLUMN"),
+                       (step("ALTER TABLE events ALTER COLUMN x SET NOT NULL"), "ALTER COLUMN"),
+                       (step("ALTER TABLE events ADD COLUMN x TEXT, DROP COLUMN y"), "a second change in the statement"),
+                       (step("ALTER TABLE events ADD COLUMN x TEXT DEFAULT ''; DELETE FROM events"), "a second statement"),
+                       (step("UPDATE events SET x=1"), "an UPDATE as a step"),
+                       (step("ALTER TABLE events ADD COLUMN y TEXT"), "another column than the step says"),
+                       (step("ALTER TABLE events ADD COLUMN x TEXT UNIQUE"), "a unique column"),
+                       (step("ALTER TABLE events ADD COLUMN x BIGINT GENERATED BY DEFAULT AS IDENTITY"), "a generated column"),
+                       ('AFTER = ["UPDATE events SET x=1"]\n', "an UPDATE in AFTER"),
+                       ('AFTER = ["CREATE INDEX CONCURRENTLY IF NOT EXISTS i ON events(x)"]\n', "CONCURRENTLY"),
+                       ('AFTER = ["CREATE INDEX IF NOT EXISTS i ON events(x); DROP TABLE events"]\n', "a statement behind the index"),
+                       ('AFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x)"]\n', "UNIQUE on an existing table without a reason"),
+                       ('# unique-ok u:\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x)"]\n', "a reason without words"),
+                       ('# unique-ok other: x\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x)"]\n', "the reason of another index"),
+                       ('SCHEMA = """CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x);"""\n', "UNIQUE on an existing table in SCHEMA"),
+                       ('SCHEMA = """DROP TABLE events;"""\n', "a DROP in SCHEMA")):
+        bad, p = frag("3482.py", text)
+        check(len(bad) == 1, f"#4285: {what} is a finding {bad}")
+        os.remove(p)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
 

@@ -670,10 +670,14 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   `SCHEMA_VERSION` only gates restores of newer backups.
 - **Migration fragments (2.475).** New tables, columns and indexes no longer go into `core/schema.py`: each task adds one
   file `core/migrations.d/<task id>.py` with up to three plain values: `SCHEMA` (idempotent `CREATE TABLE` / `CREATE INDEX`
-  text, runs right after the schema), `MIGRATIONS` (steps as above, same ids) and `AFTER` (a list of idempotent statements,
-  run on every start after the indexes). Files load in name order (`frag_load` in `core/db.py`), so two packages never touch
+  text, runs right after the schema), `MIGRATIONS` (steps as above, same ids) and `AFTER` (a list of `CREATE INDEX IF NOT EXISTS`
+  statements, run on every start after the indexes). Files load in name order (`frag_load` in `core/db.py`), so two packages never touch
   the same lines. What `core/schema.py` holds stays there. `tools/check_migrations.py` (CI) refuses a new step, table or
   index in `core/schema.py` (list: `tools/migrations_frozen.json`, it never grows) and a fragment with anything but data.
+  It also reads the statements (2.509): a step adds exactly its own column, nullable or with a `DEFAULT`; `SCHEMA` only creates;
+  a `UNIQUE` index on a table the fragment does not create can fail on existing rows and needs a line
+  `# unique-ok <index>: <why no two rows can collide>` in the fragment. `tests/p2192_c_upgrade_test.py` starts the current
+  server on the old dump with a row in every table.
 - **Process roles (2.102).** `KALMIDO_ROLE=all` (default) runs web and background loops in one process; `web` runs no
   loop; `worker` (`python app.py worker`) runs only the loops. Every loop thread (by its name, `admin/worker.py`
   `WRK_LOOPS`) takes a session-level `pg_try_advisory_lock` of its own before its rounds -- the check sits in

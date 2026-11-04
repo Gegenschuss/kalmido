@@ -4,9 +4,11 @@ freelancer-matrix: office
 Every other suite starts from an empty database; this one loads each dump of tests/fixtures/upgrade/<version>.sql.gz
 (made by tools/make_upgrade_dump.sh + tests/upgrade_seed.py from that release, invented data; the first: 2.101.0.sql.gz) into the group's database
 and starts the current image on it:
+- 2.509.0 (#4285): before the start every old table gets a row (fill_old_tables), the dump alone has them in few tables; a step
+  that only fails on existing rows fails here too
 - the migrations run through: the start succeeds, the log has no traceback / error, every MIGRATIONS step is recorded,
   kalmido_meta.app_version is the current VERSION, and the upgraded schema holds everything a fresh install has (columns
-  with type + NULL rule, indexes, row-level security + policies, triggers; extra old columns only reported)
+  with type + NULL rule + default, constraints, indexes, row-level security + policies, triggers; extra old columns only reported)
 - the data is complete through the API: the old accounts sign in with their passwords; per person the same lists and tasks
   (due date + time, repeat rule, subtasks, done state, attachment names) as the old release showed (<version>.json),
   comments, clients, office documents (number, net, gross), time entries, the personal agent
@@ -24,12 +26,29 @@ import sys
 
 import kt
 from kt import B, DATA, check, sess
-from upgrade_views import data_checks, schema, schema_gaps  # 2.510.0 (#4286): shared with p4286_restore
+from upgrade_views import data_checks, schema as schema_base, schema_gaps as gaps_base  # 2.510.0 (#4286): shared with p4286_restore
 
 N = os.path.dirname(os.path.abspath(__file__))
 FIX = os.path.join(N, "fixtures", "upgrade")
 ROOT = os.path.dirname(N)
 VERSION = open(os.path.join(ROOT, "VERSION"), encoding="utf-8").read().strip()
+
+
+def schema():
+    """upgrade_views.schema + 2.509.0 (#4285): defaults and constraints (by their definition: an old database may name a constraint otherwise)."""
+    q, s = kt.dbx, schema_base()
+    s["defaults"] = {(r[0], r[1]): r[2] for r in q("SELECT table_name, column_name, column_default FROM information_schema.columns "
+                                                    "WHERE table_schema='public' AND column_default IS NOT NULL")}
+    s["constraints"] = {(r[0], r[1]) for r in q("SELECT c.conrelid::regclass::text, pg_get_constraintdef(c.oid) FROM pg_constraint c "
+                                                "JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public' AND c.conrelid<>0")}
+    return s
+
+
+def schema_gaps(ref, got):
+    gaps, extra = gaps_base(ref, got)
+    gaps += [f"default of {k[0]}.{k[1]}: {got['defaults'].get(k)} instead of {v}" for k, v in sorted(ref["defaults"].items()) if got["defaults"].get(k) != v]
+    gaps += [f"constraint of {t} missing: {d}" for t, d in sorted(ref["constraints"] - got["constraints"])]
+    return gaps, extra
 
 
 def logs():
@@ -55,6 +74,75 @@ def load(dump):
     assert r.returncode == 0, r.stderr.decode()[-2000:]
 
 
+def fill_old_tables():
+    """2.509.0 (#4285): one row in every table of the old database that has none. The dump holds rows in few of them; a step like
+    ADD COLUMN ... NOT NULL only fails on a table with rows, so it stayed green here and broke on a live database. Only the columns
+    without a default get a value; a few rounds for tables that point at others. The rows hang on an account of their own (the last
+    row of the table pointed at, FILL_FIRST below): a key, a login factor or a move for one of the old accounts would change what the
+    data checks read. Returns {table: why not} of what stayed empty."""
+    q = kt.dbx
+    fks = {}
+    for t, col, ref, refcol in q("""SELECT c.conrelid::regclass::text, a.attname, c.confrelid::regclass::text, fa.attname FROM pg_constraint c
+                                    JOIN pg_attribute a ON a.attrelid=c.conrelid AND a.attnum=c.conkey[1]
+                                    JOIN pg_attribute fa ON fa.attrelid=c.confrelid AND fa.attnum=c.confkey[1]
+                                    JOIN pg_namespace n ON n.oid=c.connamespace WHERE c.contype='f' AND n.nspname='public'"""):
+        fks[(t, col)] = (ref, refcol)
+
+    def value(t, name, typ):
+        """The text of a value for column name, None: it points at an empty table."""
+        if (t, name) in fks:
+            ref, refcol = fks[(t, name)]
+            r = q(f'SELECT "{refcol}" FROM "{ref}" ORDER BY "{refcol}" DESC LIMIT 1')
+            return str(r[0][0]) if r else None
+        if "int" in typ or typ in ("numeric", "double precision", "real"):
+            return "0"
+        return {"bytea": "\\x00", "jsonb": "{}", "json": "{}", "boolean": "false", "date": "2026-01-01"}.get(typ, "p2192-fill-" + t if "timestamp" not in typ else "2026-01-01")
+
+    def insert(t, more=()):
+        """One row in t, with the columns more on top of the required ones."""
+        cols = q("""SELECT column_name, data_type, is_nullable='NO' AND column_default IS NULL AND is_identity='NO' AND is_generated='NEVER'
+                    FROM information_schema.columns WHERE table_schema='public' AND table_name=? ORDER BY ordinal_position""", (t,))
+        names, vals = [], []
+        for name, typ, need in cols:
+            if need or name in more:
+                v = value(t, name, typ)
+                if v is None:
+                    return f"{name} points at an empty table"
+                names.append(f'"{name}"')
+                vals.append("'" + v.replace("'", "''") + "'")
+        q(f"INSERT INTO \"{t}\"({','.join(names)}) VALUES({','.join(vals)}) ON CONFLICT DO NOTHING" if names else f'INSERT INTO "{t}" DEFAULT VALUES')
+        return None
+
+    for t, more in FILL_FIRST:
+        insert(t, more)
+    tables = [r[0] for r in q("SELECT table_name FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE' ORDER BY 1")]
+    why = {}
+    for _ in range(4):
+        why = {}
+        for t in tables:
+            if q(f'SELECT 1 FROM "{t}" LIMIT 1'):
+                continue
+            try:
+                w = insert(t)
+            except Exception as e:  # noqa: BLE001 - a CHECK of the table, wiki_spaces: an organisation or an owner, one of them
+                w = str(e)[-200:]
+                for col in [c for (x, c) in fks if x == t]:
+                    try:
+                        w = insert(t, (col,))
+                        break
+                    except Exception as e2:  # noqa: BLE001
+                        w = str(e2)[-200:]
+            if w:
+                why[t] = w
+        if not why:
+            break
+    return why
+
+
+OLD_TASKS = "SELECT COUNT(*) FROM tasks WHERE title NOT LIKE 'p2192-fill-%'"
+FILL_FIRST = (("users", ()), ("orgs", ()), ("lists", ("owner_id",)), ("tasks", ()))  # the fill's own: every other row points at these
+
+
 DUMPS = sorted(glob.glob(os.path.join(FIX, "*.sql.gz")))
 check(DUMPS, "at least one dump in tests/fixtures/upgrade")
 kt.fresh()  # the current server on an empty database: the reference schema of a fresh install
@@ -65,7 +153,9 @@ for dump in DUMPS:
         E = json.load(f)
     tag = "from " + E["version"]
     load(dump)
-    before = kt.dbx("SELECT COUNT(*) FROM tasks")[0][0]
+    empty = fill_old_tables()  # 2.509.0 (#4285)
+    check(not empty, f"{tag}: every old table has a row before the start: {empty}")
+    before = kt.dbx(OLD_TASKS)[0][0]
     try:
         os.environ["START_WAIT_S"] = "150"  # #3506: every migration since the dump runs at this first start
         kt.fresh(keep=True)
@@ -99,7 +189,8 @@ for dump in DUMPS:
         print("   gap:", g)
     if extra:
         print(f"   info: {len(extra)} column(s) only in the upgraded database: {', '.join(extra[:30])}")
-    check(kt.dbx("SELECT COUNT(*) FROM tasks")[0][0] == before, f"{tag}: no task lost by the migrations")
+    after = kt.dbx(OLD_TASKS)[0][0]  # 2.509.0 (#4285): the fill's rows aside (a step turns its old milestone into a task of its own)
+    check(after == before, f"{tag}: no task lost by the migrations: {before} -> {after}")
     users = data_checks(E, tag)
     A, Fr = users["alice"], users["frida"]
     ids = E["ids"]

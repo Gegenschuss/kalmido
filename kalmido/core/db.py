@@ -715,7 +715,7 @@ def appver_stamp(c):
 # 2.475.0 (#3478): a package's new tables, columns and indexes come as one file kalmido/core/migrations.d/<task id>.py instead of
 # one more line at the end of schema.py (the same spot for every package: conflicts). Plain data, three optional names: SCHEMA
 # (idempotent CREATE TABLE / INDEX, run right after schema.py's), MIGRATIONS (steps as in schema.py), AFTER (a list of idempotent
-# statements, run on every start after INDEXES). Sorted by file name; here and not in schema.py, so that the loader collides with nothing.
+# CREATE INDEX statements, run on every start after INDEXES; 2.509.0, #4285: additive only, tools/check_migrations.py). Sorted by file name; here and not in schema.py, so that the loader collides with nothing.
 MIG_D = os.path.join(os.path.dirname(os.path.abspath(__file__)), "migrations.d")
 
 
