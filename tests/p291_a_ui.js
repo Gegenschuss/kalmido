@@ -39,7 +39,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.status)`);
   const series = ev => ev(`fetch('/api/office/series', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.items || [])`);
   const noSide = `(() => { const W = document.documentElement.clientWidth; return [...document.querySelectorAll('.office .ofcbody *')].filter(e => e.getClientRects().length && !e.closest('.seg')).every(e => e.getBoundingClientRect().right <= W + 1); })()`;
-  await firefox(async ({cmd, ev, ctx, nav, shot}) => {
+  await firefox(async ({cmd, ev, ctx, nav, shot, idle}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
@@ -71,6 +71,10 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `fetch('/api/office/series', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.items[0].active === 0)`), 'the switch pauses the series');
     check(await ready(ev, `/paused/.test(document.querySelector('.rin-sec .rin-it')?.textContent || '')`), 'the row says paused');
     // make now -> a draft with the hint
+    // CI red of 2.529.0: a click while the series reload (rinReload: RIN.items null) was on its way found no series and did
+    // nothing; the page is quiet and the series loaded first
+    await idle();
+    check(await ready(ev, `!!(RIN.items && !RIN.loading && document.querySelector('.rin-sec [data-rin="run"]:not([disabled])'))`), 'the series is loaded, "Make now" ready');
     await ev(`(() => { document.querySelector('.rin-sec [data-rin="run"]').click(); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/series', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.items[0].made_count === 1)`), 'make now: an invoice of the series');
     const made = (await series(ev))[0]?.made?.[0];
