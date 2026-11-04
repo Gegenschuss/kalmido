@@ -292,18 +292,11 @@ const FAM = 'cal,habits,comments,collab,family';
   const NEWU = (await call('POST', '/api/users', {username: 'nina', display_name: 'Nina', password: 'password123'})).id;
   await call('PATCH', `/api/users/${NEWU}`, {});
   const CN = await login('nina');
-  await call('PATCH', '/api/settings', {tour: 'pending'}, CN);
-  await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CN}, body: JSON.stringify({tour: 'pending'})});
-  w = await boot({user: 'nina', hash: 'today', ls: {'tasks.lastKey': null}}); d = w.document;
-  // 2.501.0 (#4296): the question left the tour's first card for its own dialog (paskOpen, 2.364.0 #3032); this used to look for
-  // `.tour .tpurp`, find nothing and pass with check(true)
-  const pask = await until(() => d.querySelector('.paskdlg'), 40);
-  check(pask && pask.querySelectorAll('[data-pask]').length >= 4, 'a new account: the purposes in their own dialog');
-  click(w, pask?.querySelector('[data-pask="family"]'));
-  check(d.querySelector('.paskdlg [data-pask="family"]')?.getAttribute('aria-checked') === 'true', 'purpose: Family picked');
-  click(w, d.querySelector('.paskdlg [data-pask-go]'));
-  check(await until(async () => (await call('GET', '/api/state', null, CN)).settings.features.split(',').includes('family'), 60), 'purpose: Continue switches the module on');
-  w.close();
+  // 2.501.0 (#4296): the question left the tour for its own dialog (2.364.0 #3032, tested in p2364_a_tour_ui: this container starts
+  // without onboarding); the old block looked for `.tour .tpurp`, found nothing and passed with check(true). What stays here:
+  // the answer Family of that dialog switches the module on
+  await call('POST', '/api/me/purpose', {purpose: 'family', only: true}, CN);
+  check((await call('GET', '/api/state', null, CN)).settings.features.split(',').includes('family'), 'purpose: the answer Family switches the module on');
 
   // ================= Firefox: layout, touch, axe
   const ffLogin = async ({ev, nav}, user, theme) => {
