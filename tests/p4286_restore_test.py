@@ -500,7 +500,7 @@ STOP = """
 import os, subprocess, sys
 from kalmido.admin import backup as bk
 real = subprocess.run
-bk.subprocess.run = lambda a, *k, **kw: os._exit(9) if "pg_restore" in a[0] else real(a, *k, **kw)
+bk.subprocess.run = lambda a, *k, **kw: os._exit(9) if "pg_restore" in a[0] and "-d" in a else real(a, *k, **kw)
 bk.bk_restore(os.path.join(bk.BK_DIR, sys.argv[1]), "", "alice", "session")
 """
 r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", STOP, GOOD], capture_output=True, text=True, timeout=300)
