@@ -14,7 +14,49 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.506.0] - 2026-11-04
+## [2.520.0] - 2026-11-04
+
+Package 2.508 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Fixed
+- Deleting an account (#4301): what it shares privately no longer goes with it. Private calendars, address books, tables with their files and the knowledge pages somebody else may write pass to the person who has had the right to write them longest, with everything the others entered; a share of a folder they lie in counts. Never to an agent, a child account or a disabled account, and never into a knowledge space with the lock. The delete dialog (Settings > People > Delete) now says what is handed on and to whom, and warns in a line of its own about what goes because nobody else may take it over (an organisation's admin sees numbers only). Shared folders and files of the file store still go with the account and are named there (#4347).
+
+Package 2.501 (Bündel: Stille Grünmeldungen abstellen (übersprungene Suit, Sammelpaket: Aufgaben ohne Paket (Dispatcher), Test: jeder Büro-Menüpunkt öffnet).
+### Changed
+- The start of the app is smaller: the wiki encryption (loaded first with the wiki), the file store and the family module load on demand, and texts only the server names left the language core; about 54 KB less script and 125 KB less text, packed (#4198).
+- The start budget only rises when the same change lowers another limit by as much; CI and the live train check it (`tools/perf_budget.py --ratchet`), and the limits were lowered to the measured values plus about 0.5 percent (#4198).
+- `tests/stages.py --touched` gives core files, start files, translations and server files without a route a small fixed set of suites, translations also the suites naming the changed text; the push stage and the CI keep the full run (#4016).
+### Fixed
+- A test run that skipped something no longer says only ALL SUITES PASSED: it names skipped and partly skipped suites. No Firefox and a failed load of the on-demand modules now fail a suite; checks that could not fail became real checks (#4296).
+- New suite: every office menu point opens its page by a real mouse click at computer and phone width, with no foreign dialog and no message; `tests/ff.js` has `realClick` for other suites (#4282).
+
+Package 2.511 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- A reply by In-Reply-To alone becomes a comment only when a token in the address names an account that sees the task. A forged sender address of a person with *mails from me* on no longer comments on the task; the mail becomes a new task in that person's inbox with the note "Reply to #N, sender not allowed" (#4071).
+
+### Changed
+- Docs: the privacy template and the list of outgoing connections now name Stripe online payment, invoice links in mails and the similarity service, and cover people without an account (bookings, polls, questionnaires, payment) (#4173).
+- Docs: corrected short log addresses by default, unencrypted update dumps, office log reads (90 days), deleted mails and video sign-off records that stay, and what the assistant sends (#4173).
+- Proxy templates: Caddy, nginx and Traefik name the right address for `KALMIDO_TRUSTED_PROXIES` per setup, with a command and what *Your IP* must show (#4311).
+
+### Fixed
+- Proxy templates: restoring a backup from a file works behind Caddy and nginx (4096 MB on `/api/admin/backups/upload`, one hour on the backup paths). Also the Traefik read timeout and installer file, the nginx `http2` line and certbot order, `/.well-known/carddav` and a dead link in the installers (#4311).
+- Tests: `p2146_d_api` prints the server log at its first failure. Its one-time 500 on deleting an account after the export came from the deadlock fixed in #3090 (#4086).
+
+Package 2.510.0 (Backup emergency path: tested and repaired, CI plan without cut-off shard times, robust Firefox start in the tests).
+### Fixed
+- #4286: a backup of an older version can be restored again: foreign keys added since the backup stopped `pg_restore --clean` ("cannot drop constraint users_pkey"). The keys taken away come back after the restore or, after a hard stop, at the next start.
+- #4286: a restore whose way back failed no longer looks healthy: the server stays closed, `/api/health` answers 503, every request says an administrator has to restart it; the restart completes the database.
+- #4286: the server start removes the work folder a hard stop of a restore or check left in the backup folder (a plain dump of the database). Helpers such as `app.py set-password` never touch it.
+- #4327: the CI plan no longer takes suite times from shards cancelled at their time limit; a full run with such a shard does not end the way back to older times.
+- #4346 #4348: tests/ff.js: a retry after a hanging Firefox could not work (same profile, lock still held). Every start has its own profile, a Firefox has really ended before the next start and before its folder goes, three tries, a Firefox that died costs no wait. p2151_ui is back in the CI.
+### Changed
+- #4286: new suite p4286_restore: four round trips with a content check (encrypted format 3 with a joined file, a backup of 2.101, a backup of another instance with sealed files, init_db failing after pg_restore). tests/fake_offsite.py behaves like the real stores (S3 pages, WebDAV PUT creates no folder). Tests for the folder list of a backup, for secret-like columns of the organisation export (lint) and for rows of others in it.
+
+### Fixed
+- main: a restore of a backup no longer hangs in maintenance (503) when the git loop meets it: the loop's reads are gated and committed before it waits (signin_ui, CI red of 2.506.0; the same in the calendar, address book and ntfy inbox loops).
+- main: the tax dates keep a saved change when a load begun before the save answers after it (p290_c_ui, CI red of 2.506.0).
+- main: the one-time issue import of a repository asks where the issues go before it writes (p2356_b_import_target, CI red of 2.506.0).
 
 Package 2.506 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -980,10 +1022,25 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
 
+## [2.518.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.520.0.
+
+## [2.511.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.518.0.
+
+## [2.506.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.511.0.
+
 ## [2.502.0] - 2026-11-04
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.506.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.520.0...HEAD
+[2.520.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.520.0
+[2.518.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.518.0
+[2.511.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.511.0
 [2.506.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.506.0
 [2.502.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.502.0
