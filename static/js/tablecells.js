@@ -160,7 +160,8 @@ function tcFieldBtns(k, name) {
 async function tcFieldAct(l, b, resync) {
   const f = fieldById(+(b.dataset.colfe || b.dataset.colfd)); if (!f) return;
   if (b.dataset.colfe) { fieldModal(l.id, f, () => resync(null, 'f:' + f.id)); return; }
-  const n = [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;
+  // 2.530.0 B (#4316): the server counts every task with a value (done, not loaded, in the trash), like projects.js; local only offline
+  const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
   if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
   try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
   await load(); render(); resync();

@@ -985,7 +985,8 @@ Moving a task into another project (`PATCH /api/v1/tasks/{id}` `{"list_id": …}
 end what the target cannot carry: people coming along who have no access there, the assignee, the group, the milestone, the
 sprint, project tags the target lacks, its "also in" projects of the old workspace and subtasks that stay in a project the
 caller may not move out of. The answer then carries `move_ended` with the counts (`people`, `assignee`, `group`, `milestone`,
-`sprint`, `ltags`, `links`, `subtasks`; only the ones above 0) - tell the person. Moving the task back within a day restores
+`sprint`, `ltags`, `links`, `subtasks`; 2.530.0: `watchers`, `delegate` for watchers and a delegated agent who do not reach the
+target; only the ones above 0) - tell the person. Moving the task back within a day restores
 what still fits there; that answer carries `move_restored` with the same keys.
 
 ### Imports and values set by hand

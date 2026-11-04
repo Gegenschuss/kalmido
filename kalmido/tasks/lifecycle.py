@@ -574,13 +574,23 @@ def undo_status(c, tid, u):
         else:  # nothing of its own (no files either, see ucp_touched): nothing to unlink
             c.execute("DELETE FROM tasks WHERE id=?", (row["id"],))
         ps = u.get("plan_start") if valid_plan_start(u.get("plan_start")) else None
-        c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
-                  (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
-        if u.get("remind_at") and valid_plan_start(u.get("remind_at")):  # 2.111.0 C (#2057)
+        # 2.530.0 B (#4316): the series changed after the completion (updated_at, like ucp_edited for the copy): a field that no
+        # longer holds what the completion left there was set since -- it keeps that value; fields whose post-completion value
+        # is not known (fixed reminder, time of the day, whose turn) are then not written back at all
+        kept = usr_kept(t, u, at) if ucp_edited(t, at) else None
+        if kept is None:
+            c.execute("UPDATE tasks SET due=?, start=?, plan_start=?, repeat=?, reminded=?, updated_at=? WHERE id=?",
+                      (due, start, ps, str(u.get("repeat") or "")[:500], rem, ts, tid))
+        else:
+            put = {k: v for k, v in (("start", start), ("plan_start", ps), ("repeat", str(u.get("repeat") or "")[:500]))
+                   if k not in kept}
+            c.execute(f"UPDATE tasks SET {''.join(k + '=?, ' for k in put)}due=?, reminded=?, updated_at=? WHERE id=?",
+                      [*put.values(), due, rem, ts, tid])
+        if kept is None and u.get("remind_at") and valid_plan_start(u.get("remind_at")):  # 2.111.0 C (#2057)
             c.execute("UPDATE tasks SET remind_at=? WHERE id=?", (u["remind_at"], tid))
-        if "TIMES=" in str(u.get("repeat") or "") and valid_hm(u.get("due_time")):  # 2.116.0 D (#2066)
+        if kept is None and "TIMES=" in str(u.get("repeat") or "") and valid_hm(u.get("due_time")):  # 2.116.0 D (#2066)
             c.execute("UPDATE tasks SET due_time=? WHERE id=?", (u["due_time"], tid))
-        rot = u.get("rot")  # 2.19.0 (#653): whose turn it was (signed with the rest of the undo record)
+        rot = u.get("rot") if kept is None else None  # 2.19.0 (#653): whose turn it was (signed with the rest of the undo record)
         if isinstance(rot, list) and len(rot) == 2 and (rot[0] is None or isinstance(rot[0], int)) and isinstance(rot[1], str):
             c.execute("UPDATE tasks SET assignee_id=?, rotation=? WHERE id=?", (rot[0] if rot[0] in people else None, rot[1][:2000], tid))
         for k in u.get("kids") or []:
@@ -626,6 +636,26 @@ def ucp_touched(c, cid):
                         UNION ALL SELECT 1 FROM task_deps WHERE task_id=? OR blocker_id=? UNION ALL SELECT 1 FROM contact_tasks WHERE task_id=?
                         UNION ALL SELECT 1 FROM git_links WHERE task_id=? UNION ALL SELECT 1 FROM form_entries WHERE task_id=?
                         LIMIT 1""", (cid,) * 12).fetchone() is not None  # 2.272.0 F (#3025, review H2): notes, links, deps, contacts, git, form
+
+
+def usr_kept(t, u, at):
+    """2.530.0 B (#4316): the series t was changed after the completion at: the set of the fields (start, plan_start, repeat)
+    that no longer hold what the completion left there (set since, they win over the undo)."""
+    out = set()
+    try:
+        shift = date.fromisoformat(str(u.get("next"))) - date.fromisoformat(str(u.get("due")))
+        post_start = (date.fromisoformat(str(u["start"])) + shift).isoformat() if u.get("start") else None
+    except (TypeError, ValueError):
+        return {"start", "plan_start", "repeat"}
+    if (t["start"] or None) != post_start:
+        out.add("start")
+    if t["plan_start"]:  # the completion cleared it
+        out.add("plan_start")
+    rep = str(u.get("repeat") or "")
+    cnt = rr_count(rep)
+    if t["repeat"] != (rr_with_count(rep, cnt - 1) if cnt else rep):
+        out.add("repeat")
+    return out
 
 
 def ucp_edited(row, at):

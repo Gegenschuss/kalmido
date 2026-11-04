@@ -8,17 +8,21 @@ for the answer ("move_ended"); tmm_restore runs when the task goes back to where
 by hand) within TMM_KEEP_H hours and puts back what is still valid there (people with access, an open sprint / milestone of
 that list, links into lists of the same workspace, detached subtasks that are still top level in their list).
 2.363.3 (#3133): tmm_wish keeps an "also in" request that arrives after the move (the offline queue) for that way back too.
+2.530.0 B (#4316): also the watchers (task_watchers) and the delegated agent (delegate_agent_id) that the move ended
+(tasks/watchers.py wat_moved): counted as watchers / delegate, brought back on the way back while they still reach the list
+(watchers: like wat_moved; the agent: check_delegate for the person moving it back).
 """
 import json
 from datetime import timedelta
 
 from flask import g, has_request_context
 
-from ..core.access import list_people, list_role, ov_role, WRITE_ROLES
+from ..core.access import Denied, list_people, list_role, ov_role, WRITE_ROLES
 from ..core.db import iso, now_utc, parse_iso
 from ..core.pg import insert_id, st_ids
 from ..lists.groups import grp_shares_of_list
 from ..tasks.validation import descendants
+from ..tasks.watchers import check_delegate, dlg_events  # 2.530.0 B (#4316)
 
 TMM_KEEP_H = 24  # how long a move back restores (the undo window of the other moves)
 
@@ -38,7 +42,7 @@ def tmm_snap(c, tid):
     """Before a move / indent of tid: the rows of tid and its subtasks, who comes along, the list tags and the links."""
     ids = _ids(c, tid)
     rows = {r["id"]: dict(r) for r in c.execute(
-        """SELECT id, parent_id, list_id, assignee_id, assignee_group_id, milestone_id, sprint_id FROM tasks
+        """SELECT id, parent_id, list_id, assignee_id, assignee_group_id, milestone_id, sprint_id, delegate_agent_id FROM tasks
            WHERE id = ANY(CAST(? AS BIGINT[]))""", (st_ids(ids),))}
     people = {}
     for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
@@ -48,7 +52,15 @@ def tmm_snap(c, tid):
                           WHERE k.task_id = ANY(CAST(? AS BIGINT[]))""", (st_ids(ids),)):
         ltags.setdefault(r[0], set()).add(r[1])
     links = [dict(r) for r in c.execute("SELECT list_id, section_id, sort FROM task_links WHERE task_id=?", (tid,))]
-    return {"rows": rows, "people": people, "ltags": ltags, "links": links}
+    return {"rows": rows, "people": people, "ltags": ltags, "links": links, "watchers": _watchers(c, ids)}
+
+
+def _watchers(c, ids):
+    """2.530.0 B (#4316): task id -> the set of its watchers."""
+    out = {}
+    for r in c.execute("SELECT task_id, user_id FROM task_watchers WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
+        out.setdefault(r[0], set()).add(r[1])
+    return out
 
 
 def tmm_after(c, tid, snap, uid=None, skip=()):
@@ -57,19 +69,23 @@ def tmm_after(c, tid, snap, uid=None, skip=()):
     old = snap["rows"]
     ids = list(old)
     now = {r["id"]: dict(r) for r in c.execute(
-        """SELECT id, parent_id, list_id, assignee_id, assignee_group_id, milestone_id, sprint_id FROM tasks
+        """SELECT id, parent_id, list_id, assignee_id, assignee_group_id, milestone_id, sprint_id, delegate_agent_id FROM tasks
            WHERE id = ANY(CAST(? AS BIGINT[]))""", (st_ids(ids),))}
     root_o, root_n = old.get(tid), now.get(tid)
     if not root_o or not root_n:
         return {}
     d = {"from": [root_o["list_id"], root_o["parent_id"]], "to": [root_n["list_id"], root_n["parent_id"]],
-         "people": [], "links": [], "detached": [], "fields": {}, "ltags": {}}
+         "people": [], "links": [], "detached": [], "fields": {}, "ltags": {}, "watchers": []}
     have = {}
     for r in c.execute("SELECT task_id, user_id FROM task_people WHERE task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(ids),)):
         have.setdefault(r[0], set()).add(r[1])
     for t, us in snap["people"].items():
         for u in sorted(us - have.get(t, set())):
             d["people"].append([t, u])
+    wnow = _watchers(c, ids)  # 2.530.0 B (#4316)
+    for t, us in (snap.get("watchers") or {}).items():
+        for u in sorted(us - wnow.get(t, set())):
+            d["watchers"].append([t, u])
     keep = {r[0] for r in c.execute("SELECT list_id FROM task_links WHERE task_id=?", (tid,))}
     d["links"] = [x for x in snap["links"] if x["list_id"] not in keep]
     for t, o in old.items():
@@ -78,8 +94,8 @@ def tmm_after(c, tid, snap, uid=None, skip=()):
             continue
         if t != tid and o["parent_id"] and not n["parent_id"]:
             d["detached"].append([t, o["parent_id"], n["list_id"]])
-        ch = {k: o[k] for k in ("assignee_id", "assignee_group_id", "milestone_id", "sprint_id")
-              if o[k] and not n[k] and not (t == tid and k in skip)}
+        ch = {k: o.get(k) for k in ("assignee_id", "assignee_group_id", "milestone_id", "sprint_id", "delegate_agent_id")
+              if o.get(k) and not n.get(k) and not (t == tid and k in skip)}
         if ch:
             d["fields"][str(t)] = ch
     tags = {}
@@ -93,7 +109,8 @@ def tmm_after(c, tid, snap, uid=None, skip=()):
     fl = [v for x in d["fields"].values() for v in x]
     out = {"people": len(d["people"]), "links": len(d["links"]), "subtasks": len(d["detached"]),
            "assignee": fl.count("assignee_id"), "group": fl.count("assignee_group_id"), "milestone": fl.count("milestone_id"),
-           "sprint": fl.count("sprint_id"), "ltags": sum(len(x) for x in d["ltags"].values())}
+           "sprint": fl.count("sprint_id"), "ltags": sum(len(x) for x in d["ltags"].values()),
+           "watchers": len(d["watchers"]), "delegate": fl.count("delegate_agent_id")}  # 2.530.0 B (#4316)
     out = {k: v for k, v in out.items() if v}
     if not out:
         return {}
@@ -151,9 +168,15 @@ def tmm_restore(c, tid, prev, skip=()):
                 and not c.execute("SELECT 1 FROM task_links WHERE task_id=?", (x,)).fetchone():  # 2.273.0 (#3042, Fable): only where the mover may write
             c.execute("UPDATE tasks SET parent_id=? WHERE id=?", (p, x))
             n("subtasks")
+    for x, u in d.get("watchers") or []:  # 2.530.0 B (#4316): who still reaches the list (the rule of wat_moved)
+        if x in sub and (u in people or list_role(c, lid, u)) and c.execute("SELECT 1 FROM tasks WHERE id=? AND list_id=?", (x, lid)).fetchone():
+            if c.execute("INSERT INTO task_watchers(task_id,user_id,created_at) VALUES(?,?,?) ON CONFLICT DO NOTHING",
+                         (x, u, iso(now_utc()))).rowcount:
+                n("watchers")
     for x, ch in (d.get("fields") or {}).items():
         x = int(x)
-        r = c.execute("SELECT list_id, assignee_id, assignee_group_id, milestone_id, sprint_id FROM tasks WHERE id=?", (x,)).fetchone()
+        r = c.execute("SELECT list_id, assignee_id, assignee_group_id, milestone_id, sprint_id, delegate_agent_id FROM tasks WHERE id=?",
+                      (x,)).fetchone()
         if not r or r["list_id"] != lid or x not in sub:
             continue
         put = {}
@@ -168,13 +191,18 @@ def tmm_restore(c, tid, prev, skip=()):
         if ch.get("sprint_id") and not r["sprint_id"] and c.execute(
                 "SELECT 1 FROM sprints WHERE id=? AND list_id=? AND state!='closed'", (ch["sprint_id"], lid)).fetchone():
             put["sprint_id"], put["sprint_at"] = ch["sprint_id"], iso(now_utc())
+        if ch.get("delegate_agent_id") and not r["delegate_agent_id"] and _delegate_ok(c, lid, ch["delegate_agent_id"]):
+            put["delegate_agent_id"] = ch["delegate_agent_id"]  # 2.530.0 B (#4316)
         if x == tid:
             put = {k: v for k, v in put.items() if k not in skip and not (k == "sprint_at" and "sprint_id" in skip)}
         if put:
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in put)} WHERE id=?", [*put.values(), x])
             for k in put:
                 if k != "sprint_at":
-                    n({"assignee_id": "assignee", "assignee_group_id": "group", "milestone_id": "milestone", "sprint_id": "sprint"}[k])
+                    n({"assignee_id": "assignee", "assignee_group_id": "group", "milestone_id": "milestone", "sprint_id": "sprint",
+                       "delegate_agent_id": "delegate"}[k])
+            if put.get("delegate_agent_id"):
+                dlg_events(c, x, None, put["delegate_agent_id"])  # the agent hears of it again, as on a delegation
     if "ltags" not in skip:
         for x, names in (d.get("ltags") or {}).items():
             x = int(x)
@@ -188,6 +216,16 @@ def tmm_restore(c, tid, prev, skip=()):
     d["restored"] = iso(now_utc())
     c.execute("UPDATE space_moves SET detail=? WHERE id=?", (json.dumps(d, separators=(",", ":")), m["id"]))
     return out
+
+
+def _delegate_ok(c, lid, aid):
+    """2.530.0 B (#4316): the agent may take tasks of list lid again for the person moving it back (check_delegate)."""
+    if _wr_role(c, lid) not in WRITE_ROLES:
+        return False
+    try:
+        return check_delegate(c, lid, aid) is None
+    except Denied:  # collaboration off for that person
+        return False
 
 
 def tmm_wish(c, tid, lid, sid, sort):

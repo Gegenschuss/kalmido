@@ -300,7 +300,8 @@ function tmm_msg(msg, r) {
     x.subtasks && trn('{0} subtask stays in its project', '{0} subtasks stay in their projects', x.subtasks), x.assignee && tr('Assignee'), x.group && tr('Group'),
     x.milestone && tr('Milestone'), x.sprint && tr('Sprint'), x.ltags && trn('{0} project tag', '{0} project tags', x.ltags),
     x.client && tr('Client'), x.visibility && tr('Everyone in the organisation'), x.assignees && trn('{0} assignment of a reader', '{0} assignments of readers', x.assignees),
-    x.tclients && trn('{0} client of a client report', '{0} clients of client reports', x.tclients)].filter(Boolean);  // a list's workspace (dialogs.js); 2.401.0 (#2924): + tclients
+    x.tclients && trn('{0} client of a client report', '{0} clients of client reports', x.tclients),
+    x.watchers && trn('{0} watcher', '{0} watchers', x.watchers), x.delegate && tr('Delegation to an agent')].filter(Boolean);  // 2.530.0 B (#4316)  // a list's workspace (dialogs.js); 2.401.0 (#2924): + tclients
   return p.length ? `${msg || tr('Moved')} · ${tr('Not carried over: {0}. Undo brings it back.', p.join(', '))}` : msg;
 }
 // the few older callers: a toast with "Undo" for a step built above

@@ -16174,5 +16174,6 @@
   "Restore deleted times?": "Gelöschte Zeiten wiederherstellen?",
   "{0} time entries restored": "{0} Zeiteinträge wiederhergestellt",
   "Last deleted ({0}): {1} entries ({2}).": "Zuletzt gelöscht ({0}): {1} Einträge ({2}).",
-  "The entries stay restorable until the trash period ends (Undo, or here again).": "Die Einträge bleiben bis zum Ende der Papierkorb-Frist wiederherstellbar (Rückgängig, oder hier erneut)."
+  "The entries stay restorable until the trash period ends (Undo, or here again).": "Die Einträge bleiben bis zum Ende der Papierkorb-Frist wiederherstellbar (Rückgängig, oder hier erneut).",
+  "Delegation to an agent": "Delegation an den Agenten"
 }
