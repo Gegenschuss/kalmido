@@ -25,6 +25,7 @@ from kt import B, CT, check, dbx
 from freelancer_fixture import freelancer
 
 kt.fresh(prefix="P2525B")
+kt.docker_logs_on_first_fail(tail=120, chars=9000)
 A = kt.setup()
 FID, Fr = freelancer(B, A)
 GID, Gr = freelancer(B, A, name="gerda")
