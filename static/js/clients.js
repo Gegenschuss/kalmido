@@ -91,20 +91,6 @@ function clientDetailParts(c) {
         : `<p class="muted">${tr('No project yet: open a project’s settings and choose this client.')}</p>`}</section>`,
     note: c.note ? `<section class="stcard"><div class="sthead"><h3>${tr('Note')}</h3></div><div class="md">${renderMd(c.note)}</div></section>` : ''};
 }
-function clientDetailHtml(c, inCard) {  // 2.47.3 (#1734): inCard = the lower part of the client's card (clientpage.js)
-  const pt = clientDetailParts(c);
-  const addr = [c.contact, c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>` : '', c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''].filter(Boolean);
-  return `<div class="${inCard ? 'msclstats' : 'dash clients'} cldetail">
-    ${inCard ? '' : `<div class="clhead">${clientIco(c)}<h2>${esc(cdn_label(c))}</h2>${c.org_name ? `<span class="muted">${esc(c.org_name)}</span>` : ''}<span class="spacer"></span>
-      <button class="btn sm" data-act="client-edit" data-id="${c.id}">${ic('edit', 's')} ${tr('Edit')}</button></div>`}
-    ${!inCard && (addr.length || cdn_addrLine(c)) ? `<p class="clsub">${addr.join(' · ')}${cdn_addrLine(c) ? `<br><span class="muted cladr">${esc(cdn_addrLine(c))}</span>` : ''}</p>` : ''}
-    ${!inCard && (c.contacts || []).length > 1 ? `<ul class="clklist" role="list" aria-label="${esc(tr('Contact persons'))}">${c.contacts.map(k => `<li><b>${esc(k.name)}</b>${k.role ? ` <span class="muted">${esc(k.role)}</span>` : ''}${k.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${k.phone ? ` · <a href="tel:${esc(k.phone)}">${esc(k.phone)}</a>` : ''}</li>`).join('')}</ul>` : ''}
-    ${pt.month}
-    ${pt.lists}
-    ${pt.note}
-    ${clm_histHtml(c)}
-  </div>`;
-}
 function clientTimeQuery(c, mon) {
   const f = mon + '-01', t = monthEnd(f);
   return new URLSearchParams({from: f, to: t, scope: 'all', lists: (c.lists || []).join(',') || '-1'}).toString();
