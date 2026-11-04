@@ -25,7 +25,10 @@ not assigned = its recipient; always inside the mail's workspace (client / list 
 Writing (assign, delete, restore) = the write right on the list / for a client its mail's recipient, who created the
 client or an organisation admin (2.360.0) / the recipient. Agents and kid
 accounts get nothing here (these app routes stay 403 for them); 2.483.0 (#1902): agents and tokens READ the mails of a
-client / project they see through the API v1 (hub/hmv1.py), never "Not assigned". Deleting sets deleted_at (Undo restores)."""
+client / project they see through the API v1 (hub/hmv1.py), never "Not assigned". Deleting sets deleted_at (Undo restores);
+2.536.0 (#4338): the mail's folder (or, without one, the .eml and the attachments) goes into the file store's trash with the
+same time stamp and comes back with Undo -- only what went with the mail, a node deleted by hand before stays in the trash.
+The filed nodes of a deleted mail are never readable (hbm_node_ok / hbm_node_sql), also when a node was restored alone."""
 import email.utils
 import hashlib
 import json
@@ -164,11 +167,19 @@ def _kid(c, uid):
 
 def hbm_node_ok(c, uid, mail_id):
     """2.148.1 D (#2488): may uid read a file-store node filed with hub mail mail_id? Only who may read the mail (hbm_can,
-    also an organisation admin only then); a mail that is gone or not readable = no."""
+    also an organisation admin only then); a mail that is gone, deleted (2.536.0 #4338: in the trash) or not readable = no."""
     if _kid(c, uid):  # 2.352.0 G (#2752, review M5): like _gate -- a kid account never reads filed mails
         return False
-    m = c.execute("SELECT * FROM hub_mails WHERE id=?", (mail_id,)).fetchone()
+    m = c.execute("SELECT * FROM hub_mails WHERE id=? AND deleted_at IS NULL", (mail_id,)).fetchone()
     return bool(m) and hbm_can(c, uid, m)
+
+
+def hbm_mail_nodes(r):
+    """2.536.0 (#4338): the file-store nodes filed with hub mail row r -- its folder (the .eml and the attachments below it),
+    without one the .eml and the attachments themselves. Deleting the mail and the trash run (files/trashpurge.py) use it."""
+    if r["folder_id"]:
+        return [int(r["folder_id"])]
+    return ([int(r["eml_id"])] if r["eml_id"] else []) + _files(r)
 
 
 def hbm_node_sql(c, uid):
@@ -177,7 +188,7 @@ def hbm_node_sql(c, uid):
     list stays in Python, once per list: it knows data locks and hidden life areas that vis_sql does not."""
     if _kid(c, uid):  # 2.352.0 G (#2752, review M5): see hbm_node_ok
         return "SELECT 0 WHERE FALSE"
-    filed = "(m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL)"
+    filed = "(m.eml_id IS NOT NULL OR m.folder_id IS NOT NULL) AND m.deleted_at IS NULL"  # 2.536.0 (#4338): not a deleted one
     lids = [r[0] for r in c.execute(f"SELECT DISTINCT m.list_id FROM hub_mails m WHERE {filed} AND m.list_id IN {vis_sql()}", (uid, uid))]
     mg = _mail_guests(c, lids)
     lids = sorted(int(x) for x, role in list_roles(c, uid, lids).items() if hbm_list_read(role, mg.get(int(x))))  # 2.395.0 (#3380)
@@ -647,11 +658,15 @@ def hbm_mail_assign(mid):
 
 @app.delete("/api/hubmail/mails/<int:mid>")
 def hbm_mail_del(mid):
-    """The mail goes (deleted_at; Undo = POST .../restore). Its folder in the file store stays."""
+    """The mail goes (deleted_at; Undo = POST .../restore). 2.536.0 (#4338): its folder in the file store (without one the
+    .eml and the attachments, hbm_mail_nodes) goes into the trash with it, under the same time stamp."""
     c = db()
     _gate()
-    _need_mail(c, mid, write=True)
-    c.execute("UPDATE hub_mails SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), me(), mid))
+    m = _need_mail(c, mid, write=True)
+    ts, uid = _now(), me()
+    c.execute("UPDATE hub_mails SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, mid))
+    for nid in hbm_mail_nodes(m):  # a node already in the trash keeps its own time stamp (it stays there on Undo)
+        c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, nid))
     bump(c)
     c.commit()
     return jsonify(ok=True)
@@ -661,8 +676,14 @@ def hbm_mail_del(mid):
 def hbm_mail_restore(mid):
     c = db()
     _gate()
-    _need_mail(c, mid, write=True, deleted=True)
+    m = _need_mail(c, mid, write=True, deleted=True)
     c.execute("UPDATE hub_mails SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (mid,))
+    # 2.536.0 (#4338): only the nodes that went with the mail (exactly its time stamp); one deleted by hand before stays
+    for nid in hbm_mail_nodes(m):
+        n = c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at=?", (nid, m["deleted_at"])).fetchone()
+        if n:
+            c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?",
+                      (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid), nid))
     bump(c)
     c.commit()
     return jsonify(ok=True)

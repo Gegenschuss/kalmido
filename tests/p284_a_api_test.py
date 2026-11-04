@@ -10,7 +10,8 @@
    find left out with a note, scanner gone = "unchecked"
  - visibility: client mail = who sees the client, project mail = who sees the list, not assigned = the recipient;
    another organisation, a person who left, agents: nothing (tenant-matrix: hubmail)
- - assign / delete / restore (the undo steps), search (hashed words)
+ - assign / delete / restore (the undo steps), search (hashed words); 2.536.0 (#4338): deleting takes the mail's folder (or
+   .eml + attachments) into the file store's trash, Undo only what went with it, a deleted mail's nodes stay unreadable
 usage: p284_a_api_test.py <datadir>      (a fresh container)"""
 import email.message
 import json
@@ -314,6 +315,36 @@ check(Ca.delete(B + f"/api/hubmail/mails/{m4}").status_code == 403, "carol (memb
 check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok, "bob (admin) deletes a client mail")
 check(m4 not in ids(Ca, client_id=ACME), "deleted: gone for carol too")
 check(Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok and m4 in ids(Ca, client_id=ACME), "undo: restored")
+
+# 2.536.0 (#4338): deleting a mail takes its folder (the .eml, the attachments) into the file store's trash, Undo brings back
+# only what went with it; the filed nodes of a deleted mail stay unreadable even when one is restored alone
+F4, E4 = R["m4"]["folder_id"], R["m4"]["eml_id"]
+check(F4 and E4 and Bo.get(B + f"/api/files/nodes/{F4}").ok and Bo.get(B + f"/api/files/nodes/{E4}").ok, "#4338: the mail's folder and .eml are readable")
+check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok, "#4338: bob deletes the mail again")
+T4 = dbx("SELECT deleted_at FROM hub_mails WHERE id=?", (m4,))[0][0]
+check(T4 and dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0] == T4, "#4338: the folder is in the trash with the mail's time stamp")
+check(Bo.get(B + f"/api/files/nodes/{F4}").status_code == 404 and Bo.get(B + f"/api/files/nodes/{E4}").status_code == 404,
+      "#4338: the deleted mail's folder and .eml are not readable")
+check(Bo.post(B + f"/api/files/nodes/{F4}/restore").status_code == 404, "#4338: the folder of a deleted mail is not restored alone")
+dbx("UPDATE fs_nodes SET deleted_at=NULL WHERE id=?", (F4,), write=True)  # as if restored alone (an older version, a run)
+check(Bo.get(B + f"/api/files/nodes/{F4}").status_code == 404 and Bo.get(B + f"/api/files/nodes/{E4}").status_code == 404,
+      "#4338: a folder out of the trash alone stays unreadable while its mail is deleted")
+dbx("UPDATE fs_nodes SET deleted_at=? WHERE id=?", (T4, F4), write=True)
+check(Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok and not dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0], "#4338: Undo brings the folder back")
+check(Bo.get(B + f"/api/files/nodes/{E4}").ok, "#4338: ... and the .eml is readable again")
+dbx("UPDATE fs_nodes SET deleted_at='2026-01-01T00:00:00Z' WHERE id=?", (F4,), write=True)  # the folder deleted by hand before
+check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok and Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok, "#4338: delete + Undo once more")
+check(dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0] == "2026-01-01T00:00:00Z", "#4338: a folder deleted by hand before stays in the trash")
+dbx("UPDATE fs_nodes SET deleted_at=NULL WHERE id=?", (F4,), write=True)
+# a freelancer's mail without a folder (an older filing): the .eml and the attachments themselves
+m8, F8, E8 = R["m8"]["id"], R["m8"]["folder_id"], R["m8"]["eml_id"]
+dbx("UPDATE hub_mails SET folder_id=NULL WHERE id=?", (m8,), write=True)
+check(E8 and Er.get(B + f"/api/files/nodes/{E8}").ok, "#4338: erin (no organisation) reads her mail's .eml")
+check(Er.delete(B + f"/api/hubmail/mails/{m8}").ok, "#4338: erin deletes her mail")
+check(dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (E8,))[0][0] and Er.get(B + f"/api/files/nodes/{E8}").status_code == 404,
+      "#4338: without a folder the .eml goes into the trash")
+check(Er.post(B + f"/api/hubmail/mails/{m8}/restore").ok and Er.get(B + f"/api/files/nodes/{E8}").ok, "#4338: erin's Undo brings the .eml back")
+dbx("UPDATE hub_mails SET folder_id=? WHERE id=?", (F8, m8), write=True)
 
 # ---- the boundary: a mail bound to a client of another workspace is shown nowhere and repaired
 dbx("UPDATE hub_mails SET client_id=? WHERE id=?", (BETACO, m4), write=True)

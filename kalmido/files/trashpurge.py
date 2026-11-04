@@ -1,7 +1,8 @@
 """2.152.0 B (#2165): the trash periods of the areas without one. The watchdog (at most hourly) deletes for good what lies in
 a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): file-store nodes (with their versions, previews, text and
-index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder goes into the
-file store's trash and follows there), tables and their deleted rows / columns, pipeline deals, invoice series, the
+index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder went into the
+file store's trash when the mail was deleted -- 2.536.0, #4338 -- and follows there), tables and their deleted rows /
+columns, pipeline deals, invoice series, the
 tombstones of deleted team chat messages and the emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
 files, collab/cmttrash.py); since 2.223.3 A (#2879) also absences,
 disposition bookings, scheduling polls with their votes, appointment types and file requests.
@@ -21,6 +22,7 @@ from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
 from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..collab.cmttrash import tcx_trash_paths
+from ..hub.hubmail import hbm_mail_nodes  # 2.536.0 (#4338): the nodes of a mail, shared with deleting it
 
 TP_TICK = {"at": 0.0}
 # 2.239.0 D (#2874): nor a client with a signed data protection sheet (clients_bulk.ms_client_in_use), on top of cl_hold_sql()
@@ -96,14 +98,10 @@ def tp_hubmail(c, cut, purge):
     rows = c.execute("SELECT id, folder_id, eml_id, files FROM hub_mails WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
     if not purge:
         return len(rows)
-    import json
     ts = iso(now_utc())
     for r in rows:
-        try:
-            nodes = [r["folder_id"]] if r["folder_id"] else [r["eml_id"], *json.loads(r["files"] or "[]")]
-        except ValueError:
-            nodes = [r["eml_id"]]
-        for nid in [x for x in nodes if isinstance(x, int)]:
+        # 2.536.0 (#4338): deleting the mail put them into the trash already (hbm_mail_del); this catches the older ones
+        for nid in hbm_mail_nodes(r):
             c.execute("UPDATE fs_nodes SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, nid))
         c.execute("DELETE FROM hub_mails WHERE id=?", (r["id"],))
     return len(rows)
