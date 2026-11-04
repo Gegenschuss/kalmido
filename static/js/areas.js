@@ -496,7 +496,7 @@ function sbb_render(hid) {
 // #4047: phone: never cut or split: a word too wide in 9 px: each column as wide as its names need; if that is too wide, the row scrolls
 function sbb_fit() {
   const row = $('#side .sbmr');
-  if (row) { row.style.gridTemplateColumns = row.style.overflow = ''; }
+  if (row) row.style.gridTemplateColumns = row.style.overflow = '';
   let far = false;
   const wide = n => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
@@ -517,8 +517,8 @@ function sbb_fit() {
     }
   }
   if (far) {
-    const c = +row.style.getPropertyValue('--sbmc'), w = Array(c).fill(0);
-    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c], Math.ceil(wide(n)) + 4); });
+    const c = +row.style.getPropertyValue('--sbmc'), w = [];
+    $$('.srbn', row).forEach((n, i) => { w[i % c] = Math.max(w[i % c] || 0, wide(n) + 4); });
     row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflow = 'auto hidden';
   }
 }
