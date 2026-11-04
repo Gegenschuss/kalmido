@@ -129,7 +129,8 @@ python3 stages.py --why --changed origin/main   # the stage (full / push) and th
 CI (`.github/workflows/ci.yml`) runs two stages: the nightly run, a release (`VERSION` changed), a change of the CI files
 and a commit message with `[full]` run every suite; other pushes and pull requests run the push stage of `stages.py`
 (security / rights / tenant / organisation / freelancer suites always, the core flows, the suites of the touched areas).
-The job `plan` cuts the shards from the suite times of the last runs (`tools/shards.py`, `KALMIDO_SHARD_PLAN`).
+The job `plan` cuts the shards from the suite times of the last runs (`tools/shards.py`, `KALMIDO_SHARD_PLAN`), without
+the times of shards cancelled at their time limit.
 
 There is no rerun: a suite red once makes the run red. A suite proven flaky (red and green on the same code, in CI or in
 two Mac runs) goes into `skip.txt` with a date at most 14 days ahead and the task that fixes it; `run_all.sh` skips it

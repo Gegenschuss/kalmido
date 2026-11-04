@@ -89,8 +89,13 @@ jobs:
             timeout 60 gh run download "$id" -R "$GITHUB_REPOSITORY" -p 'timings-shard-*' -D "/tmp/timings/$id" || { echo "run $id: no timings"; continue; }
             st=$(cat /tmp/timings/"$id"/*/timings-stage.txt 2>/dev/null | sed -n 1p || true)
             echo "run $id: stage ${st:-full (no stage file)}"
+            # #4327: not the shards cancelled at their time limit: the group they were in is cut off and the newest time wins in
+            # shards.py, so the next plan runs into the limit again (same rule as keep_times of the Mac runner). A full run with
+            # such a shard does not end the way back: the groups it never reached need the times of an older run
+            cut=$(timeout 60 gh run view "$id" -R "$GITHUB_REPOSITORY" --json jobs | python3 tools/shards.py --cut-shards -) || { echo "run $id: no job list, times not used"; continue; }
+            for s in $cut; do rm -rf "/tmp/timings/$id/timings-shard-$s"; echo "run $id: shard $s was cancelled, its times are not used"; done
             order="$id $order"; n=$((n + 1))
-            [ "${st:-full}" = full ] && full=1
+            [ "${st:-full}" = full ] && [ -z "$cut" ] && full=1
             [ -n "$full" ] && [ "$n" -ge 3 ] && break
           done
           printf '%s\n' $order > /tmp/timings/order.txt

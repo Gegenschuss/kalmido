@@ -15,10 +15,13 @@ hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from
     --only F     2.180.0 A (#2695): only the groups whose first suite is a line of F (tests/stages.py --groups-out, the push
                  stage); --assign then starts with "# stage push" (run_all.sh skips the groups not in the plan)
     --target-min M  as many shards as M minutes each need (at most --shards, at least 1; push stage and, job/2398, full run)
+    --cut-shards F  #4327: the shard numbers of `gh run view --json jobs` (file, - = stdin) that were cancelled or timed out, one
+                 per line (ci.yml job "plan" leaves their times out); a list without jobs is an error (exit 2)
 Groups without a measurement count as DEFAULT_SUITE_S per suite plus DEFAULT_FRESH_S (shown as "estimated").
 """
 import argparse
 import csv
+import json
 import os
 import re
 import sys
@@ -28,6 +31,7 @@ DEFAULT_FRESH_S = 8.0  # one container start (start.sh: stop, wipe, database, he
 FRESH_RE = re.compile(r"^(now [^;]*; *)?fresh;")
 RUN_RE = re.compile(r"^(now [^;]*; *)?(fresh;)?[ \t]*run ([A-Za-z0-9_]+) ")
 SHARD_RE = re.compile(r"^shard ([0-9]+)\b")
+SHARD_JOB_RE = re.compile(r"^Test suites ([0-9]+)/[0-9]+ ")  # the shard jobs of ci.yml, not the summing job "Test suites (API, ...)"
 
 
 def list_lines(path):
@@ -127,6 +131,16 @@ def mmss(s):
     return f"{int(s // 60):3d}:{int(s % 60):02d}"
 
 
+def cut_shards(data):
+    """#4327: the shard numbers among the jobs of a CI run that ended cancelled or timed_out (a job at timeout-minutes)."""
+    out = []
+    for j in data["jobs"]:
+        m = SHARD_JOB_RE.match(j.get("name") or "")
+        if m and j.get("conclusion") in ("cancelled", "timed_out"):
+            out.append(int(m.group(1)))
+    return sorted(out)
+
+
 def main(argv=None):
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description="shard report from tests/timings.csv (LPT over the run_all.sh groups)")
@@ -136,8 +150,17 @@ def main(argv=None):
     ap.add_argument("--assign", action="store_true")
     ap.add_argument("--only", metavar="F")
     ap.add_argument("--target-min", type=float, default=0, metavar="M")
+    ap.add_argument("--cut-shards", metavar="F")
     ap.add_argument("timings", nargs="*")
     a = ap.parse_args(argv)
+    if a.cut_shards:
+        try:
+            with sys.stdin if a.cut_shards == "-" else open(a.cut_shards, encoding="utf-8") as f:
+                print(*cut_shards(json.load(f)), sep="\n")
+        except (OSError, ValueError, KeyError, TypeError) as e:  # no answer from gh: the caller must not take the times as whole
+            print(f"shards.py: no job list: {e!r}", file=sys.stderr)
+            return 2
+        return 0
     gs = groups(a.run_all)
     if not gs:
         print("shards.py: no groups in", a.run_all, file=sys.stderr)
