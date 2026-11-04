@@ -83,8 +83,9 @@ const rem = v => parseFloat(v) * 16;
   await call('PUT', `/api/lists/${LST}/agent`, {agent_id: AG});
   w = await boot({user: 'alice', hash: 'l/' + LST}); d = w.document;
   w.eval(`chatOpen(${AG})`);
-  const cin = await until(() => d.querySelector('#chat-in'));
-  check(!!cin, 'agent chat opens');
+  check(!!(await until(() => d.querySelector('#chat-in'))), 'agent chat opens');
+  await w.eval('chatLoad()');  // 2.519.0 (#4045): the open redraws the panel once the history is in; the box is fetched only after that
+  const cin = await until(() => { const x = d.querySelector('#chat-in'); return x && !x.disabled && x.isConnected ? x : null; });
   cin.value = 'water the roses'; cin.dispatchEvent(new w.Event('input', {bubbles: true}));
   key(w, cin, 'Enter', {ctrlKey: true});
   const mm = await until(() => d.querySelector('#chat-msgs .cmsg.me[data-mid]'));
