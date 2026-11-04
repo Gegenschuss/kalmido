@@ -139,8 +139,11 @@ pdir = os.path.join(DATA, "attachments", "lists", str(SP["id"]))
 before = glob.glob(os.path.join(DATA, "**", "lists", str(SP["id"]), "*"), recursive=True)
 check(before, f"the file is on disk ({pdir})")
 check(A.delete(B + "/api/sample").ok, "remove the sample")
+# 2.530.0 (#4315): the sample project goes into the projects' trash (restorable with its tasks) -- its files stay on disk
+# until the trash run, instead of leaving at once
 after = [p for p in before if os.path.exists(p)]
-check(not after, f"its project files left the disk: {after}")
+check(after == before and not any(x["id"] == SP["id"] for x in A.get(B + "/api/state").json()["lists"]),
+      f"the sample project is gone from the state, its project files wait in the trash: {after}")
 # import undo: a list from an import gets a project file, undo removes the list and the file
 imp = A.post(B + "/api/import/todoist", files={"file": ("Imp undo.csv", b"TYPE,CONTENT,INDENT\ntask,Buy stamps,1\n")})
 check(imp.ok and imp.json().get("import_id"), f"an import: {imp.status_code} {imp.text[:150]}")
