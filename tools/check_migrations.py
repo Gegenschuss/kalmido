@@ -65,7 +65,8 @@ def names(src):
 
 def sql_bare(sql):
     """sql without its comments, texts and function bodies: what is left can be read for commas, semicolons and key words."""
-    return re.sub(r"--[^\n]*", " ", re.sub(r"\$\$.*?\$\$", "$$", re.sub(r"'(?:[^']|'')*'", "''", sql), flags=re.S))
+    # one pass: a -- inside a text is no comment, an apostrophe in a comment opens no text
+    return re.sub(r"'(?:[^']|'')*'|--[^\n]*|\$\$.*?\$\$", lambda m: {"'": "''", "-": " ", "$": "$$"}[m.group(0)[0]], sql, flags=re.S)
 
 
 def step_finding(table, col, ddl):
@@ -112,6 +113,8 @@ def content_findings(n, values, src):
     for x in stmts:
         if not x.upper().startswith("CREATE"):
             bad.append(f"{n}:{sl}: SCHEMA only creates, not: {x[:60]}")
+        elif re.match(r"CREATE\s+TABLE\b", x, re.I) and not re.match(r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\b", x, re.I):
+            bad.append(f"{n}:{sl}: SCHEMA runs at every start: CREATE TABLE IF NOT EXISTS, not: {x[:60]}")
         elif re.match(r"CREATE\s+(UNIQUE\s+)?INDEX\b", x, re.I):
             why = index_finding(x, own, ok)
             if why:

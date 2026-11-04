@@ -163,6 +163,7 @@ try:
                  step("ALTER TABLE events ADD COLUMN x NUMERIC(10,2) DEFAULT 0"), step("ALTER TABLE events ADD COLUMN x TEXT DEFAULT 'DROP, a;b'"),
                  step("ALTER TABLE events ADD COLUMN x BIGINT REFERENCES users(id) ON DELETE SET NULL"),
                  'AFTER = ["CREATE INDEX IF NOT EXISTS i1 ON events(x) WHERE x IS NOT NULL"]\n',
+                 'SCHEMA = """-- the person\'s own rows\nCREATE TABLE IF NOT EXISTS n2 (id BIGINT, t TEXT DEFAULT \'--\');\nCREATE UNIQUE INDEX IF NOT EXISTS u4 ON n2(id);"""\n',
                  '# unique-ok u1: the column is new and NULL in every row\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u1 ON events(x)"]\n',
                  'SCHEMA = """CREATE TABLE IF NOT EXISTS n1 (id BIGINT); CREATE UNIQUE INDEX IF NOT EXISTS u2 ON n1(id);"""\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u3 ON n1(id)"]\n'):
         bad, p = frag("3481.py", text)
@@ -184,7 +185,9 @@ try:
                        ('# unique-ok u:\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x)"]\n', "a reason without words"),
                        ('# unique-ok other: x\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x)"]\n', "the reason of another index"),
                        ('SCHEMA = """CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x);"""\n', "UNIQUE on an existing table in SCHEMA"),
-                       ('SCHEMA = """DROP TABLE events;"""\n', "a DROP in SCHEMA")):
+                       ('SCHEMA = """DROP TABLE events;"""\n', "a DROP in SCHEMA"),
+                       ('SCHEMA = """CREATE TABLE IF NOT EXISTS n3 (id BIGINT); -- don\'t\nDROP TABLE events; -- x\'\n"""\n', "a DROP behind a comment with an apostrophe"),
+                       ('SCHEMA = """CREATE TABLE n4 (id BIGINT);"""\n', "CREATE TABLE without IF NOT EXISTS (runs at every start)")):
         bad, p = frag("3482.py", text)
         check(len(bad) == 1, f"#4285: {what} is a finding {bad}")
         os.remove(p)
