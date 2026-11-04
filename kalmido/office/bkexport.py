@@ -22,7 +22,7 @@ from ..core.config import app
 from ..core.db import db, local_now
 from ..core.i18n import N_, tr
 from ..core.errors import BadInput
-from .books import bk_gaps_text
+from .books import bk_gaps_text, ofc_meals_euer, ofc_meals_home  # 2.534.0 (#4333): ofc_meals_*
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .books import _fx as bk_fx, _home, bk_payments, bk_receipts, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
@@ -129,7 +129,6 @@ def bx_rows(c, oid, frm, to, gaps=None):
                              "currency": home, "file": ""})
     # 2.534.0 (#4333): the approved entertainment receipts, two rows each: the deductible 70 % with the full input tax and
     # the 30 % that are not deductible (a small business: 70 / 30 of the gross amount, no input tax) -- gross adds up to the bill
-    from .books import ofc_meals_euer, ofc_meals_home
     small = bool(s.get("small_business"))
     for m in ofc_meals_home(c, oid, frm, to, s):
         v, sm = ofc_meals_euer([m], small)

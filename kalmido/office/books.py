@@ -54,6 +54,7 @@ from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): wa
 from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
+from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 
@@ -332,7 +333,6 @@ def ofc_meals_home(c, oid, frm, to, s):
     """2.534.0 (#4333): the approved meals of [frm, to] (meals.ofc_bw_booked) in the office currency: [{id, date, title,
     gross, vat, net, deductible, not_deductible (Decimal), unrated}] -- net and the 70 / 30 split include the tip (bw_calc).
     A currency without an office rate counts 1:1 (unrated = its code), as the receipts do."""
-    from .meals import ofc_bw_booked
     out = []
     for m in ofc_bw_booked(c, oid, frm, to):
         cur, rate = bk_home_rate(m["currency"], s)
@@ -348,7 +348,6 @@ def ofc_meals_euer(meals, small):
     """2.534.0 (#4333), bk_euer: (expense line values [net, vat, gross], summary {count, gross, vat, deductible, not_deductible}).
     70 % of the net amount is an expense, its input tax counts in full (section 4 (5) no. 2 EStG, section 15 UStG); a small
     business deducts no input tax: 70 % of the gross amount (meals.BW_SHARE)."""
-    from .meals import BW_SHARE
     z = Decimal(0)
     gross = sum((m["gross"] for m in meals), z)
     if small:
