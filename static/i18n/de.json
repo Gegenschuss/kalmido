@@ -16177,5 +16177,7 @@
   "Share a project with the assistant first: Settings > Agents > Assistant": "Gib zuerst ein Projekt für den Assistenten frei: Einstellungen > Agenten > Assistent",
   "In your private area you decide yourself. In an organisation its admins allow it (Settings > Organisation > People: “Members may have their own agents”), or a server admin for everyone (Settings > Organisation > Agents). Without it, “Create agent” is missing or the agent cannot move into that organisation.": "In deinem privaten Bereich entscheidest du selbst. In einer Organisation erlauben es ihre Admins (Einstellungen > Organisation > Personen: „Mitglieder dürfen eigene Agenten haben“) oder ein Server-Admin für alle (Einstellungen > Organisation > Agenten). Ohne das fehlt „Agent anlegen“ oder der Agent kann nicht in diese Organisation wechseln.",
   "On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.": "An: alle auf diesem Server, in jedem Arbeitsbereich. Aus: in einer Organisation entscheiden ihre Admins (Einstellungen > Organisation > Personen), im privaten Bereich jede Person selbst.",
-  "Client and project of the file name swapped to match the PDF: client {0}, project {1}": "Kunde und Projekt aus dem Dateinamen passend zur PDF getauscht: Kunde {0}, Projekt {1}"
+  "Client and project of the file name swapped to match the PDF: client {0}, project {1}": "Kunde und Projekt aus dem Dateinamen passend zur PDF getauscht: Kunde {0}, Projekt {1}",
+  "Confirmation of the receipt": "Bestätigung des Belegs",
+  "Confirmed by {0} (not by the host).": "Bestätigt durch {0} (nicht durch den Gastgeber)."
 }

@@ -213,7 +213,7 @@ def aa_row_text(r, lg):
 # default) an admin on the default channel Web Push gets the alerts on their subscribed devices, and none at all while no
 # device is subscribed (Settings > Notifications); ntfy only for the channels ntfy / both or a shared admin topic. With an
 # own ntfy server (NTFY_URL elsewhere) the admins' own topics keep getting them, whatever channel they use (as before).
-NTFY_PUBLIC = (urllib.parse.urlsplit(NTFY_URL).hostname or "").lower().rstrip(".") in ("ntfy.sh", "www.ntfy.sh")
+# 2.533.0 (#4321): one verdict for both places -- push.ntfy_public() (the old constant NTFY_PUBLIC ignored NTFY_TOKEN)
 
 
 def aa_admin_via(c, uid, s=None):
@@ -221,7 +221,7 @@ def aa_admin_via(c, uid, s=None):
     s = s or usettings(c, uid)
     ch, t = push_channel(s), s.get("ntfy_topic") or ""
     dev = webpush_count(c, uid) if WEBPUSH_ON and ch in ("webpush", "both") else 0
-    t_ok = bool(t) and bool(NTFY_TOPIC_RE.fullmatch(t)) and (ch in ("ntfy", "both") or not WEBPUSH_ON or not NTFY_PUBLIC)
+    t_ok = bool(t) and bool(NTFY_TOPIC_RE.fullmatch(t)) and (ch in ("ntfy", "both") or not WEBPUSH_ON or not ntfy_public())
     return {"ntfy": t if t_ok else "", "webpush": 0 if t_ok and ch == "webpush" else dev}
 
 
@@ -569,7 +569,7 @@ def aa_public(c):
             "all_kinds": [{"kind": k, "label": tr(AA_LABEL[k])} for k in AA_KINDS], "mode": cfg["mode"],
             "digest_time": cfg["digest_time"], "cooldown_h": cfg["cooldown_h"], "max_hour": cfg["max_hour"],
             "disk_pct": cfg["disk_pct"], "disk_mb": cfg["disk_mb"], "integ_min": cfg["integ_min"], "admins": admins,
-            "ntfy_url": NTFY_URL, "ntfy_public": NTFY_PUBLIC, "webpush": WEBPUSH_ON,
+            "ntfy_url": NTFY_URL, "ntfy_public": ntfy_public(), "webpush": WEBPUSH_ON,
             "storage": _AA["storage"], "quick_check": _AA["qc"], "items": items,
             "rls_off": not _rls_state()}  # 2.37.0 (review W2-2)
 

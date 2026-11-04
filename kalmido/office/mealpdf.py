@@ -217,13 +217,18 @@ def bw_meal_pdf_data(c, oid, m):
     # the host's confirmation (with the signature line for the print-out, 2.296.0 A (#3176)) stays together
     conf = tr("I confirm that the details are complete and correct and that the meal was held for business reasons.")
     sw = (PDF_CW - 28) / 2
-    sig, sig_w, sig_h = bw_sig_image(c, oid, m), 0, 0
+    # 2.533.0 (#4336): somebody else than the host confirmed (an admin; a free-text host without an id counts as someone else):
+    # no "I confirm" sentence of the host and no picture of that person on the host's signature line
+    other = m["status"] == "approved" and bool(m.get("approved_by")) and (m.get("host") or {}).get("id") != m.get("approved_by")
+    if other:
+        conf = tr("Confirmed by {0} (not by the host).", m["approved_name"] or "–")
+    sig, sig_w, sig_h = (None if other else bw_sig_image(c, oid, m)), 0, 0
     if sig:  # 2.332.0 C (#3301): at most 14 mm high and half the width, on the signature line
         sig_h = 40.0
         sig_w = min(sw - 8, sig[0] * sig_h / sig[1])
         sig_h = sig_w * sig[1] / sig[0]
     need(18 + len(pdf_wrap(conf, 9.2, PDF_CW)) * 9.2 * 1.42 + 10 + 54 + 44 + sig_h)
-    p.text(PDF_L, y, tr("Confirmation of the host"), 11, True)
+    p.text(PDF_L, y, tr("Confirmation of the receipt") if other else tr("Confirmation of the host"), 11, True)
     y += 18
     y += p.para(PDF_L, y, conf, 9.2, PDF_CW)
     y += 10

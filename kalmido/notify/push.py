@@ -563,7 +563,7 @@ def notify(uid, title, msg, prio="4", click=None, actions=None, tag=None, s=None
 
 def ntfy_public():
     """2.148.1 C (#2494): True when ntfy messages go to the public default server (ntfy.sh without a token of an own one)."""
-    return (urllib.parse.urlsplit(NTFY_URL).hostname or "").lower() in ("ntfy.sh", "www.ntfy.sh") and not NTFY_TOKEN
+    return (urllib.parse.urlsplit(NTFY_URL).hostname or "").lower().rstrip(".") in ("ntfy.sh", "www.ntfy.sh") and not NTFY_TOKEN
 
 
 def reminder_recipient(c, t, users, memo=None):
