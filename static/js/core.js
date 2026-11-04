@@ -484,7 +484,8 @@ function obxClear() { if (!OBX.on) return Promise.resolve(); for (const o of OUT
 // carries the server's sign-in mark (me.sgen: session, password state, organisations); LS "wko" = {g, at} = that mark and the last
 // online sync. Online with another mark, or 14 days without an online sync (also at an offline start), the copy goes. The outbox
 // (own changes not sent yet) stays at a new sign-in of the same account (the server checks every entry when it is sent); it goes
-// with the copy when the session is gone (401 / account disabled) and when an organisation of the account is gone.
+// with the copy when the session is gone (401 / account disabled). 2.505 (#4298): an organisation of the account that is gone
+// empties it no more: it goes out as usual, the private entries arrive, what the server refuses waits in the conflicts dialog.
 const WKO_MAX_AGE = 14 * 864e5;
 function wkoDrop() {
   LS.del('wko');
@@ -492,16 +493,12 @@ function wkoDrop() {
   if (globalThis.__wkoStore) return globalThis.__wkoStore.clear().catch(() => {});  // tests: the stand-in for IndexedDB
   return new Promise(ok => { try { const r = indexedDB.deleteDatabase('kalmido-wiki'); r.onsuccess = r.onerror = r.onblocked = () => ok(); } catch { ok(); } });
 }
-function outDrop() { LS.del('outbox'); if (OBX.on) return obxClear(); for (const o of OUT.q) o.done = true; OUT.q = []; return Promise.resolve(); }
 function startDrop() { LS.del('cache'); S.lpCache = null; }
 const wkoOld = m => !m || !(Date.now() - Date.parse(m.at) < WKO_MAX_AGE);
 function sessGuard(me) {
   if (!me) return;
   const m = LS.get('wko', null);
   if (wkoOld(m) || m.g !== (me.sgen || '')) { wkoDrop(); startDrop(); LS.set('wko', {g: me.sgen || '', at: new Date().toISOString()}); }
-  const ids = (me.workspaces || []).map(w => w.id), was = LS.get('orgIds', null);
-  if (Array.isArray(was) && was.some(id => !ids.includes(id))) outDrop();  // removed from an organisation
-  LS.set('orgIds', ids);
 }
 // the session is gone (401 / account disabled at /api/state): the knowledge pages' copy goes before the sign-in page.
 // 2.306.0 B (#2889): the outbox stays (authGone keeps what waits; it goes out after the next login of the same account)

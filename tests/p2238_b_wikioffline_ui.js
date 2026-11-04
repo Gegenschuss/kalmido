@@ -6,7 +6,8 @@
 // - 14 days without an online sync: an offline start empties it; a fresh copy is read offline as before
 // - the session gone (401 at /api/state): the copy is emptied, nothing waiting is sent (2.306.0 B, #2889: the outbox itself stays
 //   for the next sign-in of the same account)
-// - the outbox: kept at a new sign-in of the same account (then sent), dropped when an organisation of the account is gone
+// - the outbox: kept at a new sign-in of the same account (then sent); 2.505 (#4298): an organisation of the account that is gone
+//   empties it no more: what is still allowed arrives, what the server refuses waits in the conflicts dialog
 // - the service worker answers (and keeps) only the app shell: /, /capture, /manifest.json, /static/ (allow list)
 // freelancer-matrix: wiki (the pages are in the private workspace of a person without an organisation)
 const fs = require('fs');
@@ -186,8 +187,7 @@ const lsj = (br, k) => { const v = br.shared.store['tasks.' + k]; return v == nu
   const T2 = (await call('POST', '/api/tasks', {title: 'Olga task'}, OK)).id;
   const bo = browser();
   w = await win(bo, 'olga', {ck: OK, hash: ''});
-  await until(() => lsj(bo, 'orgIds'));
-  check(JSON.stringify(lsj(bo, 'orgIds')) === JSON.stringify([oid]), 'the organisations are kept ' + JSON.stringify(lsj(bo, 'orgIds')));
+  await until(() => w.eval('!!S.me'));
   w.close();
   // a new sign-in while still a member: the waiting change is sent
   bo.shared.store['tasks.outbox'] = JSON.stringify([{method: 'PATCH', url: `/api/tasks/${T2}`, body: {title: 'Olga sent'}, uid: so.me.id, k: 'k2238c'}]);
@@ -196,12 +196,15 @@ const lsj = (br, k) => { const v = br.shared.store['tasks.' + k]; return v == nu
   w.close();
   const del = await call('DELETE', `/api/orgs/${oid}/members/${so.me.id}`);
   check(del.http < 300, 'setup: olga leaves Alpha ' + del.http);
-  bo.shared.store['tasks.outbox'] = JSON.stringify([{method: 'PATCH', url: `/api/tasks/${T2}`, body: {title: 'Olga dropped'}, uid: so.me.id, k: 'k2238d'}]);
+  // 2.505.0 (#4298): gone from an organisation: nothing is lost. The private change arrives, the refused one waits with its text
+  const TA = (await call('POST', '/api/tasks', {title: 'Not hers'})).id;
+  bo.shared.store['tasks.outbox'] = JSON.stringify([{method: 'PATCH', url: `/api/tasks/${TA}`, body: {title: 'Refused text'}, uid: so.me.id, k: 'k2505a'},
+    {method: 'PATCH', url: `/api/tasks/${T2}`, body: {title: 'Olga kept'}, uid: so.me.id, k: 'k2505b'}]);
   w = await win(bo, 'olga', {ck: OK, hash: ''});
-  check(await until(() => !bo.shared.store['tasks.outbox'] && w.eval('OUT.q.length') === 0), 'removed from an organisation: the outbox is empty');
-  await sleep(300);
-  check((await call('GET', `/api/tasks/${T2}`, null, OK)).title === 'Olga sent', 'removed from an organisation: nothing waiting was sent');
-  check(JSON.stringify(lsj(bo, 'orgIds')) === '[]', 'the organisations kept now: none');
+  check(await until(async () => (await call('GET', `/api/tasks/${T2}`, null, OK)).title === 'Olga kept'), 'removed from an organisation: the private change is sent');
+  check((await call('GET', `/api/tasks/${TA}`)).title === 'Not hers', 'removed from an organisation: the server refused the other change');
+  check(await until(() => !bo.shared.store['tasks.outbox'] || w.eval('OUT.q.length') === 0), 'removed from an organisation: the queue went out');
+  check(await until(() => (w.eval('S.conflicts') || []).some(x => x.field === 'rejected' && /Refused text/.test(x.mine))), 'removed from an organisation: the refused change waits in the conflicts dialog with its text');
   w.close();
 
   console.log(`\n${ok} ok, ${F.length} failed`);
