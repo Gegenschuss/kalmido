@@ -112,12 +112,14 @@ const SCROLL = to => `(() => { const wrap = document.querySelector('.dc-wrap'); 
       check(m && m.hOk && m.xOk && m.pt >= m.head && m.pb <= m.vh, `${at}, list at its end: title and close button visible ` + JSON.stringify(m));
     }
     // bob, a short list: open, scroll as far as it goes, the pane stays below the head (before 2.519.0 it went under it)
-    await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'bob', password: 'password123'})}).then(r => r.status)`);
+    await nav(B + 'static/icon.svg');
+    await ev(`fetch('/api/auth/logout', {method: 'POST', headers: {'X-Requested-With': 'kalmido'}}).then(() => (localStorage.clear(), 1))`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'bob', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: bob logs in');
     for (const [width, height] of [[1280, 800], [1024, 700]]) {
       const at = `bob ${width}x${height}`;
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width, height}});
       await nav(B + '#docs');
-      check(await wait(`document.querySelectorAll('.dc-card').length === 3`), `${at}: three cards`);
+      check(await wait(`document.querySelectorAll('.dc-card').length === 3`), `${at}: three cards ` + await ev(`document.querySelectorAll('.dc-card').length + ' ' + location.hash`).catch(e => String(e)));
       await ev(`(document.querySelector('.dc-view .dc-card [data-dco]').click(), 1)`);
       check(await wait(`!!document.querySelector('.dc-pane #dc-h')`), `${at}: the pane opens`);
       await sleep(300);
