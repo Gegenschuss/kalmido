@@ -145,11 +145,11 @@ if fin.ok:
     snap = sql("SELECT tax_snapshot FROM office_docs WHERE id=?", (R20,))[0]["tax_snapshot"]
     check('"standard": 16' in snap and float(ok(Fr.get(B + f"{D}/{R20}"), "finalised 2020")["totals"]["tax_lines"][0]["pct"]) == 16,
           "#4498: the finalised one keeps 16 % in its snapshot and totals")
-    ok(Fr.post(B + f"{D}/{RN}/finalize"), "today's invoice finalised")
+    ok(Fr.post(B + f"{D}/{R21}/finalize"), "the invoice of 2021 finalised (a period of service is required)")
     check(float(ok(Fr.get(B + f"{D}/{R20}"), "2020 again")["totals"]["tax_lines"][0]["pct"]) == 16, "#4498: ... unchanged after later documents")
 
 # ---------------------------------------------------------------- migration: emptied chain columns are chained again at the start
-before = {i: chain_row(i) for i in (I1, I2, I3, CR, R20, RN)}
+before = {i: chain_row(i) for i in (I1, I2, I3, CR, R20, R21)}
 k0 = check_chain()
 OID = sql("SELECT org_id FROM office_docs WHERE id=?", (I1,))[0]["org_id"]
 sql("UPDATE office_docs SET chain_key='', chain_seq=NULL, chain_prev='', chain_hash='' WHERE org_id=?", (OID,))
@@ -159,7 +159,7 @@ if fresh(MODE, keep=True):
     Fr = login(B, "frida")
     k = check_chain()
     check(k.get("ok") is True and k.get("count") == k0.get("count") and k.get("pending") == 0, f"#4497: the start chains them again {k}")
-    after = {i: chain_row(i) for i in (I1, I2, I3, CR, R20, RN)}
+    after = {i: chain_row(i) for i in (I1, I2, I3, CR, R20, R21)}
     check(after == before, f"#4497: in the order they were finalised, with the same hashes {after} vs {before}")
     A = sess("alice")
 
