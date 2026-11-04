@@ -763,8 +763,11 @@ async function loadNotes(lid) {
 // localStorage (an offline start); a change made offline (text, title, tags, pin, a new note) waits in the outbox like a task's
 // and is drawn at once; a newer text of the same note replaces the waiting one. The server answers a changed-in-between with
 // 409: that change waits with its text in the conflicts dialog (outReject). Deleting and moving still need a connection.
+// 2.536.0 (#4567): online too every change of a note (text, title, tags, pin, a new note) goes into the outbox at once and is
+// saved here at once ("Saved"), the server gets it in the background; a 409 of a sent one opens the note's own dialog (ntReject).
+// A locked list's note never waits in plain text: it goes straight to the server as before.
 const NT_MEM = new Map();
-const ntLocked = lid => typeof LE2E === 'object' && LE2E.on.has(lid);  // a list with the lock: its notes never wait in plain text
+const ntLocked = lid => (typeof LE2E === 'object' && LE2E.on.has(lid)) || !!(typeof listById === 'function' && listById(lid)?.e2e);  // a list with the lock: its notes never wait in plain text (2.536.0 #4567: + the list's own flag)
 function ntKeep(lid, j) { NT_MEM.set(lid, j); if (!ntLocked(lid)) LS.set('ntLast', {lid, j}); }
 function ntKept(lid) { if (NT_MEM.has(lid)) return NT_MEM.get(lid); const c = LS.get('ntLast', null); return c && c.lid === lid ? c.j : null; }
 const NT_URL = /^\/api\/(notes\/-?\d+|lists\/\d+\/notes)$/;
@@ -805,13 +808,23 @@ function ntSent(e, j) {
   const old = e.body?.expect_updated_at;
   if (old && j.updated_at) outSave(() => { for (const x of OUT.q) if (x !== e && x.url === e.url && x.body?.expect_updated_at === old) x.body = {...x.body, expect_updated_at: j.updated_at}; });
 }
-// one write of a note: straight to the server, or into the outbox (offline, a note made offline, changes of it still waiting)
+// one write of a note: into the outbox (2.536.0 #4567: online too), a locked list's note straight to the server
 async function ntWrite(n, patch) {
   const url = `/api/notes/${n.id}`;
   if (n.id < 0) delete patch.expect_updated_at;  // made offline: no base on the server yet
-  if (n.id < 0 || OUT.q.some(x => x.url === url)) { ntEnqueue('PATCH', url, patch); return {queued: true}; }
-  try { return await rawFetch('PATCH', url, patch); }
-  catch (e) { if (e instanceof Offline && !ntLocked(n.list_id)) { ntEnqueue('PATCH', url, patch); return {queued: true}; } throw e; }
+  if (n.id < 0 || !ntLocked(n.list_id)) { ntEnqueue('PATCH', url, patch); return {queued: true}; }
+  return await rawFetch('PATCH', url, patch);
+}
+// 2.536.0 (#4567): the server refused a sent change of a note with 409 (changed elsewhere since): the note's own dialog (both
+// versions), the later changes of the same note still waiting are folded into it (they share the old base). true = handled.
+function ntReject(e, err) {
+  const theirs = err?.data?.note; if (err?.status !== 409 || !theirs?.id || e.method !== 'PATCH') return false;
+  const later = OUT.q.filter(x => x !== e && x.url === e.url && x.method === 'PATCH' && !x.sending);
+  const {expect_updated_at, ...patch} = Object.assign({}, e.body, ...later.map(x => x.body));
+  if (later.length) outSave(() => { OUT.q = OUT.q.filter(x => !later.includes(x)); });
+  const mine = (S.nt.notes || []).find(x => x.id === theirs.id) || {...theirs, ...patch};
+  setTimeout(() => noteConflict(mine, theirs, patch), 0);  // the outbox goes on meanwhile
+  return true;
 }
 // #123 -> a link to that task (only tasks I see; text inside code / links / buttons and inside tags stays)
 // 2.35.0 (#1096): also in chats, comments and the description, there compact (only "#123", the title in the tooltip);
@@ -944,7 +957,8 @@ async function noteFlush() {
   if (Object.keys(patch).length === 1) return;
   try {
     const r = await ntWrite(n, patch);  // 2.143.0 C (#2153): offline into the outbox
-    if (r.queued) { const s = $('#nt-saved'); if (s) s.textContent = tr('You are offline: the note is saved as soon as the server is reachable'); return; }
+    // 2.536.0 (#4567): queued = the normal case: saved here at once; the offline hint only when really offline
+    if (r.queued) { const s = $('#nt-saved'); if (s) { s.textContent = OUT.online ? tr('Saved') : tr('You are offline: the note is saved as soon as the server is reachable'); if (OUT.online) setTimeout(() => { if (s.isConnected && s.textContent === tr('Saved')) s.textContent = ''; }, 1500); } return; }
     Object.assign(n, r); const brief = (S.notes || []).find(x => x.id === n.id); if (brief) Object.assign(brief, {title: r.title, tags: r.tags, pinned: r.pinned, updated_at: r.updated_at});
     const s = $('#nt-saved'); if (s) { s.textContent = tr('Saved'); setTimeout(() => { if (s.isConnected) s.textContent = ''; }, 1500); }
   } catch (e) {
@@ -954,7 +968,8 @@ async function noteFlush() {
 }
 async function noteConflict(mine, theirs, patch) {
   const keep = await askDialog({title: tr('Changed in the meantime by {0}', theirs.updated_by_name || '?'), html: `<p>${tr('Keep your version or take theirs?')}</p><div class="ntdiff"><div><b>${tr('Yours')}</b><pre>${esc(patch.body ?? mine.body)}</pre></div><div><b>${tr('Theirs')}</b><pre>${esc(theirs.body)}</pre></div></div>`, ok: tr('Keep mine'), cancel: tr('Take theirs')});
-  if (keep) {
+  if (keep && !ntLocked(mine.list_id)) { mine.updated_at = theirs.updated_at; ntEnqueue('PATCH', `/api/notes/${mine.id}`, {...patch, expect_updated_at: theirs.updated_at}); }  // 2.536.0 (#4567): the outbox
+  else if (keep) {
     try { const r = await rawFetch('PATCH', `/api/notes/${mine.id}`, {...patch, expect_updated_at: theirs.updated_at}); Object.assign(mine, r); } catch (e) { toast(e.message); }
   } else Object.assign(mine, theirs);
   renderView();
@@ -963,7 +978,8 @@ async function noteNew() {
   const lid = S.nt.lid;
   if (qn_isList(lid)) { qn_new(lid); return; }  // 2.477.0 (#3881): the list "Notes" makes quick notes
   const url = `/api/lists/${lid}/notes`, b = {title: tr('New note'), client_ref: outKey()};  // 2.143.0 C (#2153): offline into the outbox (ntLocal draws it)
-  let r; try { r = await rawFetch('POST', url, b); } catch (e) { if (!(e instanceof Offline) || ntLocked(lid)) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; } r = null; }
+  let r = null;  // 2.536.0 (#4567): online too into the outbox (a temporary id, ntSent swaps it), a locked list straight
+  if (ntLocked(lid)) try { r = await rawFetch('POST', url, b); } catch (e) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; }
   if (!r) { r = enqueue('POST', url, b); S.nt.newId = r.id; go('note/' + r.id); setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 120); return; }
   S.nt.notes = [r, ...(S.nt.notes || [])]; S.notes = [{id: r.id, list_id: lid, title: r.title, tags: [], pinned: false, updated_at: r.updated_at}, ...(S.notes || [])];
   S.nt.newId = r.id; go('note/' + r.id);

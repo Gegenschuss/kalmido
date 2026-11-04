@@ -88,8 +88,10 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   const ps = new w.Event('pageshow'); Object.defineProperty(ps, 'persisted', {value: true}); w.dispatchEvent(ps);
   check(await until(() => w.eval(`S.nt.notes.find(n => n.id === ${N1.id})?.updated_at`) === srv.updated_at),
     '#3387: back from the cache the note has the server\'s base ' + w.eval(`S.nt.notes.find(n => n.id === ${N1.id})?.updated_at`));
-  const r = await w.eval(`(() => { const n = S.nt.notes.find(x => x.id === ${N1.id}); return ntWrite(n, {body: 'Next key press', expect_updated_at: n.updated_at}).then(x => x.body || x.queued, e => 'err ' + e.status); })()`);
-  check(r === 'Next key press', '#3387: the next change is no conflict ' + r);
+  // 2.536.0 (#4567): a note's change goes through the queue online too: sent in the background, no conflict
+  await w.eval(`(() => { const n = S.nt.notes.find(x => x.id === ${N1.id}); return ntWrite(n, {body: 'Next key press', expect_updated_at: n.updated_at}); })()`);
+  const r = await until(async () => w.eval('OUT.q.length') === 0 && (await call('GET', `/api/notes/${N1.id}`)).body === 'Next key press');
+  check(r && !w.eval("(S.conflicts || []).some(c => c.field === 'rejected')") && !w.document.querySelector('.modal.cdlg'), '#3387: the next change is no conflict');
   w.close();
 
   // ================= #2356: the switch in the share dialog of a page

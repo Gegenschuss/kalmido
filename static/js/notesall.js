@@ -140,7 +140,7 @@ function qn_create() {
   const sent = d.text, url = `/api/lists/${d.list_id}/notes`, body = {title: qn_titleOf(sent), body: sent, client_ref: outKey()};
   S.nt.creating = (async () => {
     let r = null;
-    try { r = await rawFetch('POST', url, body); } catch (e) { if (!(e instanceof Offline) || ntLocked(d.list_id)) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; } }
+    if (ntLocked(d.list_id)) try { r = await rawFetch('POST', url, body); } catch (e) { toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); return; }  // 2.536.0 (#4567): else the outbox, online too
     if (S.nt.lid === d.list_id && !S.nt.notes) S.nt.notes = [];
     if (!r) r = enqueue('POST', url, body);  // offline: the outbox (ntLocal draws it)
     else {
@@ -154,7 +154,7 @@ function qn_create() {
     const n = (S.nt.notes || []).find(x => x.id === r.id) || r;
     if (!d.text.trim()) qn_purge(n);
     else if (d.text !== sent) { if (on) { S.nt.dirty = true; noteFlush(); } else ntWrite(n, {body: d.text, title: qn_titleOf(d.text)}).catch(() => {}); }
-    else if (on) { const s = $('#nt-saved'); if (s) s.textContent = r.queued || r.id < 0 ? tr('You are offline: the note is saved as soon as the server is reachable') : tr('Saved'); }
+    else if (on) { const s = $('#nt-saved'); if (s) s.textContent = (r.queued || r.id < 0) && !OUT.online ? tr('You are offline: the note is saved as soon as the server is reachable') : tr('Saved'); }
     if (!on && S.route.mod === 'notes') renderView();  // left already: the list shows it
   })().finally(() => { S.nt.creating = null; });
 }

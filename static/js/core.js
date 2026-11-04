@@ -857,7 +857,8 @@ async function outFlush() {
   netDotDraw();  // 2.31.0 (#378): yellow while the changes go out
   const fix = v => (typeof v === 'number' && v < 0 && idmap[v]) ? idmap[v] : v;
   const idmap = LS.get('idmap', {});
-  let dropped = 0, wdropped = 0, skipped = 0, sent = 0;
+  let dropped = 0, wdropped = 0, skipped = 0, sent = 0, sentNt = 0;
+  const ntU = u => typeof NT_URL === 'object' && NT_URL.test(u);  // 2.536.0 (#4567): a note's address (chat.js, not on every page)
   try {
     while (outSync().length) {
       const e = OUT.q[0];
@@ -883,6 +884,7 @@ async function outFlush() {
       try {
         const j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
         sent++; OUT.tries = 0; OUT.retryAt = 0;
+        if (ntU(e.url)) sentNt++;  // 2.536.0 (#4567): a note's change (they go out online too now)
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
         if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
@@ -914,7 +916,8 @@ async function outFlush() {
           setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; continue;
         }
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
-        if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
+        if (typeof ntReject === 'function' && ntU(e.url) && ntReject(e, err)) { /* 2.536.0 (#4567): 409 = the note's own dialog (chat.js) */ }
+        else if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
         e.res = null;
       }
@@ -926,12 +929,14 @@ async function outFlush() {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
-    if (sent && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();
+    if (sent && sent > sentNt && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself
     if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
     else if (wdropped) setTimeout(() => toast(trn('{0} offline change of a knowledge page not applied (page deleted or no right)', '{0} offline changes of knowledge pages not applied (page deleted or no right)', wdropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
   }
-  await load(); render();
+  // 2.536.0 (#4567): only notes went out (every few seconds while typing): no whole new state, the notes are drawn already
+  if (!(sent && sent === sentNt && !dropped && !wdropped)) await load();
+  render();
   if (typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline (attachments.js)
 }
 window.addEventListener('online', () => { OUT.retryAt = 0; flush(); });
