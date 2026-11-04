@@ -6,6 +6,8 @@ the clean-up of the list. Invented names only, addresses @example.com.
  default: deleted again, the choice is in the log
  keep_purged: everything stays, leaves the list (a later restore with the default keeps it), the choice is in the log, a note in the result
  off-site: an older backup on the target holds the list back; a target without a readable list: nothing goes
+ 2.538.0 (#4367): a removed / replaced target's backups stay "formerly off-site" and hold the list back too; on without an
+   upload = upload_pending (the backup page's hint); the keep note says accounts excepted
 usage: p2505_restore_purged_test.py <datadir>
 freelancer-matrix: admin (the restore is the instance's; the entries are those of a person without an organisation)"""
 import json
@@ -101,6 +103,8 @@ check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T_OLD,))), "keep: the entry de
 check(not sql("SELECT 1 FROM purged_rows WHERE tbl='tasks' AND ref_id IN (?,?)", (T_OLD, T_REC)), "keep: what came back left the list")
 check("3 kept (choice: keep everything)" in log(), "keep: the choice is in the log")
 check(any("trash" in n for n in j.get("notes") or []), f"keep: the note about the trash period {j.get('notes')}")
+# 2.538.0 (#4367): the accounts are no part of the choice (they are deleted again): the note says so
+check(any("accounts excepted" in n for n in j.get("notes") or []), f"keep: the note says accounts excepted {j.get('notes')}")
 restore(BK)
 A = sess("alice")
 check(bool(sql("SELECT 1 FROM tasks WHERE id=?", (T_OLD,))), "keep: a later restore with the default leaves it alone")
@@ -131,10 +135,33 @@ setting("bko_remote", None)
 setting("bko_conf", json.dumps({"on": True, "type": "s3"}))
 check("cut None" in py(CUT), "off-site: a target switched on without a list: nothing goes")
 setting("bko_conf", None)
+check("cut None" not in py(CUT) and "cut 2020" not in py(CUT), "no off-site target ever: the local rule")
+# 2.538.0 (#4367): removing the target keeps its backups' names as "formerly off-site" (they still lie there and can be
+# restored): the journal is not cut past them (was: the local rule at once, 2.505.0 review)
+OFF = B + "/api/admin/backups/offsite"
+DAV = {"url": "https://dav.example.com/backups", "user": "kbk", "password": "dav-secret-1"}
+check(A.patch(OFF, json={"type": "webdav", "webdav": DAV, "password": PW}).ok, "off-site: a target set up")
+check(A.get(OFF).json().get("upload_pending") is False, "off-site: off = no hint about a missing upload")
+setting("bko_conf", json.dumps({**json.loads(sql("SELECT value FROM settings WHERE key='bko_conf'")[0][0]), "on": True}))
+check(A.get(OFF).json().get("upload_pending") is True, "off-site: on without an upload = the backup page's hint")
 setting("bko_remote", json.dumps(["kalmido-backup-20200102-033000-auto.zip.enc"]))
-r = A.patch(B + "/api/admin/backups/offsite", json={"remove": True})
+check(A.get(OFF).json().get("upload_pending") is False, "off-site: after an upload no hint")
+r = A.patch(OFF, json={"remove": True})
 check(r.ok, f"off-site: remove the target {r.status_code} {r.text[:160]}")
 out = py(CUT)
-check("cut None" not in out and "cut 2020" not in out, "no off-site target: the local rule " + out[-200:])
+check("cut 2020-01-02" in out, "off-site removed: its backups still hold the journal back " + out[-200:])
+check("kalmido-backup-20200102-033000-auto.zip.enc" in (sql("SELECT value FROM settings WHERE key='bko_former'") or [[""]])[0][0],
+      "off-site removed: the names kept as formerly off-site")
+# another address of the target: the backups at the old one stay formerly off-site as well
+setting("bko_former", None)
+check(A.patch(OFF, json={"type": "webdav", "webdav": DAV, "password": PW}).ok, "off-site: a target again")
+setting("bko_remote", json.dumps(["kalmido-backup-20200304-033000-auto.zip.enc"]))
+check(A.patch(OFF, json={"webdav": {**DAV, "url": "https://dav2.example.com/backups"}, "password": PW}).ok, "off-site: another address")
+check(not sql("SELECT value FROM settings WHERE key='bko_remote' AND value<>''"), "another address: the list of the new target starts empty")
+check("cut 2020-03-04" in py(CUT), "another address: the old target's backups hold the journal back")
+check(A.patch(OFF, json={"keep": 5}).ok and "cut 2020-03-04" in py(CUT), "the count kept is no other target")
+setting("bko_former", "not json")
+check("cut None" in py(CUT), "an unreadable formerly-off-site list: nothing goes")
+setting("bko_former", None)
 print(f"p2505_restore_purged: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

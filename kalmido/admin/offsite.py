@@ -168,7 +168,44 @@ def bko_state(c):
             "last_ok": gsetting(c, "bko_last_ok"), "last_name": gsetting(c, "bko_last_name"),
             "last_size": int(gsetting(c, "bko_last_size") or 0), "last_error": gsetting(c, "bko_last_error"),
             "last_error_at": gsetting(c, "bko_last_error_at"),
-            "running": _BKO["running"] or ("queued" if bgj_pending(c, "offsite") else "")}  # 2.193.0 D (#2220): also queued / in the worker
+            "running": _BKO["running"] or ("queued" if bgj_pending(c, "offsite") else ""),  # 2.193.0 D (#2220): also queued / in the worker
+            # 2.538.0 (#4367): on, but no backup has reached this target yet: until one has, the journal of deleted accounts
+            # is not cleaned up (dataretention.lgc_journal_cut) -- the backup page says so
+            "upload_pending": bool(conf["on"] and conf["type"] and not gsetting(c, "bko_remote"))}
+
+
+def _where(conf):
+    """2.538.0 (#4367): where the backups lie (type + address + bucket / folder), None without a target: another place =
+    the backups at the old one are no longer this server's to rotate (bko_retire)."""
+    t = conf["type"]
+    if not t:
+        return None
+    x = conf[t]
+    if t == "s3":
+        return t, x.get("endpoint") or "", x.get("bucket") or "", x.get("prefix") or "", x.get("path_style", True) is not False
+    if t == "webdav":
+        return t, x.get("url") or ""
+    return t, x.get("host") or "", x.get("port") or 22, x.get("path") or ""
+
+
+def bko_retire(c):
+    """2.538.0 (#4367): the target goes (removed, or another type / address): the names of the backups kept there move to
+    bko_former ("formerly off-site"). The old target still holds them and nothing here deletes them any more, so a restore
+    of one can still bring back what was deleted since: the journal of deleted accounts counts them (lgc_journal_cut) and
+    is not cut too early. An unreadable bko_former stays as it is (the journal then keeps everything)."""
+    try:
+        names = json.loads(gsetting(c, "bko_remote") or "[]")
+    except ValueError:
+        names = []
+    try:
+        old = json.loads(gsetting(c, "bko_former") or "[]")
+    except ValueError:
+        old = None
+    if isinstance(old, list) and isinstance(names, list):
+        keep = sorted({n for n in (*old, *names) if isinstance(n, str)})
+        if keep:
+            gset(c, "bko_former", json.dumps(keep))
+    gset(c, "bko_remote", "")
 
 
 # ---- validation of the form
@@ -790,9 +827,10 @@ def offsite_set():
         if e is not None:
             return e
     conf, sec = bko_conf(c), bko_secrets(c)
+    was_target = _where(conf)  # 2.538.0 (#4367)
     if b.get("remove") is True:  # "Remove target": the addresses, the sealed credentials and the SFTP key pair go
         _save(c, {}, {})
-        gset(c, "bko_remote", "")  # 2.505.0 (#4302, review): its old backups no longer hold back the clean-up of the purge list
+        bko_retire(c)  # 2.538.0 (#4367): its backups stay "formerly off-site" (was: forgotten, 2.505.0 #4302 review)
         c.commit()
         _BKO.update({"for": "", "tries": 0, "next": 0.0})
         return jsonify(bko_state(c))
@@ -859,6 +897,8 @@ def offsite_set():
         if not conf["type"] or bko_missing(conf, sec):
             c.rollback()
             return err(tr("Fill in the target completely and test the connection first ({0}).", ", ".join(bko_missing(conf, sec))))
+    if was_target and was_target != _where(conf):
+        bko_retire(c)  # 2.538.0 (#4367): another target: the backups at the old one stay "formerly off-site"
     _save(c, conf, sec)
     c.commit()
     return jsonify(bko_state(c))

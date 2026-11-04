@@ -88,7 +88,8 @@ def lgc_journal_cut(now, c=None):
     folder (the rotation keeps the newest backup per day / week "that has one", so a rare backup can be older; safety
     backups count too). None = the folder cannot be read: nothing goes.
     2.505.0 (#4302): the off-site backups count the same (bko_remote, the names kept there after the last upload): an older one
-    must not bring back what was deleted without it going again. An off-site target without a readable list: nothing goes."""
+    must not bring back what was deleted without it going again. An off-site target without a readable list: nothing goes.
+    2.538.0 (#4367): + the names of a target that was removed or replaced (bko_former)."""
     cut = now - timedelta(weeks=BK_KEEP_WEEKLY_CAP)
     try:
         names = os.listdir(BK_DIR)
@@ -105,9 +106,14 @@ def lgc_journal_cut(now, c=None):
             conf = json.loads(gsetting(c, "bko_conf") or "{}")
             if not isinstance(remote, list) or (not raw and isinstance(conf, dict) and conf.get("on") is True):
                 return None
+            # 2.538.0 (#4367): the backups of a removed / replaced target ("formerly off-site", offsite.bko_retire) still
+            # lie there and can be restored: they count as well
+            former = json.loads(gsetting(c, "bko_former") or "[]")
+            if not isinstance(former, list):
+                return None
         except ValueError:
             return None
-        names = [*names, *(n for n in remote if isinstance(n, str))]
+        names = [*names, *(n for n in (*remote, *former) if isinstance(n, str))]
     for n in names:
         p = bk_parse_name(n)
         if p and p["at"] < cut:

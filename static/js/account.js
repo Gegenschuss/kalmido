@@ -1089,6 +1089,8 @@ async function bkoDraw(md, j) {
     const st = j.running ? tr('Uploading…') : j.last_ok ? tr('Last upload: {0}, {1}.', esc(aaWhen(j.last_ok)), fmtBytes(j.last_size)) : tr('No upload yet.');
     h += hint(st);
     if (j.last_error) h += `<div class="shint cnote bkoerr">${tr('The last upload failed ({0}): {1}', esc(aaWhen(j.last_error_at)), esc(j.last_error))}</div>`;
+    // 2.538.0 (#4367): on, but nothing reached this target yet: the journal of deleted accounts waits for it
+    if (j.upload_pending && !j.running) h += `<div class="shint cnote bkopend">${tr('The upload is on, but no backup has reached this target yet. Until one has, the journal of deleted accounts is not cleaned up: press “Upload now” or check the target.')}</div>`;
   }
   box.innerHTML = h;
   if (j.running && !box._poll) box._poll = setTimeout(async () => { box._poll = null; if (md.isConnected) await bkoDraw(md); }, 2000);

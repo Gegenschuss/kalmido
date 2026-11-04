@@ -1723,7 +1723,7 @@ def bkr_creds_after(c, creds):
 
 
 BKR_RECENT_DAYS = 7
-BK_KEPT_NOTE = N_("You kept what the backup holds. What lay in a trash in the backup is deleted again when its trash period is over: take it out of the trash now if it is to stay.")  # 2.505.0 (#4302)
+BK_KEPT_NOTE = N_("You kept what the backup holds, accounts excepted: accounts deleted since the backup was written are deleted again. What lay in a trash in the backup is deleted again when its trash period is over: take it out of the trash now if it is to stay.")  # 2.505.0 (#4302); 2.538.0 (#4367): the accounts are no part of the choice
 
 
 # ---- 2.360.4 (#3243): organisations and entries deleted for good after the backup was written stay deleted: by the list
