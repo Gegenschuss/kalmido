@@ -7,6 +7,7 @@ freelancer-matrix: office
  - #2841 a payment reversal is dated on the payment's day (December payment taken back later: the year's VAT stays right),
    an older reversal line dated on the correction day counts on the payment's day in the books and the key figures;
    when a DATEV export already covers the payment's day the reversal is dated today (in the next export, review F2)
+ - 2.523.0 (#4082) such a late reversal of a payment made within the cash discount period leaves the invoice open again
  - #2844 VAT note eu_goods: the client in another EU state with its VAT id (else 400), category K + deliver-to country in the
    XML, field 41; export: a client outside the EU, category G, field 43; reverse charge at home = field 60 / DATEV 8337,
    2.502.0 (#4081) reverse charge to a third country refused, an older one in field 45 / DATEV 8338,
@@ -16,6 +17,7 @@ usage: p2355_c_buero_test.py <datadir>"""
 import os
 import subprocess
 import sys
+from decimal import Decimal
 
 import requests
 
@@ -99,6 +101,29 @@ def extf(s, frm, to):
 
 g = lambda row, k: row.get('"' + k + '"', row.get(k, "")).strip('"')  # noqa: E731
 
+def skonto_late_reversal(s, cl, label):
+    """2.523.0 (#4082): a payment made within the cash discount period, taken back after a DATEV export (the reversal line is
+    dated today, past the period), no longer keeps the invoice 'paid': the reversal counts on the payment's day (BK_PAY_DAY).
+    Invoice 1190 with 2 % in 10 days (pay 1166.20 by 12.02.): 100.00 + 1066.20 in time = paid, 1066.20 reversed -> 1090.00 open."""
+    did = draft(s, cl, extra={"skonto_pct": 2, "skonto_days": 10, "payment_days": 14})
+    final(s, did, "2026-02-02")
+    oid = dbx("SELECT org_id FROM office_docs WHERE id=?", (did,))[0][0]  # the organisation or the personal office
+    check(s.post(B + f"{D}/{did}/payments", json={"date": "2026-02-03", "amount": "100.00"}).ok, f"{label} #4082: first payment in time")
+    r = s.post(B + f"{D}/{did}/payments", json={"date": "2026-02-05", "amount": "1066.20"})
+    check(r.ok and s.get(B + f"{D}/{did}").json()["status"] == "paid", f"{label} #4082: paid in time less 2 % = paid " + r.text[:200])
+    pa = [p for p in s.get(B + f"{D}/{did}/payments").json()["payments"] if Decimal(p["amount"]) == Decimal("1066.20")][0]["id"]
+    extf(s, "2026-02-01", "2026-02-28")
+    check(any("2026-02-28" in (x[0] or "") for x in dbx("SELECT detail FROM office_doc_log WHERE org_id=? AND action='export' AND target='datev'", (oid,))),
+          f"{label} #4082: the February export is in the office log")
+    r = s.delete(B + f"{D}/{did}/payments/{pa}", json={"note": "returned by the bank"})
+    rv = [p for p in s.get(B + f"{D}/{did}/payments").json()["payments"] if p.get("reverses_id") == pa]
+    check(r.ok and len(rv) == 1 and rv[0]["date"] > "2026-02-12", f"{label} #4082: the reversal is dated after the discount period {rv}")
+    doc = s.get(B + f"{D}/{did}").json()
+    check(doc["status"] != "paid", f"{label} #4082: a late reversal of the payment in time leaves the invoice open (was 'paid') {doc['status']}")
+    pm = s.get(B + f"{D}/{did}/payments").json()
+    check(Decimal(str(pm.get("open"))) == Decimal("1090.00"), f"{label} #4082: 1090.00 open again {pm.get('open')}")
+
+
 office(A)
 C_DE = client(A, "Beispielkunde AG", "DE")
 C_AT = client(A, "Example GmbH", "AT", "ATU99999999")
@@ -162,6 +187,7 @@ check(r.ok and len(rx) == 1 and rx[0]["date"] >= "2026-01-01" and "2025-12-28" i
 check(ustva(A, "m12", 2025)["kz"]["81"] == "0", "#2841 (review F2): the VAT of December is right again all the same")
 rows = extf(A, rx[0]["date"], rx[0]["date"]) if rx else []
 check(any(g(x, "Umsatz (ohne Soll/Haben-Kz)") == "595,00" for x in rows), f"#2841 (review F2): the reversal is in the next DATEV export {rows[:3]}")
+skonto_late_reversal(A, C_DE, "org")
 
 # ---------------------------------------------------------------- #2844 goods to the EU (K), export (G), reverse charge at home
 A.put(B + O + "/settings", json={"vat_basis": "soll"})
@@ -251,6 +277,8 @@ F2 = draft(Fr, F_AT, extra={"skonto_pct": 3, "skonto_days": 20, "payment_days": 
 r = Fr.post(B + f"{D}/{F2}/finalize")
 check(r.status_code == 400 and "cash discount period" in r.text, "freelancer: the discount period check " + r.text[:200])
 check(Fr.get(B + f"{D}/{E3}").status_code in (403, 404), "freelancer: no document of the organisation")
+F_DE = client(Fr, "Beispielkunde AG", "DE")
+skonto_late_reversal(Fr, F_DE, "freelancer")
 
 print(f"p2355_c_buero: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
