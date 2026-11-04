@@ -27,13 +27,13 @@ ORG_COLS = ("org_id", "list_id")
 FRAME = ("users",)
 # 2.510.0 (#4286, audit #2427): a column of an OX_AREAS table named like a secret stays out of the export (OX_SECRET_COLS: _clean
 # drops it) or stands here with the reason why it may go along
-SECRET_NAME = re.compile(r"secret|token|hash|passw|key", re.I)
+SECRET_NAME = re.compile(r"secret|token|hash|passw|key|otp|salt|cred|seal|p256dh|endpoint|(^|_)auth(_|$)", re.I)
 SECRET_OK = {
     "bookmarks.url_key": "the normalized address, for finding doubles",
     "list_notepads.agent_key": "the name of an agent's block ('status')",
     "lists.ticket_key": "the prefix of the ticket numbers",
-    "nl_consent_log.email_hash": "keyed hash of the address: the proof of the consent moves with the list",
-    "nl_suppress.email_hash": "keyed hash of the address: who unsubscribed stays unsubscribed after a move",
+    "nl_consent_log.email_hash": "plain hash of an address the organisation holds itself: the proof of the consent moves with the list",
+    "nl_suppress.email_hash": "plain hash of an address the organisation holds itself: who unsubscribed stays unsubscribed after a move",
     "office_bank_rule_nos.key": "the name of a rule's entry",
     "office_bank_tx.rkeys": "the matching keys of a bank line",
     "office_bank_tx.key_org": "the organisation the matching key belongs to",
@@ -42,7 +42,7 @@ SECRET_OK = {
     "office_gen_docs.body_hash": "fingerprint of the document's text",
     "office_signoffs.doc_hash": "fingerprint of the document that was signed off (the proof)",
     "office_texts.key": "the name of a text block",
-    "portal_tickets.email_hash": "keyed hash of the address, for the sign-in lookup (the token columns stay out)",
+    "portal_tickets.email_hash": "taken out by _ox_dec_row (the token columns by OX_SECRET_COLS)",
     "sched_poll_votes.edit_hash": "kept empty by _ox_dec_row (a voter's edit key never leaves)",
     "sched_poll_votes.ip_hash": "kept empty by _ox_dec_row",
 }

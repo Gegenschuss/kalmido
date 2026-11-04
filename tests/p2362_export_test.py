@@ -304,11 +304,12 @@ out = {"bad": [], "seen": 0, "foreign": 0}
 with _pg.system_ctx(c):
     ours = {r[0] for r in c.execute("SELECT id FROM lists WHERE org_id=?", (org,))}
     for name, table, where in (*OX_AREAS, ("control", "tasks", "1=1")):  # the control: every task, so the check has something to find
-        rows = c.execute(f"SELECT * FROM {table} WHERE ({where})", (org,) * where.count("?")).fetchall()
+        rows = c.execute(f"SELECT * FROM {table} WHERE ({where})", (org,) * where.count("?")).fetchall()  # (every ? of OX_AREAS is the organisation)
         for r in rows:
             d = dict(r)
             out["seen"] += 1
-            if d.get("org_id") not in (None, org) or (d.get("list_id") is not None and table != "lists" and d["list_id"] not in ours):
+            # (a table with an org_id: no row without one either, that is someone's private data)
+            if ("org_id" in d and d["org_id"] != org) or (d.get("list_id") is not None and table != "lists" and d["list_id"] not in ours):
                 out["bad"].append([name, d.get("id"), d.get("org_id"), d.get("list_id")])
     out["foreign"] = c.execute("SELECT COUNT(*) FROM lists WHERE org_id IS DISTINCT FROM ?", (org,)).fetchone()[0]
 print(json.dumps(out))

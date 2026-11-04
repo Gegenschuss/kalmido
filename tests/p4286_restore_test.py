@@ -442,8 +442,8 @@ print("   info: policies / triggers on the half server:", kt.dbx("SELECT COUNT(*
       kt.dbx("SELECT COUNT(DISTINCT trigger_name) FROM information_schema.triggers WHERE trigger_schema='public'")[0][0], flush=True)
 for what, rr in (("the state", A.get(B + "/api/state")), ("a sign-in", sess().post(B + "/api/auth/login", json={"username": "alice", "password": PASSWORD})),
                  ("another restore", restore(A, name=GOOD))):
-    check(rr.status_code == 503 and "kalmido-backup-" in rr.json().get("error", "") and "Restart" in rr.json().get("error", ""),
-          f"4 way back fails: {what}: closed, the message says what to do {rr.status_code} {rr.text[:240]}")
+    check(rr.status_code == 503 and "restart" in rr.json().get("error", "") and "kalmido-backup-" not in rr.json().get("error", ""),
+          f"4 way back fails: {what}: closed, says what to do, the name of the safety backup only to the one who restored {rr.status_code} {rr.text[:240]}")
 try:  # the defect is still in the database: the start cannot complete it and must not come up as half a server
     start(K1, keep=True, wait="25")
     check(False, "4 way back fails: a start on the defect does not come up")
@@ -487,5 +487,44 @@ r = restore(A, name=GOOD)
 check(r.ok, f"4 hard stop: the next restore goes through {r.status_code} {r.text[:240]}")
 check(not [x for x in leftovers() if x.startswith(("attachments.", "office."))], f"4 hard stop: ... and clears the folders of before {leftovers()}")
 same(snap(people()), GOOD_SEEN, "4 hard stop: ... with the content of its backup")
+
+# ---- review of 2.510: the keys _pg_restore takes away: a key the backup does not know (added since), a hard stop before pg_restore
+NEWFK = "ALTER TABLE list_tags ADD CONSTRAINT p4286_new_fk FOREIGN KEY (list_id) REFERENCES lists(id)"
+hasfk = lambda: bool(kt.dbx("SELECT 1 FROM pg_constraint WHERE conname='p4286_new_fk'"))
+NOTE = os.path.join(BK, ".dropped-fks.json")
+psql("-c", NEWFK)
+A = sess("alice")
+r = restore(A, name=GOOD)
+check(r.ok and hasfk() and not os.path.exists(NOTE), f"4 keys: a restore through: the key the backup does not know is there again, no list left {r.status_code} {hasfk()}")
+STOP = """
+import os, subprocess, sys
+from kalmido.admin import backup as bk
+real = subprocess.run
+bk.subprocess.run = lambda a, *k, **kw: os._exit(9) if a[0] == "pg_restore" else real(a, *k, **kw)
+bk.bk_restore(os.path.join(bk.BK_DIR, sys.argv[1]), "", "alice", "session")
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", STOP, GOOD], capture_output=True, text=True, timeout=300)
+check(r.returncode == 9 and not hasfk() and os.path.exists(NOTE), f"4 keys: a hard stop just before pg_restore: the key is gone, the list knows it {r.returncode} {hasfk()} {r.stderr[-300:]}")
+start(K1, keep=True)
+check(hasfk() and not os.path.exists(NOTE), f"4 keys: the next start brings it back {hasfk()}")
+psql("-c", "ALTER TABLE list_tags DROP CONSTRAINT p4286_new_fk")
+
+# ---- review of 2.510: a helper imports the package beside a running restore or check: it leaves their work folders alone
+MK = """
+import os, time
+from kalmido.admin.backup import BK_DIR
+for n in (".restore-p4286", ".verify-young", ".verify-old"):
+    os.makedirs(os.path.join(BK_DIR, n), exist_ok=True)
+os.utime(os.path.join(BK_DIR, ".verify-old"), (time.time() - 172800, time.time() - 172800))
+"""
+subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c", MK], check=True, timeout=120)
+r = subprocess.run(["docker", "exec", CT, "python", "-c", "import app"], capture_output=True, text=True, timeout=120)
+check(r.returncode == 0 and {".restore-p4286", ".verify-young", ".verify-old"} <= set(os.listdir(BK)), f"4 start clean: a helper removes no work folder {sorted(os.listdir(BK))[:12]} {r.stderr[-200:]}")
+r = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-e", "KALMIDO_ROLE=web", CT, "python", "-c", "from kalmido.admin import backup; backup.bk_start_clean()"], capture_output=True, text=True, timeout=120)
+left = set(os.listdir(BK))
+check(r.returncode == 0 and ".verify-young" in left and ".verify-old" not in left and ".restore-p4286" not in left,
+      f"4 start clean: with several processes a young check stays, an old one and a restore's folder go {sorted(left)[:12]} {r.stderr[-200:]}")
+start(K1, keep=True)
+check(".verify-young" not in set(os.listdir(BK)), "4 start clean: a server alone removes every work folder")
 
 sys.exit(kt.done("p4286_restore"))

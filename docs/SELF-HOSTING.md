@@ -563,7 +563,8 @@ docker compose up -d kalmido
   mount): such a restore is refused before anything changes, mount the data folder as a whole. While a restore runs,
   the background queue and the pushes after a request wait; the off-site upload does not. When a restore fails and its way
   back fails too, the message names the safety backup and the server stays closed (every request answers 503, `/api/health`
-  too) until you restart it: the start completes the database (2.510). A start that cannot do so stops with the reason in the log.
+  too) until you restart it: the start completes the database and brings back the foreign keys the restore took away (2.510).
+  A start that cannot do so stops with the reason in the log.
   2.359.2: also the own industry packs of the server (`packs/industry/` in the data folder, counted as `pack_files` in
   the manifest); a restore writes them back, keeps packs added since and moves a pack it replaces with other content to
   `packs/industry.pre-restore-…`. Not in a backup: the server key (`secret/`, see below), the backup folder itself, the
