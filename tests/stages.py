@@ -491,7 +491,9 @@ def i18n_changed_texts(base, head, rel, root):
     old, new = rows(d[0]), rows(d[1])
     texts = [v for k, v in old.items() if new.get(k) != v] + [v for k, v in new.items() if k in old and old[k] != v]
     texts += [k for k in old if k not in new]
-    return [t for t in dict.fromkeys(texts) if isinstance(t, str) and len(t) >= 4]
+    # 2.521.0 (#4479): a plural text is a list of forms (trn): its forms count one by one; a list is no dict key
+    texts = [x for t in texts for x in (t if isinstance(t, list) else [t])]
+    return [t for t in dict.fromkeys(x for x in texts if isinstance(x, str)) if len(t) >= 4]
 
 
 def touched_fixed(repo, p, why, base=None, head=None):

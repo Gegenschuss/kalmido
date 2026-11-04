@@ -78,7 +78,8 @@ with tempfile.TemporaryDirectory() as tmp:
     open(os.path.join(tmp, "tests", "run_all.sh"), "w").write('eval "$LIST"\n')
     shutil.copy(os.path.join(N, "suites.py"), os.path.join(tmp, "tests", "suites.py"))
     de = os.path.join(tmp, "static", "i18n", "de.json")
-    src = {"Invoice": "Rechnung vierzehn", "Wide": "Breit gekannt", "Gone": "Weg damit", "Same": "Gleich"}
+    src = {"Invoice": "Rechnung vierzehn", "Wide": "Breit gekannt", "Gone": "Weg damit", "Same": "Gleich",
+           "{0} match": ["Eine passt alt", "{0} passen alt"]}  # 2.521.0 (#4479): a plural text is a list of forms
     wr = lambda o: open(de, "w", encoding="utf-8").write("{\n" + ",\n".join(f"  {json.dumps(k)}: {json.dumps(v, ensure_ascii=False)}" for k, v in o.items()) + "\n}\n")  # noqa: E731
     wr(src)
     open(os.path.join(tmp, "kalmido", "office", "quiet.py"), "w").write("def quiet_helper_name():\n    return 1\n")
@@ -93,12 +94,13 @@ with tempfile.TemporaryDirectory() as tmp:
     git(tmp, "init", "-q")
     git(tmp, "add", ".")
     git(tmp, "commit", "-qm", "base")
-    wr({**{k: v for k, v in src.items() if k != "Gone"}, "Invoice": "Rechnung fünfzehn", "Wide": "Breit bekannt"})
+    wr({**{k: v for k, v in src.items() if k != "Gone"}, "Invoice": "Rechnung fünfzehn", "Wide": "Breit bekannt", "{0} match": ["Eine passt neu", "{0} passen neu"]})
     git(tmp, "add", ".")
     git(tmp, "commit", "-qm", "change")
     r = stages.Repo(tmp, os.path.join(tmp, "tests", "run_all.sh"))
     t = stages.i18n_changed_texts("HEAD^", "HEAD", "static/i18n/de.json", tmp)
     check("Rechnung vierzehn" in t and "Rechnung fünfzehn" in t and "Gone" in t and "Gleich" not in t, f"the changed texts of a translation: {t}")
+    check("{0} passen alt" in t and "{0} passen neu" in t, f"2.521.0 (#4479): a changed plural text counts with its forms, no crash: {t}")
     fixed = stages.touched_fixed(r, "static/i18n/de.json", "translations changed (not only added)", "HEAD^", "HEAD")
     check("named_ui" in fixed and "Rechnung" in fixed["named_ui"], f"the suite that names the changed text comes along: {fixed}")
     check(not any(s.startswith("many") for s in fixed), "a text more than TOUCHED_HITS_BROAD suites name brings none of them")
