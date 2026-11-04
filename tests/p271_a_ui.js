@@ -6,7 +6,7 @@
 // Firefox 390 touch: the rule dialog fits the phone, Save >= 44 px, screenshot.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const firefox = require('./ff')({tag: 'p271_a_ui', check, shots: 'P271A_SHOTS'});
@@ -67,11 +67,13 @@ const FEAT = 'cal,comments,collab,agents';
   // delete = one undo step
   await w.eval(`(async () => { await rul_load(${W}); document.querySelector('#l-rules').innerHTML = rul_rowsHtml(${W}); })()`);
   await until(() => box()?.querySelector('[data-rul-del]'));
+  const h0 = w.eval('HIST.undo.length');
   click(w, box().querySelector('[data-rul-del]'));
   await until(async () => !((await call('GET', `/api/lists/${W}/rules`)).rules || []).length);
   check(!((await call('GET', `/api/lists/${W}/rules`)).rules || []).length, '#1457: deleted');
-  await w.eval(`histStep('undo')`); await sleep(500);
-  check(((await call('GET', `/api/lists/${W}/rules`)).rules || []).length === 1, '#1457: undo brings the rule back');
+  check(await histAdded(w, h0), '#1457: one undo step');  // 2.504.0 (#4085): recorded after the reload, the server is faster
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => ((await call('GET', `/api/lists/${W}/rules`)).rules || []).length === 1), '#1457: undo brings the rule back');
   // the history: a change made by the rule reads "Rule Review"
   const t = (await call('POST', '/api/tasks', {title: 'Draft', list_id: W}, CB)).id;
   await call('PATCH', `/api/tasks/${t}`, {section_id: REV}, CB);

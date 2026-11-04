@@ -7,7 +7,7 @@
 const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -102,19 +102,23 @@ const FEAT = 'collab,comments,clients,contacts';
   const am = await until(async () => d.querySelector('.modal.hbmadlg'), 5000);
   const pick = am && [...am.querySelectorAll('[data-hbmt]')].find(b => b.dataset.hbmt === `client:${ACME}`);
   check(pick, 'assign: Acme to pick');
+  const h1 = w.eval('HIST.undo.length');
   if (pick) click(w, pick);
   await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).client_id === ACME, 5000);
   check((await call('GET', `/api/hubmail/mails/${UN}`)).client_id === ACME, 'assign: filed with Acme');
   await until(async () => !d.querySelector('.hbmhub .hbmrow'), 5000);
   check(!d.querySelector('.hbmhub .hbmrow'), 'inbox: empty after assigning');
+  check(await histAdded(w, h1), 'assign: one undo step');  // 2.504.0 (#4085): recorded after the reload, the server is faster
   await w.eval(`histStep('undo')`);
   await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).client_id === null, 15000);  // 2.308.0 (#3259)
   check((await call('GET', `/api/hubmail/mails/${UN}`)).client_id === null, 'undo: back to Not assigned (one step)');
   await until(async () => d.querySelector('.hbmhub .hbmrow'), 5000);
   check(d.querySelectorAll('.hbmhub .hbmrow').length === 1, 'inbox: the mail is back');
+  const h2 = w.eval('HIST.undo.length');
   click(w, d.querySelector('.hbmhub [data-hbmdel]'));
   await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).status === 404, 5000);
   check((await call('GET', `/api/hubmail/mails/${UN}`)).status === 404, 'delete: gone');
+  check(await histAdded(w, h2), 'delete: one undo step');  // 2.504.0 (#4085)
   await w.eval(`histStep('undo')`);
   // 2.308.0 (#3259): wait for the restored mail instead of a fixed 800 ms
   await until(async () => (await call('GET', `/api/hubmail/mails/${UN}`)).subject === 'Unsorted note', 15000);

@@ -237,6 +237,10 @@ exports.until = async (fn, {timeout = 15000, step = 100} = {}) => {
 exports.untilEl = (w, sel, text = null, timeout = 15000) => { if (typeof text === 'number') [text, timeout] = [null, text];
   return exports.until(() => [...w.document.querySelectorAll(sel)]
   .find(e => text == null || (text instanceof RegExp ? text.test(e.textContent) : e.textContent.includes(text))) || null, {timeout}); };
+// 2.504.0 (#4085): the app records a history step only after the server's answer (often after a reload too), so a suite that sees the
+// change on the server and calls histStep at once finds no step yet and undoes nothing. n0 = HIST.undo.length before the action;
+// true once the new step is there and no other step is running (histStep drops a call while one runs).
+exports.histAdded = (w, n0, o) => exports.until(() => !w.eval('HIST.busy') && w.eval('HIST.undo.length') === n0 + 1, o);
 // idle(w): the page's requests are done -- none in flight for `quiet` ms (w.__net, counted by boot()'s fetch). For an action
 // that loads (openDetail, load().then(render), a dialog that fetches); not for debounced saves or timers of the page.
 // At least `quiet` ms (a request the action starts from a short timer is still seen); at most timeout ms (then it goes on).

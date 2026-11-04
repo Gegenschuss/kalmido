@@ -8,7 +8,7 @@
 // - Data > Import links the consent import of the newsletter
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -50,8 +50,10 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   // a level: saved at once, one undo step
   const sel = d.querySelector('#s-dcs [data-dcl]'), f = sel.dataset.dcl, from = s0.levels[f];
   const to = [...sel.options].map(o => o.value).find(v => v !== from);
+  const h1 = w.eval('HIST.undo.length');
   sel.value = to; change(w, sel);
   check(await until(async () => (await call('GET', '/api/docs/settings?ws=private')).levels[f] === to), `the level of ${f} is saved at once (${from} -> ${to})`);
+  check(await histAdded(w, h1), 'the level is one undo step');  // 2.504.0 (#4085): recorded after the answer, the server is faster
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/docs/settings?ws=private')).levels[f] === from), 'undo: the old level');
   check(await until(() => d.querySelector(`#s-dcs [data-dcl="${f}"]`)?.value === from), 'undo: the pane shows the old level');
@@ -75,8 +77,10 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   check(box && shown(d, 'integr') && /Documents: inboxes/.test(d.querySelector('#s-scan-h')?.textContent || ''), 'Integrations: the block "Documents: inboxes"');
   check(box && /Folder watcher/.test(box.textContent), '… with the folder watcher');
   const ib = d.querySelector('#s-scan [data-dsc="inbox"]'), was = !!s0.inbox;
+  const h2 = w.eval('HIST.undo.length');
   ib.checked = !was; change(w, ib);
   check(await until(async () => !!(await call('GET', '/api/docs/settings?ws=private')).inbox === !was), 'the file store folder switch saves at once');
+  check(await histAdded(w, h2), 'the switch is one undo step');  // 2.504.0 (#4085)
   await w.eval(`histStep('undo')`);
   check(await until(async () => !!(await call('GET', '/api/docs/settings?ws=private')).inbox === was), 'undo: the switch as before');
   if (s0.mail?.enabled) {

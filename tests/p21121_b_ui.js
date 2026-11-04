@@ -5,7 +5,7 @@
 // - the organisation's switch in Settings > Workspaces (its admin): off and back on with undo
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -89,8 +89,10 @@ const upload = async (ck, name, text, form) => {
   })()`);
   check(on === true, 'the organisation switch is on by default');
   const cb = d.querySelector(`#xl-o${ORG}`);
+  const h0 = w.eval('HIST.undo.length');
   if (cb) { cb.checked = false; cb.dispatchEvent(new w.Event('change', {bubbles: true})); }
   check(await until(async () => (await call('GET', '/api/orgs')).orgs.find(o => o.id === ORG)?.ext_links === false, 60), 'switched off');
+  check(await histAdded(w, h0), 'the switch is one undo step');  // 2.504.0 (#4085): recorded after the answer, the server is faster
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/orgs')).orgs.find(o => o.id === ORG)?.ext_links === true, 60), 'Undo switches it on again');
   w.close();

@@ -7,7 +7,7 @@
 // reads "via webhook".
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, histAdded} = require('./boot');
 const {idle} = require('./boot');  // 2.192.0 B (#2513): idle(w) = the page's requests done, instead of fixed sleeps
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
@@ -72,13 +72,15 @@ const FEAT = 'cal,comments,collab,events,files,time';
   click(w, [...d.querySelectorAll('.menu-list [role="menuitem"]')].find(b => /Delete/.test(b.textContent)));
   await until(() => d.querySelector('.cdlg [data-cd="yes"]'));
   check(/Delete the inbound webhook/.test(d.querySelector('.cdlg')?.textContent || ''), '#2061: delete asks first');
+  const h0 = w.eval('HIST.undo.length');
   click(w, d.querySelector('.cdlg [data-cd="yes"]'));
   await until(async () => !((await call('GET', `/api/lists/${W}/hooks-in`)).hooks || []).length);
   check(!((await call('GET', `/api/lists/${W}/hooks-in`)).hooks || []).length, '#2061: deleted');
   const p2 = await fetch(B + 'api/hooks/in/' + tok, {method: 'POST', headers: {'Content-Type': 'text/plain'}, body: 'after delete'});
   check(p2.status === 404, '#2061: a deleted URL answers 404');
-  await w.eval(`histStep('undo')`); await sleep(600);
-  check(((await call('GET', `/api/lists/${W}/hooks-in`)).hooks || []).length === 1, '#2061: undo brings it back');
+  check(await histAdded(w, h0), '#2061: one undo step');  // 2.504.0 (#4085): recorded after the reload, the server is faster
+  await w.eval(`histStep('undo')`);
+  check(await until(async () => ((await call('GET', `/api/lists/${W}/hooks-in`)).hooks || []).length === 1), '#2061: undo brings it back');
   d.querySelector('.modal')?.remove();
   // the basket has no section
   const inbox = w.eval(`S.lists.find(l => l.is_inbox).id`);

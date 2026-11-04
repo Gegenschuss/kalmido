@@ -38,7 +38,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const flip = k => `(() => { const el = document.querySelector('#ofc-set [data-feat="${k}"]'); el.click(); return 1; })()`;
 
-  await firefox(async ({cmd, ev, ctx, nav, shot}) => {
+  await firefox(async ({cmd, ev, ctx, nav, shot, idle}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
@@ -59,7 +59,9 @@ const FEAT = 'cal,comments,collab,office,clients';
     const s1 = await srv(CA, j => (j.settings?.features_off || []).includes('books.datev'));
     check(!!s1 && s1.features['books.datev'] === false, '#2460: the switch saves itself');
     check(await ready(ev, `!!document.querySelector('#ocf-books-datev')?.closest('.row')?.querySelector('.ostok.on')`), '#2460: "Saved" at the switch');
-    check(await ev(`HIST.undo.length === 1`), '#2460: one undo step');
+    // 2.504.0 (#4085): the state, with what is really there: counted once the page's requests are done (a second step comes after its own answer)
+    await idle({quiet: 300});
+    check(await ev(`HIST.undo.length`) === 1, '#2460: one undo step: ' + await ev(`HIST.undo.map(e => e.label).join(' | ')`));
     check(s1?.settings?.datev_email === 'inbox@example.com', '#2460: the DATEV address stays saved');
     check(await ready(ev, `!document.getElementById('os-datev') && !document.querySelector('#ofc-set .dxset')`), '#2460: DATEV off -> no DATEV fields in Data');
     await ev(flip('books.vat_return'));

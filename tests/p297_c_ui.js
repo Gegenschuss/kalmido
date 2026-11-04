@@ -5,7 +5,7 @@
 // P297C_NOSTART=1 = the server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
-const {boot, errs, sleep, B, login} = require('./boot');
+const {boot, errs, sleep, B, login, histAdded} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -46,8 +46,10 @@ const FEAT = 'clients,office';
   const yes = await until(() => { const b = d.querySelector('.smv-dlg [data-smv="yes"]'); return b && !b.disabled && b; });
   const notes = d.querySelector('.smv-dlg .smv-notes')?.textContent || '';
   check(yes && /1 client moves/.test(notes) && /1 draft moves/.test(notes), 'the dry run names the client and its draft, Move unlocked ' + notes);
+  const h0 = w.eval('HIST.undo.length');
   yes?.click();
   check(await until(async () => (await call('GET', '/api/clients/' + C.id)).org_id === ORG), 'the client moved into the organisation');
+  check(await histAdded(w, h0), 'the move is one undo step');  // 2.504.0 (#4085): recorded after the answer, the server is faster
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await call('GET', '/api/clients/' + C.id)).org_id == null), 'Undo: the client is private again');
   check(await until(async () => (await call('GET', '/api/office/docs/' + Q.id)).id === Q.id), 'Undo: the draft is back in the personal office');
