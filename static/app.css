@@ -36,6 +36,7 @@
   --tabs-h:0px;--ui:1;
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
+  /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}
@@ -1028,10 +1029,10 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .rbtn .nbadge{top:.1875rem;right:1px}
 #tabs button .nbadge{top:.3125rem;right:auto;left:calc(50% + .3125rem)}
 .srow .c.nunread{color:var(--accent);font-weight:600}
-.nbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:2px 0 .75rem;max-width:47.5rem}
+.nbar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:2px 0 .75rem;max-width:var(--w-lesen)}
 .nbar .btn{display:inline-flex;align-items:center;gap:.375rem}
 .nbar .ntog.on{color:var(--accent);border-color:color-mix(in srgb,var(--accent) 45%,transparent);background:color-mix(in srgb,var(--accent) 8%,transparent)}
-.nlist{display:flex;flex-direction:column;gap:2px;max-width:47.5rem}
+.nlist{display:flex;flex-direction:column;gap:2px;max-width:var(--w-lesen)}
 .nitem{display:flex;gap:.75rem;align-items:flex-start;padding:.625rem;border-radius:var(--radius);cursor:pointer}
 .nitem:hover{background:var(--bg2)}
 .nitem:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
@@ -1058,7 +1059,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 .empty.nempty{display:flex;flex-direction:column;align-items:center;gap:.375rem}.empty.nempty b{color:var(--text);font-weight:600}
 /* 2.40.0 (#1415): an empty state with a button (Clients, Habits, Home & life): symbol, text of a readable width, the button below */
 .empty.eact > span{max-width:28rem}.empty.eact > .btn{margin-top:.625rem}
-.nswipe{font-size:var(--fs-s);margin:.75rem .625rem;max-width:47.5rem}
+.nswipe{font-size:var(--fs-s);margin:.75rem .625rem;max-width:var(--w-lesen)}
 .nkinds{display:flex;flex-direction:column;gap:.375rem;margin:.25rem 0 .75rem}
 
 /* ---------- settings: sectioned dialog ---------- */
@@ -1107,7 +1108,7 @@ details.sdet summary{cursor:pointer;color:var(--accent);font-size:var(--fs-m);ma
 @media (pointer:coarse){ details.sdet>summary{line-height:2.75rem} }  /* 2.366.0 (#3001): a folded help is a touch target too (p260 44 px rule) */
 
 /* ---------- statistics ---------- */
-.stats{max-width:51.25rem;padding-bottom:1.875rem}
+.stats{max-width:var(--w-seite);padding-bottom:1.875rem}
 .sttiles{display:grid;grid-template-columns:repeat(4,1fr);gap:.625rem;margin:.375rem 0 .25rem}
 .sttiles div{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:.75rem .875rem;display:flex;flex-direction:column;gap:2px;min-width:0}
 .sttiles b{font:600 1.375rem/var(--lh-tight) var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
@@ -2024,7 +2025,7 @@ button.tvr-task:hover{color:var(--accent)}
 /* 1.6.1: "Archived" view (rows of archived lists) */
 .archv{display:flex;flex-direction:column;gap:.5rem;padding:.5rem 0 2rem}
 /* 2.417.0 A (#3559): the start page of Projects (#projects): the sidebar's groups as full-width rows */
-.pstart{display:flex;flex-direction:column;gap:1.25rem;padding:.5rem 0 2rem;max-width:48rem}
+.pstart{display:flex;flex-direction:column;gap:1.25rem;padding:.5rem 0 2rem;max-width:var(--w-seite)}
 .psg .pshead{margin:0 0 .25rem;padding:0 .5rem;font-size:var(--fs-s);font-weight:400;color:var(--muted)}
 .psg .psfold{display:inline-flex;align-items:center;gap:.375rem;min-height:2rem;color:var(--muted);text-align:left}
 .psg .psfold:hover span{text-decoration:underline}
@@ -2212,7 +2213,7 @@ button.tvr-task:hover{color:var(--accent)}
 .ltsw{width:.75rem;height:.75rem;border-radius:50%;background:var(--bg4);flex:none}
 .ltcols{display:flex;gap:.375rem;padding:.5rem;flex-wrap:wrap;max-width:14rem}
 .ltcols button{width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid transparent}.ltcols button.on{border-color:var(--text)}
-.agview{max-width:52rem;margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
+.agview{max-width:var(--w-seite);margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
 .agcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.625rem;align-items:start}/* 2.505 (#4325): an opened "Projects" makes only its own card longer */
 .agcard{display:flex;align-items:center;align-content:flex-start;gap:.75rem;padding:.75rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);flex-wrap:wrap}
 .agcard.off{opacity:.6}
@@ -2236,7 +2237,7 @@ button.tvr-task:hover{color:var(--accent)}
 .jobb{display:flex;gap:.375rem;flex-wrap:wrap}.jact{font-size:var(--fs-s)}
 #achat{position:fixed;top:0;right:0;bottom:0;width:min(26rem,100vw);z-index:60;background:var(--bg2);border-left:1px solid var(--line2);box-shadow:var(--shadow);display:flex;flex-direction:column}
 #achat.hidden{display:none}
-.chview{display:flex;flex-direction:column;height:100%;max-width:44rem;margin:0 auto}
+.chview{display:flex;flex-direction:column;height:100%;max-width:var(--w-lesen);margin:0 auto}
 .chath{display:flex;align-items:center;gap:.625rem;padding:.75rem;border-bottom:1px solid var(--line)}
 /* 2.4.1 (#375): the agent's state under its name (dot or typing dots + text) */
 .adot.st-offline{background:var(--faint)}
@@ -2933,7 +2934,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .bpfoot{display:flex;justify-content:flex-end;padding:.5rem .75rem;border-top:1px solid var(--line);flex:none}
 .bpfoot .bpn{font:600 var(--fs-s)/1 var(--mono);opacity:.8}
 /* #404: filter chips (view only) in the News view and under the bell */
-.nchips{display:flex;gap:.375rem;overflow-x:auto;padding:.125rem 0 .5rem;scrollbar-width:none;max-width:47.5rem}
+.nchips{display:flex;gap:.375rem;overflow-x:auto;padding:.125rem 0 .5rem;scrollbar-width:none;max-width:var(--w-lesen)}
 .nchips::-webkit-scrollbar{display:none}
 .bpop .nchips{padding:.5rem .75rem;flex:none;border-bottom:1px solid var(--line)}
 .nchip{display:inline-flex;align-items:center;gap:.3125rem;height:2rem;padding:0 .75rem;border-radius:99rem;border:1px solid var(--line2);background:transparent;color:var(--text2);font-size:var(--fs-s);white-space:nowrap;cursor:pointer;flex:none}
@@ -3033,7 +3034,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (pointer:coarse){ .bphl{min-height:2.75rem;min-width:2.75rem} }
 @media (prefers-reduced-motion:reduce){ .bphl .bpchev{transition:none} }
 /* 2.7.1 (#410): the overview of a project list */
-.pov{max-width:72rem;padding-bottom:6rem}
+.pov{max-width:var(--w-seite);padding-bottom:6rem}
 .povg{display:grid;grid-template-columns:minmax(0,1fr);gap:0 1.25rem}
 @media (min-width:1100px){ .povg{grid-template-columns:minmax(0,1fr) minmax(16rem,22rem)} }
 .povc{min-width:0}
@@ -3554,7 +3555,7 @@ svg.kword{display:block;height:.82em;width:auto;aspect-ratio:371.8/81;color:#EEE
   #pop.sheet{bottom:var(--vvb,0px);max-height:min(86dvh,calc(var(--vvh,100dvh) - 1rem))}
 }
 .chview,.chcomp,.chcomp textarea,.cmsg,.cbub{min-width:0}
-.chview{max-width:min(44rem,100%)}
+.chview{max-width:min(var(--w-lesen),100%)}
 .cmsg .cmeta{flex-wrap:wrap}
 /* Fold screenshots: the agent chip has no amber outline (the dot / number say "waiting" / "new"); a denser sidebar on
    touch tablets (44 px rows, the desktop's text size); the phone's + a little smaller */
@@ -3758,7 +3759,7 @@ pre.mdpre code{font:inherit;background:none;padding:0;border:0}
 .mlc,.trow .meta .mlc{display:none;align-items:center;gap:.25rem}
 .lc.o10{display:none}.trow .meta .mlc.o10{display:inline-flex}
 @media (min-width:768px){
-  @container lrows (max-width:96rem){ .lc.o7{display:none} .trow .meta .mlc.o7{display:inline-flex} }
+  @container lrows (width < 96rem){ .lc.o7{display:none} .trow .meta .mlc.o7{display:inline-flex} }  /* 2.534.0 A (#4551): a list is at most --w-seite = 96rem wide; at that width the o7 columns show (max-width:96rem hid them for good) */
   @container lrows (max-width:80rem){ .lc.o5{display:none} .trow .meta .mlc.o5{display:inline-flex} }
   @container lrows (max-width:64rem){ .lc.o3{display:none} .trow .meta .mlc.o3{display:inline-flex} }
   @container lrows (max-width:48rem){
@@ -4258,7 +4259,7 @@ a.tref:hover{background:var(--accent-soft)}
 .ngs{font-size:var(--fs-s)}
 .ngitems{padding:0 0 .5rem 2.25rem}
 /* #475 the dashboard */
-.dash{max-width:72rem;margin:0 auto;padding-bottom:2rem}
+.dash{max-width:var(--w-seite);margin:0 auto;padding-bottom:2rem}
 .dashhead{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;margin:.25rem 0 1rem}
 .dashhead h2{margin:0;letter-spacing:-.01em}
 .dgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr));gap:1rem;align-items:start}
@@ -4548,7 +4549,7 @@ a.frow:hover,.frow a:hover{background:var(--bg3)}
 /* the kid view: big, calm, one column */
 body.kidmode #side,body.kidmode #tabs,body.kidmode #fab,body.kidmode #top .menu,body.kidmode #top .cmdbar,body.kidmode #top .tnew,body.kidmode #top .hist{display:none!important}
 body.kidmode #app{grid-template-columns:1fr}
-.kidv{max-width:40rem;margin:0 auto;padding:.5rem 0 2rem}
+.kidv{max-width:var(--w-form);margin:0 auto;padding:.5rem 0 2rem}
 .kidtop{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin:.5rem 0 1rem}
 .kidtop h2{flex:1;margin:0}
 .kidbal{display:inline-flex;align-items:center;gap:.375rem;padding:.375rem 1rem;border-radius:2rem;background:var(--bg3);font:700 1.5rem var(--mono);color:var(--p3)}
@@ -5355,7 +5356,7 @@ select.orgrolesel,.wsorg .mrow select.orgrolesel{min-height:2.75rem;min-width:8.
 .avatar.lg .abot-b{width:1.0625rem;height:1.0625rem}.avatar.lg .abot-b svg.i.s{width:var(--ic-xs);height:var(--ic-xs)}
 .mrow.agsum .avatar.agent{display:grid;place-items:center;background:var(--bg3);color:var(--muted)}
 /* 2.28.0 (#987): "For you" | "Activity" in the News, the sections in the bell's dropdown, the start page banner */
-.ntabs{margin:0 0 .625rem;display:flex;width:100%;max-width:47.5rem}
+.ntabs{margin:0 0 .625rem;display:flex;width:100%;max-width:var(--w-lesen)}
 .ntabs button{flex:1 1 0;display:inline-flex;align-items:center;justify-content:center;gap:.375rem;min-height:2.125rem;border-radius:calc(var(--radius) - 2px);color:var(--muted);font-size:var(--fs-m)}
 .ntabs button.on{background:var(--bg2);color:var(--text);box-shadow:var(--shadow-s)}
 .ntabs .c{font:600 var(--fs-xs)/1 var(--mono);padding:.125rem .375rem;border-radius:var(--r-s);background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
@@ -5413,7 +5414,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .tvnote svg{flex:none}
 .tvbody{flex:1;overflow:auto;padding:1rem 1.25rem;min-height:6rem;overscroll-behavior:contain}
 .tvbody pre.tvsrc{margin:0;border:0;background:none;padding:0;white-space:pre;tab-size:4;font-size:var(--fs-m)}
-.md.tvmd{font-size:var(--fs-b);max-width:46rem}
+.md.tvmd{font-size:var(--fs-b);max-width:var(--w-lesen)}
 .tvmsg{padding:1rem 0;color:var(--text2)}
 .attag{color:var(--accent)}
 @media (max-width:767px){
@@ -5485,7 +5486,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .dgrid > .ly-full{grid-column:1/-1}
 .lyb{min-width:0}
 .lyb > .dcard{height:100%}
-.lyed{max-width:40rem}
+.lyed{max-width:var(--w-form)}
 /* 2.33.0 (#1086): the editor's head with "Done" stays at the top of the scrolling view (under the page header), also on the phone */
 .lyed>.dashhead{position:sticky;top:0;z-index:6;background:var(--bg);margin-top:0;padding:.5rem 0;box-shadow:0 1px 0 var(--line)}
 .lyopts{display:flex;align-items:center;flex-wrap:wrap;gap:.5rem 1rem;margin:0 0 .75rem}
@@ -5745,7 +5746,7 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
   .chath{gap:.5rem} .chath .chback{margin-right:.125rem}
 }
 .lyed{max-width:none}  /* 2.35.0 (#1097): the blocks get the view's width (two side by side as in the view); the list stays narrow */
-.lyed .lylist,.lyed .lyopts{max-width:40rem}
+.lyed .lylist,.lyed .lyopts{max-width:var(--w-form)}
 /* 2.36.0 (#1118): the lock of a task: a small lock after the title in the row, the lock button in the task header */
 .ttl .tlkr{display:inline-flex;vertical-align:-.15em;margin-left:.375rem;color:var(--muted)}
 .ttl .tlkr svg{width:var(--ic-s);height:var(--ic-s)}
@@ -6289,7 +6290,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .sgpmd .sgpn{font-size:var(--fs-s)}
 /* 2.44.0 C (#1517): set up an agent on a computer -- the command to copy, the computers of the agent */
 /* 2.44.0 D (#1187) the areas: tabs on top of an area's page (Office, Time, Review, Home), the area switch in Settings > Modules */
-.mgtabs{display:flex;max-width:72rem;margin:.375rem auto .875rem;overflow-x:auto;scrollbar-width:none}
+.mgtabs{display:flex;max-width:var(--w-seite);margin:.375rem auto .875rem;overflow-x:auto;scrollbar-width:none}
 .mgtabs::-webkit-scrollbar{display:none}
 .mgtabs button{flex:1;justify-content:center;white-space:nowrap;min-height:2.25rem}
 .mgtabs button.on{color:var(--text);font-weight:600}
@@ -6299,7 +6300,7 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 /* 2.98 (#2180): a phone's start list and its path "< Office · group" with the group's points as one row of underlined tabs
    (no wrap, it scrolls sideways); the path of a detail page stays grey text. 2.152.2 (#2617): the computer's office rail is
    gone (its points are the office's panel of sidebar B), the page keeps its width limit */
-.ofwrap{max-width:72rem;margin:0 auto}
+.ofwrap{max-width:var(--w-seite);margin:0 auto}
 .oflg h3{padding:0 .625rem .375rem;font-size:var(--fs-s);font-weight:400;color:var(--muted)}
 .ofpt2:focus-visible,.ofpback:focus-visible,.oflr:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
 .ofbody{min-width:0}
@@ -6325,9 +6326,9 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
 .ofpt2 svg{width:var(--ic);height:var(--ic)}
 .ofpt2.on{color:var(--text);border-bottom-color:var(--accent)}
 .ofpt2.on svg{color:var(--accent)}
-.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:72rem;margin:-.375rem auto .625rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
+.ofmcrumb{display:flex;align-items:center;flex-wrap:wrap;gap:.375rem;max-width:var(--w-seite);margin:-.375rem auto .625rem;font-size:var(--fs-s);color:var(--muted);min-width:0}
 .ofmcrumb span:last-child{color:var(--text2)}
-.ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:72rem;margin:0 auto}
+.ofmstart{display:flex;flex-direction:column;gap:.875rem;max-width:var(--w-seite);margin:0 auto}
 .ofmfig{padding:.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l)}
 .ofl{display:flex;flex-direction:column;gap:1rem}
 .oflg h3{margin:0;padding-top:.25rem}
@@ -6748,7 +6749,7 @@ a.wkitem:hover{background:var(--bg3)}
 .wshside{margin-top:1rem;padding-top:.5rem;border-top:1px solid var(--line)}
 .wshside h4{display:flex;align-items:center;gap:.375rem;margin:.75rem .5rem .375rem;font-size:var(--fs-b);font-weight:600;color:var(--muted)}
 .wshside .wkitem small{margin-left:auto;flex:none;font-size:var(--fs-s)}
-.wshread .card{max-width:46rem}
+.wshread .card{max-width:var(--w-lesen)}
 .wshfh{cursor:default}
 .wshfh .iconbtn{flex:none;width:1.75rem;height:1.75rem}
 .wshfold>.wktree{margin-left:1rem}
@@ -7949,7 +7950,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .rul-prop{display:flex;gap:.5rem;align-items:flex-start;margin:.75rem 0;padding:.75rem;border-radius:.5rem;background:var(--bg3)}
 .rul-dlg #rul-text{width:100%;box-sizing:border-box;resize:vertical}
 /* 2.72.0 B (#1333) the household budget (budget.js): view, card on Home & life, dialogs; phone first, one accent */
-.bgview{max-width:46rem;margin:0 auto;padding:.75rem .75rem 5rem;display:flex;flex-direction:column;gap:.875rem;min-width:0}
+.bgview{max-width:var(--w-seite);margin:0 auto;padding:.75rem .75rem 5rem;display:flex;flex-direction:column;gap:.875rem;min-width:0}
 .bghead{display:flex;align-items:center;gap:.5rem;min-width:0}
 .bgname{margin:0;font-size:var(--fs-l);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bglist{max-width:100%;min-width:0;font-size:var(--fs-b)}
@@ -8258,7 +8259,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmproj{font-size:var(--fs-xs);display:inline-flex;align-items:center;gap:.25rem}
 .hbmacts{display:flex;align-items:center;gap:.25rem;flex:none}
 .hbmempty{margin:.25rem 0}
-.hbmhub{max-width:48rem;padding:0 1rem 2rem}
+.hbmhub{max-width:var(--w-seite);padding:0 1rem 2rem}
 .hbmhub h4{margin:1rem 0 .375rem;font-size:var(--fs-m);color:var(--muted)}
 .hbmsp{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-bottom:1px solid var(--line)}
 .hbmspn{flex:1;min-width:0;display:flex;flex-direction:column}

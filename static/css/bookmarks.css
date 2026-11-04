@@ -1,6 +1,6 @@
 /* Kalmido web client: the styles of the bookmarks (bookmarks.js, module "reading", loaded on demand with it). */
 /* 2.97.0 A (#1950): the add form, the search bar, the tags, cards (picture, title, site) or a list, the details */
-.bmview{max-width:60rem;margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
+.bmview{max-width:var(--w-seite);margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
 .bmhead{display:flex;gap:.5rem;align-items:center}
 .bmadd{display:flex;gap:.5rem;flex:1;min-width:0}
 .bmadd input{flex:1;min-width:0}

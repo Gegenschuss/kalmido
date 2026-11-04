@@ -1,0 +1,25 @@
+/* 2.534.0 A (#4551): one width system for wide screens. Every page has exactly one of the four widths of :root (app.css):
+   --w-lesen 46rem   reading text: news, agent chat, team chat history, note / knowledge page, feeds
+   --w-form  40rem   a form section: the start page layout editor, the kids' page
+   --w-seite 96rem   lists and overviews: task lists (Today, project, week, all), projects start, start / home / workload
+                     dashboards, office (all its pages and tabs), contacts, clients, statistics, time, agents, file store,
+                     budget, bookmarks, tags, archive, waiting
+   --w-voll  none    board, calendar, timeline, matrix, sheet, mind map
+   The widths are upper limits only: below them a page is 100 % wide as before (phone, 320 px, 1440 x 900 unchanged);
+   a limited page stands in the middle, its tabs above it share its edges (.mgtabs = --w-seite like the page below). */
+
+/* --w-seite: the limit itself is set on the rule of each page (app.css); here the pages that stood left get centred and the
+   task lists / file store / archive (no limit before) get theirs */
+.pstart,.stats,.pov,.lwrap,.abview,.dc-wrap:not(.dc-paneon),.tgview,.mwv,.archv{max-width:var(--w-seite);margin-inline:auto}
+
+/* --w-lesen: news bars stood left (47.5rem) - now centred, the swipe hint keeps its own side margin on narrow screens */
+#view > :is(.ntabs,.nbar,.nlist,.nchips){margin-inline:auto}  /* only the news page itself, not a news tile on the start page */
+#view > .nswipe{margin-inline:max(.625rem,calc((100% - var(--w-lesen)) / 2))}
+/* a note / knowledge page (title, fields, text, files, backlinks) in one reading column right of its list */
+.ntedit{width:100%;max-width:var(--w-lesen);margin-inline:auto}
+/* team chat: the room keeps its full width (header, borders, drop zone); history and composer read in the middle */
+.tcroom .tcmsgs{padding-inline:max(.75rem,calc((100% - var(--w-lesen)) / 2))}
+.tcroom .tccomp{padding-inline:max(.75rem,calc((100% - var(--w-lesen)) / 2))}
+
+/* --w-voll: named so a later rule cannot limit them by accident */
+.kanban,.matrix,.shvwrap,.mmwrap,.lcal,.tl{max-width:var(--w-voll)}
