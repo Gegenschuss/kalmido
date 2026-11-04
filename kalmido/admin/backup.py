@@ -1483,6 +1483,10 @@ def _pg_restore(dump):
     toc, tables = _toc_file(dump)
     if not {"users", "tasks", "kalmido_meta"} <= tables:  # (never drop anything on a list that was not understood)
         raise BackupError("format")
+    # 2.510.0 (#4286): --clean only knows the foreign keys of the dump. One added since (a backup of an older version) would stop
+    # it dropping the key it points at ("cannot drop constraint users_pkey"): such a backup could not be restored at all.
+    # These go first like those of the tables the dump lacks; the dump brings its own, init_db the rest (on an error: the way back)
+    dump_fks = {(m.group(1), m.group(2)) for m in re.finditer(r"^\d+; \d+ \d+ FK CONSTRAINT public (\S+) (\S+) ", toc, re.M)}
     c = _pg.connect_direct(DATABASE_URL)
     try:
         with _pg.system_ctx(c):  # the restore works on the whole database (every organisation)
@@ -1491,7 +1495,7 @@ def _pg_restore(dump):
                      if r[0] not in tables]
             for t, k in c.execute("""SELECT r.relname, k.conname FROM pg_constraint k JOIN pg_class r ON r.oid=k.conrelid -- pg-ok: pg_catalog oid
                                      JOIN pg_namespace n ON n.oid=r.relnamespace WHERE k.contype='f' AND n.nspname='public'""").fetchall():
-                if t in extra:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
+                if t in extra or (t, k) not in dump_fks:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
                     c.execute('ALTER TABLE "' + t.replace('"', '""') + '" DROP CONSTRAINT IF EXISTS "' + k.replace('"', '""') + '"')
         c.commit()
     finally:
