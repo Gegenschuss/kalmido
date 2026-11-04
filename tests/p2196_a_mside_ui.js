@@ -126,6 +126,12 @@ const MODS = 'cal,comments,office,contacts,wiki,time,pomo,review,stats,agents';
     await ready(ev, `S.route.key.startsWith('l:') && !document.querySelector('#side.open')`, 30);
     await ev(`(() => { history.back(); return 1; })()`);
     check(await ready(ev, `S.route.key === 'today' && !!document.querySelector('#side.open')`, 30), `${tag}: #953: Back reopens the drawer it was left from`);
+    // 2.534.0 (#4344): the entry's side mark is used up by that reopening: closing the drawer and a route() without a Back opens nothing
+    await ev(`(() => { closeSide(); return 1; })()`);
+    await ready(ev, `!document.querySelector('#side.open')`, 20);
+    await ev(`(() => { route(); return 1; })()`);
+    await sleep(600);
+    check(!(await ev(`!!document.querySelector('#side.open') || !!history.state?.side`)), `${tag}: #4344: a later route() does not reopen the drawer`);
     await ev(tap('#side .sbmr .srb[data-sbb="office"]'));
     await ready(ev, `S.route.mod === 'office'`, 30);
     await ev(tap('#side .sbmr .srb[data-sbb="cal"]'));
