@@ -73,11 +73,13 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
     ta.value = text; ta.dispatchEvent(new ww.Event('input', {bubbles: true}));
     return ta;
   };
+  // review (#4304): a closed tab fires visibilitychange (hidden) before pagehide, as a browser does
+  const tabClose = ww => { Object.defineProperty(ww.document, 'hidden', {value: true, configurable: true}); ww.document.dispatchEvent(new ww.Event('visibilitychange')); ww.dispatchEvent(new ww.Event('pagehide')); };
   let ww = await boot(wopt);
   check(await until(() => ww.eval(`WK.pg?.id === ${W1}`)), 'A2: the page is open');
   let wc = stub(ww);
   await edit(ww, 'Plan typed in the last second');
-  ww.dispatchEvent(new ww.Event('pagehide'));
+  tabClose(ww);
   // right away, without waiting: the queue has it and it went out with keepalive (the page is gone a moment later)
   const qn = ww.eval(`JSON.stringify(OUT.q.filter(x => x.url === '/api/wiki/pages/${W1}'))`);
   check(/Plan typed in the last second/.test(qn), 'A2: pagehide: the text is in the queue at once ' + qn);
@@ -96,12 +98,16 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   wc = stub(ww);
   await edit(ww, 'Secret plan');
   check(await until(() => ww.eval('WK.seal?.plain') === 'Secret plan'), 'A2 e2e: the cipher is made while typing');
-  ww.dispatchEvent(new ww.Event('pagehide'));
+  tabClose(ww);
   const qe = ww.eval(`JSON.stringify(OUT.q.filter(x => x.url === '/api/wiki/pages/${W1}'))`);
   check(/SEALED\[nalp terceS\]/.test(qe), 'A2 e2e: pagehide: the cipher is in the queue at once ' + qe);
   const kae = wc.filter(([m, p, , k]) => m === 'PATCH' && p === '/api/wiki/pages/' + W1 && k);
   check(kae.length === 1 && /SEALED/.test(kae[0][2] || ''), 'A2 e2e: pagehide: the cipher went with keepalive');
   check(!wc.some(([, , b]) => /Secret plan/.test(b || '')) && !/Secret plan/.test(JSON.stringify(ww.__store)), 'A2 e2e: the text in clear never left the page nor went into storage');
+  // review (#4304): a cipher older than the last save is never sent (it would put the page back to an older text)
+  wc.length = 0;
+  ww.eval(`WK.seal = {id: ${W1}, plain: 'Secret pl', c: 'SEALED[lp terceS]', seq: 1}; WK.savedSeq = 2; WK.seq = 3; WK.dirty = true; WK.pg.body = 'Secret plan'; document.querySelector('#wk-body').value = 'Secret plan!'; wk_stash(); 1`);
+  check(!wc.some(([m, p, b, k]) => m === 'PATCH' && k && /SEALED\[lp terceS\]/.test(b || '')) && !/SEALED\[lp terceS\]/.test(ww.eval('JSON.stringify(OUT.q)')), 'A2 e2e: a cipher older than the last save is not sent ' + JSON.stringify(wc));
   ww.close();
 
   // ================= A18: a text the server refuses (413) waits at the page as a draft
@@ -150,6 +156,8 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   const gone = (ww, re) => stub(ww, (m, p) => re.test(m + ' ' + p) ? jres(401, {error: 'Not signed in'}) : null);
   let wf = await boot(fopt('clients'));
   const fid = wf.eval('S.me.id');
+  // review (#4304): a 401 at the start (S.me not there yet) still finds the kept input of this browser's account (uid)
+  check(wf.eval(`(() => { const me = S.me; LS.set('uid', me.id); fdKeep('fdf', 'probe', {x: 1}); S.me = null; const r = fdAny(); S.me = me; fdDrop('fdf', 'probe'); return r; })()`) === true, 'A5: before /api/me answered, the kept input of the account is found (not wiped)');
   wf.eval(`clientModal(${JSON.stringify(await call('GET', '/api/clients/' + CL, null, CF))})`);
   let cmd = await until(() => wf.document.querySelector('.modal.cldlg'));
   const note = cmd?.querySelector('#cl-note');

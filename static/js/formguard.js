@@ -121,8 +121,9 @@ function fdDialog(md, key, base = '') {
   md.addEventListener('input', soon); md.addEventListener('change', keep);
   const hide = () => { gone = true; keep(); };  // the page goes (a reload after the sign-in page, a closed tab): kept, not dropped
   let gone = false;
-  addEventListener('pagehide', hide);
-  onRemove(md, () => { done = true; clearTimeout(t); removeEventListener('pagehide', hide); if (!gone) fdDrop('fdf', key); });
+  const back = () => { gone = false; };  // review (#4304): back from the bfcache, the dialog lives on: closing it drops the input again
+  addEventListener('pagehide', hide); addEventListener('pageshow', back);
+  onRemove(md, () => { done = true; clearTimeout(t); removeEventListener('pagehide', hide); removeEventListener('pageshow', back); if (!gone) fdDrop('fdf', key); });
 }
 
 window.addEventListener('beforeunload', e => { if (fgAny()) { e.preventDefault(); e.returnValue = ''; } });

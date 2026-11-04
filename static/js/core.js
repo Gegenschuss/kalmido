@@ -700,7 +700,8 @@ function outKeep(method, url, body) {
 // letters (2.269.0 C #3017, office_letters.js). kind names the form ('ltpend' letters, 'fdf' dialogs (formguard.js fdDialog),
 // 'fdc' comment drafts, 'fdw' kept writes), id the record; base = the server's updated_at the input builds on.
 const FD_KINDS = ['ltpend', 'fdf', 'fdc', 'fdw'];
-const FD_KEY = (kind, id) => `tasks.${kind}.${S.me?.id || 0}.${id}`;
+// review (#4304): before /api/me answered (a 401 at the start) the account of this browser (uid), else authGone found nothing and wiped
+const FD_KEY = (kind, id) => `tasks.${kind}.${S.me?.id || LS.get('uid', 0) || 0}.${id}`;
 function fdKeep(kind, id, b, base = '') { try { localStorage.setItem(FD_KEY(kind, id), JSON.stringify({base: base || '', b, at: Date.now()})); } catch { /* full or private mode */ } }
 function fdGet(kind, id) { try { return JSON.parse(localStorage.getItem(FD_KEY(kind, id)) || 'null'); } catch { return null; } }
 function fdDrop(kind, id) { try { localStorage.removeItem(FD_KEY(kind, id)); } catch { /* private mode */ } }
@@ -738,7 +739,8 @@ async function fdWriteFlush() {
     for (const r of fdList('fdw').sort((a, b) => a.at - b.at)) {
       let body = r.b?.body;
       if (r.b?.sv && body && typeof body === 'object') {  // a setting someone changed elsewhere since stays theirs
-        body = Object.fromEntries(Object.entries(body).filter(([k, v]) => String(S.settings?.[k] ?? '') === String(r.b.sv[k] ?? '') && String(S.settings?.[k] ?? '') !== String(v ?? '')));
+        const cur = r.b.url === '/api/me' ? S.me : S.settings;  // review (#4304): the name too (sv = what the page saw)
+        body = Object.fromEntries(Object.entries(body).filter(([k, v]) => String(cur?.[k] ?? '') === String(r.b.sv[k] ?? '') && String(cur?.[k] ?? '') !== String(v ?? '')));
         if (!Object.keys(body).length) { fdDrop('fdw', r.id); continue; }
       }
       try { await rawFetch(r.b.method, r.b.url, body, r.b.k || r.id); fdDrop('fdw', r.id); }
@@ -1054,7 +1056,7 @@ async function userSwitchAsk(id, n) {
 // 2.527.0 (#4304 A20): the conflict copies and the changes still waiting of the previous account are not deleted silently at
 // the switch: they leave as a text file (downloaded) first - each with its task, field, the saved and the own version
 function cfDownload(uid) {
-  for (const e of outSync().filter(x => x.uid !== uid)) outReject(e, {message: tr('Not synced yet')});
+  for (const e of outSync().filter(x => x.uid !== uid && !x.done)) outReject(e, {message: tr('Not synced yet')});
   const list = S.conflicts || []; if (!list.length) return false;
   const val = (f, v) => { try { return fmtVal(f, v); } catch { return typeof v === 'object' ? JSON.stringify(v) : String(v ?? ''); } };
   const txt = [`${APP_NAME} · ${new Date().toLocaleString()}`, ''].concat(...list.map(c => c.field === 'rejected'
@@ -1063,6 +1065,7 @@ function cfDownload(uid) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain'}));
   a.download = `${APP_NAME.toLowerCase()}-conflicts-${new Date().toISOString().slice(0, 10)}.txt`;
   document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   return true;
 }
 // another user than last time in this browser: drop everything local of the previous one, then the app loads again

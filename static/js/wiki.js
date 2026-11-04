@@ -659,7 +659,7 @@ document.addEventListener('click', e => {
 // 2.350.0 B (#3147): the field one writes in: the plain text editor or the open block of the live preview (wklive.js)
 const wk_ta = () => /** @type {any} */ ($('#wk-body') || $('#wk-blk'));
 const wk_isTa = t => t?.id === 'wk-body' || t?.id === 'wk-blk';
-function wk_queue() { WK.dirty = true; clearTimeout(WK.saveT); WK.saveT = setTimeout(wk_flush, 1000); wk_preseal(); }
+function wk_queue() { WK.dirty = true; WK.seq = (WK.seq || 0) + 1; clearTimeout(WK.saveT); WK.saveT = setTimeout(wk_flush, 1000); wk_preseal(); }
 // 2.527.0 (#4304 A2): the page goes away (tab closed, reload): what was typed and not saved yet goes into the queue at once
 // (synchronously, outStash) and out with keepalive under the same key (core.js keepSend; the server applies it once). An
 // encrypted space never stores or sends its text in clear: its cipher is made while typing (wk_preseal, after every seal kept
@@ -670,15 +670,16 @@ function wk_preseal() {
   clearTimeout(WK.sealT);
   WK.sealT = setTimeout(async () => {
     const b = wk_src(p); if (!b || WK.pg !== p) return;
-    const plain = b.value;
-    try { const o = await wkeSeal(p.space, {body: plain}); WK.seal = {id: p.id, plain, c: o.body}; } catch { /* locked meanwhile */ }
+    const plain = b.value, seq = WK.seq || 0;  // review (#4304): the typing state this cipher belongs to
+    try { const o = await wkeSeal(p.space, {body: plain}); WK.seal = {id: p.id, plain, c: o.body, seq}; } catch { /* locked meanwhile */ }
   }, 150);
 }
 function wk_stash() {
   const p = WK.pg, b = wk_src(p); if (!p || !WK.dirty || !b || b.value === p.body) return;
   let body = b.value, part = false;
   if (wk_e2e(p.space)) {
-    const s = WK.seal; if (!s || s.id !== p.id || s.plain === p.body) { wk_flush(true); return; }  // no cipher yet: as before
+    // review (#4304): a cipher older than the last save would put the page back to an older text: then as before
+    const s = WK.seal; if (!s || s.id !== p.id || s.plain === p.body || (s.seq || 0) <= (WK.savedSeq || 0)) { wk_flush(true); return; }  // no cipher yet: as before
     body = s.c; part = s.plain !== b.value;  // the last moment's letters may not be sealed yet: the newest cipher now, the rest below
   }
   clearTimeout(WK.saveT);
@@ -693,7 +694,7 @@ function wk_stash() {
 async function wk_flush(hide) {
   clearTimeout(WK.saveT);
   const p = WK.pg, b = wk_src(p); if (!p || !WK.dirty) return;  // 2.350.0 B (#3147): + the live preview
-  WK.dirty = false;
+  WK.dirty = false; WK.savedSeq = WK.seq || 0;  // review (#4304): what is typed up to here goes with this save (wk_stash)
   if (!b || b.value === p.body) return;
   const patch = {body: b.value, expect_updated_at: p.updated_at}, url = '/api/wiki/pages/' + p.id;
   // 2.169.0 (#2671): offline (or with a change of this page still waiting) the text waits in the outbox: closing the tab keeps it
@@ -1270,7 +1271,8 @@ async function wko_syncAll() {
 }
 window.addEventListener('online', () => setTimeout(wko_syncAll, 3000));
 // a text typed within the last second is not lost when the tab goes away
-document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_flush(true); });
+// review (#4304): closing a tab fires this before pagehide - the same synchronous stash, else the async way ran first and won
+document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_stash(); });
 window.addEventListener('pagehide', () => { if (WK.dirty) wk_stash(); });  // 2.527.0 (#4304 A2): synchronously, see wk_stash
 // 2.210 B (#2757): a right click / long press on a row of the folder list = its "…" menu (2.200.0 #2747, wk_nodeItems)
 const wk_lpS = cm_bind('#view .wkrow', r => {

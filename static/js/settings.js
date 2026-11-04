@@ -1001,7 +1001,7 @@ function settingsModal(focus) {
     for (const id of [...pend.keys()]) {
       clearTimeout(pend.get(id)); pend.delete(id);
       const el = $('#' + id, md); if (!el) continue;
-      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) fdWrite('PATCH', '/api/me', {display_name: v}, {slot: 'me.name'}); continue; }
+      if (id === 'a-name') { const v = el.value.trim(); if (v && v !== S.me?.display_name) fdWrite('PATCH', '/api/me', {display_name: v}, {slot: 'me.name', sv: {display_name: S.me?.display_name ?? null}}); continue; }
       const d = SETS[id], v = d && setVal(el, d[2]);
       if (d && d[2] === 'time' && id === 's-allday' && !v) continue;  // 2.359.0 (review): the same guard as saveEl
       if (v !== undefined && String(v) !== String(S.settings[d[0]] ?? '')) fdWrite('PATCH', '/api/settings', {[d[0]]: v}, {slot: 'set.' + d[0], sv: {[d[0]]: S.settings[d[0]] ?? null}});
