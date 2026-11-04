@@ -14,7 +14,7 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.518.0] - 2026-11-04
+## [2.520.0] - 2026-11-04
 
 Package 2.508 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
@@ -1022,6 +1022,10 @@ Package 2.383 (Kalender-Reste: Schweiz-Feiertage, CalDAV free-busy, Antworten je
 - Italian repeat rules: ordinal and article agree with domenica ("la prima domenica", "l'ultima domenica"), the custom repeat dialog reads "ogni prima domenica" (#2587)
 - Swiss public holidays were already added in 2.461 (#3773); nothing more in this package (#2587)
 
+## [2.518.0] - 2026-11-04
+
+Not released (the CI of this version was red); its changes are listed under 2.520.0.
+
 ## [2.511.0] - 2026-11-04
 
 Not released (the CI of this version was red); its changes are listed under 2.518.0.
@@ -1034,7 +1038,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.518.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.520.0...HEAD
+[2.520.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.520.0
 [2.518.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.518.0
 [2.511.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.511.0
 [2.506.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.506.0
