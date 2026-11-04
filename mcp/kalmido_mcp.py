@@ -1721,7 +1721,8 @@ TOOLS += [
      lambda api, a: api.call("DELETE", f"/chat-attachments/{_id(a, 'attachment_id')}")),
     ("update_comment", "Edit your comment (Markdown).", _obj({"comment_id": S_ID, "body": {"type": "string", "minLength": 1}}, ["comment_id", "body"]),
      lambda api, a: api.call("PATCH", f"/comments/{_id(a, 'comment_id')}", body={"body": a["body"]})),
-    ("delete_comment", "Delete a comment (yours; project owners / admins any).", _obj({"comment_id": S_ID}, ["comment_id"]),
+    ("delete_comment", "Delete a comment (yours; project owners / admins any). 2.530.0: it goes into the trash with its files (a person "
+     "restores it in the app)." + APPROVAL_NOTE, _obj({"comment_id": S_ID}, ["comment_id"]),
      lambda api, a: api.call("DELETE", f"/comments/{_id(a, 'comment_id')}")),
     # ---- project overview (write)
     ("set_project_overview", "Set the description (Markdown) of a project's overview. 2.270.0: expect_updated_at (description_at "

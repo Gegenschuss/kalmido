@@ -287,6 +287,9 @@ APP_ONLY = [
      "person (the trash view) -- an agent's file delete puts them into that trash, the way back stays with people",
      ("=POST /api/attachments/{}/restore", "=DELETE /api/attachments/{}/purge", "=POST /api/list-files/{}/restore",
       "=DELETE /api/list-files/{}/purge")),
+    ("2.530.0 A (#4315): a comment or team chat message in the trash is restored by a person (Undo in the app) -- an agent's delete "
+     "waits for a person's approval, the way back stays with people",
+     ("=POST /api/comments/{}/restore", "=POST /api/team/messages/{}/restore")),
     ("2.140.0 C (#2133): reading, searching, exporting and the mood statistics of the private journal stay with the person -- the "
      "journal never reaches an agent (API v1 only writes an entry with the scope private)",
      ("=GET /api/life/journal", "=GET /api/life/journal/stats", "=GET /api/life/journal/export")),

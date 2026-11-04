@@ -2,7 +2,8 @@
 a trash longer than ret_days("trash") (KALMIDO_TRASH_DAYS, 30): file-store nodes (with their versions, previews, text and
 index through fs_purge and its hooks), hub mails (the row and its word index; the mail's folder goes into the
 file store's trash and follows there), tables and their deleted rows / columns, pipeline deals, invoice series, the
-tombstones of deleted team chat messages and the emptied rows of deleted comments; since 2.223.3 A (#2879) also absences,
+tombstones of deleted team chat messages and the emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
+files, collab/cmttrash.py); since 2.223.3 A (#2879) also absences,
 disposition bookings, scheduling polls with their votes, appointment types and file requests.
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
@@ -33,8 +34,10 @@ TP_PLAIN = (
     ("series", "office_inv_series", ""),  # the invoices made stay (series_id is a plain number)
     # body is empty already; tchat_rx cascade. 2.152.0 (#2165, review C-H2): a thread's first message stays while replies point
     # at it (thread_of has no FK; without the root the replies can no longer be reached) -- it goes once its replies went
+    # 2.530.0 A (#4315): + the kept text (tchat_trash_text cascades) and the files of the message (rows cascade, the disk after the commit)
     ("chat_tombstones", "tchat_msgs", " AND NOT EXISTS (SELECT 1 FROM tchat_msgs r WHERE r.thread_of=tchat_msgs.id)"),
-    ("comments", "comments", ""),  # body is empty, the files went at the delete; reactions cascade
+    # body is empty; reactions and (2.530.0 A, #4315) the kept text cascade; its files went through atr_tick above (same deleted_at)
+    ("comments", "comments", ""),
     # 2.272.0 D (#3029): clients (contact persons, data protection sheets, mail-in addresses cascade -- video reviews go to their
     # own trash first, 2.530.0 D #4316; mails,
     # deals, letters ... set null); never one records (kept by law) point to since -- team/clients.py CL_HOLD
@@ -139,6 +142,9 @@ def tp_tick(c, force=False):
                             # 2.199.0 C (#2742): their folder nodes (files/fsref.py) go with them
                             c.execute("DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN "
                                       "(SELECT id FROM sheets WHERE deleted_at IS NOT NULL AND deleted_at<?)", (cut,))
+                        if table == "tchat_msgs":  # 2.530.0 A (#4315): the files kept in the trash with the message
+                            from ..collab.cmttrash import tcx_trash_paths
+                            kp += tcx_trash_paths(c, f"deleted_at IS NOT NULL AND deleted_at<?{extra}", (cut,))
                         if table in ("contacts", "books"):  # 2.351.0 B (#2749): their folder nodes (contacts/ctfolder.py) go with them
                             c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='{'contact' if table == 'contacts' else 'address_book'}' "
                                       f"AND ref_id IN (SELECT id {w})", (cut,))

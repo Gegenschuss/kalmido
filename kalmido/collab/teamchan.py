@@ -665,15 +665,7 @@ def tcx_files_of(c, mids, api=None):
     return out
 
 
-def tcx_files_drop(c, mid):
-    """Removes the file rows of message mid; returns their paths (the caller unlinks them after the commit)."""
-    paths = [x[0] for x in c.execute("SELECT path FROM tchat_files WHERE message_id=?", (mid,))]
-    if paths:
-        from ..files.textscan import ts_forget
-        for (fid,) in c.execute("SELECT id FROM tchat_files WHERE message_id=?", (mid,)).fetchall():
-            ts_forget(c, "tchat", fid)
-        c.execute("DELETE FROM tchat_files WHERE message_id=?", (mid,))
-    return paths
+# 2.530.0 A (#4315): tcx_files_drop is gone -- a deleted message keeps its files in the trash (collab/cmttrash.py)
 
 
 def tcx_user_purge(c, uid):

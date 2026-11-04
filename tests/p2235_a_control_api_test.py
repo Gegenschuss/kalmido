@@ -177,9 +177,22 @@ def run(who, S, UID, AID, H, L):
     r = S.post(B + f"/api/agents/{AID}/control/history/{by['task_planned']['id']}/undo")
     check(r.ok, f"{who}: undo the plan {r.status_code} {r.text[:150]}")
     check(requests.get(V + f"/tasks/{T}", headers=H).json()["due"] is None, f"{who}: the due date is back to none")
+    # 2.530.0 A (#4315, B11): a file of the agent's comment (as the agent's upload leaves it) goes into the trash with the comment
+    kt.dbx("INSERT INTO attachments(task_id, comment_id, name, mime, size, path, created_at) VALUES(?,?,?,?,?,?,?)",
+           (T, CM, "report.md", "text/markdown", 3, f"p4315/{who}-report.md", ago(0)))
     r = S.post(B + f"/api/agents/{AID}/control/history/{by['comment']['id']}/undo")
     check(r.ok and not [k for k in requests.get(V + f"/tasks/{T}/comments", headers=H).json().get("data", []) if k["id"] == CM],
           f"{who}: undo the comment {r.status_code}")
+    fa = kt.dbx("SELECT deleted_at FROM attachments WHERE comment_id=?", (CM,))
+    kd = kt.dbx("SELECT deleted_at FROM comments WHERE id=?", (CM,))
+    check(len(fa) == 1 and fa[0][0] and fa[0][0] == kd[0][0], f"{who}: #4315 the comment's file lies in the trash (row kept) {fa}")
+    check([tuple(x) for x in kt.dbx("SELECT body FROM comment_trash_text WHERE comment_id=?", (CM,))] == [("A note by the agent",)],
+          f"{who}: #4315 the comment's text kept in the trash")
+    check(S.post(B + f"/api/comments/{CM}/restore").ok and [k for k in requests.get(V + f"/tasks/{T}/comments", headers=H).json().get("data", [])
+                                                          if k["id"] == CM and k.get("text", k.get("body")) == "A note by the agent"],
+          f"{who}: #4315 the undone comment restored from the trash")
+    check(kt.dbx("SELECT deleted_at FROM attachments WHERE comment_id=?", (CM,))[0][0] is None, f"{who}: #4315 its file restored too")
+    kt.dbx("DELETE FROM attachments WHERE comment_id=?", (CM,))
     check(S.post(B + f"/api/agents/{AID}/control/history/{by['comment']['id']}/undo").status_code == 409, f"{who}: undo twice -> 409")
     created = [x for x in hist(S, AID) if x["kind"] == "task_created" and x["title"] == "Routine task"]
     r = S.post(B + f"/api/agents/{AID}/control/history/{created[0]['id']}/undo")

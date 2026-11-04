@@ -426,21 +426,39 @@ def comment_update(cid):
 
 @app.delete("/api/comments/<int:cid>")
 def comment_delete(cid):
-    """Author, or the owner of the list (moderation). The comment disappears with its files."""
+    """Author, or the owner of the list (moderation). The comment disappears with its files.
+    2.530.0 A (#4315): into the trash -- text and files stay until the trash period ends (collab/cmttrash.py), Undo restores it."""
     c = db()
     r, role = need_live_comment(c, cid)
     if r["user_id"] != me() and role not in MANAGE_ROLES:
         return err(tr("Only the author or the project owner can delete this comment"), 403)
-    files = [a[0] for a in c.execute("SELECT path FROM attachments WHERE comment_id=?", (cid,))]
-    c.execute("DELETE FROM attachments WHERE comment_id=?", (cid,))
-    c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (iso(now_utc()), cid))
+    from .cmttrash import cmt_trash
+    cmt_trash(c, cid)
     c.execute("UPDATE agent_rules SET source_excerpt='' WHERE source_kind='comment' AND source_id=?", (cid,))  # 2.235.0 B2 (#2903): nor its copy in a rule
     from ..collab.news import news_forget_comment
     news_forget_comment(c, cid)  # 2.306.0 C (#2889)
     bump(c)
     c.commit()
-    unlink_files(files)
     return jsonify(ok=True)
+
+
+@app.post("/api/comments/<int:cid>/restore")
+def comment_restore(cid):
+    """2.530.0 A (#4315): a deleted comment back from the trash (within the trash period): the same people who could delete it
+    (author, list owner / admins). 404 when nothing is kept (deleted before, or the trash run was quicker)."""
+    from .cmttrash import cmt_restore
+    c = db()
+    r = c.execute("SELECT * FROM comments WHERE id=? AND deleted_at IS NOT NULL", (cid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    role = need_task(c, r["task_id"], write=False, full=True)
+    if r["user_id"] != me() and role not in MANAGE_ROLES:
+        return err(tr("Only the author or the project owner can delete this comment"), 403)
+    if not cmt_restore(c, cid):
+        raise Denied(404)
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, id=cid, task_id=r["task_id"])
 
 
 # ---- collaboration pushes (module "collab" of the recipient must be on; never to the person who acted;

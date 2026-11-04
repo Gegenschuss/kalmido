@@ -961,8 +961,17 @@ def v1_comment_update(cid):
 @app.delete("/api/v1/comments/<int:cid>")
 @v1_view
 def v1_comment_delete(cid):
-    """The author, or the list's owner / admins (moderation)."""
+    """The author, or the list's owner / admins (moderation). 2.530.0 A (#4315): into the trash (restore in the app); an agent
+    waits for a person's approval (rights checked first, like deleting a field)."""
     v1_args(())
+    c = db()
+    from ..collab.comments import need_live_comment
+    from ..core.access import MANAGE_ROLES
+    r, role = need_live_comment(c, cid)
+    if r["user_id"] != me() and role not in MANAGE_ROLES:
+        raise Denied(403, tr("Only the author or the project owner can delete this comment"))
+    t = c.execute("SELECT list_id FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
+    need_approval(c, N_("Delete a comment"), (), list_id=t["list_id"] if t else None, task_id=r["task_id"])
     v1_call(comment_delete, cid, body={})
     return Response(status=204)
 
@@ -1449,8 +1458,9 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "/comments/{id}": {
             "patch": op("Edit your comment", "Comments", ok(ref("Comment")) | errs("400", "403", "404"), [pid("id", "Comment id")], scope="comments",
                         body={"type": "object", "required": ["body"], "properties": {"body": {"type": "string"}}}),
-            "delete": op("Delete a comment (author, project owner / admins)", "Comments", nobody | errs("403", "404"), [pid("id", "Comment id")],
-                         scope="comments")},
+            "delete": op("Delete a comment (author, project owner / admins)", "Comments", nobody | acc | errs("403", "404"), [pid("id", "Comment id")],
+                         scope="comments", desc="2.530.0: into the trash (text and files stay for the trash period, a person restores it in the "
+                                                "app). Agents: waits for approval (202).")},
         # 2.41.0 (#1383): answer buttons / approval cards in comments
         "/comments/{id}/choice": {
             "post": op("Answer an agent's comment with its buttons (a person's token; agents never answer: 403)", "Comments",

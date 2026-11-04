@@ -253,11 +253,20 @@ function tcMsgMenu(anchor, mid) {
 async function tcMsgDelete(mid) {
   const m = tth_msg(mid); if (!m) return false;
   if (!await askConfirm(tr('Delete this message?'), '', {ok: tr('Delete'), danger: true})) return false;
+  const was = {body: m.body, dec: m._dec, rid: S.tc.rid};  // 2.530.0 A (#4315): the decrypted text for Undo (the server only has the ciphertext)
   try { await rawFetch('DELETE', `/api/team/messages/${mid}`); } catch (e) { toast(e.message); return false; }
   if (S.tc.edit === mid) S.tc.edit = null;
-  tth_each(mid, x => Object.assign(x, {deleted: true, body: '', reactions: []})); tcPatch(); announce(tr('Message deleted'));
+  tth_each(mid, x => Object.assign(x, {deleted: true, body: '', reactions: []})); tcPatch();
+  toast(tr('Message deleted'), () => tcMsgRestore(mid, was));  // 2.530.0 A (#4315): in the trash, Undo brings it back
   if (S.tc.th) tth_load().then(() => tcPatch());  // 2.139.0 A (#2127): the thread's count
   return true;
+}
+async function tcMsgRestore(mid, was) {  // 2.530.0 A (#4315)
+  let r; try { r = await rawFetch('POST', `/api/team/messages/${mid}/restore`); } catch (e) { toast(e.message); return; }
+  if (r.enc && was.dec) { r.body = was.body; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = r.body; }
+  if (S.tc.rid !== was.rid) return;
+  tth_each(mid, x => Object.assign(x, r)); tcPatch();
+  if (S.tc.th) tth_load().then(() => tcPatch());
 }
 async function tcEditSave(mid) {
   const t = tth_editBox(), m = tth_msg(mid); if (!t || !m) return;  // 2.139.0 A (#2127): also in the thread

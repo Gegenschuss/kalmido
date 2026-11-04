@@ -16171,5 +16171,6 @@
   "Also empty the trash of other owners?": "Svuotare anche il cestino di altri proprietari?",
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trova nel cestino dei loro progetti dove puoi modificare. Sparirebbe anche dal loro cestino. Non si può annullare.", "Come admin dell’istanza puoi eliminare definitivamente anche {0} attività di altri proprietari: si trovano nel cestino dei loro progetti dove puoi modificare. Sparirebbero anche dal loro cestino. Non si può annullare."],
   "Empty theirs too": "Svuota anche il loro",
-  "{0} video review (goes to the trash of the video reviews)": ["{0} revisione video (va nel cestino delle revisioni video)", "{0} revisioni video (vanno nel cestino delle revisioni video)"]
+  "{0} video review (goes to the trash of the video reviews)": ["{0} revisione video (va nel cestino delle revisioni video)", "{0} revisioni video (vanno nel cestino delle revisioni video)"],
+  "Delete a comment": "Eliminare un commento"
 }

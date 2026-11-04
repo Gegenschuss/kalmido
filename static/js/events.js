@@ -631,7 +631,10 @@ document.addEventListener('click', async e => {
       if (!await askConfirm(tr('Delete this comment?'), tr('Everyone in the project sees it disappear.'), {ok: tr('Delete'), danger: true})) break;
       try { await capi('DELETE', `/api/comments/${cid}`); } catch { break; }
       if (S.cedit === cid) S.cedit = null;
-      await loadTimeline(S.sel); break;
+      const ctid = S.sel;  // 2.530.0 A (#4315): in the trash, Undo brings it back with its files
+      await loadTimeline(ctid);
+      toast(tr('Comment deleted'), async () => { try { await capi('POST', `/api/comments/${cid}/restore`); } catch { return; } if (S.sel === ctid) loadTimeline(ctid); });
+      break;
     }
     case 'wait-edit': waitDialog(+a.dataset.id); break;
     case 'wait-clear': waitClear(+a.dataset.id); break;

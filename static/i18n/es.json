@@ -16170,5 +16170,6 @@
   "Also empty the trash of other owners?": "¿Vaciar también la papelera de otros propietarios?",
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Como administrador de la instancia también puedes eliminar definitivamente {0} tarea de otros propietarios: está en la papelera de sus proyectos donde puedes editar. También desaparecería de su papelera. No se puede deshacer.", "Como administrador de la instancia también puedes eliminar definitivamente {0} tareas de otros propietarios: están en la papelera de sus proyectos donde puedes editar. También desaparecerían de su papelera. No se puede deshacer."],
   "Empty theirs too": "Vaciar también la suya",
-  "{0} video review (goes to the trash of the video reviews)": ["{0} revisión de vídeo (pasa a la papelera de las revisiones de vídeo)", "{0} revisiones de vídeo (pasan a la papelera de las revisiones de vídeo)"]
+  "{0} video review (goes to the trash of the video reviews)": ["{0} revisión de vídeo (pasa a la papelera de las revisiones de vídeo)", "{0} revisiones de vídeo (pasan a la papelera de las revisiones de vídeo)"],
+  "Delete a comment": "Eliminar un comentario"
 }

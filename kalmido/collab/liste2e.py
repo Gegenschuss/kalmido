@@ -1056,6 +1056,8 @@ def le2a_finish(lid):
         return err(tr("No encryption change is running for this project."), 409)
     from ..tasks.atttrash import atr_purge_list  # 2.272.0 F (#3038, review E2-H1): the files in the trash were not converted
     gone = atr_purge_list(c, lid)
+    from .cmttrash import ctt_purge_list  # 2.530.0 A (#4315): nor the kept texts / files of deleted comments and channel messages
+    gone += ctt_purge_list(c, lid)
     if lr["e2e"] == "encrypting":
         c.execute("UPDATE tasks SET wait_note='' WHERE list_id=? AND COALESCE(wait_note, '')<>''", (lid,))  # not encrypted: it goes
         from .liste2eguard import le2b_scrub  # H2: copies of the plain texts in other tables (history, time entries, pushes, webhooks, agent events ...)

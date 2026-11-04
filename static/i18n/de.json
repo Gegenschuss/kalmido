@@ -16170,5 +16170,6 @@
   "Also empty the trash of other owners?": "Auch den Papierkorb anderer Besitzer leeren?",
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Als Admin der Instanz darfst du auch {0} Aufgabe anderer Besitzer endgültig löschen: Sie liegt im Papierkorb ihrer Projekte, in denen du bearbeiten darfst. Sie fehlt dann auch in deren Papierkorb. Das lässt sich nicht rückgängig machen.", "Als Admin der Instanz darfst du auch {0} Aufgaben anderer Besitzer endgültig löschen: Sie liegen im Papierkorb ihrer Projekte, in denen du bearbeiten darfst. Sie fehlen dann auch in deren Papierkorb. Das lässt sich nicht rückgängig machen."],
   "Empty theirs too": "Auch deren leeren",
-  "{0} video review (goes to the trash of the video reviews)": ["{0} Video-Freigabe (kommt in den Papierkorb der Video-Freigaben)", "{0} Video-Freigaben (kommen in den Papierkorb der Video-Freigaben)"]
+  "{0} video review (goes to the trash of the video reviews)": ["{0} Video-Freigabe (kommt in den Papierkorb der Video-Freigaben)", "{0} Video-Freigaben (kommen in den Papierkorb der Video-Freigaben)"],
+  "Delete a comment": "Einen Kommentar löschen"
 }

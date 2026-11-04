@@ -39,7 +39,6 @@ from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso
 from ..core.pg import insert_id
 from ..core.access import Denied, joined_lists_sql, list_role, task_visible, WRITE_ROLES
 from ..core.errors import BadInput, UnknownFields
-from ..core.serializers import unlink_files
 from ..api.common import v1_call, v1_err, V1Error
 from ..accounts.session import me
 from ..tasks.lifecycle import apply_update, task_reopen, trash_task
@@ -719,12 +718,10 @@ def ctl_undo(c, r, undo):
             return tr("The comment is gone already")
         if k["user_id"] != r["agent_id"] or not task_visible(c, k["task_id"], me()):
             return no
-        files = [x[0] for x in c.execute("SELECT path FROM attachments WHERE comment_id=?", (k["id"],))]
-        c.execute("DELETE FROM attachments WHERE comment_id=?", (k["id"],))
-        c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=?", (iso(now_utc()), k["id"]))
+        from ..collab.cmttrash import cmt_trash  # 2.530.0 A (#4315, B11): text and files into the trash like comment_delete
+        cmt_trash(c, k["id"])
         news_forget_comment(c, k["id"])
         c.commit()
-        unlink_files(files)
         return None
     changed = tr("Changed meanwhile by someone else – take it back by hand")
     try:

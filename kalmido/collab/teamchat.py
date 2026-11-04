@@ -23,7 +23,6 @@ from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_a
 from ..collab.reactions import clean_emoji
 from ..collab.replies import reply_check, reply_quotes
 from ..collab.comments import mention_names  # 2.369.5 (#2517): pulled up from functions
-from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
 
 
 # ---------------------------------------------------------------- 2.17.0 (#419): team chat
@@ -372,7 +371,7 @@ def md_brief(text):
 def tchat_msg_brief(c, m):
     names = user_names(c, [int(x) for x in MENTION_RE.findall(m["body"])])
     d = {"id": m["id"], "user_id": m["user_id"], "text": comment_plain(c, md_brief(m["body"]), names)[:140], "created_at": m["created_at"]}
-    if not d["text"] and not m["enc"]:  # 2.113.1 (#2059): a message with files only: the first file's name
+    if not d["text"] and not m["enc"] and not m["deleted_at"]:  # 2.113.1 (#2059): a message with files only: the first file's name (2.530.0 A #4315: a deleted one keeps them in the trash)
         f = c.execute("SELECT name FROM tchat_files WHERE message_id=? ORDER BY id LIMIT 1", (m["id"],)).fetchone()
         if f:
             d.update(text=f["name"][:140], file=True)
@@ -853,18 +852,31 @@ def tchat_edit(mid):
 
 @app.delete("/api/team/messages/<int:mid>")
 def tchat_delete(mid):
-    """My own message (list owners / admins: any in their channel). It stays as "deleted" in the conversation."""
+    """My own message (list owners / admins: any in their channel). It stays as "deleted" in the conversation.
+    2.530.0 A (#4315): into the trash -- text and files stay until the trash period ends (collab/cmttrash.py), Undo restores it."""
     c = db()
     need_tchat(c)
     m, _r = need_tmsg(c, mid, edit="delete")
-    c.execute("UPDATE tchat_msgs SET deleted_at=?, edited_at=?, body='', enc=NULL WHERE id=?", (iso_ms(now_utc()), iso_ms(now_utc()), mid))
+    from .cmttrash import tcx_trash
+    tcx_trash(c, mid)
     c.execute("DELETE FROM tchat_rx WHERE message_id=?", (mid,))
-    from .teamchan import tcx_files_drop
-    gone = tcx_files_drop(c, mid)  # 2.113.1 (#2059): its files go for good (rows now, the disk after the commit)
     c.commit()
-    if gone:
-        unlink_files(gone)
     return jsonify(ok=True, id=mid)
+
+
+@app.post("/api/team/messages/<int:mid>/restore")
+def tchat_restore(mid):
+    """2.530.0 A (#4315): a deleted message back from the trash (within the trash period): whoever could delete it. 404 when
+    nothing is kept (deleted before, or the trash run was quicker)."""
+    from .cmttrash import tcx_restore
+    c = db()
+    need_tchat(c)
+    m, _r = need_tmsg(c, mid, edit="delete")
+    if not m["deleted_at"] or not tcx_restore(c, mid):
+        raise Denied(404)
+    c.commit()
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
+    return jsonify(tchat_msg_dict(c, m, tchat_rx(c, [mid])))
 
 
 @app.post("/api/team/messages/<int:mid>/reactions")

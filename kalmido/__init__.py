@@ -89,6 +89,7 @@ ORDER = (
     "tasks.mineorder",  # 2.40.0 (#1344)
     "tasks.delta",  # 2.42.0 (#1376): GET /api/state/delta
     "collab.replies",  # 2.33.0 (#1076): before comments / teamchat / agents.chat (they import it)
+    "collab.cmttrash",  # 2.530.0 A (#4315): the trash of comments and team chat messages (helpers only)
     "collab.comments",
     "collab.news",
     "collab.integfail",  # 2.367.3 (#2971): an integration stopped working: News + push to who can repair it

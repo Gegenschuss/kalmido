@@ -725,6 +725,7 @@ ROUTES = {
     "POST /api/outline/parse": "pure",
     # ---- tasks (192)
     "DELETE /api/attachments/{}": "tasks", "DELETE /api/chat-files/{}": "tasks", "DELETE /api/comments/{}": "tasks",
+    "POST /api/comments/{}/restore": "tasks",  # 2.530.0 A (#4315): p4315_a_comment_trash_test.py, freelancer-matrix: tasks
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
     "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
@@ -806,6 +807,7 @@ ROUTES = {
     # ---- team (43)
     "DELETE /api/disc/blocks/{}": "team", "DELETE /api/disc/connections/{}": "team", "DELETE /api/disc/requests/{}": "team",
     "DELETE /api/e2e/keys": "team", "DELETE /api/team/messages/{}": "team", "DELETE /api/users/{}": "team",
+    "POST /api/team/messages/{}/restore": "team",  # 2.530.0 A (#4315): p4315_a_comment_trash_test.py, freelancer-matrix: team
     # 2.87.9 after the merge of 2.88.0 (#1980): the instance admin's account administration (an organisation admin only
     # deletes inside the own organisation)
     "GET /api/users/{}/delete-info": "admin", "POST /api/users/bulk": "admin",
@@ -1214,7 +1216,6 @@ DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/attachments/{}
 DELETE /api/v1/chat-attachments/{}
 DELETE /api/v1/clients/{}
-DELETE /api/v1/comments/{}
 DELETE /api/v1/comments/{}/reactions/{}
 DELETE /api/v1/contacts/{}
 DELETE /api/v1/event-calendars/{}

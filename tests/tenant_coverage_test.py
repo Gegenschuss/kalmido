@@ -586,6 +586,7 @@ ROUTES = {
     "POST /api/comments/{}/decide": "comment", "POST /api/v1/comments/{}/reactions": "comment",
     "DELETE /api/v1/comments/{}/reactions/{}": "comment", "PATCH /api/v1/comments/{}": "comment",
     "DELETE /api/v1/comments/{}": "comment", "PATCH /api/comments/{}": "comment", "DELETE /api/comments/{}": "comment",
+    "POST /api/comments/{}/restore": "comment",  # 2.530.0 A (#4315)
     "POST /api/comments/{}/reactions": "comment", "POST /api/comments/{}/apply": "comment",
     "POST /api/comments/{}/choice": "comment", "GET /api/comments/{}/choice": "comment",  # 2.41.0 (#1383)
     "POST /api/v1/comments/{}/choice": "comment", "POST /api/v1/comments/{}/withdraw": "comment",
@@ -897,6 +898,7 @@ ROUTES = {
     "GET /api/team": "team", "POST /api/team/dm": "team", "GET /api/team/rooms/{}/messages": "team",
     "POST /api/team/rooms/{}/messages": "team", "PATCH /api/team/messages/{}": "team",
     "DELETE /api/team/messages/{}": "team", "POST /api/team/messages/{}/reactions": "team",
+    "POST /api/team/messages/{}/restore": "team",  # 2.530.0 A (#4315)
     "POST /api/team/rooms/{}/read": "team",
     # 2.42.0 (#828, #909): end-to-end encryption -- the person's own keys; a DM partner's public key / the DM switch (need_room,
     # tchat_coworkers); the encrypted note (need_task) and an encrypted file (need_task + attachment rules) of a task

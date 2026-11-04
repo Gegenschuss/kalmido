@@ -16170,5 +16170,6 @@
   "Also empty the trash of other owners?": "Ook de prullenbak van andere eigenaren legen?",
   "As an instance admin you may also delete {0} task of other owners for good: it lies in the trash of their projects where you may edit. They would lose it from their trash too. This cannot be undone.": ["Als beheerder van de instantie mag je ook {0} taak van andere eigenaren definitief verwijderen: die ligt in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnt dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt.", "Als beheerder van de instantie mag je ook {0} taken van andere eigenaren definitief verwijderen: die liggen in de prullenbak van hun projecten waarin je mag bewerken. Ze verdwijnen dan ook uit hun prullenbak. Dit kan niet ongedaan worden gemaakt."],
   "Empty theirs too": "Ook die van hen legen",
-  "{0} video review (goes to the trash of the video reviews)": ["{0} videobeoordeling (gaat naar de prullenbak van de videobeoordelingen)", "{0} videobeoordelingen (gaan naar de prullenbak van de videobeoordelingen)"]
+  "{0} video review (goes to the trash of the video reviews)": ["{0} videobeoordeling (gaat naar de prullenbak van de videobeoordelingen)", "{0} videobeoordelingen (gaan naar de prullenbak van de videobeoordelingen)"],
+  "Delete a comment": "Een opmerking verwijderen"
 }

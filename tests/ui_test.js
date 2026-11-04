@@ -88,6 +88,12 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   // 2.142.2: CI red once with the fixed 700 ms (slow runner) - wait for the timeline to redraw
   await until(() => d.querySelectorAll('#d-tl .cm').length === before - 1);
   check(d.querySelectorAll('#d-tl .cm').length === before - 1, 'deleted comment disappears');
+  // 2.530.0 (#4315): the comment lies in the trash -- the toast's Undo brings it back (then it goes again for the steps below)
+  (await untilEl(w, '#toast:not(.hidden) button:not(.tx)', 5000))?.click();
+  await until(() => d.querySelectorAll('#d-tl .cm').length === before);
+  check(d.querySelectorAll('#d-tl .cm').length === before, 'Undo in the toast restores the deleted comment');
+  await api(w, 'DELETE', `/api/comments/${last.id}`); w.eval('loadTimeline(S.sel)');
+  await until(() => d.querySelectorAll('#d-tl .cm').length === before - 1);
   // link field: edit + invalid
   w.eval('closeDetail()'); await until(() => !w.eval('S.sel'));
   // 2.284.0 A (#3120): CI red twice at night - the panel's late redraw (openDetail's load after the fixed 700 ms) replaced
