@@ -155,7 +155,8 @@ async function le2eFileConvert(lid, row, mode) {
     fd.append('file', new Blob([f.data], {type: 'application/octet-stream'}), 'file'); fd.append('name', f.name); fd.append('type', f.type);
   } else {
     if (row.enc !== 2 && le2eIs(f.name)) throw new Error('name');  // never a cipher as a plain name
-    fd.append('file', le2fBlob(await le2eFileEnc(lid, f, 0, row.task_id)), 'encrypted.kenc');  // 2.539.0 (#4376): a converted file is bound to its task fd.append('name', await le2eFileNameEnc(lid, f.name));
+    // 2.539.0 (#4376): a converted file is bound to its task (a 0x02 file becomes 0x03 here)
+    fd.append('file', le2fBlob(await le2eFileEnc(lid, f, 0, row.task_id)), 'encrypted.kenc'); fd.append('name', await le2eFileNameEnc(lid, f.name));
   }
   try { return await rawFetch('POST', `/api/lists/${lid}/e2e/files/${row.id}`, fd); }
   catch (x) { if (x.status === 409 && !x.data?.code) return {ok: true, id: row.id, skipped: true}; throw x; }  // done meanwhile
