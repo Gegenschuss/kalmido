@@ -39,6 +39,9 @@ concurrency:
 # "push" = the security / rights / tenant / org / freelancer suites, the core flows and the suites of the touched areas
 # (pull requests, pushes on main without a release), in as many shards as ~15 min each need. The shard jobs are named
 # "Test suites <N>/<M> <stage> (API, UI, security)": the stage of a green run is readable from the job names.
+# #4557 (04.11.2026): the groups of the hard areas (office, invoices, backup, login: tests/hard_suites.txt) get their own shards
+# 1..H of ~9 min each (tools/shards.py --hard-target-min), the first entries of the matrix, so they are queued before the others;
+# their jobs are named "Test suites <N>/<M> <stage> hart (API, UI, security)". A release in the fast lane waits for these only.
 jobs:
   plan:
     name: Shard plan (stage, suite times of the last runs)
@@ -53,6 +56,8 @@ jobs:
       stage: ${{ steps.plan.outputs.stage }}
       count: ${{ steps.plan.outputs.count }}
       shards: ${{ steps.plan.outputs.shards }}
+      hard: ${{ steps.plan.outputs.hard }}
+      matrix: ${{ steps.plan.outputs.matrix }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -100,7 +105,7 @@ jobs:
           done
           printf '%s\n' $order > /tmp/timings/order.txt
           echo "runs (oldest first): ${order:-none - estimates only}"
-      - name: Plan (full 20 shards, push stage ~15 min per shard)
+      - name: Plan (full ~30 min per shard, push stage ~15 min per shard, hard shards first ~9 min)
         id: plan
         env:
           STAGE: ${{ steps.stage.outputs.stage }}
@@ -110,21 +115,26 @@ jobs:
           stage=$STAGE
           if [ "$stage" = push ]; then
             python3 tools/shards.py --shards 20 --only /tmp/push-groups.txt $t | sed -n 1p || true
-            python3 tools/shards.py --shards 20 --target-min 15 --only /tmp/push-groups.txt --assign $t > shard-plan.txt \
+            python3 tools/shards.py --shards 20 --target-min 15 --hard-target-min 9 --only /tmp/push-groups.txt --assign $t > shard-plan.txt \
               || { stage=full; REASON="push stage plan failed - full run"; }
           fi
           if [ "$stage" = full ]; then
             # job/2398 (CI of 2.493.0): 20 fixed shards had grown to a 37-min plan, two shards hit the 50-min limit with every
             # suite green - the full run now takes as many shards as 30 min each need (at most 28; above 20 they queue)
-            python3 tools/shards.py --shards 28 --target-min 30 $t | tail -5
-            python3 tools/shards.py --shards 28 --target-min 30 --assign $t > shard-plan.txt
+            # #4557: + the hard groups on their own shards 1..H (~9 min each, at most 8) in front of the 28
+            python3 tools/shards.py --shards 28 --target-min 30 --hard-target-min 9 $t | tail -6
+            python3 tools/shards.py --shards 28 --target-min 30 --hard-target-min 9 --assign $t > shard-plan.txt
           fi
           test -s shard-plan.txt
           n=$(awk '!/^#/ && $2 > m {m = $2} END {print m + 0}' shard-plan.txt)
           test "$n" -ge 1
-          { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; } >> "$GITHUB_OUTPUT"
-          echo "::notice title=stage::$stage - $n shards, $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
-          { echo "### Test stage: $stage ($n shards)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
+          # #4557: "# hard H" = shards 1..H hold the hard groups; the matrix lists them first, their job name says "hart"
+          h=$(sed -n 's/^# hard \([0-9][0-9]*\)$/\1/p' shard-plan.txt | sed -n 1p); h=${h:-0}
+          test "$h" -lt "$n" || h=0
+          matrix=$(python3 -c 'import json, sys; n, h = map(int, sys.argv[1:]); print(json.dumps([{"shard": k, "hart": " hart" if k <= h else ""} for k in range(1, n + 1)]))' "$n" "$h")
+          { echo "stage=$stage"; echo "count=$n"; echo "shards=[$(seq -s, 1 "$n")]"; echo "hard=$h"; echo "matrix=$matrix"; } >> "$GITHUB_OUTPUT"
+          echo "::notice title=stage::$stage - $n shards ($h hard first), $(grep -vc '^#' shard-plan.txt) groups - ${REASON//%/%25}"
+          { echo "### Test stage: $stage ($n shards, $h of them hard first)"; echo; echo "$REASON"; } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: shard-plan
@@ -357,14 +367,16 @@ jobs:
     # `shard N` markers of run_all.sh, tests/run_all.sh --shard N/18 with KALMIDO_SHARD_PLAN). fail-fast off: every shard
     # reports its own failures. The job "Test suites" below needs all of them. 2.180.0 A (#2695): the number of shards and the
     # stage come from "plan" (full: 20 since #1315; push: fewer)
-    name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }} (API, UI, security)
+    # #4557: "hart" after the stage for the shards of the hard groups (the release tooling's fast lane waits for those)
+    name: Test suites ${{ matrix.shard }}/${{ needs.plan.outputs.count }} ${{ needs.plan.outputs.stage }}${{ matrix.hart }} (API, UI, security)
     runs-on: ubuntu-latest
     needs: plan
     timeout-minutes: 50  # 2.80.1: four shards ran into the 30 min limit on a slow runner; CI of 2.166.1 (#945): 50 as a safety net (#1315: 20 shards, the plan aims at ~30 min per shard)
     strategy:
       fail-fast: false
+      # #4557: [{shard, hart}] in shard order - the hard shards 1..H first, so they are queued before the others
       matrix:
-        shard: ${{ fromJSON(needs.plan.outputs.shards) }}
+        include: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
