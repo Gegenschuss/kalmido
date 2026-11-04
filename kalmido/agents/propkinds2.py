@@ -598,6 +598,8 @@ def pk2_undo(c, j, rec):
                 and not c.execute("SELECT 1 FROM office_doc_log WHERE org_id=? AND doc_id=? AND id>? AND action IN ('update','items','number','status') LIMIT 1",
                                   (oid, rec["offer"], rec.get("offer_log") or 0)).fetchone():  # changes within the same second
             from ..office.ledger import ofx_log
+            from ..office.otrash import dvb_otb_draft
+            dvb_otb_draft(c, oid, uid, rec["offer"])  # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office
             c.execute("DELETE FROM office_docs WHERE id=? AND org_id=? AND status='draft' AND number=''", (rec["offer"], oid))
             from ..office.docref import ofd_deleted
             ofd_deleted(c, rec["offer"])  # 2.199.0 G (#2742): its folder entry goes along

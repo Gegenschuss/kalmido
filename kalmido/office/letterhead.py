@@ -339,9 +339,9 @@ def bp_upload():
     fname = re.sub(r"[\x00-\x1f\x7f/\\]", "", os.path.basename(f.filename or ""))[:120]
     lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev, pdfa=[], fmt=bp_fmt(sizes))  # 2.469.0 (#3352)
     _save(c, oid, lh)
-    bp_purge(oid, {name, prev})
     ofx_log(c, oid, "upload", target="letterhead", detail={"bytes": len(raw), "pages": pages, "sha256": sha})
     c.commit()
+    bp_purge(oid, {name, prev})  # 2.533.0 A2 (#4318 B21): files go only after the commit (a failed save keeps the old one)
     return jsonify(letterhead=bp_public(lh, c, oid))
 
 
@@ -382,9 +382,9 @@ def bp_delete():
         lh["prev"], lh["file"] = lh["file"], ""
         lh.update(sha256="", bytes=0, pages=0, fmt="")
         _save(c, oid, lh)
-        bp_purge(oid, {lh["prev"]})
         ofx_log(c, oid, "delete", target="letterhead")
         c.commit()
+        bp_purge(oid, {lh["prev"]})  # 2.533.0 A2 (#4318 B21): after the commit
     return jsonify(letterhead=bp_public(lh, c, oid))
 
 

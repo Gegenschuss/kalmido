@@ -16197,5 +16197,6 @@
   "{0} hospitality receipt": ["{0} representatiebon", "{0} representatiebonnen"],
   "{0} trip cost": ["{0} reiskostenpost", "{0} reiskostenposten"],
   "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} bestand dat deze persoon in directe berichten of groepen stuurde, wordt definitief verwijderd: de anderen verliezen het ook.", "{0} bestanden die deze persoon in directe berichten of groepen stuurde, worden definitief verwijderd: de anderen verliezen ze ook."],
-  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "De projecten worden definitief verwijderd met al hun taken, ook die van andere leden: ze gaan niet naar de prullenbak."
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "De projecten worden definitief verwijderd met al hun taken, ook die van andere leden: ze gaan niet naar de prullenbak.",
+  "Offline changes made before the sign-in were kept and are sent from here": "Offline wijzigingen van vóór het aanmelden zijn bewaard en worden van hieruit verzonden"
 }

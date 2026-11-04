@@ -494,6 +494,8 @@ def _offer_drop(c, sheet, uid, did):
                  (did, oid, *SH2_OFFER_UNTOUCHED)).fetchone():
         return "edited"  # 2.270.0 B (#3021): changed in the office since the press (items, client, texts ...): the work stays
     ofx_log(c, oid, "delete", doc_id=did, detail={"number": r["number"], "status": r["status"]})
+    from ..office.otrash import dvb_otb_draft
+    dvb_otb_draft(c, oid, uid, did)  # 2.533.0 A2 (#4318 B20): into the office trash, as a draft deleted in the office
     c.execute("DELETE FROM office_docs WHERE id=? AND org_id=?", (did, oid))
     ofd_deleted(c, did)  # 2.199.0 G (#2742): its folder node goes with it
     return True

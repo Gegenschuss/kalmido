@@ -453,6 +453,19 @@ def wiki_create():
     return jsonify(wiki_dict(wiki_need(c, pid))), 201
 
 
+def dvb_wiki_locked(c, ids):
+    """2.533.0 A2 (#4318 A17): the linking pages a rename changes, each under its save lock (the name of wiki_update, taken
+    in id order) and read again after it: a save of the page in between is never overwritten with the text read before.
+    -> {id: row} of the pages still alive (a page trashed in between drops out)."""
+    out = {}
+    for i in sorted({int(x) for x in ids}):
+        write_lock(c, f"wiki-{i}")
+        p = c.execute("SELECT id, org_id, owner_id, body FROM wiki_pages WHERE id=? AND deleted_at IS NULL", (i,)).fetchone()
+        if p:
+            out[i] = p
+    return out
+
+
 def wiki_relink(c, r, old, new, uid, ts, only_edit=False):
     """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed.
     only_edit (2.200.0 F, #2747 review B7: a rename through a share): only pages uid may edit, the others stay untouched."""
@@ -460,8 +473,9 @@ def wiki_relink(c, r, old, new, uid, ts, only_edit=False):
     w, a = wiki_space_sql(r["org_id"], r["owner_id"] or uid)  # 2.200.0 B (#2747): the page's space (an edit share: another person's)
     rx = re.compile(r"\[\[\s*" + re.escape(old) + r"\s*(?=[\]|#])", re.I)
     n = 0
-    for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
-                       f"AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}", [old.lower(), *a]).fetchall():
+    hit = [x[0] for x in c.execute(f"SELECT DISTINCT p.id FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.to_path=? "
+                                   f"AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}", [old.lower(), *a]).fetchall()]
+    for p in dvb_wiki_locked(c, hit).values():  # 2.533.0 A2 (#4318 A17): under the page's save lock, read again
         try:
             ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])  # 2.123.0 A (#2105)
         except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable page keeps its text (and its old link)
@@ -488,11 +502,15 @@ def wiki_relink_many(c, oid, uid, renames, ts):
     by, n = {}, 0
     for i in range(0, len(renames), 500):
         part = [o.lower() for o, _ in renames[i:i + 500]]
-        for p in c.execute(f"SELECT DISTINCT p.id, p.org_id, p.owner_id, p.body, k.to_path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id "
+        for p in c.execute(f"SELECT DISTINCT p.id, k.to_path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id "
                            f"WHERE k.to_path IN ({','.join('?' * len(part))}) AND p.deleted_at IS NULL AND p.{w.replace(' AND ', ' AND p.')}",
                            [*part, *a]).fetchall():
-            by.setdefault(p["id"], [p, set()])[1].add(p["to_path"])
-    for p, linked in by.values():
+            by.setdefault(p["id"], set()).add(p["to_path"])
+    rows = dvb_wiki_locked(c, by)  # 2.533.0 A2 (#4318 A17): under each page's save lock, read again
+    for pid, linked in by.items():
+        p = rows.get(pid)
+        if p is None:
+            continue
         try:
             ob = wkh_open(c, p["org_id"], p["owner_id"], p["body"])
         except WikiUnreadable:  # 2.126.2 B (#2358): an unreadable page keeps its text (and its old link)

@@ -374,6 +374,7 @@ def agb_purge(c, oid, now=None, purge=True):
             f = agb_frozen(r["terms"])
             if f:
                 keep.add(f["file"])
+    keep.update(dvb_trash_terms(c, oid))  # 2.533.0 A2 (#4318 B21): + the copies in the office trash (restorable)
     n = 0
     for name in names:
         if name in keep:
@@ -387,6 +388,24 @@ def agb_purge(c, oid, now=None, purge=True):
         except OSError:
             continue  # the next round tries again
     return n
+
+
+def dvb_trash_terms(c, oid):
+    """2.533.0 A2 (#4318 B21): the terms files named by a document copy in the office trash (office_trash.snap) of office
+    area oid: a restored draft finds its frozen terms again."""
+    out = set()
+    for r in c.execute("SELECT snap FROM office_trash WHERE org_id=? AND snap LIKE ?", (oid, '%terms-%')):
+        try:
+            snap = json.loads(r["snap"]) if isinstance(r["snap"], str) else {}
+        except ValueError:
+            continue
+        for tbl, rows in (snap.get("rows") or []) if isinstance(snap, dict) else []:
+            if tbl in ("office_docs", "office_gen_docs") and isinstance(rows, list):
+                for x in rows:
+                    f = agb_frozen(x.get("terms")) if isinstance(x, dict) else None
+                    if f:
+                        out.add(f["file"])
+    return out
 
 
 def agb_purge_tick(c):

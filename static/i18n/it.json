@@ -16198,5 +16198,6 @@
   "{0} hospitality receipt": ["{0} ricevuta di rappresentanza", "{0} ricevute di rappresentanza"],
   "{0} trip cost": ["{0} spesa di viaggio", "{0} spese di viaggio"],
   "{0} file this person sent in direct messages or groups is deleted for good: the other people lose it too.": ["{0} file che questa persona ha inviato in messaggi diretti o gruppi viene eliminato definitivamente: anche gli altri lo perdono.", "{0} file che questa persona ha inviato in messaggi diretti o gruppi vengono eliminati definitivamente: anche gli altri li perdono."],
-  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "I progetti vengono eliminati definitivamente con tutte le loro attività, anche quelle di altri membri: non finiscono nel cestino."
+  "The projects are deleted for good with all their tasks, also those of other members: they do not go to the trash.": "I progetti vengono eliminati definitivamente con tutte le loro attività, anche quelle di altri membri: non finiscono nel cestino.",
+  "Offline changes made before the sign-in were kept and are sent from here": "Le modifiche offline precedenti all'accesso sono state conservate e vengono inviate da qui"
 }

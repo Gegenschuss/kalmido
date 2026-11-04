@@ -472,7 +472,7 @@ async function obxDrain() {
   if (map && Object.keys(map).length) { const idm = LS.get('idmap', {}); Object.assign(idm, map); Object.assign(HIST.ids, map); LS.set('idmap', idm); OBX.st.setMeta('swmap', undefined).catch(() => {}); }
   if (res?.length) {
     OBX.st.setMeta('swres', undefined).catch(() => {});
-    setTimeout(() => { for (const j of res) if (j.conflicts?.length) addConflicts(j.id, j.conflicts, j.title); if (res.some(j => j.skipped)) toast(tr('Recurring task was already checked off, not advanced twice')); }, 0);
+    setTimeout(() => { for (const j of res) if (j.conflicts?.length) addConflicts(j.id, j.conflicts, j.title); if (res.some(j => j.skipped)) toast(tr('Recurring task was already checked off, not advanced twice')); if (res.some(j => j.nouid)) toast(tr('Offline changes made before the sign-in were kept and are sent from here')); }, 0);  // 2.533.0 A2 (#4318 A15)
   }
   if (map && Object.keys(map).length && typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline
 }

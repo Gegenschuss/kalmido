@@ -84,6 +84,18 @@ def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=()):
     return tid
 
 
+def dvb_otb_draft(c, oid, uid, did):
+    """2.533.0 A2 (#4318 B20): the office trash copy of draft did before an undo deletes it (a table's offer step, an agent's
+    proposal taken back), labelled as docs.odoc_delete does, with the time entries it billed. None when the row is gone."""
+    r = c.execute("SELECT id, kind, number, project_title, client_id FROM office_docs WHERE id=? AND org_id=?", (did, oid)).fetchone()
+    if not r:
+        return None
+    te = [x[0] for x in c.execute("SELECT id FROM time_entries WHERE billed_doc_id=?", (did,)).fetchall()]
+    cl = c.execute("SELECT name FROM clients WHERE id=?", (r["client_id"],)).fetchone() if r["client_id"] else None
+    return otb_put(c, oid, uid, "doc", "office_docs", did, " · ".join(x for x in (r["project_title"] or r["number"], cl and cl["name"]) if x),
+                   sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
+
+
 def _insert(c, table, row):
     if table == "office_docs":  # 2.370.2 (#3088): the same request may have made a new document meanwhile (ofi_ref_doc)
         row = {**row, "client_ref": None}

@@ -9,6 +9,10 @@ could drop the entry, the tab that sends it again, an agent's retry after a lost
 
 Never swallows an effect: only a stored 2xx answer is replayed. A row without an answer (the first request still running:
 waited for a moment; or it committed and then failed) lets the repeat run as before and the new 2xx answer is stored.
+2.533.0 A2 (#4318 A14): not on the app's own routes (the offline queue, the service worker): there a committed claim is the
+committed effect, so a request that committed and then failed (5xx, e.g. a push after the commit) keeps its key as done,
+and a repeat that finds a committed claim without an answer gets {"ok": true} instead of applying the change a second time
+(a log entry, a new row). API v1 (agents, who may retry a call whose later steps failed) stays as before.
 Without the header nothing changes. Keys older than IDEM_DAYS (14, 2.380 H #3387) go when the same person claims a new key.
 """
 import json
@@ -36,6 +40,11 @@ def _idem_key():
     k = (request.headers.get(IDEM_HEADER) or "").strip()
     u = getattr(g, "user", None)
     return k if k and _IDEM_KEY.match(k) and u is not None else None
+
+
+def dvb_idem_app():
+    """2.533.0 A2 (#4318 A14): an app route (not API v1): a committed claim counts as the effect done (see the module text)."""
+    return not request.path.startswith("/api/v1/")
 
 
 def _idem_replay(r):
@@ -69,6 +78,8 @@ def idem_claim():
         if r["status"] is not None:
             return _idem_replay(r)
         if time.monotonic() > end:
+            if dvb_idem_app():  # 2.533.0 A2 (#4318 A14): committed = done, never applied twice
+                return _idem_replay({"status": 200, "body": None})
             g.idem_k = k  # committed without an answer (failed after its commit): runs again, its answer is stored
             return None
         time.sleep(0.1)
@@ -94,6 +105,8 @@ def idem_store(resp):
         if c.execute("SELECT 1 FROM idem_keys WHERE user_id=? AND k=? AND status IS NULL FOR UPDATE SKIP LOCKED", (g.user["id"], k)).fetchone():
             if ok:
                 c.execute("UPDATE idem_keys SET status=?, body=? WHERE user_id=? AND k=?", (resp.status_code, body, g.user["id"], k))
+            elif resp.status_code >= 500 and dvb_idem_app():  # 2.533.0 A2 (#4318 A14): committed, then a server error: done
+                c.execute("UPDATE idem_keys SET status=200, body=NULL WHERE user_id=? AND k=?", (g.user["id"], k))
             else:  # committed and then failed: the key is free again
                 c.execute("DELETE FROM idem_keys WHERE user_id=? AND k=?", (g.user["id"], k))
         c.commit()

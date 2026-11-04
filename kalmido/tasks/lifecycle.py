@@ -881,8 +881,11 @@ def purge_done():
     if b.get("dry"):
         return jsonify(own=mine, others=others)
     allx = b.get("others") is True
-    n = c.execute(f"UPDATE tasks SET deleted_at=? WHERE {base}" + ("" if allx else f" AND {own}"),
-                  (iso(now_utc()), uid, *(() if allx else (uid, uid)))).rowcount
+    gone = [r[0] for r in c.execute(f"UPDATE tasks SET deleted_at=? WHERE {base}" + ("" if allx else f" AND {own}") + " RETURNING id",
+                                    (iso(now_utc()), uid, *(() if allx else (uid, uid)))).fetchall()]
+    for tid in gone:  # 2.533.0 A2 (#4318 B8): a history line per task, as the list's "Clear completed" (trash_task)
+        log_act(c, tid, "delete")
+    n = len(gone)
     bump(c)
     c.commit()
     return jsonify(count=n, kept=0 if allx else others)

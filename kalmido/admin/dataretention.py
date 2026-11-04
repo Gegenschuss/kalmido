@@ -309,7 +309,7 @@ def orf_prune_versions(c, nid=None, kill=None):
         for i in range(0, len(ids), ORF_BATCH):
             part = ids[i:i + ORF_BATCH]
             office.update(x[0] for x in c.execute(f"SELECT node_id FROM ({DRT_OFFICE_NODES}) o WHERE node_id IN ({','.join('?' * len(part))})", part))
-        kept = office | {n for n in ids if n not in office and olk_fs_locked(c, n)}
+        kept = office | {n for n in ids if n not in office and olk_fs_locked(c, n, arrival=True)}  # 2.533.0 A2 (#4318 B30): + a received e-invoice
         rows = [r for r in rows if r["node_id"] not in kept]
     if rows and kill:
         c.execute(f"DELETE FROM fs_versions WHERE id IN ({','.join('?' * len(rows))})", [r["id"] for r in rows])
