@@ -16175,5 +16175,6 @@
   "{0} time entries restored": "{0} registros de tiempo restaurados",
   "Last deleted ({0}): {1} entries ({2}).": "Última eliminación ({0}): {1} registros ({2}).",
   "The entries stay restorable until the trash period ends (Undo, or here again).": "Los registros se pueden restaurar hasta que termine el plazo de la papelera (Deshacer, o aquí de nuevo).",
-  "Delegation to an agent": "Delegación al agente"
+  "Delegation to an agent": "Delegación al agente",
+  "You already have a company with this name": "Ya tienes una empresa con este nombre"
 }

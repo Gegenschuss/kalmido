@@ -3,7 +3,8 @@
 """2.422.0 API tests (#2937: a self-employed person creates a company of her own; private accounts register without an
 invitation, a switch per server, default off), own container (start.sh, SMTP sink stub_mail.py). Invented names only.
  (a) frida (no organisation) creates "Frida Studio" (POST /api/orgs): 201, she is its only member and admin, the company
-     is among her workspaces; a taken name = 409; at most 3 companies of her own (the 4th = 409)
+     is among her workspaces; a name she already uses = 409, 2.512.0 (#4077) somebody else's = 201 (no answer tells the
+     names of other customers; the server admin's route stays server-wide); at most 3 companies of her own (the 4th = 409)
  (b) the e-mail domains of such a company: not by her (403), by the server's admin yes
  (c) her personal office moves into a new company of her own (POST /api/office/move, before 2.422 only the server's
      admin; rollback test: 403 without the fix); can_move in her office settings
@@ -68,7 +69,15 @@ o = next((x for x in mine if x["id"] == OID), {})
 check(o and o.get("role") == "admin" and [m["id"] for m in o.get("members", [])] == [FID],
       f"(a) she is its only member and its admin ({o})")
 check(sql("SELECT self_made FROM orgs WHERE id=?", (OID,)) == [(FID,)], "(a) marked as a company of her own (her id)")
-check(Fr.post(B + "/api/orgs", json={"name": "frida studio"}).status_code == 409, "(a) a taken name: 409")
+r = Fr.post(B + "/api/orgs", json={"name": "frida studio"})
+check(r.status_code == 409 and "You already have" in r.text, f"(a) a name of her own again: 409, about her own ({r.status_code} {r.text[:120]})")
+# 2.512.0 (#4077): the name of somebody else's company tells nothing: it just works
+PAID, Pa = freelancer(B, A, "paula")
+r = Pa.post(B + "/api/orgs", json={"name": "FRIDA studio"})
+check(r.status_code == 201, f"(a) paula may use the name of frida's company: 201 ({r.status_code} {r.text[:120]})")
+check(Pa.post(B + "/api/orgs", json={"name": "Frida Studio"}).status_code == 409, "(a) paula's own name again: 409")
+r = A.post(B + "/api/admin/orgs", json={"name": "Frida Studio"})
+check(r.status_code == 409 and "An organisation with this name exists" in r.text, f"(a) the server admin's route stays server-wide: 409 ({r.status_code})")
 check(Fr.post(B + "/api/orgs", json={"name": " "}).status_code == 400, "(a) no name: 400")
 for n in ("Frida Two", "Frida Three"):
     check(Fr.post(B + "/api/orgs", json={"name": n}).status_code == 201, f"(a) {n}: 201")
@@ -117,8 +126,13 @@ GID, Gr = freelancer(B, A, "gina")
 Gr.patch(B + "/api/settings", json={"workspace": "private"})
 st = Gr.get(B + "/api/office/settings").json()
 check(st.get("personal") == 1 and st.get("can_move") == 1, f"(c) gina's personal office offers the move ({ {k: st.get(k) for k in ('personal', 'can_move')} })")
-r = Gr.post(B + "/api/office/move", json={"name": "Gina Works", "confirm": True})
-check(r.ok and r.json().get("org_id"), f"(c) gina moves her personal office into Gina Works ({r.status_code} {r.text[:160]})")
+# 2.512.0 (#4077): the move asks the same: only a name of her own stops it, not the name of frida's company
+assert Gr.post(B + "/api/orgs", json={"name": "Gina Works"}).status_code == 201
+Gr.patch(B + "/api/settings", json={"workspace": "private"})
+r = Gr.post(B + "/api/office/move", json={"name": "gina works", "confirm": True})
+check(r.status_code == 409 and "You already have" in r.text, f"(c) a name of her own: 409 ({r.status_code} {r.text[:160]})")
+r = Gr.post(B + "/api/office/move", json={"name": "Frida Studio", "confirm": True})
+check(r.ok and r.json().get("org_id"), f"(c) gina moves her personal office into a company named like frida's ({r.status_code} {r.text[:160]})")
 GOID = r.json().get("org_id") if r.ok else None
 check(GOID and sql("SELECT self_made, personal_of FROM orgs WHERE id=?", (GOID,)) == [(GID, None)], "(c) a company of her own, no personal office any more")
 

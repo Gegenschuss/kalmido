@@ -990,6 +990,13 @@ def org_heir_to(c, oid, uid, raw):
     return None
 
 
+def org_self_name_taken(c, uid, name):
+    """2.512.0 (#4077): uid already created a company of this name. Only uid's own: an answer about the names of the whole
+    server would tell anybody which companies its other customers are called (the server admin's route stays server-wide)."""
+    return bool(c.execute("SELECT 1 FROM orgs WHERE self_made=? AND lower(name)=lower(?) AND personal_of IS NULL AND retired_at IS NULL",
+                          (uid, name)).fetchone())
+
+
 def org_self_made_n(c, uid):
     """The companies uid created herself (2.422.0, #2937; review: also the ones she left or handed over)."""
     return c.execute("SELECT COUNT(*) FROM orgs WHERE self_made=? AND personal_of IS NULL AND retired_at IS NULL", (uid,)).fetchone()[0]
@@ -998,8 +1005,8 @@ def org_self_made_n(c, uid):
 @app.post("/api/orgs")
 def org_self_create():
     """2.422.0 (#2937): {name, icon?} -- the signed-in person creates a company and becomes its admin (201, like
-    POST /api/admin/orgs). 403 for agents and kid accounts, 403 outside the mode workspaces, 409 for a taken name or when
-    she already has ORG_SELF_MAX companies of her own."""
+    POST /api/admin/orgs). 403 for agents and kid accounts, 403 outside the mode workspaces, 409 when she already has a
+    company of this name (#4077: only her own count) or ORG_SELF_MAX companies of her own."""
     if (g.user["kind"] or "user") == "agent" or g.user["kid"]:
         raise Denied(403, tr("Only a person can create a company"))
     c, b, uid = db(), body(), me()
@@ -1007,8 +1014,8 @@ def org_self_create():
         if instance_mode(c) != "workspaces":
             raise Denied(403, tr("Only an admin of this server can create an organisation"))
         name = _clean_name(b.get("name"))
-        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
-            return err(tr("An organisation with this name exists"), 409)
+        if org_self_name_taken(c, uid, name):
+            return err(tr("You already have a company with this name"), 409)
         if org_self_made_n(c, uid) >= ORG_SELF_MAX:
             return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
         oid = insert_id(c, "INSERT INTO orgs(name,icon,domains,created_at,self_made) VALUES(?,?,?,?,?)",

@@ -31,7 +31,7 @@ IMPORT_MAX = 4 * 1024 * 1024
 
 from .homecur import HC_CODES, hc_bookings, hc_pack_editable  # noqa: E402  2.189.0 (#2475)
 from .model import office_ctx as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
-from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import ORG_NAME_MAX, ORG_SELF_MAX, instance_mode, org_member_add, org_self_made_n, org_self_name_taken  # 2.369.5 (#2517): pulled up from functions
 from .model import pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 
@@ -445,7 +445,10 @@ def pb_move_post():
     if not name:
         return err(tr("Name missing"))
     with system_ctx(c):  # creating an organisation (instance structure) out of the caller's own area
-        if c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
+        if own:  # 2.512.0 (#4077): as POST /api/orgs, only her own names: nothing about the other customers of the server
+            if org_self_name_taken(c, uid, name):
+                return err(tr("You already have a company with this name"), 409)
+        elif c.execute("SELECT 1 FROM orgs WHERE lower(name)=lower(?) AND personal_of IS NULL", (name,)).fetchone():
             return err(tr("An organisation with this name exists"), 409)
         if own and org_self_made_n(c, uid) >= ORG_SELF_MAX:
             return err(tr("You already have {0} companies of your own", ORG_SELF_MAX), 409)
