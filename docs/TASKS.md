@@ -4,7 +4,7 @@ Start page, projects with dependencies and custom fields, templates, undo, stati
 
 ## Start page
 
-A tap on the logo (*Kalmido* at the top of the sidebar) opens the **start page** (the dashboard): what waits for you (approvals,
+The **Start** icon (the first one in the bar of the areas on a computer, and in the phone's drawer) opens the **start page** (the dashboard): what waits for you (approvals,
 mentions, assignments), today's tasks (complete them right there), News bundled, the team chat, your projects with
 their progress, pinned tasks, recent notes, the agents, a few numbers and a search field. *Customize* orders the cards
 (↑ ↓, also with the keyboard) and hides the ones you do not need; the choice follows you to every device. The same
@@ -39,12 +39,12 @@ the task has `"type": "bug" | "feature" | "task" | null`; `GET /api/v1/tasks?typ
 
 Every list is a project. For projects that need more than a to-do pile, switch on *Progress and status* (project dialog, the project's
 … menu or right-click in the sidebar): the progress ring, the status, the project page and the row in *All projects* appear.
-Dependencies (and the Gantt arrows; 2.41.0: time tracking is a switch of its own per project, `time_tracking`, off by default)
+Dependencies (and the Gantt arrows; 2.41.0: time tracking is a switch of its own per project, `time_tracking`; a new project has it on when the module Time is on for its creator)
 and custom fields follow the modules below, so a shopping list or a household project never shows fields unless you want them. The
 modules below stay the outer switch: a feature shows when its module is on **and** the project has the matching switch. Switching
 *Progress and status* off again only hides these things (nothing is deleted). The server refuses a custom field value
 or a status on a project without the switch with a clear message. Time tracking (2.41.0) has its own switch in the project settings
-(*Track time in this project*, off by default; projects with time entries got it on with the update):
+(*Track time in this project*; on in a new project when the module Time is on for its creator, off otherwise; projects with time entries got it on with the update):
 without it the server refuses a timer or a new time entry, tracked time stays in the review and reports. Projects that already had dependencies, custom fields, a status or at least five
 minutes of tracked time got *Progress and status* on with the update; checklists stayed checklists. Each person can hide a project's progress bar with the
 small **×** next to it (*Show progress* in the project's … menu or the project dialog brings it back).
@@ -61,9 +61,9 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
     (*Connect to…*), or the keyboard (focus a bar with Tab, press **C**, then Enter on the target) do the same;
     *Pick from a project…* opens the searchable picker. Shift+F10 or right-click opens a bar's menu.
   - **Remove:** click an arrow for *Remove dependency* and links to both tasks, or use the bar's menu.
-  - **Move dependent tasks along** (project dialog, owner, off by default): when a task is postponed, the tasks of that
-    project that wait on it and would now start too early move by the same number of days, keeping their length, and
-    so on down the chain (at most ten levels and 50 tasks, only tasks you may change). The toast says *3 dependent
+  - **Move dependent tasks along** (project dialog, on by default in a new project): when a task is postponed, the tasks that wait on it
+    (also in other projects) move by the same number of days, keeping their length, and
+    so on down the chain (at most 500 tasks; the setting of the project of the postponed task counts for the whole chain; completed tasks, milestones, tasks without a due date and tasks you may not change stay and end that branch). The toast says *3 dependent
     tasks moved*, and one *Undo* takes the whole chain back.
 - **Sort: Flow** (sort menu, only with the dependencies module; the default of projects): tasks in the order
   the dependencies allow, so a task always comes after the ones it waits on; ties by start date, due date and time,
@@ -217,7 +217,7 @@ small **×** next to it (*Show progress* in the project's … menu or the projec
 ## Time tracking
 
 A module (on by default, *Settings > Modules*) for tracking the time you spend on tasks, for yourself or to bill a client.
-Since 2.41.0 each project switches it on in its settings (*Track time in this project*, off by default, any project type).
+Since 2.41.0 each project switches it on in its settings (*Track time in this project*, any project type; a new project starts with it on when the module is on for its creator).
 Admins can turn it off for everyone (*Settings > Modules*, *for everyone* next to *Time tracking*): the module
 disappears for all users, the time endpoints answer 403, timers running at that moment are stopped (the entries
 are kept), focus sessions no longer become time entries and no timer reminders go out. Switched back on, all
@@ -245,7 +245,7 @@ entries are there again.
   then shows amounts. A daily target shows today's progress.
 - **Forgotten timers:** a push notification after a few hours (default 4) and an automatic stop after 12 hours
   (end = start + 12 h), both adjustable per user.
-- **Rules:** an entry counts on the local day it starts (entries across midnight are not split); durations are
+- **Rules:** an entry that runs over midnight counts on each day with its share in the reports, the CSV and the timesheet (*Settings > Modules > Time tracking settings > Entries over midnight*, on by default; switched off, it counts on the day it starts); durations are
   real elapsed time, so daylight-saving changes are exact; weeks start on Monday. In a shared project every member
   sees everyone's time on its tasks, but only the person who tracked an entry can change it; time on private
   tasks stays private. View-only members can track their own time.

@@ -35,7 +35,7 @@ the module **Read later** (*Settings > Modules > Reading > Read later*, off by d
 - **Tags** (in the details, separated by commas): the tags of the shown bookmarks appear above the list; a tap filters.
 - States: *Unread*, *Read*, *Archived*. Opening the link marks a bookmark read; the check mark and the archive button on
   a card change it by hand. Archived bookmarks are hidden unless you choose *Archived* or *All*.
-- Every change (save, edit, archive, delete, move) is one undo step; a deleted bookmark can be brought back for 7 days.
+- Every change (save, edit, archive, delete, move) is one undo step; a deleted bookmark stays in the trash for the trash period of the server (30 days by default) and can be brought back until then.
 
 ## Workspaces
 

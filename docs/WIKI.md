@@ -145,7 +145,7 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   query over the pages it opened. Route: `GET /api/wiki/query?page=<id>&q=<the block's text>`.
 
 Organisation exports (Settings > Organisation) contain the pages (`wiki/pages.json`) and their files (`wiki/files.json`,
-the bytes under `files/wiki/`). Agents have no access to knowledge pages yet.
+the bytes under `files/wiki/`). Agents are not part of the export; they reach knowledge pages only through a share made for them (see [AGENTS.md](AGENTS.md#knowledge-pages)), never in an encrypted space.
 
 ## Encrypted space
 
@@ -195,8 +195,8 @@ A page, or its folder with everything below it, moves between the private space 
 organisation never sees it). The dialog names source and target, lets you pick a folder in the target and first shows what
 the check found: a name that is already taken there (then nothing moves; `409` with the names), links between a moved page
 and one that stays (they stay as text: `[[links]]` only work inside one space), pages that link files of the file store (the
-files stay where they are). Links between pages that move together follow their new paths. Out of an organisation only the
-person who created the pages or an admin of the organisation may move them. Undo moves them back to the old place in one step;
+files stay where they are). Links between pages that move together follow their new paths. Out of an organisation only an admin of the
+organisation moves them; the person who created the pages can take them into the private space once an admin released the request (see *The way back for members* in [TEAM.md](TEAM.md)). Undo moves them back to the old place in one step;
 below the page both sides see the last move (where from, when, who; a workspace you do not belong to shows only as
 "Organisation" or "private space", 2.97.0). Agents never move data between workspaces; the person does that in the app.
 Route: `POST /api/wiki/move-space {pages: [id] | folder, space, to, dest, dry}`.
@@ -221,7 +221,7 @@ later; "Customer A" never includes "Customer AB"). Whoever may write in the spac
   bar of the knowledge pages -- only what you shared, never the rest of your space (no index, search, backlinks or mentions).
   Choose the person or type an e-mail address (the answer never tells whether an account has it). Pages of an organisation
   are read by all its members anyway; people outside get a public link (no person shares across the organisation boundary).
-  Agents never get a share. The person gets a News item "X shared the page … with you" (2.126.2; it follows the
+  Agents do not use this list: they reach pages only through a share made for them (see [AGENTS.md](AGENTS.md#knowledge-pages)). The person gets a News item "X shared the page … with you" (2.126.2; it follows the
   *Sharing* row of the notification settings, no push by default) that opens *Shared with me*.
 - **Public link**: a secret address `/s/w/<token>` that opens a plain read-only page without an account and without the app
   (no scripts): the page, or the list of the folder's pages. Pictures and files of the shared pages come along; a

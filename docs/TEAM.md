@@ -349,14 +349,14 @@ control*: it opens in a new tab and its comments carry no timecode.
 - Customer link: *Create customer link* gives a page without an account (the approval link of the office, see
   [OFFICE.md](OFFICE.md) *Approval by the customer*): the newest version, the customer's comments with a timecode (name
   needed) and *Approve* / *Request changes* (with a reason). The decision sets the state of the sign-off and stands in its
-  comments; the creator of the link gets a push (notification switch *Approval requests*, also for the customer's first
+  comments; the creator of the link gets a push (notification switch *Client decisions*; if the creator has left: the office's admins; also for the customer's first
   comment within ten minutes). Comments of the team stay internal; only answers to the customer's comments are shown to
   them. A new link stops the older one; deleting the sign-off stops it at once.
 - Rights: who sees the task / project / client sees the sign-off and may comment (like task comments); changing it, new
   versions, the customer link, moving and deleting need the right to edit there. A locked project (end-to-end) has none.
   At a client (2.122.4) that is an office role in the client's organisation (or, for a private client, its creator).
 - *Move to another workspace…* takes it with its versions and comments into a project of the private space or an
-  organisation (its creator or an admin of the organisation); the customer links and their record stay in the old
+  organisation (out of an organisation: its admin, or its creator into the private space after an admin released the request, see *The way back for members*); the customer links and their record stay in the old
   workspace. Undo brings it back to its old place. Since 2.122.4 the records stay bound to the sign-off and show again
   when it comes back; in the new workspace they never show.
 - Deleting for good: a sign-off in the trash is deleted for good after 30 days (only with the deletion runs on, `KALMIDO_RETENTION_PURGE=1`: [Deletion periods](SELF-HOSTING.md#deletion-periods)) with its versions and comments. A task,
@@ -784,7 +784,7 @@ noted in the server log).
 
 An organisation admin who adds an existing account (by e-mail address under *Settings > Organisation > People*, or with *Invite by
 e-mail*) no longer makes the person a member at once: the person gets an invitation in their News (*X invites you to join
-the organisation Y*, no push) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
+the organisation Y*), by mail and as a push (at most one a day; the push follows *Tasks assigned to me*) and chooses *Join*, *Later* or *Decline the invitation*. Only after *Join* are they a member
 in the chosen role. An open invitation ends after two weeks; inviting again renews it. The answer to the admin is the same
 for every address (with or without an account), so nobody learns through it who has an account. The instance admin still
 adds people directly (on a hosted instance the operator invites, too). A new address (without an account) gets a new account
@@ -801,7 +801,7 @@ Related changes in the same release:
   *All* or *Private* it is private (it no longer lands in the first organisation by itself).
 - The organisation admins' *Projects of the organisation* acts only on the projects it shows (shared with at least one more
   person): a member's unshared project stays theirs, also in the project trash. When a person leaves or is removed, their projects
-  of the organisation still go to an admin; that now shows in the dialog's history, and the person is told in their News.
+  made in the organisation go to an admin (when removing someone, to another active person you choose instead); what they brought in from their private space goes back there with them; that now shows in the dialog's history, and the person is told in their News.
 - A project that changes its owner gets a new public link (the old one stops working; the new owner shares the new one) and
   its deploy webhooks switch off; the new owner is told in their News.
 
@@ -814,7 +814,7 @@ API for scripts of the web app: `GET /api/orgs` carries `joins` (my open invitat
 
 The group no longer grows with every person you share a project with:
 
-- **Messages** and at most five last conversations stay, unread ones first.
+- **Team chat** and at most five last conversations stay, unread ones first. This holds for the single sidebar only: with the bar of the areas (the normal layout on a computer and in the phone's drawer) the conversations are in the **Chat** area and the group has no such rows.
 - People only show while you **pin** them (at most five): right-click a person or a direct conversation in the sidebar and
   choose "Pin to the sidebar" / "Unpin from the sidebar", or use the pin in **All people …**. A person who already stands
   there as a conversation is not shown a second time. Pin and unpin are one undo step each.
@@ -839,14 +839,13 @@ The group no longer grows with every person you share a project with:
   folder they lie in counts; never an agent, a child account or a disabled account). Others keep their shares; read-only shares
   and public links of a moved knowledge page end. Without such a person the object goes with the account, and the delete dialog
   counts both beforehand. Shared folders and files of the file store still go with the account.
-- **Kept by law:** finalised invoices and archive entries (books, 10 years), booked receipts and receipts of trips taken
-  into DATEV, and the logbook (8 years), each counted from the end of its calendar year. A personal office or an
+- **Kept by law**, each counted from the end of its calendar year (the delete dialog names the exact items): books, cash book, bank and card statements, payments, procedure documentation, asset register and finalised invoices: 10 years; receipts (also those not booked yet), entertainment receipts, receipts of trips taken into DATEV and the logbook: 8 years; sent letters and confirmed sign-offs: 6 years. A personal office or an
   organisation with such data is **retired** instead of deleted: its members leave it, nobody sees it in the app any
   more, the server admins see it in *Settings > Organisation > People > Organisations* as "kept until ..." (its delete
   button shows the period), nobody can change it. Since 2.186.0 only the people who were its admins when it was retired
   export it (*Settings > Organisation* lists it with the export), other server admins do not, with one exception: when no
   former admin is left (or it was retired before 2.186.0), the server admins may download the retention export (the records
-  kept by law), never the full export; the retired personal office of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same. After the date the retention run deletes it
+  kept by law), never the full export; the retired personal office of a deleted account nobody. Retiring needs no retention export and notes no waiver. The account itself is deleted all the same, unless no other server admin could hold what has to be kept or nobody could take over the organisation's calendars and agent projects: then the dialog says "Disable the account instead". After the date the retention run deletes it
   for good (only when the server's retention switch is on; until then it is counted, see SELF-HOSTING.md).
 - **Deleting an organisation** asks first when it would take knowledge pages, tables or office data along: the dialog
   names them ("1 knowledge page, 2 tables") and offers the export of the organisation (its admins; for a retired one its former
@@ -934,8 +933,9 @@ Notifications can also go to a chat service, as a short text with the link to th
   team feed and always reports everybody.
 - **Delivery:** in the background with a short time limit; a failed message gets one more try after a minute. After 5 failed
   messages in a row the channel turns itself off: the settings say why, and you (for an organisation's channel: its admins)
-  get a News item and a push (event *Integrations* in the notification settings). Switching it on again starts the count anew. Quiet hours hold back your own
-  channel messages (urgent ones excepted).
+  get a News item and a push (event *Integrations* in the notification settings). Switching it on again starts the count anew. During quiet hours notifications do not
+  reach your own channels and are not sent later (urgent ones excepted); afterwards one push counts them, which reaches a
+  channel only with *other notifications* ticked. *Changes in my own projects* are not affected by quiet hours.
 - **Addresses:** `https://` only. Addresses in your own network and plain `http://` only for hosts an admin allowed
   (*Settings > Server > Server > Advanced* or `KALMIDO_WEBHOOK_ALLOW_HOSTS`), the same guard as for webhooks.
 - Server settings: `KALMIDO_CHANNELS=0` turns channels off; `KALMIDO_CHANNEL_FAILS` (default 5) failures in a row before a
@@ -978,7 +978,7 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
 
 - **Accounts:** admins manage users under *Settings > Organisation > People* (username, display name, optional password,
   optional SSO login, admin flag, ntfy topic, disable / delete). Everyone can change their own display name and
-  password under *Settings > Account*, and a profile picture there (a heron preset, an own photo or just the initials;
+  password under *Settings > Account*, and a profile picture there (one of ten drawn presets, an own photo or just the initials;
   admins can set a preset for someone else, e.g. the bot user of an API integration). The *Users* block comes first
   under *Settings > Organisation > People*; agents are listed there too (with the *Agent* badge) and open their own dialog
   (*Managed under Agents*). A user who still owns projects cannot be deleted (delete the projects or
@@ -998,8 +998,8 @@ Someone who gets no pushes still learns when a task is assigned to them or they 
 
   | Role | Sees | Changes |
   |---|---|---|
-  | **Owner** | everything | everything; the only one who renames, changes the type, archives, deletes, creates a public link or custom fields |
-  | **Admin** | everything | every task, sections, project status; adds and removes members and sets their roles (never the owner's); moderates comments |
+  | **Owner** | everything | everything; the only one who creates and manages the public link and hands the project to someone else |
+  | **Admin** | everything | every task, sections, project status; also renames, recolours, archives, restores and deletes the project (after archiving it), changes its type and manages its custom fields; adds and removes members and sets their roles (never the owner's); moderates comments |
   | **Member** | everything | every task, sections, project status |
   | **Participant** | only the tasks assigned to them, with their subtasks, comments, files and time; the main task of an assigned subtask as read-only context (title, dates, status) | their own tasks; may add tasks (always assigned to themselves) and subtasks; never deletes, moves out or reassigns |
   | **Viewer** | everything | nothing (may comment) |

@@ -132,7 +132,7 @@ vCard 3.0 and 4.0, each contact in the version its app wrote (a client can ask f
 name, nickname, company and department, job title, e-mails, phones, addresses, web links (with their kinds and Apple's
 custom labels), birthday (also without the year), anniversary, notes, groups (`CATEGORIES`) and the photo are fields in
 Kalmido; every other property (social profiles, Apple's contact groups, …) is kept as it came. Each address book is one
-collection (`/dav/addressbooks/<user>/b<id>/`). An address book shared with you *view only* is read-only in the apps.
+collection (`/dav/addressbooks/<user>/b<id>/`). An address book shared with you *view only* is read-only in the apps, and so is a mirrored address book (one whose source writes it). Contacts opened for you one by one through a folder appear in a read-only collection *Shared contacts* (`s1`).
 An address book of your organisation (2.52.0, see TEAM.md) appears the same way, read-only when its members may only view it.
 
 **Merging duplicates** (2.66.0): in *Contacts*, tap *Select*, tick two to ten contacts and choose *Merge*. Pick the
@@ -283,7 +283,7 @@ that task or client).
   adds the next day). With organisations you choose the workspace. Optional: the day voting ends, and whether voters see
   the names and answers of the others (on by default).
 - **The link:** copy it or show its QR code and send it to the people. They vote without an account: their name and
-  *Yes* / *Maybe* / *No* per time, optionally an e-mail address (only you see it). The page shows the times in the
+  *Yes* / *Maybe* / *No* per time, optionally an e-mail address (only you and whoever may change the poll, such as an admin of the organisation, see it). The page shows the times in the
   voter's own time zone and names the poll's zone. A voter can change their vote later on the same device or with the
   link on the thank-you page.
 - **The result:** per time the votes as a bar, the names, the best time marked (most *Yes*, then most *Maybe*).
@@ -296,7 +296,7 @@ that task or client).
   delete (Undo brings it back).
 
 In an organisation every member sees the organisation's polls; only who created a poll or an admin of the organisation
-changes it, and only its creator moves it. Agents have no access to polls in 2.98.0 and never vote through the link.
+changes it, and only its creator moves it; out of an organisation only after an admin released it (or as its admin). Agents read the polls they may see and create new ones through the API (see [AGENTS.md](AGENTS.md)); they never vote through the link.
 
 Protection: unknown, revoked, expired and deleted links look the same (no guessing), the link has 144 random bits and only
 its hash is used to find it, a hidden field catches simple bots, a vote sent within 3 seconds of loading the page or with

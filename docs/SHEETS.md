@@ -270,8 +270,7 @@ Table menu (the open table or the overview) *Move to another workspace…*: betw
 ways, only when there is another workspace. The check first names what does not come along: the attachment to a list of the
 old workspace ends (the table would otherwise open to the whole target space), rows carried over to tasks of the old workspace
 lose their link, quotations made from the table stay where they are, and formulas that use lists or clients of the old
-workspace show "No access" there. Out of an organisation only the person who created the table or an admin of the organisation
-may move it; a private table only its owner. Undo moves it back in one step and brings back the project attachment and the
+workspace show "No access" there. Out of an organisation only an admin of the organisation moves it; the person who created the table can take it into the private space once an admin released the request (see *The way back for members* in [TEAM.md](TEAM.md)); a private table only its owner. Undo moves it back in one step and brings back the project attachment and the
 carried-over links that fit again. The last move shows in the side panel. Shares of single people / agents end with the move (2.124.0). Agents never move tables between workspaces.
 Route: `POST /api/sheets/{id}/move-space {to, dry, undo}`.
 

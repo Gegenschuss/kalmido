@@ -5,7 +5,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
 ## Full feature list
 
 **Projects**
-- Projects with emoji, own picture or colour, project folders with one level of subfolders, sections (Kanban columns) with a "+" each, collapse / expand all, archive
+- Projects with emoji, own picture or colour, project folders with subfolders (up to 30 levels), sections (Kanban columns) with a "+" each, collapse / expand all, archive
 - **Folders and subfolders**: *Clients › Company X*. The sidebar is a tree (a folder's projects, then its subfolders),
   folded folders stay folded on all your devices. Drag projects into a subfolder, a subfolder into another folder or onto
   *Projects* (top level); the folder menu (…) has *New subfolder…*, *Rename*, *Move into a folder…* / *Move to the top
@@ -14,7 +14,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
   its owner's folder sits for everyone in that folder and place, and the owner's folders keep their order among each
   other in every member's sidebar (2.27.0); a shared project without a folder can be filed where each member likes. The
   sort of a shared project is set by its owner or a project admin for everyone; a member may sort it otherwise on one device
-  and the project says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most two levels)
+  and the project says so. The API takes and returns the path (`"folder": "Clients/Company X"`, at most 30 levels)
 - **Quick capture** from anywhere: `q` (or Ctrl+Space, also while typing somewhere else) opens a small box, the quick
   add syntax works and it lands in the basket whatever view is open (unless you name a project). The installed app's icon
   menu has *Quick add*. The page `/capture` holds a **bookmarklet**: drag it to the bookmarks bar, click it on any
@@ -228,9 +228,9 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
   make them wider or narrower (desktops, an unfolded Fold; each device remembers it, a double-click goes back to the
   standard width; with the keyboard: focus the grip, ← →, Enter). **Column widths** work the same way: the grip at the
   right of a column title (per device and project)
-- Command palette (Ctrl/Cmd+K, the field at the top of the sidebar) for tasks, projects, views and actions, the recently
+- Command palette (Ctrl/Cmd+K, the *Search* button in the bar at the top) for tasks, projects, views and actions, the recently
   viewed ones on top; type text and pick *Ask <agent>: …* (sends it to the agent's chat) or *Create as task: …* (quick
-  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the project; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / project field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right of the *Kalmido* row (Account, Settings, Log out)
+  add syntax; Enter when nothing else matches); `#123` jumps to task 123; keyboard shortcuts (`?` shows them all: arrows, Space to complete, E to rename in the project; calendar 1-4 / ← → / `.`; multi-select Ctrl/Cmd+A, Shift+↓ ↑, Shift+X, then Space, M or D for the selection; D / M open the date / project field of the multi-edit panel), compact, comfortable or custom density (the sidebar and the task rows each on their own); your account sits as your picture at the right end of the bar at the top (Account, Settings, Log out)
 - New accounts start with a "Getting started" project and a short welcome tour
 - A **sample project** to try things out: an image film for a client with phases, dates, dependencies, custom fields and a packing checklist, offered in the setup and the tour, removed again in one click (Settings > Data)
 - When Today is clear or a project is done, the Kalmido bot celebrates (with one of 50 dry one-liners). Can be switched off.
@@ -243,13 +243,13 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
 - Push notifications without an extra app (Web Push: Chrome, Edge, Firefox, Safari, iPhone and iPad from the Home Screen) or via [ntfy](https://ntfy.sh): reminders with *Done* / *Snooze*, focus end, habit reminders, daily digest, comments and assignments; a notification you handled on one device (task completed or opened, News read) closes on your other devices
 - **Slack, Matrix, Telegram or Signal** as extra channels (2.142.0): each person picks which kinds go there (reminders, assignments, mentions, digest, changes in own projects), organisation admins add a team channel for projects everyone in the organisation sees; the address stays encrypted on the server. People without a push device get assignments and mentions by **e-mail**, collected into at most one mail every 10 minutes (off / only without push / always, *Settings > Notifications*)
 - Share from your phone into the basket: a ready-made import for the Android app HTTP Shortcuts, a guide for the iPhone Shortcuts app (see below); app shortcuts (long-press the icon: new task, today, news, search)
-- Profile pictures: ten heron presets (2.19.0) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
+- Profile pictures: ten drawn people presets (2.19.0; agents get the matching robots) or your own photo (cropped square, resized, metadata removed), shown wherever the initials were
 - **Events and contacts** (2.21.0): your own calendars and address books in Kalmido, synced with the phone's calendar and contacts apps ([Events](CALENDAR.md#events), [Contacts](CALENDAR.md#contacts))
 - **Calendar apps (CalDAV), both ways**: every project as a task list in Reminders (iPhone, iPad, Mac), Thunderbird, Evolution, Tasks.org or DAVx⁵ on Android, with an app password per device ([Calendar apps](CALENDAR.md#calendar-apps-caldav))
 - **Calendar subscription**: your open tasks with a date as an ICS feed for Google Calendar, Apple Calendar, Outlook or Thunderbird
 - **Import from Todoist, Trello, Asana, Microsoft To Do, TickTick, Notion, Google Tasks, ClickUp, Jira, any CSV, Markdown checklists and any ICS / VTODO file** (Apple Reminders exports, Nextcloud Tasks, Thunderbird) with a preview, re-import without duplicates and undo ([Moving from other apps](IMPORT.md#moving-from-other-apps)); export everything as JSON (incl. your time entries), or your projects as Todoist CSV files or Markdown checklists (2.142.0) - no lock-in
 - **REST API** with personal access tokens (`/api/v1`, OpenAPI 3.1) and signed **webhooks** for Home Assistant, n8n or your own scripts ([docs/API.md](API.md))
-- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and seven accent colors (petrol by default) that all meet WCAG AA in both themes; the switch **View on this device** (Automatic / Phone / Computer) is kept per device, and an unfolded foldable or small tablet in landscape gets the narrow desktop view
+- **Appearance per device**: dark or light theme, compact or comfortable rows, font size from 75 to 150 % in 5 % steps, also with Ctrl + / − / 0 (the whole interface scales, not just the text), Geist, your system font or the low-vision friendly [Atkinson Hyperlegible](https://www.brailleinstitute.org/freefont/), and eight accent colors (petrol by default) that all meet WCAG AA in both themes; the switch **View on this device** (Automatic / Phone / Computer) is kept per device, and an unfolded foldable or small tablet in landscape gets the narrow desktop view
 - English and German interface, French, Spanish, Italian and Dutch in beta (translations are plain JSON files, [fix or add yours](../CONTRIBUTING.md#translations))
 
 | | | |
