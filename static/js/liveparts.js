@@ -277,7 +277,8 @@ function lzSel(id, opening) {
     lzSelBusy.delete(id);
     if (S.tasks.has(id)) render();
     else if (S.sel !== id) return;
-    else if (!opening || !t) closeDetail();
+    else if (!opening) closeDetail();
+    else if (t?.id !== id) { closeDetail(); toast(tr('Task not found')); }
     else { (S.extra ||= []).push(t); renderDetail(); }
   }, e => {
     lzSelBusy.delete(id);

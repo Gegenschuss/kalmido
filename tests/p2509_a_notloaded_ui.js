@@ -86,6 +86,19 @@ async function tapRow(w, d, label, T, title) {
   check(!!(await until(() => panelShows(d, 'Roll out the update'))), 'lists still on their way: the completed task opens');
   check(!!(await until(() => !w.eval(`S.lz?.pending.has(${L})`))), 'and its list has come');
   await idle(w);
+  // an edit of the task fetched alone survives the next reload (Fable review): the state brings no copy of it
+  await w.eval(`patchTask(${T}, {title: 'Rolled out'})`); await idle(w);
+  await w.eval('load().then(render)'); await idle(w);
+  check(w.eval(`taskById(${T}).title`) === 'Rolled out' && panelShows(d, 'Rolled out'), 'an edit stays after the next reload');
+  // an answer that is no task (a proxy's page with status 200): a hint, no loop of requests
+  w.eval('closeDetail()'); await idle(w);
+  const real = w.fetch; let asked = 0;
+  w.fetch = (u, o) => /\/api\/tasks\/\d+/.test(String(u)) ? (asked++, Promise.resolve(new w.Response('<html>', {status: 200, headers: {'Content-Type': 'text/html'}}))) : real(u, o);
+  w.eval(`S.extra = null`); w.location.hash = '#t/' + G;
+  check(!!(await until(() => /Task not found/.test(d.body.textContent))), 'no task in the answer: says so');
+  await idle(w);
+  check(noPanel(w, d), 'no task in the answer: no panel');
+  w.fetch = real;
   w.eval('closeDetail()'); await idle(w);
   // a task that leaves the state while it is open still closes (2.369.2, #3136): no fetch brings it back
   w.eval(`S.lz = null`);

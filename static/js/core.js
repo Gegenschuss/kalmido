@@ -1282,7 +1282,10 @@ async function histMore(b) {
   } catch (e) { if (e instanceof Offline) toast(tr('Only available online.')); if (b) b.disabled = false; return; }
   renderView();
 }
-function putTask(t) { S.tasks.set(t.id, t); _kidsIx = null; }
+function putTask(t) {
+  S.tasks.set(t.id, t); _kidsIx = null;
+  if (t.id === S.sel && S.extra) { const i = S.extra.findIndex(x => x.id === t.id); if (i >= 0) S.extra[i] = t; }  // 2.509.0 (#4324): the open task fetched alone: the next reload shows the edit, not the copy of before
+}
 
 // poll for changes made elsewhere (phone <-> desktop)
 // 2.40.0 (#1430): changes from elsewhere are drawn bundled: what arrives within TD_RS_MS is one render (a render that runs
