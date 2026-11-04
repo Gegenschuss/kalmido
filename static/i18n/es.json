@@ -7244,7 +7244,6 @@
   "Book value": "Valor contable",
   "Current value": "Valor actual",
   "Current value = book value, unless you enter an own value.": "Valor actual = valor contable, salvo que introduzcas un valor propio.",
-  "Default: the purchase price": "Por defecto: el precio de compra",
   "Depreciation": "Amortización",
   "Depreciation {0}": "Amortización {0}",
   "Equipment value": "Valor del equipo",
@@ -15800,7 +15799,6 @@
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "El agente trabaja una tras otra las listas indicadas en su ordenador: cuando hay un hueco libre inicia el siguiente trabajo y cierra las tareas una vez hechas. Simulación = solo informa de lo que haría.",
   "linear": "lineal",
   "declining, up to 30 %": "degresiva, hasta el 30 %",
-  "For purchases from July 2025 to December 2027. No tax advice.": "Para compras de julio de 2025 a diciembre de 2027. Sin asesoramiento fiscal.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Amortización degresiva al {0} %, lineal desde el año en que resulta mayor",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "La amortización degresiva solo es posible para compras del 1 de julio de 2025 al 31 de diciembre de 2027.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "En una instancia alojada no se sube ningún archivo: solo se restaura desde las copias de seguridad del propio servidor",
@@ -16240,5 +16238,10 @@
   "Only confirmed or cancelled bookings can be deleted": "Solo se pueden eliminar reservas confirmadas o canceladas",
   "The payment date must not lie before the invoice date ({0})": "La fecha de pago no puede ser anterior a la fecha de la factura ({0})",
   "Card fees without receipt": "Comisiones de tarjeta sin justificante",
-  "Card fee without receipt": "Comisión de tarjeta sin justificante"
+  "Card fee without receipt": "Comisión de tarjeta sin justificante",
+  "none (no expense)": "ninguna (sin gasto)",
+  "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Degresiva: para compras de julio de 2025 a diciembre de 2027. Ninguna: el precio solo sirve para el valor y la lista del seguro, el justificante cuenta como gasto normal. Sin asesoramiento fiscal.",
+  "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Por defecto: el precio de compra. Solo para la lista del seguro: un valor aquí no es un gasto y no se amortiza.",
+  "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Amortizado sin justificante vinculado: vincula aquí el justificante de compra; si no, la compra puede contar dos veces en la cuenta de ingresos y gastos (como justificante y como amortización).",
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Amortización sin justificante vinculado: {0}. Vincula el justificante de compra en el equipo; si no, puede contar dos veces."
 }

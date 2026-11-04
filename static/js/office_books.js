@@ -137,6 +137,7 @@ function bkEuerHtml() {
     <div class="bk-profit"><span>${tr('Profit')}${d.small_business ? ` <small class="muted">(${tr('small business: gross')})</small>` : ''}</span><b class="${+d.profit < 0 ? 'neg' : ''}">${ofcMoney(d.profit)}</b></div>
     ${d.tax_reserve_pct ? `<div class="bk-profit bk-res"><span>${tr('Tax reserve for the year ({0} % of the profit)', d.tax_reserve_pct)}</span><b>${ofcMoney(d.tax_reserve)}</b></div>` : ''}
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
+    ${(d.afa_no_receipt || []).length ? `<p class="bk-warn bk-afanorc">${esc(tr('Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.', d.afa_no_receipt.map(x => x.name).join(', ')))} <a href="#office/equipment">${esc(tr('Equipment'))}</a></p>` : ''}
     ${(d.meals?.notes || []).map((n, i) => `<p class="${i ? 'bk-warn' : 'muted ofchint'}" data-bk-meal="${i}">${esc(n)}</p>`).join('')}${''/* 2.534.0 (#4333): the 30 % and the double-count hint */}
     <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>`;
 }

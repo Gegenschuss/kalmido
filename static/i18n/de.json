@@ -7226,7 +7226,6 @@
   "Book value": "Restbuchwert",
   "Current value": "Zeitwert",
   "Current value = book value, unless you enter an own value.": "Zeitwert = Restbuchwert, sofern du keinen eigenen Wert einträgst.",
-  "Default: the purchase price": "Standard: der Einkaufspreis",
   "Depreciation": "Abschreibung",
   "Depreciation {0}": "Abschreibung {0}",
   "Equipment value": "Wert der Ausrüstung",
@@ -15800,7 +15799,6 @@
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "Der Agent arbeitet die auf seinem Computer genannten Listen nacheinander ab: Ist ein Platz frei, startet er den nächsten Job, und gebaute Aufgaben hakt er ab. Trockenlauf = er meldet nur, was er tun würde.",
   "linear": "linear",
   "declining, up to 30 %": "degressiv, bis 30 %",
-  "For purchases from July 2025 to December 2027. No tax advice.": "Für Käufe von Juli 2025 bis Dezember 2027. Keine Steuerberatung.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Degressive Abschreibung mit {0} %, linear ab dem Jahr, in dem das mehr ergibt",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressive Abschreibung ist nur für Käufe vom 1. Juli 2025 bis 31. Dezember 2027 möglich.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Auf einer gehosteten Instanz wird kein Archiv hochgeladen: Zurückgesichert wird nur aus den eigenen Sicherungen des Servers",
@@ -16240,5 +16238,10 @@
   "Only confirmed or cancelled bookings can be deleted": "Nur bestätigte oder abgesagte Buchungen lassen sich löschen",
   "The payment date must not lie before the invoice date ({0})": "Das Zahlungsdatum darf nicht vor dem Rechnungsdatum liegen ({0})",
   "Card fees without receipt": "Kartengebühren ohne Beleg",
-  "Card fee without receipt": "Kartengebühr ohne Beleg"
+  "Card fee without receipt": "Kartengebühr ohne Beleg",
+  "none (no expense)": "keine (keine Ausgabe)",
+  "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Degressiv: für Käufe von Juli 2025 bis Dezember 2027. Keine: der Preis dient nur dem Wert und der Versicherungsliste, der Beleg zählt als normale Ausgabe. Keine Steuerberatung.",
+  "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Standard: der Kaufpreis. Nur für die Versicherungsliste: ein Wert hier ist keine Ausgabe und wird nicht abgeschrieben.",
+  "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Abgeschrieben ohne verknüpften Beleg: verknüpfe hier den Kaufbeleg, sonst zählt der Kauf in der Einnahmen-Überschuss-Rechnung womöglich doppelt (als Beleg und als Abschreibung).",
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Abschreibung ohne verknüpften Beleg: {0}. Verknüpfe den Kaufbeleg am Gerät, sonst zählt er womöglich doppelt."
 }

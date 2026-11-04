@@ -7244,7 +7244,6 @@
   "Book value": "Valeur comptable",
   "Current value": "Valeur actuelle",
   "Current value = book value, unless you enter an own value.": "Valeur actuelle = valeur comptable, sauf si tu saisis ta propre valeur.",
-  "Default: the purchase price": "Par défaut : le prix d'achat",
   "Depreciation": "Amortissement",
   "Depreciation {0}": "Amortissement {0}",
   "Equipment value": "Valeur de l'équipement",
@@ -15800,7 +15799,6 @@
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "L'agent traite l'une après l'autre les listes indiquées sur son ordinateur : dès qu'une place est libre, il lance la tâche suivante et clôt les tâches une fois réalisées. Essai à blanc = il indique seulement ce qu'il ferait.",
   "linear": "linéaire",
   "declining, up to 30 %": "dégressif, jusqu'à 30 %",
-  "For purchases from July 2025 to December 2027. No tax advice.": "Pour les achats de juillet 2025 à décembre 2027. Pas de conseil fiscal.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Amortissement dégressif à {0} %, linéaire à partir de l'année où il donne plus",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "L'amortissement dégressif n'est possible que pour un achat du 1er juillet 2025 au 31 décembre 2027.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Sur une instance hébergée, aucune archive n'est téléversée : la restauration se fait uniquement depuis les sauvegardes du serveur",
@@ -16240,5 +16238,10 @@
   "Only confirmed or cancelled bookings can be deleted": "Seules les réservations confirmées ou annulées peuvent être supprimées",
   "The payment date must not lie before the invoice date ({0})": "La date de paiement ne peut pas être antérieure à la date de la facture ({0})",
   "Card fees without receipt": "Frais de carte sans justificatif",
-  "Card fee without receipt": "Frais de carte sans justificatif"
+  "Card fee without receipt": "Frais de carte sans justificatif",
+  "none (no expense)": "aucun (pas de dépense)",
+  "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Dégressif : pour les achats de juillet 2025 à décembre 2027. Aucun : le prix sert seulement à la valeur et à la liste d’assurance, le justificatif compte comme dépense normale. Pas de conseil fiscal.",
+  "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Par défaut : le prix d’achat. Seulement pour la liste d’assurance : une valeur ici n’est pas une dépense et n’est pas amortie.",
+  "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Amorti sans justificatif lié : liez ici le justificatif d’achat, sinon l’achat risque de compter deux fois dans le compte de recettes et dépenses (comme justificatif et comme amortissement).",
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Amortissement sans justificatif lié : {0}. Liez le justificatif d’achat à l’appareil, sinon il risque de compter deux fois."
 }

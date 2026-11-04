@@ -1066,7 +1066,7 @@ MD = {
                            "purchase_date": ("date", False, None), "purchase_net": ("money", False, None), "serial_no": ("str", False, 120),
                            "vendor": ("str", False, 120), "receipt_node_id": ("receipt", False, None), "life_months": ("months", False, None),
                            "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None),
-                           "afa_method": ("choice", False, ("auto", "linear", "declining"))}},  # 2.480.0 C (#3528): the depreciation per device
+                           "afa_method": ("choice", False, ("auto", "linear", "declining", "none"))}},  # 2.480.0 C (#3528): the depreciation per device; 2.536.0 (#4335): none
     "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},

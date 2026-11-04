@@ -7244,7 +7244,6 @@
   "Book value": "Boekwaarde",
   "Current value": "Dagwaarde",
   "Current value = book value, unless you enter an own value.": "Dagwaarde = boekwaarde, tenzij je een eigen waarde invult.",
-  "Default: the purchase price": "Standaard: de aankoopprijs",
   "Depreciation": "Afschrijving",
   "Depreciation {0}": "Afschrijving {0}",
   "Equipment value": "Waarde van de uitrusting",
@@ -15800,7 +15799,6 @@
   "The agent works the lists named on its computer off one after the other: it starts the next job when a place is free and closes tasks once they are built. Dry run = it only reports what it would do.": "De agent werkt de op zijn computer genoemde lijsten na elkaar af: is er een plek vrij, dan start hij de volgende job, en gebouwde taken sluit hij af. Proefrun = hij meldt alleen wat hij zou doen.",
   "linear": "lineair",
   "declining, up to 30 %": "degressief, tot 30 %",
-  "For purchases from July 2025 to December 2027. No tax advice.": "Voor aankopen van juli 2025 tot december 2027. Geen belastingadvies.",
   "Declining depreciation at {0} %, linear from the year it gives more": "Degressieve afschrijving van {0} %, lineair vanaf het jaar waarin dat meer oplevert",
   "Declining depreciation is only possible for a purchase from 1 July 2025 to 31 December 2027.": "Degressieve afschrijving is alleen mogelijk voor aankopen van 1 juli 2025 tot en met 31 december 2027.",
   "On a hosted instance no archive is uploaded: restoring goes only from the server's own backups": "Op een gehoste instantie wordt geen archief geüpload: terugzetten gaat alleen vanuit de eigen back-ups van de server",
@@ -16240,5 +16238,10 @@
   "Only confirmed or cancelled bookings can be deleted": "Alleen bevestigde of geannuleerde boekingen kunnen worden verwijderd",
   "The payment date must not lie before the invoice date ({0})": "De betaaldatum mag niet vóór de factuurdatum liggen ({0})",
   "Card fees without receipt": "Kaartkosten zonder bonnetje",
-  "Card fee without receipt": "Kaartkosten zonder bonnetje"
+  "Card fee without receipt": "Kaartkosten zonder bonnetje",
+  "none (no expense)": "geen (geen uitgave)",
+  "Declining: for purchases from July 2025 to December 2027. None: the price is only for the value and the insurance list, the receipt counts as a normal expense. No tax advice.": "Degressief: voor aankopen van juli 2025 tot december 2027. Geen: de prijs dient alleen voor de waarde en de verzekeringslijst, het bonnetje telt als gewone uitgave. Geen belastingadvies.",
+  "Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.": "Standaard: de aankoopprijs. Alleen voor de verzekeringslijst: een waarde hier is geen uitgave en wordt niet afgeschreven.",
+  "Depreciated without a linked receipt: link the purchase receipt here, else it may count twice in the income/expense statement (as a receipt and as depreciation).": "Afgeschreven zonder gekoppeld bonnetje: koppel hier het aankoopbonnetje, anders telt de aankoop mogelijk dubbel in de inkomsten-uitgavenrekening (als bonnetje en als afschrijving).",
+  "Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.": "Afschrijving zonder gekoppeld bonnetje: {0}. Koppel het aankoopbonnetje aan het apparaat, anders telt het mogelijk dubbel."
 }

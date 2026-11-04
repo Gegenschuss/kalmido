@@ -1053,8 +1053,9 @@ as "Tax reserve" and "Freely available". No tax advice; figures without guarante
 
 **What the statement and the VAT figures leave out, and what can count twice.** Check this before you rely on them:
 
-- **Equipment**: a device with a purchase date and a net price brings its depreciation into the statement. A receipt not
-  linked to the device still counts in full, so the purchase counts twice (see *Equipment value, depreciation and
+- **Equipment**: a device with a purchase date and a net price brings its depreciation into the statement (unless its
+  depreciation is set to *none*). A receipt not linked to the device still counts in full, so the purchase counts twice;
+  the statement names the devices depreciated without a linked receipt (2.536; see *Equipment value, depreciation and
   insurance list*).
 - **Entertainment receipts** (since 2.534): the approved ones count in both - in the statement 70 % of the net amount as
   the line *Entertainment (70 % deductible)*, their input tax in full in field 66. They have no link to the receipts: a
@@ -1296,13 +1297,17 @@ purchase date, net purchase price, serial number, vendor and the receipt. Open a
   1 July 2025 to 31 December 2027 you can choose declining depreciation per device (2.480: three times the linear rate, at
   most 30 % of the book value a year, by the month in the purchase year, then linear once that gives more; a device up to
   800 EUR stays written off in full). The table in the device shows depreciation and book value per year.
+  **Depreciation: none** (2.536) keeps the price only for the value and the insurance list: no depreciation, no expense
+  line; a linked receipt then counts as a normal expense.
 - **In the income/expense statement**: the depreciation is an expense line of its own, for every device with a purchase
-  date and a net price, also when the price was entered only for the insurance list (an expense without a receipt then).
-  The device's linked receipt counts only with its input VAT. **A receipt not linked to the device still counts in full, so
-  the purchase counts twice: link it** (**Take from receipt**). A small business gets no depreciation in the statement:
+  date and a net price (linear, declining or low-value; not with *none*). The device's linked receipt counts only with its
+  input VAT. **A receipt not linked to the device still counts in full, so the purchase counts twice: link it** (**Take
+  from receipt**). Since 2.536 the device dialog and the statement warn about a device depreciated without a linked
+  receipt (`receipt_missing` per device, `afa_no_receipt` in the statement). A price entered only for the insurance list
+  belongs into **New value** or goes with depreciation *none*. A small business gets no depreciation in the statement:
   the receipt counts gross.
 - **Insurance values**: the new value defaults to the purchase price, the current value to the book
-  value; both can be overwritten. **Insured by** links the device to an insurance contract
+  value; both can be overwritten. A new value alone is no expense and is not depreciated. **Insured by** links the device to an insurance contract
   (Contracts & insurance).
 - The equipment list shows the sums (new value, current value, depreciation of the year) and exports the
   insurance list as CSV or PDF, optionally filtered by policy.

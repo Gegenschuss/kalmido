@@ -377,7 +377,7 @@ def bk_euer(c, oid, year):
     # 2.92.0 (#1931): equipment with a purchase price is depreciated (office/assets.py ast_afa_year): the year's depreciation
     # is an expense of its own, the device's receipt counts only with its input tax (else the purchase would count twice).
     # A small business keeps the receipt as it is (its depreciation basis would be the gross price, assets.py works net)
-    afa = {"rows": [], "receipt_ids": set()}
+    afa = {"rows": [], "receipt_ids": set(), "no_receipt": []}
     if not small:
         from .assets import ast_afa_year
         afa = ast_afa_year(c, oid, year)
@@ -453,7 +453,8 @@ def bk_euer(c, oid, year):
             # 2.189.0 B (#2475): receipts in a foreign currency without an office rate count 1:1 in the home currency
             + [tr("Receipts in {0} without an exchange rate in the office settings count as {1}.", x, home) for x in sorted(unrated)]
             + meal_notes,  # 2.534.0 (#4333)
-            "unrated": sorted(unrated), "meals": meal_sum}
+            "unrated": sorted(unrated), "meals": meal_sum,
+            "afa_no_receipt": afa["no_receipt"]}  # 2.536.0 (#4335): depreciated devices without a linked receipt (the client warns)
 
 
 # ---------------------------------------------------------------- VAT return figures

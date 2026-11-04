@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
 # kalmido-suite: fresh
-"""2.536.0 B (#4334) API tests: card fees in the books, own container (start.sh, org
+"""2.536.0 B (#4334, #4335) API tests: card fees in the books and depreciation without a purchase, own container (start.sh, org
 encryption on). Invented companies, cards and figures only; every statement and receipt is made here.
 tenant-matrix: office  freelancer-matrix: office
  - #4334: positions of a confirmed card statement marked "no receipt needed" (the fees and interest by themselves, money
    back by hand) count in the income/expense statement (EUeR, own line, no input tax) and in the cash flow (kind card, a
    refund comes in), as the DATEV export books them; a draft, open, private and matched positions do not (a matched one
    counts through its receipt, once); the bank booking of the statement's total is no expense of its own
+ - #4335: depreciation "none": no plan, no depreciation line, a linked receipt counts in full (before: 400, and a price
+   was always written off); a device depreciated without a linked receipt is named in the EUeR (afa_no_receipt) and carries
+   receipt_missing; a device with a linked receipt or only a new value for the insurance list is not
  - both in an organisation and for a person without an organisation (personal office)
 usage: p2536_b_office_test.py <datadir>"""
 import base64
@@ -26,6 +29,7 @@ from freelancer_fixture import freelancer  # noqa: E402
 KEY = base64.b64encode(os.urandom(32)).decode()
 O = "/api/office"
 K = O + "/cards"
+E = O + "/equipment"
 FEAT = "cal,comments,collab,office,clients,docs"
 
 
@@ -164,10 +168,51 @@ def cards(s, uid, ws, who):
     check(card_sums(s)[:2] == (Decimal("30.32"), Decimal("5.00")), f"{who}: nor an outflow")
 
 
+def assets(s, ws, who):
+    """#4335 for one office."""
+    rc = doc(s, ws, "kamera-kauf.pdf", "1190.00", f"{Y}-03-01", {"category": "Material", "vat_pct": "19"})
+    r = s.post(B + E, json={"name": "Kamera Beleg", "category": "Kamera", "purchase_date": f"{Y}-03-01", "purchase_net": "1000", "receipt_node_id": rc})
+    check(r.status_code == 201, f"{who}: a device with its receipt {r.text[:200]}")
+    cam = r.json()["id"]
+    r = s.post(B + E, json={"name": "Laptop Ohne Beleg", "category": "Laptop", "purchase_date": f"{Y}-02-01", "purchase_net": "1500"})
+    lap = r.json()["id"]
+    r = s.post(B + E, json={"name": "Licht Nur Liste", "category": "Licht", "purchase_date": f"{Y}-04-01", "purchase_net": "2000", "afa_method": "none"})
+    check(r.status_code == 201, f"{who}: depreciation none is a choice (was 400) {r.text[:200]}")
+    lst = r.json()["id"]
+    r = s.post(B + E, json={"name": "Stativ Neuwert", "category": "Stativ", "new_value": "900"})
+    tri = r.json()["id"]
+    rows = {x["id"]: x for x in s.get(B + E + "?archived=1").json()["items"]}
+    check(rows[lst]["afa_method"] == "none" and rows[lst]["method"] == "" and rows[lst]["afa_plan"] == [] and rows[lst]["afa_year"] is None,
+          f"{who}: none: no plan {rows[lst].get('method')} {rows[lst].get('afa_plan')}")
+    check(rows[lst]["receipt_missing"] is False and rows[tri]["receipt_missing"] is False and rows[cam]["receipt_missing"] is False,
+          f"{who}: no warning without depreciation or with a receipt")
+    check(rows[lap]["receipt_missing"] is True and rows[lap]["method"] == "linear", f"{who}: depreciated without a receipt: warned")
+    eu = euer(s)
+    dep = line(eu, "a:")
+    mat = line(eu, "c:material")
+    exp_dep = sum((Decimal(p["afa"]) for i in (cam, lap) for p in rows[i]["afa_plan"] if p["year"] == Y), Decimal(0))
+    check(dep and Decimal(dep["net"]) == exp_dep and dep["count"] == 2, f"{who}: depreciation only of the camera and the laptop {dep} / {exp_dep}")
+    check(mat and mat["net"] == "0.00" and mat["vat"] == "190.00", f"{who}: the camera's receipt only with its input tax {mat}")
+    check([x["name"] for x in eu["afa_no_receipt"]] == ["Laptop Ohne Beleg"], f"{who}: the EUeR names the device without a receipt {eu['afa_no_receipt']}")
+    # the camera on none: its receipt counts in full, no depreciation of it any more
+    r = s.patch(B + f"{E}/{cam}", json={"afa_method": "none"})
+    check(r.ok, f"{who}: switched to none {r.text[:200]}")
+    eu = euer(s)
+    mat, dep = line(eu, "c:material"), line(eu, "a:")
+    check(mat["net"] == "1000.00" and mat["gross"] == "1190.00", f"{who}: none: the receipt counts as a normal expense {mat}")
+    check(dep and dep["count"] == 1, f"{who}: only the laptop is depreciated {dep}")
+    # the laptop gets a receipt: the warning goes
+    lrc = doc(s, ws, "laptop-kauf.pdf", "1785.00", f"{Y}-02-01", {"category": "Material", "vat_pct": "19"})
+    assert s.patch(B + f"{E}/{lap}", json={"receipt_node_id": lrc}).ok
+    check(euer(s)["afa_no_receipt"] == [], f"{who}: with its receipt the warning is gone")
+
+
 for s in (A, Fr):
     assert s.put(B + O + "/settings", json={"company_fields": {"name": "Beispiel Film", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE"}}).ok
 cards(A, ALICE, f"org:{ORG}", "Alpha")
+assets(A, f"org:{ORG}", "Alpha")
 cards(Fr, FID, "private", "Frida")
+assets(Fr, "private", "Frida")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

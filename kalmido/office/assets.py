@@ -14,7 +14,11 @@ depreciation of a year to the profit statement (EUeR, #1921); ast_covered tells 
 2.480.0 C (#3528): per device a choice afa_method auto | linear | declining. Declining (§ 7 Abs. 2 EStG, the
 Investitionssofortprogramm, BGBl. 2025 I of 18.07.2025) is open to a purchase from 01.07.2025 to 31.12.2027 only: up to three
 times the linear rate, at most 30 % a year of the book value, the purchase year by the month; it switches to linear (book
-value / remaining life) as soon as that is higher (§ 7 Abs. 3 EStG). A low-value asset stays one; auto = linear."""
+value / remaining life) as soon as that is higher (§ 7 Abs. 3 EStG). A low-value asset stays one; auto = linear.
+
+2.536.0 (#4335): afa_method none = no depreciation (a price only for the insurance list, or a device whose receipt counts as
+a normal expense): no plan, no EUeR row, a linked receipt counts in full. A device that is depreciated without a linked
+receipt carries receipt_missing (the dialog and the EUeR warn: the purchase may be among the receipts as well)."""
 import csv
 import io
 import re
@@ -47,7 +51,7 @@ AST_LIFE = (
           "\\bmic\\b", "recorder", "stativ", "tripod", "gimbal", "video", "speedlite", "blitz")),
 )
 AST_LIFE_DEFAULT = 60
-AST_METHODS = ("auto", "linear", "declining")  # 2.480.0 C (#3528): the choice per device (office_equipment.afa_method)
+AST_METHODS = ("auto", "linear", "declining", "none")  # 2.480.0 C (#3528): the choice per device (office_equipment.afa_method); 2.536.0 (#4335): none
 AST_DECL_FROM, AST_DECL_TO = date(2025, 7, 1), date(2027, 12, 31)  # declining only for a purchase in this window (DE, without guarantee)
 AST_DECL_MAX, AST_DECL_FACTOR = Decimal("0.30"), 3  # at most 30 % a year, at most three times the linear rate
 AST_LIFE_MAX = 600
@@ -128,8 +132,9 @@ def bnk_plan(net, pdate, life, method="auto"):
     """The depreciation of one device: (method, [{year, afa, book}]) with method 'gwg' | 'linear' | 'declining'; ('', [])
     without a purchase day or a positive net price. Linear: by the month from the purchase month on; the cumulated amount is
     rounded per year so the years add up to the net price exactly. 2.480.0 C (#3528): method 'declining' (only inside the
-    window, else linear): the rows carry mode 'declining' | 'linear' (the year it switched)."""
-    if net is None or net <= 0 or pdate is None:
+    window, else linear): the rows carry mode 'declining' | 'linear' (the year it switched). 2.536.0 (#4335): method 'none'
+    = no depreciation: ('', [])."""
+    if net is None or net <= 0 or pdate is None or method == "none":
         return "", []
     if net <= AST_GWG:
         return "gwg", [{"year": pdate.year, "afa": dstr(net), "book": "0.00"}]
@@ -188,7 +193,8 @@ def ast_values(r, today=None):
     return {"life_suggest": sug, "life_eff": int(life), "method": method, "afa_method": sel, "declining_ok": dok,
             "declining_pct": dstr(ast_declining_rate(life) * 100) if dok else None, "afa_plan": plan, "afa_year": afa_y, "year": today.year,
             "book_value": dstr(book) if book is not None else None, "new_value_eff": dstr(new) if new is not None else None,
-            "current_value_eff": dstr(cur) if cur is not None else None}
+            "current_value_eff": dstr(cur) if cur is not None else None,
+            "receipt_missing": bool(method) and not r.get("receipt_node_id")}  # 2.536.0 (#4335)
 
 
 def ast_enrich(c, oid, rows):
@@ -203,18 +209,21 @@ def ast_enrich(c, oid, rows):
 
 def ast_afa_year(c, oid, year):
     """The depreciation of office oid in year (for the profit statement, #1921): {"rows": [{equipment_id, name, amount
-    (Decimal, net), method}], "receipt_ids": {node ids}}. Archived devices count as well (archived = no longer offered,
-    the asset still is one). receipt_ids: the receipts of the devices listed -- the statement must not count them as an
-    expense as well (the depreciation replaces it; their input tax stays)."""
-    rows, rids = [], set()
+    (Decimal, net), method}], "receipt_ids": {node ids}, "no_receipt": [{equipment_id, name}]}. Archived devices count as
+    well (archived = no longer offered, the asset still is one). receipt_ids: the receipts of the devices listed -- the
+    statement must not count them as an expense as well (the depreciation replaces it; their input tax stays).
+    2.536.0 (#4335): no_receipt = the devices with a depreciation in year but no linked receipt (the statement warns)."""
+    rows, rids, miss = [], set(), []
     for r in office_rows(c, oid, "equipment"):
         v = ast_values(r, date(int(year), 12, 31))
         amt = next((dec(p["afa"]) for p in v["afa_plan"] if p["year"] == int(year)), None)
         if amt:
             rows.append({"equipment_id": r["id"], "name": r["name"], "amount": amt, "method": v["method"]})
+            if v["receipt_missing"]:
+                miss.append({"equipment_id": r["id"], "name": r["name"]})
         if v["method"] and r.get("receipt_node_id"):
             rids.add(int(r["receipt_node_id"]))
-    return {"rows": rows, "receipt_ids": rids}
+    return {"rows": rows, "receipt_ids": rids, "no_receipt": miss}
 
 
 def ast_covered(c, oid, aid):
