@@ -12,6 +12,8 @@ freelancer-matrix: office
    finalising a credit draft made before the final invoice was finalised
  - #2842 revenue per client: an invoice of 1000 with a full credit note counts 0 (was -1000, margin too); a partial
    credit note of 200 on another invoice still counts 800
+ - 2.523.0 (#4082) final invoice in a foreign currency: the deduction = what the progress invoice billed in that currency
+   (its own rate), also after the final draft's rate changed
  Each flow runs for an organisation's admin and for a person without organisation (personal office).
 usage: p2354_b_abschlag_test.py <datadir>      (P2354B_NOSTART=1: a running server on KALMIDO_TEST_PORT, no start.sh)"""
 import base64
@@ -70,6 +72,39 @@ def deductions(doc):
     return [(dd(x["rate"]), x["tax"]) for x in doc["items"] if x["kind"] == "discount"]
 
 
+def dnets(doc, kind):
+    """{tax key: abs(net)} of the calculated lines of a kind (the amounts in the document currency)"""
+    out = {}
+    for ln in doc["totals"]["lines"]:
+        if ln.get("kind") == kind:
+            out[ln["tax"]] = out.get(ln["tax"], Decimal(0)) + abs(dd(ln["net"]))
+    return out
+
+
+def fx_final(s, cl, label):
+    """2.523.0 (#4082): a quotation in USD (rate 1.10), its progress invoice of 1000 USD finalised with rate 1.20 (its own
+    rate): the final invoice deducts the USD net per rate the progress invoice billed (727.27 EUR x 1.20 = 872.72 + the 7 % part), not the EUR net x
+    the final invoice's rate 1.10 (800 + 200); a rate changed on the final draft keeps the billed amounts and finalises."""
+    q = offer(s, cl)
+    check(s.patch(B + f"{D}/{q}", json={"currency": "USD", "fx_rate": "1.1"}).ok, f"{label} #4082: quotation in USD")
+    r = s.post(B + f"{D}/{q}/invoice", json={"inv_type": "progress", "amount": 1000})
+    check(r.status_code == 201, f"{label} #4082: progress 1000 USD " + r.text[:200])
+    P = r.json()["id"]
+    check(s.patch(B + f"{D}/{P}", json={"fx_rate": "1.2"}).ok and s.post(B + f"{D}/{P}/finalize").ok, f"{label} #4082: progress finalised at rate 1.20")
+    billed = dnets(s.get(B + f"{D}/{P}").json(), "item")
+    check(billed.get("standard") == Decimal("872.72") and sum(billed.values()) > Decimal("1090"), f"{label} #4082: the progress invoice billed at 1.20 {billed}")
+    r = s.post(B + f"{D}/{q}/invoice", json={"inv_type": "final"})
+    check(r.status_code == 201, f"{label} #4082: final draft " + r.text[:200])
+    F = r.json()["id"]
+    got = dnets(r.json(), "discount")
+    check(got == billed, f"{label} #4082: the final invoice deducts what was billed in USD (was EUR x 1.10 = 800 + 200) {got}")
+    r = s.patch(B + f"{D}/{F}", json={"fx_rate": "1.15"})
+    got = dnets(r.json(), "discount") if r.ok else {}
+    check(got == billed, f"{label} #4082: a new rate on the final draft keeps the billed deduction {got}")
+    r = s.post(B + f"{D}/{F}/finalize")
+    check(r.ok, f"{label} #4082: the final draft with a changed rate finalises (no stale-deduction 400) {r.status_code} " + r.text[:200])
+
+
 def flow(s, label):
     cl = client(s, "Kunde " + label + " GmbH")
     # ---- #2836 2: a progress draft does not block the full invoice, a finalised one does
@@ -120,6 +155,7 @@ def flow(s, label):
     r = s.post(B + f"{D}/{CR2}/finalize")
     check(r.status_code == 409, f"{label} #2836 3: an older credit draft is not finalised either {r.status_code} " + r.text[:200])
     check(s.get(B + f"{D}/{P}").json()["status"] != "cancelled", f"{label} #2836 3: the progress invoice stays")
+    fx_final(s, cl, label)
     # ---- #2842 revenue per client
     year = TODAY.year
     for name, credit in (("Voll", None), ("Teil", 200)):
