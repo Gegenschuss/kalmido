@@ -1555,7 +1555,7 @@ async function route() {
   if (S.extra) await loadExtra().catch(() => { S.extra = []; });
   // 2.26.x (#953): back to an entry that was left from the open drawer (phone / folded sidebar): the drawer opens again
   // and stays; the next Back goes on as before
-  if (history.state?.side && !r.task && (isMobile() || $('#app')?.classList.contains('side-rail'))) setTimeout(() => { if (history.state?.side && !$('#side.open')) sideDrawerOpen(); }, 0);
+  if (history.state?.side && !r.task && (isMobile() || $('#app')?.classList.contains('side-rail'))) setTimeout(() => { if (!history.state?.side) return; try { const {side, ...st} = history.state; history.replaceState(Object.keys(st).length ? st : null, '', location.href); } catch { /* old browser */ } if (!$('#side.open')) sideDrawerOpen(); }, 0);  // 2.534.0 (#4344): side is used up once - a later route() without a Back does not reopen the drawer
   if (!(typeof sbm_hold === 'function' && sbm_hold())) closeSide();  // 2.196.0 A (#2737): an area icon in the phone's drawer keeps it open
   tch_overlaysClose();  // 2.38.0 (#1155)
   if (r.task) { render(); if (taskById(r.task)?.unread || r.reply) S.tlScroll = r.task; openDetail(r.task); history.replaceState(null, '', '#' + keyToHash(S.route.key)); if (r.reply) replyFocus(r.task); return; }
