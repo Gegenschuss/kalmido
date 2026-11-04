@@ -336,6 +336,32 @@ dbx("UPDATE fs_nodes SET deleted_at='2026-01-01T00:00:00Z' WHERE id=?", (F4,), w
 check(Bo.delete(B + f"/api/hubmail/mails/{m4}").ok and Bo.post(B + f"/api/hubmail/mails/{m4}/restore").ok, "#4338: delete + Undo once more")
 check(dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0] == "2026-01-01T00:00:00Z", "#4338: a folder deleted by hand before stays in the trash")
 dbx("UPDATE fs_nodes SET deleted_at=NULL WHERE id=?", (F4,), write=True)
+# review of 2.536.0 (#4338): a reused day folder (hbm_file fresh=False) holds another mail's files -- deleting the second mail
+# must not take the first mail's folder along (as if m1 had been filed into m4's folder)
+m1, F1 = R["m1"]["id"], R["m1"]["folder_id"]
+dbx("UPDATE hub_mails SET folder_id=? WHERE id=?", (F4, m1), write=True)
+check(Bo.delete(B + f"/api/hubmail/mails/{m1}").ok, "#4338: bob deletes a mail filed into another mail's folder")
+check(not dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0] and Bo.get(B + f"/api/files/nodes/{E4}").ok,
+      "#4338: the other mail's folder and .eml stay (a shared folder is not this mail's)")
+check(Bo.post(B + f"/api/hubmail/mails/{m1}/restore").ok, "#4338: Undo of the mail in the shared folder")
+dbx("UPDATE hub_mails SET folder_id=? WHERE id=?", (F1, m1), write=True)
+# review of 2.536.0 (#4338): a receipt of a locked month among the mail's files -> 409 like the file trash, the mail stays
+NOW = "2026-01-01T00:00:00Z"
+DM4 = dbx("SELECT org_id, ws, doc_date FROM doc_meta WHERE node_id=?", (E4,))  # the .eml may have its document row already
+if DM4:
+    dbx("UPDATE doc_meta SET org_id=?, ws=?, doc_date=? WHERE node_id=?", (ORG, f"o{ORG}", "2020-01-15", E4), write=True)
+else:
+    dbx("INSERT INTO doc_meta(node_id, org_id, ws, doc_date, created_at, updated_at) VALUES(?,?,?,?,?,?)", (E4, ORG, f"o{ORG}", "2020-01-15", NOW, NOW), write=True)
+dbx("INSERT INTO rc_receipts(node_id, org_id, ws, set_at) VALUES(?,?,?,?)", (E4, ORG, f"o{ORG}", NOW), write=True)
+dbx("INSERT INTO office_period_locks(org_id, period, locked_at) VALUES(?,?,?)", (ORG, "2020-01", NOW), write=True)
+check(Bo.delete(B + f"/api/hubmail/mails/{m4}").status_code == 409, "#4338: a mail whose .eml is a receipt of a locked month is not deleted (409)")
+check(m4 in ids(Bo, client_id=ACME) and not dbx("SELECT deleted_at FROM fs_nodes WHERE id=?", (F4,))[0][0], "#4338: ... the mail and its folder stay")
+dbx("DELETE FROM office_period_locks WHERE org_id=? AND period=?", (ORG, "2020-01"), write=True)
+dbx("DELETE FROM rc_receipts WHERE node_id=?", (E4,), write=True)
+if DM4:
+    dbx("UPDATE doc_meta SET org_id=?, ws=?, doc_date=? WHERE node_id=?", (*DM4[0], E4), write=True)
+else:
+    dbx("DELETE FROM doc_meta WHERE node_id=?", (E4,), write=True)
 # a freelancer's mail without a folder (an older filing): the .eml and the attachments themselves
 m8, F8, E8 = R["m8"]["id"], R["m8"]["folder_id"], R["m8"]["eml_id"]
 dbx("UPDATE hub_mails SET folder_id=NULL WHERE id=?", (m8,), write=True)

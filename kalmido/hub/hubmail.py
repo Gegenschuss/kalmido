@@ -174,11 +174,15 @@ def hbm_node_ok(c, uid, mail_id):
     return bool(m) and hbm_can(c, uid, m)
 
 
-def hbm_mail_nodes(r):
-    """2.536.0 (#4338): the file-store nodes filed with hub mail row r -- its folder (the .eml and the attachments below it),
-    without one the .eml and the attachments themselves. Deleting the mail and the trash run (files/trashpurge.py) use it."""
+def hbm_mail_nodes(c, r):
+    """2.536.0 (#4338): the file-store nodes filed with hub mail row r -- its folder (the .eml and the attachments below it)
+    when the folder was made for this mail, otherwise the .eml and the attachments themselves. Deleting the mail and the
+    trash run (files/trashpurge.py) use it. Review of 2.536.0: a reused day folder (hbm_file: fresh=False) holds another
+    mail's files, so it only counts as this mail's folder when it carries this mail's id (set for a fresh folder only)."""
     if r["folder_id"]:
-        return [int(r["folder_id"])]
+        f = c.execute("SELECT hub_mail_id FROM fs_nodes WHERE id=?", (r["folder_id"],)).fetchone()
+        if f and f["hub_mail_id"] == r["id"]:
+            return [int(r["folder_id"])]
     return ([int(r["eml_id"])] if r["eml_id"] else []) + _files(r)
 
 
@@ -664,8 +668,12 @@ def hbm_mail_del(mid):
     _gate()
     m = _need_mail(c, mid, write=True)
     ts, uid = _now(), me()
+    nodes = hbm_mail_nodes(c, m)
+    from ..office.periodlock import pl_tree_need_open
+    for nid in nodes:  # review of 2.536.0: a receipt of a locked month among them -> 409, the mail stays (as the file trash)
+        pl_tree_need_open(c, nid)
     c.execute("UPDATE hub_mails SET deleted_at=?, deleted_by=? WHERE id=?", (ts, uid, mid))
-    for nid in hbm_mail_nodes(m):  # a node already in the trash keeps its own time stamp (it stays there on Undo)
+    for nid in nodes:  # a node already in the trash keeps its own time stamp (it stays there on Undo)
         c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=? AND deleted_at IS NULL", (ts, uid, nid))
     bump(c)
     c.commit()
@@ -677,13 +685,16 @@ def hbm_mail_restore(mid):
     c = db()
     _gate()
     m = _need_mail(c, mid, write=True, deleted=True)
-    c.execute("UPDATE hub_mails SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (mid,))
     # 2.536.0 (#4338): only the nodes that went with the mail (exactly its time stamp); one deleted by hand before stays
-    for nid in hbm_mail_nodes(m):
-        n = c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at=?", (nid, m["deleted_at"])).fetchone()
-        if n:
-            c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?",
-                      (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=nid), nid))
+    back = [n for n in (c.execute("SELECT * FROM fs_nodes WHERE id=? AND deleted_at=?", (nid, m["deleted_at"])).fetchone()
+                        for nid in hbm_mail_nodes(c, m)) if n]
+    from ..office.periodlock import pl_tree_need_open
+    for n in back:  # review of 2.536.0: like the restore in the file trash, a receipt of a locked month -> 409
+        pl_tree_need_open(c, n["id"])
+    c.execute("UPDATE hub_mails SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (mid,))
+    for n in back:
+        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?",
+                  (_free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"]), n["id"]))
     bump(c)
     c.commit()
     return jsonify(ok=True)

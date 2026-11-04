@@ -101,7 +101,7 @@ def tp_hubmail(c, cut, purge):
     ts = iso(now_utc())
     for r in rows:
         # 2.536.0 (#4338): deleting the mail put them into the trash already (hbm_mail_del); this catches the older ones
-        for nid in hbm_mail_nodes(r):
+        for nid in hbm_mail_nodes(c, r):
             c.execute("UPDATE fs_nodes SET deleted_at=? WHERE id=? AND deleted_at IS NULL", (ts, nid))
         c.execute("DELETE FROM hub_mails WHERE id=?", (r["id"],))
     return len(rows)
