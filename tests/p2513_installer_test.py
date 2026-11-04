@@ -2,7 +2,8 @@
 """2.513.0: the installers without a server. install.sh runs for real with its last line (main) left out and stubs for curl,
 docker and id on the PATH; install.ps1 (no PowerShell in the test environment) is checked as text.
 - #4358: no network_mode fallback: Compose refuses it beside the networks of docker-compose.yml; the override of an older
-  installer loses the line on the next run, a clear message names the two ways out."""
+  installer loses the line on the next run, a clear message names the two ways out.
+- #4355: the latest version comes from the forward of github.com (no API limit); no answer = a clear stop, main only when named."""
 # kalmido-suite: nodata
 import os
 import shutil
@@ -97,7 +98,29 @@ for name, txt in (("install.sh", SH), ("install.ps1", PS)):
     check("network_mode: bridge" not in txt, f"#4358: {name} does not write network_mode any more")
     check("docker network prune" in txt and "default-address-pools" in txt, f"#4358: {name} names both ways out")
 
-# (more below)
+# ------------------------------------------------------------------ #4355
+def latest(body, **env):
+    stub("curl", body)
+    return run('resolve_version; echo "VERSION=$VERSION"', **env)
+
+
+FWD = "https://github.com/Gegenschuss/kalmido/releases/%s"
+rc, out, err = latest("printf '%%s' '%s'" % (FWD % "tag/v2.513.0"))
+check(rc == 0 and "VERSION=v2.513.0" in out, f"#4355: the version from the forward ({rc} {out} {err[:200]})")
+check("github.com/Gegenschuss/kalmido/releases/latest" in calls() and "api.github.com" not in calls() and " -I" in calls().replace("-fsSI", "-I"),
+      f"#4355: one HEAD request on github.com, not the API: {calls()}")
+for what, body in (("no answer", "exit 6"), ("no release (forward to the list)", "printf '%%s' '%s'" % (FWD % "").rstrip("/")),
+                   ("no forward at all", "printf ''"), ("a forward to something else", "printf '%%s' '%s'" % (FWD % "tag/nightly"))):
+    rc, out, err = latest(body)
+    check(rc == 1 and "VERSION=" not in out, f"#4355: {what} = stop, no version ({rc} {out})")
+    check("latest release" in err and "KALMIDO_VERSION=v1.2.3" in err and "Nothing was changed" in err, f"#4355: {what}: the message says what to do: {err[:300]}")
+rc, out, _ = latest("exit 6", KALMIDO_VERSION="main")
+check(rc == 0 and "VERSION=main" in out and "curl" not in calls(), f"#4355: KALMIDO_VERSION=main is still possible, without asking GitHub ({rc} {out})")
+rc, out, _ = latest("exit 6", KALMIDO_VERSION="2.500.0")
+check(rc == 0 and "VERSION=v2.500.0" in out, f"#4355: a named version works as before ({rc} {out})")
+for name, txt in (("install.sh", SH), ("install.ps1", PS)):
+    check("api.github.com" not in txt and "no release found" not in txt, f"#4355: {name} does not ask the API, no silent main")
+check("AllowAutoRedirect = $false" in PS and "$Version = 'main'" not in PS and "Fail \"Could not find the latest release" in PS, "#4355: install.ps1 reads the forward and stops without an answer")
 
 shutil.rmtree(TMP, ignore_errors=True)
 print(f"p2513_installer: {OKS[0]} ok, {len(FAILS)} failed")

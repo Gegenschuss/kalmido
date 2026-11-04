@@ -18,7 +18,7 @@
 # Options (environment variables):
 #   KALMIDO_DIR      install folder                        (default: $HOME/kalmido)
 #   KALMIDO_PORT     port on 127.0.0.1                     (default: 3040)
-#   KALMIDO_VERSION  release tag (vX.Y.Z) or branch        (default: the latest release)
+#   KALMIDO_VERSION  release tag (vX.Y.Z) or branch        (default: the latest release; main only when named)
 #   KALMIDO_BUILD=1  always build locally instead of pulling the prebuilt image
 #
 # The script never uses sudo. Source: https://github.com/Gegenschuss/kalmido (AGPL-3.0)
@@ -29,7 +29,6 @@
 set -eu
 
 GH="https://github.com/Gegenschuss/kalmido"
-GH_API="https://api.github.com/repos/Gegenschuss/kalmido"
 IMAGE_REPO="${KALMIDO_IMAGE_REPO:-ghcr.io/gegenschuss/kalmido}"   # override only for mirrors / tests
 
 say()  { printf '%s\n' "$*"; }
@@ -183,13 +182,20 @@ fetch_checked() {
   [ "$have" = "$want" ] || die "Checksum of $1 does not match the release (expected $want, got ${have:-?}). Nothing was changed."
 }
 
-# KALMIDO_VERSION unset: the latest GitHub release (falls back to the main branch if there is none)
+# 2.513.0 (#4355): the tag from the forward of github.com/.../releases/latest (the API allows 60 requests an hour per address)
+latest_release() {
+  loc=$(curl -fsSI --max-time 30 -o /dev/null -w '%{redirect_url}' "$GH/releases/latest" 2>/dev/null) || loc=""
+  tag="${loc##*/releases/tag/}"
+  printf '%s' "$tag" | grep -Eq '^v[0-9]+\.[0-9]+\.[0-9]+$' || return 1
+  printf '%s' "$tag"
+}
+
+# KALMIDO_VERSION unset: the latest GitHub release. 2.513.0 (#4355): never main by accident: unreleased code, and a migration on it
 resolve_version() {
   VERSION="${KALMIDO_VERSION:-}"
   if [ -z "$VERSION" ]; then
-    VERSION=$(curl -fsSL -H "Accept: application/vnd.github+json" "$GH_API/releases/latest" 2>/dev/null \
-      | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1) || true
-    [ -n "$VERSION" ] || VERSION=main
+    VERSION=$(latest_release) || die "Could not find the latest release on GitHub (no answer, or no release). Nothing was changed.
+Try again later, or name a version: KALMIDO_VERSION=v1.2.3 (the unreleased development state: KALMIDO_VERSION=main)."
   fi
   case "$VERSION" in
     [0-9]*.[0-9]*.[0-9]*) VERSION="v$VERSION" ;;   # 1.0.0 -> v1.0.0
@@ -449,10 +455,10 @@ main() {
   esac
 
   printf '\n\033[1mKalmido installer\033[0m\n'
-  if [ -n "${KALMIDO_VERSION:-}" ]; then
+  if [ "$VERSION" = main ]; then
+    say "Installs the unreleased development version from GitHub (branch main, as you asked) into $DIR"
+  elif [ -n "${KALMIDO_VERSION:-}" ]; then
     say "Installs version $VERSION from GitHub into $DIR"
-  elif [ "$VERSION" = main ]; then
-    say "Installs the development version from GitHub (branch main, no release found) into $DIR"
   else
     say "Installs the latest release ($VERSION) from GitHub into $DIR"
   fi
