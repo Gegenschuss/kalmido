@@ -246,6 +246,8 @@ def oi_write(c, run, uid, man, zf, files, data, who):
     run.created.setdefault("oi", [])
     names = {_oid(p.get("user_id")): _txt(p.get("name"), 100) for p in data.get("people") or [] if isinstance(p, dict)}
     lates = []
+    from .oilock import oil_prepare  # #4300
+    oil_prepare(c, run, uid, oi)
     for spec in oi_specs():
         rows = oi.get(spec.path) or []
         if not rows:

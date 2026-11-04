@@ -1017,6 +1017,13 @@ offline tool that opens it; the keys exist only in the members' browsers.
   manifest under `client_encrypted`; the organisation recovery key and `tools/kalmido_export_decrypt.py` open the archive, not the
   browser ciphertext inside). The content stays readable only in Kalmido, with the passphrases of the members. A restored
   backup therefore works as long as the members still have their passphrase or recovery code.
+- **Moving locked folders of the file store.** The account export carries the lock of your own locked folders and your own copy
+  of each folder key (it opens only with your key bundle, which comes along). The import restores the lock when you have that key
+  pair on the target: an account without keys takes the bundle over, and the folder opens with the passphrase from before. Into an
+  account with other keys the folder's encrypted content stays out, and the preview and the result name the folder: unlock it before
+  the export, or import into an account with the same keys. The organisation export carries the same for the exporting person only:
+  that person moves their account first, imports the organisation, then hands the folder key to the others from the browser. A
+  folder for which the exporting person holds no key stays out in the same way.
 - **What is lost without the key.** If a person loses passphrase **and** recovery code, they can set up their encryption anew,
   but cannot read what was only encrypted for them. In a project or an organisation's space another member can release the key to the new
   setup again. In a private knowledge space there is nobody else: the content is gone. If all members lose their keys, the content
@@ -1075,7 +1082,8 @@ relies on the session).
   the archive (the archive itself is encrypted). Content encrypted in the browser by its author (encrypted task notes
   and files) stays ciphertext; the manifest lists it under `client_encrypted`. Personal key bundles are never in the
   organisation archive: a person's encrypted notes and files open after a move only with the keys from their own account
-  export, and projects encrypted in the browser are not taken over by the import.
+  export, and projects encrypted in the browser are not taken over by the import. Locked folders of the file store:
+  see "Moving locked folders of the file store" above.
 - **Opening it.** The archive is encrypted with AES-256-GCM under the organisation's key. You need the organisation's
   recovery key that was valid when the archive was made (*Settings > Organisation > Encryption*; the archive carries
   the copy of the key that this recovery key unlocks, a later *New recovery key* does not open it) and the tool `tools/kalmido_export_decrypt.py` from the

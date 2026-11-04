@@ -46,6 +46,7 @@ from decimal import Decimal
 from flask import g, jsonify, send_file
 
 from .exportleft import left_lines  # 2.362.4 (#3107)
+from .oilock import oil_export_keys  # #4300
 from ..core.config import app, APP_VERSION, ATT_DIR, DB, OFFICE_DIR
 from ..core.db import connect, db, err, iso, now_utc
 from ..core.pg import system_ctx
@@ -270,6 +271,7 @@ OX_AREAS = (
     ("store/nodes.json", "fs_nodes", "org_id=?"),
     ("store/area_roots.json", "fs_area_roots", "org_id=? AND node_id IS NOT NULL"),
     ("store/versions.json", "fs_versions", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
+    ("store/locks.json", "fs_locks", "org_id=? AND e2e IS NOT NULL"),  # #4300 (the exporting person's own key: store/lock_keys.json, ox_build)
     ("store/shares.json", "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     ("store/history.json", "fs_log", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"),
     # 2.362.0 (#3092): + the organisation's channels (CSQ), their members and the files of the messages (bytes under files/tchat/)
@@ -459,7 +461,7 @@ OX_LEFT = {
     # organisation column
     "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
     "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
-    "fs_ext_links": _SECRET, "fs_locks": "folder locks and their keys (client_encrypted)", "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
+    "fs_ext_links": _SECRET, "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
@@ -566,7 +568,7 @@ def ox_csq(by_id):
 
 # 2.190.0 R (#2561): rows of the file store that belong to one node (left out with a hidden filed mail's nodes)
 OX_NODE_TABLES = ("fs_versions", "fs_shares", "fs_log", "doc_meta", "doc_node_tags", "doc_field_values", "rc_receipts",
-                  "fs_area_roots")  # 2.353.0 C (#2829)
+                  "fs_area_roots", "fs_locks")  # 2.353.0 C (#2829), #4300
 
 
 def ox_hidden_nodes(c, oid, hidden):
@@ -738,6 +740,8 @@ def ox_build(c, oid, out, by=None):
             elif hnodes and table in OX_NODE_TABLES:
                 rows = (r for r in rows if r.get("node_id") not in hnodes)
             _put_json(zf, man, name, rows)
+        if "fs_locks" in have and (by or {}).get("id"):  # #4300: only the exporting person's own copy of a folder key (it opens only with their keys)
+            _put_json(zf, man, "store/lock_keys.json", [r for r in oil_export_keys(c, "l.org_id=? AND k.user_id=?", (oid, by["id"])) if r["node_id"] not in hnodes])
         # the files: attachments of the tasks, project files of the lists, everything below OFFICE_DIR/<org id>
         enc = "enc" in _table_cols(c, "attachments")
         lk = _ox_locked(c, oid, man)  # 2.209.0 D (#1856): files the virus scanner locked stay out, listed in the manifest
@@ -829,7 +833,11 @@ def ox_build(c, oid, out, by=None):
             man.client_enc["locked_folders"] = c.execute("SELECT COUNT(*) FROM fs_locks WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_folder_note"] = ("Names and files below a locked folder of the file store (names starting with e2e1:, "
                                                     "files starting with KENC) are exported as stored, encrypted in the browser; only the "
-                                                    "people holding the folder key can read them, in Kalmido. No folder keys move along.")
+                                                    "people holding the folder key can read them, in Kalmido. The exporting person's own "
+                                                    "copy of each folder key comes along (store/lock_keys.json): an import opens the "
+                                                    "folder when that person has the same keys on the target (their account export moves "
+                                                    "them, before this import) and hands it on to the others from there; a folder without "
+                                                    "such a key stays out of the import: unlock it before the export.")
         if c.execute("SELECT 1 FROM wiki_spaces WHERE org_id=? AND e2e IS NOT NULL", (oid,)).fetchone():  # 2.64.3 A (#1817)
             man.client_enc["locked_wiki_pages"] = c.execute("SELECT COUNT(*) FROM wiki_pages WHERE org_id=? AND deleted_at IS NULL", (oid,)).fetchone()[0]
             man.client_enc["locked_wiki_note"] = ("Name and text of the knowledge pages of a space encrypted in the browser (values starting "

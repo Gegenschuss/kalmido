@@ -24,6 +24,7 @@ import secrets
 
 from ..core.i18n import N_
 from .orgimport import OiT, _txt  # 2.362.0 (#3131): + _txt
+from .oilock import oil_key, oil_lock  # #4300
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..core.config import ATT_DIR  # 2.149.0 G (#2517): pulled up from functions
 from ..files.fsroots import fs_area_root, fs_area_ws  # 2.353.0 C (#2829)
@@ -170,16 +171,29 @@ def _version(c, run, src, d, ctx):
     if st["names"] is None:
         st["names"] = {r.get("id"): r.get("name") for r in (ctx.data.get("oi") or {}).get("store/nodes.json") or []}
     name = st["names"].get(src.get("node_id"))
+    cipher = isinstance(name, str) and name.startswith("e2e1:")  # #4300: a file of a locked folder: its cipher name names no stored file
     try:
         path = f"files/store/{int(src['node_id'])}-v{int(src['no'])}-{_safe_part(name)}"
     except (TypeError, ValueError, KeyError):
         return None
-    got = ctx.file(path, os.path.join(FS_DIR, str(d["node_id"])), name or "file", mime=str(src.get("mime") or ""))
+    got = ctx.file(path, os.path.join(FS_DIR, str(d["node_id"])), "encrypted.kenc" if cipher else name or "file", mime=str(src.get("mime") or ""))
     if not got:
         return None
     d["path"], d["size"] = got
     d["sha256"] = _same_bytes(src, d, got[1])
     return d
+
+
+def _lock(c, run, src, d, ctx):
+    """#4300: admin/oilock.py. A folder that went into a root of the target (a crafted file: areas are never locked) gets no lock."""
+    st = _areas(run, ctx)
+    if d["node_id"] in st["merged"] or st["area_of"].get(_oidi(src.get("node_id"))):
+        return False
+    return oil_lock(run, src, d, ctx.uid)
+
+
+def _lock_key(c, run, src, d, ctx):
+    return oil_key(c, run, src, d, ctx.uid)  # #4300
 
 
 def _share(c, run, src, d, ctx):
@@ -597,6 +611,8 @@ SPECS = [
         label=N_("File store"), prep=_node),
     OiT("store/area_roots.json", "fs_area_roots", rid=False, key=("ws", "area"), prep=_area_root),  # 2.353.0 C (#2829)
     OiT("store/versions.json", "fs_versions", refs={"node_id": "fs_nodes"}, need=("node_id",), people=_P, space=(), prep=_version),
+    OiT("store/locks.json", "fs_locks", refs={"node_id": "fs_nodes"}, need=("node_id",), rid=False, prep=_lock),  # #4300: go with the node (undo)
+    OiT("store/lock_keys.json", "fs_lock_keys", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "me"}, space=(), rid=False, prep=_lock_key),
     OiT("store/shares.json", "fs_shares", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "member", **_P}, space=(),
         prep=_share),
     OiT("store/history.json", "fs_log", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"}, space=()),

@@ -110,7 +110,7 @@ _U_ORG = "data of an organisation or an office: the organisation export"
 _U_LATER = "not part of the decision of #3469, not in the account export yet"
 UMZ_LEFT_USERS = {
     "abs_cal_feeds": _U_SECRET, "app_passwords": _U_SECRET, "contact_srcs": _U_SECRET, "disc_profiles": _U_SECRET, "disc_tokens": _U_SECRET,
-    "doc_fetchers": _U_SECRET, "doc_mail": _U_SECRET, "ev_cal_feeds": _U_SECRET, "fs_lock_keys": _U_SECRET, "hub_tokens": _U_SECRET,
+    "doc_fetchers": _U_SECRET, "doc_mail": _U_SECRET, "ev_cal_feeds": _U_SECRET, "hub_tokens": _U_SECRET,
     "list_key_pending": _U_SECRET, "list_keys": _U_SECRET, "mail_tokens": _U_SECRET, "notify_channels": _U_SECRET, "ntfy_inboxes": _U_SECRET,
     "org_invites": _U_SECRET, "pl_conn_users": _U_SECRET, "pl_tokens": _U_SECRET, "recovery_codes": _U_SECRET, "user_invites": _U_SECRET,
     "user_keys": _U_SECRET, "webauthn_creds": _U_SECRET, "wiki_key_pending": _U_SECRET, "wiki_keys": _U_SECRET, "wiki_shares": _U_SECRET,
@@ -136,7 +136,9 @@ UMZ_LEFT_USERS = {
 UMZ_ENC_NOTE = ("Encrypted in the browser: stored here as ciphertext. Your key bundle (e2e_keys, wrapped with your passphrase and "
                 "recovery code) comes along: after an import into an account without its own keys, locked notes and your encrypted "
                 "files open with the same passphrase. Into an account that already has keys they arrive unreadable. Projects "
-                "encrypted in the browser are not taken over by the import (switch their encryption off before the export).")
+                "encrypted in the browser are not taken over by the import (switch their encryption off before the export). "
+                "Locked folders of the file store come along with your own folder key (private_lock_keys, it opens only with "
+                "your key bundle) and open with the same passphrase; into an account with other keys the import leaves them out.")
 
 _UMZ = {}  # user id -> the running export thread (of this process; 2.370.3 (#2760): the queue row tells it for every process)
 _UMZ_LOCK = threading.Lock()
@@ -382,6 +384,13 @@ def umz_extra_queries(uid):
         # files/store/<node>-v<no>-<name> like the organisation export) and the roots of my areas (knowledge, tables) in that tree
         "private_versions": ("""SELECT v.id, v.node_id, v.no, v.size, v.mime, v.sha256, v.created_by, v.created_at FROM fs_versions v JOIN fs_nodes n ON n.id=v.node_id
                                 WHERE n.owner_id=? AND n.org_id IS NULL AND n.kind='file' AND n.deleted_at IS NULL ORDER BY v.node_id, v.no""", (uid,)),
+        # #4300: my locked folders and my own copies of their keys (the ids their ciphertexts are bound to: admin/oilock.py)
+        "private_locks": ("""SELECT l.node_id, l.e2e, l.e2e_gen, l.e2e_at, COALESCE(l.aad_folder, l.node_id) AS aad_folder FROM fs_locks l JOIN fs_nodes n ON n.id=l.node_id
+                             WHERE n.owner_id=? AND n.org_id IS NULL AND n.deleted_at IS NULL AND l.e2e IS NOT NULL ORDER BY l.node_id""", (uid,)),
+        "private_lock_keys": ("""SELECT k.node_id, k.gen, k.wrapped, k.wrapper_pub, k.created_at, COALESCE(k.aad_r, k.user_id) AS aad_r, COALESCE(k.aad_w, k.wrapped_by) AS aad_w,
+                                 (SELECT e.pub FROM e2e_keys e WHERE e.user_id=k.user_id) AS recipient_pub
+                                 FROM fs_lock_keys k JOIN fs_locks l ON l.node_id=k.node_id JOIN fs_nodes n ON n.id=k.node_id
+                                 WHERE k.user_id=? AND n.owner_id=k.user_id AND n.org_id IS NULL AND n.deleted_at IS NULL AND l.e2e IS NOT NULL ORDER BY k.node_id, k.gen""", (uid,)),
         "private_area_roots": ("SELECT area, node_id, updated_at FROM fs_area_roots WHERE owner_id=? AND org_id IS NULL AND node_id IS NOT NULL "
                                "ORDER BY area", (uid,)),
         "wiki_pages": ("SELECT id, org_id, owner_id, path, body, attrs, created_at, updated_at FROM wiki_pages WHERE owner_id=? "
@@ -674,6 +683,7 @@ def umz_build(c, uid, stream, export_id):
             _put_rows(zf, out, "server_links", links)
         _put_rows(zf, out, "budgets", bud_export(c, uid))
         client_enc["locked_notes"] = out.tables.get("task_note_locks", 0)
+        client_enc["locked_folders"] = out.tables.get("private_locks", 0)  # #4300
         office = umz_office(c, zf, out, uid, have, locked)  # 2.362.2 (#3099)
         manifest = {
             "format": UMZ_FORMAT, "v": UMZ_V, "kalmido_version": APP_VERSION, "created_at": iso(now_utc()),

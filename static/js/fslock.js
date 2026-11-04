@@ -4,12 +4,14 @@
 'use strict';
 
 // lock id = the id of the locked folder. info: GET /api/files/lock/<id>; keys: {gen: CryptoKey} once the encryption is unlocked
-const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F)
+const FSL = {info: {}, keys: {}, tried: {}, memo: new Map(), busy: {}, auto: {}, q: '', wait: {}, aad: {}};  // wait: {lock id: [{user_id, name}]} (2.353.0 F); aad: #4300
 const FSL_HEAD = 9;
 const fslIs = v => typeof v === 'string' && v.startsWith('e2e1:');
-const fslNameAad = (lid, g) => `kalmido-fsname:v1:${lid}:${g}`;
-const fslFileAad = (lid, g) => `kalmido-fsfile:v1:${lid}:${g}`;
-const fslWrapAad = (lid, gen, r, w) => `kalmido-fslockkey:v1:${lid}:${gen}:${r}:${w}`;
+// #4300: an imported folder stays bound to its id on the server it was locked on (known from fslInfo, before any key of the folder)
+const fslBound = lid => FSL.aad[lid] || lid;
+const fslNameAad = (lid, g) => `kalmido-fsname:v1:${fslBound(lid)}:${g}`;
+const fslFileAad = (lid, g) => `kalmido-fsfile:v1:${fslBound(lid)}:${g}`;
+const fslWrapAad = (lid, gen, r, w) => `kalmido-fslockkey:v1:${fslBound(lid)}:${gen}:${r}:${w}`;
 function fslErr(msg, code) { const e = /** @type {any} */ (new Error(msg)); e.code = code; return e; }
 const fslErrLocked = () => fslErr(tr('Unlock first: this folder is encrypted in the browser.'), 'fs_lock_locked');
 const fslOk = () => !!globalThis.crypto?.subtle && typeof e2eSeal === 'function';
@@ -19,23 +21,25 @@ async function fslKek(pub, lid, gen) {
   const pk = await crypto.subtle.importKey('jwk', {kty: 'EC', crv: 'P-256', x: pub.x, y: pub.y}, {name: 'ECDH', namedCurve: 'P-256'}, false, []);
   const bits = await crypto.subtle.deriveBits({name: 'ECDH', public: pk}, E2E.priv, 256);
   let hk; try { hk = await crypto.subtle.importKey('raw', bits, 'HKDF', false, ['deriveKey']); } finally { new Uint8Array(bits).fill(0); }
-  return crypto.subtle.deriveKey({name: 'HKDF', hash: 'SHA-256', salt: e2eTEnc().encode(`fslock:${lid}:${gen}`), info: e2eTEnc().encode('kalmido-fslockkey:v1')}, hk, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
+  return crypto.subtle.deriveKey({name: 'HKDF', hash: 'SHA-256', salt: e2eTEnc().encode(`fslock:${fslBound(lid)}:${gen}`), info: e2eTEnc().encode('kalmido-fslockkey:v1')}, hk, {name: 'AES-GCM', length: 256}, false, ['encrypt', 'decrypt']);
 }
 const fslWrap = async (raw, lid, gen, uid, pub) => e2eSeal(await fslKek(pub, lid, gen), raw, fslWrapAad(lid, gen, uid, S.me.id));
 const fslName = (lid, uid) => (FSL.info[lid]?.members || []).find(m => m.user_id === uid)?.name || personNameAny?.(uid) || '?';
-// my key of a generation (wrapped by me: my own public key, never the server's copy; by someone else: the key this browser remembered)
+// my key of a generation (wrapped by me: my own public key, never the server's copy; by someone else: the key this browser remembered;
+// #4300: wrapped by someone on the old server: no person here to remember it for, first use like a person seen for the first time)
 async function fslRaw(lid, k) {
   const w = k.wrapped_by, me = S.me.id;
   let pub;
   if (w === me) pub = E2E.own;
-  else { pub = k.wrapper_pub; if (!le2eSeenOk(w, pub)) throw fslErr(tr('The key of {0} has changed. Compare the safety number before you continue.', fslName(lid, w)), 'fs_lock_keychanged'); }
+  else { pub = k.wrapper_pub; if (w != null && !le2eSeenOk(w, pub)) throw fslErr(tr('The key of {0} has changed. Compare the safety number before you continue.', fslName(lid, w)), 'fs_lock_keychanged'); }
   const wr = typeof k.wrapped === 'string' ? JSON.parse(k.wrapped) : k.wrapped;
-  return e2eOpen(await fslKek(pub, lid, k.gen), wr, fslWrapAad(lid, k.gen, me, w));
+  return e2eOpen(await fslKek(pub, lid, k.gen), wr, fslWrapAad(lid, k.gen, k.aad_r ?? me, k.aad_w ?? w));  // #4300: the ids of an imported copy
 }
 async function fslInfo(lid, force) {
   if (!force && FSL.info[lid]) return FSL.info[lid];
   const j = await rawFetch('GET', `/api/files/lock/${lid}`);
   FSL.info[lid] = j;
+  if (j.aad_id) FSL.aad[lid] = j.aad_id;
   for (const m of j.members || []) if (m.pub && m.user_id !== S.me?.id) le2eSeenOk(m.user_id, m.pub);
   return j;
 }

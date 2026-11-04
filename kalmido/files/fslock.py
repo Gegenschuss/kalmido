@@ -8,6 +8,8 @@ browser), wrapped for every person with access (fs_lock_keys; ECDH -> HKDF-SHA25
   b"KENC\\x02" | gen (u32) | iv (12) | AES-256-GCM(u32 header length | {name, type, size} | bytes); stored as versions of
   type application/octet-stream (sealed at rest as every file on top);
 - fs_nodes.e2e_gen = the generation of a node's ciphertexts (0 = plain). The locked folder's own name stays plain.
+#4300: <folder>, <R> and <W> are the ids on the server the ciphertext was made on: an imported folder keeps them
+(fs_locks.aad_folder, fs_lock_keys.aad_r / aad_w; admin/oilock.py).
 The server never sees a plain name or content of such a node: no preview, no text recognition, no search on the server, no
 document recognition, no agent and no API token (only a person in the web app). Shares go to people only; who has access
 but no key waits until a manager (the folder's owner, an organisation's admin) hands it over from the browser.
@@ -254,10 +256,11 @@ def fsl_info(c, nid, uid):
     gen = int(lk["e2e_gen"] or 0) if lk else 0
     people = fsl_people(c, n)
     keys = [] if not lk else [
-        {"gen": r["gen"], "wrapped": json.loads(r["wrapped"]), "wrapped_by": r["wrapped_by"], "wrapper_pub": json.loads(r["wrapper_pub"])}
+        {"gen": r["gen"], "wrapped": json.loads(r["wrapped"]), "wrapped_by": r["wrapped_by"], "wrapper_pub": json.loads(r["wrapper_pub"]),
+         **({"aad_r": r["aad_r"], "aad_w": r["aad_w"]} if r["aad_r"] else {})}  # #4300
         for r in c.execute("SELECT * FROM fs_lock_keys WHERE node_id=? AND user_id=? ORDER BY gen", (nid, uid))]
     pending = [{"user_id": p["user_id"], "name": p["name"], "has_keys": p["has_keys"]} for p in people if mode and gen not in p["key_gens"]]
-    return {"node_id": nid, "mode": mode, "gen": gen, "by": lk["e2e_by"] if lk else None, "at": lk["e2e_at"] if lk else None,
+    return {"node_id": nid, "aad_id": int(lk["aad_folder"] or nid) if lk else nid, "mode": mode, "gen": gen, "by": lk["e2e_by"] if lk else None, "at": lk["e2e_at"] if lk else None,
             "can_manage": fsl_can_manage(c, uid, nid), "keys": keys, "members": people, "pending": pending,
             "left": fsl_left(c, lk) if mode in ("encrypting", "decrypting") else 0}
 
@@ -681,7 +684,7 @@ def fsl_keys(nid):
                 continue  # an existing copy is replaced only after the recipient set up new keys (like the lists)
         c.execute("INSERT INTO fs_lock_keys(node_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?) "
                   "ON CONFLICT (node_id,gen,user_id) DO UPDATE SET wrapped=excluded.wrapped, wrapped_by=excluded.wrapped_by, "
-                  "wrapper_pub=excluded.wrapper_pub, created_at=excluded.created_at", (nid, gn, u, w, uid, mine["pub"], ts))
+                  "wrapper_pub=excluded.wrapper_pub, created_at=excluded.created_at, aad_r=NULL, aad_w=NULL", (nid, gn, u, w, uid, mine["pub"], ts))
         got.add(u)
     bump(c)
     c.commit()
