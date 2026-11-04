@@ -7,6 +7,7 @@ name: Release
 # 2.277 (#2914): the release also carries the installers, the source archives and SHA256SUMS (with the image digest);
 # kalmido.com/install.sh forwards to releases/latest/download/install.sh, the installer checks the archive and pins the
 # image to the digest. 2.277 (#3054): the notes are made readable with tools/release_notes.py.
+# 2.538.0 (#4360): the notes are highlights on top and stay below tools/release_notes.py MAX_CHARS (GitHub refuses over 125000).
 # 2.309.0 (#3269): "the CI is the only gate" (#1315) - the job ci-gate waits for a green FULL run of the workflow CI on the
 # tagged commit (tools/ci_gate.py); red, cancelled, only the push stage or no run = no image, no release.
 # 2.360.2 (#2912): actions are pinned to commit hashes (Dependabot keeps them current, tests/p23602_a_api_test.py); only the job
