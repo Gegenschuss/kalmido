@@ -1692,9 +1692,13 @@ def fi_parse_filename(name, clients=()):
             out["project"] = m.group("proj")
         out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
     else:
-        m = re.fullmatch(r"(?P<proj>[^_]+)_(?P<client>[^_]+)_(?P<title>.*?)_{2,}(?P<date>[^_]+)_(?:R|RE|Rechnung)", stem, re.I)
+        # 2.533.0 (#4499): one underscore before the date is enough ("657_Client_2026-03-11_R": no title; was: two
+        # underscores required, the name stayed unrecognised) -- when the date really is one
+        m = re.fullmatch(r"(?P<proj>[^_]+)_(?P<client>[^_]+)(?:_(?P<title>.*?))?_+(?P<date>[^_]+)_(?:R|RE|Rechnung)", stem, re.I)
+        if m and not fi_parse_date(m.group("date")):
+            m = None
         if m:
-            out.update(kind="invoice", project_no=m.group("proj"), client_name=m.group("client"), project=m.group("title").replace("_", " ").strip(),
+            out.update(kind="invoice", project_no=m.group("proj"), client_name=m.group("client"), project=(m.group("title") or "").replace("_", " ").strip(),
                        date=fi_parse_date(m.group("date")))
             out["sure"] = bool(out["date"]) and not fi_date_open(m.group("date"))
         else:  # a free form: the first number is the project, a date anywhere, R / KV mark the kind
@@ -1713,21 +1717,49 @@ def fi_parse_filename(name, clients=()):
                 out["kind"] = "offer"
     if not out["kind"]:
         out["kind"] = "invoice"
-    cn = fi_norm(out["client_name"])
-    if cn and len(cn) >= 3:
-        best = None
-        for cid, cname in clients:
-            n = fi_norm(cname)
-            if not n:
-                continue
-            if n == cn:
-                best = (cid, cname)
-                break
-            if best is None and len(n) >= 4 and (n.startswith(cn) or cn.startswith(n)):
-                best = (cid, cname)
-        if best:
-            out["client_id"] = best[0]
+    out["client_id"] = ofb_client_match(out["client_name"], clients)
     return out
+
+
+def ofb_client_match(name, clients):
+    """The id of the client [(id, name)] a file name's client field means (the same name, else a prefix of 4+), or None."""
+    cn = fi_norm(name)
+    if not cn or len(cn) < 3:
+        return None
+    best = None
+    for cid, cname in clients:
+        n = fi_norm(cname)
+        if not n:
+            continue
+        if n == cn:
+            return cid
+        if best is None and len(n) >= 4 and (n.startswith(cn) or cn.startswith(n)):
+            best = cid
+    return best
+
+
+def ofb_firm_is(firm, field):
+    """2.533.0 (#4499): True when a file name field names the company read from the PDF (the same, or the start of it)."""
+    f, n = fi_norm(firm), fi_norm(field)
+    return bool(f and n and len(n) >= 3 and (f == n or f.startswith(n) or (len(f) >= 3 and n.startswith(f))))
+
+
+def ofb_swap(p, firms, clients=()):
+    """2.533.0 (#4499): client and project of a file name the wrong way round ("Client_Project_KV04_..."): when the client
+    field does not name the company of the PDF (firms: the names read / the client found) but the first field does, the
+    proposal with both swapped {client_name, client_id, project, project_no}; else None."""
+    toks = re.sub(r"\.pdf$", "", os.path.basename(p.get("file_name") or ""), flags=re.I).strip().split("_")
+    firms = [f for f in firms if f]
+    if len(toks) < 3 or not firms or not p.get("client_name"):
+        return None
+    first, second = toks[0], toks[1]
+    if first.isdigit() or p["client_name"] != second:
+        return None
+    if any(ofb_firm_is(f, second) for f in firms) or not any(ofb_firm_is(f, first) for f in firms):
+        return None
+    rest = p.get("project") if p.get("project") != first else ""
+    return {"client_name": first, "client_id": ofb_client_match(first, clients),
+            "project": " ".join(x for x in (second, rest) if x), "project_no": "" if p.get("project_no") == first else p.get("project_no") or ""}
 
 
 def fi_number_taken(c, oid, num):
@@ -2307,8 +2339,9 @@ def fi_parse_post():
 
 @app.post("/api/office/legacy/archive/address")
 def fk_archive_address_post():
-    """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) -> the recipient's address
-    read from the text layer of page 1 and the proposals (new client / contact person / address differs); nothing stored."""
+    """2.40.0 (#1421) org admin. multipart 'file' (PDF) + client_id? (the file name's proposal) + file_name? -> the recipient's
+    address read from the text layer of page 1 and the proposals (new client / contact person / address differs; 2.533.0
+    #4499: swap = client and project of the file name swapped when only its first field names the PDF's company); nothing stored."""
     c, uid, oid = _ctx()
     if hit_limit(f"pdftext:{uid}", PDF_RATE, 600):  # 2.81.0 (#1463): the same budget as POST /api/pdf-text
         raise Denied(429, tr("Too many requests, please slow down"))
@@ -2319,7 +2352,16 @@ def fk_archive_address_post():
         cid = int(request.form.get("client_id") or 0) or None
     except ValueError:
         cid = None
-    return jsonify(fk_pdf_address(c, oid, raw, uid, cid))
+    out = fk_pdf_address(c, oid, raw, uid, cid)
+    # 2.533.0 (#4499): file_name (optional): client / project of the name checked against the company of the PDF -> swap
+    fn = str(request.form.get("file_name") or "")[:300]
+    if fn and out.get("status") == "ok":
+        cl = [(r["id"], r["name"]) for r in c.execute(f"SELECT id, name FROM clients WHERE {pb_cl_sql(c, oid)} AND archived=0 AND deleted_at IS NULL ORDER BY id")]
+        p = fi_parse_filename(fn, cl)
+        # the company found among the clients counts only when the PDF's name led there (not the file name's client_id)
+        known = out["client_name"] if out.get("client_id") and out["client_id"] != cid else ""
+        out["swap"] = ofb_swap(p, [(out.get("address") or {}).get("name") or "", known], cl)
+    return jsonify(out)
 
 
 @app.post("/api/office/legacy/archive/run")

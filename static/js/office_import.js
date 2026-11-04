@@ -193,11 +193,13 @@ function oimAddrHtml(x, i) {
     ${a.reasons?.length ? `<p class="oimwarn">${ic('alert', 's')} ${esc(a.reasons.join(' · '))}</p>` : ''}
     ${r.new_client ? box('new', x.pNew, tr('Create a new client: {0}', a.name)) : ''}
     ${r.add_contact ? box('contact', x.pContact, tr('Add as contact person to {1}: {0}', r.add_contact, r.client_name)) : ''}
-    ${r.address_differs ? `<p class="muted">${ic('info', 's')} ${esc(tr('Address differs from the client card of {0}', r.client_name))}</p>` : ''}</div>`;
+    ${r.address_differs ? `<p class="muted">${ic('info', 's')} ${esc(tr('Address differs from the client card of {0}', r.client_name))}</p>` : ''}
+    ${x.swapped ? `<p class="muted oimswap">${ic('info', 's')} ${esc(tr('Client and project of the file name swapped to match the PDF: client {0}, project {1}', x.client_name, x.project))}</p>` : ''}</div>`;
 }
 async function oimReadAddr(x) {
   x.addrBusy = true;
   const fd = new FormData(); fd.append('file', x.file, x.file_name); if (x.client_id) fd.append('client_id', x.client_id);
+  fd.append('file_name', x.file_name || '');  // 2.533.0 (#4499): client / project of the name checked against the PDF
   try {
     const r = await fetch('/api/office/legacy/archive/address', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     x.addr = r.ok ? await r.json() : {status: 'error'};
@@ -205,6 +207,8 @@ async function oimReadAddr(x) {
   x.addrBusy = false;
   if (x.addr.status === 'ok') {
     x.pNew = !!x.addr.new_client && !x.addr.unsure; x.pContact = !!x.addr.add_contact && !x.addr.unsure;
+    const sw = x.addr.swap;  // 2.533.0 (#4499): only the first field of the name is the PDF's company: client and project swapped
+    if (sw && !x.done) { Object.assign(x, {client_name: sw.client_name, project: sw.project, project_no: sw.project_no, client_id: sw.client_id || x.addr.client_id || null}); x.swapped = true; }
     if (x.addr.client_id && !x.client_id) x.client_id = x.addr.client_id;
   }
 }
