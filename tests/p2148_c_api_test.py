@@ -94,6 +94,8 @@ check("@example.com" not in json.dumps(d), "no mail addresses in the document")
 check(d["gaps"] >= 5, f"gaps counted {d['gaps']}")
 check(field(d, "periods")["auto"] and field(d, "numbers")["auto"].count("\n") >= 4, "periods and number ranges prefilled")
 check(d["company"] == "Alpha Studio GmbH", "company in the head")
+lg = field(d, "log")["auto"]  # 2.531.0 (#4497): the promise of the hash chain is kept (office/chain.py) and named
+check("hash chain" in lg and "Chain intact" in lg and "SHA-256" in lg, "#4497: the log section names the hash chain and its check " + lg[-300:])
 
 r = A.put(B + P, json={"own": {"company": "GmbH, film production (test v1)", "backup": "Copies kept at an example place"}, "base": 0})
 check(r.ok, "save version 1 " + r.text[:200])

@@ -16322,5 +16322,9 @@
   "{1} entries in {0} were refused by this server and not taken over": "Ce serveur a refusé {1} entrées dans {0} ; elles n’ont pas été reprises",
   "From the import (entry of {0})": "De l’import (entrée du {0})",
   "A journal day was too long to add the entry of the file in full: {0}": "Un jour du journal était trop long pour ajouter l’entrée du fichier en entier : {0}",
-  "Journal: the entry of the file was added below a day that already had an entry here": "Journal : l’entrée du fichier a été ajoutée sous un jour qui avait déjà une entrée ici"
+  "Journal: the entry of the file was added below a day that already had an entry here": "Journal : l’entrée du fichier a été ajoutée sous un jour qui avait déjà une entrée ici",
+  "Check: chain intact": "Vérifier : chaîne intacte",
+  "Chain intact: {0} finalised document checked.": ["Chaîne intacte : {0} document finalisé vérifié.", "Chaîne intacte : {0} documents finalisés vérifiés."],
+  "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} document finalisé n’est pas encore chaîné (il est ajouté à la prochaine finalisation).", "{0} documents finalisés ne sont pas encore chaînés (ils sont ajoutés à la prochaine finalisation)."],
+  "Chain broken: document {0} differs from what was finalised.": "Chaîne rompue : le document {0} diffère de ce qui a été finalisé."
 }

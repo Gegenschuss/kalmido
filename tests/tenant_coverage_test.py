@@ -553,7 +553,7 @@ ROUTES = {
     # ---- office (E, 2.36.2 #1021 / #1142): finalising a document, its history and the organisation's office log (3)
     "POST /api/office/docs/{}/finalize": "office", "POST /api/office/docs/{}/unlock": "office",  # 2.114.2 (#2263)
     "GET /api/office/docs/{}/number-preview": "office",  # 2.431.0 B (#3605): the number of the finalise dialog
-    "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office",
+    "GET /api/office/docs/{}/log": "office", "GET /api/office/log": "office", "GET /api/office/log/chain": "office",  # 2.531.0 (#4497)
     # ---- office (F1, 2.38.0 #1021): invoices, credit notes, reminders, payments, sending, DATEV inbox (11)
     "POST /api/office/docs/{}/invoice": "office", "POST /api/office/docs/{}/credit": "office", "POST /api/office/docs/from-time": "office",
     "POST /api/office/docs/{}/delivery": "office", "GET /api/office/docs/{}/timesheet.pdf": "office",  # 2.120.0 D (#2089)

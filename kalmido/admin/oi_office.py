@@ -265,6 +265,8 @@ def _p_doc(c, run, src, d, ctx):
     if _oi_number_taken(c, ctx.space, d.get("number")):
         run.warning(N_("A document number already exists in the target office, the document was skipped: {0}"), d.get("number"))
         return None
+    for col in ("chain_key", "chain_seq", "chain_prev", "chain_hash"):  # 2.531.0 (#4497): the target's own chain (office/chain.py hch_append)
+        d.pop(col, None)
     for col in ("ref_doc_ids", "abs_refs"):  # set by the finish pass (other documents)
         if col in d and d[col] is not None:  # an empty value stays empty (the round trip compares them)
             d[col] = "[]"

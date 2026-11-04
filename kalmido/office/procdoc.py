@@ -230,9 +230,16 @@ def pd_auto(c, oid, L):
         out["encryption"] = t("Verschlüsselung der Büro-Daten im Ruhezustand: nein (laut Betreiber).",
                               "Encryption of office data at rest: no (according to the operator).")
     out["log"] = t("Das Büro-Protokoll hält fest, wer wann welche Dokumente und Stammdaten geändert oder exportiert hat, bei Änderungen mit "
-                   "dem Wert davor und danach. Kassenbuch und Fahrtenbuch führen eigene Änderungsprotokolle. Das Protokoll sehen nur Admins.",
+                   "dem Wert davor und danach. Kassenbuch und Fahrtenbuch führen eigene Änderungsprotokolle. Das Protokoll sehen nur Admins. "
+                   # 2.531.0 (#4497): the promise of the hash chain (office/chain.py)
+                   "Festgeschriebene Rechnungen, Gutschriften, Mahnungen und Lieferscheine sind je Nummernkreis in einer Hash-Kette "
+                   "verbunden (SHA-256 über den Hash des vorigen Dokuments und die unveränderlichen Daten des Dokuments); die Prüfung "
+                   "„Kette intakt“ im Büro-Protokoll rechnet sie neu und nennt das erste abweichende Dokument.",
                    "The office log records who changed or exported which documents and master data when, for changes with the value "
-                   "before and after. Cash book and logbook keep their own change logs. Only admins see the log.")
+                   "before and after. Cash book and logbook keep their own change logs. Only admins see the log. "
+                   "Finalised invoices, credit notes, reminders and delivery notes are linked per number series in a hash chain "
+                   "(SHA-256 over the hash of the document before and the document's unchangeable data); the check \"Chain intact\" "
+                   "in the office log recomputes it and names the first document that differs.")
 
     # 4 operating
     from ..admin.backup import BK_ON_ENV

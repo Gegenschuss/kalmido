@@ -19,7 +19,7 @@ from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput, BadKey, DeniedKey
 from .costs import ek_item_margins, ek_purchases_write, ek_role_cost
-from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, dec, fmt_money, fmt_rate, inv_calc, office_calc
+from .calc import INV_ITEM_KINDS, INV_VAT_NOTES, PRD_INTERNAL_DETAIL, RAW_MODES, TAX_KEYS, calc_tax_day, dec, fmt_money, fmt_rate, inv_calc, office_calc
 from .packs import office_pack_for
 from .doclang import DOC_LANGS, doc_client_lang, doc_lg, doc_own, doc_pack, fd_lang_gaps  # 2.185.0 C (#2520); 2.460.0 (#3767)
 from .sheet import dk_pack, dk_packs_on
@@ -381,12 +381,13 @@ def _calc_doc(r, home="EUR"):  # 2.189.0 (#2475): home = the office's home curre
             "discount_pct": r["discount_pct"], "producing_on": dict(r).get("producing_on"),  # 2.47.0 (#1645)
             "producing_mode": dict(r).get("producing_mode"), "share_label": dict(r).get("share_label"),  # 2.113.1 (#2251)
             **{k: dict(r).get(k) for k in PRD_DOC_KEYS},  # 2.113.1 (#2252): handling costs / markup
-            "vat_note": dict(r).get("vat_note")}  # 2.47.3 (#1360): "small" prints the section 19 note
+            "vat_note": dict(r).get("vat_note"),  # 2.47.3 (#1360): "small" prints the section 19 note
+            "date": dict(r).get("date"), "service_to": dict(r).get("service_to")}  # 2.531.0 (#4498): the rates of the day of service
 
 
 def doc_totals(c, oid, r, items=None):
     s = office_settings(c, oid)
-    pack = doc_pack(office_pack_for(s), doc_lg(r["lang"]))  # 2.185.0 C (#2520): the pack's words in the document's language
+    pack = doc_pack(office_pack_for(s, calc_tax_day(dict(r))), doc_lg(r["lang"]))  # 2.185.0 C (#2520): the pack's words in the document's language; 2.531.0 (#4498): its day's rates
     if r["kind"] == "credit":
         pack = inv_credit_pack(c, oid, r, pack)  # 2.354.0 D (#2838): the rates frozen with its invoice
     if r["kind"] == "reminder":  # 2.38.0: a reminder has no positions, its lines are the invoices it lists
@@ -1142,7 +1143,7 @@ def odoc_render(c, doc_id, oid, keep_detail=False):
         logo_path = ofx_logo_path(oid, snd.get("logo"))
         color = snd.get("color") or ""
     else:
-        pack = doc_pack(office_pack_for(s) or {}, lang)
+        pack = doc_pack(office_pack_for(s, calc_tax_day(dict(r))) or {}, lang)  # 2.531.0 (#4498)
         t = doc_totals(c, oid, r)
         co = ofx_company_print(ofx_company(c, oid), s.get("company") or {}, lang, pack)
         logo_path = None
@@ -1653,6 +1654,7 @@ DUP_SKIP = {"id", "number", "status", "created_at", "updated_at", "sent_at", "cr
             "cancels_id", "ref_doc_ids", "source_doc_id",  # 2.38.0 review: a copy is a fresh document, bound to nothing
             "terms",  # 2.113.2 (#2253): a copy takes the terms when it is finalised itself
             "replaces_id",  # 2.437.0 B (#3621): set below, only when asked for
+            "chain_key", "chain_seq", "chain_prev", "chain_hash",  # 2.531.0 (#4497): a copy joins a chain only when it is finalised itself
             "version_of", "cashflow",  # 2.88.0 (#1915): set below (a quotation's copy = its next version, cash flow auto)
             "series_id", "series_period", "abs_refs",  # 2.120.0 A (#2087): abs_refs  # 2.91.0 A (#1923): a copy is no invoice of the series (office/recurring.py sets them itself)
             "reminder_fee_state", "agent_id", "list_id", "dup_times_from",  # 2.355.0 A (#2839): inv_type -- a copy of a final invoice is a plain one

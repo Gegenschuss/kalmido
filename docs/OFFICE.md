@@ -464,6 +464,14 @@ Shape (see `de.json`):
  "retention": {"receipts": 8, "books": 10, "min_years": 8, "editable": false}}
 ```
 
+2.531: a tax key (`standard`, `reduced`, `exempt`) is a number (valid always, as before) or a list of rates with the day
+they are valid from, e.g. `"standard": [{"valid_from": "1970-01-01", "rate": 19}, {"valid_from": "2020-07-01", "rate": 16},
+{"valid_from": "2021-01-01", "rate": 19}]` (the German pack carries the change of the second half of 2020: 16 / 5 %). Each
+rate is valid until the next one begins. The validator wants the list ascending, no day twice and the first entry from
+`1970-01-01` (no gap at the start); `exempt` stays 0. A document is computed with the rates of its day of service: the
+end of its period of service (`service_to`), else its date. A tax label may hold `{rate}` (`"{rate} % MwSt."`), filled with
+that rate. Finalised documents keep the rates of their snapshot.
+
 2.147: `features` lists the office functions the pack offers (see *Country pack functions and switches*); a pack without
 it (made before 2.147) offers what its `einvoice` / `bookkeeping` blocks say plus the export and the finalising rules.
 The keys `books.receipt_images`, `books.period_lock` and `books.procedure_doc` only exist with the status `planned`; the
@@ -1720,7 +1728,7 @@ choosing a framework contract presets raw data, rights and closing unless `apply
 `POST /api/office/docs/<id>/number` (`{number}` by hand, unique per organisation, or the next one of the scheme),
 `POST /api/office/docs/<id>/status`, `POST /api/office/docs/<id>/duplicate`, `GET /api/office/docs/<id>/render` (the
 print model as JSON: all texts, labels and amounts already in the document's language and format),
-`POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log` and `GET /api/office/log?limit=` (organisation
+`POST /api/office/docs/<id>/finalize`, `GET /api/office/docs/<id>/log`, `GET /api/office/log?limit=` and `GET /api/office/log/chain` (2.531, the hash chain check; organisation
 admins). The head also carries the period of service (`service_from`, `service_to`, dates; printed as one line).
 
 ### The project of a document
@@ -1884,6 +1892,19 @@ Finalising freezes it:
 - the sender (company lines and fields, colour, the logo by its SHA-256 - the file is kept as `logo-<hash>.png` - with its size and side), the
   recipient (with the client's billing fields) and the country pack's rates, formats and print words (`pack_version`)
   are stored in the document.
+
+2.531: every finalised invoice, credit note, reminder and delivery note also joins the **hash chain** of its office and
+number series (credit notes on the invoices' counter share their chain): `chain_hash = SHA-256(chain_prev + the
+document's canonical data)`, `chain_prev` = the hash of the document finalised before in that chain (empty for the
+first). The canonical data is sorted JSON of what never changes after finalising: number, kind, date, period of service,
+currency, `locked_at`, the recipient and sender snapshots, the positions (kind, title, detail, quantity, unit, rate, tax
+class, `tax_pct`, `net`, `tax_amount`), the totals without purchase prices / margin and the frozen rates. Payments, status,
+due date, reminder level, sending, notes and the stored files' checksums stay out, so everyday work never breaks the chain.
+Quotations and trial documents are not chained (a quotation may be taken back, a trial document deleted). Documents
+finalised before 2.531, or brought in by an office import, are chained at the next start in the order they were finalised.
+In the office log, admins (in the personal office the person) press **Check: chain intact**
+(`GET /api/office/log/chain` -> `{ok, count, pending, first_bad: {id, number, chain, seq}}`): every chain is recomputed
+and the first document that was changed in the database, removed from the middle of its chain or unlocked is named.
 
 The print model and the PDF of a finalised document are built from this snapshot only: later changes of the company,
 the logo, the services, the client or the country pack do not change it. Changing the head, the positions or the number

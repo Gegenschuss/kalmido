@@ -488,7 +488,8 @@ ROUTES = {
     "GET /api/office/fixed-costs": "office", "GET /api/office/fixed-costs/import/template": "office",
     "GET /api/office/kpi": "office", "GET /api/office/legacy/archive": "office", "GET /api/office/legacy/archive/{}": "office",
     "GET /api/office/legacy/archive/{}/pdf": "office", "GET /api/office/legacy/counter": "office",
-    "GET /api/office/legacy/runs": "office", "GET /api/office/log": "office", "GET /api/office/logo": "office",
+    "GET /api/office/legacy/runs": "office", "GET /api/office/log": "office", "GET /api/office/log/chain": "office",  # 2.531.0 (#4497)
+    "GET /api/office/logo": "office",
     "GET /api/office/mail-status": "office", "GET /api/office/number-preview": "office", "GET /api/office/packs": "office",
     "GET /api/office/packs/{}": "office", "GET /api/office/pack-switch": "office",  # 2.147.0 (#2462)
     "GET /api/office/pay-props": "office", "GET /api/office/settings": "office",

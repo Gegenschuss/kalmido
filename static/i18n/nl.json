@@ -16322,5 +16322,9 @@
   "{1} entries in {0} were refused by this server and not taken over": "Deze server heeft {1} items in {0} geweigerd; ze zijn niet overgenomen",
   "From the import (entry of {0})": "Uit de import (notitie van {0})",
   "A journal day was too long to add the entry of the file in full: {0}": "Een dagboekdag was te lang om de notitie uit het bestand volledig toe te voegen: {0}",
-  "Journal: the entry of the file was added below a day that already had an entry here": "Dagboek: de notitie uit het bestand is toegevoegd onder een dag die hier al een notitie had"
+  "Journal: the entry of the file was added below a day that already had an entry here": "Dagboek: de notitie uit het bestand is toegevoegd onder een dag die hier al een notitie had",
+  "Check: chain intact": "Controleren: keten intact",
+  "Chain intact: {0} finalised document checked.": ["Keten intact: {0} definitief document gecontroleerd.", "Keten intact: {0} definitieve documenten gecontroleerd."],
+  "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} definitief document is nog niet geketend (het wordt bij de volgende vastlegging toegevoegd).", "{0} definitieve documenten zijn nog niet geketend (ze worden bij de volgende vastlegging toegevoegd)."],
+  "Chain broken: document {0} differs from what was finalised.": "Keten verbroken: document {0} wijkt af van wat definitief werd vastgelegd."
 }

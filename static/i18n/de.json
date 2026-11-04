@@ -16322,5 +16322,9 @@
   "{1} entries in {0} were refused by this server and not taken over": "{1} Einträge in {0} hat dieser Server abgelehnt, sie wurden nicht übernommen",
   "From the import (entry of {0})": "Aus dem Import (Eintrag vom {0})",
   "A journal day was too long to add the entry of the file in full: {0}": "Ein Journal-Tag war zu lang, um den Eintrag der Datei vollständig anzuhängen: {0}",
-  "Journal: the entry of the file was added below a day that already had an entry here": "Journal: Der Eintrag der Datei wurde unter einem Tag angehängt, der hier schon einen Eintrag hatte"
+  "Journal: the entry of the file was added below a day that already had an entry here": "Journal: Der Eintrag der Datei wurde unter einem Tag angehängt, der hier schon einen Eintrag hatte",
+  "Check: chain intact": "Prüfen: Kette intakt",
+  "Chain intact: {0} finalised document checked.": ["Kette intakt: {0} festgeschriebenes Dokument geprüft.", "Kette intakt: {0} festgeschriebene Dokumente geprüft."],
+  "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} festgeschriebenes Dokument ist noch nicht verkettet (es kommt beim nächsten Festschreiben dazu).", "{0} festgeschriebene Dokumente sind noch nicht verkettet (sie kommen beim nächsten Festschreiben dazu)."],
+  "Chain broken: document {0} differs from what was finalised.": "Kette unterbrochen: Dokument {0} weicht vom festgeschriebenen Stand ab."
 }

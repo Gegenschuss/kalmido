@@ -8866,3 +8866,8 @@ time,.meta .dt,.dpbtn,.remchips button,.dprow .dpt,.dprow .dps,.fwhen{font-famil
 
 /* 2.490.0 (#4032): the rail's show / hide button stays on top while the rail scrolls */
 #srail .srb.srpanel{position:sticky;top:0;z-index:2;background:var(--sbbg,var(--bg2))}
+
+/* 2.531.0 A (#4497) */
+.ofc-chain{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
+.ofc-chain p{margin:0}
+.ofc-chain .bad{color:var(--danger)}

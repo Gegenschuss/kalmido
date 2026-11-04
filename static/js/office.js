@@ -572,7 +572,7 @@ function ofcSettingsHtml() {
     </fieldset>${ost_p('data')}
     ${adm ? `<h3>${tr('Import legacy data')}</h3><p class="muted">${tr('Clients, services, equipment and fixed costs from a spreadsheet, leads from a CSV file; old invoices and quotations as an archive.')}</p><div class="lacts"><a class="btn sm" href="#office/import">${ic('upload', 's')} ${tr('Import legacy data')}</a></div>` : ''}
     </fieldset>${ost_p('access')}
-    ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}` : ''}
+    ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}${ofcChainHtml()}` : ''}
     </fieldset>${ost_p('data')}
     ${adm && OFC.info.personal && (OFC.info.can_move || OFC.info.move_orgs?.length) ? `<h3>${tr('Transfer into an organisation')}</h3>${''/* 2.144.6 C (#2436): one section, one word (übertragen) for both ways */}
     ${OFC.info.can_move ? `<p class="muted">${tr('Documents, numbers, settings, master data and clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Transfer into a new organisation…')}</button></div>` : ''}
@@ -776,6 +776,15 @@ const oxaPut = b => rawFetch('PUT', '/api/office/settings', {...b, expect_update
   if (!oxaStale(x) && x.message !== 'auth' && !x.shown) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message);
   throw x;
 });
+// 2.531.0 (#4497): the check of the hash chain over the finalised documents (GET /api/office/log/chain)
+function ofcChainHtml() {
+  const k = OFC.chain, btn = `<button type="button" class="btn sm" data-ofc="chain">${ic('check', 's')} ${tr('Check: chain intact')}</button>`;
+  if (!k) return `<div class="ofc-chain">${btn}</div>`;
+  const pend = k.pending ? ` ${esc(trn('{0} finalised document is not chained yet (it is added at the next finalising).', '{0} finalised documents are not chained yet (they are added at the next finalising).', k.pending))}` : '';
+  const msg = k.ok ? esc(trn('Chain intact: {0} finalised document checked.', 'Chain intact: {0} finalised documents checked.', k.count)) + pend
+    : esc(tr('Chain broken: document {0} differs from what was finalised.', k.first_bad.number || '#' + k.first_bad.id)) + ` <a href="#office/offers/${+k.first_bad.id}">#${+k.first_bad.id}</a>`;
+  return `<div class="ofc-chain">${btn} <p class="${k.ok ? 'muted' : 'bad'}" role="status">${msg}</p></div>`;
+}
 async function ofcSaveSettings(form) {
   const body = oxaChanged(ofcSettingsBody(form)), at = document.activeElement?.closest?.('#ofc-set') ? document.activeElement : null;
   // 2.298.0 A1 (#3186): Enter saves the page quietly: the mark at the field instead of the toast "Saved"
@@ -1071,6 +1080,7 @@ document.addEventListener('click', async e => {
   else if (a === 'open') { e.preventDefault(); const r = ofcRow(b.dataset.kind, +b.dataset.id); if (r) ofcModal(b.dataset.kind, r); }
   else if (a === 'log-all' || a === 'log-ag') { e.preventDefault(); OFC.logAg = a === 'log-ag'; ofcDraw(); }  // 2.51.0 A (#1348)
   else if (a === 'import') { e.preventDefault(); const inp = $('#os-import'); if (inp) { inp.onchange = () => { ofcImport(inp.files[0], $('#os-overwrite')?.checked); inp.value = ''; }; inp.click(); } }
+  else if (a === 'chain') { e.preventDefault(); try { OFC.chain = await api('GET', '/api/office/log/chain'); } catch (x) { toast(x.message || ''); OFC.chain = null; } ofcDraw(); }  // 2.531.0 (#4497)
   else if (a === 'log') { e.preventDefault(); try { const j = await api('GET', '/api/office/log?limit=50'); OFC.log = j.log || []; } catch (x) { toast(x.message || ''); OFC.log = []; } ofcDraw(); }
   else if (a === 'scheme-reset') { e.preventDefault(); const inp = $('#' + b.dataset.for); if (!inp || inp.disabled) return;  // 2.114.2 (#2264): last saved valid scheme (the server fills the default when none is saved)
     inp.value = OFC.info.settings?.[b.dataset.kind + '_scheme'] || ''; inp.focus(); inp.dispatchEvent(new Event('input', {bubbles: true})); }
