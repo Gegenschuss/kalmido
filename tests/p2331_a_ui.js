@@ -60,6 +60,10 @@ const up = async (url, name) => { const fd = new FormData(); fd.append('file', n
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 12`), '#3307: the state stays after reloading');
     await ev(`(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); q.value = 'plan-11'; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 1`), '#3307: the search filters by file name');
+    // 2.517.0 (#3586): the flake - a late redraw of the page emptied the search field; the search text now survives a redraw
+    await ev(`(() => { document.querySelector('#pov-files input.povfq[data-k="files"]').dataset.old = '1'; renderView(); return 1; })()`);
+    check(await ready(ev, `(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); return !!q && !q.dataset.old; })()`), '#3586: the page was redrawn');
+    check(await ready(ev, `document.querySelector('#pov-files input.povfq[data-k="files"]').value === 'plan-11' && [...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 1`), '#3586: the search text and its filter survive a redraw');
     await ev(`(() => { const q = document.querySelector('#pov-files input.povfq[data-k="files"]'); q.value = ''; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     await ready(ev, `[...document.querySelectorAll('#pov-files .povfl[data-k="files"] .povf')].filter(e => e.offsetParent).length === 12`);
     await tap('#pov-files [data-pov="fl-more"][data-k="files"]', '#3307: "Show less" is there');

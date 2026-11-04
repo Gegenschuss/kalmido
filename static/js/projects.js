@@ -232,11 +232,13 @@ const POV_BLOCKS = [['kpis', N_('Key figures'), 'chart', 'full'], ['desc', N_('D
 const POV_FL_N = 8;
 const povMdOpen = lid => (LS.get('povMdOpen', []) || []).includes(lid);  // 2.331.0 A (#3310): per project
 const povFlAll = (lid, k) => (LS.get('povFlAll', []) || []).includes(lid + ':' + k);
+// 2.517.0 (#3586): the search text per project and list survives a redraw of the page (a live update emptied the field)
+const povFlQ = {};
 function povFlHtml(lid, k, rows, names) {
   if (!rows.length) return '';
-  const many = rows.length > POV_FL_N, all = povFlAll(lid, k);
-  const items = rows.map((h, i) => h.replace('<div class="povf', `<div data-n="${esc(String(names[i] || '').toLowerCase())}" class="povf`));
-  return `${many ? `<input type="search" class="povfq" data-k="${k}" placeholder="${esc(tr('Search files'))}" aria-label="${esc(tr('Search files'))}" autocomplete="off">` : ''}<div class="povfl${many && all ? ' all' : ''}" data-k="${k}">${items.join('')}</div>`
+  const many = rows.length > POV_FL_N, all = povFlAll(lid, k), q = many ? povFlQ[lid + ':' + k] || '' : '', v = q.trim().toLowerCase();
+  const items = rows.map((h, i) => { const n = String(names[i] || '').toLowerCase(); return h.replace('<div class="povf', `<div data-n="${esc(n)}"${v && !n.includes(v) ? ' hidden' : ''} class="povf`); });
+  return `${many ? `<input type="search" class="povfq" data-k="${k}" value="${esc(q)}" placeholder="${esc(tr('Search files'))}" aria-label="${esc(tr('Search files'))}" autocomplete="off">` : ''}<div class="povfl${many && all ? ' all' : ''}${v ? ' q' : ''}" data-k="${k}">${items.join('')}</div>`
     + (many ? `<button type="button" class="linkbtn povmore" data-pov="fl-more" data-k="${k}" aria-expanded="${all}">${all ? tr('Show less') : tr('Show all {0}', rows.length)}</button>` : '');
 }
 // 2.456.0 (#3837): a key link to another place, by the arrow and by dragging; attached once, at the first draw (this script
@@ -435,6 +437,7 @@ document.addEventListener('input', e => { if (e.target.id === 'pov-desc-in') { c
 document.addEventListener('input', e => {
   const q = e.target.classList?.contains('povfq') ? e.target : null, list = q && q.nextElementSibling;
   if (!list) return;
+  const l = routeList(); if (l) povFlQ[l.id + ':' + q.dataset.k] = q.value;  // 2.517.0 (#3586)
   const v = q.value.trim().toLowerCase();
   list.classList.toggle('q', !!v);
   for (const r of list.children) r.hidden = !!v && !(r.dataset.n || '').includes(v);
