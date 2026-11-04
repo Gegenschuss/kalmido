@@ -808,7 +808,7 @@ async function outFlush() {
         if (j && j.conflicts?.length && e.url === '/api/tasks/batch' && body?.action === 'complete') { skipped++; j.conflicts = []; }  // 2.270.0 C (#3022): already ticked = not advanced twice
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
-          const own = j.conflicts.filter(c => ownVal(j.id + ':' + c.field, c.server) && body && c.field in body);
+          const own = j.conflicts.filter(c => ownVal(cfTid(c, j.id) + ':' + c.field, c.server) && body && c.field in body);  // 2.527.0 (#4304): the entry's task
           if (own.length === j.conflicts.length && !e.rebased) { outSave(() => { e.rebased = true; e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; }); continue; }
           addConflicts(j.id, j.conflicts, j.title);
         }
@@ -891,15 +891,19 @@ function flushSoon() { if (flushSoon.t) return; flushSoon.t = setTimeout(() => {
 // ------------------------------------------------------------------ conflicts (edited here and elsewhere)
 S.conflicts = LS.get('conflicts', []);
 const FIELD_NAMES = {ttype: N_('Type'), title: N_('Title'), content: N_('Description'), due: N_('Due'), due_time: N_('Time'), priority: N_('Priority'), list_id: N_('Project'), tags: N_('Tags'), reminders: N_('Reminder'), repeat: N_('Repeat'), repeat_from: N_('Repeat from'), start: N_('Start|date'), section_id: N_('Section'), parent_id: N_('Parent task'), pinned: N_('Pinned'), duration: N_('Duration'), url: N_('Link'), deadline: N_('Deadline'), nag: N_('Repeat reminder'), ms: N_('Milestone'), milestone_id: N_('Milestone')};
+// 2.527.0 (#4304): an entry with its own task id (the answer of /api/tasks/batch and /reorder: conflicts[{id, title, ...}],
+// the answer itself has no id) belongs to that task; tid / title are only the fallback for a PATCH of one task
+const cfTid = (c, tid) => Number.isInteger(+c?.id) && +c.id > 0 ? +c.id : tid;
 function addConflicts(tid, list, title) {
   for (const c of list) {
-    S.conflicts = S.conflicts.filter(x => !(x.tid === tid && x.field === c.field));
-    S.conflicts.push({tid, title: title || S.tasks.get(tid)?.title || '', field: c.field, server: c.server, mine: c.mine, at: Date.now()});
+    const id = cfTid(c, tid);
+    S.conflicts = S.conflicts.filter(x => !(x.tid === id && x.field === c.field));
+    S.conflicts.push({tid: id, title: (id === tid ? title : c.title) || c.title || S.tasks.get(id)?.title || '', field: c.field, server: c.server, mine: c.mine, at: Date.now()});
   }
   LS.set('conflicts', S.conflicts);
   renderTop();
   // 2.13.2 (#478 F7): no toast on top of the calm bar under the field (it said the same and covered "Waiting for …")
-  setTimeout(() => { if (S.sel === tid && list.every(c => $(`#detail .cfbar[data-f="${c.field}"]`))) return; toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)); }, 300);
+  setTimeout(() => { if (list.every(c => S.sel === cfTid(c, tid) && $(`#detail .cfbar[data-f="${c.field}"]`))) return; toast(list.length === 1 ? tr('A field was changed elsewhere in the meantime, please review') : tr('{0} fields were changed elsewhere in the meantime, please review', list.length)); }, 300);
 }
 // 2.126.0 D (#1992 O8): an offline change the server refused (deleted, no right any more, invalid) is not lost silently:
 // its text waits in the conflicts dialog with the reason, to copy
