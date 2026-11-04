@@ -15837,7 +15837,6 @@
   "Support has not used it yet.": "Der Support hat ihn noch nicht genutzt.",
   "Support access": "Support-Zugriff",
   "My account": "Mein Konto",
-  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.": "Der Betreiber dieses Servers sieht nicht in dein Konto oder deine Organisation. Brauchst du Hilfe, öffne sie hier für eine begrenzte Zeit: Der Support kann dich dann anmelden, dein Passwort zurücksetzen oder deine Projekte ansehen. Der Zugriff schließt sich von selbst, du kannst ihn jederzeit beenden, und jeder Zugriff steht hier.",
   "Earlier support access": "Frühere Support-Zugriffe",
   "{0} access": ["{0} Zugriff", "{0} Zugriffe"],
   "Open support access?": "Support-Zugriff öffnen?",
@@ -16146,5 +16145,6 @@
   "“is none of” always applies on top, also with OR.": "„ist keines von“ gilt immer zusätzlich, auch bei ODER.",
   "{0} task matches": ["{0} Aufgabe passt", "{0} Aufgaben passen"],
   "Reading view: a large preview beside a narrow list": "Lese-Ansicht: große Vorschau neben einer schmalen Liste",
-  "This file cannot be shown here. You can download it.": "Diese Datei lässt sich hier nicht anzeigen. Du kannst sie herunterladen."
+  "This file cannot be shown here. You can download it.": "Diese Datei lässt sich hier nicht anzeigen. Du kannst sie herunterladen.",
+  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.": "Der Betreiber dieses Servers sieht nicht in dein Konto oder deine Organisation. Brauchst du Hilfe, öffne sie hier für eine begrenzte Zeit: Der Support kann dich dann anmelden, dein Passwort zurücksetzen oder deine Projekte ansehen. Der Zugriff schließt sich von selbst, und du kannst ihn jederzeit beenden. Was der Support damit tut, steht hier: Zeit, Methode, Route und Status, nie Inhalte. Dasselbe Lesen oder dieselbe Ablehnung innerhalb von 10 Minuten zählt einmal, höchstens 300 Einträge bleiben (Lesezugriffe fallen zuerst weg), die neuesten 20 werden angezeigt und von früheren Zugriffen nur die Anzahl."
 }

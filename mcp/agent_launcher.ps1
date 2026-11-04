@@ -182,7 +182,7 @@ function Fetch {
   } catch {
     $code = $null
     try { $code = [int]$_.Exception.Response.StatusCode } catch { }
-    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false; working = $true; resumes = '-'; gname = '-'; gmail = '-'; gco = '0'} }
+    if ($code -eq 403) { return [pscustomobject]@{model = '-'; ac = '-'; pct = '-'; nightly = '-'; seq = $script:Seq; tz = 'UTC'; enabled = $false; working = $true; resumes = '-'; gname = '-'; gmail = '-'; gco = '0'; held = $false} }
     if ($code -eq 401) { return [pscustomobject]@{revoked = $true} }
     if ($code) { Log "GET /api/v1/agent: HTTP $code" } else { Log "GET /api/v1/agent: $($_.Exception.Message)" }
     return $null
@@ -195,13 +195,14 @@ function Fetch {
   $seq = if ($rt -and $rt.reset_seq) { [int]$rt.reset_seq } else { 0 }
   $tz = if ($rt -and $rt.timezone) { [string]$rt.timezone } else { 'UTC' }
   $en = if ($null -ne $a.enabled) { [bool]$a.enabled } else { $true }
+  $held = ($a.status -eq 'paused') -and ($a.PSObject.Properties.Name -contains 'status_key') -and (-not $a.status_key)  # 2.503.0 (#4309)
   $ws = if ($a.work_style -and $a.work_style.state) { $a.work_style.state } else { $null }
   $wk = -not ($ws -and $ws.working -eq $false)
   $res = if ($ws -and $ws.work_resumes_at) { if ($ws.work_resumes_at -is [datetime]) { $ws.work_resumes_at.ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ') } else { [string]$ws.work_resumes_at } } else { '-' }
   $gname = '-'; $gmail = '-'  # 2.396.0 (#3386): the git author, '-' = not sent (an older server)
   if ($rt -and $rt.git_author -and ([string]$rt.git_author -match '^([^<>\t\n]+) <([^<>\s]+)>$')) { $gname = $Matches[1].Trim(); $gmail = $Matches[2] }
   $gco = if ($rt -and $rt.git_coauthor) { '1' } else { '0' }
-  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en; working = $wk; resumes = $res; gname = $gname; gmail = $gmail; gco = $gco}
+  return [pscustomobject]@{model = $model; ac = $ac; pct = $pct; nightly = $nightly; seq = $seq; tz = $tz; enabled = $en; working = $wk; resumes = $res; gname = $gname; gmail = $gmail; gco = $gco; held = $held}
 }
 
 # kalmido-capability: host_name
@@ -390,7 +391,7 @@ try {
     $script:Closed = $true
     return $true
   }
-  if ($s.enabled) { Report-Host; if (-not (Closed $s)) { Start-Safe $s } } else { Log 'the agent is paused in Kalmido; waiting' }
+  if ($s.enabled) { if (-not $s.held) { Report-Host }; if (-not (Closed $s)) { Start-Safe $s } } else { Log 'the agent is paused in Kalmido; waiting' }
   [void](Nightly-Due $s)  # a start after tonight's time already counts as the nightly restart
   while ($true) {
     Nap $Poll

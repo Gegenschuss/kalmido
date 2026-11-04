@@ -142,7 +142,7 @@ fetch() {
   out=$(printf 'header = "Authorization: Bearer %s"\n' "$KALMIDO_TOKEN" |
         curl -sS --max-time 20 --config - -w '\n%{http_code}' "${KALMIDO_URL%/}/api/v1/agent") || return 1
   code=${out##*$'\n'}
-  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\t-\t-\t-\n' "${SEQ:-0}"; return 0; fi
+  if [[ "$code" == 403 ]]; then printf -- '-\t-\t-\t-\t%s\tUTC\t0\t1\t-\t-\t-\t-\t0\n' "${SEQ:-0}"; return 0; fi
   [[ "$code" == 401 ]] && return 2
   [[ "$code" == 200 ]] || { log "GET /api/v1/agent: HTTP $code"; return 1; }
   printf '%s' "${out%$'\n'*}" | "$PY" -c '
@@ -155,8 +155,9 @@ ga = re.fullmatch(r"([^<>\t\n]+) <([^<>\s]+)>", str(r.get("git_author") or ""))
 print("\t".join(str(x) for x in (r.get("model") or "-", "1" if r.get("autocompact", True) else "0", pct if pct else "-",
                                   r.get("nightly_reset") or "-", int(r.get("reset_seq") or 0), r.get("timezone") or "UTC",
                                   "1" if a.get("enabled", True) else "0", "0" if w.get("working") is False else "1",
-                                  w.get("work_resumes_at") or "-", ga.group(1).strip() if ga else "-", ga.group(2) if ga else "-",
-                                  "1" if r.get("git_coauthor") else "0")))'
+                                  w.get("work_resumes_at") or "-", (ga.group(1).strip() or "-") if ga else "-", ga.group(2) if ga else "-",
+                                  "1" if r.get("git_coauthor") else "0",
+                                  "1" if a.get("status") == "paused" and "status_key" in a and not a["status_key"] else "0")))'
 }
 
 PID=""
@@ -226,7 +227,7 @@ while true; do
   sleep "$POLL" & wait $!
 done
 REVOKED=""
-IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO <<< "$line"
+IFS=$'\t' read -r MODEL AC PCT NIGHTLY SEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO HELD <<< "$line"
 if [[ $ONCE == 1 ]]; then start; exit 0; fi
 SIG="$MODEL|$AC|$PCT|$GNAME|$GMAIL|$GCO"
 DONE_DAY=""  # the day whose nightly restart is done (a start after that time counts)
@@ -253,7 +254,7 @@ closed() {
   [[ -n "$CLOSED" ]] || log "outside the work window of its work style: no new session until ${RESUMES/#-/the window opens}"
   CLOSED=1
 }
-[[ "$ENABLED" == 1 ]] && report_host
+[[ "$ENABLED" == 1 && "$HELD" != 1 ]] && report_host  # 2.503.0 (#4309): the report says idle, a pause with a reason stays
 if [[ "$ENABLED" != 1 ]]; then log "the agent is paused in Kalmido; waiting"; elif ! closed; then start; fi
 STARTED=${STARTED:-$(date +%s)}
 nightly_due >/dev/null || true  # a start after tonight's time already counts as the nightly restart
@@ -267,7 +268,7 @@ while true; do
   if [[ $rc == 2 ]]; then revoked; stop; continue; fi
   if [[ $rc != 0 ]]; then log "Kalmido not reachable; keeping the agent as it is"; continue; fi
   REVOKED=""
-  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO <<< "$line"
+  IFS=$'\t' read -r MODEL AC PCT NIGHTLY NSEQ TZNAME ENABLED WORKING RESUMES GNAME GMAIL GCO HELD <<< "$line"
   why=""
   [[ "$NSEQ" != "$SEQ" ]] && why="reset now ($SEQ -> $NSEQ)"
   [[ -z "$why" && "$MODEL|$AC|$PCT|$GNAME|$GMAIL|$GCO" != "$SIG" ]] && why="runtime settings changed"

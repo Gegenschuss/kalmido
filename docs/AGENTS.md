@@ -1265,8 +1265,12 @@ Different from the kill switch: the agent keeps its token, but does not handle e
 works interactively in its place. The agent reports `PUT /api/v1/agent/status {"status": "paused", "text": "<reason>"}`
 (MCP `set_status`), or an admin / the owner of a personal agent uses the hourglass in *Settings > Agents*
 (`{"pause_reason": "..."}`, empty = resume). People see the reason in the agent chip, the chat ("does not answer right
-now: ...") and the projects. Events keep queueing; `bin/events.sh` from AGENT-SETUP.md holds them back until the agent
-reports another status.
+now: ...") and the projects. Events keep queueing; `bin/events.sh` from AGENT-SETUP.md holds them back until another
+status is reported. *Since 2.503:* the reference starter holds them too: while the pause lasts its runner (`agent_run.py`,
+started by `agent_launcher.sh` / `.ps1`) starts no run and no dispatcher tick, keeps the events in its queue on disk (a
+restart keeps them), reports no status of its own, so the reason stays, and looks again every 30 seconds. A run that is under
+way when the pause comes ends normally. An agent run by this starter cannot end the pause itself, since no run starts: a person
+does, with the hourglass (`{"pause_reason": ""}`) or another status report. Its own pauses (plan limit, outside the work window, `status_key` set) are not this pause.
 
 ### Proposals to another topic
 

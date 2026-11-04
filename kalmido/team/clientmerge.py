@@ -8,7 +8,7 @@ afterwards (the overview says so). Per field that differs, pick names the client
 people who see every client and may delete the others (their creator or an admin, like DELETE); all in one scope (the
 same organisation, or the private clients of one person). The route is a thin wrapper: #1357 (an agent tidying up
 duplicates) will call clm_merge / clm_undo directly."""
-from flask import g, jsonify
+from flask import jsonify
 
 from ..core.config import app
 from ..core.i18n import tr, trn
@@ -20,9 +20,10 @@ from ..core.merges import (MG_MAX, mg_cascade_rows, mg_fk_refs, mg_history, mg_m
 from ..accounts.session import me
 from ..tasks.validation import as_int
 from ..core.errors import BadInput, UnknownFields
-from .clients import CLIENT_BILL_GATED, CLIENT_BILLING, _gate, cl_bill_ok, _org_boundary, _user, client_rows, need_client
+from .clients import CLIENT_BILL_GATED, CLIENT_BILLING, _gate, cl_bill_ok, cl_may_delete, _org_boundary, _user, client_rows, need_client
 from .clients import client_get  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_sees_all  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin
 
 def Nn_(one, other):  # a plural pair for trn (marked for tools/i18n_check.py, like notify/alerts.py)
     return one, other
@@ -64,16 +65,11 @@ def clm_scope(r):
     return (r["org_id"], None) if r["org_id"] is not None else (None, r["created_by"])
 
 
-def clm_may_delete(uid, r):
-    u = getattr(g, "user", None)
-    return bool((u is not None and u["is_admin"]) or r["created_by"] == uid)
-
-
 def clm_check(c, uid, target, ids):
     """The rows {id: row} after the checks: every client visible (else 404), the others deletable by uid (else 403), all
     in one scope (else 400)."""
     rows = {i: need_client(c, i, uid) for i in ids}
-    if any(not clm_may_delete(uid, rows[i]) for i in ids if i != target):
+    if any(not cl_may_delete(c, uid, rows[i]) for i in ids if i != target):  # 2.503.0 (#4322): the same right as DELETE
         raise Denied(403, tr("Only the person who created the client or an admin can delete it"))
     if len({clm_scope(r) for r in rows.values()}) != 1:
         raise BadInput(tr("Only clients of the same workspace can be merged"))
@@ -259,7 +255,8 @@ def clm_may_undo(c, uid, d):
         return False
     cl = (d.get("snapshot") or {}).get("clients") or []
     u = _user(c, uid)
-    return bool(d["user_id"] == uid or (u and u["is_admin"]) or (cl and all(x.get("created_by") == uid for x in cl)))
+    return bool(d["user_id"] == uid or (u and u["is_admin"] and not _org_boundary(c)) or (d["org_id"] is not None and is_org_admin(c, uid, d["org_id"]))  # 2.503.0 (#4322)
+                or (cl and all(x.get("created_by") == uid for x in cl)))
 
 
 def clm_undo(c, uid, rid):

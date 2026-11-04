@@ -192,8 +192,9 @@ The shipped international base pack (`kalmido/office/packs/xx.json`) is the best
 - `einvoice.formats`: the e-invoice formats you can vouch for (`zugferd` = EN 16931 / Factur-X; `xrechnung` is German)
 - `features`: only the functions that are correct for your country, each `{"status": "ready"}` (or `planned`). Known keys:
   `books.datev`, `docs.delivery` (a pack without it keeps delivery notes on), `docs.einvoice`, `books.vat_return`, `books.tax_dates`, `books.export_csv`, `books.gobd` (`money.cashflow`,
-  `money.kpi`, `money.travel`, `money.meals`, `money.subs` are offered by every pack, since 2.380); planned for
-  later packages: `books.receipt_images`, `books.period_lock`, `books.procedure_doc`. Unknown keys fail the check.
+  `money.kpi`, `money.travel`, `money.meals`, `money.subs` are offered by every pack, since 2.380). The keys
+  `books.receipt_images`, `books.period_lock`, `books.procedure_doc` are accepted with the status `planned` only: the
+  functions themselves have been there since 2.148 and do not depend on them. Unknown keys fail the check.
 - `retention`: years for receipts and books, the legal minimum as `min_years`
 
 Check the file with `POST /api/office/packs/validate` (or `tools/packs_catalog.py`) and publish it in a catalogue (see

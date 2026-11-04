@@ -251,5 +251,26 @@ AGH = {"Authorization": "Bearer " + ag["token"], "X-Requested-With": "kalmido"}
 r = requests.post(M_URL, headers=AGH, json={"target": M, "ids": [X]})
 check(r.status_code in (401, 403, 404) and A.get(B + f"/api/clients/{X}").ok, f"an agent token cannot merge ({r.status_code})")
 
+# ---- 2.503.0 (#4322): merging takes the same right as DELETE: an admin of the organisation who is no server admin
+r = A.post(B + "/api/users", json={"username": "dora", "display_name": "Dora Admin", "password": "password123", "email": "dora@example.com"})
+assert r.ok, r.text
+assert A.put(B + f"/api/orgs/{ORG}/members", json={"email": "dora@example.com", "role": "admin"}).ok
+Do = sess("dora")
+Do.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+check(Do.get(B + "/api/state").json()["me"].get("is_admin") is not True, "dora is no server admin")
+D1 = A.post(B + "/api/clients", json={"name": "Dup one", "org_id": ORG}).json()["id"]
+D2 = A.post(B + "/api/clients", json={"name": "Dup two", "org_id": ORG}).json()["id"]
+check(Bo.post(M_URL, json={"target": D1, "ids": [D2]}).status_code == 403, "#4322: a plain member still cannot merge another's client")
+r = Do.post(M_URL, json={"target": D1, "ids": [D2], "dry": True})
+check(r.ok, f"#4322: an organisation admin gets the overview ({r.status_code} {r.text[:200]})")
+r = Do.post(M_URL, json={"target": D1, "ids": [D2]})
+check(r.ok and A.get(B + f"/api/clients/{D2}").status_code == 404, f"#4322: an organisation admin merges a client created by somebody else ({r.status_code} {r.text[:200]})")
+r = A.post(undo_url(r.json()["run_id"]))
+check(r.ok and A.get(B + f"/api/clients/{D2}").ok, f"undo of the merge by another admin ({r.status_code})")
+r = A.post(M_URL, json={"target": D1, "ids": [D2]})
+check(r.ok, f"merged by the other admin ({r.status_code} {r.text[:200]})")
+check(Do.post(undo_url(r.json()["run_id"])).ok and Do.get(B + f"/api/clients/{D2}").ok, "#4322: an organisation admin undoes a merge somebody else made")
+check(Ca.post(M_URL, json={"target": D1, "ids": [D2]}).status_code == 404, "#4322: an admin of another organisation still cannot merge (404)")
+
 print(f"p266_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

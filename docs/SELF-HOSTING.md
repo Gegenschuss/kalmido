@@ -2194,13 +2194,20 @@ without an organisation); an organisation admin grants it for each organisation 
 1 day, 3 days or 7 days, ends by itself and can be ended at any time (by the person, or by any admin of the
 organisation). While it is open, the instance admin's ways into exactly that account or organisation work as on a
 self-hosted server (sign-in link, password link, members and roles, its projects and agents); the instance admin's
-account list shows the end time. Every request that passed only thanks to a grant is listed for the customer on the
-grant: time, who, method, route and status, never values or contents. An organisation's grant ends as soon as the admin
-who granted it is no admin of it any more. *Since 2.500:* a session started with such a sign-in link (a support session)
+account list shows the end time. The sign-in link ends with the grant, and so does the session it starts; the password
+link goes to the customer's own address only. *Since 2.500:* a session started with such a sign-in link (a support session)
 reads everything the person reads and edits contents (projects, tasks, documents, files, wiki, tables, contacts, office
 records), and nothing else: no credentials, agents, app connections (OAuth), public links, shares, members, invitations,
-webhooks, keys, settings of the office, sending, or deleting for good. Its writes stand on the grant as well, refused ones
-included, marked as the support session. Agents and API tokens cannot grant. The backup download stays off on a hosted
+webhooks, keys, settings of the office, sending, or deleting for good.
+
+What is logged, for the customer, on the grant: every request that passed only thanks to a grant and, *since 2.503*, every
+request of a support session, readings and the sign-in itself included (2.500 listed its writes only): time, method, route
+pattern, status and who (the instance admin's name, or "Support access" for a support session, which runs as the customer).
+Never values or contents; a route is the pattern, without ids. The limits: the same reading or the same refused request
+within 10 minutes is one entry; a grant keeps at most 300 entries, readings go first; Settings shows the latest 20 of an
+open grant and only the number of entries of the last 10 ended ones (`GET /api/support-access` returns all that are kept).
+Not listed: static files. An organisation's grant ends as soon as the admin who granted it is no admin of it any more.
+Agents and API tokens cannot grant. The backup download stays off on a hosted
 server (it holds every customer's content). Routes: `GET /api/support-access`, `POST /api/support-access`
 `{hours, org_id?}`, `DELETE /api/support-access/<id>`.
 

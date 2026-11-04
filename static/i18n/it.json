@@ -15837,7 +15837,6 @@
   "Support has not used it yet.": "Il supporto non l'ha ancora usato.",
   "Support access": "Accesso del supporto",
   "My account": "Il mio account",
-  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.": "Il gestore di questo server non vede il tuo account né la tua organizzazione. Se ti serve aiuto, aprili qui per un tempo limitato: il supporto potrà farti accedere, reimpostare la password o vedere i tuoi progetti. Si chiude da solo, puoi terminarlo quando vuoi e ogni accesso è elencato qui.",
   "Earlier support access": "Accessi del supporto precedenti",
   "{0} access": ["{0} accesso", "{0} accessi"],
   "Open support access?": "Aprire l'accesso del supporto?",
@@ -16147,5 +16146,6 @@
   "“is none of” always applies on top, also with OR.": "“non è nessuno di” vale sempre in aggiunta, anche con O.",
   "{0} task matches": ["{0} attività corrisponde", "{0} attività corrispondono"],
   "Reading view: a large preview beside a narrow list": "Vista di lettura: un’anteprima grande accanto a un elenco stretto",
-  "This file cannot be shown here. You can download it.": "Questo file non può essere mostrato qui. Puoi scaricarlo."
+  "This file cannot be shown here. You can download it.": "Questo file non può essere mostrato qui. Puoi scaricarlo.",
+  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.": "Il gestore di questo server non vede il tuo account né la tua organizzazione. Se ti serve aiuto, aprili qui per un tempo limitato: il supporto potrà farti accedere, reimpostare la password o vedere i tuoi progetti. Si chiude da solo e puoi terminarlo quando vuoi. Ciò che il supporto fa con esso è registrato qui: ora, metodo, percorso e stato, mai i contenuti. La stessa lettura o lo stesso rifiuto entro 10 minuti conta una volta, si conservano al massimo 300 voci (le letture vengono eliminate per prime), si mostrano le ultime 20 e degli accessi precedenti solo il numero."
 }

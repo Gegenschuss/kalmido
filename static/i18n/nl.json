@@ -15837,7 +15837,6 @@
   "Support has not used it yet.": "Support heeft het nog niet gebruikt.",
   "Support access": "Toegang voor support",
   "My account": "Mijn account",
-  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.": "De beheerder van deze server kijkt niet in je account of organisatie. Heb je hulp nodig, open het hier voor beperkte tijd: support kan je dan aanmelden, je wachtwoord herstellen of je projecten bekijken. Het sluit vanzelf, je kunt het altijd beëindigen en elke toegang staat hier.",
   "Earlier support access": "Eerdere toegang voor support",
   "{0} access": ["{0} toegang", "{0} toegangen"],
   "Open support access?": "Toegang voor support openen?",
@@ -16146,5 +16145,6 @@
   "“is none of” always applies on top, also with OR.": "„is geen van” geldt altijd extra, ook bij OF.",
   "{0} task matches": ["{0} taak past", "{0} taken passen"],
   "Reading view: a large preview beside a narrow list": "Leesweergave: een grote voorvertoning naast een smalle lijst",
-  "This file cannot be shown here. You can download it.": "Dit bestand kan hier niet worden weergegeven. Je kunt het downloaden."
+  "This file cannot be shown here. You can download it.": "Dit bestand kan hier niet worden weergegeven. Je kunt het downloaden.",
+  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.": "De beheerder van deze server kijkt niet in je account of organisatie. Heb je hulp nodig, open het hier voor beperkte tijd: support kan je dan aanmelden, je wachtwoord herstellen of je projecten bekijken. Het sluit vanzelf en je kunt het altijd beëindigen. Wat support ermee doet, wordt hier vastgelegd: tijd, methode, route en status, nooit inhoud. Dezelfde leesactie of weigering binnen 10 minuten telt één keer, er blijven maximaal 300 regels bewaard (leesacties vallen het eerst weg), de laatste 20 worden getoond en van eerdere toegang alleen het aantal."
 }

@@ -7,8 +7,9 @@ ein_xml(c, oid, did, fmt)  -> bytes: the XML of document did of organisation oid
 ein_check(xml_bytes)       -> [findings]: the module's own plausibility check without a validator (mandatory BTs, sums)
 
 Amounts are Decimal strings all the way (never float): the totals of the print model carry two-place strings, the line
-totals are read as text. Tax categories: S (standard / reduced rate), AE (reverse charge), G (export outside the EU),
-E (exempt, small business) by the document's vat_note. A foreign currency (USD) gets BT-5 USD, BT-6 EUR and BT-111 (the
+totals are read as text. Tax categories: S (standard / reduced rate; a line at 0 % of a taxed document Z or E, _line_cat), and
+by the vat_note of a document without VAT AE (reverse charge), O (not taxable domestically; G without a register or tax number),
+K (intra-Community goods), G (export of goods), E (small business, unknown note), see VAT_CATEGORY and _doc_cat. A foreign currency (USD) gets BT-5 USD, BT-6 EUR and BT-111 (the
 tax in EUR) from totals.tax_eur. 2.189.0 (#2475): "EUR" is the office's home currency (totals.home, missing = EUR). A credit note is type 381 with positive amounts and the invoice it cancels in BT-25.
 The KoSIT validator (Schematron EN 16931 + XRechnung) and veraPDF run in CI on the files tests/office_einvoice_test.py
 writes (tools/einvoice_validate.sh)."""

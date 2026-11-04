@@ -12,8 +12,10 @@ client needs help, the client opens the door for a limited time -- never the ope
 A grant runs 1 hour, 1 day, 3 days or 7 days (SGA_HOURS), ends by itself and can be ended at any time by the person / by any
 admin of the organisation. A new grant of the same scope replaces the open one. Every request in which the operator (an
 instance admin) passed the guard only thanks to a grant is logged on the grant: time, who, method, route pattern and status
-(never values or contents); reading the same route again within SGA_GET_GAP_S is one entry. The client sees the grant and its
-log; the operator sees nothing of it except that the doors are open. An organisation grant holds only while the admin who
+(never values or contents); reading the same route again, or the same refusal, within SGA_GET_GAP_S is one entry. 2.503.0 (#4307): so is every request
+of a support session (a sign-in link the operator made through the grant, the session runs as the client: via 'support'), the
+sign-in itself included; such an entry is marked as done by support and goes on the newest grant of the account. At most SGA_USES_MAX entries
+per grant, readings go first. The client sees the grant and its log; the operator sees nothing of it except that the doors are open. An organisation grant holds only while the admin who
 granted it is still an admin of the organisation (and it is not retired). Agents and API tokens cannot grant (a session or the
 proxy sign-in only). A self-hosted server has no use for it: the routes answer hosted=false and refuse a grant (409).
 
@@ -122,6 +124,8 @@ def sga_session_cap(c, uid, token_hash):
     if end:
         with system_ctx(c):  # support grants of other accounts / organisations (row-level security): structure, no content
             c.execute("UPDATE sessions SET via='support', expires_at=LEAST(expires_at, ?) WHERE token_hash=?", (end, token_hash))
+        if has_request_context():  # 2.503.0 (#4307): the sign-in is the first entry of the log
+            g.sga_support = uid
 
 
 def sga_close(c, r, now):
@@ -178,6 +182,16 @@ def sga_is_support(c):
     return bool(r) and r[0] == "support"
 
 
+def sga_session_mark(c, token_hash):
+    """2.503.0 (#4307): the current request is one of a support session: it goes into the client's log (sga_flush). Called by
+    authenticate, so a request an early gate refuses is listed too, a reading as well as a write. Only a hosted server makes such sessions."""
+    if request.method == "OPTIONS" or not sga_hosted():
+        return
+    r = c.execute("SELECT via FROM sessions WHERE token_hash=?", (token_hash,)).fetchone()
+    if r and r[0] == "support":
+        g.sga_support = g.user["id"]
+
+
 @app.before_request
 def sga_guard():
     if g.get("auth_via") != "session" or g.get("user") is None or request.method == "OPTIONS":
@@ -194,7 +208,7 @@ def sga_guard():
     gid = sga_open(c, uid=g.user["id"], note=False)
     if gid:
         g.sga_used = {*(g.get("sga_used") or ()), int(gid)}
-        g.sga_support = True
+        g.sga_support = g.user["id"]
     p = request.path
     hit = not sga_may_write(p)
     if not hit and request.method == "PATCH":
@@ -206,26 +220,51 @@ def sga_guard():
 
 
 def _route():
+    """The route pattern, never the address: a path without a route could carry a value (2.503.0, #4307)."""
     r = request.url_rule
-    return (r.rule if r is not None else request.path)[:120]
+    return r.rule[:120] if r is not None else "(unknown)"
+
+
+def sga_read_again(uses, e, now):
+    """Entry e is a reading or a refused request the log of a grant already has within SGA_GET_GAP_S (2.503.0, #4307: anywhere in
+    that time, not only as the last entry: the app reads a few routes in turn, and that alone filled the log; review: refused
+    requests in a row must not push the readings out of the log, a request that went through always counts)."""
+    if e["m"] not in ("GET", "HEAD") and e["s"] < 400:
+        return False
+    since = now - timedelta(seconds=SGA_GET_GAP_S)
+    for u in reversed(uses):
+        if not isinstance(u, dict):
+            continue
+        at = parse_iso(u.get("at") or "")
+        if at is None or at <= since:
+            return False
+        if (u.get("m"), u.get("r"), u.get("by"), u.get("s"), u.get("sup")) == (e["m"], e["r"], e["by"], e["s"], e.get("sup")):
+            return True
+    return False
 
 
 @app.after_request
 def sga_flush(resp):
     """Writes the uses of this request on their grants (own connection: a reading request commits nothing)."""
     used = g.get("sga_used") if has_request_context() else None
-    if not used:
+    sup = g.get("sga_support") if has_request_context() else None
+    if not used and not sup:
         return resp
     try:
         now = now_utc()
-        e = {"at": iso(now), "by": int(g.user["id"]), "m": request.method[:8], "r": _route(), "s": int(resp.status_code)}
-        if g.get("sga_support"):  # 2.500.0 (#4070): done in a support session, not by the person
+        e = {"at": iso(now), "by": int(sup or g.user["id"]), "m": request.method[:8], "r": _route(), "s": int(resp.status_code)}
+        if sup:  # 2.500.0 (#4070): done in a support session, not by the person
             e["sup"] = 1
         c = connect()
         try:
             with system_ctx(c):  # an organisation's grant is behind row-level security; this connection runs inside a request
                 c.execute("SET LOCAL lock_timeout = '2s'")  # review F7: never stall a response behind the request's own locks
-                for gid in sorted(used):
+                gids = {int(gid) for gid in used or ()}
+                if sup:  # 2.503.0 (#4307): a reading or the sign-in of a support session goes on the account's newest grant
+                    row = c.execute("SELECT id FROM support_grants WHERE user_id=? AND org_id IS NULL ORDER BY id DESC LIMIT 1", (int(sup),)).fetchone()
+                    if row:
+                        gids.add(int(row[0]))
+                for gid in sorted(gids):
                     row = c.execute("SELECT uses FROM support_grants WHERE id=? FOR UPDATE", (gid,)).fetchone()
                     if not row:
                         continue
@@ -233,10 +272,8 @@ def sga_flush(resp):
                         uses = json.loads(row[0] or "[]")
                     except ValueError:
                         uses = []
-                    last = uses[-1] if uses and isinstance(uses[-1], dict) else None
-                    if (last and e["m"] in ("GET", "HEAD") and (last.get("m"), last.get("r"), last.get("by"), last.get("s")) == (e["m"], e["r"], e["by"], e["s"])
-                            and (parse_iso(last.get("at") or "") or now) > now - timedelta(seconds=SGA_GET_GAP_S)):
-                        continue  # the same reading again: one entry
+                    if sga_read_again(uses, e, now):
+                        continue  # the same reading / refusal again: one entry
                     uses.append(e)
                     while len(uses) > SGA_USES_MAX:  # review F4: readings go first, a change is never pushed out
                         i = next((k for k, u in enumerate(uses) if not isinstance(u, dict) or u.get("m") in ("GET", "HEAD")), 0)

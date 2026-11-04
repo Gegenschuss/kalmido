@@ -27,7 +27,7 @@ async function sgvDraw(md) {
   const past = j.past || [];
   box.innerHTML = `<h4 id="s-sgv-h">${tr('Support access')}</h4>
     <div class="members">${sgvGrantHtml(j.account, 'me', tr('My account'))}${(j.orgs || []).map(o => sgvGrantHtml(o.grant, String(o.org_id), o.name)).join('')}</div>
-    <div class="shint">${tr('The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.')}</div>
+    <div class="shint">${tr('The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.')}</div>
     ${past.length ? `<details><summary>${tr('Earlier support access')}</summary><ul class="slist">${past.map(p => `<li>${esc(tr('{0} to {1}', sgvWhen(p.created_at), sgvWhen(p.ended_at || p.ends_at)))} · ${esc(trn('{0} access', '{0} accesses', p.uses.length))}</li>`).join('')}</ul></details>` : ''}`;
 }
 document.addEventListener('click', async e => {

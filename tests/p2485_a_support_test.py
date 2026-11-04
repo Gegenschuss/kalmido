@@ -11,6 +11,7 @@ with KALMIDO_HOSTED=1, then restarted self-hosted with KEEP=1). Invented account
 freelancer-matrix: own
 tenant-matrix: support
 usage: p2485_a_support_test.py <datadir>"""
+import json
 import os
 import sys
 
@@ -108,7 +109,45 @@ check(j["account"]["id"] == GF and any(u["method"] == "POST" and u["route"] == "
                                        and u["by"] == "Alice" for u in uses)
       and any(u["route"] == "/api/users/<int:uid>/invite" for u in uses), f"frida sees what the operator did (method, route, who) {uses}")
 check(all(set(u) == {"at", "by", "method", "route", "status"} for u in uses), "the log holds no values, only what kind of request")
-n = len(uses)
+# 2.503.0 (#4307): what the operator does in the session started with the link is on the client's log too (the session runs as frida)
+check(any(u["method"] == "POST" and u["route"] == "/api/auth/link" and u["status"] == 200 and u["by"] == "Support access" for u in uses),
+      f"the sign-in with the link is listed, as support access {uses}")
+check(any(u["route"] == "/api/state" and u["method"] == "GET" for u in uses), f"a reading in the support session is listed {uses}")
+check(any(u["route"] == "/api/me/tokens" and u["status"] == 403 for u in uses), f"a refused write in the support session is listed {uses}")
+check(not any(u["route"] == "/api/support-access" and u["method"] == "GET" for u in uses), f"frida's own requests are not listed {uses}")
+
+
+def sup_uses():
+    return S["frida"].get(B + "/api/support-access").json()["account"]["uses"]
+
+
+def sup_n(route):
+    return sum(1 for u in sup_uses() if u["route"] == route and u["method"] == "GET")
+
+
+X.get(B + "/api/state")
+X.get(B + "/api/support-access")
+X.get(B + "/api/state")
+check(sup_n("/api/state") == 1 and sup_n("/api/support-access") == 1, f"the same reading again, also with another in between: one entry {sup_uses()}")
+X.get(B + "/api/clients/987654")
+X.get(B + "/api/no-such/secret-value")
+us = sup_uses()
+check(any(u["route"] == "/api/clients/<int:cid>" for u in us) and "987654" not in str(us), f"a route is its pattern, without the id {us}")
+check(any(u["route"] == "(unknown)" and u["status"] == 404 for u in us) and "secret-value" not in str(us), f"a path without a route shows no value {us}")
+# review: refused requests in a row do not fill the log; a request an early gate refuses (no app header) is listed
+X.post(B + "/api/me/tokens", json={"name": "ops"})
+X.post(B + "/api/me/tokens", json={"name": "ops"})
+check(sum(1 for u in sup_uses() if u["route"] == "/api/me/tokens" and u["status"] == 403) == 1, f"the same refusal again: one entry {sup_uses()}")
+X.post(B + "/api/clients", json={"name": "x"}, headers={"X-Requested-With": None})
+check(any(u["route"] == "/api/clients" and u["method"] == "POST" and u["status"] == 403 for u in sup_uses()), f"refused by the header check: listed {sup_uses()}")
+KEEP = kt.dbx("SELECT uses FROM support_grants WHERE id=?", (GF,))[0][0]
+dbw("UPDATE support_grants SET uses=? WHERE id=?", (json.dumps([{"at": "2020-01-01T00:00:00Z", "by": None, "m": "GET", "r": "/old", "s": 200}] * 300), GF))
+X.post(B + "/api/me/tokens", json={"name": "ops"})
+X.get(B + "/api/state")
+n = json.loads(kt.dbx("SELECT uses FROM support_grants WHERE id=?", (GF,))[0][0])
+check(len(n) == 300 and n[-2]["r"] == "/api/me/tokens" and n[-1]["r"] == "/api/state", f"at most 300 entries, the newest stay {n[-2:]}")
+dbw("UPDATE support_grants SET uses=? WHERE id=?", (KEEP, GF))
+n = len(sup_uses())  # 2.503.0 (#4307): the support session added entries since
 A.get(B + "/api/users?all=1")
 check(len(S["frida"].get(B + "/api/support-access").json()["account"]["uses"]) == n, "listing the accounts is no use of the grant")
 

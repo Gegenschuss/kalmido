@@ -15837,7 +15837,6 @@
   "Support has not used it yet.": "El soporte aún no lo ha usado.",
   "Support access": "Acceso del soporte",
   "My account": "Mi cuenta",
-  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.": "El operador de este servidor no ve tu cuenta ni tu organización. Si necesitas ayuda, ábrela aquí por un tiempo limitado: el soporte podrá iniciar tu sesión, restablecer tu contraseña o ver tus proyectos. Se cierra solo, puedes terminarlo cuando quieras y cada acceso aparece aquí.",
   "Earlier support access": "Accesos del soporte anteriores",
   "{0} access": ["{0} acceso", "{0} accesos"],
   "Open support access?": "¿Abrir el acceso del soporte?",
@@ -16146,5 +16145,6 @@
   "“is none of” always applies on top, also with OR.": "«no es ninguno de» se aplica siempre además, también con O.",
   "{0} task matches": ["{0} tarea coincide", "{0} tareas coinciden"],
   "Reading view: a large preview beside a narrow list": "Vista de lectura: una vista previa grande junto a una lista estrecha",
-  "This file cannot be shown here. You can download it.": "Este archivo no se puede mostrar aquí. Puedes descargarlo."
+  "This file cannot be shown here. You can download it.": "Este archivo no se puede mostrar aquí. Puedes descargarlo.",
+  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.": "El operador de este servidor no ve tu cuenta ni tu organización. Si necesitas ayuda, ábrela aquí por un tiempo limitado: el soporte podrá iniciar tu sesión, restablecer tu contraseña o ver tus proyectos. Se cierra solo y puedes terminarlo cuando quieras. Lo que hace el soporte con él queda registrado aquí: hora, método, ruta y estado, nunca contenidos. La misma lectura o el mismo rechazo en 10 minutos cuenta una vez, se guardan como máximo 300 entradas (las lecturas se eliminan primero), se muestran las 20 últimas y de los accesos anteriores solo el número."
 }

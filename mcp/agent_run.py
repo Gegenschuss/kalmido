@@ -87,6 +87,7 @@ PERM_TIMEOUT_S = int(os.environ.get("KALMIDO_PERM_TIMEOUT") or 540)  # 2.44.0 (#
 PERM_RELAY = os.environ.get("KALMIDO_PERM_RELAY", "1").strip() != "0"
 RUN_TIMEOUT_S = int(os.environ.get("KALMIDO_RUN_TIMEOUT") or 3600)  # 2.44.0 (#1448): 0 = no time limit per run
 RETRY_429_S = (5, 15, 30, 60)  # 2.44.0 (#1448): HTTP 429 of the API -> try again after 5 / 15 / 30 / 60 s
+HOLD_POLL_S = 30  # 2.503.0 (#4309): how often a pause with a reason is read again; a new event looks at once
 QUEUE_SETTLE_S = 2.0  # 2.44.0 (#1448): events that come within 2 s of each other are handled together
 SESSION_RESUME = os.environ.get("KALMIDO_SESSION_RESUME", "1").strip() != "0"  # 2.44.0 (#1446)
 SESSION_MAX_TOKENS = int(os.environ.get("KALMIDO_SESSION_MAX_TOKENS") or 150000)
@@ -200,6 +201,8 @@ class Api:
     server answers 404 / 400 unknown field: an older server keeps working without them (2.32 steps + host info, 2.33
     plan usage, 2.35 approval cards)."""
 
+    keep_status = None  # 2.503.0 (#4309): -> True while no status report may go out (Runner.held)
+
     def __init__(self, url, token):
         self.base = url.rstrip("/") + "/api/v1"
         self.token = token
@@ -245,6 +248,8 @@ class Api:
 
     # kalmido-capability: status_typing / model / permission_mode / old_server
     def status(self, status, text="", task_id=None, host=None, key="", at=""):
+        if self.keep_status and self.keep_status():  # 2.503.0 (#4309): a pause with a reason stays until a person ends it
+            return
         b = {"status": status, "text": (text or "")[:200]}
         if task_id and status in ("working", "waiting"):
             b["task_id"] = task_id
@@ -1866,6 +1871,8 @@ class Runner:
         self.agent = {}  # GET /api/v1/agent (owner_id, runtime) -- read at the start of the loop
         self.wake = threading.Event()
         self.refresh_due = False
+        self.was_held = False  # 2.503.0 (#4309): the last answer of held()
+        self.api.keep_status = self.held
         self.perm_thread = None
         self.cur = 0
         self.proc, self.cur_st, self.abort_ev = None, None, None  # 2.144.0 (#2412): the running command, its stream, the Stop
@@ -2309,6 +2316,22 @@ class Runner:
         text = self.say(key + "_at", show) if show else self.say(key)
         self.api.status(status, text, key=key, at=at, **kw)
 
+    def held(self):
+        """2.503.0 (#4309): a person or the agent set the status 'paused' with a reason (Settings > Agents, the hourglass; set_status):
+        no run starts and no status report overwrites it. The runner's own pauses (plan limit, outside the work window) carry a
+        status_key and do not count; a server without the key (before 2.450) cannot tell them apart and never holds. An error of
+        the call keeps what was known."""
+        try:
+            a = self.api.req("GET", "/agent", retry=False) or {}  # also called from the event thread: never held up by 429 waits
+        except Exception as e:
+            log(f"pause check: {type(e).__name__}")
+            return self.was_held
+        now = a.get("status") == "paused" and "status_key" in a and not a["status_key"]
+        if now != self.was_held:
+            log("paused with a reason: events wait" if now else "pause ended: working through the queue")
+        self.was_held = now
+        return now
+
     def refresh_agent(self):
         try:
             self.agent = self.api.req("GET", "/agent") or {}
@@ -2390,7 +2413,7 @@ class Runner:
             return None
         if self.refresh_due:  # runtime_changed: the switch may have changed
             self.refresh_agent()
-        if agent_dispatch.mode_of(self.agent) == "off":
+        if agent_dispatch.mode_of(self.agent) == "off" or self.held():  # 2.503.0 (#4309): a pause with a reason holds it too
             return None
         if getattr(self, "dispatcher", None) is None:
             self.dispatcher = agent_dispatch.Dispatcher(self)
@@ -2759,8 +2782,19 @@ class Runner:
         return st, rc
 
     def handle(self, evs, save=False):
+        """Runs the events; -> the events of the groups a pause with a reason held back (save only: the queue keeps them)."""
         evs = self.intercept(evs)
+        kept = []
         for uid, group in self.groups(evs):
+            if save and (kept or self.held()):  # 2.503.0 (#4309): the pause may have come during the run before
+                for ev in group:
+                    if ev.get("event") == "task_bundle":  # already out of the collected bundle: its events go back
+                        inner = (ev.get("data") or {}).get("events") or []
+                        self.queue_add(inner)
+                        kept += inner  # review: some of them may be of this very batch, the loop must not drop those
+                    else:
+                        kept.append(ev)
+                continue
             until = self.usage.paused_until()
             if until:
                 when = time.strftime("%Y-%m-%d %H:%M", time.localtime(until))
@@ -2778,6 +2812,7 @@ class Runner:
                     self.cur = max(seqs)
                     self.save_cursor(self.cur)
                 self.queue_drop(group)
+        return kept
 
     # kalmido-capability: robust_runs (2.44.0, #1448): the events wait in a queue on disk while a run lasts
     def queue_add(self, evs):
@@ -2877,11 +2912,15 @@ class Runner:
                 self.wake.wait(60)
                 self.wake.clear()
                 continue
+            if self.held():  # 2.503.0 (#4309): the events wait in the queue on disk, a restart keeps them
+                self.wake.wait(HOLD_POLL_S)
+                self.wake.clear()
+                continue
             time.sleep(QUEUE_SETTLE_S if self.state.data["queue"] else 0)
             with self.state.lock:
                 taken = list(self.state.data["queue"])
-            self.handle(taken, save=True)
-            self.queue_drop(taken)
+            kept = {str(e.get("seq")) for e in self.handle(taken, save=True)}
+            self.queue_drop([e for e in taken if str(e.get("seq")) not in kept])
 
 
 def launcher_gone():

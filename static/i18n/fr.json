@@ -15837,7 +15837,6 @@
   "Support has not used it yet.": "Le support ne l'a pas encore utilisé.",
   "Support access": "Accès du support",
   "My account": "Mon compte",
-  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself, you can end it at any time, and every access is listed here.": "L'exploitant de ce serveur ne voit pas ton compte ni ton organisation. Si tu as besoin d'aide, ouvre-les ici pour une durée limitée : le support peut alors te connecter, réinitialiser ton mot de passe ou consulter tes projets. L'accès se ferme tout seul, tu peux y mettre fin à tout moment et chaque accès est listé ici.",
   "Earlier support access": "Accès du support précédents",
   "{0} access": ["{0} accès", "{0} accès"],
   "Open support access?": "Ouvrir l'accès du support ?",
@@ -16146,5 +16145,6 @@
   "“is none of” always applies on top, also with OR.": "« n’est aucun de » s’applique toujours en plus, même avec OU.",
   "{0} task matches": ["{0} tâche correspond", "{0} tâches correspondent"],
   "Reading view: a large preview beside a narrow list": "Vue de lecture : un grand aperçu à côté d’une liste étroite",
-  "This file cannot be shown here. You can download it.": "Ce fichier ne peut pas être affiché ici. Tu peux le télécharger."
+  "This file cannot be shown here. You can download it.": "Ce fichier ne peut pas être affiché ici. Tu peux le télécharger.",
+  "The operator of this server cannot see into your account or organisation. If you need help, open it here for a limited time: support can then sign you in, reset your password or look at your projects. It closes by itself and you can end it at any time. What support does with it is recorded here: time, method, route and status, never contents. The same reading or refused request within 10 minutes counts once, at most 300 entries are kept (readings go first), the latest 20 are shown, and of earlier access only the number.": "L'exploitant de ce serveur ne voit pas ton compte ni ton organisation. Si tu as besoin d'aide, ouvre-les ici pour une durée limitée : le support peut alors te connecter, réinitialiser ton mot de passe ou consulter tes projets. L'accès se ferme tout seul et tu peux y mettre fin à tout moment. Ce que le support en fait est consigné ici : heure, méthode, route et statut, jamais les contenus. La même lecture ou le même refus dans les 10 minutes compte une seule fois, 300 entrées au plus sont conservées (les lectures partent en premier), les 20 dernières sont affichées et, pour les accès précédents, seulement leur nombre."
 }

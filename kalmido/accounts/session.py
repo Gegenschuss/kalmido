@@ -341,6 +341,8 @@ def authenticate():
                     g.user, g.auth_via = r, "session"
                     from ..accounts.sessions import ses_touch
                     ses_touch(c, _token_hash(tok))  # 2.115.0 B (#2062): last activity, at most every few minutes
+                    from .supportgrant import sga_session_mark
+                    sga_session_mark(c, _token_hash(tok))  # 2.503.0 (#4307)
     path = request.path
     if request.method not in ("GET", "HEAD", "OPTIONS") and path.startswith("/api/") \
             and request.headers.get(CSRF_HEADER) != CSRF_VALUE:
