@@ -1063,7 +1063,7 @@ function cfDownload(uid) {
     ? [`== ${c.title || '?'} · ${tr('Offline change not saved')}`, `${tr('reason')}: ${c.server || ''}`, `${tr('your version')}:`, String(c.mine ?? ''), '']
     : [`== ${c.title || '?'} · ${histFieldName(c.field)}`, `${tr('saved')}: ${val(c.field, c.server)}`, `${tr('your version')}: ${val(c.field, c.mine)}`, ''])).join('\n');
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], {type: 'text/plain'}));
-  a.download = `${APP_NAME.toLowerCase()}-conflicts-${new Date().toISOString().slice(0, 10)}.txt`;
+  a.download = `${APP_NAME.toLowerCase()}-conflicts-${today()}.txt`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 10000);
   return true;
