@@ -1,0 +1,63 @@
+# The hard areas of Kalmido (#4557, card 12305): invoices / office, backup / restore, login. One fnmatch pattern per line
+# (lower case), matched against a suite name and the name of its test group (tools/shards.py groups(): the first suite).
+# tools/shards.py --hard-target-min puts the groups that match on their own CI shards that start first (ci.yml job
+# "tests-hard"); the release tooling reads the same list to decide which red suite holds a release.
+# Only words of the test names here - a pattern that hits a UI or signature suite makes it hard and slows every release.
+
+# invoices / office
+*office*
+*invoice*
+*rechnung*
+*einvoice*
+*peppol*
+*_ubl*
+*zugferd*
+*xrechnung*
+*dunning*
+*quote*
+*offer*
+*receipt*
+*datev*
+*vat*
+*cashbook*
+*kasse*
+
+# backup
+*backup*
+*restore*
+*offsite*
+*sicherung*
+
+# login: sign-in, passwords, tokens, registration, rights
+*signin*
+*sign_in*
+*login*
+*logout*
+*auth*
+*oidc*
+*sso*
+*passkey*
+*webauthn*
+*totp*
+*2fa*
+*twofa*
+pw*
+*_pw*
+*password*
+*passwort*
+*token*
+*session*
+*register*
+*signup*
+*invite*
+*crypto*
+*tenancy*
+*rights*
+
+# security scanners (unsure = hard)
+*audit*
+*gitleaks*
+*secret*
+*bandit*
+*semgrep*
+*trivy*

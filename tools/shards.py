@@ -15,12 +15,20 @@ hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from
     --only F     2.180.0 A (#2695): only the groups whose first suite is a line of F (tests/stages.py --groups-out, the push
                  stage); --assign then starts with "# stage push" (run_all.sh skips the groups not in the plan)
     --target-min M  as many shards as M minutes each need (at most --shards, at least 1; push stage and, job/2398, full run)
+    --hard-target-min M  #4557: the groups of the hard areas (office, invoices, backup, login:
+                 a group whose first suite or any of its suites matches a pattern of --hard-file) get their own shards 1..H
+                 (as many as M minutes each need, at most --hard-shards), the other groups the shards after them as before
+                 (--shards / --target-min count those alone); --assign then starts with "# hard H". 0 = off (one plan for all)
+    --hard-file F  the patterns (fnmatch, lower case, one per line, # comments; default tests/hard_suites.txt beside
+                 --run-all); a missing file = no hard groups (one plan for all)
+    --hard-shards K  the most hard shards (default 8)
     --cut-shards F  #4327: the shard numbers of `gh run view --json jobs` (file, - = stdin) that were cancelled or timed out, one
                  per line (ci.yml job "plan" leaves their times out); a list without jobs is an error (exit 2)
 Groups without a measurement count as DEFAULT_SUITE_S per suite plus DEFAULT_FRESH_S (shown as "estimated").
 """
 import argparse
 import csv
+import fnmatch
 import json
 import os
 import re
@@ -32,6 +40,7 @@ FRESH_RE = re.compile(r"^(now [^;]*; *)?fresh;")
 RUN_RE = re.compile(r"^(now [^;]*; *)?(fresh;)?[ \t]*run ([A-Za-z0-9_]+) ")
 SHARD_RE = re.compile(r"^shard ([0-9]+)\b")
 SHARD_JOB_RE = re.compile(r"^Test suites ([0-9]+)/[0-9]+ ")  # the shard jobs of ci.yml, not the summing job "Test suites (API, ...)"
+HARD_SHARDS_MAX = 8  # #4557: GitHub runs about 20 jobs at once, six of them the checks beside "plan"
 
 
 def list_lines(path):
@@ -127,6 +136,39 @@ def lpt(costs, n):
     return [(k + 1, sorted(pick[k]), load[k]) for k in range(n)]
 
 
+def hard_patterns(path):
+    """#4557: the patterns of the hard areas (tests/hard_suites.txt, the one list the release tooling reads too); [] = no file."""
+    try:
+        with open(path, encoding="utf-8") as f:
+            return [ln.strip().lower() for ln in f if ln.strip() and not ln.lstrip().startswith("#")]
+    except OSError:
+        return []
+
+
+def is_hard(g, pats):
+    """#4557: a group is hard when its name (first suite) or one of its suites matches a pattern - a shard is waited for as soon
+    as one suite in it is hard, so a group with one hard suite goes to the hard shards whole."""
+    return any(fnmatch.fnmatch(x.lower(), p) for x in [g[0], *g[1]] for p in pats)
+
+
+def split_plan(costs, hard, n, target_min, hard_target_min, hard_most=HARD_SHARDS_MAX):
+    """#4557: [(shard number, [group indexes], seconds)] with the hard groups (HARD: their indexes) on their own shards 1..H
+    (as many as HARD_TARGET_MIN minutes each need, at most HARD_MOST) and the others on H+1.. (as many as TARGET_MIN need, at
+    most N; N when TARGET_MIN is 0), each part spread by lpt(). -> (plan, H); H = 0 without hard groups (the old plan)."""
+    hard = sorted(set(hard))
+    soft = [i for i in range(len(costs)) if i not in set(hard)]
+    if not hard or hard_target_min <= 0:
+        m = shard_count(costs, n, target_min) if target_min > 0 else n
+        return lpt(costs, m), 0
+    h = shard_count([costs[i] for i in hard], max(1, hard_most), hard_target_min)
+    plan = [(k, [hard[i] for i in idx], s) for k, idx, s in lpt([costs[i] for i in hard], h)]
+    if soft:
+        sc = [costs[i] for i in soft]
+        m = shard_count(sc, n, target_min) if target_min > 0 else n
+        plan += [(h + k, [soft[i] for i in idx], s) for k, idx, s in lpt(sc, m)]
+    return plan, h
+
+
 def mmss(s):
     return f"{int(s // 60):3d}:{int(s % 60):02d}"
 
@@ -151,6 +193,9 @@ def main(argv=None):
     ap.add_argument("--only", metavar="F")
     ap.add_argument("--target-min", type=float, default=0, metavar="M")
     ap.add_argument("--cut-shards", metavar="F")
+    ap.add_argument("--hard-target-min", type=float, default=0, metavar="M")
+    ap.add_argument("--hard-file", metavar="F")
+    ap.add_argument("--hard-shards", type=int, default=HARD_SHARDS_MAX, metavar="K")
     ap.add_argument("timings", nargs="*")
     a = ap.parse_args(argv)
     if a.cut_shards:
@@ -181,12 +226,17 @@ def main(argv=None):
     cs = [cost(g, t) for g in gs]
     costs = [c for c, _ in cs]
     measured = sum(1 for _, ok in cs if ok)
-    if a.target_min > 0:  # job/2398: the full run too (--shards = the most), it grew past 20 x 30 min (CI 2.493.0: 2 shards at 50 min)
-        n = shard_count(costs, n, a.target_min)
+    pats = hard_patterns(a.hard_file or os.path.join(os.path.dirname(os.path.abspath(a.run_all)), "hard_suites.txt"))
+    hard = [i for i, g in enumerate(gs) if is_hard(g, pats)] if a.hard_target_min > 0 else []
+    # job/2398: the full run too (--shards = the most), it grew past 20 x 30 min (CI 2.493.0: 2 shards at 50 min)
+    plan, nh = split_plan(costs, hard, n, a.target_min, a.hard_target_min, a.hard_shards)
+    n = len(plan)
     if a.assign:
         if a.only is not None:
             print("# stage push")
-        for k, idx, _ in lpt(costs, n):
+        if nh:
+            print(f"# hard {nh}")
+        for k, idx, _ in plan:
             for i in idx:
                 print(gs[i][0], k)
         return 0
@@ -195,7 +245,6 @@ def main(argv=None):
         marker.setdefault(g[2], [0, 0.0])
         marker[g[2]][0] += 1
         marker[g[2]][1] += c
-    plan = lpt(costs, n)
     print(f"{len(gs)} groups, {sum(len(g[1]) for g in gs)} suites, {measured} groups measured "
           f"({len(gs) - measured} estimated), total {mmss(sum(costs)).strip()} min:s")
     print("shard  markers: groups   time   |  LPT: groups   time")
@@ -206,6 +255,10 @@ def main(argv=None):
     worst_m = max((v[1] for v in marker.values()), default=0.0)
     worst_l = max(p[2] for p in plan)
     off = (worst_m / worst_l - 1) * 100 if worst_l else 0.0
+    if nh:
+        hs = sum(costs[i] for i in hard)
+        print(f"hard (#4557): {len(hard)} groups, {mmss(hs).strip()} min:s on shards 1-{nh} (longest "
+              f"{mmss(max(p[2] for p in plan[:nh])).strip()}), the others on {nh + 1}-{n} (longest {mmss(max((p[2] for p in plan[nh:]), default=0)).strip()})")
     print(f"longest shard: markers {mmss(worst_m).strip()}, LPT {mmss(worst_l).strip()} ({off:+.0f} %)")
     top = sorted(range(len(gs)), key=lambda i: -costs[i])[:10]
     print("longest groups: " + ", ".join(f"{gs[i][0]} {mmss(costs[i]).strip()}{'' if cs[i][1] else '*'}" for i in top))
