@@ -107,7 +107,8 @@ check(pdf.ok and pdf.content[:5] == b"%PDF-", "the PDF of the invoice")
 # ---------------------------------------------------------------- #3173 GiroCode: the open amount after a part payment
 gc = (render(EX).get("payment") or {}).get("girocode") or ""
 check("EUR1570.00" in gc, f"#3173: GiroCode before payment = gross 1570.00: {gc!r}")
-r = Fr.post(B + f"{D}/{EX}/payments", json={"date": "2026-10-25", "amount": "500.00", "method": "transfer"})
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+r = Fr.post(B + f"{D}/{EX}/payments", json={"amount": "500.00", "method": "transfer"})
 check(r.status_code == 201, "part payment " + r.text[:160])
 gc = (render(EX).get("payment") or {}).get("girocode") or ""
 check("EUR1070.00" in gc and "EUR1570.00" not in gc, f"#3173: GiroCode after 500 paid = open 1070.00 (was the gross): {gc!r}")

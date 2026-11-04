@@ -144,7 +144,8 @@ assert r.status_code == 201, r.text
 OFF = r.json()["id"]
 INV = invoice(Fr, CL, cost=40)
 NUM = Fr.get(B + f"{D}/{INV}").json()["number"]
-r = Fr.post(B + f"{D}/{INV}/payments", json={"date": "2026-03-10", "amount": "119.00"})
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+r = Fr.post(B + f"{D}/{INV}/payments", json={"amount": "119.00"})
 check(r.status_code == 201, "personal office: the payment " + r.text[:200])
 BK = Fr.get(B + CBS).json()["books"][0]["id"]
 assert Fr.patch(B + f"{CBS}/{BK}", json={"opening": "100", "opening_day": "2026-01-01"}).ok

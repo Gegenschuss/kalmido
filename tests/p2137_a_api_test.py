@@ -173,7 +173,8 @@ INV = r.json().get("id")
 r = A.post(B + f"{D}/{INV}/finalize")
 check(r.ok and r.json().get("locked"), "the invoice is finalised " + r.text[:160])
 INV_NO = r.json().get("number")
-check(A.post(B + f"{D}/{INV}/payments", json={"date": "2026-06-01", "amount": "100.00", "method": "transfer"}).status_code == 201, "a payment")
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+check(A.post(B + f"{D}/{INV}/payments", json={"amount": "100.00", "method": "transfer"}).status_code == 201, "a payment")
 INV_PDF = A.get(B + f"{D}/{INV}/pdf").content
 TPL = A.post(B + D, json={"kind": "invoice", "client_id": CL, "project_title": "Betreuung {month}", "service_from": "2026-01-01",
                           "service_to": "2026-01-31", "items": [{"title": "Betreuung", "qty": 1, "rate": 500}]}).json()["id"]

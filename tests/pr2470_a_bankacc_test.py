@@ -153,11 +153,12 @@ check(A.put(B + BA + f"/{second['id']}", json={"iban": IBAN2, "bank_name": "Must
 
 # ---------------------------------------------------------------- DATEV
 assert A.put(B + O + "/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345", "fy_start": 1, "acct_len": 4, "chart": "SKR03", "bank": "1210"}}).ok
-assert A.post(B + f"{D}/{FIN}/payments", json={"date": "2026-03-20", "amount": "100.00", "method": "transfer"}).status_code == 201
 sql_d = dbxm.connect(DATA)
 sql_d.execute("UPDATE office_docs SET date='2026-03-05' WHERE id=?", (FIN,))
 sql_d.commit()
 sql_d.close()
+# 2.523.0 (#4082): the invoice is dated first (was after the payment): a payment before the invoice date is refused now
+assert A.post(B + f"{D}/{FIN}/payments", json={"date": "2026-03-20", "amount": "100.00", "method": "transfer"}).status_code == 201
 
 
 def konto():

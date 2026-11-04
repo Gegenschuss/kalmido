@@ -187,7 +187,8 @@ DPP = invoice(A, CL)
 ubl0 = A.get(B + f"{D}/{DPP}/ubl").text
 xml0 = A.get(B + f"{D}/{DPP}/xml").text
 gross = float(A.get(B + f"{D}/{DPP}").json()["totals"]["gross"])
-check(A.post(B + f"{D}/{DPP}/payments", json={"amount": round(gross / 2, 2), "date": "2026-05-20"}).ok, "#4079: half of it paid")
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+check(A.post(B + f"{D}/{DPP}/payments", json={"amount": round(gross / 2, 2)}).ok, "#4079: half of it paid")
 check(A.get(B + f"{D}/{DPP}").json()["status"] != "paid" and float(A.get(B + f"{D}/{DPP}").json()["open"]) < gross, "#4079: the payment is booked")
 check(A.get(B + f"{D}/{DPP}/ubl").text == ubl0, "#4079: the UBL after the part payment is the UBL before it")
 check(A.get(B + f"{D}/{DPP}/xml").text == xml0, "#4079: the stored XML stays")

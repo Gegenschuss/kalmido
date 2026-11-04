@@ -246,12 +246,13 @@ check(A.post(B + f"{D}/{EMPTY}/payments", json={"amount": 10}).status_code == 40
 check(A.post(B + f"{D}/{IID}/payments", json={"amount": -5}).status_code == 400 and A.post(B + f"{D}/{IID}/payments", json={"amount": 5, "method": "gold"}).status_code == 400,
       "payment validated")
 check(Bo.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-01", "amount": "10000.00"}).status_code == 403, "2.39.1 (#1210 N3): a member cannot record a payment (403)")
-r = A.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-01", "amount": "10000.00", "method": "transfer", "note": "Abschlag"})
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+r = A.post(B + f"{D}/{IID}/payments", json={"amount": "10000.00", "method": "transfer", "note": "Abschlag"})
 check(r.status_code == 201 and r.json()["state"] == "partial" and r.json()["status"] == "issued" and r.json()["paid"] == "10000.00" and r.json()["open"] == "30963.25",
       "the admin records a part payment -> partial " + r.text[:160])
 check(r.json()["status_text"] == "Partly paid", f"state text: {r.json()['status_text']}")
 PAY1 = r.json()["payments"][0]["id"]
-r = A.post(B + f"{D}/{IID}/payments", json={"date": "2026-06-10", "amount": 30963.25, "method": "transfer"})
+r = A.post(B + f"{D}/{IID}/payments", json={"amount": 30963.25, "method": "transfer"})
 check(r.status_code == 201 and r.json()["status"] == "paid" and r.json()["state"] == "paid" and r.json()["paid_at"] and r.json()["open"] == "0.00", "the rest -> paid with paid_at " + r.text[:160])
 PAY2 = r.json()["payments"][1]["id"]
 check(A.get(B + f"{D}/{IID}/payments").json()["payments"][1]["created_by_name"] == "Alice Admin", "payments list with names")

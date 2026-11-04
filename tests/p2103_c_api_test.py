@@ -225,6 +225,7 @@ check(r.status_code == 409 and "24 hours" in r.text, "#2168: after 24 hours the 
 
 # ---------------------------------------------------------------- #2168 payments: a reversal, never a delete
 INV2 = invoice(A, CL, 300)
+sql("UPDATE office_docs SET date=? WHERE id=?", (DAY(3), INV2), write=True)  # 2.523.0 (#4082): no payment before the invoice date
 r = A.post(B + f"{D}/{INV2}/payments", json={"date": DAY(2), "amount": "100.00", "method": "transfer"})
 check(r.status_code == 201 and r.json()["state"] == "partial", "a part payment " + r.text[:160])
 P1 = r.json()["payments"][0]["id"]

@@ -275,7 +275,8 @@ r = Do.post(B + D, json={"kind": "invoice", "client_id": CP, "service_from": "20
 assert r.status_code == 201, r.text
 PI = r.json()["id"]
 check(Do.post(B + f"{D}/{PI}/finalize").ok, "personal office: a small business invoice finalised")
-check(Do.post(B + f"{D}/{PI}/payments", json={"date": "2026-03-12", "amount": 300}).status_code == 201, "personal office: paid")
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+check(Do.post(B + f"{D}/{PI}/payments", json={"amount": 300}).status_code == 201, "personal office: paid")
 PR = receipt(Do, "private", "objektiv.pdf", "119.00", "2026-03-04", "Equipment", "19")
 info = Do.get(B + BK + "?year=2026&month=2026-03").json()
 check(info["upload_ws"] == "private" and [x["node_id"] for x in info["receipts"]] == [PR] and info["small_business"], f"personal office: its receipts {info}")

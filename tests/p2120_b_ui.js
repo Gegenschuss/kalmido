@@ -49,7 +49,8 @@ const signinLink = (mail, org) => execFileSync('docker', ['exec', CT, 'python', 
   const inv = await call(CA, 'POST', '/api/office/docs', {kind: 'invoice', client_id: cl.id, service_from: '2026-05-01', items: [{title: 'Beratung', qty: 1, rate: 1000}]});
   check((await call(CA, 'POST', `/api/office/docs/${inv.id}/finalize`)).http === 200, 'finalised');
   await call(CA, 'POST', `/api/office/docs/${inv.id}/status`, {status: 'sent'});
-  await call(CA, 'POST', `/api/office/docs/${inv.id}/payments`, {date: '2026-06-01', amount: '100.00', method: 'transfer'});
+  // 2.523.0 (#4082): no fixed payment date - a payment before the invoice date (today) is refused now
+  await call(CA, 'POST', `/api/office/docs/${inv.id}/payments`, {amount: '100.00', method: 'transfer'});
   const off = await call(CA, 'POST', '/api/office/docs', {client_id: cl.id, project_title: 'Imagefilm Hafen mit einem sehr langen Projekttitel für das schmale Telefon', items: [{title: 'Dreh', qty: 1, rate: 900}]});
   await call(CA, 'POST', `/api/office/docs/${off.id}/status`, {status: 'sent'});
   await call(CA, 'POST', `/api/office/docs/${off.id}/signoff`, {});

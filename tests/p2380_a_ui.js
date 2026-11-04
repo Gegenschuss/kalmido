@@ -42,7 +42,8 @@ const TEST_IBAN = 'DE02120300000000202051';
   const inv2 = await call('POST', `/api/office/docs/${offer.id}/invoice`, {force: true});
   const fin = await call('POST', `/api/office/docs/${inv2.id}/finalize`);
   check(fin.http === 200 && fin.number === 'RE-2026-001' && fin.status === 'issued', 'second invoice finalised ' + fin.http + ' ' + JSON.stringify(fin.error || fin.number));
-  const pay = await call('POST', `/api/office/docs/${inv2.id}/payments`, {date: '2026-10-01', amount: 1000, method: 'transfer'});
+  // 2.523.0 (#4082): no fixed payment date - a payment before the invoice date (today) is refused now
+  const pay = await call('POST', `/api/office/docs/${inv2.id}/payments`, {amount: 1000, method: 'transfer'});
   check(pay.http === 201 && pay.state === 'partial', 'a part payment -> partial ' + pay.http);
 
   // ================= jsdom: the list with kind chips and state tags

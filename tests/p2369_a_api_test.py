@@ -201,7 +201,8 @@ rem = A.post(B + f"{D}/reminder", json={"doc_ids": [OV], "level": 1, "fee": 0})
 check(rem.status_code in (200, 201), "setup: a reminder " + rem.text[:200])
 RID = rem.json()["id"]
 check(A.post(B + f"{D}/{RID}/finalize").ok, "setup: reminder finalised")
-check(A.post(B + f"{D}/{OV}/payments", json={"amount": "120.00", "date": "2026-06-02"}).status_code in (200, 201), "setup: its invoice paid")
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+check(A.post(B + f"{D}/{OV}/payments", json={"amount": "120.00"}).status_code in (200, 201), "setup: its invoice paid")
 dbx("UPDATE office_docs SET date='2011-06-01' WHERE id=?", (RID,), write=True)
 copies(RID, "RA", 19, "'2012-05-05'")
 copies(RID, "RB", 200, "'2013-05-05'")

@@ -85,35 +85,36 @@ def count_docs(s, kind):
 for who, s in (("org", A), ("freelancer", Fr)):
     CL = setup_office(s, who.title())
     # ---------------------------------------------------------------- payments
+    # 2.523.0 (#4082): paid today (was yesterday): a payment before the invoice date (today) is refused now
     I1 = invoice(s, CL, 300)
     if who == "org":
         I1_ORG = I1
-    r1 = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[1], "amount": "50", "client_ref": f"pay-{who}-1"})
-    r2 = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[1], "amount": "50", "client_ref": f"pay-{who}-1"})
+    r1 = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[0], "amount": "50", "client_ref": f"pay-{who}-1"})
+    r2 = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[0], "amount": "50", "client_ref": f"pay-{who}-1"})
     check(r1.status_code == 201 and r2.status_code == 200 and len(pays(s, I1)) == 1,
           f"{who}: the same client_ref twice = one payment {r1.status_code} {r2.status_code} {len(pays(s, I1))}")
     check("client_ref" not in pays(s, I1)[0], f"{who}: the payment's client_ref is not handed out")
     res = []
 
     def go(ref=f"pay-{who}-par"):
-        res.append(s.post(B + f"{D}/{I1}/payments", json={"date": DAY[1], "amount": "20", "client_ref": ref}).status_code)
+        res.append(s.post(B + f"{D}/{I1}/payments", json={"date": DAY[0], "amount": "20", "client_ref": ref}).status_code)
     th = [threading.Thread(target=go) for _ in range(4)]
     [t.start() for t in th]
     [t.join() for t in th]
     check(sorted(res) == [200, 200, 200, 201] and len(pays(s, I1)) == 2, f"{who}: four parallel requests with one ref = one payment {res} {len(pays(s, I1))}")
-    r = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[1], "amount": "10", "client_ref": f"pay-{who}-2"})
+    r = s.post(B + f"{D}/{I1}/payments", json={"date": DAY[0], "amount": "10", "client_ref": f"pay-{who}-2"})
     check(r.status_code == 201 and len(pays(s, I1)) == 3, f"{who}: another ref = another payment")
     I2 = invoice(s, CL, 80)
-    r = s.post(B + f"{D}/{I2}/payments", json={"date": DAY[1], "amount": "10", "client_ref": f"pay-{who}-2"})
+    r = s.post(B + f"{D}/{I2}/payments", json={"date": DAY[0], "amount": "10", "client_ref": f"pay-{who}-2"})
     check(r.status_code == 409 and not pays(s, I2), f"{who}: a ref of another invoice 409 {r.status_code}")
-    s.post(B + f"{D}/{I2}/payments", json={"date": DAY[1], "amount": "10"})
-    s.post(B + f"{D}/{I2}/payments", json={"date": DAY[1], "amount": "10"})
+    s.post(B + f"{D}/{I2}/payments", json={"date": DAY[0], "amount": "10"})
+    s.post(B + f"{D}/{I2}/payments", json={"date": DAY[0], "amount": "10"})
     check(len(pays(s, I2)) == 2, f"{who}: without a ref as before (two payments)")
     # a retry after the full payment: no 409 "only open invoices"
     I3 = invoice(s, CL, 50)
     g = s.get(B + f"{D}/{I3}").json()["totals"]["gross"]
-    r1 = s.post(B + f"{D}/{I3}/payments", json={"date": DAY[1], "amount": g, "client_ref": f"pay-{who}-full"})
-    r2 = s.post(B + f"{D}/{I3}/payments", json={"date": DAY[1], "amount": g, "client_ref": f"pay-{who}-full"})
+    r1 = s.post(B + f"{D}/{I3}/payments", json={"date": DAY[0], "amount": g, "client_ref": f"pay-{who}-full"})
+    r2 = s.post(B + f"{D}/{I3}/payments", json={"date": DAY[0], "amount": g, "client_ref": f"pay-{who}-full"})
     check(r1.status_code == 201 and r2.status_code == 200 and r2.json().get("state") == "paid" and len(pays(s, I3)) == 1,
           f"{who}: sent again after the full payment = 200 the paid invoice {r1.status_code} {r2.status_code} {r2.text[:200]}")
 

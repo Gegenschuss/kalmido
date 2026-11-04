@@ -7,6 +7,7 @@ freelancer-matrix: office
  - #2841 a payment reversal is dated on the payment's day (December payment taken back later: the year's VAT stays right),
    an older reversal line dated on the correction day counts on the payment's day in the books and the key figures;
    when a DATEV export already covers the payment's day the reversal is dated today (in the next export, review F2)
+ - 2.523.0 (#4082) a payment dated before its invoice is refused (400), on the invoice date it is booked
  - 2.523.0 (#4082) such a late reversal of a payment made within the cash discount period leaves the invoice open again
  - #2844 VAT note eu_goods: the client in another EU state with its VAT id (else 400), category K + deliver-to country in the
    XML, field 41; export: a client outside the EU, category G, field 43; reverse charge at home = field 60 / DATEV 8337,
@@ -124,6 +125,18 @@ def skonto_late_reversal(s, cl, label):
     check(Decimal(str(pm.get("open"))) == Decimal("1090.00"), f"{label} #4082: 1090.00 open again {pm.get('open')}")
 
 
+def pay_before_invoice(s, cl, label):
+    """2.523.0 (#4082): a payment typed in with a date before the invoice date -> 400 with a clear message (was booked);
+    on the invoice date itself it is fine."""
+    did = draft(s, cl, rate=100)
+    final(s, did, "2026-02-10")
+    r = s.post(B + f"{D}/{did}/payments", json={"date": "2026-02-09", "amount": "10.00"})
+    check(r.status_code == 400 and "before the invoice date" in r.text and "2026-02-10" in r.text and not s.get(B + f"{D}/{did}/payments").json()["payments"],
+          f"{label} #4082: a payment dated before the invoice is refused {r.status_code} " + r.text[:200])
+    r = s.post(B + f"{D}/{did}/payments", json={"date": "2026-02-10", "amount": "10.00"})
+    check(r.status_code == 201, f"{label} #4082: a payment on the invoice date is booked {r.status_code} " + r.text[:200])
+
+
 office(A)
 C_DE = client(A, "Beispielkunde AG", "DE")
 C_AT = client(A, "Example GmbH", "AT", "ATU99999999")
@@ -188,6 +201,7 @@ check(ustva(A, "m12", 2025)["kz"]["81"] == "0", "#2841 (review F2): the VAT of D
 rows = extf(A, rx[0]["date"], rx[0]["date"]) if rx else []
 check(any(g(x, "Umsatz (ohne Soll/Haben-Kz)") == "595,00" for x in rows), f"#2841 (review F2): the reversal is in the next DATEV export {rows[:3]}")
 skonto_late_reversal(A, C_DE, "org")
+pay_before_invoice(A, C_DE, "org")
 
 # ---------------------------------------------------------------- #2844 goods to the EU (K), export (G), reverse charge at home
 A.put(B + O + "/settings", json={"vat_basis": "soll"})
@@ -279,6 +293,7 @@ check(r.status_code == 400 and "cash discount period" in r.text, "freelancer: th
 check(Fr.get(B + f"{D}/{E3}").status_code in (403, 404), "freelancer: no document of the organisation")
 F_DE = client(Fr, "Beispielkunde AG", "DE")
 skonto_late_reversal(Fr, F_DE, "freelancer")
+pay_before_invoice(Fr, F_DE, "freelancer")
 
 print(f"p2355_c_buero: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

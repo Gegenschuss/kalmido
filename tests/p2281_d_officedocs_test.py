@@ -79,7 +79,8 @@ CL = A.post(B + "/api/clients", json={"name": "Example Client Ltd", "street": "2
 # the two oldest: overdue (no payment, due long ago) and partly paid
 OVER = invoice(A, CL)
 PART = invoice(A, CL)
-r = A.post(B + f"{D}/{PART}/payments", json={"amount": "10.00", "date": "2026-03-20"})
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+r = A.post(B + f"{D}/{PART}/payments", json={"amount": "10.00"})
 check(r.status_code in (200, 201), "setup: a part payment " + r.text[:200])
 dbx("UPDATE office_docs SET date='2020-01-01', due_date='2020-01-15' WHERE id=?", (OVER,), write=True)
 dbx("UPDATE office_docs SET date='2020-01-02', due_date='2099-12-31' WHERE id=?", (PART,), write=True)

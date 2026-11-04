@@ -166,9 +166,10 @@ assert A.post(B + f"{D}/{OFF}/status", json={"status": "sent"}).ok
 SIG = A.post(B + f"{D}/{OFF}/signoff", json={}).json()
 OFFNUM = A.get(B + f"{D}/{OFF}").json()["number"]
 INV1, inv1 = invoice(A, X, 1000)
-assert A.post(B + f"{D}/{INV1}/payments", json={"date": "2026-06-01", "amount": "100.00", "method": "transfer"}).ok
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+assert A.post(B + f"{D}/{INV1}/payments", json={"amount": "100.00", "method": "transfer"}).ok
 INV2, inv2 = invoice(A, X, 200)
-assert A.post(B + f"{D}/{INV2}/payments", json={"date": "2026-06-01", "amount": inv2["totals"]["gross"], "method": "transfer"}).ok
+assert A.post(B + f"{D}/{INV2}/payments", json={"amount": inv2["totals"]["gross"], "method": "transfer"}).ok
 DRAFT, _ = invoice(A, X, 300, final=False, sent=False)
 ISSUED, issued = invoice(A, X, 400, sent=False)
 INVY, invy = invoice(A, Y, 500)

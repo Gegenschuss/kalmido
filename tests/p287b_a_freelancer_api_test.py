@@ -151,7 +151,8 @@ inv = ok(F.post(B + f"/api/office/docs/{IDS['doc']}/invoice"), "office: an invoi
 ok(F.post(B + f"/api/office/docs/{inv.get('id')}/finalize"), "office: finalise the invoice")
 ok(F.get(B + f"/api/office/docs/{inv.get('id')}/pdf"), "office: the PDF")
 # #1918: what an organisation's office reserves to its admins, the freelancer does in the personal office
-ok(F.post(B + f"/api/office/docs/{inv.get('id')}/payments", json={"date": "2026-09-02", "amount": 100}), "office: record a payment (admin)", (200, 201))
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+ok(F.post(B + f"/api/office/docs/{inv.get('id')}/payments", json={"amount": 100}), "office: record a payment (admin)", (200, 201))
 q2 = ok(F.post(B + "/api/office/docs", json={"project_title": "Imagefilm 2", "client_id": IDS["client"]}), "office: a second quotation", (200, 201))
 ok(F.put(B + f"/api/office/docs/{q2.get('id')}/items", json={"items": [{"service_id": IDS["service"], "qty": 1}]}), "office: its positions")
 ok(F.post(B + f"/api/office/docs/{q2.get('id')}/status", json={"status": "sent"}), "office: quotation sent")

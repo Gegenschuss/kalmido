@@ -114,7 +114,8 @@ I1 = invoice()
 r = A.post(B + f"{D}/{I1}/finalize")
 check(r.ok, "DE: invoice finalised " + r.text[:200])
 check((dbx("SELECT xml_sha256 FROM office_docs WHERE id=?", (I1,))[0][0] or "") != "", "DE: the finalised invoice has its e-invoice XML")
-check(A.post(B + f"{D}/{I1}/payments", json={"date": "2026-03-20", "amount": "1190.00", "method": "transfer"}).ok, "DE: payment recorded")
+# 2.523.0 (#4082): no fixed payment date - a payment before the invoice date is refused now; today = on/after the invoice
+check(A.post(B + f"{D}/{I1}/payments", json={"amount": "1190.00", "method": "transfer"}).ok, "DE: payment recorded")
 TAX1 = A.get(B + f"{D}/{I1}").json()["totals"]["tax_lines"][0]["pct"]
 check(float(TAX1) == 19, f"DE: 19 % on the invoice ({TAX1})")
 
