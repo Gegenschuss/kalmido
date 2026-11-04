@@ -5,7 +5,7 @@
 // - organisation (a list, its task open) -> Private (the list is not there -> the inbox, the task closes) -> a private list, a
 //   sidebar group folded -> organisation: the inbox (no page and no task come back), its sidebar group
 //   -> All (keeps the page; changes there are not written back) -> Private: its sidebar group
-// - a link into the other workspace (wsFollow): the target wins, the filter follows
+// - a link into the other workspace (wsFollow): the target wins, the filter follows and brings the target's kept state (#4189)
 // - a reload (same device) keeps the state of both
 // kalmido-suite: fresh
 // Without an organisation (P4): no route is new; the switch needs an organisation, the first block checks it does nothing
@@ -89,8 +89,11 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   // a link into the organisation: the target wins and the filter follows
   w.location.hash = '#l/' + W; await until(() => w.eval('wsCur()') === OW && w.eval('S.route.key') === 'l:' + W);
   check(w.eval('wsCur()') === OW, 'a link into the organisation switches along');
-  // a link (wsFollow) changes only the filter, it brings no kept state back: the sidebar groups shown now become the organisation's on the next save
-  w.eval(`LS.set('sideOpenG', ['more'])`);
+  // 2.523.0 (#4189): a link (wsFollow) brings the target's kept state back like a switch (was: only the filter, the old workspace's
+  // sidebar groups became the organisation's on the next save); the page stays the link's target, Private keeps its own
+  check(await until(() => w.eval(`JSON.stringify(LS.get('sideOpenG'))`) === '["more"]'), '#4189: a link brings the organisation\'s sidebar group ' + w.eval(`JSON.stringify(LS.get('sideOpenG'))`));
+  check(w.eval(`JSON.stringify(LS.get('wsView', {}).private?.ls?.sideOpenG)`) === '[]', '#4189: Private keeps its own state ' + w.eval(`JSON.stringify(LS.get('wsView', {}).private?.ls?.sideOpenG)`));
+  check(w.eval('S.route.key') === 'l:' + W, '#4189: the page stays the link target ' + w.eval('S.route.key'));
   await w.eval(`wsSet('private')`);
   await until(() => w.eval('S.route.key') === 'inbox' && w.eval('wsCur()') === 'private');
   w.eval(`LS.set('sideOpenG', ['tags'])`);

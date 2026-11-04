@@ -144,6 +144,10 @@ function wsFollow(key) {
   if (!wsOptions().includes(ws)) return;  // an organisation the person is not in (a list shared from outside): leave the filter
   const from = wsCur();
   S.settings.workspace = ws; LS.set('ws', ws);
+  // 2.523.0 (#4189): the target's own state comes back like on a switch (wsSet); route() saved the old one just before (wsv_leave),
+  // the page stays the link's target (wsv_restore is synchronous and does not touch the page)
+  const kept = (LS.get('wsView', {}) || {})[ws];
+  if (kept) wsv_restore(kept, ws);
   api('PATCH', '/api/settings', {workspace: ws}).catch(() => {});
   ws_autoNote(from);
 }

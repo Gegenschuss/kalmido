@@ -969,7 +969,7 @@ function settingsModal(focus) {
       return;
     }
     if (el.dataset.mgarea) { mg_areaSwitch(md, el); return; }  // 2.44.0 (#1187)
-    if (el.dataset.feat) {
+    if (el.dataset.feat && !el.closest('#ofc-set')) {  // 2.523.0 (#4343): an office function in #ofc-set is office.js's (ost_save), one undo step, not a personal module
       const on = el.checked, k = el.dataset.feat, n = tr(FEATS.find(x => x[0] === k)?.[1] || k);
       const fs = new Set((S.settings.features ?? FEATS.map(x => x[0]).join(',')).split(',').filter(Boolean));
       on ? fs.add(k) : fs.delete(k);
