@@ -1741,9 +1741,15 @@ The key is sent only as `Authorization: Bearer ...` to that address and never ap
 exports. The address is yours (an environment variable), so addresses in the local or Docker network are allowed; only
 http(s), no redirects to other hosts, one attempt per call, no streaming.
 
-Local model with Ollama in the same compose file (no key, nothing leaves your network):
+Both examples go into a file `docker-compose.override.yml` next to `docker-compose.yml` (Docker Compose merges it on
+its own); pasted into `docker-compose.yml` itself, the second `kalmido:` and `volumes:` keys are refused as duplicates,
+and an update replaces that file anyway. If the installer already wrote an override file, add the lines to it and remove
+its first line, so the installer leaves the file alone. Then `docker compose config` shows the merged result and `docker compose up -d` applies it.
+
+Local model with Ollama (no key, nothing leaves your network):
 
 ```yaml
+services:
   kalmido:
     environment:
       KALMIDO_AI_BASE_URL: http://ollama:11434/v1
@@ -1752,20 +1758,25 @@ Local model with Ollama in the same compose file (no key, nothing leaves your ne
   ollama:
     image: ollama/ollama
     volumes: ["ollama:/root/.ollama"]
+volumes:
+  ollama:
 ```
 
 An OpenAI-compatible provider in the EU (check its data processing terms and sign a processing agreement first; the
 people's texts go there):
 
 ```yaml
+services:
   kalmido:
     environment:
       KALMIDO_AI_BASE_URL: https://inference.provider.example/v1
       KALMIDO_AI_MODEL: provider-model-name
       KALMIDO_AI_KEY_FILE: /secret/ai.key
       KALMIDO_AI_NAME: Example AI (EU)
-    volumes: ["./secret:/secret:ro"]
 ```
+
+Put the key into `secret/ai.key` (one line): `./secret` is already mounted at `/secret` by `docker-compose.yml`. Do not
+mount it a second time read-only - the server could no longer create its own key file there on the first start.
 
 ## Related tasks: the embedding service
 
