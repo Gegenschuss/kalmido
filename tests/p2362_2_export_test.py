@@ -301,7 +301,9 @@ PG = one("SELECT id FROM orgs WHERE personal_of=?", (GID,))
 nid = one("SELECT node_id FROM office_cash_entries WHERE org_id=?", (PG,))
 check(nid and nid != FILED, f"#3099 the cash entry points at its file again {nid}")
 check(one("SELECT owner_id FROM fs_nodes WHERE id=?", (nid,)) == GID and one("SELECT org_id FROM fs_nodes WHERE id=?", (nid,)) is None, "#3099 the file is gerd's")
-gnames = [x[0] for x in dbx("SELECT name FROM fs_nodes WHERE owner_id=? AND kind='file'", (GID,))]
+# 2.506.0 (#4299): only what this run brought: the files of the runs undone above lie in the trash now
+RUN_NODES = [x[1] for x in json.loads(one("SELECT created FROM imports WHERE id=?", (j["result"]["import_id"],)))["oi"] if x[0] == "fs_nodes"]
+gnames = [x[0] for x in dbx(f"SELECT name FROM fs_nodes WHERE owner_id=? AND kind='file' AND id IN ({','.join('?' * len(RUN_NODES))})", (GID, *RUN_NODES))]
 check("taxi-beleg.pdf" in gnames and "kasse-bild.pdf" in gnames, f"#3099 the receipts came along {gnames}")
 check("weg-beleg.pdf" not in gnames and "notiz.txt" not in gnames and "bert-geheim.pdf" not in gnames, f"#3099 trash, other documents and another person's stay out {gnames}")
 check(one("SELECT receipt_node_id FROM office_equipment WHERE org_id=?", (PG,)) is None, "#3099 the foreign node's reference is empty")
