@@ -495,33 +495,33 @@ function sbb_render(hid) {
 // type, down to 9 px; wider still it ends in "…" with the whole name as title. Measured in the page, the width of a word is not in CSS
 // #3506 (#3405): a smaller type can break a name of several words into other lines, so the width is measured again after
 // each step (and scrollWidth counts too) until it fits; one rule of three left "Reisen & Kontakte" 2 px too wide at 320 px
-// #4047: on the phone (the drawer's row) a name is never cut: a word too wide even in 9 px widens its column and the row
-// scrolls sideways (never "…", never split inside the word)
+// #4047: on the phone (the drawer's row) a name is never cut and never split: when a word is too wide even in 9 px, every column
+// gets the width its names need (short names give room to long ones, all in sight); only what fits in no way lets the row scroll
 function sbb_fit() {
   const row = $('#side .sbmr');
   if (row) { row.style.gridTemplateColumns = row.style.overflowX = row.style.overflowY = ''; }
-  const tooWide = new Map();  // a name of the drawer's row -> its width in 9 px
+  let tooWide = false;
+  const wide = n => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
   for (const n of $$('#srail .srbn, #side .sbmr .srbn')) {
     n.classList.remove('srcut'); n.style.fontSize = '';
     const box = n.clientWidth; if (!box) continue;
-    const wide = () => { const rg = document.createRange(); rg.selectNodeContents(n); return Math.max(rg.getBoundingClientRect?.().width || 0, n.scrollWidth); };
-    let need = wide();
+    let need = wide(n);
     if (!(need > box + .5)) continue;
     let px = parseFloat(getComputedStyle(n).fontSize) * box / need;
     for (let i = 0; i < 12 && px >= 9; i++) {
       n.style.fontSize = `${Math.floor(px * 10) / 10}px`;
-      need = wide();
+      need = wide(n);
       if (!(need > box + .5)) break;
       px = Math.min(px - .2, px * box / need);
     }
     if (px < 9 || need > box + .5) {
-      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide.set(n, wide()); continue; }
+      if (n.closest('.sbmr')) { n.style.fontSize = '9px'; tooWide = true; continue; }
       n.style.fontSize = ''; n.classList.add('srcut'); n.closest('.srb').title ||= n.textContent;
     }
   }
-  if (tooWide.size) {  // the other columns keep their width, the row scrolls
-    const cols = parseInt(row.style.getPropertyValue('--sbmc')) || 5, w = Array(cols).fill($('.srb', row).offsetWidth);
-    $$('.srbn', row).forEach((n, i) => { if (tooWide.has(n)) w[i % cols] = Math.max(w[i % cols], Math.ceil(tooWide.get(n)) + 4); });
+  if (tooWide) {
+    const cols = parseInt(row.style.getPropertyValue('--sbmc')) || 5, w = Array(cols).fill(0);
+    [...row.children].forEach((b, i) => { const n = $('.srbn', b); if (n) w[i % cols] = Math.max(w[i % cols], Math.ceil(wide(n)) + 4); });
     row.style.gridTemplateColumns = w.map(x => `minmax(${x}px,1fr)`).join(' '); row.style.overflowX = 'auto'; row.style.overflowY = 'hidden';
   }
 }
