@@ -219,7 +219,7 @@ async function vtr_restore(id) {
   if (!lid && !x.task_id && !x.list_id && !x.client_id) loadModule('videos').then(() => vdr_open(id), () => {});  // no project to go to: it opens
 }
 document.addEventListener('click', e => {
-  const b = e.target.closest?.('[data-vtra]'); if (!b) return;
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-vtra]'); if (!(b instanceof HTMLElement)) return;
   e.preventDefault();
-  vtr_restore(+b.closest('[data-vtr]')?.dataset.vtr);
+  vtr_restore(+(/** @type {HTMLElement|null} */ (b.closest('[data-vtr]')))?.dataset.vtr);
 });
