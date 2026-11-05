@@ -1231,7 +1231,6 @@ DELETE /api/v1/lists/{}/links/{}
 DELETE /api/v1/lists/{}/members/{}
 DELETE /api/v1/lists/{}/milestones/{}
 DELETE /api/v1/lists/{}/tags/{}
-DELETE /api/v1/me/app-passwords/{}
 DELETE /api/v1/notepads/{}
 DELETE /api/v1/notes/{}
 DELETE /api/v1/sections/{}
@@ -1376,7 +1375,6 @@ POST /api/lists/{}/signoffs/{}/revoke
 POST /api/lists/{}/sprints
 POST /api/lists/{}/tags/promote
 POST /api/lists/{}/time/restore
-POST /api/me/avatar
 POST /api/me/drop-token
 POST /api/me/mail/token
 POST /api/me/pin/lock
@@ -1521,7 +1519,6 @@ POST /api/v1/lists/{}/shift
 POST /api/v1/lists/{}/shop-areas
 POST /api/v1/lists/{}/sprints/assign
 POST /api/v1/lists/{}/tags
-POST /api/v1/me/app-passwords
 POST /api/v1/me/purpose
 POST /api/v1/news/read
 POST /api/v1/notes/{}/restore
