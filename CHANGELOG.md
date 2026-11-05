@@ -14,6 +14,18 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.563.0] - 2026-11-05
+
+CI-Fix 2.560 (p2172_a_edit_ui, CI limit of the test shards).
+### Fixed
+- Tests: the wiki editor suite checks the editor against the reading column width from the stylesheet instead of a fixed number, so a new reading width no longer turns it red.
+- CI: a test shard of the full run may take 90 minutes instead of 60; with 20 shards all 13 soft shards had stopped at 60 minutes before their suites finished (#4388).
+
+Package 2.563 (Start pflegen: Startgröße senken).
+### Changed
+- Start: Office > Clients (`clientpage.js`, the client list and the client's card) is no longer loaded at start but on the first visit of the view, like the other areas; the office, the contacts and the trash dialogs load it before they draw. The start part of the e-mail filing that lived in it (the mail link of a task / an event and its click) stays at start in `lazyload.js`. The start sends about 9.7 KB less JavaScript (packed) and one script less (#4742).
+- Start budget: the ceilings in `tools/perf_budget.json` sink by what this saved (JS packed 1,050,000 -> 1,040,262 bytes, language core 320,000 -> 319,286, start scripts 145 -> 144); the budget test holds the ceilings at most at their 2.521.0 values (#4742).
+
 ## [2.562.0] - 2026-11-05
 
 Package 2.553 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Audit-Lücken gesammelt: 180x Aufgabe ohne Beleg-Co).
@@ -1556,7 +1568,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.562.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.563.0...HEAD
+[2.563.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.0
 [2.562.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.562.0
 [2.560.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.560.0
 [2.551.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.551.0
