@@ -154,6 +154,7 @@ TENANT_EXEMPT = {
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
     "pl_conn_users": "who could use a shared Paperless connection (unused since 2.36.0, kept)", "pl_tokens": _OWN,
     "user_task_order": _OWN + " (2.40.0 #1344: the own order of My tasks; rows only for tasks the person sees)",
+    "user_mine_sections": _OWN + " (2.569.0 #4395: the own sections of My tasks; only names, no task data)",
     "user_keys": _OWN + " (2.64.0 #1864: the wrapped account key; read and written only by core/orgcrypt.py as system, never served)",
     "wait_hidden": _OWN + " (2.41.0 #1205: Waiting-on texts the person took out of their own suggestions)",
     "view_layouts": _OWN + " (2.55.0 #1069: saved arrangements of a view; layout json only, no content)",
