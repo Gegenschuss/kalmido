@@ -29,6 +29,11 @@ check(shards.hard_patterns(os.path.join(N, "no_such_file.txt")) == [], "no file 
 check(shards.is_hard(("backup", ["backup"], 0), pats), "group backup is hard")
 check(shards.is_hard(("p2360_d_ui", ["p2360_d_ui", "office_calc"], 0), pats), "a UI group with one office suite is hard whole")
 check(not shards.is_hard(("p8_api", ["p8_api", "calendar_feed"], 0), pats), "a calendar group is soft")
+# 2.552.0 (#4656): "vat" only as a word of the name - *vat* hit 'private' and 'avatar' and held the fast lane
+for soft in ("p2306_a_private_seal", "p2470_e_avatar_ui"):
+    check(not shards.is_hard((soft, [soft], 0), pats), f"{soft} is soft (vat inside a word does not count)")
+for hard in ("p9_vat_api", "vat_rates", "p12_report_vat"):
+    check(shards.is_hard((hard, [hard], 0), pats), f"{hard} is hard (vat as a word)")
 
 # 3. split_plan: hard on 1..H (as many as their target needs, at most hard_most), the others after them; off = the old LPT
 costs = [600.0, 500.0, 400.0, 300.0, 1800.0, 1700.0, 1600.0, 1500.0, 1400.0, 1300.0]

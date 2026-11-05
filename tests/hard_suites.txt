@@ -18,7 +18,10 @@
 *offer*
 *receipt*
 *datev*
-*vat*
+# 2.552.0 (#4656): vat only as a word of the name - *vat* hit 'private' and 'avatar'
+*_vat_*
+*_vat
+vat_*
 *cashbook*
 *kasse*
 
