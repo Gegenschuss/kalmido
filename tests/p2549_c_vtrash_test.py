@@ -95,7 +95,7 @@ check(VO not in trash(Fr) and VO not in trash(Ot), "people outside the organisat
 check(Fr.post(B + f"/api/videos/{VO}/restore").status_code == 404, "frida cannot restore the organisation's review")
 LP = project(A, "Alice private")
 check(A.post(B + f"/api/videos/{VO}/restore", json={"list_id": LP}).status_code == 409, "alice: into a private project (another workspace): 409")
-LA = project(A, "Alpha new", ORG)
+LA = project(S["bob"], "Alpha new", ORG)
 r = S["bob"].post(B + f"/api/videos/{VO}/restore", json={"list_id": LA})
 check(r.ok and r.json().get("list_id") == LA, f"bob: restored into the organisation's project {r.text[:200]}")
 check(S["bob"].post(B + f"/api/videos/{VO}/restore").status_code == 404, "a second restore: 404 (no longer in the trash)")
