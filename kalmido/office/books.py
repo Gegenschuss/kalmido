@@ -51,7 +51,7 @@ BK_PAY_DAY = "COALESCE(NULLIF(o.date, ''), p.date)"
 
 
 from .model import office_ctx_admin as _ctx  # noqa: E402  2.149.0 G (#2517): was an own copy
-from ..files.store import fs_chain, fs_deleted, fs_role  # 2.369.5 (#2517): pulled up from functions
+from ..files.store import fs_roles_many  # 2.369.5 (#2517): pulled up from functions; 2.546.0 (#4186): the rights in one go
 from .periodlock import period_need_open  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
@@ -129,7 +129,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     paid_at (input tax). uid: only documents this person sees (default: the signed-in person; 0 = all, for jobs).
     2.356.0 (#3097): gaps = a dict the exports fill with what they leave out: "no_amount" / "no_date" ([titles] of receipts
     this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open)."""
-    from ..docs.store import doc_open
+    from ..docs.store import doc_opener  # 2.546.0 (#4186)
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
@@ -138,15 +138,20 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
                      f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                      f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
                      (ws, frm, to)).fetchall()
-    out = []
+    out, amts, opener = [], {}, {}
+    for r in rows:  # 2.546.0 (#4186): the amounts first (key read once), then trash and rights of the rest in one go (fs_roles_many)
+        if r["ws"] not in opener:
+            opener[r["ws"]] = doc_opener(c, r["ws"], "doc_meta.amount")
+        raw = opener[r["ws"]](r["amount"]) or ""
+        amts[r["node_id"]] = dec(raw, "0") if raw else dec(0)
+    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0 or gaps is not None], uid)
     for r in rows:
-        raw = doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or ""
-        a = dec(raw, "0") if raw else dec(0)
+        a = amts[r["node_id"]]
         if a == 0 and gaps is None:
             continue
-        if fs_deleted(fs_chain(c, r["node_id"])):
+        if acc[r["node_id"]][0]:
             continue  # a folder above it is in the trash
-        if uid and not fs_role(c, r["node_id"], uid):
+        if uid and not acc[r["node_id"]][1]:
             if gaps is not None and a != 0:
                 gaps["hidden"] = gaps.get("hidden", 0) + 1
             continue
@@ -162,12 +167,14 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
                     "unrated": cur if rate is None else None,  # 2.189.0 B (#2475): a foreign receipt without office rate
                     "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None})  # 2.420.0 C (#3448)
     if gaps is not None:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
-        for r in c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+        undated = c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "
-                           "ORDER BY r.node_id LIMIT 1000", (ws,)).fetchall():  # review N4: bounded (named, not all of them)
-            if fs_deleted(fs_chain(c, r["node_id"])):
+                           "ORDER BY r.node_id LIMIT 1000", (ws,)).fetchall()  # review N4: bounded (named, not all of them)
+        acc = fs_roles_many(c, [r["node_id"] for r in undated], uid)  # 2.546.0 (#4186)
+        for r in undated:
+            if acc[r["node_id"]][0]:
                 continue
-            if uid and not fs_role(c, r["node_id"], uid):
+            if uid and not acc[r["node_id"]][1]:
                 gaps["hidden"] = gaps.get("hidden", 0) + 1
                 continue
             gaps.setdefault("no_date", []).append(r["name"] or "")
@@ -204,9 +211,9 @@ def bk_einv_offers(c, oid, uid=None):
     rows = c.execute("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.ws=? AND d.method='e-invoice' "
                      "AND n.kind='file' AND n.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id) "
                      "ORDER BY d.node_id DESC LIMIT ?", (bk_ws(c, oid), BK_OFFER_MAX * 2)).fetchall()
-    out = []
+    out, acc = [], fs_roles_many(c, [r["node_id"] for r in rows], uid)  # 2.546.0 (#4186): trash + rights in one go
     for r in rows:
-        if fs_deleted(fs_chain(c, r["node_id"])) or (uid and not fs_role(c, r["node_id"], uid)):
+        if acc[r["node_id"]][0] or (uid and not acc[r["node_id"]][1]):
             continue
         m = meta_row(c, r["node_id"])
         inv = ei_rc_offer(c, m) if m else None
@@ -582,9 +589,13 @@ def bk_get():
     s = office_settings(c, oid)
     ws = bk_ws(c, oid)
     m_from, m_to = bk_period(int(mo[:4]), "m" + mo[5:])
-    month = [_rc_public(x) for x in bk_receipts(c, oid, m_from, m_to)][-BK_LIST_MAX:]
     gaps = {}  # 2.356.0 (#3097): receipts of the year the exports leave out (no date / no amount)
-    missing = [_rc_public(x) for x in bk_receipts(c, oid, f"{year}-01-01", f"{year}-12-31", gaps=gaps) if x["vat_pct"] is None][:BK_LIST_MAX]
+    y_from, y_to = f"{year}-01-01", f"{year}-12-31"
+    y_rcs = bk_receipts(c, oid, y_from, y_to, gaps=gaps)
+    # 2.546.0 (#4186): the month inside the year = the year's receipts of its days (same order, same rights); was a second run
+    m_rcs = [x for x in y_rcs if m_from <= x["date"] <= m_to] if y_from <= m_from and m_to <= y_to else bk_receipts(c, oid, m_from, m_to)
+    month = [_rc_public(x) for x in m_rcs][-BK_LIST_MAX:]
+    missing = [_rc_public(x) for x in y_rcs if x["vat_pct"] is None][:BK_LIST_MAX]
     from ..docs.dups import dup_seen
     dups = dup_seen(c, {x["node_id"] for x in month + missing}, uid)  # 2.185.0 A (#2583): marked in the list, still counted
     for x in month + missing:

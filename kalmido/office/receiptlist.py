@@ -15,6 +15,7 @@ Invoice number and VAT id only from an incoming e-invoice (office/einvoice_in.py
 never from the text recognition's guesses."""
 import csv
 import io
+import json
 import os
 import re
 import tempfile
@@ -29,7 +30,7 @@ from ..core.config import app
 from ..core.db import body, local_day, local_now, now_iso
 from ..core.i18n import tr
 from ..core.orgcrypt import OrgCryptError
-from ..files.store import fs_chain, fs_deleted, fs_role
+from ..files.store import fs_chain, fs_deleted, fs_role, fs_roles_many
 from ..personal.timetrack import BadInput
 from .homecur import hc_code
 from .ledger import ofx_log
@@ -97,7 +98,7 @@ def rcl_all(c, oid, f, uid, own=False):
     [{node_id, date, doc_date, paid_at, due_date, title, category, project_id, project, supplier_id, supplier, vat_pct,
     net, vat, amount (Decimal, office currency), currency, orig_amount, orig_currency, mime, size, file, einvoice,
     number, vat_id}]. 2.187.0 B (#2476): own=True only the receipts uid uploaded (office groups, level "own")."""
-    from ..docs.store import doc_open, label_name, meta_json
+    from ..docs.store import doc_opener, label_name  # 2.546.0 (#4186): doc_opener
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     home = _home(s)
@@ -108,15 +109,25 @@ def rcl_all(c, oid, f, uid, own=False):
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
                      + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
                      + f"ORDER BY {day}, r.node_id", (ws, f["from"], f["to"]) + ((uid,) if own else ())).fetchall()
-    lists, out = {}, []
+    lists, out, amts, who, opener, opener_x = {}, [], {}, {}, {}, {}
+    for r in rows:  # 2.546.0 (#4186): the amounts first (key read once), then trash and rights of the rest in one go (fs_roles_many)
+        if r["ws"] not in opener:
+            opener[r["ws"]] = doc_opener(c, r["ws"], "doc_meta.amount")
+        raw = opener[r["ws"]](r["amount"]) or ""
+        amts[r["node_id"]] = dec(raw, "0") if raw else Decimal(0)
+    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0], uid)
+
+    def _who(p):  # 2.546.0 (#4186): one users query per person, not per receipt
+        if p not in who:
+            who[p] = _rcl_who(c, p)
+        return who[p]
     for r in rows:
-        raw = doc_open(c, r["ws"], "doc_meta.amount", r["amount"]) or ""
-        a = dec(raw, "0") if raw else Decimal(0)
+        a = amts[r["node_id"]]
         if a == 0:
             continue  # as the bookkeeping: a receipt without an amount is none yet
-        if fs_deleted(fs_chain(c, r["node_id"])):
+        if acc[r["node_id"]][0]:
             continue
-        if not fs_role(c, r["node_id"], uid):
+        if not acc[r["node_id"]][1]:
             continue
         cur = hc_code(r["currency"]) or (r["currency"] or "").strip().upper() or home  # 2.189.0 B (#2475): also "£"
         gross = money(bk_to_home(a, cur, s))
@@ -133,9 +144,9 @@ def rcl_all(c, oid, f, uid, own=False):
                     "supplier_id": r["sender_id"], "supplier": label_name(c, ws, "sender", r["sender_id"]) or "",
                     "vat_pct": vat_pct, "net": net, "vat": vat, "amount": gross, "currency": home,
                     "orig_amount": money(a) if cur != home else None, "orig_currency": cur if cur != home else None,
-                    "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(meta_json(c, r, "extracted", {})),
-                    "submitted_by": _rcl_who(c, r["submitted_by"]),  # 2.356.0 D (#3129): handed in by a member
-                    "checked_at": r["checked_at"] or None, "checked_by": _rcl_who(c, r["checked_by"]) if r["checked_at"] else None})  # 2.420.0 C (#3448)
+                    "mime": r["mime"] or "", "size": int(r["size"] or 0), "file": r["name"] or "", **_rcl_einv(_rcl_extracted(opener_x, c, r)),
+                    "submitted_by": _who(r["submitted_by"]),  # 2.356.0 D (#3129): handed in by a member
+                    "checked_at": r["checked_at"] or None, "checked_by": _who(r["checked_by"]) if r["checked_at"] else None})  # 2.420.0 C (#3448)
     from ..docs.dups import dup_seen
     dups = dup_seen(c, [x["node_id"] for x in out], uid)  # 2.185.0 A (#2583): a possible duplicate (marked, still counted)
     for x in out:
@@ -146,6 +157,18 @@ def rcl_all(c, oid, f, uid, own=False):
     for x in out:
         x["hints"] = seen.get(x["node_id"], 0) + (1 if x["dup"] else 0)
     return out
+
+
+def _rcl_extracted(openers, c, r):
+    """2.546.0 (#4186): meta_json(c, r, "extracted", {}) with the key of r's space read once per list (doc_opener)."""
+    if r["ws"] not in openers:
+        from ..docs.store import doc_opener
+        openers[r["ws"]] = doc_opener(c, r["ws"], "doc_meta.extracted")
+    try:
+        v = json.loads(openers[r["ws"]](r["extracted"]) or "null")
+    except ValueError:
+        v = None
+    return v if isinstance(v, dict) else {}
 
 
 def _rcl_who(c, uid):

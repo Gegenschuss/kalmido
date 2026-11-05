@@ -167,6 +167,40 @@ def doc_seal(c, ws, ctx, value):
     return doc_seal_as(c, ws, ctx, value, bool(ws_user(ws)) and docs_ukey_on(c))  # 2.126.0 A (#1970)
 
 
+def doc_opener(c, ws, ctx, default=""):
+    """2.546.0 (#4186): doc_open for many values of one space ws and field ctx (the receipt lists): the same two forms and the
+    same default, the keys looked up once instead of per value (oc_key reads its key row on every call)."""
+    keys = {}
+
+    def key(kind):
+        if kind not in keys:
+            try:
+                keys[kind] = _acct_key(c, ws, False) if kind == "acct" else _ws_key(c, ws, create=False)
+            except OrgCryptError as e:
+                keys[kind] = e
+        return keys[kind]
+
+    def open_(value):
+        if not isinstance(value, str) or not value.startswith(PREFIX):
+            return value
+        uid = ws_user(ws)
+        if uid:
+            k = key("acct")
+            if k and not isinstance(k, OrgCryptError):
+                try:
+                    return oc_dec_k(k, -uid, f"{ctx}|{ws}", value)
+                except OrgCryptError:
+                    pass
+        k = key("ws")
+        if isinstance(k, OrgCryptError):
+            return default
+        try:
+            return oc_dec_k(k, ws_org(ws) or 0, f"{ctx}|{ws}", value)
+        except OrgCryptError:
+            return default
+    return open_
+
+
 def doc_open(c, ws, ctx, value, default=""):
     """The plain value; default when a sealed value cannot be opened (another server key, a lost organisation key)."""
     if not isinstance(value, str) or not value.startswith(PREFIX):
