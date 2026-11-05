@@ -216,7 +216,8 @@ function ab_shChip(n, own) {
 function ab_shHead(d) {  // the open folder: "Share" on top (who may share) and the line below it
   const n = d?.node; if (!n || S.route.aus) return '';
   const t = ab_shLineTxt(n); if (!t) return '';
-  return `<p class="muted abshline">${ic(n.share_with?.some(e => e.k === 'a') ? 'bot' : 'users', 's')}<span>${esc(t)}</span></p>`;
+  const sw = n.share_with || [], bot = sw.length && sw.every(e => e.k === 'a');  // the robot only for agents alone (as the row)
+  return `<p class="muted abshline">${ic(bot ? 'bot' : 'users', 's')}<span>${esc(t)}</span></p>`;
 }
 function ab_rowHtml(n, trash) {
   const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
