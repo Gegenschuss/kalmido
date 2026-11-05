@@ -8,6 +8,9 @@ freelancer-matrix: office
    the income statement counts the section 13b amount as net without input tax; a wrong mark answers 400
  - paid reminder fees: marked paid = income "reminder fees (not taxable)" in the income statement (no VAT, Anlage EUeR line
    of Kz 103), money in in the cash flow (kind fee) and the key figures on the day it was marked; waived = gone again
+ - a final invoice with a negative rest (-595.00): "to pay back" 595.00, a refund above it 409, a refund of 200.00 is booked
+   negative (state partial, cash flow out kind refund, VAT base on cash basis -168), the rest makes it paid; another one is
+   cancelled by its credit note (negative itself, was refused)
  - the same for a person without an organisation (own office)
 usage: p2545_c_buero_test.py <datadir>"""
 import os
@@ -158,10 +161,55 @@ def fees(s, who):
     check(not [x for x in eu["income"] if x["key"] == "fee"], f"{who}: a waived fee is no income again {eu.get('income')}")
 
 
+# ---------------------------------------------------------------- final invoice with a negative rest
+def neg_final(s, who, rate):
+    cl = s.post(B + "/api/clients", json={"name": f"{who} Bau GmbH", "street": "Weg 2", "zip": "20095", "city": "Hamburg", "country": "DE"}).json()["id"]
+    r = s.post(B + D, json={"kind": "invoice", "client_id": cl, "service_from": f"{Y}-01-05", "items": [{"title": "Abschläge zu hoch", "qty": 1, "rate": rate}]})
+    assert r.status_code == 201, r.text
+    did = r.json()["id"]
+    dbxm.q(DATA, "UPDATE office_docs SET inv_type='final' WHERE id=?", (did,))
+    check(s.post(B + f"{D}/{did}/finalize").ok, f"{who}: the negative final invoice is finalised")
+    return did
+
+
+def neg_rest(s, who):
+    TODAY = testclock.today().isoformat()
+    did = neg_final(s, who, -500)
+    d = s.get(B + f"{D}/{did}").json()
+    check(d.get("overpaid") == "595.00" and d.get("open") == "0.00" and d.get("state") in ("issued", "sent"),
+          f"{who}: to pay back 595.00 {d.get('overpaid')} {d.get('open')} {d.get('state')}")
+    r = s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 600})
+    check(r.status_code == 409, f"{who}: a refund above the rest is refused {r.status_code}")
+    before = ustva(s, "y").get("kz", {}).get("81")
+    r = s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 200})
+    check(r.status_code == 201, f"{who}: a refund of 200 is booked " + r.text[:200])
+    d = s.get(B + f"{D}/{did}").json()
+    amt = dbxm.q(DATA, "SELECT amount FROM office_payments WHERE doc_id=?", (did,))
+    check([float(x[0]) for x in amt] == [-200.0] and d.get("overpaid") == "395.00" and d.get("state") == "partial",
+          f"{who}: stored as -200, 395 left, partial {amt} {d.get('overpaid')} {d.get('state')}")
+    cf = s.get(B + O + f"/cashflow?from={TODAY[:7]}&months=1").json()
+    ent = [e for e in cf.get("entries", []) if e.get("kind") == "refund" and e.get("doc_id") == did]
+    check(ent and ent[0]["dir"] == "out" and ent[0]["amount"] == "200.00", f"{who}: cash flow: the refund goes out {ent}")
+    after = ustva(s, "y").get("kz", {}).get("81")
+    check(int(after) - int(before) in (-168, -169), f"{who}: cash basis: the refund lowers field 81 by 168 ({before} -> {after})")
+    check(s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 395}).status_code == 201, f"{who}: the rest refunded")
+    d = s.get(B + f"{D}/{did}").json()
+    check(d.get("status") == "paid" and d.get("overpaid") == "0.00", f"{who}: paid back in full = paid {d.get('status')} {d.get('overpaid')}")
+    d2 = neg_final(s, who, -100)
+    r = s.post(B + f"{D}/{d2}/credit")
+    check(r.status_code == 201, f"{who}: credit note draft on the negative final invoice " + r.text[:200])
+    cr = r.json()["id"]
+    r = s.post(B + f"{D}/{cr}/finalize")
+    check(r.ok, f"{who}: the (negative) credit note is finalised " + r.text[:200])
+    check(s.get(B + f"{D}/{d2}").json().get("status") == "cancelled", f"{who}: the negative final invoice is cancelled by it")
+
+
 r13b_office(A, f"org:{ORG}", "Alpha")
 r13b_office(Fr, "private", "Frida")
 fees(A, "Alpha")
 fees(Fr, "Frida")
+neg_rest(A, "Alpha")
+neg_rest(Fr, "Frida")
 
 print(f"p2545_c_buero: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

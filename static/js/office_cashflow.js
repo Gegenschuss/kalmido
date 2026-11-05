@@ -4,7 +4,7 @@
 // here, with a repeat. Server: kalmido/office/cashflow.py. No bank access.
 const RKF = {data: null, q: '', months: 3, from: '', open: null, fixed: null, agr: null, err: null, oid: null, basis: LS.get('cfBasis', 'gross') === 'net' ? 'net' : 'gross', check: null};  // 2.67.0 (#1838): basis, check
 const RK_CF_KINDS = {payment: N_('Payment'), credit: N_('Refund on a credit note'), invoice: N_('Invoice'), offer: N_('Quotation, not yet invoiced'),
-  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow'), agreement: N_('Contract or insurance'), receipt: N_('Receipt'), card: N_('Card fee without receipt'), fee: N_('Reminder fee')};  // 2.545.0 (#4387): fee; 2.91.0 A (#1923): series; 2.92.0 A (#1925): agreement; 2.114.1 B (#2018): receipt; 2.536.0 (#4334): card
+  purchase: N_('Purchase'), trip: N_('Travel expenses'), fixed: N_('Fixed cost'), series: N_('Invoice series|cashflow'), agreement: N_('Contract or insurance'), receipt: N_('Receipt'), card: N_('Card fee without receipt'), fee: N_('Reminder fee'), refund: N_('Refund on a final invoice')};  // 2.545.0 (#4387): fee, refund; 2.91.0 A (#1923): series; 2.92.0 A (#1925): agreement; 2.114.1 B (#2018): receipt; 2.536.0 (#4334): card
 const RK_CF_REPEATS = [['monthly', N_('monthly')], ['quarterly', N_('quarterly')], ['yearly', N_('yearly')], ['once', N_('once')]];
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['cashflow', 'trend', N_('Cash flow'), 1, () => rk_cashflowHtml(), 'money', 'money.cashflow']);  // admins only; 2.380 F (#3411): [6] the switch
 

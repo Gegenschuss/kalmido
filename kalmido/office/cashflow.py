@@ -373,6 +373,10 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         if r is None:
             continue
         cr = r["kind"] == "credit"  # a refund paid on a credit note goes out
+        if not cr and dec(p["amount"]) < 0:  # 2.545.0 (#4387): the refund of a final invoice with a negative rest goes out
+            put(p["date"], "out", "actual", "refund", -dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
+                res=dec(p["amount"]) / _fx(r, home) * netf(r), number=r["number"], doc_id=r["id"])
+            continue
         put(p["date"], "out" if cr else "in", "actual", "credit" if cr else "payment", dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
             res=(-1 if cr else 1) * dec(p["amount"]) / _fx(r, home) * netf(r), number=r["number"], doc_id=r["id"])
     # in: 2.545.0 (#4387): paid reminder fees (actual, on the day they were marked paid; no VAT, the whole fee is net)

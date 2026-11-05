@@ -181,6 +181,11 @@ def inv_state(r, pm, today=None):
     p = pm.get(r["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
     gross = money(dec(t.get("gross") or 0))
     covered = p["paid"] + p["credits"]
+    if gross < 0 and r["kind"] == "invoice":  # 2.545.0 (#4387): a final invoice with a negative rest, mirrored (refunds are negative)
+        gross, covered = -gross, -covered
+        if covered >= gross:
+            return "paid"
+        return "partial" if p["paid"] < 0 else st
     if gross > 0 and covered >= gross:
         return "paid"
     if r["kind"] == "invoice":
@@ -216,16 +221,19 @@ def inv_refresh_paid(c, oid, did):
     p = pm.get(did) or {"paid": Decimal(0), "credits": Decimal(0)}
     ts = iso(now_utc())
     from .abschlag import abs_skonto_covered  # 2.120.0 A (#2087): paid in time less the cash discount = paid
+    neg = gross < 0 and r["kind"] == "invoice"
+    if neg:  # 2.545.0 (#4387): a final invoice with a negative rest: refunds (negative payments) and a negative credit note
+        gross, p = -gross, {"paid": -p["paid"], "credits": -p["credits"]}  # (the cancellation) mirrored, the same rules
     if gross > 0 and not p["paid"] and p["credits"] >= gross and r["kind"] == "invoice":
         # 2.190.0 D (#2496): covered by credit notes alone = cancelled like one full credit note (paid needs a payment)
         c.execute("UPDATE office_docs SET status='cancelled', paid_at=NULL, updated_at=? WHERE id=? AND org_id=?", (ts, did, oid))
         ofx_log(c, oid, "status", doc_id=did, detail={"before": {"status": r["status"]}, "after": {"status": "cancelled"}})
         inv_cancel_fees(c, oid, did)  # 2.355.0 D (#2846)
-    elif gross > 0 and p["paid"] and (p["paid"] + p["credits"] >= gross or abs_skonto_covered(c, oid, r, p["credits"])):
+    elif gross > 0 and p["paid"] and (p["paid"] + p["credits"] >= gross or (not neg and abs_skonto_covered(c, oid, r, p["credits"]))):
         if r["status"] != "paid":
             c.execute("UPDATE office_docs SET status='paid', paid_at=?, updated_at=? WHERE id=? AND org_id=?", (ts, ts, did, oid))
             from ..integrations.webhooks import who_note
-            if r["kind"] == "invoice":  # 2.354.0 D (#2837): a refunded credit note is no paid invoice
+            if r["kind"] == "invoice" and not neg:  # 2.354.0 D (#2837): a refunded credit note is no paid invoice (2.545.0: nor a refunded final invoice)
                 who_note("invoice.paid", "invoice", did)  # 2.115.0 A (#2061): the payments reached the total
     elif r["status"] == "paid":
         c.execute("UPDATE office_docs SET status=?, paid_at=NULL, updated_at=? WHERE id=? AND org_id=?",
@@ -368,7 +376,8 @@ def inv_before_finalize(c, oid, r, s, pack):
     # 2.190.0 D (#2496): a negative total is booked as a credit note, never finalised. 2.190.0 R (#2496): except a final
     # invoice (progress invoices above the work done leave a negative rest; a credit note needs a finalised invoice)
     if r["kind"] in ("invoice", "credit") and _col(r, "inv_type") != "final":
-        if money(dec(doc_totals(c, oid, r).get("gross") or 0)) < 0:
+        g_ = money(dec(doc_totals(c, oid, r).get("gross") or 0))
+        if g_ < 0 and not (r["kind"] == "credit" and inv_neg_final_floor(c, oid, r) <= g_):
             raise BadKey(N_("A negative total can only be finalised as a credit note with positive amounts"))
     if r["kind"] == "invoice" and not _col(r, "due_date"):
         days = _col(r, "payment_days")
@@ -376,6 +385,21 @@ def inv_before_finalize(c, oid, r, s, pack):
             days = int(s.get("payment_days") or 14)
         d = date.fromisoformat(r["date"]) + timedelta(days=int(days))
         c.execute("UPDATE office_docs SET due_date=?, payment_days=? WHERE id=? AND org_id=?", (d.isoformat(), int(days), r["id"], oid))
+
+
+def inv_neg_final_floor(c, oid, r):
+    """2.545.0 (#4387): credit note r on a final invoice with a negative rest (progress invoices above the work done) may be
+    negative itself -- it cancels that rest -- down to the invoice's gross less the credit notes already on it; else 0 (a
+    credit note stays positive)."""
+    cid = _col(r, "cancels_id")
+    inv_ = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='invoice'", (cid, oid)).fetchone() if cid else None
+    if inv_ is None or _col(inv_, "inv_type") != "final" or not ofx_locked(inv_):
+        return Decimal(0)
+    gross = money(dec(_j(inv_["totals"], {}).get("gross") or 0))
+    if gross >= 0:
+        return Decimal(0)
+    p = inv_paid_map(c, oid, [inv_["id"]]).get(inv_["id"]) or {"paid": Decimal(0), "credits": Decimal(0)}
+    return min(gross - p["credits"] - p["paid"], Decimal(0))
 
 
 def inv_check_date(c, oid, r, s):
@@ -1564,7 +1588,10 @@ def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None, typed=False):
             return None
     r = doc_row(c, oid, did)
     refund = r["kind"] == "credit" and ofx_locked(r) and r["status"] not in ("cancelled", "paid")  # 2.354.0 D (#2837): the refund
-    if not refund and (r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid")):
+    # 2.545.0 (#4387): a final invoice with a negative rest: the payment is the refund to the customer, booked negative
+    neg = (r["kind"] == "invoice" and ofx_locked(r) and r["status"] not in ("cancelled", "paid")
+           and money(dec(_j(r["totals"], {}).get("gross") or 0)) < 0)
+    if not refund and not neg and (r["kind"] != "invoice" or not ofx_locked(r) or r["status"] in ("cancelled", "paid")):
         raise DeniedKey(409, N_("Payments go on finalised, open invoices only"))  # 2.469.0 (#3459): payonline._why reads the key
     amt = dec(b.get("amount"), "NaN") if b.get("amount") not in (None, "") else Decimal("NaN")
     if amt.is_nan() or amt <= 0 or amt > Decimal("100000000"):
@@ -1581,6 +1608,10 @@ def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None, typed=False):
             write_lock(c, f"office_credits_{int(r['cancels_id'])}")
         if money(amt) > inv_refund_open(c, oid, r):  # 2.354.0 D (#2837): only what the customer paid beyond the invoice
             raise Denied(409, tr("The refund exceeds what is to be paid back"))
+    elif neg:
+        if money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["overpaid"]):
+            raise Denied(409, tr("The refund exceeds what is to be paid back"))
+        amt = -amt  # 2.545.0 (#4387): money out, as a refund on a credit note lowers the income (books._pay_parts)
     elif money(amt) > dec(inv_money_fields(r, inv_paid_map(c, oid, [did]))["open"]):
         raise DeniedKey(409, N_("The payment exceeds the open amount"))  # 2.469.0 (#3459)
     method = b.get("method") or "transfer"
@@ -1591,7 +1622,7 @@ def inv_pay_add(c, oid, uid, did, b, ref=None, online_ref=None, typed=False):
                     (oid, did, d, float(money(amt)), method, note, uid, iso(now_utc()), ref, online_ref))
     inv_refresh_paid(c, oid, did)
     ofx_log(c, oid, "payment", doc_id=did, detail={"id": pid, "date": d, "amount": dstr(amt), "method": method})
-    if not refund:
+    if not refund and not neg:
         from .dunning import dun_paid_news
         dun_paid_news(c, oid, r, uid)  # 2.367.4 (#2972)
     return pid

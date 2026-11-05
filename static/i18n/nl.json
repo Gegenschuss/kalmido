@@ -16276,6 +16276,7 @@
   "Receipts with reverse charge (section 13b): base {0} / {1}, tax and input tax {2} each. They are not on the lines above yet; please enter them in the section 13b part of the form.": "Bonnen met verlegging (§ 13b): grondslag {0} / {1}, belasting en voorbelasting elk {2}. Ze staan nog niet in de regels hierboven; vul ze in bij het deel § 13b van het formulier.",
   "Reminder fees received (not taxable)": "Ontvangen aanmaningskosten (niet belastbaar)",
   "Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document": "Vaste vergoeding voor te late betaling (art. 288 (5) BGB), min de aanmaningskosten",
+  "Refund on a final invoice": "Terugbetaling op een eindfactuur",
   "Tasks are made from a quotation only": "Taken worden alleen uit een offerte gemaakt",
   "New|position": "Nieuw",
   "Changed by hand": "Met de hand gewijzigd",

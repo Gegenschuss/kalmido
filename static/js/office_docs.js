@@ -402,7 +402,14 @@ function ofdPayList(d, adm) {  // 2.354.0 D (#2837): also the refunds of a credi
   const ps = d.payments || [];
   return ps.length ? `<ul class="ofdits ofdpays" role="list">${ps.map(p => `<li class="ofdit ofdpay"><span class="ofdpos muted">${ic('check', 's')}</span><span class="ofcn"><b>${esc(ofdMoney(p.amount, d))}</b><small class="muted">${esc([p.reverses_id ? tr('Reversal') : p.reversed ? tr('Reversed') : '', p.date ? fmtDateLoc(p.date) : '', tr(p.method === 'online' ? OFD_PAY_ONLINE : OFD_PAY.find(x => x[0] === p.method)?.[1] || p.method), p.note, p.created_by_name].filter(Boolean).join(' · '))}</small></span>${adm && !p.reverses_id && !p.reversed ? `<button type="button" class="ib" data-ofd="pay-del" data-pid="${p.id}" aria-label="${esc(tr('Reverse payment'))}" title="${esc(tr('Reverse payment'))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>` : '';
 }
+// 2.545.0 (#4387): a final invoice with a negative rest (progress invoices above the work done): its payments are refunds
+const ofdNegRest = d => d.kind === 'invoice' && d.locked && +(d.totals?.gross || 0) < 0;
 function ofdPaymentsHtml(d, adm) {
+  if (ofdNegRest(d) && d.status !== 'cancelled') {
+    const sum = `<p class="ofdpaysum"><span>${tr('Paid back: {0}', ofdMoney(Math.abs(+d.paid || 0), d))}</span><b>${tr('To pay back: {0}', ofdMoney(d.overpaid || 0, d))}</b></p>`;
+    return (ofdPayList(d, adm) || `<p class="muted">${tr('No refund booked yet.')}</p>`) + sum
+      + (adm && +d.overpaid > 0 ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record refund')}</span></button>` : '');
+  }
   const list = ofdPayList(d, adm) || `<p class="muted">${tr('No payments yet.')}</p>`;
   const sum = `<p class="ofdpaysum"><span>${tr('Paid: {0}', ofdMoney(d.paid || 0, d))}</span>${+d.credits ? `<span>${tr('Credited: {0}', ofdMoney(d.credits, d))}</span>` : ''}<b>${tr('Open: {0}', ofdMoney(d.open || 0, d))}</b>${+d.overpaid > 0 && !(d.credits_of || []).length ? `<b>${tr('To pay back: {0}', ofdMoney(d.overpaid, d))}</b>` /* 2.355.0 A (#2847); 2.354.0 D (#2837): with credit notes the refund line below says it, less the refunds booked */ : ''}</p>`;
   const cr = (d.credits_of || []).length ? `<p class="muted ofchint">${tr('Credit notes')}: ${d.credits_of.map(c => `<a href="#office/invoices/${c.id}">${esc(c.number || tr('Draft'))}</a>`).join(', ')}</p>`
@@ -1105,9 +1112,9 @@ function ofdRefundsHtml(d, adm) {
   return list + sum + (adm && +d.refund_open > 0 ? `<button type="button" class="btn sm" data-ofd="pay">${ic('plus', 's')}<span>${tr('Record refund')}</span></button>` : '');
 }
 function ofdPaymentDialog(d) {
-  const rf = d.kind === 'credit';  // 2.354.0 D (#2837): a refund on a credit note
+  const rf = d.kind === 'credit' || ofdNegRest(d);  // 2.354.0 D (#2837): a refund on a credit note; 2.545.0 (#4387): on a negative final invoice
   ofdDlg(rf ? tr('Record refund') : tr('Record payment'), ofdF('p-date', tr('Date'), dateIn('ofd-p-date', today(), {label: tr('Date'), clear: false}))
-    + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(rf ? d.refund_open : d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
+    + ofdF('p-amount', tr('Amount'), `<span class="lacts"><input id="ofd-p-amount" inputmode="decimal" class="numin" value="${esc(ofdNumIn(d.kind === 'credit' ? d.refund_open : rf ? d.overpaid : d.open))}" maxlength="14"><span class="muted">${ofcSym(d.currency)}</span></span>`)
     + ofdF('p-method', tr('Method'), ofcSel('ofd-p-method', 'transfer', OFD_PAY.map(([v, n]) => [v, tr(n)]))) + ofdF('p-note', tr('Note'), `<input id="ofd-p-note" maxlength="500">`),
     tr('Record'), async md => { const j = await ofdRefCall(`pay${d.id}`, ref => ofdSave('POST', `/api/office/docs/${d.id}/payments`, {date: $('#ofd-p-date', md).value, amount: ofcNum($('#ofd-p-amount', md).value), method: $('#ofd-p-method', md).value, note: $('#ofd-p-note', md).value, client_ref: ref})); if (!j) return false; toast(rf ? tr('Refund recorded') : j.state === 'paid' ? tr('Paid in full') : tr('Payment recorded')); });
 }

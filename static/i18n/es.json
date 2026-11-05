@@ -16276,6 +16276,7 @@
   "Receipts with reverse charge (section 13b): base {0} / {1}, tax and input tax {2} each. They are not on the lines above yet; please enter them in the section 13b part of the form.": "Recibos con inversión del sujeto pasivo (§ 13b): base {0} / {1}, impuesto e IVA soportado {2} cada uno. Aún no figuran en las líneas de arriba; introdúcelos en la parte del § 13b del formulario.",
   "Reminder fees received (not taxable)": "Gastos de reclamación cobrados (no sujetos)",
   "Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document": "Indemnización fija por demora (art. 288 (5) BGB), menos los gastos de reclamación",
+  "Refund on a final invoice": "Reembolso de una factura final",
   "Tasks are made from a quotation only": "Las tareas solo se crean a partir de un presupuesto",
   "New|position": "Nuevo",
   "Changed by hand": "Cambiado a mano",
