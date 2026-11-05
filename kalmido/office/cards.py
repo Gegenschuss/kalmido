@@ -18,7 +18,6 @@ from flask import Response, jsonify, request
 
 from ..collab.comments import user_names
 from ..core.access import Denied
-from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.config import app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput
@@ -38,6 +37,10 @@ from .model import office_ctx, office_ctx_admin, office_role, pb_owner
 from .periodlock import period_need_open, pl_is_locked
 from .rights import LV, ofr_allows, ofr_need_area, ofr_rights
 from .bank import _norm, BNK_LIST_MAX  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+
+ow_kind("office_cc_card", "office_cc_cards")
+ow_kind("office_cc_line", "office_cc_lines")
 
 CC_PROVIDERS = {"mastercard": "Mastercard"}
 CC_KINDS = ("purchase", "fee", "credit")
@@ -180,18 +183,21 @@ def cc_add():
 
 @app.patch("/api/office/cards/<int:cid>")
 def cc_patch(cid):
+    """2.567.0 D (#4711): through office/owrite.py ow_write -- lock, version (409 with the card under "current"), only the
+    fields that change (an empty text and none are the same), history, updated_by, bump."""
     c, uid, oid = office_ctx_admin()
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    write_lock(c, f"office_cc_cards-{int(cid)}")  # 2.560.0 D (#4700): the merge of the stored card and the body under the row's lock
-    cur = cc_card_row(c, oid, cid)
-    ccf_check(b, cur["updated_at"], "row", lambda: _card_public(c, oid, cur))  # saved elsewhere meanwhile: 409 with the card, never overwritten
-    v = _card_fields(c, oid, b, cur)
-    row = oc_enc_fields(c, oid, "office_cc_cards", dict(v))
-    c.execute(f"UPDATE office_cc_cards SET {', '.join(k + '=?' for k in row)}, updated_at=? WHERE id=? AND org_id=?", (*row.values(), iso(now_utc()), cid, oid))
-    ofx_log(c, oid, "update", target="cards", detail={"card": cid})
-    bump(c)
+
+    def clean(c, b, cur):
+        v = _card_fields(c, oid, b, cur)
+        return {k: x for k, x in v.items() if (x or None) != (cur.get(k) or None)}
+    _, changed = ow_write(c, uid, "office_cc_card", cid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
+                          dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_cards", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_cards", v),
+                          public=lambda c, cur: _card_public(c, oid, cur))
+    if changed:
+        ofx_log(c, oid, "update", target="cards", detail={"card": cid})
     c.commit()
     return jsonify(_card_public(c, oid, cc_card_row(c, oid, cid)))
 

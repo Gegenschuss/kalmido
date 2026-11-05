@@ -12,7 +12,6 @@ from datetime import date
 from flask import jsonify, request
 
 from ..core.access import Denied
-from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.config import app
 from ..core.db import body, bump, iso, now_utc
 from ..core.errors import BadInput
@@ -30,6 +29,7 @@ from .model import office_settings
 from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
 from .rcsubmit import rsb_ingest
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer (kind office_cc_line: cards.py)
 
 CL_DAYS = 10  # +- days around a position that count as "date close"
 CL_SCAN = 5000  # newest documents looked at
@@ -200,7 +200,8 @@ def cl_add(sid):
 @app.patch("/api/office/cards/lines/<int:lid>")
 def cl_patch(lid):
     """{state: open|noreceipt|private} marks a position of a confirmed statement (not a matched one); the fields of POST
-    change a position of a draft."""
+    change a position of a draft. 2.567.0 D (#4711): through ow_write (lock, version: 409 with the position under "current",
+    only the columns that change, history, updated_by, bump)."""
     c, uid, oid, every = cc_ctx()
     write_lock(c, f"office_cc_{oid}")
     x, s = cl_row(c, oid, lid, uid, every)
@@ -208,24 +209,26 @@ def cl_patch(lid):
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    write_lock(c, f"office_cc_lines-{int(lid)}")  # 2.560.0 D (#4700): (under the office's card lock) the row's own, like the other office dialogs
-    ccf_check(b, x.get("updated_at"), "row", lambda: _public(c, x))  # saved elsewhere meanwhile: 409 with the position, never overwritten
-    ts = iso(now_utc())
-    if "state" in b:
-        if b["state"] not in ("open", "noreceipt", "private"):
-            raise BadInput(tr("Invalid value: {0}", "state"))
-        if x["state"] == "matched":
-            raise Denied(409, tr("This position has its receipt; undo the match first"))
-        c.execute("UPDATE office_cc_lines SET state=?, updated_at=? WHERE id=? AND org_id=?", (b["state"], ts, lid, oid))
-    keys = {k for k in b if k not in ("state", "expect_updated_at")}  # 2.560.0 D (#4700): the version is no field
-    if keys:
-        _draft(s)
-        v = _fields(b, {k: x[k] for k in ("day", "merchant", "amount", "orig_amount", "orig_currency", "kind")})
-        cc_writable(c, oid, s, v["day"])
-        row = oc_enc_fields(c, oid, "office_cc_lines", {"merchant": v["merchant"], "amount": dstr(v["amount"]), "orig_amount": dstr(v["orig_amount"]) if v["orig_amount"] is not None else ""})
-        c.execute("UPDATE office_cc_lines SET day=?, merchant=?, amount=?, orig_amount=?, orig_currency=?, kind=?, state=?, updated_at=? WHERE id=? AND org_id=?",
-                  (v["day"], row["merchant"], row["amount"], row["orig_amount"], v["orig_currency"], v["kind"], "noreceipt" if v["kind"] == "fee" else "open", ts, lid, oid))
-    bump(c)
+
+    def clean(c, b, cur):
+        out = {}
+        if "state" in b:
+            if b["state"] not in ("open", "noreceipt", "private"):
+                raise BadInput(tr("Invalid value: {0}", "state"))
+            if cur["state"] == "matched":
+                raise Denied(409, tr("This position has its receipt; undo the match first"))
+            out["state"] = b["state"]
+        if {k for k in b if k not in ("state", "expect_updated_at")}:  # 2.560.0 D (#4700): the version is no field
+            _draft(s)
+            base = {k: cur[k] for k in ("day", "merchant", "orig_currency", "kind")}
+            base.update(amount=money(dec(cur["amount"], "0")), orig_amount=money(dec(cur["orig_amount"])) if cur["orig_amount"] else None)
+            v = _fields(b, base)
+            cc_writable(c, oid, s, v["day"])
+            out.update(day=v["day"], merchant=v["merchant"], amount=dstr(v["amount"]), orig_amount=dstr(v["orig_amount"]) if v["orig_amount"] is not None else "",
+                       orig_currency=v["orig_currency"], kind=v["kind"], state="noreceipt" if v["kind"] == "fee" else "open")
+        return {k: z for k, z in out.items() if (z or None) != (cur.get(k) or None)}
+    ow_write(c, uid, "office_cc_line", lid, b, clean, oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_lines", r),
+             enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_lines", v), public=lambda c, cur: _public(c, cl_row(c, oid, lid, uid, every)[0]))
     c.commit()
     return _answer(c, oid, uid, lid, every)
 
