@@ -4,6 +4,7 @@
 //   waits for the real id (no request with the stand-in id), then lands in the real section; no GET /api/state follows
 // - a refused new section is taken back with the server's message
 // - a deleted section is gone at once (its task stays without a section); a refusal (500) brings it back with its task
+// - kanban: a task dropped into the new column before the answer waits for the real id and lands in the real section
 // - a person without an organisation (freelancer parity): the new section shows at once, too
 // The held answers wait in the page (window.fetch wrapped) until the test lets them go: every wait is on a real state.
 const {execFileSync} = require('child_process');
@@ -38,7 +39,7 @@ const noState = w => !w.__log.some(k => /^GET \/api\/state\b/.test(k) && !/[?&]a
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
-  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', modules: []});
+  await call(CA, 'POST', '/api/admin/setup', {lang: 'en', modules: ['kanban']});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done'});
   const L = (await call(CA, 'POST', '/api/lists', {name: 'Kitchen'})).id;
   const S1 = (await call(CA, 'POST', '/api/sections', {list_id: L, name: 'Now'})).id;
@@ -99,6 +100,24 @@ const noState = w => !w.__log.some(k => /^GET \/api\/state\b/.test(k) && !/[?&]a
   check(noState(w), 'delete: no GET /api/state');
   unhold(w);
   w.close();
+
+  // ================= kanban: a task dropped into the new column while it waits for its id lands in the real section
+  await call(CA, 'PATCH', `/api/lists/${L}`, {view: 'kanban'});
+  const wk = await boot({user: 'alice', hash: 'l/' + L}), dk = wk.document;
+  const col = name => [...dk.querySelectorAll('#view .kcol[data-kcol]')].find(c => c.textContent.includes(name));
+  check(await until(() => dk.querySelector(`#view .kcol .trow[data-id="${T2}"]`)), 'kanban: the board shows the task');
+  await hold(wk, /^POST \/api\/sections$/);
+  wk.eval(`window.__p = sectionCreate(${L}, 'Column X')`);
+  check(await until(() => wk.__held.length === 1 && +(col('Column X')?.dataset.kcol || 0) < 0), 'kanban: the new column shows before the answer');
+  wk.eval(`window.__m = dropTask0(${T2}, [...document.querySelectorAll('#view .kcol[data-kcol]')].find(c => c.textContent.includes('Column X')), 0)`);
+  await sleep(0);
+  check(!wk.__log.some(k => /\/api\/tasks\/(reorder|\d+)$/.test(k) && !/^GET/.test(k)), 'kanban: the drop waits for the real id');
+  wk.__held[0].go(); await wk.eval('window.__p'); await wk.eval('window.__m');
+  const colX = (await secs()).find(s => s.name === 'Column X')?.id;
+  check(colX > 0 && await until(async () => (await call(CA, 'GET', `/api/tasks/${T2}`)).section_id === colX), 'kanban: the task is in the real column on the server');
+  check(!wk.__log.some(k => /\/-\d+/.test(k)), 'kanban: no request carried the stand-in id: ' + wk.__log.join(' | '));
+  unhold(wk);
+  wk.close();
 
   // ================= a person without an organisation: the new section at once
   await call(CA, 'POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});

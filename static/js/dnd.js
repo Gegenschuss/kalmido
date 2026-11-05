@@ -71,6 +71,10 @@ async function dropTask0(id, el, clientY) {
   $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop'));
   document.body.classList.remove('tdrag');
   if (el.closest('#detail')) return;
+  // 2.559.0 (#4659): dropped into a section still on its way (a kanban column, a row under its header): its real id first,
+  // into the element the drop reads it from (taskToSection waits by itself)
+  { const gh = !kcol && row?.closest('.group')?.querySelector('.ghead[data-section]'), at = kcol ? [kcol, 'kcol'] : gh ? [gh, 'section'] : null;
+    if (at && +at[0].dataset[at[1]] < 0) { const r = await secReal(+at[0].dataset[at[1]]); if (!r) return; at[0].dataset[at[1]] = r; } }
   if (await mbDropHook(t, el)) return;  // 2.156.0 C (#2072): the board of My tasks (its column = date / priority / list)
   if (await ml_drop(t, {sec, kcol, row, side, cell, wcol, wad, quad, y: clientY})) return;  // 2.71.0 B (#1459): in a further list only the link moves
   if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
