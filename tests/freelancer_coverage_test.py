@@ -1235,7 +1235,6 @@ DELETE /api/tasks/{}/contacts/{}
 DELETE /api/tasks/{}/enc-note
 DELETE /api/tasks/{}/links/{}
 DELETE /api/tasks/{}/note-lock
-DELETE /api/tasks/{}/waiting
 DELETE /api/v1/address-books/{}
 DELETE /api/v1/address-books/{}/members/{}
 DELETE /api/v1/attachments/{}
@@ -1270,9 +1269,7 @@ DELETE /api/v1/time/timer
 DELETE /api/v1/trash
 PATCH /api/books/{}/org
 PATCH /api/budget/recurring/{}
-PATCH /api/calendars/{}
 PATCH /api/calendars/{}/events
-PATCH /api/comments/{}
 PATCH /api/docs/labels/{}/{}
 PATCH /api/family/rewards/{}
 PATCH /api/filters/{}
@@ -1301,7 +1298,6 @@ PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}
 PATCH /api/v1/event-calendars/{}
-PATCH /api/v1/events/{}
 PATCH /api/v1/family/rewards/{}
 PATCH /api/v1/fields/{}
 PATCH /api/v1/filters/{}
@@ -1312,7 +1308,6 @@ PATCH /api/v1/lists/{}/milestones/{}
 PATCH /api/v1/lists/{}/tags/{}
 PATCH /api/v1/me/notifications
 PATCH /api/v1/notepads/{}
-PATCH /api/v1/office/leads/{}
 PATCH /api/v1/sections/{}
 PATCH /api/v1/team/messages/{}
 PATCH /api/v1/templates/{}
@@ -1536,7 +1531,6 @@ POST /api/v1/lists/{}/tags
 POST /api/v1/me/purpose
 POST /api/v1/news/read
 POST /api/v1/notes/{}/restore
-POST /api/v1/office/leads
 POST /api/v1/tasks/{}/approval
 POST /api/v1/tasks/{}/attachments
 POST /api/v1/tasks/{}/attachments/text
@@ -1594,7 +1588,6 @@ PUT /api/supporter/{}
 PUT /api/tasks/{}/bell
 PUT /api/tasks/{}/enc-note
 PUT /api/tasks/{}/note-lock
-PUT /api/tasks/{}/waiting
 PUT /api/v1/address-books/{}/members/{}
 PUT /api/v1/contacts/{}/care
 PUT /api/v1/event-calendars/{}/members/{}
