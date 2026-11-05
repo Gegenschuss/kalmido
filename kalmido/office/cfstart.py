@@ -28,6 +28,10 @@ from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
 from .model import office_settings  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance and a correction go into the office trash
+
+CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash
+OTB_UNDO[CFS_TRASH_START] = OTB_UNDO[CFS_TRASH_ADJ] = _ctx  # the toast's undo: the office admin, as deleting them
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
 
 CFS_DIRS = ("in", "out")
@@ -102,13 +106,16 @@ def cfs_start_put():
 
 @app.delete("/api/office/cashflow/start")
 def cfs_start_delete():
-    """Office admin. Removes the start balance (the cash flow is as before it) -> {ok, prev}."""
+    """Office admin. Removes the start balance (the cash flow is as before it) -> {ok, prev, trash_id}. 2.567.0 (#4707): a
+    copy goes into the office trash first (the undo: POST /api/office/trash/undo/cf_start/<trash_id>); none set: trash_id null."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_cfs_{int(oid)}")
     prev = cfs_start(c, oid)
+    tid = otb_put(c, oid, uid, CFS_TRASH_START, "office_cf_start", oid, (prev or {}).get("day") or "", key="org_id") if prev else None  # label: the day (the amount is sealed)
     c.execute("DELETE FROM office_cf_start WHERE org_id=?", (oid,))
     bump(c)
     c.commit()
-    return jsonify(ok=True, prev=prev)
+    return jsonify(ok=True, prev=prev, trash_id=tid)
 
 
 # ---------------------------------------------------------------- corrections by hand
@@ -187,13 +194,16 @@ def cfs_adjust_patch(aid):
 
 @app.delete("/api/office/cashflow/adjust/<int:aid>")
 def cfs_adjust_delete(aid):
-    """Deletes a correction; answers it as it was (the client's undo posts it again)."""
+    """Deletes a correction; answers it as it was and 2.567.0 (#4707) its office trash id (the client's undo writes the copy
+    back, POST /api/office/trash/undo/cf_adjust/<trash_id>)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_cf_adjust-{int(aid)}")
     old = _adj_public(c, oid, _adj_row(c, oid, aid))
+    tid = otb_put(c, oid, uid, CFS_TRASH_ADJ, "office_cf_adjust", aid, old["month"])  # label: the month (amount and note are sealed)
     c.execute("DELETE FROM office_cf_adjust WHERE id=? AND org_id=?", (aid, oid))
     bump(c)
     c.commit()
-    return jsonify(ok=True, item=old)
+    return jsonify(ok=True, item=old, trash_id=tid)
 
 
 # ---------------------------------------------------------------- the real balance at the end of a month

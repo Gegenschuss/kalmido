@@ -300,9 +300,9 @@ function cfs_modal(a, mo) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/cashflow/adjust/${a.id}`); md.remove(); rk_cfReload();
-        let id = a.id;
-        offerUndo(tr('Deleted'), histAdd({label: tr('Correction deleted'), undo: async () => { id = (await api('POST', '/api/office/cashflow/adjust', keep(j.item))).id; rk_cfReload(); },
-          redo: async () => { await api('DELETE', `/api/office/cashflow/adjust/${id}`); rk_cfReload(); }}));
+        let id = a.id, tid = j.trash_id || null;  // 2.567.0 (#4707): the undo writes the office trash copy back (same id)
+        offerUndo(tr('Deleted'), histAdd({label: tr('Correction deleted'), undo: async () => { if (tid) await api('POST', `/api/office/trash/undo/cf_adjust/${tid}`); else id = (await api('POST', '/api/office/cashflow/adjust', keep(j.item))).id; rk_cfReload(); },
+          redo: async () => { tid = (await api('DELETE', `/api/office/cashflow/adjust/${id}`)).trash_id || null; rk_cfReload(); }}));
         return;
       }
       const v = id => $(id, md)?.value ?? '';
@@ -371,9 +371,12 @@ function cfs_settingsHtml() {
     ${st === undefined ? `<p class="muted">${tr('Loading…')}</p>` : `${ofcRowF('cfs-amount-set', tr('Starting balance'), `<span class="lacts">${ofcIn('cfs-amount-set', st ? fmtNum(+st.amount, 2) : '', {num: true, ph: tr('optional')})}<span class="muted">${ofcSym(ofcHome())}</span></span>`)}
     <div class="row"><label id="cfs-dayl">${tr('Reference date')}</label>${dateIn('cfs-day', st?.day || CFS.day || today(), {label: tr('Reference date'), clear: false})}</div>`}</section>`;
 }
-async function cfs_startSet(v) {
-  CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (await api('DELETE', '/api/office/cashflow/start'), null);
+async function cfs_startSet(v, tid) {  // 2.567.0 (#4707): -> the office trash id of a removed start balance; tid: its undo writes that copy back
+  let out = null;
+  if (tid) CFS.st = (await api('POST', `/api/office/trash/undo/cf_start/${tid}`), (await api('GET', '/api/office/cashflow/start')).start);
+  else CFS.st = v ? (await api('PUT', '/api/office/cashflow/start', {amount: v.amount, day: v.day})).start : (out = (await api('DELETE', '/api/office/cashflow/start')).trash_id || null, null);
   CFS.day = ''; RKF.data = null; const sec = $('.cfsset'); if (sec) sec.outerHTML = cfs_settingsHtml();
+  return out;
 }
 document.addEventListener('change', async e => {
   const t = e.target; if (!(t.id === 'cfs-amount-set' || t.id === 'cfs-day') || !t.closest?.('.cfsset')) return;
@@ -382,8 +385,9 @@ document.addEventListener('change', async e => {
   const was = CFS.st ? {amount: CFS.st.amount, day: CFS.st.day} : null, now = amount == null ? null : {amount: String(amount), day};
   if (!was && !now) { CFS.day = day; return; }  // nothing saved yet: the office settings redraw when a part finished loading, the picked day stays
   if (was && now && +was.amount === +now.amount && was.day === now.day) return;
-  try { await cfs_startSet(now); } catch (x) { toast(x.message || tr('unknown')); return; }
-  offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was), redo: () => cfs_startSet(now)}));
+  let tid = null;
+  try { tid = await cfs_startSet(now); } catch (x) { toast(x.message || tr('unknown')); return; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Starting balance changed'), undo: () => cfs_startSet(was, tid), redo: async () => { tid = await cfs_startSet(now); }}));
 });
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.id === 'cfs-amount-set') { e.preventDefault(); e.stopPropagation(); x.blur(); } }, true);  // never the settings form's submit
 
