@@ -212,6 +212,9 @@ def otb_restore_route(tid):
     t0 = c.execute("SELECT deleted_at FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
     notes = {}
     kind, ref = otb_restore(c, oid, tid, notes)
+    if kind == "equipment":  # 2.558.0 C (#4591): a restored device starts its warranty / maintenance tasks again
+        from .eqcare import eqc_sync
+        eqc_sync(c, oid, ref, revive=True)
     if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
         from .travel import rk_trash_check
         rk_trash_check(c, oid, kind, ref)

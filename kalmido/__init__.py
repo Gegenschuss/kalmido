@@ -413,6 +413,7 @@ ORDER = (
     "office.contractfiles",  # 2.117.0 B (#2285): PDF files of a framework contract (upload, view, replace, trash)
     "office.agrref",  # 2.351.0 B (#2749): framework contract PDFs and contracts & insurance in folders (reference kinds)
     "office.assets",  # 2.92.0 B (#1931): equipment value: purchase, depreciation, current value, insurance list
+    "office.eqcare",  # 2.558.0 C (#4591): warranty end and maintenance of equipment as tasks (no routes)
     "office.bpread",  # 2.120.0 E (#2091): the PDF reader of the own letterhead (no routes, no kalmido imports)
     "office.letterhead",  # 2.120.0 E (#2091): the own letterhead behind the office documents (upload, margins, preview)
     "files.officeprev",  # 2.92.0 C (#1926): preview + text of .docx / .xlsx (limited worker), who can summarise a file

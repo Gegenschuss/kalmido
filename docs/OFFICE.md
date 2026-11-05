@@ -1352,6 +1352,17 @@ API (office admins; members 403, another office area 404): the fields go through
 admins also `afa_plan`, `afa_year`, `book_value`, `new_value_eff`, `current_value_eff`,
 `life_suggest`, `life_eff`, `agreement_name`. `GET /api/office/equipment/value` (sums and rows), `value.csv`, `value.pdf`
 (`?agreement_id=`, 0 = not insured), `GET /api/office/equipment/policies`, `GET /api/office/equipment/receipts[/<id>]`.
+
+**Warranty and maintenance (2.558).** As with a private device of *Home & life*, a device's editor (admins; without an
+organisation your personal office) has *Warranty and maintenance*: **Warranty until** becomes a task due on that day
+(a deadline, reminder 30 days before), every **maintenance** (inspection, service, calibration or other, an optional
+label, every N months, the next date) a repeating task (reminder 7 days before). New tasks go into the inbox of the admin
+who saves, nobody is assigned; moved to another list they stay there and still follow the device (name, date, interval).
+A date emptied, a maintenance taken out, the device archived or deleted: its task is done (never deleted); restored or
+taken out of the archive, the tasks start again. Members and agents never get these fields. API: `warranty_until`
+(`YYYY-MM-DD`, `""` = none) and `maint` (`[{id?, kind inspection|service|calibration|other, label?, every_months 1..120,
+next?, lead_days?}]`, the whole list) through the same `POST|PATCH` (with `expect_updated_at`); `GET` answers admins
+also `warranty_task` and per maintenance `task` (`{id, due, done}`).
 ## Logbook
 
 *Since 2.93.*

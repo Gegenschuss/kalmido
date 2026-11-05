@@ -204,6 +204,8 @@ def ast_enrich(c, oid, rows):
     for r in rows:
         r.update(ast_values(r, today))
         r["agreement_name"] = names.get(r.get("agreement_id")) or ""
+    from .eqcare import eqc_enrich  # 2.558.0 C (#4591): the warranty / maintenance tasks
+    eqc_enrich(c, rows)
     return rows
 
 

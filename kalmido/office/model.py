@@ -1065,13 +1065,14 @@ MD = {
     # money columns and the serial number encrypted at rest ("crypt": the orgcrypt FIELDS of the table)
     "equipment": {"table": "office_equipment", "order": "lower(category), lower(name), id", "label": "name", "crypt": "office_equipment",
                   "admin_cols": ("purchase_date", "purchase_net", "serial_no", "vendor", "receipt_node_id", "life_months", "new_value",
-                                 "current_value", "agreement_id", "afa_method"),
+                                 "current_value", "agreement_id", "afa_method", "warranty_until", "warranty_task_id", "maint"),  # 2.558.0 C (#4591)
                   "cols": {"name": ("str", True, NAME_MAX), "name_en": ("str", False, NAME_MAX), "category": ("str", False, 80),  # 2.45.1 (#1556): name_en
                            "daily_rate": ("num0", False, None), "archived": ("int01", False, None), "trans": ("trans", False, (("name",), NAME_MAX)),
                            "purchase_date": ("date", False, None), "purchase_net": ("money", False, None), "serial_no": ("str", False, 120),
                            "vendor": ("str", False, 120), "receipt_node_id": ("receipt", False, None), "life_months": ("months", False, None),
                            "new_value": ("money", False, None), "current_value": ("money", False, None), "agreement_id": ("agreement", False, None),
-                           "afa_method": ("choice", False, ("auto", "linear", "declining", "none"))}},  # 2.480.0 C (#3528): the depreciation per device; 2.536.0 (#4335): none
+                           "afa_method": ("choice", False, ("auto", "linear", "declining", "none")),
+                           "warranty_until": ("date", False, None), "maint": ("maint", False, None)}},  # 2.558.0 C (#4591): office/eqcare.py  # 2.480.0 C (#3528): the depreciation per device; 2.536.0 (#4335): none
     "sets": {"table": "office_sets", "order": "lower(name), id", "label": "name",
              "cols": {"name": ("str", True, NAME_MAX), "discount_pct": ("num", False, None), "items": ("items", False, None),
                       "archived": ("int01", False, None)}},
@@ -1128,12 +1129,12 @@ def _row_dict(kind, r, c=None, oid=None):
     if kind == "roles":  # the crew's columns are not part of a freelancer role
         for k in ("rate_day", "intext", "markup_pct"):
             d.pop(k, None)
-    for k in ("items", "rates", "trans"):  # 2.460.0 (#3767): trans
+    for k in ("items", "rates", "trans", "maint"):  # 2.460.0 (#3767): trans; 2.558.0 C (#4591): maint (a list)
         if k in d:
             try:
-                d[k] = json.loads(d[k]) if d[k] else ([] if k == "items" else {})
+                d[k] = json.loads(d[k]) if d[k] else ([] if k in ("items", "maint") else {})
             except ValueError:
-                d[k] = [] if k == "items" else {}
+                d[k] = [] if k in ("items", "maint") else {}
     for k in ("raw_fee", "producing", "archived", "raw_included"):
         if k in d:
             d[k] = int(d[k] or 0)
@@ -1275,6 +1276,9 @@ def _clean_col(c, oid, kind, k, v):
         except ValueError:
             raise BadInput(tr("Invalid value: {0}", k))
         return v
+    if typ == "maint":  # 2.558.0 C (#4591): [{kind, label?, every_months, next?, lead_days?, id?}]
+        from .eqcare import eqc_clean_maint
+        return eqc_clean_maint(v)
     if typ == "items":  # [{equipment_id, qty}]
         if v in (None, ""):
             return "[]"
@@ -1375,6 +1379,9 @@ def office_create(c, oid, kind, b):
         cols += ["created_at", "updated_at"]
         vals += [ts, ts]
     cur_id = insert_id(c, f"INSERT INTO {m['table']}({','.join(cols)}) VALUES({','.join('?' * len(cols))})", vals)
+    if kind == "equipment" and (b.get("warranty_until") or b.get("maint")):  # 2.558.0 C (#4591): the warranty / maintenance tasks
+        from .eqcare import eqc_sync
+        eqc_sync(c, oid, cur_id)
     return office_row(c, oid, kind, cur_id)
 
 
@@ -1424,6 +1431,9 @@ def office_update(c, oid, kind, rid, b):
             vals.append(iso_ms(now_utc()))  # 2.269.0 C (#3017): milliseconds, two saves in one second differ
         vals += [r["id"], oid]
         c.execute(f"UPDATE {m['table']} SET {', '.join(sets)} WHERE id=? AND org_id=?", vals)
+    if kind == "equipment" and sets and any(k in b for k in ("warranty_until", "maint", "archived", "name")):  # 2.558.0 C (#4591)
+        from .eqcare import eqc_sync
+        eqc_sync(c, oid, r["id"], before=r)
     return office_row(c, oid, kind, rid)
 
 
@@ -1511,6 +1521,9 @@ def office_delete(c, oid, kind, rid):
     """Deletes the row; when it is in use (documents, contracts, sets) it is archived instead. -> 'deleted' | 'archived'"""
     m = MD[kind]
     r = office_row(c, oid, kind, rid)
+    if kind == "equipment":  # 2.558.0 C (#4591): archived or deleted, its warranty / maintenance tasks end
+        from .eqcare import eqc_end
+        eqc_end(c, oid, r["id"])
     if office_in_use(c, kind, r["id"], oid):
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"

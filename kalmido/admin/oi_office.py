@@ -556,7 +556,8 @@ SPECS = [
     OiT("office/roles.json", "office_roles", refs={"import_run_id": "office_import_runs"}, private="office"),
     OiT("office/services.json", "office_services", refs={"role_id": "office_roles", "import_run_id": "office_import_runs"}, private="office"),
     OiT("office/agreements.json", "office_agreements", refs={"task_id": "tasks"}, late={"doc_node_id": "fs_nodes"}, people=_P, private="office"),
-    OiT("office/equipment.json", "office_equipment", refs={"agreement_id": "office_agreements", "import_run_id": "office_import_runs"},
+    OiT("office/equipment.json", "office_equipment", refs={"agreement_id": "office_agreements", "import_run_id": "office_import_runs",
+                                                           "warranty_task_id": "tasks"},  # 2.558.0 C (#4591)
         late={"receipt_node_id": "fs_nodes"}, private="office"),
     OiT("office/packages.json", "office_sets", private="office", prep=_p_sets),
     OiT("office/doc_templates.json", "office_doc_templates", people=_P, private="office"),

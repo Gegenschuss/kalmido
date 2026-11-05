@@ -60,7 +60,28 @@ function astFields(r) {
     ${ofcRowF('of-new_value', tr('New value'), ofcIn('of-new_value', astM(r?.new_value), {num: true, ph: astM(r?.purchase_net)}), tr('Default: the purchase price. Only for the insurance list: a value here is no expense and is not depreciated.'))}
     ${ofcRowF('of-current_value', tr('Current value'), ofcIn('of-current_value', astM(r?.current_value), {num: true, ph: astM(r?.book_value)}), tr('Current value = book value, unless you enter an own value.'))}
     ${ofcRowF('of-agreement_id', tr('Insured by'), ofcSel('of-agreement_id', r?.agreement_id, r?.agreement_id ? [[r.agreement_id, r.agreement_name || `#${r.agreement_id}`]] : [], tr('none')))}
-    ${astNote()}</details>${r?.id ? `<div class="astlink dlbox" id="ast-link" data-eq="${r.id}"></div>` : ''}`;  // 2.140.0 B (#2136): the private device link
+    ${astNote()}</details>${astCare(r)}${r?.id ? `<div class="astlink dlbox" id="ast-link" data-eq="${r.id}"></div>` : ''}`;  // 2.140.0 B (#2136): the private device link
+}
+// 2.558.0 C (#4591): warranty end + maintenance (office/eqcare.py) as with a private device: every date keeps a task (in the
+// inbox of whoever saves, with a reminder), a maintenance repeats every N months; the next date follows the task when it is done
+const AST_MK = () => [['inspection', tr('Inspection')], ['service', tr('Service|maintenance')], ['calibration', tr('Calibration')], ['other', tr('Other')]];
+const astTaskLink = t => t ? `<a class="muted ast-task" href="#t/${+t.id}">${ic('check', 's')} ${esc(t.done ? tr('Task done') : tr('Task due {0}', fmtDateLoc(t.due)))}</a>` : '';
+let astMn = 0;
+function astMaintRow(x) {
+  const n = ++astMn, nx = x?.task && !x.task.done ? x.task.due : (x?.next || '');
+  return `<div class="ast-mrow" data-mid="${esc(x?.id ?? '')}">${ofcSel(`ast-mk${n}`, x?.kind || 'inspection', AST_MK(), null, tr('Kind'))}
+    <input id="ast-ml${n}" class="ast-ml" value="${esc(x?.label || '')}" maxlength="80" placeholder="${esc(tr('Label (optional)'))}" aria-label="${esc(tr('Label (optional)'))}">
+    <label class="ast-me">${esc(tr('Every (months)'))} <input id="ast-me${n}" class="numin" inputmode="numeric" maxlength="3" value="${esc(x?.every_months ?? 12)}"></label>
+    ${dateIn(`ast-mn${n}`, nx, {label: tr('Next date'), attrs: 'data-ast-next="1"'})}
+    <button type="button" class="iconbtn" data-ast="m-del" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>${astTaskLink(x?.task)}</div>`;
+}
+function astCare(r) {
+  if (!ofcAdmin()) return '';
+  return `<details class="ast-sec ast-care" ${r?.warranty_until || r?.maint?.length ? 'open' : ''}><summary>${tr('Warranty and maintenance')}</summary>
+    <div class="row"><label id="of-warranty_untill">${tr('Warranty until')}</label>${dateIn('of-warranty_until', r?.warranty_until || '', {label: tr('Warranty until'), empty: tr('optional')})}${astTaskLink(r?.warranty_task)}</div>
+    <p class="muted">${esc(tr('Every date becomes a task in your inbox with a reminder; a maintenance repeats.'))}</p>
+    <div class="ast-maint">${(r?.maint || []).map(astMaintRow).join('')}</div>
+    <button type="button" class="btn sm" data-ast="m-add">${ic('plus', 's')} ${tr('Add maintenance')}</button></details>`;
 }
 // 2.480.0 C (#3528): declining depreciation is a choice for a purchase from 01.07.2025 to 31.12.2027 above the low-value limit
 // (the server checks the window as well). 2.536.0 (#4335): the choice is always there (linear / none), declining only then
@@ -87,6 +108,8 @@ function astBind(md, r) {
   md.addEventListener('click', e => {
     const b = e.target.closest('[data-ast]'); if (!b || !md.contains(b)) return;
     if (b.dataset.ast.startsWith('dl-')) { astLinkAct(md, b); return; }
+    if (b.dataset.ast === 'm-add') { $('.ast-maint', md)?.insertAdjacentHTML('beforeend', astMaintRow(null)); return; }  // 2.558.0 C (#4591)
+    if (b.dataset.ast === 'm-del') { b.closest('.ast-mrow')?.remove(); return; }
     if (b.dataset.ast === 'unlink') { $('#of-receipt_node_id', md).value = ''; $('#ast-rcname', md).innerHTML = `<span class="muted">${esc(tr('none'))}</span>`; b.hidden = true; }
     else if (b.dataset.ast === 'pick') modalSub(md, () => astPick(md));
   });
@@ -139,7 +162,9 @@ function astBody(md) {
   return {purchase_date: v('#of-purchase_date'), purchase_net: ofcNum(v('#of-purchase_net')), receipt_node_id: +v('#of-receipt_node_id') || null,
     vendor: v('#of-vendor'), serial_no: v('#of-serial_no'), life_months: ofcNum(v('#of-life_months')), new_value: ofcNum(v('#of-new_value')),
     current_value: ofcNum(v('#of-current_value')), agreement_id: +v('#of-agreement_id') || null,
-    afa_method: ['declining', 'none'].includes(v('#of-afa_method')) ? v('#of-afa_method') : 'auto'};  // 2.480.0 C (#3528); 2.536.0 (#4335): none
+    afa_method: ['declining', 'none'].includes(v('#of-afa_method')) ? v('#of-afa_method') : 'auto',  // 2.480.0 C (#3528); 2.536.0 (#4335): none
+    ...($('#of-warranty_until', md) ? {warranty_until: v('#of-warranty_until'), maint: $$('.ast-mrow', md).map(row => ({...(+row.dataset.mid ? {id: +row.dataset.mid} : {}),  // 2.558.0 C (#4591)
+      kind: $('select', row).value, label: $('.ast-ml', row).value.trim(), every_months: +$('.ast-me input', row).value || 12, next: $('[data-ast-next]', row)?.value || ''}))} : {})};
 }
 // one undo step for a saved device: the fields before back (members never edit)
 function astUndo(r, body) {
