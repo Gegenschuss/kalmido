@@ -73,7 +73,16 @@ function brl_edit(r, init) {
     try {
       if (r) await brl_put(r.id, body, r); else await brl_new({...body, apply_open: !!$('#brl-open', md)?.checked});
       md.remove();
-    } catch (x) { b.disabled = false; $('.aerr', md).textContent = x.message || tr('unknown'); }
+    } catch (x) {
+      b.disabled = false;
+      const el = $('.aerr', md);
+      if (r && x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-brl-reload>${tr('Reload')}</button>`;
+        $('[data-brl-reload]', el).addEventListener('click', () => { md.remove(); brl_load(); brl_edit(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || tr('unknown');
+    }
   });
   return md;
 }
@@ -90,10 +99,18 @@ async function brl_new(body) {
   return j;
 }
 async function brl_put(id, body, was) {
-  await api('PUT', `/api/office/bank/rules/${id}`, body); brl_stale(); brl_load();
-  offerUndo(tr('Saved'), histAdd({label: tr('Bank rule changed'),
-    undo: async () => { await api('PUT', `/api/office/bank/rules/${id}`, brl_body(was)); brl_load(); },
-    redo: async () => { await api('PUT', `/api/office/bank/rules/${id}`, body); brl_load(); }}));
+  // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten); undo / redo
+  // write only the keys this save changed, each with the version the step before left
+  const j = await (was?.updated_at ? rawFetch : api)('PUT', `/api/office/bank/rules/${id}`, was?.updated_at ? {...body, expect_updated_at: was.updated_at} : body); brl_stale(); brl_load();
+  const old = brl_body(was), now = brl_body(j.rule), ks = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
+  let ver = j.rule.updated_at;
+  const step = async src => {
+    try { ver = (await rawFetch('PUT', `/api/office/bank/rules/${id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).rule.updated_at; }
+    catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || tr('unknown')); }
+    brl_load();
+  };
+  if (!ks.length) { toast(tr('Saved')); return; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Bank rule changed'), undo: () => step(old), redo: () => step(now)}));
 }
 async function brl_on(id, on) {
   try { await api('PUT', `/api/office/bank/rules/${id}`, {active: on}); } catch (x) { toast(x.message || tr('unknown')); brl_load(); return; }

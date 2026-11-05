@@ -29,6 +29,7 @@ from ..core.i18n import tr
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..receipts.suggest import rc_categories
 from .bank import BNK_KINDS, IBAN_RE, _clean, _norm, _tx_dec
 from .books import bk_ws
@@ -324,7 +325,8 @@ def br_public(r):
     return {"id": r["id"], "name": r["name"], "counterpart": r["counterpart"] or "", "iban": r["iban"] or None, "purpose": r["purpose"] or "",
             "amount_min": r["amount_min"] or None, "amount_max": r["amount_max"] or None, "direction": r["direction"] or None,
             "action": r["action"], "category": r["category"] or None, "account": r["account"] or None, "active": bool(r["active"]),
-            "hits": r["hits"], "last_hit_at": r["last_hit_at"], "created_at": r["created_at"], "deleted": bool(r["deleted_at"])}
+            "hits": r["hits"], "last_hit_at": r["last_hit_at"], "created_at": r["created_at"], "deleted": bool(r["deleted_at"]),
+            "updated_at": r["updated_at"]}  # 2.560.0 C (#4700): the version the dialog sends back
 
 
 def _rule_row(c, oid, rid, deleted=False):
@@ -381,8 +383,9 @@ def br_new():
 def br_edit(rid):
     """The fields given change (also active: bool); marks set already stay (POST /rules/<id>/revert lifts them)."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_bank_rules_{oid}")
+    write_lock(c, f"office_bank_rules_{oid}")  # the area's lock (the rules' limit / order) covers this rule too
     old = _rule_dec(c, oid, _rule_row(c, oid, rid))
+    ccf_check(body(), old["updated_at"], "row", lambda: br_public(old))  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409
     _write(c, oid, rid, br_spec(body(), old))
     bump(c)
     c.commit()
