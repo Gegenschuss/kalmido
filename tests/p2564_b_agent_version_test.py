@@ -36,7 +36,7 @@ def bad_version(r):
 
 def stale(r, oid):
     j = r.json() if r.headers.get("Content-Type", "").startswith("application/json") else {}
-    cur = (j.get("error") or {}).get("current") or {}
+    cur = (j.get("error") or {}).get("current") or j.get("current") or {}  # the quotation draft keeps its older answer (current next to error)
     return r.status_code == 409 and cur.get("id") == oid
 
 
