@@ -3232,51 +3232,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .lprog .pbar{width:17.5rem;max-width:30vw;height:.25rem;background:var(--line2)}
 .lprog span{color:var(--text2)}
 /* the agent band */
-.agband{container-type:inline-size;display:flex;align-items:stretch;margin:0 0 .75rem;border:1px solid var(--line2);border-radius:.625rem;background:var(--bg2);overflow:hidden}
-.agb-tog{flex:none;width:2rem;display:grid;place-items:center;color:var(--muted);border-right:1px solid var(--line)}
-.agb-tog:hover{color:var(--text);background:var(--bg3)}
-.agband.closed .agb-tog{flex:1;width:auto;display:flex;align-items:center;gap:.625rem;padding:0 .75rem;min-height:2.25rem;border-right:0;justify-content:flex-start;min-width:0}
-.agband.closed .agb-tog svg{transform:rotate(-90deg)}
-.agb-sum{display:inline-flex;align-items:center;gap:.3125rem;min-width:0;font-size:var(--fs-s);color:var(--text2)}
-.agb-sum>span{margin-left:.375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.agb-wmini{display:inline-flex;align-items:center;gap:.5rem;padding:0 .75rem;font-size:var(--fs-s);color:var(--st-wait-t);white-space:nowrap}
-.agb-cells{display:flex;flex:1;min-width:0}
-.agb-a{flex:1 1 0;min-width:8rem;padding:.75rem 1rem;display:flex;flex-direction:column;gap:.25rem;text-align:left;border-right:1px solid var(--line)}
-.agb-a:last-child{border-right:0}
-.agb-a:hover{background:var(--bg3)}
-.agb-h{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-m);min-width:0}
-.agb-h b{flex:0 1 auto;min-width:3ch;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.agb-h .muted{flex:0 100 auto;min-width:0;font-size:var(--fs-s);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}  /* 2.556.0 (#4663): the name has priority over the state */
-.agb-t{font-size:var(--fs-m);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.agb-t .mono{font-size:var(--fs-s);color:var(--text2)}
-.agb-p{height:2px;background:var(--line2);display:flex;overflow:hidden;color:var(--st-off)}
-.agb-p i{display:block;height:2px;background:currentColor}
-.agb-a.hs-working .agb-p{color:var(--st-work)}.agb-a.hs-ready .agb-p{color:var(--st-ready)}.agb-a.hs-waiting .agb-p{color:var(--st-wait)}.agb-a.hs-error .agb-p{color:var(--st-err)}
-@media (prefers-reduced-motion:no-preference){ .agb-p.run i{animation:agbrun 1.8s ease-in-out infinite} }
-@keyframes agbrun{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}
-.agb-w{flex:1.35 1 0;min-width:0;padding:.625rem 1rem;display:flex;align-items:center;gap:.75rem;background:var(--wait-soft)}
-.agb-wi{flex:1;min-width:0;display:flex;flex-direction:column;gap:.125rem}
-.agb-wi .agb-t{font-size:var(--fs-s);color:var(--text2)}
-.agb-w .btn{height:2.25rem;border-radius:1.125rem;flex:none}
-.agb-no{width:2.25rem;height:2.25rem;border-radius:50%;justify-content:center;border:1px solid var(--line2);background:var(--bg2);color:var(--text);flex:none}
-/* 2.556.0 (#4663): the band follows its own width (container-type on .agband), not the window's. agb_fit() (agents.js) hides the boxes that
-   do not fit (min 8rem) and shows "+N"; below 30rem a box is a dot + the name (state and task in its title), below 16rem only the dots */
-.agb-a[hidden],.agb-more[hidden]{display:none}
-.agb-more{flex:none;width:3rem;display:grid;place-items:center;font-size:var(--fs-s);font-weight:600;color:var(--text2);border-left:1px solid var(--line)}
-.agb-more:hover{background:var(--bg3);color:var(--text)}
-.agb-sumn{display:none}
-@container (max-width:30rem){
-  .agb-cells{flex-wrap:wrap}
-  .agb-a{padding:.5rem .75rem;flex-direction:row;align-items:center}
-  .agb-a .agb-h .muted,.agb-a .agb-t,.agb-a .agb-p{display:none}
-  .agb-w{flex:1 1 100%;border-top:1px solid var(--line)}
-}
-@container (max-width:16rem){
-  .agb-cells{display:none}
-  .agband>.agb-tog{flex:1;width:auto;display:flex;align-items:center;gap:.625rem;padding:0 .75rem;min-height:2.25rem;border-right:0;justify-content:flex-start;min-width:0}
-  .agband>.agb-tog .agb-sumn{display:inline-flex}
-}
-@media (pointer:coarse){ .agb-tog{width:2.75rem} .agband.closed .agb-tog{min-height:2.75rem} .agb-w .btn{height:2.75rem;border-radius:1.375rem} .agb-no{width:2.75rem;height:2.75rem} }
 /* task rows: status glyph + ticket gutter; the selected row gets an accent bar on the left */
 .trow{min-height:var(--row-h);gap:.625rem}
 .trow::before,.trow.pr5::before,.trow.pr3::before,.trow.pr1::before{background:transparent;top:0;bottom:0;border-radius:0}
