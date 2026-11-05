@@ -9,6 +9,7 @@ from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import body, bump, db, write_lock, iso, now_utc
 from ..core.access import Denied, tvis, vis_sql, list_role
+from ..core.conflict import ccf_check  # 2.569.0 (#4395): versions of the own sections
 from ..accounts.session import me
 
 VW_MINE_MAX = 5000  # tasks in one order (more are cut: the oldest placed ones fall back to "not placed")
@@ -243,7 +244,6 @@ def ms_create():
 def ms_patch(sid):
     """{name?, collapsed?, expect_updated_at?}: rename (not "Recently assigned") or fold the section. Only a new name changes the
     version; expect_updated_at set and another version now -> 409 {error, section}."""
-    from ..core.conflict import ccf_check
     c, uid = _ms_person()
     b = body() or {}
     write_lock(c, f"mine-order-{uid}")
@@ -274,7 +274,6 @@ def ms_patch(sid):
 def ms_delete(sid):
     """{expect_updated_at?}: deletes an own section (not "Recently assigned"); its tasks fall into the topmost section that is left
     (none left: no section). -> {restore: what POST /api/mine-sections takes back for the Undo}."""
-    from ..core.conflict import ccf_check
     c, uid = _ms_person()
     b = body() or {}
     write_lock(c, f"mine-order-{uid}")
