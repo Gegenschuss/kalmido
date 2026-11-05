@@ -61,8 +61,9 @@ def three(S, who, what, table, rid, url, b1, b2, ver):
     sql(f"UPDATE {table} SET updated_at=? WHERE id=?", (OLD, rid))
     before = sql(f"SELECT * FROM {table} WHERE id=?", (rid,))
     r = S.patch(B + url, json={**b1, "expect_updated_at": "2019-12-31T00:00:00+00:00"})
-    check(r.status_code == 409 and isinstance(r.json().get("row"), dict), f"{who} {what}: an old expect_updated_at -> 409 with the row {r.status_code} {r.text[:200]}")
-    check(r.status_code != 409 or ver(r.json()["row"]) == OLD, f"{who} {what}: the 409 names the stored version")
+    cur = (r.json().get("current") or r.json().get("row")) if r.status_code == 409 else None  # 2.567.0 (#4711): "current" of the core's write layer, "row" of the older routes
+    check(isinstance(cur, dict), f"{who} {what}: an old expect_updated_at -> 409 with the row {r.status_code} {r.text[:200]}")
+    check(r.status_code != 409 or ver(cur) == OLD, f"{who} {what}: the 409 names the stored version")
     check(sql(f"SELECT * FROM {table} WHERE id=?", (rid,)) == before, f"{who} {what}: the 409 wrote nothing")
     r = S.patch(B + url, json=b1)
     check(r.ok, f"{who} {what}: without expect_updated_at as before {r.status_code} {r.text[:200]}")

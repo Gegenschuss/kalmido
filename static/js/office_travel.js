@@ -712,7 +712,7 @@ document.addEventListener('click', e => {
 
 // 2.560.0 D (#4700): the version check of the office dialogs that save a whole form (trips, receipts, logbook, cash book,
 // credit cards, entertainment): the body carries the updated_at the dialog was opened with (saved elsewhere meanwhile -> 409
-// with the current row under "row", never overwritten), the undo writes back only the keys this save changed, with the new
+// with the current row under "current" (2.567.0 #4711; "row" of the older routes), never overwritten), the undo writes back only the keys this save changed, with the new
 // version. Without a version (an old row) the save goes as before.
 function ofcVerBody(body, r) { return r?.updated_at ? {...body, expect_updated_at: r.updated_at} : body; }
 function ofcVerUndo(old, body, now) {
@@ -724,14 +724,15 @@ function ofcVerUndo(old, body, now) {
 // dialog once more with the person's input, the bar below says so with "Reload" (reopen: the saved state), nothing typed is
 // lost; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast
 function ofcVerLate(x, ver, again, reopen) {
-  if (x?.status === 409 && x.data?.row) { let m2 = null; try { m2 = again(); } catch { /* the toast below */ } if (!m2 || !ofcVerConflict(m2, x, reopen)) toast(tr('Changed in the meantime')); }
+  if (x?.status === 409 && (x.data?.current || x.data?.row)) { let m2 = null; try { m2 = again(); } catch { /* the toast below */ } if (!m2 || !ofcVerConflict(m2, x, reopen)) toast(tr('Changed in the meantime')); }
   else if (ver && x?.message) toast(x.message);
 }
 // a 409 of such a save: the dialog's error line says so with "Reload" (reopen: the dialog with the saved state); -> handled
 function ofcVerConflict(md, x, reopen) {
-  if (x?.status !== 409 || !x.data?.row) return false;
+  const cur = x?.data?.current || x?.data?.row;  // 2.567.0 D (#4711): the routes on the core's write layer answer "current"
+  if (x?.status !== 409 || !cur) return false;
   const el = $('.aerr', md); if (!el) { toast(tr('Changed in the meantime')); return true; }
   el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ofc-reload>${tr('Reload')}</button>`;
-  $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); reopen(x.data.row); });
+  $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); reopen(cur); });
   return true;
 }

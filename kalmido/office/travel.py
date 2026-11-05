@@ -24,7 +24,6 @@ from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_st
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied, vis_sql
-from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
@@ -57,6 +56,11 @@ from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functi
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
 from .otrash import otb_gone_out, otb_put, otb_restore  # 2.530.0 C (#4315, B17)
+from .owrite import ow_kind, ow_write  # noqa: E402  2.567.0 D (#4711): the saves go through the core's write layer
+
+ow_kind("office_trip", "office_trips")
+ow_kind("office_trip_item", "office_trip_items")
+ow_kind("office_trip_purpose", "office_trip_purposes")
 
 
 def rk_cat_label(k, lg=None):
@@ -506,21 +510,22 @@ def rk_trip_post():
 
 @app.patch("/api/office/trips/<int:tid>")
 def rk_trip_patch(tid):
+    """2.567.0 D (#4711): through office/owrite.py ow_write -- lock, version (expect_updated_at; 409 with the trip under
+    "current"), only the fields sent, history, updated_by, bump. Without expect_updated_at as before."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_trips-{int(tid)}")  # 2.560.0 D (#4700): a second save with the same base waits, then sees the first
-    t = oc_dec_fields(c, oid, "office_trips", _trip(c, oid, tid))
+    _trip(c, oid, tid)  # the rights (level "own") as before
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, t["updated_at"], "row", lambda: _one(c, oid, tid))  # saved elsewhere meanwhile: 409 with the trip, never overwritten
-    row = rk_trip_clean(c, oid, uid, b, t)
-    if row:
-        _trip_need_open(c, oid, t, row.get("date_from"), row.get("date_to"))  # 2.148.0 A (#2471)
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_trips", row)
-        c.execute(f"UPDATE office_trips SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [tid, oid])
-        bump(c)
-        c.commit()
+
+    def clean(c, b, t):
+        row = rk_trip_clean(c, oid, uid, b, t)
+        if row:
+            _trip_need_open(c, oid, t, row.get("date_from"), row.get("date_to"))  # 2.148.0 A (#2471)
+        return row
+    ow_write(c, uid, "office_trip", tid, b, clean, oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_trips", r),
+             enc=lambda c, v: oc_enc_fields(c, oid, "office_trips", v), public=lambda c, t: _one(c, oid, tid))
+    c.commit()
     return jsonify(_one(c, oid, tid))
 
 
@@ -583,29 +588,30 @@ def _rk_val(v):
 
 @app.patch("/api/office/trips/<int:tid>/items/<int:iid>")
 def rk_item_patch(tid, iid):
+    """2.567.0 D (#4711): through ow_write like the trip (409 with the receipt under "current")."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_trip_items-{int(iid)}")  # 2.560.0 D (#4700)
-    cur = oc_dec_fields(c, oid, "office_trip_items", _item(c, oid, tid, iid))
+    _item(c, oid, tid, iid)  # the trip's rights, the receipt is there
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, cur["updated_at"], "row", lambda: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))  # 409 with the receipt
-    row = rk_item_clean(c, oid, b, cur, home=rk_home_cur(c, oid))
-    # 2.152.0 (#2168, review B-M1): a locked receipt (in DATEV / billed on a finalised document) keeps its tick, amount
-    # and date; text, DATEV number and category stay editable
-    why = olk_trip_item_reason(c, oid, cur)
-    if why and "amount_home" not in b and all(_rk_val(row.get(k)) == _rk_val(cur.get(k)) for k in ("amount", "currency", "fx_rate")):
-        for k in ("amount", "currency", "fx_rate", "amount_home"):
-            row.pop(k, None)  # the dialog sends the money unchanged: the stored amount in the office currency stays as it is
-    if why and any(_rk_val(row[k]) != _rk_val(cur.get(k)) for k in RK_LOCKED_KEYS if k in row):
-        raise Denied(409, why)
-    if row:
-        _trip_need_open(c, oid, _trip(c, oid, tid), cur["date"], row.get("date"), items=False)  # 2.148.0 A (#2471)
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_trip_items", row)
-        c.execute(f"UPDATE office_trip_items SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [iid, oid])
-        bump(c)
-        c.commit()
+
+    def clean(c, b, cur):
+        row = rk_item_clean(c, oid, b, cur, home=rk_home_cur(c, oid))
+        # 2.152.0 (#2168, review B-M1): a locked receipt (in DATEV / billed on a finalised document) keeps its tick, amount
+        # and date; text, DATEV number and category stay editable
+        why = olk_trip_item_reason(c, oid, cur)
+        if why and "amount_home" not in b and all(_rk_val(row.get(k)) == _rk_val(cur.get(k)) for k in ("amount", "currency", "fx_rate")):
+            for k in ("amount", "currency", "fx_rate", "amount_home"):
+                row.pop(k, None)  # the dialog sends the money unchanged: the stored amount in the office currency stays as it is
+        if why and any(_rk_val(row[k]) != _rk_val(cur.get(k)) for k in RK_LOCKED_KEYS if k in row):
+            raise Denied(409, why)
+        if row:
+            _trip_need_open(c, oid, _trip(c, oid, tid), cur["date"], row.get("date"), items=False)  # 2.148.0 A (#2471)
+        return row
+    ow_write(c, uid, "office_trip_item", iid, b, clean, where="id=? AND trip_id=? AND org_id=?", args=(iid, tid, oid), oid=oid,
+             dec=lambda c, r: oc_dec_fields(c, oid, "office_trip_items", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_trip_items", v),
+             public=lambda c, cur: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))
+    c.commit()
     return jsonify(_one(c, oid, tid))
 
 
@@ -739,18 +745,20 @@ def rka_purpose_post():
 
 @app.patch("/api/office/trips/purposes/<int:pid>")
 def rka_purpose_patch(pid):
-    """{name} renames an own purpose; the trips keep the text they have."""
+    """{name} renames an own purpose; the trips keep the text they have. 2.567.0 D (#4711): through ow_write (version
+    optional, 409 under "current"); the answer carries updated_at."""
     c, uid, oid = _ctx()
     _purpose(c, oid, pid)
     b = body()
-    name = rka_purpose_name(b.get("name") if isinstance(b, dict) else None)
+    b = b if isinstance(b, dict) else {}
+    name = rka_purpose_name(b.get("name"))
     for r in c.execute("SELECT id, name FROM office_trip_purposes WHERE org_id=? AND deleted_at IS NULL AND id<>?", (oid, pid)).fetchall():
         if r["name"].casefold() == name.casefold():
             raise BadInput(tr("This purpose already exists"))
-    c.execute("UPDATE office_trip_purposes SET name=?, updated_at=? WHERE id=? AND org_id=?", (name, iso(now_utc()), pid, oid))
-    bump(c)
+    row, _ = ow_write(c, uid, "office_trip_purpose", pid, b, lambda c, b, cur: {"name": name}, where="id=? AND org_id=? AND deleted_at IS NULL",
+                      oid=oid, public=lambda c, cur: {"id": cur["id"], "name": cur["name"], "updated_at": cur["updated_at"]})
     c.commit()
-    return jsonify(id=pid, name=name)
+    return jsonify(id=pid, name=row["name"], updated_at=row["updated_at"])
 
 
 @app.delete("/api/office/trips/purposes/<int:pid>")
