@@ -375,6 +375,10 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         cr = r["kind"] == "credit"  # a refund paid on a credit note goes out
         put(p["date"], "out" if cr else "in", "actual", "credit" if cr else "payment", dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
             res=(-1 if cr else 1) * dec(p["amount"]) / _fx(r, home) * netf(r), number=r["number"], doc_id=r["id"])
+    # in: 2.545.0 (#4387): paid reminder fees (actual, on the day they were marked paid; no VAT, the whole fee is net)
+    from .books import bk_fees_paid
+    for f in bk_fees_paid(c, oid, first, _add_months(last_month, 1) + "-00", home):
+        put(f["date"], "in", "actual", "fee", f["amount"], tr("Reminder fee"), res=f["amount"], number=f["number"], doc_id=f["doc_id"])
     # in: open rest of finalised invoices (plan, on the due day)
     for r in inv:
         open_ = dec(inv_money_fields(r, pm)["open"])

@@ -491,7 +491,7 @@ function ofdTotalsHtml(d, t, adm) {
   if (ofdIsInv(d)) {  // 2.38.0: invoice sums are exact strings; subtotal, tax per rate, total, paid / open
     // 2.355.0 D (#2846): + default interest per invoice and the flat fee (the same rows as the PDF)
     const rmx = d.kind === 'reminder' ? [...(t.lines || []).filter(l => l.kind === 'ref' && +l.interest > 0).map(l => [tr('Default interest {0}: {1} % p.a., {2} days|document', l.number || '', fmtNum(+t.interest_rate || 0, 2), l.interest_days || 0), l.interest_text || ofdMoney(l.interest, d), 'tax']),
-      ...(+t.flat_fee > 0 ? [[tr('Flat fee for late payment (section 288 (5) BGB)|document'), t.flat_fee_text || ofdMoney(t.flat_fee, d), 'tax']] : [])] : [];
+      ...(+t.flat_fee > 0 ? [[tr(+t.flat_credited > 0 ? 'Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document' : 'Flat fee for late payment (section 288 (5) BGB)|document'), t.flat_fee_text || ofdMoney(t.flat_fee, d), 'tax']] : [])] : [];  // 2.545.0 (#4387): credited against the fee
     const rows = d.kind === 'reminder' ? [[tr('Amount outstanding'), ofdMoney(t.net || 0, d), 'net'], ...rmx, ...(+t.fee ? [[tr('Reminder fee'), ofdMoney(t.fee, d), 'tax']] : []), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']]
       : [[tr('Subtotal'), ofdMoney(t.net || 0, d), 'net'], ...(t.tax_lines || []).map(x => [x.label, x.amount_text || ofdMoney(x.amount, d), 'tax']), [tr('Total'), ofdMoney(t.gross || 0, d), 'gross']];
     if (d.kind === 'invoice' && d.locked && (+d.paid || +d.credits)) rows.push([tr('Amount outstanding'), ofdMoney(d.open || 0, d), 'open']);

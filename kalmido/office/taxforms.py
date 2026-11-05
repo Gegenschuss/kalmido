@@ -123,7 +123,7 @@ def tf_euer(c, oid, year):
         gross, vat = dec(r["gross"]), dec(r["vat"])
         if small or r["key"] == "small":
             amt["small"] += gross
-        elif r["key"] == "exempt":
+        elif r["key"] in ("exempt", "fee"):  # 2.545.0 (#4387): paid reminder fees are not taxable (Kz 103)
             amt["free"] += gross
         else:
             amt["taxed"] += gross - vat

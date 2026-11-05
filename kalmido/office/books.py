@@ -288,7 +288,8 @@ def _income_label(key):
     if key.startswith("vat"):
         return tr("Revenue {0} % VAT", key[3:])
     return {"small": tr("Revenue (small business)"), "reverse": tr("Tax-free revenue / reverse charge"),
-            "abroad": tr("Tax-free revenue / reverse charge"), "exempt": tr("Tax-free revenue / reverse charge")}[key]
+            "abroad": tr("Tax-free revenue / reverse charge"), "exempt": tr("Tax-free revenue / reverse charge"),
+            "fee": tr("Reminder fees received (not taxable)")}[key]  # 2.545.0 (#4387)
 
 
 def bk_reverse_key(c, oid, r, memo):
@@ -376,6 +377,19 @@ def ofc_meals_euer(meals, small):
                                    "deductible": dstr(money(ded)), "not_deductible": dstr(money(nd))}
 
 
+def bk_fees_paid(c, oid, frm, to, home):
+    """2.545.0 (#4387): the paid fees of finalised reminders in [frm, to] (ISO days): [{doc_id, number, date, amount (Decimal,
+    home currency)}]. The day = reminder_fee_paid_at (set when a person marks the fee paid), before 2.545 the reminder's date.
+    A reminder fee is damages, not a sale: no VAT, not in the VAT return (the tax advisor checks, #1153)."""
+    day = "COALESCE(NULLIF(reminder_fee_paid_at, ''), date)"
+    out = []
+    for r in c.execute(f"SELECT id, number, currency, fx_rate, reminder_fee, {day} AS day FROM office_docs WHERE org_id=? AND kind='reminder' "
+                       f"AND locked_at IS NOT NULL AND trial=0 AND reminder_fee > 0 AND reminder_fee_state='paid' AND {day}>=? AND {day}<=? "
+                       f"ORDER BY {day}, id", (oid, frm, to)).fetchall():
+        out.append({"doc_id": r["id"], "number": r["number"], "date": r["day"], "amount": money(dec(r["reminder_fee"]) / _fx(r, home))})
+    return out
+
+
 # ---------------------------------------------------------------- EUeR
 def bk_euer(c, oid, year):
     """The income / expense statement of a year (see the module text); amounts as text with two decimals."""
@@ -389,6 +403,9 @@ def bk_euer(c, oid, year):
             k = "exempt" if k in ("reverse", "abroad", "eu_goods", "export") else k  # 2.355.0 C (#2844): + goods
             x = inc.setdefault(k, [Decimal(0)] * 3)
             x[0], x[1], x[2] = x[0] + net, x[1] + vat, x[2] + gross
+    for f in bk_fees_paid(c, oid, y0, y1, home):  # 2.545.0 (#4387): paid reminder fees, without VAT
+        x = inc.setdefault("fee", [Decimal(0)] * 3)
+        x[0], x[2] = x[0] + f["amount"], x[2] + f["amount"]
     exp, missing, unrated = {}, 0, set()
     # 2.92.0 (#1931): equipment with a purchase price is depreciated (office/assets.py ast_afa_year): the year's depreciation
     # is an expense of its own, the device's receipt counts only with its input tax (else the purchase would count twice).
@@ -446,7 +463,7 @@ def bk_euer(c, oid, year):
                       tr(OFC_MEAL_TWICE)]
         meal_sum["notes"] = meal_notes
     m2 = lambda v: dstr(money(v))  # noqa: E731
-    order = lambda k: (0, -int(dec(k[3:]))) if k.startswith("vat") else (1 if k == "exempt" else 2, 0)  # noqa: E731
+    order = lambda k: (0, -int(dec(k[3:]))) if k.startswith("vat") else ({"exempt": 1, "fee": 3}.get(k, 2), 0)  # noqa: E731
     income = [{"key": k, "label": _income_label(k), "net": m2(v[0]), "vat": m2(v[1]), "gross": m2(v[2])}
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}

@@ -16274,6 +16274,8 @@
   "Service from a business in the EU (section 13b)": "Prestation d'une entreprise de l'UE (§ 13b)",
   "Other reverse charge (section 13b)": "Autre autoliquidation (§ 13b)",
   "Receipts with reverse charge (section 13b): base {0} / {1}, tax and input tax {2} each. They are not on the lines above yet; please enter them in the section 13b part of the form.": "Justificatifs en autoliquidation (§ 13b) : base {0} / {1}, taxe et TVA déductible {2} chacune. Ils ne figurent pas encore dans les lignes ci-dessus ; saisis-les dans la partie § 13b du formulaire.",
+  "Reminder fees received (not taxable)": "Frais de relance encaissés (non imposables)",
+  "Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document": "Indemnité forfaitaire pour retard de paiement (art. 288 (5) BGB), moins les frais de relance",
   "Tasks are made from a quotation only": "Les tâches ne sont créées qu’à partir d’un devis",
   "New|position": "Nouveau",
   "Changed by hand": "Modifié à la main",

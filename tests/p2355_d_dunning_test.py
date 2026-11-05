@@ -195,7 +195,9 @@ def run(s, who):
     t0 = s.get(B + f"{D}/{rm5}").json()["totals"]
     check(s.put(B + O + "/settings", json={"dunning_interest": 0, "dunning_flat_fee": 0, "dunning_client_kind": "auto"}).ok, f"{who}: switched off again")
     t1 = s.get(B + f"{D}/{rm5}").json()["totals"]
-    check(t0.get("interest") == str(want6) and t0.get("flat_fee") == "40.00", f"{who}: a draft follows the settings until it is finalised (all businesses) {t0.get('interest')} {t0.get('flat_fee')}")
+    # 2.545.0 (#4387): the 5.00 reminder fee is credited against the flat fee (section 288 (5) sentence 3 BGB): 40 - 5 = 35
+    check(t0.get("interest") == str(want6) and t0.get("flat_fee") == "35.00" and t0.get("flat_credited") == "5.00",
+          f"{who}: a draft follows the settings until it is finalised (all businesses) {t0.get('interest')} {t0.get('flat_fee')} {t0.get('flat_credited')}")
     check(t1.get("interest") == t0.get("interest") and t1.get("flat_fee") == t0.get("flat_fee") and t1.get("gross") == t0.get("gross"),
           f"{who}: the finalised reminder keeps interest, flat fee and total (GoBD) {t1.get('interest')} {t1.get('gross')}")
 

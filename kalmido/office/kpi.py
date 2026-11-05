@@ -74,6 +74,12 @@ def kpi_revenue(c, oid, home, docs, year, today):
         sums[mo] = sums.get(mo, dec(0)) + a
         if not to_date or p["date"][5:10] <= today[5:10]:
             ytd[y] = ytd.get(y, dec(0)) + a
+    from .books import bk_fees_paid  # 2.545.0 (#4387): paid reminder fees count as money received, as in the books (no VAT)
+    for f in bk_fees_paid(c, oid, f"{year - 1}-01-01", f"{year}-12-31", home):
+        y, mo = f["date"][:4], f["date"][:7]
+        sums[mo] = sums.get(mo, dec(0)) + f["amount"]
+        if not to_date or f["date"][5:10] <= today[5:10]:
+            ytd[y] = ytd.get(y, dec(0)) + f["amount"]
     g = lambda d, k: dstr(money(d.get(k, dec(0))))
     mm = today[5:7] if to_date else "12"
     return {"months": [{"month": f"{year}-{m:02d}", "amount": g(sums, f"{year}-{m:02d}"), "prev": g(sums, f"{year - 1}-{m:02d}")} for m in range(1, 13)],

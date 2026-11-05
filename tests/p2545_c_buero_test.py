@@ -6,6 +6,8 @@ freelancer-matrix: office
    amount as the base of field 46, the tax at 19 % in field 47 and the same as input tax in field 67; "other" (e.g. a third
    country) goes to 84 / 85 at the rate chosen (7 % here); a normal receipt stays in 66; 83 is unchanged by section 13b;
    the income statement counts the section 13b amount as net without input tax; a wrong mark answers 400
+ - paid reminder fees: marked paid = income "reminder fees (not taxable)" in the income statement (no VAT, Anlage EUeR line
+   of Kz 103), money in in the cash flow (kind fee) and the key figures on the day it was marked; waived = gone again
  - the same for a person without an organisation (own office)
 usage: p2545_c_buero_test.py <datadir>"""
 import os
@@ -16,6 +18,7 @@ from decimal import Decimal
 
 import requests
 
+import dbx as dbxm
 import testclock
 from freelancer_fixture import freelancer
 
@@ -117,8 +120,48 @@ def r13b_office(s, ws, who):
     check(kz.get("46") == "0" and kz.get("67") == "35.00", f"{who}: without the mark the receipt leaves 46 / 67 {kz}")
 
 
+# ---------------------------------------------------------------- paid reminder fees
+def fees(s, who):
+    TODAY = testclock.today().isoformat()
+    cl = s.post(B + "/api/clients", json={"name": f"{who} Kunde", "street": "Weg 1", "zip": "50667", "city": "Köln", "country": "DE"}).json()["id"]
+    r = s.post(B + D, json={"kind": "invoice", "client_id": cl, "project_title": "Schnitt", "service_from": f"{Y}-01-05",
+                            "items": [{"title": "Schnitt", "qty": 1, "rate": 500}]})
+    assert r.status_code == 201, r.text
+    inv = r.json()["id"]
+    check(s.post(B + f"{D}/{inv}/finalize").ok, f"{who}: invoice finalised")
+    dbxm.q(DATA, "UPDATE office_docs SET due_date=? WHERE id=?", (f"{Y}-01-01", inv))
+    r = s.post(B + D + "/reminder", json={"doc_ids": [inv], "level": 2, "fee": 7.5})
+    check(r.ok, f"{who}: reminder with fee " + r.text[:200])
+    rm = r.json()["id"]
+    check(s.post(B + f"{D}/{rm}/finalize").ok, f"{who}: reminder finalised")
+    eu = s.get(B + O + f"/books/euer?year={Y}").json()
+    check(not [x for x in eu["income"] if x["key"] == "fee"], f"{who}: an open fee is no income {eu.get('income')}")
+    check(s.post(B + f"{D}/{rm}/fee", json={"state": "paid"}).ok, f"{who}: fee marked paid")
+    day = dbxm.q(DATA, "SELECT reminder_fee_paid_at FROM office_docs WHERE id=?", (rm,))[0][0]
+    check(day == TODAY, f"{who}: the paid day is stored {day} {TODAY}")
+    eu = s.get(B + O + f"/books/euer?year={Y}").json()
+    fee = [x for x in eu["income"] if x["key"] == "fee"]
+    check(fee and fee[0]["net"] == "7.50" and fee[0]["vat"] == "0.00" and fee[0]["gross"] == "7.50", f"{who}: income statement: paid fee 7.50 without VAT {fee}")
+    tf = s.get(B + BK + f"/taxform/euer?year={Y}").json()
+    free = [x for x in tf.get("rows", []) if x.get("kz") == "103"]
+    check(not tf.get("known") or (free and free[0]["amount"] == "7.50"), f"{who}: Anlage EUeR: the fee in the line of Kz 103 {free}")
+    cf = s.get(B + O + f"/cashflow?from={TODAY[:7]}&months=1").json()
+    ent = [e for e in cf.get("entries", []) if e.get("kind") == "fee"]
+    check(ent and ent[0]["amount"] == "7.50" and ent[0]["state"] == "actual" and ent[0]["doc_id"] == rm, f"{who}: cash flow: the fee came in {ent}")
+    kp = s.get(B + O + "/kpi").json()
+    mo = [m for m in kp["revenue"]["months"] if m["month"] == TODAY[:7]]
+    check(mo and mo[0]["amount"] == "7.50", f"{who}: key figures: the fee in this month's money received {mo}")
+    kz = ustva(s, "y").get("kz", {})
+    check(kz.get("81") == "0" and kz.get("48") == "0", f"{who}: the fee is not in the VAT return {kz}")
+    check(s.post(B + f"{D}/{rm}/fee", json={"state": "waived"}).ok, f"{who}: fee waived")
+    eu = s.get(B + O + f"/books/euer?year={Y}").json()
+    check(not [x for x in eu["income"] if x["key"] == "fee"], f"{who}: a waived fee is no income again {eu.get('income')}")
+
+
 r13b_office(A, f"org:{ORG}", "Alpha")
 r13b_office(Fr, "private", "Frida")
+fees(A, "Alpha")
+fees(Fr, "Frida")
 
 print(f"p2545_c_buero: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

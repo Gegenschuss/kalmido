@@ -734,7 +734,8 @@ def inv_reminder_totals(c, oid, r, pack=None):
         frozen = _j(r["totals"], {})
         lines = [ln for ln in frozen.get("lines", []) if ln.get("kind") == "ref"]
         extra = {"interest": money(dec(frozen.get("interest") or 0)), "flat_fee": money(dec(frozen.get("flat_fee") or 0)),
-                 "interest_rate": frozen.get("interest_rate") or "", "business": frozen.get("business")}
+                 "interest_rate": frozen.get("interest_rate") or "", "business": frozen.get("business"),
+                 "flat_credited": money(dec(frozen.get("flat_credited") or 0))}  # 2.545.0 (#4387)
     else:
         lines = inv_reminder_rows(c, oid, ids) if ids else []
         extra = inv_reminder_interest(c, oid, r, lines)
@@ -747,6 +748,7 @@ def inv_reminder_totals(c, oid, r, pack=None):
             ln["interest_text"] = fmt_money(ln["interest"], lang, cur)
     return {"interest": dstr(extra["interest"]), "interest_text": fmt_money(extra["interest"], lang, cur), "interest_rate": extra["interest_rate"],
             "flat_fee": dstr(extra["flat_fee"]), "flat_fee_text": fmt_money(extra["flat_fee"], lang, cur), "business": extra["business"],
+            "flat_credited": dstr(money(extra.get("flat_credited") or Decimal(0))),  # 2.545.0 (#4387): the fee credited against the flat fee
             **{"lang": lang, "currency": cur, "fx_rate": None, "fx_note": "", "vat_mode": "novat", "raw_mode": "none", "lines": lines,
             "net": dstr(total), "net_text": fmt_money(total, lang, cur), "fee": dstr(fee), "fee_text": fmt_money(fee, lang, cur), "tax_lines": [],
             "tax": "0.00", "tax_total": "0.00", "gross": dstr(gross), "gross_text": fmt_money(gross, lang, cur), "costs": "0.00", "margin": "0.00",
@@ -764,7 +766,10 @@ def inv_reminder_extra_rows(t, lang, cur):
             rows.append([tr("Default interest {0}: {1} % p.a., {2} days|document", ln.get("number") or "", rate, ln.get("interest_days") or 0, lg=lang),
                          ln.get("interest_text") or fmt_money(ln["interest"], lang, cur)])
     if dec(t.get("flat_fee") or 0) > 0:
-        rows.append([tr("Flat fee for late payment (section 288 (5) BGB)|document", lg=lang), t.get("flat_fee_text") or fmt_money(t["flat_fee"], lang, cur)])
+        # 2.545.0 (#4387): credited against the reminder fee (section 288 (5) sentence 3 BGB) -- the row says so
+        label = (N_("Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document") if dec(t.get("flat_credited") or 0) > 0
+                 else N_("Flat fee for late payment (section 288 (5) BGB)|document"))
+        rows.append([tr(label, lg=lang), t.get("flat_fee_text") or fmt_money(t["flat_fee"], lang, cur)])
     return rows
 
 
@@ -816,9 +821,15 @@ def inv_reminder_interest(c, oid, r, lines, s=None):
                 ln["interest"], ln["interest_days"] = dstr(i), days
                 out["interest"] += i
     if on_f and biz and (r["currency"] or "EUR") == "EUR":
+        # 2.545.0 (#4387): the flat fee is credited against the reminder fee (section 288 (5) sentence 3 BGB: damages for the
+        # costs of pursuing the claim count towards it) -- fee and flat fee together never exceed the larger of the two
+        credit = money(dec(_col(r, "reminder_fee") or 0))
         for ln in lines:
-            ln["flat_fee"] = dstr(FLAT_FEE_EUR)
-            out["flat_fee"] += FLAT_FEE_EUR
+            take = min(credit, FLAT_FEE_EUR)
+            credit -= take
+            ln["flat_fee"] = dstr(FLAT_FEE_EUR - take)
+            out["flat_fee"] += FLAT_FEE_EUR - take
+            out["flat_credited"] = out.get("flat_credited", Decimal(0)) + take
     return out
 
 
@@ -1817,7 +1828,9 @@ def fd_fee_post(did):
     if before == "cancelled" and st != before:  # 2.355.0 D (#2846): cancelled with its invoice, for good
         raise Denied(409, tr("This fee was cancelled together with its invoice"))
     if st != before:
-        c.execute("UPDATE office_docs SET reminder_fee_state=? WHERE id=? AND org_id=?", (st, did, oid))
+        # 2.545.0 (#4387): the day it was paid -- the income statement, key figures and cash flow count it then (books.bk_fees_paid)
+        paid_day = local_now().date().isoformat() if st == "paid" else None
+        c.execute("UPDATE office_docs SET reminder_fee_state=?, reminder_fee_paid_at=? WHERE id=? AND org_id=?", (st, paid_day, did, oid))
         ofx_log(c, oid, "reminder_fee", doc_id=did, detail={"before": before, "after": st, "fee": dstr(money(dec(r["reminder_fee"])))})
         bump(c)
     c.commit()

@@ -16274,6 +16274,8 @@
   "Service from a business in the EU (section 13b)": "Leistung eines Unternehmens aus der EU (§ 13b Abs. 1)",
   "Other reverse charge (section 13b)": "Andere Fälle, z. B. aus dem Nicht-EU-Ausland oder Bauleistung (§ 13b Abs. 2)",
   "Receipts with reverse charge (section 13b): base {0} / {1}, tax and input tax {2} each. They are not on the lines above yet; please enter them in the section 13b part of the form.": "Belege mit Steuerschuld des Empfängers (§ 13b): Bemessungsgrundlage {0} / {1}, Steuer und Vorsteuer je {2}. Sie stehen noch nicht in den Zeilen oben; bitte im Abschnitt zu § 13b des Formulars eintragen.",
+  "Reminder fees received (not taxable)": "Erhaltene Mahngebühren (nicht steuerbar)",
+  "Flat fee for late payment (section 288 (5) BGB), less the reminder fee|document": "Verzugspauschale (§ 288 Abs. 5 BGB), abzüglich Mahngebühr",
   "Tasks are made from a quotation only": "Aufgaben werden nur aus einem Angebot angelegt",
   "New|position": "Neu",
   "Changed by hand": "Von Hand geändert",
