@@ -46,6 +46,24 @@ function bg_live() {
 }
 // after an own change
 async function bg_after() { BG.home = null; await bg_load(); }
+// 2.559.0 (#4660): an own entry shows at once (optWrite): the rows of BG.data change before the answer, the view is drawn
+// again; afterwards the totals / month values (the server's) are fetched in the background (bg_load replaces BG.data only on
+// its answer, so the rows stay; the card on Home & life refetches by itself)
+const bg_draw = () => { if (S.route.mod !== 'budget') return; const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('budget', viewBudget()))); };
+const bg_refresh = () => { bg_load(); bg_homeLoad(); };
+const BG_PEND = new Map();  // a new entry still on its way: its provisional (negative) id -> the promise of the real id
+// a provisional entry into the shown month (sorted like the server: newest day first); idempotent, returns the way back
+const bg_entPut = row => () => {
+  const d = BG.data; if (!d || d.list_id !== row.list_id || d.month !== String(row.day).slice(0, 7)) return null;
+  if (!d.entries.some(x => x.id === row.id)) { const i = d.entries.findIndex(x => x.day < row.day); d.entries.splice(i < 0 ? d.entries.length : i, 0, row); }
+  return () => { if (BG.data) BG.data.entries = BG.data.entries.filter(x => x.id !== row.id); };
+};
+// an entry out of the shown month (filter, idempotent); the way back puts it at its old place
+const bg_entCut = id => () => {
+  const d = BG.data, i = d ? d.entries.findIndex(x => x.id === id) : -1; if (i < 0) return null;
+  const row = d.entries[i]; d.entries = d.entries.filter(x => x.id !== id);
+  return () => { const e = BG.data?.entries; if (e && !e.some(x => x.id === id)) e.splice(Math.min(i, e.length), 0, row); };
+};
 
 // ---- the card on Home & life
 function bg_homeCard() {
@@ -144,20 +162,35 @@ function bg_entryModal(e) {
     if (!title) { $('#bg-title', md).focus(); throw new Error(tr('Please enter what it was')); }
     if (!day) throw new Error(tr('Please enter the date'));
     const body = {day, amount, kind: bg_kindOf(md), title, note: v('#bg-note'), counterpart: v('#bg-cp'), cat_id: +v('#bg-cat') || null};
+    // 2.559.0 (#4660): the dialog closes at once, the row shows before the answer; a refusal takes it back (api() says why)
+    md.remove();
     if (!e) {
-      const r = await api('POST', bg_url('/entries'), body);
+      const tmp = -Date.now(), lid = BG.lid, row = {id: tmp, list_id: lid, ...body, amount: String(amount), recurring_id: null, source: null, files: [], updated_at: null};
+      const req = optWrite(bg_entPut(row), () => api('POST', `/api/budget/${lid}/entries`, body), bg_draw);
+      BG_PEND.set(tmp, req.then(r => r.id, () => null));  // a refusal: nothing to open (null), no unhandled rejection
+      let r; try { r = await req; } catch { BG_PEND.delete(tmp); return; }
+      BG_PEND.delete(tmp);
+      const x = BG.data?.entries.find(y => y.id === tmp); if (x) Object.assign(x, r);  // the real id (the undo / an upload need it)
       let cur = r;
       offerUndo(tr('Added: {0}', title), histAdd({label: tr('New entry “{0}”', title), undo: async () => { await api('DELETE', `/api/budget/entries/${cur.id}`); bg_after(); },
         redo: async () => { cur = await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); }}));
-      md.remove(); await bg_after();
+      bg_draw(); bg_refresh();
       return;
     }
     const before = bg_body(e), id = e.id;
-    try { await rawFetch('PATCH', `/api/budget/entries/${id}`, e.updated_at ? {...body, expect_updated_at: e.updated_at} : body); }  // 2.269.0 C (#3017)
-    catch (x) { if (x.status === 409 && x.data?.entry) { lifeConflict(md, () => { md.remove(); bg_entryModal(x.data.entry); }); return; } throw x; }
+    // 2.559.0 (#4660): saved elsewhere in between (409 with the saved entry): the row goes back and the dialog opens again with
+    // the input of the person and the bar "Changed in the meantime · Reload" (as before, when it stayed open); nothing is lost
+    let r;
+    try { r = await optWrite(optSet(() => BG.data?.entries.find(x => x.id === id), {...body, amount: String(amount)}), () => rawFetch('PATCH', `/api/budget/entries/${id}`, e.updated_at ? {...body, expect_updated_at: e.updated_at} : body), bg_draw); }  // 2.269.0 C (#3017)
+    catch (x) {
+      if (x.status === 409 && x.data?.entry) { const m2 = bg_entryModal({...e, ...body}); lifeConflict(m2, () => { m2.remove(); bg_entryModal(x.data.entry); }); bg_refresh(); return; }
+      if (x.message !== 'auth') toast(x.message || tr('Error'));  // rawFetch says nothing itself
+      return;
+    }
+    const x = BG.data?.entries.find(y => y.id === id); if (x && r?.id === id) Object.assign(x, r);  // the new updated_at (the next save's check)
     histAdd({label: tr('Entry “{0}” changed', title), undo: async () => { await api('PATCH', `/api/budget/entries/${id}`, before); bg_after(); },
       redo: async () => { await api('PATCH', `/api/budget/entries/${id}`, body); bg_after(); }});
-    md.remove(); toast(tr('Saved')); await bg_after();
+    toast(tr('Saved')); bg_refresh();
   }, e ? null : '#bg-amt');
   bg_kindWire(md, 'bg-kind', k => { const s = $('#bg-cat', md); s.innerHTML = bg_catOpts(k, +s.value || null); });
   if (!w) for (const x of $$('input, select, textarea, .bgkind button', md)) x.disabled = true;  // read access: look only
@@ -169,7 +202,7 @@ function bg_entryModal(e) {
     const del = ev.target.closest('[data-bg-del]'), fdel = ev.target.closest('[data-bgf-del]');
     if (del) {
       if (e.files?.length && !await askConfirm(tr('Delete “{0}”?', e.title), trn('The {0} receipt is deleted with it and cannot be brought back.', 'The {0} receipts are deleted with it and cannot be brought back.', e.files.length), {ok: tr('Delete'), danger: true})) return;
-      await bg_delEntry(e); md.remove();
+      md.remove(); bg_delEntry(e);  // 2.559.0 (#4660): the question stays, then the entry goes at once
     } else if (fdel) {
       const f = (e.files || []).find(x => x.id === +fdel.dataset.bgfDel); if (!f) return;
       if (!await askConfirm(tr('Delete “{0}”?', f.name), tr('The receipt cannot be brought back.'), {ok: tr('Delete'), danger: true})) return;
@@ -185,12 +218,13 @@ function bg_entryModal(e) {
   });
   return md;
 }
+// 2.559.0 (#4660): the row goes at once, a refusal brings it back (api() says why); the undo after the answer
 async function bg_delEntry(e) {
-  let r; try { r = await api('DELETE', `/api/budget/entries/${e.id}`); } catch { return; }
+  let r; try { r = await optWrite(bg_entCut(e.id), () => api('DELETE', `/api/budget/entries/${e.id}`), bg_draw); } catch { return; }
   let cur = r.entry || e;
   offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), undo: async () => { cur = await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },
     redo: async () => { await api('DELETE', `/api/budget/entries/${cur.id}`); bg_after(); }}));
-  bg_after();
+  bg_refresh();
 }
 // book a recurring entry in the shown month
 async function bg_book(rid) {
@@ -597,6 +631,7 @@ document.addEventListener('click', async e => {
   else if (k === 'prev' || k === 'next') { BG.month = bg_addMonth(BG.data.month, k === 'prev' ? -1 : 1); await bg_load(); $(`#view [data-bg="${k}"]`)?.focus(); }
   else if (k === 'now') { BG.month = bg_month(); await bg_load(); $('#view [data-bg="next"]')?.focus(); }
   else if (k === 'add') bg_entryModal(null);
+  else if (k === 'entry' && id < 0) { const p = BG_PEND.get(id); if (p) p.then(rid => { const en = BG.data?.entries.find(x => x.id === rid); if (en) bg_entryModal(en); }, () => {}); }  // 2.559.0 (#4660): a new entry on its way opens once it has its id
   else if (k === 'entry') { const en = BG.data.entries.find(x => x.id === id); if (en) bg_entryModal(en); }
   else if (k === 'book') { a.disabled = true; await bg_book(id); }
   else if (k === 'cats') bg_catsModal();
