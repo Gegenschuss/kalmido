@@ -1404,8 +1404,6 @@ POST /api/newsletter/sync
 POST /api/notes/{}/restore
 POST /api/notify-templates/asked
 POST /api/ntfy/test
-POST /api/office/bank/rules
-POST /api/office/cashflow/adjust
 POST /api/office/catalog/refresh
 POST /api/office/datev/import
 POST /api/office/datev/import/check
