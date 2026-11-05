@@ -1648,14 +1648,13 @@ def org_leave(c, oid, uid, heir, back=None):
                 c.execute(f"UPDATE {table} SET owner_id=? WHERE id=?", (heir, xid))
             else:
                 c.execute(f"UPDATE {table} SET org_id=NULL WHERE id=?", (xid,))
-        c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (uid, oid))
+    # 2.566.0 (#4712): their (and their agents') member rows and shares of the organisation's calendars and address books
+    # are the shared core's revocation (person_revoked 'leave' below: members= of the kinds, restorable rows)
     # 2.46.0 (#1592, review fix): the leaver's personal agents leave the organisation with them -- its lists, calendars,
     # address books and the membership (an agent of an organisation is one of its members)
     ags = [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=?", (uid,)).fetchall()]
     for aid in ags:
         c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE org_id=?)", (aid, oid))
-        for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
-            c.execute(f"DELETE FROM {mt} WHERE user_id=? AND {key} IN (SELECT id FROM {table} WHERE org_id=?)", (aid, oid))
         c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, aid))
     # 2.87.0 (#1983): the leaver and their agents are no longer invited to the events of the organisation's calendars
     c.execute("DELETE FROM event_attendees WHERE user_id IN (%s) AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k "
