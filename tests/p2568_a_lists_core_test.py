@@ -295,5 +295,9 @@ rv = revoked_of(L9, uid["erik"])
 check(rc == 0 and not sees(S["erik"], L9) and rv and rv[0][1] == "expired" and rv[0][2] is None, f"F4: the expired row is 'expired', by nobody {rv[:1]} {out}")
 sh = A.get(B + f"/api/lists/{L9}/shares").json()
 check(any(x["id"] == rv[0][0] and x["reason"] == "expired" for x in sh["revoked"]), "F4: GET .../shares tells the expiry from a removal")
+# F3: it comes back without its expiry
+r = A.post(B + f"/api/lists/{L9}/shares/{rv[0][0]}/restore")
+check(r.ok and r.json().get("expiry_removed") is True and sees(S["erik"], L9) and role_of(L9, "erik") == "edit" and core_row(L9, uid["erik"])[3] is None,
+      f"F3: the expired share comes back without its expiry and the answer says so {core_row(L9, uid['erik'])} " + r.text[:200])
 
 sys.exit(done("p2568_a_lists_core"))

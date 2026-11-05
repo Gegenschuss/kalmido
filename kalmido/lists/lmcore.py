@@ -35,8 +35,8 @@ from flask import g, jsonify
 from ..accounts.session import me
 from ..core.access import _list_role, need_collab, need_list
 from ..core.config import app
-from ..core.db import bump, db
-from ..core.i18n import N_
+from ..core.db import bump, db, err, iso, now_utc
+from ..core.i18n import N_, tr
 from ..core.objects import obj_register, obj_share, obj_share_restore, obj_shares, obj_unshare
 from ..core.pg import system_ctx
 from ..core.writes import obj_history, obj_history_add
@@ -120,13 +120,19 @@ def lmc_unshare(c, actor, lid, uid):
 
 
 def _on_restore(c, uid, lid, share):
-    """obj_share_restore put uid's (the target's) row back: the project's own rules of a share decide (member_set: the
-    workspace, one agent per project, the lock, a child ...); a refusal answers its error, nothing is committed."""
+    """obj_share_restore put uid's (the target's) own member row back (list_own, a person / an agent: core/objects.py, review
+    F2): the project's own rules of a share decide (member_set: the workspace, one agent per project, the lock, a child ...);
+    a refusal answers its error, nothing is committed. Review F3: an expiry that ran out meanwhile is dropped (the share comes
+    back without one; the route's answer says so with expiry_removed)."""
     target = share.get("user_id") or share.get("agent_id")
     role = share.get("list_role") if share.get("list_role") in ("admin", "edit", "participant", "view") else "view"
+    exp = share.get("expires_at")
+    if exp and str(exp) <= iso(now_utc()):
+        exp, g.lmc_expiry_removed = None, True
+        c.execute("UPDATE fs_shares SET expires_at=NULL WHERE id=?", (int(share["id"]),))  # before member_set reads the row
     g.lmc_restore = int(target)  # member_set: the target need not be one the manager may look up (shared by e-mail before)
     try:
-        v1_call(member_set, int(lid), body={"user_id": int(target), "role": role, "expires_at": share.get("expires_at")})
+        v1_call(member_set, int(lid), body={"user_id": int(target), "role": role, "expires_at": exp})
     finally:
         g.pop("lmc_restore", None)
 
@@ -202,7 +208,8 @@ def lmc_share_restore_route(lid, revoked_id):
     sid = obj_share_restore(c, me(), LMC_KIND, lid, revoked_id)
     bump(c)
     c.commit()
-    return jsonify(id=sid, **obj_shares(c, me(), LMC_KIND, lid))
+    gone = bool(g.pop("lmc_expiry_removed", False))  # review F3: an expired share came back without its expiry
+    return jsonify(id=sid, expiry_removed=gone, **obj_shares(c, me(), LMC_KIND, lid))
 
 
 @app.get("/api/lists/<int:lid>/history")
