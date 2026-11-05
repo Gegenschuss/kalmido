@@ -29,6 +29,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES, SAMPLE_MT, sample_langs, sample_text  # 2.117.0 B (#2283); 2.449.0 (#3768)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
@@ -816,10 +817,12 @@ def dt_tpl_post():
 @app.patch("/api/office/doc-templates/<int:tid>")
 def dt_tpl_patch(tid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_doc_templates-{int(tid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
     cur = dt_tpl(c, oid, tid)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur["updated_at"], "row", lambda: dt_tpl_public(cur))
     row = dt_tpl_clean(c, oid, b, cur)
     if row:
         row["updated_at"] = iso(now_utc())
@@ -1029,6 +1032,7 @@ def dt_doc_patch(gid):
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur["updated_at"], "row", lambda: dt_doc_public(c, oid, cur))  # 2.560.0 C (#4700): two tabs' autosaves never overwrite each other
     row = {}
     if any(k in b for k in ("client_id", "list_id", "doc_id")):
         row.update(dt_refs(c, oid, b, cur))

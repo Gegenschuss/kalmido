@@ -230,14 +230,26 @@ function dtTplModal(t) {
       const v = s => $(s, md)?.value ?? '';
       const body = {name: v('#dt-tname'), kind: v('#dt-tkind'), lang: v('#dt-tlang'), sign: $('#dt-tsign', md).checked ? 1 : 0, body: v('#dt-tbody')};
       if (t) {
+        // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> the bar, never overwritten); the undo writes
+        // back only the changed keys, again with the check
         const old = {name: t.name, kind: t.kind, lang: t.lang, sign: t.sign, body: t.body};
-        await api('PATCH', `/api/office/doc-templates/${t.id}`, body); md.remove(); dtReload();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/doc-templates/${t.id}`, old); dtReload(); });
+        const sv = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/doc-templates/${t.id}`, t.updated_at ? {...body, expect_updated_at: t.updated_at} : body); md.remove(); dtReload();
+        const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => String(v ?? '') !== String(sv?.[k] ?? '')));
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/doc-templates/${t.id}`, {...back, expect_updated_at: sv.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } dtReload(); });
+        else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/doc-templates', body); md.remove(); dtReload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/doc-templates/${j.id}`); dtReload(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (like office.js ofcModal)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-dt-treload>${tr('Reload')}</button>`;
+        $('[data-dt-treload]', el).addEventListener('click', () => { md.remove(); dtReload(); dtTplModal(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
 }
 async function dtStartersModal() {
@@ -283,12 +295,32 @@ async function dtSave(d, quiet) {
   if (!('sign_image' in body)) delete old.sign_image;  // the undo only takes back this person's own change
   const same = ['title', 'body', 'client_id', 'list_id', 'doc_id', 'sign'].every(k => (body[k] ?? null) === (d[k] ?? null)) && !('sign_image' in body);
   try {
-    if (!same) Object.assign(d, await api('PATCH', `/api/office/gen-docs/${d.id}`, body));
-    if (!quiet) { DT.undo = null; toast(tr('Saved'), async () => { await api('PATCH', `/api/office/gen-docs/${d.id}`, old); dtReload(); }); }
-    else if (!same && !(DT.undo && DT.undo.id === d.id)) DT.undo = {id: d.id, v: old};
+    // 2.560.0 C (#4700): with the updated_at this tab has (the answer brings the new one, so the own next autosave passes);
+    // a second tab saved meanwhile -> 409 and the bar with "Reload" instead of overwriting each other
+    if (!same) Object.assign(d, await rawFetch('PATCH', `/api/office/gen-docs/${d.id}`, d.updated_at ? {...body, expect_updated_at: d.updated_at} : body));
+    if (!quiet) {
+      DT.undo = null;
+      const back = dtChangedKeys(old, d);  // the undo writes back only what this save changed, with the version check
+      if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/gen-docs/${d.id}`, {...back, expect_updated_at: d.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } dtReload(); });
+      else toast(tr('Saved'));
+    } else if (!same && !(DT.undo && DT.undo.id === d.id)) DT.undo = {id: d.id, v: old};
     const el = $('#dt-err'); if (el) el.textContent = '';
     return true;
-  } catch (x) { const el = $('#dt-err'); if (el) el.textContent = x.message || ''; return false; }
+  } catch (x) {
+    if (x.status === 409 && x.data?.row) { dtConflict(d, x.data.row); return false; }
+    const el = $('#dt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
+    return false;
+  }
+}
+// 2.560.0 C (#4700): the keys of an undo state that differ from the saved document now (sign_image: the own signature, as sent)
+const dtChangedKeys = (old, d) => Object.fromEntries(Object.entries(old).filter(([k, v]) => k === 'sign_image' ? v !== (d.sign_mine ? 1 : 0) : (v ?? null) !== (d[k] ?? null)));
+// 2.560.0 C (#4700): saved in another tab / on another device meanwhile: the bar like the letters (office_letters.js lt_conflict)
+function dtConflict(d, cur) {
+  clearTimeout(dtSaveTimer);
+  const el = $('#dt-err');
+  if (!el || S.route.id !== d.id) { toast(tr('Changed in the meantime')); return; }
+  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-dt-reload>${tr('Reload')}</button>`;
+  $('[data-dt-reload]', el).addEventListener('click', () => { clearTimeout(dtSaveTimer); DT.undo = null; Object.assign(d, cur); dtReload(); });
 }
 let dtSaveTimer = null;
 const dtSaveSoon = id => { clearTimeout(dtSaveTimer); dtSaveTimer = setTimeout(() => { const d = dtDoc(id); if (d && d.status === 'draft' && S.route.id === id) dtSave(d, true); }, 1500); };
