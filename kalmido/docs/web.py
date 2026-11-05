@@ -612,7 +612,8 @@ def docs_patch(nid):
     # 2.564.0 D (#4701): the version the document sheet works on (expect_updated_at); saved meantime -> 409 + the document
     write_lock(c, f"doc_meta-{nid}")
     m0, n0 = _doc(c, nid)
-    ccf_check(d, m0["updated_at"], "doc", lambda: doc_json(c, m0, n0, full=True, role=n0["role"]))
+    if m0["state"] not in ("wait", "run"):  # the recognition moves updated_at too, but keeps values set by hand (HAND_FIELDS): no conflict
+        ccf_check(d, m0["updated_at"], "doc", lambda: doc_json(c, m0, n0, full=True, role=n0["role"]))
     if isinstance(d, dict):
         d = {k: v for k, v in d.items() if k != "expect_updated_at"}
     e = doc_update(c, nid, d, me())
