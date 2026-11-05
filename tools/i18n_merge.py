@@ -80,7 +80,7 @@ def selftest():
     j = lambda *kv: "{\n" + ",\n".join(f'  "{k}": "{v}"' for k, v in kv) + "\n}\n"
     m, c = merge(j(("_meta", "x"), ("A", "a"), ("B", "b"), ("C", "c")), j(("_meta", "x"), ("A", "a"), ("B", "b"), ("C", "c"), ("M", "m")),
                  j(("_meta", "x"), ("A", "a2"), ("C", "c"), ("Z", "z")))
-    ok1 = not c and m == j(("_meta", "x"), ("A", "a2"), ("C", "c"), ("M", "m"), ("Z", "z"))
+    ok1 = not c and m == j(("_meta", "x"), ("A", "a2"), ("C", "c"), ("Z", "z"), ("M", "m"))  # Z follows its predecessor C
     m, c = merge(j(("A", "a")), j(("A", "a-ours")), j(("A", "a-theirs")))
     ok2 = c == ["A"] and "<<<<<<< ours" in m and json.loads(m.replace("<<<<<<< ours", "").replace("=======", "").replace(">>>>>>> theirs", "").replace('"a-ours",', '"a-ours"')) if False else c == ["A"] and "<<<<<<< ours" in m
     m, c = merge("[1]\n", j(("A", "a")), j(("A", "b")))
