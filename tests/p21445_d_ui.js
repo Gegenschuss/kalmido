@@ -85,7 +85,9 @@ const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (aw
     const sug = await ev(`(async () => {
       const inp = document.getElementById('shv-ed'); inp.value = '='; 
       const items = Array.from({length: 14}, (_, i) => ({token: 'var' + i, label: 'Variable ' + i, kind: 'variable'}));
-      const place = () => { SHV.ac = {items, i: 0, from: 1, to: 1, inp}; shvAcDraw(); const b = document.getElementById('shv-ac').getBoundingClientRect(), f = inp.getBoundingClientRect(); return {bt: b.top, bb: b.bottom, ft: f.top, fb: f.bottom}; };
+      // 2.543.0 (#4611): each place with a fresh list: the 2rem rows on touch put the first list below the field, a moved list's top
+      // runs through the (reduced-motion) transition and the rect read at once was still the old place
+      const place = () => { shvAcClose(); SHV.ac = {items, i: 0, from: 1, to: 1, inp}; shvAcDraw(); const b = document.getElementById('shv-ac').getBoundingClientRect(), f = inp.getBoundingClientRect(); return {bt: b.top, bb: b.bottom, ft: f.top, fb: f.bottom}; };
       const a = place();
       const real = Object.getOwnPropertyDescriptor(window, 'visualViewport');
       const f = inp.getBoundingClientRect();

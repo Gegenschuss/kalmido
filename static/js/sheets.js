@@ -16,7 +16,7 @@
 'use strict';
 
 const SHV = {idx: {}, sh: null, err: '', errFor: null, busy: {}, cur: null, anc: null, ed: null, filt: {}, deps: 0, ac: null, acT: 0,
-  drag: null, lp: null, lpDone: 0, newSp: '', stale: false, tick: 0, presAt: 0};
+  drag: null, lp: null, lpDone: 0, newSp: '', stale: false, tick: 0, presAt: 0, refDrag: null, refAt: 0, acTouch: null};  // 2.543.0 (#4611): + a reference being dragged, a tapped suggestion
 // 2.89.0 (#1916): parts C / D: menu: [(sheet) -> items] (the sheet's "…" menu), overview: [(space, lid) -> items] (the overview's "…");
 // a var on window, so entries registered by a script that ran before this one stay
 var SHV_HOOKS = window.SHV_HOOKS || {};
@@ -208,7 +208,7 @@ function shvSheetHtml(sh) {
     <button type="button" class="iconbtn" data-shv="menu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button></div>`;
   const c0 = SHV.cur && sh._col.has(SHV.cur.c) && sh._rowNo.has(SHV.cur.r) ? SHV.cur : null, cc = c0 && shvCell(c0.r, c0.c, sh);
   const bar = `<div class="shvbar"><span class="shvaddr" id="shv-addr" aria-live="polite">${c0 ? esc(cc?.name || shvAddr(c0.r, c0.c, sh)) : ''}</span><span class="shvfx" aria-hidden="true">fx</span>
-    <input id="shv-in" value="${esc(cc?.raw || '')}" autocomplete="off" spellcheck="false" ${w && c0 ? '' : 'readonly'} aria-label="${esc(tr('Content of the cell'))}" placeholder="${esc(c0 ? (w ? tr('Value or =formula') : '') : tr('Choose a cell'))}"></div>`;
+    <span class="shvinw"><input id="shv-in" value="${esc(cc?.raw || '')}" autocomplete="off" spellcheck="false" ${w && c0 ? '' : 'readonly'} aria-label="${esc(tr('Content of the cell'))}" placeholder="${esc(c0 ? (w ? tr('Value or =formula') : '') : tr('Choose a cell'))}"></span></div>`;  // 2.543.0 (#4611): the wrapper holds the coloured mirror
   const shz = typeof shz_plan === 'function' && shz_plan(sh);  // 2.98.0 C (#2181): sheetsize.js
   const colgroup = `<colgroup><col class="shvrhc">${cols.map(c => `<col data-c="${c.id}" style="width:${shvW(c) / 16}rem">`).join('')}${w ? '<col class="shvaddcc">' : ''}${shz ? shz_colsHtml(sh) : ''}</colgroup>`;  // 2.98.0 C (#2181): + the empty columns that fill the frame
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
@@ -371,6 +371,7 @@ function shvBarSync() {
   const cur = SHV.cur, c = cur && shvCell(cur.r, cur.c);
   if (ad) ad.textContent = cur ? (c?.name || shvAddr(cur.r, cur.c)) : '';
   if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Choose a cell'); }
+  shvRefPaint();  // 2.543.0 (#4611)
 }
 function shvSideSync() { const s = $('#shv-side'); if (s && SHV.sh && !s.contains(document.activeElement)) s.innerHTML = shvSideHtml(SHV.sh); }
 function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'function') shz_fill(); if (typeof shk_after === 'function') shk_after(); }  // 2.124.0 B (#2111): + the rows / columns kept in view  // 2.98.0 C (#2181): the empty cells that fill the frame
@@ -720,11 +721,13 @@ function shvEditStart(typed, bar) {
   const n = inp.value.length; inp.setSelectionRange(n, n);
   const b = $('#shv-in'); if (b) b.value = val;
   if (val.startsWith('=')) shvAcUpdate(inp);
+  shvRefPaint();  // 2.543.0 (#4611): the coloured references of the formula
 }
 async function shvEditEnd(save, move) {
   const ed = SHV.ed; if (!ed) return;
   const inp = ed.bar ? $('#shv-in') : $('#shv-ed'), v = inp ? inp.value : ed.val;
-  SHV.ed = null; shvAcClose();
+  SHV.ed = null; SHV.refDrag = null; shvAcClose();
+  shvRefPaint();  // 2.543.0 (#4611): no reference boxes, no mirror after the edit
   if (SHV.presAt) shvPresence(null);
   const td = document.getElementById(`shv-c-${ed.r}-${ed.c}`);
   if (td && !ed.bar) { td.classList.remove('editing'); const t = document.createElement('template'); t.innerHTML = shvTd(SHV.sh, ed.r, SHV.sh._col.get(ed.c)).trim(); if (t.content.firstElementChild) td.replaceWith(t.content.firstElementChild); }
@@ -830,8 +833,20 @@ function shvAcUpdate(inp) {
 function shvAcDraw() {
   const a = SHV.ac; if (!a) return;
   let box = $('#shv-ac');
-  if (!box) { box = document.createElement('div'); box.id = 'shv-ac'; box.className = 'shvac'; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', tr('Suggestions')); document.body.appendChild(box); }
-  box.innerHTML = a.items.map((x, i) => `<button type="button" role="option" class="${i === a.i ? 'on' : ''}" aria-selected="${i === a.i}" data-shvac="${i}" ${x.help ? `title="${esc(x.help)}"` : ''}><code>${esc(x.token)}</code><span class="shvacl">${esc(x.label || '')}</span>${x.value_display != null && x.value_display !== '' ? `<span class="shvacv">${esc(x.value_display)}</span>` : ''}</button>`).join('');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'shv-ac'; box.className = 'shvac'; box.setAttribute('role', 'listbox'); box.setAttribute('aria-label', tr('Suggestions')); document.body.appendChild(box);
+    // 2.543.0 (#4611): a tap picks on touchend and cancels the emulated mouse (mousedown / focus / click come only after the finger
+    // lifts, the field lost its focus and the keyboard closed before); a swipe still scrolls the list
+    box.addEventListener('touchstart', e => { const t = e.touches[0], b = e.target.closest?.('[data-shvac]'); SHV.acTouch = b && t ? {x: t.clientX, y: t.clientY, i: +b.dataset.shvac} : null; }, {passive: true});
+    box.addEventListener('touchend', e => {
+      const t0 = SHV.acTouch, t = e.changedTouches[0], b = e.target.closest?.('[data-shvac]'); SHV.acTouch = null;
+      if (!t0 || !t || !b || +b.dataset.shvac !== t0.i || Math.hypot(t.clientX - t0.x, t.clientY - t0.y) > 10) return;
+      if (e.cancelable) e.preventDefault();
+      shvAcPick(t0.i);
+    }, {passive: false});
+  }
+  // 2.543.0 (#4611): the short help of a function also as a line of its own (shown on touch, sheets.css; a mouse keeps the tooltip)
+  box.innerHTML = a.items.map((x, i) => `<button type="button" role="option" class="${i === a.i ? 'on' : ''}" aria-selected="${i === a.i}" data-shvac="${i}" ${x.help ? `title="${esc(x.help)}"` : ''}><code>${esc(x.token)}</code><span class="shvacl">${esc(x.label || '')}</span>${x.value_display != null && x.value_display !== '' ? `<span class="shvacv">${esc(x.value_display)}</span>` : ''}${x.help ? `<span class="shvach">${esc(x.help)}</span>` : ''}</button>`).join('');
   // 2.144.5 D (#2011): beside the field, never over it: below when it fits above the keyboard, else on the roomier side, shortened to fit
   const r = a.inp.getBoundingClientRect(), vv = window.visualViewport;
   const vBot = vv ? vv.offsetTop + vv.height : innerHeight, vTop = vv ? vv.offsetTop : 0;
@@ -849,28 +864,102 @@ function shvAcPick(i) {
   const x = a.items[i], inp = a.inp, v = inp.value;
   let ins = x.token; if (x.kind === 'function' && v[a.to] !== '(') ins += '(';
   inp.value = v.slice(0, a.from) + ins + v.slice(a.to);
-  const p = a.from + ins.length; inp.setSelectionRange(p, p); inp.focus();
+  const p = a.from + ins.length + (x.kind === 'function' && ins === x.token ? 1 : 0);  // 2.543.0 (#4611): a "(" already there: the cursor goes behind it, into the bracket
+  inp.focus({preventScroll: true}); inp.setSelectionRange(p, p);
   shvAcClose(); shvMirror(inp);
 }
 function shvMirror(inp) {  // the cell's editor and the formula bar show the same text
   if (SHV.ed) SHV.ed.val = inp.value;
   const o = inp.id === 'shv-ed' ? $('#shv-in') : $('#shv-ed'); if (o && o !== inp) o.value = inp.value;
+  shvRefPaint();  // 2.543.0 (#4611)
 }
-// a click on a cell while writing a formula (after an operator, "(" or ";"): its address goes in (Shift: a range)
+// a click on a cell while writing a formula (after an operator, "(" or ";"): its address goes in (Shift or a drag: a range)
+function shvRefCan(inp) {  // 2.543.0 (#4611): may a reference go in at the cursor (or replace the one just put in)?
+  const ed = SHV.ed; if (!ed || !inp || !inp.value.startsWith('=')) return false;
+  const pos = inp.selectionStart ?? inp.value.length, before = inp.value.slice(0, pos);
+  return !!(ed.ref && ed.ref.end === pos && before.endsWith(ed.ref.text)) || /[=+\-*/(;,&<>:]\s*$/.test(before);
+}
 function shvRefInsert(r, c, extend) {
-  const ed = SHV.ed, inp = ed && (ed.bar ? $('#shv-in') : $('#shv-ed')); if (!inp || !inp.value.startsWith('=')) return false;
+  const ed = SHV.ed, inp = ed && (ed.bar ? $('#shv-in') : $('#shv-ed')); if (!shvRefCan(inp)) return false;
   const pos = inp.selectionStart ?? inp.value.length, before = inp.value.slice(0, pos);
   const last = ed.ref && ed.ref.end === pos && before.endsWith(ed.ref.text);
-  if (!last && !/[=+\-*/(;,&<>:]\s*$/.test(before)) return false;
   let text = shvAddr(r, c);
   const cell = shvCell(r, c); if (cell?.name && !extend) text = cell.name;
   let start = pos;
-  if (last) { start = pos - ed.ref.text.length; if (extend && ed.ref.a) text = ed.ref.a + ':' + shvAddr(r, c); }
+  if (last) { start = pos - ed.ref.text.length; if (extend && ed.ref.a && ed.ref.a !== text) text = ed.ref.a + ':' + text; }
   inp.value = inp.value.slice(0, start) + text + inp.value.slice(pos);
   const p = start + text.length; inp.setSelectionRange(p, p);
   ed.ref = {end: p, text, a: last && extend ? ed.ref.a : shvAddr(r, c)};
   shvMirror(inp);
   return true;
+}
+// 2.543.0 (#4611): the references of a formula in colours, like a spreadsheet: every reference (cell, range, named cell of this sheet)
+// its own colour of a fixed row (sheets.css --shr0..7, light / dark); the same colour for its box on the grid and its text in the cell's
+// editor and the formula bar. The inputs stay plain inputs: a mirror behind them draws the text (theirs is transparent, the cursor not).
+const SHV_RC = 8;
+const shvColNo = l => [...String(l).toUpperCase()].reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0);
+function shvRefToks(v) {  // -> [{s, e, key, a: [col no, row no], b: [..] | null}] the local references of a formula, each with its colour (ci)
+  const out = [], seen = new Map(), sh = SHV.sh; if (!v.startsWith('=') || !sh) return out;
+  const names = new Map(); for (const c of sh.cells || []) if (c.name) names.set(String(c.name).toLowerCase(), c);
+  const re = /"(?:[^"]|"")*"?|(?:'(?:[^']|'')*'|[\p{L}_][\p{L}\p{N}_.]*)!\$?[A-Za-z]{1,3}\$?\d{1,6}(?::\$?[A-Za-z]{1,3}\$?\d{1,6})?|\$?([A-Za-z]{1,3})\$?(\d{1,6})(?::\$?([A-Za-z]{1,3})\$?(\d{1,6}))?(?![\p{L}\p{N}_.$(])|[\p{L}_][\p{L}\p{N}_.]*/gu;
+  let m;
+  while ((m = re.exec(v))) {
+    const t = m[0], s0 = m.index, prev = v[s0 - 1] || '';
+    if (/[\p{L}\p{N}_.$]/u.test(prev)) continue;  // a part of a number (1e5) or of a name
+    let a = null, b = null, key;
+    if (m[1]) { a = [shvColNo(m[1]), +m[2]]; b = m[3] ? [shvColNo(m[3]), +m[4]] : null; key = t.replace(/\$/g, '').toUpperCase(); }
+    else if (/^[\p{L}_]/u.test(t) && !/^\s*\(/.test(v.slice(s0 + t.length))) {
+      const c = names.get(t.toLowerCase()); if (!c) continue;
+      const col = sh._col.get(c.col_id), rn = sh._rowNo.get(c.row_id); if (!col || !rn) continue;
+      a = [shvColNo(col.letter), rn]; key = col.letter + rn;
+    } else continue;
+    if (!seen.has(key)) seen.set(key, seen.size % SHV_RC);
+    out.push({s: s0, e: s0 + t.length, key, a, b, ci: seen.get(key)});
+  }
+  return out;
+}
+function shvMirPaint(inp, toks) {  // the coloured mirror behind an editor (only while a formula is being edited)
+  if (!inp) return;
+  const on = !!SHV.ed && inp.value.startsWith('='), host = inp.parentElement;
+  let m = host?.querySelector(':scope > .shvmir');
+  if (!on) { m?.remove(); inp.classList.remove('shvmx'); return; }
+  if (!m) { m = document.createElement('div'); m.className = 'shvmir' + (inp.id === 'shv-ed' ? ' ed' : ''); m.setAttribute('aria-hidden', 'true'); inp.before(m); }
+  const v = inp.value; let h = '', p = 0;
+  for (const t of toks) { h += esc(v.slice(p, t.s)) + `<span class="shvrt" data-ci="${t.ci}" style="--rc:var(--shr${t.ci})">${esc(v.slice(t.s, t.e))}</span>`; p = t.e; }
+  m.innerHTML = `<span class="shvmt">${h + esc(v.slice(p))}</span>`;
+  if (inp.style.width) m.style.width = inp.style.width;
+  inp.classList.add('shvmx'); m.scrollLeft = inp.scrollLeft;
+}
+function shvRefPaint() {  // the mirrors of both editors, the boxes of the references on the grid, the drag mode of the cells
+  const sc = $('#shv-scroll'), sh = SHV.sh, ed = SHV.ed;
+  const inp = ed && (ed.bar ? $('#shv-in') : $('#shv-ed')), v = inp ? inp.value : '';
+  const toks = ed && sh ? shvRefToks(v) : [];
+  for (const x of [$('#shv-ed'), $('#shv-in')]) shvMirPaint(x, toks);
+  if (!sc || !sh) return;
+  shvTouchHook(sc);
+  sc.classList.toggle('shvfx', shvRefCan(inp));  // touch: a finger on a cell then draws a range instead of scrolling (sheets.css)
+  sc.querySelectorAll(':scope > .shvrb').forEach(x => x.remove());
+  if (!toks.length) return;
+  const [rs, cs] = shvGrid(), cno = cs.map(id => shvColNo(sh._col.get(id)?.letter || '')), rno = rs.map(id => sh._rowNo.get(id));
+  const o = sc.getBoundingClientRect(), done = new Set(), frag = document.createDocumentFragment();
+  for (const t of toks) {
+    if (done.has(t.key)) continue; done.add(t.key);
+    const b = t.b || t.a, c0 = Math.min(t.a[0], b[0]), c1 = Math.max(t.a[0], b[0]), r0 = Math.min(t.a[1], b[1]), r1 = Math.max(t.a[1], b[1]);
+    const ri = rno.map((n, i) => n >= r0 && n <= r1 ? i : -1).filter(i => i >= 0), ci = cno.map((n, i) => n >= c0 && n <= c1 ? i : -1).filter(i => i >= 0);
+    if (!ri.length || !ci.length) continue;
+    const tl = document.getElementById(`shv-c-${rs[ri[0]]}-${cs[ci[0]]}`), br = document.getElementById(`shv-c-${rs[ri[ri.length - 1]]}-${cs[ci[ci.length - 1]]}`); if (!tl || !br) continue;
+    const p = tl.getBoundingClientRect(), q = br.getBoundingClientRect(), d = document.createElement('div');
+    d.className = 'shvrb'; d.dataset.ci = t.ci; d.dataset.ref = t.key; d.setAttribute('aria-hidden', 'true'); d.style.setProperty('--rc', `var(--shr${t.ci})`);
+    d.style.left = (p.left - o.left + sc.scrollLeft - sc.clientLeft) + 'px'; d.style.top = (p.top - o.top + sc.scrollTop - sc.clientTop) + 'px';
+    d.style.width = (q.right - p.left) + 'px'; d.style.height = (q.bottom - p.top) + 'px';
+    frag.appendChild(d);
+  }
+  sc.appendChild(frag);
+}
+function shvTouchHook(sc) {  // a finger that starts a reference: no scrolling, no emulated mouse (it would take the editor's focus / the keyboard)
+  if (sc.dataset.shvth) return; sc.dataset.shvth = '1';
+  sc.addEventListener('touchstart', e => { if (SHV.refDrag && e.cancelable) e.preventDefault(); }, {passive: false});
+  sc.addEventListener('touchmove', e => { if (SHV.refDrag && e.cancelable) e.preventDefault(); }, {passive: false});
 }
 
 // ---- arrows: from the sources to the chosen cell (and on to the cells that use it), or for the whole sheet
@@ -978,7 +1067,8 @@ document.addEventListener('pointerdown', e => {
   const td = shvTdOf(e.target); if (!td || !SHV.sh || e.button > 0) return;
   const r = +td.dataset.r, c = +td.dataset.c;
   if (SHV.ed && SHV.ed.r === r && SHV.ed.c === c && !SHV.ed.bar) return;  // a click inside the own editor
-  if (SHV.ed && shvRefInsert(r, c, e.shiftKey)) { e.preventDefault(); return; }
+  // 2.543.0 (#4611): the reference goes in at once, with a finger too; moving on draws a range (pointermove), the editor keeps focus
+  if (SHV.ed && shvRefInsert(r, c, e.shiftKey)) { e.preventDefault(); SHV.refDrag = {r, c}; SHV.refAt = Date.now(); clearTimeout(SHV.lp?.t); SHV.lp = null; return; }
   if (e.pointerType === 'touch') {
     clearTimeout(SHV.lp?.t);
     SHV.lp = {x: e.clientX, y: e.clientY, td, t: setTimeout(() => { SHV.lpDone = Date.now(); SHV.lp = null; shvTipPop(td); }, 500)};
@@ -992,19 +1082,26 @@ document.addEventListener('pointerdown', e => {
 });
 document.addEventListener('pointermove', e => {
   if (SHV.lp && Math.hypot(e.clientX - SHV.lp.x, e.clientY - SHV.lp.y) > 10) { clearTimeout(SHV.lp.t); SHV.lp = null; }
+  if (SHV.refDrag && SHV.ed) {  // 2.543.0 (#4611): a reference drawn over the cells grows into a range (in its colour at once)
+    const td = shvTdOf(document.elementFromPoint?.(e.clientX, e.clientY)); if (!td) return;
+    const r = +td.dataset.r, c = +td.dataset.c;
+    if (r !== SHV.refDrag.r || c !== SHV.refDrag.c) { SHV.refDrag = {r, c}; SHV.refAt = Date.now(); shvRefInsert(r, c, true); }
+    return;
+  }
   if (!SHV.drag || e.pointerType === 'touch') return;
   const td = shvTdOf(document.elementFromPoint?.(e.clientX, e.clientY)); if (!td) return;
   const r = +td.dataset.r, c = +td.dataset.c;
   if (SHV.cur && (SHV.cur.r !== r || SHV.cur.c !== c)) { SHV.cur = {r, c}; shvPaintSel(); }
 });
-document.addEventListener('pointerup', () => { SHV.drag = null; if (SHV.lp) { clearTimeout(SHV.lp.t); SHV.lp = null; } });
-document.addEventListener('pointercancel', () => { SHV.drag = null; if (SHV.lp) { clearTimeout(SHV.lp.t); SHV.lp = null; } });
+document.addEventListener('pointerup', () => { SHV.drag = null; if (SHV.refDrag) { SHV.refDrag = null; SHV.refAt = Date.now(); } if (SHV.lp) { clearTimeout(SHV.lp.t); SHV.lp = null; } });
+document.addEventListener('pointercancel', () => { SHV.drag = null; SHV.refDrag = null; if (SHV.lp) { clearTimeout(SHV.lp.t); SHV.lp = null; } });
 document.addEventListener('contextmenu', e => { if (shvTdOf(e.target) && isTouch()) e.preventDefault(); });
 document.addEventListener('click', e => {  // touch: tap = choose, a second tap on the chosen cell edits
   const td = shvTdOf(e.target); if (!td || !SHV.sh || !isTouch()) return;
   if (Date.now() - SHV.lpDone < 600) return;
   const r = +td.dataset.r, c = +td.dataset.c;
   if (SHV.ed && SHV.ed.r === r && SHV.ed.c === c) return;
+  if (SHV.ed && Date.now() - SHV.refAt < 700) return;  // 2.543.0 (#4611): the tap / drag of a reference is done (pointerdown); its click must not shrink a range
   if (SHV.ed && shvRefInsert(r, c, false)) return;
   if (SHV.ed) shvEditEnd(true);
   if (SHV.cur && SHV.cur.r === r && SHV.cur.c === c) { SHV.sh.can_write ? shvEditStart(null) : shvTipPop(td); return; }
@@ -1079,23 +1176,33 @@ document.addEventListener('input', e => {
   }
 });
 document.addEventListener('focusin', e => {
-  if (e.target.id === 'shv-in' && SHV.cur && SHV.sh?.can_write && !SHV.ed) { const r = SHV.cur; SHV.ed = {r: r.r, c: r.c, orig: shvRaw(r.r, r.c), val: e.target.value, bar: true}; }
+  if (e.target.id === 'shv-in' && SHV.cur && SHV.sh?.can_write && !SHV.ed) { const r = SHV.cur; SHV.ed = {r: r.r, c: r.c, orig: shvRaw(r.r, r.c), val: e.target.value, bar: true}; shvRefPaint(); }
 });
 document.addEventListener('focusout', e => {
   const t = e.target;
   if ((t.id === 'shv-ed' || t.id === 'shv-in') && SHV.ed) {
     setTimeout(() => {  // a click on a suggestion or on a cell (formula reference) keeps the editor
       if (!SHV.ed || document.activeElement === t || document.activeElement?.closest?.('#shv-ac')) return;
+      // 2.543.0 (#4611): a finger on a suggestion or a reference that still took the focus: back into the field (keyboard and cursor stay)
+      if ((SHV.acTouch || SHV.refDrag || Date.now() - SHV.refAt < 700) && t.isConnected) { t.focus({preventScroll: true}); return; }
       if ((t.id === 'shv-ed' && !SHV.ed.bar) || (t.id === 'shv-in' && SHV.ed.bar)) shvEditEnd(true);
     }, 120);
   }
   if (t.id === 'shv-name' && SHV.sh && SHV.cur) { const c = shvCell(SHV.cur.r, SHV.cur.c); if (c) shvName(c, t.value.trim()); }
 });
-document.addEventListener('mousedown', e => { if (e.target.closest?.('#shv-ac')) e.preventDefault(); }, true);
+document.addEventListener('mousedown', e => { if (e.target.closest?.('#shv-ac') || (SHV.ed && Date.now() - SHV.refAt < 700 && shvTdOf(e.target))) e.preventDefault(); }, true);  // 2.543.0 (#4611): + the emulated mouse of a reference tap
+// 2.543.0 (#4611): the mirror follows the field's own scrolling and cursor (a long formula), the suggestions stay above the keyboard
+document.addEventListener('scroll', e => { const t = e.target; if (t?.classList?.contains('shvmx')) { const m = t.parentElement?.querySelector(':scope > .shvmir'); if (m) m.scrollLeft = t.scrollLeft; } }, true);
+document.addEventListener('selectionchange', () => {
+  const t = document.activeElement; if (!SHV.ed || (t?.id !== 'shv-ed' && t?.id !== 'shv-in')) return;
+  requestAnimationFrame(() => { const m = t.parentElement?.querySelector(':scope > .shvmir'); if (m) m.scrollLeft = t.scrollLeft; $('#shv-scroll')?.classList.toggle('shvfx', shvRefCan(t)); });
+});
+window.visualViewport?.addEventListener('resize', () => { if (SHV.ac) shvAcDraw(); });
+window.visualViewport?.addEventListener('scroll', () => { if (SHV.ac) shvAcDraw(); });
 document.addEventListener('copy', e => { if (document.activeElement?.id === 'shv-scroll' && SHV.cur) shvCopy(e, false); });
 document.addEventListener('cut', e => { if (document.activeElement?.id === 'shv-scroll' && SHV.cur && SHV.sh?.can_write) shvCopy(e, true); });
 document.addEventListener('paste', e => { if (document.activeElement?.id === 'shv-scroll' && SHV.cur) shvPaste(e); });
-window.addEventListener('resize', () => { if (S.route.mod === 'sheets' && SHV.deps) requestAnimationFrame(shvDepsDraw); });
+window.addEventListener('resize', () => { if (S.route.mod === 'sheets' && SHV.deps) requestAnimationFrame(shvDepsDraw); if (S.route.mod === 'sheets' && SHV.ed) requestAnimationFrame(shvRefPaint); });
 // ---- 2.96.0 B (#1941): a table to the other workspace (private <-> organisation). The shared dialog (spacemove.js) shows the
 // server's dry run (the list attachment that ends, carried-over rows that lose their link, formulas that show "No access");
 // the move back is ONE undo step and brings the attachment and the links back where they fit again.

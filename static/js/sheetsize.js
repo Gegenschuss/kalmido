@@ -40,7 +40,7 @@ function shz_plan(sh) {
   const H = s ? s.h : shz_full() ? (el ? el.clientHeight / rem : 0) : SHZ_AUTO_H;
   if (el) SHZ.w[sh.id] = el.clientWidth / rem;
   if (!(W > 0)) return false;  // no frame measured yet (first draw, no layout): no empty cells
-  const rowH = matchMedia('(hover: none)').matches ? 2.75 : 2;
+  const rowH = 2;  // 2.543.0 (#4611): the cells are 2rem on touch, too
   const tw = 2.75 + sh.columns.reduce((a, c) => a + shvW(c) / 16, 0) + (sh.can_write ? 2.5 : 0);
   const n = shvVisRows(sh).length, free = H - rowH * (n + 1) - .125;
   const c = Math.max(0, Math.min(30, Math.ceil((W - tw - .125) / SHZ_COL)));
