@@ -367,12 +367,21 @@ def le2a_move(c, tid, cur, f, extra, dst):
                 c.execute("UPDATE comments SET body=? WHERE id=?", (v, key))
             else:
                 c.execute("UPDATE task_field_values SET value=? WHERE task_id=? AND field_id=?", (v, *key))
+        # 2.556.0 C review (#4583, finding 2): a completed copy's subtask snapshot is in the source format: it goes
+        c.execute(f"UPDATE tasks SET sub_snapshot='' WHERE id IN ({','.join('?' * len(ids))}) AND sub_snapshot<>''", ids)
         if mode == "on":
             # 2.64.1 review (L2): the waiting note is not encrypted (like finish: it goes)
             if ids:
                 c.execute(f"UPDATE tasks SET wait_note='' WHERE id IN ({','.join('?' * len(ids))}) AND COALESCE(wait_note, '')<>''", ids)
             le2a_scrub_tasks(c, ids)
     return post
+
+
+def le2a_rsn_drop(c, lid):
+    """2.556.0 C review (#4583, finding 2): the lock goes on / off: the subtask snapshots of the list's completed copies
+    (tasks.sub_snapshot, written in plain by tasks/lifecycle.rsn_take, which writes none while the list has a lock) go --
+    the browser does not convert them, so neither plain text under the lock nor a ciphertext after it stays."""
+    c.execute("UPDATE tasks SET sub_snapshot='' WHERE list_id=? AND sub_snapshot<>''", (lid,))
 
 
 def le2a_scrub_tasks(c, ids):
@@ -849,6 +858,7 @@ def le2a_start(lid):
         return err(tr("The project is already encrypted in the browser."), 409)
     c.execute("DELETE FROM list_keys WHERE list_id=?", (lid,))
     c.execute("DELETE FROM list_key_pending WHERE list_id=?", (lid,))
+    le2a_rsn_drop(c, lid)  # 2.556.0 C review (#4583)
     for u, w in given.items():
         c.execute("INSERT INTO list_keys(list_id,gen,user_id,wrapped,wrapped_by,wrapper_pub,created_at) VALUES(?,?,?,?,?,?,?)",
                   (lid, gen, u, w, uid, mine["pub"], ts))
@@ -1106,6 +1116,7 @@ def le2a_stop(lid):
                      (uid, ts, lid)).rowcount:
         c.rollback()
         return err(tr("The project is not encrypted in the browser."), 409)
+    le2a_rsn_drop(c, lid)  # 2.556.0 C review (#4583)
     c.execute("INSERT INTO list_activity(list_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
               (lid, uid, "e2e", json.dumps({"on": False}), ts))
     bump(c)

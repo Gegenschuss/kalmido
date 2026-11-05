@@ -33,6 +33,11 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
   check(!box?.querySelector('input, button, [data-act]'), 'read only: nothing to click');
   w.eval(`openDetail(${R})`); await idle(w);
   check(await until(() => w.eval(`S.sel === ${R}`)) && !d.querySelector('#detail .rsnap'), 'the original shows no snapshot');
+  // 2.556.0 C review (#4583, finding 3): a copy that is open again (or a series again) shows no old round, even with the field
+  w.eval(`Object.assign(S.tasks.get(${cp}), {status: 0}); openDetail(${cp})`); await idle(w);
+  check(await until(() => w.eval(`S.sel === ${cp}`)) && !d.querySelector('#detail .rsnap'), 'reopened copy: no snapshot');
+  w.eval(`Object.assign(S.tasks.get(${cp}), {status: 2, repeat: 'FREQ=WEEKLY'}); openDetail(${R}); openDetail(${cp})`); await idle(w);
+  check(await until(() => w.eval(`S.sel === ${cp}`)) && !d.querySelector('#detail .rsnap'), 'copy with a repeat: no snapshot');
 
   check(errs.length === 0, 'no script errors: ' + errs.join(' | '));
   w.close();

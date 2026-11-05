@@ -353,7 +353,7 @@ def v1_task(d):
         out["also"] = d["also"]
     if d.get("file_hit"):  # 2.81.0 (#1856): search -- only the recognised text of this file matched (absent otherwise; G4: needs attachments:read)
         out["file_hit"] = d["file_hit"]
-    if d.get("sub_snapshot"):  # 2.556.0 C (#4583): the completed copy of a recurring task: its subtasks then (serializers.task_dict)
+    if d.get("sub_snapshot"):  # 2.556.0 C (#4583): the completed copy of a recurring task: its subtasks then (serializers.task_dict; never for an agent's token)
         out["sub_snapshot"] = d["sub_snapshot"]
     return out
 
@@ -375,11 +375,8 @@ def task_for(c, row, uid):
         out["note_locked"] = True  # 2.48.0 (#1642): the note is locked with its owner's password (never readable here)
     if str(row["tt_id"] or "").startswith("mail:"):  # 2.126.0 B (#1978): title and notes came from an e-mail
         out.update(origin="mail", untrusted=True)
-    if "sub_snapshot" in row.keys() and row["sub_snapshot"]:  # 2.556.0 C (#4583): as v1_task (events, webhooks)
-        from ..core.serializers import rsn_out
-        ss = rsn_out(row["sub_snapshot"])
-        if ss:
-            out["sub_snapshot"] = ss
+    # 2.556.0 C review (#4583, finding 1): no sub_snapshot here -- events go to agents (their data lock hides subtasks the
+    # snapshot would name) and webhooks go outside; only people read it (serializers.rsn_shown)
     return out
 
 

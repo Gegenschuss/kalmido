@@ -16,13 +16,47 @@ from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
 # ---------------------------------------------------------------- serializers
 
+RSN_ITEMS_MAX, RSN_TITLE_MAX = 100, 500  # 2.556.0 C review (#4583): as lifecycle.RSN_MAX; a title is cut to this
+
+
 def rsn_out(v):
-    """2.556.0 C (#4583): tasks.sub_snapshot (JSON text, lifecycle.rsn_take) -> {done, total, items} or None (none / damaged)."""
+    """2.556.0 C (#4583): tasks.sub_snapshot (JSON text, lifecycle.rsn_take) -> {done, total, items} or None (none / damaged).
+    Review (finding 4): only the known shape goes out -- at most RSN_ITEMS_MAX items, each {title: str (cut), status in
+    -1 / 0 / 2, depth: int}; anything else (an import, an old row) is dropped."""
     try:
         ss = json.loads(v or "null")
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, RecursionError):
         return None
-    return ss if isinstance(ss, dict) and isinstance(ss.get("items"), list) else None
+    if not isinstance(ss, dict) or not isinstance(ss.get("items"), list):
+        return None
+    items = []
+    for i in ss["items"]:
+        if len(items) >= RSN_ITEMS_MAX:
+            break
+        if not isinstance(i, dict) or not isinstance(i.get("title"), str) or isinstance(i.get("status"), bool) \
+                or i.get("status") not in (-1, 0, 2) or isinstance(i.get("depth"), bool) or not isinstance(i.get("depth"), int):
+            continue
+        items.append({"title": i["title"][:RSN_TITLE_MAX], "status": i["status"], "depth": min(max(i["depth"], 1), 60)})
+    if not items:
+        return None
+
+    def num(k):
+        x = ss.get(k)
+        return x if isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 100000 else None
+    done, total = num("done"), num("total")
+    if done is None or total is None or total < len(items) or done > total:  # counts that do not fit: those of the items
+        done, total = sum(1 for i in items if i["status"] == 2), len(items)
+    return {"done": done, "total": total, "items": items}
+
+
+def rsn_shown(d):
+    """2.556.0 C review (#4583): may this task dict carry its sub_snapshot? Only a completed copy that is not a series again
+    (finding 3: reopened / given a repeat it is a live task) and never for an agent (finding 1: the snapshot names subtasks the
+    agent's data lock hides -- core/dlock.py; agents read the copy's subtasks nowhere else either)."""
+    if d.get("status") != 2 or d.get("repeat"):
+        return False
+    from ..agents.core import is_agent
+    return not (has_request_context() and is_agent(getattr(g, "user", None)))
 
 
 def task_dict(r, tags, full_snips=False):
@@ -51,7 +85,8 @@ def task_dict(r, tags, full_snips=False):
         d.pop("approval", None)
         d.pop("approver_id", None)
     if "sub_snapshot" in d:  # 2.556.0 C (#4583): a completed copy of a recurring task: its subtasks then (read only), only when set
-        ss = rsn_out(d.pop("sub_snapshot"))
+        raw = d.pop("sub_snapshot")
+        ss = rsn_out(raw) if rsn_shown(d) else None  # review: not for agents, not on a live task
         if ss:
             d["sub_snapshot"] = ss
     fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set

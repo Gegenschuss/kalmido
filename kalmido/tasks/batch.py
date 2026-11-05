@@ -305,6 +305,8 @@ def task_batch():
                 from ..lists.rules import rul_fire, rul_snap
                 rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
                 c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
+                from .lifecycle import rsn_clear
+                rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
                 log_act(c, tid, "reopen")
                 rul_fire(c, tid, rb)
                 undo[str(tid)] = signed(tid, {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"],

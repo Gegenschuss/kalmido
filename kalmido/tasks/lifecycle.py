@@ -247,6 +247,8 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
             from ..tasks.movememo import tmm_snap
             tmm = tmm_snap(c, tid)
         c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tid])
+        if f.get("repeat"):
+            rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3): a completed copy that repeats again keeps no old round
         if "list_id" in f:  # subtasks follow their parent (all levels)
             move_subtree(c, tid, f["list_id"])
             if le2_post:
@@ -412,7 +414,12 @@ RSN_MAX = 100  # items kept in a snapshot (done / total count all of them)
 def rsn_take(c, tid):
     """2.556.0 C (#4583): the subtasks of tid (all levels, in their order, not in the trash) as they are now -> the JSON of
     tasks.sub_snapshot ({"done", "total", "items": [{"title", "status", "depth"}]}) or '' without subtasks. A title of a list
-    with the lock stays its ciphertext (same list and field: the browser opens it like the copy's own title)."""
+    with the lock stays its ciphertext (same list and field: the browser opens it like the copy's own title).
+    Review (finding 2): a list with the lock (any state) keeps none -- the lock's switch, key change and moves do not know
+    this column, so it never holds a ciphertext (or a plain text there); liste2e clears it when the lock or a move starts."""
+    from ..collab.liste2e import le2e_task_mode
+    if le2e_task_mode(c, tid):
+        return ""
     ids = descendants(c, tid)
     if not ids:
         return ""
@@ -435,6 +442,12 @@ def rsn_take(c, tid):
         return ""
     return json.dumps({"done": sum(1 for i in items if i["status"] == 2), "total": len(items), "items": items[:RSN_MAX]},
                       ensure_ascii=False)
+
+
+def rsn_clear(c, tid):
+    """2.556.0 C review (#4583, finding 3): the completed copy is reopened or becomes a series again: its sub_snapshot goes
+    (it described one past round; the task's own subtasks are what counts now)."""
+    c.execute("UPDATE tasks SET sub_snapshot='' WHERE id=? AND sub_snapshot<>''", (tid,))
 
 
 def do_complete(c, tid, status=2, undo=None):
@@ -517,6 +530,8 @@ def do_complete(c, tid, status=2, undo=None):
     else:
         c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=?",
                   (status, ts, who, ts, tid))
+        if status == 0:
+            rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3): open again = a live task, the old round's state goes
         if status != 0:  # completing a parent completes its open subtasks (all levels)
             for d in descendants(c, tid):
                 c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0",
@@ -774,6 +789,7 @@ def task_reopen(tid):
         log_act(c, tid, "reopen")
         stars_revoke(c, tid, at=old["completed_at"], kid=old["completed_by"])  # 2.19.0 (#653)
     c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
     rul_fire(c, tid, rb)
     bump(c)
     c.commit()
