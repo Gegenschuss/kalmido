@@ -27,6 +27,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
 from ..core.access import health_hidden, need_feat, token_lists
+from ..core.dlock import dl_list_hidden  # 2.560.0 B (#4699)
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, lang, tr
@@ -104,8 +105,8 @@ def _on_trash(c, uid, rid, restore):
 
 
 def _hidden(c, uid):
-    """Agents only (like sheet_shares, shshare.py shs_fits): the tables of a project with a lock, a health / budget project or
-    outside the agent's list limit. A person: none (a folder share opens a project's table like a sheet share does) --
+    """Agents only (like sheet_shares, shshare.py shs_fits): the tables of a project with a lock, a health / budget project,
+    outside the agent's list limit or (2.560.0 B, #4699) left out by its data lock. A person: none (a folder share opens a project's table like a sheet share does) --
     2.199.0 F (#2742, review G5): through an API token the token's limits (its lists, health only with the scope private,
     no locked project)."""
     agent = sh_is_agent(c, uid)
@@ -121,9 +122,10 @@ def _hidden(c, uid):
     cap = _agent_cap(c, uid) if agent else token_lists()
     life = ("health", "budget") if agent else (("health",) if health_hidden(c, uid) else ())
     bad = []
-    for l in c.execute("SELECT id, life, e2e FROM lists WHERE id IN (SELECT DISTINCT list_id FROM sheets WHERE list_id IS NOT NULL "
+    for l in c.execute("SELECT id, life, e2e, org_id FROM lists WHERE id IN (SELECT DISTINCT list_id FROM sheets WHERE list_id IS NOT NULL "
                        "AND book_id IS NULL)").fetchall():
-        if l["e2e"] is not None or (l["life"] or "") in life or (cap is not None and l["id"] not in cap):
+        if l["e2e"] is not None or (l["life"] or "") in life or (cap is not None and l["id"] not in cap) or \
+                (agent and dl_list_hidden(c, uid, l["id"], l["life"], l["org_id"])):  # 2.560.0 B (#4699): the agent's data lock
             bad.append(l["id"])
     out = f"(SELECT id FROM sheets WHERE list_id IN ({','.join(str(int(x)) for x in bad)}))" if bad else ""
     if has_request_context():

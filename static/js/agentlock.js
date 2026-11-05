@@ -3,6 +3,7 @@
 // Areas as switches (the fixed ones locked and greyed, the defaults marked), projects and tags to add / remove. Autosave: PATCH
 // /api/agents/<id>/data-lock with only the changed part; the server enforces the lock in every read path of the agent (core/dlock.py).
 const AWL_AREAS = [['mail', N_('Private e-mails')], ['contracts', N_('Contracts')], ['home', N_('Home & devices')], ['travel', N_('Private trips')],
+  ['calendar', N_('Calendar')], ['contacts', N_('Contacts')],  // 2.560.0 B (#4699): whole modules
   ['journal', N_('Journal')], ['mood', N_('Mood')], ['health', N_('Health')], ['budget', N_('Household budget')], ['reading', N_('Read later')]];
 function awl_html(j) {
   const d = j.data_lock, always = new Set(j.always), def = j.defaults || {};

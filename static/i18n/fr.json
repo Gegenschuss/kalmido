@@ -16457,5 +16457,6 @@
   "Whole word": "Mot entier",
   "Regular expression": "Expression régulière",
   "Replace all": "Tout remplacer",
-  "Task…": "Tâche…"
+  "Task…": "Tâche…",
+  "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine"
 }

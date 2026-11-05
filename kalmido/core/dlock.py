@@ -5,6 +5,10 @@ One place for every read path of an agent; core/access.py calls it at its centra
    also when someone else's request asks for the agent (events: agent_emit -> acx_task_ok / list_role)
  - _req_filters_sql: the agent's own list scope (vis_sql / wr_sql / acx_lists_sql of its requests)
  - tvis / task_visible: single locked tasks (e-mails in a private space, tasks with a locked tag) and all their subtasks
+ - 2.560.0 B (#4699) the side ways to the same data: sheets/core.py sh_may (a table bound to a locked list, also when shared
+   with the agent or filed in a folder shared with it), events/model.py ev_role_of / ev_range (an event whose task the lock
+   covers), and the areas "calendar" / "contacts" (events/model.py _ev_role / my_cal_ids, contacts/model.py book_role /
+   my_book_ids / contacts_on, need_feat for every write route of the two modules)
 The lock only ever narrows what an agent sees: the tenant boundary and the fixed rules (health, budget, read later, the
 journal with its mood: never an agent's since 2.22.0 / 2.72.0 / 2.172.1) stay as they are and cannot be opened here.
 
@@ -15,9 +19,14 @@ from flask import g, has_request_context, request
 
 DL_ALWAYS = ("journal", "mood", "health", "budget", "reading")  # fixed (scope "private" / list rules), shown as locked
 DL_LIST_AREAS = ("contracts", "home", "travel")  # the private lists of Home & life (lists.life, no organisation)
-DL_SWITCH = ("mail",) + DL_LIST_AREAS
+# 2.560.0 B (#4699): whole modules an agent can be kept out of (its calendars with their events / its address books with
+# their contacts), checked in their own role functions (events/model.py _ev_role, contacts/model.py book_role) and need_feat
+DL_MOD_AREAS = ("calendar", "contacts")
+DL_FEAT_AREA = {"events": "calendar", "contacts": "contacts"}  # need_feat module -> area
+DL_SWITCH = ("mail",) + DL_LIST_AREAS + DL_MOD_AREAS
 DL_AREAS = DL_ALWAYS + DL_SWITCH
-DL_DEFAULT = {"mail": True, "contracts": False, "home": False, "travel": False}  # private e-mails locked for every agent
+DL_DEFAULT = {"mail": True, "contracts": False, "home": False, "travel": False,  # private e-mails locked for every agent
+              "calendar": False, "contacts": False}
 DL_LISTS_MAX, DL_TAGS_MAX, DL_TAG_LEN = 200, 50, 50
 DL_INLINE_MAX = 500  # 2.235.0 B2 (#2902): locked task ids written inline into a query, more = one array constant
 
@@ -47,6 +56,7 @@ def _dl_eff(raw):
     d["_lareas"] = tuple(k for k in DL_LIST_AREAS if d["areas"][k])
     d["_mail"] = d["areas"]["mail"]
     d["_tags"] = tuple(sorted({t.lower() for t in d["tags"]}))
+    d["_mods"] = frozenset(k for k in DL_MOD_AREAS if d["areas"][k])
     return d
 
 
@@ -70,6 +80,18 @@ def dl_of(c, uid):
     if cache is not None:
         cache[uid] = out
     return out
+
+
+def dl_area_locked(c, uid, area):
+    """2.560.0 B (#4699): is the whole module area ("calendar" | "contacts") locked for account uid? False for people."""
+    d = dl_of(c, uid)
+    return bool(d) and area in d["_mods"]
+
+
+def dl_sheet_locked(c, uid, r):
+    """2.560.0 B (#4699): is table row r (its rights row: a further sheet has its first sheet's) bound to a list locked for
+    account uid? Asked by sheets/core.py sh_may before a share or a folder could open it. False for people."""
+    return bool(r is not None and r["list_id"]) and dl_list_locked(c, uid, r["list_id"])
 
 
 def dl_list_hidden(c, uid, lid, life, org_id):

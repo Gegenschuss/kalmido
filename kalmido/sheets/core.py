@@ -20,6 +20,7 @@ import time
 from flask import g, has_request_context
 
 from ..core.access import MANAGE_ROLES, Denied, WRITE_ROLES, acx_org_ok, list_role
+from ..core.dlock import dl_of, dl_sheet_locked  # 2.560.0 B (#4699)
 from ..core.db import bump, iso_ms, now_utc
 from ..core.i18n import N_, lang, tr
 from ..core.pg import insert_id, write_lock
@@ -106,7 +107,10 @@ def sh_list_bound(c, r):
 
 def sh_may(c, uid, r, write=False, share=True, fold=True):
     """May uid read (write: change) sheet r? share=False: through the space / list only (no share, no folder).
-    2.199.0 C (#2742): fold -- a folder the table is filed in gives its role too (the higher one counts, sheets/shfolder.py)."""
+    2.199.0 C (#2742): fold -- a folder the table is filed in gives its role too (the higher one counts, sheets/shfolder.py).
+    2.560.0 B (#4699): a table bound to a list the agent's data lock leaves out gives it nothing, not by a share nor a folder."""
+    if uid and dl_of(c, uid) and dl_sheet_locked(c, uid, shb_rights_row(c, r)):
+        return False
     if _sh_may(c, uid, r, write, share):
         return True
     if not (share and fold and uid):

@@ -13,7 +13,7 @@ from ..core.db import db, ensure_inbox, err, trigger_ensure, usettings
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.errors import Denied  # noqa: F401  2.149.0 G (#2517): moved to core/errors.py, re-exported here
 from .pg import set_ctx_hook, st_ids, system_ctx as pg_system  # 2.149.0 G (#2517): pulled up from functions
-from .dlock import dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 2.235.0 B (#2902): an agent's data lock
+from .dlock import DL_FEAT_AREA, dl_area_locked, dl_list_hidden, dl_lists_sql, dl_task_hidden, dl_task_sql  # 2.235.0 B (#2902): an agent's data lock
 from ..core.pg import system_ctx as _sys, LOOKUP  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -128,6 +128,8 @@ def access_note(lid, write=False):
 def need_feat(f):
     if f not in (usettings(db(), me()).get("features") or "").split(","):
         raise Denied(409, tr(FEAT_OFF[f]))
+    if f in DL_FEAT_AREA and dl_area_locked(db(), me(), DL_FEAT_AREA[f]):  # 2.560.0 B (#4699): a module the agent's data lock leaves out
+        raise Denied(403, tr("The agent's data lock leaves this area out"))
 
 
 def _members_on():

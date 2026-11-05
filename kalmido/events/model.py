@@ -16,6 +16,7 @@ from ..core.usertz import hm_text, tz_gap, tz_of_s
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, task_visible
+from ..core.dlock import dl_area_locked, dl_of, dl_tasks_locked  # 2.560.0 B (#4699)
 from ..core.pages import valid_url
 from ..tasks.validation import (
     as_int, clean_reminders, rmd_export, rr_feasible, rr_norm, rr_problem, valid_date, valid_hm,
@@ -103,7 +104,7 @@ def ev_role(c, uid, cal):
 
 
 def _ev_role(c, uid, cal):
-    if cal is None:
+    if cal is None or dl_area_locked(c, uid, "calendar"):  # 2.560.0 B (#4699): the agent's data lock leaves the calendars out
         return None
     if "org_id" in cal.keys() and not acx_org_ok(c, uid, cal["org_id"]):  # 2.36.2 (#1142): organisation calendars: members only
         return None
@@ -134,6 +135,8 @@ def need_evcal(c, cid, write=False, manage=False, uid=None):
 
 def my_cal_ids(c, uid, hidden=True):
     """{calendar id: role} of the calendars uid sees (hidden=False: without the ones uid hid)."""
+    if dl_area_locked(c, uid, "calendar"):  # 2.560.0 B (#4699): the agent's data lock leaves the calendars out
+        return {}
     out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM ev_cals WHERE owner_id=?", (uid,)) if acx_org_ok(c, uid, r[1])}
     if collab_all():
         for r in c.execute("SELECT m.cal_id, m.role, m.hidden, k.org_id FROM ev_cal_members m JOIN ev_cals k ON k.id=m.cal_id "
@@ -659,7 +662,10 @@ def ev_att_ok(c, uid, cal_org_id):
 
 
 def ev_role_of(c, uid, r, cals=None):
-    """The person's role for an event: the calendar's, else 'attendee' (invited person), else None."""
+    """The person's role for an event: the calendar's, else 'attendee' (invited person), else None. 2.560.0 B (#4699): None
+    for an agent whose data lock covers the event's task (a locked list or area, a locked tag) or leaves the calendars out."""
+    if dl_of(c, uid) and (dl_area_locked(c, uid, "calendar") or (r["task_id"] and dl_tasks_locked(c, uid, [r["task_id"]]))):
+        return None
     role = (cals or {}).get(r["cal_id"]) if cals is not None else None
     cal = None
     if role is None:
@@ -725,7 +731,10 @@ def occ_out(r, o, role, att_n=0, partstat=None):
 
 
 def ev_range(c, uid, lo, hi, cal=None):
-    """Every occurrence uid sees in [lo, hi] (dates): own + shared calendars (not hidden) and events uid is invited to."""
+    """Every occurrence uid sees in [lo, hi] (dates): own + shared calendars (not hidden) and events uid is invited to.
+    2.560.0 B (#4699): an agent never gets the events whose task its data lock covers (one query for all of them)."""
+    if dl_area_locked(c, uid, "calendar"):
+        return []
     cals = my_cal_ids(c, uid, hidden=False)
     if cal is not None:
         cals = {k: v for k, v in cals.items() if k == cal}
@@ -743,6 +752,11 @@ def ev_range(c, uid, lo, hi, cal=None):
                                     (uid, (hi + timedelta(days=1)).isoformat(), (lo - timedelta(days=1)).isoformat()))
                if ev_att_ok(c, uid, r["cal_org"])]  # 2.87.0 (#1983)
     allc = my_cal_ids(c, uid)
+    if dl_of(c, uid):
+        gone = dl_tasks_locked(c, uid, [r["task_id"] for r in rows] + [r["task_id"] for r in inv])
+        if gone:
+            rows = [r for r in rows if r["task_id"] not in gone]
+            inv = [r for r in inv if r["task_id"] not in gone]
     out, seen = [], set()
     nat, occ_mine = {}, {}
     ids = [r["id"] for r in rows] + [r["id"] for r in inv]

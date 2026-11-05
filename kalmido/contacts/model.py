@@ -16,6 +16,7 @@ from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, list_role, org_trips_hidden, task_visible, WRITE_ROLES
+from ..core.dlock import dl_area_locked  # 2.560.0 B (#4699)
 from ..tasks.validation import DATE_MIN_Y
 from ..collab.comments import user_names
 from ..core.errors import BadInput
@@ -55,6 +56,8 @@ VC_MAPPED = {"BEGIN", "END", "VERSION", "PRODID", "UID", "FN", "N", "NICKNAME", 
 
 
 def contacts_on(c, uid):
+    if dl_area_locked(c, uid, "contacts"):  # 2.560.0 B (#4699): the agent's data lock leaves the contacts out
+        return False
     return "contacts" in (usettings(c, uid).get("features") or "").split(",")
 
 
@@ -88,7 +91,10 @@ def obk_org_role(c, uid, oid, org_role):
 
 def book_role(c, uid, b, trash=False, fold=True):
     """2.143.0 A (#2151): read-only in the book's organisation -> view. 2.272.0 E1 (#3038): a book in the trash only with trash.
-    2.351.0 B (#2749): fold = also the role its folder gives (contacts/ctfolder.py; never 'owner'), the higher one counts."""
+    2.351.0 B (#2749): fold = also the role its folder gives (contacts/ctfolder.py; never 'owner'), the higher one counts.
+    2.560.0 B (#4699): no role for an agent whose data lock leaves the contacts out (also not through a share or a folder)."""
+    if dl_area_locked(c, uid, "contacts"):
+        return None
     role = _bk_ro(c, uid, b["org_id"] if b is not None and "org_id" in b.keys() else None, _book_role(c, uid, b, trash))
     if fold and b is not None and BOOK_RANK.get(role, 0) < BOOK_RANK["edit"] and not ("deleted_at" in b.keys() and b["deleted_at"]):
         from .ctfolder import CTF_BOOK, ctf_node_role  # a later module (ORDER)
@@ -142,6 +148,8 @@ def need_book(c, bid, write=False, manage=False, uid=None, trash=False):
 
 
 def my_book_ids(c, uid, fold=True):
+    if dl_area_locked(c, uid, "contacts"):  # 2.560.0 B (#4699)
+        return {}
     out = {r[0]: "owner" for r in c.execute("SELECT id, org_id FROM books WHERE owner_id=? AND owner_org_id IS NULL AND deleted_at IS NULL", (uid,))
            if acx_org_ok(c, uid, r[1])}
     oids = user_orgs(c, uid)
@@ -972,6 +980,8 @@ def contact_brief(r):
 def contacts_query(c, uid, q="", book=None, group=None, limit=500, offset=0, trash=False, folder=None):
     """2.351.0 B (#2749): + the contacts filed on their own in a folder that gives uid a role (not in the trash view, not
     with a book filter); folder = (book ids, contact ids) filed in one folder (ctfolder.ctf_folder_ids): only those."""
+    if dl_area_locked(c, uid, "contacts"):  # 2.560.0 B (#4699): also no contact filed on its own in a folder
+        return [], 0
     ids = my_book_ids(c, uid)
     if book is not None:
         ids = {k: v for k, v in ids.items() if k == book}

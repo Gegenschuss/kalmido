@@ -2909,7 +2909,9 @@ team agent, an instance admin locks data for one agent in its settings (section 
 - **Areas**: private e-mails (tasks that came in by e-mail in a private space; locked by default for every agent, also
   for agents made before 2.235.0), contracts, home & devices and private trips (the private lists of Home & life). The
   journal with its mood, health, the household budget and read later are never visible to an agent anyway (they cannot
-  be opened here).
+  be opened here). *Since 2.560.0 (#4699)* also whole modules: `calendar` (every calendar and event, also invitations,
+  free / busy) and `contacts` (every address book and contact, also through a share or a folder); reading gives empty
+  lists or `404`, the routes that change data or need the module answer `403`.
 - **Projects**: single lists.
 - **Tags**: tasks with one of these tags (a personal tag or a project tag), with all their subtasks.
 
@@ -2918,11 +2920,15 @@ comments, attachments, the roadmap, events, the chat context, the input of propo
 *Plan my day* or *Break down*, also in `GET /api/v1/agent/jobs/{id}`): a locked project or task does not exist for the agent
 (404, also for writes, so nothing tells it that the data is there) and no event about it is queued. The lock only ever
 narrows what the agent sees; sharing and the organisation boundary stay as they are. The people see everything as before.
+*Since 2.560.0 (#4699)* this holds on the side ways too: a table attached to a locked project is `404` for the agent even
+when it was shared with the agent one by one or filed in a folder shared with it (`/api/v1/sheets`, the file store's
+content route, the index), and an event whose task lies in a locked project or area (or carries a locked tag) is left out
+of `GET /api/v1/events` and is `404` on its own routes.
 
 The agent reads WHAT is locked, never the names of what it cannot see: `GET /api/v1/agent` (MCP `get_agent`) gives
 
 ```
-"data_lock": {"areas": ["journal", "mood", "health", "budget", "reading", "mail"],
+"data_lock": {"areas": ["journal", "mood", "health", "budget", "reading", "mail"],  // + "calendar", "contacts" when locked
               "always": ["journal", "mood", "health", "budget", "reading"], "list_ids": [12], "tags_count": 1}
 ```
 

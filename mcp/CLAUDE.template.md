@@ -407,6 +407,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 ### Data you never see (2.235.0)
 - `get_agent` gives `data_lock`: areas, project ids and the number of tags your owner locked for you. Kalmido hides them
   from you everywhere (404, no events). Never ask for that data or try to reach it another way (copies, other people).
+- 2.560.0: the areas can be whole modules, `calendar` and `contacts`: then you get no calendar, event or contact (empty
+  lists, 404, writes 403); a table of a locked project stays hidden even when shared with you or filed in your folder.
 
 ### An inquiry becomes a project, setting up (2.51.0)
 - A customer inquiry in the chat (text or a mail as attachment): answer with ONE proposal `propose_to_person` kind

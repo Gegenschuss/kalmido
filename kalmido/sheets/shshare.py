@@ -22,6 +22,7 @@ from flask import g, has_request_context, jsonify
 
 from ..core.config import app, EMAIL_RE
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
+from ..core.dlock import dl_list_locked  # 2.560.0 B (#4699)
 from ..core.db import body, bump, db, err, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
@@ -76,6 +77,8 @@ def shs_fits(c, uid, r, agent=None):
             return False  # an agent of another workspace never
         if r["org_id"] is None and agent["owner_id"] not in (None, r["owner_id"]):
             return False  # somebody else's personal agent
+        if r["list_id"] and dl_list_locked(c, uid, r["list_id"]):
+            return False  # 2.560.0 B (#4699): a table of a list the agent's data lock leaves out (also not offered as a target)
         if r["list_id"] and agent["list_ids"]:
             cap = _agent_cap(c, uid)
             if cap is not None and r["list_id"] not in cap:
