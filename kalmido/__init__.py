@@ -505,6 +505,7 @@ ORDER = (
     "office.girocode", "office.dunning",  # 2.147.1 B (#2054): the GiroCode (EPC QR), payment reminders suggested for overdue invoices
     "office.officemove",  # 2.97.0 C (#2049): office data between the personal office and an organisation's office
     "office.pbtransfer",  # 2.137.0 D (#1981): the personal office into an existing organisation (after office.officemove)
+    "office.owrite",  # 2.567.0 (#4711): the one write call of an office row on the core's write layer (lock, version, history, undo)
     "office.undo",  # 2.111.0 A (#2233): undo of the office editors (copies before each own change, restore with conflict check)
     "office.otrash",  # 2.272.0 E2 (#3038): the office trash (deleted drafts and master data, restore, purge after the period)
     "tasks.atttrash",  # 2.272.0 E2 (#3038): the trash run of task / comment / project files (no routes)
