@@ -15,7 +15,6 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const FEAT = 'cal,comments,collab,fields';
-const btn = (d, txt) => [...([...d.querySelectorAll('.modal')].pop()?.querySelectorAll('button') || [])].find(x => x.textContent.trim() === txt);
 
 (async () => {
   await sleep(600);
@@ -36,10 +35,11 @@ const btn = (d, txt) => [...([...d.querySelectorAll('.modal')].pop()?.querySelec
   await until(() => d.querySelector('#side'));
   // ---- the field dialog: delete, the toast's Undo
   w.eval(`fieldModal(${L}, fieldById(${FD}), null)`);
-  click(w, await until(() => d.querySelector('.modal [data-m="del"]')));
-  await until(() => btn(d, 'Delete'));
-  check(/goes into the trash with its values/.test([...d.querySelectorAll('.modal')].pop().textContent), 'the question says the field goes into the trash');
-  click(w, btn(d, 'Delete'));
+  const asked = [];
+  w.confirm = t => { asked.push(t); return true; };  // boot.js answers the app's questions through w.confirm (title + text)
+  click(w, await until(() => d.querySelector('#fd-name')?.closest('.modal')?.querySelector('[data-m="del"]')));
+  await until(() => asked.length);
+  check(/Delete the field/.test(asked[0] || '') && /goes into the trash with its values/.test(asked[0] || ''), 'the question says the field goes into the trash ' + asked[0]);
   check(await until(async () => !(await hasField())), 'deleted');
   const undo = await until(() => !d.querySelector('#toast').classList.contains('hidden') && /Field deleted/.test(d.querySelector('#toast').textContent) && d.querySelector('#toast button'));
   check(undo && /Undo/.test(undo.textContent), 'the toast offers Undo');
@@ -66,9 +66,8 @@ const btn = (d, txt) => [...([...d.querySelectorAll('.modal')].pop()?.querySelec
   const mm = await until(() => d.querySelector(`.shmodal [data-mmrest="${bob}"]`));
   check(mm && /Restore what Bob had/.test(mm.getAttribute('aria-label') || ''), 'the member row offers the way back');
   click(w, mm);
-  await until(() => btn(d, 'Restore'));
-  check(/1 assignment/.test([...d.querySelectorAll('.modal')].pop().textContent), 'the question names what comes back');
-  click(w, btn(d, 'Restore'));
+  await until(() => asked.length > 1);
+  check(/Restore what Bob had/.test(asked[1] || '') && /1 assignment/.test(asked[1] || ''), 'the question names what comes back ' + asked[1]);
   check(await until(async () => (await call('GET', `/api/tasks/${T}`)).assignee_id === bob), 'restored: bob is the assignee again');
   check(await until(() => !d.querySelector(`.shmodal [data-mmrest="${bob}"]`)), 'the button is gone after the restore');
   w.close();
