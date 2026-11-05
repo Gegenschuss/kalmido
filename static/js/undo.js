@@ -165,7 +165,7 @@ function histLocal(state) {
 async function histRun(e, dir) {
   if (e.parts) {
     const out = {skipped: [], queued: false};
-    for (const p of dir === 'undo' ? [...e.parts].reverse() : e.parts) { const r = await histRun(p, dir); out.skipped.push(...r.skipped); out.queued = out.queued || r.queued; }
+    for (const p of dir === 'undo' ? [...e.parts].reverse() : e.parts) { const r = await histRun(p, dir); out.skipped.push(...r.skipped); out.queued = out.queued || r.queued; out.note = out.note || r.note; }
     return out;
   }
   const q = e.q;
@@ -182,14 +182,14 @@ async function histRun(e, dir) {
   }
   const r = await e[dir](e) || {};
   if (r.q) { e.q = r.q; histLocal(dir === 'undo' ? e.snaps : e.after); }  // queued offline: show where it is going
-  return {skipped: r.skipped || [], queued: !!r.q, none: !!r.none};
+  return {skipped: r.skipped || [], queued: !!r.q, none: !!r.none, note: r.note};  // 2.560.0 (#4667): note = a sentence instead of "Undone: …"
 }
 // n steps back (undo) or forward (redo), one after the other
 async function histStep(dir, n = 1) {
   if (HIST.busy) return;
   HIST.busy = true; renderHist();
   const done = [], skipped = [];
-  let queued = false, stop = false, dropped = null;
+  let queued = false, stop = false, dropped = null, note = '';
   try {
     await flushSaves();
     for (let i = 0; i < n && !stop; i++) {
@@ -208,7 +208,7 @@ async function histStep(dir, n = 1) {
       if (r.none && !r.skipped.length) r.skipped.push(e.label);
       if (r.none) dropped = e;  // nothing could be applied (changed elsewhere): out of the history
       else HIST[dir === 'undo' ? 'redo' : 'undo'].push(e);
-      done.push(e); skipped.push(...r.skipped); queued = queued || r.queued;
+      done.push(e); skipped.push(...r.skipped); queued = queued || r.queued; note = note || r.note || '';
       if (r.none) stop = true;
     }
   } finally {
@@ -224,7 +224,7 @@ async function histStep(dir, n = 1) {
         else {
           const what = done.length > 1 ? (dir === 'undo' ? trn('{0} step undone', '{0} steps undone', done.length) : trn('{0} step redone', '{0} steps redone', done.length))
             : dir === 'undo' ? tr('Undone: {0}', done[0].label) : tr('Redone: {0}', done[0].label);
-          toast(queued ? what + ' · ' + tr('sent as soon as you are online') : what);
+          toast(note || (queued ? what + ' · ' + tr('sent as soon as you are online') : what));  // 2.560.0 (#4667): e.g. restored without its client
         }
       }
     } catch (x) { console.warn('history', x); }

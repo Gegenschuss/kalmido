@@ -55,7 +55,7 @@ from . import model  # 2.369.5 (#2517): pulled up from functions
 from .countries import fk_country_code  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_items, recalc, ofd_free_receipts  # 2.369.5 (#2517): pulled up from functions
-from .otrash import otb_put, otb_restore  # 2.530.0 C (#4315, B17)
+from .otrash import otb_gone_out, otb_put, otb_restore  # 2.530.0 C (#4315, B17)
 
 
 def rk_cat_label(k, lg=None):
@@ -654,12 +654,14 @@ def rk_trash_restore(tid):
         raise Denied(404)
     if t["deleted_by"] != uid and model.office_role(c, uid, oid) != "admin":
         raise Denied(403, tr("Only an admin of this workspace can do this"))
-    kind, ref = otb_restore(c, oid, tid)
+    notes = {}  # 2.560.0 (#4667): a client gone for good since: back without it, the answer says so (gone / note)
+    kind, ref = otb_restore(c, oid, tid, notes)
     trip = rk_trash_check(c, oid, kind, ref)
     ofx_log(c, oid, "restore", target=kind, detail={"id": ref})
     bump(c)
     c.commit()
-    return jsonify(_one(c, oid, trip))
+    out = otb_gone_out(notes)  # the trip has a note of its own: the sentence goes as restore_note
+    return jsonify({**_one(c, oid, trip), **({"gone": out["gone"]} if out else {}), **({"restore_note": out["note"]} if "note" in out else {})})
 
 
 # ---------------------------------------------------------------- 2.117.0 A (#2292): own purposes

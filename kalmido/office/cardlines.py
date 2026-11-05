@@ -26,7 +26,7 @@ from .books import bk_receipt_set_paid, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_stmt_row, cc_writable, cl_day)
 from .model import office_settings
-from .otrash import OTB_CHECK, otb_put, otb_restore
+from .otrash import OTB_CHECK, otb_gone_out, otb_put, otb_restore
 from .rcsubmit import rsb_ingest
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
 
@@ -142,10 +142,10 @@ def cl_row(c, oid, lid, uid, every):
     return x, s
 
 
-def _answer(c, oid, uid, lid, every):
+def _answer(c, oid, uid, lid, every, extra=None):
     from .cards import _stmt_public
     x, s = cl_row(c, oid, lid, uid, every)
-    return jsonify(line=_public(c, x), statement=_stmt_public(c, oid, s))
+    return jsonify(line=_public(c, x), statement=_stmt_public(c, oid, s), **(extra or {}))
 
 
 def _fields(b, cur=None):
@@ -270,11 +270,12 @@ def cl_trash_restore(tid):
         raise Denied(404)
     if t["deleted_by"] != uid and not every:
         raise Denied(404)
-    _, lid = otb_restore(c, oid, tid)
+    notes = {}  # 2.560.0 (#4667): what was emptied because it is gone for good goes into the answer
+    _, lid = otb_restore(c, oid, tid, notes)
     cl_trash_check(c, oid, lid, uid, every)
     bump(c)
     c.commit()
-    return _answer(c, oid, uid, lid, every)
+    return _answer(c, oid, uid, lid, every, otb_gone_out(notes))
 
 
 @app.get("/api/office/cards/lines/<int:lid>/candidates")

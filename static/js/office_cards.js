@@ -130,7 +130,7 @@ function ccLineDlg(x) {
 async function ccDo(label, doit, undo) {
   try { await doit(); } catch (x) { return false; }
   ccStale();
-  offerUndo(label, histAdd({label, undo: async () => { await undo(); ccStale(); }, redo: async () => { await doit(); ccStale(); }}));
+  offerUndo(label, histAdd({label, undo: async () => { const r = await undo(); ccStale(); return r?.note ? {note: r.note} : undefined; }, redo: async () => { await doit(); ccStale(); }}));  // 2.560.0 (#4667): undo may return {note}
   return true;
 }
 async function ccUpload(cid, file) {
@@ -197,7 +197,7 @@ document.addEventListener('click', async e => {
     const x = ccLineOf(id), req = {day: x.day, merchant: x.merchant, amount: x.amount, orig_amount: x.orig_amount, orig_currency: x.orig_currency, kind: x.kind};
     let cur = id, tid = null;  // 2.552.0 (#4561 B21): the undo writes the office trash copy back (same id), else types it in again
     ccDo(tr('Position removed'), async () => { tid = (await api('DELETE', `/api/office/cards/lines/${cur}`)).trash_id || null; },
-      async () => { cur = (await (tid ? api('POST', `/api/office/cards/trash/${tid}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req))).line.id; });
+      async () => { const r = await (tid ? api('POST', `/api/office/cards/trash/${tid}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req)); cur = r.line.id; return r.note ? {note: r.note} : undefined; });  // 2.560.0 (#4667): the office trash's sentence when something it named is gone for good
   } else if (a === 'mark') {
     const was = ccLineOf(id)?.state || 'open', v = b.dataset.v;
     ccDo(tr('Saved'), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: v}), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: was}));

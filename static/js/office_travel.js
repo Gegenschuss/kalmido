@@ -122,7 +122,7 @@ function rk_rowMenu(id, anchor) {
       if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', label), '', {ok: tr('Delete'), danger: true})) return;
       try {
         const j = await api('DELETE', `/api/office/trips/${t.id}`); rk_reload();
-        toast(tr('Deleted'), async () => { await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); });  // 2.530.0 C (#4315): from the office trash
+        toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
       } catch (x) { toast(x.message || tr('unknown')); }
     }} : null]);
 }
@@ -254,7 +254,7 @@ function rk_tripModal(t) {
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', t.dest || rk_span(t)), '', {ok: tr('Delete'), danger: true})) return;
         const j = await api('DELETE', `/api/office/trips/${t.id}`); md.remove(); RK.open = null; rk_reload();
-        toast(tr('Deleted'), async () => { await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); });  // 2.530.0 C (#4315): from the office trash
+        toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
         return;
       }
       const v = id => $(id, md)?.value ?? '';

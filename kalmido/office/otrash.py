@@ -226,10 +226,16 @@ def otb_restore_route(tid):
     ofx_log(c, oid, "restore", **({"doc_id": ref} if kind == "doc" else {"target": kind}), detail={"id": ref})
     bump(c)
     c.commit()
+    return jsonify(ok=True, kind=kind, id=ref, **otb_gone_out(notes))
+
+
+def otb_gone_out(notes):
+    """2.560.0 (#4667): what otb_restore's notes add to a restore answer: {gone, note} - the general trash and the undo of the
+    areas (cards, trips) say the same sentence."""
     out = {"gone": notes["gone"]} if notes.get("gone") else {}
     if "client_id" in out.get("gone", ()):  # 2.552.0 (#4561 B19): the app shows this sentence
         out["note"] = tr("Restored without a client: the client was deleted for good meanwhile.")
-    return jsonify(ok=True, kind=kind, id=ref, **out)
+    return out
 
 
 @app.delete("/api/office/trash/<int:tid>")
