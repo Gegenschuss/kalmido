@@ -127,7 +127,13 @@ function ofm_admSeen(adm, rights, used, menuOff = []) {
   // 2.187.0 A (#2476): + the levels of a person ruled by office groups (null = as before), so #clients / #contacts show the right menu
   const lv = rights && rights.levels && !rights.legacy && rights.manager !== 'admin' ? rights.levels : null, l = LS.get('ofmLv', {}) || {};
   if (JSON.stringify(l[ofm_ws()] || null) !== JSON.stringify(lv)) { if (lv) l[ofm_ws()] = lv; else delete l[ofm_ws()]; LS.set('ofmLv', l); }
+  const ow = LS.get('ofmOwn', {}) || {}, on = ofm_legOwnOf(rights);  // 2.545.0 (#4592): the own areas of a member in "Previous access"
+  if (JSON.stringify(ow[ofm_ws()] || []) !== JSON.stringify(on)) { if (on.length) ow[ofm_ws()] = on; else delete ow[ofm_ws()]; LS.set('ofmOwn', ow); }
 }
+// 2.545.0 (#4592): a member in "Previous access" has the level "own" in some areas (server: office/rights.py LEGACY_OWN,
+// the travel expenses): their menu point shows, everything else stays as before
+const ofm_legOwnOf = r => r && r.legacy && r.levels ? Object.keys(r.levels).filter(k => r.levels[k] === 'own') : [];
+const ofm_legOwn = k => (typeof OFC !== 'undefined' && OFC.info ? ofm_legOwnOf(OFC.info.rights) : (LS.get('ofmOwn', {}) || {})[ofm_ws()] || []).includes(k);
 // 2.187.0 A (#2476): {area: level} of a person ruled by office groups in the workspace shown (null = not ruled by groups)
 function ofm_lv() {
   if (typeof OFC !== 'undefined' && OFC.info) { const r = OFC.info.rights; return r && r.levels && !r.legacy && r.manager !== 'admin' ? r.levels : null; }
@@ -137,7 +143,7 @@ function ofm_lv() {
 // 2.436.0 (#3620): "View as member" in an organisation's office: no settings / contracts / bank; daily work stays
 const MV_OFM = ['settings', 'agreements', 'bank'];
 const mvOfc = () => mvOn() && (typeof OFC !== 'undefined' && OFC.info ? !OFC.info.personal : String(wsCur()).startsWith('org:'));
-const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm(); };  // 2.276.0 A (#3039): lvk
+const ofm_ok = i => { if (MV_OFM.includes(i.key) && mvOfc()) return false; const lv = ofm_lv(), k = i.lvk || i.key; return lv && k in lv ? i.key === 'settings' || lv[k] !== 'none' : !i.adm || ofm_adm() || ofm_legOwn(k); };  // 2.276.0 A (#3039): lvk; 2.545.0 (#4592): + ofm_legOwn
 // 2.276.0 A (#3039): what the office already holds (GET /api/office/settings used: invoice, receipt, inquiry, meal, travel,
 // sub, fixed), per person and workspace like the role (LS ofmUsed); null = not known yet (everything as before)
 function ofm_used() { return typeof OFC !== 'undefined' && OFC.info ? OFC.info.used || null : (LS.get('ofmUsed', {}) || {})[ofm_ws()] || null; }

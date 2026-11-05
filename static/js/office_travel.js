@@ -52,7 +52,8 @@ function rk_travelHtml() {
   if (RK.err) return `<div class="empty">${esc(RK.err)}</div>`;
   if (!RK.data) { if (!RK.loading) setTimeout(rk_load, 0); return `<p class="muted lempty">${tr('Loading…')}</p>`; }
   if (RK.open && rk_trip(RK.open)) return rk_tripHtml(rk_trip(RK.open));
-  const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['trips', tr('Trips')], ['logbook', tr('Logbook')], ['report', tr('Evaluation')]].map(([k, n]) => `<button type="button" data-rk="view" data-v="${k}" class="${RK.view === k ? 'on' : ''}" aria-pressed="${RK.view === k}">${n}</button>`).join('')}</div>`;  // 2.93.0 B (#1928): the logbook
+  const views = `<div class="seg" role="group" aria-label="${esc(tr('View'))}">${[['trips', tr('Trips')], ['logbook', tr('Logbook')], ['report', tr('Evaluation')]].filter(([k]) => k !== 'logbook' || !ofr_legOwn('travel')).map(([k, n]) => `<button type="button" data-rk="view" data-v="${k}" class="${RK.view === k ? 'on' : ''}" aria-pressed="${RK.view === k}">${n}</button>`).join('')}</div>`;  // 2.93.0 B (#1928): the logbook
+  if (RK.view === 'logbook' && ofr_legOwn('travel')) RK.view = 'trips';  // 2.545.0 (#4592): a member's own trips without the logbook
   if (RK.view === 'logbook') return `<div class="ofcbar rkbar">${views}</div>` + lbHtml();
   const y0 = new Date().getFullYear(), years = [y0 + 1, y0, y0 - 1, y0 - 2, y0 - 3].map(String);
   const miss = RK.data.missing || 0;
@@ -75,15 +76,16 @@ function rk_listHtml() {
 }
 function rk_tripHtml(t) {
   const its = RK.filter === 'missing' ? t.items.filter(i => !i.datev) : t.items, ro = !!t.own_ro;  // 2.187.1 B (#2735): entered by somebody else for me: read only
+  const own = ofr_lvOf('travel') === 'own';  // 2.545.0 (#4592): level "own" neither bills nor ticks "in DATEV" (the server ignores / refuses it)
   const head = `<div class="ofcbar"><button class="btn sm ghost" data-rk="back">${ic('back', 's')}<span>${tr('All trips')}</span></button><span class="spacer"></span>
     ${ro ? '' : `<button class="btn sm" data-rk="edit" data-id="${t.id}">${ic('edit', 's')}<span>${tr('Edit trip')}</span></button>`}</div>
     ${ro ? `<p class="muted ofchint">${ic('lock', 's')} ${esc(tr('This trip was entered by somebody else: you can read it, but not change it.'))}</p>` : ''}
     <div class="rkhead"><h3>${esc(t.dest || tr('Trip'))}</h3><p class="muted">${esc([rk_span(t), t.overnight ? tr('with overnight stay') : '', rk_purpose(t)].filter(Boolean).join(' · '))}</p>
     ${(t.people || []).length ? `<p class="muted">${esc(tr('Participants'))}: ${esc(t.people.map(p => p.name).join(', '))}</p>` : ''}${t.km ? `<p class="muted">${esc(tr('{0} km', fmtNum(+t.km, 0)))}</p>` : ''}${t.note ? `<p class="rknote">${esc(t.note)}</p>` : ''}</div>`;
-  const rows = its.map(i => `<li class="rkit">${ro ? '' : `<label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>`}
+  const rows = its.map(i => `<li class="rkit">${ro || own ? '' : `<label class="rksel"><input type="checkbox" data-rk="sel" data-id="${i.id}" ${RK.sel.has(i.id) ? 'checked' : ''} ${i.billed ? 'disabled' : ''} aria-label="${esc(tr('Select'))}"></label>`}
     <button type="button" class="ofcrow" ${ro ? 'disabled' : ''} data-rk="item" data-id="${i.id}"><span class="ofcn"><b>${esc(rk_cat(i.category))}${i.text ? ` · ${esc(i.text)}` : ''}</b><small class="muted">${esc([fmtDateLoc(i.date), i.currency !== rk_home() ? `${fmtNum(+i.amount, 2)} ${i.currency}` : '', i.datev_no ? tr('DATEV receipt no. {0}', i.datev_no) : ''].filter(Boolean).join(' · '))}</small></span>
     ${i.billed ? `<span class="rotag">${esc(tr('Billed on {0}', i.billed.number || tr('Draft')))}</span>` : ''}<span class="rksum">${ofcMoney(i.amount_home)}</span></button>
-    ${rk_dv() && !ro ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
+    ${rk_dv() && !ro && !own ? `<label class="chkl rkdatev"><input type="checkbox" data-rk="datev" data-id="${i.id}" ${i.datev ? 'checked' : ''}> ${tr('in DATEV')}</label>` : ''}</li>`).join('');
   const nsel = t.items.filter(i => RK.sel.has(i.id) && !i.billed).length;
   return head + rk_vmaCard(t) + `<div class="ofcbar"><b>${tr('Receipts')}</b><span class="muted">${ofcMoney(t.total)}</span><span class="spacer"></span>
     ${ro ? '' : `<button class="btn sm pri" data-rk="add" data-id="${t.id}">${ic('plus', 's')}<span>${tr('Add receipt')}</span></button>`}</div>`
@@ -282,7 +284,7 @@ function rk_itemModal(t, i) {
     <div class="rkfx" ${cur === home ? 'hidden' : ''}>${ofcRowF('rk-fx', tr('Exchange rate (1 {0} = …)', home), ofcIn('rk-fx', i?.fx_rate ? fmtNum(+i.fx_rate, 4) : '', {num: true}))}
       <p class="muted ofchint rkfxout"></p></div>
     ${ofcRowF('rk-text', tr('Text'), ofcIn('rk-text', i?.text, {max: 300, ph: tr('e.g. ICE Hamburg – Berlin')}))}
-    ${rk_dv() ? `${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
+    ${rk_dv() && ofr_lvOf('travel') !== 'own' ? `${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
     ${ofcRowF('rk-dno', tr('DATEV receipt number'), ofcIn('rk-dno', i?.datev_no, {max: 60, ph: tr('optional')}))}` : ''}
     <div class="aerr" role="alert"></div>
     <div class="foot">${i ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${i ? tr('Save') : tr('Add')}</button></div>`);

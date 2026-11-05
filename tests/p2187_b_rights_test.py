@@ -127,7 +127,10 @@ assert A.post(B + "/api/time/entries", json={"list_id": LID, "start": TD + "T08:
 check(Bo.get(B + O + "/docs").status_code == 200, "(a) a member without a group: quotes & invoices 200")
 check(Bo.get(B + O + "/bank/tx").status_code == 403, "(a) a member without a group: bank 403")
 check(Bo.get(B + O + "/kpi").status_code == 403, "(a) a member without a group: figures 403")
-check(Bo.get(B + O + "/trips").status_code == 403, "(a) a member without a group: travel expenses (admins only) 403")
+# 2.545.0 (#4592): a member enters their own trips (level "own"); the admin's trip stays invisible, billing stays 403
+r = Bo.get(B + O + "/trips")
+check(r.status_code == 200 and TA not in [t["id"] for t in r.json()["trips"]], "(a) a member without a group: only the own trips " + r.text[:160])
+check(Bo.get(B + O + "/trips/bill-docs").status_code == 403, "(a) a member without a group: billing trips (admins only) 403")
 mine = Bo.get(B + R).json()
 check(mine.get("mine", {}).get("legacy") is True and "people" not in mine, f"(a) the rights page: previous access, no management {mine.get('mine')}")
 

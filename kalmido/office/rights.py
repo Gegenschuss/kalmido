@@ -158,6 +158,10 @@ OWN_ROUTES = {
     "POST /api/office/cards/lines/<int:lid>/unmatch", "POST /api/office/cards/lines/<int:lid>/upload",
 }
 
+# 2.545.0 (#4592, decision of 2026-11-04): an org member in "Previous access" works in these areas on the level "own" (their
+# own entries through the OWN_ROUTES, like the group "Staff"); every other route of the area stays for the office's admins
+LEGACY_OWN = frozenset({"travel"})
+
 TPL_LEGACY = "legacy"
 TPL_NONE = "none"
 
@@ -198,8 +202,8 @@ TPL_ORDER = ("orgadmin", "finance", "bookkeeping", "projects", "staff", "readonl
 def ofr_legacy_levels(role):
     """What the group "Previous access" means for an org member of role (display and comparison only: these people keep the
     exact checks of before, office_org)."""
-    if role == "member":
-        return {k: ("edit" if AREA_LEGACY[k] == "member" else "none") for k in AREA_KEYS}
+    if role == "member":  # 2.545.0 (#4592): + the own trips (LEGACY_OWN)
+        return {k: ("edit" if AREA_LEGACY[k] == "member" else "own" if k in LEGACY_OWN else "none") for k in AREA_KEYS}
     if role == "readonly":
         return {k: ("view" if AREA_LEGACY[k] == "member" else "none") for k in AREA_KEYS}
     if role == "accounting":  # 2.143.0 A (#2151): reads the whole office incl. the admins' bookkeeping, exports
@@ -376,6 +380,8 @@ def ofr_allows(c, uid, oid, area, level="view", special=None):
     """office_can for the places outside /api/office that had their own checks before 2.187: a person not ruled by groups
     keeps exactly those (True here), a person ruled by groups needs the level (2.187.0 C)."""
     if ofr_rights(c, uid, oid) is None:
+        if area in LEGACY_OWN and ofr_own_uid(area) is not None:  # 2.545.0 (#4592): a member's own trips: no special, nothing above "own"
+            return special is None and LV[level] <= LV["own"]
         return True
     return office_can(c, uid, oid, area, level, special)
 
@@ -415,7 +421,7 @@ def ofr_check(c, uid, oid, area=None, admin=False):
     caller skips its old admin check); False = not ruled by groups (the old checks stay)."""
     r = ofr_rights(c, uid, oid)
     if r is None:
-        return False
+        return ofr_legacy_own(c, uid, oid, area)
     if request.path.startswith("/api/office/rights"):
         return True  # the rights page checks on its own (ofr_manager)
     if request.path.startswith("/api/office/undo/client/"):
@@ -438,6 +444,19 @@ def ofr_check(c, uid, oid, area=None, admin=False):
         raise Denied(403, tr(NO_RIGHT))
     if special and special not in r["specials"]:
         raise Denied(403, tr(NO_SPECIAL))
+    return True
+
+
+def ofr_legacy_own(c, uid, oid, area=None):
+    """2.545.0 (#4592): an org member in "Previous access" on an own route of an area of LEGACY_OWN (also via the undo of the
+    area's trash): True + g.ofr_own (the route filters to the person's own entries, 404 for anybody else's) -- the caller
+    skips its admin check; False for everything else (the checks of before stay: the admins' routes answer 403)."""
+    area = area or ofr_area_of(request.path)
+    if area not in LEGACY_OWN or org_role(c, uid, oid) != "member" or pb_owner(c, oid) is not None or _is_agent(c, uid):
+        return False
+    if ofr_rule() not in OWN_ROUTES or ofr_need()[0] == "manage" or ofr_need()[1]:
+        return False
+    g.ofr_own = area
     return True
 
 

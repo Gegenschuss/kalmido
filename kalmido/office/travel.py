@@ -5,7 +5,9 @@ billed twice). Kalmido keeps no receipt images: they live in DATEV (decision of 
 per diem (Verpflegungsmehraufwand) of every trip with the BMF rates of the year (office/vma.py), its report as PDF / Excel /
 CSV and the import of a per diem spreadsheet (office/vmaimport.py).
 
-Every route: office_gate + office_org with the admin of the office area (like purchases; members get 403). Amounts are
+Every route: office_gate + office_org with the admin of the office area (like purchases). 2.545.0 (#4592): an org member
+enters, changes and deletes their own trips (office/rights.py LEGACY_OWN, level "own": rk_trips / _trip filter by the
+person, somebody else's trip = 404); approving, DATEV, billing, purposes and exports stay the admins'. Amounts are
 decimal strings; participants, note and amounts encrypted at rest (orgcrypt). Never reached by agents."""
 import csv
 import io

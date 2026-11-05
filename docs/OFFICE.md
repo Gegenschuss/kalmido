@@ -16,7 +16,7 @@ assistants with a token) reach the module only through `/api/v1/office` and only
 | Who | May |
 |---|---|
 | Organisation admin | module settings, master data, framework contracts, logo, import, delete documents |
-| Organisation member | without a group (see *Office rights*): read master data and settings, export the master data file, create / edit quotations and invoices, finalise and send them, PDF |
+| Organisation member | without a group (see *Office rights*): read master data and settings, export the master data file, create / edit quotations and invoices, finalise and send them, PDF; since 2.545.0 their own trips in the travel expenses (enter, change, delete; nobody else's trips; no DATEV tick, billing, purposes or exports) |
 | Organisation roles *Read-only* and *Accounting* | at most reading and the exports; every change is refused (Accounting uploads receipts in the documents area) |
 | Organisation role *Guest* | nothing |
 | Owner of a personal office | everything an organisation admin may, in the own personal office |
@@ -44,7 +44,8 @@ narrows it down per person (members without the right to manage it see *My right
 - **The organisation role comes first**: *Guest* has no office, *Read-only* and *Accounting* cannot change anything,
   whatever their groups say.
 - **Not ruled by groups**: organisation admins and the owner of a personal office always have everything. A member in no
-  group has the implicit group *Previous access*: exactly what members could do before 2.187. An update changes nothing;
+  group has the implicit group *Previous access*: exactly what members could do before 2.187, plus (since 2.545.0) the level
+  `own` in Travel expenses. An update changes nothing else;
   restricting is done afterwards.
 - **Groups**: a person is in one or more groups. A group has a level per office area, `none`, `own` (only the person's own
   entries; only in Times to bill, Credit cards, Receipts, Travel expenses, Logbook, Entertainment receipts), `view`, `edit`

@@ -13,20 +13,22 @@ const OFC_TEXT_KINDS = [['rights_time', N_('Rights: duration')], ['rights_territ
 // 2.143.0 A (#2151): the organisation role accounting reads the admins' bookkeeping too (the server refuses every change)
 // 2.187.0 A (#2476): a person ruled by office groups: "admin" = the area of the shown tab allows it (an area that was the
 // admins' before: view; the others: manage); everybody else exactly as before
-const ofcAdmin = area => ofr_grp() ? ofr_admLike(area) : OFC.info?.role === 'admin' || OFC.info?.role === 'accounting';
+const ofcAdmin = area => ofr_grp() ? ofr_admLike(area) : OFC.info?.role === 'admin' || OFC.info?.role === 'accounting' || ofr_legOwn(area);
 // 2.187.0 A (#2476): the office rights (GET /api/office/settings rights); null = not ruled by groups (admins, a personal
 // office's owner, members in "Previous access": the client behaves exactly as before)
 const OFR_LVS = ['none', 'own', 'view', 'edit', 'manage'];
 const ofr_grp = () => { const r = OFC.info?.rights; return r && r.levels && !r.legacy && r.manager !== 'admin' ? r : null; };
 const ofr_area = tab => { const t = tab || OFC.tab || S.route.tab; const lv = OFC.info?.rights?.levels || {}; return t in lv ? t : ['import', 'rights'].includes(t) ? 'settings' : t === 'receipts' ? 'books' : t === 'invoices' ? 'offers' : null; };  // 2.380.0 B (#3409): invoices = the quotations' area  // 2.276.0 A (#3039): receipts = the bookkeeping's area
-const ofr_lvOf = area => ofr_grp()?.levels?.[area || ''] || 'none';
+const ofr_lvOf = area => ofr_grp()?.levels?.[area || ''] || (ofr_legOwn(area) ? 'own' : 'none');
+// 2.545.0 (#4592): a member in "Previous access" works on the level "own" in the travel expenses (server: rights.py LEGACY_OWN)
+const ofr_legOwn = area => { const r = OFC.info?.rights, a = area || ofr_area(); return !!(r && r.legacy && a && r.levels?.[a] === 'own'); };
 const ofr_admLike = area => { const a = area || ofr_area(); if (!a) return false; const lv = ofr_lvOf(a); return (OFC.info.rights.adm || []).includes(a) ? lv !== 'none' : lv === 'manage'; };
 // may I (level of area, optional special: release / pay / lock / export)? Not ruled by groups = ofcAdmin() (the places
 // that asked it before keep their answer). The server checks every route on its own
 // a step that needs a special the group lacks (true only for a person ruled by groups): its button is hidden
-const ofr_noSp = (area, special) => !!ofr_grp() && !ofcCan(area, 'view', special);
+const ofr_noSp = (area, special) => (!!ofr_grp() && !ofcCan(area, 'view', special)) || (!!special && ofr_legOwn(area));  // 2.545.0 (#4592): + level "own" of "Previous access" (no specials)
 function ofcCan(area, level = 'view', special = '') {
-  const r = ofr_grp(); if (!r) return ofcAdmin();
+  const r = ofr_grp(); if (!r) return ofr_legOwn(area) ? level === 'own' && !special : ofcAdmin();  // 2.545.0 (#4592)
   const lv = r.levels?.[area] || 'none';
   if (lv === 'none' || OFR_LVS.indexOf(lv) < OFR_LVS.indexOf(level)) return false;
   return !special || (r.specials || []).includes(special);
