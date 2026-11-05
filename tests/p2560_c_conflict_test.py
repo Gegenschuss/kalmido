@@ -102,7 +102,7 @@ for who, s, cl_org in (("org", A, ORG), ("freelancer", Fr, None)):
     has_ts(who, "template", s.get(B + O + "/doc-templates").json().get("templates", []), tid)
 
     # ---- generated documents: a draft's autosave from two tabs
-    gid = made("gendoc", s.post(B + O + "/gen-docs", json={"title": "Note", "body": "First text"}))
+    gid = made("gendoc", s.post(B + O + "/gen-docs", json={"title": "Note", "body": "First text", "client_id": cli}))
     route(s, who, "gendoc", f"{O}/gen-docs/{gid}", {"body": "Tab B text"}, {"body": "Tab A text"}, same=lambda x: x["body"] == "Tab B text")
     d = s.get(B + O + "/gen-docs").json()
     has_ts(who, "gendoc", d.get("docs", []), gid)
