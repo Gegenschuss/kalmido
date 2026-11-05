@@ -3,9 +3,10 @@ from datetime import timedelta
 from flask import jsonify
 
 from ..core.config import app, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso, usettings
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..accounts.session import me
 from ..core.access import Denied, need_feat, need_task, tvis, vis_sql
 from ..core.serializers import running_pomo
@@ -114,13 +115,21 @@ def habit_update(hid):
     b = body()
     c = db()
     need_habit(c, hid)
+    # 2.564.0 D (#4701): the version the dialog opened with (updated_at, else created_at); saved meantime -> 409 + the habit
+    write_lock(c, f"habits-{hid}")
+    h = c.execute("SELECT * FROM habits WHERE id=?", (hid,)).fetchone()
+    ccf_check(b, h["updated_at"] or h["created_at"], "habit", lambda: dict(h))
     vals = {k: clean_habit_value(k, b[k]) for k in HABIT_FIELDS if k in b and k not in ("remind_at", "remind_times")}  # BadInput: 400, nothing stored
     vals.update(remind_columns(b))  # 2.140.0 C (#2135)
     for k, v in vals.items():
         c.execute(f"UPDATE habits SET {k}=? WHERE id=?", (v, hid))
+    ts = h["updated_at"]
+    if set(vals) - {"sort"}:  # a new order alone is no new version of the habit
+        ts = iso_ms(now_utc())
+        c.execute("UPDATE habits SET updated_at=? WHERE id=?", (ts, hid))
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, updated_at=ts or h["created_at"])
 
 
 @app.delete("/api/habits/<int:hid>")

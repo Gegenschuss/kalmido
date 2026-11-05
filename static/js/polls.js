@@ -101,7 +101,9 @@ async function tpo_edit(p = null, o = {}) {
       if (p) {
         const was = {title: p.title, description: p.description, location: p.location, duration: p.duration, show_votes: p.show_votes,
           expires_at: p.expires_at, ...(closed ? {} : {options: p.options.map(x => ({id: x.id, start: x.start, end: x.end}))})};
-        const r = (await rawFetch('PATCH', `/api/polls/${p.id}`, b)).poll;
+        // 2.564.0 D (#4701): against the version the dialog opened with; 409 = saved meantime: the reason, the current poll opens
+        let r; try { r = (await rawFetch('PATCH', `/api/polls/${p.id}`, {...b, expect_updated_at: p.updated_at})).poll; }
+        catch (x) { if (x.status === 409 && x.data?.poll) { md.remove(); toast(x.message); tpo_show(x.data.poll); return; } throw x; }
         md.remove();
         histToast(tr('Poll saved'), histAdd({label: tr('Poll “{0}” changed', r.title), undo: () => api('PATCH', `/api/polls/${p.id}`, was), redo: () => api('PATCH', `/api/polls/${p.id}`, b)}));
         tpo_show(r);

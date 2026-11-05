@@ -32,7 +32,7 @@ from datetime import datetime, timedelta, timezone
 from flask import g, has_request_context, jsonify, make_response, request
 
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.i18n import browser_lang, LANGS, N_, lang, short_day, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, now_utc
 from ..accounts.session import _accept_lang, _token_hash, me, rate_ip
@@ -41,6 +41,7 @@ from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..accounts.orgout import oo_denied, oo_into_note, org_out, org_out_ok  # 2.361.2 B (#2923)
 from ..core.access import Denied, acx_anon_bind, acx_org_ok, need_feat
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import hit_limit
 from ..lists.public import BOT_ERROR, PUB_CSP, pub_html, public_links_on
 from ..events.model import ev_zone, tz_ok, wall, wall_s
@@ -227,7 +228,7 @@ def tpo_expires(v, zone_name):
 def tpo_fields(c, uid, b, old=None, org=None):
     """A request body -> the columns of a poll (all of them for a new one); the refs are checked against org."""
     allowed = {"title", "description", "duration", "location", "tz", "options", "expires_at", "show_votes", "task_id",
-               "client_id", "list_id", "space", "link_on", "regenerate"}
+               "client_id", "list_id", "space", "link_on", "regenerate", "expect_updated_at"}  # 2.564.0 D (#4701): + the version
     if not isinstance(b, dict) or set(b) - allowed:
         raise BadInput(tr("Invalid data"))
     f = {}
@@ -429,6 +430,9 @@ def tpo_update(pid):
     tpo_gate()
     c, uid, b = db(), me(), body()
     r = tpo_need(c, pid, write=True)
+    write_lock(c, f"sched_polls-{pid}")  # 2.564.0 D (#4701): the dialog's version (expect_updated_at); saved meantime -> 409 + the poll
+    r = tpo_need(c, pid, write=True)
+    ccf_check(b, r["updated_at"], "poll", lambda: tpo_dict(c, r, uid))
     if isinstance(b, dict) and "space" in b:
         return err(tr("Invalid value: {0}", "space"))
     f = tpo_fields(c, uid, b, old=r, org=r["org_id"])

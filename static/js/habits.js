@@ -166,6 +166,7 @@ function habitModal(id) {
   const x = id ? S.habits.find(h => h.id === id) : {name: '', goal: 1, days: '1234567', per_week: 0, color: HCOLORS[1], remind_at: '', logs: {}, notes: {}, created_at: new Date().toISOString()};
   x.notes = x.notes || {};
   let selDay = null, noteTimer;
+  const ver = id ? x.updated_at || x.created_at : null;  // 2.564.0 D (#4701): the version this dialog opened with
   const st = id ? habitStats(x) : null;
   let month = S.habitMonth || today().slice(0, 7);
   const heat = () => {
@@ -230,7 +231,9 @@ function habitModal(id) {
       const perWeek = $('#h-freq button.on', md)?.dataset.freq === 'week' ? Math.max(1, Math.min(7, +$('#h-pw', md).value || 1)) : 0;
       const body = {name: $('#h-name', md).value.trim(), goal: Math.max(1, +$('#h-goal', md).value || 1), days, per_week: perWeek, remind_times: [...new Set($$('#h-rems input[data-dp]', md).map(i => i.value).filter(Boolean))].sort(), color: $('#h-col button.on', md)?.dataset.c || HCOLORS[0]};
       if (!body.name) return $('#h-name', md).focus();
-      if (id) await api('PATCH', '/api/habits/' + id, body); else await api('POST', '/api/habits', body);
+      // 2.564.0 D (#4701): 409 = saved meantime elsewhere: api() says why, the current habit is loaded (nothing overwritten)
+      if (id) { try { await api('PATCH', '/api/habits/' + id, {...body, ...(ver ? {expect_updated_at: ver} : {})}); } catch (e) { if (e.status === 409) { md.remove(); await load(); render(); } return; } }
+      else await api('POST', '/api/habits', body);
       md.remove(); await load(); render();
     }
     if (act === 'arch') { await api('PATCH', '/api/habits/' + id, {archived: x.archived ? 0 : 1}); md.remove(); await load(); render(); }
