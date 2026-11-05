@@ -16,6 +16,7 @@ from ..lists.lists import COL_MAX, columns_out
 from ..tasks.validation import log_act
 from ..collab.comments import user_names
 from ..core.errors import BadInput
+from ..core.conflict import Conflict  # 2.564.0 (#4701)
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from .formula import fx_check_cycles, fx_compile, fx_display
 
@@ -314,10 +315,21 @@ def field_create(lid):
 @app.patch("/api/fields/<int:fid>")
 def field_update(fid):
     """{name?, options?, pinned?, sort?}: owner and list admins (2.39.1); the type cannot change. Removed select options
-    lose their values."""
+    lose their values.
+    2.564.0 (#4701): under write_lock('field-<id>'); _prev.options = the option list the client saw: a select / multiselect whose
+    options changed meanwhile (another admin) -> 409 {"field": the current field}, nothing written. Values are cleared only for
+    options of the seen list that this change removes (an option another admin added stays with its values). Without _prev (old
+    clients, API) the old behaviour, under the lock."""
     b = body()
     c = db()
-    r = need_field(c, fid)
+    need_field(c, fid)
+    write_lock(c, f"field-{fid}")
+    r = c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone()  # read again: the state the lock protects
+    seen = fd_seen_options(b)
+    if seen is not None and r["type"] in ("select", "multiselect") and "options" in b:
+        have = json.loads(r["options"] or "{}").get("options") or []
+        if fd_opt_sig(have) != fd_opt_sig(seen):
+            raise Conflict("field", field_dict(r, c))
     name, _, opts = field_clean_def(b, r)
     if r["type"] == "formula":
         fx_set(c, r["list_id"], b, opts, fid)
@@ -331,6 +343,8 @@ def field_update(fid):
             c.execute("UPDATE list_fields SET sort=? WHERE id=?", (float(b["sort"]), fid))
         except (TypeError, ValueError):
             return err(tr("Invalid data"))
+    # 2.564.0 (#4701): only now, under the lock and after the check above (with _prev the stored list is the seen one), so only
+    # options this change removes lose their values, never one another admin added meanwhile
     if r["type"] == "select":
         keep = {o["id"] for o in opts["options"]}
         for (oid,) in c.execute("SELECT DISTINCT value FROM task_field_values WHERE field_id=?", (fid,)).fetchall():
@@ -349,6 +363,23 @@ def field_update(fid):
     bump(c)
     c.commit()
     return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
+
+
+def fd_seen_options(b):
+    """2.564.0 (#4701): the option list the client saw (_prev.options: the list, or the options object holding it); None = none sent."""
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if not prev or "options" not in prev:
+        return None
+    v = prev["options"]
+    if isinstance(v, dict):
+        v = v.get("options")
+    return [o for o in v if isinstance(o, dict)] if isinstance(v, list) else None
+
+
+def fd_opt_sig(opts):
+    """2.564.0 (#4701): an option list compared as the client shows it (id, name, colour, signal colour, order)."""
+    return [(str(o.get("id") or ""), str(o.get("name") or ""), str(o.get("color") or ""), str(o.get("special") or ""))
+            for o in opts if isinstance(o, dict)]
 
 
 @app.get("/api/fields/<int:fid>/count")

@@ -715,7 +715,9 @@ function fdCreate(lid, body, done) {
 function fdEdit(f, body, done) {
   const old = {name: f.name, options: JSON.parse(JSON.stringify(f.options || {})), pinned: f.pinned};
   const vals = {name: body.name, pinned: body.pinned ? 1 : 0, ...(f.type === 'formula' ? {} : {options: JSON.parse(JSON.stringify(body.options || {}))})};  // a formula's options the server works out
-  const pr = optWrite(optSet(() => fieldById(f.id), vals), () => api('PATCH', '/api/fields/' + f.id, body));
+  // 2.564.0 (#4701): the options seen go along (_prev): a list another admin changed meanwhile answers 409 with the current field
+  const sel = (f.type === 'select' || f.type === 'multiselect') && body.options, seen = sel ? JSON.parse(JSON.stringify(f.options?.options || [])) : null;
+  const pr = optWrite(optSet(() => fieldById(f.id), vals), () => api('PATCH', '/api/fields/' + f.id, sel ? {...body, _prev: {options: seen}} : body));
   done?.(fieldById(f.id), false);
   pr.then(async j => {
     const x = fieldById(f.id); if (x && j?.id) Object.assign(x, fdDef(j));
@@ -730,9 +732,13 @@ function fdEdit(f, body, done) {
     if (f.type === 'formula') { try { await load(); } catch { /* offline */ } }  // the computed values
     render(); done?.(fieldById(f.id), true);
     const back = {name: old.name, pinned: !!old.pinned, options: old.options, ...(f.type === 'formula' ? {formula: old.options.formula || ''} : {})};
-    const go = b => async () => { await api('PATCH', '/api/fields/' + f.id, b); return {}; };
-    histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back), redo: go(body)});
-  }, () => done?.(fieldById(f.id), true));
+    const now = sel ? JSON.parse(JSON.stringify(x?.options?.options || [])) : null;  // what the server stored (undo / redo say what they saw)
+    const go = (b, p) => async () => { await api('PATCH', '/api/fields/' + f.id, sel ? {...b, _prev: {options: p}} : b); return {}; };
+    histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back, now), redo: go(body, seen)});
+  }, e => {
+    const x = fieldById(f.id); if (e?.status === 409 && e.data?.field && x) { Object.assign(x, fdDef(e.data.field)); render(); }  // the current state, not ours
+    done?.(fieldById(f.id), true);
+  });
   return pr;
 }
 function fdDelete(f, done) {
