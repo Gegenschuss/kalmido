@@ -162,7 +162,7 @@ for who in ("nora", "rita", "gina"):
           f"org {who}: no names of the shares {r.status_code} {str(j)[:300]}")
 r = AGS.get(B + "/api/files", params={"parent": TEAM})
 j = r.json() if r.ok else {}
-check(r.status_code in (200, 401, 403, 404) and "share_with" not in str(j) and "Gina Guest" not in str(j),
+check(r.status_code == 401 and "share_with" not in str(j) and "Gina Guest" not in str(j),
       f"org agent with a share: no names {r.status_code} {str(j)[:300]}")
 
 # ---- a person without an organisation (freelancer-matrix: files)
@@ -170,13 +170,15 @@ FID, Fr = freelancer(B, A)
 FF = folder(Fr, "Freelance")
 check(row(lst(Fr, space="private"), FF).get("share_with") == [], "freelancer: own folder, Only you")
 t = Fr.get(B + f"/api/files/nodes/{FF}/share-targets").json()
-pal = next((p for p in t.get("people", []) if p["id"] == ids["bob"]), None) or (t.get("people") or [None])[0]
-if pal:
-    share(Fr, FF, user_id=pal["id"])
-    check(names(row(lst(Fr, space="private"), FF).get("share_with")) == [("u", pal["name"])], "freelancer: the name of the share")
+# CI red of 2.563.0 (p2501_a_nosham): a person without an organisation has nobody to share with (workspace rule), only an
+# agent - so the names are checked on the agent's share (before: a people branch that never ran and a check(True) else)
+check(t.get("people") == [] and t.get("groups") == [], f"freelancer: nobody to share with (workspace rule) {t}")
+bot = next((x for x in t.get("agents", []) if x["id"] == AG), None)
+check(bot is not None, f"freelancer: the agent is offered {t}")
+if bot:
+    share(Fr, FF, agent_id=AG)
+    check(names(row(lst(Fr, space="private"), FF).get("share_with")) == [("a", "Helper bot")], "freelancer: the name of the share")
     FS = folder(Fr, "Inside", FF)
-    check(names(row(lst(Fr, parent=FF), FS).get("share_with")) == [("u", pal["name"])], "freelancer: inherited into a subfolder")
-else:
-    check(True, "freelancer: nobody to share with (workspace rule)")
+    check(names(row(lst(Fr, parent=FF), FS).get("share_with")) == [("a", "Helper bot")], "freelancer: inherited into a subfolder")
 
 sys.exit(kt.done("p2558_4693_share_names"))
