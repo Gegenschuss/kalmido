@@ -53,6 +53,30 @@ migrates itself.
   run; all findings were fixed and re-verified (see CHANGELOG.md).
 - There has been **no independent human security audit** yet. Reviews are very welcome.
 
+### Scanner exception lists (2.543.0, #4625)
+
+`semgrep` and the OWASP ZAP baseline scan are **red for new findings only**. Every known, reviewed finding stands in an
+exception list in the repository, with its reason and date:
+
+- **semgrep: `tools/semgrep_baseline.json`.** One entry per finding: the rule id, the file, the code line (whitespace
+  collapsed), the reason, the date and, when the finding is a real gap that is being fixed, the task number. A finding
+  is known when rule, file and code line match - the line number does not count, so edits above a finding do not make it
+  new. `tools/semgrep_baseline.py` compares semgrep's JSON output against the list (CI job "semgrep"; an entry whose
+  finding is gone is reported as a notice and should be removed).
+- **ZAP: `.zap/rules.tsv`.** One line per ZAP plugin id (`id`, `IGNORE`, reason with the date). The scan runs without `-I`,
+  so every alert that is not ignored there fails the job "OWASP ZAP baseline".
+
+Adding an entry, in this order:
+
+1. Read the finding and decide: a real gap is **fixed**, or gets a task and the entry names that task - it is never
+   only listed. Only a reviewed false positive or an accepted, explained behaviour is listed without a fix.
+2. semgrep: run the scan as in `.github/workflows/ci.yml` with `--json --output semgrep.json`, then
+   `python3 tools/semgrep_baseline.py semgrep.json --accept "reason" [--task N]` writes every new finding with that
+   reason and today's date (or add the entry by hand with the same fields). ZAP: add the line `id<TAB>IGNORE<TAB>reason,
+   date` to `.zap/rules.tsv`; an ignored plugin id silences all alerts of that plugin, so name what the id covers.
+3. The reason says *why* the finding is not a bug here (which guard, which escaping, which fixed value), not that the
+   scanner is wrong. `tests/semgrep_baseline_test.py` checks that every entry is complete and still matches a code line.
+
 ### Known scanner findings (reviewed, not bugs)
 
 - `semgrep` flags SQL built with f-strings: the interpolated parts are fixed SQL fragments or `?`
@@ -61,8 +85,12 @@ migrates itself.
   the services in the [list of outgoing connections](docs/SELF-HOSTING.md#outgoing-connections), through a wrapper that
   allows http/https only and same-host redirects, or, for addresses people give (calendars, feeds, invoice links in mails),
   a guard that connects to public addresses only.
+- `semgrep` flags SHA-1 (`usedforsecurity=False`): ETags, sync tokens, import uids and change stamps, no security use.
 - ZAP reports the `style-src 'unsafe-inline'` part of the Content-Security-Policy: scripts are strictly
-  `'self'`; inline styles are used for user-chosen list colours (validated hex values).
+  `'self'`; inline styles are used for user-chosen list colours (validated hex values). `media-src https:` is on
+  purpose for embedded video. The missing `Cross-Origin-Embedder-Policy` is accepted: it would block the embedded
+  players and mail images, and Kalmido sets `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` and
+  `frame-ancestors 'none'`.
 
 ## Design notes for operators
 

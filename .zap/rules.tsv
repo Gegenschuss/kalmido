@@ -1,0 +1,9 @@
+# #4625 (2.543.0): the rule file of the OWASP ZAP baseline scan in CI (.github/workflows/ci.yml, zap-baseline.py -c rules.tsv).
+# One line per ZAP plugin id: id <TAB> IGNORE|WARN|FAIL <TAB> reason. The job runs WITHOUT -I, so every alert that is not
+# IGNORE here fails the job (WARN = exit 2, FAIL = exit 1): a new alert is red. An IGNORE needs the reason and the date
+# here and a line in SECURITY.md ("Scanner exception lists"); a real gap gets a task, not an IGNORE.
+# The scan is unauthenticated (the public shell only). Known since the CI run of 2.541.0 (05.11.2026):
+10049	IGNORE	(Non-Storable Content) robots.txt, manifest, icons and redirects are sent with Cache-Control no-store on purpose; informational. 2026-11-05
+10055	IGNORE	(CSP) media-src allows https: for embedded video (audit 22.10.2026, hardening, no script vector) and style-src 'unsafe-inline' for validated list colours; script-src stays 'self' and is checked by the API test suites. 2026-11-05
+10109	IGNORE	(Modern Web Application) detection of a single-page app; informational. 2026-11-05
+90004	IGNORE	(Cross-Origin-Embedder-Policy missing) COEP require-corp would block the embedded video players and mail images; COOP and CORP are set, frame-ancestors is 'none'; no SharedArrayBuffer use. 2026-11-05

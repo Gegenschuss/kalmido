@@ -1,0 +1,460 @@
+{
+ "_doc": "#4625: known semgrep findings, reviewed (SECURITY.md 'Scanner exception lists'). Matching: rule + file + code line (whitespace collapsed), not the line number. tools/semgrep_baseline.py compares.",
+ "entries": [
+  {
+   "rule": "python.flask.security.audit.directly-returned-format-string.directly-returned-format-string",
+   "file": "kalmido/accounts/login.py",
+   "code": "return f\"{proto or request.scheme}://{request.host}\"",
+   "reason": "_req_origin is a helper of the WebAuthn origin check, not a route response; nothing is rendered.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/accounts/useradmin.py",
+   "code": "rows = c.execute(f\"SELECT * FROM users WHERE {where} ORDER BY lower(COALESCE(display_name, username)), id LIMIT ? OFFSET ?\",",
+   "reason": "SQL built from fixed fragments only: ua8_where returns fixed conditions with '?' placeholder lists, the search text goes through the parameters.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/accounts/useradmin.py",
+   "code": "total = c.execute(f\"SELECT COUNT(*) FROM users WHERE {where}\", args).fetchone()[0]",
+   "reason": "SQL built from fixed fragments only: ua8_where returns fixed conditions with '?' placeholder lists, the search text goes through the parameters.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.request-data-write.request-data-write",
+   "file": "kalmido/admin/acctimport.py",
+   "code": "data = request.get_data(cache=False)",
+   "reason": "chunk upload of the account import (admin only): the size is checked against UMZ_CHUNK before the body is read, the piece goes into the import's own file and is verified by length.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/admin/hosting.py",
+   "code": "out[\"id\"] += \"-\" + hashlib.sha1(sig.encode(), usedforsecurity=False).hexdigest()[:8]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a short content id of a notice, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.request-data-write.request-data-write",
+   "file": "kalmido/admin/wkimport.py",
+   "code": "data = request.get_data(cache=False)",
+   "reason": "chunk upload of the wiki import: the size is checked against UMZ_CHUNK before the body is read, the piece goes into the import's own file and is verified by length.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "+ \"\".join(f'<a href=\"{base}/{apb_slot_key(s)}\">{s:%H:%M}</a>' for s in v) + '</div></section>')",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "days += (f'<section class=\"apb-day\"><h2>{e(apb_day(d, lg))}</h2><div class=\"apb-slots\">'",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "nav = '<nav class=\"apb-nav\">' + \\",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "+ \"\".join(f'<a href=\"{base}/{apb_slot_key(s)}\">{s:%H:%M}</a>' for s in v) + '</div></section>')",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "days += (f'<section class=\"apb-day\"><h2>{e(apb_day(d, lg))}</h2><div class=\"apb-slots\">'",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/calendars/apptbook.py",
+   "code": "nav = '<nav class=\"apb-nav\">' + \\",
+   "reason": "public booking page built by the app's HTML builder: every text is html.escape'd (e()), the slug is escaped, slot keys and ids are strftime / int values.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/calendars/caldav.py",
+   "code": "return dav_multistatus([f\"<D:response><D:href>{_xe(href)}</D:href><D:propstat><D:prop>{''.join(_el(n) for n in names)}\"",
+   "reason": "DAV multistatus XML: the href is escaped (_xe), the property names come from the parsed XML (valid element names), a foreign namespace is escaped in _el.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/calendars/caldav.py",
+   "code": "return dav_multistatus([f\"<D:response><D:href>{_xe(href)}</D:href><D:propstat><D:prop>{''.join(_el(n) for n in names)}\"",
+   "reason": "DAV multistatus XML: the href is escaped (_xe), the property names come from the parsed XML (valid element names), a foreign namespace is escaped in _el.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/calendars/caldav.py",
+   "code": "h = hashlib.sha1(usedforsecurity=False)",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV ETag / sync token, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/calendars/caldav.py",
+   "code": "return '\"' + hashlib.sha1((\"\\n\".join(lines) + (\"|tz\" if tz else \"\")).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:24] + '\"'",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV ETag / sync token, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/calendars/polls.py",
+   "code": "f'<input class=\"frm-link\" readonly value=\"{e(link)}\" aria-label=\"{e(tr(\"Link to change your vote\", lg=lg))}\">'",
+   "reason": "thank-you page of the public poll: link, token and texts are html.escape'd (e()).",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/calendars/polls.py",
+   "code": "f'<input class=\"frm-link\" readonly value=\"{e(link)}\" aria-label=\"{e(tr(\"Link to change your vote\", lg=lg))}\">'",
+   "reason": "thank-you page of the public poll: link, token and texts are html.escape'd (e()).",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/contacts/carddav.py",
+   "code": "h = hashlib.sha1(usedforsecurity=False)",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CardDAV ETag / sync token, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/contacts/carddav.py",
+   "code": "return '\"' + hashlib.sha1(body.encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:24] + '\"'",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CardDAV ETag / sync token, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/contacts/ctxlist.py",
+   "code": "dig = hashlib.sha1(json.dumps(v, sort_keys=True, ensure_ascii=False).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:20]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a stable uid for an imported CSV row, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/contacts/model.py",
+   "code": "dig = hashlib.sha1(card.encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:20]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a stable uid / duplicate marker of an imported vCard, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/contacts/model.py",
+   "code": "v[\"uid\"] = \"import-\" + hashlib.sha1((v[\"fn\"] + \"|\" + json.dumps(v[\"emails\"])).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:20]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a stable uid / duplicate marker of an imported vCard, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/events/dav.py",
+   "code": "h = hashlib.sha1(usedforsecurity=False)",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): CalDAV sync token, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/events/ics.py",
+   "code": "cs[0][\"UID\"] = icalendar.vText(f\"import-{hashlib.sha1(str(cs[0].to_ical()).encode(), usedforsecurity=False).hexdigest()[:20]}\")",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): ICS ETag / import uid, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/events/ics.py",
+   "code": "return '\"' + hashlib.sha1((\"\\n\".join(lines) + \"|\" + \",\".join(sorted(tzs))).encode(\"utf-8\"), usedforsecurity=False).hexdigest()[:24] + '\"'",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): ICS ETag / import uid, a change marker, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/family/carddav.py",
+   "code": "uid = get(\"UID\").strip()[:200] or \"fn:\" + hashlib.sha1(fn.encode(), usedforsecurity=False).hexdigest()[:16]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a stable uid for a contact without UID, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/files/fstags.py",
+   "code": "rows = c.execute(f\"\"\"SELECT DISTINCT t.id, t.name FROM doc_node_tags nt JOIN doc_tags t ON t.id=nt.tag_id JOIN fs_nodes n ON n.id=nt.node_id",
+   "reason": "SQL built from fixed fragments only: fs_visible_sql inlines checked integer ids, dt_space returns fixed conditions, dt_where '?' lists, DT_HITS is a constant.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/files/fstags.py",
+   "code": "rows = c.execute(f\"SELECT n.* FROM fs_nodes n WHERE {' AND '.join(where)} ORDER BY lower(n.name), n.id LIMIT {DT_HITS + 1}\", params).fetchall()",
+   "reason": "SQL built from fixed fragments only: fs_visible_sql inlines checked integer ids, dt_space returns fixed conditions, dt_where '?' lists, DT_HITS is a constant.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/books.py",
+   "code": "w.writerow([bk_csv_cell(r[\"label\"]), num(r[\"net\"]), num(r[\"vat\"]), num(r[\"gross\"])])",
+   "reason": "CSV export: free text goes through bk_csv_cell (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/books.py",
+   "code": "w.writerow([bk_csv_cell(title), \"\", \"\", \"\"])",
+   "reason": "CSV export: free text goes through bk_csv_cell (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/books.py",
+   "code": "w.writerow([bk_csv_cell(tr(\"Profit\")), num(d[\"profit\"]), \"\", \"\"])",
+   "reason": "CSV export: free text goes through bk_csv_cell (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/books.py",
+   "code": "w.writerow([bk_csv_cell(tr(\"Total\")), num(tot[\"net\"]), num(tot[\"vat\"]), num(tot[\"gross\"])])",
+   "reason": "CSV export: free text goes through bk_csv_cell (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/office/cards.py",
+   "code": "sid = insert_id(c, f\"INSERT INTO office_cc_statements({','.join(row)}) VALUES({','.join('?' * len(row))})\", list(row.values()))",
+   "reason": "SQL built from fixed fragments only: the column names are the fixed keys of oc_enc_fields, one '?' per value.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.audit.insecure-file-permissions.insecure-file-permissions",
+   "file": "kalmido/office/pdfweb.py",
+   "code": "os.chmod(p, 0o700)",
+   "reason": "chmod 0o700 on the office folders at start-up tightens the old 0755, never loosens anything.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/travel.py",
+   "code": "w.writerow([_csv_safe(g[\"label\"]), g[\"count\"], num(g[\"amount\"])])",
+   "reason": "CSV export: free text goes through _csv_safe (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/travel.py",
+   "code": "w.writerow([head, tr(\"Receipts\"), tr(\"Amount\") + f\" ({cur})\"])",
+   "reason": "CSV export: free text goes through _csv_safe (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/office/travel.py",
+   "code": "w.writerow([tr(\"Total\"), rep[\"count\"], num(rep[\"total\"])])",
+   "reason": "CSV export: free text goes through _csv_safe (csv_cell, the formula guard), the other cells are translated labels and numbers.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/personal/stats.py",
+   "code": "for r in c.execute(f\"\"\"SELECT list_id, due, completed_at FROM tasks WHERE completed_by=? AND status=2",
+   "reason": "SQL built from fixed fragments only: wsa_space_lists returns a fixed subquery with a checked integer (or '').",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/personal/stats.py",
+   "code": "for r in c.execute(f\"\"\"SELECT t.due, t.status, t.created_at, t.completed_at, t.deleted_at FROM tasks t JOIN lists l ON l.id=t.list_id",
+   "reason": "SQL built from fixed fragments only: wsa_space_lists returns a fixed subquery with a checked integer (or '').",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/receipts/rchecks.py",
+   "code": "return hashlib.sha1(\"\\x1f\".join(\"\" if x is None else str(x) for x in v).encode(), usedforsecurity=False).hexdigest()[:20] # a change stamp, not security",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a change stamp of the receipt values, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/tasks/delta.py",
+   "code": "now = {r[0]: r[1] for r in c.execute(f\"SELECT id, list_id FROM tasks WHERE id IN ({q})\", list(chg))}",
+   "reason": "SQL built from fixed fragments only: a '?' placeholder list, the ids go through the parameters.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.django.security.injection.raw-html-format.raw-html-format",
+   "file": "kalmido/team/portal.py",
+   "code": "out = head + (f'<p class=\"ok\" role=\"status\">{e(flash)}</p>' if flash else \"\")",
+   "reason": "customer portal page: the flash text is a fixed message or html.escape'd (e()).",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.raw-html-concat.raw-html-format",
+   "file": "kalmido/team/portal.py",
+   "code": "out = head + (f'<p class=\"ok\" role=\"status\">{e(flash)}</p>' if flash else \"\")",
+   "reason": "customer portal page: the flash text is a fixed message or html.escape'd (e()).",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.csv-writer-injection.csv-writer-injection",
+   "file": "kalmido/videos/review.py",
+   "code": "w.writerow([v, tc, vdr_csv_cell(name), vdr_csv_cell(text), tr(\"Yes\") if done else \"\", tr(\"Yes\") if ans else \"\"])",
+   "reason": "CSV export: name and text go through vdr_csv_cell (csv_cell, the formula guard), version and timecode are numbers / formatted times.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/wiki/pages.py",
+   "code": "for r in c.execute(f\"SELECT id, org_id, owner_id, body FROM wiki_pages WHERE deleted_at IS NULL AND {ws} \"",
+   "reason": "SQL built from fixed fragments only: wiki_space_sql returns a fixed condition, WIKI_INDEX_MAX is a constant, values go through the parameters.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.lang.security.insecure-hash-algorithms.insecure-hash-algorithm-sha1",
+   "file": "kalmido/wiki/pages.py",
+   "code": "h = hashlib.sha1(part.encode(), usedforsecurity=False).hexdigest()[:6]",
+   "reason": "sha1 with usedforsecurity=False (the rule does not read the flag): a short hash in a shortened path part, no security use.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/wiki/wkembed.py",
+   "code": "rows = c.execute(f\"SELECT DISTINCT p.id, p.org_id, p.path FROM wiki_links k JOIN wiki_pages p ON p.id=k.from_id WHERE k.{col}=? \"",
+   "reason": "SQL built from fixed fragments only: the column is one of two fixed names, the organisation ids are int()-cast, wke_open_sql is fixed.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "python.flask.security.injection.tainted-sql-string.tainted-sql-string",
+   "file": "kalmido/wiki/wktags.py",
+   "code": "rows = [x for x in c.execute(f\"SELECT p.* FROM wiki_pages p WHERE p.deleted_at IS NULL AND {w} AND left(p.path, 5)<>'e2e1:' \"",
+   "reason": "SQL built from fixed fragments only: _space_w returns a fixed condition, wkf_visible_sql inlines checked integer ids, WIKI_INDEX_MAX is a constant.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method",
+   "file": "static/js/acctset.js",
+   "code": "$('h3', md).insertAdjacentHTML('afterend', `<div class=\"shint\">${ic('key', 's')} ${esc(tr('The client granted support access until {0}. Everything you do here is listed for the client.', fmtStamp(new Date(u.support_until))))}</div>`);",
+   "reason": "insertAdjacentHTML of the app's own template: texts go through esc() / tr(), values are numbers or picker markup built by the app.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/agentchat.js",
+   "code": "return `<div class=\"cmsg ${mine ? 'me' : 'ag agc'}${jb ? ' jobm' + (jn9_part(jb) ? ' jpart' : '') : ''}${rxShow('c' + m.id)}${chatPerm(m) ? ' perm' : ''}${ap ? ' apv' + (apo ? ' apvopen' : '') : ''}\" data-k=\"m${m.id}${m.choice ? 'a' : ''}${ap ? chatChoiceSt(m)[0] : ''}${m.edited_at ? 'e' + m.edited_at : ''}${ed ? 'E' : ''}\" data-mid=\"a:${m.id}\" ${ap ? `id=\"apv-${m.id}\"` : ''}${jb ? ` style=\"--jcol:${jcol}\"` : ''}>${!mine && stepsAlwaysOn() ? chatStepsKept(m) : ''}${replyQuoteHtml(m, 'a')}${ap ? apvHead(m, apo) : ''}${jb ? jc_tagHtml(jb, m) : ''}${ed ? chatEditHtml(m) : m.body && !(ap === 'a' && m.body.trim() === m.choices.approval.title) ? `<div class=\"cbub\">${jb ? jc_bodyHtml(commentBody(m.body, {}), jb) : commentBody(m.body, {})}</div>` : ''}${chatAttHtml(m)}${tlkChSug(m) ? '' : chatChoicesHtml(m)}${!mine && m.job_id && m.job_steps ? jobStepsHtml(m.job_id, m.job_steps) : ''}${t ? `<button class=\"runtask\" data-act=\"open-id\" data-id=\"${t.id}\">${ic('arrow', 's')}<span>${esc(t.title)}</span></button>` : ''}${!mine && m.offer_save && !m.saved_task_id ? `<div class=\"csoffer\"><button type=\"button\" class=\"btn sm\" data-act=\"chat-save\" data-mid=\"${m.id}\">${ic('bookmark', 's')} ${tr('Save as task')}</button></div>` : ''}<div class=\"cmeta\"><time>${fmtWhen(m.created_at)}</time>${dlv}${cpnMark(m)}${mine && m.edited_at ? chatEditedHtml(m) : ''}${chatRxHtml(m, a)}${a?.enabled ? replyBtn('chrbtn mreply') : ''}${chatSavedMark(m)}<button type=\"button\" class=\"rx rxtog\" data-act=\"chat-msg-menu\" data-mid=\"${m.id}\" aria-haspopup=\"menu\" title=\"${esc(tr('More'))}\" aria-label=\"${esc(tr('More'))}\">${ic('dots', 's')}</button></div>${tlkChSug(m) ? chatChoicesHtml(m) : ''}</div>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/chat.js",
+   "code": "const keep = await askDialog({title: tr('Changed in the meantime by {0}', theirs.updated_by_name || '?'), html: `<p>${tr('Keep your version or take theirs?')}</p><div class=\"ntdiff\"><div><b>${tr('Yours')}</b><pre>${esc(patch.body ?? mine.body)}</pre></div><div><b>${tr('Theirs')}</b><pre>${esc(theirs.body)}</pre></div></div>`, ok: tr('Keep mine'), cancel: tr('Take theirs')});",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/collab.js",
+   "code": ": `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class=\"cbody\">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/collab.js",
+   "code": "const main = editing ? `<div class=\"cedit\"><textarea class=\"c-edit-input\" data-cid=\"${c.id}\" rows=\"2\">${esc(decodeMentions(c.body, U))}</textarea><div class=\"mpick hidden\"></div>${files}<div class=\"cbar\"><span class=\"spacer\"></span><button class=\"btn sm\" data-act=\"c-edit-cancel\">${tr('Cancel')}</button><button class=\"btn sm pri\" data-act=\"c-edit-save\" data-cid=\"${c.id}\">${tr('Save')}</button></div></div>`",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/collab.js",
+   "code": "return `<div class=\"cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}\" data-cid=\"${c.id}\" data-mid=\"c:${c.id}\">${cav}<div class=\"cmain\"><div class=\"chead\"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class=\"muted cwhen\" title=\"${esc(fmtWhen(c.created_at))}\">${fmtWhenHead(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method",
+   "file": "static/js/contacts.js",
+   "code": "$('.foot', md).insertAdjacentHTML('beforebegin', `<div class=\"ctxdup\" role=\"status\"><p>${ic('users', 's')} ${tr('There is already a contact like this:')}</p><ul class=\"ctlinks\">${it.map(x => `<li><button type=\"button\" class=\"linkbtn\" data-ctxdup=\"${x.id}\">${esc(x.fn || x.org || '?')}</button><span class=\"muted\"> · ${esc(x.reasons.map(r => why[r]).join(', '))}${ctBook(x.book_id) && (S.books || []).length > 1 ? ' · ' + esc(ctBook(x.book_id).name) : ''}</span></li>`).join('')}</ul><p class=\"muted\">${tr('Save again to create it anyway.')}</p></div>`);",
+   "reason": "insertAdjacentHTML of the app's own template: texts go through esc() / tr(), values are numbers or picker markup built by the app.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/hubmail.js",
+   "code": "return `<div class=\"hbmview\" data-hbmview=\"${m.id}\">${seg || img || whole ? `<div class=\"hbmvbar\">${seg}${whole}${img}</div>` : ''}${body}</div>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/hubmail.js",
+   "code": "src=\"/api/hubmail/mails/${m.id}/html${q ? '?' + q : ''}\"></iframe>` : `<div class=\"hbmtext\">${esc(st.full ? m.body || '' : m.body_short ?? m.body ?? '')}</div>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/jobchat.js",
+   "code": ": `<div class=\"jcdres acset-j1${jcd_kind(m) === 'error' ? ' jcdx' : ''}\"><button type=\"button\" class=\"acset-jl\" data-jca=\"more\" data-jm=\"${m.id}\" aria-expanded=\"false\" title=\"${esc(tr('Show more'))}\">${esc(jcd_line(m.body))}</button></div>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method",
+   "file": "static/js/liste2eui.js",
+   "code": "r.insertAdjacentHTML('beforeend', `<span class=\"le2uex\">${le2u_rowExtra(j, uid, name, chgIds.has(uid))}</span>`);",
+   "reason": "insertAdjacentHTML of the app's own template: texts go through esc() / tr(), values are numbers or picker markup built by the app.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "typescript.react.security.audit.react-unsanitized-method.react-unsanitized-method",
+   "file": "static/js/polls.js",
+   "code": "rows.insertAdjacentHTML('beforeend', tpo_rowHtml({start: d ? `${addDays(d, 1)}T${t || '10:00'}` : ''}));",
+   "reason": "insertAdjacentHTML of the app's own template: texts go through esc() / tr(), values are numbers or picker markup built by the app.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/wkembed.js",
+   "code": "return `${m}<button type=\"button\" class=\"iconbtn wemcb\" data-wem=\"cb\" data-k=\"${k - 1}\" title=\"${esc(tr('Create as task'))}\" aria-label=\"${esc(tr('Create as task'))}: ${esc(L.text.slice(0, 60))}\">${ic('plus', 's')}</button>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/wkembed.js",
+   "code": "return `<li class=\"cb ${on ? 'on' : ''}\"${may ? ` data-wkcbl=\"${k - 1}\"` : ''}><input type=\"checkbox\" ${may ? `data-wkcb=\"${k - 1}\" aria-label=\"${esc(L.text || tr('Checkbox'))}\"` : 'disabled'}${on ? ' checked' : ''}>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/wkembed.js",
+   "code": "return open > 1 ? `<div class=\"wemcbbar\"><button type=\"button\" class=\"btn sm\" data-wem=\"cbs\">${ic('check', 's')}${esc(tr('Open items as tasks'))} · ${open}</button></div>${h}` : h;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  },
+  {
+   "rule": "javascript.express.security.injection.raw-html-format.raw-html-format",
+   "file": "static/js/wkhist.js",
+   "code": "return `<small class=\"wksnip\">${o + esc(cs.slice(at).join(''))}</small>`;",
+   "reason": "client template: every text goes through esc() or the app's markdown renderer (commentBody), ids are numbers, the rest are literals; the XSS suites cover the rendering.",
+   "date": "2026-11-05"
+  }
+ ]
+}

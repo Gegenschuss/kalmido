@@ -384,18 +384,22 @@ jobs:
         run: cd tests && node quick_lang_test.js
 
   semgrep:
-    name: semgrep (informational)
+    # 2.543.0 (#4625): red for NEW findings only. The known, reviewed findings stand in tools/semgrep_baseline.json (rule, file,
+    # code line, reason, date; SECURITY.md "Scanner exception lists"); tools/semgrep_baseline.py compares the JSON output
+    # against it. A real gap gets a task and is fixed, not only listed.
+    name: semgrep
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Known, reviewed false positives (see SECURITY.md) must not block the build.
-    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
       - run: pip install semgrep==1.183.0
-      - run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests --exclude static/vendor app.py kalmido static tools
+      - name: semgrep scan
+        run: semgrep scan --config p/python --config p/flask --config p/javascript --metrics=off --exclude tests --exclude static/vendor --json --output /tmp/semgrep.json app.py kalmido static tools
+      - name: New findings against the exception list
+        run: python3 tools/semgrep_baseline.py /tmp/semgrep.json
 
   tests:
     # 2.2.1: the suites run as parallel shards (2.7.1: 4, 2.15.1: 5, 2.16.0: 6, 2.18.0: 7, 2.30.0: 8, 2.37.1: 9, 2.40.0: 10, 2.80.2: 11, 2.80.3: 12, 2.84.0 + 2.80.3: 13, 2.124.2: 17, 20.10.2026: 19, 22.10.2026: 21, 2.179: 18 cut by the job "plan" from the measured suite times instead of the
@@ -489,10 +493,11 @@ jobs:
           test "${{ needs.tests.result }}" = "success"
 
   zap:
-    name: OWASP ZAP baseline (informational)
+    # 2.543.0 (#4625): red for NEW alerts only. .zap/rules.tsv names the reviewed alerts (IGNORE with the reason and date,
+    # SECURITY.md "Scanner exception lists"); the scan runs without -I, so every other alert fails the job.
+    name: OWASP ZAP baseline
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - name: Start PostgreSQL
@@ -531,6 +536,8 @@ jobs:
           for i in $(seq 1 90); do curl -sf http://127.0.0.1:3040/api/health && break; sleep 1; done
           curl -sf http://127.0.0.1:3040/api/health || { docker logs kalmido-zap 2>&1 | tail -40; exit 1; }
       - name: ZAP baseline scan (unauthenticated)
+        # the rule file is read from /zap/wrk (the mounted .zap folder); the container's user must be able to read it
         run: |
-          docker run --rm --network host ghcr.io/zaproxy/zaproxy:2.17.0 \
-            zap-baseline.py -t http://127.0.0.1:3040/ -I
+          chmod a+rx .zap && chmod a+r .zap/rules.tsv
+          docker run --rm --network host -v "$PWD/.zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.17.0 \
+            zap-baseline.py -t http://127.0.0.1:3040/ -c rules.tsv
