@@ -6070,6 +6070,9 @@ html.mini #app.detail-open{grid-template-columns:minmax(0,1fr) var(--detW,25.5re
 .trow .mosub > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .trow .mosub:hover{color:var(--text);text-decoration:underline}
 @media (pointer:coarse){ .trow .mosub{min-height:1.75rem} }
+/* 2.569.0 (#4395): My tasks, own sections: "New section" under the last one */
+#view .msenew{display:flex;align-items:center;gap:.375rem;margin:.5rem 0 .25rem;padding:.5rem;min-height:2.75rem;color:var(--muted)}
+#view .msenew:hover{color:var(--text)}
 /* 2.41.0 (#1365): "My tasks": the small group "From hidden lists" and the folded "Hidden" with one head per list */
 .ghead.mturg,.ghead.mthid{font-weight:500;color:var(--muted)}
 .ghead.mturg{font-size:var(--fs-xs)}

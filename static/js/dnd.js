@@ -12,7 +12,7 @@ document.addEventListener('dragstart', e => {
   requestAnimationFrame(() => r.classList.add('dragging'));
 });
 document.addEventListener('dragend', () => { dragId = null; DSE.v = 0; document.body.classList.remove('tdrag'); $$('.dragging,.dropbefore,.dropafter,.drop').forEach(x => x.classList.remove('dragging', 'dropbefore', 'dropafter', 'drop')); });
-const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop, #view .sprh[data-sprdrop]';  // 2.60.0 (#343): + the sprint header
+const DROP_SEL = '.trow, .kcol, .quad, .cal .cell, .srow[data-drop], .wcol, .wad, .wh, #view .ghead[data-section], #view .sdrop, #view .sprh[data-sprdrop], #view .ghead[data-key^="ms:"]';  // 2.60.0 (#343): + the sprint header; 2.569.0 (#4395): + the own sections of My tasks
 // lower half of a row = drop after it (so the end of a block / list is reachable)
 const dropAfter = (row, y) => { const r = row.getBoundingClientRect(); return y != null && r.height > 0 && y > r.top + r.height / 2; };
 // 2.87.9 (#1965): the highlight changes only when the target or its half changes (dragover fires on every mouse move; the
@@ -78,6 +78,7 @@ async function dropTask0(id, el, clientY) {
   { const gh = !kcol && row?.closest('.group')?.querySelector('.ghead[data-section]'), at = kcol ? [kcol, 'kcol'] : gh ? [gh, 'section'] : null;
     if (at && +at[0].dataset[at[1]] < 0) { const r = await secReal(+at[0].dataset[at[1]]); if (!r) return; at[0].dataset[at[1]] = r; } }
   if (await mbDropHook(t, el)) return;  // 2.156.0 C (#2072): the board of My tasks (its column = date / priority / list)
+  if (!row && await mseDropHead(t, el)) return;  // 2.569.0 (#4395): onto the head of an own section of My tasks
   if (await ml_drop(t, {sec, kcol, row, side, cell, wcol, wad, quad, y: clientY})) return;  // 2.71.0 B (#1459): in a further list only the link moves
   if (sec && sec.dataset.newsec) { taskToNewSection(id); return; }  // (sec is false over a row)
   if (sec) { taskToSection(id, sec.dataset.section ? +sec.dataset.section : null); return; }

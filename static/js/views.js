@@ -302,7 +302,8 @@ function sortTasks(arr, m = sortMode()) {
 function groupTasks(v) {
   const all = v.mine ? moSort(v.open.slice()) : sortTasks(v.open.slice()), pinned = all.filter(t => t.pinned);  // 2.40.0 (#1344): My tasks in the own order
   // 1.7.0: Flow shows one sequence instead of date groups (sections and the folder's lists stay)
-  const g = kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order
+  if (v.mine) mseInit();  // 2.569.0 (#4395): the first opening makes the default sections
+  const g = v.mine && mseOn() ? mseGroups(all.filter(t => !t.pinned)) : kbOrderGroups(groupRest(v.group === 'date' && sortMode() === 'flow' ? {...v, group: 'none'} : v, all.filter(t => !t.pinned), v.inSec || []));  // 2.39.1 (#1221): own order; 2.569.0 (#4395): own sections
   const mine = kbMineGroup();  // 2.39.1 (#1219): My tasks + "From your lists, without a date"
   let kbHid = [];  // 2.41.0 (#1365): undated tasks of a hidden list go to "Hidden" too
   if (mine) { const ids = new Set(all.map(t => t.id)); mine.tasks = mine.tasks.filter(t => !ids.has(t.id) && favKeep(t)); kbHid = mine.tasks.filter(mtHid); mine.tasks = mine.tasks.filter(t => !mtHid(t)); if (mine.tasks.length) g.push(mine); }

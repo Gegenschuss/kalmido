@@ -8,7 +8,7 @@ shares) insert a row without a task id: "full". bump() stamps the rows of its tr
 new version; rows of a write that bumped before it wrote stay unstamped and count as changed until the next bump stamps them.
 
 GET /api/state/delta?since=<v> -> {full: true} (the client loads /api/state as before) or {v, tasks, gone, progress, counts,
-mine_order, mine_hidden, evlinks, tcontacts, timer, time_totals, time_lists}: tasks = the changed tasks the person sees, in the
+mine_order, mine_hidden, mine_sections, evlinks, tcontacts, timer, time_totals, time_lists}: tasks = the changed tasks the person sees, in the
 serialization of /api/state (same query, same visibility); gone = ids the client must drop (deleted, moved into a list it
 does not see, no longer visible). Full when the answer is not certain: a scope change since v, since older than what is kept
 (or than this server's start), since newer than the server's v (a restore), more than DL_MAX changed tasks, a person who is a
@@ -27,7 +27,7 @@ from ..core.serializers import load_tasks, td_lean, TD_DEFAULTS  # 2.149.0 G (#2
 from ..core.pg import st_ids  # 2.369.2 (#3136)
 from ..core.state import ev_links, ev_sig, lz_counts, lz_ids_arg, lz_tree, st_where  # 2.149.0 G (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
-from ..tasks.mineorder import mt_mine_hidden, vw_mine_order  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.mineorder import mt_mine_hidden, vw_mine_order, vw_mine_sections  # 2.369.5 (#2517): pulled up from functions; 2.569.0 (#4395): + sections
 
 DL_MAX = 200     # more changed tasks than this: the full state is cheaper
 DL_ROWS = 5000  # rows of dl_changes read at most (more: full)
@@ -344,7 +344,7 @@ def state_delta():
         v=v, full=False, tasks=tasks, gone=sorted(i for i in ids if i not in seen),
         progress={str(k): p for k, p in list_progress(c, sorted(lids), s.get("progress_subtasks") == "1", uid).items()},
         **({"counts": counts} if counts is not None else {}),
-        mine_order=vw_mine_order(c, uid), mine_hidden=mt_mine_hidden(c, uid),
+        mine_order=vw_mine_order(c, uid), mine_hidden=mt_mine_hidden(c, uid), mine_sections=vw_mine_sections(c, uid),
         evlinks=ev_links(c, uid, sorted(seen)) if seen and events_on(c, uid) else {},
         tcontacts=task_contacts(c, uid, seen) if seen else {},
         timer=time_running(c, uid) if tall else None,

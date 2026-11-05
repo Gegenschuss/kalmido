@@ -843,6 +843,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/subtasks": "tasks", "POST /api/v1/tasks/{}/take": "tasks", "POST /api/v1/tasks/{}/tidy": "tasks",
     "POST /api/v1/tasks/{}/to-shopping": "tasks", "POST /api/v1/tasks/{}/typing": "tasks",
     "PUT /api/tasks/mine-order": "tasks", "PUT /api/tasks/{}/bell": "tasks", "PUT /api/tasks/{}/enc-note": "tasks",
+    "POST /api/mine-sections": "tasks", "POST /api/mine-sections/init": "tasks", "PATCH /api/mine-sections/{}": "tasks", "DELETE /api/mine-sections/{}": "tasks", "PUT /api/mine-sections/order": "tasks",  # 2.569.0 (#4395): p2569_a_mine_sections_test.py
     "PUT /api/tasks/{}/note-lock": "tasks", "PUT /api/tasks/{}/waiting": "tasks", "PUT /api/v1/tasks/{}/waiting": "tasks",
     "PUT /api/workload/capacity/{}": "tasks",
     # ---- team (43)

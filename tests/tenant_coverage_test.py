@@ -811,6 +811,7 @@ ROUTES = {
     "GET /api/favorites/targets": "favtarget",  # 2.441.0 (#3592): stored keys can name anything, each target is checked
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
+    "POST /api/mine-sections": "own", "POST /api/mine-sections/init": "own", "PATCH /api/mine-sections/{}": "own", "DELETE /api/mine-sections/{}": "own", "PUT /api/mine-sections/order": "own",  # 2.569.0 (#4395): the own sections of My tasks
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
     "POST /api/ntfy/test": "own",  # 2.142.0 C (#2150); 2.574.0 (#3779): GET / PUT /api/me/ntfy-inbox are gone
      "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",

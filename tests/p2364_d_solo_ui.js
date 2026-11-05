@@ -1,8 +1,8 @@
 // kalmido-suite: fresh
 // 2.364.0 D (#3036) team entries only with collaborators: one mark "has collaborators" (hasPeers: a project shared with
 // another person or an agent, or an organisation of mine with someone else - /api/state org_peers). Without it: no
-// "My tasks" in the sidebar (unless something is assigned), no "Assign to me" / "Waiting on someone" when sorting the
-// basket, no "Waiting on someone…" in the task's "…". "Lock" is in "…" always (the task panel's bar shows only a set lock,
+// "Assign to me" / "Waiting on someone" when sorting the basket ("My tasks" stays in the sidebar since 2.569.0, #4395), no
+// "Waiting on someone…" in the task's "…". "Lock" is in "…" always (the task panel's bar shows only a set lock,
 // to unlock); "Time" sits there instead when time tracking is on; "Lock note" is a "…" entry. A task already waiting
 // keeps "No longer waiting". Sharing a project with a second person brings the entries back. Own container, jsdom.
 // freelancer-matrix: tasks - frida has no organisation (alone, then sharing one project with bob).
@@ -58,7 +58,7 @@ const FEAT = 'cal,comments,collab,time';
   let w = await boot({user: 'frida', hash: 'l/' + L}), d = w.document;
   await until(() => d.querySelector(`#view .trow[data-id="${T}"]`));
   check(w.eval('hasPeers()') === false, 'alone: hasPeers() false');
-  check(!d.querySelector('#side [data-go="assigned"]'), 'alone: no "My tasks" in the sidebar');
+  check(d.querySelector('#side [data-go="assigned"]'), 'alone: "My tasks" in the sidebar all the same');  // 2.569.0 (#4395): always shown (was: not alone)
   let its = await labels(w, d, T);
   check(its.length > 3, 'the task menu opened ' + its.length);
   check(!its.includes('Waiting on someone…') && !its.includes('Assign…') && !its.includes('Ask for approval…'), 'alone: no Waiting on someone… / Assign… / Ask for approval… ' + JSON.stringify(its));

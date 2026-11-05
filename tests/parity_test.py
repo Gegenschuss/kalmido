@@ -642,6 +642,8 @@ APP_ONLY = [
     ("2.41.0 (#1365 / #1205): \"Show in My tasks\" per list and the person's Waiting-on suggestions are personal app "
      "settings of a person; agents never set them (an agent writes the waiting text itself with PUT /tasks/{id}/waiting)",
      ("PUT /api/lists/{}/in-mine", "* /api/me/wait-suggestions")),
+    ("2.569.0 (#4395): the own sections of My tasks are, like the own order, personal app settings of a person; agents have none",
+     ("* /api/mine-sections", "* /api/mine-sections/{}", "PUT /api/mine-sections/order", "POST /api/mine-sections/init")),
     ("2.29.0 (#1029): the permission mode switch in the chat header; in the API it is the agent's runtime (admins: "
      "PATCH /api/admin/agents/{id}, owners: PATCH /api/my/agents/{id}), the agent reads it in GET /agent",
      ("PUT /api/agents/{}/permission-mode",)),

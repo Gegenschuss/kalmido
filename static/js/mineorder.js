@@ -15,7 +15,7 @@ const moOwn = () => moActive() && moView() === 'own';
 const moPred = () => collab() ? mineAssigned : mineTask;
 // 2.363.3 (#3133): S.mineBase = the order the server confirmed, sent as _prev: an order that waited offline does not overwrite one set elsewhere
 const moIds = o => Object.entries(o).sort((a, b) => a[1] - b[1]).map(x => +x[0]);
-const moFromState = j => { mtFromState(j); if (OUT.q.some(e => e.url === '/api/tasks/mine-order')) return S.mineOrder || {}; S.mineBase = moIds(j.mine_order || {}); return j.mine_order || {}; };
+const moFromState = j => { mtFromState(j); mseFromState(j); if (OUT.q.some(e => e.url === '/api/tasks/mine-order')) return S.mineOrder || {}; S.mineBase = moIds(j.mine_order || {}); return j.mine_order || {}; };
 const moPos = t => { const p = S.mineOrder?.[t.id]; return p == null ? null : +p; };
 function moCmp(a, b) {
   const x = moPos(a), y = moPos(b);
@@ -30,13 +30,14 @@ function moAll() {
   const p = moPred(), m = openTasks(true).filter(t => !t.context && p(t)), ids = new Set(m.map(t => t.id));
   return moSort(m.filter(t => !t.parent_id || !ids.has(t.parent_id)));
 }
-async function moSave(ids) {
+async function moSave(ids, secs) {  // 2.569.0 (#4395): secs = {task id: own section id} put there by hand
   S.mineOrder = Object.fromEntries(ids.map((id, i) => [id, i]));
+  if (secs && S.mineSecs) S.mineSecs.tasks = {...S.mineSecs.tasks, ...secs};
   render();
   const send = ids.filter(id => id > 0), seen = S.mineBase;
   S.mineBase = send;  // the next drag builds on this one
   try {
-    const r = await api('PUT', '/api/tasks/mine-order', {ids: send, ...(seen ? {_prev: {ids: seen}} : {})});
+    const r = await api('PUT', '/api/tasks/mine-order', {ids: send, ...(seen ? {_prev: {ids: seen}} : {}), ...(secs ? {secs} : {})});
     if (r?.order_kept) { toast(tr(MO_KEPT)); await load(); render(); }
   } catch { if (S.mineBase === send) S.mineBase = seen; /* api() showed it; the server never confirmed this order; offline it waits in the outbox */ }
 }
@@ -47,6 +48,7 @@ async function moDrop(t, row, after) {
   if (!target || target.id === t.id) return true;
   const all = moAll().map(x => x.id);
   if (!all.includes(t.id) || !all.includes(target.id)) return true;  // e.g. "From your lists, without a date": no own order there
+  if (mseOn()) return mseDrop(t, row.closest('.group')?.querySelector('.ghead[data-key^="ms:"]'), target.id, after);  // 2.569.0 (#4395)
   const ids = all.filter(x => x !== t.id);
   ids.splice(ids.indexOf(target.id) + (after ? 1 : 0), 0, t.id);
   if (moView() === 'lists' && target.list_id !== t.list_id) {  // grouped: into another group = into that list
@@ -70,7 +72,8 @@ function moSubHtml(t) {
 function moViewItems() {
   if (!moActive() || moBoard()) return [];  // 2.156.0 C (#2072): the board has its own columns
   const set = v => () => { if (moView() === v) return; S.settings.mine_view = v; render(); api('PATCH', '/api/settings', {mine_view: v}).catch(() => {}); };
-  return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by project'), icon: 'list', on: moView() === 'lists', fn: set('lists')}];
+  return [{label: tr('Own order'), icon: 'sort', on: moView() === 'own', fn: set('own')}, {label: tr('Grouped by project'), icon: 'list', on: moView() === 'lists', fn: set('lists')},
+    ...(moView() === 'own' && !isMobile() ? [{label: tr('Project as a column'), icon: 'columns', on: moListCol(), fn: () => { LS.set('moListCol', !moListCol()); render(); }}] : [])];  // 2.569.0 (#4395)
 }
 
 // ---- 2.41.0 (#1365): "Show in My tasks" per list, only for me (PUT /api/lists/<id>/in-mine; /api/state mine_hidden = ids of
@@ -142,4 +145,116 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   if (b.dataset.act === 'mo-view') moSetPref('mine_board', b.dataset.k === 'board' ? '1' : '0');
   else moSetPref('mine_board_by', b.dataset.k);
+}, true);
+
+// ---- 2.569.0 (#4395): own sections in the own order (/api/mine-sections, kalmido/tasks/mineorder.py; /api/state mine_sections
+// {list, tasks}). Personal: they never change a list, its sections or its order. On top the fixed section "Recently assigned"
+// (kind recent: tasks without a place; shown while it has tasks, never renamed or deleted); the first opening makes "Now",
+// "Soon", "Someday" (kinds now / soon / later, the name '' = the translated default). A task due today or overdue goes into the
+// section of kind now (also renamed) unless the person put it into a section by hand (tasks map); without such a section the
+// rule is gone. A task with a place but no section stands in the topmost section. Deleting a section moves its tasks into the
+// topmost one left (Undo brings it back); renaming and deleting carry the version (409 = changed on another device).
+const MSE_KIND = {recent: N_('Recently assigned'), now: N_('Now'), soon: N_('Soon'), later: N_('Someday')};
+const mseList = () => S.mineSecs?.list || [];
+const mseName = s => s.name || tr(MSE_KIND[s.kind] || '');
+const mseOn = () => moOwn() && !moBoard() && mseList().length > 0;
+const moListCol = () => moOwn() && !isMobile() && LS.get('moListCol', false) === true;  // (4): "Project" as a column (this device)
+function mseFromState(j) {
+  if (!j.mine_sections) return;
+  const q = OUT.q.some(e => e.url === '/api/tasks/mine-order');  // a drag waiting offline keeps its sections
+  S.mineSecs = {list: j.mine_sections.list || [], tasks: q && S.mineSecs ? S.mineSecs.tasks : j.mine_sections.tasks || {}};
+}
+let mseIniting = false;
+async function mseInit() {  // the first opening of the own order: the default sections (once; the server does nothing a second time)
+  if (mseIniting || !moOwn() || !S.mineSecs || mseList().length) return;
+  mseIniting = true;
+  try { const j = await api('POST', '/api/mine-sections/init', {}); if (j?.mine_sections) { S.mineSecs = j.mine_sections; render(); } } catch { mseIniting = false; /* offline: next time */ }
+}
+// the section a task stands in (id; null = no own section left)
+function mseOf(t, x) {
+  const p = x.map[t.id];
+  if (p && x.ids.has(p)) return p;  // put there by hand: wins
+  if (x.now && mtUrgent(t, x.t0)) return x.now.id;
+  if (moPos(t) == null && x.rec) return x.rec.id;
+  return x.top ? x.top.id : null;
+}
+function mseCtx() {
+  const L = mseList(), own = L.filter(s => s.kind !== 'recent');
+  return {rec: L.find(s => s.kind === 'recent'), own, now: own.find(s => s.kind === 'now'), top: own[0], ids: new Set(own.map(s => s.id)), map: S.mineSecs?.tasks || {}, t0: today()};
+}
+// views.js groupTasks: the groups of the own order (arr = the shown tasks in the own order)
+function mseGroups(arr) {
+  const x = mseCtx(), by = new Map();
+  for (const t of arr) { const k = mseOf(t, x); if (!by.has(k)) by.set(k, []); by.get(k).push(t); }
+  const mk = s => {
+    const id = 'ms:' + s.id;
+    if (s.collapsed) S.collapsed.add(id); else S.collapsed.delete(id);  // the folding of every device (the server keeps it)
+    return {id, name: mseName(s), tasks: by.get(s.id) || [], cls: 'mosec' + (s.kind === 'recent' ? ' msrec' : ''), mosec: s};
+  };
+  const out = x.rec && by.get(x.rec.id)?.length ? [mk(x.rec)] : [];
+  out.push(...x.own.map(mk));
+  if (by.get(null)?.length) out.push({id: 'ms:none', name: '', tasks: by.get(null)});
+  return out;
+}
+// render.js: the "…" of an own section in its head; the button "New section" under the last one
+const mseHeadHtml = g => g.mosec && g.mosec.kind !== 'recent' ? `<button type="button" class="iconbtn gact" data-mse-menu="${g.mosec.id}" title="${esc(tr('More') + ': ' + g.name)}" aria-label="${esc(tr('More') + ': ' + g.name)}">${ic('dots', 's')}</button>` : '';
+const mseAddHtml = () => mseOn() ? `<button type="button" class="linkbtn msenew" data-mse-add="1">${ic('plus', 's')}<span>${esc(tr('New section'))}</span></button>` : '';
+// a drop into an own section (moDrop: onto a row of it; dnd.js: onto its head = on top of it). Only the tasks shown in own
+// sections are sent (with their places); "Recently assigned" takes nothing.
+async function mseDrop(t, head, targetId = null, after = false) {
+  const sid = head ? +head.dataset.key.slice(3) : NaN, s = mseList().find(x => x.id === sid);
+  if (!s || s.kind === 'recent') return true;
+  const x = mseCtx(), all = moAll().filter(y => y.id !== t.id), flat = [];
+  for (const o of x.own) flat.push(...all.filter(y => mseOf(y, x) === o.id).map(y => y.id));
+  flat.push(...all.filter(y => mseOf(y, x) === null).map(y => y.id));
+  let at = targetId != null && flat.includes(targetId) ? flat.indexOf(targetId) + (after ? 1 : 0) : -1;
+  if (at < 0) { const first = all.find(y => mseOf(y, x) === sid); at = first ? flat.indexOf(first.id) : flat.length; }
+  flat.splice(at, 0, t.id);
+  await moSave(flat, {[t.id]: sid});
+  return true;
+}
+const mseDropHead = async (t, el) => { const h = moActive() && mseOn() && el.closest?.('#view .ghead[data-key^="ms:"]'); return h ? mseDrop(t, h) : false; };
+async function mseCall(method, url, b) {
+  try { const j = await api(method, url, b); if (j?.mine_sections) S.mineSecs = {...j.mine_sections, ...(OUT.q.some(e => e.url === '/api/tasks/mine-order') ? {tasks: S.mineSecs.tasks} : {})}; if (j?.order_kept) toast(tr('The sections were changed on another device: that order stays.')); render(); return j; }
+  catch (e) { if (e?.status === 409 || e?.status === 404) { await load(); render(); } return null; }  // api() showed the reason; the current state instead of an old one
+}
+async function mseRename(s) {
+  const old = mseName(s), n = (await askPrompt(tr('Rename section'), old, {ok: tr('Rename'), input: {max: 200}}))?.trim();
+  if (!n || n === old) return;
+  const j = await mseCall('PATCH', `/api/mine-sections/${s.id}`, {name: n, expect_updated_at: s.updated_at});
+  if (j?.section) toast(tr('Section renamed'), () => mseCall('PATCH', `/api/mine-sections/${s.id}`, {name: old, expect_updated_at: j.section.updated_at}));
+}
+async function mseMove(s, d) {
+  const ids = mseList().filter(x => x.kind !== 'recent').map(x => x.id), i = ids.indexOf(s.id), k = i + d;
+  if (i < 0 || k < 0 || k >= ids.length) return;
+  const nw = ids.slice(); nw.splice(i, 1); nw.splice(k, 0, s.id);
+  await mseCall('PUT', '/api/mine-sections/order', {ids: nw, _prev: {ids}});
+}
+async function mseDelete(s) {
+  const j = await mseCall('DELETE', `/api/mine-sections/${s.id}`, {expect_updated_at: s.updated_at});
+  if (j?.restore) toast(tr('Section deleted'), () => mseCall('POST', '/api/mine-sections', {name: j.restore.name, restore: j.restore}));
+}
+async function mseAdd() {
+  const n = (await askPrompt(tr('New section'), '', {ok: tr('Create'), input: {placeholder: tr('Name'), max: 200}}))?.trim();
+  if (n) await mseCall('POST', '/api/mine-sections', {name: n});
+}
+function mseMenu(anchor, sid) {
+  const s = mseList().find(x => x.id === sid); if (!s) return;
+  const own = mseList().filter(x => x.kind !== 'recent'), i = own.indexOf(s);
+  menu(anchor, [
+    {label: tr('Rename'), icon: 'edit', fn: () => mseRename(s)},
+    ...(i > 0 ? [{label: tr('Move up'), icon: 'up', fn: () => mseMove(s, -1)}] : []),
+    ...(i < own.length - 1 ? [{label: tr('Move down'), icon: 'down', fn: () => mseMove(s, 1)}] : []),
+    '-',
+    {label: tr('Delete section (tasks stay)'), icon: 'trash', cls: 'flag-5', fn: () => mseDelete(s)},
+  ]);
+}
+document.addEventListener('click', e => {
+  const m = e.target.closest?.('#view [data-mse-menu]'), a = !m && e.target.closest?.('#view [data-mse-add]');
+  if (m || a) { e.preventDefault(); e.stopPropagation(); if (m) mseMenu(m, +m.dataset.mseMenu); else mseAdd(); return; }
+  const h = e.target.closest?.('#view .ghead[data-key^="ms:"]');  // folding: the server keeps it for every device (events.js toggles it here)
+  if (!h || e.target.closest('.gact, .shandle') || h.dataset.key === 'ms:none') return;
+  const s = mseList().find(x => x.id === +h.dataset.key.slice(3)); if (!s) return;
+  s.collapsed = !s.collapsed;
+  api('PATCH', `/api/mine-sections/${s.id}`, {collapsed: s.collapsed}).catch(() => {});
 }, true);

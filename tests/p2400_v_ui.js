@@ -118,14 +118,20 @@ const ORGNAME = 'Northwind Trading Company';
   const sub = d.querySelector(`#view .trow[data-id="${T1}"] .mosub`);
   check(sub && /Team › Backlog/.test(sub.textContent), '#1344: the subtitle "List › Section" ' + sub?.textContent);
   const sort0 = (await call('GET', '/api/state')).tasks.filter(t => [T1, T2, T3].includes(t.id)).map(t => t.sort).join();
+  // 2.569.0 (#4395): the tasks without a place stand in "Recently assigned" (newest first); a drag puts them into an own
+  // section (here: onto the head of "Now", then T1 before T3 there); "Recently assigned" keeps T2
+  const nowHead = () => [...d.querySelectorAll('#view .ghead[data-key^="ms:"]')].find(x => /Now/.test(x.textContent));
+  await until(() => nowHead());
+  await w.eval(`dropTask(${T3}, document.querySelector('#view .ghead[data-key="${nowHead()?.dataset.key}"]'), 0)`);
+  await until(() => order().join() === [T2, T1, T3].join());
   w.eval(`dropTask(${T1}, document.querySelector('#view .trow[data-id="${T3}"]'), 0)`);
-  check(await until(() => order().join() === [T1, T3, T2].join()), '#1344: a drag puts it there ' + order().join());
+  check(await until(() => order().join() === [T2, T1, T3].join() && nowHead().closest('.group').querySelector(`.trow[data-id="${T1}"]`)), '#1344: a drag puts it there ' + order().join());
   const mo = await until(async () => { const s = await call('GET', '/api/state'); return s.mine_order?.[T1] === 0 && s; });
-  check(mo && mo.mine_order[T3] === 1 && mo.mine_order[T2] === 2, '#1344: the own order on the server ' + JSON.stringify(mo?.mine_order));
+  check(mo && mo.mine_order[T3] === 1 && mo.mine_order[T2] == null, '#1344: the own order on the server ' + JSON.stringify(mo?.mine_order));
   check(mo && mo.tasks.filter(t => [T1, T2, T3].includes(t.id)).map(t => t.sort).join() === sort0, '#1344: tasks.sort unchanged');
   const T4 = await mk('Brand new mine', HOME, {assignee_id: ME.id});
-  await w.eval('load().then(render)'); await sleep(300);
-  check(order()[0] === T4 && order().slice(1).join() === [T1, T3, T2].join(), '#1344: a new task lands on top ' + order().join());
+  await w.eval('load().then(render)'); await until(() => order()[0] === T4);
+  check(order()[0] === T4 && order().slice(1).join() === [T2, T1, T3].join(), '#1344: a new task lands on top ' + order().join());
   click(w, d.querySelector(`#view .trow[data-id="${T1}"] .mosub`)); await sleep(300);
   check(w.eval('S.route.key') === 'l:' + TEAM, '#1344: a tap on the subtitle opens the list (' + w.eval('S.route.key') + ')');
   w.eval('go("assigned")'); await sleep(300);

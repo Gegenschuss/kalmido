@@ -299,7 +299,7 @@ def state():
     from ..events.model import cals_for, events_on
     from ..contacts.model import books_for, contacts_on, task_contacts
     from ..team.clients import clients_brief
-    from ..tasks.mineorder import mt_mine_hidden, vw_mine_order
+    from ..tasks.mineorder import mt_mine_hidden, vw_mine_order, vw_mine_sections
     c = db()
     uid = me()
     v0 = int(gsetting(c, "version"))  # 2.42.0 (#1376): before the tasks: they are at least this new (the delta starts here)
@@ -364,6 +364,7 @@ def state():
         settings={k: v for k, v in s.items() if k not in ("digest_sent", "digest_mail_sent", "digest_mail_try", "review_sent") and not k.startswith("sup_key")},  # 2.74.0 (#338): never the licence key
         mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
         mine_hidden=mt_mine_hidden(c, uid),  # 2.41.0 (#1365): ids of the lists I switched off for "My tasks"
+        mine_sections=vw_mine_sections(c, uid),  # 2.569.0 (#4395): my own sections of "My tasks" and the tasks put into them
         notify=notif_matrix(s),  # 2.1.0 (#317)
         ntfy_url=NTFY_URL,
         trash_purge=ret_on("trash"),  # 2.223.3 A (#2877): False = the trash runs only count, nothing is deleted after the period
