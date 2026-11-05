@@ -279,4 +279,13 @@ r = requests.post(INV, headers=BH, json=FT)
 check(r.status_code == 201, f"person and agent with both rights: 201 ({r.status_code} {r.text[:200]})")
 check(starter(Bo, GB).get("state") == "created", "starter: with both rights created")
 
+# ---- review 2.568.0 (N4): a team agent of an office the instance admin does not work in: its own reason
+r = A.post(B + "/api/users", json={"username": "carol", "display_name": "Carol Other", "password": "password123", "email": "carol@example.com"})
+check(r.ok, "carol " + r.text[:160])
+ORG2 = A.post(B + "/api/admin/orgs", json={"name": "Beta", "admin_id": r.json()["id"]}).json()["id"]
+r = A.post(B + "/api/admin/agents", json={"username": "teamki2", "display_name": "Team KI", "provider": SP, "org_id": ORG2, "scopes": ["read", "office"]})
+check(r.status_code in (200, 201), f"a team server agent of another organisation {r.status_code} {r.text[:200]}")
+x = starter(A, r.json()["id"])
+check(x.get("state") == "skipped" and "You do not work in this agent's office" in (x.get("reason") or ""), f"starter: not in the agent's office -> its own reason {x}")
+
 sys.exit(done("p2568_b_ai_office"))

@@ -78,6 +78,7 @@ SRV_OFFICE_WHY = {
     "switch": N_("Switch on “May draft office documents” for the agent first (its settings, Office & finance)"),
     "person": N_("Switch on the office for yourself first (Settings > Features)"),
     # review 2.568.0 (M2): the person's own right (the route asks it too) and an agent with office groups (the groups decide)
+    "member": N_("You do not work in this agent's office"),
     "right": N_("Give yourself the right “Quotations & invoices” in the office first"),
     "groups": N_("Put the agent into an office rights group with “Quotations & invoices” (edit) first"),
     "privacy": N_("Switch on “Agents may read office data” first (office settings, agents)"),
@@ -153,8 +154,10 @@ def srv_office_gap(c, a, uid):
     if not u or "office" not in scopes_effective(c, {"scopes": a["scopes"] or ",".join(SCOPES_AGENT_DEFAULT)}, u):
         return "scope"
     oid = ofa_area(c, a)  # a personal agent: its owner's personal office (none before the office was opened once)
-    if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
+    if not oid or not office_on(c, uid):
         return "person"
+    if office_role(c, uid, oid) not in ("admin", "member"):  # review 2.568.0 (N4): e.g. a team agent of an office the person is not in
+        return "member"
     if not office_can(c, uid, oid, "offers", "edit"):  # review 2.568.0 (M2): like the route (_v1ctx)
         return "right"
     if not ofa_agent_on(c, a, oid, "offers", "edit"):
