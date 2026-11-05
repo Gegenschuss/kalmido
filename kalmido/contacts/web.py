@@ -447,10 +447,11 @@ def lv_import_run(st, ctx, uid, bid, cards, since=None, photos=True):
 def op_import_state(uid, iid):
     """2.370.3 (#2760): the state from the import's queue row (any process); a row that ended without its run writing the end
     (the server stopped meanwhile) is an interrupted import."""
+    unsure = False
     try:
         got = bgj_state(LV_KIND, uid, lambda p: p.get("import_id") == iid)
-    except Exception:  # noqa: BLE001 -- no database: the runs of this process
-        got = None
+    except Exception:  # noqa: BLE001 -- the runs of this process
+        got, unsure = None, True
     if got:
         row, st = got
         if st.get("user_id") != uid:
@@ -460,6 +461,8 @@ def op_import_state(uid, iid):
         return lv_import_public(st)
     with _IMP_LOCK:
         st = _IMP.get(iid)
+        if (not st or st["user_id"] != uid) and unsure:  # 2.551.0 (#4643): no answer from the database counts as busy, not as gone
+            raise Denied(503, tr("Server error, please try again later"))
         if not st or st["user_id"] != uid:
             raise Denied(404)
         return lv_import_public(st)

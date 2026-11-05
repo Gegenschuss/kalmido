@@ -161,6 +161,27 @@ check(st and st.get("state") == "invalid", f"account import: the check ran as a 
 ck = rows("umz:check")
 check(len(ck) == 1 and ck[0][1] == "done" and ck[0][5] == ALICE, f"account import: the check is a row of the person {[(x[0], x[1]) for x in ck]}")
 
+# 2.551.0 (#4643): a look at the queue that fails (the database busy for a moment) counts an export as running (not as ended), as
+# the imports do (#4295); the contacts import's state answers 503 (keep asking), not 404 (gone)
+bz = py(f"""
+import json
+from kalmido.admin import acctexport as ae, orgexport as oe
+from kalmido.contacts import web as cw
+def boom(*a, **k):
+    raise RuntimeError("p4643: no answer from the database")
+ae.bgj_busy = oe.bgj_busy = cw.bgj_state = boom
+out = {{"account": ae._running({ALICE}), "org": oe._running(987654)}}
+try:
+    cw.op_import_state({ALICE}, "4643000000000000000000ab")
+    out["contacts"] = 200
+except Exception as e:
+    out["contacts"] = getattr(e, "status", getattr(e, "code", str(e)))
+print(json.dumps(out))
+""")[1]
+check(bz.get("account") is True, f"#4643: account export: a failing look at the queue counts it as running {bz}")
+check(bz.get("org") is True, f"#4643: organisation export: a failing look at the queue counts it as running {bz}")
+check(bz.get("contacts") == 503, f"#4643: contacts import state: a failing look at the queue is 503, not 404 {bz}")
+
 # ---------------------------------------------------------------- long slots: full with exports / imports, mails still go
 lg = py("""
 import json

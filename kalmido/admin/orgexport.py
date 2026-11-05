@@ -1024,8 +1024,8 @@ def _running(oid, c=None):
         return True
     try:
         return bgj_busy("ox:export", org_id=int(oid), c=c)
-    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
-        return False
+    except Exception:  # noqa: BLE001 -- 2.551.0 (#4643): no answer from the database counts as busy (as _busy of the imports, #4295)
+        return True
 
 
 @bgj_fn("ox:export", long=True)
