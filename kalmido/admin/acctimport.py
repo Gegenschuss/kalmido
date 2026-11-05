@@ -456,9 +456,19 @@ def umz_open(path, key, size, full=True):
         for p, (zi, sha) in files.items():
             if left(p):
                 n = rows_of.get(p[5:-5])
-                unread[p[5:-5]] = n if isinstance(n, int) and not isinstance(n, bool) and n > 0 else 0
-                if full:
-                    _sum_entry(zf, zi, sha)
+                if isinstance(n, int) and not isinstance(n, bool) and n >= 0:
+                    unread[p[5:-5]] = n
+                    if full:
+                        _sum_entry(zf, zi, sha)
+                elif zi.file_size <= UMZ_JSON_MAX:
+                    # 2.531.0 (#4317 F5): a file without the row counts (made by hand, an older writer): the part is read only to
+                    # count it, never kept, so what stays on the old server is still named
+                    rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, sha), p)
+                    unread[p[5:-5]] = len(rows) if isinstance(rows, list) else 0
+                else:
+                    unread[p[5:-5]] = 0
+                    if full:
+                        _sum_entry(zf, zi, sha)
             elif p.startswith("data/") and p.endswith(".json") and "/" not in p[5:]:
                 rows = _json(_read_entry(zf, zi, UMZ_JSON_MAX, sha), p)
                 if not isinstance(rows, list) or not all(isinstance(x, dict) for x in rows):
