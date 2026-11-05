@@ -8,6 +8,7 @@ as core/instance.UPDATE_KICK).
 """
 OBJ = {}
 REVOKE = []
+SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
 
 
 def person_revoked(c, uid, org, reason, heir=None, role=None):
@@ -17,3 +18,10 @@ def person_revoked(c, uid, org, reason, heir=None, role=None):
     for f in REVOKE:
         out.update(f(c, uid, org, reason, heir=heir, role=role) or {})
     return out
+
+
+def obj_settle(c, kind, rid):
+    """2.568.0 (#4739, review F1): the members of an object changed outside its area (accounts/orgs.py ol_private: the
+    organisation's agents leave a project that turns private) -- the area's own share rows of the core follow (restorable)."""
+    for f in SETTLE:
+        f(c, kind, rid)

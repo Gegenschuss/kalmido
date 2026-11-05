@@ -5,7 +5,7 @@ import re
 
 from flask import g, has_request_context, jsonify, request
 
-from ..core.objhooks import person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objhooks import obj_settle, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.config import app, OFFICE_DIR
 from ..core.pg import insert_id, like_escape, system_ctx
 from ..core.i18n import N_, tr
@@ -1572,8 +1572,7 @@ def ol_private(c, lid, uid):
         c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, aid))
         c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, aid))
         dlg_gone(c, lid, aid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
-    from ..lists.lffolder import lf_own_stale
-    lf_own_stale(c, lid)  # 2.568.0 (#4739, review F1): the organisation agents' own rows of the core go with them (restorable)
+    obj_settle(c, "list", lid)  # 2.568.0 (#4739, review F1): the organisation agents' own rows of the core go with them (restorable)
     from ..admin.orgcrypt_cli import oc_settle_kick
     oc_settle_kick([lid])  # 2.64.0 (#1864): its files get the owner's account key
 

@@ -42,7 +42,8 @@ from ..core.pg import system_ctx
 from ..core.writes import obj_history, obj_history_add
 from ..api.common import v1_call
 from .groups import grp_list_ids, grp_of_user, grp_sync
-from .lffolder import lf_place
+from .lffolder import lf_own_stale, lf_place
+from ..core.objhooks import SETTLE
 from .lists import member_set
 
 LMC_KIND = "list"
@@ -231,3 +232,11 @@ def lmc_history_route(lid):
     if _list_role(c, int(lid), me()) == "participant":  # review F5: they see the project (need_list), not its settings' history
         return err(tr("Participants do not see the project's settings history"), 403)
     return jsonify(history=obj_history(c, me(), LMC_KIND, lid))
+
+
+def _settle(c, kind, rid):
+    if kind == LMC_KIND:
+        lf_own_stale(c, int(rid))
+
+
+SETTLE.append(_settle)  # core/objhooks.obj_settle (accounts/orgs.py ol_private calls it without importing the lists)

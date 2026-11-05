@@ -21,6 +21,7 @@ from ..accounts.onboarding import sample_create, sample_state
 from ..lists.templates import ptype_create, PTYPE_NAMES
 from ..notify.push import push_prio, push_reachable
 from ..agents.core import agent_ids, is_agent
+from ..lists.lffolder import lf_own_stale  # 2.568.0 (#4739): an earlier module of the same layer
 
 
 # ---------------------------------------------------------------- 2.19.0 (#653): the module "Family"
@@ -205,7 +206,6 @@ def kid_force_participant(c, kid):
     gone = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)",
                                     (kid,)).fetchall()]
     c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)", (kid,))
-    from ..lists.lffolder import lf_own_stale
     for lid in gone:  # 2.568.0 (#4739, review F1): the kid's own row of the core goes with it (restorable)
         lf_own_stale(c, lid)
     c.execute("""UPDATE list_members SET role='participant',
