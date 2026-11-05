@@ -16275,6 +16275,8 @@
   "Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.": "Aufbewahrt ab Jahresende: Rechnungen und Belege {0} Jahre, Bücher {1} Jahre, Fahrtenbuch {2} Jahre, Geschäftsbriefe {3} Jahre.",
   "retention lock extended / ended": "Sperre verlängert / beendet",
   "Records kept by law (receipts, books, logbook, business letters) are kept {0} years longer than the law asks. Change it with {1} in the .env file (0 = exactly the law, never shorter).": "Gesetzlich aufbewahrte Unterlagen (Belege, Bücher, Fahrtenbuch, Geschäftsbriefe) bleiben {0} Jahre länger als vom Gesetz verlangt. Ändern mit {1} in der .env-Datei (0 = genau das Gesetz, nie kürzer).",
+  "{0} receipts with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "{0} Belege mit Reverse Charge (§ 13b) netto ohne Steuerschlüssel gebucht: den §-13b-Schlüssel mit der Steuerberatung ergänzen",
+  "1 receipt with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "1 Beleg mit Reverse Charge (§ 13b) netto ohne Steuerschlüssel gebucht: den §-13b-Schlüssel mit der Steuerberatung ergänzen",
   "Services from businesses in the EU (section 13b, base)": "Leistungen von Unternehmen aus der EU (§ 13b, Bemessungsgrundlage)",
   "Tax on services from businesses in the EU (section 13b)": "Steuer auf Leistungen von Unternehmen aus der EU (§ 13b)",
   "Other services with reverse charge (section 13b, base)": "Andere Leistungen mit Steuerschuld des Empfängers (§ 13b, Bemessungsgrundlage)",

@@ -74,6 +74,9 @@ DV_NO_CAT = N_("{0} receipts without a category booked on the account {1}")
 DV_NO_CAT_1 = N_("1 receipt without a category booked on the account {0}")
 DV_NO_VAT = N_("{0} receipts without a VAT rate booked without input tax")
 DV_NO_VAT_1 = N_("1 receipt without a VAT rate booked without input tax")
+# 2.545.0 (#4387, review): section 13b receipts go into the batch net without a tax key: the key needs the tax adviser (#1153)
+DV_RC13B = N_("{0} receipts with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser")
+DV_RC13B_1 = N_("1 receipt with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser")
 # 2.120.0 (#2090): travel receipts marked "in DATEV" (with a DATEV number) are booked there already -- not twice
 DV_IN_DATEV = N_("{0} travel receipts already in DATEV are not exported again")
 DV_IN_DATEV_1 = N_("1 travel receipt already in DATEV is not exported again")
@@ -268,7 +271,7 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}
-    rows, no_cat, no_vat = [], 0, 0
+    rows, no_cat, no_vat, rc13b = [], 0, 0, 0
     from flask import has_request_context, request
     from ..docs.dups import dup_open
     dups = _dup_of_receipt(c, dup_open(c, [rc["node_id"] for rc in receipts]))
@@ -284,6 +287,7 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
                 continue
         no_cat += not rc["category"]
         no_vat += rc["vat_pct"] is None and not small
+        rc13b += bool(rc.get("rc13b"))  # 2.545.0 (#4387, review)
         bu = "" if small else bu_in.get(rc["vat_pct"] or "", "")
         rows.append(_line(amount, dv_cat_account(st, rc["category"]), own.get(rc["node_id"], gegen), bu, rc["date"], f"B{rc['node_id']}",
                           (rc["category"] + " " + rc["title"]) if rc["category"] else rc["title"], node=rc["node_id"],
@@ -297,6 +301,8 @@ def dv_receipt_rows(c, oid, d_from, d_to, st, s):
         hints.append({"key": "no_category", "count": no_cat, "text": tr(DV_NO_CAT_1, o) if no_cat == 1 else tr(DV_NO_CAT, no_cat, o)})
     if no_vat:
         hints.append({"key": "no_vat", "count": no_vat, "text": tr(DV_NO_VAT_1) if no_vat == 1 else tr(DV_NO_VAT, no_vat)})
+    if rc13b:
+        hints.append({"key": "rc13b", "count": rc13b, "text": tr(DV_RC13B_1) if rc13b == 1 else tr(DV_RC13B, rc13b)})
     if dup_ids:
         n = len(dup_ids)
         txt = (tr(DV_DUP_IN_1) if n == 1 else tr(DV_DUP_IN, n)) if with_dups else (tr(DV_DUP_1) if n == 1 else tr(DV_DUP, n))

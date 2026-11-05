@@ -16275,6 +16275,8 @@
   "Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.": "Bewaard vanaf het einde van het jaar: facturen en bonnen {0} jaar, boeken {1} jaar, rittenregistratie {2} jaar, zakelijke brieven {3} jaar.",
   "retention lock extended / ended": "bewaarvergrendeling verlengd / beëindigd",
   "Records kept by law (receipts, books, logbook, business letters) are kept {0} years longer than the law asks. Change it with {1} in the .env file (0 = exactly the law, never shorter).": "Wettelijk bewaarde stukken (bonnen, boeken, rittenregistratie, zakelijke brieven) blijven {0} jaar langer dan de wet vraagt. Wijzig dit met {1} in het .env-bestand (0 = precies de wet, nooit korter).",
+  "{0} receipts with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "{0} bonnen met verleggingsregeling (§ 13b) netto zonder btw-code geboekt: vul de § 13b-code aan met je belastingadviseur",
+  "1 receipt with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "1 bon met verleggingsregeling (§ 13b) netto zonder btw-code geboekt: vul de § 13b-code aan met je belastingadviseur",
   "Services from businesses in the EU (section 13b, base)": "Diensten van ondernemingen uit de EU (§ 13b, grondslag)",
   "Tax on services from businesses in the EU (section 13b)": "Belasting over diensten van ondernemingen uit de EU (§ 13b)",
   "Other services with reverse charge (section 13b, base)": "Andere diensten met verlegging (§ 13b, grondslag)",

@@ -50,7 +50,7 @@ def _net_share(r):
     """net / gross of a document (a payment's net part); 1 without VAT or without totals."""
     t = _j(r["totals"])
     g, n = dec(t.get("gross") or 0), dec(t.get("net") or 0)
-    return n / g if g > 0 and n > 0 else dec(1)
+    return n / g if g != 0 and n / g > 0 else dec(1)  # 2.545.0 (#4387, review): a negative final invoice (both negative) keeps its share
 
 
 def kpi_revenue(c, oid, home, docs, year, today):

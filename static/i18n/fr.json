@@ -16275,6 +16275,8 @@
   "Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.": "Conservé à partir de la fin de l’année : factures et justificatifs {0} ans, livres {1} ans, carnet de route {2} ans, lettres commerciales {3} ans.",
   "retention lock extended / ended": "verrou de conservation prolongé / levé",
   "Records kept by law (receipts, books, logbook, business letters) are kept {0} years longer than the law asks. Change it with {1} in the .env file (0 = exactly the law, never shorter).": "Les documents conservés légalement (justificatifs, livres, carnet de route, lettres commerciales) sont gardés {0} ans de plus que ce qu’exige la loi. Modifie-le avec {1} dans le fichier .env (0 = exactement la loi, jamais moins).",
+  "{0} receipts with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "{0} justificatifs en autoliquidation (§ 13b) comptabilisés en net sans code TVA : ajoutez le code § 13b avec votre conseiller fiscal",
+  "1 receipt with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "1 justificatif en autoliquidation (§ 13b) comptabilisé en net sans code TVA : ajoutez le code § 13b avec votre conseiller fiscal",
   "Services from businesses in the EU (section 13b, base)": "Prestations d'entreprises de l'UE (§ 13b, base)",
   "Tax on services from businesses in the EU (section 13b)": "Taxe sur les prestations d'entreprises de l'UE (§ 13b)",
   "Other services with reverse charge (section 13b, base)": "Autres prestations en autoliquidation (§ 13b, base)",

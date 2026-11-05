@@ -16276,6 +16276,8 @@
   "Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.": "Conservato dalla fine dell’anno: fatture e ricevute {0} anni, libri {1} anni, registro di viaggio {2} anni, lettere commerciali {3} anni.",
   "retention lock extended / ended": "blocco di conservazione prolungato / terminato",
   "Records kept by law (receipts, books, logbook, business letters) are kept {0} years longer than the law asks. Change it with {1} in the .env file (0 = exactly the law, never shorter).": "I documenti conservati per legge (ricevute, libri, registro di viaggio, lettere commerciali) restano {0} anni in più di quanto chiede la legge. Modificalo con {1} nel file .env (0 = esattamente la legge, mai meno).",
+  "{0} receipts with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "{0} giustificativi in inversione contabile (§ 13b) registrati al netto senza codice IVA: aggiungi il codice § 13b con il tuo consulente fiscale",
+  "1 receipt with reverse charge (section 13b) booked net without a tax key: add the section 13b key with your tax adviser": "1 giustificativo in inversione contabile (§ 13b) registrato al netto senza codice IVA: aggiungi il codice § 13b con il tuo consulente fiscale",
   "Services from businesses in the EU (section 13b, base)": "Servizi da imprese dell'UE (§ 13b, base imponibile)",
   "Tax on services from businesses in the EU (section 13b)": "Imposta sui servizi da imprese dell'UE (§ 13b)",
   "Other services with reverse charge (section 13b, base)": "Altri servizi con inversione contabile (§ 13b, base imponibile)",
