@@ -65,6 +65,7 @@ const FEAT = 'cal,comments,collab,contracts,feeds,reading';
   await until(() => d.querySelector('.rlrow'));
   const row = d.querySelector('.rlrow');
   check(row && /example\.com/.test(row.textContent) && row.querySelector('a.bmtitle[target="_blank"][rel~="noopener"]'), '#2679: saved, listed with link and site');
+  await until(() => d.querySelector('.rlrow [data-rl="tick"]'));  // 2.559.0 (#4660): the row shows at once, its tick once the server gave it its id
   click(w, d.querySelector('.rlrow [data-rl="tick"]'));
   await until(() => !d.querySelector('.rlrow'));
   check(!d.querySelector('.rlrow'), '#2679: ticked off');
@@ -94,6 +95,7 @@ const FEAT = 'cal,comments,collab,contracts,feeds,reading';
   check(d.querySelector('#rss-url') && d.querySelector('[data-rss="del"]'), '#2677: the admin manages the sources');
   click(w, d.querySelector('.rssitem [data-rss="later"]'));
   await until(() => d.querySelector('.rssitem [data-rss="later"][aria-pressed="true"]'));
+  await until(async () => (await call('GET', '/api/reading?space=' + SP)).count === 1);  // 2.559.0 (#4660): "Saved" shows before the answer: wait for the server
   w.close();
   w = await boot({user: 'bob', hash: 'feeds'}); d = w.document;
   await until(() => d.querySelector('.rssitem'));

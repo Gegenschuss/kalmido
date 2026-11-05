@@ -81,6 +81,8 @@ const FEAT = 'cal,contracts,feeds';
   click(w, lat());
   await until(() => lat()?.getAttribute('aria-pressed') === 'true');
   check(lat()?.textContent.includes('Saved'), '#1162: "Read later" -> "Saved"');
+  // 2.559.0 (#4660): "Saved" shows before the answer: wait for the server's task
+  await until(async () => ((await call('GET', '/api/state')).tasks || []).some(t => t.title === 'Fresh article'));
   const st = await call('GET', '/api/state');
   const rl = st.lists.find(l => l.life === 'reading');
   const tasks = (st.tasks || []).filter(t => rl && t.list_id === rl.id);
@@ -101,6 +103,7 @@ const FEAT = 'cal,contracts,feeds';
   click(w, d.querySelector('[data-rss="allread"]'));
   await until(() => !d.querySelector('.rssitem.unread'));
   check(!d.querySelector('.rssitem.unread'), '#1162: "Mark all read"');
+  await until(() => w.eval(`HIST.undo[HIST.undo.length - 1]?.label`) === 'Mark all read');  // 2.559.0 (#4660): shown at once, the undo step comes with the answer
   await w.eval(`histStep('undo')`);
   await until(() => d.querySelector('.rssitem.unread'));
   check(d.querySelector('.rssitem.unread'), '#1162: one undo step brings the unread one back');

@@ -11,7 +11,7 @@
 // never a mixed view.
 // Everything comes as plain text (always esc()), links only http(s).
 const RDL = {items: [], more: false, count: 0, doneN: 0, list: null, sp: '', done: false, loading: false, at: 0, seq: 0,
-  busy: false, ticked: false};
+  busy: false, ticked: false, pend: /** @type {Promise<any>|null} */ (null)};  // pend: 2.559.0 (#4660) the last tick still on its way
 const rdl_sp = () => rd_space();
 const rdl_href = u => /^https?:\/\//i.test(u || '') ? u : '';
 
@@ -26,6 +26,7 @@ async function rdl_load(more) {
     const j = await api('GET', '/api/reading?' + q);
     if (seq !== RDL.seq) return;
     RDL.items = more ? RDL.items.concat(j.items) : j.items; RDL.more = j.more; RDL.count = j.count; RDL.doneN = j.done_count; RDL.list = j.list_id; RDL.sp = sp;
+    for (const p of OPT) p.put();  // 2.559.0 (#4660): own changes still on the way stay on top of the fresh list
   } catch (e) { if (seq === RDL.seq && e.status === 404 && rd_open()) go('reading'); }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== RDL.seq) return;
   RDL.loading = false; RDL.done = true; RDL.at = Date.now();
@@ -51,10 +52,10 @@ function viewReading() {
   const row = x => {
     const u = rdl_href(x.url);
     const t = u ? `<a class="bmtitle" href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(x.title)}</a>` : `<span class="bmtitle">${esc(x.title)}</span>`;
-    const tick = x.can_edit ? `<button type="button" class="iconbtn" data-rl="tick" data-id="${x.id}" aria-pressed="${x.done}" title="${esc(x.done ? tr('Unread') : tr('Read|done'))}" aria-label="${esc((x.done ? tr('Unread') : tr('Read|done')) + ': ' + x.title)}">${ic(x.done ? 'undo' : 'check', 's')}</button>` : '';
+    const tick = x.can_edit && x.id > 0 ? `<button type="button" class="iconbtn" data-rl="tick" data-id="${x.id}" aria-pressed="${x.done}" title="${esc(x.done ? tr('Unread') : tr('Read|done'))}" aria-label="${esc((x.done ? tr('Unread') : tr('Read|done')) + ': ' + x.title)}">${ic(x.done ? 'undo' : 'check', 's')}</button>` : '';
     return `<li class="bmrow rlrow ${x.done ? 'st-read' : ''}" data-id="${x.id}"><span class="bmthumb bmnopic" aria-hidden="true">${ic(u ? 'link' : 'book', 's')}</span>
       <div class="bmbody">${t}<span class="muted bmsite">${esc([x.site, fmtWhen(x.done ? x.completed_at : x.created_at)].filter(Boolean).join(' · '))}</span>${x.summary ? `<p class="bmdesc">${esc(x.summary)}</p>` : ''}</div>
-      <span class="bmacts">${u ? `<a class="iconbtn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}${tick}<a class="iconbtn" href="#t/${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</a></span></li>`;
+      <span class="bmacts">${u ? `<a class="iconbtn" href="${esc(u)}" target="_blank" rel="noopener noreferrer" title="${esc(tr('Open the link'))}" aria-label="${esc(tr('Open {0}', x.title))}">${ic('link', 's')}</a>` : ''}${tick}${x.id > 0 ? `<a class="iconbtn" href="#t/${x.id}" title="${esc(tr('Details'))}" aria-label="${esc(tr('Details: {0}', x.title))}">${ic('dots', 's')}</a>` : ''}</span></li>`;  // 2.559.0 (#4660): a row still on its way (negative id) has no actions yet
   };
   return `<div class="bmview rlview">${head}<ul class="bmlist rllist">${RDL.items.map(row).join('')}</ul>${RDL.more ? `<button type="button" class="btn bmmore" data-rl="more">${tr('Show more')}</button>` : ''}</div>`;
 }
@@ -73,18 +74,42 @@ async function rdl_save(url, title, share = false, to = '') {
     redo: async () => { tid = (await api('POST', '/api/reading', {url, space, ...(title ? {title: title.slice(0, 300)} : {})})).task_id; if (S.route.mod === 'reading') await rdl_reload(); }}));
   return j;
 }
+// 2.559.0 (#4660): a pasted link shows at once as a row still on its way (negative id, the link as its title, no actions);
+// the answer gives it the real id, a refusal takes it out again (api() said why); the server's title / site follow with a
+// reload in the background (the row stays until the fresh list is there)
+const rdl_host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const rdl_tmpPut = tmp => () => {
+  if (RDL.ticked || rdl_item(tmp.id)) return null;  // the ticked ones shown: a new entry is not one of them
+  RDL.items.unshift(tmp); RDL.count++;
+  return () => { if (!rdl_item(tmp.id)) return; RDL.items = RDL.items.filter(y => y.id !== tmp.id); RDL.count = Math.max(0, RDL.count - 1); };
+};
 async function rdl_add(url) {
-  RDL.busy = true; rdl_draw();
-  try { await rdl_save(url, ''); RDL.busy = false; await rdl_reload(); return true; }
-  catch { RDL.busy = false; rdl_draw(); return false; }  // api() showed the reason
-}
-async function rdl_tick(id) {
-  const x = rdl_item(id); if (!x) return;
-  const done = !x.done, path = id => `/api/tasks/${id}/${done ? 'complete' : 'reopen'}`, back = id => `/api/tasks/${id}/${done ? 'reopen' : 'complete'}`;
-  await api('POST', path(id));
-  RDL.items = RDL.items.filter(y => y.id !== id);
-  if (done) { RDL.count = Math.max(0, RDL.count - 1); RDL.doneN++; } else { RDL.doneN = Math.max(0, RDL.doneN - 1); RDL.count++; }
+  const tmp = {id: -Date.now(), title: url, url, site: rdl_host(url), created_at: new Date().toISOString(), done: false, can_edit: false, summary: ''};
+  let j; try { j = await optWrite(rdl_tmpPut(tmp), () => rdl_save(url, ''), rdl_draw); } catch { return false; }  // api() showed the reason
+  const x = rdl_item(tmp.id);
+  if (x && (!j?.created || rdl_item(j.task_id))) { RDL.items = RDL.items.filter(y => y.id !== tmp.id); if (!j?.created) RDL.count = Math.max(0, RDL.count - 1); }
+  else if (x) x.id = j.task_id;
   rdl_draw();
+  if (S.route.mod === 'reading') rdl_reload();  // in the background: title, site and the count are the server's
+  return true;
+}
+// 2.559.0 (#4660): ticking off (and back) takes the row out at once, the request runs behind it; a refusal brings it back
+// at its place (api() said why). Idempotent: optWrite puts it again on a state that arrives meanwhile.
+const rdl_tickPut = (id, done) => () => {
+  const i = RDL.items.findIndex(y => y.id === id); if (i < 0) return null;
+  const x = RDL.items[i]; RDL.items = RDL.items.filter(y => y.id !== id);
+  if (done) { RDL.count = Math.max(0, RDL.count - 1); RDL.doneN++; } else { RDL.doneN = Math.max(0, RDL.doneN - 1); RDL.count++; }
+  return () => {
+    if (rdl_item(id)) return;
+    RDL.items.splice(Math.min(i, RDL.items.length), 0, x);
+    if (done) { RDL.count++; RDL.doneN = Math.max(0, RDL.doneN - 1); } else { RDL.doneN++; RDL.count = Math.max(0, RDL.count - 1); }
+  };
+};
+async function rdl_tick(id) {
+  const x = rdl_item(id); if (!x || id < 0) return;
+  const done = !x.done, path = id => `/api/tasks/${id}/${done ? 'complete' : 'reopen'}`, back = id => `/api/tasks/${id}/${done ? 'reopen' : 'complete'}`;
+  const req = RDL.pend = optWrite(rdl_tickPut(id, done), () => api('POST', path(id)), rdl_draw);
+  await req;
   offerUndo(done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title), histAdd({label: done ? tr('Read: {0}', x.title) : tr('Unread: {0}', x.title),
     undo: async () => { await api('POST', back(id)); await rdl_reload(); },
     redo: async () => { await api('POST', path(id)); await rdl_reload(); }}));
@@ -104,13 +129,15 @@ document.addEventListener('submit', async e => {
   const f = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-rl-form]')); if (!f) return;
   e.preventDefault();
   const inp = /** @type {HTMLInputElement} */ ($('#rl-url', /** @type {any} */ (f))), v = inp.value.trim(); if (!v || RDL.busy) return;
-  if (await rdl_add(v)) { const i = /** @type {HTMLInputElement|null} */ ($('#rl-url')); if (i) i.value = ''; } else $('#rl-url')?.focus();
+  inp.value = '';  // 2.559.0 (#4660): the field empties at once, a refusal gives the link back
+  if (!await rdl_add(v)) { const i = /** @type {HTMLInputElement|null} */ ($('#rl-url')); if (i) { if (!i.value) i.value = v; i.focus(); } }
 });
 document.addEventListener('click', async e => {
   const a = /** @type {HTMLButtonElement|null} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-rl]')); if (!a || a.disabled) return;
   e.preventDefault();
   const k = a.dataset.rl, id = +(a.dataset.id || 0);
-  if (k === 'open-list' || k === 'done-list') { RDL.ticked = k === 'done-list'; RDL.items = []; RDL.done = false; rdl_draw(); rdl_reload(); return; }
+  // 2.559.0 (#4660): the other list loads once a tick still on its way is through (else it would miss that entry)
+  if (k === 'open-list' || k === 'done-list') { RDL.ticked = k === 'done-list'; RDL.items = []; RDL.done = false; RDL.loading = true; rdl_draw(); Promise.resolve(RDL.pend).catch(() => {}).then(rdl_reload); return; }
   a.disabled = true;
   try {
     if (k === 'more') await rdl_load(true);

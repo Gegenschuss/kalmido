@@ -32,6 +32,7 @@ async function rss_load(more) {
     if (f) { RSS.feeds = f.feeds; RSS.max = f.max; RSS.manage = f.manage !== false; }
     RSS.sp = sp;
     RSS.items = more ? RSS.items.concat(j.items) : j.items; RSS.more = j.more; RSS.unread = j.unread;
+    for (const p of OPT) p.put();  // 2.559.0 (#4660): own changes still on the way stay on top of the fresh list
   } catch (e) { if (seq === RSS.seq && e.status === 404) { RSS.feed = 0; if (rd_open() && S.route.mod === 'feeds') go('feeds'); } }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== RSS.seq) return;
   RSS.loading = false; RSS.done = true; RSS.at = Date.now();
@@ -109,28 +110,65 @@ async function rss_del(id) {
     redo: async () => { await api('DELETE', `/api/feeds/${id}`); await rss_reload(); }}));
   await rss_reload();
 }
+// 2.559.0 (#4660): read / unread shows at once (the article, the unread counts of the view, the feed choice and the card on
+// Home & life), the request runs behind it; a refusal puts the old marks and counts back (api() said why). Idempotent: an
+// article already marked is left alone, so a state arriving meanwhile (optWrite puts again) counts nothing twice.
+const rss_readPut = (ids, read) => () => {
+  const ch = ids.map(rss_item).filter(x => x && !!x.read !== read);
+  if (!ch.length) return null;
+  const d = read ? -1 : 1, fu = (RSS.feeds || []).map(f => [f, f.unread]), u0 = RSS.unread;
+  for (const x of ch) x.read = read;
+  RSS.unread = Math.max(0, RSS.unread + d * ch.length);
+  for (const f of RSS.feeds || []) f.unread = Math.max(0, (f.unread || 0) + d * ch.filter(x => x.feed_id === f.id).length);
+  return () => { for (const x of ch) x.read = !read; RSS.unread = u0; for (const [f, n] of fu) f.unread = n; };
+};
+let rss_q = Promise.resolve();  // the marks go out one after the other: read and back quickly reach the server in this order
 async function rss_mark(ids, read) {
-  const j = await api('POST', '/api/feeds/read', {ids, read, space: rss_sp()});
-  for (const id of j.ids) { const x = rss_item(id); if (x) x.read = read; }
-  RSS.unread = Math.max(0, RSS.unread + (read ? -j.ids.length : j.ids.length));
-  for (const f of RSS.feeds || []) f.unread = Math.max(0, f.unread + (read ? -1 : 1) * RSS.items.filter(x => j.ids.includes(x.id) && x.feed_id === f.id).length);
-  rss_draw();
+  const want = ids.filter(id => { const x = rss_item(id); return x && !!x.read !== read; });
+  const sp = rss_sp(), go = () => api('POST', '/api/feeds/read', {ids, read, space: sp});
+  const j = await optWrite(rss_readPut(ids, read), () => (rss_q = rss_q.catch(() => {}).then(go)), rss_draw);
+  // the server changed others than shown (another device was quicker): its counts in the background
+  if (j.ids.length !== want.length || j.ids.some(id => !want.includes(id))) rss_reload();
   return j.ids;
 }
+// 2.559.0 (#4660): "Mark all read" marks the shown articles at once (of the chosen feed, or all) and the counts go to 0; the
+// list comes again in the background (articles not loaded yet are the server's); a refusal puts everything back
+const rss_allPut = feed => () => {
+  const ch = RSS.items.filter(x => !x.read && (!feed || x.feed_id === feed)), fs = (RSS.feeds || []).filter(f => !feed || f.id === feed);
+  if (!ch.length && !fs.some(f => f.unread)) return null;
+  const fu = (RSS.feeds || []).map(f => [f, f.unread]), u0 = RSS.unread;
+  for (const x of ch) x.read = true;
+  RSS.unread = feed ? Math.max(0, RSS.unread - (fs[0]?.unread || 0)) : 0;
+  for (const f of fs) f.unread = 0;
+  return () => { for (const x of ch) x.read = false; RSS.unread = u0; for (const [f, n] of fu) f.unread = n; };
+};
 async function rss_allRead() {
-  const space = rss_sp();
-  const j = await api('POST', '/api/feeds/read', RSS.feed ? {feed_id: RSS.feed, read: true, space} : {read: true, space});
+  const space = rss_sp(), feed = RSS.feed;
+  const j = await optWrite(rss_allPut(feed), () => api('POST', '/api/feeds/read', feed ? {feed_id: feed, read: true, space} : {read: true, space}), rss_draw);
+  rss_reload();  // in the background
   if (!j.ids.length) return;
   let ids = j.ids;
   offerUndo(trn('{0} article marked read', '{0} articles marked read', ids.length), histAdd({label: tr('Mark all read'),
     undo: async () => { await api('POST', '/api/feeds/read', {ids, read: false, space}); await rss_reload(); },
     redo: async () => { ids = (await api('POST', '/api/feeds/read', {ids, read: true, space})).ids; await rss_reload(); }}));
-  await rss_reload();
 }
+// 2.559.0 (#4660): "Read later" says "Saved" at once (the article counts as read), the request runs behind it; a refusal
+// puts button and mark back. The undo step comes with the answer (it needs the task's id).
+const rss_laterPut = id => () => {
+  const x = rss_item(id); if (!x || x.task_id) return null;
+  const was = !!x.read; x.task_id = -1;
+  if (!was) { x.read = true; RSS.unread = Math.max(0, RSS.unread - 1); const f = (RSS.feeds || []).find(f => f.id === x.feed_id); if (f) f.unread = Math.max(0, (f.unread || 0) - 1); }
+  return () => {
+    const y = rss_item(id); if (!y || y.task_id !== -1) return;
+    y.task_id = null;
+    if (!was) { y.read = false; RSS.unread++; const f = (RSS.feeds || []).find(f => f.id === y.feed_id); if (f) f.unread = (f.unread || 0) + 1; }
+  };
+};
 async function rss_later(id) {
   const x = rss_item(id); if (!x) return;
-  const j = await api('POST', `/api/feeds/items/${id}/later`, {});
-  x.task_id = j.task_id; if (!x.read) { x.read = true; RSS.unread = Math.max(0, RSS.unread - 1); }
+  const j = await optWrite(rss_laterPut(id), () => api('POST', `/api/feeds/items/${id}/later`, {}), rss_draw);
+  const y = rss_item(id) || x;
+  y.task_id = j.task_id; if (!y.read) { y.read = true; RSS.unread = Math.max(0, RSS.unread - 1); }
   rss_draw();
   if (!j.created) { toast(tr('Already in your reading list')); return; }
   let tid = j.task_id;

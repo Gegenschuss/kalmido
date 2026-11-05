@@ -54,6 +54,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
   d.querySelector('[data-bm-form]').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
   await until(() => d.querySelector('.bmgrid .bmcard'));
   check(d.querySelectorAll('.bmgrid .bmcard').length === 1, '#1950: the link shows up as a card');
+  await until(() => w.eval(`HIST.undo.length`) >= 1);  // 2.559.0 (#4660): the card shows at once, the undo step comes with the answer
   check(w.eval(`HIST.undo.length`) >= 1 && /Save bookmark/.test(w.eval(`HIST.undo[HIST.undo.length - 1].label`)), '#1950: saving is one undo step');
   await until(() => /Gardening on balconies/.test(d.querySelector('.bmcard .bmtitle')?.textContent || ''), 120);
   const card = d.querySelector('.bmcard');
@@ -104,6 +105,7 @@ const click = (w, el, o = {}) => el && el.dispatchEvent(new w.MouseEvent('click'
   check(tx && /A paragraph about zebrafish/.test(tx.textContent) && !tx.querySelector('b, script') && !/never-shown|injected|Menu words/.test(tx.textContent), '#1950: the reading text as plain text');
   if (md) { md.querySelector('#bmd-note').value = 'read on Sunday'; click(w, md.querySelector('[data-m="save"]')); }
   await until(() => !d.querySelector('.modal.bmdlg'));
+  await until(async () => (await call('GET', `/api/bookmarks/${id1}`)).note === 'read on Sunday');  // 2.559.0 (#4660): the dialog closes before the answer
   check((await call('GET', `/api/bookmarks/${id1}`)).note === 'read on Sunday', '#1950: the note is saved');
   w.close();
 

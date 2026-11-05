@@ -30,6 +30,7 @@ async function bm_load(more) {
     const j = await api('GET', '/api/bookmarks?' + q);
     if (seq !== BM.seq) return;
     BM.items = more ? BM.items.concat(j.items) : j.items; BM.more = j.more; BM.tags = j.tags; BM.count = j.count; BM.sp = sp;
+    for (const p of OPT) p.put();  // 2.559.0 (#4660): own changes still on the way stay on top of the fresh list
   } catch (e) { if (seq === BM.seq && e.status === 404 && rd_open()) go('bookmarks'); }  // 2.540.0 (#4588): a space not open to me: the overview
   if (seq !== BM.seq) return;
   BM.loading = false; BM.done = true; BM.at = Date.now();
@@ -96,37 +97,63 @@ function bm_row(x) {
 // ---- actions (each one undo step)
 const bm_item = id => BM.items.find(x => x.id === id);
 // 2.490.0 C (#4025): extra.space = the space picked when sharing (else the shown one); where = its name for the message
+// 2.559.0 (#4660): the link shows at once as a card still on its way (negative id, the link as its title, "Loading preview…",
+// no actions) in the list it belongs to (the shown space, no search / tag / read-only filter); the answer puts the server's
+// bookmark in its place, a refusal takes it out (api() said why); the preview follows with the reload in the background
+const bm_host = u => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch { return ''; } };
+const bm_tmpPut = (tmp, sp) => () => {
+  if (bm_item(tmp.id) || BM.sp !== sp || BM.q || BM.tag || !['', 'unread', 'all'].includes(BM.state)) return null;
+  BM.items.unshift(tmp); BM.count++;
+  return () => { if (!bm_item(tmp.id)) return; BM.items = BM.items.filter(y => y.id !== tmp.id); BM.count = Math.max(0, BM.count - 1); };
+};
 async function bm_add(url, extra = {}, where = '') {
-  BM.busy = true; bm_draw();
+  const sp = extra.space || bm_addSp();
+  const tmp = {id: -Date.now(), url, title: extra.title || url, site: bm_host(url), description: '', note: '', tags: [], state: 'unread', preview: 'pending', image: '', can_edit: false, space: sp};
   try {
-    const j = await api('POST', '/api/bookmarks', {url, space: bm_addSp(), ...extra});
+    const j = await optWrite(bm_tmpPut(tmp, sp), () => api('POST', '/api/bookmarks', {url, space: bm_addSp(), ...extra}), bm_draw);
     const b = j.bookmark;
-    BM.busy = false;
+    const i = BM.items.findIndex(y => y.id === tmp.id);
+    if (i >= 0) { if (j.existed || bm_item(b.id)) { BM.items.splice(i, 1); BM.count = Math.max(0, BM.count - 1); } else BM.items[i] = b; }
     if (j.existed) toast(tr('Already saved: {0}', b.title), () => bm_detail(b.id), 6000, tr('Open'));
     else offerUndo(where ? tr('Saved in “{0}”: {1}', where, b.title) : tr('Saved: {0}', b.title), histAdd({label: tr('Save bookmark {0}', qn(b.title)),
       undo: async () => { await api('DELETE', `/api/bookmarks/${b.id}`); await bm_reload(); },
       redo: async () => { await api('POST', `/api/bookmarks/${b.id}/restore`, {}); await bm_reload(); }}));
-    BM.polls = 0; await bm_reload();
+    bm_draw();
+    BM.polls = 0; bm_reload();  // in the background: the preview, the count
     return b;
-  } catch { BM.busy = false; bm_draw(); return null; }  // api() showed the reason
+  } catch { return null; }  // api() showed the reason (optWrite took the card out)
 }
-async function bm_patch(id, ch, label) {
-  const x = bm_item(id) || await api('GET', `/api/bookmarks/${id}`);
+// 2.559.0 (#4660): a change (read / unread, archive, the details) shows at once on the card, the request runs behind it; a
+// refusal puts the old values back (api() said why). The list comes again in the background only where the server decides
+// what it shows: the state (the filter / the default list hide archived ones), tags (their counts), a new link (its preview).
+// The changes go out one after the other (read and back quickly reach the server in this order). hl: the undo step's name.
+let bm_q = Promise.resolve();
+async function bm_patch(id, ch, label, hl = label, x0 = null) {
+  const x = bm_item(id) || x0 || await api('GET', `/api/bookmarks/${id}`);
   const old = {}; for (const k of Object.keys(ch)) old[k] = x[k];
-  const nx = await api('PATCH', `/api/bookmarks/${id}`, ch);
-  offerUndo(label, histAdd({label,
+  const go = () => api('PATCH', `/api/bookmarks/${id}`, ch);
+  const nx = await optWrite(optSet(() => bm_item(id), ch), () => (bm_q = bm_q.catch(() => {}).then(go)), bm_draw);
+  offerUndo(label, histAdd({label: hl,
     undo: async () => { await api('PATCH', `/api/bookmarks/${id}`, old); await bm_reload(); },
     redo: async () => { await api('PATCH', `/api/bookmarks/${id}`, ch); await bm_reload(); }}));
-  await bm_reload();
+  if ('url' in ch) BM.polls = 0;
+  if ('state' in ch || 'tags' in ch || 'url' in ch) bm_reload();
   return nx;
 }
-async function bm_del(id) {
-  const x = bm_item(id) || await api('GET', `/api/bookmarks/${id}`);
-  await api('DELETE', `/api/bookmarks/${id}`);
+// 2.559.0 (#4660): deleting takes the card out at once; a refusal brings it back at its place; the tag counts follow in the
+// background
+const bm_delPut = id => () => {
+  const i = BM.items.findIndex(y => y.id === id); if (i < 0) return null;
+  const x = BM.items[i]; BM.items = BM.items.filter(y => y.id !== id); BM.count = Math.max(0, BM.count - 1);
+  return () => { if (bm_item(id)) return; BM.items.splice(Math.min(i, BM.items.length), 0, x); BM.count++; };
+};
+async function bm_del(id, x0 = null) {
+  const x = bm_item(id) || x0 || await api('GET', `/api/bookmarks/${id}`);
+  await optWrite(bm_delPut(id), () => api('DELETE', `/api/bookmarks/${id}`), bm_draw);
   offerUndo(tr('Deleted: {0}', x.title), histAdd({label: tr('Delete bookmark {0}', qn(x.title)),
     undo: async () => { await api('POST', `/api/bookmarks/${id}/restore`, {}); await bm_reload(); },
     redo: async () => { await api('DELETE', `/api/bookmarks/${id}`); await bm_reload(); }}));
-  await bm_reload();
+  bm_reload();
 }
 async function bm_move(x) {
   const from = bm_spOrg(x.space);
@@ -179,20 +206,14 @@ async function bm_detail(id) {
           tags: v('#bmd-tags').split(/[,\s]+/).map(t => t.replace(/^#/, '')).filter(Boolean), state: v('#bmd-state')};
         const ch = {};
         for (const [f, val] of Object.entries(nw)) if (JSON.stringify(val) !== JSON.stringify(f === 'tags' ? x.tags : x[f])) ch[f] = val;
-        if (Object.keys(ch).length) {
-          try { await rawFetch('PATCH', `/api/bookmarks/${id}`, ch); } catch (er) { $('.aerr', md).textContent = er.message || ''; b.disabled = false; return; }
-          const old = {}; for (const f of Object.keys(ch)) old[f] = x[f];
-          offerUndo(tr('Saved: {0}', nw.title || x.title), histAdd({label: tr('Edit bookmark {0}', qn(x.title)),
-            undo: async () => { await api('PATCH', `/api/bookmarks/${id}`, old); await bm_reload(); },
-            redo: async () => { await api('PATCH', `/api/bookmarks/${id}`, ch); await bm_reload(); }}));
-          if (ch.url) BM.polls = 0;
-          await bm_reload();
-        }
-        md.remove(); return;
+        // 2.559.0 (#4660): the dialog closes at once, the card shows the new values; a refusal puts them back (api() says why)
+        md.remove();
+        if (Object.keys(ch).length) bm_patch(id, ch, tr('Saved: {0}', nw.title || x.title), tr('Edit bookmark {0}', qn(x.title)), x).catch(() => {});
+        return;
       }
       if (k === 'refresh') { await api('POST', `/api/bookmarks/${id}/refresh`, {}); toast(tr('The preview is being loaded again')); BM.polls = 0; md.remove(); await bm_reload(); return; }
       if (k === 'move') { md.remove(); await bm_move(x); return; }
-      if (k === 'del') { md.remove(); await bm_del(id); return; }
+      if (k === 'del') { md.remove(); await bm_del(id, x); return; }
     } catch { /* api() showed it */ }
     b.disabled = false;
   });
@@ -233,7 +254,8 @@ document.addEventListener('submit', async e => {
   const f = e.target.closest?.('[data-bm-form]'); if (!f) return;
   e.preventDefault();
   const inp = $('#bm-url', f), v = inp.value.trim(); if (!v || BM.busy) return;
-  if (await bm_add(v)) { const i = $('#bm-url'); if (i) i.value = ''; } else $('#bm-url')?.focus();
+  inp.value = '';  // 2.559.0 (#4660): the field empties at once, a refusal gives the link back
+  if (!await bm_add(v)) { const i = $('#bm-url'); if (i) { if (!i.value) i.value = v; i.focus(); } }
 });
 let bm_qT = 0;
 document.addEventListener('input', e => {
@@ -256,7 +278,7 @@ document.addEventListener('click', async e => {
   if (k === 'cards' || k === 'list') { LS.set('bmView', k); bm_draw(); return; }
   if (k === 'bmlet') { bm_bookmarkletHelp(); return; }
   if (k === 'kk') { settingsModal('karakeep'); return; }  // 2.365.2 B (#2789)
-  if (k === 'open') { bm_detail(id); return; }
+  if (k === 'open') { if (id > 0) bm_detail(id); return; }  // 2.559.0 (#4660): a card still on its way has no details yet
   a.disabled = true;
   try {
     if (k === 'more') await bm_load(true);
