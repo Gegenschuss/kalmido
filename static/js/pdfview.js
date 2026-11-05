@@ -19,6 +19,14 @@ function pv_load() {
   if (!pv_lib) pv_lib = import(PV_LIB).then(m => { m.GlobalWorkerOptions.workerSrc = PV_WORKER; return m; }).catch(e => { pv_lib = null; throw e; });
   return pv_lib;
 }
+// 2.549.0 (#4578): the library and the worker get a time limit (15 s, window.pv_waitMs shortens it for the tests): a worker
+// that never starts on a device ends in the failure with Download instead of 'Loading…' for ever; the hung task is ended
+const PV_WAIT = 15000;
+function pv_timed(p, task) {
+  let t = 0;
+  const late = new Promise((_, no) => { t = setTimeout(() => { try { task?.destroy(); } catch {} no(Object.assign(new Error('pdf.js did not start'), {name: 'PvTimeout'})); }, window.pv_waitMs || PV_WAIT); });
+  return Promise.race([p, late]).finally(() => clearTimeout(t));
+}
 const pv_isPdf = a => a?.mime === 'application/pdf' || /\.pdf$/i.test(String(a?.name || ''));
 // 2.65.0 (#1823): the click on a preview link and pv_attr moved to lazyload.js (drawn at start, this file loads on demand)
 
@@ -188,10 +196,12 @@ async function pdfView(o) {
     const r = o.data ? null : await fetch(url, {credentials: 'same-origin'});  // 2.353.0 A (#2758): o.data = bytes decrypted in the browser
     if (r && !r.ok) throw new Error(r.status === 404 || r.status === 410 ? tr('File damaged or missing') : tr('Could not load the file'));
     const data = o.data || new Uint8Array(await r.arrayBuffer());
-    const lib = await pv_load();
+    const lib = await pv_timed(pv_load());
     if (my !== gen || !m.isConnected) return;
     // isEvalSupported off: pdf.js never builds code from the file; no scripting, links stay inert (no annotation layer)
-    doc = await lib.getDocument({data, isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true}).promise;
+    const task = lib.getDocument({data, isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true});
+    // 2.549.0 (#4578): a worker that fails ("Setting up fake worker failed") or never answers is no message for the user
+    doc = await pv_timed(task.promise, task).catch(e => { throw e?.name === 'PasswordException' || e?.name === 'InvalidPDFException' ? e : Object.assign(new Error(String(e?.message || e)), {name: 'PvWorker'}); });
     if (my !== gen || !m.isConnected) { doc.destroy(); return; }
     for (let i = 1; i <= doc.numPages; i++) {
       // every page's own size (mixed formats); only the first is read up front, the others when the document is long

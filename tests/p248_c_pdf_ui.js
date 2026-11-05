@@ -5,6 +5,7 @@
 // - Esc closes it and gives the focus back to the link
 // - a damaged PDF shows a clear message with a download button instead of an empty area
 // - the library is served from the same origin as a JavaScript module (no CDN)
+// - 2.549.0 (#4578): a worker that hangs or cannot be loaded ends in the message with Download (time limit), not 'Loading…'
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -103,6 +104,28 @@ async function upload(tid, name, buf) {
     for (let i = 0; i < 40; i++) { pw = await ev(`(() => { const p = document.querySelector('.pview .pvpage canvas')?.parentElement, b = document.querySelector('.pview .pvbody'); return p && b ? {pw: p.getBoundingClientRect().width, bw: b.clientWidth} : null; })()`); if (pw) break; await sleep(250); }
     check(pw && pw.pw <= pw.bw && pw.pw > pw.bw * 0.8, '#1367: on a phone the page fits the width ' + JSON.stringify(pw));
     await shot('p248c-pdf-phone.png');
+    // 2.549.0 (#4578): a PDF worker that never starts (hangs) or fails ends in the message with Download, not 'Loading…' for
+    // ever; window.pv_waitMs shortens the time limit (15 s) for the test; each case on a fresh page (pdf.js keeps its fake worker)
+    const fresh = async () => {
+      await nav(B + 'static/icon.svg'); await nav(B + '#t/' + T);
+      for (let i = 0; i < 60 && !(await ev(`typeof loadModule === 'function' && !!document.querySelector('.att.file a[data-pview]')`).catch(() => false)); i++) await sleep(250);
+      await ev(`loadModule('pdf').then(() => 1)`);
+    };
+    const failOf = async () => {
+      let r = null;
+      for (let i = 0; i < 60; i++) { r = await ev(`(() => { const m = document.querySelector('.lightbox.pview'); return m ? {fail: m.querySelector('.pvfail')?.textContent.trim() || '', dl: !!m.querySelector('.pvfail a[download]'), loading: !!m.querySelector('.tvmsg')} : null; })()`); if (r?.fail) break; await sleep(250); }
+      return r;
+    };
+    const href = `document.querySelector('.att.file a[title="contract.pdf"]').getAttribute('href')`;
+    await fresh();
+    await ev(`(() => { window.pv_waitMs = 1500; window.Worker = class { constructor() {} addEventListener() {} removeEventListener() {} postMessage() {} terminate() {} }; pdfView({url: ${href}, name: 'contract.pdf'}); return 1; })()`);
+    const hung = await failOf();
+    check(hung && hung.dl && !hung.loading && hung.fail === 'The preview could not be loaded.', '#4578: a worker that never starts ends in the message with Download after the time limit ' + JSON.stringify(hung));
+    await shot('p248c-pdf-worker-hung.png');
+    await fresh();
+    await ev(`pv_load().then(l => { l.GlobalWorkerOptions.workerSrc = '/static/vendor/pdfjs/missing-worker.mjs'; window.Worker = function () { throw new Error('blocked'); }; pdfView({url: ${href}, name: 'contract.pdf'}); return 1; })`);
+    const bad = await failOf();
+    check(bad && bad.dl && !bad.loading && bad.fail === 'The preview could not be loaded.', '#4578: a worker that cannot be loaded shows the plain message with Download, not the library error ' + JSON.stringify(bad));
   }, false);
 
   console.log(`p248_c_pdf_ui: ${ok} passed, ${F.length} failed`);
