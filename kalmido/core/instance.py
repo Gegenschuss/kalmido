@@ -203,6 +203,7 @@ def admin_settings():
             or (b.get("public_links") is True and not eff["public_links"])
             or (pub_new is not None and pub_off - pub_new)  # 2.489.0 C (#2656): a kind switched back on opens the server too
             or (b.get("mcp_remote") is True and gsetting(c, "mcp_remote") != "1")  # 2.488.0 (#3363): opens /mcp + /oauth/*
+            or (b.get("server_agents_off") is False and gsetting(c, "server_agents_off") == "1")  # 2.557.0 C (#4670): allows server agents again (switching off asks nothing)
             or (b.get("signup_mode") in ("approval", "domain", "open") and b["signup_mode"] != gsetting(c, "signup_mode"))
             or (b.get("signup_private") is True and gsetting(c, "signup_private") != "1")):  # 2.422.0 (#2937)
         e = oidc_reauth(c, b)

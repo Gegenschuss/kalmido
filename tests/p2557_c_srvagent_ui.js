@@ -152,7 +152,7 @@ async function scenario(tag, user, ck) {
     check(md && !md.querySelector('[data-m="srv-ok"]') && !md.querySelector('#srv-key'), 'switched off: a note, no fields, no Create');
   } else check(false, 'switched off: the button is still there (the dialog explains)');
   w.close();
-  await call('PATCH', '/api/admin/settings', {server_agents_off: false});
+  await call('PATCH', '/api/admin/settings', {server_agents_off: false, password: 'password123'});  // allowing them again: with the password
   console.log(`p2557_c_srvagent_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

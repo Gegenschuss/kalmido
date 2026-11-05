@@ -161,6 +161,13 @@ function srv_adminHtml(hint) {
 async function srv_adminSwitch(el) {
   const on = el.checked;
   if (!on && !await askConfirm(tr('Switch server agents off?'), tr('No server agent runs any more until you switch them on again; nothing is deleted.'), {ok: tr('Turn off'), danger: true})) { el.checked = true; return; }
-  try { const j = await api('PATCH', '/api/admin/settings', {server_agents_off: !on}); if (j && j.version) S.about = j; srv_def = null; toast(tr('Saved')); }
-  catch { el.checked = !on; }
+  try {  // allowing them again opens the server: the account password like the other opening switches (core/instance.py)
+    let j; try { j = await rawFetch('PATCH', '/api/admin/settings', {server_agents_off: !on}); } catch (x) {
+      if (!x.data?.password_needed) { toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
+      const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
+      j = await api('PATCH', '/api/admin/settings', {server_agents_off: !on, password: p.password});
+    }
+    if (j && j.version) S.about = j;
+    srv_def = null; toast(tr('Saved'));
+  } catch { el.checked = !on; }
 }
