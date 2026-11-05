@@ -10,9 +10,9 @@ tenant-matrix: document
    the undo puts it back as it was; a second undo 409; an undo older than 30 days 409 and no longer offered
  - the tenant boundary: another person's id is never moved (409 "Nothing to move"), another person's undo 404, an agent 403;
    a person without an office: nothing listed, POST 409
- - an organisation's office (Alice, its admin): an old receipt in a folder of her own documents, shared with a person outside the
-   organisation, and an e-invoice move into the organisation's documents (the share ends); the undo brings both back into
-   her own documents, the receipt into its folder under its name, the share again
+ - an organisation's office (Alice, its admin): a receipt booked in her personal office stays (the reason in the preview, not
+   moved); two e-invoices, one in a folder of her own documents shared with a person outside the organisation, move into the
+   organisation's documents (the share ends); the undo brings both back, into the folder under its name, the share again
  - a member of the organisation who is no admin: no hint (why=admin), POST 403
 usage: p4434_a_umzug_test.py <datadir>      (a fresh container; P4434A_NOSTART=1 / KMT_NOSTART=1: it runs already)"""
 import os
@@ -107,9 +107,9 @@ g1 = upload(G, "rechnung-gina.xml", ubl_inv("ER-2026-93", "Beispiel Licht AG", "
 r = Fr.post(MV, json={"ids": [g1]})
 check(r.status_code == 409 and row(g1)[:2] == ("", ""), f"another person's document is never moved {r.status_code} {row(g1)}")
 check(Fr.post(MV, json={"ids": "all"}).status_code == 400, "ids must be a list: 400")
-r = Fr.post(B + "/api/agents", json={"name": "Umzieher"})
-tok = (r.json().get("token") or "") if r.ok else ""
-check(bool(tok), "setup: an agent token")
+r = A.post(B + "/api/admin/agents", json={"scopes": ["write"], "username": "umzieher", "display_name": "Umzieher"})
+tok = (r.json().get("token") or "") if r.status_code in (200, 201) else ""
+check(bool(tok), f"setup: an agent token {r.status_code} {r.text[:160]}")
 r = requests.post(MV, headers={"Authorization": "Bearer " + tok}, json={"ids": [f1]})
 check(r.status_code in (401, 403), f"an agent never moves ({r.status_code})")
 check(requests.get(MV, headers={"Authorization": "Bearer " + tok}).status_code in (401, 403), "an agent gets no preview")
@@ -160,34 +160,37 @@ A.patch(B + "/api/settings", json={"lang": "en", "features": "docs,files,office"
 r = A.put(B + "/api/office/settings", json={"company_fields": {"name": "Alice Beratung", "vat_id": "DE555666777"}})
 check(r.ok, "setup: Alice's personal office first " + r.text[:160])
 a1 = upload(A, "beleg-alt.xml", ubl_inv("ER-2026-95", "Beispiel Druck GmbH", "DE456789123"))
-check(A.post(B + f"/api/docs/{a1}/receipt/einvoice").ok, "setup: a1 an old receipt of her personal office")
+check(A.post(B + f"/api/docs/{a1}/receipt/einvoice").ok, "setup: a1 an old receipt of her personal office (booked there)")
 a2 = upload(A, "rechnung-neu.xml", ubl_inv("ER-2026-96", "Beispiel Strom AG", "DE567891234"))
-r = A.post(B + "/api/files/folders", json={"name": "Belege alt", "space": "private"})
+a3 = upload(A, "rechnung-licht.xml", ubl_inv("ER-2026-98", "Beispiel Licht AG", "DE678912345"))
+r = A.post(B + "/api/files/folders", json={"name": "Rechnungen alt", "space": "private"})
 FOLD = r.json()["id"]
-check(A.patch(B + f"/api/files/nodes/{a1}", json={"parent_id": FOLD}).ok, "setup: a1 into the folder Belege alt")
+check(A.patch(B + f"/api/files/nodes/{a2}", json={"parent_id": FOLD}).ok, "setup: a2 into the folder Rechnungen alt")
 GINA = dbx("SELECT id FROM users WHERE username='gina'")[0][0]
-r = A.post(B + f"/api/files/nodes/{a1}/shares", json={"user_id": GINA, "role": "view"})
-check(r.status_code in (200, 201), f"setup: a1 shared with Gina (outside the organisation) {r.status_code} {r.text[:160]}")
+r = A.post(B + f"/api/files/nodes/{a2}/shares", json={"user_id": GINA, "role": "view"})
+check(r.status_code in (200, 201), f"setup: a2 shared with Gina (outside the organisation) {r.status_code} {r.text[:160]}")
 ORG = A.post(B + "/api/admin/orgs", json={"name": "Alpha", "admin_id": ALICE}).json()["id"]
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(A.put(B + "/api/office/settings", json={"company_fields": {"name": "Alpha Studio GmbH", "vat_id": "DE999888777"}}).ok, "setup: Alpha's office")
-o1, o2 = row(a1), row(a2)
+o1, o2, o3 = row(a1), row(a2), row(a3)
 shares = lambda nid: dbx("SELECT user_id, role FROM fs_shares WHERE node_id=?", (nid,))  # noqa: E731
-check(o1[3] is None and o1[4] == FOLD and shares(a1) == [(GINA, "view")], f"setup: a1 private in its folder, shared {o1} {shares(a1)}")
+check(o2[3] is None and o2[4] == FOLD and shares(a2) == [(GINA, "view")], f"setup: a2 private in its folder, shared {o2} {shares(a2)}")
 j = preview(A)
-check(j["office"] == "org" and picks(j).get(a1) == "move" and picks(j).get(a2) == "move", f"the preview of Alpha's office {j}")
-check(row(a1) == o1 and shares(a1) == [(GINA, "view")], "the preview moves nothing, the share stays")
-r = A.post(MV, json={"ids": [a1, a2]})
-check(r.ok and r.json()["moved"] == 2, f"the move into Alpha {r.status_code} {r.text[:200]}")
+it = {x["id"]: x for x in j["items"]}
+check(j["office"] == "org" and it.get(a2, {}).get("pick") == "move" and it.get(a3, {}).get("pick") == "move", f"the preview of Alpha's office {j}")
+check(a1 in it and it[a1]["pick"] == "stay" and it[a1].get("block"), f"a receipt booked in the personal office stays, with its reason {it.get(a1)}")
+check((row(a1), row(a2), row(a3)) == (o1, o2, o3) and shares(a2) == [(GINA, "view")], "the preview moves nothing, the share stays")
+r = A.post(MV, json={"ids": [a1, a2, a3]})
+check(r.ok and r.json()["moved"] == 2 and [x["id"] for x in r.json()["stayed"]] == [a1], f"the move into Alpha, the booked one stays {r.status_code} {r.text[:300]}")
 RA = r.json()["id"]
-check(row(a1)[2:4] == (f"o{ORG}", ORG) and row(a2)[2:4] == (f"o{ORG}", ORG), f"both in Alpha's documents {row(a1)} {row(a2)}")
-check(shares(a1) == [], "the share with a person outside Alpha ended")
-check(G.get(B + f"/api/docs/{a1}").status_code in (403, 404), "Gina no longer sees a1")
+check(row(a2)[2:4] == (f"o{ORG}", ORG) and row(a3)[2:4] == (f"o{ORG}", ORG) and row(a1) == o1, f"a2, a3 in Alpha's documents {row(a2)} {row(a3)} {row(a1)}")
+check(shares(a2) == [], "the share with a person outside Alpha ended")
+check(G.get(B + f"/api/docs/{a2}").status_code in (403, 404), "Gina no longer sees a2")
 r = A.post(MV + f"/{RA}/undo")
 check(r.ok and r.json()["back"] == 2, f"the undo out of Alpha {r.status_code} {r.text[:200]}")
-check(row(a1)[2:] == o1[2:] and row(a2)[2:] == o2[2:], f"#4434: both back, a1 into its folder under its name {row(a1)} {o1}")
-check(shares(a1) == [(GINA, "view")], f"the share is back {shares(a1)}")
-check(G.get(B + f"/api/docs/{a1}").ok, "Gina sees a1 again")
+check(row(a2)[2:] == o2[2:] and row(a3)[2:] == o3[2:], f"#4434: both back, a2 into its folder under its name {row(a2)} {o2}")
+check(shares(a2) == [(GINA, "view")], f"the share is back {shares(a2)}")
+check(G.get(B + f"/api/docs/{a2}").ok, "Gina sees a2 again")
 
 # ==== a member who is no admin of the organisation
 r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bert", "display_name": "Bert",
