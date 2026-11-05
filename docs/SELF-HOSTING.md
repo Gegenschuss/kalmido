@@ -871,7 +871,9 @@ At a glance (the same two lists as in Settings > Organisation > People > Organis
   in the app's queue, reading and signing in go on (a run that dies frees the server after two minutes; 2.360.2).
   A new key is made, every encrypted value and file of the organisation is encrypted again with it, then the old key
   is removed and a new recovery key is written (to stdout, or with `--recovery-out` into a new file with mode 0600: move
-  it offline and delete the file). On this server all earlier recovery keys, including the earlier format, stop
+  it offline and delete the file). Copies in the office trash are encrypted again as well (2.558); a copy sealed before an
+  earlier renewal opens with neither key and is counted on its own (`trash_unreadable`): it stays as it is and never holds
+  the run back, its restore brings those fields back unreadable. On this server all earlier recovery keys, including the earlier format, stop
   working. Older organisation exports and backups stay readable with the recovery key and master key of their time
   (they hold the old key): the renewal protects only what is stored from then on. The search index of documents, files,
   mails and knowledge pages and the duplicate check of the budget are made again with the new key at the end of the run (until then the

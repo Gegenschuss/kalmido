@@ -1114,8 +1114,10 @@ def _rot_value(k1, k2, oid, kind, ctx, ws, v, bad):
         return v
 
 
-def rot_fields(c, oid, k1, k2, stop=None):
-    """Re-encrypt every value of organisation oid from k1 to k2 (compare and set, in batches). -> (changed, unreadable)."""
+def rot_fields(c, oid, k1, k2, stop=None, tbad=None):
+    """Re-encrypt every value of organisation oid from k1 to k2 (compare and set, in batches). -> (changed, unreadable).
+    2.558.0 D (#4669, review F2): tbad (a one-item list) counts the unreadable values of the office trash copies on their own
+    (rotate_org: they never hold K1 back); None = they count in unreadable."""
     n, bad = 0, [0]
     ws = f"o{int(oid)}"
     for table, idc, col, ocol, kind, ctx in _rot_jobs(oid):
@@ -1141,7 +1143,7 @@ def rot_fields(c, oid, k1, k2, stop=None):
             if len(rows) < BATCH:
                 break
             last = rows[-1]["rid"]
-    n += rot_trash(c, oid, k1, k2, bad, stop)
+    n += rot_trash(c, oid, k1, k2, bad if tbad is None else tbad, stop)
     return n, bad[0]
 
 
@@ -1372,10 +1374,14 @@ def rotate_org(c, oid, stop=None, rounds=3, force=False):
         k1, k2, started = oc.rck_rot_begin(c, oid)
         rot_lock_off(c, lock)  # review: only the switch needs it: a writer from here on reads the new key row, the run may take hours
         lock = None
-        out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "finished": False, "secret": None}
+        out = {"org": oid, "fields": 0, "files": 0, "unreadable": 0, "trash_unreadable": 0, "finished": False, "secret": None}
         empty = 0
         for _ in range(rounds + 1 if rounds else 0):  # (rounds=0: stop right after the key switch)
-            nf, bf = rot_fields(c, oid, k1, k2, stop)
+            # 2.558.0 D (#4669, review F2): a copy in the office trash sealed before an earlier rotation opens with neither
+            # key (old stock, it was never rotated before #4669): counted on its own, it never keeps the rotation from ending
+            tb = [0]
+            nf, bf = rot_fields(c, oid, k1, k2, stop, tb)
+            out["trash_unreadable"] = tb[0]
             ns, bs = rot_files(c, oid, k1, k2, stop)
             out["fields"] += nf
             out["files"] += ns
@@ -1616,6 +1622,9 @@ def main(argv):
                 print(TAG, "rotate: not finished - run it again (the server reads with both keys meanwhile)" if not t["unreadable"] else
                       "rotate: not finished - some values / files open with neither key; check them, then repeat (--force: finish anyway)", flush=True)
                 return 1
+            if t.get("trash_unreadable"):  # 2.558.0 D (#4669, review F2)
+                print(TAG, "rotate:", t["trash_unreadable"], "values in copies of the office trash open with neither key (sealed before an "
+                      "earlier rotation); they stay as they are, a restore brings those fields back unreadable", flush=True)
             rot_announce(c, a.org, "rotated")
             print(TAG, "rotate: the earlier recovery keys no longer count on this server (older exports / backups stay readable with the "
                   "key of their time). The new recovery key:", flush=True)

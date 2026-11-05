@@ -8,6 +8,7 @@ freelancer-matrix: office
    (before the fix the copy kept values of the earlier key, which is gone after the rotation)
  - the copy in office_trash.snap holds other ciphertext after the rotation, still sealed; the run reports nothing unreadable
  - a second rotation re-encrypts the copy again (no value left with a key that is gone)
+ - 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation counts as trash_unreadable, the rotation finishes
  - a person without an organisation: the same in the personal office
 usage: p2558_c_trash_rot_test.py <datadir>"""
 import base64
@@ -93,6 +94,24 @@ def case(s, who, oid):
     j = j.get("item", j) if isinstance(j, dict) else {}
     check(d.ok and j.get("serial_no") == serial and float(j.get("purchase_net") or 0) == price,
           f"{who}: serial number and price readable after restore {d.status_code} {str(j)[:300]}")
+    # 2.558.0 D (#4669, review F2): a copy sealed before an earlier rotation (old stock) opens with neither key: counted on
+    # its own, the rotation still finishes (before the fix it stopped with "not finished" until --force)
+    r = s.post(B + O + "/equipment", json={"name": f"Stativ {who}", "serial_no": f"SN-{who}-old", "purchase_date": "2025-03-01"})
+    tid2 = s.delete(B + O + f"/equipment/{r.json()['id']}").json().get("trash_id")
+    old = one("SELECT snap FROM office_trash WHERE id=?", (tid2,))
+    rc, out, err = cli("rotate", "--org", str(oid))
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"), timeout=10)
+    try:
+        c.execute("UPDATE office_trash SET snap=? WHERE id=?", (old, tid2))  # back to the values of the key that is gone now
+        c.commit()
+    finally:
+        c.close()
+    rc, out, err = cli("rotate", "--org", str(oid))
+    line = next((x for x in out.splitlines() if x.split("rotate:", 1)[-1].strip().startswith("{")), "")
+    t = json.loads(line.split("rotate:", 1)[1]) if line else {}
+    check(rc == 0 and "R2-" in out and t.get("finished") and t.get("trash_unreadable", 0) >= 1 and t.get("unreadable") == 0,
+          f"{who}: an unreadable old trash copy is counted on its own, the rotation finishes {rc} {t} {out[-300:]} {err[-300:]}")
+    check(one("SELECT snap FROM office_trash WHERE id=?", (tid2,)) == old, f"{who}: the unreadable copy stays as it is")
 
 
 case(A, "alice", ORG)
