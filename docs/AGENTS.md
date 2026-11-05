@@ -344,7 +344,8 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   | Due billing on Mondays at 08:00 (2.568.0, off by default) | a planned job weekly on Mondays at 08:00 *Due billing*: billable time not billed yet, due invoice series and subscriptions as one reminder in its chat that offers an invoice draft (made only after your Yes on an approval card), plus a standing rule: quotations and invoices only as drafts, never finalised, numbered, sent or cancelled |
 
   The office tick grants no office rights itself: it is *skipped* with the reason until the agent has the scope `office`
-  (permission *Office drafts*), its switch *May draft office documents* (or office groups), you work in that office and the
+  (permission *Office drafts*), you work in that office with the right *Quotations & invoices* (edit), its switch *May draft
+  office documents* (an agent in office rights groups: a group with *Quotations & invoices* (edit)) and the
   office allows *Agents may read office data* ([Office: drafts only](#office-drafts-only)). Once they are given, the button *Due
   billing on Mondays at 08:00* in the agent's server settings sets it up later. Finalising, numbering, sending and
   cancelling stay with the person; completing or deleting on its own and team projects are not part of the starter pack.
