@@ -28,6 +28,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
 from ..core.access import Denied
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save, pb_cl_live
@@ -165,7 +166,7 @@ def lb_vehicles(c, oid):
         if lo is None and (own is None or d["id"] not in used):  # 2.187.1 B (#2735): others drove since the start: no guess
             lo = d.get("odo_start")
         out.append({"id": d["id"], "name": d["name"], "plate": d.get("plate") or "", "kind": d["kind"], "odo_start": _km_str(d.get("odo_start")),
-                    "archived": d["archived"], "last_odo": _km_str(lo)})
+                    "archived": d["archived"], "last_odo": _km_str(lo), "updated_at": d.get("updated_at") or ""})  # 2.560.0 D (#4700): the dialog's version
     return out
 
 
@@ -232,8 +233,11 @@ def lb_vehicle_post():
 def lb_vehicle_patch(vid):
     """Partial {name, plate, kind, odo_start, archived 0|1} (archived = the undo-able "delete")."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_vehicles-{int(vid)}")  # 2.560.0 D (#4700): a second save with the same base waits, then sees the first
     cur = _vehicle(c, oid, vid)
-    row = _vehicle_clean(_body(), cur)
+    b = _body()
+    ccf_check(b, cur["updated_at"], "row", lambda: next(v for v in lb_vehicles(c, oid) if v["id"] == vid))  # saved elsewhere meanwhile: 409
+    row = _vehicle_clean(b, cur)
     if row:
         before = _veh_vals(next(v for v in lb_vehicles(c, oid) if v["id"] == vid))
         after = dict(before, **_veh_vals(dict(row, odo_start=_km_str(row["odo_start"]) if "odo_start" in row else before["odo_start"])))
@@ -519,9 +523,12 @@ def lb_drive_post():
 def lb_drive_patch(did):
     """Partial drive (keys as POST); logs the values before of every changed field."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_drives-{int(did)}")  # 2.560.0 D (#4700)
     cur = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
     lbc_need_open(c, oid, cur)  # 2.152.0 C (#2169): closed -> 409 (a correction is a new drive)
-    row = _drive_clean(c, oid, uid, _body(), cur)
+    b = _body()
+    ccf_check(b, cur["updated_at"], "row", lambda: _one(c, oid, uid, did))  # saved elsewhere meanwhile: 409 with the drive
+    row = _drive_clean(c, oid, uid, b, cur)
     moved = ("day" in row and row["day"] != cur["day"]) or ("vehicle_id" in row and row["vehicle_id"] != cur["vehicle_id"])
     # review F8: also a change of the vehicle alone must not put the drive into a month closed for that vehicle
     if moved and lbc_month_closed(lbc_closed(c, oid), row.get("vehicle_id", cur["vehicle_id"]), row.get("day", cur["day"])):

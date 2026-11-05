@@ -101,13 +101,13 @@ function lbVehModal(v) {
       const body = {name: val('#lgb-vname'), plate: val('#lgb-vplate'), kind: val('#lgb-vkind'), odo_start: ofcNum(val('#lgb-vodo'))};
       if (v) {
         const old = {name: v.name, plate: v.plate, kind: v.kind, odo_start: v.odo_start};
-        await api('PATCH', `/api/office/vehicles/${v.id}`, body); md.remove(); lbReload(true);
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/vehicles/${v.id}`, old); lbReload(true); });
+        const now = await (v.updated_at ? rawFetch : api)('PATCH', `/api/office/vehicles/${v.id}`, ofcVerBody(body, v)); md.remove(); lbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409
+        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/vehicles/${v.id}`, ofcVerUndo(old, body, now)); lbReload(true); });  // only the keys this save changed
       } else {
         const j = await api('POST', '/api/office/vehicles', body); md.remove(); LB.vid = j.id; LB.view = 'drives'; lbReload(true);
         toast(tr('Added'), async () => { await api('PATCH', `/api/office/vehicles/${j.id}`, {archived: 1}); lbReload(true); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { if (ofcVerConflict(md, x, row => { lbReload(true); lbVehModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
 }
 // 2.152.0 C (#2169): a closed drive (a week after it, or its month closed) is read-only; the fix is a new entry with a reason
@@ -183,15 +183,15 @@ function lbDriveModal(d, fix) {
       if (d) {
         const old = {day: d.day, vehicle_id: d.vehicle_id, start_place: d.start_place, dest: d.dest, purpose: d.purpose, odo_start: d.odo_start, odo_end: d.odo_end,
           km: d.km, kind: d.kind, client_id: d.client_id, project: d.project, user_id: d.user_id};
-        const j = await api('PATCH', `/api/office/drives/${d.id}`, body); md.remove(); lbReload(true);
+        const j = await (d.updated_at ? rawFetch : api)('PATCH', `/api/office/drives/${d.id}`, ofcVerBody(body, d)); md.remove(); lbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409
         // 2.93.0 B (#1928 review): a taken-over drive with other km -> the trip keeps the old km, said once here
-        toast(j.trip_hint || (j.warn ? lbWarn(j.warn) : tr('Saved')), async () => { await api('PATCH', `/api/office/drives/${d.id}`, old); lbReload(true); });
+        toast(j.trip_hint || (j.warn ? lbWarn(j.warn) : tr('Saved')), async () => { await api('PATCH', `/api/office/drives/${d.id}`, ofcVerUndo(old, body, j)); lbReload(true); });  // only the keys this save changed
       } else {
         if (fix) { body.corrects_id = fix.id; body.correct_note = val('#lgb-fixnote').trim(); if (!body.correct_note) { $('.aerr', md).textContent = tr('A correction needs its reason'); return; } }
         const j = await api('POST', '/api/office/drives', body); md.remove(); LB.vid = j.vehicle_id || LB.vid; RK.year = j.day.slice(0, 4); lbReload(true);
         toast(j.warn ? lbWarn(j.warn) : tr('Added'), async () => { await api('DELETE', `/api/office/drives/${j.id}`); lbReload(true); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { if (ofcVerConflict(md, x, row => { lbReload(true); lbDriveModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
 }
 const LB_ACT = {create: N_('Created'), change: N_('Changed'), delete: N_('Deleted'), restore: N_('Restored'), trip: N_('Taken over into the travel expenses'),  // 2.93.0 B (#1928 review): trip
