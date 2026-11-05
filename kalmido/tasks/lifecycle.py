@@ -970,7 +970,7 @@ def tre_cascades(c, ids, list_ids=()):
 def trash_purge_info():
     """2.530.0 D (#4316): the numbers before deleting for good. ?task=ID (that task, ?hard=1) | ?list=ID (a project in the
     projects' trash) | nothing (= "Empty trash", &all=1: also the other owners' trash of an instance admin) ->
-    {tasks, kept, kept_law, others, tickets, forms, videos}."""
+    {tasks, kept, kept_law, others, tickets, forms, videos} (+ moved_values for ?list, 2.552.0 #4561 B12)."""
     c, uid = db(), me()
     tid, lid = request.args.get("task", type=int), request.args.get("list", type=int)
     if tid:
@@ -983,6 +983,8 @@ def trash_purge_info():
         otr_need(c, lid)
         out = {"tasks": c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=?", (lid,)).fetchone()[0], "kept": 0, "kept_law": 0, "others": 0}
         out.update(tre_cascades(c, [], [lid]))
+        from ..lists.fields import fd_moved_count
+        out["moved_values"] = fd_moved_count(c, list_id=lid)  # 2.552.0 (#4561 B12): tasks moved away lose their values of its fields
     else:
         ids, _ok, cnt = tre_plan(c, uid, wide=request.args.get("all") == "1")
         out = {"tasks": cnt["deleted"], "kept": cnt["kept"], "kept_law": cnt["kept_law"], "others": cnt["others"]}

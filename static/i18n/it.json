@@ -16312,6 +16312,8 @@
   "{0}: the position is in the quotation again": "{0}: la posizione è di nuovo nel preventivo",
   "Credit card position": "Voce della carta di credito",
   "Restored without a client: the client was deleted for good meanwhile.": "Ripristinato senza cliente: nel frattempo il cliente è stato eliminato definitivamente.",
+  "{0} task with a value was moved to another project: its value is deleted too.": ["{0} attività con un valore è stata spostata in un altro progetto: anche il suo valore viene eliminato.", "{0} attività con un valore sono state spostate in un altro progetto: anche i loro valori vengono eliminati."],
+  "{0} task moved to another project loses its values of this project’s fields.": ["{0} attività spostata in un altro progetto perde i suoi valori dei campi di questo progetto.", "{0} attività spostate in un altro progetto perdono i loro valori dei campi di questo progetto."],
   "The off-site backup is set up by the operator.": "Il backup esterno lo configura il gestore.",
   "On a hosted instance the operator sets up the off-site backup": "Su un'istanza ospitata il backup esterno lo configura il gestore",
   "Release to remove": "Rilascia per rimuovere",

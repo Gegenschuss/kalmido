@@ -7,6 +7,8 @@ freelancer-matrix: office, wiki, tasks
  - B21: a deleted credit card position goes into the office trash first (label without the sealed merchant / amount); the
    undo route and the office trash bring it back with its id; another office 404; a confirmed statement takes none back (409)
  - B19: a draft in the office trash whose client was deleted for good since comes back without the client, the answer says so
+ - B12: a task moved to another project keeps its value at the old field: the field's delete count (moved) and the project's
+   purge-info (moved_values) name it, both delete dialogs say it
 usage: p2552_b_dataloss_test.py <datadir>      (KMT_NOSTART=1: a running server)"""
 import os
 import sys
@@ -19,6 +21,12 @@ from freelancer_fixture import freelancer
 
 O = "/api/office"
 K = O + "/cards"
+SRC = os.environ.get("KALMIDO_SRC") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+
+def kt_src(rel):
+    with open(os.path.join(SRC, rel), encoding="utf-8") as f:
+        return f.read()
 
 
 def sql(q, args=()):
@@ -102,5 +110,29 @@ row = sql("SELECT client_id, project_title FROM office_docs WHERE id=?", (DID,))
 check(row and row[0][0] is None, f"B19: the draft has no client now: {row}")
 check(Fr.get(B + O + f"/docs/{DID}").ok, "B19: the draft opens")
 check(not sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B19: the copy left the trash")
+
+# ================================================================== B12 values of moved tasks: the delete dialogs name them
+Fr.patch(B + "/api/settings", json={"set_delta": {"features": {"add": ["fields"]}}})
+L1 = Fr.post(B + "/api/lists", json={"name": "Altprojekt Beispiel", "kind": "project"}).json()["id"]
+L2 = Fr.post(B + "/api/lists", json={"name": "Neuprojekt Beispiel", "kind": "project"}).json()["id"]
+r = Fr.post(B + f"/api/lists/{L1}/fields", json={"name": "Budget", "type": "number"})
+check(r.ok, f"B12: a field {r.status_code} {r.text[:160]}")
+FD = r.json()["id"]
+T1 = Fr.post(B + "/api/tasks", json={"title": "Bleibt hier", "list_id": L1}).json()["id"]
+T2 = Fr.post(B + "/api/tasks", json={"title": "Zieht um", "list_id": L1}).json()["id"]
+for t in (T1, T2):
+    check(Fr.patch(B + f"/api/tasks/{t}", json={"fields": {str(FD): 120}}).ok, "B12: a value")
+j = Fr.get(B + f"/api/fields/{FD}/count").json()
+check(j.get("tasks") == 2 and j.get("moved") == 0, f"B12: nothing moved yet {j}")
+check(Fr.patch(B + f"/api/tasks/{T2}", json={"list_id": L2}).ok, "B12: one task moves to the other project")
+check(sql("SELECT COUNT(*) FROM task_field_values WHERE task_id=? AND field_id=?", (T2, FD))[0][0] == 1, "B12: its value stays at the old field")
+j = Fr.get(B + f"/api/fields/{FD}/count").json()
+check(j.get("tasks") == 2 and j.get("moved") == 1, f"B12: the field's delete count names the moved task {j}")
+check(Fr.patch(B + f"/api/lists/{L1}", json={"archived": True}).ok and Fr.delete(B + f"/api/lists/{L1}").ok, "B12: the old project into the projects' trash")
+pi = Fr.get(B + f"/api/trash/purge-info?list={L1}").json()
+check(pi.get("moved_values") == 1 and pi.get("tasks") == 1, f"B12: purge-info of the project names the moved task {pi}")
+for rel in ("static/js/projects.js", "static/js/tablecells.js"):
+    check("fdMovedWarn(fc)" in kt_src(rel), f"B12: the field delete dialog of {rel} names the moved tasks")
+check("j.moved_values" in kt_src("static/js/trashui.js"), "B12: the project's delete dialog names them")
 
 sys.exit(done("p2552_b_dataloss"))

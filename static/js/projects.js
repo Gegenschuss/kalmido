@@ -756,8 +756,8 @@ function fieldModal(lid, f, done) {
     if ((a === 'del' || a === 'save') && edit && f.id < 0) { await fdReal(f.id); f = fieldById(FD_REAL.get(f.id)) || f; if (f.id < 0) return; }  // 2.554.0 B (#4658): a field still on its way: its real id first
     if (a === 'del') {
       // 2.40.0 (#1192): the server counts every task with a value (also those not loaded here); the local count if offline
-      const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
-      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
+      const fc = await api('GET', `/api/fields/${f.id}/count`).catch(() => null), n = fc ? fc.tasks : [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;  // 2.552.0 (#4561 B12): + moved
+      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fdMovedWarn(fc) + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
       md.remove(); fdDelete(f, done); return;  // 2.554.0 B (#4658): gone at once, the server follows (fdDelete)
     }
     if (a === 'save') {

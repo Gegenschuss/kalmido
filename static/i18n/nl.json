@@ -16311,6 +16311,8 @@
   "{0}: the position is in the quotation again": "{0}: de positie staat weer in de offerte",
   "Credit card position": "Creditcardpost",
   "Restored without a client: the client was deleted for good meanwhile.": "Hersteld zonder klant: de klant is intussen definitief verwijderd.",
+  "{0} task with a value was moved to another project: its value is deleted too.": ["{0} taak met een waarde is naar een ander project verplaatst: de waarde wordt ook verwijderd.", "{0} taken met een waarde zijn naar een ander project verplaatst: hun waarden worden ook verwijderd."],
+  "{0} task moved to another project loses its values of this project’s fields.": ["{0} naar een ander project verplaatste taak verliest haar waarden uit de velden van dit project.", "{0} naar een ander project verplaatste taken verliezen hun waarden uit de velden van dit project."],
   "The off-site backup is set up by the operator.": "De externe back-up wordt door de beheerder ingericht.",
   "On a hosted instance the operator sets up the off-site backup": "Op een gehoste instantie richt de beheerder de externe back-up in",
   "Release to remove": "Loslaten om te verwijderen",

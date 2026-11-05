@@ -139,7 +139,8 @@ function trCascText(j) {
   return [j.tickets ? trn('{0} report from the client portal is deleted with it.', '{0} reports from the client portal are deleted with them.', j.tickets) : '',
     j.forms ? trn('{0} form entry is deleted with it.', '{0} form entries are deleted with them.', j.forms) : '',
     j.videos ? trn('{0} video review goes to the trash of the video reviews.', '{0} video reviews go to the trash of the video reviews.', j.videos) : '',
-    j.kept_law ? trn('{0} task stays: its project keeps receipts by law.', '{0} tasks stay: their project keeps receipts by law.', j.kept_law) : ''].filter(Boolean).join(' ');
+    j.kept_law ? trn('{0} task stays: its project keeps receipts by law.', '{0} tasks stay: their project keeps receipts by law.', j.kept_law) : '',
+    j.moved_values ? trn('{0} task moved to another project loses its values of this project’s fields.', '{0} tasks moved to another project lose their values of this project’s fields.', j.moved_values) : ''].filter(Boolean).join(' ');  // 2.552.0 (#4561 B12)
 }
 async function trPurgeInfo(q) { return api('GET', '/api/trash/purge-info' + q).catch(() => null); }
 // one task in the trash deleted for good (events.js 'purge')

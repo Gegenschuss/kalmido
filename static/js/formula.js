@@ -32,6 +32,10 @@ function fxUsedWarn(fid) {
   const by = (S.fields || []).filter(f => f.type === 'formula' && (f.options?.expr || '').includes(`{#${fid}}`)).map(f => f.name);
   return by.length ? ' ' + tr('Formulas that use it stay empty: {0}', by.join(', ')) : '';
 }
+// 2.552.0 (#4561 B12): the answer of GET /api/fields/{id}/count: tasks moved to another project keep their value hidden here, it goes too
+function fdMovedWarn(j) {
+  return j?.moved ? ' ' + trn('{0} task with a value was moved to another project: its value is deleted too.', '{0} tasks with a value were moved to another project: their values are deleted too.', j.moved) : '';
+}
 
 // ---- the number format of a result: the person's language, at most 2 decimals, the unit after it
 function fxFmt(v, unit) {

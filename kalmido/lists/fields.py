@@ -357,7 +357,18 @@ def field_count(fid):
     c = db()
     need_field(c, fid)
     return jsonify(tasks=c.execute("SELECT COUNT(DISTINCT task_id) FROM task_field_values WHERE field_id=?", (fid,)).fetchone()[0],
-                   used_by=fx_used_by(c, fid))
+                   used_by=fx_used_by(c, fid), moved=fd_moved_count(c, field_id=fid))
+
+
+def fd_moved_count(c, field_id=None, list_id=None):
+    """2.552.0 (#4561 B12): how many tasks moved to another list since still hold a value of field field_id (or of a field of
+    list list_id): the value stays hidden at the old field and goes when that field / list is deleted. A number only, in the
+    system context (the task may lie in a list the person does not see)."""
+    from ..core.pg import system_ctx
+    with system_ctx(c):
+        return c.execute("SELECT COUNT(DISTINCT v.task_id) FROM task_field_values v JOIN list_fields f ON f.id=v.field_id "
+                         "JOIN tasks t ON t.id=v.task_id WHERE t.list_id IS DISTINCT FROM f.list_id AND "
+                         + ("f.id=?" if field_id is not None else "f.list_id=?"), (field_id if field_id is not None else list_id,)).fetchone()[0]
 
 
 @app.get("/api/fields/task-refs")
