@@ -13,11 +13,18 @@ async function spr_assign(ids, sid, lab) {
   const snaps = ids.map(i => snapTask(S.tasks.get(i)));
   let j;
   const prev = Object.fromEntries(snaps.map(b => [b.id, {sprint_id: b.sprint_id || null}]));  // 2.370.0 (#3126): a task moved elsewhere meanwhile stays there
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'patch', data: {sprint_id: sid || null, prev}}); } catch { return; }
-  if (j?.errors?.length) toast(j.errors[0]);
+  // 2.559.0 (#4660): the tasks move at once (optWrite as #1501), no GET /api/state; an error puts them back. A task the server
+  // kept (changed elsewhere: its value from the conflict) goes back here; one it skipped (no right) comes with a reload behind it
+  // The sprint header counts the tasks here meanwhile (no GET /api/sprints/<id> of the old figures) and asks the server again after
+  const sets = ids.map(i => optSet(() => S.tasks.get(i), {sprint_id: sid || null}));
+  const sprs = [...new Set([sid, ...snaps.map(b => b.sprint_id)].filter(Boolean))], here = on => sprs.forEach(s => { delete SPR.j[s]; SPR.busy[s] = on; });
+  try { j = await optWrite(() => { here(true); const b = sets.map(f => f()); return () => b.forEach(x => x?.()); }, () => api('POST', '/api/tasks/batch', {ids, action: 'patch', data: {sprint_id: sid || null, prev}})); }
+  catch { here(false); render(); return; }
+  here(false);
+  if (j?.errors?.length) { toast(j.errors[0]); load().then(render, () => {}); }
   const cf = j?.conflicts || [];
-  for (const c of cf) addConflicts(c.id, [c], c.title);
-  await load(); render();
+  for (const c of cf) { addConflicts(c.id, [c], c.title); const t = S.tasks.get(c.id); if (t && c.field === 'sprint_id') t.sprint_id = c.server ?? null; }
+  render();
   const pairs = snaps.filter(b => !cf.some(c => c.id === b.id)).map(b => [b, snapTask(S.tasks.get(b.id)), ['sprint_id']]);
   if (!pairs.length) return;
   const msg = lab || (sid ? tr('In {0}', spr_name(spr_byId(spr_list(snaps[0].list_id), sid))) : tr('Moved to the backlog'));
