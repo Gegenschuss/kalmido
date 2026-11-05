@@ -142,7 +142,15 @@ function agrModal(a) {
       if (m === 'del') { await agrDelete(a); md.remove(); return; }
       if (m === 'arch') { await agrArchive(a, !a.archived); md.remove(); return; }
       await agrSave(a, read()); md.remove();
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-agr-reload>${tr('Reload')}</button>`;
+        $('[data-agr-reload]', el).addEventListener('click', () => { md.remove(); agrReload(); agrModal(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
   return md;
 }
@@ -156,10 +164,19 @@ async function agrSave(a, body) {
       redo: async () => { await api('POST', `/api/office/agreements/${j.id}/restore`, {}); agrReload(); }}));
     return j;
   }
+  // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten); undo / redo
+  // write only the keys this save changed, each with the version the step before left
   const old = agrBody(a);
-  const j = await api('PATCH', `/api/office/agreements/${a.id}`, body); agrReload();
-  offerUndo(tr('Saved'), histAdd({label: tr('Contract changed'), undo: async () => { await api('PATCH', `/api/office/agreements/${a.id}`, old); agrReload(); },
-    redo: async () => { await api('PATCH', `/api/office/agreements/${a.id}`, body); agrReload(); }}));
+  const j = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/agreements/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); agrReload();
+  const now = agrBody(j), keys = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
+  let ver = j.updated_at;
+  const step = async src => {
+    try { ver = (await rawFetch('PATCH', `/api/office/agreements/${a.id}`, {...Object.fromEntries(keys.map(k => [k, src[k]])), expect_updated_at: ver})).updated_at; }
+    catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
+    agrReload();
+  };
+  if (!keys.length) { toast(tr('Saved')); return j; }
+  offerUndo(tr('Saved'), histAdd({label: tr('Contract changed'), undo: () => step(old), redo: () => step(now)}));
   return j;
 }
 async function agrArchive(a, on) {

@@ -32,6 +32,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..files.fsref import fs_ref_rename
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .calc import dec, dstr, money
@@ -470,10 +471,12 @@ def agr_post():
 def agr_patch(aid):
     """Office admin. Any field of POST, archived 0|1, task 0|1, list_id -> the contract. The deadline task follows."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_agreements-{int(aid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
     cur = bk_dec(c, oid, _row(c, oid, aid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur.get("updated_at"), "row", lambda: bk_public(c, oid, uid, _row(c, oid, aid)))
     row = bk_clean(c, oid, uid, b, cur)
     revive = False
     if "archived" in b:
