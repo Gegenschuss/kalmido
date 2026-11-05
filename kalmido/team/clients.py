@@ -20,6 +20,7 @@ from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org
 from ..accounts.orgroles import user_orgs_full, is_write_request  # 2.369.5 (#2517): pulled up from functions
 from ..personal.timetrack import time_report  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.supportgrant import sga_org_foreign
+from ..office.owrite import ow_write  # 2.567.0 (#4711): the office's write layer (the clients save through it)
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients
@@ -393,7 +394,6 @@ def client_update(cid):
     """2.567.0 (#4711): through the office's write layer (office/owrite.py ow_write): the lock, the version (409 with the
     current client under "current" and "client"), only the fields sent, the undo step with the contact persons, the
     history, updated_by, bump. The rights stay need_client's."""
-    from ..office.owrite import ow_write
     c = db()
     uid = me()
     _gate(c)

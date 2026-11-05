@@ -844,10 +844,9 @@ def lt_profile_image_delete():
 
 def lt_undo_ctx(ref):
     """2.567.0 (#4711): the session undo of a letter (office/undo.py, kind "letter"): its admins, a draft only."""
-    from .undo import OUN_FINAL
     c, uid, oid = lt_ctx()
     if lt_row(c, oid, ref)["status"] != "draft":
-        raise Denied(409, tr(OUN_FINAL))
+        raise Denied(409, tr("A sent letter cannot be changed any more. Edit a copy instead."))
     return c, uid, oid, lambda c: lt_public(c, oid, lt_row(c, oid, ref))
 
 
