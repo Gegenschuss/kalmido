@@ -116,7 +116,7 @@ def lmc_unshare(c, actor, lid, uid):
         s = _own_row(c, lid, uid)
         if s is None:
             return None
-    with system_ctx(c):
+    with system_ctx(c):  # the node may lie in a folder the actor does not see (another person's path); member_remove checked the right
         return obj_unshare(c, actor, LMC_KIND, int(lid), s["id"], checked=True)
 
 

@@ -273,6 +273,9 @@ APP_ONLY = [
      "view) -- an agent's delete puts them into that trash, the way back stays with people (like the files and comments)",
      ("=GET /api/trash/parts", "=POST /api/sections/{}/restore", "=POST /api/sprints/{}/restore", "=POST /api/lists/{}/links/{}/restore",
       "=POST /api/templates/{}/restore")),
+    ("2.568.0 (#4739): a project's core share rows, their restore and its settings history stay with people like the core "
+     "objects' own (2.558.0 #4709 above) -- an agent changes members through PUT/DELETE /lists/{}/members, never restores taken shares",
+     ("=GET /api/lists/{}/shares", "=POST /api/lists/{}/shares/{}/restore", "=GET /api/lists/{}/history")),
     ("2.558.0 (#4709): the core objects' own management stays with people -- creating, the trash, deleting, the editor's undo session and who it is shared with (an agent changes what is shared with it, never its shares or its existence)",
      ("=POST /api/obj/{}", "=POST /api/obj/{}/{}/trash", "=POST /api/obj/{}/{}/restore", "=DELETE /api/obj/{}/{}", "=GET /api/obj/{}/{}/history",
       "=POST /api/obj/{}/{}/undo", "=GET /api/obj/{}/{}/shares", "=POST /api/obj/{}/{}/shares", "=DELETE /api/obj/{}/{}/shares/{}",
