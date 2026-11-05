@@ -92,12 +92,19 @@ async function statusModal(lid) {
     if (b.dataset.st !== undefined) { sel = b.dataset.st; $$('.stopt', md).forEach(x => x.classList.toggle('on', x === b)); return; }
     if (b.dataset.m === 'close') md.remove();
     if (b.dataset.m === 'save') {
-      const was = l.status;
-      try { await api('POST', `/api/lists/${lid}/status`, {status: sel, note: $('#st-note', md)?.value.trim() || ''}); } catch { return; }
-      md.remove(); await load(); render(); toast(sel ? tr('Status: {0}', statusLabel(sel)) : tr('Status cleared'));
+      const was = l.status, note = $('#st-note', md)?.value.trim() || '';
+      md.remove();  // 2.559.0 (#4660): the status shows at once, an error puts the old one back (lstStatusOpt)
+      try { await lstStatusOpt(lid, sel, note); } catch { return; }
+      toast(sel ? tr('Status: {0}', statusLabel(sel)) : tr('Status cleared'));
       if (sel === 'complete' && was !== 'complete') celebrate('project', {name: lname(l)});
     }
   });
+}
+// 2.559.0 (#4660): a project status set from a dialog shows at once (optWrite as #1501): the list carries it before the answer,
+// no GET /api/state afterwards (other devices get it with the live update); an error (api() says why) puts the old one back
+function lstStatusOpt(lid, st, note = '') {
+  const vals = {status: st, status_note: st ? String(note).slice(0, 500) : '', status_by: S.me?.id ?? null, status_by_name: S.me?.display_name || S.me?.username || '', status_at: new Date().toISOString()};
+  return optWrite(optSet(() => listById(lid), vals), () => api('POST', `/api/lists/${lid}/status`, {status: st, note}));
 }
 // ---- "Where is it stuck?" overview (module view, from the state)
 S.ov = {only: LS.get('ovOnly', false)};

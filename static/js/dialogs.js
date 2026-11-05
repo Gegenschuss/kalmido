@@ -881,8 +881,8 @@ function lmSecWire(md) {
 }
 async function lmStatusSet(lid, sel) {  // the status at once, without a note (the status dialog adds one, with the history)
   const v = sel.value;
-  try { await api('POST', `/api/lists/${lid}/status`, {status: v, note: ''}); } catch { sel.value = listById(lid)?.status || ''; return; }
-  await load(); render(); toast(v ? tr('Status: {0}', statusLabel(v)) : tr('Status cleared'));
+  try { await lstStatusOpt(lid, v); } catch { sel.value = listById(lid)?.status || ''; return; }  // 2.559.0 (#4660): at once, no load()
+  toast(v ? tr('Status: {0}', statusLabel(v)) : tr('Status cleared'));
 }
 // 2.361.2 (#2923): moving a project into an organisation: a member gets it back only through its admins (they ask for it)
 function lwsBack(org, from) {
