@@ -402,7 +402,15 @@ def _share_sql(c, uid, reg, agent):
 def obj_visible_sql(c, uid, kind):
     """A subquery (ids inlined, no ? parameters) of the ids of kind account uid sees, not in the trash: the area's own role
     (visible hook, or the default base role) or a share; the organisation floor, hidden, the data lock and a token's list limit
-    applied. Use as `id IN <obj_visible_sql(c, uid, kind)>`."""
+    applied. Use as `id IN <obj_visible_sql(c, uid, kind)>`. Review F6: a kind with a cap hook gets ValueError -- a share
+    may open less there than the SQL names, so its area lists with obj_rows (which asks obj_role per row)."""
+    if obj_reg(kind)["cap"]:
+        raise ValueError(f"obj_visible_sql {kind}: the kind has a cap hook, list it with obj_rows")
+    return _visible_sql(c, uid, kind)
+
+
+def _visible_sql(c, uid, kind):
+    """obj_visible_sql without the cap guard (obj_rows: the SQL is its candidate set, obj_role decides each row)."""
     reg = obj_reg(kind)
     t = reg["table"]
     none = f"(SELECT id FROM {t} WHERE FALSE)"
@@ -467,7 +475,7 @@ def obj_rows(c, uid, kind, where="", args=(), trash=False, limit=500):
         sql = (f"SELECT o.* FROM {t} o WHERE o.deleted_at IS NOT NULL AND ((o.org_id IS NULL AND o.owner_id = {int(uid)}) "
                f"OR o.org_id IN ({_ids(org_ids)}))")
     else:
-        sql = f"SELECT o.* FROM {t} o WHERE o.id IN {obj_visible_sql(c, uid, kind)}"
+        sql = f"SELECT o.* FROM {t} o WHERE o.id IN {_visible_sql(c, uid, kind)}"
     if where:
         sql += f" AND ({where})"
     sql += f" ORDER BY o.updated_at DESC, o.id DESC LIMIT {int(limit)}"

@@ -74,7 +74,9 @@ folders, and a folder share opens it.
 
 On top: another organisation never (404), what `hidden` names never opens through a share (agents and tokens: not even
 through the area's own role), an agent's data lock, a token limited to lists, and the trash (only `manage` sees an object
-there). `obj_need` turns this into 404 / 403; `obj_visible_sql(c, uid, kind)` / `obj_rows(...)` give the lists.
+there). `obj_need` turns this into 404 / 403; `obj_visible_sql(c, uid, kind)` / `obj_rows(...)` give the lists. A kind
+with a `cap` hook lists only with `obj_rows` (it asks `obj_role` per row): `obj_visible_sql` refuses it with `ValueError`,
+because a share there may open less than the SQL would name.
 
 Losing access is in one place too: `obj_revoke_person(c, uid, org, reason)` runs when a person leaves an organisation
 (their and their agents' shares on its nodes, their team chat rooms there; their objects go to the heir), when a role
