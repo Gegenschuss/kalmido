@@ -163,6 +163,7 @@ const secName = sid => sid ? (S.sections.find(x => x.id === sid)?.name || '') : 
 // a task into a section, at its top; a subtask becomes a standalone task there (as in kanban); one undo
 function taskToSection(id, sid) { return histGroup(() => taskToSection0(id, sid)); }
 async function taskToSection0(id, sid) {
+  if (sid < 0) { sid = await secReal(sid); if (!sid) return; }  // 2.559.0 (#4659): a section still on its way
   const t = S.tasks.get(id); if (!t) return;
   if (!canEdit(t)) { roToast(); return; }
   if (sid && !S.sections.some(x => x.id === sid && x.list_id === t.list_id)) return;
@@ -191,6 +192,7 @@ const secPut = (lid, ids) => () => {
 // the sections of a list in a new order: one request (one transaction), undo sends the old order back
 async function saveSectionOrder(lid, ids, msg) {
   if (!canEditList(lid)) { roToast(); return; }
+  if (ids.some(i => i < 0)) { ids = await Promise.all(ids.map(secReal)); if (ids.some(i => !i)) return; }  // 2.559.0 (#4659): a section still on its way
   let j;
   const was = S.sections.filter(s => s.list_id === lid).map(s => secId(s.id));  // 2.273.0 B (#3051): the order the drag started from
   try { j = await optWrite(secPut(lid, ids), () => api('POST', `/api/lists/${lid}/sections/order`, {ids, _prev: was})); } catch { return; }  // 2.41.2 (#1501): at once
@@ -202,16 +204,43 @@ async function saveSectionOrder(lid, ids, msg) {
   offerUndo(msg || tr('Sections reordered'), histAdd({label: tr('Sections of {0} reordered', lname(listById(lid)) || ''), lids: [lid], undo: ord(j.prev, j.ids), redo: ord(j.ids, j.prev)}));
 }
 // sections with history steps: added, renamed, deleted (the undo brings it back with its tasks, at its old place)
+// 2.559.0 (#4659): a new section shows at once with a stand-in id below 0 (no wait for the answer); what is done with it
+// before the answer (a task dropped on it, rename, delete, a new order) waits for its real id (secReal, as fdReal of the
+// fields); a refusal takes the row back. The answer swaps the stand-in for the real row (HIST.secmap knows the way)
+const SEC_TMP = new Map();
+let secSeq = 0;
+async function secReal(sid) {
+  if (!(sid < 0)) return sid;
+  if (HIST.secmap.has(sid)) return HIST.secmap.get(sid);
+  return SEC_TMP.has(sid) ? await SEC_TMP.get(sid) : null;
+}
 async function sectionCreate(lid, name) {
+  const tmp = -1e9 - (++secSeq), mine = S.sections.filter(x => x.list_id === lid);
+  const row = {id: tmp, list_id: lid, name, sort: mine.length ? Math.max(...mine.map(x => +x.sort || 0)) + 1 : 0};
+  let real = null;
+  const drop = () => { S.sections = S.sections.filter(x => x.id !== tmp); };
+  const put = () => { if (!real && !S.sections.some(x => x.id === tmp)) S.sections.push({...row}); return drop; };  // again on top of a state fetched meanwhile
+  const pr = optWrite(put, async () => {
+    const r = await api('POST', '/api/sections', {list_id: lid, name});
+    const {moved, skipped, ...nr} = r;
+    real = nr.id; HIST.secmap.set(tmp, nr.id);
+    const i = S.sections.findIndex(x => x.id === tmp);
+    if (S.sections.some(x => x.id === nr.id)) drop(); else if (i >= 0) S.sections[i] = nr; else S.sections.push(nr);
+    for (const t of S.tasks.values()) if (t.section_id === tmp) t.section_id = nr.id;
+    return r;
+  });
+  SEC_TMP.set(tmp, pr.then(r => r.id, () => null));
   let s;
-  try { s = await api('POST', '/api/sections', {list_id: lid, name}); } catch { return; }
-  { const {moved, skipped, ...row} = s; if (!S.sections.some(x => x.id === row.id)) S.sections.push(row); render(); }  // 2.41.2 (#1501): the answer, no reload
+  try { s = await pr; } catch { return; } finally { SEC_TMP.delete(tmp); }
+  render();
   const nm = qn(name.slice(0, 40));
   histAdd({label: tr('Section {0} added', nm), lids: [lid], sid: s.id,
     undo: async e => { const r = await api('DELETE', '/api/sections/' + secId(e.sid), {_prev: {name, tasks: []}}); return r.ok ? {} : {skipped: [tr('Section {0}', nm)], none: true}; },
     redo: async e => { const r = await api('POST', '/api/sections', {list_id: lid, name, sort: s.sort}); HIST.secmap.set(secId(e.sid), r.id); return {}; }});
+  return s;
 }
 async function sectionRename(sid, name) {
+  if (sid < 0) { sid = await secReal(sid); if (!sid) return; }  // 2.559.0 (#4659): a section still on its way
   const s0 = S.sections.find(x => x.id === sid); if (!s0) return;
   const old = s0.name, lid = s0.list_id;
   try { await optWrite(optSet(() => S.sections.find(x => x.id === sid), {name}), () => api('PATCH', '/api/sections/' + sid, {name})); } catch { return; }  // 2.41.2 (#1501): at once
@@ -219,13 +248,21 @@ async function sectionRename(sid, name) {
   const go = (to, from) => async e => { const r = await api('PATCH', '/api/sections/' + secId(e.sid), {name: to, _prev: {name: from}}); return r.conflicts?.length ? {skipped: [tr('Section {0}', qn(from.slice(0, 40)))], none: true} : {}; };
   histAdd({label: tr('Section renamed to {0}', qn(name.slice(0, 40))), lids: [lid], sid, undo: go(old, name), redo: go(name, old)});
 }
+// 2.559.0 (#4659): gone at once (its tasks stay without a section), the request behind it; a refusal brings it back
 async function sectionDelete(sid) {
+  if (sid < 0) { sid = await secReal(sid); if (!sid) return; }
   const s0 = S.sections.find(x => x.id === sid); if (!s0) return;
+  const put = () => {
+    const at = S.sections.findIndex(x => x.id === sid), was = S.sections[at] || s0, had = [];
+    S.sections = S.sections.filter(x => x.id !== sid);
+    for (const t of S.tasks.values()) if (t.section_id === sid) { t.section_id = null; had.push(t.id); }
+    return () => {
+      if (!S.sections.some(x => x.id === sid)) S.sections.splice(at < 0 ? S.sections.length : Math.min(at, S.sections.length), 0, was);
+      for (const i of had) { const t = S.tasks.get(i); if (t && t.section_id == null) t.section_id = sid; }
+    };
+  };
   let r;
-  try { r = await api('DELETE', '/api/sections/' + sid); } catch { return; }
-  S.sections = S.sections.filter(x => x.id !== sid);  // 2.41.2 (#1501): its tasks stay without a section; no reload
-  for (const t of S.tasks.values()) if (t.section_id === sid) t.section_id = null;
-  render();
+  try { r = await optWrite(put, () => api('DELETE', '/api/sections/' + sid)); } catch { return; }
   const sec = r.section || {name: s0.name, sort: s0.sort, list_id: s0.list_id}, nm = qn(sec.name.slice(0, 40));
   const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [],
     undo: async x => {

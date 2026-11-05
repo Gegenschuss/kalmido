@@ -257,6 +257,7 @@ async function dgBlock(ids, row, after) {
 // into a section / kanban column of a list as standalone tasks, at its top, order kept
 async function dgToSection(ids, lid, sid) {
   if (!canEditList(lid)) { roToast(); return; }
+  if (sid < 0) { sid = await secReal(sid); if (!sid) return; }  // 2.559.0 (#4659): a section still on its way (dnd.js)
   let list = dgRoots(dgOrder(ids));
   const ro = list.filter(i => !canEdit(S.tasks.get(i)));
   list = list.filter(i => !ro.includes(i));
