@@ -16313,6 +16313,7 @@
   "Restored without a client: the client was deleted for good meanwhile.": "Restauré sans client : le client a été supprimé définitivement entre-temps.",
   "{0} task with a value was moved to another project: its value is deleted too.": ["{0} tâche avec une valeur a été déplacée vers un autre projet : sa valeur est aussi supprimée.", "{0} tâches avec une valeur ont été déplacées vers un autre projet : leurs valeurs sont aussi supprimées."],
   "{0} task moved to another project loses its values of this project’s fields.": ["{0} tâche déplacée vers un autre projet perd ses valeurs des champs de ce projet.", "{0} tâches déplacées vers un autre projet perdent leurs valeurs des champs de ce projet."],
+  "Its name was taken: restored as {0}": "Le nom était pris : restauré sous {0}",
   "The off-site backup is set up by the operator.": "La sauvegarde externe est configurée par l'exploitant.",
   "On a hosted instance the operator sets up the off-site backup": "Sur une instance hébergée, l'exploitant configure la sauvegarde externe",
   "Release to remove": "Relâchez pour retirer",

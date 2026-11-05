@@ -16313,6 +16313,7 @@
   "Restored without a client: the client was deleted for good meanwhile.": "Ohne Kunden wiederhergestellt: Der Kunde wurde inzwischen endgültig gelöscht.",
   "{0} task with a value was moved to another project: its value is deleted too.": ["{0} Aufgabe mit Wert wurde in ein anderes Projekt verschoben: Ihr Wert wird mitgelöscht.", "{0} Aufgaben mit Wert wurden in ein anderes Projekt verschoben: Ihre Werte werden mitgelöscht."],
   "{0} task moved to another project loses its values of this project’s fields.": ["{0} in ein anderes Projekt verschobene Aufgabe verliert ihre Werte aus den Feldern dieses Projekts.", "{0} in andere Projekte verschobene Aufgaben verlieren ihre Werte aus den Feldern dieses Projekts."],
+  "Its name was taken: restored as {0}": "Der Name war vergeben: wiederhergestellt als {0}",
   "The off-site backup is set up by the operator.": "Die Sicherung außer Haus richtet der Betreiber ein.",
   "On a hosted instance the operator sets up the off-site backup": "Auf einer gehosteten Instanz richtet der Betreiber die Sicherung außer Haus ein",
   "Release to remove": "Loslassen zum Entfernen",

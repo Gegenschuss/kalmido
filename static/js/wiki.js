@@ -887,7 +887,7 @@ async function wk_trashDlg(sp = wk_cur()) {
     if (k === 'close') { modalClose(md); return; }
     b.disabled = true;
     try {
-      if (k === 'restore' && p) { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [id]}); if (r.skipped?.length) toast(tr('A page with this name already exists')); }
+      if (k === 'restore' && p) { const r = await rawFetch('POST', '/api/wiki/restore', {ids: [id]}); if (r.skipped?.length) toast(tr('A page with this name already exists')); else if (r.renamed?.length) toast(tr('Its name was taken: restored as {0}', qn(wk_base(r.renamed[0].path)))); }  // 2.552.0 (#4561 B28)
       if (k === 'purge' && p) {
         if (!await askConfirm(tr('Delete “{0}” permanently?', p.path ? wk_base(p.path) : tr('Encrypted page')), tr('The page and its files are deleted for good. This cannot be undone.'), {danger: true, ok: tr('Delete permanently')})) return;
         await rawFetch('POST', '/api/wiki/purge', {space: sp, ids: [id]});

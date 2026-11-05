@@ -76,7 +76,7 @@ from ..core.access import Denied, acx_of, collab_all
 from ..core.db import body, bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, lang, tr
-from ..core.pg import IntegrityError, system_ctx, write_lock
+from ..core.pg import IntegrityError, like_escape, system_ctx, write_lock
 from ..accounts.orgroles import org_sees_all, org_writes
 from ..accounts.orgs import user_orgs  # 2.200.0 B (#2747)
 from ..accounts.session import me
@@ -493,9 +493,36 @@ def _after(c, uid, nid, ctx):
     wkf_repath(c, uid, oid, owner, refs, (ctx or {}).get("folder"), own)
 
 
+def wkf_trash_follow(c, oid, owner, src, dst):
+    """2.552.0 (#4561 B28): folder src (a path) was renamed / moved to dst: the pages of src in the trash follow (restored, they
+    land in the folder by its new name, not in a new one by the old name). Only the path: a name taken there is settled at the
+    restore (" (2)"); a page that would get too deep / too long stays as it is. -> how many followed"""
+    if not src or not dst or src.lower() == dst.lower():
+        return 0
+    w, a = wiki_space_sql(oid, owner)
+    pre = like_escape(src.lower()) + "/%"
+    n = 0
+    for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w} AND lower(path) LIKE ? ESCAPE '\\'",
+                       [*a, pre]).fetchall():
+        if str(p["path"]).startswith("e2e1:"):
+            continue
+        new = dst + p["path"][len(src):]
+        try:
+            if wiki_clean_path(new) != new:
+                continue
+        except BadInput:
+            continue
+        c.execute("UPDATE wiki_pages SET path=? WHERE id=?", (new, p["id"]))
+        n += 1
+    return n
+
+
 def wkf_repath(c, uid, oid, owner, refs, old_folder=None, new_folder=None):
     """refs = [(page node row, its new folder path)]: every page gets folder path + its own last part -- 409 for a taken name
-    or a path too deep / too long (nothing changes), else the paths, the links of the other pages and the shares follow."""
+    or a path too deep / too long (nothing changes), else the paths, the links of the other pages and the shares follow.
+    2.552.0 (#4561 B28): a renamed / moved folder (old_folder -> new_folder) takes its pages in the trash along."""
+    if old_folder is not None and new_folder is not None:
+        wkf_trash_follow(c, oid, owner, old_folder, new_folder)
     if not refs:
         if old_folder is not None and new_folder is not None and old_folder != new_folder:
             wsh_repath(c, oid, owner, old_folder, new_folder, True)  # an empty folder's share follows too

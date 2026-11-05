@@ -654,7 +654,8 @@ def wiki_move():
     n = wiki_relink_many(c, oid, uid, [(r["path"], nw) for r, nw in moves], ts)
     from .wkshare import wsh_repath  # 2.123.0 B (#2104): the shares of the folder and of its pages follow
     wsh_repath(c, oid, None if oid else uid, src, dst, True)
-    from .wkfolder import wkf_folder_move, wkf_sync
+    from .wkfolder import wkf_folder_move, wkf_sync, wkf_trash_follow
+    wkf_trash_follow(c, oid, None if oid else uid, src, dst)  # 2.552.0 (#4561 B28): its pages in the trash follow too
     wkf_folder_move(c, uid, oid, src, dst)  # 2.200.0 A (#2747): the folder node (with its shares) follows, then the pages
     wkf_sync(c, uid, oid)
     bump(c)
@@ -683,7 +684,8 @@ def wiki_trash_many():
 
 @app.post("/api/wiki/restore")
 def wiki_restore_many():
-    """{ids, files?} -- back from the trash; a page whose name was taken in the meantime stays there (skipped)."""
+    """{ids, files?} -- back from the trash; a page whose name was taken in the meantime comes back as "Name (2)" (renamed:
+    [{id, from, path}], 2.552.0 #4561 B28; was: skipped), a locked space's page then stays there (skipped)."""
     return wiki_bulk(False)
 
 
@@ -696,7 +698,7 @@ def wiki_bulk(trash):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     if not isinstance(fids, list) or len(fids) > WIKI_ZIP_FILES or any(isinstance(x, bool) or not isinstance(x, int) for x in fids):
         raise BadInput(tr("Invalid value: {0}", "files"))
-    done, skipped, ts = [], [], iso_ms(now_utc())
+    done, skipped, renamed, ts = [], [], [], iso_ms(now_utc())
     from .wikiatt import wka_bulk  # 2.99.0 A (#2182): files to the trash before their pages, back after them
     fdone, fskip = wka_bulk(c, uid, fids, True) if trash else ([], [])
     for pid in ids:
@@ -706,9 +708,15 @@ def wiki_bulk(trash):
         except Denied:
             skipped.append(pid)
             continue
+        path = r["path"]
+        if not trash:  # 2.552.0 (#4561 B28): a name taken meanwhile: back as "Name (2)" (as a sheet's tab), not left in the trash
+            from .wkfolder import wkf_locked
+            from .wikie2e import _wke_free_path
+            if not wkf_locked(c, r):  # a browser ciphertext name cannot be changed here: skipped as before
+                path = _wke_free_path(c, r["org_id"], r["owner_id"], pid, r["path"])
         try:
             with c.savepoint():
-                c.execute("UPDATE wiki_pages SET deleted_at=? WHERE id=?", (ts if trash else None, pid))
+                c.execute("UPDATE wiki_pages SET deleted_at=?, path=? WHERE id=?", (ts if trash else None, path, pid))
                 if not trash and r["deleted_at"]:  # 2.272.0 A (#3026): its files trashed with it (or later) come back too;
                     # a file deleted on its own before the page stays in the trash
                     c.execute("UPDATE wiki_files SET deleted_at=NULL WHERE page_id=? AND deleted_at>=? AND wkx_held_at IS NULL",
@@ -716,14 +724,21 @@ def wiki_bulk(trash):
                     from .wikiatt import wkx_files_back
                     wkx_files_back(c, uid, r)  # 2.528.0 D (#4306): files held at a lock only for who could read the space then
             done.append(pid)
+            if path != r["path"]:
+                renamed.append({"id": pid, "from": r["path"], "path": path})
         except IntegrityError:
             skipped.append(pid)
+    if renamed:  # 2.552.0 (#4561 B28): the tree node follows the new name
+        from .wkfolder import wkf_sync
+        for sp in {(x["org_id"], x["owner_id"]) for x in c.execute("SELECT org_id, owner_id FROM wiki_pages WHERE id = ANY(CAST(? AS BIGINT[]))",
+                                                                     ([x["id"] for x in renamed],)).fetchall()}:
+            wkf_sync(c, sp[1] or uid, sp[0])
     if not trash:
         fdone, fskip = wka_bulk(c, uid, fids, False)
     if done or fdone:
         bump(c)
         c.commit()
-    return jsonify(ok=True, ids=done, skipped=skipped, files=fdone, files_skipped=fskip)
+    return jsonify(ok=True, ids=done, skipped=skipped, files=fdone, files_skipped=fskip, renamed=renamed)
 
 
 # ---- 2.143.0 B (#2211): the trash of pages -- listed, deleted for good by hand ("Delete for good", "Empty trash") and after

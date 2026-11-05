@@ -9,6 +9,8 @@ freelancer-matrix: office, wiki, tasks
  - B19: a draft in the office trash whose client was deleted for good since comes back without the client, the answer says so
  - B12: a task moved to another project keeps its value at the old field: the field's delete count (moved) and the project's
    purge-info (moved_values) name it, both delete dialogs say it
+ - B28: renaming a knowledge folder (POST /api/wiki/move and the tree's rename) takes its pages in the trash along; a page
+   whose name was taken meanwhile comes back as "Name (2)" (renamed in the answer), not skipped
 usage: p2552_b_dataloss_test.py <datadir>      (KMT_NOSTART=1: a running server)"""
 import os
 import sys
@@ -134,5 +136,49 @@ check(pi.get("moved_values") == 1 and pi.get("tasks") == 1, f"B12: purge-info of
 for rel in ("static/js/projects.js", "static/js/tablecells.js"):
     check("fdMovedWarn(fc)" in kt_src(rel), f"B12: the field delete dialog of {rel} names the moved tasks")
 check("j.moved_values" in kt_src("static/js/trashui.js"), "B12: the project's delete dialog names them")
+
+# ================================================================== B28 knowledge: folder rename takes trash pages along, restore " (2)"
+def wpage(path, text="Beispieltext"):
+    r = Fr.post(B + "/api/wiki/pages", json={"space": "private", "path": path, "body": text})
+    check(r.status_code == 201, f"B28: page {path} {r.status_code} {r.text[:160]}")
+    return r.json()["id"]
+
+
+def wpath(pid):
+    return sql("SELECT path FROM wiki_pages WHERE id=?", (pid,))[0][0]
+
+
+def wtrashed(pid):
+    return sql("SELECT deleted_at FROM wiki_pages WHERE id=?", (pid,))[0][0] is not None
+
+
+W1, W2 = wpage("Projekte/Laufend"), wpage("Projekte/Abgelegt")
+check(Fr.delete(B + f"/api/wiki/pages/{W2}").ok, "B28: one page of the folder in the trash")
+r = Fr.post(B + "/api/wiki/move", json={"space": "private", "from": "Projekte", "to": "Archiv"})
+check(r.ok and wpath(W1) == "Archiv/Laufend", f"B28: the folder is renamed {r.status_code} {r.text[:160]}")
+check(wpath(W2) == "Archiv/Abgelegt" and wtrashed(W2), f"B28: the page in the trash followed and stays in the trash: {wpath(W2)}")
+r = Fr.post(B + "/api/wiki/restore", json={"ids": [W2]})
+check(r.ok and r.json().get("ids") == [W2] and wpath(W2) == "Archiv/Abgelegt" and not wtrashed(W2), f"B28: restored into the renamed folder {r.text[:200]}")
+
+# the tree's rename (PATCH of the folder node)
+W3, W4 = wpage("Kunden/Offen"), wpage("Kunden/Erledigt")
+Fr.get(B + "/api/wiki", params={"space": "private"})  # the tree is synced
+node = sql("SELECT parent_id FROM fs_nodes WHERE kind='ref' AND ref_kind='wiki' AND ref_id=?", (W3,))
+check(bool(node), "B28: the page has its node in the tree")
+check(Fr.delete(B + f"/api/wiki/pages/{W4}").ok, "B28: another page in the trash")
+r = Fr.patch(B + f"/api/files/nodes/{node[0][0]}", json={"name": "Kundschaft"}) if node else None
+check(r is not None and r.ok and wpath(W3) == "Kundschaft/Offen", f"B28: the folder node renamed {r.status_code if r is not None else '-'}")
+check(wpath(W4) == "Kundschaft/Erledigt" and wtrashed(W4), f"B28: the page in the trash followed the tree's rename: {wpath(W4)}")
+
+# a name taken meanwhile: back as "Name (2)"
+W5 = wpage("Notiz", "alter Text")
+check(Fr.delete(B + f"/api/wiki/pages/{W5}").ok, "B28: a page in the trash")
+W6 = wpage("Notiz", "neuer Text")
+r = Fr.post(B + "/api/wiki/restore", json={"ids": [W5]})
+j = r.json() if r.ok else {}
+check(r.ok and j.get("ids") == [W5] and not j.get("skipped"), f"B28: the page comes back instead of being skipped {r.text[:200]}")
+check(wpath(W5) == "Notiz (2)" and not wtrashed(W5) and wpath(W6) == "Notiz", f"B28: as 'Notiz (2)', the new page keeps its name: {wpath(W5)}")
+check([x.get("path") for x in j.get("renamed") or []] == ["Notiz (2)"], f"B28: the answer names the new name {j}")
+check("r.renamed" in kt_src("static/js/wiki.js"), "B28: the knowledge trash says the new name")
 
 sys.exit(done("p2552_b_dataloss"))
