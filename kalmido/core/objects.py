@@ -170,13 +170,23 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
         r = _base(c, uid, reg, row)
         return "edit" if r == "manage" else r
 
-    def fsr_hidden(c, uid):  # an object in the trash never opens through a folder (+ what the area hides)
-        own = hidden(c, uid) if hidden else ""
-        tr_ = f"(SELECT id FROM {table} WHERE deleted_at IS NOT NULL)"
-        return f"({tr_[1:-1]} UNION {own[1:-1]})" if own else tr_
+    def fsr_on_trash(c, uid, rid, restore):
+        """Review F7: an object in the trash has its reference node in the file store's trash too (writes.py obj_trash), so the
+        folders need no hidden clause for it. Should the node come back on its own while the object is still in the trash: who
+        manages the object restores it with it, anyone else leaves both in the trash ("stays")."""
+        row = obj_row(c, kind, rid)
+        if restore and row is not None and row["deleted_at"]:
+            if uid and obj_role(c, uid, kind, rid, row=row) == "manage":
+                from .writes import obj_restore
+                obj_restore(c, uid, kind, rid)
+            else:
+                c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=?",
+                          (row["deleted_at"], row["deleted_by"], kind, int(rid)))
+                return "stays"
+        return on_trash(c, uid, rid, restore) if on_trash else None
 
     fs_ref_register(kind, label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
-                    protect=protect, hidden=fsr_hidden, on_trash=on_trash, title=lambda c, rid: obj_title(c, kind, rid),
+                    protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
                     content=content, cap=cap)
     return reg
 

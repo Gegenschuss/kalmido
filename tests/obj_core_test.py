@@ -126,9 +126,12 @@ check(AG.role(O1) == "view", "lock off: view again")
 # ---------------------------------------------------------------- the trash
 check(Bo.post(B + f"/api/obj/{K}/{O1}/trash").ok, "the owner puts it into the trash")
 check(role(Ca, O1) == 404 and O1 not in ids(Ca) and AG.role(O1) == 404, "in the trash: member and agent 404")
+NODE1 = "SELECT deleted_at FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?"
+check(dbx(NODE1, (K, O1))[0][0] is not None, "review F7: its reference node lies in the file store's trash with it")
 check(O1 in ids(A, trash=True) and O1 in ids(Bo, trash=True) and O1 not in ids(Ca, trash=True), "the trash list: only who manages it")
 check(Ca.post(B + f"/api/obj/{K}/{O1}/restore").status_code == 404, "a member cannot restore it")
 check(Bo.post(B + f"/api/obj/{K}/{O1}/restore").ok and role(Ca, O1) == "edit", "restored: the member edits again")
+check(dbx(NODE1, (K, O1))[0][0] is None, "... and its node came back with it")
 
 # ---------------------------------------------------------------- review F3: a listing reads the share chain once, not per row
 TIMING = re.compile(r'db;dur=[\d.]+;desc="n=(\d+)"')

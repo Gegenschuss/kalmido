@@ -217,6 +217,9 @@ def obj_trash(c, uid, kind, rid):
     ts = _now()
     c.execute(f"UPDATE {reg['table']} SET deleted_at=?, deleted_by=?, rev=rev+1, updated_at=?, updated_by=? WHERE id=? AND deleted_at IS NULL",
               (ts, uid, ts, uid, int(rid)))
+    # review F7: its reference node goes into the file store's trash with it (the folders hide it as any node there)
+    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at IS NULL",
+              (ts, uid, kind, int(rid)))
     obj_history_add(c, uid, kind, rid, {}, {}, action="trash")
     obj_forget()
     bump(c, _area(reg))
@@ -226,8 +229,13 @@ def obj_trash(c, uid, kind, rid):
 def obj_restore(c, uid, kind, rid):
     """Out of the trash ('manage')."""
     reg = obj_reg(kind)
-    obj_need(c, uid, kind, rid, "manage", trash=True)
+    row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
+    from ..files.store import _free_name
+    n = c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at=?", (kind, int(rid), row["deleted_at"])).fetchone()
+    if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
+        nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
+        c.execute("UPDATE fs_nodes SET deleted_at=NULL, deleted_by=NULL, name=? WHERE id=?", (nm, n["id"]))
     ts = _now()
     c.execute(f"UPDATE {reg['table']} SET deleted_at=NULL, deleted_by=NULL, rev=rev+1, updated_at=?, updated_by=? WHERE id=?",
               (ts, uid, int(rid)))

@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS meetings (
   rev BIGINT NOT NULL DEFAULT 1, created_at TEXT NOT NULL, created_by BIGINT,
   updated_at TEXT NOT NULL, updated_by BIGINT, deleted_at TEXT, deleted_by BIGINT,
   title TEXT NOT NULL DEFAULT '', agenda TEXT NOT NULL DEFAULT '', starts DATE);
+CREATE INDEX IF NOT EXISTS meetings_trash ON meetings(deleted_at) WHERE deleted_at IS NOT NULL;  -- the trash list
 ```
 
 Add the table to `kalmido/core/rls.py` TABLES (it has an `org_id`) and to the export lists (`tools/check_export_tables.py`
@@ -98,7 +99,10 @@ c.commit()
   `current`, nothing written. People may leave it out (old clients); **agents must send it** (400 without).
 - Each change: `rev+1`, `updated_at`, `updated_by`, an entry in the history (one person's changes within ten minutes
   merge; an agent's are marked), the title on the reference node, `bump` of the area.
-- `obj_create`, `obj_trash`, `obj_restore`, `obj_purge` (only from the trash), `obj_history`, `obj_undo`.
+- `obj_create`, `obj_trash`, `obj_restore`, `obj_purge` (only from the trash), `obj_history`, `obj_undo`. `obj_trash` puts the
+  object's reference node into the file store's trash with it and `obj_restore` brings that node back, so the folders and
+  their searches hide a trashed object like any node in the trash (no extra clause per kind). Should the file store's
+  trash empty the node first, the object comes back without its folder place.
 - Write paths that do not go through `obj_write` yet (old areas during the move) use the adapters `obj_undo_pre` /
   `obj_undo_post`, `obj_history_add` and `obj_touch`.
 
