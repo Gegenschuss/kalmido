@@ -2313,9 +2313,12 @@ TOOLS += [
      _obj({"due": {"type": "boolean"}, **_RB}), lambda api, a: api.call("GET", "/office/leads", {**_pick(a, ("requested_by",)), **({"due": "1"} if a.get("due") else {})})),
     ("create_office_lead", "2.94.0: add a lead (stage lead; at least a title, person, company or e-mail). A person converts it into a client later.",
      _obj(_LEAD), lambda api, a: api.call("POST", "/office/leads", body=_pick(a, tuple(_LEAD)))),
-    ("update_office_lead", "2.94.0: change the next step, the follow-up day or the note of a lead (only while it is a lead).",
-     _obj({"lead_id": S_ID, **{k: _LEAD[k] for k in ("next_step", "follow_up", "note", "requested_by")}}, ["lead_id"]),
-     lambda api, a: api.call("PATCH", f"/office/leads/{int(a['lead_id'])}", body=_pick(a, ("next_step", "follow_up", "note", "requested_by")))),
+    ("update_office_lead", "2.94.0: change the next step, the follow-up day or the note of a lead (only while it is a lead). "
+                           "2.567.0: expect_updated_at (the lead's updated_at as you read it) is required; 409 = a person changed it since.",
+     _obj({"lead_id": S_ID, **{k: _LEAD[k] for k in ("next_step", "follow_up", "note", "requested_by")},
+           "expect_updated_at": {"type": "string", "description": "updated_at of the lead as you read it"}}, ["lead_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/office/leads/{int(a['lead_id'])}",
+                             body=_pick(a, ("next_step", "follow_up", "note", "requested_by", "expect_updated_at")))),
 ]
 
 # 2.153.0 (#2031): letter drafts (correspondence) -- you write subject and text, a person checks, signs and sends. The person

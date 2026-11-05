@@ -26,7 +26,7 @@ from .rights import ofr_rights
 from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from ..team.clients import cl_trash
 from .pipeline import (EMAIL_RE, LEAD_SOURCES, MAX_DEALS, PL2_PROB, _client_ok, _ctx, _one, _row, _txt, _update,
-                       pl2_clean, pl2_list, pl2_public)
+                       pl2_clean, pl2_list, pl2_public, pl2_write)
 from ..team.clients import clean_client  # 2.369.5 (#2517): pulled up from functions
 from .contacts_cl import fk_add  # 2.369.5 (#2517): pulled up from functions
 from ..life.budget import BUD_ROWS_MAX  # 2.369.5 (#2517): pulled up from functions
@@ -36,6 +36,7 @@ LEAD_V1_FIELDS = ("id", "title", "contact", "company", "email", "phone", "source
                   "created_at", "updated_at")
 LEAD_V1_IN = ("title", "contact", "company", "email", "phone", "source", "next_step", "follow_up", "note")
 LEAD_V1_PATCH = ("next_step", "follow_up", "note")
+LEAD_V1_PATCH_IN = LEAD_V1_PATCH + ("expect_updated_at",)  # 2.567.0 (#4711): the version is required
 LEAD_ADMIN_ONLY = N_("Only the admins of the office see the pipeline.")
 # the CSV columns: normalised header (lower case, letters and digits only) -> field
 LEAD_COLS = {
@@ -422,16 +423,22 @@ def v1_lead_post():
 @app.patch("/api/v1/office/leads/<int:did>")
 @v1_view
 def v1_lead_patch(did):
-    """{next_step?, follow_up?, note?}: only these, only while the deal is a lead."""
+    """{next_step?, follow_up?, note?, expect_updated_at}: only these, only while the deal is a lead. 2.567.0 (#4711):
+    expect_updated_at (the lead's updated_at as read) is required."""
     from .agentdocs import _json
-    b = _json(LEAD_V1_PATCH)
+    b = _json(LEAD_V1_PATCH_IN)
     c = db()
     aid, oid, uid = _v1lead(c, b.get("requested_by"), write=True)
-    cur = pl2_public(c, oid, _row(c, oid, did))
-    if cur["stage"] != "lead":
-        raise Denied(409, tr("This is no lead any more"))
-    _update(c, oid, did, pl2_clean(c, oid, {k: b[k] for k in LEAD_V1_PATCH if k in b}, cur))
-    bump(c)
+    _row(c, oid, did)
+
+    def clean(c, b, cur):
+        if cur["stage"] != "lead":
+            raise Denied(409, tr("This is no lead any more"))
+        return pl2_clean(c, oid, {k: b[k] for k in LEAD_V1_PATCH if k in b}, cur)
+
+    # 2.567.0 (#4711): the agent sends the version it read (400 without, 409 + the current deal under "current"); the
+    # history marks its change (before: pipeline._update without any log)
+    pl2_write(c, oid, did, b, clean, uid=aid, version=True)
     c.commit()
     return jsonify(lead_v1_public(pl2_public(c, oid, _row(c, oid, did))))
 
@@ -456,5 +463,8 @@ def lead_spec(paths, schemas, op, ok, errs, ref, pid, q):
                    scope="office", desc=rules)}
     paths["/office/leads/{id}"] = {"patch": op("Change the next step, follow-up day or note of a lead (2.94.0)", T, ok(o) | errs("400", "403", "404", "409"),
                                                [pid("id", "Lead id")], body={"type": "object", "properties": {
-                                                   k: props[k] for k in LEAD_V1_PATCH + ("requested_by",)}}, scope="office",
-                                               desc="Only while it is a lead (409 once a person converted it).")}
+                                                   **{k: props[k] for k in LEAD_V1_PATCH + ("requested_by",)},
+                                                   "expect_updated_at": {"type": "string", "description": "updated_at of the lead as you read it"}},
+                                                   "required": ["expect_updated_at"]}, scope="office",
+                                               desc="Only while it is a lead (409 once a person converted it). 2.567.0: only with expect_updated_at "
+                                                    "(400 without; 409 with the current lead under current when a person changed it since).")}

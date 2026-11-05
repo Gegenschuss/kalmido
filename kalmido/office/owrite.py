@@ -24,10 +24,10 @@ Interface:
   ow_crypt(table, oid) -> (dec, enc)                            for a table with encrypted columns (core/orgcrypt.py)
   ow_undo_ctx(kind, fn)                                         the session undo of the kind (office/undo.py route)
   ow_history(c, kind, rid, limit=50) -> the entries (the caller checked the rights to read the row)
-  ow_is_agent(c, uid) -> bool"""
+  ow_is_agent(c, uid) -> bool, ow_uid() -> the signed-in account or None"""
 import json
 
-from flask import jsonify
+from flask import g, has_request_context, jsonify
 
 from ..collab.comments import user_names
 
@@ -92,6 +92,12 @@ def ow_cols(c, table):
 def ow_crypt(table, oid):
     """(dec, enc) of ow_write for a table whose columns the organisation's key seals at rest."""
     return (lambda c, r: oc_dec_fields(c, oid, table, r)), (lambda c, d: oc_enc_fields(c, oid, table, d))
+
+
+def ow_uid():
+    """The signed-in account of the request (None outside one: background work)."""
+    u = getattr(g, "user", None) if has_request_context() else None
+    return u["id"] if u is not None else None
 
 
 def ow_is_agent(c, uid):
