@@ -712,6 +712,7 @@ ROUTES = {
     "POST /api/contacts/groups": "pim", "GET /api/calendars": "pim",
     "GET /api/calendars/events": "pim", "GET /api/contacts": "pim", "GET /api/contacts/{}": "pim", "GET /api/contacts/{}/history": "pim",  # 2.119.1 B (#2083)
     "GET /api/evcals": "pim",
+    "GET /api/evcals/trash": "pim", "POST /api/evcals/{}/restore": "pim",  # 2.566.0 (#4707): the calendar's trash (p2566_c_kern_cal_test.py)
     "GET /api/evinvite": "pim", "GET /api/evcals/{}/feed": "pim", "POST /api/evcals/{}/feed": "pim",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "pim",  # 2.155.0 B (#2077): only the own bar without an organisation
     "GET /api/v1/events/freebusy": "pim",  # 2.467.0 (#2586): the same; a freelancer's agent only about its owner

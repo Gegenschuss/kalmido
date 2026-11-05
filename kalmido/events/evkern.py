@@ -20,7 +20,7 @@ from ..core.errors import BadInput
 from ..core.i18n import N_, tr
 from ..core.objects import obj_node, obj_register, obj_role, obj_visible_sql
 from ..core.pg import system_ctx, write_lock
-from ..core.writes import obj_restore, obj_trash
+from ..core.writes import obj_restore, obj_trash, obj_write
 from ..files.fsref import fs_ref_drop
 from .invite import evi_cal_cancel
 from ..contacts.model import BK_KERN
@@ -91,7 +91,7 @@ def _f_desc(c, v, row=None):
     return v[:2000]
 
 
-KERN.update(role=obj_role, visible=obj_visible_sql, node=obj_node)
+KERN.update(role=obj_role, visible=obj_visible_sql, node=obj_node, write=obj_write)
 obj_register(EV_KIND, "ev_cals", label=N_("Calendar"), fields={"name": _f_name, "color": _f_color, "description": _f_desc},
              title=lambda c, rid: (_cal(c, rid) or {"name": ""})["name"], base_role=_base, visible=_visible, area="calendar",
              scopes=("calendar", "calendar"), dl_area="calendar", routes=False, members=("ev_cal_members", "cal_id"),
@@ -135,6 +135,9 @@ def ev_cal_trash_purge(c, cut, purge):
                 c.execute(f"DELETE FROM {t} WHERE kind=? AND ref_id=?", (EV_KIND, cid))
             c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
     return len(old)
+
+
+KERN.update(trash=ev_cal_trash, restore=ev_cal_restore, purge=ev_cal_trash_purge)
 
 
 # ---------------------------------------------------------------- the copy into the core (once)

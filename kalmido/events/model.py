@@ -97,7 +97,8 @@ def wall_s(dt):
 # (core/migrations.d/4712_a.py). A calendar WITH a live node is shared only by its node (a share taken back in the core stays
 # taken back); the old member row is read only for a calendar without one (one release long, stage 7 removes the table).
 EV_KIND = "evcal"
-KERN = {}  # 2.566.0 (#4712): obj_role / obj_visible_sql / obj_node of the shared core, filled by events/evkern.py (it loads later, ORDER)
+KERN = {}  # 2.566.0 (#4712): obj_role / obj_visible_sql / obj_node / obj_write and the calendar's trash of the shared core, filled
+#            by events/evkern.py (it loads after the areas, kalmido/__init__.py ORDER)
 EV_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='evcal' AND n.ref_id={} AND n.deleted_at IS NULL"
 _CAL_COLS = ("id", "org_id", "owner_id", "deleted_at")
 
@@ -1268,7 +1269,8 @@ def _wd_events(c, users, S, LG, now):
         old = c.execute("SELECT id, cal_id FROM events WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
         if old and purge:
             c.executemany("DELETE FROM events WHERE id=?", [(r[0],) for r in old])
-        ret_report(c, "trash", {"events": len(old)}, purge, run="events")
+        ncal = KERN["purge"](c, cut, purge) if "purge" in KERN else 0  # 2.566.0 (#4707): the calendars in the trash (events/evkern.py)
+        ret_report(c, "trash", {"events": len(old), "calendars": ncal}, purge, run="events")
         c.commit()
     c.execute("DELETE FROM ev_reminded WHERE at<?", (iso(now_utc() - timedelta(days=60)),))
     c.commit()

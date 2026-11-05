@@ -293,6 +293,9 @@ APP_ONLY = [
      ("=POST /api/notes/quick-list",)),
     ("2.392.0 C (#3370): the yes to a one-way step is a person's, per task, in the app: never an agent or a token",
      ("=POST /api/tasks/{}/irreversible-yes",)),
+    ("2.566.0 (#4707): a calendar in the trash is restored by its owner in the app (the calendar settings' trash) -- an agent's "
+     "delete of a calendar puts it into that trash, the way back stays with people as for the address books",
+     ("=GET /api/evcals/trash", "=POST /api/evcals/{}/restore")),
     ("2.272.0 E1 (#3038): an address book in the trash is restored or deleted for good by a person -- an agent's delete of a whole "
      "address book waits for a person's approval already, so the way back stays with people too",
      ("=POST /api/books/{}/restore", "=POST /api/books/{}/purge")),

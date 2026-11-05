@@ -13,16 +13,21 @@ from ..tasks.validation import as_int, valid_date
 from ..core.errors import BadInput
 from ..events.model import (
     att_clean, cal_create, cal_fields, cal_member_set, cal_public, cal_touch, cals_for, default_cal, ev_delete, ev_dict,
-    ev_fields, ev_lock, ev_occ_change, ev_ov_tidy, ev_range, ev_store, ev_tell, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
+    ev_fields, ev_lock, ev_occ_change, ev_ov_tidy, ev_range, ev_store, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
     wall,
 )
 from ..events.ics import ics_export
-from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_cal_cancel, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
+from ..events.invite import evi_after_delete, evi_after_restore, evi_after_save, evi_estimate, evi_flag, evi_precheck, evi_send, evi_snap
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pulled up from functions
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
+from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_has_node, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
+from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
+from ..files.store import _free_name  # 2.566.0 (#4712)
+from ..core.pg import system_ctx  # 2.566.0 (#4712)
+from ..core.retention import ret_trash_days  # 2.566.0 (#4707)
 
 
 def _unknown(b, allowed):
@@ -45,17 +50,24 @@ def op_cal_new(c, uid, b):
 
 
 def op_cal_edit(c, uid, cid, b):
-    _unknown(b, ("name", "color", "description", "hidden", "org_id"))
+    _unknown(b, ("name", "color", "description", "hidden", "org_id", "expect_updated_at"))
     cal, role = need_evcal(c, cid)
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
         if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
+            ev_node_follow(c, cid)
             cal_touch(c, cid)
     f = {k: b[k] for k in ("name", "color", "description") if k in b}
     if f:
         if role != "owner":
             raise Denied(403, tr("Only the owner of the calendar can do this"))
         f = cal_fields(f)
-        c.execute(f"UPDATE ev_cals SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
+        # 2.566.0 (#4712): through the shared core's write path -- the lock, the version (expect_updated_at: 409 with the
+        # calendar as it is now under "current"), rev, the history, the change counter. Without a version the old behaviour
+        # stays, also for an agent (the API's version rule for agents is #4702's, not this route's): its own read is the version.
+        exp = b.get("expect_updated_at") or cal["updated_at"] or None
+        _row, ch = KERN["write"](c, uid, EV_KIND, cid, f, expect=exp)
+        if "name" in ch:
+            fs_ref_rename(c, EV_KIND, cid, ch["name"][1])
         cal_touch(c, cid)
     if "hidden" in b:  # per person: the calendar's events are left out of my views (and reminders); data stays
         if not isinstance(b["hidden"], bool):
@@ -70,15 +82,51 @@ def op_cal_edit(c, uid, cid, b):
 
 
 def op_cal_delete(c, uid, cid):
+    """2.566.0 (#4707): the calendar goes into the trash with its events (events/evkern.py ev_cal_trash), restorable for the
+    trash period (op_cal_restore); the invitations are cancelled as before."""
     need_evcal(c, cid, manage=True)
-    mails = evi_cal_cancel(c, uid, cid)  # 2.111.0 B (#2056): its invited external attendees learn the events are gone
-    for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL", (cid,)).fetchall():
-        ev_tell(c, r, "cancelled")  # 2.367.2 (#2969): the people of the server too
-    c.execute("DELETE FROM ev_cals WHERE id=?", (cid,))
+    mails = KERN["trash"](c, uid, cid)  # 2.111.0 B (#2056) + 2.367.2 (#2969): the invited learn the events are gone
     bump(c)
     c.commit()
     if not _by_agent():  # 2.148.1 G (#2495): no cancellation mails through an agent's change
         evi_send(mails)
+
+
+def op_cal_trash(c, uid):
+    """2.566.0 (#4707): the calendars in the trash uid may restore (their owner), newest first."""
+    rows = c.execute("SELECT * FROM ev_cals WHERE owner_id=? AND deleted_at IS NOT NULL ORDER BY deleted_at DESC, id DESC LIMIT 200",
+                     (uid,)).fetchall()
+    out = []
+    for r in rows:
+        if ev_role(c, uid, r, trash=True) == "owner":
+            n = c.execute("SELECT COUNT(*) FROM events WHERE cal_id=? AND deleted_at=?", (r["id"], r["deleted_at"])).fetchone()[0]
+            out.append({"id": r["id"], "name": r["name"], "color": r["color"], "org_id": r["org_id"], "deleted_at": r["deleted_at"], "events": n})
+    return {"items": out, "trash_days": ret_trash_days()}
+
+
+def op_cal_restore(c, uid, cid):
+    """2.566.0 (#4707): the calendar out of the trash with the events that went with it (its owner; 404 otherwise)."""
+    need_evcal(c, cid, manage=True, trash=True)
+    with system_ctx(c):
+        n = c.execute("SELECT COUNT(*) FROM ev_cals WHERE owner_id=(SELECT owner_id FROM ev_cals WHERE id=?) AND deleted_at IS NULL", (cid,)).fetchone()[0]
+    if n >= EV_CALS_MAX:
+        raise Denied(409, tr("At most {0} calendars", EV_CALS_MAX))
+    KERN["restore"](c, uid, cid)
+    bump(c)
+    c.commit()
+    return cal_public(c, c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone(), uid)
+
+
+def ev_node_follow(c, cid):
+    """2.566.0 (#4712): the calendar moved into another workspace (obj_org_set, its members fit there): its reference node
+    follows to the top of that workspace's tree, so its shares (the members) stay valid; without a node nothing to do."""
+    with system_ctx(c):
+        k = c.execute("SELECT org_id, owner_id FROM ev_cals WHERE id=?", (cid,)).fetchone()
+        n = c.execute("SELECT id, name FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (EV_KIND, cid)).fetchone()
+        if k is None or n is None:
+            return
+        c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, parent_id=NULL, name=? WHERE id=?",
+                  (k["org_id"], k["owner_id"], _free_name(c, None, k["owner_id"], k["org_id"], n["name"], skip=n["id"]), n["id"]))
 
 
 def op_member_set(c, uid, cid, b):
@@ -94,7 +142,12 @@ def op_member_remove(c, uid, cid, who):
     cal, role = need_evcal(c, cid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the calendar can do this"))
-    if not c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, who)).rowcount:
+    n = c.execute("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (cid, who)).rowcount  # the trigger takes its share too
+    if ev_has_node(c, cid):  # 2.566.0 (#4712): a share of the node without a member row (restored in the core) goes as well
+        with system_ctx(c):
+            n += c.execute("DELETE FROM fs_shares WHERE node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?) "
+                           "AND (user_id=? OR agent_id=?)", (EV_KIND, cid, who, who)).rowcount
+    if not n:
         raise Denied(404)
     cal_touch(c, cid)
     bump(c)
@@ -139,6 +192,10 @@ def op_event_edit(c, uid, eid, b, occ=None):
     send = evi_flag(b)  # 2.111.0 B (#2056)
     r, role = need_event(c, eid, write=True)
     r = ev_lock(c, eid)  # 2.565.0 (#4703): always under the event's lock, with the row as it is now (not only with expect)
+    if isinstance(b, dict) and b.get("expect_updated_at") and not b.get("expect"):  # 2.566.0 (#4712): the core's name, the same as expect
+        b = {**{k: v for k, v in b.items() if k != "expect_updated_at"}, "expect": b["expect_updated_at"]}
+    elif isinstance(b, dict) and "expect_updated_at" in b:
+        b = {k: v for k, v in b.items() if k != "expect_updated_at"}
     snap = evi_snap(c, eid)
     if send:
         evi_precheck(c, uid, evi_estimate(c, b, eid))
@@ -295,6 +352,18 @@ def evcals_delete(cid):
     need_feat("events")
     op_cal_delete(db(), me(), cid)
     return jsonify(ok=True)
+
+
+@app.get("/api/evcals/trash")
+def evcals_trash():
+    need_feat("events")
+    return jsonify(op_cal_trash(db(), me()))
+
+
+@app.post("/api/evcals/<int:cid>/restore")
+def evcals_restore(cid):
+    need_feat("events")
+    return jsonify(op_cal_restore(db(), me(), cid))
 
 
 @app.put("/api/evcals/<int:cid>/members")
