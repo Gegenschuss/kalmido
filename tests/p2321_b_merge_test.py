@@ -7,6 +7,7 @@
 - two packages that add different translation keys / modules / skip lines merge and rebase without a conflict
 - the same key changed differently on both sides stays a conflict; code outside the sw.js lists stays a conflict
 - tools/sw_lists.py rewrites / checks the lists against index.html + lazyload.js; the real tree is current"""
+import json
 import os
 import shutil
 import subprocess
@@ -73,7 +74,8 @@ branch(r, "p2", {"static/i18n/de.json": I18N.replace('  "B": "b"\n', '  "B": "b"
 git(r, "checkout", "-q", "main"); git(r, "merge", "-q", "p1")
 p = git(r, "merge", "p2", ok=False)
 check(p.returncode == 0, f"two packages adding different keys / modules / skip lines merge clean: {p.stderr.strip()[-200:]}")
-check('"P1": "p1",\n  "P2": "p2"' in rd(r, "static/i18n/de.json"), "translations: both keys, ours first")
+# 2.549.0 (#4564): a new key of theirs follows its predecessor in theirs (P2 behind B), ours keeps its order around it
+check(list(json.loads(rd(r, "static/i18n/de.json"))) == ["_meta", "A", "B", "P2", "P1"], f"translations: both keys, theirs behind its predecessor\n{rd(r, 'static/i18n/de.json')}")
 check("const LAZY = ['/static/js/l1.js', '/static/js/p1.js', '/static/js/p2.js'];" in rd(r, "static/sw.js") and
       "const LAZY_CSS = ['/static/css/l1.css', '/static/css/p2.css'];" in rd(r, "static/sw.js") and
       "const SHELL = ['/', '/static/app.css', '/static/js/a.js', '/static/js/p1.js'];" in rd(r, "static/sw.js"), f"sw.js lists: entry union\n{rd(r, 'static/sw.js')}")
@@ -87,7 +89,7 @@ git(r, "commit", "-qam", "p3")
 p = git(r, "rebase", "main", ok=False)
 check(p.returncode == 0, f"rebase of a third package onto main: clean: {p.stderr.strip()[-200:]}")
 t = rd(r, "static/i18n/de.json")
-check('"A": "a-new"' in t and '"P1"' in t and '"P2"' in t and t.rstrip().endswith('"P3": "p3"\n}'), f"rebased translations: change kept, all keys\n{t}")
+check('"A": "a-new"' in t and list(json.loads(t)) == ["_meta", "A", "B", "P3", "P2", "P1"], f"rebased translations: change kept, all keys, P3 behind its predecessor B (#4564)\n{t}")
 check("const LAZY_CSS = ['/static/css/l1.css', '/static/css/p2.css', '/static/css/p3.css'];" in rd(r, "static/sw.js"), "rebased sw.js list")
 # 2.358.0 (#3394): two packages each take their fixed suites off skip.txt (neighbouring lines): all stay off - union brought them back
 skip = "".join(f"s{i} 2026-11-01 #{i} ev\n" for i in range(1, 7))
