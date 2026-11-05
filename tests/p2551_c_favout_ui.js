@@ -58,9 +58,9 @@ const GEO = `(() => {
   check(noOut() && !w.eval('FV2.drag') && tile('v:today'), 'mouse: Esc / no drop: the tile stays, the marks are gone');
   check((await items()).includes('v:today'), 'mouse: Esc: still a favourite');
 
-  drag('dragstart', tile('v:today'), 120, IN_Y);
+  let src = tile('v:today'); drag('dragstart', src, 120, IN_Y);  // the source element: a real dragend fires on it even when the bar drew it away
   drag('dragover', d.body, 120, OUT_Y);
-  drag('drop', d.body, 120, OUT_Y); drag('dragend', tile('v:today'), 0, 0);
+  drag('drop', d.body, 120, OUT_Y); drag('dragend', src, 0, 0);
   check(await until(() => !tile('v:today')), 'mouse: let go outside: the tile is gone');
   check(await until(async () => (await items()).join() === `l:${L},v:tomorrow`), 'mouse: removed on the server ' + (await items()));
   check(noOut(), 'mouse: no marks left');
@@ -70,9 +70,9 @@ const GEO = `(() => {
 
   // a move inside the bar still works (the first behind the third)
   w.eval(GEO);
-  drag('dragstart', tile('v:today'), 120, IN_Y);
+  src = tile('v:today'); drag('dragstart', src, 120, IN_Y);
   drag('dragover', tile('v:tomorrow'), 104 + 2 * 34 + 25, IN_Y);
-  drag('drop', tile('v:tomorrow'), 104 + 2 * 34 + 25, IN_Y); drag('dragend', tile('v:today'), 0, 0);
+  drag('drop', tile('v:tomorrow'), 104 + 2 * 34 + 25, IN_Y); drag('dragend', src, 0, 0);
   check(await until(async () => (await items()).join() === `l:${L},v:tomorrow,v:today`), 'mouse: moving inside the bar still works ' + (await items()));
 
   // ================= touch
