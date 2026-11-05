@@ -16566,6 +16566,7 @@
   "Calendars in the trash are deleted for good after {0} days, with their events.": "Agenda's in de prullenbak worden na {0} dagen definitief verwijderd, met hun afspraken.",
   "Changed elsewhere, not undone": "Elders gewijzigd, niet ongedaan gemaakt",
   "This entry carries the shares of its calendar or address book: it goes into the trash only with it": "Dit item draagt de delingen van zijn agenda of adresboek: het gaat alleen samen daarmee naar de prullenbak",
+  "Shared with a group: take that share back before the workspace changes": "Gedeeld met een groep: trek die deling in voordat de werkruimte verandert",
   "Model per routine": "Model per routine",
   "A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.": "Een routine van het startpakket kan een eigen model gebruiken, bijv. een goedkoper model voor de briefing. Leeg = het model van de agent.",
   "Like the agent": "Zoals de agent",

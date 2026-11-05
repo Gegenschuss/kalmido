@@ -517,7 +517,7 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
     oid = clean_org_id(c, v, me())
     if (oid or None) == (r["org_id"] or None):
         return False
-    for (uid,) in c.execute(f"SELECT user_id FROM {members} WHERE {oid_col}=? ORDER BY user_id", (obj_id,)).fetchall():
+    for uid in _obj_sharers(c, table, members, oid_col, obj_id):
         p = ws_fit_problem(c, oid, uid, kind)
         if p:
             raise Denied(409, p)
@@ -532,6 +532,22 @@ def obj_org_set(c, table, oid_col, members, obj_id, v, kind):
             c.execute(f"SELECT name FROM {table} WHERE id=?", (obj_id,)).fetchone()[0])
     c.execute(f"UPDATE {table} SET org_id=? WHERE id=?", (oid, obj_id))
     return True
+
+
+def _obj_sharers(c, table, members, oid_col, obj_id):
+    """2.566.0 (#4712, review F2): the people and agents calendar / address book obj_id is shared with, as the shared core
+    sees it: the shares of its reference node (they follow it into the new workspace, core/objects.obj_node_follow), else
+    its old member rows. A group's share on the node is refused (409): a group has no workspace, and the core lets a share
+    go only to the people of the object's own one -- its owner takes it back first (the file store's dialog)."""
+    ref = {"ev_cals": "evcal", "books": "address_book"}[table]
+    with system_ctx(c):  # structure: the node may lie in the organisation's tree, its shares are the owner's own object's
+        n = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (ref, int(obj_id))).fetchone()
+        if n is None:
+            return [r[0] for r in c.execute(f"SELECT user_id FROM {members} WHERE {oid_col}=? ORDER BY user_id", (obj_id,)).fetchall()]
+        rows = c.execute("SELECT user_id, agent_id, group_id FROM fs_shares WHERE node_id=? ORDER BY id", (n[0],)).fetchall()
+    if any(r["group_id"] for r in rows):
+        raise Denied(409, tr("Shared with a group: take that share back before the workspace changes"))
+    return sorted({r["user_id"] or r["agent_id"] for r in rows if r["user_id"] or r["agent_id"]})
 
 
 def clean_org_id(c, v, uid):

@@ -19,6 +19,7 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - review F4: member rows written while there was no node are all mirrored when the node comes; review F3: a node in the
    file store's trash is still the node (a share taken back stays taken back), it does not go there alone while it carries
    shares, and removed for good it writes its shares back into the member rows
+ - review F2: a workspace move checks the shares of the node (a person only in the core, a group): 409, nothing moves
  - review F1: the owner leaves the organisation without an heir: the calendar's node follows into the private tree, a share
    taken back in the core stays taken back, one only in the core stays
  - the start's one-shot (migr_kern4712, a restart on the same data): members without a node get it and their core shares
@@ -301,6 +302,32 @@ check(B5 not in ids(Gi.get(B + "/api/books")), "review F3: the book's node in th
 sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
 check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
       "review F3: the book's node removed for good: gina stays out, bob's core-only share lives on as his row")
+
+# ================================================================== review F2: a workspace move checks the core's shares
+r = A.post(B + "/api/admin/orgs", json={"name": "Southwind Works"})
+assert r.status_code in (200, 201), r.text
+ORG2 = r.json()["id"]
+sql("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin') ON CONFLICT (org_id,user_id) DO UPDATE SET role='admin'", (ORG2, ALICE), write=True)
+K7 = A.post(B + "/api/evcals", json={"name": "Shared rota", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/evcals/{K7}/members", json={"user_id": BOB, "role": "view"}).ok, "F2: the organisation's calendar shared with bob")
+N8 = node("evcal", K7)
+sql("DELETE FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K7, BOB), write=True)
+sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N8, BOB), write=True)  # restored in the core
+check(K7 in ids(Bo.get(B + "/api/evcals")), "F2: bob has it through the core only (no member row)")
+r = A.patch(B + f"/api/evcals/{K7}", json={"org_id": ORG2})
+check(r.status_code == 409, f"review F2: into an organisation bob is not in -> 409 for his core share ({r.status_code} {r.text[:120]})")
+check(sql("SELECT org_id FROM ev_cals WHERE id=?", (K7,)) == [(ORG,)] and sql("SELECT org_id FROM fs_nodes WHERE id=?", (N8,)) == [(ORG,)],
+      "review F2: nothing moved")
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N8, BOB), write=True)
+sql("INSERT INTO groups(name,created_at,created_by) VALUES('Rota team','2026-11-05T00:00:00+00:00',?)", (ALICE,), write=True)
+GRP = sql("SELECT id FROM groups WHERE name='Rota team'")[0][0]
+sql("INSERT INTO fs_shares(node_id,group_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N8, GRP), write=True)
+r = A.patch(B + f"/api/evcals/{K7}", json={"org_id": None})
+check(r.status_code == 409 and sql("SELECT org_id FROM ev_cals WHERE id=?", (K7,)) == [(ORG,)],
+      f"review F2: a group's share on the node does not follow into the private space unchecked -> 409 ({r.status_code})")
+sql("DELETE FROM fs_shares WHERE node_id=? AND group_id=?", (N8, GRP), write=True)
+check(A.patch(B + f"/api/evcals/{K7}", json={"org_id": ORG2}).ok and sql("SELECT org_id FROM fs_nodes WHERE id=?", (N8,)) == [(ORG2,)],
+      "F2: without them the move works, the node follows")
 
 # ================================================================== review F1: the owner leaves the organisation without an heir
 r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})

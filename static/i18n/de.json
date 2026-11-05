@@ -16566,6 +16566,7 @@
   "Calendars in the trash are deleted for good after {0} days, with their events.": "Kalender im Papierkorb werden nach {0} Tagen endgültig gelöscht, mit ihren Terminen.",
   "Changed elsewhere, not undone": "Woanders geändert, nicht rückgängig gemacht",
   "This entry carries the shares of its calendar or address book: it goes into the trash only with it": "Dieser Eintrag trägt die Freigaben seines Kalenders oder Adressbuchs: er kommt nur mit ihm in den Papierkorb",
+  "Shared with a group: take that share back before the workspace changes": "Mit einer Gruppe geteilt: diese Freigabe vor dem Wechsel des Arbeitsbereichs zurücknehmen",
   "Model per routine": "Modell je Ablauf",
   "A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.": "Ein Ablauf des Startpakets kann ein eigenes Modell nutzen, z. B. ein günstigeres fürs Briefing. Leer = das Modell des Agenten.",
   "Like the agent": "Wie der Agent",
