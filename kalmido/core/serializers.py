@@ -55,8 +55,11 @@ def rsn_shown(d):
     agent's data lock hides -- core/dlock.py; agents read the copy's subtasks nowhere else either)."""
     if d.get("status") != 2 or d.get("repeat"):
         return False
-    from ..agents.core import is_agent
-    return not (has_request_context() and is_agent(getattr(g, "user", None)))
+    u = getattr(g, "user", None) if has_request_context() else None
+    try:  # an agent's person row says kind "agent" (agents/core.is_agent, not imported: core does not reach up into agents)
+        return not (u and (u["kind"] or "user") == "agent")
+    except (KeyError, IndexError, TypeError):
+        return True
 
 
 def task_dict(r, tags, full_snips=False):
