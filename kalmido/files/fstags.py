@@ -13,6 +13,7 @@ from flask import g, jsonify, request
 from ..core.config import app
 from ..core.db import body, bump, db, err
 from ..core.i18n import tr
+from ..core.pg import write_lock  # 2.564.0 (#4701)
 from ..core.access import Denied, acx_of
 from ..accounts.session import me
 from ..docs import store as S
@@ -78,6 +79,27 @@ def dt_set(c, n, raw, uid):
         return doc_update(c, n["id"], {"tags": list(raw or [])}, uid)
     S.set_tags(c, n["id"], dt_values(c, dt_ws(n), raw))
     return None
+
+
+def dt_merge(c, have, old, mine):
+    """2.564.0 (#4701): the stored tag names have with what one client changed (old = the list it saw, mine = its new list;
+    names or ids, compared by name in any case): removed ones go, added ones come, the rest stays as stored."""
+    def nm(t):
+        if isinstance(t, int) and not isinstance(t, bool):
+            r = c.execute("SELECT name FROM doc_tags WHERE id=?", (t,)).fetchone()
+            return r[0] if r else None
+        return t.strip() if isinstance(t, str) and t.strip() else None
+    key = lambda x: x.casefold()  # noqa: E731
+    old_k = {key(x) for x in map(nm, old) if x}
+    mine_n = [x for x in map(nm, mine) if x]
+    mine_k = {key(x) for x in mine_n}
+    off = old_k - mine_k
+    out, seen = [], set()
+    for x in [x for x in have if key(x) not in off] + [x for x in mine_n if key(x) not in old_k]:
+        if key(x) not in seen:
+            seen.add(key(x))
+            out.append(x)
+    return out
 
 
 def dt_move(c, nid, ws):
@@ -146,15 +168,22 @@ def files_node_tags(nid):
 
 @app.put("/api/files/nodes/<int:nid>/tags")
 def files_node_tags_put(nid):
-    """{tags: [names | ids]} -- the tags of a file / folder (write access; names make new tags of its workspace)."""
+    """{tags: [names | ids], _prev?: {tags: the list the client saw}} -- the tags of a file / folder (write access; names make
+    new tags of its workspace). 2.564.0 (#4701): with _prev only the tags added / removed against it apply (a tag set
+    elsewhere meanwhile stays), under write_lock('fs-tags-<id>'); without _prev the list replaces them as before."""
     c = db()
     _no_agent()
     n = need_node(c, nid, write=True)
     if n["kind"] == "link":
         fs_link_target(c, n)  # as a rename: a link changes only for someone who may open its original
-    raw = body().get("tags")
+    b = body()
+    raw = b.get("tags")
     if not isinstance(raw, list):
         return err(tr("Invalid value: {0}", "tags"))
+    write_lock(c, f"fs-tags-{nid}")
+    prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else None
+    if prev and isinstance(prev.get("tags"), list):
+        raw = dt_merge(c, [t["name"] for t in S.node_tags(c, nid)], prev["tags"], raw)
     if raw:
         fsl_need_unlocked(c, nid)  # 2.353.0 F (#2758, review N10): tags are plain -- none in a locked folder (taking them off stays possible)
     e = dt_set(c, n, raw, me())

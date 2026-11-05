@@ -110,16 +110,17 @@ function dt_abDetails(n) {
   return `<h4>${tr('Tags')}</h4><div class="abdtags">${(n.tags || []).map(t => `<span class="abtag">${esc(t.name)}</span>`).join('') || `<span class="muted">${tr('No tags yet')}</span>`}
     ${w ? `<button type="button" class="btn sm" data-abd="tags">${ic('tag', 's')} ${tr('Edit tags…')}</button>` : ''}</div>`;
 }
-async function dt_abPut(id, names) { const r = await api('PUT', `/api/files/nodes/${id}/tags`, {tags: names}); DT_AB.res = null; ab_reload(); return r; }
+// 2.564.0 (#4701): seen = the tags shown before (_prev): only what was added / removed here applies, a tag set elsewhere stays
+async function dt_abPut(id, names, seen) { const r = await api('PUT', `/api/files/nodes/${id}/tags`, {tags: names, ...(seen ? {_prev: {tags: seen}} : {})}); DT_AB.res = null; ab_reload(); return r; }
 async function dt_abEdit(n, after) {
   let t; try { t = await api('GET', `/api/files/nodes/${n.id}/tags`); } catch { return; }
   const was = (t.tags || []).map(x => x.name);
   const names = await dt_pick({title: tr('Tags of “{0}”', n.name), all: t.all || [], cur: was, ok: tr('Save')});
   if (!names || (names.length === was.length && names.every((x, i) => x === was[i]))) return;
-  try { await dt_abPut(n.id, names); } catch { return; }
+  try { await dt_abPut(n.id, names, was); } catch { return; }
   if (after) after();
-  const step = v => async () => { try { await dt_abPut(n.id, v); } catch { /* shown */ } return {}; };
-  offerUndo(tr('Tags of {0} changed', n.name), histAdd({label: tr('Tags of {0} changed', n.name), undo: step(was), redo: step(names)}));
+  const step = (v, p) => async () => { try { await dt_abPut(n.id, v, p); } catch { /* shown */ } return {}; };
+  offerUndo(tr('Tags of {0} changed', n.name), histAdd({label: tr('Tags of {0} changed', n.name), undo: step(was, names), redo: step(names, was)}));
 }
 async function dt_abFilter(sp) {
   let list; try { list = (await api('GET', `/api/files/tags?space=${encodeURIComponent(sp)}`)).tags || []; } catch { return; }
