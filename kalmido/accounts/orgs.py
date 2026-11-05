@@ -1504,6 +1504,7 @@ def org_member_put(oid):
             org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
             if cur["role"] == "admin":
                 rck_admin_gone(c, oid, uid)  # 2.539.0 (#4373)
+            org_open_chan_off(c, oid, uid, role)  # 2.560.0 (#4698 b)
     elif uid != me() and (not g.user["is_admin"] or _operator_apart()):  # 2.148.1 A (#2480): an existing account joins only by accepting an invitation (2.306.0 D1, #2875: also the operator's)
         from .orginvite import ojn_invite
         ojn_invite(c, oid, uid, role)
@@ -1519,6 +1520,18 @@ def org_member_put(oid):
         return jsonify(ok=True, by_email=True)
     return jsonify(ok=True, by_email=False, **({"pending": True} if pending else {}),
                    org=org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
+
+
+def org_open_chan_off(c, oid, uid, role):
+    """2.560.0 (#4698 b): uid's role in oid became guest / accounting (no full reading): they leave the organisation's OPEN
+    channels they had joined, with their personal agents (an open channel is the organisation's room, a member row there
+    would keep reading it); closed channels stay (a personal invitation)."""
+    from .orgroles import FULL_READ
+    if role in FULL_READ:
+        return
+    with system_ctx(c):  # the person's own rows in the organisation's channels, also when an admin changes the role
+        c.execute("DELETE FROM tchat_members WHERE (user_id=? OR user_id IN (SELECT user_id FROM agents WHERE owner_id=?)) AND room_id IN "
+                  "(SELECT id FROM tchat_rooms WHERE kind='channel' AND is_open=1 AND org_id=?)", (uid, uid, oid))
 
 
 def org_role_news(c, oid, uid, role):
@@ -1651,6 +1664,12 @@ def org_leave(c, oid, uid, heir, back=None):
     # groups have no organisation and the person stays a member there -- their marks stay
     c.execute("DELETE FROM tchat_reads WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=? OR "
               "list_id IN (SELECT id FROM lists WHERE org_id=?))" % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid, oid))
+    with system_ctx(c):  # 2.560.0 (#4698 a): their channel memberships and file / knowledge shares in the organisation end
+        # (coming back the same day, also as a guest = no old closed channels, no old folder shares)
+        c.execute("DELETE FROM tchat_members WHERE user_id IN (%s) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)"
+                  % ",".join("?" * (len(ags) + 1)), (uid, *ags, oid))
+        c.execute("DELETE FROM fs_shares WHERE (user_id IN ({0}) OR agent_id IN ({0})) AND node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)"
+                  .format(",".join("?" * (len(ags) + 1))), (uid, *ags, uid, *ags, oid))
     # 2.53.0 (#1424, review): the leaver's task bells in the organisation go too (else the nightly boundary check alarms)
     c.execute("DELETE FROM task_bell WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
     from ..sheets.shshare import shs_leave

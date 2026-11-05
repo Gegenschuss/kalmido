@@ -91,9 +91,10 @@ def wsh_url(c, r):
 
 
 # 2.126.2 B (#2358): a link of an organisation's page works only while its maker is an active member (wsh_find) -- SQL for
-# the live rows (wsh_rows) and the ended mark (wsh_gone); a = wiki_shares. Private spaces: unchanged.
+# the live rows (wsh_rows) and the ended mark (wsh_gone); a = wiki_shares. Private spaces: unchanged. 2.560.0 (#4698 c): and only
+# while the maker still has a writing role there (a maker made guest / read-only / accounting no longer sees the folder)
 WSH_MAKER = ("({a}.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id={a}.org_id "
-             "AND m.user_id={a}.created_by AND u.disabled=0))")
+             "AND m.user_id={a}.created_by AND m.role IN ('admin','member') AND u.disabled=0))")
 
 
 def wsh_gone(c, rows):
@@ -591,13 +592,13 @@ def wsh_send(c, f, public):
 # ---------------------------------------------------------------- the public link /s/w/<token>
 def wsh_find(c, token):
     """The live link share of a token (its space open, its owner / maker still active and, in an organisation, still a
-    member) or None. Then the request reads as nobody, bound to exactly the share's organisation (like the list links)."""
+    member with a writing role, 2.560.0 #4698 c) or None. Then the request reads as nobody, bound to exactly the share's organisation (like the list links)."""
     if not PUB_TOKEN_RE.fullmatch(token or "") or not public_links_on(c, "wiki"):
         return None
     with system_ctx(c):  # resolve the token (one row) across organisations; nothing else is read here
+        # 2.560.0 (#4698 c): the maker's rule is WSH_MAKER (a writing role in the organisation), as the dialog's ended mark
         r = c.execute("SELECT s.* FROM wiki_shares s JOIN users u ON u.id=COALESCE(s.owner_id, s.created_by) WHERE s.token_hash=? "
-                      "AND s.kind='link' AND u.disabled=0 AND (s.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m WHERE "
-                      "m.org_id=s.org_id AND m.user_id=s.created_by))", (_token_hash(token),)).fetchone()
+                      "AND s.kind='link' AND u.disabled=0 AND " + WSH_MAKER.format(a="s"), (_token_hash(token),)).fetchone()
     if not r or r["revoked_at"] or wsh_expired(r):
         return None
     acx_anon_bind(c, r["org_id"])

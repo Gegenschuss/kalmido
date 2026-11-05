@@ -70,13 +70,16 @@ def public_links_on(c, kind=None):
 
 
 def pub_find(c, token):
-    """The live link of a token (owner enabled, not expired) + the list, or None."""
+    """The live link of a token (owner enabled, not expired) + the list, or None. 2.560.0 (#4698 c): a link of an organisation's
+    list only while its maker (an old link without one: the list's owner) is an admin / member there (made guest = it ends)."""
     if not PUB_TOKEN_RE.fullmatch(token or ""):
         return None
     with system_ctx(c):  # 2.37.0 (#1150): resolve the token (one row) across organisations ...
         r = c.execute(f"""SELECT p.*, l.name AS l_name, l.is_inbox AS l_inbox, l.checklist AS l_checklist, l.owner_id AS l_owner,
                          l.org_id AS l_org FROM public_links p JOIN lists l ON l.id=p.list_id JOIN users u ON u.id=l.owner_id
-                         WHERE p.token_hash=? AND u.disabled=0 AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health') AND NOT {reading_sql('l')} AND NOT (l.life='travel' AND l.org_id IS NOT NULL)""", (_token_hash(token),)).fetchone()  # 2.72.0 (#1333): never a budget; 2.102.0 review F4: never a list in the trash; 2.190.0 C (#2496): never a health list; 2.306.0 Fix-2a (#2875): never read later (private or the organisation's)
+                         WHERE p.token_hash=? AND u.disabled=0 AND l.deleted_at IS NULL AND COALESCE(l.life,'') NOT IN ('budget', 'health') AND NOT {reading_sql('l')} AND NOT (l.life='travel' AND l.org_id IS NOT NULL)
+                         AND (l.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members m WHERE m.org_id=l.org_id AND m.user_id=COALESCE(p.created_by, l.owner_id)
+                              AND m.role IN ('admin','member')))""", (_token_hash(token),)).fetchone()  # 2.72.0 (#1333): never a budget; 2.102.0 review F4: never a list in the trash; 2.190.0 C (#2496): never a health list; 2.306.0 Fix-2a (#2875): never read later (private or the organisation's)
     if not r or (r["expires_at"] and parse_iso(r["expires_at"]) <= now_utc()):
         return None
     acx_anon_bind(c, r["l_org"])  # ... then the page reads as nobody, inside exactly the list's organisation
