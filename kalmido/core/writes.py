@@ -140,24 +140,23 @@ def obj_history(c, uid, kind, rid, limit=50):
 
 # ---------------------------------------------------------------- create / write
 def obj_create(c, uid, kind, vals, org_id=None):
-    """A new object of kind in uid's private space (org_id None) or organisation org_id (a member / admin; an agent only of
-    its own workspace). vals: the kind's fields (the cleaners; unknown = 400). Returns the row."""
+    """A new object of kind in uid's private space (org_id None) or organisation org_id (a member / admin). Agents make
+    nothing (403, docs/AGENTS.md: creating stays with people; review F4). vals: the kind's fields (the cleaners; unknown =
+    400). Returns the row."""
     from ..accounts.orgroles import need_org_write
     from .access import acx_org_ok
     reg = obj_reg(kind)
     if reg["feat"]:
         from .access import need_feat
         need_feat(reg["feat"])
-    ctx = acx_of(c, uid)
+    if acx_of(c, uid).role == "agent":
+        raise Denied(403)  # review F4: creating stays with people (an agent's object would have no owner who sees it)
     if org_id is not None:
         if isinstance(org_id, bool) or not isinstance(org_id, int):
             raise BadInput(tr("Invalid value: {0}", "org_id"))
-        if not acx_org_ok(c, uid, org_id) or (ctx.role == "agent" and ctx.agent_org_id != org_id):
+        if not acx_org_ok(c, uid, org_id):
             raise Denied(404)
-        if ctx.role != "agent":
-            need_org_write(c, uid, org_id)
-    elif ctx.role == "agent" and ctx.agent_org_id:
-        raise Denied(403)  # an organisation's agent makes nothing in a private space
+        need_org_write(c, uid, org_id)
     v = _clean(c, reg, vals, None)
     for k, f in reg["fields"].items():
         if k not in v:

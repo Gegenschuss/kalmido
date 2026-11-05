@@ -3,9 +3,11 @@
 The test container registers the kind 'objprobe' (KALMIDO_TEST_OBJ=1, kalmido/core/objects.py _probe_register) on the table
 obj_probe, which only these suites create (TABLE_SQL, through tests/dbx.py): the columns every core table has plus the
 fields title / note / size / done."""
+import subprocess
+
 import requests
 
-from kt import B, H, dbx, fresh
+from kt import B, CT, H, dbx, fresh
 
 K = "objprobe"
 ENV = {"KALMIDO_TEST_OBJ": "1", "KALMIDO_TEST_TIMING_ALL": "1"}  # the statements of a request (Server-Timing, review F3)
@@ -65,3 +67,14 @@ def agent(s, name, org=None, scopes=("read", "tasks:write")):
     r = s.post(B + "/api/my/agents", json={"username": name, "display_name": name.title(), "scopes": list(scopes), **({"org_id": org} if org else {})})
     assert r.ok, (name, r.status_code, r.text[:300])
     return Agent(r.json()["id"], r.json()["token"])
+
+
+def in_app(code):
+    """Python inside the server container, outside a request (the app loaded, c = a connection in the system context, the
+    core's functions as an area's background code calls them) -> stdout + stderr (review F4 / F5)."""
+    body = "\n".join("    " + x for x in code.split("\n"))
+    out = subprocess.run(["docker", "exec", CT, "python", "-c",
+                          "import app\nfrom kalmido.core.db import connect\nfrom kalmido.core.pg import system_ctx\n"
+                          "from kalmido.core.errors import Denied\nc = connect()\nwith system_ctx(c):\n" + body + "\nc.close()"],
+                         capture_output=True, text=True)
+    return out.stdout + out.stderr

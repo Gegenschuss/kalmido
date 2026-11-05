@@ -9,6 +9,7 @@ generic routes (core/objweb.py) with the test kind 'objprobe' (KALMIDO_TEST_OBJ=
  - a folder share of the file store opens an object filed there (one register: fsref)
  - agents: only an explicit share, never another workspace, hidden objects and the data lock give nothing
  - a listing reads the share chain once (review F3): 12 more objects cost a member or a folder share no statement more
+ - called outside a request (an area's own code): an agent creates nothing (F4)
  - the trash: only who manages it sees it (?trash=1), restore, a member gets 404 meanwhile
  - an account deleted: its organisation objects go to the heir (review F1), its private ones go with it
  - obj_revoke_person: leaving takes the shares on the organisation's nodes and the team chat rooms along (coming back as a
@@ -26,7 +27,7 @@ N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, check, dbx, docker_logs_on_first_fail, done, sess  # noqa: E402
-from obj_probe import K, agent, ids, new, role, start  # noqa: E402
+from obj_probe import K, agent, ids, in_app, new, role, start  # noqa: E402
 
 start("OBJCORE")
 docker_logs_on_first_fail()
@@ -150,6 +151,15 @@ print(f"PERF obj list: member {n1} -> {n2} statements ({c1} -> {c2} rows), folde
 check(n1 > 0 and c2 == c1 + 12 and n2 <= n1 + 2, f"a member's list: 12 more rows, the same statements ({n1} -> {n2})")
 check(a1 > 0 and d2 == d1 + 12 and a2 <= a1 + 2, f"by a folder share: 12 more rows, the same statements ({a1} -> {a2})")
 
+# ---------------------------------------------------------------- review F4 / F5: the core's functions called from an area's own code
+out = in_app(f"""from kalmido.core.writes import obj_create
+try:
+    obj_create(c, {AG.id}, "{K}", {{"title": "Bot's plan"}}, org_id={ORG})
+    print("MADE")
+except Denied as e:
+    print("DENIED", e.code)""")
+check("DENIED 403" in out and dbx("SELECT COUNT(*) FROM obj_probe WHERE title=?", ("Bot's plan",))[0][0] == 0,
+      f"F4: an agent makes no object (creating stays with people): {out[-300:]}")
 # ---------------------------------------------------------------- another organisation / person: 404 on every route (tenant-matrix: obj)
 OAG = agent(Ol, "otherbot", ORG2)
 for s, who in ((Ol, "olga"), (Fr, "frida")):
