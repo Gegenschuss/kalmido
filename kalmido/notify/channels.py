@@ -40,7 +40,7 @@ from ..core.errors import BadInput
 from ..core.mailframe import MAIL_ACC, MAIL_MUTED, Safe, mail_html
 from ..notify.alerts import _env_int, aa_count, aa_err, aa_fail, aa_ok
 from ..core.env import env_bool
-from ..calendars.subscriptions import CAL_ERR  # 2.369.5 (#2517): pulled up from functions
+from ..calendars.subscriptions import CAL_ERR, CAL_SEND_S, cal_until  # 2.369.5 (#2517): pulled up from functions; 2.539.0 (#4379): CAL_SEND_S, cal_until
 from ..collab.integfail import integ_org_admins, integ_tell  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import comment_plain, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import _need_org_admin  # 2.369.5 (#2517): pulled up from functions
@@ -138,7 +138,6 @@ def chn_request(kind, t, text):
 
 def chn_send(kind, t, text, allow):
     """One POST (no database access): (ok, HTTP status or None, error code or '')."""
-    from ..calendars.subscriptions import CAL_SEND_S, cal_until
     until = time.monotonic() + CAL_SEND_S  # 2.539.0 (#4379): the whole send ends after CAL_SEND_S (a server answering drop by drop)
     with cal_until(until) as cut:
         res = _chn_send1(kind, t, text, allow, until)

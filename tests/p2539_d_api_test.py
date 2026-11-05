@@ -51,7 +51,8 @@ from kalmido.calendars import subscriptions as S
 from kalmido.integrations import webhooks as WH, git as G
 from kalmido.notify import channels as CH
 from kalmido.newsletter.adapters import nwl_adapter, NwlError
-S.CAL_SEND_S = WH.CAL_SEND_S = G.CAL_SEND_S = 2
+from kalmido.newsletter import adapters as NA
+S.CAL_SEND_S = WH.CAL_SEND_S = G.CAL_SEND_S = CH.CAL_SEND_S = NA.CAL_SEND_S = 2  # review 2.539.0 (#4379): channels / newsletter bind it at module level
 class Drip(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     def log_message(self, *a):

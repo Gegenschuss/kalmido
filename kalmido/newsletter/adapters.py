@@ -21,6 +21,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from ..calendars.subscriptions import CAL_SEND_S, cal_until  # 2.539.0 (#4379): the total limit of a call
+
 NWL_KINDS = ("listmonk", "brevo", "cleverreach")
 NWL_PREVIEW = ("brevo", "cleverreach")  # untested against the real service
 NWL_DEFAULT_URL = {"brevo": "https://api.brevo.com", "cleverreach": "https://rest.cleverreach.com"}
@@ -54,7 +56,6 @@ class _Base:
     def _req(self, method, path, data=None, headers=None, form=False, ok404=False):
         """JSON request -> (status, parsed answer). 404 with ok404 -> (404, None). 2.539.0 (#4379): the whole request ends
         after CAL_SEND_S (a server answering drop by drop: NwlError timeout)."""
-        from ..calendars.subscriptions import CAL_SEND_S, cal_until
         until = time.monotonic() + CAL_SEND_S
         with cal_until(until) as cut:
             try:
