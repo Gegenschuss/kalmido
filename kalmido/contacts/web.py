@@ -27,7 +27,7 @@ from ..accounts.orgs import user_orgs
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn, bgj_progress, bgj_state  # 2.370.3 (#2760)
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
-from ..contacts.model import BK_KERN  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
+from ..contacts.model import BK_KERN, bk_has_node  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
@@ -187,7 +187,12 @@ def op_book_member_rm(c, uid, bid, who):
     bk, role = need_book(c, bid)
     if who != uid and role != "owner":
         raise Denied(403, tr("Only the owner of the address book can do this"))
-    if not c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, who)).rowcount:
+    n = c.execute("DELETE FROM book_members WHERE book_id=? AND user_id=?", (bid, who)).rowcount  # the trigger takes its share too
+    if bk_has_node(c, bid):  # 2.566.0 (#4712, review F5): a share of the node without a member row (restored in the core), as op_member_remove
+        with system_ctx(c):
+            n += c.execute("DELETE FROM fs_shares WHERE node_id IN (SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='address_book' AND ref_id=?) "
+                           "AND (user_id=? OR agent_id=?)", (int(bid), who, who)).rowcount
+    if not n:
         raise Denied(404)
     book_touch(c, bid)
     bump(c)

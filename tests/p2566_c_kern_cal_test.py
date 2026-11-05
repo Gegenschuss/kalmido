@@ -19,6 +19,7 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - review F4: member rows written while there was no node are all mirrored when the node comes; review F3: a node in the
    file store's trash is still the node (a share taken back stays taken back), it does not go there alone while it carries
    shares, and removed for good it writes its shares back into the member rows
+ - review F5: the members dialog of a book removes a share that lives only in the core
  - review F2: a workspace move checks the shares of the node (a person only in the core, a group): 409, nothing moves
  - review F1: the owner leaves the organisation without an heir: the calendar's node follows into the private tree, a share
    taken back in the core stays taken back, one only in the core stays
@@ -302,6 +303,17 @@ check(B5 not in ids(Gi.get(B + "/api/books")), "review F3: the book's node in th
 sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
 check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
       "review F3: the book's node removed for good: gina stays out, bob's core-only share lives on as his row")
+
+# ================================================================== review F5: a book's share only in the core goes in the members dialog
+check(A.put(B + f"/api/books/{B5}/members", json={"user_id": GINA, "role": "view"}).ok, "F5: the tidy book shared with gina again")
+N9 = node("address_book", B5)
+check(N9 is not None and share("address_book", B5, BOB) == "view", "F5: its new node mirrored bob's row as well (F4)")
+sql("DELETE FROM book_members WHERE book_id=? AND user_id=?", (B5, BOB), write=True)
+sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N9, BOB), write=True)  # restored in the core
+check(B5 in ids(Bo.get(B + "/api/books")), "F5: bob has the book through the core only")
+r = A.delete(B + f"/api/books/{B5}/members/{BOB}")
+check(r.ok and share("address_book", B5, BOB) is None and B5 not in ids(Bo.get(B + "/api/books")),
+      f"review F5: the owner removes that share in the members dialog ({r.status_code})")
 
 # ================================================================== review F2: a workspace move checks the core's shares
 r = A.post(B + "/api/admin/orgs", json={"name": "Southwind Works"})
