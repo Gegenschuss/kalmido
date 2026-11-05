@@ -633,7 +633,11 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
-  if (outNow(method, url, body)) { const r = enqueue(method, url, body); if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r; }  // 2.537.0 (#4568)
+  if (outNow(method, url, body)) {  // 2.537.0 (#4568)
+    const r = enqueue(method, url, body);
+    if (OUT.online && r?._q) r._q.live = 1;  // 2.551.0 (#4649): sent online: a refusal is said as api() said it (outFlush)
+    if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r;
+  }
   const ox = oxbPrev(method, url, body); body = ox.body;  // 2.528.0 B (#4305)
   try { let j = await rawFetch(method, url, body, oxaKey(body)); if (ox.on && j?.conflicts?.length && typeof le2eRekeyConflicts === 'function') j = await le2eRekeyConflicts(url, body, j, b2 => rawFetch(method, url, b2));  // 2.543.0 (#4632): a key change is no conflict
     if (ox.on && j?.conflicts?.length) addConflicts(j.id || +url.split('/').pop(), j.conflicts, j.title); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
@@ -820,6 +824,12 @@ function outLater(e) {
   if (!w) { let res; const p = new Promise(r => { res = r; }); w = {p, res}; OUT_LATER.set(e.k, w); }
   return w.p;
 }
+// 2.551.0 (#4649): for a caller that keeps a typed value when its save fails: a Promise of the server's refusal (an Error) of
+// the change r stands for (r = what api() gave back, r._q its outbox entry), null once it is saved or waits for another try
+function outFail(r) {
+  const e = r?._q; if (!e?.live) return Promise.resolve(null);
+  return outLater(e).then(j => j ? null : e.err || null);
+}
 // an entry's answer came (j) or it was refused (null): its waiter gets it; a task's own answer is put in place (the server's
 // computed fields), when no newer change of the same task waits behind it. true = settled, no whole new state needed.
 function outAnswer(e, j) {
@@ -929,6 +939,7 @@ async function outFlush() {
   let dropped = 0, wdropped = 0, skipped = 0, sent = 0, sentNt = 0;
   const ntU = u => typeof NT_URL === 'object' && NT_URL.test(u);  // 2.536.0 (#4567): a note's address (chat.js, not on every page)
   let sentTk = 0;  // 2.537.0 (#4568): changes of a task whose answer settled it (outAnswer): no whole new state for them
+  const refused = [];  // 2.551.0 (#4649): changes sent online the server refused (said at once): the page takes the server's state, then their callers hear it
   try {
     while (outSync().length) {
       const e = OUT.q[0];
@@ -988,6 +999,14 @@ async function outFlush() {
           if (err.data.task && typeof putTask === 'function') putTask(err.data.task);
           setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; outAnswer(e, null); continue;  // 2.537.0 (#4568): its waiter hears it
         }
+        // 2.551.0 (#4649): a change sent online that the server refused (a wrong value, no right, deleted: 4xx, not a 409 conflict)
+        // is said with the server's words as api() did before #4568; the page goes back to the server's state (load), nothing
+        // waits in the conflicts dialog, its caller hears it (outFail)
+        if (e.live && st >= 400 && st < 500 && st !== 409 && !wiki && !ntU(e.url)) {
+          console.warn('outbox: refused', e, err); if (globalThis.document) $('#detail .dsaved')?.classList.remove('on');  // its "Saved" was too early
+          if (err.message !== 'auth' && !err.shown) { if (err.data?.out_request && typeof oor_ask === 'function') toast(err.message, () => oor_ask(err.data.out_request), 10000, tr('Ask an admin')); else toast(err.message); }
+          outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.err = err; e.done = true; refused.push(e); continue;
+        }
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
         if (typeof ntReject === 'function' && ntU(e.url) && ntReject(e, err)) { /* 2.536.0 (#4567): 409 = the note's own dialog (chat.js) */ }
         else if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
@@ -1003,15 +1022,19 @@ async function outFlush() {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
-    if (sent && sent > sentNt + sentTk && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself; 2.537.0 (#4568): a task's change said "Saved" already
+    if (sent && sent > sentNt + sentTk && !OUT.q.length && !dropped && !wdropped && !skipped && !refused.length) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself; 2.537.0 (#4568): a task's change said "Saved" already
     if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
     else if (wdropped) setTimeout(() => toast(trn('{0} offline change of a knowledge page not applied (page deleted or no right)', '{0} offline changes of knowledge pages not applied (page deleted or no right)', wdropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
+    // 2.551.0 (#4649): left early (an entry behind it waits for the connection / another try): the refused ones are settled here
+    if (OUT.q.length && refused.length) { const r = refused.splice(0); load().then(() => render(), () => {}).finally(() => { for (const e of r) outAnswer(e, null); }); }
   }
   // 2.536.0 (#4567): only notes went out (every few seconds while typing): no whole new state, the notes are drawn already;
   // 2.537.0 (#4568): the same for task changes the answers settled
-  if (!(sent && sent === sentNt + sentTk && !dropped && !wdropped)) await load();
-  render();
+  try {
+    if (!(sent && sent === sentNt + sentTk && !dropped && !wdropped && !refused.length)) await load();
+    render();
+  } finally { for (const e of refused) outAnswer(e, null); }  // 2.551.0 (#4649): after the server's state is drawn (a kept typed value stays)
   if (typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline (attachments.js)
 }
 window.addEventListener('online', () => { OUT.retryAt = 0; flush(); });

@@ -587,13 +587,18 @@ async function saveField(el) {
   const v = cf_val(el, f);
   if (f.type === 'select') { const o = selOpt(f, v); el.classList.toggle('fill', !!lrSelFill(o)); el.style.cssText = o && lrSelFill(o) ? `--fc:${cssColor(o.color)};--fct:${lrInk(cssColor(o.color))}` : ''; }  // #1193
   if ((t.fields?.[fid] ?? null) === v) return;
-  try { await patchTask(t.id, {fields: {[fid]: v}}); } catch {
-    // 2.359.2 B (#3049): not saved (api() said why): the detail is drawn again, a typed value stays in its field and leaving it tries again
-    const typed = el.type !== 'checkbox' && el.tagName !== 'SELECT' ? el.value : null;
+  // 2.359.2 B (#3049): not saved (api() said why): the detail is drawn again, a typed value stays in its field and leaving it tries again
+  const typed = el.type !== 'checkbox' && el.tagName !== 'SELECT' ? el.value : null;
+  const keep = () => {
+    if (S.sel !== t.id) return;
     renderDetail();
     const n = typed != null && $(`#detail [data-cf="${fid}"]`);
     if (n && n.tagName === el.tagName && n.type === el.type) { n.value = typed; n.addEventListener('blur', () => saveField(n), {once: true}); }
-  }
+  };
+  let r;
+  try { r = await patchTask(t.id, {fields: {[fid]: v}}); } catch { keep(); return; }
+  // 2.551.0 (#4649): online the change goes through the outbox (#4568): the server's refusal (e.g. "number expected") comes later
+  outFail(r).then(err => { if (err) keep(); });
 }
 // 2.422.0 A (#3468): a custom field typed in but never left (it saves on "change"): the page going away puts the value into the
 // queue and out with keepalive (core.js outKeep), like the title / description; a locked list's field (the queue holds no plain
