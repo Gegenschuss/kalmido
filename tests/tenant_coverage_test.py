@@ -531,6 +531,7 @@ ROUTES = {
     "GET /api/v1/office/series": "office", "GET /api/v1/office/subs": "office",  # 2.483.0 (#2007): p2483_a_series_api_test.py
     "POST /api/v1/office/offers": "office", "PATCH /api/v1/office/offers/{}": "office", "POST /api/v1/office/offers/{}/invoice": "office",
     "POST /api/v1/office/reminders": "office", "GET /api/v1/office/payment-suggestions": "office", "POST /api/v1/office/payment-suggestions": "office",
+    "POST /api/v1/office/invoices": "office",  # 2.568.0 (#4673): an agent's invoice draft without a quotation (p2568_b_ai_office_test.py)
     "GET /api/office/datev/extf": "office",  # 2.47.3 (#1460): DATEV booking batch, admin only (p2473_e_api_test.py)
     "GET /api/office/datev/accounts": "office",  # 2.120.0 C (#2090): input side accounts, admin only (p2120_c_api_test.py)
     # 2.148.0 D (#2458): the DATEV import, suppliers, opening balances; admin only, another organisation 404 (p2148_d_api_test.py)

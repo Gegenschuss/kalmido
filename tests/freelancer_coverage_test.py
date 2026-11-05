@@ -576,6 +576,7 @@ ROUTES = {
     "POST /api/receipt-suggestions/{}/reopen": "office", "POST /api/v1/clients": "office",
     "POST /api/v1/clients/bulk": "office", "POST /api/v1/office/offers": "office",
     "POST /api/v1/office/offers/{}/invoice": "office", "POST /api/v1/office/payment-suggestions": "office",
+    "POST /api/v1/office/invoices": "office",  # 2.568.0 (#4673): p2568_b_ai_office_test.py
     "POST /api/v1/office/reminders": "office", "PUT /api/newsletter": "office", "PUT /api/newsletter/consent": "office", "POST /api/newsletter/consent/import": "office",
     "PUT /api/office/cashflow/check": "office", "PUT /api/office/docs/{}/items": "office",
     "PUT /api/office/docs/{}/parts/{}/items": "office", "PUT /api/office/settings": "office", "PUT /api/paperless": "office",
