@@ -108,6 +108,12 @@ c.commit()
   trash empty the node first, the object comes back without its folder place.
 - Write paths that do not go through `obj_write` yet (old areas during the move) use the adapters `obj_undo_pre` /
   `obj_undo_post`, `obj_history_add` and `obj_touch`.
+- Stage 2 (#4711, the office and the clients): their rows have no `owner_id` / `rev` and rights of their own, so they are
+  no registered kinds yet. `obj_track(kind, table, ...)` names such a kind for the history and the undo only (no rights,
+  no routes, no folders); `kalmido/office/owrite.py` `ow_write(...)` is the one write call of an office row: lock, version
+  (agents must send it), only the fields sent, undo step, `updated_at` / `updated_by`, history (an encrypted column stays
+  sealed there), `bump`. The area checks its rights before, as it always did. `office/undo.py` keeps its route and header
+  and runs on `obj_undo_run` (the steps live in `obj_undo`).
 
 ## 5. Routes you get
 

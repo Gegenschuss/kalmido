@@ -25,7 +25,13 @@ Interface:
   obj_trash(c, uid, kind, id) -> row, obj_restore(c, uid, kind, id) -> row, obj_purge(c, uid, kind, id)
   obj_history(c, uid, kind, id, limit=50) -> [{id, at, user_id, name, agent, action, before, after}]  ('view')
   obj_undo(c, uid, kind, id, sess, op) -> {state counts}            op undo | redo | all | redoall
-  obj_is_agent(c, uid) -> bool"""
+  obj_is_agent(c, uid) -> bool
+
+2.567.0 (#4711, stage 2): old areas whose rows have no owner_id / rev (the office, the clients) are no registered kinds yet:
+obj_track(kind, table, area=..., undo_scope=..., undo_keep=..., undo_nofp=...) names them for the history and the undo
+only (no rights, no routes, no folders -- the area keeps its own checks). obj_history_add, obj_undo_pre / obj_undo_post and
+obj_undo_run (= obj_undo without its rights check, the area checked them) take such a kind like a registered one; the office's
+one write call on top is office/owrite.py ow_write."""
 import base64
 import hashlib
 import json
@@ -59,6 +65,20 @@ UNDO_CONFLICT = N_("Changed by someone else in the meantime, so it cannot be und
 UNDO_MOVED = N_("Moved to another workspace in the meantime, so it cannot be undone")
 UNDO_NOTHING = N_("Nothing to undo")
 PURGE_FIRST = N_("Put it into the trash first")
+OBJ_TRACK = {}  # 2.567.0 (#4711): kind -> {table, area, undo_scope, undo_keep, undo_nofp, fields: None} (obj_track)
+
+
+def obj_track(kind, table, *, area="other", undo_scope=None, undo_keep=None, undo_nofp=None):
+    """2.567.0 (#4711): an old area's kind for the history and the undo only (module docstring). undo_keep / undo_nofp:
+    {table: {column}} never written back on undo / never part of the fingerprint (a number drawn since, cached sums)."""
+    OBJ_TRACK[kind] = {"kind": kind, "table": table, "area": area, "undo_scope": undo_scope, "fields": None,
+                       "undo_keep": dict(undo_keep or {}), "undo_nofp": dict(undo_nofp or {})}
+    return OBJ_TRACK[kind]
+
+
+def _reg(kind):
+    """A registered kind or one of obj_track."""
+    return OBJ_TRACK.get(kind or "") or obj_reg(kind)
 
 
 def obj_is_agent(c, uid):
@@ -101,9 +121,10 @@ def obj_touch(c, uid, kind, rid):
 def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=None, agent=None):
     """Note a change of the object in obj_history (before / after: {field: value} of what changed). An 'update' of the same
     person (and the same agent flag) within OBJ_MERGE_MIN minutes merges into the last entry: its before stays, after grows."""
-    obj_reg(kind)
+    reg = _reg(kind)
     if org_id is None:
-        r = obj_row(c, kind, rid)
+        r = (c.execute(f"SELECT org_id FROM {reg['table']} WHERE id=?", (int(rid),)).fetchone() if kind in OBJ_TRACK
+             else obj_row(c, kind, rid))
         org_id = (r["org_id"] or None) if r is not None else None
     ag = 1 if (obj_is_agent(c, uid) if agent is None else agent) else 0
     ts = _now()
@@ -274,7 +295,7 @@ def _unval(v):
 
 def undo_scope(kind, rid, oid):
     """[(table, where, args, several rows?)] of the object; the first is its main row."""
-    reg = obj_reg(kind)
+    reg = _reg(kind)
     if reg["undo_scope"]:
         return reg["undo_scope"](int(rid), oid)
     return [(reg["table"], "id=?", (int(rid),), False)]
@@ -288,8 +309,9 @@ def _snap(c, sc):
     return out
 
 
-def _fp(snap):
-    s = {t: [{k: v for k, v in r.items() if k not in UNDO_NO_FP} for r in rows] for t, rows in snap.items()}
+def _fp(snap, nofp=None):
+    nofp = nofp or {}
+    s = {t: [{k: v for k, v in r.items() if k not in UNDO_NO_FP and k not in nofp.get(t, ())} for r in rows] for t, rows in snap.items()}
     return hashlib.sha256(json.dumps(s, sort_keys=True, default=str).encode()).hexdigest()
 
 
@@ -298,8 +320,10 @@ def _lock_rows(c, sc):
     c.execute(f"SELECT id FROM {t} WHERE {where} FOR UPDATE", args).fetchall()
 
 
-def _write_back(c, sc, snap, uid):
-    """Copy snap back: the main row's own columns (not its identity, version, trash), the other tables' rows replaced."""
+def _write_back(c, sc, snap, uid, keep=None):
+    """Copy snap back: the main row's own columns (not its identity, version, trash), the other tables' rows replaced.
+    keep {table: {column}}: columns that stay as they are now (obj_track undo_keep)."""
+    keep = keep or {}
     for t, where, args, many in reversed(sc):
         if many:
             c.execute(f"DELETE FROM {t} WHERE {where}", args)
@@ -309,10 +333,13 @@ def _write_back(c, sc, snap, uid):
         if not many:
             if not rows:
                 continue
-            row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in UNDO_FIXED}
+            row = {k: _unval(v) for k, v in rows[0].items() if k in cols and k not in UNDO_FIXED and k not in keep.get(t, ())}
             if i == 0 and {"rev", "updated_at", "updated_by"} <= cols:
                 c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)}{',' if row else ''} rev=rev+1, updated_at=?, updated_by=? WHERE {where}",
                           [*row.values(), _now(), uid, *args])
+            elif i == 0 and "updated_at" in cols:  # 2.567.0 (#4711): an old area's row (obj_track): a new version for the next save
+                row.update(updated_at=_now(), **({"updated_by": uid} if "updated_by" in cols else {}))
+                c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)} WHERE {where}", [*row.values(), *args])
             elif row:
                 c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in row)} WHERE {where}", [*row.values(), *args])
             continue
@@ -351,59 +378,81 @@ def obj_undo_pre(c, uid, kind, rid, oid=None):
     sid = insert_id(c, "INSERT INTO obj_undo(org_id, user_id, sess, kind, ref_id, seq, state, snap, fp_before, fp_after, created_at) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?,?)",
                     (main.get("org_id"), uid, tok, kind, int(rid), (rows[-1]["seq"] + 1) if rows else 1, "done",
-                     json.dumps(snap, ensure_ascii=False, default=str), _fp(snap), "", iso(now_utc())))
-    g.obj_undo_step = (sid, sc)
+                     json.dumps(snap, ensure_ascii=False, default=str), _fp(snap, _nofp(kind)), "", iso(now_utc())))
+    g.obj_undo_step = (sid, sc, _nofp(kind))
 
 
 def obj_undo_post(c):
     """Right before the commit of the write: the state after the step (what an undo expects to find)."""
     st = g.pop("obj_undo_step", None) if has_request_context() else None
     if st:
-        c.execute("UPDATE obj_undo SET fp_after=? WHERE id=?", (_fp(_snap(c, st[1])), st[0]))
+        c.execute("UPDATE obj_undo SET fp_after=? WHERE id=?", (_fp(_snap(c, st[1]), st[2]), st[0]))
+
+
+def _nofp(kind):
+    return _reg(kind).get("undo_nofp") or {}
 
 
 def _main_org(snap, sc):
     return ((snap.get(sc[0][0]) or [{}])[0]).get("org_id")
 
 
-def _undo_one(c, sc, st, uid):
+def _undo_one(c, sc, st, uid, reg, fix=None):
+    nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_after"] or _fp(cur) != st["fp_after"]:
+    if not st["fp_after"] or _fp(cur, nofp) != st["fp_after"]:
         raise Denied(409, tr(UNDO_CONFLICT))
     old = json.loads(st["snap"])
     if _main_org(old, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
-    _write_back(c, sc, old, uid)
+    _write_back(c, sc, old, uid, reg.get("undo_keep"))
+    if fix:
+        fix(c)
     c.execute("UPDATE obj_undo SET state='undone', redo=?, fp_undone=? WHERE id=?",
-              (json.dumps(cur, ensure_ascii=False, default=str), _fp(_snap(c, sc)), st["id"]))
+              (json.dumps(cur, ensure_ascii=False, default=str), _fp(_snap(c, sc), nofp), st["id"]))
     return cur, old
 
 
-def _redo_one(c, sc, st, uid):
+def _redo_one(c, sc, st, uid, reg, fix=None):
+    nofp = reg.get("undo_nofp") or {}
     cur = _snap(c, sc)
-    if not st["fp_undone"] or _fp(cur) != st["fp_undone"] or not st["redo"]:
+    if not st["fp_undone"] or _fp(cur, nofp) != st["fp_undone"] or not st["redo"]:
         raise Denied(409, tr(UNDO_CONFLICT))
     new = json.loads(st["redo"])
     if _main_org(new, sc) != _main_org(cur, sc):
         raise Denied(409, tr(UNDO_MOVED))
-    _write_back(c, sc, new, uid)
-    c.execute("UPDATE obj_undo SET state='done', redo=NULL, fp_undone=NULL, fp_after=? WHERE id=?", (_fp(_snap(c, sc)), st["id"]))
+    _write_back(c, sc, new, uid, reg.get("undo_keep"))
+    if fix:
+        fix(c)
+    c.execute("UPDATE obj_undo SET state='done', redo=NULL, fp_undone=NULL, fp_after=? WHERE id=?", (_fp(_snap(c, sc), nofp), st["id"]))
     return cur, new
 
 
 def obj_undo(c, uid, kind, rid, sess, op="undo"):
     """undo = the newest own step of session sess back, all = every own step (back to the opening), redo / redoall = the way
     forward again; rights as for a change ('write'). 409 when someone else changed it meanwhile. Returns {state: count}."""
+    _undo_args(sess, op)
+    row, _ = obj_need(c, uid, kind, rid, "write")
+    return obj_undo_run(c, uid, kind, rid, row["org_id"] or None, sess, op)
+
+
+def _undo_args(sess, op):
     import re
-    reg = obj_reg(kind)
     tok = str(sess or "").strip().lower()
     if not re.fullmatch(r"[a-f0-9]{16,64}", tok) or op not in UNDO_OPS:
         raise BadInput(tr("Invalid data"))
-    row, _ = obj_need(c, uid, kind, rid, "write")
+    return tok
+
+
+def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None):
+    """2.567.0 (#4711): obj_undo without its rights check -- the caller checked them (an obj_track kind: the area's own,
+    office/undo.py). oid = the object's workspace now; fix(c) runs after each write back (the sums of a document)."""
+    tok = _undo_args(sess, op)
+    reg = _reg(kind)
     if obj_is_agent(c, uid):
         raise Denied(403)
     write_lock(c, f"obj-{kind}-{int(rid)}")
-    sc = undo_scope(kind, rid, row["org_id"] or None)
+    sc = undo_scope(kind, rid, oid)
     _lock_rows(c, sc)
     steps = c.execute("SELECT * FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? ORDER BY seq", (uid, tok, kind, int(rid))).fetchall()
     done = [s for s in steps if s["state"] == "done"]
@@ -415,19 +464,20 @@ def obj_undo(c, uid, kind, rid, sess, op="undo"):
         if op == "all" and undone:
             c.execute(f"DELETE FROM obj_undo WHERE id IN ({','.join('?' * len(undone))})", [s["id"] for s in undone])
         for st in reversed(done if op == "all" else done[-1:]):
-            a, z = _undo_one(c, sc, c.execute("SELECT * FROM obj_undo WHERE id=?", (st["id"],)).fetchone(), uid)
+            a, z = _undo_one(c, sc, c.execute("SELECT * FROM obj_undo WHERE id=?", (st["id"],)).fetchone(), uid, reg, fix)
             first, last = first or a, z
     else:
         if not undone:
             raise Denied(409, tr(UNDO_NOTHING))
         for st in undone if op == "redoall" else undone[:1]:
-            a, z = _redo_one(c, sc, c.execute("SELECT * FROM obj_undo WHERE id=?", (st["id"],)).fetchone(), uid)
+            a, z = _redo_one(c, sc, c.execute("SELECT * FROM obj_undo WHERE id=?", (st["id"],)).fetchone(), uid, reg, fix)
             first, last = first or a, z
     t = sc[0][0]
     b0, a0 = (first.get(t) or [{}])[0], (last.get(t) or [{}])[0]
-    diff = [k for k in reg["fields"] if not _same(b0.get(k), a0.get(k))]
+    keys = reg["fields"] if reg["fields"] is not None else [k for k in {**b0, **a0} if k not in UNDO_FIXED and k not in UNDO_NO_FP]
+    diff = [k for k in keys if not _same(b0.get(k), a0.get(k))]
     obj_history_add(c, uid, kind, rid, {k: b0.get(k) for k in diff}, {k: a0.get(k) for k in diff}, action="undo" if op in ("undo", "all") else "redo",
-                    org_id=row["org_id"] or None, agent=False)
+                    org_id=oid, agent=False)
     bump(c, _area(reg))
     left = c.execute("SELECT state, COUNT(*) FROM obj_undo WHERE user_id=? AND sess=? AND kind=? AND ref_id=? GROUP BY state",
                      (uid, tok, kind, int(rid))).fetchall()

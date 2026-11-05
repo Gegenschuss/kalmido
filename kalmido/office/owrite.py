@@ -1,0 +1,113 @@
+"""2.567.0 (#4711): the shared core, stage 2 -- ONE write call for an office row (and a client) on the core's write layer.
+
+The office's rows (office_* tables, the clients) have no owner_id / rev and their own rights (office_gate, office_org,
+ofr_check and the office groups), so they are no registered kinds of core/objects.py yet (a real registration would open
+them to shares and folders). The transition docs/dev/kern.md names: the kinds are tracked for the history and the undo only
+(core/writes.py obj_track), and ow_write does for one row in ONE call what obj_write does for a core object:
+
+  write_lock('obj-<kind>-<id>') -> the row again under the lock (FOR UPDATE) -> an AGENT must send expect_updated_at (400
+  without, as obj_write) -> the version check (core/conflict.py ccf_check: 409 with the current state under "current", or
+  the route's old key) -> only the fields sent (the module's own cleaner, partial) -> nothing changed = nothing written ->
+  the undo step (header X-Kalmido-Undo, people only: obj_undo_pre / obj_undo_post) -> updated_at (milliseconds, the base of
+  the next save), updated_by -> the history (obj_history: before / after of the changed columns AS STORED -- an encrypted
+  column stays sealed there, an agent marked) -> bump. The caller commits.
+
+The rights stay the module's own (called before ow_write, unchanged: office_gate, office_org, ofr_check, need_client); no
+other route changes here. A route that changes more than the row (a client's contact persons) does it in `extra`, inside
+the same undo step.
+
+Interface:
+  ow_kind(kind, table, scope=None, keep=None, nofp=None)       track a kind (at import of its module)
+  ow_write(c, uid, kind, rid, b, clean, *, where=..., args=..., dec=None, enc=None, public=None, key="current",
+           version=True, extra=None, force=False) -> (row after (dec'd dict), {column: (before, after)})
+  ow_history(c, kind, rid, limit=50) -> the entries (the caller checked the rights to read the row)
+  ow_is_agent(c, uid) -> bool"""
+from ..core.conflict import ccf_check
+from ..core.db import bump, iso_ms, now_utc
+from ..core.errors import BadInput, Denied
+from ..core.i18n import tr
+from ..core.pg import table_columns, write_lock
+from ..core.writes import (NEED_VERSION, OBJ_TRACK, _same, _val, obj_history_add, obj_is_agent, obj_track, obj_undo_post,
+                           obj_undo_pre)
+
+_COLS = {}  # table -> its columns (they only grow at start-up: the migrations run before the first request)
+
+
+def ow_kind(kind, table, scope=None, keep=None, nofp=None):
+    """Track an office kind (core/writes.py obj_track): scope(rid, oid) -> the undo's tables (default: the row)."""
+    return obj_track(kind, table, area="other", undo_scope=scope or (lambda rid, oid: [(table, "id=?", (int(rid),), False)]),
+                     undo_keep=keep, undo_nofp=nofp)
+
+
+def ow_cols(c, table):
+    if table not in _COLS:
+        _COLS[table] = table_columns(c, table)
+    return _COLS[table]
+
+
+def ow_is_agent(c, uid):
+    return obj_is_agent(c, uid)
+
+
+def _stored(v):
+    return _val(v)
+
+
+def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=None, oid=None, dec=None, enc=None, public=None,
+             key="current", version=True, extra=None, force=False):
+    """Change row rid of kind (module docstring). b = the request body (expect_updated_at in it); clean(c, b, cur) -> {column:
+    clean value} of the fields sent; dec(c, raw) -> the row as dict (decrypted), enc(c, {column: value}) -> as stored;
+    public(c, cur) -> the current state of a 409; version=False for the module's own internal writes (no version check);
+    extra(c, cur, changed) runs inside the step (more rows of the object); force = stamp the row even when no own column
+    changed (extra changed something). Returns (row after, changed)."""
+    reg = OBJ_TRACK.get(kind)
+    if reg is None:
+        raise ValueError(f"ow_write: kind {kind!r} not tracked (ow_kind)")
+    t = reg["table"]
+    rid = int(rid)
+    args = (rid, oid) if args is None else tuple(args)
+    write_lock(c, f"obj-{kind}-{rid}")
+    raw = c.execute(f"SELECT * FROM {t} WHERE {where} FOR UPDATE", args).fetchone()
+    if raw is None:
+        raise Denied(404)
+    cur = dec(c, raw) if dec else dict(raw)
+    b = b if isinstance(b, dict) else {}
+    agent = obj_is_agent(c, uid) if uid else False
+    if version:
+        if agent and not b.get("expect_updated_at"):
+            raise BadInput(tr(NEED_VERSION))
+        ccf_check(b, raw["updated_at"], key, lambda: public(c, cur) if public else dict(cur))
+    vals = clean(c, b, cur) or {}
+    changed = {k: (cur.get(k), v) for k, v in vals.items() if not _same(cur.get(k), v)}
+    if not changed and not force:
+        return cur, {}
+    roid = raw["org_id"] if "org_id" in raw.keys() else oid
+    obj_undo_pre(c, uid, kind, rid, roid or None)
+    upd = enc(c, {k: z for k, (_, z) in changed.items()}) if (enc and changed) else {k: z for k, (_, z) in changed.items()}
+    cols = ow_cols(c, t)
+    stamp = {"updated_at": iso_ms(now_utc())}
+    if "updated_by" in cols and uid:
+        stamp["updated_by"] = uid
+    sets = {**upd, **stamp}
+    c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), rid])
+    if extra:
+        extra(c, cur, changed)
+    if changed:
+        rw = dict(raw)
+        obj_history_add(c, uid, kind, rid, {k: _stored(rw.get(k)) for k in changed}, {k: _stored(upd.get(k)) for k in changed},
+                        org_id=roid or None, agent=agent)
+    obj_undo_post(c)
+    bump(c)
+    new = c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone()
+    return (dec(c, new) if dec else dict(new)), changed
+
+
+def ow_history(c, kind, rid, limit=50):
+    """The history of row rid of kind, newest first. The caller checked the rights to read it (the office's own)."""
+    import json
+    from ..collab.comments import user_names
+    rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (kind, int(rid), int(limit))).fetchall()
+    names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
+    return [{"id": r["id"], "at": r["updated_at"], "user_id": r["user_id"], "name": names.get(r["user_id"], ""), "agent": bool(r["agent"]),
+             "action": r["action"], "fields": sorted(set(json.loads(r["vals_before"] or "{}")) | set(json.loads(r["vals_after"] or "{}")))}
+            for r in rows]

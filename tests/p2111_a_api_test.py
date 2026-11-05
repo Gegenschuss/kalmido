@@ -47,7 +47,8 @@ def one(sql, args=()):
 
 
 def steps(uid, tok):
-    return one("SELECT COUNT(*) FROM office_undo WHERE user_id=? AND sess=? AND state='done'", (uid, tok))
+    # 2.567.0 (#4711): the steps live in the core's obj_undo now (office/undo.py on core/writes.py)
+    return one("SELECT COUNT(*) FROM obj_undo WHERE user_id=? AND sess=? AND state='done'", (uid, tok))
 
 
 def U(tok):
@@ -120,8 +121,8 @@ check(any(x.get("action") == "update" and (x.get("detail") or {}).get("undo") fo
       "the office log names the undo")
 
 # ---- without the header nothing is recorded; an own write without undo in between ends the way back
-n = one("SELECT COUNT(*) FROM office_undo")
-check(Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-1"}).ok and one("SELECT COUNT(*) FROM office_undo") == n, "no header: no step")
+n = one("SELECT COUNT(*) FROM obj_undo")  # 2.567.0 (#4711): the core's obj_undo
+check(Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-1"}).ok and one("SELECT COUNT(*) FROM obj_undo") == n, "no header: no step")
 r = undo(Bo, "doc", D, T1, "undo")
 check(r.status_code == 409 and doc(Bo, D)["project_ref"] == "P-1", f"a change without undo in between: 409, it stays ({r.status_code})")
 
@@ -170,9 +171,9 @@ r = A.post(B + f"/api/office/docs/{D}/status", json={"status": "sent"})
 check(r.ok, f"alice marks it sent ({r.status_code} {r.text[:200]})")
 r = undo(Bo, "doc", D, T5)
 check(r.status_code == 409 and doc(A, D)["project_ref"] == "P-2" and doc(A, D)["status"] == "sent", f"sent: 409, it stays ({r.status_code} {r.text[:200]})")
-n = one("SELECT COUNT(*) FROM office_undo")
+n = one("SELECT COUNT(*) FROM obj_undo")  # 2.567.0 (#4711): the core's obj_undo
 r = Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-3"}, headers=U(T5))
-check(r.status_code == 409 and one("SELECT COUNT(*) FROM office_undo") == n, f"a save of a sent document: 409, no step ({r.status_code})")
+check(r.status_code == 409 and one("SELECT COUNT(*) FROM obj_undo") == n, f"a save of a sent document: 409, no step ({r.status_code})")
 # 2.546.0 (#4287): finalised in between (the head of this file promised it, only "sent" was tested): 409, the quotation stays
 T9 = "%032x" % (0xa11ce0 + 9)
 r = Bo.post(B + "/api/office/docs", json={"project_title": "Autumn campaign"})
