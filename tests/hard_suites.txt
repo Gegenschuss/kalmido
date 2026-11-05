@@ -61,3 +61,5 @@ pw*
 *bandit*
 *semgrep*
 *trivy*
+*zap*
+*owasp*
