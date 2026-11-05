@@ -8,6 +8,7 @@ every step, an organisation admin the trip step once more.
 freelancer-matrix: office
 usage: p2560_d_trash_note_test.py <datadir>      (KMT_NOSTART=1: a running server)"""
 import os
+import sys
 from datetime import date
 
 import requests
@@ -99,4 +100,4 @@ check(tj.count("r?.restore_note") == 2, "UI: both trip deletes show restore_note
 check("return r.note ? {note: r.note}" in cj and "return r?.note ? {note: r.note}" in cj, "UI: the card position's undo hands the note on")
 check("toast(note ||" in uj, "UI: the history's message says the note instead of 'Undone: …'")
 
-done()
+sys.exit(done("p2560_d_trash_note"))
