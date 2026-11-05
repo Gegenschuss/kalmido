@@ -244,8 +244,9 @@ def op_contact_edit(c, uid, cid, b):
     r, role = need_contact(c, cid, write=True)  # 2.182.0 (#2719): access before the body check (a foreign id is always 404)
     _unknown(b, CT_KEYS + ("expect",))
     r = c.execute("SELECT * FROM contacts WHERE id=? FOR UPDATE", (cid,)).fetchone() or r  # 2.273.0 C (#3048): expect checked under the row lock
-    if b.get("expect") and b["expect"] != r["updated_at"]:
-        raise Denied(409, tr("The contact was changed meanwhile"))
+    if b.get("expect") and b["expect"] != r["updated_at"]:  # 2.564.0 (#4702): with the contact as it is now (the shared core's Conflict)
+        from ..core.conflict import Conflict
+        raise Conflict("contact", contact_dict(c, r, uid), msg=tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
     if "book_id" in b and b["book_id"] not in (None, "") and as_int(b["book_id"], "book_id", 1) != r["book_id"]:
         nb = as_int(b["book_id"], "book_id", 1)

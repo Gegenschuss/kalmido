@@ -7,10 +7,11 @@ from ..core.db import db
 from ..accounts.session import me
 from ..core.access import need_feat
 from ..tasks.validation import as_int
+from ..core.conflict import take_version
 from ..core.errors import BadInput, reject_unknown
 from ..api.v1 import v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_json, v1_view
-from ..contacts.model import BOOK_ROLES, CT_KINDS, CT_LINKS, need_book
+from ..contacts.model import BOOK_ROLES, CT_KINDS, CT_LINKS, need_book, need_contact
 from ..contacts.web import (
     _ct_uploads, ct_gather, op_book_delete, op_book_edit, op_book_member, op_book_member_rm, op_book_new, op_books, op_contact, op_contact_delete,
     op_contact_edit, op_contact_new, op_contacts, op_export, op_import, op_link, op_unlink, VCF_MAX,
@@ -140,7 +141,9 @@ def v1_contact(cid):
 def v1_contact_edit(cid):
     v1_args(())
     need_feat("contacts")
-    return jsonify(op_contact_edit(db(), me(), cid, v1_json()))
+    need_contact(db(), cid, write=True)  # 2.564.0 (#4702): a foreign / read-only contact stays 404 / 403 before the version rule
+    b = take_version(v1_json(), "expect")  # expect / expect_updated_at / If-Match; required for agents
+    return jsonify(op_contact_edit(db(), me(), cid, b))
 
 
 @app.delete("/api/v1/contacts/<int:cid>")
@@ -237,7 +240,11 @@ def contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     paths["/contacts/{id}"] = {
         "get": op("One contact with its linked tasks and events", K, ok(ref("Contact")) | errs("404"), [cid_p], scope=S),
         "patch": op("Change a contact (only the fields given)", K, ok(ref("Contact")) | errs("400", "403", "404", "409"), [cid_p],
-                    body={"type": "object", "properties": {**props, "expect": {"type": "string"}}}, scope=S),
+                    body={"type": "object", "properties": {**props, "expect": {"type": "string", "description": "updated_at of the contact as read "
+                                                                                      "(409 with error.current when it changed meanwhile; 2.564.0: also as "
+                                                                                      "expect_updated_at or the header If-Match, required for agent accounts: "
+                                                                                      "400 version_required)"},
+                                                           "expect_updated_at": {"type": "string", "description": "2.564.0: the same as expect"}}}, scope=S),
         "delete": op("Delete a contact: into the trash (2.272.0; notes and links stay), restorable for the trash period (contacts/bulk undelete)", K,
                      {"204": {"description": "In the trash"}} | errs("403", "404"), [cid_p], scope=S)}
     paths["/contacts/bulk"] = {"post": op(  # 2.46.1 (#1554)
