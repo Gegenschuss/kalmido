@@ -369,20 +369,23 @@ WAIT_NOTE_MAX = 300
 
 
 def set_waiting(c, tid, b):
-    """{note?, until?} -> sets / changes the waiting state (caller commits). BadInput on invalid values."""
+    """{note?, until?} -> sets / changes the waiting state (caller commits). BadInput on invalid values.
+    2.564.0 (#4701): only the fields sent change: a task already waiting keeps its note / follow-up day when the body leaves it
+    out (an empty note / until null still clears it); under write_lock('task-<id>') like apply_update."""
     unknown = sorted(k for k in b if k not in ("note", "until"))
     if unknown:
         raise UnknownFields(unknown)
-    note = b.get("note")
+    write_lock(c, f"task-{tid}")
+    cur = c.execute("SELECT waiting_at, wait_note, wait_until, wait_fired FROM tasks WHERE id=?", (tid,)).fetchone()
+    note = b.get("note") if "note" in b or not cur["waiting_at"] else cur["wait_note"]
     if note is not None and not isinstance(note, str):
         raise BadInput(tr("Invalid value: {0}", "note"))
     note = (note or "").strip()[:WAIT_NOTE_MAX]
     from ..collab.liste2e import le2a_locked_text
     le2a_locked_text(c, c.execute("SELECT list_id FROM tasks WHERE id=?", (tid,)).fetchone()[0], note)  # 2.64.1 (#1817): not encrypted
-    until = b.get("until") or None
+    until = (b.get("until") if "until" in b or not cur["waiting_at"] else cur["wait_until"]) or None
     if until is not None and not valid_date(until):
         raise BadInput(tr("Invalid value: {0}", "until"))
-    cur = c.execute("SELECT waiting_at, wait_until, wait_fired FROM tasks WHERE id=?", (tid,)).fetchone()
     fired = cur["wait_fired"] if cur["waiting_at"] and cur["wait_until"] == until else ""
     c.execute("UPDATE tasks SET waiting_at=?, wait_note=?, wait_until=?, wait_by=?, wait_fired=?, updated_at=? WHERE id=?",
               (cur["waiting_at"] or iso(now_utc()), note, until, me() or None, fired, iso(now_utc()), tid))

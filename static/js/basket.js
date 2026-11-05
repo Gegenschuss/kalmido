@@ -186,7 +186,8 @@ async function kbSortDo(a, anchor) {
   }
   if (a === 'wait') { KB.waitOpen = true; kbSortDraw(); return; }
   if (a === 'wait-ok') {
-    const note = ($('#kb-wn', KB.md)?.value || '').trim(), body = {note, until: addDays(today(), 7)};
+    // 2.564.0 (#4701): a task already waiting keeps its follow-up day (only the note typed here goes)
+    const note = ($('#kb-wn', KB.md)?.value || '').trim(), body = t.waiting_at ? {note} : {note, until: addDays(today(), 7)};
     // 2.559.0 (#4660): shown at once and on to the next one; an error takes it back (waitOpt)
     waitOpt(t.id, body).then(() => toast(tr('Waiting on someone'), () => waitOpt(t.id, null).catch(() => {})), () => {});
     kbNext(); return;

@@ -658,8 +658,11 @@ function waitDialog(id) {
   md.classList.add('waitmodal');
   mtWaitSugg(md, $('#w-note', md));  // 2.41.0 (#1205): the recent entries (before the field's own Enter)
   const save = async () => {
-    const body = {note: $('#w-note', md).value.trim(), until: $('#w-until', md).value || null};
-    md.remove();  // 2.559.0 (#4660): shown at once, an error takes it back (waitOpt)
+    const all = {note: $('#w-note', md).value.trim(), until: $('#w-until', md).value || null};
+    // 2.564.0 (#4701): a task already waiting sends only what was changed here (a note / day set elsewhere meanwhile stays)
+    const x = taskById(id), body = x?.waiting_at ? Object.fromEntries(Object.entries(all).filter(([k, v]) => v !== (k === 'note' ? t.wait_note || '' : t.wait_until || null))) : all;
+    md.remove();
+    if (x?.waiting_at && !Object.keys(body).length) return;  // 2.559.0 (#4660): shown at once, an error takes it back (waitOpt)
     try { await waitOpt(id, body); } catch { return; }
     toast(tr('Waiting on someone'));
   };
@@ -730,7 +733,8 @@ function mtWaitSugg(md, inp) {
 // carries it before the answer, no GET /api/state afterwards; the server's task follows; an error (api() says why) takes it back
 async function waitOpt(id, body) {
   const t = taskById(id); if (!t) return null;
-  const vals = body ? {waiting_at: t.waiting_at || new Date().toISOString(), wait_note: String(body.note || '').slice(0, 300), wait_until: body.until || null, wait_by: S.me?.id ?? null}
+  const keep = (k, f) => t.waiting_at && !(k in body) ? f : null;  // 2.564.0 (#4701): a field left out stays as it is (the server does the same)
+  const vals = body ? {waiting_at: t.waiting_at || new Date().toISOString(), wait_note: keep('note', t.wait_note) ?? String(body.note || '').slice(0, 300), wait_until: keep('until', t.wait_until) ?? (body.until || null), wait_by: S.me?.id ?? null}
     : {waiting_at: null, wait_note: '', wait_until: null, wait_by: null};
   const draw = () => { render(); if (S.sel === id) renderDetail(); };
   const j = await optWrite(optSet(() => taskById(id), vals), () => body ? api('PUT', `/api/tasks/${id}/waiting`, body) : api('DELETE', `/api/tasks/${id}/waiting`), draw);

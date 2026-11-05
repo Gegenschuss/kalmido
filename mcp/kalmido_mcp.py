@@ -745,7 +745,7 @@ TOOLS = [
                              body={"expect_due": a["expect_due"]} if a.get("expect_due") else None)),
     ("set_waiting", "Mark a task as waiting on someone (outside: a client, an office, a delivery), or change it. note: who / "
                     "what it waits for; until: the follow-up day (YYYY-MM-DD) -- on that day the person gets a reminder and agents that "
-                    "follow the task the event followup_due.",
+                    "follow the task the event followup_due. Changing it: a field left out keeps its value.",
      _obj({"task_id": S_ID, "note": {"type": "string", "maxLength": 300}, "until": {"type": ["string", "null"]}}, ["task_id"]), t_set_waiting),
     ("clear_waiting", "The task no longer waits on external.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("DELETE", f"/tasks/{int(a['task_id'])}/waiting")),

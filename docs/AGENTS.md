@@ -1099,7 +1099,8 @@ what still fits there; that answer carries `move_restored` with the same keys.
 
 (Called *waiting on external* before 2.25.0; the API and the MCP tools kept their names.) A task can wait for someone
 outside Kalmido: `PUT /api/v1/tasks/{id}/waiting` with `{"note": "who / what", "until":
-"YYYY-MM-DD"}` (both optional, `until` = the follow-up day) sets or changes it, `DELETE` ends it, and
+"YYYY-MM-DD"}` (both optional, `until` = the follow-up day) sets or changes it (2.564.0: on a task already waiting a field
+left out keeps its value; `"note": ""` / `"until": null` clear it), `DELETE` ends it, and
 `GET /api/v1/tasks?waiting=true` lists such tasks. Every task has `waiting` (`null` or `{note, until, since, by}`).
 The task stays open. MCP: `set_waiting`, `clear_waiting`, `list_waiting`.
 
