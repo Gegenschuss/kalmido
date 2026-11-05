@@ -18,6 +18,7 @@ from ..tasks.validation import (
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.564.0 (#4701)
 from ..core.serializers import unlink_files
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
@@ -455,7 +456,12 @@ def template_create():
 def template_update(tid):
     b = body()
     c = db()
-    r = need_template(c, tid)
+    need_template(c, tid)
+    # 2.564.0 (#4701): the merge into the stored data (tpl_merge) sees no other change in between; expect_updated_at (optional)
+    # = the version the client read: changed meanwhile -> 409 {"template": the current one}
+    write_lock(c, f"template-{tid}")
+    r = c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()
+    ccf_check(b, r["updated_at"], "template", lambda: tpl_dict(r))
     gone = []
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
