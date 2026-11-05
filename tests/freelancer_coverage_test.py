@@ -113,6 +113,7 @@ ROUTES = {
     "POST /api/office/trips/trash/{}/restore": "office",
     # 2.552.0 (#4561 B21): the undo of deleting a credit card position from the office trash (p2552_b_dataloss_test.py as the freelancer)
     "POST /api/office/cards/trash/{}/restore": "office",
+    "POST /api/office/trash/undo/{}/{}": "office",  # 2.567.0 (#4707): p2567_c_office_trash_test.py (other office 403 / 404, member 403)
     # 2.488.0 (#3363): the hosted MCP access (p2488_mcp_oauth_test.py: the person without an organisation connects her own agent)
     "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
     "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
@@ -1212,8 +1213,6 @@ DELETE /api/my/agents/{}/machines/{}
 DELETE /api/newsletter
 DELETE /api/newsletter/segments/{}
 DELETE /api/notepads/{}
-DELETE /api/office/cashflow/adjust/{}
-DELETE /api/office/cashflow/start
 DELETE /api/office/docs/{}/parts/{}
 DELETE /api/office/logo
 DELETE /api/office/meals/choices/{}
@@ -1592,7 +1591,6 @@ PUT /api/newsletter
 PUT /api/newsletter/consent
 PUT /api/office/cashflow/actual
 PUT /api/office/cashflow/check
-PUT /api/office/cashflow/start
 PUT /api/office/logbook/settings
 PUT /api/paperless
 PUT /api/supporter/{}
