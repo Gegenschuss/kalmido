@@ -111,16 +111,26 @@
 }
 .dc-f{position:relative}
 .dc-f input,.dc-f select{min-height:2.5rem}
-/* 2.497.0 A (#4046): one fixed grid for all fields of the document (receipt, document): label column, field, "automatic" */
-.dc-body .dc-f{display:grid;grid-template-columns:var(--dc-lw,8.5rem) minmax(0,1fr) auto;align-items:center;gap:.25rem .625rem;margin:0 0 .5rem}
+/* 2.497.0 A (#4046): one fixed grid for all fields of the document (receipt, document)
+   2.555.0 A (#4470): the form asks its own width (container dcform on .dc-props, not the screen): under 36rem (sidebar pane,
+   sheet, phone) the label stands above its field and every field takes the full width; wider forms get the label column left.
+   "automatic" stands at the right of the label line (wide: in the label column under the label), never as a column of its own,
+   so the right edges of all fields stay one line */
+.dc-props{container:dcform / inline-size}
+.dc-body .dc-f{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:.125rem .5rem;margin:0 0 .5rem}
 .dc-body .dc-f[hidden]{display:none}
-.dc-body .dc-f>label,.dc-body .dc-f>span:first-child:empty{grid-column:1;min-width:0;width:auto;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
-.dc-body .dc-f>:nth-child(2){grid-column:2;min-width:0;width:100%;box-sizing:border-box}
+.dc-body .dc-f>label,.dc-body .dc-f>span:first-child:empty{grid-column:1;grid-row:1;min-width:0;width:auto;color:var(--muted);font-size:var(--fs-s);overflow-wrap:anywhere}
+.dc-body .dc-f>span:first-child:empty{display:none}
+.dc-body .dc-f>:nth-child(2){grid-column:1 / -1;grid-row:2;min-width:0;width:100%;box-sizing:border-box}
 .dc-body .dc-f>input[type=checkbox]{width:auto;justify-self:start}
 .dc-body .dc-f>.dpw{display:flex}
 .dc-body .dc-f>.dpw>*{flex:1 1 auto;min-width:0}
-.dc-body .dc-f>.dc-auto{grid-column:3;margin-left:0}
-.dc-optbtn{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .5rem calc(var(--dc-lw,8.5rem) + .625rem)}
+.dc-body .dc-f>.dc-auto{grid-column:2;grid-row:1;justify-self:end;margin-left:0}
+/* 2.555.0 A (#4470): the date button looks like the text fields beside it (height, border, background, size of the text) */
+.dc-body .dc-f .dpbtn{min-height:2.5rem;border-color:var(--field-line);background:var(--bg3);font-size:var(--fld-fs);box-sizing:border-box}
+.dc-body .dc-f .dpbtn:hover{border-color:var(--faint)}
+.dc-body .dc-f .dpbtn[aria-expanded="true"],.dc-body .dc-f .dpbtn:focus-visible{border-color:var(--accent)}
+.dc-optbtn{display:flex;flex-wrap:wrap;gap:.375rem;margin:0 0 .5rem}
 .dc-chip{display:inline-flex;align-items:center;gap:.25rem;min-height:2.25rem;padding:.25rem .75rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--text2);font:inherit;font-size:var(--fs-s);cursor:pointer}
 .dc-chip:hover,.dc-chip:focus-visible{border-color:var(--accent);color:var(--text)}
 .dc-text{margin:.625rem 0;border-top:1px solid var(--line)}
@@ -132,14 +142,14 @@
 .rc-add{margin:.625rem 0}
 .rc-add .btn{min-height:2.5rem}
 .rcpick{min-height:2.5rem;justify-content:flex-start;font-weight:400}.rcpick .lic{width:1rem;flex:none}.rcpick .dpjnm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:left}.rcpick .dpjchev{flex:none;color:var(--muted)}  /* 2.540.0 (#4471): the project picker button (office.css .dpjpick) */
-@media (max-width:30rem){
-  /* phones: the label above its field, still one grid for all fields */
-  .dc-body .dc-f{grid-template-columns:minmax(0,1fr) auto;gap:.125rem .5rem}
-  .dc-body .dc-f>label,.dc-body .dc-f>span:first-child:empty{grid-column:1 / -1}
-  .dc-body .dc-f>span:first-child:empty{display:none}
-  .dc-body .dc-f>:nth-child(2){grid-column:1}
-  .dc-body .dc-f>.dc-auto{grid-column:2}
-  .dc-optbtn{margin-left:0}
+@container dcform (min-width:36rem){
+  /* 2.555.0 A (#4470): a wide form: the label column left, the field right of it (two rows when "automatic" is under the label) */
+  .dc-body .dc-f{grid-template-columns:var(--dc-lw,8.5rem) minmax(0,1fr);gap:.25rem .625rem}
+  .dc-body .dc-f>span:first-child:empty{display:block}
+  .dc-body .dc-f>:nth-child(2){grid-column:2;grid-row:1}
+  .dc-body .dc-f:has(>.dc-auto)>:nth-child(2){grid-row:1 / span 2}
+  .dc-body .dc-f>.dc-auto{grid-column:1;grid-row:2;justify-self:start}
+  .dc-optbtn{margin-left:calc(var(--dc-lw,8.5rem) + .625rem)}
 }
 @media (prefers-reduced-motion:reduce){ .dc-text .dc-chev,.dc-acts [data-dc="actsmore"] .dc-chev{transition:none} }
 .dc-auto{margin-left:.375rem;padding:.125rem .5rem;border:1px solid var(--line);border-radius:99rem;background:var(--bg3);color:var(--muted);font-size:var(--fs-xs);cursor:pointer;white-space:nowrap}

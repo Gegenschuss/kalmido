@@ -93,7 +93,8 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     let rows = JSON.parse(await ev(GRID));
     check(rows.length >= 6, 'the fields of the document ' + rows.length);
     check(same(rows, 'l') && same(rows, 'x'), 'a letter: labels and fields each start at one left edge ' + JSON.stringify(rows));
-    check(rows[0].x - rows[0].l >= 60, 'computer: the label stands left of its field');
+    // 2.555.0 (#4470): the pane beside the list is narrower than 36rem: the label stands above its field (left of it only in a wide form, p2555_a_formnarrow_ui)
+    check(rows.every(r => Math.abs(r.x - r.l) <= 1), 'computer pane: the label above its field ' + JSON.stringify(rows));
     const widths = await ev(`(() => { const w = s => Math.round(document.querySelector(s).getBoundingClientRect().width); return JSON.stringify([w('#dc-name'), w('#dc-asn').valueOf() && w('.dc-f .dc-amt')]); })()`);
     const [wn, wa] = JSON.parse(widths);
     check(Math.abs(wn - wa) <= 2, 'the archive number row is as wide as the title ' + widths);
