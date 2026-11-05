@@ -178,7 +178,9 @@ def openapi_spec():
         "sub_snapshot": {"type": "object", "description": "2.556.0: only on the completed copy a recurring task leaves when it is "
                          "ticked (read only, never changes): its subtasks at that moment -- done, total and items [{title, status "
                          "(2 done, 0 open, -1 won't do), depth (1 = direct subtask)}], at most 100 items. The copy has no subtasks "
-                         "of its own; the original's subtasks are open again for the next round. Absent on every other task"},
+                         "of its own; the original's subtasks are open again for the next round. Absent on every other task, once the copy is "
+                         "reopened or repeats again, in a project with the browser lock, and always for an agent's token "
+                         "(events and webhooks never carry it)"},
         # 2.36.0 (#1118): the lock
         "locked": {"type": "boolean", "description": "2.36.0: locked in the app: title, notes, dates, priority, project, tags, repeat "
                    "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "
