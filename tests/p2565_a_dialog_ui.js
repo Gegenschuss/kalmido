@@ -125,6 +125,27 @@ async function contactChecks(w, d, who) {
   if (md) click(w, md.querySelector('[data-evm="save"]'));
   check(await until(async () => { const x = await call(CK, 'GET', `/api/events/${SE.id}`); const t = Object.fromEntries((x.overrides || []).map(o => [o.rid, o.title])); return t[`${D1}T09:00`] === 'Standup remote' && t[`${D2}T09:00`] === 'Standup late'; }),
     'series: both single dates keep their change');
+  // ---- #4703: dragging one date sends the version, the undo the version of the drag's answer; an undo after a change
+  // elsewhere gets 409 and overwrites nothing
+  d.querySelectorAll('.modal').forEach(m => m.remove());
+  const D5 = dstr(new Date(Date.now() + 5 * 86400000));
+  spy(w);
+  const dragged = await w.eval(`cg_commit({own: true, eid: ${SE.id}, recurring: true, occ: '${D5}T09:00', all_day: false, title: 'Standup', s: new Date('${D5}T09:00'), e: new Date('${D5}T09:30')},
+    {start: '${D5}T10:00', end: '${D5}T10:30'}, 'one')`);
+  const ov5 = async () => ((await call(CK, 'GET', `/api/events/${SE.id}`)).overrides || []).find(o => o.rid === `${D5}T09:00`);
+  const drag1 = w.__sent.find(x => new RegExp(`occ=${D5}`).test(x.u));
+  check(dragged === true && drag1?.b?.expect && (await ov5())?.start === `${D5}T10:00`, `drag one date: sent with the version, moved ${JSON.stringify(drag1?.b)}`);
+  const at1 = (await call(CK, 'GET', `/api/events/${SE.id}`)).updated_at;
+  await w.eval(`HIST.undo[HIST.undo.length - 1].undo()`);
+  const undo1 = w.__sent.filter(x => new RegExp(`occ=${D5}`).test(x.u))[1];
+  check(undo1?.b?.expect === at1 && await until(async () => (await ov5())?.start === `${D5}T09:00`), `undo: sent with the version of the drag's answer, back at 09:00 ${JSON.stringify(undo1?.b)}`);
+  await w.eval(`HIST.redo.length ? HIST.redo[HIST.redo.length - 1].redo() : HIST.undo[HIST.undo.length - 1].redo()`).catch(() => null);
+  check(await until(async () => (await ov5())?.start === `${D5}T10:00`), 'redo: moved again');
+  check((await call(CK2, 'PATCH', `/api/events/${SE.id}?occ=${D2}T09:00`, {title: 'Standup later'})).http === 200, 'drag: the other device changes the series meanwhile');
+  const r409 = await w.eval(`HIST.undo[HIST.undo.length - 1].undo().then(() => 'ok', e => e.status)`).catch(e => e?.status);
+  const after = await call(CK, 'GET', `/api/events/${SE.id}`);
+  check(r409 === 409 && (await ov5())?.start === `${D5}T10:00` && after.overrides.find(o => o.rid === `${D2}T09:00`)?.title === 'Standup later',
+    `undo with a version of before: 409, the other's change and the move stay (${r409})`);
   w.close();
 
   // ================= the phone width once
