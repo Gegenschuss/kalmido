@@ -64,7 +64,8 @@ def put(s, body):
 
 
 def same_except(a, b, keys, what):
-    """every settings key but `keys` unchanged"""
+    """every settings key but `keys` unchanged; updated_at is the settings' version since 2.528.0 (#4305 A3) and moves with every save"""
+    keys = set(keys) | {"updated_at"}
     diff = sorted(k for k in set(a) | set(b) if k not in keys and a.get(k) != b.get(k))
     check(not diff, f"{what}: nothing else changed {diff}")
 
