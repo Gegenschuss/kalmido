@@ -724,12 +724,14 @@ TOOLS = [
                     "moving it back within a day restores it (move_restored). 2.392.0: irreversible {reason} marks a one-way step "
                     "(migration without a way back, data move, deletion); where the project has irreversible_needs_yes on, your "
                     "integrate / deploy requests stay open until a person said yes to that task. A new reason takes the yes back; "
-                    "you cannot take a mark off (null: people only).",
+                    "you cannot take a mark off (null: people only). 2.564.0: changing content (title, notes, dates, priority, repeat, "
+                    "assignee, tags, people, fields, type, milestone, family, reviewer, url, points, snippets) REQUIRES "
+                    "expect_updated_at or _prev, else 400 version_required; moving, pin, lock, delivery need none.",
      _obj({"task_id": S_ID, **{k: v for k, v in TASK_FIELDS.items() if k != "parent_id"},
            "irreversible": {"type": ["object", "null"], "properties": {"reason": {"type": "string", "maxLength": 500}}, "additionalProperties": False,
                             "description": "2.392.0: {reason} marks the task as a one-way step, null takes the mark off (people only)"},
            "shift_chain": {"type": "boolean", "description": "false: the tasks waiting on this one stay (default true)"},
-           "expect_updated_at": {"type": "string", "description": "updated_at of the task as you read it (recommended)"},
+           "expect_updated_at": {"type": "string", "description": "updated_at of the task as you read it (2.564.0: required with a content change, or _prev)"},
            "_prev": {"type": "object", "description": "{field: the value you read} for the fields you send"}}, ["task_id"]), t_update_task),
     ("add_snippet", "2.35.0: add one code snippet to a task (a diff, a log, a proposed change, an error message): plain code with a "
                     "language (no Markdown), optional file path + line. At most 20 per task, 20000 characters each. People see it in "
@@ -1343,11 +1345,12 @@ TOOLS += [
                         "(raw \"\" empties it; a formula starts with =). 2.270.0: prefer row_id / col_id from sheet_read (\"B4\" points at "
                         "another row once someone sorts or inserts rows) and send prev = the input you read (\"\" = empty): a cell someone "
                         "changed since is not overwritten but listed in conflicts {row_id, col_id, server, mine} - read it again and decide. "
-                        "expect_rev (optional, strict): 409 (error.cells = the current cells) when the table changed at all since that rev. "
+                        "expect_rev (strict): 409 (error.cells = the current cells) when the table changed at all since that rev. 2.564.0: "
+                        "send expect_rev (rev from sheet_read) or a prev with EVERY cell, else 400 version_required. "
                         "One call = one batch; a wrong formula changes nothing (the error says why). The answer has the "
                         "changed cells and those depending on them.",
      _obj({"sheet_id": S_ID, "cells": {"type": "array", "maxItems": 5000, "items": {"type": "object", "description": "{row_id, col_id, raw, prev?} or {cell, raw, prev?}"}},
-           "expect_rev": {"type": "integer"}},
+           "expect_rev": {"type": "integer", "description": "rev from sheet_read (2.564.0: required unless every cell has prev)"}},
           ["sheet_id", "cells"]),
      lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/cells", body={"cells": a.get("cells") or [], **_pick(a, ("expect_rev",))})),
     ("sheet_append_rows", "2.89.0 (scope sheets:write): append rows (inputs in the order of the columns) at the end or after_row_id. "
@@ -1404,8 +1407,9 @@ TOOLS += [
     ("wiki_write", "2.200.0 (scope wiki:write): replace the Markdown text of a knowledge page shared with you to edit (role edit; "
                    "view only = 403). Read it first and send the WHOLE new text plus expect_updated_at from wiki_read: 409 (with "
                    "the current page in error.page) when a person saved in between - merge and try again. Every save is one entry "
-                   "of the page's history the people can restore. At most 500000 characters.",
-     _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body"]),
+                   "of the page's history the people can restore. At most 500000 characters. 2.564.0: expect_updated_at is required "
+                   "(400 version_required without).",
+     _obj({"page_id": S_ID, "body": {"type": "string", "maxLength": 500000}, "expect_updated_at": {"type": "string"}}, ["page_id", "body", "expect_updated_at"]),
      lambda api, a: api.call("PATCH", f"/wiki/pages/{_id(a, 'page_id')}", body=_pick(a, ("body", "expect_updated_at")))),
     ("wiki_create", "2.200.0 (scope wiki:write): a new knowledge page in a knowledge folder shared with you to edit: folder_id (the "
                     "folder's id from list_files, which shows knowledge folders only with files:read AND wiki:read: a folder below a shared "
@@ -1595,7 +1599,8 @@ TOOLS += [
     ("batch_tasks", "Change many tasks at once (1-500 ids): action update (changes = task fields as in update_task) | complete | "
                     "reopen | wont_do | delete | restore. Tasks you may not change are skipped (errors). An agent's batch with 10 or "
                     "more tasks waits for a person's approval (approval_required + job). Against changes since you read: _prev "
-                    "(update), expect (complete, wont_do); what changed is skipped and listed in conflicts.",
+                    "(update), expect (complete, wont_do); what changed is skipped and listed in conflicts. 2.564.0: an update of content "
+                    "fields (as update_task) REQUIRES _prev with an entry for every id, else 400 version_required.",
      _obj({"ids": {"type": "array", "items": {"type": "integer"}, "minItems": 1, "maxItems": 500},
            "action": {"type": "string", "enum": ["update", "complete", "reopen", "wont_do", "delete", "restore"]},
            "changes": {"type": "object"},
@@ -2132,7 +2137,7 @@ def t_search_files(api, a):
 
 def t_write_file(api, a):
     """file_id: a new version of that file; else a new file in folder_id (default: your own result folder)."""
-    body = _pick(a, ("content", "mime"))
+    body = _pick(a, ("content", "mime", *(("expect_version",) if a.get("file_id") else ())))  # 2.564.0 (#4702)
     if a.get("base64") is not None:
         body["content_base64"] = a["base64"]
     if a.get("file_id"):
@@ -2155,9 +2160,10 @@ TOOLS += [
      _obj({"q": {"type": "string", "minLength": 1, "maxLength": 200}, "space": {"type": "string"}}, ["q"]), t_search_files),
     ("write_file", "2.48.0: put a file into the file store: name + content (UTF-8 text) or base64, into folder_id (role edit) or, "
                    "without it, your own result folder (reports, drafts, patches people should read). file_id instead: a new version of "
-                   "that file (the older ones stay).",
+                   "that file (the older ones stay); 2.564.0: then expect_version (the file's version from list_files / read_file) is "
+                   "required: 400 version_required without, 409 conflict (current = the file now) when a newer version came meanwhile.",
      _obj({"name": {"type": "string"}, "folder_id": S_ID, "file_id": S_ID, "content": {"type": "string"}, "base64": {"type": "string"},
-           "mime": {"type": "string"}}), t_write_file),
+           "mime": {"type": "string"}, "expect_version": {"type": "integer", "description": "2.564.0: with file_id, the version you read"}}), t_write_file),
     ("create_file_folder", "2.48.0: a new folder in the file store, in folder_id (role edit) or in your own result folder.",
      _obj({"name": {"type": "string", "minLength": 1}, "folder_id": S_ID}, ["name"]),
      lambda api, a: api.call("POST", "/files", body={"name": a["name"], "kind": "folder", **({"parent_id": int(a["folder_id"])} if a.get("folder_id") else {})})),

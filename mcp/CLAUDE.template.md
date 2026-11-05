@@ -117,7 +117,10 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   edit it freely, and do not lift a lock a person set unless they ask you to.
 - **Do not overwrite people (2.270.0).** People edit the same tasks while you work. With `update_task` always send
   `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
-  it again (the answer's `current`), decide anew, never just resend. `create_task` gets a `client_ref` of your own, so a
+  it again (the answer's `current`), decide anew, never just resend. 2.564.0: a version is required for content
+  changes (`400 version_required` without): `update_task` / `batch_tasks` (`expect_updated_at` or `_prev`), `wiki_write`
+  (`expect_updated_at`), `sheet_set_cells` (`expect_rev` or `prev` per cell), `write_file` with `file_id` (`expect_version`).
+  A change of a locked task shows as `locked_bypass` in its history. `create_task` gets a `client_ref` of your own, so a
   retry after a timeout does not make a second task (2.370.2: `add_comment` and `suggest_payment` too); `update_note` and `update_offer_draft` take `expect_updated_at` too,
   and positions you keep in `update_offer_draft` go with their `id`.
   2.564.0: `update_event`, `update_contact`, `update_offer_draft`, `update_letter_draft` and `update_office_lead` require

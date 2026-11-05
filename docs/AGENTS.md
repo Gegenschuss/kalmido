@@ -1056,6 +1056,35 @@ A retry must not do the work twice. Two optional helpers (old agents keep workin
   answer back with the header `Idempotent-Replayed: true` and changes nothing. A call that failed (4xx / 5xx) stores
   nothing, so retry it with the same key. Keys are kept for 14 days (at most the newest 5000 per account). A key used again within that time gets the old answer back and the action does not happen again. Use a new key for each new action.
 
+### Version required
+
+*Since 2.564.0.*
+
+An agent account must say which version it read whenever it changes content a person edits (people's own tokens and
+the app are unchanged). Without one the write answers `400` with
+`{"error": {"code": "version_required", "message": "...", "fields": [the keys that would do]}}` and nothing changes;
+with an old one it answers `409` `conflict` with the state now under `current` (read it, decide anew, never just resend).
+Read first, send the version back:
+
+| Area | Write | Version to send | Read it from |
+|---|---|---|---|
+| Tasks | `PATCH /api/v1/tasks/{id}` (MCP `update_task`) with a content field | `expect_updated_at`, the header `If-Match` or `_prev` | `updated_at` of `GET /api/v1/tasks/{id}` (`get_task`) |
+| Tasks | `POST /api/v1/tasks/batch` `update` with a content field (MCP `batch_tasks`) | `_prev` with an entry for every id | the tasks you read |
+| Knowledge | `PATCH /api/v1/wiki/pages/{id}` (MCP `wiki_write`) | `expect_updated_at` or `If-Match` | `updated_at` of `wiki_read` |
+| Tables | `PUT /api/v1/sheets/{id}/cells` (MCP `sheet_set_cells`) | `expect_rev`, or `prev` with every cell | `rev` / the cells of `sheet_read` |
+| Files | `POST /api/v1/files/{id}/versions` (MCP `write_file` with `file_id`) | `expect_version` or `If-Match` | `version` of `list_files` / `read_file` |
+
+Content fields of a task: `title`, `notes`, `due`, `due_time`, `start`, `deadline`, `deadline_in_today`, `plan_start`,
+`duration`, `priority`, `repeat`, `repeat_from`, `assignee_id`, `assignee_group_id`, `rotation`, `list_tags`, `tags`,
+`people`, `fields`, `type`, `milestone`, `milestone_id`, `family`, `reviewer_id`, `url`, `points`, `snippets`. State steps
+need no version: moving (`list_id`, `section_id`, `parent_id`, `sprint_id`, `POST .../move`), `pinned`, `locked`,
+`stars`, reminders, the delegation, `delivery`, `irreversible`, `shift_chain`, completing and reopening.
+
+Example: `PATCH /api/v1/tasks/42` `{"title": "New title", "expect_updated_at": "2026-11-05T10:00:00.123Z"}`.
+
+The lock of a task (`locked`) still binds only the app; a change of a locked field by an agent is marked in the task's
+history (`locked_bypass`), so people see it.
+
 ### Dates move the dependency chain
 
 *Since 2.67.0.*
