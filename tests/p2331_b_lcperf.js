@@ -126,6 +126,10 @@ const N = 300, STEPS = 60;
       await act([{type: 'key', id: 'k', actions: [...[...val].flatMap(c => [{type: 'keyDown', value: c}, {type: 'keyUp', value: c}]), {type: 'keyDown', value: ''}, {type: 'keyUp', value: ''}]}]);
       check(await ready(`!document.querySelector('#tc-${tid} .tcin') && /${val}/.test(document.querySelector('#tc-${tid} .lc[data-k="f:${FT}"]')?.textContent || '')`), `the typed value is shown (${run})`);
       check(await ready('__m.r >= 2'), `the save and the server's answer redrew the list (${run})`);  // the redraw at once + the one with the answer
+      // 2.551.0 (#4651): the change goes through the outbox online too (#4568): the server has it once the outbox is empty,
+      // without a conflict (tcSave's _prev = the cell's value before) - the redraws above no longer wait for its answer
+      check(await ready('!OUT.q.length && !OUT.flushing'), `the outbox sent the change (${run})`);
+      check(await ev('S.conflicts.length') === 0, `no conflict for the own change (${run})`);
       check((await call(CA, 'GET', '/api/state')).tasks.find(t => t.id === tid)?.fields?.[FT] === val, `the value is saved (${run})`);
       await sleep(600);
       report(`type ${val.length} keys + Enter run ${run}`, await ev('__m.stop()'));

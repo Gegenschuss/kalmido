@@ -4,6 +4,8 @@
 // - a task's detail drawn again while the tag field is typed in (the video section arrives late) keeps the text
 // - settings: a failed autosave leaves the typed value in its field (not reset to the saved one)
 // - a custom field of a task: a failed save leaves the typed value; leaving the field again saves it
+//   2.551.0 (#4654): the tag field and a custom field change a task, which goes through the outbox online too (#4568): a 500
+//   waits there (the dot says so), the page keeps the value and the next try saves it
 // - "Custom selection" of a project's bell, a dialog with a write behind OK (askDialog submit), renaming in Files: closed only
 //   once saved, on an error they stay open with what was ticked / typed
 // - the list dialog: "Close" with a failed save keeps the dialog and the typed name ("Discard changes?" first); Esc too
@@ -91,10 +93,14 @@ const titles = async () => (await call('GET', '/api/state')).tasks.map(t => t.ti
   fake = (m, p) => m === 'PATCH' && p === '/api/tasks/' + T1 ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
   let tg = d.querySelector('#d-tag'); tg.focus(); tg.value = 'spring'; enter(w, tg);
   check(await until(() => calls.some(c => c.p === '/api/tasks/' + T1) && !tg.dataset.qbusy, {step: 5}), 'tag: sent');
-  check(d.querySelector('#d-tag').value === 'spring', 'tag 500: the text stays (' + d.querySelector('#d-tag').value + ' | ' + d.querySelector('#toast')?.textContent + ' | ' + JSON.stringify(calls.map(c => c.m + c.p)) + ')');
+  // 2.551.0 (#4654): a task's change goes through the outbox online too since #4568: a 500 keeps it there for another try
+  // (as p2359_a_autosave_ui), the tag stays on the task in the page and the dot says a change waits; the retry saves it
+  check(await until(() => w.eval('OUT.q.length') === 1 && w.eval('OUT.q[0].tries') === 1 && !w.eval('OUT.flushing')), 'tag 500: the change waits in the outbox (' + d.querySelector('#toast')?.textContent + ' | ' + JSON.stringify(calls.map(c => c.m + c.p)) + ')');
+  check(w.eval(`S.tasks.get(${T1}).tags.includes('spring')`) && [...d.querySelectorAll('#detail .tagedit')].some(x => /spring/.test(x.textContent)), 'tag 500: the tag stays on the task in the page');
+  check(await until(() => !!d.querySelector('.netdot.n-sync')), 'tag 500: the dot shows a change waits (' + d.querySelector('.netdot')?.getAttribute('aria-label') + ')');
   fake = null;
-  enter(w, d.querySelector('#d-tag'));
-  check(await until(async () => ((await call('GET', '/api/tasks/' + T1)).tags || []).includes('spring')), 'tag: saved on the next Enter');
+  check(await until(async () => ((await call('GET', '/api/tasks/' + T1)).tags || []).includes('spring')), 'tag: saved by the next try');
+  check(await until(() => !w.eval('OUT.q.length') && !d.querySelector('.netdot.n-sync')), 'tag: nothing waits any more');
 
   // ================= shopping mode
   w.eval(`if (typeof closeDetail === 'function') closeDetail(); shopModeOpen(${SH})`);
@@ -155,12 +161,12 @@ const titles = async () => (await call('GET', '/api/state')).tasks.map(t => t.ti
   fake = (m, p) => m === 'PATCH' && p === '/api/tasks/' + T1 ? jres(500, {error: 'Server error'}) : null; calls.length = 0;
   w.document.querySelector('#toast')?.classList.add('hidden');
   let cf = d.querySelector(`#detail [data-cf="${FB}"]`); cf.focus(); cf.value = 'Bulb shop'; cf.dispatchEvent(new w.Event('change', {bubbles: true}));
-  check(await until(() => calls.some(c => c.p === '/api/tasks/' + T1) && toastErr(d)), 'field: the save was tried and failed');
-  await sleep(100);
-  check(d.querySelector(`#detail [data-cf="${FB}"]`)?.value === 'Bulb shop', 'field 500: the typed value stays (' + d.querySelector(`#detail [data-cf="${FB}"]`)?.value + ')');
+  // 2.551.0 (#4654): through the outbox since #4568 (see the tag above): a 500 waits there for another try, no toast of its own
+  check(await until(() => calls.some(c => c.p === '/api/tasks/' + T1) && w.eval('OUT.q.length') === 1 && w.eval('OUT.q[0].tries') >= 1 && !w.eval('OUT.flushing')), 'field: the save was tried and waits in the outbox');
+  check(await until(() => !!d.querySelector('.netdot.n-sync')), 'field 500: the dot shows a change waits');
+  check(d.querySelector(`#detail [data-cf="${FB}"]`)?.value === 'Bulb shop' && w.eval(`S.tasks.get(${T1}).fields?.[${FB}]`) === 'Bulb shop', 'field 500: the typed value stays (' + d.querySelector(`#detail [data-cf="${FB}"]`)?.value + ')');
   fake = null;
-  cf = d.querySelector(`#detail [data-cf="${FB}"]`); cf.dispatchEvent(new w.FocusEvent('blur'));
-  check(await until(async () => (await call('GET', '/api/tasks/' + T1)).fields?.[FB] === 'Bulb shop'), 'field: leaving it again saves it');
+  check(await until(async () => (await call('GET', '/api/tasks/' + T1)).fields?.[FB] === 'Bulb shop', {timeout: 20000}), 'field: the next try saves it');
 
   // ================= the bell's "Custom selection": closed once saved
   w.__dialogs = 'manual';
