@@ -16563,6 +16563,7 @@
   "Calibration: {0}": "Calibración: {0}",
   "Maintenance: {0}": "Mantenimiento: {0}",
   "The agent's data lock leaves this area out": "El bloqueo de datos del agente excluye esta área",
+  "Calendars in the trash are deleted for good after {0} days, with their events.": "Los calendarios de la papelera se eliminan definitivamente tras {0} días, con sus citas.",
   "Changed elsewhere, not undone": "Cambiado en otro lugar, no deshecho",
   "Model per routine": "Modelo por rutina",
   "A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.": "Una rutina del paquete inicial puede usar un modelo propio, p. ej. uno más barato para el resumen. Vacío = el modelo del agente.",

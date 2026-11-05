@@ -498,7 +498,7 @@ async function evCalsModal() {
   const md = modal(`<div class="lhdr"><h3>${ic('cal', 's')} ${tr('Calendars')}</h3><span class="spacer"></span><button class="iconbtn" data-evc="close" aria-label="${tr('Close')}">${ic('x')}</button></div><div id="evc-body"></div>
     <div class="foot">${feat('events') ? `<button class="btn" data-evc="phone">${ic('phone', 's')} ${tr('On the phone…')}</button>` : ''}${feat('events') && !S.me?.kid ? `<button class="btn" data-evc="booking">${ic('link', 's')} ${tr('Booking page…')}</button>` : ''}<span class="spacer"></span>${S.calendars?.enabled ? `<button class="btn" data-evc="subs">${ic('gear', 's')} ${tr('Subscriptions…')}</button>` : ''}${feat('events') ? `<button class="btn pri" data-evc="new">${ic('plus', 's')} ${tr('New calendar')}</button>` : ''}</div>`);
   md.classList.add('evcmodal');
-  const st = {lists: false};
+  const st = {lists: false, trash: null};  // 2.566.0 (#4707): trash = the calendars in the trash once opened
   const sw = (key, kind, on, dis, label) => `<label class="swc ${dis ? 'off' : ''}" title="${esc(label)}"><input type="checkbox" data-cvx="${kind}" data-key="${key}" ${on ? 'checked' : ''} ${dis ? 'disabled' : ''}><span class="swt" aria-hidden="true"></span><span class="sr">${esc(label)}</span></label>`;
   const three = c => {  // Today + planning (off while the calendar is hidden: hidden = gone from Today and the planner too)
     const off = !c.on;
@@ -525,7 +525,11 @@ async function evCalsModal() {
       <i class="cevdot"></i><span class="evcn">${esc(c.name)}</span>${sw(c.key, 'show', c.on, false, tr('Show {0} in my calendar', c.name))}${three(c)}
       <button class="iconbtn" data-cvxmenu="${c.key}" data-name="${esc(c.name)}" aria-haspopup="menu" aria-label="${esc(tr('More for {0}', c.name))}" title="${esc(tr('More'))}">${ic('dots')}</button></div>`).join('')
       : `<p class="muted">${tr('No subscriptions yet. Add one under Settings > Integrations > Calendars.')}</p>`}`;
-    $('#evc-body', md).innerHTML = tl + own + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
+    // 2.566.0 (#4707): the calendars in the trash (the shared core's trash): opened on demand, restore with their events
+    const tr2 = !feat('events') ? '' : `<button type="button" class="btn sm evctrbtn" data-evc="trash" aria-expanded="${!!st.trash}">${ic('trash', 's')} ${tr('Trash')}</button>${!st.trash ? ''
+      : st.trash.items.length ? `<ul class="evclist evctrash" aria-label="${esc(tr('Trash'))}">${st.trash.items.map(c => `<li class="evcrow" style="--cc:${cssColor(c.color) || 'var(--accent)'}"><i class="cevdot"></i><span class="evcn">${esc(c.name)}<span class="muted"> · ${esc(trn('{0} event', '{0} events', c.events))} · ${esc(tr('In the trash since {0}', fmtDate((c.deleted_at || '').slice(0, 10))))}</span></span><button type="button" class="btn sm" data-evctr="${c.id}">${ic('undo', 's')} ${tr('Restore')}</button></li>`).join('')}</ul>`
+      : `<p class="muted">${tr('The trash is empty')}</p>`}${st.trash?.trash_days ? `<p class="muted">${esc(trashNote(tr('Calendars in the trash are deleted for good after {0} days, with their events.', st.trash.trash_days)))}</p>` : ''}`;
+    $('#evc-body', md).innerHTML = tl + own + tr2 + sb + (typeof abc_group === 'function' ? abc_group() : '');  // 2.155.0 B (#2076)
   };
   const redraw = () => { cvxRedraw(); draw(); };
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
@@ -567,10 +571,16 @@ async function evCalsModal() {
         {label: tr('Only this calendar'), icon: 'eye', fn: async () => { await cvxOnly(`e:${c.id}`); draw(); }},  // 2.36.1 (#1127)
         {label: tr('Show all calendars'), icon: 'all', fn: async () => { await cvxAll(); draw(); }},
         !own && {label: tr('Leave this calendar'), icon: 'logout', fn: async () => { if (!await askConfirm(tr('Leave the calendar “{0}”?', c.name), '', {ok: tr('Leave'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}/members/${S.me.id}`); } catch { return; } refresh(); }},
-        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the calendar “{0}” with all its events?', c.name), tr('This cannot be undone.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}`); } catch { return; } refresh(); }}]);
+        own && {label: tr('Delete…'), icon: 'trash', cls: 'danger', fn: async () => { if (!await askConfirm(tr('Delete the calendar “{0}” with all its events?', c.name), tr('They can be restored from the trash.'), {ok: tr('Delete'), danger: true})) return; try { await api('DELETE', `/api/evcals/${c.id}`); } catch { return; } st.trash = null; refresh(); }}]);  // 2.566.0 (#4707): into the trash
       return;
     }
+    const rb = e.target.closest('[data-evctr]');
+    if (rb) {  // 2.566.0 (#4707): out of the trash with its events
+      try { await api('POST', `/api/evcals/${+rb.dataset.evctr}/restore`); } catch { return; }
+      toast(tr('Restored')); st.trash = null; calInvalidate(); await refresh(); renderView(); return;
+    }
     const b = e.target.closest('[data-evc]'); if (!b) return;
+    if (b.dataset.evc === 'trash') { st.trash = st.trash ? null : await api('GET', '/api/evcals/trash').catch(() => ({items: []})); draw(); return; }
     if (b.dataset.evc === 'close') md.remove();
     if (b.dataset.evc === 'lists') { st.lists = !st.lists; draw(); }
     if (b.dataset.evc === 'phone') { md.remove(); settingsModal('caldav'); }  // 2.365.2 B (#2789): the steps live in Settings > Integrations

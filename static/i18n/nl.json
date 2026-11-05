@@ -16563,6 +16563,7 @@
   "Calibration: {0}": "Kalibratie: {0}",
   "Maintenance: {0}": "Onderhoud: {0}",
   "The agent's data lock leaves this area out": "De gegevensblokkade van de agent laat dit gebied weg",
+  "Calendars in the trash are deleted for good after {0} days, with their events.": "Agenda's in de prullenbak worden na {0} dagen definitief verwijderd, met hun afspraken.",
   "Changed elsewhere, not undone": "Elders gewijzigd, niet ongedaan gemaakt",
   "Model per routine": "Model per routine",
   "A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.": "Een routine van het startpakket kan een eigen model gebruiken, bijv. een goedkoper model voor de briefing. Leeg = het model van de agent.",
