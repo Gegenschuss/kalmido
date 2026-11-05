@@ -98,7 +98,7 @@ function cb_setHtml() {
 }
 function cbBooksHtml() {  // the settings of the cash boxes: sections like the general settings, saved on change
   const bs = CB.base.books;
-  return `<div class="cb-books">${bs.map(b => `<section class="cb-bk${b.archived ? ' cb-arch' : ''}" data-bid="${b.id}" aria-labelledby="cb-bk${b.id}"><h3 id="cb-bk${b.id}">${esc(b.name)}${b.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${b.archived ? ` <span class="rotag">${tr('archived')}</span>` : ''}</h3>
+  return `<div class="cb-books">${bs.map(b => `<section class="cb-bk${b.archived ? ' cb-arch' : ''}" data-bid="${b.id}" aria-labelledby="cb-bk${b.id}"><h4 id="cb-bk${b.id}">${esc(b.name)}${b.is_default ? ` <span class="rotag">${tr('Default')}</span>` : ''}${b.archived ? ` <span class="rotag">${tr('archived')}</span>` : ''}</h4>
     ${ofcRowF(`cb-n${b.id}`, tr('Name'), `<input id="cb-n${b.id}" data-cbf="name" value="${esc(b.name)}" maxlength="80">`)}
     ${ofcRowF(`cb-o${b.id}`, tr('Opening balance'), `<input id="cb-o${b.id}" data-cbf="opening" inputmode="decimal" class="numin" value="${esc(fmtNum(+b.opening, 2))}" ${b.last_closed || b.entries ? 'disabled' : ''}>`, b.last_closed ? tr('Fixed after the first day closing.') : b.entries ? tr('Fixed after the first entry.') : '')}
     <div class="row"><label>${tr('Opening day')}</label>${dateIn(`cb-od${b.id}`, b.opening_day, {label: tr('Opening day'), clear: false})}</div>

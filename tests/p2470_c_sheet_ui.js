@@ -38,8 +38,9 @@ const partOf = j => Array.isArray(j?.parts) ? j.parts.filter(p => p.kind === 'sh
 
   // ================= the switch in the office settings
   let w = await boot({hash: 'office/settings'}); let d = w.document;
-  const sw = await until(() => d.querySelector('#os-ind-film'), 60);
-  check(sw && !sw.checked && /Film & Video/.test(sw.closest('label')?.textContent || ''), 'settings: the switch Film & Video, off');
+  // 2.555.0 (#4664): the switch is on the pack's card under Packs (the calculation rules only link there)
+  const sw = await until(() => d.querySelector('#pkc [data-pkc-on="film"]'), 60);
+  check(sw && !sw.checked && /Film/.test(sw.closest('.pkc-item')?.textContent || ''), 'settings: the switch Film & Video, off');
   w.close();
   const st = await call('PUT', '/api/office/settings', {industry_packs: ['film']});
   check(st.http === 200 && (st.settings || {}).industry_packs?.[0] === 'film', 'settings: pack on');

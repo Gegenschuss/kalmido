@@ -485,8 +485,7 @@ function ofcSettingsHtml() {
   // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)
   return `<form class="ofcset" id="ofc-set" data-fg="ofc-set:${OFC.info.org_id}" data-fg-live autocomplete="off">
     ${adm ? '' : `<p class="muted ofclockhint">${ic('lock', 's')}<span>${tr('Only admins and the bookkeeping change this.')}</span></p>`}${/* 2.356.0 D (#3006) */ ''}
-    ${ost_p('company', dis)}
-    <h3>${tr('Company')}</h3>
+    ${ost_p('company', dis)}${''/* 2.555.0 (#4664): no own heading "Company" here: the group heading above says it (biz_paint) */}
     ${ofcRowF('os-name', tr('Company name'), `<textarea id="os-name" data-grow="3" style="overflow:hidden" rows="${Math.min(3, Math.max(1, String(cf.name || co.name || orgN).split('\n').length))}" maxlength="200" ${dis}>${esc(cf.name || co.name || orgN)}</textarea>`, orgN && !cf.name && !co.name ? tr('Suggested from the organisation’s name, saved once you change or confirm it') : tr('up to three lines'))}${orgN && adm && !cf.name && !co.name ? `<p class="ofcnamesug"><button type="button" class="btn sm" data-ofc="name-take">${tr('Confirm name')}</button></p>` : ''}
     ${ofcCompanyFieldsHtml(cf, dis)}
     <details class="ofcfree"><summary>${tr('Free lines (used where the fields above are empty)')}</summary>
@@ -501,11 +500,10 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-color', tr('Brand colour'), `<span class="lacts"><input id="os-color" value="${esc(s.color || '')}" maxlength="7" placeholder="#2f5d8a" class="numin" ${dis}><i class="ofcsw" style="background:${cssColor(s.color) || 'var(--accent)'}"></i></span>`)}${ofcII('color', tr('empty = the app’s accent colour'))}
     <p class="muted" id="os-color-note"${ofcColorLight(s.color) ? '' : ' hidden'}>${esc(tr('Text in a light brand colour is printed in a darker variant of it.'))}</p>
     ${ofcRowF('os-paper', tr('Paper size'), ofcSel('os-paper', s.paper === 'letter' ? 'letter' : 'a4', [['a4', tr('A4 (DIN 5008)')], ['letter', tr('US-Letter (8.5 × 11 in)')]]))}${/* 2.357.0 A (#3156) */ ''}
-    <p class="dtp-warn" id="os-paper-hint" role="status" ${typeof bp_paperHint === 'function' && bp_paperHint(s.paper) ? '' : 'hidden'}>${typeof bp_paperHint === 'function' ? esc(bp_paperHint(s.paper)) : ''}</p>${/* 2.469.0 (#3352) */ ''}
+    ${/* 2.469.0 (#3352); 2.555.0 (#4664): the paper size hint stands once, in the letterhead part right below (#bp-paper-hint) */ ''}
     ${typeof bp_settingsHtml === 'function' ? bp_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('tax', dis)}${ost_taxHtml()}${/* 2.365.2 D (#2789) */ ''}
-    </fieldset>${ost_p('docs', dis)}
-    <h3>${tr('Documents & numbers')}</h3>
+    </fieldset>${ost_p('docs', dis)}${''/* 2.555.0 (#4664): the group heading says "Documents & numbers" */}
     ${ofcRowF('os-lang', tr('Document language'), ofcSel('os-lang', s.lang, (S.languages || []).map(L => [L.code, L.name])))}
     ${ost_homeHtml(s, dis)}
     ${ofcRowF('os-currency', tr('Currency'), `<span class="lacts">${ofcSel('os-currency', s.currency, ost_curs(s.currency))}${ost_fxHtml(s, dis)}</span>`)}${ofcII((s.home_currency || 'EUR') === 'EUR' ? 'currency' : 'currency_x')}
@@ -545,6 +543,7 @@ function ofcSettingsHtml() {
     ${typeof ccn_settingsHtml === 'function' ? ccn_settingsHtml(dis) : '' /* 2.444.0 (#3447): the reminder of the card positions without a receipt */}
     ${typeof rcm_settingsHtml === 'function' ? rcm_settingsHtml() : '' /* 2.424.0 B (#3450): receipts by e-mail */}
     </fieldset>${ost_p('docs', dis)}
+    <h3>${tr('Closing texts')}</h3>${''/* 2.555.0 (#4664): the language tabs of the closing texts had no heading */}
     ${ofcClosingTabs(s, dis)}
     <h3>${tr('Calculation rules')}</h3>
     <p class="shint">${tr('Default for new quotations, can be changed in each quotation')}</p>
@@ -558,7 +557,7 @@ function ofcSettingsHtml() {
     <div class="ofcrule" data-rule="raw">
     ${ofcRowF('os-rf', tr('Raw data factor'), `<input id="os-rf" value="${esc(fmtNum(s.raw_factor, 2))}" inputmode="decimal" class="numin" ${dis}>`)}${ofcII('rf', tr('raw data amount = sum of the raw data positions × factor'))}
     </div>
-    ${typeof pkc_indHtml === 'function' ? pkc_indHtml(s, dis) : ofcChk('os-ind-film', tr('Industry pack Film & Video (shoot calculation in quotations)'), (s.industry_packs || []).includes('film')) + ofcII('indfilm')}
+    ${ost_indLinkHtml(s)}${''/* 2.555.0 (#4664): the industry packs are switched only on their cards under Packs; here the way there */}
     <h3>${tr('Default texts')}</h3>
     ${ofcRowF('os-intro-de', tr('Introduction (German)'), ofcSel('os-intro-de', s.intro_text_id?.de, ofcTextOpts('intro'), tr('none')))}${ofcII('texts')}
     ${ofcRowF('os-intro-en', tr('Introduction (English)'), ofcSel('os-intro-en', s.intro_text_id?.en, ofcTextOpts('intro', 'en'), tr('none')))}
@@ -567,8 +566,7 @@ function ofcSettingsHtml() {
     ${ofcRowF('os-rt', tr('Rights: duration'), ofcSel('os-rt', s.rights_default?.time_id, ofcTextOpts('rights_time'), tr('none')))}${ofcII('rights')}
     ${ofcRowF('os-rr', tr('Rights: territory'), ofcSel('os-rr', s.rights_default?.territory_id, ofcTextOpts('rights_territory'), tr('none')))}
     ${ofcRowF('os-rm', tr('Rights: media'), ofcSel('os-rm', s.rights_default?.media_id, ofcTextOpts('rights_media'), tr('none')))}
-    </fieldset>${ost_p('packs', dis)}
-    <h3>${tr('Country pack')}</h3>
+    </fieldset>${ost_p('packs', dis)}${''/* 2.555.0 (#4664): no heading "Country pack" over the row "Country pack" */}
     ${ofcRowF('os-pack', tr('Country pack'), `<span class="lacts">${ofcSel('os-pack', s.pack, (OFC.packs || [[p.code, p.name]]))}<span class="muted">${esc(tr('VAT: {0} standard, {1} reduced, {2} exempt', `${fmtNum(p.tax.standard, 1)} %`, `${fmtNum(p.tax.reduced, 1)} %`, `${fmtNum(p.tax.exempt, 1)} %`))}</span></span>`)}${ofcII('pack')}
     ${ofcOwnRatesHtml(s, p, dis)}
     </fieldset>${ost_p('functions', dis)}
@@ -577,6 +575,7 @@ function ofcSettingsHtml() {
     ${typeof oa_settingsHtml === 'function' ? oa_settingsHtml(s, dis) : ''}
     </fieldset>${ost_p('packs')}
     ${typeof pkc_html === 'function' ? pkc_html() : ''}
+    </fieldset>${ost_p('tax')}${''/* 2.555.0 (#4664): travel expenses and entertainment receipts belong to Bank & taxes, not to Packs */}
     ${typeof rk_settingsHtml === 'function' ? rk_settingsHtml() : ''}
     ${typeof bw_settingsHtml === 'function' ? bw_settingsHtml() : ''}
     </fieldset>${ost_p('docs')}${''/* 2.417.0 C (#3445): the test mode, per person (members too: a fieldset of its own, never disabled) */}
@@ -840,7 +839,7 @@ function ost_homeHtml(s, dis) {
   const home = s.home_currency || 'EUR', pk = OFC.info.pack || {};
   if (!pk.currency_editable) return '';
   const field = OFC.info.home_locked ? `<span class="lacts"><b id="os-home-v">${esc(home)}</b></span>` : ofcSel('os-home', home, ost_curs(home));
-  return ofcRowF('os-home', tr('Home currency'), field, OFC.info.home_locked ? tr(OFC_HC_LOCKED) : tr('Fixed after the first bookings.'), {keep: 1}) + ofcII('home');
+  return ofcRowF(OFC.info.home_locked ? 'os-home-v' : 'os-home', tr('Home currency'), field, OFC.info.home_locked ? tr(OFC_HC_LOCKED) : tr('Fixed after the first bookings.'), {keep: 1}) + ofcII('home');
 }
 const ost_fxPair = s => { const home = s.home_currency || 'EUR', cur = s.currency || home; return home === 'EUR' && (cur === 'EUR' || cur === 'USD') ? ['EUR', 'USD'] : cur !== home ? [home, cur] : null; };
 function ost_fxHtml(s, dis) {
@@ -871,7 +870,7 @@ function ofcSettingsBody(form) {
     ...($('#os-accept-on', form) ? {accept_on: $('#os-accept-on', form).checked ? 1 : 0} : {}),  // 2.114.4 B (#2270)
     ...($('#os-sign-offers', form) ? {sign_offers: $('#os-sign-offers', form).checked ? 1 : 0} : {}),  // 2.357.0 C (#3158)
     ...($('#os-portal-docs', form) ? {portal_docs: $('#os-portal-docs', form).checked ? 1 : 0} : {}),  // 2.120.0 B (#2088)
-    industry_packs: typeof pkc_indBody === 'function' ? pkc_indBody(form) : $('#os-ind-film', form)?.checked ? ['film'] : [],  // 2.47.0 (#1216), 2.76.0 (#1023): every os-ind-*
+    industry_packs: [...(OFC.info.settings?.industry_packs || [])],  // 2.555.0 (#4664): switched only on the pack cards (each saves at once, ost_part), the page sends the saved list unchanged
     intro_text_id: {de: +v('#os-intro-de') || null, en: +v('#os-intro-en') || null}, closing_text_id: {de: +v('#os-closing-de') || null, en: +v('#os-closing-en') || null},
     rights_default: {time_id: +v('#os-rt') || null, territory_id: +v('#os-rr') || null, media_id: +v('#os-rm') || null}, pack: v('#os-pack'),
     ...($('#os-cr-shared', form) ? {credit_shared: $('#os-cr-shared', form).checked ? 1 : 0} : {}),  // 2.433.0 (#3597)
@@ -898,18 +897,25 @@ const OST_SUBS = [['company', 'building', N_('Company')], ['tax', 'wallet', N_('
 // basis, tax dates, mileage allowance, start balance and monthly check of the cash flow, cash boxes). Every part keeps its own
 // route, autosave and undo (data-fg-skip: not a field of this form); the tabs keep a link here (ofcSetLink).
 function ost_taxHtml() {
-  if (!ofcAdmin()) return `<p class="muted">${tr('Only admins and the bookkeeping change this.')}</p>`;
+  if (!ofcAdmin()) return '';  // 2.555.0 (#4664): the lock hint stands once on top of the page; the group falls away for members
   return `<div class="ostax" data-fg-skip>${[typeof bka_settingsHtml === 'function' ? bka_settingsHtml() : '' /* 2.470.0 (#3596) */, typeof bkSettingsHtml === 'function' ? bkSettingsHtml() : '',
     typeof txdSectionHtml === 'function' && ofcFeat('books.tax_dates') ? txdSectionHtml() : '',
     typeof lb_rateSetHtml === 'function' ? lb_rateSetHtml() : '', typeof cfs_settingsHtml === 'function' ? cfs_settingsHtml() : '',
     typeof fci_setHtml === 'function' ? fci_setHtml() : '', typeof cb_setHtml === 'function' ? cb_setHtml() : ''].join('')}</div>`;
+}
+// 2.555.0 (#4664): the calculation rules no longer have their own boxes for the industry packs (the same setting as the switch
+// on a pack's card under Packs, which stays the one place): one quiet line names the packs switched on and leads there
+function ost_indLinkHtml(s) {
+  const on = s.industry_packs || [], all = typeof PKC !== 'undefined' && PKC.packs?.industry || [];
+  const nm = c => { const p = all.find(x => x.code === c); return p && typeof pkc_nm === 'function' ? pkc_nm(p) : c; };
+  return `<p class="muted ofchint ostind">${esc(on.length ? tr('Industry packs switched on: {0}', on.map(nm).join(', ')) : tr('No industry pack switched on.'))} <button type="button" class="linkbtn" data-ostgo="pkc">${esc(tr('Switch industry packs'))}</button></p>`;
 }
 // Enter in one of these fields saves it (blur = its change), never the whole settings form
 document.addEventListener('keydown', e => { const x = e.target; if (e.key === 'Enter' && !e.isComposing && x.tagName === 'INPUT' && x.closest?.('#ofc-set .ostax')) { e.preventDefault(); x.blur(); } }, true);
 // where a setting of a tab moved: a quiet line with the way into Settings > Company & office (events.js data-setgo)
 const ofcSetLink = (k, what) => `<p class="muted ofchint ofcsetl">${ic('gear', 's')} <span>${esc(what)}:</span> <button type="button" class="linkbtn" data-setgo="biz-${k}">${esc(tr('Settings › Company & office › {0}', tr(OST_SUBS.find(x => x[0] === k)?.[2] || 'Company & office')))}</button></p>`;
 const ost_p = (k, dis) => `<fieldset class="ostp" data-ostp="${k}" ${dis || ''}>`;
-const ost_show = k => $('#s-biz-' + k)?.scrollIntoView?.({block: 'start'});  // 2.365.2 (#2789): the areas stand one below the other
+const ost_show = k => ($('#s-biz-' + k) || $('#ofc-set #' + k))?.scrollIntoView?.({block: 'start'});  // 2.365.2 (#2789): the areas stand one below the other; 2.555.0 (#4664): or a part's own id (pkc)
 // 2.470.0 (#3596): Texts & templates: the catalogues keep their own pages (office/services, office/texts, the document templates);
 // here one row each with what it holds and the way there, as far as the person reaches that point of the office
 const OST_TPL = [['services', 'list', N_('Services'), 'office/services'], ['texts', 'note', N_('Text blocks'), 'office/texts'], ['gendocs', 'file', N_('Document templates'), 'office/gendocs']];
@@ -931,17 +937,33 @@ function biz_paint() {
   const rights = typeof orr_html === 'function' && OFC.info.rights;  // 2.470.0 (#3596): members too, their "My rights" (was a tab of the old page)
   // 2.470.0 (#3596): the areas are put in order before the drawing: setHtml keeps input being typed, and a field moved afterwards would lose the focus
   const t = document.createElement('template');
-  t.innerHTML = `<div class="sbizws"><span class="muted">${esc(tr('Applies to'))}</span> ${ofcAreaHtml()}</div>${pb_hintHtml()}${typeof ocf_chooseHtml === 'function' ? ocf_chooseHtml(true) : '' /* 2.470.0 (#3596): were on the old page */}${ofcSettingsHtml()}
-    ${rights ? `<h4 id="s-biz-rights">${esc(tr('Rights|office'))}</h4><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
+  // 2.555.0 (#4664): no "Applies to" with the workspace menu (it offered "All workspaces"): the settings hold for the area
+  // ofcWs() picks, named once as plain text; the switch is the workspace at the top of the app
+  t.innerHTML = `<p class="sbizws muted">${esc(tr('Workspace: {0}', biz_areaName()))}</p>${pb_hintHtml()}${typeof ocf_chooseHtml === 'function' ? ocf_chooseHtml(true) : '' /* 2.470.0 (#3596): were on the old page */}${ofcSettingsHtml()}
+    ${rights ? `<h3 id="s-biz-rights" class="sbizg">${esc(tr('Rights|office'))}</h3><p class="shint">${esc(tr('Who may see and change which part of the office.'))}</p><div class="row"><a class="btn sm" href="#office/rights" data-bizgo>${ic('shield', 's')} ${esc(tr('Rights in the office'))}</a></div>` : ''}`;
   const form = $('#ofc-set', t.content);
   for (const [k, , n] of OST_SUBS) {
     const fs = form ? $$(`[data-ostp="${k}"]`, form).filter(f => f.children.length) : []; if (!fs.length) continue;
-    const h = document.createElement('h4'); h.id = 's-biz-' + k; h.textContent = tr(n);
+    const h = document.createElement('h3'); h.id = 's-biz-' + k; h.className = 'sbizg'; h.textContent = tr(n);  // 2.555.0 (#4664): the groups h3, their parts h4 (biz_lvl)
     form.append(h, ...fs);
     fs.forEach(f => f.setAttribute('aria-labelledby', h.id));
   }
+  biz_lvl(t.content);
   keepFocus(box, () => setHtml(box, t.innerHTML));
+  if (!box._bizLvl) { box._bizLvl = new MutationObserver(() => biz_lvl(box)); box._bizLvl.observe(box, {childList: true, subtree: true}); }
   if (S.bizJump) biz_jump(box);
+}
+// 2.555.0 (#4664): the name of the office area the page sets (the office's own head keeps ofcAreaHtml with its switch)
+const biz_areaName = () => OFC.info.personal ? tr('Private|workspace') : (orgLabelOf(OFC.info.org_id) || wsName(ofcWs()));
+// 2.555.0 (#4664): the heading levels of the page: group h3 (biz_paint), the parts one level below it. The part functions write
+// h3 (and h4 inside) as on their own office pages, so here every h3 of a part becomes h4 and every h4 h5, once (data-hl), also
+// when a part draws itself again later (the observer in biz_paint); id, class and content stay
+function biz_lvl(root) {
+  for (const h of root.querySelectorAll('#ofc-set .ostp h3:not([data-hl]), #ofc-set .ostp h4:not([data-hl])')) {
+    const n = document.createElement(h.tagName === 'H3' ? 'h4' : 'h5');
+    for (const a of h.attributes) n.setAttribute(a.name, a.value);
+    n.dataset.hl = '1'; n.append(...h.childNodes); h.replaceWith(n);
+  }
 }
 // 2.365.2 D (#2789): settingsModal('biz-<part>') (settings.js sets S.bizJump) scrolls once to the part's heading or to one of
 // these places, with the soft ring of the settings search
@@ -950,9 +972,9 @@ function biz_jump(box) {
   const k = S.bizJump; S.bizJump = null;
   const at = () => $(BIZ_AT[k] || '#s-biz-' + k, box) || $('#s-biz-' + (k === 'peppol' ? 'docs' : k === 'agents' ? 'access' : k === 'datev' ? 'data' : k), box);
   setTimeout(() => {
-    const el = at(), r = el && (el.closest('.row, details, h3, h4') || el); if (!r) return;
+    const el = at(), r = el && (el.closest('.row, details, h3, h4, h5') || el); if (!r) return;
     for (let det = r.closest('details'); det; det = det.parentElement?.closest('details')) det.open = true;
-    r.scrollIntoView?.({block: el.matches('h4') ? 'start' : 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600);
+    r.scrollIntoView?.({block: el.matches('h3, h4') ? 'start' : 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600);
   }, 30);
 }
 // every field saves itself: the part of the PUT body that belongs to it (null = no setting: the country's text field, search, ...);
@@ -988,7 +1010,6 @@ function ost_part(el, full) {
   if (el.dataset.ocm) return {menu_off: ocm_off(el.dataset.ocm, !el.checked)};  // 2.440.0 (#3609): one point of the office menu
   if (el.dataset.ccb) return {client_blocks_off: ccb_off(el.dataset.ccb, !el.checked)};  // 2.435.0 A (#3600): one block of the client card
   // an industry pack box: only this pack switches (the list of the others stays as saved, also when not all boxes are drawn)
-  if (id.startsWith('os-ind-')) return {industry_packs: ost_packs(el.dataset.ind || id.slice(7), el.checked)};
   if (el.dataset.pkcOn) return {industry_packs: ost_packs(el.dataset.pkcOn, el.checked)};  // 2.113.0 (#2246): the switch on a pack's card
   if (el.closest('.dxset') && full.datev_extf) return {datev_extf: full.datev_extf};
   return /^os-/.test(id) ? full : null;  // a settings field this map does not know yet (e.g. added later): the whole page, never a silent loss

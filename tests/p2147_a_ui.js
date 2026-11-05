@@ -49,7 +49,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`!document.querySelector('.ocf-choose')`), '#2462: an office with saved settings is not asked for its country');
 
     // ================= #2460 the area Functions
-    check(await ev(`[...document.querySelectorAll('#ofc-set > h4')].map(h => h.id.replace('s-biz-', '')).filter(k => !['tax', 'tpl'].includes(k)).join(',')`) === 'company,docs,packs,functions,data,access', '#2460: the areas, Functions after Packs');  // 2.470.0 (#3596): headings in Settings, no tabs
+    // 2.555.0 (#4664): the groups are h3 now
+    check(await ev(`[...document.querySelectorAll('#ofc-set > h3')].map(h => h.id.replace('s-biz-', '')).filter(k => !['tax', 'tpl'].includes(k)).join(',')`) === 'company,docs,packs,functions,data,access', '#2460: the areas, Functions after Packs');  // 2.470.0 (#3596): headings in Settings, no tabs
     const feats = await ev(`[...document.querySelectorAll('#ofc-set [data-feat]')].map(x => x.dataset.feat + ':' + (x.checked ? 1 : 0) + (x.disabled ? 'd' : '')).join(',')`);
     // 2.380 (#3411): + the five points of Money; 2.434.0 (#3608): + docs.delivery
     check(feats === 'books.datev:1,docs.delivery:1,docs.einvoice:1,books.vat_return:1,books.tax_dates:1,books.export_csv:1,books.gobd:1d,money.meals:1,money.travel:1,money.subs:1,money.cashflow:1,money.kpi:1', '#2460: DE offers every function, finalising rules locked ' + feats);

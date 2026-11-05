@@ -34,9 +34,10 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(!!d.querySelector('[data-ofc="pb-move"]'), 'freelancer: the instance admin may move the office into an organisation');
   check(!d.querySelector('.pbhint'), 'freelancer: no hint without an organisation');
   {  // 2.180.0 C (#2695): merged from p21446_c_ui.js (#2436) - ONE section "Transfer into an organisation"
-    const hs = [...d.querySelectorAll('#s-biz h3')].filter(h => /^Transfer into an organisation$/.test(h.textContent.trim()));
+    // 2.555.0 (#4664): the parts are h4 (the groups h3)
+    const hs = [...d.querySelectorAll('#s-biz h4')].filter(h => /^Transfer into an organisation$/.test(h.textContent.trim()));
     check(hs.length === 1, 'freelancer: exactly one transfer heading: ' + hs.length);
-    check(![...d.querySelectorAll('#s-biz h3')].some(h => /^Move into/.test(h.textContent.trim())), 'freelancer: no "Move into" heading any more');
+    check(![...d.querySelectorAll('#s-biz h3, #s-biz h4')].some(h => /^Move into/.test(h.textContent.trim())), 'freelancer: no "Move into" heading any more');
     check(d.querySelectorAll('[data-ofc="pb-move"]').length === 1, 'freelancer: the new-organisation button is there once');
     const sec = d.querySelector('[data-ofc="pb-move"]')?.closest('fieldset');
     check(!!sec && sec === hs[0]?.closest('fieldset'), 'freelancer: the button sits in the same section as the heading');

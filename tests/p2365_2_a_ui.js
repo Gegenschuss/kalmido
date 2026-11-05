@@ -44,9 +44,10 @@ const FEAT = 'cal,comments,collab,files,docs,office,clients';
     check(!!form, `${who}: the office settings form sits in Settings`);
     if (form) {
       check(!form.querySelector('[data-ostp][hidden]'), `${who}: no tab row, no hidden area`);
-      const hs = [...form.querySelectorAll(':scope > h4')].map(h => h.id);
+      const hs = [...form.querySelectorAll(':scope > h3')].map(h => h.id);  // 2.555.0 (#4664): the groups are h3
       check(hs[0] === 's-biz-company' && hs.includes('s-biz-docs') && hs.length >= 4, `${who}: one heading per area, Company first ` + hs.join());
-      check(/Applies to/.test(d.querySelector('#s-biz .sbizws')?.textContent || ''), `${who}: "Applies to" names the workspace`);
+      // 2.555.0 (#4664): no "Applies to" with the workspace menu any more: the area once as plain text
+      check(/^Workspace: \S/.test(d.querySelector('#s-biz .sbizws')?.textContent || '') && !d.querySelector('#s-biz [data-act="ws-menu"]'), `${who}: the head names the workspace as text, no menu`);
       check(!form.querySelector('#os-paydays')?.disabled, `${who}: the own office is editable`);
       // a field saves itself (autosave): change + focus out, the server has it
       const f = form.querySelector('#os-paydays');

@@ -54,7 +54,7 @@ function pkc_html() {
   if (!PKC.data && !PKC.loading) setTimeout(() => pkc_load(), 0);
   const d = PKC.data, kinds = [['', N_('All|packs')], ['country', N_('Countries')], ['industry', N_('Industries')]];
   return `<section class="pkc" id="pkc" data-fg-skip aria-labelledby="pkc-h">
-    <h3 id="pkc-h">${tr('Packs')}</h3>${ofcII('packs')}
+    <h3 id="pkc-h">${tr('Industry packs')}</h3>${ofcII('packs')}${''/* 2.555.0 (#4664): the group heading is "Packs" already */}
     <div class="pkc-bar">
       <input type="search" id="pkc-q" value="${esc(PKC.q)}" placeholder="${esc(tr('Search packs'))}" aria-label="${esc(tr('Search packs'))}" maxlength="80" autocomplete="off" enterkeyhint="search">
       <span class="pkc-kinds" role="group" aria-label="${esc(tr('Kind'))}">${kinds.map(([v, n]) => `<button type="button" class="btn sm${PKC.kind === v ? ' on' : ''}" data-pkc="kind" data-kind="${v}" aria-pressed="${PKC.kind === v}">${esc(tr(n))}</button>`).join('')}</span>
@@ -100,22 +100,12 @@ function pkc_itemHtml(it) {
   </li>`;
 }
 // 2.113.0 (#2246): an industry pack's card says whether the pack is switched on in this office and switches it at once
-// (office.js ost_save: saved like every settings field, one undo step; the same setting as the box in the calculation rules)
+// (office.js ost_save: saved like every settings field, one undo step; 2.555.0 (#4664): the only switch of it, the calculation rules link here)
 function pkc_onHtml(it, adm) {
   const on = (OFC.info?.settings?.industry_packs || []).includes(it.code);
   return `<div class="pkc-on"><label class="chkl swl"><span class="swc"><input type="checkbox" role="switch" data-pkc-on="${esc(it.code)}" ${on ? 'checked' : ''} ${adm ? '' : 'disabled'} aria-label="${esc(tr('Industry pack {0}', it.name || it.code))}"><span class="swt" aria-hidden="true"></span></span><span class="pkc-onst">${esc(on ? tr('Switched on') : tr('Off'))}</span></label></div>`;
 }
 document.addEventListener('change', e => { const t = e.target; if (t.dataset?.pkcOn && t.closest('#pkc')) { const st = t.closest('.pkc-on')?.querySelector('.pkc-onst'); if (st) st.textContent = t.checked ? tr('Switched on') : tr('Off'); } });
-// the industry pack boxes of the calculation rules: film keeps its id os-ind-film (and its text), the others os-ind-<code>
-function pkc_indHtml(s, dis) {
-  pkc_sync();
-  const on = s.industry_packs || [], list = PKC.packs?.industry || [{code: 'film'}];
-  if (!list.some(p => p.code === 'film') && on.includes('film')) list.unshift({code: 'film'});
-  return list.map(p => p.code === 'film'
-    ? ofcChk('os-ind-film', tr('Industry pack Film & Video (shoot calculation in quotations)'), on.includes('film')) + ofcII('indfilm')
-    : `<div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="os-ind-${esc(p.code)}" data-ind="${esc(p.code)}" ${on.includes(p.code) ? 'checked' : ''} ${dis}> ${esc(tr('Industry pack {0}', pkc_nm(p)))}</label>${p.badge === 'community' ? pkc_badge('community') : ''}</div>`).join('');
-}
-const pkc_indBody = form => $$('input[id^="os-ind-"]', form).filter(x => x.checked).map(x => x.dataset.ind || x.id.slice(7));
 // ---- actions (one undo step each)
 const pkc_item = k => (PKC.data?.items || []).find(x => pkc_key(x) === k);
 const pkc_url = it => `/api/office/packs/installed/${encodeURIComponent(it.kind)}/${encodeURIComponent(it.code)}`;
@@ -220,7 +210,7 @@ function ocf_settingsHtml(dis) {
   const p = OFC.info.pack || {}, of = ocf_offers(), off = OFC.info.settings?.features_off || [];
   const mine = OCF_FEATS.filter(f => of[f[0]] === 'ready' && !f[0].startsWith('money.')), not = OCF_FEATS.filter(f => of[f[0]] !== 'ready');
   const rt = p.retention || {};
-  return `<h3>${tr('Functions')}</h3>${ofcII('functions')}
+  return `${ofcII('functions')}${''/* 2.555.0 (#4664): no heading "Functions" under the group heading "Functions" */}
     <p class="muted">${esc(tr('Country pack: {0}', `${pkc_nm(p)} (${p.code})`))} · <button type="button" class="linkbtn" data-ostgo="packs">${tr('Change country')}</button></p>
     <div class="ocf-list">${mine.map(([k, i, n, d]) => {
       const fixed = OCF_FIXED.includes(k), on = fixed || !off.includes(k);
@@ -261,7 +251,7 @@ function ocf_chooseHtml(slim) {
   // every other page: one slim line whose button leads there
   const ent = typeof ofm_items === 'function' && ofm_items().some(i => i.key === 'pipeline') ? 'pipeline' : 'offers';
   if (slim || (S.route.tab && ![ent, 'start'].includes(S.route.tab) && !isMobile()))  // 2.470.0 (#3596): slim in Settings, the card may stand behind the dialog
-    return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" data-go="office/${ent}">${tr('Choose country')}</button></div>`;
+    return `<div class="ocf-choose ocf-slim muted">${ic('globe', 's')}<span>${tr('Where is your office?')}</span><button type="button" class="btn sm" ${slim ? 'data-ocf="to-pack"' /* 2.555.0 (#4664): in Settings the country is chosen on the same page */ : `data-go="office/${ent}"`}>${tr('Choose country')}</button></div>`;
   pkc_sync();
   if (!PKC.packs && !PKC.packsBusy) setTimeout(pkc_loadPacks, 0);
   const opts = (PKC.packs?.country || []).map(p => [p.code, p.neutral ? pkc_nm(p) : `${pkc_nm(p)} (${p.code})`]);
@@ -288,3 +278,11 @@ async function ocf_confirmSwitch(code) {
   return askConfirm(tr('Change the country to “{0}”?', pkc_nm(j)), lines.join(' '), {ok: tr('Change')});
 }
 document.addEventListener('click', e => { const b = e.target.closest?.('[data-ocf="choose"]'); if (b) { e.preventDefault(); ocf_choose(); } });
+// 2.555.0 (#4664): "Choose country" in Settings > Company & office: to the country pack field of the same page (Packs), never out of the settings
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('#s-biz [data-ocf="to-pack"]'); if (!b) return;
+  e.preventDefault();
+  const sel = $('#s-biz #os-pack'), r = sel?.closest('.row'); if (!r) return;
+  r.scrollIntoView?.({block: 'center'}); r.classList.add('sflash'); setTimeout(() => r.classList.remove('sflash'), 1600);
+  if (!sel.disabled) sel.focus({preventScroll: true});
+});

@@ -64,14 +64,15 @@ function writeCatalogue() {
   // ================= no catalogue set up
   let w = await boot({hash: 'office/settings'}), d = w.document;
   const sec = await until(() => d.querySelector('#pkc'), 80);
-  check(sec && /Packs/.test(sec.querySelector('h3')?.textContent || ''), 'settings: the section Packs');
-  const ctyH = [...d.querySelectorAll('#ofc-set h3')].findIndex(h => /Country pack/.test(h.textContent)), pkH = [...d.querySelectorAll('#ofc-set h3')].findIndex(h => h.id === 'pkc-h');
-  check(ctyH >= 0 && pkH > ctyH, 'the section comes after Country pack');
+  // 2.555.0 (#4664): the part heading is h4 "Industry packs" (group "Packs"), no heading "Country pack" over its row
+  check(sec && /Industry packs/.test(sec.querySelector('h4')?.textContent || ''), 'settings: the section Industry packs');
+  const cty = d.querySelector('#ofc-set #os-pack'), pkH = d.getElementById('pkc-h');
+  check(cty && pkH && (cty.compareDocumentPosition(pkH) & 4) && ![...d.querySelectorAll('#ofc-set h3, #ofc-set h4')].some(h => /Country pack/.test(h.textContent)), 'the section comes after the country pack');
   await until(() => card(d, 'country/DE'));
   check(/No catalogue set up/.test(d.querySelector('#pkc .pkc-src')?.textContent || ''), 'no catalogue: the note');
   check(/Built in/.test(card(d, 'country/DE')?.textContent || '') && /Verified/.test(card(d, 'country/DE')?.querySelector('.pkc-badge')?.textContent || ''), 'no catalogue: DE built in, verified');
   check(!card(d, 'country/DE')?.querySelector('[data-pkc="install"],[data-pkc="remove"]'), 'a built-in pack has no install / uninstall button');
-  check(d.querySelector('#os-ind-film'), 'the film box keeps its id');
+  check(!d.querySelector('#os-ind-film') && await until(() => card(d, 'industry/film')?.querySelector('[data-pkc-on="film"]')), 'film: switched on its card only (2.555.0 #4664: no box in the rules)');
   w.close();
 
   // ================= with the fake catalogue
@@ -110,11 +111,11 @@ function writeCatalogue() {
   const nUndo = w.eval('HIST.undo.length');
   click(w, card(d, 'industry/event').querySelector('[data-pkc="install"]'));
   check(await until(() => /Installed v1/.test(card(d, 'industry/event')?.textContent || ''), 80) && !d.querySelector('.modal.cdlg'), 'event: installed without a question');
-  check(await until(() => d.querySelector('#os-ind-event')), 'the calculation rules show the box of the event pack');
+  check(await until(() => card(d, 'industry/event')?.querySelector('[data-pkc-on="event"]')), 'the card of the event pack has its switch');  // 2.555.0 (#4664): was the box in the calculation rules
   check(w.eval('HIST.undo.length') === nUndo + 1, 'one undo step');
   w.eval("histStep('undo')");
   check(await until(() => card(d, 'industry/event')?.querySelector('[data-pkc="install"]'), 80), 'Undo: event is not installed any more');
-  check(await until(() => !d.querySelector('#os-ind-event')), 'Undo: its box is gone');
+  check(await until(() => !d.querySelector('[data-pkc-on="event"]')), 'Undo: its switch is gone');
   w.close();
 
   // ================= the country pack in use cannot be uninstalled

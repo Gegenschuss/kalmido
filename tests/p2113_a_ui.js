@@ -49,7 +49,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `!!document.querySelector('#ofc-set #s-biz-company') && !!document.getElementById('os-name')`, 80), 'the settings page');
 
     // ================= #2247 the areas
-    check(await ev(`[...document.querySelectorAll('#ofc-set > h4')].map(h => h.id.replace('s-biz-', '')).join(',')`) === 'company,tax,docs,tpl,packs,functions,data,access', '#2247: the areas, one below the other');  // 2.470.0 (#3596): the office page with its tabs is gone, + Texts & templates
+    // 2.555.0 (#4664): the groups are h3 now (their parts h4)
+    check(await ev(`[...document.querySelectorAll('#ofc-set > h3')].map(h => h.id.replace('s-biz-', '')).join(',')`) === 'company,tax,docs,tpl,packs,functions,data,access', '#2247: the areas, one below the other');  // 2.470.0 (#3596): the office page with its tabs is gone, + Texts & templates
     check(await ev(vis('os-name')) && await ev(vis('os-pack')) && await ev(vis('os-paydays')), '#2247: every area is shown');
     check(await ev(`!document.querySelector('[data-ofc="save-settings"]')`), '#2247: no Save button');
     // opening saves nothing and shows no bar
@@ -98,7 +99,7 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(!(await ev(`!!document.querySelector('#pkc [data-pkc-item^="country/"] [data-pkc-on]')`)), '#2246: no switch on a country pack');
     await ev(`(() => { ${card}.querySelector('[data-pkc-on]').click(); return 1; })()`);
     check(!!(await srv(j => (j.settings?.industry_packs || []).includes('film'))), '#2246: the switch turns the pack on at once');
-    check(await ready(ev, `(() => { const c = ${card}; return !!c && c.querySelector('[data-pkc-on]').checked && c.querySelector('.pkc-onst').textContent.trim() === 'Switched on' && document.getElementById('os-ind-film').checked; })()`), '#2246: the card says Switched on, the box of the rules follows');
+    check(await ready(ev, `(() => { const c = ${card}; return !!c && c.querySelector('[data-pkc-on]').checked && c.querySelector('.pkc-onst').textContent.trim() === 'Switched on' && !document.getElementById('os-ind-film') && /Film/.test(document.querySelector('#ofc-set .ostind')?.textContent || ''); })()`), '#2246: the card says Switched on, the line of the rules names it');  // 2.555.0 (#4664): no box in the rules any more, the card is the only switch
     await shot('p2113-a-pack-on.png');
     await ev(`(() => { ${card}.querySelector('[data-pkc-on]').click(); return 1; })()`);
     check(!!(await srv(j => !(j.settings?.industry_packs || []).includes('film'))) && await ready(ev, `${card}.querySelector('.pkc-onst').textContent.trim() === 'Off'`), '#2246: and off again');

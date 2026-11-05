@@ -1707,9 +1707,9 @@ function ss_hits(md, q, shown, SYN) {
     else targets.push(...to().map(x => x.toLowerCase()));
   }
   if (!grp.length) for (const [ws, sel] of SYN) if (ws.some(w => w === q || (q.length >= 3 && w.startsWith(q)) || (q.length > 3 && q.includes(w)))) { const el = $(sel, md); if (el) add(el, el.closest('.spane')?.dataset.pane); }
-  const heads = p => $$('h4', p);
+  const heads = p => $$('h4, h3.sbizg', p);  // 2.555.0 (#4664): the groups of Company & office are h3
   const secOf = (el, p) => { let last = null; for (const h of heads(p)) { if (h === el || (h.compareDocumentPosition(el) & 4)) last = h; else break; } return last; };
-  const TITLES = 'h4, .row > label, label.chkl, .featgrid label > span, .modrow b, summary, button:not(.iconbtn), th, option', HINTS = '.shint, .modrow small';
+  const TITLES = 'h4, h3.sbizg, .row > label, label.chkl, .featgrid label > span, .modrow b, summary, button:not(.iconbtn), th, option', HINTS = '.shint, .modrow small';
   const own = el => el.matches('.featgrid label > span') ? (el.firstChild?.textContent || '') + ' ' + (el.querySelector('small')?.textContent || '') : ss_text(el);
   const okEl = el => shown(el) && !el.closest('.ssres');
   const terms = [q, ...targets];
@@ -1817,7 +1817,7 @@ async function biz_mailDraw(md) {
   if (!box.isConnected) return;
   if (!x || !(x.manage || x.set)) { box.innerHTML = ''; return; }
   const what = !x.set ? tr('No mailbox yet') : [x.receive ? tr('receives') : '', x.send ? tr('sends') : ''].filter(Boolean).join(' · ') + (x.active ? '' : ' · ' + tr('paused'));
-  box.innerHTML = `<h4 id="s-bizmail-h">${tr('E-mail')}</h4><p class="shint">${tr('A workspace can fetch its own mailbox: its e-mails are filed here like forwarded ones, and replies go out from its address.')}</p>
+  box.innerHTML = `<h3 id="s-bizmail-h" class="sbizg">${tr('E-mail')}</h3>${''/* 2.555.0 (#4664): a group of Company & office (h3) */}<p class="shint">${tr('A workspace can fetch its own mailbox: its e-mails are filed here like forwarded ones, and replies go out from its address.')}</p>
     <div class="row"><span class="muted">${x.address ? esc(x.address) + ' · ' : ''}${esc(what)}</span>${x.manage ? `<button type="button" class="btn sm" data-hmba="edit" data-ws="${esc(x.ws)}">${ic('gear', 's')}<span>${tr(x.set ? 'Change' : 'Set up')}</span></button>` : ''}</div>
     ${x.error_text ? `<p class="hmberr" role="status">${ic('info', 's')} ${esc(x.error_text)}</p>` : ''}`;
 }

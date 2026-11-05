@@ -31,7 +31,7 @@ function oa_switchDraw(box, j) {
 
 // ---- the privacy switch of the office area (office.js settings form)
 const oa_settingsHtml = (s, dis) => `<h3>${tr('Agents')}</h3>
-  <div class="row"><label></label><label class="chkl"><input type="checkbox" id="os-agents-read" ${s.agents_read ? 'checked' : ''} ${dis}> ${tr('Agents may read office data')}</label></div>
+  <div class="row"><label class="chkl" style="min-width:0"><input type="checkbox" id="os-agents-read" ${s.agents_read ? 'checked' : ''} ${dis}> ${tr('Agents may read office data')}</label></div>
   <div class="shint keep">${tr('Client and price data go to the AI model of the connected agent. Each agent also needs its own switch “May draft office documents”; every access is in the access log.')}</div>
   <div class="shint keep">${esc(tr('The switch of each agent: Settings > Agents > the agent > Permissions.'))} <button type="button" class="linkbtn" data-setgo="agents">${esc(tr('Settings › Agents'))}</button></div>`;  // 2.365.2 D (#2789)
 const oa_settingsBody = form => ($('#os-agents-read', form) ? {agents_read: $('#os-agents-read', form).checked ? 1 : 0} : {});

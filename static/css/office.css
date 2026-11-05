@@ -74,6 +74,13 @@
 /* 2.113.0 (#2247): the areas of the settings (the strip of Settings > Administration; settings.css loads lazily) and "Saved" at a field */
 .ofcset .ostp{border:0;margin:0;padding:0;min-width:0}
 .ofcset .ostp>h3:first-child{margin-top:.25rem}
+/* 2.555.0 (#4664): Settings > Company & office: groups h3 (.sbizg), parts h4, inner headings h5 (office.js biz_lvl) - the same look as before */
+.ofcset h4{margin:1.25rem 0 .5rem;font-size:var(--fs-m);letter-spacing:-.01em}
+.ofcset .ostp>h4:first-child{margin-top:.25rem}
+.ofcset h5[data-hl]{margin:1.25rem 0 .5rem;font-size:var(--fs-m);color:var(--text);font-weight:600;display:flex;align-items:center;gap:.5rem}
+.ofcset .onum h5[data-hl]{margin:1rem 0 .25rem}
+.ofcset .lgb-card h5[data-hl]{margin:0 0 .125rem}
+.ofcset .cb-bk h5[data-hl]{margin:0 0 .5rem;display:block;letter-spacing:-.01em}
 .ostok{display:inline-flex;align-items:center;gap:.375rem;font-size:var(--fs-s);color:var(--muted);opacity:0}
 .ostok.on{opacity:1}
 .ostok .i{color:var(--ok)}
@@ -1119,8 +1126,9 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 /* 2.365.2 (#2789): the office settings inside Settings > Company & office: the areas one below the other, the workspace on top */
 .sbiz .ofcset{max-width:none}
 .sbizws{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem}
-.sbiz .ofcset>h4{margin:1.5rem 0 .5rem}
-.sbiz .ofcset>h4:first-of-type{margin-top:.5rem}
+.smodal .sbizg{margin:1.25rem 0 .5rem;font-size:var(--fs-m);color:var(--text);font-weight:600;letter-spacing:normal;display:flex;align-items:center;gap:.5rem}
+.sbiz .ofcset>h3.sbizg{margin:1.5rem 0 .5rem}
+.sbiz .ofcset>h3.sbizg:first-of-type{margin-top:.5rem}
 /* 2.414.0 A (#3502): the booking archive (office_bookarch.js) */
 .bka-h{margin:.75rem 0 .25rem}
 .bka-empty{margin:1rem 0}
