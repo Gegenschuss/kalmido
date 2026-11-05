@@ -17,7 +17,7 @@ from datetime import timedelta
 from flask import g, has_request_context, jsonify
 
 from ..core.config import app
-from ..core.pg import IntegrityError, insert_id, table_columns, write_lock
+from ..core.pg import IntegrityError, insert_id, system_ctx, table_columns, write_lock
 from ..core.i18n import tr
 from ..core.db import bump, iso, iso_ms, now_utc, parse_iso
 from ..core.access import Denied
@@ -108,8 +108,11 @@ def otb_dangling(c, table, row):
             "JOIN pg_attribute a ON a.attrelid=co.conrelid AND a.attnum=co.conkey[1] "
             "JOIN pg_attribute fa ON fa.attrelid=co.confrelid AND fa.attnum=co.confkey[1] WHERE co.contype='f' "
             "AND co.conrelid=CAST(? AS regclass) AND array_length(co.conkey, 1)=1 AND co.confdeltype='n' ORDER BY a.attname", (table,)).fetchall()]
-    return [col for col, ref, rcol in OTB_OUT[table]
-            if row.get(col) is not None and not c.execute(f"SELECT 1 FROM {ref} WHERE {rcol}=?", (row[col],)).fetchone()]
+    # 2.552.0 (#4561, review F2): whether the row is there at all, like the database's own check (row-level security
+    # would hide a row of another organisation that is still there and must not be emptied); only yes / no leaves the block
+    with system_ctx(c):
+        return [col for col, ref, rcol in OTB_OUT[table]
+                if row.get(col) is not None and not c.execute(f"SELECT 1 FROM {ref} WHERE {rcol}=?", (row[col],)).fetchone()]
 
 
 def _insert(c, table, row):
@@ -143,6 +146,8 @@ def otb_restore(c, oid, tid, notes=None):
                 if "updated_at" in cols:
                     row["updated_at"] = iso(now_utc())
                 gone = otb_dangling(c, table, row)  # 2.552.0 (#4561 B19): a client gone for good since: back without it, the answer says so
+                if gone and table == "office_docs" and row.get("locked_at"):  # 2.552.0 (#4561, review F1): a finalised document never comes back changed
+                    raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile."))
                 for col in gone:
                     row[col] = None
                 if notes is not None and gone:

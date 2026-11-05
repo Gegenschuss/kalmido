@@ -250,6 +250,8 @@ def cl_trash_check(c, oid, lid, uid=None, every=True):
     s = cc_stmt(c, oid, r["statement_id"], uid, every) if uid is not None else cc_stmt_row(c, oid, r["statement_id"])
     _draft(s)
     cc_writable(c, oid, s, r["day"])
+    if not c.execute("SELECT 1 FROM office_cc_cards WHERE id=? AND org_id=? AND deleted_at IS NULL", (s["card_id"], oid)).fetchone():
+        raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile."))  # 2.552.0 (#4561, review F4): the card was deleted
     return r["statement_id"]
 
 

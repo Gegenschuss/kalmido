@@ -12,6 +12,7 @@ freelancer-matrix: office, wiki, tasks
  - B28: renaming a knowledge folder (POST /api/wiki/move and the tree's rename) takes its pages in the trash along; a page
    whose name was taken meanwhile comes back as "Name (2)" (renamed in the answer), not skipped
 usage: p2552_b_dataloss_test.py <datadir>      (KMT_NOSTART=1: a running server)"""
+import json
 import os
 import sys
 from datetime import date
@@ -93,6 +94,14 @@ r = Fr.post(B + f"/api/office/cards/trash/{TID}/restore")
 check(r.status_code == 409 and not sql("SELECT 1 FROM office_cc_lines WHERE id=?", (LID,)), f"B21: a confirmed statement takes no position back (409) {r.status_code}")
 check(Fr.post(B + O + f"/trash/{TID}/restore").status_code == 409, "B21: the office trash refuses it as well (409)")
 check(sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B21: the copy stays in the trash after the refusal")
+# 2.552.0 (#4561, review F4): the card itself deleted meanwhile: the position does not go back into its statement
+card2 = Fr.post(B + K, json={"holder_id": FID, "last4": "8765"}).json()["id"]
+SID2 = Fr.post(B + f"{K}/{card2}/statements", files={"file": ("stmt.pdf", b"%PDF-1.4\n%%EOF\n", "application/pdf")}, data={"month": D[:7]}).json()["statement"]["id"]
+LID2 = Fr.post(B + f"{K}/statements/{SID2}/lines", json={"day": D, "merchant": "Kartenweg Beispiel", "amount": "3.00"}).json()["line"]["id"]
+TID2 = Fr.delete(B + f"{K}/lines/{LID2}").json().get("trash_id")
+sql("UPDATE office_cc_cards SET deleted_at=? WHERE id=?", (D + "T00:00:00", card2))
+check(Fr.post(B + O + f"/trash/{TID2}/restore").status_code == 409 and not sql("SELECT 1 FROM office_cc_lines WHERE id=?", (LID2,)),
+      "B21 (review F4): a deleted card takes no position back (409)")
 
 # ================================================================== B19 a draft whose client is gone for good comes back without it
 CID = Fr.post(B + "/api/clients", json={"name": "Weggangskunde GmbH", "email": "weg@example.com"}).json()["id"]
@@ -114,6 +123,17 @@ row = sql("SELECT client_id, project_title FROM office_docs WHERE id=?", (DID,))
 check(row and row[0][0] is None, f"B19: the draft has no client now: {row}")
 check(Fr.get(B + O + f"/docs/{DID}").ok, "B19: the draft opens")
 check(not sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B19: the copy left the trash")
+# 2.552.0 (#4561, review F1): a finalised document never comes back changed - its client gone for good = still 409
+CID2 = Fr.post(B + "/api/clients", json={"name": "Festkunde GmbH", "email": "fest@example.com"}).json()["id"]
+DID2 = Fr.post(B + O + "/docs", json={"project_title": "Sommer Beispiel", "client_id": CID2}).json()["id"]
+TID3 = Fr.delete(B + O + f"/docs/{DID2}").json().get("trash_id")
+snap = json.loads(sql("SELECT snap FROM office_trash WHERE id=?", (TID3,))[0][0])
+snap["rows"][0][1][0]["locked_at"] = D + "T00:00:00"  # the copy as a finalised quotation's (2.530.0)
+sql("UPDATE office_trash SET snap=? WHERE id=?", (json.dumps(snap), TID3))
+check(Fr.delete(B + f"/api/clients/{CID2}").ok and Fr.delete(B + f"/api/clients/{CID2}/purge").ok, "B19 (review F1): its client deleted for good")
+r = Fr.post(B + O + f"/trash/{TID3}/restore")
+check(r.status_code == 409 and not sql("SELECT 1 FROM office_docs WHERE id=?", (DID2,)) and sql("SELECT 1 FROM office_trash WHERE id=?", (TID3,)),
+      f"B19 (review F1): a finalised copy is refused (409), it stays in the trash {r.status_code} {r.text[:160]}")
 
 # ================================================================== B12 values of moved tasks: the delete dialogs name them
 Fr.patch(B + "/api/settings", json={"set_delta": {"features": {"add": ["fields"]}}})
@@ -161,6 +181,11 @@ check(r.ok and wpath(W1) == "Archiv/Laufend", f"B28: the folder is renamed {r.st
 check(wpath(W2) == "Archiv/Abgelegt" and wtrashed(W2), f"B28: the page in the trash followed and stays in the trash: {wpath(W2)}")
 r = Fr.post(B + "/api/wiki/restore", json={"ids": [W2]})
 check(r.ok and r.json().get("ids") == [W2] and wpath(W2) == "Archiv/Abgelegt" and not wtrashed(W2), f"B28: restored into the renamed folder {r.text[:200]}")
+# 2.552.0 (#4561, review F5): the folder's own page (same name as the folder) in the trash follows as well
+W7, W8 = wpage("Mappe"), wpage("Mappe/Inhalt")
+check(Fr.delete(B + f"/api/wiki/pages/{W7}").ok, "B28 (review F5): the folder's own page in the trash")
+r = Fr.post(B + "/api/wiki/move", json={"space": "private", "from": "Mappe", "to": "Ablage"})
+check(r.ok and wpath(W8) == "Ablage/Inhalt" and wpath(W7) == "Ablage" and wtrashed(W7), f"B28 (review F5): the folder's own page followed: {wpath(W7)}")
 
 # the tree's rename (PATCH of the folder node)
 W3, W4 = wpage("Kunden/Offen"), wpage("Kunden/Erledigt")
