@@ -10,10 +10,11 @@ from decimal import Decimal, InvalidOperation
 from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR
-from ..core.db import body, bump, db, err, iso, now_utc, insert_id
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, insert_id
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.i18n import tr
 from ..core.numtext import server_num
-from ..core.pg import st_ids  # 2.525.0 (#4195): an id set as one array parameter
+from ..core.pg import st_ids, write_lock  # 2.525.0 (#4195): an id set as one array parameter
 from ..core.access import Denied, acx_of
 from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
@@ -608,9 +609,16 @@ def docs_patch(nid):
     _no_agent()
     _doc(c, nid, write=True)
     d = body()
+    # 2.564.0 D (#4701): the version the document sheet works on (expect_updated_at); saved meantime -> 409 + the document
+    write_lock(c, f"doc_meta-{nid}")
+    m0, n0 = _doc(c, nid)
+    ccf_check(d, m0["updated_at"], "doc", lambda: doc_json(c, m0, n0, full=True, role=n0["role"]))
+    if isinstance(d, dict):
+        d = {k: v for k, v in d.items() if k != "expect_updated_at"}
     e = doc_update(c, nid, d, me())
     if e:
         return e
+    c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))  # every saved change is a new version (tags, folder ...)
     if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")

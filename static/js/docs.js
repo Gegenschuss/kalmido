@@ -581,6 +581,10 @@ function dc_localDoc(d, body) {
 }
 // 2.559.0 (#4659): the changes of a document still on their way (id -> bodies): an earlier answer keeps the later ones on top
 const DC_PEND = new Map();
+const DC_VER = new Map(), DC_Q = new Map();  // 2.564.0 D (#4701): id -> the version the sheet saves against / its chain of changes
+// the newest version this sheet knows: its own last answer or the document as the sheet shows it (opened, undo, accept);
+// ISO texts compare in time order (".123" after the same second without)
+const dc_ver = id => { const a = DC_VER.get(id) || '', b = DC.doc?.id === id ? DC.doc.updated_at || '' : ''; return a > b ? a : b; };
 async function dc_patch(id, body, label) {
   const before = DC.doc && DC.doc.id === id ? Object.fromEntries(Object.keys(body).map(k => [k, dc_cur(DC.doc, k, body[k])])) : null;
   const d0 = DC.doc?.id === id ? DC.doc : null, pend = DC_PEND.get(id) || [];
@@ -588,9 +592,19 @@ async function dc_patch(id, body, label) {
   const done = () => { pend.splice(pend.indexOf(body), 1); if (!pend.length && DC_PEND.get(id) === pend) DC_PEND.delete(id); };
   if (d0) { DC.doc = dc_localDoc(d0, body); dc_mdDraw($('.dc-md')); }  // at once, the request behind it
   let d;
-  try { d = await api('PATCH', `/api/docs/${id}`, body); } catch {  // the fields of this change as they were (the others stay)
+  // 2.564.0 D (#4701): one change after the other, each against the version the sheet has (the last answer): saved meantime
+  // elsewhere = 409, api() says why and the sheet shows the current document instead of overwriting it
+  const run = (DC_Q.get(id) || Promise.resolve()).catch(() => {}).then(async () => {
+    const v = dc_ver(id), x = await api('PATCH', `/api/docs/${id}`, v ? {...body, expect_updated_at: v} : body);
+    if (x?.updated_at) DC_VER.set(id, x.updated_at);
+    return x;
+  });
+  DC_Q.set(id, run);
+  try { d = await run; } catch (x) {  // the fields of this change as they were (the others stay)
     done();
-    if (d0 && DC.doc?.id === id) DC.doc = {...DC.doc, ...Object.fromEntries(Object.keys(body).map(k => [k, d0[k]]))};
+    const cur = x?.status === 409 ? x.data?.doc : null;
+    if (cur) { DC_VER.set(id, cur.updated_at); if (DC.doc?.id === id) DC.doc = pend.reduce(dc_localDoc, cur); }
+    else if (d0 && DC.doc?.id === id) DC.doc = {...DC.doc, ...Object.fromEntries(Object.keys(body).map(k => [k, d0[k]]))};
     dc_mdDraw($('.dc-md')); return;
   }
   done();
