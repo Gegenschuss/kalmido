@@ -742,11 +742,15 @@ def _need_share_node(c, nid, strict=False):
     return n
 
 
-def _share_targets(c, n):
+def _share_targets(c, n, uid=None):
     """{people, groups, agents} the owner may share node n with: the same workspace only (an organisation's node: its members
     and its agents; a private node: the people the person may share lists with and the private agents without an owner or
-    their own -- the agents a list can be shared with)."""
-    uid = me()
+    their own -- the agents a list can be shared with). uid: who shares (default the signed-in person; 2.558.0 #4709 review
+    F5: core/objects.py obj_share passes its own, then the groups are the ones uid made or belongs to unless uid is the
+    signed-in person)."""
+    from flask import g, has_request_context
+    asker = uid is None or (has_request_context() and getattr(g, "user", None) is not None and g.user["id"] == uid)
+    uid = me() if uid is None else uid
     vis = visible_people(c, uid)
     org = n["org_id"]
     people, agents = [], []
@@ -768,7 +772,12 @@ def _share_targets(c, n):
         people.append({"id": r["id"], "name": r["display_name"]})
     groups = []
     if collab_all() and not wk:
-        groups = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM groups ORDER BY name") if grp_visible(c, r)]
+        if asker:
+            groups = [{"id": r["id"], "name": r["name"]} for r in c.execute("SELECT id, name FROM groups ORDER BY name") if grp_visible(c, r)]
+        else:
+            groups = [{"id": r["id"], "name": r["name"]} for r in c.execute(
+                "SELECT id, name FROM groups WHERE created_by=? OR id IN (SELECT group_id FROM group_members WHERE user_id=?) ORDER BY name",
+                (int(uid), int(uid)))]
     from .fslock import fl_is_locked
     if fl_is_locked(c, n["id"]):
         agents = []  # 2.353.0 A (#2758): a locked folder is never shared with agents

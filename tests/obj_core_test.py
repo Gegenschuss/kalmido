@@ -9,7 +9,7 @@ generic routes (core/objweb.py) with the test kind 'objprobe' (KALMIDO_TEST_OBJ=
  - a folder share of the file store opens an object filed there (one register: fsref)
  - agents: only an explicit share, never another workspace, hidden objects and the data lock give nothing
  - a listing reads the share chain once (review F3): 12 more objects cost a member or a folder share no statement more
- - called outside a request (an area's own code): an agent creates nothing (F4)
+ - called outside a request (an area's own code): an agent creates nothing (F4), obj_share uses its uid, not the session (F5)
  - the trash: only who manages it sees it (?trash=1), restore, a member gets 404 meanwhile
  - an account deleted: its organisation objects go to the heir (review F1), its private ones go with it
  - obj_revoke_person: leaving takes the shares on the organisation's nodes and the team chat rooms along (coming back as a
@@ -160,6 +160,16 @@ except Denied as e:
     print("DENIED", e.code)""")
 check("DENIED 403" in out and dbx("SELECT COUNT(*) FROM obj_probe WHERE title=?", ("Bot's plan",))[0][0] == 0,
       f"F4: an agent makes no object (creating stays with people): {out[-300:]}")
+out = in_app(f"""from kalmido.core.objects import obj_share
+for t in ({uid['carl']}, {uid['olga']}):
+    try:
+        print("SHARED", t, obj_share(c, {ALICE}, "{K}", {O3}, "user_id", t, "view"))
+    except Denied as e:
+        print("DENIED", t, e.code)
+c.rollback()""")
+check(f"SHARED {uid['carl']}" in out and f"DENIED {uid['olga']} 409" in out,
+      f"F5: obj_share outside a request takes its uid (the same workspace still only): {out[-300:]}")
+
 # ---------------------------------------------------------------- another organisation / person: 404 on every route (tenant-matrix: obj)
 OAG = agent(Ol, "otherbot", ORG2)
 for s, who in ((Ol, "olga"), (Fr, "frida")):

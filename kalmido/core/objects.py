@@ -527,10 +527,11 @@ def obj_node(c, uid, kind, rid, make=False):
     return c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
 
 
-def _pool_ok(c, n, key, tid):
-    """Is target (key, tid) one the signed-in person may share node n with (files/web.py: the same workspace only)?"""
+def _pool_ok(c, n, key, tid, uid=None):
+    """Is target (key, tid) one uid (default the signed-in person) may share node n with (files/web.py: the same workspace
+    only)? Review F5: obj_share / obj_share_restore pass their own uid."""
     from ..files.web import _share_targets
-    pool = _share_targets(c, n)[{"user_id": "people", "group_id": "groups", "agent_id": "agents"}[key]]
+    pool = _share_targets(c, n, uid=int(uid) if uid else None)[{"user_id": "people", "group_id": "groups", "agent_id": "agents"}[key]]
     return any(x["id"] == tid for x in pool)
 
 
@@ -546,7 +547,7 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
     if isinstance(target, bool) or not isinstance(target, int):
         raise BadInput(tr("Invalid value: {0}", key))
     n = obj_node(c, uid, kind, rid, make=True)
-    if not _pool_ok(c, n, key, target):
+    if not _pool_ok(c, n, key, target, uid):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
     if key == "agent_id":
         from ..files.fslock import fl_is_locked, fsl_denied
@@ -606,7 +607,7 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
     s = json.loads(r["row_json"])
     key = next((k for k in ("user_id", "group_id", "agent_id") if s.get(k)), None)
     n = obj_node(c, uid, kind, rid, make=True)
-    if not key or not _pool_ok(c, n, key, int(s[key])):
+    if not key or not _pool_ok(c, n, key, int(s[key]), uid):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
     if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone():
         c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
