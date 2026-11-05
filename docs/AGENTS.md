@@ -4347,6 +4347,16 @@ with `view` is `403`, everything else `404`. The token needs the area's scopes (
 `tasks:write`; the MCP server lists `update_object` only for a token with `tasks:write`). Every change of yours is in the
 object's history, marked as an agent's. Creating, deleting, the trash and sharing stay with people.
 
+*Since 2.566.0 (stage 3, #4712):* calendars and address books are kinds of the shared core too (`evcal`, `address_book`),
+without the generic object routes above: agents keep the calendar and address book API (`/event-calendars`, `/events`,
+`/address-books`, CalDAV / CardDAV). A calendar or address book shared with you is a share of the core on its node of the file
+store: taken back there or in the calendar / address book, your owner leaving the organisation or the organisation retiring
+ends your access at once; the data lock `calendar` / `contacts` applies through the core. `DELETE /event-calendars/{id}`
+(`delete_event_calendar`) puts the calendar into the trash with its events: a person restores it in the app within the
+trash period (no agent route). Every change of an event (the series or one occurrence; app, API, CalDAV) runs under one
+lock of the series, so `expect` (also as `expect_updated_at`) and CalDAV's `If-Match` compare with what is really stored
+(`409` / `412` when it changed meanwhile).
+
 ## Knowledge pages
 
 *Since 2.200.0.*

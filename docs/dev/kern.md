@@ -64,6 +64,10 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
   `on_revoke` (its part of `obj_revoke_person`) and `list_col` (the column a token's project limit is checked against). Its
   routes call `obj_share(..., extra=..., checked=True)` / `obj_unshare(..., checked=True)` after checking the right and the
   target themselves.
+- An old area moving onto the core (stage 3): `members=(table, key column)` names its old member table (one release a
+  fallback reader): `obj_revoke_person` takes its rows with the shares when a person leaves / the organisation retires.
+  `fs_hooks={...}` replaces keyword arguments of the file store's registration, for a kind the file store knew before the core
+  (the address books keep their folder rules: filing and sharing the node stay with who manages it).
 
 The kind is registered with the file store's reference nodes at the same time (files/fsref.py): the object can lie in
 folders, and a folder share opens it.
@@ -162,6 +166,22 @@ A new area tests its kind with a suite of its own (the role matrix of tests/obj_
 organisations + a private person, read-only, guest, a group, an agent, an expired share, the trash) and carries the markers
 `tenant-matrix:` / `freelancer-matrix:` of its routes. The core itself is tested with the test kind `objprobe`
 (`KALMIDO_TEST_OBJ=1`, tests/obj_probe.py).
+
+## Stage 3: calendars and address books (2.566.0, #4712)
+
+- `evcal` (ev_cals, events/evkern.py) and `address_book` (books, contacts/ctkern.py) are kinds without the generic routes
+  (`routes=False`); their own routes, the API v1 and CalDAV / CardDAV call the core. Their role is `obj_role`
+  (events/model.py `ev_role`; the books' `book_role` reads the same share through its folder way, `ctf_node_role`).
+- Their shares are rows of `fs_shares` on the object's reference node. The trigger `kalmido_kern_mirror`
+  (core/migrations.d/4712_a.py) mirrors every change of the old member tables `ev_cal_members` / `book_members` into them
+  (a row added, its role changed, deleted -- any code path), once the object has a node: the start's one-shot
+  (`migr_kern4712`) gave every calendar / book with members its node, a new member gets it first. With a live node only the
+  core's share counts, so a share taken back in the core (the file store's dialog, `obj_revoke_person`) stays taken back;
+  without one the old row is still read. Stage 7 removes the old tables and the trigger.
+- The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
+  (`ev_cal_trash`, restore `POST /api/evcals/<id>/restore`, purged with the events' trash run). Events are no kind of their
+  own (their series, attendees and iCalendar have rules of their own): every change runs under the series lock
+  `write_lock('obj-event-<id>')` with the row read again (`ev_lock`), CalDAV's If-Match under the same lock.
 
 ## Not in stage 1
 
