@@ -172,6 +172,19 @@ check(r.status_code == 409, f"cells with an old rev: 409 {r.status_code}")
 r = call(AGH, "PUT", f"/sheets/{SID}/cells", json={"cells": [{"cell": "B1", "raw": "9", "prev": "1"}]})
 check(r.ok and r.json()["conflicts"] and r.json()["conflicts"][0]["server"] == "5", f"cells with prev: the person's input stays {r.text[:300]}")
 
+# the table's title (2.564.0: under the table's lock and in its history)
+rev = call(AGH, "GET", f"/sheets/{SID}").json()["rev"]
+r = call(AGH, "PATCH", f"/sheets/{SID}", json={"title": "Budget 2"})
+check(vreq(r) and r.json()["error"]["fields"] == ["expect_rev"], f"title without a version: 400 {r.status_code} {r.text[:200]}")
+r = call(AGH, "PATCH", f"/sheets/{SID}", json={"title": "Budget 2", "expect_rev": rev - 1})
+check(conflict(r) and call(AGH, "GET", f"/sheets/{SID}").json()["title"] == "Budget", f"title with an old rev: 409, the title stays {r.status_code} {r.text[:200]}")
+r = call(AGH, "PATCH", f"/sheets/{SID}", json={"title": "Budget 2", "expect_rev": rev})
+check(r.ok and r.json()["title"] == "Budget 2", f"title with the current rev: renamed {r.status_code} {r.text[:200]}")
+hh = [e for e in A.get(B + f"/api/sheets/{SID}/history").json().get("entries", []) if e.get("what") == "title"]
+check(len(hh) == 1 and hh[0]["old"] == "Budget" and hh[0]["new"] == "Budget 2", f"the rename is in the table's history {hh}")
+r = call(PH, "PATCH", f"/sheets/{SID}", json={"title": "Budget 3"})
+check(r.ok and r.json()["title"] == "Budget 3", f"a person's token renames without a version: as before {r.status_code} {r.text[:200]}")
+
 
 # ================================================================== a new file version
 def files_round(who, h, person_h=None):
@@ -185,7 +198,8 @@ def files_round(who, h, person_h=None):
     r = call(h, "POST", f"/files/{fid}/versions", json={"content": "v2", "expect_version": 1})
     check(r.status_code == 201 and r.json().get("version") == 2, f"{who}: the current version writes {r.status_code} {r.text[:200]}")
     r = call(h, "POST", f"/files/{fid}/versions", json={"content": "v3", "expect_version": 1})
-    check(conflict(r), f"{who}: an old version: 409 conflict {r.status_code} {r.text[:200]}")
+    check(conflict(r) and (r.json()["error"].get("current") or r.json().get("current") or {}).get("version") == 2,
+          f"{who}: an old version: 409 conflict with the file now {r.status_code} {r.text[:200]}")
     check(call(h, "GET", f"/files/{fid}/text").json().get("version") == 2, f"{who}: no version 3 came")
     check(call(h, "POST", f"/files/{fid}/versions", json={"content": "v3", "expect_version": "2"}).status_code == 400, f"{who}: expect_version must be a number")
     r = call(h, "POST", f"/files/{fid}/versions", hdr={"If-Match": '"2"'}, json={"content": "v3"})

@@ -147,7 +147,7 @@ check(cells(d)["D4"]["value"] == 240 and [o["label"] for o in d["columns"][4]["o
       "the new row is calculated, a new label became a choice")
 r = ta.post(V + f"/sheets/{SID}/columns", json={"title": "Notiz", "kind": "text"})
 check(r.status_code == 201 and r.json()["col_id"], "add a column " + r.text[:200])
-check(ta.patch(V + f"/sheets/{SID}", json={"title": "Angebot Garten 2"}).json()["title"] == "Angebot Garten 2", "rename")
+check(ta.patch(V + f"/sheets/{SID}", json={"title": "Angebot Garten 2", "expect_rev": ta.get(V + f"/sheets/{SID}").json()["rev"]}).json()["title"] == "Angebot Garten 2", "rename")
 vs = ta.get(V + f"/sheets/{SID}/vars").json()["data"]
 toks = {v["token"] for v in vs}
 check("list.garden.open" in toks and "here.open" in toks, "vars: the shared list and hier")
@@ -313,7 +313,7 @@ RB = r.json()["id"]
 check(ta.get(V + f"/sheets/{RB}").ok, "review 2: the team agent sees bob's table on the shared list")
 check(ta.patch(V + f"/sheets/{RB}", json={"list_id": None}).status_code == 403, "review 2: the agent cannot detach a table it did not create")
 check(Bo.get(B + f"/api/sheets/{RB}").json()["list_id"] == W, "review 2: ... the table stays attached")
-check(ta.patch(V + f"/sheets/{RB}", json={"title": "Renamed by agent"}).ok, "review 2: renaming stays allowed")
+check(ta.patch(V + f"/sheets/{RB}", json={"title": "Renamed by agent", "expect_rev": ta.get(V + f"/sheets/{RB}").json()["rev"]}).ok, "review 2: renaming stays allowed")  # 2.564.0 (#4702): an agent sends the version it read
 r = ta.post(V + "/sheets", json={"title": "Own bound", "space": f"org:{ORG}", "list_id": W})
 check(r.status_code == 201 and ta.patch(V + f"/sheets/{r.json()['id']}", json={"list_id": None}).ok,
       "review 2: the agent detaches a table it created itself")
