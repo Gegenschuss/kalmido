@@ -1003,7 +1003,7 @@ def proposal_apply(jid):
 @app.post("/api/proposals/<int:jid>/discard")
 def proposal_discard(jid):
     c = db()
-    j = need_prop(c, jid, team=True)  # 2.569.0 B (#4675)
+    j = need_prop(c, jid)  # 2.569.0 (#4675 review): only the one who asked discards; the project's writers see and apply
     if j["prop_state"] in ("applied", "discarded"):
         return err(tr("This proposal was already applied or discarded"), 409)
     ts = iso(now_utc())

@@ -197,6 +197,8 @@ for s, who in ((Ri, "rita (read only)"), (Ol, "another organisation"), (Fr, "a p
     check(s.get(B + f"/api/lists/{P}/agent-proposals").status_code == 404, f"{who}: the project's proposals 404")
     check(not any(x["kind"] == "job" and x["id"] == JID for x in s.get(B + "/api/inbox").json().get("items", [])), f"{who}: not waiting")
     check(s.post(B + f"/api/proposals/{JID}/discard", json={}).status_code == 404, f"{who}: no discard")
+# 2.569.0 (#4675 review): only the one who asked discards another's proposal - dora sees and applies, never throws it away
+check(Do.post(B + f"/api/proposals/{JID}/discard", json={}).status_code == 404, "dora (write rights, not who asked): no discard")
 r = Do.post(B + f"/api/proposals/{JID}/apply", json={"select": ["0"]})
 check(r.ok and r.json().get("created") == 1, f"dora applies it {r.status_code} {r.text[:200]}")
 check(dbx("SELECT COUNT(*) FROM tasks WHERE parent_id=? AND title='Sharpen the pencils' AND deleted_at IS NULL", (T2,)) == [(1,)], "the subtask is there")
@@ -226,6 +228,20 @@ check(until(lambda: agent_comments(TF, FAG), 40), "frida's task starts the run (
 fr = until(lambda: [x for x in runs(FAG) if x[1] != "run"] or None, 20)
 check(fr and len(fr) == 1 and fr[0][1] == "done" and fr[0][2] == "task_added" and fr[0][3] == FID, f"one run, for frida {fr}")
 check(not any("GINA-CHAT" in json.dumps(x) or "GINA-MENTION" in json.dumps(x) for x in plog()), "gina's chat and mention never reached the model")
+# 2.569.0 (#4675 review): a proposal of frida's PERSONAL server agent in the shared project stays frida's - gina (edit) never sees it
+r = Fr.post(B + "/api/proposals", json={"agent_id": FAG, "kind": "subtasks", "task_id": TF})
+check(r.status_code in (200, 201), f"frida asks her agent for subtasks {r.status_code} {r.text[:200]}")
+FJ = r.json().get("job", r.json()).get("id")
+r = Fr.post(B + f"/api/my/agents/{FAG}/token", json={})
+check(r.ok, f"a token of frida's agent {r.status_code}")
+FT = {"Authorization": "Bearer " + r.json()["token"], "X-Requested-With": "kalmido"}
+r = requests.post(B + f"/api/v1/agent/jobs/{FJ}/proposal", headers=FT, json={"kind": "subtasks", "items": [{"title": "Frida's step"}]}, timeout=30)
+check(r.ok, f"her agent's proposal {r.status_code} {r.text[:200]}")
+check(Fr.get(B + f"/api/proposals/{FJ}").ok, "frida sees her agent's proposal")
+check(Gi.get(B + f"/api/proposals/{FJ}").status_code == 404, "gina (write rights) does not see the personal agent's proposal")
+check(Gi.post(B + f"/api/proposals/{FJ}/apply", json={"select": ["0"]}).status_code == 404, "... nor applies it")
+check(not any(p["id"] == FJ for p in Gi.get(B + f"/api/lists/{FL}/agent-proposals").json().get("proposals", [])), "... nor finds it in the project")
+check(not any(x["kind"] == "job" and x["id"] == FJ for x in Gi.get(B + "/api/inbox").json().get("items", [])), "... nor waiting for her")
 
 logs = subprocess.run(["docker", "logs", CT], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True).stdout
 check(not any(k in logs for k in (KEY_ORG, KEY_FR)), "no key in the server log")

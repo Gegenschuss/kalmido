@@ -300,7 +300,7 @@ def srv_team_create(oid):
 # ---------------------------------------------------------------- proposals in team projects
 
 def srv_prop_team_ok(c, j, uid):
-    """May person uid (not the one who asked) see proposal job j? Only a proposal of a server agent that belongs to one project
+    """May person uid (not the one who asked) see proposal job j? Only a proposal of a TEAM server agent that belongs to one project
     (SRV_TEAM_PROP_KINDS with its list_id, not a basket) and only with write rights in that project (list_role)."""
     if not j or not j["kind"] or j["kind"] not in SRV_TEAM_PROP_KINDS or not j["list_id"] or not uid:
         return False
@@ -308,6 +308,8 @@ def srv_prop_team_ok(c, j, uid):
         a = agent_row(c, j["agent_id"])
         u = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
     if not a or (a["provider"] or "") != SRV_PROV or not u or u["kind"] == "agent":
+        return False
+    if a["owner_id"]:  # review: a personal server agent works for its owner alone - its proposals stay with the one who asked
         return False
     lst = c.execute("SELECT is_inbox FROM lists WHERE id=?", (j["list_id"],)).fetchone()
     return bool(lst) and not lst["is_inbox"] and list_role(c, j["list_id"], uid) in WRITE_ROLES
