@@ -233,7 +233,7 @@ async function firefox(fn) {
   click(w, gm.querySelector('[data-m="agg-copy"]')); await sleep(200);
   check(copied && copied.includes('/etc/kalmido/agent.env') && /docs\/AGENT-SECURITY\.md/.test(copied), 'Copy prompt');
   click(w, gm.querySelector('[data-agt="b"]')); await sleep(100);
-  check(!gm.querySelector('[data-agp="b"]').hidden && gm.querySelector('[data-agp="a"]').hidden && gm.querySelectorAll('.agsteps.agb li').length === 11, 'Do it yourself: 11 steps');
+  check(!gm.querySelector('[data-agp="b"]').hidden && gm.querySelector('[data-agp="a"]').hidden && gm.querySelectorAll('.agsteps.agb li').length === 12, 'Do it yourself: 12 steps (#4179: control level)');
   check(gm.querySelector('a[href$="docs/AGENT-SETUP.md"]') && gm.querySelector('a[href$="docs/AGENT-SECURITY.md"]'), 'links to AGENT-SETUP.md and AGENT-SECURITY.md');
   [...d.querySelectorAll('.modal')].forEach(m => m.remove());
   w.close();

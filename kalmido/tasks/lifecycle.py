@@ -957,9 +957,9 @@ def tre_cascades(c, ids, list_ids=()):
     with system_ctx(c):
         if list_ids:
             ids = [*ids, *(r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id = ANY(CAST(? AS BIGINT[]))", (st_ids(list_ids),)))]
-        alls = [r[0] for r in c.execute(f"""WITH RECURSIVE d(id, lvl) AS (SELECT id, 0 FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) UNION
-                    SELECT t.id, d.lvl + 1 FROM tasks t JOIN d ON t.parent_id=d.id WHERE d.lvl < {MAX_DEPTH + 7})
-                    SELECT DISTINCT id FROM d""", (st_ids(ids),))] if ids else []
+        alls = [r[0] for r in c.execute("""WITH RECURSIVE d(id, lvl) AS (SELECT id, 0 FROM tasks WHERE id = ANY(CAST(? AS BIGINT[])) UNION
+                    SELECT t.id, d.lvl + 1 FROM tasks t JOIN d ON t.parent_id=d.id WHERE d.lvl < ?)
+                    SELECT DISTINCT id FROM d""", (st_ids(ids), MAX_DEPTH + 7))] if ids else []
         a, out = st_ids(alls), {"videos": vdr_doomed_count(c, task_ids=alls, list_ids=list_ids)}
         for k, t in (("tickets", "portal_tickets"), ("forms", "form_entries")):
             out[k] = c.execute(f"SELECT COUNT(*) FROM {t} WHERE task_id = ANY(CAST(? AS BIGINT[]))", (a,)).fetchone()[0] if alls else 0
