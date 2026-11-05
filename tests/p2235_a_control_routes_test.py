@@ -65,6 +65,7 @@ ROUTES = {
     "DELETE /api/v1/tasks/{}": "one_way", "DELETE /api/v1/tasks/{}/contacts/{}": "one_way",
     "DELETE /api/v1/tasks/{}/dependencies/{}": "one_way", "DELETE /api/v1/tasks/{}/links/{}": "one_way",
     "DELETE /api/v1/team/messages/{}": "one_way", "DELETE /api/v1/team/rooms/{}/members/{}": "one_way",
+    "DELETE /api/v1/team/rooms/{}/groups/{}": "one_way",  # 2.565.0 (#4719): unshare a channel from a group, like removing a member
     "DELETE /api/v1/templates/{}": "one_way", "DELETE /api/v1/time/entries/{}": "one_way", "DELETE /api/v1/trash": "one_way",
     "POST /api/v1/folders/delete": "one_way", "POST /api/v1/imports/{}/undo": "one_way",
     # ---- change
