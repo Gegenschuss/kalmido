@@ -268,7 +268,8 @@ check(r.status_code == 201 and r.json().get("images") is True, "#2356: a link wi
 S1, T1 = r.json().get("id"), r.json().get("url", "").rsplit("/", 1)[-1]
 p = requests.get(B + "/s/w/" + T1)
 check(p.ok and f'src="/s/w/{T1}/img/{PID}/{IMG}"' in p.text, "#2356: the public page shows the picture " + p.text[-400:])
-check(f"/{TXT}" not in p.text and "geheime" not in p.text, "#2356: a file that is no picture stays hidden")
+# 2.549.0 (#4636): exact paths, a bare "/<id>" matched other ids that merely contain the number
+check(f"/img/{PID}/{TXT}\"" not in p.text and f"/api/files/nodes/{TXT}/" not in p.text and "geheime" not in p.text, "#2356: a file that is no picture stays hidden")
 q = requests.get(B + f"/s/w/{T1}/img/{PID}/{IMG}")
 check(q.ok and q.content == PNG and q.headers.get("Content-Type", "").startswith("image/png") and "nosniff" in q.headers.get("X-Content-Type-Options", "")
       and "no-store" in q.headers.get("Cache-Control", ""), f"#2356: the picture comes through the link ({q.status_code} {q.headers.get('Content-Type')})")
