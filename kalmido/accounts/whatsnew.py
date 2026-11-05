@@ -6,8 +6,8 @@ The source is static/whatsnew.json, written by the release process only (never e
 A missing or broken file is no error: there is nothing new then. The version a person saw last (whatsnew_seen) and the
 switch (whatsnew_on, Settings > Help) are user settings, so they hold on every device. A person without a stored version
 (a new account, or the first start after this feature came) gets the current version and no dialog.
-Test containers (KALMIDO_TEST=1) read <data dir>/whatsnew-test.json instead when it exists: the suites bring their own
-example file without checking in the real one."""
+Test containers (KALMIDO_TEST=1) read only <data dir>/whatsnew-test.json (none there = no file): the suites bring their own
+example file, the real one the release writes never shows in a test."""
 import json
 import os
 import threading
@@ -38,9 +38,9 @@ def wn_ver(v):
 
 def wn_path():
     if os.environ.get("KALMIDO_TEST") == "1":  # tests only: the suite's example file in the data dir
-        p = os.path.join(os.path.dirname(DB), "whatsnew-test.json")
-        if os.path.exists(p):
-            return p
+        # 2.562.0 (#4685, CI red p2556_b_whatsnew_api): never the shipped static/whatsnew.json, so a test container
+        # without the example file has no file (the release fills the real one; it made "no file" show its versions)
+        return os.path.join(os.path.dirname(DB), "whatsnew-test.json")
     return WN_FILE
 
 
