@@ -55,11 +55,14 @@ function pp_card(x) {
     ${offer || x.list_id ? `<span class="ppmeta">${offer}${x.list_id ? `<span class="rotag">${ic('brief', 's')}${tr('Project')}</span>` : ''}</span>` : ''}</div></li>`;
 }
 
-async function pp_patch(id, body, msg = tr('Saved')) {
-  const j = await api('PATCH', `/api/office/deals/${id}`, body);
+async function pp_patch(id, body, msg = tr('Saved'), expect = null) {
+  // 2.560.0 C (#4700): the dialog sends the updated_at it opened with (saved elsewhere meanwhile -> 409 and the bar); the undo
+  // writes back only the keys that really changed, with the version this save left
+  const j = await (expect ? rawFetch : api)('PATCH', `/api/office/deals/${id}`, expect ? {...body, expect_updated_at: expect} : body);
   pp_reload();
-  const before = j.before || {};
-  if (Object.keys(before).length) toast(msg, async () => { await api('PATCH', `/api/office/deals/${id}`, before); pp_reload(); });
+  const before = Object.fromEntries(Object.entries(j.before || {}).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(j[k] ?? null)));
+  if (Object.keys(before).length) toast(msg, async () => { try { await rawFetch('PATCH', `/api/office/deals/${id}`, {...before, expect_updated_at: j.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } pp_reload(); });
+  else toast(msg);
   return j;
 }
 async function pp_move(id, stage) {
@@ -130,12 +133,20 @@ function pp_modal(x, stage) {
         probability: Math.max(0, Math.min(100, Math.round(+v('#pp-prob') || 0))), expected_date: v('#pp-date'), note: v('#pp-note'), lost_reason: v('#pp-lost')};
       if ($('#pp-client', md) && body.stage !== 'lead') body.client_id = v('#pp-client') ? +v('#pp-client') : null;
       if (lf && body.stage === 'lead') Object.assign(body, leadBody(md));  // 2.94.0 A (#1930): the lead's fields
-      if (x) { await pp_patch(x.id, body); md.remove(); }
+      if (x) { await pp_patch(x.id, body, tr('Saved'), x.updated_at || null); md.remove(); }
       else {
         const j = await api('POST', '/api/office/deals', body); md.remove(); PPS.stage = j.stage; pp_reload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/deals/${j.id}`); pp_reload(); });
       }
-    } catch (x2) { err(x2.message); }
+    } catch (x2) {
+      const el = $('.aerr', md);
+      if (el && x2.status === 409 && x2.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-pp-reload>${tr('Reload')}</button>`;
+        $('[data-pp-reload]', el).addEventListener('click', () => { md.remove(); pp_reload(); pp_modal(x2.data.row); });
+        return;
+      }
+      err(x2.message);
+    }
   });
   setTimeout(() => $('#pp-title', md)?.focus(), 30);
   return md;

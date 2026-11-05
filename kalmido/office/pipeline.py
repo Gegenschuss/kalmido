@@ -14,7 +14,8 @@ from datetime import date
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
@@ -304,10 +305,12 @@ def pl2_patch(did):
     """Partial: the fields of POST + sort, offer_id (a quotation of the office area, null = unbound). Answers the deal and
     "before" = the old values of the keys changed (the client's undo patches them back)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_deals-{int(did)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
     cur = pl2_public(c, oid, _row(c, oid, did))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur.get("updated_at"), "row", lambda: _one(c, oid, did))
     row = pl2_clean(c, oid, b, cur)
     if "offer_id" in b:
         v = b.get("offer_id")
