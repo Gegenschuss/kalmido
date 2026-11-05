@@ -59,7 +59,7 @@ function awr_mount(md, agent) {
     if (ed) {
       const r = (j?.rules || []).find(x => x.id === +ed.dataset.awrEdit); if (!r) return;
       const row = ed.closest('.awr'), n = $('.n', row);
-      n.innerHTML = `<textarea class="awredit" rows="2" maxlength="${+ed.dataset.awrMax || 500}" aria-label="${esc(tr('Rule'))}">${esc(r.text)}</textarea><span class="awrbtns"><button type="button" class="btn sm pri" data-awr-save="${r.id}">${tr('Save')}</button><button type="button" class="btn sm" data-awr-cancel="1">${tr('Cancel')}</button></span>`;
+      n.innerHTML = `<textarea class="awredit" rows="2" maxlength="${+ed.dataset.awrMax || 500}" aria-label="${esc(tr('Rule'))}">${esc(r.text)}</textarea><span class="awrbtns"><button type="button" class="btn sm pri" data-awr-save="${r.id}" data-awr-ver="${esc(r.updated_at || '')}">${tr('Save')}</button><button type="button" class="btn sm" data-awr-cancel="1">${tr('Cancel')}</button></span>`;
       $('textarea', n).focus(); return;
     }
     if (t.closest('[data-awr-cancel]')) { draw(); return; }
@@ -67,7 +67,9 @@ function awr_mount(md, agent) {
     if (sv) {
       const v = $('.awredit', sv.closest('.awr')).value.trim(); if (!v) { err(tr('The rule is empty.')); return; }
       err('');
-      try { await api('PATCH', `${base}/${sv.dataset.awrSave}`, {text: v}); await reload(); toast(tr('Rule saved')); } catch (x) { fail(x); }
+      // 2.564.0 D (#4701): against the version the box opened with; 409 = reworded meantime: the reason stays, the current rules are loaded
+      const ver = sv.dataset.awrVer;
+      try { await api('PATCH', `${base}/${sv.dataset.awrSave}`, {text: v, ...(ver ? {expect_updated_at: ver} : {})}); await reload(); toast(tr('Rule saved')); } catch (x) { if (x.status === 409) await reload(); fail(x); }
       return;
     }
     const del = t.closest('[data-awr-del]');

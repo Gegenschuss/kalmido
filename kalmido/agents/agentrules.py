@@ -14,10 +14,11 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc
+from ..core.db import body, bump, db, iso, iso_ms, now_utc
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied, task_visible
 from ..core.errors import BadInput, UnknownFields
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import v1_args, v1_json, v1_view
 from ..agents.core import agent_emit, agent_row, agent_shares, agent_usable, need_agent
 from ..agents.workstyle import ws_need_editor
@@ -224,16 +225,19 @@ def ar_route_patch(aid, rid):
     c = db()
     ws_need_editor(c, aid)
     b = body()
-    unknown = sorted(k for k in b if k not in ("text", "state"))
+    unknown = sorted(k for k in b if k not in ("text", "state", "expect_updated_at"))
     if unknown:
         raise UnknownFields(unknown)
+    _need_rule(c, aid, rid)
+    write_lock(c, f"agent_rules-{rid}")  # 2.564.0 D (#4701): reworded meantime by someone else -> 409 + the rule
     r = _need_rule(c, aid, rid)
+    ccf_check(b, r["updated_at"], "rule", lambda: _view(c, r, g.user["id"]))
     text = _text(b["text"]) if "text" in b else r["body"]
     state = b.get("state", r["state"])
     if state not in AR_STATES:
         raise BadInput(tr("Invalid value: {0}", "state"))
     if (text, state) != (r["body"], r["state"]):
-        c.execute("UPDATE agent_rules SET body=?, state=?, updated_at=? WHERE id=?", (text, state, iso(now_utc()), rid))
+        c.execute("UPDATE agent_rules SET body=?, state=?, updated_at=? WHERE id=?", (text, state, iso_ms(now_utc()), rid))
         ar_changed(c, aid, "paused" if state != r["state"] and state == "paused" else
                    "resumed" if state != r["state"] else "edited")
         bump(c)
