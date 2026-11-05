@@ -2,7 +2,7 @@
 // equipment + sets, text blocks, framework contracts, settings (company, logo, colour, language, currency, number scheme,
 // producing / raw data rules, country pack, import / export of the master data). Everything belongs to the organisation
 // one works in (the workspace switch); members read the master data, the organisation's admins edit it.
-const OFC = {tab: '', data: {}, loading: {}, seq: 0, q: '', arch: false, info: null, infoErr: null, infoLoading: false};
+const OFC = {tab: '', data: {}, loading: {}, seq: 0, q: '', arch: false, info: null, infoErr: null, infoLoading: false, fromAll: ''};  // 2.543.0 (#4606): + fromAll
 const OFC_TABS = [['offers', 'file', N_('Quotations')], ['invoices', 'receipt', N_('Invoices')], ['services', 'list', N_('Services')], ['equipment', 'camera', N_('Equipment')],
   ['texts', 'note', N_('Text blocks')], ['contracts', 'file', N_('Framework contracts')], ['settings', 'gear', N_('Settings')]];
 const OFC_UNITS = [['day', N_('Day|unit')], ['hour', N_('Hour|unit')], ['piece', N_('Piece|unit')], ['minute', N_('Minute|unit')], ['flat', N_('Flat rate|unit')], ['percent', N_('Percent|unit')]];  // 2.47.0 (#1649): percent (KSK)
@@ -86,6 +86,20 @@ function ofcAreaHint() {
   toast(tr('This office belongs to the workspace {0}. The switch at the top of the office changes the workspace.', wsName(cur)), null, 9000);
   api('PATCH', '/api/settings', {office_ws_hint: '1'}).catch(() => { /* the local copy holds until the next load */ });
 }
+// ---- 2.543.0 (#4606): "All workspaces" with more than one area (Private and an organisation, or more): the office shows the
+// overview of the areas (areas.js spo_html, like Knowledge) instead of silently one office or "Choose a workspace". The server reads the office from the workspace
+// setting, so a tap switches the workspace to that area (wsSet, the page stays) and its office opens; "All workspaces /" in
+// its head switches back to the overview. A workspace chosen = as before.
+const ofc_spaces = () => wsOptions().filter(w => w !== 'all');
+const ofc_allOvr = () => wsOn() && wsCur() === 'all' && ofc_spaces().length > 1;
+const ofc_allUpHtml = () => OFC.fromAll && wsOn() && wsCur() === OFC.fromAll ? `<button type="button" class="linkbtn ofcallup" data-ofcall="up">${esc(tr('All workspaces'))}</button><span class="abcsep" aria-hidden="true">/</span>` : '';
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('.ofcall .spovr, [data-ofcall="up"]'); if (!a) return;
+  e.preventDefault();
+  const to = a.dataset.spov || 'all';
+  OFC.fromAll = a.dataset.spov || '';
+  wsSet(to, {keep: true});
+});
 // the office's area in its header (Private / the organisation), with organisations the workspace switch itself
 function ofcAreaHtml() {
   const ws = ofcWs(), nm = OFC.info.personal ? tr('Private|workspace') : (orgLabelOf(OFC.info.org_id) || wsName(ws));
@@ -165,6 +179,7 @@ function viewOffice() {
   if (OFC.tab !== tab) { OFC.tab = tab; OFC.q = ''; }  // the search belongs to one tab
   if (tab === 'start' && ofm_menuOff(S.route.tab)) setTimeout(() => { if (ofm_menuOff(S.route.tab)) location.replace('#office/start'); }, 0);  // 2.440.0 (#3609)
   pb_wsFollow();
+  if (ofc_allOvr()) return `<div class="dash office ofcall">${spo_html(() => 'office', ofc_spaces().map(w => [w, wsName(w), wsIcon(w)]))}</div>`;  // 2.543.0 (#4606)
   if (!OFC.info && !OFC.infoErr && !OFC.infoLoading) setTimeout(ofcInfo, 0);
   // 2.87.9 (#1917): no tab row any more -- the office menu (areas.js ofm_menuHtml, via mg_wrap) leads to every tab
   if (OFC.info) ofm_admSeen(OFC.info.role === 'admin', OFC.info.rights, OFC.info.used, OFC.info.settings?.menu_off);  // 2.276.0 A (#3039): + used; 2.440.0 (#3609): + the points switched off
@@ -187,7 +202,7 @@ function viewOffice() {
   const ro = ['readonly', 'accounting'].includes(OFC.info?.role)  // 2.143.0 A (#2151): reads only (create / delete hidden in app.css)
     || (!!ofr_grp() && !!ofr_area(tab) && ['none', 'view'].includes(ofr_lvOf(ofr_area(tab))) && !(tab === 'receipts' && OFC.info?.submit));  // 2.356.0 D (#3129): hands in  // 2.187.0 A (#2476): the group's level of this area
   // 2.147.2 A (#2500): the role words here, not oinvRoleSel (settings module): a direct start of the office threw and stayed on "Loading…"
-  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}>${OFC.info && typeof tri_stripHtml === 'function' ? tri_stripHtml() : '' /* 2.417.0 C (#3445): the test mode strip */}<div class="ofchead">${OFC.info ? `${ofcAreaHtml()/* 2.356.0 B (#2932) */}<span class="muted ofcorg">${OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : ''}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
+  const html = `<div class="dash office" data-ofctab="${tab}"${ro ? ' data-ofcro="1"' : ''}>${OFC.info && typeof tri_stripHtml === 'function' ? tri_stripHtml() : '' /* 2.417.0 C (#3445): the test mode strip */}<div class="ofchead">${OFC.info ? `${ofc_allUpHtml() /* 2.543.0 (#4606) */}${ofcAreaHtml()/* 2.356.0 B (#2932) */}<span class="muted ofcorg">${OFC.info.settings?.company?.name ? ` · ${esc(OFC.info.settings.company.name)}` : ''}${OFC.info.role === 'admin' ? ` · ${tr('Admin|role')}` : ro ? ` · ${esc(OFC.info.role === 'readonly' || ofr_grp() ? tr('Read-only') : tr('Accounting'))}` : ''}</span>` : ''}</div><div class="ofcbody"${ofcDocTab(tab) && !body ? ' data-fl-fill' : ''}>${body}</div></div>`;
   if (ofcDocTab(tab) && OFC.info && typeof ofdOffersTab === 'function') setTimeout(() => { const el = $('.office .ofcbody .pboffers') || $('.office .ofcbody'); if (el && ofcTab() === tab) ofdOffersTab(el); }, 0);  // 2.47.3 (#1360): below the hint
   return html;
 }

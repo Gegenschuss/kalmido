@@ -1572,7 +1572,7 @@ function parseHash() {
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
   if (a === 'l' && listById(+b)?.life === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): a budget list opens its budget
   if (a === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): budget/<list id> (budget.js reads the id)
-  if (b === 's' && ['ablage', 'reading', 'bookmarks', 'feeds', 'life'].includes(a)) return {mod: a, key: a, nid: null, wsp: h.split('/')[2] || ''};  // 2.540.0 (#4575 #4588): <view>/s/<space>, the space open under "All workspaces" (areas.js spo_html)
+  if (b === 's' && ['ablage', 'reading', 'bookmarks', 'feeds', 'life', 'workload'].includes(a)) return {mod: a, key: a, nid: null, wsp: h.split('/')[2] || ''};  // 2.540.0 (#4575 #4588): <view>/s/<space>, the space open under "All workspaces" (areas.js spo_html)  // 2.543.0 (#4606): + workload/s/<space> (Workload, Absences, Disposition)
   if (a === 'feeds') return {mod: 'feeds', key: 'feeds'};  // 2.85.0 B (#1162)
   if (a === 'bookmarks') return {mod: 'bookmarks', key: 'bookmarks'};  // 2.97.0 A (#1950)
   if (a === 'reading') return {mod: 'reading', key: 'reading'};  // 2.172.0 B (#2679): read later (readlater.js)

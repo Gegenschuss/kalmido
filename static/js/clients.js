@@ -12,12 +12,12 @@ const workloadOn = () => feat('workload') && collab();
 // 2.380.2 (#3407): the Einsatzplan follows the shown workspace: a company = that organisation (no picker), Private = not in
 // the menus (one person, nothing to plan; a link or a notification still opens it), All = the picker as before
 const wlWsOrg = () => { const ws = wsOn() ? wsCur() : 'all'; return ws.startsWith('org:') ? +ws.slice(4) : null; };
-const wlOrg = () => wlWsOrg() || WLV.org;
+const wlOrg = () => wlWsOrg() || tm_want(null) || WLV.org;  // 2.543.0 (#4606): + the space open under "All"
 const wlShown = () => workloadOn() && !(wsOn() && wsCur() === 'private');
 if (typeof p61b_wsOn === 'function') p61b_wsOn('workload', after => { if (!after) return; WLV.data = null; if (S.route?.mod === 'workload' && WLV.tab === 'wl') wlLoad(); });
 const formsOn = () => feat('forms');
 const CLV = {data: null, id: null, loading: false, seq: 0, month: null};
-const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl'};  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
+const WLV = {data: null, start: null, weeks: 4, org: null, loading: false, seq: 0, tab: 'wl', wsp: ''};  // 2.543.0 (#4606): + wsp  // 2.50.0 (#1195, #1194): tab wl | abs | dispo
 const clientById = id => (S.clients || []).find(c => c.id === id);
 // 2.97.0 B (#1951): the name a client shows in pickers and lists: its display name, else its name ("name (city)" when two
 // clients of one workspace share it, see team/clients.cdn_labels); documents keep the name. cdn_name: by id from S.clients
@@ -328,6 +328,7 @@ async function wlLoad() {
   const seq = ++WLV.seq;
   WLV.loading = true;
   const q = new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})});
+  WLV.wsp = tm_wsp();  // 2.543.0 (#4606): the space the rows belong to
   try { const j = await api('GET', '/api/workload?' + q); if (seq === WLV.seq) WLV.data = j; } catch { if (seq === WLV.seq) WLV.data = {error: true}; }
   WLV.loading = false;
   if (S.route.mod === 'workload' && seq === WLV.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); }
@@ -335,6 +336,7 @@ async function wlLoad() {
 function viewWorkload() {
   if (WLV.tab === 'abs') return ab2_view();  // 2.50.0 (#1195): absences (absence.js)
   if (WLV.tab === 'dispo' && dp_on()) return dp_view();  // 2.50.0 (#1194): disposition (dispo.js)
+  if (WLV.data && !WLV.loading && (WLV.wsp || '') !== tm_wsp()) WLV.data = null;  // 2.543.0 (#4606): another space opened
   if (!WLV.data && !WLV.loading) setTimeout(wlLoad, 0);
   const d = WLV.data;
   if (!d) return `<div class="dash wload"><p class="muted lempty">${tr('Loading…')}</p></div>`;
@@ -349,8 +351,10 @@ function viewWorkload() {
     return `<td class="wlc lv-${lv}${c.absent_days ? ' ab2wl' : ''}"><button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="${i}" ${c.tasks ? '' : 'disabled'} title="${esc(tip)}" aria-label="${esc(tip)}"><span class="wlbar"><i style="width:${Math.min(100, c.pct || 0)}%"></i></span><span class="wlt"><b>${fmtNum(h, 1)} h</b>${c.pct != null ? ` <small>${c.pct} %</small>` : ''}${c.unestimated ? `<small class="muted wlun">${esc(trn('{0} without an estimate', '{0} without an estimate', c.unestimated))}</small>` : ''}</span></button></td>`;
   };
   const rows = d.people.map(p => `<tr><th scope="row"><span class="wlp">${av(p.id, p.display_name)}<span class="wln"><b>${esc(p.display_name)}</b><button type="button" class="linkbtn wlcap" data-act="wl-cap" data-uid="${p.id}" ${p.own || S.me?.is_admin ? '' : 'disabled'} title="${esc(tr('Hours per week'))}">${esc(tr('{0} h / week', fmtNum(p.capacity_h, 1)))}</button></span></span></th>${p.weeks.map((c, i) => cell(p, c, i)).join('')}<td class="wlc wlnd">${p.nodate.tasks ? `<button type="button" class="wlb" data-act="wl-cell" data-uid="${p.id}" data-w="nd"><span class="wlt">${esc(trn('{0} task', '{0} tasks', p.nodate.tasks))}</span></button>` : ''}</td></tr>`).join('');
-  return `<div class="dash wload">${ab2_tabs('wl')}<div class="clhead"><span class="spacer"></span>
-      ${d.orgs.length > 1 && !wlWsOrg() ? `<select id="wl-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+  const th = tm_head(d);  // 2.543.0 (#4606)
+  if (th?.ovr) return `<div class="dash wload">${ab2_tabs('wl')}${th.ovr}</div>`;
+  return `<div class="dash wload">${ab2_tabs('wl')}${th?.crumb || ''}<div class="clhead"><span class="spacer"></span>
+      ${d.orgs.length > 1 && !wlWsOrg() && !th ? `<select id="wl-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="wl-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="wl-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="wl-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <a class="btn sm" href="/api/workload/export.xlsx?${new URLSearchParams({weeks: WLV.weeks, ...(WLV.start ? {start: WLV.start} : {}), ...(wlOrg() ? {org: wlOrg()} : {})})}" download>${ic('download', 's')} ${tr('Excel (XLSX)')}</a></div>
     <div class="muted wlnote">${tr('Only what you can see.')}<div class="shint">${tr('Open tasks assigned to each person, by their planned start, else their due date (overdue ones count this week), with their duration as the estimate.')}</div></div>
@@ -584,6 +588,22 @@ const ab2_kindName = k => tr(AB2_KINDS.find(x => x[0] === k)?.[1] || 'Away');
 function ab2_tabs(cur) {
   const t = (k, label) => `<button type="button" data-act="ab2-tab" data-v="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(label))}</button>`;
   return `<div class="seg ab2tabs" role="group" aria-label="${esc(tr('Team'))}">${t('wl', N_('Workload'))}${t('abs', N_('Absences'))}${dp_on() ? t('dispo', N_('Disposition')) : ''}</div>`;
+}
+// ---- 2.543.0 (#4606): "All workspaces" with more than one area of the shown tab: Workload, Absences and Disposition show the
+// overview of the areas (areas.js spo_html, like Knowledge and the file store) instead of a picker or silently one area; a tap
+// opens #workload/s/<space> (the three tabs keep it), the path above it leads back. A workspace chosen = as before.
+const tm_allOn = () => wsOn() && wsCur() === 'all';
+const tm_wsp = () => tm_allOn() && S.route?.mod === 'workload' ? S.route.wsp || '' : '';
+// the areas of a tab's answer: its organisations, for the absences also the personal area (Private)
+const tm_rows = (d, priv) => [...(priv && d?.personal ? [['private', tr('Private|workspace'), wsIcon('private')]] : []), ...(d?.orgs || []).map(o => ['org:' + o.id, o.name, wsIcon('org:' + o.id)])];
+// the area id to load for the open space (null = the server's choice); personal = the personal area's id once known
+const tm_want = personal => { const w = tm_wsp(); return w === 'private' ? personal || null : /^org:\d+$/.test(w) ? +w.slice(4) : null; };
+// the head of a tab under "All": {ovr} = the overview (no space open), {crumb} = the path back above the open one; null = as before
+function tm_head(d, priv) {
+  if (!tm_allOn()) return null;
+  const rows = tm_rows(d, priv); if (rows.length < 2) return null;
+  const open = rows.find(r => r[0] === tm_wsp());
+  return open ? {crumb: spo_crumbHtml('workload', open[1])} : {ovr: spo_html('workload', rows)};
 }
 // "Plan my day" on a day away / a holiday: a hint instead of the proposal (the server leaves the proposal empty)
 function ab2_dayHint(a) {

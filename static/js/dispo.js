@@ -5,14 +5,16 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const DPV = {data: null, start: null, days: 7, org: null, seq: 0, loading: false, filter: 'all', mine: null, free: null};
+const DPV = {data: null, start: null, days: 7, org: null, seq: 0, loading: false, filter: 'all', mine: null, free: null, wsp: ''};  // 2.543.0 (#4606): + wsp
 const DP_GROUPS = [['people', N_('People')], ['contacts', N_('Contacts')], ['equipment', N_('Equipment')], ['sets', N_('Equipment sets')]];
 
 async function dp_load() {
   const seq = ++DPV.seq;
   DPV.loading = true;
   const st = DPV.start || dp_monday(today());
-  const q = new URLSearchParams({start: st, days: DPV.days, ...(DPV.org ? {org: DPV.org} : {})});
+  const want = tm_want(null) || DPV.org;  // 2.543.0 (#4606): the space open under "All" first
+  const q = new URLSearchParams({start: st, days: DPV.days, ...(want ? {org: want} : {})});
+  DPV.wsp = tm_wsp();
   try {
     const [j, m] = await Promise.all([api('GET', '/api/team/dispo?' + q), api('GET', '/api/team/bookings/mine').catch(() => ({bookings: []}))]);
     if (seq === DPV.seq) { DPV.data = j; DPV.mine = m.bookings || []; }
@@ -39,6 +41,7 @@ function dp_exports(d) {
 }
 
 function dp_view() {
+  if (DPV.data && !DPV.loading && (DPV.wsp || '') !== tm_wsp()) { DPV.data = null; DPV.free = null; }  // 2.543.0 (#4606): another space opened
   if (!DPV.data && !DPV.loading) setTimeout(dp_load, 0);
   const d = DPV.data;
   if (!d) return `<div class="dash wload dp">${ab2_tabs('dispo')}<p class="muted lempty">${tr('Loading…')}</p></div>`;
@@ -78,8 +81,10 @@ function dp_view() {
   const f = (k, label) => `<button type="button" data-act="dp-filter" data-v="${k}" class="${DPV.filter === k ? 'on' : ''}" aria-pressed="${DPV.filter === k}">${esc(tr(label))}</button>`;
   const fr = DPV.free;
   const freeHtml = fr ? `<div class="dpfree"><p><b>${esc(tr('Free on {0}', fmtDayAbs(fr.date)))}</b></p>${[['people', 'People'], ['contacts', 'Contacts'], ['equipment', 'Equipment'], ['sets', 'Equipment sets']].map(([k, n]) => fr[k].length ? `<p><span class="muted">${esc(tr(n))}:</span> ${fr[k].map(r => esc(r.name)).join(', ')}</p>` : '').join('') || `<p class="muted">${tr('Nobody and nothing is free.')}</p>`}${fr.away.length ? `<p class="muted">${esc(tr('Away: {0}', fr.away.map(id => d.resources.people.find(p => p.id === id)?.name || '?').join(', ')))}</p>` : ''}</div>` : '';
-  return `<div class="dash wload dp">${ab2_tabs('dispo')}<div class="clhead"><div class="seg" role="group" aria-label="${esc(tr('Show'))}">${f('all', N_('All'))}${f('people', N_('People'))}${f('tech', N_('Equipment'))}</div><span class="spacer"></span>
-      ${d.orgs.length > 1 ? `<select id="dp-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+  const th = tm_head(d);  // 2.543.0 (#4606): "All workspaces": the overview of the areas, or the path back above the open one
+  if (th?.ovr) return `<div class="dash wload dp">${ab2_tabs('dispo')}${th.ovr}</div>`;
+  return `<div class="dash wload dp">${ab2_tabs('dispo')}${th?.crumb || ''}<div class="clhead"><div class="seg" role="group" aria-label="${esc(tr('Show'))}">${f('all', N_('All'))}${f('people', N_('People'))}${f('tech', N_('Equipment'))}</div><span class="spacer"></span>
+      ${d.orgs.length > 1 && !th ? `<select id="dp-org" aria-label="${esc(tr('Workspace'))}">${d.orgs.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="dp-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="dp-move" data-d="0">${tr('This week')}</button><button class="iconbtn" data-act="dp-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       ${dp_exports(d)}
       ${d.can_book ? `<button class="btn sm pri" data-act="dp-new">${ic('plus', 's')} ${tr('Book')}</button>` : ''}</div>

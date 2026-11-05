@@ -175,9 +175,20 @@ exports.login = async (user, pw = 'password123', o = {}) => {
 // 2.53.0 (#1410): lazy = false (the default) loads the modules the app loads on demand (settings, contacts, office) right after
 // the start, so suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
 // 2.126.0 D (#1989): shared = {store: {}, wins: []}: windows of one browser -- one localStorage, a write fires "storage" in the others
-exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, startPage, shared = null} = {}) {
+// 2.543.0 (#4606): under "All workspaces" with Private and one organisation the office shows the overview of the areas (office.js
+// ofc_allOvr); the suites written before open the office the server chose there (that organisation's): officeWs saves that
+// workspace for them, only in exactly this case ("All", one organisation). boot does it for a start in the office (hash office...)
+// unless allWs: true (the suites of the overview); a suite that walks into the office later calls it itself.
+exports.officeWs = async hd => {
+  const H = {...hd, 'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+  const j = await (await fetch(B + 'api/state', {headers: H})).json().catch(() => ({}));
+  const ws = j.me?.workspaces || [], cur = j.settings?.workspace || 'all';
+  if (j.workspaces && ws.length === 1 && !/^(private|org:\d+)$/.test(cur)) await fetch(B + 'api/settings', {method: 'PATCH', headers: H, body: JSON.stringify({workspace: 'org:' + ws[0].id})});
+};
+exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, startPage, shared = null, allWs = false} = {}) {
   const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons, startPage});
   if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons, startPage});  // 2.56.1 (#1799)
+  if (!allWs && /^office(\/|$)/.test(hash)) await exports.officeWs(proxy ? {'Remote-User': proxy} : {Cookie: cookie});  // 2.543.0 (#4606)
   // 1.8.1: the start view is the Inbox; the suites written before start on Today as a device that was there last
   // (pass ls: {'tasks.lastKey': null} for a real first start, p181_ui.js)
   // 2.17.0 (#452): News are bundled per task by default; the suites written before test the plain list (that device

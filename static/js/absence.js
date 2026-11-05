@@ -5,7 +5,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const AB2 = {data: null, start: null, org: null, seq: 0, loading: false};
+const AB2 = {data: null, start: null, org: null, seq: 0, loading: false, wsp: '', personal: null};  // 2.543.0 (#4606): + wsp, personal
 
 
 async function ab2_load() {
@@ -13,13 +13,18 @@ async function ab2_load() {
   AB2.loading = true;
   const st = AB2.start || today().slice(0, 7) + '-01', d = pd(st);
   const end = ds(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-  const q = new URLSearchParams({start: st, end, ...(AB2.org ? {org: AB2.org} : {})});
-  try { const j = await api('GET', '/api/team/absences?' + q); if (seq === AB2.seq) AB2.data = j; } catch { if (seq === AB2.seq) AB2.data = {error: true}; }
+  const want = tm_want(AB2.personal) || AB2.org;  // 2.543.0 (#4606): the space open under "All" first
+  const q = new URLSearchParams({start: st, end, ...(want ? {org: want} : {})});
+  AB2.wsp = tm_wsp();
+  try { const j = await api('GET', '/api/team/absences?' + q); if (seq === AB2.seq) { AB2.data = j; AB2.personal = j.personal || null; }
+    if (seq === AB2.seq && !want && AB2.wsp === 'private' && j.personal && j.org_id !== j.personal) { AB2.loading = false; return ab2_load(); }  // 2.543.0 (#4606): Private opened before its id was known
+  } catch { if (seq === AB2.seq) AB2.data = {error: true}; }
   AB2.loading = false;
   if (S.route.mod === 'workload' && WLV.tab === 'abs' && seq === AB2.seq) { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, viewWorkload())); }
 }
 
 function ab2_view() {
+  if (AB2.data && !AB2.loading && (AB2.wsp || '') !== tm_wsp()) AB2.data = null;  // 2.543.0 (#4606): another space opened
   if (!AB2.data && !AB2.loading) setTimeout(ab2_load, 0);
   const d = AB2.data;
   if (!d) return `<div class="dash wload ab2">${ab2_tabs('abs')}<p class="muted lempty">${tr('Loading…')}</p></div>`;
@@ -49,8 +54,10 @@ function ab2_view() {
     : d.state ? `<span class="muted ab2st">${esc(tr('Public holidays: {0}', d.states[d.state] || d.state))}</span>` : '');
   // 2.96.0 D (#1941): the own personal area next to the organisations (the workspace switch on "Private" opens it)
   const areas = [...(d.personal ? [{id: d.personal, name: tr('Private|workspace')}] : []), ...d.orgs];
-  return `<div class="dash wload ab2">${ab2_tabs('abs')}<div class="clhead"><h3 class="ab2mon">${esc(mon)}</h3><span class="spacer"></span>
-      ${areas.length > 1 ? `<select id="ab2-org" aria-label="${esc(tr('Workspace'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
+  const th = tm_head(d, true);  // 2.543.0 (#4606): "All workspaces": the overview of the areas, or the path back above the open one
+  if (th?.ovr) return `<div class="dash wload ab2">${ab2_tabs('abs')}${th.ovr}</div>`;
+  return `<div class="dash wload ab2">${ab2_tabs('abs')}${th?.crumb || ''}<div class="clhead"><h3 class="ab2mon">${esc(mon)}</h3><span class="spacer"></span>
+      ${areas.length > 1 && !th ? `<select id="ab2-org" aria-label="${esc(tr('Workspace'))}">${areas.map(o => `<option value="${o.id}" ${o.id === d.org_id ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       <button class="iconbtn" data-act="ab2-move" data-d="-1" aria-label="${esc(tr('Earlier'))}" title="${esc(tr('Earlier'))}">${ic('left', 's')}</button><button class="btn sm" data-act="ab2-move" data-d="0">${tr('This month')}</button><button class="iconbtn" data-act="ab2-move" data-d="1" aria-label="${esc(tr('Later'))}" title="${esc(tr('Later'))}">${ic('right', 's')}</button>
       <button class="btn sm pri" data-act="ab2-new">${ic('plus', 's')} ${tr('Enter an absence')}</button></div>
     <p class="muted">${tr('Only the person and the admins see the reason and the note.')}</p>
