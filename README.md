@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.560.0** (2026-11-05):
-- **Agents**: server agents run on the Kalmido server with your own API key (#4670); the data lock also covers Calendar and Contacts.
-- **Knowledge**: one editor on CodeMirror 6, Markdown marks only at the cursor (#4052).
-- **Wide screens**: tile grids and list and detail side by side (#4552, #4553).
-- **For everyone**: a "New for you" dialog after updates (switch in Settings > Help).
+**2.562.0** (2026-11-05):
+- **Account**: delete your own account (7 days locked with a cancel link, then deleted).
+- **Customer portal**: requests by e-mail become tickets with a status link; answers go out by mail.
+- **Files and Office**: see who a folder or file is shared with; equipment warranty and maintenance become tasks.
+- **Speed**: many actions and dialogs show at once without waiting for the server.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
