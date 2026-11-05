@@ -972,7 +972,7 @@ document.addEventListener('keydown', async e => {
   // 2.4.0 (#187): Ctrl+Space = quick capture from anywhere (also while typing somewhere else)
   if (S.me?.kid) return;  // 2.49.0 (#1537): a child has no shortcuts (quick add, views ... only fail for it)
   if (e.ctrlKey && !e.altKey && !e.metaKey && (e.code === 'Space' || e.key === ' ') && t.id !== 'qsheet' && !$('.authscreen')) { e.preventDefault(); quickCapture(); return; }
-  if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+  if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable || e.metaKey || e.ctrlKey || e.altKey) return;  // 2.554.0 (#4052): + a contenteditable field (the knowledge editor): its letters are text, no shortcuts
   if (e.key === 'n') { e.preventDefault(); const q = currentQuickInput(); if (q && (!isMobile() || tabletDock())) q.focus(); else openQuickSheet(); }
   if (e.key === 'q' && !$('.modal')) { e.preventDefault(); quickCapture(); }
   // 2.477.0 (#3881): m = a quick note, where m means nothing else (palette.js: the focused task / the selection moves; the timeline's bar)

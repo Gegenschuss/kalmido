@@ -71,6 +71,8 @@ function wkcm_ta() {
   };
   return WKCM.px;
 }
+// the editor holds the focus (not view.hasFocus: that also asks document.hasFocus(), false in a window without the system's focus)
+const wkcm_focused = () => { const v = WKCM.view; return !!v && v.contentDOM === document.activeElement; };
 const wkcm_isEl = t => !!t?.classList?.contains('cm-content') && !!t.closest?.('#wk-cm');
 // the text to save while the editor holds page p (null = it does not); untouched = the page's own string
 function wkcm_val() { const v = WKCM.view; return !v ? '' : v.state.doc === WKCM.baseDoc ? WKCM.base : v.state.doc.toString(); }
@@ -78,7 +80,7 @@ function wkcm_src(p) { const v = WKCM.view; return p && v && v._pid === p.id ? {
 // ---- the place in wiki.js wk_pageHtml: an empty box the editor moves into (morph: data-fl-fill keeps it, render.js)
 function wkcm_html(p) {
   if (WKCM.view && WKCM.view._pid !== p.id) wkcm_drop();
-  WKCM.pid = p.id; WKCM.p = p; WKCM.foc = !!WKCM.view?.hasFocus;
+  WKCM.pid = p.id; WKCM.p = p; WKCM.foc = wkcm_focused();
   if (typeof wem_st === 'function') wem_st(p);  // the widgets share the page's file / link answers (wkembed.js)
   Promise.resolve().then(wkcm_mount); setTimeout(wkcm_mount, 0);
   const wait = WKCM.ok ? '' : `<div class="wkcmwait">${wk_bodyStrip(p.body).trim() ? wk_render(p) : ''}<p class="muted mhint">${esc(tr('Loading…'))}</p></div>`;
@@ -104,6 +106,7 @@ function wkcm_mount() {
   box.textContent = '';
   v = WKCM.view = new C.EditorView({state: wkcm_state(p), parent: box});
   v._pid = p.id; WKCM.px = null;
+  if (box.contains(document.activeElement)) wkcm_focFx(v);
   wkcm_dgSoon();
   if (WKCM.caretAt != null) { const at = WKCM.caretAt; WKCM.caretAt = null; WKCM.focusNext = false; wkcm_caret(at); }
   else if (WKCM.focusNext) { WKCM.focusNext = false; v.focus(); }
@@ -136,7 +139,7 @@ function wkcm_ext(p) {
       paste: e => !!e.clipboardData?.files?.length, drop: e => !!e.dataTransfer?.files?.length})),
     C.Prec.high(C.keymap.of([{key: 'Enter', run: wkcm_enter}, {key: 'Tab', run: v => wkcm_indent(v, 1)}, {key: 'Shift-Tab', run: v => wkcm_indent(v, -1)}])),
     C.keymap.of([...C.historyKeymap, ...C.searchKeymap, ...C.defaultKeymap.filter(k => !WKCM_NOKEY.has(k.key) && !WKCM_NOKEY.has(k.mac))]),
-    WKCM_FIELD, C.EditorView.focusChangeEffect.of((_st, on) => WKCM_FOC.of(on)),
+    WKCM_FIELD, C.EditorView.domEventHandlers({focus: (_e, v) => wkcm_focFx(v), blur: (_e, v) => wkcm_focFx(v)}),
     C.EditorView.updateListener.of(wkcm_upd),
   ];
 }
@@ -145,9 +148,15 @@ function wkcm_phrases() {
   return {Find: tr('Find'), Replace: tr('Replace'), next: tr('Next match'), previous: tr('Previous match'), all: tr('All'), 'match case': tr('Match case'),
     'by word': tr('Whole word'), regexp: tr('Regular expression'), replace: tr('Replace'), 'replace all': tr('Replace all'), close: tr('Close')};
 }
+// the marks at the cursor show while the editor has the focus (after the event: no dispatch inside CodeMirror's own handling)
+function wkcm_focFx(v) {
+  queueMicrotask(() => { const on = v.contentDOM === document.activeElement; if (v.state.field(WKCM_FIELD).foc !== on) v.dispatch({effects: WKCM_FOC.of(on)}); });
+  return false;
+}
 function wkcm_upd(u) {
   if (u.docChanged && u.transactions.some(t => !t.annotation(WKCM_EXT))) wk_queue();
-  if ((u.docChanged || u.selectionSet) && u.view.hasFocus) { const ta = wkcm_ta(); if (ta) wk_acUpdate(ta); }
+  if ((u.view.contentDOM === document.activeElement) !== u.state.field(WKCM_FIELD).foc) wkcm_focFx(u.view);  // a window without the system's focus sends no focus events
+  if ((u.docChanged || u.selectionSet) && u.view.contentDOM === document.activeElement) { const ta = wkcm_ta(); if (ta) wk_acUpdate(ta); }
   if (u.docChanged || u.viewportChanged || u.transactions.some(t => t.effects.length)) wkcm_dgSoon();
 }
 // formulas / diagrams in the widgets are drawn by diagram.js (it finds them in .wkmd)
@@ -268,7 +277,7 @@ function wkcm_build(st, foc) {
   const line = (a, cls) => out.push(D.line({class: cls}).range(doc.lineAt(a).from));
   const lines = (a, z, cls) => { for (let n = doc.lineAt(a).number, e = doc.lineAt(z).number; n <= e; n++) out.push(D.line({class: cls}).range(doc.line(n).from)); };
   const blocks = [], skip = [];  // ranges drawn as one widget (nothing else inside), ranges no inline pattern may touch (code)
-  const inside = (a, z, rs) => rs.some(r => a < r[1] && z > r[0]);
+  const inside = (a, z, rs) => rs.some(r => a < r[1] && z > r[0]), within = (a, z, rs) => rs.some(r => a >= r[0] && z <= r[1]);
   const block = (a, z, h, cls) => { out.push(D.replace({widget: new W.Html(h, true, cls), block: true}).range(a, z)); blocks.push([a, z]); };
   // front matter: muted, never parsed as a heading
   const fm = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(doc.sliceString(0, Math.min(doc.length, 20000)));
@@ -291,7 +300,7 @@ function wkcm_build(st, foc) {
   // first pass: code (no inline pattern inside), tables and drawn fences as widgets (before the [[ links: nothing inside a widget)
   tree.iterate({enter: n => {
     const a = n.from, z = n.to, k = n.name;
-    if (z <= fmEnd || inside(a, z, blocks)) return false;
+    if (z <= fmEnd || within(a, z, blocks)) return false;
     if (k === 'FencedCode') {
       const info = n.node.getChild('CodeInfo'), lang = info ? doc.sliceString(info.from, info.to).trim() : '', la = doc.lineAt(a).from, lz = doc.lineAt(z).to;
       if (WKCM_BLK.test(lang) && !near(la, lz)) block(la, lz, wkcm_md(doc.sliceString(la, lz), false), 'cm-wkfig');
@@ -326,7 +335,7 @@ function wkcm_build(st, foc) {
   }
   tree.iterate({enter: n => {
     const a = n.from, z = n.to, k = n.name;
-    if (z <= fmEnd || inside(a, z, blocks)) return false;
+    if (z <= fmEnd || within(a, z, blocks)) return false;
     if (/^ATXHeading(\d)$/.test(k)) {
       line(a, 'cm-wkh cm-wkh' + k.slice(-1));
       if (!lineNear(a, z)) { const c = n.node.getChildren('HeaderMark'); for (const h of c) { if (h.from === a) hide(h.from, Math.min(h.to + (doc.sliceString(h.to, h.to + 1) === ' ' ? 1 : 0), z)); else hide(h.from, h.to); } }
@@ -460,6 +469,12 @@ function wkcm_tbl(st, a, z) {
 }
 const wkcm_cellMd = raw => raw.replace(/\\\|/g, '|');
 const wkcm_cellRaw = t => t.replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');  // the field shows | where the text has \|
+// the table of a widget as it is in the text now (a widget kept by eq() may stand at another place than when it was drawn)
+function wkcm_tblNow(v, d) {
+  let at; try { at = v.posAtDOM(d); } catch { return null; }
+  for (let n = wkcm_C().syntaxTree(v.state).resolveInner(Math.min(at + 1, v.state.doc.length), 1); n; n = n.parent) if (n.name === 'Table') return wkcm_tbl(v.state, n.from, n.to);
+  return null;
+}
 function wkcm_tblDraw(v, d, t) {
   const n = Math.max(...t.rows.map(r => r.cells.length));
   const cell = (r, c) => { const x = t.rows[r].cells[c], tag = r ? 'td' : 'th', al = t.al[c] ? ` style="text-align:${t.al[c]}"` : '';
@@ -469,7 +484,7 @@ function wkcm_tblDraw(v, d, t) {
   d.onmousedown = e => {
     const x = /** @type {any} */ (e.target);
     if (e.button !== 0 || x.closest('input')) return;
-    if (x.closest('.cm-wktsrc')) { e.preventDefault(); const w = d._wk.t; v.dispatch({selection: {anchor: w.from}}); v.focus(); return; }
+    if (x.closest('.cm-wktsrc')) { e.preventDefault(); const w = wkcm_tblNow(v, d); if (w) v.dispatch({selection: {anchor: w.from}}); v.focus(); return; }
     if (x.closest('a[href]')) return;
     const c = x.closest('[data-r]'); if (!c) return;
     e.preventDefault(); wkcm_cellEdit(v, d, +c.dataset.r, +c.dataset.c);
@@ -488,7 +503,7 @@ function wkcm_tblUpdate(v, d, w) {
   return true;
 }
 function wkcm_cellEdit(v, d, r, c) {
-  const t = d._wk?.t, x = t?.rows[r]?.cells[c], el = d.querySelector(`[data-r="${r}"][data-c="${c}"]`);
+  const t = wkcm_tblNow(v, d), x = t?.rows[r]?.cells[c], el = d.querySelector(`[data-r="${r}"][data-c="${c}"]`);
   if (!x || !el) return;
   const old = el.querySelector('input'); if (old) { old.focus(); return; }
   const inp = document.createElement('input'); inp.type = 'text'; inp.className = 'cm-wkcell'; inp.value = wkcm_cellMd(x.raw);
@@ -496,7 +511,7 @@ function wkcm_cellEdit(v, d, r, c) {
   el.textContent = ''; el.appendChild(inp); inp.focus(); inp.select();
   WKCM.cell = inp;
   const write = () => {
-    const w = d._wk?.t, y = w?.rows[r]?.cells[c]; if (!y) return;
+    const w = wkcm_tblNow(v, d), y = w?.rows[r]?.cells[c]; if (!y) return;
     const raw = wkcm_cellRaw(inp.value), empty = y.a === y.b;
     const ins = empty && raw ? (v.state.sliceDoc(y.a - 1, y.a) === '|' ? ' ' : '') + raw + (v.state.sliceDoc(y.b, y.b + 1) === '|' ? ' ' : '') : raw;
     if (ins === v.state.sliceDoc(y.a, y.b)) return;
@@ -504,10 +519,10 @@ function wkcm_cellEdit(v, d, r, c) {
   };
   const close = () => {
     if (!inp.isConnected) return; WKCM.cell = null;
-    const w = d._wk?.t, y = w?.rows[r]?.cells[c]; el.innerHTML = y ? wkcm_md(wkcm_cellMd(y.raw), true) : '';
+    const w = wkcm_tblNow(v, d), y = w?.rows[r]?.cells[c]; el.innerHTML = y ? wkcm_md(wkcm_cellMd(y.raw), true) : '';
   };
   const move = (r2, c2) => {
-    const w = d._wk?.t; if (!w) return;
+    const w = wkcm_tblNow(v, d); if (!w) return;
     const n = Math.max(...w.rows.map(q => q.cells.length));
     if (c2 >= n) { c2 = 0; r2++; } if (c2 < 0) { r2--; c2 = n - 1; }
     if (r2 < 0) { close(); v.dispatch({selection: {anchor: Math.max(0, w.from - 1)}}); v.focus(); return; }
@@ -515,7 +530,7 @@ function wkcm_cellEdit(v, d, r, c) {
       const at = w.to, row = '\n|' + '  |'.repeat(n);
       inp.removeEventListener('blur', blur); close();
       v.dispatch({changes: {from: at, insert: row}, userEvent: 'input'});
-      setTimeout(() => { const nd = [...document.querySelectorAll('#wk-cm .cm-wktbl')].find(q => /** @type {any} */ (q)._wk?.t.from === w.from); if (nd) wkcm_cellEdit(v, nd, r2, c2); }, 0);
+      setTimeout(() => { const nd = [...document.querySelectorAll('#wk-cm .cm-wktbl')].find(q => wkcm_tblNow(v, q)?.from === w.from); if (nd) wkcm_cellEdit(v, nd, r2, c2); }, 0);
       return;
     }
     inp.removeEventListener('blur', blur); close(); wkcm_cellEdit(v, d, r2, c2);
@@ -526,8 +541,8 @@ function wkcm_cellEdit(v, d, r, c) {
   inp.addEventListener('keydown', e => {
     if (e.key === 'Tab') { e.preventDefault(); e.stopPropagation(); move(r, c + (e.shiftKey ? -1 : 1)); }
     else if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); move(r + 1, c); }
-    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); inp.removeEventListener('blur', blur); close(); const w = d._wk?.t; v.dispatch({selection: {anchor: w ? Math.min(w.to + 1, v.state.doc.length) : 0}}); v.focus(); }
-    else if ((e.ctrlKey || e.metaKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); const C = wkcm_C(); (e.key.toLowerCase() === 'y' || e.shiftKey ? C.redo : C.undo)(v); const w = d._wk?.t, y = w?.rows[r]?.cells[c]; if (y) inp.value = wkcm_cellMd(y.raw); }
+    else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); inp.removeEventListener('blur', blur); close(); const w = wkcm_tblNow(v, d); v.dispatch({selection: {anchor: w ? Math.min(w.to + 1, v.state.doc.length) : 0}}); v.focus(); }
+    else if ((e.ctrlKey || e.metaKey) && /^[zy]$/i.test(e.key)) { e.preventDefault(); const C = wkcm_C(); (e.key.toLowerCase() === 'y' || e.shiftKey ? C.redo : C.undo)(v); const w = wkcm_tblNow(v, d), y = w?.rows[r]?.cells[c]; if (y) inp.value = wkcm_cellMd(y.raw); }
   });
 }
 // the suggestions / commands just below the caret (a phone with its keyboard open keeps wkembed.js wem_acPlace)

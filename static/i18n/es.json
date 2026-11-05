@@ -7783,7 +7783,6 @@
   "Path": "Ruta",
   "Markdown: # heading, - list, [[Page]] links a page, #123 a task": "Markdown: # título, - lista, [[Página]] enlaza una página, #123 una tarea",
   "Write … ([[Page]], #123)": "Escribe … ([[Página]], #123)",
-  "Empty page. Switch to Edit to write.": "Página vacía. Cambia a Editar para escribir.",
   "Empty page.": "Página vacía.",
   "Linked from": "Enlazada desde",
   "Create this page": "Crear esta página",

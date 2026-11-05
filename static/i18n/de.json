@@ -7765,7 +7765,6 @@
   "Path": "Pfad",
   "Markdown: # heading, - list, [[Page]] links a page, #123 a task": "Markdown: # Überschrift, - Liste, [[Seite]] verlinkt eine Seite, #123 eine Aufgabe",
   "Write … ([[Page]], #123)": "Schreiben … ([[Seite]], #123)",
-  "Empty page. Switch to Edit to write.": "Leere Seite. Zum Schreiben auf Bearbeiten wechseln.",
   "Empty page.": "Leere Seite.",
   "Linked from": "Verlinkt von",
   "Create this page": "Diese Seite anlegen",

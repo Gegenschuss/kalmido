@@ -7783,7 +7783,6 @@
   "Path": "Chemin",
   "Markdown: # heading, - list, [[Page]] links a page, #123 a task": "Markdown : # titre, - liste, [[Page]] lie une page, #123 une tâche",
   "Write … ([[Page]], #123)": "Écrire … ([[Page]], #123)",
-  "Empty page. Switch to Edit to write.": "Page vide. Passez en Modifier pour écrire.",
   "Empty page.": "Page vide.",
   "Linked from": "Liée depuis",
   "Create this page": "Créer cette page",
