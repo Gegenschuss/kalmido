@@ -205,7 +205,6 @@ def amv_post():
     if not want:
         raise Denied(409, tr("Nothing to move"))
     rid = insert_id(c, "INSERT INTO doc_office_moves(user_id,target,items,n,created_at) VALUES(?,?,'[]',0,?)", (uid, off[1], iso(now_utc())))
-    uset(c, uid, AMV_HIDE, "1")  # the hint has done its work; the undo line follows
     c.commit()
     items = []
     for g0 in range(0, len(want), AMV_GROUP):
@@ -218,6 +217,8 @@ def amv_post():
             else:
                 stayed.append({"id": nid, "reason": res})
         c.execute("UPDATE doc_office_moves SET items=?, n=? WHERE id=?", (json.dumps(items, separators=(",", ":"), default=str), len(items), rid))
+        if items:  # review #4434: the hint has done its work only once something moved; the undo line follows
+            uset(c, uid, AMV_HIDE, "1")
         bump(c)
         c.commit()
         _rm(old)
@@ -228,8 +229,9 @@ def amv_post():
                    undo_until=iso(now_utc() + timedelta(days=AMV_UNDO_DAYS)) if items else None)
 
 
-def amv_back(c, uid, run, x):
-    """One document of move run back -> (True, old sealed files) | (False, []) when it changed since and stays."""
+def amv_back(c, uid, run, x, made=None):
+    """One document of move run back -> (True, old sealed files) | (False, []) when it changed since and stays; the new sealed
+    files of a document that went back are added to made (removed again when its group rolls back)."""
     nid = x["id"]
     m = S.meta_row(c, nid)
     node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
@@ -244,6 +246,8 @@ def amv_back(c, uid, run, x):
         return True, []
     if m["ws"] != run["target"]:
         return False, []  # moved on since (another workspace): it stays there
+    if not x.get("rc") and c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (nid,)).fetchone():
+        return False, []  # review #4434: recorded as a receipt in the organisation since = changed, it stays there
     p = c.execute("SELECT org_id, owner_id, deleted_at, kind FROM fs_nodes WHERE id=?", (x["parent"],)).fetchone() if x.get("parent") else None
     parent = x["parent"] if p and p["kind"] == "folder" and not p["deleted_at"] and p["org_id"] is None and p["owner_id"] == uid else None
     try:
@@ -273,6 +277,8 @@ def amv_back(c, uid, run, x):
     except BaseException:
         _rm(new_paths)
         raise
+    if made is not None:
+        made += new_paths
     return True, old_paths
 
 
@@ -297,16 +303,23 @@ def amv_undo(rid):
     c.commit()
     back, stayed = 0, []
     for g0 in range(0, len(items), AMV_GROUP):
-        old = []
-        for x in items[g0:g0 + AMV_GROUP]:
-            ok, res = amv_back(c, uid, run, x)
-            if ok:
-                back += 1
-                old += res
-            else:
-                stayed.append(x["id"])
-        bump(c)
-        c.commit()
+        old, made = [], []
+        try:
+            for x in items[g0:g0 + AMV_GROUP]:
+                ok, res = amv_back(c, uid, run, x, made)
+                if ok:
+                    back += 1
+                    old += res
+                else:
+                    stayed.append(x["id"])
+            bump(c)
+            c.commit()
+        except BaseException:  # review #4434: the group rolls back, its new files go, the undo stays open for another click
+            c.rollback()
+            _rm(made)
+            c.execute("UPDATE doc_office_moves SET undone_at=NULL WHERE id=?", (rid,))
+            c.commit()
+            raise
         _rm(old)
     return jsonify(back=back, stayed=stayed)
 

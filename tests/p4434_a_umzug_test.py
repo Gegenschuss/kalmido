@@ -180,6 +180,8 @@ it = {x["id"]: x for x in j["items"]}
 check(j["office"] == "org" and it.get(a2, {}).get("pick") == "move" and it.get(a3, {}).get("pick") == "move", f"the preview of Alpha's office {j}")
 check(a1 in it and it[a1]["pick"] == "stay" and it[a1].get("block"), f"a receipt booked in the personal office stays, with its reason {it.get(a1)}")
 check((row(a1), row(a2), row(a3)) == (o1, o2, o3) and shares(a2) == [(GINA, "view")], "the preview moves nothing, the share stays")
+r = A.post(MV, json={"ids": [a1]})
+check(r.ok and r.json()["moved"] == 0 and not preview(A, count="1")["hidden"], f"review #4434: nothing moved, the hint stays {r.text[:160]}")
 r = A.post(MV, json={"ids": [a1, a2, a3]})
 check(r.ok and r.json()["moved"] == 2 and [x["id"] for x in r.json()["stayed"]] == [a1], f"the move into Alpha, the booked one stays {r.status_code} {r.text[:300]}")
 RA = r.json()["id"]
@@ -191,6 +193,16 @@ check(r.ok and r.json()["back"] == 2, f"the undo out of Alpha {r.status_code} {r
 check(row(a2)[2:] == o2[2:] and row(a3)[2:] == o3[2:], f"#4434: both back, a2 into its folder under its name {row(a2)} {o2}")
 check(shares(a2) == [(GINA, "view")], f"the share is back {shares(a2)}")
 check(G.get(B + f"/api/docs/{a2}").ok, "Gina sees a2 again")
+
+# ---- review #4434: a receipt recorded in the organisation since (not booked) stays there at the undo
+r = A.post(MV, json={"ids": [a3]})
+check(r.ok and r.json()["moved"] == 1, f"setup: a3 into Alpha again {r.status_code} {r.text[:200]}")
+RA2 = r.json()["id"]
+dbx("INSERT INTO rc_receipts(node_id, org_id, ws, category, set_by, set_at) VALUES(?,?,?,'',?,?)",
+    (a3, ORG, f"o{ORG}", ALICE, datetime.now(timezone.utc).isoformat(timespec="seconds")))
+r = A.post(MV + f"/{RA2}/undo")
+check(r.ok and r.json()["back"] == 0 and r.json()["stayed"] == [a3] and row(a3)[2:4] == (f"o{ORG}", ORG),
+      f"#4434: a receipt recorded in Alpha since stays there {r.text[:160]} {row(a3)}")
 
 # ==== a member who is no admin of the organisation
 r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bert", "display_name": "Bert",
