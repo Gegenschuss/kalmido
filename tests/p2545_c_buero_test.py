@@ -116,6 +116,12 @@ def r13b_office(s, ws, who):
     want = {"46": "1000", "47": "190.00", "84": "500", "85": "35.00", "67": "225.00", "66": "19.00", "83": "-19.00"}
     check(all(kz.get(k) == v for k, v in want.items()), f"{who}: fields 46/47, 84/85, 67, 66, 83 {kz}")
     check(d.get("missing_vat") == 0, f"{who}: section 13b receipts are not 'without VAT rate' {d.get('missing_vat')}")
+    # review (#4387): the DATEV batch carries section 13b receipts net without a tax key -> the check names them
+    r = s.put(B + O + "/settings", json={"datev_extf": {"advisor_no": "1234567", "client_no": "12345", "fy_start": 1, "acct_len": 4, "chart": "SKR03"}})
+    check(r.ok, f"{who}: DATEV numbers stored " + r.text[:160])
+    r = s.get(B + O + f"/datev/extf?from={Y}-03-01&to={Y}-03-31&check=1")
+    hk = {h["key"]: h for h in (r.json().get("hints", []) if r.ok else [])}
+    check(hk.get("rc13b", {}).get("count") == 2 and "13b" in hk["rc13b"]["text"], f"{who}: DATEV check names the 2 section 13b receipts {r.status_code} {r.text[:300]}")
     eu = s.get(B + O + f"/books/euer?year={Y}").json()
     check(Decimal(eu["expense_total"]["net"]) == Decimal("1600.00") and Decimal(eu["expense_total"]["vat"]) == Decimal("19.00"),
           f"{who}: income statement: section 13b amounts net without input tax {eu.get('expense_total')}")
@@ -183,6 +189,8 @@ def neg_rest(s, who):
     r = s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 600})
     check(r.status_code == 409, f"{who}: a refund above the rest is refused {r.status_code}")
     before = ustva(s, "y").get("kz", {}).get("81")
+    kmonth = lambda: Decimal(next((m["amount"] for m in s.get(B + O + "/kpi").json()["revenue"]["months"] if m["month"] == TODAY[:7]), "0"))
+    k_before = kmonth()
     r = s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 200})
     check(r.status_code == 201, f"{who}: a refund of 200 is booked " + r.text[:200])
     d = s.get(B + f"{D}/{did}").json()
@@ -194,6 +202,9 @@ def neg_rest(s, who):
     check(ent and ent[0]["dir"] == "out" and ent[0]["amount"] == "200.00", f"{who}: cash flow: the refund goes out {ent}")
     after = ustva(s, "y").get("kz", {}).get("81")
     check(int(after) - int(before) in (-168, -169), f"{who}: cash basis: the refund lowers field 81 by 168 ({before} -> {after})")
+    # review (#4387): the key figures count the refund net (-168.07), not gross (-200.00)
+    k_delta = kmonth() - k_before
+    check(abs(k_delta + Decimal("168.07")) <= Decimal("0.01"), f"{who}: key figures: the refund lowers money received by 168.07 net ({k_delta})")
     check(s.post(B + f"{D}/{did}/payments", json={"date": TODAY, "amount": 395}).status_code == 201, f"{who}: the rest refunded")
     d = s.get(B + f"{D}/{did}").json()
     check(d.get("status") == "paid" and d.get("overpaid") == "0.00", f"{who}: paid back in full = paid {d.get('status')} {d.get('overpaid')}")
