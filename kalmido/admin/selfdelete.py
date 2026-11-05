@@ -374,7 +374,7 @@ def _settle(c, uid, plan):
         bad = _may_delete_along(c, lr, plan.get("how") or "")
         if bad:
             return err(bad, 409), None
-        with system_ctx(c):
+        with system_ctx(c):  # the watchdog deletes the person's own project along, as chosen when it was asked for
             icon, lf = list_purge(c, lr["id"], inbox)
         icons.append((lr["id"], icon))
         files += lf
@@ -461,7 +461,7 @@ def sdl_tick(c, *_):
             tok = secrets.token_urlsafe(24)
             plan["toks"] = (plan.get("toks") or [])[-3:] + [tkh_hash(tok)]
             plan["reminded"] = iso(now)
-            with system_ctx(c):
+            with system_ctx(c):  # the watchdog notes the reminder in the person's own row (no request, nobody signed in)
                 c.execute("UPDATE users SET delete_plan=? WHERE id=?", (json.dumps(plan), u["id"]))
             c.commit()
             sdl_mail(c, u["id"], "remind", f"{u['id']}.{tok}")

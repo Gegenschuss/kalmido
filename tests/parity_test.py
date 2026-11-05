@@ -770,6 +770,14 @@ APP_ONLY = [
     ("2.270.0 A (#3019): the history of a project description (earlier texts, who replaced them) is a person's view in the "
      "web app; agents read and change the current description through GET / PATCH /lists/{id}/overview",
      ("=GET /api/lists/{}/overview/history",)),
+    # 2.553.0 (#1413): deleting one's own account needs the password / app code of a person; an agent never deletes its owner
+    ("2.553.0 (#1413): a person deletes their own account in the web app (password or app code, 7 days with a cancel link); "
+     "tokens and agents cannot ask for it",
+     ("=GET /api/account/delete", "=POST /api/account/delete")),
+    # 2.553.0 (#3460): the request address of a project is a setting of its owner / admins, like its form and mail address
+    ("2.553.0 (#3460): the switch 'Requests by e-mail' and its address belong to the project's owner and admins in the web app; "
+     "agents see the resulting tickets as task_added events with source mail",
+     ("=GET /api/lists/{}/request-mail", "=PATCH /api/lists/{}/request-mail")),
     ("2.556.0 B (#4685): New for you is the web app's dialog after an update (the seen version per person); agents have no "
      "dialog and read the change log themselves",
      ("=GET /api/whatsnew", "=POST /api/whatsnew/seen")),
