@@ -528,6 +528,13 @@ def upg_heirless(c, uid):
             if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
                          "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
                 need.add(oid)
+        from ..core.objects import OBJ
+        for reg in OBJ.values():  # 2.558.0 (#4709, review F1): the organisations' objects of the shared core go to the heir too
+            if reg["base_role"] is None:
+                for (oid,) in c.execute(f"SELECT DISTINCT org_id FROM {reg['table']} WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():
+                    if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
+                                 "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
+                        need.add(oid)
     for oid in need:
         if not upg_heir(c, oid, uid):
             out.add(oid)

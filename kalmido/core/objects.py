@@ -659,6 +659,15 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                          reason, by, int(org), "user_id")
             c.execute("DELETE FROM obj_undo WHERE org_id=?", (int(org),))
         elif reason == "delete" and uid:
+            from ..accounts.orgretain import upg_heir
+            for reg in OBJ.values():  # review F1: an organisation's object stays with it, the heir owns it (owner_id cascades)
+                if reg["base_role"] is None:
+                    out[reg["kind"]] = 0
+                    for (o,) in c.execute(f"SELECT DISTINCT org_id FROM {reg['table']} WHERE owner_id=? AND org_id IS NOT NULL", (int(uid),)).fetchall():
+                        h = upg_heir(c, o, uid)
+                        if h:
+                            out[reg["kind"]] += c.execute(f"UPDATE {reg['table']} SET owner_id=? WHERE org_id=? AND owner_id=?",
+                                                          (int(h), int(o), int(uid))).rowcount
             c.execute("DELETE FROM obj_undo WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_history SET user_id=NULL WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_revoked SET by_id=NULL WHERE by_id=?", (int(uid),))

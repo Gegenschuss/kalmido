@@ -9,6 +9,7 @@ generic routes (core/objweb.py) with the test kind 'objprobe' (KALMIDO_TEST_OBJ=
  - a folder share of the file store opens an object filed there (one register: fsref)
  - agents: only an explicit share, never another workspace, hidden objects and the data lock give nothing
  - the trash: only who manages it sees it (?trash=1), restore, a member gets 404 meanwhile
+ - an account deleted: its organisation objects go to the heir (review F1), its private ones go with it
  - obj_revoke_person: leaving takes the shares on the organisation's nodes and the team chat rooms along (coming back as a
    guest revives nothing), the heir owns the leaver's objects; a demotion to guest leaves the open channels joined
 tenant-matrix: obj (another organisation and its agent: 404 on every route of an object, its shares, history, undo, trash)
@@ -166,6 +167,19 @@ check(dbx("SELECT owner_id FROM obj_probe WHERE id=?", (O1,))[0][0] == ALICE and
 check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["carl"], "role": "guest"}).ok, "carl is demoted to guest")
 check(dbx("SELECT COUNT(*) FROM tchat_members WHERE user_id=? AND room_id=?", (uid["carl"], CH))[0][0] == 0
       and role(Ca, O3) == 404, "a guest: out of the open channel joined, the object no longer by the organisation's role")
+
+# ---------------------------------------------------------------- review F1: an account deleted keeps the organisation's objects
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "dave", "display_name": "Dave",
+                                   "password": "password123", "email": "dave@example.com"})
+uid["dave"] = r.json().get("id")
+Da = sess("dave")
+D1 = new(Da, "Dave's team plan", ORG)["id"]
+DP = new(Da, "Dave's own notes")["id"]
+r = A.delete(B + f"/api/users/{uid['dave']}")
+check(r.ok, f"the admin deletes dave's account ({r.status_code} {r.text[:160]})")
+check((dbx("SELECT owner_id FROM obj_probe WHERE id=?", (D1,)) or [[None]])[0][0] == ALICE and role(A, D1) == "manage",
+      "his organisation object lives on with the heir")
+check(dbx("SELECT COUNT(*) FROM obj_probe WHERE id=?", (DP,))[0][0] == 0, "his private object goes with the account")
 
 # ---------------------------------------------------------------- a person without an organisation (freelancer-matrix: obj)
 FP = new(Fr, "Frida's plan", size=3)
