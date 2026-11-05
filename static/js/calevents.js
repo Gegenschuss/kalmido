@@ -343,7 +343,7 @@ async function evEditor(o = {}) {
     if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf}); }
     return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf});
   };
-  if (dlg) {
+  if (dlg) {  // lazy-ok-begin: dlg exists only once objsave.js is loaded (typeof saveDialog above, evEditor loads the module)
     const view = () => scope === 'one' ? (x => evOccView(x, o.occ)) : undefined, opened = () => scope === 'one' ? evOccView(srv, o.occ) : srv;
     dlg.save = (url, body) => saveDialog(url, opened(), body, {exp: 'expect', key: 'event', base: dlg.base, view: view(), get: `/api/events/${ev.id}`,
       send: x => rawFetch('PATCH', url, x).catch(e => { if (e.status !== 409 && e.message !== 'auth' && !e.shown) toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); throw e; })});
@@ -353,7 +353,7 @@ async function evEditor(o = {}) {
     });
     if (o.cf?.theirs.length) objMerge(md, o.cf, () => {}, {field: k => evField(md, k),
       take: keys => { md.remove(); evAgain(o.cf.raw, Object.fromEntries(Object.entries(o.cf.mine || {}).filter(([k]) => !keys.includes(k))), null); }});
-  }
+  }  // lazy-ok-end
   if (typeof crr_wire === 'function') crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
@@ -430,7 +430,7 @@ async function evEditor(o = {}) {
       let j;
       try { j = await evOpt(put, req, render); } catch (e) {  // nothing typed is lost (a conflict 409 too: api() said why)
         if (e?.cf) { toast(tr('Changed by someone else in the meantime')); evAgain(e.cf.raw, e.cf.mine, e.cf); return; }  // 2.565.0 (#4705)
-        if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}); return; }  // what was typed stays "changed" for the next save
+        if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}); return; }  // lazy-ok: dlg only with objsave.js loaded; what was typed stays "changed" for the next save
         // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
         const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
         evEditor(!ev ? {...o, ...body, attendees: atts} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ}
