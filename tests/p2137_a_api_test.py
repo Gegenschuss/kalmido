@@ -217,6 +217,14 @@ check(d.get("locked") and d.get("client_id") == CL2, f"still finalised, its clie
 pays = Ca.get(B + f"{D}/{INV2}/payments").json().get("payments", [])
 check(len(pays) == 1 and abs(float(pays[0].get("amount")) - 100) < 0.01, f"the payment came along {pays}")
 check(Ca.get(B + f"{D}/{INV2}/pdf").content == INV_PDF, "the stored PDF of the finalised invoice is the same file")
+# 2.546.0 (#4287): the imported finalised invoice refuses changes and deleting (409), not only reads locked; it stays as it is
+r1 = Ca.patch(B + f"{D}/{INV2}", json={"project_title": "Geändert", "date": "2026-01-02"})
+r2 = Ca.put(B + f"{D}/{INV2}/items", json={"items": [{"title": "Geändert", "qty": 9, "rate": 9}]})
+r3 = Ca.delete(B + f"{D}/{INV2}")
+d2 = Ca.get(B + f"{D}/{INV2}").json()
+check((r1.status_code, r2.status_code, r3.status_code) == (409, 409, 409), f"imported invoice: PATCH / PUT items / DELETE 409 ({r1.status_code} {r2.status_code} {r3.status_code})")
+check(d2.get("project_title") == d.get("project_title") and d2.get("date") == d.get("date") and d2.get("items") == d.get("items")
+      and d2.get("totals") == d.get("totals") and Ca.get(B + f"{D}/{INV2}/pdf").content == INV_PDF, "imported invoice: head, positions, totals and PDF unchanged")
 offs = [x for x in Ca.get(B + D + "?kind=offer").json().get("docs", []) if x.get("project_title") == "Imagefilm"]
 check(len(offs) == 1, "the quotation came along")
 od = Ca.get(B + f"{D}/{offs[0]['id'] if offs else 0}").json()

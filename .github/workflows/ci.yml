@@ -273,9 +273,11 @@ jobs:
     # 2.38.0 (#1021 P5): the e-invoice files Kalmido writes pass the real validators -- veraPDF (PDF/A-3b) and the KoSIT
     # validator (EN 16931 / XRechnung Schematron); tests/office_einvoice_test.py writes the files, tools/einvoice_validate.sh
     # checks them (blocking)
+    # 2.546.0 B (#4289): also the files of the real finalising (tests/p2546_b_einvoice_api_test.py starts the server with the
+    # app image, makes the invoices through its routes and takes the stored PDF + XML), with a minimum number of them
     name: E-invoice validators (veraPDF, KoSIT)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30  # 2.546.0 B (#4289): was 15; the image build on a cache miss comes on top
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -292,6 +294,26 @@ jobs:
           key: kalmido-validators-${{ hashFiles('tools/einvoice_validate.sh') }}
       - name: Test dependencies
         run: pip install -r tests/requirements.txt
+      # 2.546.0 B (#4289): the image of the job "image" (same key) when it is in the cache, else built here (as the shards)
+      - name: Image key
+        id: imgkey
+        run: echo "key=kalmido-image-$(date -u +%G-%V)-${{ hashFiles('Dockerfile', 'tools/requirements.lock', 'tools/requirements.static.lock', 'app.py', 'VERSION', 'kalmido/**', 'static/**', 'folderwatch/**') }}" >> "$GITHUB_OUTPUT"
+      - name: Image cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        continue-on-error: true
+        with:
+          path: /tmp/kalmido-image
+          key: ${{ steps.imgkey.outputs.key }}
+      - name: Image (load, build on miss)
+        run: |
+          if [ -s /tmp/kalmido-image/kalmido-test.tar ] && docker load -i /tmp/kalmido-image/kalmido-test.tar \
+             && docker image inspect kalmido:test >/dev/null; then
+            echo "image loaded from the cache"
+          else
+            echo "image not in the cache (or not loadable) - building it"
+            docker build -t kalmido:test .
+          fi
+          rm -rf /tmp/kalmido-image
       - name: Write the e-invoice files (XML + PDF/A-3)
         run: |
           python tests/office_pdf_test.py
@@ -303,11 +325,24 @@ jobs:
           python tests/p2357_a_paper_pdf_test.py  # 2.357.0 A (#3156): US-Letter invoice with e-invoice, on a letterhead, draft
           python tests/p2355_c_einvoice_test.py  # 2.355.0 C (#2844): categories K (goods to the EU, deliver-to address) and G (export)
           python tests/p2408_a_einvoice_test.py  # 2.408.0 A (#3520): final invoice after the BMF letter of 15.10.2026 (BT-113 + BT-22), CII + UBL
+          python tests/p2424_c_einvoice_test.py  # 2.424.0 C (#3524): ZUGFeRD 2.5.2 points (credit note, progress / final invoice, AE) - 2.546.0 B (#4289)
+          # 2.546.0 B (#4289): the real finalising through the server (19 / 7 %, discount, reverse charge, credit note, personal office);
+          # its server data in its own folder (start.sh wipes the data dir, the files go to tests/.data/einvoice/real-*)
+          python tests/p2546_b_einvoice_api_test.py "$RUNNER_TEMP/einvoice-api-data"
+      - name: "At least 14 files from the real finalising (2.546.0 B, #4289)"
+        run: |
+          ls -l tests/.data/einvoice/real-* || true
+          pdf=$(ls tests/.data/einvoice/real-*.pdf 2>/dev/null | wc -l); xml=$(ls tests/.data/einvoice/real-*.xml 2>/dev/null | wc -l)
+          echo "real finalising: $pdf PDF, $xml XML"
+          [ "$pdf" -ge 7 ] && [ "$xml" -ge 7 ] || { echo "::error title=e-invoice files::too few files from the real finalising ($pdf PDF, $xml XML; at least 7 + 7)"; exit 1; }
       - name: veraPDF + KoSIT
         run: tools/einvoice_validate.sh tests/.data/einvoice/*.pdf tests/.data/einvoice/*.xml
       - name: Reports on failure
         if: failure()
         run: for f in ~/.cache/kalmido-validators/reports/*-report.xml; do echo "== $f"; grep -oE 'rep:message[^>]*>[^<]*' "$f" | head -30; done 2>/dev/null || true
+      - name: "Container log on failure (2.546.0 B, #4289)"
+        if: failure()
+        run: docker logs kalmido-test 2>&1 | tail -100 || true
 
   demo:
     # 2.12.0 (#436): the browser demo builds from the current sources and runs without a server (jsdom smoke test + Firefox

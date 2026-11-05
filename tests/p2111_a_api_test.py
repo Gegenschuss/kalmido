@@ -173,6 +173,20 @@ check(r.status_code == 409 and doc(A, D)["project_ref"] == "P-2" and doc(A, D)["
 n = one("SELECT COUNT(*) FROM office_undo")
 r = Bo.patch(B + f"/api/office/docs/{D}", json={"project_ref": "P-3"}, headers=U(T5))
 check(r.status_code == 409 and one("SELECT COUNT(*) FROM office_undo") == n, f"a save of a sent document: 409, no step ({r.status_code})")
+# 2.546.0 (#4287): finalised in between (the head of this file promised it, only "sent" was tested): 409, the quotation stays
+T9 = "%032x" % (0xa11ce0 + 9)
+r = Bo.post(B + "/api/office/docs", json={"project_title": "Autumn campaign"})
+check(r.status_code == 201, f"bob: another quotation ({r.status_code})")
+D2 = r.json()["id"]
+check(Bo.put(B + f"/api/office/docs/{D2}/items", json={"items": ITEMS}).ok, "its positions (no step)")
+check(Bo.patch(B + f"/api/office/docs/{D2}", json={"project_title": "Autumn film"}, headers=U(T9)).ok, "bob: a step on it")
+r = A.post(B + f"/api/office/docs/{D2}/finalize")
+check(r.ok and r.json().get("locked"), f"alice finalises it ({r.status_code} {r.text[:200]})")
+for op in ("undo", "all"):
+    r = undo(Bo, "doc", D2, T9, op)
+    d2 = doc(A, D2)
+    check(r.status_code == 409 and d2["project_title"] == "Autumn film" and d2.get("locked") and len(d2.get("items") or []) == 1,
+          f"finalised: {op} 409, it stays ({r.status_code} {r.text[:200]})")
 
 # ---- master data: a service (admins only)
 r = A.post(B + "/api/office/services", json={"name_de": "Beratung", "daily_rate": 800})
