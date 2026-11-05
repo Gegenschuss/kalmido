@@ -64,14 +64,20 @@ from datetime import timedelta
 
 from flask import g, has_request_context, request
 
-from ..accounts.orgroles import org_role_key, FULL_READ
-from .access import Denied, acx_of, acx_org_ok, collab_all
-from .db import insert_id, iso, now_utc
+from ..accounts.orgroles import FULL_READ, RO_MSG, org_role_key
+from .access import Denied, acx_of, acx_org_ok, collab_all, need_feat, token_lists
+from .db import LV_AREA_KEYS, insert_id, iso, now_iso, now_utc
 from .errors import BadInput
 from .i18n import tr
-from .pg import system_ctx
+from .pg import system_ctx, table_columns
+from ..files.fsref import FSR, _api_way as fsr_api_way, fs_ref_node, fs_ref_node_role, fs_ref_register
+from ..files.store import _free_name, _FsPre, fs_chain, fs_chains, fs_log_add, fs_visible_sql_c, safe_fs_name
+from ..files.web import _agent_event, _inherited_shares, _share_targets, _shares
+from .dlock import dl_of
+from ..files.fslock import fl_is_locked, fsl_denied
+from ..accounts.orgretain import upg_heir
 
-OBJ = {}  # kind -> the registered hooks
+from .objhooks import OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
 OBJ_REVOKED_DAYS = 30  # rows taken away stay restorable this long (obj_revoked)
@@ -147,8 +153,6 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage"):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload)."""
-    from ..files.fsref import fs_ref_register
-    from .db import LV_AREA_KEYS
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if base_role is not None and visible is None:
@@ -234,7 +238,6 @@ def obj_title(c, kind, rid):
 
 # ---------------------------------------------------------------- the role
 def _api_way(c, uid):
-    from ..files.fsref import _api_way as fsr_api_way
     return fsr_api_way(c, uid)
 
 
@@ -242,7 +245,6 @@ def _req_token_lists(uid):
     """The list limit of the request's own token (None: none, or not uid's request)."""
     if not has_request_context() or g.get("auth_via") != "token" or not g.get("user") or g.user["id"] != uid:
         return None
-    from .access import token_lists
     return token_lists()
 
 
@@ -264,7 +266,6 @@ def _gate(c, uid, reg, row):
         if sql and c.execute(f"SELECT 1 WHERE ? IN {sql}", (int(row["id"]),)).fetchone():
             return False
     if agent and reg["dl_area"]:
-        from .dlock import dl_of
         d = dl_of(c, uid)
         if d and d["areas"].get(reg["dl_area"], True):
             return False
@@ -300,7 +301,6 @@ def _base(c, uid, reg, row):
 def _share_role(c, uid, reg, row, pre=None):
     """Step 3b: the role the object's reference node gives through shares (fsref: explicit shares of its chain only).
     pre: the nodes, chains and share reads of a whole listing (obj_rows, review F3)."""
-    from ..files.fsref import fs_ref_node, fs_ref_node_role
     if pre is not None:
         n = pre["nodes"].get(int(row["id"]))
         if not n:
@@ -361,7 +361,6 @@ def obj_need(c, uid, kind, rid, need="view", trash=False):
     trash with trash=True too), 403 without the role need ('view' | 'write' | 'manage')."""
     reg = obj_reg(kind)
     if reg["feat"]:
-        from .access import need_feat
         need_feat(reg["feat"])
     row = obj_row(c, kind, rid)
     role = obj_role(c, uid, kind, rid, row=row) if row is not None else None
@@ -373,7 +372,6 @@ def obj_need(c, uid, kind, rid, need="view", trash=False):
     if OBJ_RANK[role] < OBJ_RANK[want]:
         org = row["org_id"] or None
         if org and org_role_key(c, uid, org) == "readonly":
-            from ..accounts.orgroles import RO_MSG
             raise Denied(403, tr(RO_MSG))
         raise Denied(403)
     return row, role
@@ -387,8 +385,6 @@ def _ids(xs):
 def _share_sql(c, uid, reg, agent):
     """The ids whose reference node lies below (or is) a node shared explicitly with uid, in the object's own workspace,
     reachable in the file store (fs_visible_sql: the boundary, the trash of the folders, locks) and not hidden."""
-    from ..files.store import fs_visible_sql_c
-    from .db import now_iso
     now = now_iso().replace("'", "")
     u = int(uid)
     if agent:
@@ -430,7 +426,6 @@ def _visible_sql(c, uid, kind):
     ctx = acx_of(c, uid)
     agent = ctx.role == "agent"
     if agent and reg["dl_area"]:
-        from .dlock import dl_of
         d = dl_of(c, uid)
         if d and d["areas"].get(reg["dl_area"], True):
             return none
@@ -467,7 +462,6 @@ def _visible_sql(c, uid, kind):
             extra += f" AND o.id NOT IN {sql}"
     lim = _req_token_lists(uid)
     if lim is not None:
-        from .pg import table_columns
         if "list_id" not in table_columns(c, t):
             return none
         extra += f" AND o.list_id IN ({_ids(sorted(lim))})"
@@ -502,14 +496,12 @@ def obj_rows(c, uid, kind, where="", args=(), trash=False, limit=500):
 def _rows_pre(c, uid, kind, ids):
     """Review F3: for a listing, the reference nodes of all its objects, their chains and the share reads at once (files/store.py
     fs_chains + _FsPre, the pattern of fs_roles_many) -- obj_role keeps its rules, only the reads are shared."""
-    from ..files.store import _FsPre, fs_chains
     nodes = {}
     ids = sorted({int(i) for i in ids})
     for k in range(0, len(ids), 500):
         part = ids[k:k + 500]
         for n in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id IN ({_ids(part)})", (kind,)).fetchall():
             nodes[int(n["ref_id"])] = n
-    from ..files.fsref import FSR
     chains = fs_chains(c, [n["id"] for n in nodes.values()]) if nodes else {}
     hidden, hk = None, (FSR.get(kind) or {}).get("hidden")
     if hk and nodes:  # what the file store's hidden hook of the kind names (fsr_hidden), for the filed ones at once
@@ -526,8 +518,6 @@ def _by_role(c, uid, org):
 def obj_node(c, uid, kind, rid, make=False):
     """The reference node of the object (a row); make: an object in no folder gets its node at the top of its workspace's
     tree (it then shows in the file store like every filed object)."""
-    from ..files.fsref import fs_ref_node
-    from ..files.store import fs_log_add, safe_fs_name, _free_name
     reg = obj_reg(kind)
     n = fs_ref_node(c, kind, rid)
     if n is not None or not make:
@@ -548,7 +538,6 @@ def obj_node(c, uid, kind, rid, make=False):
 def _pool_ok(c, n, key, tid, uid=None):
     """Is target (key, tid) one uid (default the signed-in person) may share node n with (files/web.py: the same workspace
     only)? Review F5: obj_share / obj_share_restore pass their own uid."""
-    from ..files.web import _share_targets
     pool = _share_targets(c, n, uid=int(uid) if uid else None)[{"user_id": "people", "group_id": "groups", "agent_id": "agents"}[key]]
     return any(x["id"] == tid for x in pool)
 
@@ -556,7 +545,6 @@ def _pool_ok(c, n, key, tid, uid=None):
 def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
     """Share the object with ONE person / group / agent (key user_id | group_id | agent_id): needs 'manage'; the same target
     again changes role / expiry. Returns the share id."""
-    from ..files.store import fs_log_add
     row, _ = obj_need(c, uid, kind, rid, "manage")
     if acx_of(c, uid).role == "agent":
         raise Denied(403)
@@ -568,7 +556,6 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
     if not _pool_ok(c, n, key, target, uid):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
     if key == "agent_id":
-        from ..files.fslock import fl_is_locked, fsl_denied
         if fl_is_locked(c, n["id"]):
             raise fsl_denied("fs_locked_agent")
     old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], target)).fetchone()
@@ -581,7 +568,6 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
                         (n["id"], target, role, expires_at, uid, iso(now_utc()), _by_role(c, uid, row["org_id"] or None)))
         if key == "agent_id":
-            from ..files.web import _agent_event
             _agent_event(c, target, n, role)
     fs_log_add(c, n["id"], "share", f"{key[:-3]}:{target}:{role}")
     obj_forget()
@@ -601,7 +587,6 @@ def _revoked_prune(c):
 def obj_unshare(c, uid, kind, rid, sid):
     """Take the share sid of the object's own node back (needs 'manage'): it goes into obj_revoked, restorable. Returns the
     obj_revoked id. Shares of the folders above are the file store's (its dialog)."""
-    from ..files.store import fs_log_add
     row, _ = obj_need(c, uid, kind, rid, "manage")
     n = obj_node(c, uid, kind, rid)
     s = c.execute("SELECT * FROM fs_shares WHERE id=? AND node_id=?", (int(sid), n["id"] if n else 0)).fetchone()
@@ -641,8 +626,6 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
 def obj_shares(c, uid, kind, rid):
     """{shares: the object's own, inherited: those of the folders above (read-only here), revoked: taken back, restorable}
     -- for who manages the object."""
-    from ..files.web import _inherited_shares, _shares
-    from ..files.store import fs_chain
     obj_need(c, uid, kind, rid, "manage")
     n = obj_node(c, uid, kind, rid)
     if n is None:
@@ -716,7 +699,6 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                          reason, by, int(org), "user_id")
             c.execute("DELETE FROM obj_undo WHERE org_id=?", (int(org),))
         elif reason == "delete" and uid:
-            from ..accounts.orgretain import upg_heir
             for reg in OBJ.values():  # review F1: an organisation's object stays with it, the heir owns it (owner_id cascades)
                 if reg["base_role"] is None:
                     out[reg["kind"]] = 0
@@ -745,6 +727,9 @@ def obj_public(c, uid, kind, row, role=None):
     title = obj_title(c, kind, row["id"]) if reg["title"] or "title" not in row.keys() else (row["title"] or "")  # review F3: the row is here
     out.update(kind=kind, role=role, title=title, open=reg["open_url"](row["id"]))
     return out
+
+
+REVOKE.append(obj_revoke_person)  # core/objhooks.person_revoked (accounts calls it without importing the domain layer)
 
 
 def _probe_register():

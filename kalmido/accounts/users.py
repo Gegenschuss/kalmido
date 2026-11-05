@@ -9,6 +9,7 @@ import zipfile
 from flask import g, jsonify, request, Response, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
+from ..core.objhooks import person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, ntfy_topic_taken, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings, iso
@@ -581,8 +582,7 @@ def _user_purge(c, uid, made):
     bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)
     for o in rck_admin_orgs(c, uid):  # 2.539.0 (#4373): an admin who saw an organisation's recovery key goes (before the log forgets the id)
         rck_admin_gone(c, o, uid)
-    from ..core.objects import obj_revoke_person
-    obj_revoke_person(c, uid, None, "delete")  # 2.558.0 (#4709): its undo steps and revoked rows, its name in the core's history
+    person_revoked(c, uid, None, "delete")  # 2.558.0 (#4709): its undo steps and revoked rows, its name in the core's history
     # 2.152.0 A (#2164): the personal office is dismantled with its files, or retired when it keeps invoices / receipts by
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)

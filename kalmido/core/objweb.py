@@ -18,7 +18,7 @@ Agents (API v1, the agent channel, scope agent + the kind's own scopes):
   GET    /api/v1/agent/objects/<kind>         what the agent sees (only what is shared with it)
   GET    /api/v1/agent/objects/<kind>/<id>
   PATCH  /api/v1/agent/objects/<kind>/<id>    expect_updated_at required (400 without, 409 when changed meanwhile)"""
-from flask import jsonify, request
+from flask import g, jsonify, request
 
 from ..accounts.session import me
 from ..api.common import v1_args, v1_json, v1_view
@@ -30,6 +30,8 @@ from .errors import BadInput
 from .i18n import tr
 from .objects import obj_need, obj_public, obj_reg, obj_rows, obj_share, obj_share_restore, obj_shares, obj_unshare
 from .writes import obj_create, obj_history, obj_purge, obj_restore, obj_trash, obj_undo, obj_write
+from ..files.web import _expiry
+from ..api.scopes import need_scope
 
 
 def _reg(kind):
@@ -132,7 +134,6 @@ def obj_shares_route(kind, rid):
 
 @app.post("/api/obj/<kind>/<int:rid>/shares")
 def obj_share_route(kind, rid):
-    from ..files.web import _expiry
     _reg(kind)
     c, uid = db(), me()
     b = body()
@@ -166,10 +167,10 @@ def obj_share_restore_route(kind, rid, revoked_id):
 # ---------------------------------------------------------------- agents (API v1)
 def _agent_kind(kind, write=False):
     """The kind for the agent channel: only an agent's token, with the kind's read (write) scope."""
-    from ..agents.core import need_agent
-    from ..api.scopes import need_scope
     reg = _reg(kind)
-    aid = need_agent()
+    if (g.user["kind"] or "user") != "agent":  # agents/core.need_agent (the layer agents is above this module's)
+        raise Denied(403, tr("Only agent accounts can use this endpoint"))
+    aid = g.user["id"]
     need_scope(reg["scopes"][1 if write else 0])
     return aid
 

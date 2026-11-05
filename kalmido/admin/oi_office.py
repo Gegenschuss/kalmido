@@ -27,6 +27,7 @@ from .orgexport import _safe_part  # 2.369.5 (#2517): pulled up from functions
 from ..office.pdfweb import LOGO_FILE, epdf_name  # 2.369.5 (#2517): pulled up from functions
 from ..office.signoff import sig_purpose, sig_token_new  # 2.369.5 (#2517): pulled up from functions
 from ..office.letterhead import BP_FILE_RE  # 2.369.5 (#2517): pulled up from functions
+from ..office.eqcare import eqc_sync
 
 # ids inside JSON texts: key -> map kind (unknown -> None)
 OI_JSON_IDS = {"service_id": "office_services", "producing_service_id": "office_services", "role_id": "office_roles",
@@ -740,7 +741,6 @@ def _f_equipment(c, run, uid, data, who):
     old mark named this device and part; maint[].task_id goes through the task map like warranty_task_id. A task that stayed
     behind (an inbox is never exported) or names something else is dropped, and the device makes its open tasks anew in the
     importing admin's inbox (office/eqcare.py eqc_sync), so no device comes in without its dates and none twice."""
-    from ..office.eqcare import eqc_sync
     fams = {}
     for t in data.get("tasks") or []:
         f = _oi_json(t.get("fam"), {}) if isinstance(t, dict) else {}

@@ -33,13 +33,17 @@ from datetime import timedelta
 
 from flask import g, has_request_context, request
 
-from .access import Denied, acx_of
+from .access import Denied, acx_of, acx_org_ok, need_feat
 from .conflict import ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
 from .objects import OBJ_COLS, obj_need, obj_public, obj_reg, obj_row, obj_title, obj_forget
 from .pg import table_columns, write_lock
+from ..collab.comments import user_names
+from ..accounts.orgroles import need_org_write
+from ..files.fsref import fs_ref_drop, fs_ref_rename
+from ..files.store import _free_name
 
 OBJ_MERGE_MIN = 10  # changes of one person to one object within this many minutes are one history entry (wiki/wkhist.py)
 OBJ_HISTORY_MAX = 200  # entries kept per object (the oldest go)
@@ -129,7 +133,6 @@ def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=No
 
 def obj_history(c, uid, kind, rid, limit=50):
     """The history of the object, newest first ('view' on it)."""
-    from ..collab.comments import user_names
     obj_need(c, uid, kind, rid, "view")
     rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (kind, int(rid), int(limit))).fetchall()
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
@@ -143,11 +146,8 @@ def obj_create(c, uid, kind, vals, org_id=None):
     """A new object of kind in uid's private space (org_id None) or organisation org_id (a member / admin). Agents make
     nothing (403, docs/AGENTS.md: creating stays with people; review F4). vals: the kind's fields (the cleaners; unknown =
     400). Returns the row."""
-    from ..accounts.orgroles import need_org_write
-    from .access import acx_org_ok
     reg = obj_reg(kind)
     if reg["feat"]:
-        from .access import need_feat
         need_feat(reg["feat"])
     if acx_of(c, uid).role == "agent":
         raise Denied(403)  # review F4: creating stays with people (an agent's object would have no owner who sees it)
@@ -172,7 +172,6 @@ def obj_create(c, uid, kind, vals, org_id=None):
 
 def obj_write(c, uid, kind, rid, b, expect=None):
     """Change the fields of the object sent in b (module docstring). Returns (row, {field: (before, after)})."""
-    from ..files.fsref import fs_ref_rename
     reg = obj_reg(kind)
     obj_need(c, uid, kind, rid, "write")
     write_lock(c, f"obj-{kind}-{int(rid)}")
@@ -231,7 +230,6 @@ def obj_restore(c, uid, kind, rid):
     reg = obj_reg(kind)
     row, _ = obj_need(c, uid, kind, rid, "manage", trash=True)
     write_lock(c, f"obj-{kind}-{int(rid)}")
-    from ..files.store import _free_name
     n = c.execute("SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND deleted_at=?", (kind, int(rid), row["deleted_at"])).fetchone()
     if n is not None:  # review F7: the node obj_trash put into the trash comes back (not one the file store's own trash holds)
         nm = _free_name(c, n["parent_id"], n["owner_id"], n["org_id"], n["name"], skip=n["id"])
@@ -248,7 +246,6 @@ def obj_restore(c, uid, kind, rid):
 def obj_purge(c, uid, kind, rid):
     """Delete for good: only an object in the trash ('manage'; 409 otherwise). Its node, history, undo steps and revoked
     shares go with it."""
-    from ..files.fsref import fs_ref_drop
     reg = obj_reg(kind)
     row = obj_row(c, kind, rid)
     if row is not None and not row["deleted_at"]:

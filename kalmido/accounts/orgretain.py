@@ -18,6 +18,7 @@ import re
 
 from flask import g, has_request_context
 
+from ..core.objhooks import OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.access import Denied
 from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
 from ..core.i18n import N_, tr, trn
@@ -335,8 +336,7 @@ def odl_retire(c, oid, until, gone=None):
         adm = [str(r[0]) for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
                                             "AND m.role='admin' AND COALESCE(u.kind, 'user')!='agent' AND m.user_id!=? ORDER BY m.user_id",
                                             (oid, int(gone or 0))).fetchall()]
-        from ..core.objects import obj_revoke_person
-        obj_revoke_person(c, None, oid, "retire")  # 2.558.0 (#4709): every share on its nodes, every membership of its rooms (restorable rows)
+        person_revoked(c, None, oid, "retire")  # 2.558.0 (#4709): every share on its nodes, every membership of its rooms (restorable rows)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         odl_public_off(c, oid)  # 2.360.4 (#3243)
         odl_members_off(c, oid)  # 2.560.0 (#4697): before org_id=NULL (then the organisation's boundary no longer holds)
@@ -528,7 +528,6 @@ def upg_heirless(c, uid):
             if c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id!=? "
                          "AND COALESCE(u.kind, '')!='agent' AND u.disabled=0 LIMIT 1", (oid, uid)).fetchone():
                 need.add(oid)
-        from ..core.objects import OBJ
         for reg in OBJ.values():  # 2.558.0 (#4709, review F1): the organisations' objects of the shared core go to the heir too
             if reg["base_role"] is None:
                 for (oid,) in c.execute(f"SELECT DISTINCT org_id FROM {reg['table']} WHERE owner_id=? AND org_id IS NOT NULL", (uid,)).fetchall():

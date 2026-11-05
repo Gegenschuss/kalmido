@@ -79,7 +79,9 @@ there). `obj_need` turns this into 404 / 403; `obj_visible_sql(c, uid, kind)` / 
 with a `cap` hook lists only with `obj_rows` (it asks `obj_role` per row): `obj_visible_sql` refuses it with `ValueError`,
 because a share there may open less than the SQL would name.
 
-Losing access is in one place too: `obj_revoke_person(c, uid, org, reason)` runs when a person leaves an organisation
+Losing access is in one place too: `obj_revoke_person(c, uid, org, reason)` (called by the layer accounts through
+`core/objhooks.person_revoked`, so accounts never imports the core's modules; `core/objects.py` and `core/writes.py`
+belong to the layer domain, `core/objweb.py` to the layer integrations, `LAYER_OF` in `kalmido/__init__.py`) runs when a person leaves an organisation
 (their and their agents' shares on its nodes, their team chat rooms there; their objects go to the heir), when a role
 goes down to guest / accounting (the open channels they joined), when an organisation retires (every share on its nodes,
 every room membership) and when an account is deleted (its organisation objects go to the heir, `upg_heir`, before the

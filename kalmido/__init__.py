@@ -19,10 +19,12 @@ LAYERS = (
     ("integrations", ("integrations", "api", "admin", "paperless", "newsletter")),
     ("agents", ("agents", "assistant", "startup")),
 )
-LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area
+LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
+            "core.objects": "domain", "core.writes": "domain", "core.objweb": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
+    "core.objhooks",  # 2.558.0 (#4709): what accounts needs of the shared core (filled by core.objects, no imports)
     "core.config",
     "core.schema",
     "core.i18n",

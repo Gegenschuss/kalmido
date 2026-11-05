@@ -25,6 +25,7 @@ from ..core.retention import ret_days
 from .ledger import ofx_log
 from .model import office_ctx, office_role
 from .rights import ofr_admin_or
+from .eqcare import eqc_sync
 
 OTB_REFS = {}  # table -> [(child table, column, 'c' cascade | 'n' set null)]
 OTB_DEPTH = 3
@@ -213,7 +214,6 @@ def otb_restore_route(tid):
     notes = {}
     kind, ref = otb_restore(c, oid, tid, notes)
     if kind == "equipment":  # 2.558.0 C (#4591): a restored device starts its warranty / maintenance tasks again
-        from .eqcare import eqc_sync
         eqc_sync(c, oid, ref, revive=True)
     if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
         from .travel import rk_trash_check
