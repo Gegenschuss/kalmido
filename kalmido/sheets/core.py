@@ -1468,7 +1468,7 @@ def sh_freeze(c, sheet_row, cell_row, frozen, uid):
                   (sh_freeze_dump(v, res.get("display") or ""), uid, ts, cell_row["id"]))
     else:
         c.execute("UPDATE sheet_cells SET frozen=0, frozen_value=NULL, updated_by=?, updated_at=? WHERE id=?", (uid, ts, cell_row["id"]))
-    shh_meta(c, sheet_row["id"], "freeze", "1" if cell_row["frozen"] else "", "1" if frozen else "", uid, cell_row)
+    shh_meta(c, sheet_row["id"], "freeze", "1" if cell_row["frozen"] else "0", "1" if frozen else "0", uid, cell_row)
     sh_touch(c, sheet_row["id"], uid)
 
 
