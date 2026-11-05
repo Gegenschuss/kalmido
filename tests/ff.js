@@ -152,8 +152,12 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
       }
       for (let k = 0; ; k++) {
         try { r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'}, k < 2 ? 40000 : 120000); break; } catch (e) {
-          if (k >= 2 || !/no answer within/.test(e.message)) throw e;
-          console.log(`ff: navigate ${String(url).slice(0, 120)} gave no answer in 40 s, once more`);
+          // CI red of 2.563.0 (p2120_a_ui): a navigate while the page still loads or goes somewhere itself (an app reacting to a new
+          // sign-in, its own redirect) is answered NS_BINDING_ABORTED - the page's own load won; let it settle, then the same navigate again
+          const aborted = /NS_BINDING_ABORTED/.test(e.message);
+          if (k >= 2 || !(aborted || /no answer within/.test(e.message))) throw e;
+          console.log(`ff: navigate ${String(url).slice(0, 120)} ${aborted ? 'was aborted by the page' : 'gave no answer in 40 s'}, once more`);
+          if (aborted) for (let i = 0; i < 50 && !await ev(`document.readyState === 'complete'`).catch(() => false); i++) await sleep(100);
         }
       }
       // 2.501.0 (#4296): a module that does not load is red (the suite's later calls would only fail by chance); a page that
