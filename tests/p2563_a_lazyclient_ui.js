@@ -18,6 +18,8 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const until = fn => require('./boot').until(fn, {timeout: 15000, step: 50});
 const ran = (w, f) => !!w.document.querySelector(`script[data-ld="${f}"]`);
 const fn = (w, n) => w.eval(`typeof ${n}`) === 'function';
+// close a window only once nothing loads any more (the card asks for other modules, e.g. video sign-offs; a close aborts them)
+const close = async w => { await until(() => w.eval('ld_n') === 0); w.close(); };
 
 (async () => {
   if (!process.env.KMT_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
@@ -53,14 +55,14 @@ const fn = (w, n) => w.eval(`typeof ${n}`) === 'function';
   await until(() => w.document.querySelector('#view .ctcard:not(.ctnone)'));
   check(w.document.querySelector('#view .ctcard:not(.ctnone)'), "the client's card is drawn");
   check(w.eval(`hbm_taskLinkHtml(taskById(${T.id}) || {id: ${T.id}})`).includes('data-hbmlnk'), 'the mail link still draws after the module came');
-  w.close();
+  await close(w);
 
   // ---- the modules that use its globals load it first
   for (const [m, probe] of [['office', 'oim_link'], ['contacts', 'ctk_mapLink'], ['trashui', 'ms_clAct']]) {
     w = await boot({user: 'alice', lazy: true});
     const res = await w.eval(`loadModule('${m}').then(() => 'loaded', e => String(e))`);
     check(res === 'loaded' && ran(w, 'clientpage') && fn(w, probe), `module ${m} loads the client page first (${probe}): ${res}`);
-    w.close();
+    await close(w);
   }
 
   check(errs.length === 0, 'no JS errors: ' + errs.slice(0, 3).join(' | '));
