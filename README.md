@@ -19,11 +19,10 @@
 
 ## What's new
 
-**2.543.0** (2026-11-05):
-- **Tables**: a trash view for rows, columns and tables; conflicting online changes show the conflict dialog instead of overwriting.
-- **Office**: entertainment receipts in EÜR and VAT; reverse charge worked out from the client's country; quotation mails warn when the terms are missing.
-- **Security**: support sessions cannot book or change accounts; locked projects keep no plain-text notes; sign-in and browser encryption hardened.
-- **Layout**: one width system on wide screens; booking pages can delete bookings.
+**2.551.0** (2026-11-05):
+- **Office**: members record their own trips in travel expenses; reverse charge receipts, paid reminder fees, refunds on final invoices, travel receipts with input tax.
+- **Notes and favourites**: note cards have a menu on right click / long press; favourite tiles can be dragged out of the bar to remove them.
+- **Self-hosting**: `KALMIDO_RETENTION_BUFFER_YEARS` (default 1) and the office switch *Extend the lock*.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
