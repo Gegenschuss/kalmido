@@ -109,14 +109,15 @@ def _stored(v):
 
 
 def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=None, oid=None, dec=None, enc=None, public=None,
-             alias=None, version=True, extra=None, force=False, lock=None):
+             alias=None, version=True, extra=None, force=False, lock=None, write=None):
     """Change row rid of kind (module docstring). b = the request body (expect_updated_at in it); clean(c, b, cur) -> {column:
     clean value} of the fields sent; dec(c, raw) -> the row as dict (decrypted), enc(c, {column: value}) -> as stored;
     public(c, cur) -> the current state of a 409 (under "current", and under alias too: the key the route used before);
     version=False for the module's own internal writes (no version check);
     extra(c, cur, changed) runs inside the step (more rows of the object); force = stamp the row even when no own column
     changed (extra changed something); lock = the name of the row's lock when the module's other writes use one already
-    (default obj-<kind>-<id>). Returns (row after, changed)."""
+    (default obj-<kind>-<id>); write(c, cur, {column: new}) = the module's own writer instead of the plain UPDATE (master
+    data: office/model.py office_update seals and checks itself). Returns (row after, changed)."""
     reg = OBJ_TRACK.get(kind)
     if reg is None:
         raise ValueError(f"ow_write: kind {kind!r} not tracked (ow_kind)")
@@ -146,12 +147,21 @@ def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=Non
     stamp = {"updated_at": iso_ms(now_utc())}
     if "updated_by" in cols and uid:
         stamp["updated_by"] = uid
-    sets = {**upd, **stamp}
+    if write is not None:
+        if changed:
+            write(c, cur, {k: z for k, (_, z) in changed.items()})
+        upd = None  # the history takes the stored values from the row
+        sets = stamp
+    else:
+        sets = {**upd, **stamp}
     c.execute(f"UPDATE {t} SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), rid])
     if extra:
         extra(c, cur, changed)
     if changed:
         rw = dict(raw)
+        if upd is None:
+            nw = dict(c.execute(f"SELECT * FROM {t} WHERE id=?", (rid,)).fetchone())
+            upd = {k: nw.get(k) for k in changed}
         obj_history_add(c, uid, kind, rid, {k: _stored(rw.get(k)) for k in changed}, {k: _stored(upd.get(k)) for k in changed},
                         org_id=roid or None, agent=agent)
     obj_undo_post(c)

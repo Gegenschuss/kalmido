@@ -20,7 +20,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields, oc_is_enc
 from ..core.i18n import N_, tr
 from ..core.db import body, bump
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
+from .owrite import ow_write  # 2.567.0 (#4711): the office's write layer
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
@@ -410,15 +410,19 @@ def ltb_post():
 @app.patch("/api/office/letter-blocks/<int:bid>")
 def ltb_patch(bid):
     c, uid, oid = ltb_ctx()
-    write_lock(c, f"office_texts-{int(bid)}")  # 2.560.0 C (#4700): the lock of office_update; saved elsewhere meanwhile -> 409 with the block
-    cur = ltb_row(c, oid, bid)
-    ccf_check(body(), cur.get("updated_at"), "row", lambda: ltb_public(cur))  # (ltb_clean keeps only name / body, the check is here)
-    row = ltb_clean(body())
-    if row:
-        cur = office_update(c, oid, "texts", cur["id"], row)
-        bump(c)
-        c.commit()
-    return jsonify(ltb_public(cur))
+    ltb_row(c, oid, bid)
+    b = body()
+    out = {}
+
+    def write(c, cur, vals):
+        out["row"] = office_update(c, oid, "texts", cur["id"], vals)  # it checks and seals the text (ltx_clean)
+
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- the lock of office_update; saved elsewhere meanwhile -> 409
+    # ("current" + "row"); only name / body (ltb_clean); history, undo step (kind of the master data "texts")
+    cur, _ = ow_write(c, uid, "office_md_texts", bid, b, lambda c, b, cur: ltb_clean(b), oid=oid, dec=lambda c, r: ltb_row(c, oid, bid),
+                      public=lambda c, cur: ltb_public(cur), alias="row", lock=f"office_texts-{int(bid)}", write=write)
+    c.commit()
+    return jsonify(ltb_public(ltb_row(c, oid, bid)))
 
 
 @app.delete("/api/office/letter-blocks/<int:bid>")
