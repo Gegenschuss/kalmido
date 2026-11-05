@@ -24,7 +24,7 @@ from datetime import date, timedelta
 import requests
 
 from freelancer_fixture import freelancer
-from kt import B, H, check, dbx, done, fresh, setup
+from kt import B, H, check, dbx, done, fresh, sess, setup
 
 KEY = base64.b64encode(os.urandom(32)).decode()
 O = "/api/office"
@@ -130,6 +130,14 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     check(S.put(B + f"/api/lists/{LP}/members", json={"user_id": G, "role": "edit"}).ok, f"{who}: the project shared with the agent")
     r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LH, "from": D9, "to": TODAY})
     check(r.status_code == 404, f"{who}: a project the agent does not see: 404 ({r.status_code} {r.text[:160]})")
+    # review 2.568.0 (M1a): a task of another project / a deleted task with list_id of the agent's project -> 404
+    TH = S.post(B + "/api/tasks", json={"list_id": LH, "title": "Hidden task"}).json()["id"]
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": TH, "from": D9, "to": TODAY})
+    check(r.status_code == 404, f"{who}: task_id of another project: 404 ({r.status_code} {r.text[:160]})")
+    TD = S.post(B + "/api/tasks", json={"list_id": LP, "title": "Gone task"}).json()["id"]
+    check(S.delete(B + f"/api/tasks/{TD}").ok, f"{who}: a task of the project deleted")
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": TD, "from": D9, "to": TODAY})
+    check(r.status_code == 404, f"{who}: a deleted task: 404 ({r.status_code} {r.text[:160]})")
     for bad in ({"client_id": CL, "from_time": True, "from": D9, "to": TODAY},  # no project
                 {"client_id": CL, "from_time": True, "list_id": LP},  # no period
                 {"client_id": CL, "from_time": True, "list_id": LP, "from": TODAY, "to": D9},  # period backwards
@@ -203,9 +211,67 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     # ---- another person's agent finds nothing of it (tenant-matrix: office)
     if S is F:
         r = requests.post(INV, headers=AH0_ORG, json={"client_id": CL, "items": [{"text": "x", "qty": 1, "price": 1}]})
-        check(r.status_code in (400, 403, 404), f"the organisation's agent with the freelancer's client: refused ({r.status_code})")
+        # review 2.568.0 (M1d): a tenant border answers 403 / 404, never a 400 of an input check that would hide it
+        check(r.status_code in (403, 404), f"the organisation's agent with the freelancer's client: refused ({r.status_code} {r.text[:120]})")
+        # review 2.568.0 (M1c): the freelancer's project with the organisation's agent -> 404
+        r = requests.post(INV, headers=AH0_ORG, json={"client_id": CL_ORG, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
+        check(r.status_code == 404, f"the organisation's agent with the freelancer's project: 404 ({r.status_code} {r.text[:120]})")
         check(not dbx("SELECT 1 FROM office_docs WHERE client_id=? AND agent_id=?", (CL, AG_ORG)), "nothing made with another office's client")
     else:
-        AG_ORG, AH0_ORG = G, AH
+        AG_ORG, AH0_ORG, LP_ORG, CL_ORG = G, AH, LP, CL
+
+# ---- review 2.568.0 (M1b): in an organisation the office rights groups decide, for the person and for the agent
+r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob Staff", "password": "password123", "email": "bob@example.com"})
+check(r.ok, "bob: a member " + r.text[:160])
+BOB = r.json()["id"]
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "bob@example.com", "role": "member"}).ok, "bob in the organisation")
+Bo = sess("bob")
+Bo.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
+
+
+def group(name, **lv):
+    r = A.post(B + O + "/rights/groups", json={"name": name})
+    check(r.status_code == 201, f"office rights group {name} " + r.text[:160])
+    gid = r.json()["id"]
+    levels(gid, **lv)
+    return gid
+
+
+def levels(gid, **lv):
+    check(A.patch(B + O + f"/rights/groups/{gid}", json={"levels": lv}).ok, f"office rights group {gid}: {lv}")
+
+
+def member(uid, gid):
+    r = A.put(B + O + f"/rights/people/{uid}", json={"groups": [f"g:{gid}"]})
+    check(r.ok, f"{uid} into group {gid} {r.status_code} {r.text[:160]}")
+
+
+GB, BH = agent(Bo, "kibob", ["read", "office"])
+check(A.patch(B + f"{O}/agents/{GB}", json={"office_drafts": True}).ok, "bob's agent: the office switch on")
+for u in (BOB, GB):
+    check(A.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": u, "role": "edit"}).ok, f"the project shared with {u}")
+entry(BOB, LP_ORG, None, D1, 1800)
+FT = {"client_id": CL_ORG, "from_time": True, "list_id": LP_ORG, "from": D9, "to": TODAY}
+FREE = {"client_id": CL_ORG, "items": [{"text": "Cut", "qty": 1, "price": 100}]}
+GV = group("Look only", offers="view", time="view")
+member(BOB, GV)
+r = requests.post(INV, headers=BH, json=FREE)
+check(r.status_code == 403, f"the person with quotations only to view: 403 ({r.status_code} {r.text[:160]})")
+GS = group("Sales without time", offers="edit", time="none")
+member(BOB, GS)
+r = requests.post(INV, headers=BH, json=FT)
+check(r.status_code == 403, f"the person without times to bill: 403 ({r.status_code} {r.text[:160]})")
+levels(GS, time="view")
+GA = group("Agent look only", offers="view", time="none")
+member(GB, GA)
+r = requests.post(INV, headers=BH, json=FREE)
+check(r.status_code == 403, f"the agent's group with quotations only to view: 403 ({r.status_code} {r.text[:160]})")
+levels(GA, offers="edit")
+r = requests.post(INV, headers=BH, json=FT)
+check(r.status_code == 403, f"the agent's group without times to bill: 403 ({r.status_code} {r.text[:160]})")
+check(not dbx("SELECT 1 FROM office_docs WHERE agent_id=?", (GB,)), "the refusals made no draft")
+levels(GA, time="view")
+r = requests.post(INV, headers=BH, json=FT)
+check(r.status_code == 201, f"person and agent with both rights: 201 ({r.status_code} {r.text[:200]})")
 
 sys.exit(done("p2568_b_ai_office"))
