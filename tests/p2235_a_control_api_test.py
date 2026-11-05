@@ -279,7 +279,7 @@ ctl(F, FA, {"level": "free"})
 r = requests.patch(V + f"/tasks/{OT}", headers=FAH, json={"title": "Changed by the agent"})
 check(r.status_code == 409 and r.json()["error"]["level"] == "routine", f"free agent, edit owner: capped to routine in that list {r.status_code}")
 check(requests.post(V + "/tasks", headers=FAH, json={"title": "Routine in Otto's", "list_id": OL}).status_code == 201, "routine passes there")
-check(requests.patch(V + f"/tasks/{OT}", headers=FAH, json={"due": "2026-12-24"}).ok, "planning passes there")
+check(requests.patch(V + f"/tasks/{OT}", headers=FAH, json={"due": "2026-12-24", "expect_updated_at": requests.get(V + f"/tasks/{OT}", headers=FAH).json()["updated_at"]}).ok, "planning passes there")  # 2.564.0 (#4702): an agent sends the version it read
 
 # ================================================================== a team agent of the instance admin
 r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name": "Team", "scopes": SCOPES})

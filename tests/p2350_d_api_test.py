@@ -213,7 +213,7 @@ check("add_snippet" in tools and "snippets" in tools["update_task"]["inputSchema
 TM = A.post(B + "/api/tasks", json={"title": "MCP task", "list_id": SW}).json()["id"]
 res = rpc("tools/call", {"name": "add_snippet", "arguments": {"task_id": TM, "code": "console.log(1)", "lang": "js", "path": "app.js", "line": 3}})["result"]
 check(res["isError"] is False and res["structuredContent"]["snippet"]["path"] == "app.js", "#1095: MCP add_snippet " + json.dumps(res)[:300])
-res = rpc("tools/call", {"name": "update_task", "arguments": {"task_id": TM, "snippets": []}})["result"]
+res = rpc("tools/call", {"name": "update_task", "arguments": {"task_id": TM, "snippets": [], "expect_updated_at": A.get(B + f"/api/tasks/{TM}").json()["updated_at"]}})["result"]  # 2.564.0 (#4702): an agent sends the version it read
 check(res["isError"] is False and not A.get(B + f"/api/tasks/{TM}").json().get("snippets"), "#1095: MCP update_task snippets [] removes all")
 res = rpc("tools/call", {"name": "add_snippet", "arguments": {"task_id": T, "code": "x"}})["result"]
 check(res["isError"] is True, "#1095: MCP add_snippet: the 21st is refused")

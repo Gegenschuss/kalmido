@@ -252,7 +252,7 @@ e = events(cl, cur)["data"]
 check([x["event"] for x in e] == ["unassigned"], "unassigned event")
 A.patch(B + f"/api/tasks/{T2}", json={"assignee_id": CL})
 cur = events(cl, 0)["cursor"]
-check(cl.patch(f"/tasks/{T2}", json={"assignee_id": None, "expect_updated_at": cl.get(f"/tasks/{T2}").json()["updated_at"]}).ok and not events(cl, cur)["data"], "agent unassigns itself: no event")  # 2.564.0 (#4702): an agent sends the version it read
+check(cl.patch(f"/tasks/{T2}", json={"assignee_id": None, "_prev": {"assignee_id": CL}}).ok and not events(cl, cur)["data"], "agent unassigns itself: no event")  # 2.564.0 (#4702): an agent sends the version it read
 A.patch(B + f"/api/tasks/{T2}", json={"assignee_id": CL})
 cur = events(cl, 0)["cursor"]
 
