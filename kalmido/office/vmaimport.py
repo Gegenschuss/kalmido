@@ -35,7 +35,7 @@ from .calc import dstr, money
 from .legacyimport import fx_run, fx_settle  # 2.363.2 (#3104)
 from .vma import VMA_HOME, VMA_NAMES, vma_dates, vma_places, vma_rate, vma_table_year, vma_trip
 from .legacyimport import _col_index, _local, _rels, _xml, _sheet, _in_rph, _upload  # 2.369.5 (#2517): pulled up from functions
-from .travel import rk_trips, rka_purposes, rka_purposes_adopt, _trip, _trip_need_open  # 2.369.5 (#2517): pulled up from functions
+from .travel import _ctx, rk_trips, rka_purposes, rka_purposes_adopt, _trip, _trip_need_open  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .olock import olk_trip_item_reason  # 2.369.5 (#2517): pulled up from functions
 from .otrash import OTB_MANY, OTB_UNDO, otb_put  # 2.567.0 (#4707)
@@ -581,7 +581,6 @@ OTB_MANY[VMI_TRASH] = vmi_trash_back
 
 
 def _vmi_ctx():
-    from .travel import _ctx
     return _ctx()
 
 
@@ -591,7 +590,6 @@ OTB_UNDO[VMI_TRASH] = _vmi_ctx  # the toast's undo: the rights of the trips, as 
 @app.post("/api/office/trips/delete")
 def vmi_delete_many():
     """Office admin. {ids: [...]} -> vmi_remove (the undo of an import: one step)."""
-    from .travel import _ctx
     c, uid, oid = _ctx()
     b = body()
     ids = b.get("ids") if isinstance(b, dict) else None

@@ -14,14 +14,18 @@ After the trash period files/trashpurge.py (TP_PLAIN) deletes the copies. Not th
 import json
 import re
 
-from flask import g, jsonify
+from flask import jsonify
 
 from ..core.config import app
 from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
-from ..core.access import Denied, list_role, need_list, WRITE_ROLES
+from ..core.access import Denied, acx_of, list_role, need_list, WRITE_ROLES
+from ..tasks.validation import log_changes
+from ..collab.comments import user_names
+from .listtrash import OTR_TRASH_DAYS
+from .sprints import spr_dict, spr_row
 
 LPT_COL = re.compile(r"^[a-z_][a-z0-9_]*$")
 LPT_LIST_MAX = 300  # the trash view shows the newest ones
@@ -52,8 +56,7 @@ def lpt_sprint_put(c, sid, uid):
 
 def lpt_need(c, kind, ref_id):
     """The newest copy of kind / ref_id the current person may restore (edit rights on its live list); 404 otherwise."""
-    from ..agents.core import is_agent
-    if is_agent(g.user):
+    if acx_of(c, me()).role == "agent":  # agents never restore (core/access.py: the account kind, through its token too)
         raise Denied(404)
     r = c.execute("SELECT * FROM list_part_trash WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT 1", (kind, int(ref_id))).fetchone()
     if not r:
@@ -71,7 +74,6 @@ def lpt_insert(c, table, snap):
 def section_restore(sid):
     """A deleted section comes back with the same id, its limits and its tasks that are still without a section in the list
     -> the section + {moved, skipped} (like POST /api/sections, the undo of the app). 404: not in the trash."""
-    from ..tasks.validation import log_changes
     c = db()
     r = lpt_need(c, "section", sid)
     lid = r["list_id"]
@@ -107,7 +109,6 @@ def section_restore(sid):
 def sprint_restore(sid):
     """A removed planned sprint comes back with the same id (a number taken meanwhile: the next free one) and its tasks that
     are in no sprint now -> {sprint, moved, skipped}. 404: not in the trash."""
-    from .sprints import spr_dict, spr_row
     c = db()
     r = lpt_need(c, "sprint", sid)
     lid = r["list_id"]
@@ -143,11 +144,8 @@ def lpt_index():
     """The trash view's group "Other deleted items": sections, planned sprints, key links of the lists the person may change,
     their own templates and the rows of the budgets they may change -> {items: [{kind, id, list_id, list, name, deleted_at,
     by_name}], days}. kind: section | sprint | link | template | budget_entry | budget_cat | budget_rec."""
-    from ..agents.core import is_agent
-    from ..collab.comments import user_names
-    from .listtrash import OTR_TRASH_DAYS
     c, uid = db(), me()
-    if is_agent(g.user):
+    if acx_of(c, uid).role == "agent":
         raise Denied(404)
     can, items = {}, []
     names = {}
