@@ -511,7 +511,10 @@ def lock_applies():
 def lock_problem(c, cur, f, b=None):
     """The error text when the change f (clean_task values; b = the raw body for tags) touches a locked field of the
     task row cur, else None. Checkbox ticks in the notes are no change of the notes."""
-    if not cur or "locked" not in cur.keys() or not cur["locked"] or not lock_applies():
+    if not cur or "locked" not in cur.keys() or not cur["locked"]:
+        return None
+    bound = lock_applies()
+    if not bound and not lock_bypass_agent():
         return None
     if "locked" in f and not f["locked"]:
         return None  # unlocking (and changing in the same request) is allowed to whoever may change the task
@@ -541,7 +544,17 @@ def lock_problem(c, cur, f, b=None):
             except Exception:  # noqa: BLE001 -- invalid names: set_ltags reports them; a change in any case
                 new = None
             hit = new is None or sorted(x.casefold() for x in new) != sorted(x.casefold() for x in ltag_names(c, cur["id"]))
+    if hit and not bound:  # 2.564.0 (#4702): an agent stays free of the lock, but the history says it changed a locked task
+        log_act(c, cur["id"], "locked_bypass")
+        return None
     return tr("This task is locked. Unlock it to change it.") if hit else None
+
+
+def lock_bypass_agent():
+    """2.564.0 (#4702): an agent account writing through the API: not bound by the lock (the decision of #4702), but its
+    change of a locked field is marked in the task's history as locked_bypass (lock_problem)."""
+    from ..agents.core import is_agent
+    return has_request_context() and is_agent(getattr(g, "user", None))
 
 
 def descendants(c, tid):

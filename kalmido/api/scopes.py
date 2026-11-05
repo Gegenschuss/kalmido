@@ -44,6 +44,8 @@ from ..api.v1 import (
     _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
     V1_TASK_IN, v1_task_in,
 )
+from ..api.v1 import V1_TASK_VERSIONED  # 2.564.0 (#4702)
+from ..core.conflict import need_version, VersionRequired  # 2.564.0 (#4702)
 from ..api.common import cursor_dec, v1_args, v1_call, v1_feature, v1_json, v1_page, v1_view
 from ..api.openapi import openapi_spec
 from ..agents.core import agent_emit, agent_row, is_agent, job_dict, JOB_LOG_MAX
@@ -670,6 +672,8 @@ def v1_task_batch():
         if not isinstance(ch, dict) or not ch:
             raise BadInput(tr("Nothing to change"))
         data = v1_task_in(ch, tuple(k for k in V1_TASK_IN if k not in ("parent_id", "reviewer_id")))  # 2.390.0 B (#3355): reviewer one by one
+        if any(k in ch for k in V1_TASK_VERSIONED):  # 2.564.0 (#4702): an agent's content change says what it read of
+            need_version(b, "_prev", header=False)  # every task (_prev {id: {field: value read}}, checked below)
     elif b.get("changes"):
         raise UnknownFields(["changes"])
     for k, acts in (("_prev", ("update",)), ("expect", ("complete", "wont_do"))):
@@ -677,6 +681,9 @@ def v1_task_batch():
             raise UnknownFields([k])
     prev = {k: v1_prev_in(v) for k, v in _v1_batch_per(b["_prev"], "_prev", ids).items()} if "_prev" in b else {}
     expect = {k: _v1_batch_expect(v) for k, v in _v1_batch_per(b["expect"], "expect", ids).items()} if "expect" in b else {}
+    if act == "update" and is_agent(g.user) and any(k in b["changes"] for k in V1_TASK_VERSIONED) \
+            and {str(i) for i in ids} - set(prev):  # 2.564.0 (#4702): a task of the batch without what the agent read
+        raise VersionRequired(("_prev",))
     c = db()
     ids = list(dict.fromkeys(ids))
     vis = [i for i in ids if task_visible(c, i, me())]

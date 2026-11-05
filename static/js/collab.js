@@ -650,6 +650,7 @@ function actText0(a, U) {
     case 'snippets': return d.n ? tr('{0} changed the code snippets ({1})', who, d.n) : tr('{0} removed the code snippets', who);  // 2.35.0 (#1095)
     case 'ttype': return d.to ? tr('{0} set the type to {1}', who, q(ttName(d.to))) : tr('{0} removed the type', who);  // 2.4.0 (#340)
     case 'lock': return d.on ? tr('{0} locked the task', who) : tr('{0} unlocked the task', who);  // 2.36.0 (#1118)
+    case 'locked_bypass': return tr('{0} changed the task although it is locked (agents are not bound by the lock)', who);  // 2.564.0 (#4702)
     case 'ms': return d.on ? tr('{0} made the task a milestone', who) : tr('{0} made the milestone a normal task', who);  // 2.18.0 (#430)
     case 'milestone': return d.title ? tr('{0} added the task to the milestone {1}', who, q(d.title)) : tr('{0} removed the task from its milestone', who);
     case 'repeat': return d.rule ? tr('{0} set the repetition to {1}', who, q(repeatLabel(d.rule))) : tr('{0} stopped the repetition', who);

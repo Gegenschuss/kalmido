@@ -40,6 +40,7 @@ from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_m
 from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
+from ..core.conflict import need_version  # 2.564.0 (#4702)
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
 from ..calendars.caldav import apppw_delete, apppw_list, dav_info
@@ -1315,6 +1316,23 @@ def v1_expect(c, tid, raw):
     return None
 
 
+# 2.564.0 (#4702): the fields of a task a person edits by hand. An agent that changes one of them must say which version it
+# read (expect_updated_at, the header If-Match or _prev; else 400 version_required, core/conflict.py need_version), so a
+# person's edit made after the agent read is never overwritten silently. State steps without text stay free: moving
+# (list_id, section_id, parent_id, sprint_id), pin, lock, stars, reminders, the delegation, delivery / one-way marks,
+# complete / reopen (own routes) - an agent's moving and ticking work as before.
+V1_TASK_VERSIONED = ("title", "notes", "content", "due", "due_time", "start", "deadline", "deadline_in_today", "plan_start",
+                     "duration", "priority", "repeat", "repeat_from", "assignee_id", "assignee_group_id", "rotation",
+                     "list_tags", "tags", "people", "fields", "type", "milestone", "milestone_id", "family", "reviewer_id",
+                     "url", "points", "snippets")
+
+
+def v1_task_need_version(b, fields=("expect_updated_at", "_prev"), header=True):
+    """2.564.0 (#4702): b = the raw body of a task change (API names) -> need_version when it touches a versioned field."""
+    if isinstance(b, dict) and any(k in b for k in V1_TASK_VERSIONED):
+        need_version(b, *fields, header=header)
+
+
 @app.patch("/api/v1/tasks/<int:tid>")
 @v1_view
 def v1_task_update(tid):
@@ -1327,6 +1345,7 @@ def v1_task_update(tid):
     sc = raw.pop("shift_chain", True)  # 2.67.0 B (#1865): false = the tasks waiting on it stay where they are
     if not isinstance(sc, bool):
         raise BadInput(tr("Invalid value: {0}", "shift_chain"))
+    v1_task_need_version(raw)  # 2.564.0 (#4702): agents send the version they read with a content change
     stale = v1_expect(c, tid, raw)
     if stale:
         return stale

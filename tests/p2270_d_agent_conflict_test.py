@@ -75,7 +75,11 @@ check(len(mine) == 1 and mine[0]["data"].get("prev") == "Bob's text", f"#3028: t
 bob = [a for a in acts if a["kind"] == "content" and a["user_id"] == ids["bob"]]
 check(bob and bob[0]["data"].get("prev") == "Start", f"#3028: the person's change keeps the text before too {bob}")
 time.sleep(1.1)
-check(agent("PATCH", f"/tasks/{T}", json={"notes": "Agent text 2"}).ok, "#3028: without expect: the old behaviour (last write wins)")
+# 2.564.0 (#4702): an agent without a version is refused (400 version_required); with the current one it writes (merged entry)
+r = agent("PATCH", f"/tasks/{T}", json={"notes": "Agent text 2"})
+check(r.status_code == 400 and r.json()["error"]["code"] == "version_required", f"#4702: an agent without expect: 400 {r.status_code} {r.text[:200]}")
+check(agent("PATCH", f"/tasks/{T}", json={"notes": "Agent text 2", "expect_updated_at": agent("GET", f"/tasks/{T}").json()["updated_at"]}).ok,
+      "#3028: the agent writes again with the current version")
 acts = A.get(B + f"/api/tasks/{T}/timeline").json().get("activity", [])
 mine = [a for a in acts if a["kind"] == "content" and a["user_id"] == AGID]
 check(len(mine) == 1 and mine[0]["data"].get("prev") == "Bob's text", f"#3028: a merged entry keeps the text before the first edit {mine}")
@@ -143,7 +147,11 @@ check([A.get(B + f"/api/tasks/{i}").json()["due"] for i in BT] == ["2027-04-02",
 r = agent("POST", "/tasks/batch", json={"ids": BT[:1], "action": "update", "changes": {"notes": "Neu", "priority": "high"}, "_prev": {str(BT[0]): {"notes": "x", "priority": "low"}}})
 check(r.ok and r.json()["count"] == 1 and {c["field"] for c in r.json()["conflicts"]} == {"notes"}, f"#3126 update: API field names, the unchanged field writes {r.text[:300]}")
 r = agent("POST", "/tasks/batch", json={"ids": BT[1:2], "action": "update", "changes": {"due": "2027-04-10"}})
-check(r.ok and r.json()["count"] == 1 and A.get(B + f"/api/tasks/{BT[1]}").json()["due"] == "2027-04-10", "#3126 without _prev: as before (old agents)")
+# 2.564.0 (#4702): an agent's batch update of content without _prev is refused now (was: as before)
+check(r.status_code == 400 and r.json()["error"]["code"] == "version_required" and A.get(B + f"/api/tasks/{BT[1]}").json()["due"] == "2027-04-09",
+      f"#4702: an agent's batch without _prev: 400 version_required, nothing changes {r.text[:300]}")
+r = agent("POST", "/tasks/batch", json={"ids": BT[1:2], "action": "update", "changes": {"due": "2027-04-10"}, "_prev": {str(BT[1]): {"due": "2027-04-09"}}})
+check(r.ok and r.json()["count"] == 1 and A.get(B + f"/api/tasks/{BT[1]}").json()["due"] == "2027-04-10", "#3126 with _prev: it writes")
 for bad, why in (({"action": "update", "changes": {"title": "x"}, "_prev": {"999999": {"title": "a"}}}, "an id outside the batch"),
                  ({"action": "update", "changes": {"title": "x"}, "_prev": {str(BT[1]): {"nonsense": 1}}}, "an unknown field"),
                  ({"action": "update", "changes": {"title": "x"}, "_prev": []}, "no object"),
