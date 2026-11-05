@@ -1139,7 +1139,7 @@ def agent_is_ai(a):
 
 def agent_public(c, a, uid=None):
     """An agent as the people who share lists with it see it: status + their visible running / waiting jobs + unread chat."""
-    from ..agents.usage import usage_block, usage_cost_public
+    from ..agents.usage import usage_block, usage_cost_public, usage_flows_public
     jobs = c.execute("SELECT * FROM agent_jobs WHERE agent_id=? AND state IN ('running','waiting') ORDER BY id DESC LIMIT 200",
                      (a["user_id"],)).fetchall()
     if uid is not None:
@@ -1182,6 +1182,8 @@ def agent_public(c, a, uid=None):
             "quota": _quota(a),
             # 2.407.0 B (#3493): its costs (API-key agents: the ring against its cost limit; amounts only for owner / admins)
             "cost": usage_cost_public(c, a, uid),
+            # 2.565.0 D (#4674): a server agent's tokens per starter routine this month (owner / admins; the ring's list)
+            "flows": usage_flows_public(c, a, uid),
             # 2.35.0 (#1103): open approval requests + permission questions to the viewer (the badge "1 approval open")
             "approvals_open": _approvals_open(c, a["user_id"], uid),
             # 2.58.0 (#1761): its list limit, only for the people who manage it (owner / admin); [] = all its lists

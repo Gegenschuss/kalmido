@@ -57,6 +57,10 @@ SRV_DEFAULT_INSTRUCTIONS = N_("You are my personal assistant inside Kalmido and 
 SRV_OFF_KEY = "server_agents_off"
 
 SRV_STARTER = ("briefing", "tidy", "docs", "meetings", "followup", "office")  # 2.568.0 (#4673): + office
+# 2.565.0 D (#4674): the routines that may have a model of their own (agent_server.flow_models; '' = the agent's model): the ones
+# that start a run themselves - the planned jobs briefing / tidy / followup and "Tasks from notes" (job_request kind extract).
+# docs is no routine of its own here: a new document starts no run of a server agent (srvagent_run.py SRV_TRIGGERS).
+SRV_FLOWS = ("briefing", "tidy", "meetings", "followup")
 SRV_FOLLOWUP_DAYS = 5
 SRV_FOLLOWUP_MAX = 60
 SRV_BRIEF_AT, SRV_TIDY_AT, SRV_FOLLOWUP_AT = "07:30", "07:00", "09:00"
@@ -99,21 +103,24 @@ def _tz(c, uid):
         return TZ.key
 
 
-def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None):
-    """A planned job of uid for agent aid (agents/schedules.py, the same checks as the dialog) -> (state, id, reason)."""
+def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None, flow=""):
+    """A planned job of uid for agent aid (agents/schedules.py, the same checks as the dialog) -> (state, id, reason).
+    2.565.0 D (#4674): flow = the starter routine it stands for (agent_schedules.srv_flow: its run uses the routine's model)."""
     if not agent_shares(c, aid, uid):
         return "skipped", None, tr("Share a project with the agent first")
     r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND title=? AND list_check=0", (aid, uid, title)).fetchone()
     if r:
+        if flow:  # a plan of an older starter pack learns its routine
+            c.execute("UPDATE agent_schedules SET srv_flow=? WHERE id=? AND srv_flow=''", (flow, r[0]))
         return "exists", r[0], None
     f = sched_in(c, aid, uid, {"title": title, "prompt": prompt, "freq": freq, "days": days or [], "time": hm,
                                "tz": _tz(c, uid), "action": action, "enabled": True})
     if c.execute("SELECT COUNT(*) FROM agent_schedules WHERE agent_id=? AND user_id=? AND list_check=0", (aid, uid)).fetchone()[0] >= SCHED_MAX:
         return "skipped", None, tr("At most {0} plans per agent", SCHED_MAX)
     ts = iso(now_utc())  # the same row as POST /api/agents/<id>/schedules (schedules.py agent_schedule_create)
-    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at,action)
-                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                    (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], None, 1, ts, ts, f["action"]))
+    sid = insert_id(c, """INSERT INTO agent_schedules(agent_id,user_id,title,prompt,freq,days,at_time,tz,list_id,enabled,created_at,updated_at,action,srv_flow)
+                       VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (aid, uid, f["title"], f["prompt"], f["freq"], f["days"], f["at_time"], f["tz"], None, 1, ts, ts, f["action"], flow))
     _sched_set_next(c, sid)
     return "created", sid, None
 
@@ -190,10 +197,10 @@ def srv_starter_apply(c, a, uid, items, days):
             continue
         if k == "briefing":
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_BRIEF_AT)
+            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_BRIEF_AT, flow=k)
         elif k == "tidy":
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_TIDY_AT, action="triage")
+            res = _plan(c, aid, uid, tr(t), tr(p), "daily", SRV_TIDY_AT, action="triage", flow=k)
         elif k == "docs":
             res = _docs(c, a, uid, tr(SRV_TEXTS[k]))
         elif k == "meetings":
@@ -202,7 +209,7 @@ def srv_starter_apply(c, a, uid, items, days):
             res = _office(c, a, uid)
         else:
             t, p = SRV_TEXTS[k]
-            res = _plan(c, aid, uid, tr(t), tr(p, days), "weekdays", SRV_FOLLOWUP_AT)
+            res = _plan(c, aid, uid, tr(t), tr(p, days), "weekdays", SRV_FOLLOWUP_AT, flow=k)
         out.append({"item": k, "state": res[0], "id": res[1], "reason": res[2]})
     return out
 
@@ -230,7 +237,7 @@ def srv_defaults():
     need_person(403, tr("Agents cannot use this endpoint"))
     return jsonify(enabled_instance=not srv_off(c), provider=SRV_PROVIDER, default_name=tr(SRV_DEFAULT_NAME),
                    default_model=SRV_DEFAULT_MODEL, default_instructions=tr(SRV_DEFAULT_INSTRUCTIONS),
-                   starter=list(SRV_STARTER), followup_days=SRV_FOLLOWUP_DAYS, followup_max=SRV_FOLLOWUP_MAX)
+                   starter=list(SRV_STARTER), flows=list(SRV_FLOWS), followup_days=SRV_FOLLOWUP_DAYS, followup_max=SRV_FOLLOWUP_MAX)
 
 
 @app.post("/api/agents/<int:aid>/server/starter")

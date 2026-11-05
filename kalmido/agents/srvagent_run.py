@@ -19,6 +19,10 @@ The run:
     agent_runs; ends at SRV_STEPS model calls or after SRV_RUN_S s; Stop (POST /api/agents/<id>/abort) ends it within a second.
  5. its final text goes into the chat of the person who asked (chat, chat_choice, a planned job) unless the model already wrote
     them with send_chat; an error is told there in a neutral sentence.
+ 2.565.0 D (#4674): a starter routine (srvstarter.SRV_FLOWS: a planned job of the starter pack, "Sort the basket", "Tasks from
+ notes") runs with its own model when one is set (agent_server.flow_models, else the agent's model). One run = one routine: the
+ events are taken up to the first one of another routine (the rest: the next run); agent_runs.flow and agent_usage.flow say
+ which routine the run and its usage belonged to.
 The key is opened only for the provider call (srvagent.srv_key) and never logged; provider errors are neutral texts."""
 import json
 import os
@@ -29,7 +33,7 @@ from flask import g, has_request_context
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import system_ctx
-from ..core.i18n import N_, tr
+from ..core.i18n import LANGS, N_, tr
 from ..core.db import connect, iso, now_utc, usettings
 from ..core.env import env_int
 from ..accounts.bgjobs import bgj_add, bgj_fn
@@ -37,7 +41,8 @@ from ..accounts.session import _token_hash
 from ..agents.core import agent_active, agent_row, CHAT_MAX
 from ..agents.admin import agent_token_new
 from ..agents.mcpremote import _inproc_cls, mcpr_module
-from .srvagent import ProviderError, srv_key, srv_models, srv_off, srv_pick_default, srv_provider, srv_row, srv_defaults, SRV_PROVIDER
+from .srvagent import ProviderError, srv_flow_models, srv_key, srv_models, srv_off, srv_pick_default, srv_provider, srv_row, srv_defaults, SRV_PROVIDER
+from .srvstarter import SRV_BRIEF_AT, SRV_FLOWS, SRV_FOLLOWUP_AT, SRV_TEXTS
 
 SRV_PARALLEL = env_int("KALMIDO_SRVAGENT_PARALLEL", 2, lo=1, hi=64)   # runs at once on this server
 SRV_RUN_S = env_int("KALMIDO_SRVAGENT_RUN_S", 300, lo=10, hi=3600)     # s of one run at most
@@ -268,6 +273,12 @@ def _run(aid, rid):
         evs = api.call("GET", "/agent/events", {"since": cursor, "limit": SRV_EVENTS})
         data = evs.get("data") or []
         new_cursor = int(evs.get("cursor") or cursor)
+        flow, data, new_cursor = _db(lambda c: srv_flow_cut(c, aid, data, new_cursor))  # 2.565.0 D (#4674): one routine per run
+        fm = srv_flow_models(row).get(flow) if flow else ""
+        if fm:
+            model = fm
+        if flow or fm:
+            _db(lambda c: c.execute("UPDATE agent_runs SET flow=?, model=? WHERE id=?", (flow, model, rid)))
         # the events are taken: a failed run never works the same events off again (no loop of costs)
         _db(lambda c: c.execute("UPDATE agent_server SET cursor=GREATEST(cursor, ?) WHERE agent_id=?", (new_cursor, aid)))
         work = [e for e in data if isinstance(e, dict) and e.get("event") in SRV_TRIGGERS and (e.get("actor") or {}).get("kind") != "agent"]
@@ -281,7 +292,7 @@ def _run(aid, rid):
         tools, allowed = _tools(mod, api)
         messages = [{"role": "user", "content": [{"type": "text", "text": _events_text(mod, data)}]}]
         _status(api, "working", model)
-        state, text, sent = _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker)
+        state, text, sent = _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow)
         if state == "done" and text.strip() and asker and asker not in sent:
             _say(api, asker, text.strip())
     except _Stop as s:
@@ -405,7 +416,7 @@ def _call(prov, rid, deadline, *a):
     return box["r"]
 
 
-def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker):
+def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow=""):
     """The model and its tool calls -> (state, final text or error key, people written to with send_chat)."""
     sent = set()
     for _ in range(SRV_STEPS):
@@ -426,7 +437,7 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
         left = max(5, min(SRV_CALL_S, int(deadline - time.time())))
         r = _call(prov, rid, deadline, model, system, messages, tools, SRV_MAX_TOKENS, left)
         u = r["usage"]
-        _usage(api, aid, rid, model, u)
+        _usage(api, aid, rid, model, u, flow)
         uses = [b for b in r["content"] if b.get("type") == "tool_use"]
         text = "\n".join(b.get("text") or "" for b in r["content"] if b.get("type") == "text").strip()
         if r["stop"] != "tool_use" or not uses:
@@ -441,17 +452,68 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
     return "failed", N_("The step limit of the run is reached"), sent
 
 
-def _usage(api, aid, rid, model, u):
+def _usage(api, aid, rid, model, u, flow=""):
     def count(c):
         c.execute("UPDATE agent_runs SET steps=steps+1, tokens_in=tokens_in+?, tokens_out=tokens_out+?, beat_at=? WHERE id=?",
                   (u["input"] + u["cache_read"] + u["cache_write"], u["output"], iso(now_utc()), rid))
     _db(count)
     try:  # the usage ring, the limits and their alerts: the same report as any agent's (numbers only)
-        api.call("POST", "/agent/usage", body={"model": model, "input_tokens": u["input"], "output_tokens": u["output"],
-                                               "cache_read_tokens": u["cache_read"], "cache_write_tokens": u["cache_write"],
-                                               "note": f"server agent run {rid}"})
+        r = api.call("POST", "/agent/usage", body={"model": model, "input_tokens": u["input"], "output_tokens": u["output"],
+                                                   "cache_read_tokens": u["cache_read"], "cache_write_tokens": u["cache_write"],
+                                                   "note": f"server agent run {rid}"})
     except Exception as e:  # noqa: BLE001 -- the run's row keeps the numbers
         print("server agent", aid, "usage not reported:", type(e).__name__, flush=True)
+        return
+    uid = (r or {}).get("id") if isinstance(r, dict) else None
+    if flow and isinstance(uid, int):  # 2.565.0 D (#4674): the routine of this report (no field of the public API)
+        _db(lambda c: c.execute("UPDATE agent_usage SET flow=? WHERE id=? AND agent_id=?", (flow, uid, aid)))
+
+
+# ---------------------------------------------------------------- 2.565.0 D (#4674): the routine of the events of a run
+
+def srv_flow_of(c, aid, e):
+    """The starter routine (srvstarter.SRV_FLOWS) an event belongs to, '' for none: a planned job of the starter pack
+    (agent_schedules.srv_flow; a plan of an older pack by its title in one of the languages), a job_request "Sort the basket"
+    (tidy) or "Tasks from notes" (meetings)."""
+    if not isinstance(e, dict):
+        return ""
+    d = e.get("data") if isinstance(e.get("data"), dict) else {}
+    if e.get("event") == "scheduled_job":
+        sid = d.get("schedule_id")
+        if not isinstance(sid, int):
+            return ""
+        r = c.execute("SELECT srv_flow, title, freq, at_time FROM agent_schedules WHERE id=? AND agent_id=?", (sid, aid)).fetchone()
+        if not r:
+            return ""
+        if r["srv_flow"] in SRV_FLOWS:
+            return r["srv_flow"]
+        if r["srv_flow"]:
+            return ""
+        # a plan of the starter pack before 2.565.0 (no srv_flow yet): its title in a language AND its rhythm of the pack
+        old = {"briefing": ("daily", SRV_BRIEF_AT), "followup": ("weekdays", SRV_FOLLOWUP_AT)}
+        return next((k for k, (fq, hm) in old.items() if r["freq"] == fq and r["at_time"] == hm
+                     and r["title"] in {SRV_TEXTS[k][0], *(tr(SRV_TEXTS[k][0], lg=lg) for lg in LANGS)}), "")
+    if e.get("event") == "job_request":
+        return {"triage": "tidy", "extract": "meetings"}.get(d.get("kind") or "", "")
+    return ""
+
+
+def srv_flow_cut(c, aid, data, cursor):
+    """(routine, the events of this run, the cursor after them): the events up to the first work event of another routine than the
+    first work event's (the rest stays for the next run: the cursor stops before it)."""
+    flow, seen = None, False
+    for i, e in enumerate(data):
+        if not isinstance(e, dict) or e.get("event") not in SRV_TRIGGERS or (e.get("actor") or {}).get("kind") == "agent":
+            continue
+        f = srv_flow_of(c, aid, e)
+        if not seen:
+            flow, seen = f, True
+        elif f != flow:
+            prev = data[i - 1].get("seq") if i and isinstance(data[i - 1], dict) else None
+            if isinstance(prev, int):
+                return flow, data[:i], prev
+            break
+    return flow or "", data, cursor
 
 
 def _tool(api, mod, allowed, b, sent):

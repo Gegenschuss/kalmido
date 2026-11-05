@@ -12,13 +12,16 @@ Routes (people only; who may: the owner of a personal agent, for a team agent an
 as editing the agent - srv_need):
   GET  /api/agents/<id>/server          {provider, model, instructions, has_key, key_hint, enabled_instance, default_model,
                                          default_instructions, server}
-  PUT  /api/agents/<id>/server          {provider?, model?, instructions?, api_key?, delete_key?: true} -> as GET; makes the row and
-                                         turns the agent into a server agent; 403 {error: server_agents_off} while the instance
-                                         switch is on
+  PUT  /api/agents/<id>/server          {provider?, model?, instructions?, api_key?, delete_key?: true, flow_models?} -> as GET;
+                                         makes the row and turns the agent into a server agent; 403 {error: server_agents_off}
+                                         while the instance switch is on. 2.565.0 D (#4674): flow_models {routine: model}
+                                         (routines: srvstarter.SRV_FLOWS) = a model of its own per starter routine, '' = the
+                                         agent's model; a model the provider does not list (GET …/models) -> 400, the entries
+                                         not named stay; GET gives flow_models with every routine ('' = the agent's)
   GET  /api/agents/<id>/server/models   {models: [{id, name}], default, fallback_note?} live from the provider (cached
                                          SRV_MODELS_TTL s); 409 {error: no_key} without a key
   GET  /api/agents/<id>/server/runs     ?limit=20 -> {runs: [{id, trigger, state, started, ended, steps, tokens_in, tokens_out,
-                                         error, model}]}
+                                         error, model, flow}]} (flow: the starter routine, 2.565.0)
 The instance switch server_agents_off ("1" = off, set through the instance settings route): no PUT, no runs.
 The runs themselves: agents/srvagent_run.py (a queue row of the worker, never the web process).
 
@@ -40,10 +43,11 @@ from ..core.pg import system_ctx
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, gsetting, iso, now_utc
 from ..core.access import Denied
+from ..core.errors import BadInput
 from ..core.env import env_int
 from ..accounts.session import me
 from ..accounts.supportgrant import sga_is_support  # 2.557.0 (2nd review)
-from .srvstarter import SRV_DEFAULT_INSTRUCTIONS, SRV_DEFAULT_MODEL  # 2.557.0: the bridge of the parts is gone
+from .srvstarter import SRV_DEFAULT_INSTRUCTIONS, SRV_DEFAULT_MODEL, SRV_FLOWS  # 2.557.0: the bridge of the parts is gone
 from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin
 from ..agents.core import agent_row, need_person, RUNTIME_MODEL_MAX, RUNTIME_MODEL_RE
@@ -221,6 +225,37 @@ def srv_need(c, aid):
     raise Denied(404)
 
 
+def srv_flow_models(row):
+    """2.565.0 D (#4674): {routine: model} of every routine in SRV_FLOWS ('' = the agent's model) from agent_server.flow_models."""
+    try:
+        d = json.loads(row["flow_models"] or "{}") if row and "flow_models" in row.keys() else {}
+    except (TypeError, ValueError):
+        d = {}
+    d = d if isinstance(d, dict) else {}
+    return {k: d[k] if isinstance(d.get(k), str) else "" for k in SRV_FLOWS}
+
+
+def srv_flow_models_in(c, aid, v, row):
+    """PUT flow_models {routine: model | '' | null} -> the stored json; BadInput for an unknown routine or a model the provider does
+    not list for the agent's key (400), ProviderError when the list cannot be read (502 at the caller)."""
+    if not isinstance(v, dict) or any(k not in SRV_FLOWS for k in v):
+        raise BadInput(tr("Invalid value: {0}", "flow_models"))
+    new = {k: (m if m is not None else "") for k, m in v.items()}
+    if any(not isinstance(m, str) or len(m.strip()) > RUNTIME_MODEL_MAX or (m.strip() and not RUNTIME_MODEL_RE.fullmatch(m.strip()))
+           for m in new.values()):
+        raise BadInput(tr("Invalid value: {0}", "flow_models"))
+    new = {k: m.strip() for k, m in new.items()}
+    if any(new.values()):
+        ms = srv_models(c, aid, row) if row else None
+        if ms is None:
+            raise BadInput(tr("Save an API key first; then the provider’s models are listed here."))
+        ids = {m["id"] for m in ms}
+        bad = sorted(k for k, m in new.items() if m and m not in ids)
+        if bad:
+            raise BadInput(tr("The model is not offered by the provider") + ": " + ", ".join(bad))
+    return json.dumps({k: m for k, m in {**srv_flow_models(row), **new}.items() if m}, ensure_ascii=False)
+
+
 def srv_dict(c, a, row=None):
     row = row if row is not None else srv_row(c, a["user_id"])
     dm, di = srv_defaults()
@@ -228,7 +263,8 @@ def srv_dict(c, a, row=None):
             "instructions": row["instructions"] if row else "", "has_key": bool(row and row["key_sealed"]),
             "key_hint": ("…" + row["key_hint"]) if row and row["key_sealed"] and row["key_hint"] else "",
             "enabled_instance": not srv_off(c), "default_model": dm, "default_instructions": tr(di),  # 2.557.0: in the person's language
-            "server": bool(row) and (a["provider"] or "") == SRV_PROVIDER}
+            "server": bool(row) and (a["provider"] or "") == SRV_PROVIDER,
+            "flow_models": srv_flow_models(row)}  # 2.565.0 D (#4674)
 
 
 @app.get("/api/agents/<int:aid>/server")
@@ -247,7 +283,7 @@ def srv_put(aid):
     b = body()
     if not isinstance(b, dict):
         return err(tr("The body must be a JSON object"))
-    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key"))
+    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key", "flow_models"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     sets = {}
@@ -275,6 +311,13 @@ def srv_put(aid):
         if not isinstance(k, str) or not (SRV_KEY_MIN <= len(k.strip()) <= SRV_KEY_MAX) or not KEY_RE.fullmatch(k.strip()):
             return err(tr("Invalid value: {0}", "api_key"))  # never the value itself
         key = k.strip()
+    if b.get("flow_models") is not None:  # 2.565.0 D (#4674): checked against the live list of the key stored now
+        try:
+            sets["flow_models"] = srv_flow_models_in(c, aid, b["flow_models"], srv_row(c, aid))
+        except BadInput as e:
+            return err(str(e))
+        except ProviderError as e:
+            return jsonify(error=tr(e.text)), 502
     with system_ctx(c):  # the agent's own row; srv_need decided who may
         c.execute("""INSERT INTO agent_server(agent_id, cursor, updated_at, updated_by)
                      VALUES(?, (SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?), ?, ?)
@@ -362,7 +405,8 @@ def srv_runs_get(aid):
         rows = c.execute("SELECT * FROM agent_runs WHERE agent_id=? ORDER BY id DESC LIMIT ?", (aid, limit)).fetchall()
     return jsonify(runs=[{"id": r["id"], "trigger": r["cause"], "state": r["state"], "started": r["started"], "ended": r["ended"],
                           "steps": r["steps"], "tokens_in": r["tokens_in"], "tokens_out": r["tokens_out"],
-                          "error": tr(r["error"]) if r["error"] else "", "model": r["model"]} for r in rows])
+                          "error": tr(r["error"]) if r["error"] else "", "model": r["model"],
+                          "flow": r["flow"] if "flow" in r.keys() else ""} for r in rows])  # 2.565.0 D (#4674): its starter routine
 
 
 # ---------------------------------------------------------------- the hook in agents/core.py agent_emit

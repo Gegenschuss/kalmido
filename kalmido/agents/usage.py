@@ -172,6 +172,22 @@ def usage_cost_public(c, a, uid=None):
     return out
 
 
+def usage_flows_public(c, a, uid=None):
+    """2.565.0 D (#4674): the tokens of server agent a per starter routine this month [{flow, tokens, model}] for its chat header
+    (the usage ring's list) -- only for who may read its usage numbers (its owner, instance admins: as usage_cost_public);
+    model = the routine's own model ('' = the agent's). None for others and for agents that are no server agents."""
+    k = a.keys()
+    if not uid or "provider" not in k or (a["provider"] or "") != "kalmido-server" or \
+            not (("owner_id" in k and a["owner_id"] == uid) or is_admin_id(c, uid)):
+        return None
+    from ..agents.srvagent import srv_flow_models, srv_row
+    fm = srv_flow_models(srv_row(c, a["user_id"]))
+    rows = c.execute("""SELECT flow, SUM(input_tokens + output_tokens + cache_write_tokens) AS t FROM agent_usage
+                        WHERE agent_id=? AND day>=? AND flow<>'' GROUP BY flow""", (a["user_id"], usage_period("month")[1])).fetchall()
+    used = {r["flow"]: int(r["t"] or 0) for r in rows}
+    return [{"flow": k, "tokens": used.get(k, 0), "model": m} for k, m in fm.items() if used.get(k) or m]
+
+
 def usage_fmt(v, metric, lg=None):
     """1234567 tokens -> "1,234,567 tokens" (German: 1.234.567 Tokens); cost -> "$1.23"."""
     if metric == "cost":
@@ -733,7 +749,7 @@ def agents_usage_get():
     d_win, d30, d7 = (today - timedelta(days=days - 1)).isoformat(), (today - timedelta(days=29)).isoformat(), \
         (today - timedelta(days=6)).isoformat()
     rows = c.execute(f"""SELECT agent_id, task_id, list_id, model, day, input_tokens, output_tokens, cache_read_tokens,
-                                cache_write_tokens, cost_usd FROM agent_usage
+                                cache_write_tokens, cost_usd, flow FROM agent_usage
                          WHERE agent_id IN ({','.join('?' * len(ids)) or 'NULL'}) AND day>=?""",
                      (*ids, min(d_win, d30))).fetchall() if ids else []
     roles, tvis = {}, {}
@@ -747,8 +763,12 @@ def agents_usage_get():
         if tid not in tvis:
             tvis[tid] = bool(tid) and task_visible(c, tid, uid)
         return tvis[tid]
+    # 2.565.0 D (#4674): the owner of a personal agent also sees its reports without a project (a server agent's runs, its chat):
+    # who may read its usage numbers anyway (usage_cost_public, #2928); tasks and lists stay hidden by the checks below
+    own = {a["user_id"] for a in ags if a["owner_id"] == uid}
     if not adm:  # only what was reported for lists I see (a participant: for tasks I see)
-        rows = [r for r in rows if r["list_id"] and role(r["list_id"]) and (role(r["list_id"]) != "participant" or sees_task(r["task_id"]))]
+        rows = [r for r in rows if (r["list_id"] and role(r["list_id"]) and (role(r["list_id"]) != "participant" or sees_task(r["task_id"])))
+                or (not r["list_id"] and r["agent_id"] in own)]
 
     def acc(dst, r):
         dst["input"] += r["input_tokens"]
@@ -772,7 +792,7 @@ def agents_usage_get():
             acc(t["today"], r)
     win = [r for r in rows if r["day"] >= d_win and (sel is None or r["agent_id"] == sel)]
     per_day = {(today - timedelta(days=days - 1 - i)).isoformat(): zero() for i in range(days)}
-    tasks, lists, models = {}, {}, {}
+    tasks, lists, models, flows = {}, {}, {}, {}
     for r in win:
         acc(per_day[r["day"]], r) if r["day"] in per_day else None
         tk = r["task_id"] if r["task_id"] and sees_task(r["task_id"]) else (-1 if r["task_id"] else None)
@@ -781,6 +801,8 @@ def agents_usage_get():
         lk = r["list_id"] if r["list_id"] and role(r["list_id"]) else (-1 if r["list_id"] else 0)
         acc(lists.setdefault(lk, zero()), r)
         acc(models.setdefault(r["model"], zero()), r)
+        if r["flow"]:  # 2.565.0 D (#4674): the starter routine of a server agent's run
+            acc(flows.setdefault(r["flow"], zero()), r)
     trows = []
     for tk, v in sorted(tasks.items(), key=lambda x: -x[1]["tokens"])[:10]:
         if tk == -1:
@@ -806,6 +828,7 @@ def agents_usage_get():
     return jsonify(agents=out, admin=adm, days=days, agent_id=sel,
                    per_day=[{"day": k, **v} for k, v in per_day.items()], tasks=trows, lists=lrows,
                    models=[{"model": k, **v} for k, v in sorted(models.items(), key=lambda x: -x[1]["tokens"])],
+                   flows=[{"flow": k, **v} for k, v in sorted(flows.items(), key=lambda x: -x[1]["tokens"])],  # 2.565.0 D (#4674)
                    cost=any(r["cost_usd"] is not None for r in rows))
 
 
