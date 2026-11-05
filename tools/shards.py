@@ -234,7 +234,7 @@ def main(argv=None):
     pats = hard_patterns(a.hard_file or os.path.join(os.path.dirname(os.path.abspath(a.run_all)), "hard_suites.txt"))
     hard = [i for i, g in enumerate(gs) if is_hard(g, pats)] if a.hard_target_min > 0 else []
     # job/2398: the full run too (--shards = the most), it grew past 20 x 30 min (CI 2.493.0: 2 shards at 50 min)
-    # #4388: the full run with --total 20 (fixed, the limit of ci.yml 60 min) instead of up to 28 x 30 min that queued
+    # #4388: the full run with --total 20 (fixed, the limit of ci.yml 60 min, 90 since job/2867) instead of up to 28 x 30 min that queued
     plan, nh = split_plan(costs, hard, n, a.target_min, a.hard_target_min, a.hard_shards, a.total)
     n = len(plan)
     if a.assign:

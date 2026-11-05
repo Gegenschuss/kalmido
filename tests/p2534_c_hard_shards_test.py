@@ -110,7 +110,8 @@ try:
     check([x["hart"] for x in mx] == [" hart"] * hh + [""] * (n - hh), "the hard shards first, marked ' hart'")
     # 2.556 (#4388): the full run plans exactly 20 shards in all (GitHub runs ~20 at once), limit 60 min
     check(n == 20, f"full run: 20 shards in all, hard ones included: {n}")
-    check(re.search(r"needs: plan\n\s+timeout-minutes: 60\b", ci), "the shard job has the 60 min limit")
+    # job/2867 (CI v2.560.0): 60 was too short for 13 soft shards (~70 min each), all 13 were cut - 90 now
+    check(re.search(r"needs: plan\n\s+timeout-minutes: 90\b", ci), "the shard job has the 90 min limit")
     tpl = re.search(r"^\s+name: (Test suites \$\{\{ matrix\.shard \}\}.*)$", ci, re.M)
     check(bool(tpl) and "${{ matrix.hart }}" in tpl.group(1), "the shard job name carries matrix.hart")
     check("include: ${{ fromJSON(needs.plan.outputs.matrix) }}" in ci, "the matrix of the shard job is the plan's list")
