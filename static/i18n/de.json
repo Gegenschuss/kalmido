@@ -16543,5 +16543,6 @@
   "Service: {0}": "Service: {0}",
   "Calibration: {0}": "Kalibrierung: {0}",
   "Maintenance: {0}": "Wartung: {0}",
-  "The agent's data lock leaves this area out": "Die Datensperre des Agenten lässt diesen Bereich aus"
+  "The agent's data lock leaves this area out": "Die Datensperre des Agenten lässt diesen Bereich aus",
+  "Set again meanwhile: the earlier value was not restored.": "Inzwischen neu gesetzt: der frühere Wert wurde nicht wiederhergestellt."
 }

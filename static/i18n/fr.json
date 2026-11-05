@@ -16543,5 +16543,6 @@
   "Service: {0}": "Entretien : {0}",
   "Calibration: {0}": "Étalonnage : {0}",
   "Maintenance: {0}": "Maintenance : {0}",
-  "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine"
+  "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine",
+  "Set again meanwhile: the earlier value was not restored.": "Redéfini entre-temps : l'ancienne valeur n'a pas été restaurée."
 }
