@@ -27,6 +27,7 @@ takes the core share back (obj_node_unshare: obj_revoked) and marks / removes th
 """
 from flask import g, has_request_context, jsonify
 
+from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..core.config import app, EMAIL_RE
 from ..core.access import Denied, acx_org_ok, collab_all, need_feat
 from ..core.dlock import dl_list_locked  # 2.560.0 B (#4699)
@@ -524,3 +525,6 @@ def sheets_shares_delete(sid, shid):
         _tell_unshared(c, sid, [x["user_id"]])
     shs_drop_cache()
     return _answer(c, sid)
+
+
+objhooks.START.append(("migr_core4717", True, shs_core_move))  # 2.565.0 (#4717): once (core/db.init_db)

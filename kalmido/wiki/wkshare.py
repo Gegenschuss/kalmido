@@ -35,6 +35,7 @@ from urllib.parse import quote
 
 from flask import g, jsonify, request
 
+from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ, ATT_DIR
 from ..core.i18n import browser_lang, lang, short_day, tr
 from ..core.db import body, bump, db, iso, local_day, local_now, now_utc
@@ -1021,3 +1022,5 @@ def wsh_md(text, link, file, depth=0, node=None):
     flush()
     return "".join(out)
 
+
+objhooks.START.append(("migr_core4717_wiki", True, wsh_core_move))  # 2.565.0 (#4717): once (core/db.init_db)

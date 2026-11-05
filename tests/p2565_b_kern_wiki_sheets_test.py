@@ -215,7 +215,7 @@ W6 = page(Fr, "Legacy")
 dbx("INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,created_by,created_at,page_id,images) "
     "VALUES(NULL,?,'Legacy',0,'person',?,'',?,?,?,0)", (FID, FIO, FID, TS, W6))
 check(Fi.get(B + f"/api/wiki/shared/pages/{W6}").status_code == 200, "fallback: an old page share not moved yet reads as before")
-dbx("DELETE FROM settings WHERE key='migr_core4717'")
+dbx("DELETE FROM settings WHERE key IN ('migr_core4717','migr_core4717_wiki')")  # 2.565.0: one key per area (core/objhooks.START)
 kt.fresh(prefix="P2565B", env={"KALMIDO_API_RATE": "100000"}, keep=True)  # the start runs the one-shot again
 Bo, Gi, Fr, Fi = sess("bob"), sess("gina"), sess("frida"), sess("fiona")
 check(core("sheet", T2, GINA) == ["view"] and dbx("SELECT core_id IS NOT NULL FROM sheet_shares WHERE sheet_id=?", (T2,)) == [(True,)],

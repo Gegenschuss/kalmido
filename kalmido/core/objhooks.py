@@ -4,9 +4,12 @@ core/objects.py (the shared core, layer domain: it stands on the file store's re
 package import loads every module of ORDER, so they are always filled before a request or a command runs (the same pattern
 as core/instance.UPDATE_KICK).
   OBJ     kind -> the registered hooks of obj_register (accounts/orgretain.py reads it: the heir of an account's objects)
+  START   2.565.0 (#4717 #4719): (key, once, f(c)) that core/db.init_db runs at every start (once: only until gsetting key is "1") -
+          the areas' forward copies onto the shared core, without core/db importing the areas
   REVOKE  the functions f(c, uid, org, reason, heir=None, role=None) of what a person loses (core/objects.obj_revoke_person)
 """
 OBJ = {}
+START = []
 REVOKE = []
 SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
 

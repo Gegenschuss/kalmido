@@ -28,6 +28,7 @@ from ..core.schema import (
 from ..core.i18n import LANGS, tr
 from .pg import pool_refresh, system_ctx as pg_system_ctx  # 2.149.0 G (#2517): pulled up from functions
 from . import config  # 2.369.5 (#2517): pulled up from functions
+from . import objhooks  # 2.565.0 (#4717 #4719): START, the areas' forward copies onto the shared core
 from .i18n import N_  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -1153,13 +1154,19 @@ def init_db(guard=True, load=None):
             gset(c, "migr_lf2352", "1")
             if any(n.values()):
                 print("list folders into the projects trees (#2748):", n, flush=True)
-        # 2.565.0 (#4719), every start: the team chat's members as shares of the shared core, kept in step with tchat_members
-        # (copy forward; what an older version added / removed after a rollback)
-        from ..collab.tcxcore import tcx_core_sync
-        n = tcx_core_sync(c)
-        clk("tcx_core_sync")
-        if any(n.values()):
-            print("team chat members on the shared core (#4719):", n, flush=True)
+        # 2.565.0 (#4717 #4719): the areas' forward copies onto the shared core (core/objhooks.START, filled by the areas):
+        # the team chat's members kept in step with tchat_members every start (collab/tcxcore.py tcx_core_sync, also what an older
+        # version added / removed after a rollback); once, the shares of tables and of knowledge pages / folders with people as
+        # core shares on their reference nodes (sheets/shshare.py shs_core_move, wiki/wkshare.py wsh_core_move; no one-way step)
+        for key, once, f in list(objhooks.START):
+            if once and gsetting(c, key) == "1":
+                continue
+            n = f(c)
+            clk(key)
+            if once:
+                gset(c, key, "1")
+            if n and (any(n.values()) if isinstance(n, dict) else any(n) if isinstance(n, (list, tuple)) else n):
+                print(f"onto the shared core ({key}):", n, flush=True)
         # 2.33.0 (#927), once: lists / folders shared so far keep every notification ("all", written explicitly; new shares
         # start with "read"), their owners are asked once in the app
         if gsetting(c, "migr_notiftpl2330") != "1":
@@ -1168,16 +1175,6 @@ def init_db(guard=True, load=None):
             gset(c, "migr_notiftpl2330", "1")
             if nl or nf:
                 print("notification templates: shared lists", nl, "and folders", nf, "kept on \"all\" (#927)", flush=True)
-        # 2.565.0 (#4717), once (forward copy, no one-way step): the shares of tables and of private knowledge pages / folders with
-        # people become core shares on their reference nodes (sheets/shshare.py shs_core_move, wiki/wkshare.py wsh_core_move); the
-        # old rows stay their cards and are read as before where nothing could move yet (an older version reads them as before)
-        if gsetting(c, "migr_core4717") != "1":
-            from ..sheets.shshare import shs_core_move
-            from ..wiki.wkshare import wsh_core_move
-            n = (shs_core_move(c), wsh_core_move(c))
-            gset(c, "migr_core4717", "1")
-            if any(n):
-                print("shares onto the shared core (#4717): tables", n[0], "knowledge cards", n[1], flush=True)
         clk("before_users")
         for (uid,) in c.execute("SELECT id FROM users ORDER BY id").fetchall():
             ensure_inbox(c, uid)

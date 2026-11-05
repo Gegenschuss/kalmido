@@ -40,6 +40,7 @@ from ..agents.workstyle import ws_get
 from ..agents.workqueue import wq_spec
 from ..agents.agentrules import ar_spec  # 2.235.0 C (#2903)
 from ..agents.chatprefs import cp_spec  # 2.491.0 (#2849)
+from ..agents.srvagent import srv_flow_models, srv_row  # 2.565.0 (#4674)
 from ..agents.proposals import PROP_KINDS, PROP_MAX_BYTES, PROP_MAX_ITEMS, PROP_STATES, PROP_SUMMARY_MAX
 from ..accounts.orgs import _operator_apart, op_foreign_account  # 2.399.0 (#2687)
 
@@ -180,7 +181,6 @@ def usage_flows_public(c, a, uid=None):
     if not uid or "provider" not in k or (a["provider"] or "") != "kalmido-server" or \
             not (("owner_id" in k and a["owner_id"] == uid) or is_admin_id(c, uid)):
         return None
-    from ..agents.srvagent import srv_flow_models, srv_row
     fm = srv_flow_models(srv_row(c, a["user_id"]))
     rows = c.execute("""SELECT flow, SUM(input_tokens + output_tokens + cache_write_tokens) AS t FROM agent_usage
                         WHERE agent_id=? AND day>=? AND flow<>'' GROUP BY flow""", (a["user_id"], usage_period("month")[1])).fetchall()

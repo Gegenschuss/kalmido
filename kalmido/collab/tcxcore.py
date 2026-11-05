@@ -29,6 +29,7 @@ Interface:
   tcx_core_rooms_sql(uid) -> SQL of the room ids uid is a member of through the core (person, agent, group)
   tcx_core_sync(c) -> {added, taken, nodes}   every start (core/db.py init_db)
 """
+from ..core import objhooks  # 2.565.0: START (core/db.init_db runs the forward copy)
 from ..core.db import iso, now_utc
 from ..core.i18n import N_
 from ..core.objects import _take as obj_take_rows, obj_member_put, obj_member_take, obj_register, obj_share_rows_sql
@@ -175,3 +176,5 @@ def tcx_core_sync(c):
         ids = [x[0] for x in gone]
         taken = obj_take_rows(c, "fs_shares", f"id IN ({','.join('?' * len(ids))})", tuple(ids), "unshare", None, None, "user_id", kind=TCX_KIND)
     return {"nodes": nodes, "added": added, "taken": taken}
+
+objhooks.START.append(("tcx_core_sync", False, tcx_core_sync))  # 2.565.0 (#4719): every start (core/db.init_db)
