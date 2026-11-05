@@ -83,6 +83,9 @@ for name, _, schema, fn in mcp.TOOLS:
         except Exception:  # noqa: BLE001 -- a tool that checks its arguments itself: the calls made so far count
             pass
 
+# 2.558.0 (#4709, review F9): tools on an /agent route whose server side asks a second scope (need_scope: the kind's write
+# scope of the shared core) are listed under that scope, so a read token does not see a tool that always answers 403
+SECOND = {"update_object": "tasks:write"}
 bad, unknown = [], []
 for name, _, _, _ in mcp.TOOLS:
     need = mcp.TOOL_SCOPE.get(name, "read")
@@ -91,7 +94,7 @@ for name, _, _, _ in mcp.TOOLS:
     scs = {S[r] for r in routes if r in S}
     if not scs:
         continue
-    if need == "agent":
+    if need == "agent" or SECOND.get(name) == need:
         ok = all(r.split(" ", 1)[1].startswith("/agent") or S.get(r) in ("read", "agent") for r in routes if r in S)
     else:
         ok = need in scs and not (scs - {"read"} and need == "read") and "agent" not in scs - {need}
@@ -101,7 +104,7 @@ check(not bad, f"every MCP tool has the scope of its route(s): {bad[:8]} ({len(b
 check(not unknown, f"every route an MCP tool calls is in the OpenAPI document: {unknown[:8]}")
 for name, want in (("set_deployment", "structure"), ("duplicate_list", "structure"), ("set_task_sprint", "structure"),
                    ("set_list_review", "structure"), ("review_task", "tasks:write"), ("list_documents", "files:read"),
-                   ("get_document", "files:read"), ("update_document", "files:write")):
+                   ("get_document", "files:read"), ("update_document", "files:write"), ("update_object", "tasks:write")):
     check(mcp.TOOL_SCOPE.get(name) == want, f"{name}: scope {want} ({mcp.TOOL_SCOPE.get(name, 'read')})")
 
 # tools/list for a read-only person token: none of them shows

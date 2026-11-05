@@ -4261,8 +4261,8 @@ stays hidden. The kind (`kind`) is the area's name for its objects.
 Changing always needs `expect_updated_at` = the `updated_at` of your last read: without it `400`, when a person changed the
 object since `409` with the current state in `error.current` (read it, merge, try again). An unknown field is `400`, a share
 with `view` is `403`, everything else `404`. The token needs the area's scopes (read / write; most areas: `read` and
-`tasks:write`). Every change of yours is in the object's history, marked as an agent's. Creating, deleting, the trash and
-sharing stay with people.
+`tasks:write`; the MCP server lists `update_object` only for a token with `tasks:write`). Every change of yours is in the
+object's history, marked as an agent's. Creating, deleting, the trash and sharing stay with people.
 
 ## Knowledge pages
 
