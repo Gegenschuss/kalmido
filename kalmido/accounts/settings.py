@@ -801,7 +801,7 @@ def umz_export_queries(uid):
     q = {
         "lists": ("SELECT * FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL)", (uid,)),
         "list_members": (f"SELECT * FROM list_members WHERE list_id IN {own}", (uid,)),
-        "sections": (f"SELECT * FROM sections WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),  # 2.567.0 A (#4707): not the trash
+        "sections": (f"SELECT * FROM sections WHERE list_id IN {own}", (uid,)),
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
         "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),

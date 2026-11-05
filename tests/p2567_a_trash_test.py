@@ -145,6 +145,10 @@ check(T not in [x["id"] for x in Fr.get(B + "/api/state").json().get("templates"
 check(Fr.post(B + f"/api/templates/{T}/apply", json={}).status_code == 404, "… it cannot be used")
 check(("template", T) in parts(Fr) and ("template", T) not in parts(St), "… the trash view names it (only its person's)")
 check(St.post(B + f"/api/templates/{T}/restore").status_code == 404, "another person cannot restore it (404)")
+ex = Fr.get(B + "/api/export.json")
+check(ex.ok and T not in [x["id"] for x in ex.json().get("templates", [])]
+      and E4 not in [e["id"] for x in ex.json().get("budget", []) for e in x["entries"]],
+      f"the person's export leaves out what is in the trash {ex.status_code} {ex.text[:200]}")
 r = Fr.post(B + f"/api/templates/{T}/restore")
 check(r.ok and r.json()["id"] == T and T in [x["id"] for x in Fr.get(B + "/api/templates").json()["templates"]], f"restored {r.text[:200]}")
 
