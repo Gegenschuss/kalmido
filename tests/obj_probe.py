@@ -17,9 +17,12 @@ TABLE_SQL = """CREATE TABLE IF NOT EXISTS obj_probe (
 
 
 def start(prefix):
-    """A fresh container with the test kind, and its table."""
+    """A fresh container with the test kind, and its table (the app works as kalmido_app: its rights on the new table, which
+    the start-up gave every table there was, core/rls.py)."""
     fresh(env=ENV, prefix=prefix)
     dbx(TABLE_SQL)
+    dbx("GRANT SELECT, INSERT, UPDATE, DELETE ON obj_probe TO kalmido_app")
+    dbx("GRANT USAGE, SELECT ON SEQUENCE obj_probe_id_seq TO kalmido_app")
 
 
 def new(s, title, org=None, **kw):
