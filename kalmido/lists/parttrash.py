@@ -21,7 +21,7 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
-from ..core.access import Denied, acx_of, list_role, need_list, WRITE_ROLES
+from ..core.access import Denied, acx_of, list_role, need_list, wr_sql, WRITE_ROLES
 from ..tasks.validation import log_changes
 from ..collab.comments import user_names
 from .listtrash import OTR_TRASH_DAYS
@@ -156,7 +156,8 @@ def lpt_index():
             names[lid] = x[0] if x else ""
         return names[lid]
     for r in c.execute("SELECT p.* FROM list_part_trash p JOIN lists l ON l.id=p.list_id WHERE l.deleted_at IS NULL "
-                       "ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000").fetchall():
+                       f"AND p.list_id IN {wr_sql()} "  # review 2.567: the caller's lists before the LIMIT (not the instance's newest)
+                       "ORDER BY p.deleted_at DESC, p.id DESC LIMIT 2000", (uid, uid)).fetchall():
         if not _writable(c, uid, r["list_id"], can):
             continue
         snap = json.loads(r["snap"] or "{}")
@@ -164,7 +165,8 @@ def lpt_index():
         items.append({"kind": r["kind"], "id": r["ref_id"], "list_id": r["list_id"], "name": nm, "deleted_at": r["deleted_at"],
                       "deleted_by": r["deleted_by"]})
     for r in c.execute("SELECT k.* FROM list_links k JOIN lists l ON l.id=k.list_id WHERE k.deleted_at IS NOT NULL AND l.deleted_at IS NULL "
-                       "ORDER BY k.deleted_at DESC LIMIT 2000").fetchall():
+                       f"AND k.list_id IN {wr_sql()} "
+                       "ORDER BY k.deleted_at DESC LIMIT 2000", (uid, uid)).fetchall():
         if _writable(c, uid, r["list_id"], can):
             items.append({"kind": "link", "id": r["id"], "list_id": r["list_id"], "name": r["title"] or r["url"], "deleted_at": r["deleted_at"],
                           "deleted_by": r["deleted_by"]})

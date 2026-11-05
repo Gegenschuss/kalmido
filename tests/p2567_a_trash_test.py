@@ -117,6 +117,19 @@ check(St.post(B + f"/api/budget/recurring/{R}/restore").status_code == 404, "ano
 r = Fr.post(B + f"/api/budget/recurring/{R}/restore")
 check(r.ok and r.json()["id"] == R and next(e for e in month()["entries"] if e["id"] == E3)["recurring_id"] == R,
       f"restored: the booked entry is linked again {r.text[:200]}")
+# review 2.567: an entry of the template restored while the template is in the trash, the month booked again meanwhile -> the
+# template's restore linked both to the same month (unique index budget_entries_booked: 500, the template stayed in the trash)
+check(Fr.delete(B + f"/api/budget/entries/{E3}").ok, "the booked rent deleted again")
+E4 = Fr.post(B + f"/api/budget/recurring/{R}/book", json={"month": M})
+check(E4.status_code == 201, f"… the month booked anew {E4.text[:200]}")
+E4 = E4.json()["id"]
+check(Fr.delete(B + f"/api/budget/recurring/{R}").ok, "… the template deleted")
+check(Fr.post(B + f"/api/budget/entries/{E3}/restore").ok, "… the older entry restored while its template is in the trash")
+r = Fr.post(B + f"/api/budget/recurring/{R}/restore")
+ents = {e["id"]: e for e in month()["entries"]}
+check(r.ok and ents[E4]["recurring_id"] == R and ents[E3]["recurring_id"] is None,
+      f"the template restored: the newest entry of the month linked, the older one plain {r.status_code} {r.text[:200]}")
+check(Fr.delete(B + f"/api/budget/entries/{E3}").ok, "(the plain copy deleted again)")
 
 # a read-only member restores nothing
 check(Fr.put(B + f"/api/lists/{L}/members", json={"user_id": SID, "role": "view"}).ok, "setup: the budget shared read-only with sven")

@@ -743,8 +743,14 @@ def rec_restore(c, uid, rid):
     if c.execute("SELECT COUNT(*) FROM budget_recurring WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= BUD_REC_MAX:
         raise BadInput(tr("Too many recurring items"))
     c.execute("UPDATE budget_recurring SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), r["id"]))
-    c.execute("UPDATE budget_entries SET recurring_id=trash_rec_id, trash_rec_id=NULL WHERE trash_rec_id=? AND deleted_at IS NULL "
-              "AND recurring_id IS NULL AND rmonth<>''", (r["id"],))
+    # one entry per template and month (index budget_entries_booked): the newest of a month is linked again, an older one of
+    # the same month (restored meanwhile, booked again since) comes back as a plain entry, as entry_restore does (review 2.567)
+    for e in c.execute("SELECT id, rmonth FROM budget_entries WHERE trash_rec_id=? AND deleted_at IS NULL AND recurring_id IS NULL "
+                       "AND rmonth<>'' ORDER BY id DESC", (r["id"],)).fetchall():
+        if _booked(c, r["id"], e["rmonth"]):
+            c.execute("UPDATE budget_entries SET trash_rec_id=NULL, rmonth='' WHERE id=?", (e["id"],))
+        else:
+            c.execute("UPDATE budget_entries SET recurring_id=?, trash_rec_id=NULL WHERE id=?", (r["id"], e["id"]))
     return rec_get(c, uid, r["id"])
 
 
