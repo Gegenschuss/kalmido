@@ -1,0 +1,8 @@
+/* 2.556.0 (#4685): the dialog "New for you" after an update (whatsnew.js, loaded with it): one section per version, newest
+   first, the list scrolls inside the dialog. */
+.wnmd .card{max-width:36rem}
+.wnmd .wnlist{max-height:min(60vh,32rem);overflow-y:auto;overscroll-behavior:contain;padding-right:.25rem}
+.wnmd .wnver+.wnver{margin-top:.75rem}
+.wnmd .wnhead{margin:0 0 .25rem;font-size:var(--fs-s);font-weight:600;color:var(--muted)}
+.wnmd .wnver ul{margin:0;padding-left:1.25rem;display:flex;flex-direction:column;gap:.25rem}
+.wnmd .wnolder{margin:.75rem 0 0;font-size:var(--fs-s)}

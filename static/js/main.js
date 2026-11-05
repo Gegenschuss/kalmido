@@ -163,5 +163,6 @@ function bootDone() {
   if (suImp && S.me?.is_admin && !S.capturePage) { setTimeout(() => { if (!$('.modal')) settingsModal('data'); }, 400); setTimeout(tourModAuto, 600); }
   else if (S.settings.tour === 'pending' && !new URLSearchParams(location.search).get('share') && !S.capturePage) setTimeout(tourAuto, 400);  // 2.223.0 A (#2821): once per session, only in Projects
   else if (!new URLSearchParams(location.search).get('share')) setTimeout(tourModAuto, 400);  // 2.466.0 (#3314): an area opened directly
+  setTimeout(wn_boot, 2500);  // 2.556.0 (#4685): "New for you" after an update (lazyload.js)
   setTimeout(quipsLoad, 1500);
 })();

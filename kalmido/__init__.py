@@ -97,6 +97,7 @@ ORDER = (
     "personal.timetrack",
     "personal.timewipe",  # 2.43.0 (#1434)
     "accounts.settings",
+    "accounts.whatsnew",  # 2.556.0 (#4685): "New for you" after an update (user settings whatsnew_seen / whatsnew_on)
     "lists.favorites",  # 2.40.0 (#1361)
     "lists.listexport",  # 2.116.0 C (#2064)
     "accounts.layouts",  # 2.32.0 (#1063, #983)

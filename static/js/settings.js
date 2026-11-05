@@ -81,6 +81,7 @@ const SETS = {  // control id -> [setting key, label, kind]
   's-review': ['review_time', N_('Daily review at'), 'time'],
   's-brief': ['brief_time', N_('Morning briefing at'), 'time'],  // 2.34.0 (#264)
   's-tmore': ['tours_more', N_('Show more introductions'), 'chk'],  // 2.466.0 (#3314)
+  's-wnew': ['whatsnew_on', N_('Show what is new after an update'), 'chk'],  // 2.556.0 (#4685): whatsnew.js
   's-lemo': ['list_emoji', N_('Suggest icons for new projects'), 'chk'],  // 2.32.0 (#1077)
   's-sdn': ['show_done_new', N_('Hide completed tasks in new projects'), 'chk'],  // 2.49.0 (#1535)
   's-prbg': ['prio_bg', N_('Priority as background'), 'sel'],  // 2.40.0 (#1416)
@@ -828,6 +829,7 @@ function settingsModal(focus) {
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
+      <div class="row">${chk('s-wnew', s.whatsnew_on !== '0', tr('Show what is new after an update'))}</div><!-- 2.556.0 (#4685): the dialog "New for you" -->
       ${S.me?.kid ? '' : `<div class="row">${chk('s-tmore', s.tours_more !== '0', tr('Show more introductions'))}</div>
       <div class="row">${TOUR_AREAS.filter(id => sbb_def(id)?.[3]()).map(id => `<button class="btn sm" data-m="tour-mod" data-v="${id}">${esc(tr(sbb_def(id)[2]))}</button>`).join('')}</div>`}<!-- 2.466.0 (#3314): one area's introduction again -->
       ${isMobile() ? '' : `<div class="shelp">${tr('{0}: search and commands for everything (tasks, projects, views, settings). j / k move through the tasks, x completes, s snoozes, g t goes to Today.', kbText('Mod+K'))}</div>`}

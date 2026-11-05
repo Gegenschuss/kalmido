@@ -102,6 +102,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.556.0 (#4685): "New for you" after an update (p2556_b_whatsnew_api_test.py as the freelancer)
+    "GET /api/whatsnew": "own", "POST /api/whatsnew/seen": "own",
     # 2.545.0 (#4595): the switch "Extend the lock" of the own office (p2545_b_rethold_test.py as the freelancer)
     "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",
     # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)

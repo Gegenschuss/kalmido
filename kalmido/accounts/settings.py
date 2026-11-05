@@ -68,6 +68,8 @@ SETTINGS_FLAGS += ("video_ext_ok",)  # 2.240.0 (#2886): load YouTube / Vimeo pla
 SETTINGS_FLAGS += ("agent_quota_show",)  # 2.407.0 B (#3493): the usage ring in the agent chat header (0 = only in the ⋯ menu)
 SETTINGS_FLAGS += ("ws_accent",)  # 2.490.0 B (#4026): the interface in the colour of the workspace (static/js/wscolor.js)
 SETTINGS_FLAGS += ("member_view",)  # 2.436.0 (#3620): "View as member", display only (static/js/core.js mvResp; the rights stay)
+SETTINGS_FLAGS += ("whatsnew_on",)  # 2.556.0 (#4685): the dialog "New for you" after an update (accounts/whatsnew.py)
+SETTINGS_SERVER_ONLY += ("whatsnew_seen",)  # 2.556.0 (#4685): set by /api/whatsnew/seen only
 SETTINGS_NUM = {"pomo_focus": (0, 600), "pomo_short": (0, 600), "pomo_long": (0, 600), "pomo_long_every": (1, 50),
                 "time_rounding": (0, 1440), "time_remind_h": (0, 1000), "time_autostop_h": (0, 1000), "time_target": (0, 24),
                 "detail_split": (20, 85)}  # 2.31.0 (#344)

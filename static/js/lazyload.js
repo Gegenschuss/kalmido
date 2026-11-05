@@ -84,6 +84,7 @@ const LD_MODS = {
   sideviews: ['sideviews'],  // 2.156.0 D (#2186): saved views of the sidebar (favtiles.js has the stand-ins)
   notetrash: ['notetrash'],  // 2.272.0 E1 (#3038): the notes of a project in the trash (chat.js draws the button)
   trashui: ['trashui'],  // 2.272.0 G (#3038): the trash dialogs / views of 2.272.0 (start budget)
+  whatsnew: ['whatsnew'],  // 2.556.0 (#4685): the dialog "New for you" after an update (wn_boot below loads it only when there is news)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
@@ -122,7 +123,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
   wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
-  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
+  integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)
   // 2.65.0 (#1823)
@@ -141,6 +142,19 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   ms_clTrashHtml: ['trashui', 1], povTrashHtml: ['trashui'],  // 2.272.0 G (#3038)
   vtr_html: ['trashui'],  // 2.549.0 (#4536): the video sign-offs in the trash view
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1]};  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
+// 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
+// server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at
+// all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.
+function wn_boot(tries = 0) {
+  const s = S.settings || {};
+  if (s.whatsnew_seen == null || !APP_VER || s.whatsnew_seen === APP_VER || S.me?.kind === 'agent' || MW_ON || S.capturePage) return;
+  if ((TOUR.on || $('.modal')) && tries < 20) { setTimeout(() => wn_boot(tries + 1), 3000); return; }  // after the tour / an open dialog
+  api('GET', '/api/whatsnew').then(j => {
+    s.whatsnew_seen = j.seen;
+    if (j.on && j.versions?.length) loadModule('whatsnew').then(() => wn_open(j), () => {});
+    else if (j.seen !== j.current) api('POST', '/api/whatsnew/seen').then(r => { s.whatsnew_seen = r.seen; }, () => {});
+  }, () => { /* offline / an older server: the next start asks again */ });
+}
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)
 const tpo_on = () => feat('events') && S.me?.kind !== 'agent';
