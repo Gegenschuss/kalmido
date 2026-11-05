@@ -24,6 +24,7 @@ import base64
 import os
 import threading
 
+import dbx as dbxm  # noqa: E402  2.552.0 (#4647)
 import kt
 from kt import B, check, sess
 from freelancer_fixture import freelancer
@@ -40,6 +41,16 @@ CLIENT = {"name": "Beispiel Kunde AG", "street": "Marktstrasse 5", "zip": "50667
 
 def sql(q, args=()):
     return kt.dbx(q, args)
+
+
+def wsql(q, args=()):
+    """2.552.0 (#4647): a write in the suite's database."""
+    c = dbxm.connect(os.path.join(kt.DATA, "tasks.db"))
+    try:
+        c.execute(q, args)
+        c.commit()
+    finally:
+        c.close()
 
 
 def rows_by_title(pv):
@@ -163,6 +174,12 @@ def scenario(S, who, shoot=False, member=None):
           and sql("SELECT 1 FROM activity WHERE task_id=? AND kind='offer_gone'", (ts["Sprachaufnahme"][0],)), f"{who}: the removed position only marked")
     j = S.get(B + f"/api/lists/{L}/office-docs").json()
     check(j["budget"]["doc_id"] == Q2 and j["budget"]["net_text"] == pv3["net_text"], f"{who}: the budget follows the new version {j.get('budget')}")
+    # 2.552.0 (#4647, review): doc_id is SET NULL when a version is deleted - a link left NULL must not hide the project's budget
+    keep = sql("SELECT task_id, doc_id, updated_at FROM task_offer_links WHERE task_id=?", (ts["Konzept"][0],))[0]
+    wsql("UPDATE task_offer_links SET doc_id=NULL, updated_at='9999-12-31T00:00:00' WHERE task_id=?", (keep[0],))
+    j = S.get(B + f"/api/lists/{L}/office-docs").json()
+    check((j.get("budget") or {}).get("doc_id") == Q2, f"{who}: a link without its quotation does not hide the budget {j.get('budget')}")
+    wsql("UPDATE task_offer_links SET doc_id=?, updated_at=? WHERE task_id=?", (keep[1], keep[2], keep[0]))
     check(S.get(B + f"{D}/{Q2}").json().get("offer_tasks") == len(ts2) and S.get(B + f"{D}/{Q}").json().get("offer_tasks") == len(ts2), f"{who}: both versions count the tasks")
     pv4 = S.get(B + f"{D}/{Q2}/tasks").json()
     check(all(x["state"] in ("same", "manual") for x in pv4["rows"] if x["title"] != "Druckdaten") and pv4["gone"][0]["marked"] and not pv4["gone"][0]["pick"],

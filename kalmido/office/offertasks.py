@@ -324,7 +324,7 @@ def otk_apply(did):
             log_act(c, x["task_id"], "offer_gone")
             n_gone += 1
     # the rows left as they are follow the new version too (doc_id: the project's budget shows this quotation's net)
-    c.execute("UPDATE task_offer_links SET doc_id=?, root_id=? WHERE list_id=? AND root_id=? AND doc_id<>?", (r["id"], root, lid, root, r["id"]))
+    c.execute("UPDATE task_offer_links SET doc_id=?, root_id=? WHERE list_id=? AND root_id=? AND (doc_id IS NULL OR doc_id<>?)", (r["id"], root, lid, root, r["id"]))  # 2.552.0 (#4647, review): a deleted version left NULL
     ofx_log(c, oid, "tasks", doc_id=did, detail={"list_id": lid, "created": n_new, "updated": n_upd, "marked": n_gone})
     bump(c)
     c.commit()
@@ -334,7 +334,7 @@ def otk_apply(did):
 def otk_project_budget(c, oid, lid):
     """GET /api/lists/<lid>/office-docs (office people only): the project's budget from its quotation -- {doc_id, number,
     hours (the field values of the tasks it made, not gone), net_text (the quotation's net)} or None."""
-    k = c.execute("SELECT doc_id FROM task_offer_links WHERE list_id=? AND gone=0 ORDER BY updated_at DESC, task_id DESC LIMIT 1", (lid,)).fetchone()
+    k = c.execute("SELECT doc_id FROM task_offer_links WHERE list_id=? AND gone=0 AND doc_id IS NOT NULL ORDER BY updated_at DESC, task_id DESC LIMIT 1", (lid,)).fetchone()
     if not k:
         return None
     r = c.execute("SELECT * FROM office_docs WHERE id=? AND org_id=? AND kind='offer'", (k[0], oid)).fetchone()
