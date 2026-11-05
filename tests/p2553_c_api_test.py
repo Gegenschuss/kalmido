@@ -131,5 +131,5 @@ tool[3](Api(), {"section_id": 7, "dwell_warn_h": None, "dwell_alert_h": 0})
 check(calls == [("PATCH", "/sections/7", {"dwell_warn_h": 8}), ("PATCH", "/sections/7", {"dwell_warn_h": None, "dwell_alert_h": 0})],
       f"MCP: PATCH with only the given limits ({calls})")
 check(m.TOOL_SCOPE.get("set_dwell_limits") == "structure", "MCP: scope structure like set_wip_limit")
-check("set_dwell_limits" in m.TOOLSETS["tickets"].split(), "MCP: in the toolset tickets")
+check("set_dwell_limits" in tuple(m.TOOLSETS["tickets"]), "MCP: in the toolset tickets")
 sys.exit(done("p2553_c_api"))
