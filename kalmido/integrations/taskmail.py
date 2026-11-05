@@ -42,6 +42,7 @@ from ..collab.comments import MAIL_REPLY, MENTION_RE, collab_user, user_names
 from ..collab.liste2e import le2e_mode
 from ..collab.liste2eguard import le2b_list_locked
 from ..collab.news import news_add
+from ..hub.hubmail import hbm_from_verified  # 2.539.0 (#4381): module level, hubmail comes earlier in the layer order
 from ..hub.mailbox import _refs, _sender
 from . import mail as M
 
@@ -158,7 +159,7 @@ def tmr_take(c, msg, mid, uid, how_to=None):
         return None, ""
     ok, who = tmr_who(c, tid, sender, tu)
     if who:  # 2.539.0 (#4381, audit #2483 M5): in a person's name only when the receiving server confirmed the sender's domain
-        from ..hub.hubmail import hbm_from_verified  # (KALMIDO_MAIL_AUTHSERV_ID); else "By e-mail from <address>", no account
+        # (KALMIDO_MAIL_AUTHSERV_ID); else "By e-mail from <address>", no account
         if not hbm_from_verified(msg, sender):
             who = None
     # 2.393.2 F (#3375): review 1 - by In-Reply-To alone only when the account of the address the mail went to sees the task (the
