@@ -76,9 +76,9 @@ function brl_edit(r, init) {
     } catch (x) {
       b.disabled = false;
       const el = $('.aerr', md);
-      if (r && x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+      if (r && x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
         el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-brl-reload>${tr('Reload')}</button>`;
-        $('[data-brl-reload]', el).addEventListener('click', () => { md.remove(); brl_load(); brl_edit(x.data.row); });
+        $('[data-brl-reload]', el).addEventListener('click', () => { md.remove(); brl_load(); brl_edit(x.data.current || x.data.row); });
         return;
       }
       el.textContent = x.message || tr('unknown');

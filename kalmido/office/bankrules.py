@@ -29,13 +29,15 @@ from ..core.i18n import tr
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.access import Denied
 from ..core.errors import BadInput
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from ..receipts.suggest import rc_categories
 from .bank import BNK_KINDS, IBAN_RE, _clean, _norm, _tx_dec
 from .books import bk_ws
 from .calc import dec, dstr, money
 from .model import office_ctx_admin as _ctx
 from .periodlock import period_need_open, pl_is_locked
+
+ow_kind("office_bank_rule", "office_bank_rules")
 
 BR_ACTIONS = ("private", "ignored", "noreceipt", "category")
 BR_MARKS = ("private", "ignored", "noreceipt")  # the actions that mark a booking
@@ -336,12 +338,6 @@ def _rule_row(c, oid, rid, deleted=False):
     return r
 
 
-def _write(c, oid, rid, d):
-    row = oc_enc_fields(c, oid, "office_bank_rules", {k: d[k] for k in _FIELDS})
-    row["updated_at"] = iso(now_utc())
-    c.execute(f"UPDATE office_bank_rules SET {', '.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", [*row.values(), rid, oid])
-
-
 def br_create(c, oid, uid, spec):
     """Makes a rule in area oid from spec (the body of POST /rules; checked by br_spec) -> its id. 409 at BR_MAX rules."""
     d = br_spec(spec)
@@ -381,13 +377,21 @@ def br_new():
 
 @app.put("/api/office/bank/rules/<int:rid>")
 def br_edit(rid):
-    """The fields given change (also active: bool); marks set already stay (POST /rules/<id>/revert lifts them)."""
+    """The fields given change (also active: bool); marks set already stay (POST /rules/<id>/revert lifts them).
+    2.567.0 D (#4711): through office/owrite.py ow_write -- version (409 with the rule under "current"), only the columns
+    that change, history, updated_by, bump."""
     c, uid, oid = _ctx()
     write_lock(c, f"office_bank_rules_{oid}")  # the area's lock (the rules' limit / order) covers this rule too
-    old = _rule_dec(c, oid, _rule_row(c, oid, rid))
-    ccf_check(body(), old["updated_at"], "row", lambda: br_public(old))  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409
-    _write(c, oid, rid, br_spec(body(), old))
-    bump(c)
+    b = body()
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+
+    def clean(c, b, cur):
+        d = br_spec(b, cur)
+        return {k: d[k] for k in _FIELDS if not (d[k] in (None, "") and cur.get(k) in (None, ""))}
+    ow_write(c, uid, "office_bank_rule", rid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
+             dec=lambda c, r: _rule_dec(c, oid, r), enc=lambda c, v: oc_enc_fields(c, oid, "office_bank_rules", v),
+             public=lambda c, cur: br_public(cur))
     c.commit()
     return jsonify(rule=_one(c, oid, rid))
 
