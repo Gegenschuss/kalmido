@@ -64,7 +64,8 @@ const events = async (since = 0) => (await v1('GET', `/agent/events?since=${sinc
   const cm2 = d.querySelector(`.cm[data-cid="${k1}"]`);
   const up = cm2?.querySelector('[data-e="up"]');
   check(up?.classList.contains('on') && up.querySelector('.rxn')?.textContent === '1' && /Alice/.test(up.title), 'my 👍 shown with count + name');
-  check(/Approved/.test(d.querySelector('#toast')?.textContent || d.body.textContent), 'toast: Approved');
+  // 2.559.0 (#4659): the 👍 shows before the answer now; the toast comes with the answer: waited for
+  check(await require('./boot').until(() => /Approved/.test(d.querySelector('#toast')?.textContent || d.body.textContent), {timeout: 30000}), 'toast: Approved');
   let ev = await events();
   for (let i = 0; i < 100 && !ev.some(e => e.event === 'reaction' && e.data.approval === 'approved'); i++) { await sleep(150); ev = await events(); }  // 2.500.0: the event, not a moment
   check(ev.some(e => e.event === 'reaction' && e.data.approval === 'approved'), 'agent got the approval');
