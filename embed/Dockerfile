@@ -15,6 +15,8 @@ ARG EMBED_TOK_SHA256=0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebd
 COPY fetch_model.py /tmp/fetch_model.py
 RUN EMBED_REPO=${EMBED_REPO} EMBED_REV=${EMBED_REV} EMBED_ONNX=${EMBED_ONNX} EMBED_ONNX_SHA256=${EMBED_ONNX_SHA256} \
     EMBED_TOK=${EMBED_TOK} EMBED_TOK_SHA256=${EMBED_TOK_SHA256} python3 /tmp/fetch_model.py && rm /tmp/fetch_model.py
+# 2.554.0 (#4169): pip itself is not needed at runtime and carries known holes: removed after the last pip call
+RUN python -m pip uninstall -y pip
 # the model's name is stored with every vector: another file / model = everything computed again
 ENV EMBED_MODEL=multilingual-e5-small-int8 EMBED_THREADS=1 EMBED_DIM=384 EMBED_POOLING=mean EMBED_PREFIX_QUERY="query: " EMBED_PREFIX_PASSAGE="passage: "
 RUN useradd --system --uid 10090 --no-create-home embed

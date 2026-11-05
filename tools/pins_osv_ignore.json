@@ -1,0 +1,8 @@
+{
+  "_comment": "Holes reported by tools/pins.py --osv that were checked by hand and cannot be reached (#4169). Key = OSV/GHSA id, value = reason. A hole not listed here turns the check red; remove an entry when the library is updated.",
+  "GHSA-55q2-fjhq-7xh7": "DOMPurify inside mermaid.min.js: IN_PLACE sanitizing with hooks; mermaid calls sanitize() on a string (no IN_PLACE, no own hooks), securityLevel strict, no HTML labels",
+  "GHSA-6688-9rhm-gjv2": "DOMPurify inside mermaid.min.js: IN_PLACE option only; mermaid does not use it",
+  "GHSA-c6gr-qvv4-5v3f": "DOMPurify inside mermaid.min.js: needs PARSER_MEDIA_TYPE application/xhtml+xml; mermaid keeps the default text/html",
+  "GHSA-cg2g-xh64-v4q7": "DOMPurify inside mermaid.min.js: needs SAFE_FOR_TEMPLATES with DOM output modes; mermaid does not set it, Kalmido renders no template engine over diagrams",
+  "GHSA-mrv2-3pqr-j5jr": "DOMPurify inside mermaid.min.js: IN_PLACE with removing hooks; not used by mermaid"
+}

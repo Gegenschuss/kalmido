@@ -37,6 +37,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends tesseract-ocr t
 # 2.360.3 (#2915): every package with its version and hashes, also what the direct ones pull in (tools/requirements.in + .lock)
 COPY tools/requirements.lock /tmp/requirements.lock
 RUN pip install --no-cache-dir --require-hashes -r /tmp/requirements.lock && rm /tmp/requirements.lock
+# 2.554.0 (#4169): pip itself is not needed at runtime (CMD, HEALTHCHECK and the app never call it) and carries known holes: removed after the last pip call
+RUN python -m pip uninstall -y pip
 WORKDIR /app
 # 2.380 G (#3390): + the hashes of the agent starter files (mcp/starter_sha256.txt, tools/starter_sha.py); the pattern lets a
 # checkout without mcp/ build too (then the agent setup gets no hashes and checks nothing, as before)
