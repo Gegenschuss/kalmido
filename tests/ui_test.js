@@ -60,15 +60,17 @@ const api = async (w, method, url, body) => (await w.fetch(url, {method, headers
   ta.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
   check(ta.value === 'Ping @Bob ', 'Enter picks the mention: ' + JSON.stringify(ta.value));
   ta.value += 'please check'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
-  // offline: nothing lost, clear notice
+  // offline: nothing lost, clear notice; 2.537.0 (#4569): the comment stands in the list at once, not sent = "Send again" there
+  const n0 = d.querySelectorAll('#d-tl .cm').length;
   w.__offline = true;
-  await w.eval('sendComment()'); await until(() => /offline/i.test(d.querySelector('#toast').textContent));
-  check(/offline/i.test(d.querySelector('#toast').textContent) && d.querySelector('#c-input').value === 'Ping @Bob please check', 'offline: notice + text stays: ' + d.querySelector('#toast').textContent);
+  await w.eval('sendComment()');
+  const cfl = await until(() => d.querySelector('#d-tl .cm.cmfail'));
+  check(!!cfl && /Ping/.test(cfl.textContent) && /Bob/.test(cfl.textContent) && /Not sent/.test(cfl.textContent) && d.querySelector('#c-input').value === '', 'offline: the comment stays in the list with "Send again", the box is free: ' + cfl?.textContent);
   check(w.eval('OUT.q.length') === 0, 'offline comment is not queued in the outbox');
   w.__offline = false;
-  const n0 = d.querySelectorAll('#d-tl .cm').length;
-  await w.eval('sendComment()'); await until(() => d.querySelectorAll('#d-tl .cm').length === n0 + 1 && d.querySelector('#c-input').value === '');
-  check(d.querySelectorAll('#d-tl .cm').length === n0 + 1 && d.querySelector('#c-input').value === '', 'online: comment sent, box cleared');
+  cfl?.querySelector('[data-act="c-resend"]')?.click();
+  await until(() => d.querySelectorAll('#d-tl .cm').length === n0 + 1 && !d.querySelector('#d-tl .cmpend'));
+  check(d.querySelectorAll('#d-tl .cm').length === n0 + 1 && !d.querySelector('#d-tl .cmpend') && d.querySelector('#c-input').value === '', 'online: Send again sent it, once in the list, box cleared');
   const tlj = await api(w, 'GET', `/api/tasks/${ids.ST}/timeline`);
   const last = tlj.comments[tlj.comments.length - 1];
   check(last.body === `Ping <@${ids.ids.bob}> please check` && last.mentions[0] === ids.ids.bob, 'mention stored as user id: ' + last.body);

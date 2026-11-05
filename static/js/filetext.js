@@ -55,10 +55,15 @@ function ftxtSet(q) {
   if (!q.trim()) { FTXT.seq++; FTXT.res = null; ab_draw(); return; }
   FTXT.timer = setTimeout(ftxtRun, 250);
 }
+// 2.537.0 (#4574): a picture opens in the app's preview (lightbox), never in a new tab; dl = the download address
+function ftxtImgView(f, url, dl) {
+  if (typeof attLightbox === 'function') { attLightbox('f', [{id: 'f', name: f.name, size: f.size}], (a, d) => d ? dl : url); return; }
+  const a = document.createElement('a'); a.href = dl; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
+}
 function ftxtOpenLf(f) {
   const url = `/api/list-files/${f.id}`;
   if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url, name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }
-  if (/^image\//.test(f.mime || '')) { window.open(url, '_blank', 'noopener'); return; }
+  if (/^image\//.test(f.mime || '')) { ftxtImgView(f, url, url + '?dl=1'); return; }
   if (dv_is(f)) { dpvOpen({url: url + '/preview', name: f.name, size: f.size, dlUrl: url + '?dl=1'}); return; }  // 2.92.0 C (#1926)
   const a = document.createElement('a'); a.href = url + '?dl=1'; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
 }

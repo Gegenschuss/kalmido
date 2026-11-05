@@ -555,8 +555,10 @@ async function doSave(key, retry) {
 // typing in the title / description: one history step per field and editing session (focus to blur), not per save
 function histText(s, t) {
   const key = s.id + ':' + s.field, top = HIST.undo[HIST.undo.length - 1];
-  if (top && top.text === key && top.sess === s.sess && !HIST.redo.length && !t?._q && !(top.q && !top.q.done)) {  // queued saves: own steps (the outbox can cancel them)
-    top.pairs[0][1][s.field] = s.value; top.after = [snapTask(S.tasks.get(s.id) || t)]; top.q = t?._q || null;
+  // queued saves: own steps while the one before still waits (the outbox can cancel them); 2.537.0 (#4568): online every save
+  // goes through the outbox, one sent already is no reason for a new step (the typing of one visit stays one step)
+  if (top && top.text === key && top.sess === s.sess && !HIST.redo.length && !(top.q && !top.q.done)) {
+    top.pairs[0][1][s.field] = s.value; top.after = [snapTask(S.tasks.get(s.id) || t)]; top.q = null;  // 2.537.0 (#4568): never the newest entry alone (the one before reached the server: Undo goes behind it through the outbox, not by cancelling)
     top.label = s.field === 'title' ? tr('Renamed {0}', qn(String(s.value).slice(0, 40))) : tr('Description of {0}', qn(String(t.title || '').slice(0, 40)));
     if (!reverseOf(top.pairs[0][0], top.pairs[0][1], [s.field])) { HIST.undo.pop(); }  // typed back to the start: nothing to undo
     renderHist(); return;
@@ -578,19 +580,37 @@ async function patchTask(id, body, quiet) {
   putTask(t); render(); if (S.sel === id) renderDetail();
   if (!quiet && before) {
     if (t?.shifted?.length || t?.chain?.skipped?.length) shiftUndo(before, t, '');  // 2.67.0 B (#1865): + what stayed
-    else histFields(histLabel(before, S.tasks.get(id) || t), [[before, snapTask(S.tasks.get(id) || t)]], {res: t});
+    else shiftLate(before, histFields(histLabel(before, S.tasks.get(id) || t), [[before, snapTask(S.tasks.get(id) || t)]], {res: t}), '', t);  // 2.537.0 (#4568)
   }
   return t;
 }
+// 2.537.0 (#4568): a task's change went into the outbox (r._q, online too): the server's answer comes later. The dependent
+// tasks it moved along (shifted) and the ones that stayed (chain) join the step recorded already (e) with their toast and a
+// reload; no step recorded = shiftUndo's own. later = a Promise of the answer (default: the outbox entry's).
+function shiftLate(before, e, msg, r, later) {
+  const p = later || (r?._q && typeof outLater === 'function' ? outLater(r._q) : null); if (!p) return;
+  p.then(j => {
+    const sh = j?.shifted || [];
+    if (!sh.length && !j?.chain?.skipped?.length) return;
+    if (!e) { shiftUndo(before, {...j, id: r?.id ?? j.id}, msg); return; }
+    if (sh.length) load().then(() => render()).catch(() => {});
+    if (!HIST.undo.includes(e)) return;  // undone meanwhile: only the reload
+    const moved = sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : '';
+    histExtend(e, sh.map(x => [{id: x.id, start: x.prev_start, due: x.prev_due}, {id: x.id, start: x.start, due: x.due}, ['start', 'due']]), moved);
+    histToast([msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : '', dch_skipText(j.chain)].filter(Boolean).join(' · '), e);
+  }).catch(() => {});
+}
 // one step for a date change and the dependent tasks the server moved along with it (t.shifted: [{id, start, due,
 // prev_start, prev_due}]); msg = what the change itself was ('' = only the "moved along" part)
-function shiftUndo(before, t, msg) {
+// 2.537.0 (#4568): later = a Promise of the server's answer still to come (shiftLate; default: t's outbox entry)
+function shiftUndo(before, t, msg, later) {
   const sh = t?.shifted || [];
   if (sh.length) load().then(() => render()).catch(() => {});
   const after = t && snapTask(S.tasks.get(t.id) || t), rev = before && after && reverseOf(before, after, HIST_FIELDS);
   const m = [msg, sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : '', dch_skipText(t?.chain)].filter(Boolean).join(' · ');  // 2.67.0 B (#1865)
-  if (!rev && !sh.length) { if (msg) toast(msg); return; }
+  if (!rev && !sh.length) { if (msg) toast(msg); shiftLate(before, null, msg, t, later); return; }
   const pairs = [...(rev ? [[before, after, HIST_FIELDS]] : []), ...sh.map(x => [{id: x.id, start: x.prev_start, due: x.prev_due}, {id: x.id, start: x.start, due: x.due}, ['start', 'due']])];
   const e = histFields([before && after ? histLabel(before, after) : '', sh.length ? trn('{0} dependent task moved', '{0} dependent tasks moved', sh.length) : ''].filter(Boolean).join(' · '), pairs, {res: t});
   if (e) histToast(m, e);
+  shiftLate(before, e, msg, t, later);
 }

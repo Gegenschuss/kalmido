@@ -42,7 +42,7 @@ async function pdfView(o) {
       <button type="button" class="iconbtn" data-pv="in" title="${esc(tr('Zoom in'))}" aria-label="${esc(tr('Zoom in'))}">${ic('plus')}</button></div>
     ${o.arch ? `<button type="button" class="iconbtn" data-pv="arch" title="${esc(tr('Correct archived document'))}" aria-label="${esc(tr('Correct archived document'))}">${ic('edit')}</button>` : '' /* 2.451.0 (#3834) */}
     <a class="iconbtn" href="${esc(dl)}" download="${esc(o.name || '')}" title="${esc(tr('Download'))}" aria-label="${esc(tr('Download'))}">${ic('download')}</a>
-    <a class="iconbtn" href="${esc(url)}" target="_blank" rel="noopener" title="${esc(tr('Open in new tab'))}" aria-label="${esc(tr('Open in new tab'))}">${PV_IC.ext}</a>
+    ${typeof mw_desk === 'function' && mw_desk() ? `<a class="iconbtn" href="${esc(url)}" target="_blank" rel="noopener" title="${esc(tr('Open in new tab'))}" aria-label="${esc(tr('Open in new tab'))}">${PV_IC.ext}</a>` : '' /* 2.537.0 (#4574): only with a mouse */}
     <button type="button" class="iconbtn" data-pv="x" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button></div>
     <div class="tvbody pvbody" tabindex="-1"><div class="tvmsg muted">${tr('Loading…')}</div></div></div>`;
   const body = $('.pvbody', m);

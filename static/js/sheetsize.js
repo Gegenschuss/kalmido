@@ -71,7 +71,7 @@ function shz_gripHtml(sh) {
 function shz_btnsHtml(sh) {
   if (!shz_on()) return '';
   const fs = document.documentElement.classList.contains('shzfull');
-  return `${typeof MW_ON !== 'undefined' && MW_ON ? '' : `<button type="button" class="iconbtn" data-shz="win" title="${esc(tr('Open in its own window'))}" aria-label="${esc(tr('Open in its own window'))}">${ic('panel', 's')}</button>`}`
+  return `${typeof MW_ON !== 'undefined' && MW_ON || !mw_desk() ? '' : `<button type="button" class="iconbtn" data-shz="win" title="${esc(tr('Open in its own window'))}" aria-label="${esc(tr('Open in its own window'))}">${ic('panel', 's')}</button>`}`
     + `${shz_mini() ? '' : `<button type="button" class="iconbtn" data-shz="full" aria-pressed="${fs}" title="${esc(fs ? tr('Leave full screen') : tr('Full screen'))}" aria-label="${esc(fs ? tr('Leave full screen') : tr('Full screen'))}">${ic(fs ? 'collapse' : 'expand', 's')}</button>`}`;
 }
 // after a draw: watch the frame; a frame of another width (window, panel, grip) gets its cells anew
@@ -205,6 +205,7 @@ document.addEventListener('focusout', e => { if (e.target.id === 'shz-ed') setTi
 
 // ---- its own window and full screen
 function shz_win(id) {
+  if (!mw_desk()) return null;  // 2.537.0 (#4574): no window of its own without a mouse
   const w = Math.min(1100, screen.availWidth || 1100), h = Math.min(760, screen.availHeight || 760);
   const x = Math.max(0, (window.screenX || 0) + 60), y = Math.max(0, (window.screenY || 0) + 60);
   const win = window.open(`/?mini=1#sheets/${id}`, 'kalmido-sheet-' + id, `popup,width=${w},height=${h},left=${x},top=${y}`);

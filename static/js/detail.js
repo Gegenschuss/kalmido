@@ -645,7 +645,7 @@ function renderDetail0() {
   // others made); the box itself is always there (sticky at the bottom), a single line until it is used
   // 2.31.0 (#344): desktop: the comments in their own area below the properties (split), shown even without comments
   const split = !ck && cmSplitOn(t);
-  const cmOk = cmtOn() && t.id > 0 && !ck && !t.context, cm = cmOk && (split || ncm || cmSocial(t) || tlForeign(t).length) ? 'full' : '';
+  const cmOk = cmtOn() && t.id > 0 && !ck && !t.context, cm = cmOk && (split || ncm || (typeof CPEND === 'object' && CPEND[t.id]?.length) || cmSocial(t) || tlForeign(t).length) ? 'full' : '';  // 2.537.0 (#4569): + an own comment on its way
   // 2.0.7: private lists with collaboration keep the folded "History" of 2.0.5 (every change, mine included, the
   // import line too); it stays out of the notes above, so they have no activity noise
   const hist = collab() && t.id > 0 && !ck && !t.context && !shared;

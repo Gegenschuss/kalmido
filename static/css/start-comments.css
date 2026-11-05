@@ -3,3 +3,7 @@
   .cacts{position:absolute;right:.25rem;top:.25rem;margin:0;display:none;opacity:1;background:var(--bg2);border-radius:var(--radius);box-shadow:0 0 0 1px var(--line)}
   .cm:hover .cacts,.cm:focus-within .cacts,.cm.cacton .cacts{display:inline-flex}
 }
+/* 2.537 (#4569) a comment on its way stands in the list lighter; a failed one shows Not sent with Send again / Discard */
+.cm.cmpend:not(.cmfail) .cbody{opacity:.6}
+.cm.cmfail .cpfail{color:var(--danger);font-size:.85em}
+.cm.cmfail .chead .btn{margin-left:.4em}

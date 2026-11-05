@@ -3,7 +3,7 @@
 //   with keepalive under the same key; the queued copy sent later changes nothing twice and raises no conflict
 // - the session ends (401) in the middle of a save, and while other typed text still waits: both are in the queue before the
 //   reload and the local data is kept; sent after the next sign-in of the same account
-// - a save that fails (500): the field says "Not saved yet", the text goes again later, the mark goes once it is saved
+// - a save that fails (500): the text goes again later (2.537.0 #4568: from the outbox, no field mark of its own)
 // - notes, the diary and the settings send their typed text with keepalive when the page goes (the diary and notes also queue it)
 // - the automatic reload for a new version waits for a draft kept only in memory (S.drafts)
 // kalmido-suite: fresh
@@ -73,8 +73,10 @@ const queued = (w, re) => w.eval('outSync()').filter(x => re.test(x.url));
   fake = (m, p) => m === 'PATCH' && p === '/api/tasks/' + T1 && n500-- > 0 ? jres(500, {error: 'Server error'}) : null;
   type(w, '#d-title', 'Plant tulips in October');
   w.eval('flushSaves()');
-  check(await until(() => !!w.document.querySelector('#d-title.unsaved') && /Not saved yet/.test(w.document.querySelector('.unsv')?.textContent || '')), 'the field says "Not saved yet"');
-  check(w.eval(`!!saveTimers['${T1}:title'] && saveTimers['${T1}:title'].base`) === 'Plant tulips and daffodils', 'the retry keeps the base the server has');
+  // 2.537.0 (#4568): the save goes through the outbox online too: a 500 keeps it first in the queue (the outbox tries again
+  // later, the network dot says "Syncing"), the text stays in the page; the field's own "Not saved yet" was the direct save's
+  check(await until(() => w.eval('OUT.q.length') === 1 && w.eval('OUT.q[0].tries') === 1 && !w.eval('OUT.flushing')), 'the save waits in the outbox after the server error');
+  check(w.eval('OUT.q[0].body._prev?.title') === 'Plant tulips and daffodils' && w.eval(`S.tasks.get(${T1}).title`) === 'Plant tulips in October', 'the retry keeps the base the server has, the page the new text');
   check(await until(async () => (await call('GET', '/api/tasks/' + T1)).title === 'Plant tulips in October', {timeout: 20000}), 'the retry saved it');
   check(await until(() => !w.document.querySelector('.unsv') && !w.document.querySelector('#d-title.unsaved')), 'the mark went');
   check(!w.eval('S.conflicts').length, 'no conflict after the retry');

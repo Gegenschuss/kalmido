@@ -512,6 +512,8 @@ def doc_public(c, oid, r, admin, items=True):
     if r["kind"] == "offer":
         from .cashflow import cf8_chain
         d["cf_chain"] = cf8_chain(c, oid, r)  # 2.88.0 (#1915): which version of the chain counts in the cash flow
+        from .offertasks import otk_count
+        d["offer_tasks"] = otk_count(c, r)  # 2.537.0 C (#3433): tasks made from this quotation's chain in its project
     from .peppol import pep_doc_extra
     pep_doc_extra(c, oid, d)  # 2.154.0 B (#1960): the newest Peppol send of an invoice / credit note
     if items:
@@ -1696,9 +1698,12 @@ def odoc_duplicate(did):
     from ..integrations.webhooks import who_note
     who_note("invoice.created", "invoice", nid)  # 2.115.0 A (#2061): a copy
     for it in doc_items(c, did, oid):
+        src = it
         it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
         it["doc_id"] = nid
         it["org_id"] = oid
+        if r["kind"] == "offer":  # 2.537.0 C (#3433): a new version keeps the origin of its positions (office/offertasks.py)
+            it["origin_id"] = src.get("origin_id") or src["id"]
         it = oc_item_store(c, oid, it)  # 2.42.0 (#828)
         c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))
     if r["kind"] == "offer":  # 2.47.0 (#1215): the parts with their positions

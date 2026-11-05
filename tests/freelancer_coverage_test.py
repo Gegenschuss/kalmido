@@ -1070,6 +1070,8 @@ ROUTES = {
     "GET /api/office/datev/zip": "office",
     # 2.168.0 A (#2665): a document's project, a project's documents (p2168_a_docproject_test.py as a person without an organisation)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
+    # 2.537.0 C (#3433): tasks with a time budget from a quotation (p3433_c_offer_tasks_test.py as a person without an organisation)
+    "GET /api/office/docs/{}/tasks": "office", "POST /api/office/docs/{}/tasks": "office",
     # 2.299.0 D (#3193): hide / show the hints of the receipt check (p2299_d_api_test.py as a person without an organisation)
     "POST /api/docs/{}/checks": "files",
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py as a person without an organisation)
@@ -1397,7 +1399,6 @@ POST /api/office/datev/import
 POST /api/office/datev/import/check
 POST /api/office/deals/{}/project
 POST /api/office/deals/{}/restore
-POST /api/office/docs/{}/project
 POST /api/office/drives/{}/restore
 POST /api/office/drives/{}/trip
 POST /api/office/gen-docs/tree/folders

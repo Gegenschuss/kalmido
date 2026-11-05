@@ -189,7 +189,7 @@ function ab_collHtml(d, sp) {
 }
 function ab_collOpen(f) {  // like a search hit of a project file (filetext.js ftxtOpenLf): PDF viewer, picture in a new tab, else download
   if (f.mime === 'application/pdf' && typeof pdfView === 'function') { pdfView({url: f.url, name: f.name, size: f.size, dlUrl: f.dl}); return; }
-  if (/^image\//.test(f.mime || '')) { window.open(f.url, '_blank', 'noopener'); return; }
+  if (/^image\//.test(f.mime || '')) { ftxtImgView(f, f.url, f.dl); return; }  // 2.537.0 (#4574)
   const a = document.createElement('a'); a.href = f.dl; a.download = f.name; document.body.appendChild(a); a.click(); a.remove();
 }
 document.addEventListener('click', e => {

@@ -618,8 +618,11 @@ function actText0(a, U) {
     case 'created': if (d.report) return tr('Created from an error report ({0})', q(d.report === 'sentry' ? 'Sentry' : d.report === 'client' ? tr('Browser') : tr('webhook')));  // 2.18.0 (#408); 2.102.0 E (#1999): client
       if (d.sheet && d.proposal) return tr('{0} carried the task over from a table, from a proposal by {1}', who, q(uname(d.agent, U))) + ` <a href="#sheets/${+d.sheet}">${esc(tr('Open table'))}</a>`;  // 2.126.1 B (#2125)
       if (d.sheet) return tr('{0} carried the task over from a table', who) + ` <a href="#sheets/${+d.sheet}">${esc(tr('Open table'))}</a>`;  // 2.89.0 (#1916, D): no table name (the list may be shared wider)
+      if (d.offer) return tr('{0} created the task from a quotation', who);  // 2.537.0 C (#3433): no number (the project may be shared wider than the office)
       return d.proposal ? tr('{0} created the task from a proposal by {1}', who, q(uname(d.agent, U))) : tr('{0} created the task', who);
-    case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));  // 2.3.0 (#262)
+    case 'proposal': return tr('{0} applied a proposal by {1}', who, q(uname(d.agent, U)));
+    case 'offer_gone': return tr('{0}: the position is no longer in the quotation (the task stays)', who);  // 2.537.0 C (#3433)
+    case 'offer_back': return tr('{0}: the position is in the quotation again', who);  // 2.3.0 (#262)
     case 'event': return tr('The task became an event; the people who came along are invited to it');  // 2.21.0 (#659)
     case 'title': return tr('{0} renamed the task to “{1}”', who, esc(d.to || ''));
     case 'bell': return tbl_actText(d, who);  // 2.53.0 C (#1424)
@@ -804,13 +807,15 @@ function timelineItems(ro = false) {
   const U = T.users || {};
   const items = [...T.comments.map(c => ({at: c.created_at, c, ro})), ...(showAct() || !soc ? (soc ? T.activity || [] : tlForeign(taskById(T.id))).map(a => ({at: a.created_at, a})) : [])]
     .sort((x, y) => new Date(x.at) - new Date(y.at) || (x.c ? 1 : 0) - (y.c ? 1 : 0));
-  if (!items.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
+  const pend = cmtPendItems(T);  // 2.537.0 (#4569): own comments still on their way, after the newest
+  if (!items.length && !pend.length) return soc || cmSplitOn(taskById(T.id)) ? `<div class="muted cmempty">${tr('No comments yet.')}</div>` : '';  // 2.31.0 (#344): the split keeps its area
   const lastC = [...items].reverse().find(it => it.c);
+  items.push(...pend);
   if (cmtNew()) items.reverse();  // 2.4.2 (#386)
   // 2.13.2 (#478 F5): comments of the same author in a row (within 15 minutes) are one group: only the first shows the
   // picture, name and badge
   const grp = (it, i) => { const p = items[i - 1]; return !!(it.c && p?.c && p.c.user_id === it.c.user_id && Math.abs(new Date(it.at) - new Date(p.at)) < 900000); };
-  return items.map((it, i) => it.c ? commentHtml(it.c, U, it.ro).replace('<div class="cm ', `<div class="cm ${it === lastC ? 'last ' : ''}${grp(it, i) ? 'grp ' : ''}`) : `<div class="actl"><span>${actText(it.a, U)}</span><time>${fmtWhen(it.a.created_at)}</time></div>`).join('');
+  return items.map((it, i) => it.p ? cmtPendHtml(it.p, T.id) : it.c ? commentHtml(it.c, U, it.ro).replace('<div class="cm ', `<div class="cm ${it === lastC ? 'last ' : ''}${grp(it, i) ? 'grp ' : ''}`) : `<div class="actl"><span>${actText(it.a, U)}</span><time>${fmtWhen(it.a.created_at)}</time></div>`).join('');
 }
 // 2.0.7: the folded history of a private list (as in 2.0.5): all changes of the task, oldest first
 function histItems() {
@@ -852,7 +857,7 @@ function drawTimeline() {
   cfst_since();  // 2.410.0 A (#3514): "since …" under a stage bar
   const n = $('#d-tl-count'); if (n) n.textContent = S.tl.comments?.length || '';
   const n2 = $('#d-jump-count'); if (n2) n2.textContent = S.tl.comments?.length || '';
-  const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || cmSocial(t) || tlForeign(t).length > 0);
+  const t = taskById(S.sel), want = !!t && (cmSplitOn(t) || (S.tl.comments?.length || 0) > 0 || !!CPEND[S.sel]?.length || cmSocial(t) || tlForeign(t).length > 0);
   if (t && $('#detail .dcomp') && !!$('#d-tl') !== want) {  // #315: the list appears with the first comment (or goes with the last)
     const f = document.activeElement?.id === 'c-input'; renderDetail(); if (f) $('#c-input')?.focus();
   }
@@ -920,6 +925,7 @@ async function sendComment() {
   // 2.370.2 (#3088): the same text sent again after a failed answer = the same comment
   const cr = CMT_REF[tid]?.text === raw ? CMT_REF[tid] : (CMT_REF[tid] = {text: raw, ref: Date.now().toString(36) + Math.random().toString(36).slice(2, 10)});
   if (payload instanceof FormData) payload.append('client_ref', cr.ref); else payload.client_ref = cr.ref;
+  if (!files.length) return cmtPendStart(tid, {ref: cr.ref, raw, text, payload, pub, mrep});  // 2.537.0 (#4569): at once in the list
   const btn = $('[data-act="c-send"]'); if (btn) btn.disabled = true;
   try { const r = await capi('POST', `/api/tasks/${tid}/comments`, payload); if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } } if (mrep) mrep_done(r?.mail_reporter); }  // 2.392.0 B (#3364): "partly: rest in Y"
   catch { if (pub) { PTL.on[tid] = true; ptl_draw(); } if (mrep) { MREP.on[tid] = true; ptl_draw(); } return; }
@@ -929,6 +935,65 @@ async function sendComment() {
   if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } const f = $('#c-files'); if (f) f.innerHTML = ''; }
   await loadTimeline(tid);
   const box = $('#d-tl-items'); if (box) (cmtNew() ? box.firstElementChild : box.lastElementChild)?.scrollIntoView({block: 'nearest'});
+}
+// 2.537.0 (#4569): a comment without files stands in the list at once as "Sending…" (the box empties, Send stays free, as in
+// the team chat): CPEND keeps it per task until the timeline brings the real one. A failed send stays there with "Send again"
+// (its text kept, the same client_ref #3088: a second try never makes a double) and "Discard". "To the customer" and "Also
+// by e-mail to the reporter" go with it as before; a locked list's text is encrypted on the way (rawFetch) as before.
+const CPEND = {};  // task id -> [{ref, raw, text, payload, pub, mrep, last, st: 'send' | 'fail' | 'sent', id, err}]
+function cmtPendStart(tid, p) {
+  p.last = S.tl.id === tid ? Math.max(0, ...(S.tl.comments || []).map(c => c.id)) : 0; p.at = new Date().toISOString();
+  (CPEND[tid] ||= []).push(p);
+  delete CMT_REF[tid];  // the next text gets its own ref, this one keeps p.ref for its tries
+  // the box stays empty when the detail is drawn anew ('' before the kept draft); the kept draft (fdc) goes only once the server
+  // has it (a reload in between gives it back)
+  S.drafts[tid] = ''; replySent('c:' + tid);
+  if (S.sel === tid) { const i = $('#c-input'); if (i) { i.value = ''; autosize(i); } }
+  cmtPendDraw(tid, true);
+  return cmtPendSend(tid, p);  // drawn already: a caller may wait for the server (as before)
+}
+// the own comments of task T still to show: not those the timeline has already (its id, or the same text of mine after it)
+function cmtPendItems(T) {
+  const L = CPEND[T.id]; if (!L?.length || !T.comments) return [];
+  const has = p => T.comments.some(c => c.id === p.id || (c.user_id === S.me?.id && c.id > p.last && c.body === p.text));
+  CPEND[T.id] = L.filter(p => !(p.st !== 'fail' && has(p)));
+  if (!CPEND[T.id].length) delete CPEND[T.id];
+  return (CPEND[T.id] || []).map(p => ({at: p.at, p}));
+}
+function cmtPendHtml(p, tid) {
+  const fail = p.st === 'fail', who = S.me ? S.me.display_name || S.me.username || '' : '';
+  const meta = fail ? `<span class="cpfail">${esc(p.err ? tr('Not sent: {0}', p.err) : tr('Not sent'))}</span><button type="button" class="btn sm" data-act="c-resend" data-tid="${tid}" data-ref="${esc(p.ref)}">${tr('Send again')}</button><button type="button" class="btn sm" data-act="c-pdrop" data-tid="${tid}" data-ref="${esc(p.ref)}">${tr('Discard')}</button>`
+    : `<span class="muted cwhen">${tr('Sending…')}</span>`;
+  return `<div class="cm cmpend${fail ? ' cmfail' : ''}" data-k="p${esc(p.ref)}" ${fail ? 'role="alert"' : 'aria-busy="true"'}>${S.me ? av(S.me.id, who) : ''}<div class="cmain"><div class="chead"><b>${esc(who)}</b>${meta}</div><div class="cbody">${commentBody(p.text, S.tl.users || {}, taskById(tid)?.list_id)}</div></div></div>`;
+}
+function cmtPendDraw(tid, scroll) {
+  if (S.sel !== tid || S.tl.id !== tid) return;
+  drawTimeline();
+  if (!scroll) return;
+  const box = $('#d-tl-items'); if (box) (cmtNew() ? box.firstElementChild : box.lastElementChild)?.scrollIntoView({block: 'nearest'});
+}
+async function cmtPendSend(tid, p) {
+  p.st = 'send'; p.err = '';
+  try {
+    const r = await rawFetch('POST', `/api/tasks/${tid}/comments`, p.payload);  // the entry itself says when it failed (no toast)
+    p.st = 'sent'; p.id = r?.id;
+    if (fdGet('fdc', tid)?.b === p.raw && !S.drafts[tid]) fdDrop('fdc', tid);  // nothing new typed since: the kept draft was this one
+    if (r?.partial) { toast(r.partial.reason || tr('Saved')); if (r.partial.applied) { await load(); render(); } }  // 2.392.0 B (#3364)
+    if (p.mrep) mrep_done(r?.mail_reporter);
+  } catch (e) {
+    if (e.message === 'auth') { if (!S.drafts[tid]) fdKeep('fdc', tid, p.raw); return; }  // the sign-in page: the text comes back in the box
+    p.st = 'fail'; p.err = e instanceof Offline ? '' : e.message || '';
+    if (p.pub) { PTL.on[tid] = true; ptl_draw(); } if (p.mrep) { MREP.on[tid] = true; ptl_draw(); }
+    cmtPendDraw(tid); return;
+  }
+  if (S.sel === tid) await loadTimeline(tid);
+  if (CPEND[tid]?.includes(p) && S.tl.id !== tid) CPEND[tid] = CPEND[tid].filter(x => x !== p);  // another task open: its list loads anew
+  cmtPendDraw(tid);
+}
+function cmtPendBtn(a) {
+  const tid = +a.dataset.tid, p = (CPEND[tid] || []).find(x => x.ref === a.dataset.ref); if (!p) return;
+  if (a.dataset.act === 'c-resend') { if (p.pub) ptl_take(tid); if (p.mrep) mrep_take(tid); cmtPendSend(tid, p); cmtPendDraw(tid); return; }
+  CPEND[tid] = CPEND[tid].filter(x => x !== p); cmtPendDraw(tid);
 }
 function addCommentFiles(files) {
   files = noEmpty(files); if (!files.length || !S.sel) return;

@@ -351,6 +351,52 @@ def time_list_totals(c, uid, own=False):
     return out
 
 
+def task_budget(c, uid, tid, lid):
+    """2.537.0 (#3433): {h, s, pct, level, own} of task tid's branch (the task + its subtasks) for the task detail "tracked X
+    of Y h", or None. Rights like the project head bar (time_list_totals own=True): a list with time tracking, no budget
+    for a participant; other people's time only for the list's owner / admins / org admins (own = only my time counted).
+    h = the "Budget h" values of the branch once per branch (budget_parents: a subtask's value replaces its parents'),
+    s = the finished entries of the branch (the client adds my running timer); level like the client's budget (80 / 100 %)."""
+    lr = c.execute(f"SELECT life FROM lists WHERE id=? AND id IN {MT_TIME_SQL}", (lid,)).fetchone()
+    if not lr or lid in set(plists(c, uid)) or (lr["life"] in HIDDEN_LIFE and health_hidden()):
+        return None
+    names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
+    fids = [r["id"] for r in c.execute("SELECT id, name FROM list_fields WHERE list_id=? AND type='number'", (lid,))
+            if (r["name"] or "").strip().lower() in names]
+    if not fids:
+        return None
+    kids = {}
+    for k, p in c.execute("SELECT id, parent_id FROM tasks WHERE list_id=? AND deleted_at IS NULL AND parent_id IS NOT NULL", (lid,)):
+        kids.setdefault(p, []).append(k)
+    ids, todo = {tid}, [tid]
+    while todo:  # the branch below tid (guarded against a broken cycle)
+        for k in kids.get(todo.pop(), ()):
+            if k not in ids:
+                ids.add(k)
+                todo.append(k)
+    q = ",".join("?" * len(ids))
+    vals = {}
+    for t, v in c.execute(f"""SELECT task_id, value FROM task_field_values WHERE field_id IN ({','.join('?' * len(fids))})
+                              AND task_id IN ({q})""", (*fids, *ids)):
+        try:
+            x = float(str(v).replace(",", "."))
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(x) and x > 0:
+            vals[t] = vals.get(t, 0) + x
+    skip = budget_parents(c, lid, vals) if vals else set()
+    b = round(sum(x for t, x in vals.items() if t not in skip), 2)
+    if b <= 0:
+        return None
+    adm = n43_admin_lists(c, uid)
+    own = adm is not None and lid not in adm
+    s = c.execute(f"""SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND task_id IN ({q})
+                      AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} AND {n43_own_sql(uid, adm, "")}""",
+                  (*ids, uid, uid, uid)).fetchone()[0]
+    pct = round(s / 3600 / b * 100)
+    return {"h": b, "s": s, "pct": pct, "level": "over" if pct >= 100 else "warn" if pct >= 80 else "ok", "own": own}
+
+
 def stop_timer(c, r, at, ts):
     end = max(parse_iso(r["start"]), at)
     sec = int((end - parse_iso(r["start"])).total_seconds())
@@ -707,12 +753,15 @@ def time_list():
     c = db()
     uid = me()
     a = dict(request.args)
+    bud = None
     if a.get("task_id"):
         try:
             need_task(c, int(a["task_id"]), write=False, full=True)
         except ValueError:
             raise Denied(404) from None
         a.setdefault("scope", "all")
+        tl = c.execute("SELECT list_id FROM tasks WHERE id=?", (int(a["task_id"]),)).fetchone()
+        bud = task_budget(c, uid, int(a["task_id"]), tl[0]) if tl and tl[0] else None  # 2.537.0 (#3433): "tracked X of Y h"
     try:
         lim = max(0, int(request.args.get("limit", 2000)))
     except ValueError:  # 2.148.1 E (#2496)
@@ -726,7 +775,7 @@ def time_list():
         out = [entry_out(r, uid, vis, ref, rm) for r in rows]
         from .timesheet import tsl_mark
         tsl_mark(c, uid, out)
-        return jsonify(entries=out, seconds=sec, mine=mine)
+        return jsonify(entries=out, seconds=sec, mine=mine, **({"budget": bud} if a.get("task_id") else {}))
     # 2.63.0 (#1523): the entries of ONE task (task detail) stay as before; lists / periods follow the admin rule
     rows, _, _, wanted = time_rows(c, uid, a, own=own)
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]

@@ -65,7 +65,7 @@ const V = B + 'api/v1';
   click(w, cmEl(c1.id)?.querySelector('[data-act="msg-reply"]')); await sleep(100);
   d.querySelector('#c-input').value = 'Yes, with a screenshot.';
   click(w, d.querySelector('[data-act="c-send"]'));
-  await until(() => [...d.querySelectorAll('#detail .cm')].length === 3);
+  await until(() => [...d.querySelectorAll('#detail .cm[data-cid]')].length === 3);  // 2.537.0 (#4569): the real one (it shows at once as "Sending…" first)
   const tl = await call('GET', `/api/tasks/${T}/timeline`);
   const R1 = tl.comments.find(c => c.body === 'Yes, with a screenshot.');
   check(R1 && R1.reply_to === c1.id, 'comment: sent with reply_to ' + JSON.stringify(R1 && R1.reply_to));

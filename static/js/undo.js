@@ -95,6 +95,18 @@ function histFields(label, pairs, o = {}) {
   return histAdd({label, pairs, undo: go(true), redo: go(false), snaps: pairs.map(p => p[0]), after: pairs.map(p => ({...(snapTask(S.tasks.get(p[1].id)) || {}), ...p[1]})),
     res: o.res, lids: pairs.flatMap(p => [p[0].list_id, p[1].list_id]), text: o.text, sess: o.sess});
 }
+// 2.537.0 (#4568): more task pairs for a step recorded already (the dependent tasks the server moved along, its answer came
+// after the step: attachments.js shiftLate); label = a part for its name ("2 dependent tasks moved")
+function histExtend(e, pairs, label) {
+  pairs = (pairs || []).filter(p => p[0] && p[1] && reverseOf(p[0], p[1], p[2] || HIST_FIELDS) && !e?.pairs?.some(q => q[0].id === p[0].id));
+  if (!e?.pairs || !pairs.length) return false;
+  e.pairs.push(...pairs); e.snaps.push(...pairs.map(p => p[0]));
+  e.after.push(...pairs.map(p => ({...(snapTask(S.tasks.get(p[1].id)) || {}), ...p[1]})));
+  e.lids = [...new Set([...e.lids, ...pairs.map(p => S.tasks.get(p[0].id)?.list_id)].filter(Boolean))];
+  if (label && !e.label.includes(label)) e.label = [e.label, label].filter(Boolean).join(' · ');
+  renderHist();
+  return true;
+}
 // completion / won't do (status) of ids; res = the answer of the forward request (signed undo payloads)
 function histDone(label, ids, snaps, res, status = 2) {
   const toks = r => { const u = r?.undo; return !u ? {} : u.sig ? {[ids[0]]: u} : u; };
@@ -317,6 +329,7 @@ async function patchUndoable(id, body, msg) {
   const e = before && after && histFields(histLabel(before, after), [[before, after]], {res: t});
   if (e) offerUndo(msg, e);
   else if (msg) toast(msg);
+  if (before) shiftLate(before, e || null, msg, t);  // 2.537.0 (#4568): the outbox's answer may still move dependent tasks along
   return t;
 }
 async function toggleTask(id) {
