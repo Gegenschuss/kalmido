@@ -310,6 +310,20 @@ def odl_public_off(c, oid):
     c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
 
 
+def odl_members_off(c, oid):
+    """2.560.0 (#4697): before organisation oid's calendars and address books become private (odl_retire, odl_dismantle):
+    every member row of somebody else than the owner (former colleagues, the organisation's agents, other people's agents)
+    ends, and so do the invitations of people to the events of these calendars (as org_leave does for one person). The
+    owner keeps the object; their own personal agents stay with it (the owner's delegates). The caller is in system_ctx."""
+    keep = "SELECT 1 FROM {t} k WHERE k.id={m}.{key} AND (k.owner_id={m}.{u} OR EXISTS (SELECT 1 FROM agents a WHERE a.user_id={m}.{u} AND a.owner_id=k.owner_id))"
+    for table, mt, key in (("ev_cals", "ev_cal_members", "cal_id"), ("books", "book_members", "book_id")):
+        c.execute(f"DELETE FROM {mt} WHERE {key} IN (SELECT id FROM {table} WHERE org_id=?) AND NOT EXISTS ("
+                  + keep.format(t=table, m=mt, key=key, u="user_id") + ")", (oid,))
+    c.execute("DELETE FROM event_attendees WHERE user_id IS NOT NULL AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
+              "WHERE k.org_id=? AND k.owner_id!=event_attendees.user_id AND NOT EXISTS (SELECT 1 FROM agents a WHERE "
+              "a.user_id=event_attendees.user_id AND a.owner_id=k.owner_id))", (oid,))
+
+
 def odl_retire(c, oid, until, gone=None):
     """Retires organisation oid until `until`: members (people and agents) out, its calendars / address books stay with
     their owners (private, as on a deletion) without public ways in, its agents leave it, the e-mail domains no longer let
@@ -323,6 +337,7 @@ def odl_retire(c, oid, until, gone=None):
                                             (oid, int(gone or 0))).fetchall()]
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         odl_public_off(c, oid)  # 2.360.4 (#3243)
+        odl_members_off(c, oid)  # 2.560.0 (#4697): before org_id=NULL (then the organisation's boundary no longer holds)
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
@@ -366,6 +381,7 @@ def odl_dismantle(c, oid):
         files += shk_org_files(c, oid)  # 2.124.0 B (#2110): files of its tables' file cells
         files += odl_tchat_files(c, oid)  # 2.190.0 B (#2561): team chat files sealed with its key
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
+        odl_members_off(c, oid)  # 2.560.0 (#4697): as odl_retire
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438)
         # 2.42.0 (#828): files of lists that left the organisation are sealed with their new organisation's key (or plain),
