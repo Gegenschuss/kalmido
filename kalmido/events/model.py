@@ -9,7 +9,7 @@ from dateutil.rrule import rrulestr
 from flask import g, has_request_context
 
 from ..core.config import PUBLIC_URL, TZ
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock  # 2.565.0 (#4703): write_lock
 from ..core.i18n import N_, short_day, tr, lang
 from ..core.db import bump, gset, gsetting, iso, iso_ms, now_utc, usettings
 from ..core.usertz import hm_text, tz_gap, tz_of_s
@@ -1078,9 +1078,21 @@ def ev_ov_shift(r, nr):
         return lambda k: None
 
 
+def ev_lock(c, eid):
+    """2.565.0 (#4703): an event's writes one after the other (web, API, CalDAV): the lock 'event-<id>' for the rest of the
+    transaction, then the row as it is now (FOR UPDATE), or None. Lists inside the row (overrides, exdates) are changed only
+    from this row, so a second writer that waited sees the first one's change instead of writing its old copy back."""
+    write_lock(c, f"event-{int(eid)}")
+    r = c.execute("SELECT * FROM events WHERE id=? FOR UPDATE", (int(eid),)).fetchone()
+    if not r or r["deleted_at"]:  # deleted by the writer we waited for
+        raise Denied(404)
+    return r
+
+
 def ev_occ_change(c, r, occ, b):
     """Only this occurrence: {"delete": true} leaves it out, else its own title / times / place (an override)."""
     from ..events.ics import OV_KEYS
+    r = ev_lock(c, r["id"])  # 2.565.0 (#4703): overrides / exdates from the locked row, never from a copy read before
     if not r["rrule"]:
         raise BadInput(tr("The event does not repeat"))
     if not (valid_date(occ) if r["all_day"] else wall(occ)) or not is_occ(r, occ):

@@ -68,7 +68,8 @@ const ap_draftCls = e => e?.status === 'tentative' ? ' evdraft' : '';
 // 2.144.2 B (#1811): the status on its way per event; a popover opened again meanwhile (the GET can overtake the PATCH) shows it
 const AP_EVPEND = new Map();
 async function ap_evStatus(ev, st, label) {
-  const put = async x => { AP_EVPEND.set(ev.id, x); try { await api('PATCH', `/api/events/${ev.id}`, {status: x}); } finally { AP_EVPEND.delete(ev.id); } calInvalidate(); renderView(); return {}; };
+  let at = ev.updated_at;  // 2.565.0 (#4703): the version each step builds on (a draft changed elsewhere meanwhile: 409, shown as it is now)
+  const put = async x => { AP_EVPEND.set(ev.id, x); try { const j = await api('PATCH', `/api/events/${ev.id}`, at ? {status: x, expect: at} : {status: x}); if (j?.updated_at) at = j.updated_at; } catch (e) { if (e?.status === 409) { calInvalidate(); renderView(); } throw e; } finally { AP_EVPEND.delete(ev.id); } calInvalidate(); renderView(); return {}; };
   try { await put(st); } catch { return; }
   if (!$('#pop').classList.contains('hidden') && $('#pop .apdraftact')) closePop();  // 2.58.0 (#1811): a popup still showing the draft is closed, not left with Draft + Confirm
   histToast(label, histAdd({label, undo: () => put(ev.status), redo: () => put(st)}));

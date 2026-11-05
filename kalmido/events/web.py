@@ -13,7 +13,7 @@ from ..tasks.validation import as_int, valid_date
 from ..core.errors import BadInput
 from ..events.model import (
     att_clean, cal_create, cal_fields, cal_member_set, cal_public, cal_touch, cals_for, default_cal, ev_delete, ev_dict,
-    ev_fields, ev_occ_change, ev_ov_tidy, ev_range, ev_store, ev_tell, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
+    ev_fields, ev_lock, ev_occ_change, ev_ov_tidy, ev_range, ev_store, ev_tell, EV_KEYS, EV_PARTSTAT, EV_RANGE_DAYS, EV_TITLE_MAX, need_event, need_evcal,
     wall,
 )
 from ..events.ics import ics_export
@@ -138,6 +138,7 @@ def op_event_new(c, uid, b):
 def op_event_edit(c, uid, eid, b, occ=None):
     send = evi_flag(b)  # 2.111.0 B (#2056)
     r, role = need_event(c, eid, write=True)
+    r = ev_lock(c, eid)  # 2.565.0 (#4703): always under the event's lock, with the row as it is now (not only with expect)
     snap = evi_snap(c, eid)
     if send:
         evi_precheck(c, uid, evi_estimate(c, b, eid))
@@ -185,6 +186,7 @@ def _ev_conflict(c, r, uid):
 
 def op_event_delete(c, uid, eid, occ=None):
     r, role = need_event(c, eid, write=True)
+    r = ev_lock(c, eid)  # 2.565.0 (#4703): as op_event_edit
     snap = evi_snap(c, eid)
     if occ:
         ev_occ_change(c, r, occ, {"delete": True})

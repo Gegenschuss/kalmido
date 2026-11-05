@@ -15,6 +15,7 @@ from flask import request, Response
 from ..core.config import APP_NAME, TZ
 from ..core.i18n import tr
 from ..core.db import bump, IntegrityError, gsetting, iso_ms, now_utc, parse_iso
+from ..core.pg import write_lock  # 2.565.0 (#4703)
 from ..core.access import collab_all
 from ..calendars.caldav import (
     _el, _privs, _xe, A_, C_, CS_, D_, dav_body, dav_common, dav_href, dav_multistatus, dav_principal_href, dav_propfind_req,
@@ -183,12 +184,19 @@ def home_responses(c, u, want, start):
     return out
 
 
-def member_now(c, u, coll, name):
-    """(row, etag, lines, tzs) of a resource, rendered fresh."""
+def member_now(c, u, coll, name, lock=False):
+    """(row, etag, lines, tzs) of a resource, rendered fresh. lock (2.565.0, #4703, as contacts/carddav.py card_now): PUT /
+    DELETE check If-Match and write under the resource name's lock and the event's own lock (the one the app and the API take,
+    events/model.py ev_lock) with the row FOR UPDATE: a device and the app writing at once never both pass with the same state."""
+    if lock and coll["id"] is not None:
+        write_lock(c, f"caldav:{coll['id']}:{name}")
     if coll["id"] is not None:
         r = c.execute("SELECT * FROM events WHERE cal_id=? AND href=? AND deleted_at IS NULL", (coll["id"], name)).fetchone()
     else:
         r = next((x for x in _rows(c, u, coll) if x["href"] == name), None)
+    if r and lock:
+        write_lock(c, f"event-{int(r['id'])}")
+        r = c.execute("SELECT * FROM events WHERE id=? AND deleted_at IS NULL FOR UPDATE", (r["id"],)).fetchone()
     if not r:
         return None
     lines, tzs = ev_lines(c, r)
@@ -357,7 +365,7 @@ def ev_put(c, u, coll, name, pw_row=None):
         raise DavError(e.code, e.text, e.cond) from None
     except (ValueError, TypeError, OverflowError, KeyError, AttributeError):
         raise DavError(400, "The calendar data could not be read", "<C:valid-calendar-data/>") from None
-    have = member_now(c, u, coll, name)
+    have = member_now(c, u, coll, name, lock=True)  # 2.565.0 (#4703)
     inm, im = request.headers.get("If-None-Match", "").strip(), request.headers.get("If-Match", "").strip()
     if have and inm == "*":
         raise DavError(412, "The resource exists already")
@@ -449,7 +457,7 @@ def evdav(m, c, u, pw_row, kind, key, name):
             return ev_rsvp_delete(c, u, coll, name)
         if coll["role"] not in ("owner", "edit"):
             raise DavError(403, "Read only", "<D:need-privileges/>")
-        have = member_now(c, u, coll, name)
+        have = member_now(c, u, coll, name, lock=True)  # 2.565.0 (#4703)
         if not have:
             raise DavError(404, "Not found")
         im = request.headers.get("If-Match", "").strip()

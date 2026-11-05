@@ -75,9 +75,13 @@ async function cg_commit(e, patch, scope) {
     if (r !== ev.rrule) { fwd.rrule = r; back.rrule = ev.rrule; }
   }
   const url = `/api/events/${ev.id}` + (one ? `?occ=${encodeURIComponent(e.occ)}` : '');
-  try { await api('PATCH', url, one ? fwd : {...fwd, expect: ev.updated_at}); } catch { return false; }
+  // 2.565.0 (#4703): every step sends the version it builds on (also "only this date", the undo and the redo): a series another
+  // device changed meanwhile answers 409 (api() says why), the calendar shows the event as it is now, nothing is overwritten
   const re = () => { calInvalidate(); renderView(); };
-  offerUndo(tr('Event changed'), histAdd({label: tr('Times of “{0}”', ev.title || tr('(no title)')), undo: () => api('PATCH', url, back), redo: () => api('PATCH', url, fwd), post: re}));
+  let at = ev.updated_at;
+  const send = b => api('PATCH', url, {...b, expect: at}).then(j => { if (j?.updated_at) at = j.updated_at; return j; }, x => { if (x?.status === 409) re(); throw x; });
+  try { await send(fwd); } catch { return false; }
+  offerUndo(tr('Event changed'), histAdd({label: tr('Times of “{0}”', ev.title || tr('(no title)')), undo: () => send(back), redo: () => send(fwd), post: re}));
   return true;
 }
 
