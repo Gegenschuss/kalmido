@@ -287,9 +287,18 @@ def _base(c, uid, reg, row):
     return "view" if rk == "readonly" else reg["org_access"]
 
 
-def _share_role(c, uid, reg, row):
-    """Step 3b: the role the object's reference node gives through shares (fsref: explicit shares of its chain only)."""
+def _share_role(c, uid, reg, row, pre=None):
+    """Step 3b: the role the object's reference node gives through shares (fsref: explicit shares of its chain only).
+    pre: the nodes, chains and share reads of a whole listing (obj_rows, review F3)."""
     from ..files.fsref import fs_ref_node, fs_ref_node_role
+    if pre is not None:
+        n = pre["nodes"].get(int(row["id"]))
+        if not n:
+            return None
+        sp = None if reg["space"] else (row["org_id"] or None, row["owner_id"])
+        r = fs_ref_node_role(c, uid, n, chain=pre["chains"].get(n["id"]) or [], pre=pre["fs"], sp=sp,
+                             hidden=int(row["id"]) in pre["hidden"] if pre["hidden"] is not None else None)
+        return r if r in ("view", "edit") else None
     n = fs_ref_node(c, reg["kind"], row["id"])
     if not n:
         return None
@@ -309,8 +318,9 @@ def obj_forget():
         g.pop("obj_roles", None)
 
 
-def obj_role(c, uid, kind, rid, row=None):
-    """None | 'view' | 'edit' | 'manage' -- THE role of account uid on the object (module docstring, steps 1-4)."""
+def obj_role(c, uid, kind, rid, row=None, pre=None):
+    """None | 'view' | 'edit' | 'manage' -- THE role of account uid on the object (module docstring, steps 1-4). pre: obj_rows'
+    reads of the whole listing (_rows_pre)."""
     reg = OBJ.get(kind or "")
     if reg is None or not uid:
         return None
@@ -326,7 +336,8 @@ def obj_role(c, uid, kind, rid, row=None):
     out = None
     if row is not None and _gate(c, uid, reg, row):
         base = _base(c, uid, reg, row)
-        share = _share_role(c, uid, reg, row) if base != "manage" else None
+        # review F3: a share gives at most 'edit' -- the chain is read only when the area's own role is below it
+        share = _share_role(c, uid, reg, row, pre=pre) if OBJ_RANK[base] < OBJ_RANK["edit"] else None
         out = base if OBJ_RANK[base] >= OBJ_RANK[share] else share
         if row["deleted_at"] and out != "manage":
             out = None  # step 4: the trash only for who may restore it
@@ -461,11 +472,32 @@ def obj_rows(c, uid, kind, where="", args=(), trash=False, limit=500):
         sql += f" AND ({where})"
     sql += f" ORDER BY o.updated_at DESC, o.id DESC LIMIT {int(limit)}"
     out = []
-    for r in c.execute(sql, tuple(args)).fetchall():
-        role = obj_role(c, uid, kind, r["id"], row=r)
+    rows = c.execute(sql, tuple(args)).fetchall()
+    pre = _rows_pre(c, uid, kind, [r["id"] for r in rows])
+    for r in rows:
+        role = obj_role(c, uid, kind, r["id"], row=r, pre=pre)
         if role and (not trash or role == "manage"):
             out.append((r, role))
     return out
+
+
+def _rows_pre(c, uid, kind, ids):
+    """Review F3: for a listing, the reference nodes of all its objects, their chains and the share reads at once (files/store.py
+    fs_chains + _FsPre, the pattern of fs_roles_many) -- obj_role keeps its rules, only the reads are shared."""
+    from ..files.store import _FsPre, fs_chains
+    nodes = {}
+    ids = sorted({int(i) for i in ids})
+    for k in range(0, len(ids), 500):
+        part = ids[k:k + 500]
+        for n in c.execute(f"SELECT * FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id IN ({_ids(part)})", (kind,)).fetchall():
+            nodes[int(n["ref_id"])] = n
+    from ..files.fsref import FSR
+    chains = fs_chains(c, [n["id"] for n in nodes.values()]) if nodes else {}
+    hidden, hk = None, (FSR.get(kind) or {}).get("hidden")
+    if hk and nodes:  # what the file store's hidden hook of the kind names (fsr_hidden), for the filed ones at once
+        sql = hk(c, uid) or ""
+        hidden = {int(x[0]) for x in c.execute(f"SELECT id FROM {OBJ[kind]['table']} WHERE id IN ({_ids(nodes)}) AND id IN {sql}").fetchall()} if sql else set()
+    return {"nodes": nodes, "chains": chains, "hidden": hidden, "fs": _FsPre({r["id"] for ch in chains.values() for r in ch})}
 
 
 # ---------------------------------------------------------------- shares of an object (rows of fs_shares on its node)
@@ -691,7 +723,8 @@ def obj_public(c, uid, kind, row, role=None):
     out = {k: row[k] for k in ("id", "org_id", "owner_id", "rev", "created_at", "created_by", "updated_at", "updated_by", "deleted_at")}
     for k in reg["fields"]:
         out[k] = row[k]
-    out.update(kind=kind, role=role, title=obj_title(c, kind, row["id"]), open=reg["open_url"](row["id"]))
+    title = obj_title(c, kind, row["id"]) if reg["title"] or "title" not in row.keys() else (row["title"] or "")  # review F3: the row is here
+    out.update(kind=kind, role=role, title=title, open=reg["open_url"](row["id"]))
     return out
 
 

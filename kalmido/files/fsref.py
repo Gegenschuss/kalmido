@@ -150,30 +150,31 @@ def _hidden(c, uid, reg, ref_id):
     return c.execute(f"SELECT 1 WHERE ? IN {sql}", (int(ref_id),)).fetchone() is not None
 
 
-def fs_ref_node_role(c, uid, n, chain=None):
+def fs_ref_node_role(c, uid, n, chain=None, pre=None, sp=None, hidden=None):
     """The role a reference node row n gives uid through its folders (None | 'view' | 'edit'), without the base role.
     2.199.0 F (#2742, review): only the explicit shares of the chain count (person, group, agent; a read-only member at most
     'view') -- not the ownership of an organisation's branch (who made the folder), not organisation access, not the
     accounting role's documents folder, not an agent's result folder. In a private tree its owner (the object is theirs:
-    _same_space) has 'edit'."""
+    _same_space) has 'edit'. pre: the reads of a whole listing at once (files/store.py _FsPre, 2.558.0 #4709 review F3); sp / hidden: the object's workspace and
+    whether the kind's hidden hook names it, when the caller read them already for the listing."""
     reg = FSR.get(n["ref_kind"] or "")
     if reg is None:
         return None
     chain = chain if chain is not None else fs_chain(c, n["id"])
     if not chain or fs_deleted(chain):
         return None
-    sp = reg["space"](c, n["ref_id"])
+    sp = sp if sp is not None else reg["space"](c, n["ref_id"])
     if not sp or not _same_space(sp, n):
         return None
-    if _hidden(c, uid, reg, n["ref_id"]):
+    if hidden if hidden is not None else _hidden(c, uid, reg, n["ref_id"]):
         return None
-    if not fs_role(c, n["id"], uid, chain=chain):
+    if not fs_role(c, n["id"], uid, chain=chain, pre=pre):
         return None  # the organisation boundary, hidden receipts / mails (fs_role)
     org = n["org_id"]
     if not org and n["owner_id"] == uid:
         return "edit"
     agent = acx_of(c, uid).role == "agent"
-    r = _role_of(_shares_role(c, [x["id"] for x in chain], uid, agent))
+    r = _role_of(_shares_role(c, [x["id"] for x in chain], uid, agent, pre=pre))
     if r and org and not agent:
         if org_role_key(c, uid, org) == "readonly":
             r = "view"

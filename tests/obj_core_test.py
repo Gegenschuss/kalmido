@@ -8,6 +8,7 @@ generic routes (core/objweb.py) with the test kind 'objprobe' (KALMIDO_TEST_OBJ=
    only people / agents of the same workspace (409); taken back = gone, restorable (obj_revoked)
  - a folder share of the file store opens an object filed there (one register: fsref)
  - agents: only an explicit share, never another workspace, hidden objects and the data lock give nothing
+ - a listing reads the share chain once (review F3): 12 more objects cost a member or a folder share no statement more
  - the trash: only who manages it sees it (?trash=1), restore, a member gets 404 meanwhile
  - an account deleted: its organisation objects go to the heir (review F1), its private ones go with it
  - obj_revoke_person: leaving takes the shares on the organisation's nodes and the team chat rooms along (coming back as a
@@ -16,6 +17,7 @@ tenant-matrix: obj (another organisation and its agent: 404 on every route of an
 freelancer-matrix: obj (a person without an organisation: her private object, shared with her own agent)
 usage: obj_core_test.py <datadir>"""
 import os
+import re
 import sys
 
 import requests
@@ -126,6 +128,27 @@ check(role(Ca, O1) == 404 and O1 not in ids(Ca) and AG.role(O1) == 404, "in the 
 check(O1 in ids(A, trash=True) and O1 in ids(Bo, trash=True) and O1 not in ids(Ca, trash=True), "the trash list: only who manages it")
 check(Ca.post(B + f"/api/obj/{K}/{O1}/restore").status_code == 404, "a member cannot restore it")
 check(Bo.post(B + f"/api/obj/{K}/{O1}/restore").ok and role(Ca, O1) == "edit", "restored: the member edits again")
+
+# ---------------------------------------------------------------- review F3: a listing reads the share chain once, not per row
+TIMING = re.compile(r'db;dur=[\d.]+;desc="n=(\d+)"')
+
+
+def nstmt(s):
+    r = s.get(B + f"/api/obj/{K}")
+    m = TIMING.search(r.headers.get("Server-Timing", ""))
+    return (int(m.group(1)) if m else -1), len(r.json().get("items") or []) if r.ok else 0
+
+
+n1, c1 = nstmt(Ca)
+a1, d1 = nstmt(Ac)
+for i in range(12):
+    oid = new(A, f"Plan {i}", ORG)["id"]
+    A.post(B + "/api/files/refs", json={"ref_kind": K, "ref_id": oid, "parent_id": fol})
+n2, c2 = nstmt(Ca)
+a2, d2 = nstmt(Ac)
+print(f"PERF obj list: member {n1} -> {n2} statements ({c1} -> {c2} rows), folder share {a1} -> {a2} ({d1} -> {d2} rows)")
+check(n1 > 0 and c2 == c1 + 12 and n2 <= n1 + 2, f"a member's list: 12 more rows, the same statements ({n1} -> {n2})")
+check(a1 > 0 and d2 == d1 + 12 and a2 <= a1 + 2, f"by a folder share: 12 more rows, the same statements ({a1} -> {a2})")
 
 # ---------------------------------------------------------------- another organisation / person: 404 on every route (tenant-matrix: obj)
 OAG = agent(Ol, "otherbot", ORG2)
