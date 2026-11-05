@@ -216,11 +216,27 @@ async function cg_end() {
     if (!await askConfirm(tr('Change every date of this repeating event?'), tr('Single dates of a subscribed calendar cannot be changed here.'), {ok: tr('All dates')})) { st.ghost.remove(); renderView(); return; }
     scope = 'all';
   }
-  st.ghost.classList.add('cgsaving');
-  const ok = await cg_commit(ev, patch, scope).catch(() => false);
+  // 2.559.0 (#4659): the event stands at its new place at once (the shown dates it moves, evOpt in calevents.js) and the stand-in
+  // goes; the request runs behind it, an error puts it back. cg_commit gets a copy with the times from before.
+  const e0 = {...ev};
   st.ghost.remove();
+  let ok = true;
+  try { await evOpt(cg_movePut(e0, patch, scope), async () => { if (!await cg_commit(e0, patch, scope).catch(() => false)) throw new Error('cg'); }); } catch { ok = false; }
+  if (!ok) return;
   calInvalidate(); renderView();
-  if (ok && !ev.own) toast(tr('Event changed'));
+  if (!ev.own) toast(tr('Event changed'));
+}
+// the dates a move / resize changes: one date (a single event, "Only this date") or every shown date of the series, shifted by
+// the same start / end offset (whole days for all-day events, minutes else)
+function cg_movePut(e, patch, scope) {
+  const all = e.recurring && scope !== 'one' || (!e.own && e.dvw_rec);
+  const pick = () => S.cal.items.filter(x => e.own ? x.own && x.eid === e.eid && (all || x.occ === e.occ) : !x.own && (all && e.uid ? x.sub === e.sub && x.uid === e.uid : x.id === e.id));
+  if (e.all_day) {
+    const dS = diffDays(e.start, patch.start), dE = diffDays(e.end, patch.end);
+    return evItemsPut(pick, (x, o) => ({start: addDays(o.start, dS), end: addDays(o.end, dE)}));
+  }
+  const dS = new Date(patch.start) - e.s, dE = new Date(patch.end) - e.e, sh = (v, d) => new Date(+new Date(v) + d).toISOString().replace(/\.\d{3}Z$/, 'Z');
+  return evItemsPut(pick, (x, o) => ({start: sh(o.start, dS), end: sh(o.end, dE)}));
 }
 
 // ---- the block "New event" in the grid (o: {day, s, e} for times, {d0, d1, month} for whole days)

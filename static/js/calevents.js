@@ -31,12 +31,58 @@ const EV_REM_TXT = {'0': N_('At the start'), '5': N_('5 min'), '10': N_('10 min'
 const evRemLabel = (m, allDay) => { if (allDay) { const o = EV_REM_DAY.find(x => x[0] === String(m)); if (o) return tr(o[1]); } return EV_REM_TXT[String(m)] ? tr(EV_REM_TXT[String(m)]) : remLabel(String(m)); };
 const evCalColor = e => cssColor((S.cal.evcals || {})[e.cal]?.color) || cssColor(evCal(e.cal)?.color) || 'var(--accent)';
 const evCalName = e => e.cal == null ? tr('Invitation') : (S.cal.evcals || {})[e.cal]?.name || evCal(e.cal)?.name || tr('Calendar');
+// 2.559.0 (#4659): calendar writes show at once, like optWrite (core.js) for the state: put() changes the shown range (S.cal.items,
+// S.evcals) and returns how to take it back; the request runs behind it (no GET /api/state). While it runs, a range fetched
+// meanwhile (calInvalidate / evsig, then cevApply) and a state fetched meanwhile (core.js OPT) get the change again on top, so it
+// never flickers back. An error (api() said why) puts the old state back and fetches the range again.
+const EV_OPT = new Set();
+if (typeof cevApply === 'function') { const ev_apply0 = cevApply; cevApply = (j, key) => { ev_apply0(j, key); for (const p of EV_OPT) p.put(); }; }  // calendar.js
+async function evOpt(put, req, draw = renderView) {
+  const backs = [], p = {put: () => { const b = put(); if (b) backs.push(b); }};
+  p.put(); EV_OPT.add(p); OPT.add(p); draw();
+  try { return await req(); }
+  catch (e) { EV_OPT.delete(p); OPT.delete(p); for (const b of backs.reverse()) b(); calInvalidate(); draw(); throw e; }
+  finally { EV_OPT.delete(p); OPT.delete(p); }
+}
+// several puts as one (each applied again on its own: one may find its part done already)
+const evPuts = (...ps) => () => { const bs = ps.map(f => f()).filter(Boolean); return bs.length ? () => bs.reverse().forEach(b => b()) : null; };
+// the task panel's events (S.evlinks: task id -> [{id, title, start, all_day}], from the state): event eid prepares task tid
+// with v = {title, start, all_day}; tid / v null = it leaves every task's list
+function evLinkPut(eid, tid, v) {
+  return () => {
+    const L = S.evlinks || (S.evlinks = {}), was = JSON.stringify(L);
+    for (const k of Object.keys(L)) if (L[k].some(e => e.id === eid)) L[k] = L[k].filter(e => e.id !== eid);
+    if (tid && v) (L[tid] = L[tid] || []).push({id: eid, ...v});
+    if (JSON.stringify(L) === was) return null;
+    return () => { S.evlinks = JSON.parse(was); };
+  };
+}
+// the shown occurrences of event eid (all of them, or the one of date occ); a stand-in of a new one has a negative eid (evEditor)
+const evItems = (eid, occ) => S.cal.items.filter(x => x.own && x.eid === eid && (occ == null || x.occ === occ));
+// the put of a change of shown occurrences: pick() = the items, vals(x, o) = their new fields (o = the values before, kept from the
+// first time, so a shift is never applied twice to a range fetched again); an item already changed by this put is left alone
+function evItemsPut(pick, vals) {
+  const tok = {}, old = new Map(), k = x => x.own ? x.eid + '|' + x.occ : 's' + x.id;
+  return () => {
+    let n = 0;
+    for (const x of pick()) {
+      if (x._evo === tok) continue;
+      const o = old.get(k(x)) || {...x}, v = vals(x, o); if (!v) continue;
+      if (!old.has(k(x))) old.set(k(x), Object.fromEntries(Object.keys(v).map(f => [f, x[f]])));
+      Object.assign(x, v); x._evo = tok; cevPrep(x); n++;
+    }
+    return n ? () => { for (const x of pick()) if (x._evo === tok) { Object.assign(x, old.get(k(x)) || {}); delete x._evo; cevPrep(x); } } : null;
+  };
+}
+// a local wall time "YYYY-MM-DDTHH:MM" as the range has it (UTC); all-day: the date as it is
+const evIso = (s, allDay) => allDay ? s.slice(0, 10) : new Date(s.length === 10 ? s + 'T00:00' : s).toISOString().replace(/\.\d{3}Z$/, 'Z');
 
 // ---- the popover of an own event (occurrence e from S.cal.items)
 function evWhen(e) {
   return cevWhen(e.d0 ? e : cevPrep({...e}));
 }
 async function evPop(anchor, e) {
+  if (e.eid < 0) return;  // 2.559.0 (#4659): the stand-in of a new event still on its way (evEditor) has nothing to open yet
   const p = openPop(anchor, `<div class="cevpop evpop" style="--cc:${evCalColor(e)}"><div class="cevh"><i class="cevdot"></i><b>${esc(cevTitle(e))}</b></div><div class="muted">${tr('Loading…')}</div></div>`);
   let ev;
   try { ev = await api('GET', `/api/events/${e.eid}`); } catch { closePop(); return; }
@@ -90,9 +136,23 @@ async function evDelete(ev, occ) {
     if (!r) return;
     mode = r;
   } else if (!await askConfirm(tr('Delete the event “{0}”?', ev.title), '', {ok: tr('Delete'), danger: true})) return;
-  try { await api('DELETE', `/api/events/${ev.id}` + (mode === 'one' ? `?occ=${encodeURIComponent(occ)}` : '')); } catch { return; }
-  calInvalidate(); await load().catch(() => {}); renderView();
-  if (mode === 'all') toast(tr('Event deleted'), async () => { try { await api('POST', `/api/events/${ev.id}/restore`); } catch { return; } calInvalidate(); await load().catch(() => {}); renderView(); });
+  // 2.559.0 (#4659): the event leaves the calendar at once, the request runs behind it (an error brings it back); the undo
+  // of the toast puts its dates back at once as well
+  const gone = [], put = () => {
+    const its = S.cal.items, keep = its.filter(x => !(x.own && x.eid === ev.id && (mode === 'all' || x.occ === occ)));
+    if (keep.length === its.length) return null;
+    for (const x of its) if (!keep.includes(x) && !gone.some(g => g.occ === x.occ)) gone.push(x);
+    S.cal.items = keep; return () => { S.cal.items = its; };
+  };
+  const lk = mode === 'all' ? evLinkPut(ev.id, null, null) : () => null;
+  try { await evOpt(evPuts(put, lk), () => api('DELETE', `/api/events/${ev.id}` + (mode === 'one' ? `?occ=${encodeURIComponent(occ)}` : '')), render); } catch { return; }
+  calInvalidate(); render();
+  const back = () => {
+    const add = gone.filter(g => !S.cal.items.some(x => x.own && x.eid === g.eid && x.occ === g.occ));
+    if (!add.length) return null;
+    const its = S.cal.items; S.cal.items = its.concat(add); return () => { S.cal.items = its.filter(x => !add.includes(x)); };
+  };
+  if (mode === 'all') toast(tr('Event deleted'), async () => { try { await evOpt(back, () => api('POST', `/api/events/${ev.id}/restore`)); } catch { return; } calInvalidate(); renderView(); });
   else toast(tr('This date was removed'));
 }
 function evAskScope(title, ok) {  // a repeating event: only this date or every date
@@ -139,6 +199,45 @@ function evRepKey(rule, start) {
   if (!b) return '';
   for (const [k] of EV_REP) if (k && evRepRule(k, start) === b) return k;
   return 'custom';
+}
+// 2.559.0 (#4659): "Show in my calendar" of an own calendar: c.hidden at once; hidden, its events leave the shown range (shown,
+// they come with the range fetched after the answer)
+function evCalShowPut(id, on) {
+  return () => {
+    const c = evCal(id), its = S.cal.items, keep = on ? its : its.filter(x => !(x.own && x.cal === id));
+    if (!c || (c.hidden === !on && keep.length === its.length)) return null;
+    const h0 = c.hidden; c.hidden = !on; S.cal.items = keep;
+    return () => { const x = evCal(id); if (x) x.hidden = h0; if (S.cal.items === keep) S.cal.items = its; };
+  };
+}
+// 2.559.0 (#4659): the puts of the editor's save (evOpt). A new event: one stand-in (its first date) with a negative eid; left out
+// once the range fetched meanwhile has the real one already
+let EV_TMP = 0;
+function evNewPut(body, natt) {
+  const eid = --EV_TMP, id = 'evtmp' + -eid, start = evIso(body.start, body.all_day), end = evIso(body.end, body.all_day);
+  const put = () => {
+    if (S.cal.items.some(x => x.id === id || (x.own && x.eid > 0 && x.cal === body.cal_id && x.title === body.title && x.start === start))) return null;
+    const x = cevPrep({id, eid, occ: body.start, own: true, cal: body.cal_id, title: body.title, location: body.location, description: body.description,
+      all_day: body.all_day, start, end, recurring: !!body.rrule, changed: false, status: body.status || 'confirmed', role: 'owner', task_id: body.task_id || null, att: natt});
+    S.cal.items = S.cal.items.concat(x);
+    return () => { S.cal.items = S.cal.items.filter(y => y.id !== id); };
+  };
+  const all = evPuts(put, body.task_id ? evLinkPut(eid, body.task_id, {title: body.title, start: body.start, all_day: body.all_day}) : () => null);
+  all.tmp = eid;
+  return all;
+}
+// a changed event: its shown dates take the new title, place, calendar ...; the times only where one date is meant (a single event,
+// "Only this date"): the series' new times come with the range fetched again
+function evSavePut(ev, occ, body) {
+  const one = occ != null || !ev.rrule, lk0 = Object.values(S.evlinks || {}).flat().find(e => e.id === ev.id);
+  const lk = 'task_id' in body ? evLinkPut(ev.id, body.task_id, {title: body.title, start: one || !lk0 ? body.start : lk0.start, all_day: body.all_day}) : () => null;
+  return evPuts(lk, evItemsPut(() => evItems(ev.id, occ), () => {
+    const v = {title: body.title, location: body.location, description: body.description};
+    if (body.cal_id != null) v.cal = body.cal_id;
+    if (body.status) v.status = body.status;
+    if (one) Object.assign(v, {all_day: body.all_day, start: evIso(body.start, body.all_day), end: evIso(body.end, body.all_day)});
+    return v;
+  }));
 }
 async function evEditor(o = {}) {
   const ev = o.ev || null, cals = evWritable().concat(ev && !evWritable().some(c => c.id === ev.cal_id) && evCal(ev.cal_id) ? [evCal(ev.cal_id)] : []);
@@ -268,8 +367,9 @@ async function evEditor(o = {}) {
       }
       if (typeof evi_on === 'function' && evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
       if (dvw_isSub(val('ev-cal'))) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
+      let req;
       if (scope === 'one') {
-        try { await api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, {...body, expect: ev.updated_at}); } catch { return; }  // 2.273.0 C (#3051): like the series
+        req = () => api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, {...body, expect: ev.updated_at});  // 2.273.0 C (#3051): like the series
       } else {
         const rk = val('ev-rep');
         let rule = rk === 'custom' ? rrBase(st.rrule) : rk ? evRepRule(rk, body.start) : '';
@@ -279,14 +379,26 @@ async function evEditor(o = {}) {
           attendees: atts.map(a => a.user_id ? {user_id: a.user_id, partstat: a.partstat || 'needs-action'} : a.contact_id ? {contact_id: a.contact_id, partstat: a.partstat || 'needs-action'} : {email: a.email, name: a.name || '', partstat: a.partstat || 'needs-action'})});
         if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
         if (body.url && !validUrl(body.url)) { toast(tr('The link must start with http:// or https://')); return; }
-        try {
-          if (ev) await api('PATCH', `/api/events/${ev.id}`, {...body, expect: ev.updated_at});
-          else await api('POST', '/api/events', body);
-        } catch { return; }
+        req = () => ev ? api('PATCH', `/api/events/${ev.id}`, {...body, expect: ev.updated_at}) : api('POST', '/api/events', body);
         LS.set('evCal', body.cal_id);
       }
+      // 2.559.0 (#4659): the dialog closes at once and the event stands (a new one as a stand-in with a negative id until the
+      // answer), no GET /api/state; an error puts the calendar back and opens the editor again with what was typed
       md.remove();
-      calInvalidate(); await load().catch(() => {}); render();
+      const put = ev ? evSavePut(ev, scope === 'one' ? o.occ : null, body) : evNewPut(body, atts.length);
+      let j;
+      try { j = await evOpt(put, req, render); } catch {  // nothing typed is lost (a conflict 409 too: api() said why)
+        // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
+        const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
+        evEditor(!ev ? {...o, ...body, attendees: atts} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ}
+          : {ev: {...ev, ...body, cal_id: body.cal_id ?? ev.cal_id, attendees: atts}, occ: o.occ});
+        return;
+      }
+      if (!ev && j?.id) {  // clickable before the range / the state come again
+        for (const x of S.cal.items) if (x.eid === put.tmp) x.eid = j.id;
+        for (const a of Object.values(S.evlinks || {})) for (const x of a) if (x.id === put.tmp) x.id = j.id;
+      }
+      calInvalidate(); render();
       toast(ev ? tr('Event saved') : tr('Event created'));
     }
   });
@@ -376,9 +488,9 @@ async function evCalsModal() {
   const refresh = async () => { await load().catch(() => {}); await cvxCals(true).catch(() => {}); redraw(); };
   md.addEventListener('change', async e => {
     const s = e.target.closest('[data-evcshow]');
-    if (s) {
-      try { await api('PATCH', `/api/evcals/${s.dataset.evcshow}`, {hidden: !s.checked}); } catch { s.checked = !s.checked; return; }
-      const c = evCal(+s.dataset.evcshow); if (c) c.hidden = !s.checked;
+    if (s) {  // 2.559.0 (#4659): switched at once (a hidden calendar's events leave the views), an error switches it back
+      const id = +s.dataset.evcshow, on = s.checked;
+      try { await evOpt(evCalShowPut(id, on), () => api('PATCH', `/api/evcals/${id}`, {hidden: !on}), () => { draw(); renderView(); }); } catch { s.checked = !on; draw(); return; }
       redraw(); return;
     }
     const x = e.target.closest('[data-cvx]'); if (!x) return;

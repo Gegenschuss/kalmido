@@ -42,6 +42,22 @@ async function calPatch(md, id, body) {
   try { await api('PATCH', `/api/calendars/${id}`, body); } catch { await calsDraw(md); return false; }
   await calsDraw(md); return true;
 }
+// 2.559.0 (#4659): "Show" of a subscription switches at once (its row, the count, its events leave the shown range), the request
+// runs behind it (evOpt, calevents.js); an error switches it back. The list is read again in the background afterwards.
+function calVis(md, id, inp) {
+  const on = inp.checked, box = $('#s-cals', md);
+  const put = () => {
+    const x = (box?._j?.subs || []).find(s => s.id === id), y = (S.cvxSubs || []).find(s => s.id === id), its = S.cal.items;
+    const keep = on ? its : its.filter(e => e.own || String(e.sub) !== String(id));
+    if (x?.visible === on && keep.length === its.length) return null;
+    const o1 = x?.visible, o2 = y?.visible, c0 = S.calendars;
+    const cnt = () => { if (box?._j) S.calendars = {...(S.calendars || {}), subs: box._j.subs.filter(s => s.visible).length}; };
+    if (x) x.visible = on; if (y) y.visible = on; cnt(); S.cal.items = keep;
+    box?.querySelector(`[data-cal="${id}"]`)?.classList.toggle('off', !on);
+    return () => { if (x) x.visible = o1; if (y) y.visible = o2; S.calendars = c0; if (S.cal.items === keep) S.cal.items = its; box?.querySelector(`[data-cal="${id}"]`)?.classList.toggle('off', !o1); };
+  };
+  evOpt(put, () => api('PATCH', `/api/calendars/${id}`, {visible: on}), () => {}).then(() => { calInvalidate(); calsDraw(md); }, () => { inp.checked = !on; calsDraw(md); });
+}
 function calColorPop(anchor, colors, cur, fn) {
   const p = openPop(anchor, `<div class="cpal">${colors.map(c => `<button data-c="${c}" style="--cc:${c}" class="${c === cur ? 'on' : ''}" aria-label="${c}"></button>`).join('')}</div>`);
   p.onclick = ev => { const b = ev.target.closest('[data-c]'); if (b) { closePop(); fn(b.dataset.c); } };
@@ -65,7 +81,7 @@ function calsWire(md) {
       try { await calsDraw(md, await api('DELETE', `/api/calendars/${id}`)); toast(tr('Calendar removed')); } catch { /* api() showed it */ }
     }
   });
-  md.addEventListener('change', e => { const i = e.target.closest('[data-calact="vis"]'); if (i) calPatch(md, +i.closest('[data-cal]').dataset.cal, {visible: i.checked}); });
+  md.addEventListener('change', e => { const i = e.target.closest('[data-calact="vis"]'); if (i) calVis(md, +i.closest('[data-cal]').dataset.cal, i); });
   // allowed internal hosts (admins): saved when leaving the field, one history step. 2.380 G (#3389): one field per service
   md.addEventListener('change', async e => {
     const k = e.target.dataset?.allowp; if (!k) return;

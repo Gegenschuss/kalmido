@@ -37,7 +37,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   md.querySelector('#ev-title').value = 'Only this date';
   click(w, md.querySelector('[data-evm="save"]'));
   check(await until(() => /changed meanwhile/i.test(d.querySelector('#toast')?.textContent || '')), 'the 409 hint of the stale copy shows: ' + (d.querySelector('#toast')?.textContent || ''));
-  check(d.querySelector('.modal.evmodal'), 'the editor stays open (nothing lost)');
+  // 2.559.0 (#4659): the editor closes at once on Save and comes back with what was typed when the server refuses
+  check(await until(() => d.querySelector('.modal.evmodal')?.querySelector('#ev-title')?.value === 'Only this date'), 'the editor stays open (nothing lost)');
   const after = await call('GET', `/api/events/${eid}`);
   check(after.title === 'Weekly (renamed elsewhere)' && !(after.overrides || []).some(o => o.rid === occ), 'the date was not changed from the stale copy ' + JSON.stringify(after.overrides || []));
   // a fresh copy saves the date
