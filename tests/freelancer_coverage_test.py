@@ -118,6 +118,9 @@ ROUTES = {
     "POST /oauth/register": "agents", "GET /oauth/authorize": "agents", "POST /oauth/authorize": "agents", "POST /oauth/token": "agents",
     "POST /oauth/revoke": "agents", "GET /mcp": "agents", "POST /mcp": "agents", "DELETE /mcp": "agents",
     "GET /api/my/mcp-grants": "agents", "DELETE /api/my/mcp-grants/{}": "agents",
+    # 2.557.0 B (#4670): the server agent (p2557_b_srvagent_test.py: the person without an organisation sets up her own one)
+    "GET /api/agents/{}/server": "agents", "PUT /api/agents/{}/server": "agents", "GET /api/agents/{}/server/models": "agents",
+    "GET /api/agents/{}/server/runs": "agents",
     # 2.391.0 C (#3362): setting up integrations through /api/v1 (p2391_c_setup_api_test.py as the freelancer; an organisation's webhooks: its admins)
     "GET /api/v1/me/tokens": "own", "POST /api/v1/me/tokens": "own", "DELETE /api/v1/me/tokens/{}": "own",
     "GET /api/v1/me/webhooks": "own", "POST /api/v1/me/webhooks": "own", "PATCH /api/v1/me/webhooks/{}": "own",

@@ -250,6 +250,9 @@ def agent_emit(c, aid, event, data, actor="auto", via=None):
         w = c.execute("SELECT * FROM webhooks WHERE id=? AND enabled=1", (a["webhook_id"],)).fetchone()
         if w:
             wh_queue_raw(c, w, env)
+    if (a["provider"] or "") == "kalmido-server":  # 2.557.0 B (#4670): Kalmido runs the model itself (agents/srvagent.py)
+        from ..agents.srvagent import srv_event
+        srv_event(c, a, event)
     c.execute("""DELETE FROM agent_events WHERE agent_id=? AND (created_at<? OR id<=(SELECT id FROM agent_events WHERE agent_id=?
                  ORDER BY id DESC LIMIT 1 OFFSET ?))""",
               (aid, iso(now_utc() - timedelta(days=AGENT_EVENTS_KEEP_DAYS)), aid, AGENT_EVENTS_KEEP_MAX))

@@ -171,6 +171,8 @@ ORDER = (
     "agents.propkinds2",  # 2.51.0 B (#1351 #1358)
     "agents.setup",  # 2.44.0 (#1517)
     "agents.mcpremote",  # 2.488.0 (#3363): the hosted MCP access (/mcp, OAuth 2.1, after agents.admin)
+    "agents.srvagent",  # 2.557.0 B (#4670): the server agent (settings, provider, routes; after agents.mcpremote)
+    "agents.srvagent_run",  # 2.557.0 B (#4670): its runs (a queue row of the worker)
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)

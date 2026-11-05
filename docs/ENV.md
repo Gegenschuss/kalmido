@@ -292,6 +292,14 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_RELATED_MIX` | `nsum` | Order of the related tasks (how meaning and title similarity are mixed). |
 | `KALMIDO_RELATED_NORM` | `0.84` | Normalisation point of the similarity for that order. |
 | `KALMIDO_RELATED_SEARCH` | `0.82` | Lowest similarity of a meaning search hit. |
+| `KALMIDO_SRVAGENT_ANTHROPIC_URL` | `https://api.anthropic.com` | Base address of the Anthropic API for server agents (the tests point it at a local stand-in). |
+| `KALMIDO_SRVAGENT_CALL_S` | `120` | Seconds one model call of a server agent may take at most. |
+| `KALMIDO_SRVAGENT_MAX_TOKENS` | `4096` | Answer tokens of one model call of a server agent. |
+| `KALMIDO_SRVAGENT_MODELS_S` | `15` | Seconds for the model list of the provider. |
+| `KALMIDO_SRVAGENT_PARALLEL` | `2` | Server agent runs at once on this server (one per agent). |
+| `KALMIDO_SRVAGENT_RUN_S` | `300` | Seconds one server agent run may take at most. |
+| `KALMIDO_SRVAGENT_STEPS` | `25` | Model calls of one server agent run at most. |
+| `KALMIDO_SRVAGENT_TOOLSETS` | `tickets,chat,calendar,wiki,life,office` | Tool packages of mcp/kalmido_mcp.py a server agent gets (within the scopes of its token; chat always). |
 | `KALMIDO_STARTER_BASE` | `https://github.com/Gegenschuss/kalmido/raw/v{version}/mcp/` | Download address of the agent starter files ({version} is replaced). |
 | `KALMIDO_TIDY_QUIET_S` | `120` | Seconds a project must be quiet before its tidy agent is asked. |
 | `KALMIDO_USAGE_DAYS` | `400` | Days the agent usage records are kept. |

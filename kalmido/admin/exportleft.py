@@ -27,6 +27,7 @@ UMZ_BUILD_TABLES = ('budget_cats', 'budget_entries', 'budget_recurring', 'fs_ver
 UMZ_LEFT_TABLES = {
     "agent_audit": _AGENT, "agent_burst_held": _SERVER, "agent_decisions": _AGENT, "agent_jobs": _AGENT, "agent_job_tasks": _AGENT, "job_watch": _AGENT, "agent_list_access": _AGENT, "agent_rules": _AGENT, "agent_usage": _AGENT,
     "agents": _AGENT, "folder_agents": _AGENT, "oauth_codes": _AGENT, "oauth_grants": _AGENT,  # 2.488.0 (#3363): accesses of MCP clients to agents
+    "agent_server": _AGENT, "agent_runs": _AGENT,  # 2.557.0 B (#4670): a server agent's settings (its key sealed) and runs
     "task_offer_links": _DERIVED,  # 2.537.0 C (#3433): where a task came from in a quotation (the budget itself is in its field)
     "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times" (working data until the trash period ends)
     "comment_trash_text": _DERIVED, "tchat_trash_text": _DERIVED,  # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends)

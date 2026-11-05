@@ -127,6 +127,8 @@ TENANT_EXEMPT = {
     "agent_setup_codes": "2.44.0 (#1517): a one-time setup code of one agent, issued by its owner / an instance admin and redeemed without an account (the agent row carries the workspace)",
     "oauth_codes": "2.488.0 (#3363): a one-time authorization code of the hosted MCP access: the person who agreed and the agent they may manage (agents/mcpremote.py mcpr_may; the agent row carries the workspace)",
     "oauth_grants": "2.488.0 (#3363): an access of an MCP client to one agent, given by a person who may manage it (like agent_setup_codes; the agent row carries the workspace, its token goes through /api/v1)",
+    "agent_server": "2.557.0 B (#4670): the settings of one server agent (agent_id = the agent; its row in agents carries the workspace), managed by who may edit the agent; its key is sealed and never served",
+    "agent_runs": "2.557.0 B (#4670): the runs of one server agent (numbers and states only; the agent row carries the workspace, its tool calls go through /api/v1)",
     "task_tags": _TASK, "attachments": _TASK, "comments": _TASK, "activity": _TASK, "task_seen": _TASK, "task_push": _TASK,
     "task_decisions": _TASK, "task_deps": _TASK, "pomos": _TASK, "tidy_pending": _TASK, "task_people": _TASK, "task_watchers": _TASK, "comment_reactions": "per comment -> its task",
     "habits": _OWN, "pl_conns": _OWN + " (Paperless connection, unused since 2.36.0, kept)",
