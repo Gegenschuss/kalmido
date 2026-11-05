@@ -24,6 +24,7 @@ from ..core.orgcrypt import oc_dec_col, oc_dec_fields, oc_enc_fields, oc_item_st
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.db import body, bump, db, iso, now_utc
 from ..core.access import Denied, vis_sql
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .pdf import pdf_date
 from .calc import dec, dstr, money
@@ -327,7 +328,7 @@ def _item_public(c, oid, r, docs):
     return {"id": d["id"], "trip_id": d["trip_id"], "date": d["date"], "category": d["category"], "amount": d["amount"], "currency": d["currency"],
             "fx_rate": format(dec(d["fx_rate"]).normalize(), "f") if d.get("fx_rate") is not None else None, "amount_home": d["amount_home"], "text": d["text"],
             "datev": d["datev"], "datev_no": d["datev_no"], "billed": bd, "billed_at": d.get("billed_at") if bd else None,
-            "vat_pct": d.get("vat_pct")}  # 2.545.0 (#4387)
+            "vat_pct": d.get("vat_pct"), "updated_at": d.get("updated_at") or ""}  # 2.545.0 (#4387); 2.560.0 D (#4700): the version the dialog sends back
 
 
 def _docs_map(c, oid):
@@ -356,7 +357,7 @@ def rk_trip_public(c, oid, t, items, docs=None):
             "km": dstr(dec(d["km"])) if d.get("km") is not None else None, "note": d.get("note") or "", "items": its,
             "total": dstr(money(total)), "missing": sum(1 for x in its if not x["datev"]), "unbilled": sum(1 for x in its if not x["billed"]),
             "country": vf["country"], "place": vf["place"], "t_start": vf["t_start"], "t_end": vf["t_end"], "vma_days": vf["vma_days"],
-            "vma_off": vf["vma_off"], "vma": vma}
+            "vma_off": vf["vma_off"], "vma": vma, "updated_at": d.get("updated_at") or ""}  # 2.560.0 D (#4700): the version the dialog sends back
 
 
 def rk_trips(c, oid, year=None, trip_id=None):
@@ -506,10 +507,12 @@ def rk_trip_post():
 @app.patch("/api/office/trips/<int:tid>")
 def rk_trip_patch(tid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_trips-{int(tid)}")  # 2.560.0 D (#4700): a second save with the same base waits, then sees the first
     t = oc_dec_fields(c, oid, "office_trips", _trip(c, oid, tid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, t["updated_at"], "row", lambda: _one(c, oid, tid))  # saved elsewhere meanwhile: 409 with the trip, never overwritten
     row = rk_trip_clean(c, oid, uid, b, t)
     if row:
         _trip_need_open(c, oid, t, row.get("date_from"), row.get("date_to"))  # 2.148.0 A (#2471)
@@ -581,10 +584,12 @@ def _rk_val(v):
 @app.patch("/api/office/trips/<int:tid>/items/<int:iid>")
 def rk_item_patch(tid, iid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_trip_items-{int(iid)}")  # 2.560.0 D (#4700)
     cur = oc_dec_fields(c, oid, "office_trip_items", _item(c, oid, tid, iid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur["updated_at"], "row", lambda: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))  # 409 with the receipt
     row = rk_item_clean(c, oid, b, cur, home=rk_home_cur(c, oid))
     # 2.152.0 (#2168, review B-M1): a locked receipt (in DATEV / billed on a finalised document) keeps its tick, amount
     # and date; text, DATEV number and category stay editable

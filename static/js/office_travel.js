@@ -264,13 +264,13 @@ function rk_tripModal(t) {
       if (t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
           country: t.country, place: t.place, t_start: t.t_start, t_end: t.t_end, vma_days: t.vma_days, vma_off: t.vma_off};  // 2.95.0 A (#1932)
-        await api('PATCH', `/api/office/trips/${t.id}`, body); md.remove(); rk_reload();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}`, old); rk_reload(); });
+        const now = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)); md.remove(); rk_reload();  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409, never overwritten
+        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}`, ofcVerUndo(old, body, now)); rk_reload(); });  // only the keys this save changed
       } else {
         const j = await api('POST', '/api/office/trips', body); md.remove(); RK.open = j.id; rk_reload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_tripModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
   return md;
 }
@@ -312,13 +312,13 @@ function rk_itemModal(t, i) {
       if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'), true);
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no, vat_pct: i.vat_pct ?? null};  // 2.545.0 (#4387): + VAT rate
-        await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, body); md.remove(); rk_reload();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, old); rk_reload(); });
+        const now = (await (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i))).items?.find(x => x.id === i.id); md.remove(); rk_reload();  // 2.560.0 D (#4700)
+        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerUndo(old, body, now)); rk_reload(); });  // only the keys this save changed
       } else {
         const j = await api('POST', `/api/office/trips/${t.id}/items`, body); md.remove(); rk_reload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${t.id}/items/${j.item_id}`); rk_reload(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_itemModal(t, row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
   return md;
 }
@@ -642,3 +642,22 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rki="pick"]'); if (!b) return;
   e.preventDefault(); rk_impPick();
 });
+
+// 2.560.0 D (#4700): the version check of the office dialogs that save a whole form (trips, receipts, logbook, cash book,
+// credit cards, entertainment): the body carries the updated_at the dialog was opened with (saved elsewhere meanwhile -> 409
+// with the current row under "row", never overwritten), the undo writes back only the keys this save changed, with the new
+// version. Without a version (an old row) the save goes as before.
+function ofcVerBody(body, r) { return r?.updated_at ? {...body, expect_updated_at: r.updated_at} : body; }
+function ofcVerUndo(old, body, now) {
+  const b = {};
+  for (const k of Object.keys(old)) if (k in body && JSON.stringify(old[k] ?? null) !== JSON.stringify(body[k] ?? null)) b[k] = old[k];
+  return ofcVerBody(b, now);
+}
+// a 409 of such a save: the dialog's error line says so with "Reload" (reopen: the dialog with the saved state); -> handled
+function ofcVerConflict(md, x, reopen) {
+  if (x?.status !== 409 || !x.data?.row) return false;
+  const el = $('.aerr', md); if (!el) { toast(tr('Changed in the meantime')); return true; }
+  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ofc-reload>${tr('Reload')}</button>`;
+  $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); reopen(x.data.row); });
+  return true;
+}
