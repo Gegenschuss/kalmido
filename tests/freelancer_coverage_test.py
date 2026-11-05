@@ -263,7 +263,7 @@ ROUTES = {
     "POST /api/agent-setup/redeem": "auth", "POST /api/agent-setup/remove": "auth", "POST /api/auth/2fa": "auth",
     "POST /api/auth/2fa/passkey": "auth", "POST /api/auth/2fa/passkey/options": "auth", "POST /api/auth/enrol/passkey": "auth",
     "POST /api/auth/enrol/passkey/options": "auth", "POST /api/auth/enrol/totp": "auth",
-    "POST /api/auth/enrol/totp/confirm": "auth", "POST /api/auth/forgot": "auth", "POST /api/auth/invite/accept": "auth",
+    "POST /api/auth/enrol/totp/confirm": "auth", "POST /api/auth/forgot": "auth", "POST /api/auth/delete-cancel": "auth", "POST /api/auth/invite/accept": "auth",
     "POST /api/auth/invite/check": "auth", "POST /api/auth/link": "auth", "POST /api/auth/login": "auth",
     "POST /api/auth/logout": "auth", "POST /api/auth/passkey": "auth", "POST /api/auth/passkey/options": "auth",
     "POST /api/stepup/passkey": "auth",  # 2.223.2 C (#2871): the passkey challenge of the step-up (stepup_need)
@@ -609,7 +609,7 @@ ROUTES = {
     "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
     "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
     "DELETE /api/me/wait-suggestions": "own", "DELETE /api/me/webhooks/{}": "own", "DELETE /api/push/subs/{}": "own",
-    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/export/file": "own", "POST /api/account/export/file": "own",
+    "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/delete": "own", "POST /api/account/delete": "own", "GET /api/account/export/file": "own", "POST /api/account/export/file": "own",
     "GET /api/account/import": "own", "GET /api/account/import/{}": "own", "GET /api/me": "own",
     "GET /api/me/app-passwords": "own", "GET /api/me/mail": "own", "GET /api/me/share/httpshortcuts.zip": "own",
     "GET /api/me/storage": "own", "GET /api/me/tokens": "own", "GET /api/me/wait-suggestions": "own",

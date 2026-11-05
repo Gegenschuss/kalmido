@@ -631,6 +631,7 @@ async function authScreen(j) {
       try {
         const r = await fetch(setup ? '/api/auth/setup' : '/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)});
         const res = await r.json().catch(() => ({}));
+        if (!r.ok && res.deleting) { lg_delScreen(el, logo, {username: body.username, password: body.password, at: res.delete_at}); return; }  // 2.553.0 (#1413)
         if (!r.ok) { errEl.textContent = res.error || httpErrText(r.status); return; }
         if (setup) { await setupChoices(el, logo); return; }
         if (res.twofa) { await authTwofa(el, logo, res.methods || ['totp']); return; }
@@ -638,6 +639,8 @@ async function authScreen(j) {
         location.replace(afterLogin());
       } catch { errEl.textContent = tr('Server not reachable.'); }
     });
+    const dc = (location.hash.match(/delete-cancel=([\w.-]+)/) || [])[1];  // 2.553.0 (#1413): the link of the mail
+    if (dc) { history.replaceState(null, '', location.pathname); lg_delScreen(el, logo, {token: dc}); }
   }
   document.body.appendChild(el);
   $('#app')?.setAttribute('inert', '');  // 2.13.0 (#453 P7): nothing behind the login (the hidden "New task" button) gets the focus
@@ -830,6 +833,23 @@ document.addEventListener('change', async e => {
 });
 // the form "Create account" on the login page (#711)
 // 2.49.0 (#1531): "Forgot your password?": e-mail address or user name -> a one-time link by mail (the answer is always the same)
+// 2.553.0 (#1413): an account whose deletion was asked for: the sign-in (right password) or the mail's link offers only
+// "Cancel the deletion" (POST /api/auth/delete-cancel, admin/selfdelete.py); afterwards the ordinary sign-in
+function lg_delScreen(el, logo, o) {
+  el.innerHTML = `<div class="card">${logo}
+    <h2 class="invh">${tr('Your account will be deleted')}</h2>
+    <p role="status">${esc(o.at ? tr('Your account will be deleted for good on {0}. It is locked until then.', fmtDate(String(o.at).slice(0, 10))) : tr('Cancel the deletion of your account? It can be used again afterwards.'))}</p>
+    <div class="aerr" role="alert" id="dc-err"></div>
+    <button class="btn pri" type="button" data-dc="go">${tr('Cancel the deletion')}</button>
+    <button class="linkbtn" type="button" data-au="back">${tr('Back to the sign-in')}</button></div>`;
+  $('[data-dc="go"]', el).addEventListener('click', async e => {
+    const b = e.currentTarget; b.disabled = true;
+    try {
+      await authPost('/api/auth/delete-cancel', o.token ? {token: o.token} : {username: o.username, password: o.password});
+      $('.card', el).innerHTML = `${logo}<h2 class="invh">${tr('The deletion was cancelled')}</h2><p role="status">${tr('Your account can be used again. Please sign in.')}</p><button class="btn pri" type="button" data-au="back">${tr('To the sign-in')}</button>`;
+    } catch (x) { $('#dc-err', el).textContent = x.message; b.disabled = false; }
+  });
+}
 function lg_forgotScreen(el, logo, pre = '') {
   el.innerHTML = `<div class="card">${logo}
     <h2 class="invh">${tr('Forgot your password?')}</h2>

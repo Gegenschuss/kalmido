@@ -272,6 +272,9 @@ def rx_gate(c, sub, along=True, how=None):
         return None, (N_("{0} deleted {1}: its legal retention period was over."), "expired")
     if how is None:
         how = request.args.get("retention") or ""
+        how = "" if how == "requested" else how  # 2.553.0 (#1413): never from a request (below: only the background run passes it)
+    if how == "requested":  # 2.553.0 (#1413): the person's own deletion: the export / waiver passed this gate when it was asked for
+        return None, (N_("{0} deleted {1}: the retention step was done when the deletion was asked for."), "exported")
     if how == "waived":
         rx_log(c, sub, "waiver", {"counts": counts})
         return None, (N_("{0} deleted {1} without the retention export (waived explicitly)."), "waiver")

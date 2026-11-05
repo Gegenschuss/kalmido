@@ -73,6 +73,13 @@ Deleted accounts: an admin deletes an account with its sessions, devices, tokens
 Comments and messages the person wrote in shared projects and chats stay with their text, without the name. Say this
 in your statement.
 
+A person can also delete their own account (Settings > Account > Delete account, GDPR Art. 17): confirmed with the
+password (and the app code when one is set), the account is locked at once and deleted for good after 7 days. Meanwhile
+projects they share stay usable for the others; for each own project they chose before whether it goes to a member or is
+deleted along. A mail with a cancel link goes out at once and a reminder one day before; signing in with the password
+also offers only "Cancel the deletion". The last admin of an organisation and the only server admin cannot delete
+themselves until somebody else holds the role.
+
 So that a restored backup does not bring a deleted account back, Kalmido notes each deleted account as salted hashes
 (no readable name or address) and deletes it again after a restore. The note goes with the log clean-up once no backup
 on the server can still hold the account. A copy kept outside the server (a downloaded backup, an off-site target that

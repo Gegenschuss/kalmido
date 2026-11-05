@@ -441,6 +441,7 @@ ORDER = (
     "admin.exportleft", "admin.oilock", "admin.orgexport",  # 2.42.0 (#833): organisation export (encrypted archive); #4300: oilock
     "admin.retexport",  # 2.146.0 D (#2468): the retention export before deleting an account / organisation
     "admin.purgeshare",  # 2.508.0 (#4301): what an account shares privately passes on when it is deleted (no routes)
+    "admin.selfdelete",  # 2.553.0 (#1413): a person deletes their own account (7 days locked, then the watchdog deletes it)
     "admin.acctexport",  # 2.73.0 B (#1473): account export (moving between servers, GDPR copy)
     "admin.acctimport",  # 2.73.0 B (#1473): account import with the mapping of people
     "admin.wkimport",  # 2.177.0 (#2685): large ZIP imports of knowledge pages in pieces, unpacked in the background with progress

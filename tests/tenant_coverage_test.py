@@ -1018,6 +1018,7 @@ ROUTES = {
     "GET /agent-setup.sh": "public", "GET /agent-setup.ps1": "public",
     # 2.49.0 (#1531, #1199, #1201): Forgot your password?, knowledge pages, outline import
     "POST /api/auth/forgot": "auth", "POST /api/outline/parse": "pure",
+    "POST /api/auth/delete-cancel": "auth", "GET /api/account/delete": "own", "POST /api/account/delete": "own",  # 2.553.0 (#1413)
     # 2.89.0 C (#1916): tables as files and for agents
     "GET /api/sheets/{}/export.csv": "sheet_v1", "GET /api/sheets/{}/export.xlsx": "sheet_v1", "POST /api/sheets/import": "sheet_v1",
     "GET /api/v1/wiki/pages": "wiki_v1", "GET /api/v1/wiki/pages/{}": "wiki_v1",  # 2.200.0 C (#1781)

@@ -174,6 +174,11 @@ def auth_login():
     if not ok and u and pw_ok and u["password_hash"] and u["disabled"] and u["signup"] == "pending":
         # 2.23.0 (#711): the right password of a registration that waits for an admin (says nothing to anyone else)
         return err(tr("Your account waits for an admin to approve it."), 403)
+    if not ok and u and pw_ok and u["password_hash"] and u["disabled"] and u["delete_at"]:
+        # 2.553.0 (#1413): the right password of an account whose deletion was asked for: it offers only the cancelling
+        # (admin/selfdelete.py, POST /api/auth/delete-cancel); the account stays locked
+        return jsonify(error=tr("The deletion of this account was asked for. Cancel the deletion to use it again."),
+                       deleting=True, delete_at=u["delete_at"]), 403
     if not ok:
         # admin alerts: only real usernames are named (a typo in the name field could be a password)
         for k in _rate_fail(keys):
