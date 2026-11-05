@@ -161,6 +161,11 @@ back = dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, ui
 check(r.ok and len(back) == 1 and back[0][0] == "guest", f"gina comes back as a guest ({r.status_code} {r.text[:160]})")
 Gi = sess("gina")
 check(role(Gi, O2) == 404 and O2 not in ids(Gi), "coming back revives no old share")
+r = A.get(B + f"/api/obj/{K}/{O2}/shares")
+GR = [x["id"] for x in (r.json().get("revoked") or []) if x.get("user_id") == uid["gina"] and x.get("reason") == "leave"] if r.ok else []
+check(len(GR) == 1, f"review F2: the share taken on leaving shows on the object, restorable ({r.status_code} {r.text[:200]})")
+r = A.post(B + f"/api/obj/{K}/{O2}/shares/{GR[0] if GR else 0}/restore")
+check(r.ok and role(Gi, O2) == "view", f"... and the admin gives it back ({r.status_code} {r.text[:160]})")
 check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['bob']}").ok, "bob (the owner of O1) leaves")
 check(dbx("SELECT owner_id FROM obj_probe WHERE id=?", (O1,))[0][0] == ALICE and role(A, O1) == "manage" and role(Bo, O1) == 404,
       "his organisation object goes to the heir (the admin who removed him)")

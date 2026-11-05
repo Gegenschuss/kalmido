@@ -610,9 +610,15 @@ def obj_shares(c, uid, kind, rid):
 def _take(c, src, sql, args, reason, by, org, who_col, kind=None):
     """Moves the rows of src matching sql into obj_revoked and deletes them. Returns their number."""
     rows = c.execute(f"SELECT * FROM {src} WHERE {sql}", args).fetchall()
+    refs = {}
+    if src == "fs_shares" and rows:  # review F2: a share on a core object's reference node keeps kind / ref_id (obj_shares, restore)
+        q = ",".join("?" * len({r["node_id"] for r in rows}))
+        refs = {x[0]: (x[1], x[2]) for x in c.execute(f"SELECT id, ref_kind, ref_id FROM fs_nodes WHERE kind='ref' AND id IN ({q})",
+                                                      tuple({r["node_id"] for r in rows})).fetchall() if x[1] in OBJ}
     for r in rows:
         who = (r[who_col] or (r["agent_id"] if "agent_id" in r.keys() else None)) if who_col else None
-        _revoked_add(c, src, r, reason, by, org=org, uid=who, kind=kind)
+        rk, ri = refs.get(r["node_id"], (kind, None)) if refs else (kind, None)
+        _revoked_add(c, src, r, reason, by, org=org, uid=who, kind=rk, ref_id=ri)
     if rows:
         c.execute(f"DELETE FROM {src} WHERE {sql}", args)
     return len(rows)
