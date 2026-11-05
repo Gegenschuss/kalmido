@@ -643,6 +643,7 @@ def _inproc_cls(mod):
             super().__init__("http://kalmido.invalid", token, timeout=mod.WAIT_MAX + 30)
             self.me_cache = {"at": 0.0, "v": None}  # per call of /mcp, never shared between tokens
             self.ip, self.base_url = ip, base_url
+            self.environ_extra = {}  # 2.557.0 (#4670, review): a WSGI key no network request can set (headers become HTTP_*)
             self.deadline = deadline or (time.time() + MCPR_RUN_S)
 
         def call(self, method, path, query=None, body=None, timeout=None, multipart=None, binary_cap=None):
@@ -670,7 +671,7 @@ def _inproc_cls(mod):
             u = urllib.parse.urlsplit(req.full_url)
             hdrs = {k: v for k, v in req.header_items() if k.lower() not in ("host", "content-length")}
             r = app.test_client().open(u.path, query_string=u.query, method=req.get_method(), headers=hdrs, data=req.data,
-                                       base_url=self.base_url, environ_base={"REMOTE_ADDR": self.ip})
+                                       base_url=self.base_url, environ_base={"REMOTE_ADDR": self.ip, **self.environ_extra})
             try:
                 if binary_cap and r.status_code < 400:
                     return self._file(r, binary_cap)

@@ -77,12 +77,12 @@ def srv_kick(aid, delay=0.0):
     if has_request_context():
         g.setdefault("srv_kick", set()).add(aid)
         return
-    _add(aid, max(delay, 2.0))  # a caller outside a request commits right after agent_emit
+    _add(aid, max(delay, 2.0), again=1)  # a caller outside a request commits right after agent_emit (review: one look later too)
 
 
-def _add(aid, delay=0.0):
+def _add(aid, delay=0.0, again=0):
     try:
-        bgj_add("srvagent:run", aid, user_id=aid, once=True, delay=delay)
+        bgj_add("srvagent:run", aid, again, user_id=aid, once=True, delay=delay)
     except Exception as e:  # noqa: BLE001 -- the event stays in the queue; the next one starts the run
         print("server agent", aid, "not queued:", type(e).__name__, flush=True)
 
@@ -99,6 +99,9 @@ def srv_abort(c, aid):
     """Stop: the running run of agent aid ends at its next look (at most about a second later). The caller commits."""
     with system_ctx(c):  # the agent's own run row (the abort route checked who may stop it)
         c.execute("UPDATE agent_runs SET abort_at=? WHERE agent_id=? AND state='run' AND abort_at IS NULL", (iso(now_utc()), aid))
+        # review 2.557.0: Stop also before the queued run took its place - what was asked until now is not done
+        c.execute("""UPDATE agent_server SET cursor=GREATEST(cursor, (SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?))
+                     WHERE agent_id=?""", (aid, aid))
 
 
 class _Stop(Exception):
@@ -111,14 +114,18 @@ class _Stop(Exception):
 # ---------------------------------------------------------------- one run
 
 @bgj_fn("srvagent:run", tries=1, gate=False, long=True)
-def srv_run_job(aid):
-    """The queue row: a place, then the run; afterwards the next run when more events came meanwhile."""
+def srv_run_job(aid, again=0):
+    """The queue row: a place, then the run; afterwards the next run when more events came meanwhile. again = a kick from outside
+    a request (review 2.557.0): its caller may not have committed the event yet, so nothing found = one more look later."""
     c = connect()
     try:
         got = _claim(c, aid)
     finally:
         c.close()
     if got == "busy":
+        _add(aid, SRV_BUSY_S)
+        return
+    if got is None and again:
         _add(aid, SRV_BUSY_S)
         return
     if not isinstance(got, tuple):
@@ -180,13 +187,21 @@ def _claim(c, aid, probe=False):
     return rid, ev["event"]
 
 
+def _api(mod, tok, deadline):
+    """The in-process client of a run (review 2.557.0): marked in the WSGI environ, so v1.py lets this token's own run pass its
+    owner's address rule (the run is on this server); the same token from anywhere else meets the rule as usual."""
+    api = _inproc_cls(mod)(tok, "127.0.0.1", PUBLIC_URL.rstrip("/") + "/", deadline)
+    api.environ_extra = {"kalmido.inproc": "srvagent"}
+    return api
+
+
 def _token(aid):
-    """A token of the agent for this run only (its scopes, projects and lists; no address rule: the run is on this server)."""
+    """A token of the agent for this run only (its scopes, projects, lists and address rule; the run itself passes it through _api)."""
     c = connect()
     try:
         with system_ctx(c):
             tok = agent_token_new(c, aid, name=SRV_TOKEN_NAME)
-            c.execute("UPDATE api_tokens SET expires_at=?, allowed_ips='' WHERE token_hash=?",
+            c.execute("UPDATE api_tokens SET expires_at=? WHERE token_hash=?",  # review: the address rule stays (see _api)
                       (iso(now_utc() + timedelta(seconds=SRV_RUN_S + SRV_CALL_S + 60)), _token_hash(tok)))
         c.commit()
         return tok
@@ -246,7 +261,7 @@ def _run(aid, rid):
         if why:  # before the events are read: they wait for the end of the pause
             raise _Stop("paused", why)
         deadline = time.time() + SRV_RUN_S
-        api = _inproc_cls(mod)(tok, "127.0.0.1", PUBLIC_URL.rstrip("/") + "/", deadline)
+        api = _api(mod, tok, deadline)
         evs = api.call("GET", "/agent/events", {"since": cursor, "limit": SRV_EVENTS})
         data = evs.get("data") or []
         new_cursor = int(evs.get("cursor") or cursor)
@@ -281,7 +296,7 @@ def _run(aid, rid):
 
 
 def _finish(aid, rid, tok, state, text, asker, lang):
-    api = _inproc_cls(mcpr_module())(tok, "127.0.0.1", PUBLIC_URL.rstrip("/") + "/", time.time() + 30) if tok else None
+    api = _api(mcpr_module(), tok, time.time() + 30) if tok else None
     if api is not None:
         try:
             held = state != "paused" and _db(lambda c: c.execute("SELECT status FROM agents WHERE user_id=?", (aid,)).fetchone()[0]) == "paused"
@@ -334,7 +349,7 @@ def _tools(mod, api):
     for t in ((r or {}).get("result") or {}).get("tools") or []:
         n = t.get("name")
         ts = mod.TOOLSET_OF.get(n)
-        if n in SRV_SKIP_TOOLS or (ts is not None and ts not in SRV_TOOLSETS and ts != "chat"):
+        if n in SRV_SKIP_TOOLS or ts is None or (ts not in SRV_TOOLSETS and ts != "chat"):  # review 2.557.0: no toolset = not offered
             continue
         out.append({"name": n, "description": (t.get("description") or "")[:4000], "input_schema": t.get("inputSchema") or {"type": "object"}})
         names.add(n)

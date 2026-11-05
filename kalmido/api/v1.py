@@ -57,6 +57,7 @@ from ..collab.replies import with_replies  # 2.369.5 (#2517): pulled up from fun
 from ..personal.timetrack import n43_admin_lists  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import instance_mode, visible_people  # 2.369.5 (#2517): pulled up from functions
 from ..lists.formula import fx_fill  # 2.369.5 (#2517): pulled up from functions
+SRV_TOKEN_NAME = "Server agent run"  # 2.557.0 (#4670): = agents/srvagent_run.py SRV_TOKEN_NAME (no import: api below agents)
 
 
 # ---------------------------------------------------------------- package B: REST API with personal access tokens
@@ -180,7 +181,10 @@ def api_authenticate():
         refused = usage_refused(c, u["id"])
         if refused is not None:
             return refused
-    if not g.get("approved_job") and not token_ip_ok(row, client_ip()):  # 2.15.0 (#479): optional address restriction (checked when an approved request was stored)
+    # 2.557.0 (#4670, review): a server agent's run token keeps the owner's address rule; only its own run in this process
+    # (environ key set by agents/srvagent_run.py, never by a network request) is on the server itself
+    srv_inproc = request.environ.get("kalmido.inproc") == "srvagent" and str(row["name"] or "") == SRV_TOKEN_NAME
+    if not g.get("approved_job") and not srv_inproc and not token_ip_ok(row, client_ip()):  # 2.15.0 (#479): optional address restriction (checked when an approved request was stored)
         return v1_err(403, tr("This token may not be used from this address"))
     scopes = scopes_effective(c, row, u)
     need = v1_scope_need(request.method, request.url_rule)

@@ -13,6 +13,7 @@ tenant-matrix: agent (another person neither reads nor changes it; its tool call
  - rights: a task of a project not shared with the agent comes back as an error from the tool, its title never reaches the model
  - a mention starts a run that comments through add_comment
  - Stop (POST /api/agents/<id>/abort) ends a slow run at once (state aborted, "Stopped." in the chat)
+ - review 2.557.0: the run token keeps the owner's address rule; models 403 while switched off; Stop before the run started drops the request
  - the hard usage limit pauses the agent with its reason (no model call); after the limit is lifted the next event runs
  - the instance switch server_agents_off: PUT 403, no run
  - a key the provider refuses: the run fails with a neutral text, the key (repeated by the provider) is in no answer and no log
@@ -209,6 +210,18 @@ after, _ = chat("Back again")
 check(agent_says(after, "FAKE answer"), "after the limit the next event runs and answers")
 check(until(lambda: dbx("SELECT status FROM agents WHERE user_id=?", (AID,)) == [("idle",)], 15), "the pause ended by itself")
 
+# ---------------------------------------------------------------- review 2.557.0: the owner's address rule stays on the run token
+r = call(Fr, "patch", f"/api/my/agents/{AID}", json={"allowed_ips": "10.9.9.9"})
+check(r.ok, f"the owner restricts the agent to one address {r.status_code} {r.text[:160]}")
+after, _ = chat("From the server FAKE_SLOW")
+check(until(lambda: last_run() and last_run()[1] == "run", 20), "the run under the address rule is running")
+ips = until(lambda: dbx("SELECT allowed_ips FROM api_tokens WHERE user_id=? AND name='Server agent run'", (AID,)), 10)
+check(ips and ips[0][0] == "10.9.9.9", f"the run token keeps the owner's address rule {ips}")
+check(call(Fr, "post", f"/api/agents/{AID}/abort", json={}).ok, "Stop the slow run")
+run = until(lambda: (last_run() if last_run() and last_run()[1] != "run" else None), 15)
+check(run and run[1] == "aborted", f"the run itself passed the rule from the server (else its events call fails) {run}")
+check(call(Fr, "patch", f"/api/my/agents/{AID}", json={"allowed_ips": ""}).ok, "the address rule lifted")
+
 # ---------------------------------------------------------------- the instance switch
 dbx("INSERT INTO settings(key, value) VALUES('server_agents_off', '1') ON CONFLICT(key) DO UPDATE SET value='1'")
 r = call(Fr, "put", f"/api/agents/{AID}/server", json={"model": "claude-haiku-5-5"})
@@ -220,7 +233,15 @@ chat("While off")
 check(until(lambda: dbx("SELECT 1 FROM bg_jobs WHERE kind='srvagent:run' AND id>? AND state IN ('done', 'failed')", (bg0,)), 20),
       "the queue row ran")
 check((last_run() or [0])[0] == rid0, "but no run while the switch is on")
+r = call(Fr, "get", f"/api/agents/{AID}/server/models")  # review 2.557.0: no provider call with the key while off
+check(r.status_code == 403 and r.json().get("error") == "server_agents_off", f"switch on: models 403 ({r.status_code})")
+chat("Queued walrus FAKE_QUEUED")  # review 2.557.0: Stop before the run took its place - it is not done afterwards
+check(call(Fr, "post", f"/api/agents/{AID}/abort", json={}).ok, "Stop while the request waits")
 dbx("DELETE FROM settings WHERE key='server_agents_off'")
+n0 = len(plog())
+after, _ = chat("After the switch")
+check(agent_says(after, "FAKE answer"), "the next request runs")
+check(not any("FAKE_QUEUED" in json.dumps(x) for x in plog()[n0:]), "the stopped request never reached the model")
 
 # ---------------------------------------------------------------- a key the provider refuses
 r = call(Fr, "put", f"/api/agents/{AID}/server", json={"api_key": KEY_BAD})

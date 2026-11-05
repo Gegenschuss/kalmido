@@ -224,8 +224,11 @@ def srv_need(c, aid):
     if a["org_id"] and is_org_admin(c, uid, a["org_id"]):
         return a
     if g.user["is_admin"]:
-        with system_ctx(c):
-            return need_agent_admin(c, aid, cred=True)
+        try:
+            with system_ctx(c):
+                return need_agent_admin(c, aid, cred=True)
+        except Denied:  # review 2.557.0: a support access learns nothing about the agent either (404, not 403)
+            raise Denied(404) from None
     raise Denied(404)
 
 
@@ -341,6 +344,8 @@ def srv_pick_default(ms):
 def srv_models_get(aid):
     c = db()
     srv_need(c, aid)
+    if srv_off(c):  # review 2.557.0: switched off = no call to the provider with the owner's key either
+        return jsonify(error="server_agents_off", message=tr("Server agents are switched off on this server")), 403
     try:
         ms = srv_models(c, aid)
     except ProviderError as e:
