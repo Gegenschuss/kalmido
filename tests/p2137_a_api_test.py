@@ -16,6 +16,7 @@ usage: p2137_a_api_test.py <datadir>"""
 # tenant-matrix: own
 import base64
 import os
+import re
 import struct
 import subprocess
 import sys
@@ -362,6 +363,17 @@ check(dbx("SELECT COUNT(*) AS n FROM office_docs WHERE org_id=? AND number=?", (
 check(dbx("SELECT COUNT(*) AS n FROM clients WHERE org_id=? AND name='Kunde Beispiel'", (ORG3,))[0]["n"] == 1, "its private client came along")
 check(not dbx("SELECT 1 FROM lists WHERE name='Frida Privatliste' AND owner_id!=?", (FID,)), "no private list came along")
 check(Do.get(B + f"{O}/logo").content == LOGO_SRC, "the logo came along")
+# 2.547.0 (#4295): the next invoice of the target continues the imported number range (never a number twice, no gap)
+CL3 = dbx("SELECT id FROM clients WHERE org_id=? AND name='Kunde Beispiel'", (ORG3,))
+r = Do.post(B + D, json={"kind": "invoice", "client_id": CL3[0]["id"] if CL3 else 0, "service_from": "2026-06-01",
+                         "items": [{"title": "Nachdreh", "qty": 1, "rate": 200}]})
+check(r.status_code == 201, f"#4295: a new invoice after the import {r.status_code} {r.text[:160]}")
+r = Do.post(B + f"{D}/{r.json().get('id')}/finalize")
+NEXT_NO = r.json().get("number") if r.ok else ""
+m_old, m_new = re.fullmatch(r"(.*?)(\d+)", str(INV_NO or "")), re.fullmatch(r"(.*?)(\d+)", str(NEXT_NO or ""))
+check(r.ok and m_old and m_new and m_new.group(1) == m_old.group(1) and int(m_new.group(2)) == int(m_old.group(2)) + 1
+      and len(m_new.group(2)) == len(m_old.group(2)), f"#4295: the next number follows the imported one {INV_NO} -> {NEXT_NO} {r.text[:160]}")
+check(dbx("SELECT COUNT(*) AS n FROM office_docs WHERE org_id=? AND number=?", (ORG3, NEXT_NO))[0]["n"] == 1, "#4295: ... once")
 
 if FAILS:  # the container log once (was in the suite's own check(), 2.206.0 #2762)
     logs()

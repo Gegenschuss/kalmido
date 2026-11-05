@@ -561,5 +561,41 @@ check(Da.post(B + f"/api/imports/{j['result'].get('import_id')}/undo").ok and no
       "undo after the stop")
 A.patch(B + f"/api/users/{DAVE}", json={"storage_quota_mb": None})
 
+# 2.547.0 (#4295): a run that breaks off at its end (recording it is refused by a test trigger) leaves nothing behind:
+# no list, no task, no attachment row, no file on disk, no import to undo
+
+
+def disk_files():
+    out = set()
+    for root, _dirs, fs in os.walk(os.path.join(DATA, "attachments")):
+        out |= {os.path.join(root, f) for f in fs}
+    return out
+
+
+az = mkzip({"lists": [{"id": 1, "name": "Abbruch Test", "created_at": ts}],
+            "tasks": [{"id": 1, "list_id": 1, "title": "Abbruch Aufgabe", "created_at": ts, "updated_at": ts}],
+            "attachments": [{"id": 1, "task_id": 1, "name": "a.txt", "file": "files/attachments/1-a.txt", "created_at": ts}]},
+           files={"files/attachments/1-a.txt": b"Abbruch Inhalt"}, man={"source": {"url": "https://abbruch.example.com", "hosted": True}})
+files0, imps0 = disk_files(), dbx("SELECT COUNT(*) AS n FROM imports WHERE user_id=?", (DAVE,))[0]["n"]
+dbx(f"CREATE OR REPLACE FUNCTION p4295_fail() RETURNS trigger AS $$ BEGIN IF NEW.user_id = {int(DAVE)} THEN "
+    "RAISE EXCEPTION 'p4295 test'; END IF; RETURN NEW; END $$ LANGUAGE plpgsql")
+dbx("CREATE TRIGGER p4295_fail BEFORE INSERT ON imports FOR EACH ROW EXECUTE FUNCTION p4295_fail()")
+try:
+    iid = upload(Da, az)
+    j = wait(Da, iid)
+    check(j.get("state") == "preview", f"#4295 setup: the file opens {j.get('state')} {j.get('error')}")
+    j = run(Da, iid) if j.get("state") == "preview" else j
+finally:
+    dbx("DROP TRIGGER IF EXISTS p4295_fail ON imports")
+    dbx("DROP FUNCTION IF EXISTS p4295_fail()")
+check(j.get("state") == "failed", f"#4295: the broken-off run says failed {j.get('state')} {j.get('error')}")
+check(not dbx("SELECT 1 FROM lists WHERE owner_id=? AND name='Abbruch Test'", (DAVE,))
+      and not dbx("SELECT 1 FROM tasks WHERE title='Abbruch Aufgabe'") and not dbx("SELECT 1 FROM attachments WHERE name='a.txt' AND user_id=?", (DAVE,)),
+      "#4295: no list, task or attachment of the broken-off run")
+check(dbx("SELECT COUNT(*) AS n FROM imports WHERE user_id=?", (DAVE,))[0]["n"] == imps0, "#4295: no import recorded")
+left = disk_files() - files0
+check(not left, f"#4295: no file of the broken-off run stays on disk {sorted(left)[:5]}")
+Da.delete(B + f"/api/account/import/{iid}")
+
 print(f"p273_b_api: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

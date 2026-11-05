@@ -407,6 +407,64 @@ ok(A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo"), 
 iid, st = plain(A, doctor({"files/pictures/../evil.png": good}))
 check(st.get("state") == "invalid", f"#3849: a path trick in a name is refused as a whole {st.get('state')}")
 
+# ---------------------------------------------------------------- 2.547.0 (#4295): a doctored office part, undo in a locked month
+# the Org archive is a plain ZIP anyone can upload: ids in its office part that point at rows of another organisation (ORG3, the
+# first import) are never taken over; a month locked in the target after the import keeps the import (undo 409, nothing removed)
+F_CL = one("SELECT id FROM clients WHERE org_id=? ORDER BY id LIMIT 1", (ORG3,))
+F_DOC = one("SELECT id FROM office_docs WHERE org_id=? ORDER BY id LIMIT 1", (ORG3,))
+F_LIST = NL
+with zipfile.ZipFile(ZIP) as z:
+    names = set(z.namelist())
+    docs = json.loads(z.read("office/documents.json"))
+    items = json.loads(z.read("office/document_items.json")) if "office/document_items.json" in names else []
+    pays = json.loads(z.read("office/payments.json")) if "office/payments.json" in names else []
+    f_cl = {x.get("id") for x in json.loads(z.read("clients.json"))}
+    f_li = {x.get("id") for x in json.loads(z.read("lists.json"))}
+f_doc = {x.get("id") for x in docs}  # per kind: an id is mapped only within its own kind
+check(F_CL and F_DOC and F_CL not in f_cl and F_DOC not in f_doc and F_LIST not in f_li,
+      f"#4295 setup: foreign ids that are not in the file {F_CL} {F_DOC} {F_LIST} / {f_cl} {f_doc} {f_li}")
+draft = next((x for x in docs if x.get("project_title") == "Entwurf"), None)
+check(draft is not None, "#4295 setup: the draft is in the file")
+for x in docs:
+    x.update(client_id=F_CL, list_id=F_LIST, contract_id=F_DOC, cancels_id=F_DOC, replaces_id=F_DOC, ref_doc_ids=json.dumps([F_DOC]))
+if draft is not None:
+    draft["date"] = "2026-02-10"  # a finished month that the target locks after the import
+for x in items:
+    x.update(service_id=F_DOC, list_id=F_LIST)
+pays.append({"id": 987654321, "doc_id": F_DOC, "amount": "99.00", "date": "2026-10-01", "method": "transfer"})
+F_PAYS = one("SELECT COUNT(*) FROM office_payments WHERE doc_id=?", (F_DOC,))
+put = {"office/documents.json": json.dumps(docs).encode(), "office/payments.json": json.dumps(pays).encode()}
+if items:
+    put["office/document_items.json"] = json.dumps(items).encode()
+ORG7 = new_org("Eta Leer")
+iid, st = plain(A, doctor(put))
+check(st.get("state") == "preview", f"#4295: the doctored office part opens {st.get('state')} {st.get('error')}")
+j = run(A, iid, ORG7)
+IMP7 = (j.get("result") or {}).get("import_id")
+d7 = [dict(x) for x in dbx("SELECT id, client_id, list_id, contract_id, cancels_id, replaces_id, ref_doc_ids, date FROM office_docs "
+                           "WHERE org_id=?", (ORG7,))]
+own_cl = {x["id"] for x in dbx("SELECT id FROM clients WHERE org_id=?", (ORG7,))}
+own_docs = {x["id"] for x in d7}
+check(len(d7) == len(docs), f"#4295: the documents of the file came along {len(d7)} of {len(docs)}")
+check(all(x["client_id"] is None or x["client_id"] in own_cl for x in d7) and not [x for x in d7 if x["client_id"] == F_CL],
+      f"#4295: a client id of another organisation becomes None {d7}")
+check(all(x["list_id"] is None and x["contract_id"] is None and x["cancels_id"] is None and x["replaces_id"] is None for x in d7),
+      f"#4295: list / contract / cancelled / replaced document of another organisation: None {d7}")
+check(all(not set(json.loads(x["ref_doc_ids"] or "[]")) - own_docs for x in d7), f"#4295: no reference to a document of another organisation {d7}")
+if items:
+    it7 = dbx(f"SELECT service_id, list_id FROM office_doc_items WHERE doc_id IN ({','.join(str(int(i)) for i in own_docs) or '0'})")
+    check(it7 and all(x["service_id"] is None and x["list_id"] is None for x in it7), f"#4295: positions keep no foreign service / list {[dict(x) for x in it7]}")
+check(one("SELECT COUNT(*) FROM office_payments WHERE doc_id=?", (F_DOC,)) == F_PAYS
+      and not dbx("SELECT 1 FROM office_payments WHERE org_id=? AND amount='99.00'", (ORG7,)),
+      "#4295: a payment for a document of another organisation is not taken over")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG7}"})
+r = A.post(B + f"{O}/periods/lock", json={"through": "2026-02", "confirm": "02/2026"})
+check(r.ok and "2026-02" in (r.json().get("locked") or []), f"#4295 setup: February 2026 locked in the target {r.status_code} {r.text[:160]}")
+before7 = counts(ORG7)
+r = A.post(B + f"/api/imports/{IMP7}/undo")
+check(r.status_code == 409, f"#4295: undo with a document in a month locked since: 409 ({r.status_code} {r.text[:160]})")
+check(counts(ORG7) == before7 and before7["office_docs"], f"#4295: nothing removed {before7} {counts(ORG7)}")
+
 if FAILS:  # the container log once
     ct = os.environ.get("KALMIDO_TEST_CONTAINER", "kalmido-test")
     print(subprocess.run(["docker", "logs", "--tail", "60", ct], stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

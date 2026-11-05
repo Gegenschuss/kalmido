@@ -206,6 +206,12 @@ iid = r.json()["id"]
 check(last is not None and last.ok and last.json().get("state") == "upload", "#2685: an upload half way")
 r = Bo.delete(f"{U}/{iid}")
 check(r.ok and Bo.get(f"{U}/{iid}").status_code == 404, f"#2685: cancel removes the upload {r.status_code}")
+# 2.547.0 (#4295): a cancelled upload leaves nothing: no folder (nor its ".gone" step) on disk, no page of it
+BOB_DIR = os.path.join(DATA, "exports", "wiki-import", str(Bo.get(B + "/api/state").json()["me"]["id"]))
+check(not [d for d in (os.listdir(BOB_DIR) if os.path.isdir(BOB_DIR) else []) if d.startswith(iid)],
+      f"#4295: the cancelled upload's folder is gone {os.listdir(BOB_DIR) if os.path.isdir(BOB_DIR) else []}")
+check(len([p for p in Bo.get(B + "/api/wiki", params={"space": SP}).json()["pages"] if p["path"].startswith("Handbuecher/")]) == 0,
+      "#4295: no page of the cancelled upload")
 r = Bo.post(B + "/api/wiki/import", params={"space": SP}, files={"file": ("k.zip", small_zip("Alt"), "application/zip")})
 check(r.ok and len(r.json().get("created", [])) == 1 and r.json().get("files_n") == 1, "#2685: the single POST still imports small ZIPs " + r.text[:200])
 
