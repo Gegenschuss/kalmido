@@ -14,6 +14,51 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.551.0] - 2026-11-05
+
+Package 2.543 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI: semgrep und ZAP werden bei neuen Funden rot).
+### Added
+- Tables on touch (#4611): while writing a formula a tap on a cell inserts its address and a finger drawn over cells inserts a range (A2:B3); the field keeps focus and the keyboard stays open. Every reference has its own colour (blue, red, green, purple, orange, ...): the frame on the grid and the underlined reference text in the cell and the formula bar match, also in dark mode.
+- Formula suggestions on touch (#4611): a tap on a suggestion (SUMME, WENN ...) inserts it with the cursor in the bracket, the keyboard stays open, the list sits above the keyboard, entries are at least 44 px high and the short help is visible in the row.
+- Team and office under "All workspaces" (#4606): Workload, Absences and Disposition show one card per workspace instead of a picker; a tap opens it with its own address (#workload/s/<workspace>), "All workspaces /" leads back. The office shows the same overview; a tap switches to that workspace (own office address follows in #4638).
+### Changed
+- Table cells on touch are 2rem high like on a computer (was 2.75rem) (#4611).
+- Office lists on phones (#4473): the amount with "net"/"gross" small behind it in one line, the status ("Draft", "paid") as a label in the meta line; a row is only title plus meta line high.
+- CI (#4625): semgrep and the OWASP ZAP baseline are no longer informational - they fail on new findings only. Known, reviewed findings stand in tools/semgrep_baseline.json and .zap/rules.tsv with reason and date (SECURITY.md "Scanner exception lists"); a broken scan is red, never green.
+### Fixed
+- Encrypted lists (#4632): a change to a task right after a key change (a member left) was refused as an edit conflict and lost; it is saved now, a real conflict from another device is still reported.
+
+Package 2.551 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main allein: p151_ui, Rot auf main allein: p2331_b_lcperf).
+### Added
+- Notes: a right click (computer) or a long press (phone) on a note card in a project's notes or in All notes opens that note's menu - on the phone the sheet at the bottom with the note's title: Open, Pin / Unpin, Copy link, Move to project…, Delete (with Undo). The click that ends the press does not open the note (#4607)
+- Favourites bar: drag a tile well below the bar (about one and a half tiles) and it is crossed out (a red X over its icon), the bar says "Release to remove"; letting go there removes it, the toast offers Undo and puts it back in its place. Back into the bar = normal moving again; hold and let go without moving still opens the menu. Mouse and touch (#4615)
+- Tests: new UI tests address buttons and menu items by a `data-act` anchor named after the i18n key (`untilAct` in tests/boot.js, `act` in tests/ff.js; rule in CONTRIBUTING.md) (#4599)
+### Changed
+- The agency project type no longer brings an empty "Budget h" field (every task has its own budget); existing fields stay, an offer that creates tasks still adds it when needed (#3906)
+- A task value the server refuses while online (e.g. text in a number field) is said as a toast again and the typed value stays in the field; a server error (500) waits in the outbox and is sent again, the connection dot shows "waiting" (#4649, #4654)
+### Fixed
+- Saving a task text again after a lost answer no longer shows a conflict with your own earlier save (#4646)
+- A task that gets a repeat, or a changed repeat, shows its ghosts in the calendar without reloading (#4650)
+- Dragging a timeline bar earlier says again that the waiting tasks stay where they are (#4653)
+- Renaming an organisation refuses a name another active organisation has (a retired one's name is free) (#4635)
+- A list moved into a folder without the question takes the folder's time tracking (#4640)
+- Exports and the contacts import count as busy when the database cannot be asked, instead of as free (#4643)
+- User docs follow the code: holiday countries, groups under People, the Kalmido figure (#4494)
+- Tests wait for the outbox instead of a fixed time (#4651)
+
+Package 2.545 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Travel expenses for members (#4592): a member of an organisation without an office group (legacy access) now has the level "own" in Office > Travel expenses: they enter, change and delete their own trips and receipts and see only those in the list, the report and the per diem report. Settling, the DATEV tick, purposes, import, CSV / per diem files, trash and logbook stay with the office admins; admins still see all trips.
+- Legal retention with a buffer (#4595): the legal periods (receipts and invoices 8 years, books 10, logbook 8, business letters 6) are kept one year longer by default; the operator sets the buffer with `KALMIDO_RETENTION_BUFFER_YEARS` (never below the law), shown under Settings > Organisation > Data > Deletion runs.
+- Extend the lock (#4595): Office settings > Data has the switch *Extend the lock* for an open tax audit; while it is on, nothing kept by law is deleted, also after the period (receipts, file versions, archive run, sign-offs, deleting the organisation or the account with that personal office). Switching it on and off is in the office log.
+- Reverse charge on incoming receipts (#4387): a receipt can be marked "EU service (section 13b (1))" or "other section 13b cases"; the VAT return shows the key figures 46/47, 84/85 and the input tax 67 (BMF form USt 1 A 2026). The DATEV batch books them net without a tax key; the check before the download names them.
+- Paid reminder fees (#4387): a fee marked paid counts in the income statement (not taxable), the cash flow and the key figures; the 40 euro flat fee is credited against the reminder fee (section 288 (5) sentence 3 BGB). Fees marked paid before this version count on the reminder's date, so earlier years can show them now.
+- Final invoice with a negative rest (#4387): the refund to the customer is booked on the final invoice ("Book refund"), the state follows; a negative credit note up to the rest cancels it.
+- Travel receipts with input tax (#4387): a travel receipt can carry a VAT rate; it then counts net plus input tax (key figure 66), also in the bookings export and DATEV.
+### Fixed
+- The live poll no longer fetches the whole state a second time while a load is already on its way; it waits for it and catches up at most once (#4483).
+- The menu path check covers README.md again; examples/README.md names today's menu (#4384).
+
 ## [2.549.0] - 2026-11-05
 
 Package 2.531 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main a).
@@ -1404,7 +1449,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.549.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.551.0...HEAD
+[2.551.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.551.0
 [2.549.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.549.0
 [2.546.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.546.0
 [2.544.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.544.0
