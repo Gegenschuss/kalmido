@@ -21,6 +21,7 @@ from .letters import lt_book_ids, lt_jl, lt_lang, lt_public, lt_ctx, lt_row, lt_
 from ..core.pages import new_inbox_task  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import my_inbox, need_task  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707)
 
 LTL_KINDS = ("answers", "reply")  # answers = the letter answers the document; reply = the document answers the letter
 
@@ -441,6 +442,10 @@ def ltl_ctx():
     return lt_ctx()
 
 
+LTL_TRASH = "letter_link"  # 2.567.0 (#4707): kind of a removed letter link in the office trash
+OTB_UNDO[LTL_TRASH] = ltl_ctx  # the toast's undo: the rights of the letters, as removing it
+
+
 def ltl_kind(v):
     if v not in LTL_KINDS:
         raise BadInput(tr("Invalid value: {0}", "kind"))
@@ -480,19 +485,22 @@ def ltl_links_post(lid):
 
 @app.delete("/api/office/letters/<int:lid>/links/<int:nid>")
 def ltl_links_del(lid, nid):
-    """Removes the link (?kind=answers|reply; without: both). Undo = POST it again."""
+    """Removes the link (?kind=answers|reply; without: both). 2.567.0 (#4707): into the office trash first, one entry for
+    the links it removes (trash_id: the undo POST /api/office/trash/undo/letter_link/<id> writes them back)."""
     c, uid, oid = ltl_ctx()
     d = lt_row(c, oid, lid)
     kind = request.args.get("kind") or ""
     if kind:
         ltl_kind(kind)
-    n = c.execute("DELETE FROM office_letter_links WHERE letter_id=? AND org_id=? AND node_id=?" + (" AND kind=?" if kind else ""),
-                  (d["id"], oid, nid, *((kind,) if kind else ()))).rowcount
-    if not n:
+    ids = [r[0] for r in c.execute("SELECT id FROM office_letter_links WHERE letter_id=? AND org_id=? AND node_id=?" + (" AND kind=?" if kind else "") + " ORDER BY id",
+                                   (d["id"], oid, nid, *((kind,) if kind else ()))).fetchall()]
+    if not ids:
         raise Denied(404)
+    tid = otb_put(c, oid, uid, LTL_TRASH, "office_letter_links", ids, d.get("letter_date") or "")  # label: the letter's date (its subject is sealed)
+    c.execute("DELETE FROM office_letter_links WHERE id = ANY(CAST(? AS BIGINT[])) AND org_id=?", (ids, oid))
     bump(c)
     c.commit()
-    return jsonify(ok=True, links=ltl_links_of(c, oid, d["id"]), followup=ltl_followup(c, oid, d))
+    return jsonify(ok=True, links=ltl_links_of(c, oid, d["id"]), followup=ltl_followup(c, oid, d), trash_id=tid)
 
 
 @app.get("/api/office/letters/<int:lid>/thread")

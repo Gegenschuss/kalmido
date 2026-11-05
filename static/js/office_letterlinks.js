@@ -78,9 +78,10 @@ async function ltkUnlink(nid, kind) {
   const x = await api('DELETE', `/api/office/letters/${lid}/links/${nid}?kind=${kind}`).catch(() => null); if (!x) return;
   ltkSet(x);
   const msg = tr('Document unlinked');
+  let tid = x.trash_id || null;  // 2.567.0 (#4707): the undo writes the office trash copy back
   histToast(msg, histAdd({label: msg,
-    undo: async () => { const y = await api('POST', `/api/office/letters/${lid}/links`, {node_id: nid, kind}); if (LTK.id === lid) ltkSet(y); return {}; },
-    redo: async () => { const y = await api('DELETE', `/api/office/letters/${lid}/links/${nid}?kind=${kind}`); if (LTK.id === lid) ltkSet(y); return {}; }}));
+    undo: async () => { if (tid) await api('POST', `/api/office/trash/undo/letter_link/${tid}`); const y = tid ? await api('GET', `/api/office/letters/${lid}/links`) : await api('POST', `/api/office/letters/${lid}/links`, {node_id: nid, kind}); if (LTK.id === lid) ltkSet(y); return {}; },
+    redo: async () => { const y = await api('DELETE', `/api/office/letters/${lid}/links/${nid}?kind=${kind}`); tid = y.trash_id || null; if (LTK.id === lid) ltkSet(y); return {}; }}));
 }
 function ltkReloadLetter() { if (typeof ltReload === 'function') ltReload(); }
 function ltkRefField() { return $('[name="ref_line"]') || $('[data-ltf="ref_line"]') || $('#lt-ref_line'); }
