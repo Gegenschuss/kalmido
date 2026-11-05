@@ -576,6 +576,8 @@ def list_update(lid):
             list_own_mark(c, lid, "time_tracking")
         if vals.get("life") in ("health", "budget", "reading") or (vals.get("life") == "travel" and c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]):  # 2.22.0 (#663): a health list is never shared with an agent (2.72.0: a budget; 2.173.0 A, #2680: an organisation's trip; 2.172.1, #2689: read later)
             c.execute("DELETE FROM list_members WHERE list_id=? AND user_id IN (SELECT id FROM users WHERE kind='agent')", (lid,))
+            from ..lists.lffolder import lf_own_stale
+            lf_own_stale(c, lid)  # 2.568.0 (#4739, review F1): the agent's own row of the core goes with it (restorable)
         # 2.22.0 (#747): a list that becomes a shopping list gets no shop areas by itself any more ("Add shop areas")
         if "rate" in b:  # hourly rate for the time reports (None / '' = none)
             try:

@@ -627,6 +627,14 @@ def lf_expire_tick(c):
                     f"""SELECT DISTINCT m.list_id FROM list_members m JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind='list' AND n.ref_id=m.list_id
                         JOIN fs_shares s ON s.node_id=n.id AND s.list_own=1 AND COALESCE(s.user_id, s.agent_id)=m.user_id
                         WHERE m.own_role IS NOT NULL AND s.expires_at IS NOT NULL AND s.expires_at <= ? AND m.list_id IN ({q})""", (now,))}
+        # 2.568.0 (#4739, review F1): the core's own member rows follow list_members on every way a role ends (not only grp_sync)
+        stale = [r[0] for r in c.execute("""SELECT DISTINCT n.ref_id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+                                             WHERE n.kind='ref' AND n.ref_kind=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m
+                                             WHERE m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
+                                          (LF_KIND,)).fetchall()]
+    for lid in stale:
+        if lid not in lids:
+            lf_own_stale(c, lid)
     lf_resync(c, lids, actor=0)
     if lids:
         bump(c)  # 2.352.0 F (#2748, review N1): the clients drop the lists at once

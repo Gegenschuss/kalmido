@@ -12,6 +12,11 @@
    share still reaches a guest
  - one agent per project stays the area's rule (409 for a second one), the core's row is the agent's
  - PATCH /api/lists/<id> columns / kpis / props: an entry with before / after in the history (GET /api/lists/<id>/history)
+ - 2.568.0 A2 (review F1-F7): the agent's / organisation agent's / a role's row goes on every way a role ends (health,
+   ol_private, the watchdog); an expired row is 'expired' and comes back without its expiry; restore only turns the
+   project's own rows into memberships (a file store row stays one, a group's own row 409); a participant gets 403 on the
+   history; the own rows add nothing in the file store; coming back names who shared; restore as a list admin, after a new
+   share (409, the row goes), for a disabled account; an agent's token on the new routes
 tenant-matrix: list (another organisation's admin: 404 on the shares, the restore and the history of a project)
 freelancer-matrix: lists (a person without an organisation: her private project shared by e-mail, removed, restored, history)
 usage: p2568_a_lists_core_test.py <datadir>"""
@@ -217,5 +222,64 @@ check(Fr.patch(B + f"/api/lists/{PL}", json={"columns": ["due"]}).ok and len(Fr.
       "her project's history")
 check(Fi.get(B + f"/api/lists/{PL}/shares").status_code == 403 and A.get(B + f"/api/lists/{PL}/shares").status_code == 404,
       "fiona (an editor) does not manage the shares, the instance admin does not see them")
+
+
+# ---------------------------------------------------------------- 2.568.0 A2 (#4739): the review's findings (F1-F7)
+import json  # noqa: E402
+
+
+def pyx(code):
+    """Runs code in the app's container (an app context, the system's row rules) -> (exit code, output)."""
+    p = subprocess.run(["docker", "exec", "-w", "/app", "-e", "TASKS_WATCHDOG=0", CT, "python", "-c",
+                        "import app\nfrom kalmido.core.config import app as fa\nfrom kalmido.core.db import connect\n"
+                        "from kalmido.core.pg import system_ctx\nc = connect()\nwith fa.app_context(), system_ctx(c):\n"
+                        + "".join("    " + x + "\n" for x in code.strip().splitlines()) + "c.commit()\n"],
+                       capture_output=True, text=True)
+    return p.returncode, (p.stdout + p.stderr)[-400:]
+
+
+def revoked_of(lid, who_id):
+    """[(id, reason, by_id, row)] of the core's rows taken from who_id on project lid, newest first."""
+    return [(r[0], r[1], r[2], json.loads(r[3])) for r in
+            dbx("SELECT id, reason, by_id, row_json FROM obj_revoked WHERE src='fs_shares' AND kind='list' AND ref_id=? AND user_id=? ORDER BY id DESC",
+                (lid, who_id))]
+
+
+def node_of(lid):
+    r = dbx("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind='list' AND ref_id=?", (lid,))
+    return r[0][0] if r else None
+
+
+for u in ("erik", "fynn"):
+    r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": u, "display_name": u.title(),
+                                       "password": "password123", "email": f"{u}@example.com"})
+    check(r.ok, f"setup: {u} " + r.text[:200])
+    uid[u] = r.json().get("id")
+    S[u] = sess(u)
+    S[u].patch(B + "/api/settings", json={"tour": "done", "lang": "en", "features": "collab,files,comments,fields"})
+
+# F1: the ways a role ends besides the members dialog take the core's row too
+FB = Fr.post(B + "/api/my/agents", json={"username": "frhealth", "display_name": "Health bot", "scopes": ["read"]})
+check(FB.ok, "setup: frida's own agent " + FB.text[:160])
+FB = FB.json().get("id")
+FH = new_list(Fr, "Frida check-ups", org=None)
+r = Fr.put(B + f"/api/lists/{FH}/agent", json={"agent_id": FB})
+check(r.ok and core_row(FH, FB) is not None, "F1: frida's agent on her project: the core's row " + r.text[:160])
+r = Fr.patch(B + f"/api/lists/{FH}", json={"life": "health"})
+check(r.ok and core_row(FH, FB) is None and [x[1] for x in revoked_of(FH, FB)] == ["unshare"],
+      f"F1: a health project: the agent leaves and its core row goes (restorable) {core_row(FH, FB)} {revoked_of(FH, FB)} " + r.text[:120])
+L7 = new_list(A, "Moving out")
+r = A.put(B + f"/api/lists/{L7}/agent", json={"agent_id": AG[0]})
+check(r.ok and core_row(L7, AG[0]) is not None, "F1: setup: the organisation agent on a project " + r.text[:160])
+# ol_private as org_leave calls it for a brought-in project (an organisation agent not of the person leaves)
+rc, out = pyx(f"from kalmido.accounts.orgs import ol_private\nol_private(c, {L7}, {uid['dora']})")
+check(rc == 0 and core_row(L7, AG[0]) is None and dbx("SELECT 1 FROM list_members WHERE list_id=? AND user_id=?", (L7, AG[0])) == [],
+      f"F1: the project leaves the organisation: the organisation agent's core row goes with it {core_row(L7, AG[0])} {out}")
+# a role ended on a way nobody told the core about: the watchdog round catches it
+check(core_row(L3, uid["gina"]) is not None, "F1: gina's own row on the crew board")
+dbx("DELETE FROM list_members WHERE list_id=? AND user_id=?", (L3, uid["gina"]))
+rc, out = watchdog_round()
+check(rc == 0 and core_row(L3, uid["gina"]) is None and revoked_of(L3, uid["gina"])[:1] and revoked_of(L3, uid["gina"])[0][1] == "unshare",
+      f"F1: the watchdog round takes a core row without its list_members row {out}")
 
 sys.exit(done("p2568_a_lists_core"))

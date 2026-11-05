@@ -202,7 +202,12 @@ def kid_balance(c, kid):
 def kid_force_participant(c, kid):
     """A kid takes part in shared lists only as a participant (sees only what is assigned to it or where it comes along)."""
     # 2.64.1 (#1817): lists encrypted in the browser have no participants: a kid leaves them (the members trigger drops its keys)
+    gone = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)",
+                                    (kid,)).fetchall()]
     c.execute("DELETE FROM list_members WHERE user_id=? AND list_id IN (SELECT id FROM lists WHERE e2e IS NOT NULL)", (kid,))
+    from ..lists.lffolder import lf_own_stale
+    for lid in gone:  # 2.568.0 (#4739, review F1): the kid's own row of the core goes with it (restorable)
+        lf_own_stale(c, lid)
     c.execute("""UPDATE list_members SET role='participant',
                  own_role=CASE WHEN own_role IS NULL THEN NULL ELSE 'participant' END,
                  grole=CASE WHEN grole IS NULL THEN NULL ELSE 'participant' END,
