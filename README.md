@@ -19,10 +19,11 @@
 
 ## What's new
 
-**2.551.0** (2026-11-05):
-- **Office**: members record their own trips in travel expenses; reverse charge receipts, paid reminder fees, refunds on final invoices, travel receipts with input tax.
-- **Notes and favourites**: note cards have a menu on right click / long press; favourite tiles can be dragged out of the bar to remove them.
-- **Self-hosting**: `KALMIDO_RETENTION_BUFFER_YEARS` (default 1) and the office switch *Extend the lock*.
+**2.560.0** (2026-11-05):
+- **Agents**: server agents run on the Kalmido server with your own API key (#4670); the data lock also covers Calendar and Contacts.
+- **Knowledge**: one editor on CodeMirror 6, Markdown marks only at the cursor (#4052).
+- **Wide screens**: tile grids and list and detail side by side (#4552, #4553).
+- **For everyone**: a "New for you" dialog after updates (switch in Settings > Help).
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
