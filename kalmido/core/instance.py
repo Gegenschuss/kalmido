@@ -91,6 +91,7 @@ def about_info(c, u):
                  public_links=gsetting(c, "public_links") != "0", public_links_env=PUB_ENV,
                  public_links_off=sorted(pub_kinds_off(c)),  # 2.489.0 C (#2656): the kinds switched off on their own
                  mcp_remote=gsetting(c, "mcp_remote") == "1")  # 2.488.0 (#3363): the hosted MCP access (default off)
+        d.update(server_agents_off=gsetting(c, "server_agents_off") == "1")  # 2.557.0 C (#4670): Administration > Agents
         from ..core.config import SECRET_KEY, SECRET_KEY_PROBLEM, SECRET_KEY_SRC
         d.update(secret_key=bool(SECRET_KEY), secret_key_problem=SECRET_KEY_PROBLEM, secret_key_src=SECRET_KEY_SRC)  # 2.45.0 (#1515)
         d.update(backup_tools_problem=gsetting(c, "bk_tools_problem"))  # 2.359.3 (#2945): "<pg_dump>|<server>", else empty
@@ -372,7 +373,7 @@ def pub_kinds_off(c):
 def _apply_instance(c, b):
     """Stores the instance switches of b (caller commits); an error response for a non-boolean value."""
     from ..personal.timetrack import stop_timer
-    keys = ("collab_all", "time_all", "update_check") + AUTH_SWITCHES
+    keys = ("collab_all", "time_all", "update_check") + AUTH_SWITCHES + ("server_agents_off",)  # 2.557.0 C (#4670): "1" = no server agents
     if any(k in b and not isinstance(b[k], bool) for k in keys):
         return err(tr("Invalid value: {0}", next(k for k in keys if k in b and not isinstance(b[k], bool))))
     from ..accounts.signup import signup_settings

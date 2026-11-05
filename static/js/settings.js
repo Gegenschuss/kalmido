@@ -389,7 +389,7 @@ function agSetupPaneHtml(hint) {
   return `<h4 id="s-agg-h">${tr('Who is the agent for?')}</h4>
     ${seg('guide', g, [['own', N_('For me'), 'user'], ['team', N_('For the team'), 'users']])}
     <p class="agwhy muted" id="s-agwhy">${agWhyHtml(g, adm)}</p>
-    <div class="shint keep agone">${ic('download', 's')} <span>${tr('The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.')}</span></div>
+    <div class="shint keep agone">${ic('download', 's')} <span>${tr('The quick way: create the agent, then “Set up on a computer” at it gives you one command to paste.')}</span></div>${typeof srv_guideHtml === 'function' ? srv_guideHtml() : ''}${''/* 2.557.0 C (#4670): the agent on the Kalmido server */}
     <h4 id="s-myown-h">${tr('Your personal agents')}</h4>
     ${hint(tr('Only you can chat with it; it runs on your own computer.'))}
     <div class="members aglist" id="s-myown" aria-labelledby="s-myown-h"><div class="muted mhint">${tr('Loading…')}</div></div>
@@ -419,6 +419,7 @@ function agAdminPaneHtml(hint) {
     <h4 id="s-mcpr-h">${tr('Hosted MCP access')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-mcpr" ${S.about?.mcp_remote ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Apps may connect to agents with a sign-in (OAuth)')}</span></label></div>
     ${hint(tr('On: apps with an MCP connector connect to this server at /mcp; a signed-in person chooses one of their agents, and the app gets exactly its permissions (revocable under Settings > Agents). Off: /mcp and the sign-in addresses do not exist.'))}
+    ${typeof srv_adminHtml === 'function' ? srv_adminHtml(hint) : ''}${''/* 2.557.0 C (#4670) */}
     <h4 id="s-sclim-h">${tr('Permission limit')}</h4>
     ${hint(tr('What agents and API tokens may get at most on this server. A permission switched off here applies to every existing token at once.'))}
     <div id="s-sclim" aria-labelledby="s-sclim-h"></div>`;
@@ -432,7 +433,7 @@ async function agSetupDraw(md) {
   for (const a of j.agents || []) if (a.color) (S.colors ||= {})[a.id] = a.color;  // 2.47.1 (#1721)
   const row = a => `<div class="mrow agsrow ${a.enabled ? '' : 'off'}" data-myag="${a.id}">${avBtn(a.id, a.name)}<span class="n"><span class="agnm"><b>${esc(a.name)}</b> <span class="muted">${esc(a.username)}</span>${av_wsBtn(a)}</span>
       <small class="muted agfacts">${hdot(agentHst(a))}${((t) => `<span class="agft" title="${esc(t)}">${esc(t)}</span>`)([a.enabled ? agentSt(a) : a.admin_paused ? tr('paused by an admin') : tr('paused'), trn('{0} project', '{0} projects', (a.lists || []).length), scopeSummary(a.effective_scopes || a.scopes)].join(' · '))}</small></span>
-    <span class="agacts">${av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
+    <span class="agacts">${typeof srv_is === 'function' && srv_is(a) ? `<button class="iconbtn" data-myag-act="srv" title="${esc(tr('On the Kalmido server'))}" aria-label="${esc(tr('{0} on the Kalmido server', a.name))}">${ic('cloud', 's')}</button>` : av_setupBtn(a)}<button class="iconbtn" data-myag-act="work" title="${esc(tr('Work style and notifications'))}" aria-label="${esc(tr('Work style and notifications'))}">${ic('cog', 's')}</button><button class="iconbtn" data-myag-act="perm" title="${esc(tr('Permissions'))}" aria-label="${esc(tr('Permissions of {0}', a.name))}">${ic('lock', 's')}</button><button class="iconbtn" data-myag-act="log" title="${esc(tr('Log and usage limit'))}" aria-label="${esc(tr('Log and usage limit of {0}', a.name))}">${ic('chart', 's')}</button><button class="iconbtn" data-myag-act="token" title="${esc(tr('New API token'))}" aria-label="${esc(tr('New API token'))}">${ic('key', 's')}</button>
       <button class="iconbtn ${a.enabled ? 'danger' : ''}" data-myag-act="pause" title="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" aria-label="${esc(a.enabled ? tr('Pause|agent') : tr('Resume'))}" ${!a.enabled && a.admin_paused ? 'disabled' : ''}>${ic(a.enabled ? 'pause' : 'play', 's')}</button>
       <button class="iconbtn danger" data-myag-act="del" title="${esc(tr('Delete'))}" aria-label="${esc(tr('Delete'))}">${ic('trash', 's')}</button></span></div>`;
   const add = j.allowed && j.count < j.max ? `<div class="row myagnew"><input id="myag-name" placeholder="${esc(tr('Display name'))}" aria-label="${esc(tr('Display name'))}" maxlength="60"><input id="myag-user" placeholder="${esc(tr('Username, e.g. my-claude'))}" aria-label="${esc(tr('Username'))}" title="${esc(tr('for the sign-in and @mentions'))}" maxlength="32" autocapitalize="off" autocomplete="off" spellcheck="false"><input id="myag-prov" placeholder="${esc(tr('Where it runs, e.g. Claude (Anthropic, USA)'))}" aria-label="${esc(tr('Where it runs'))}" maxlength="80"><button class="btn sm pri" data-myag-act="new">${ic('plus', 's')} ${tr('Create agent')}</button></div>
@@ -493,7 +494,9 @@ function agSetupWire(md) {
         av_setupOffer(r, `/api/my/agents/${r.id}`, r.token);  // 2.46.6 (#1709): set it up now; the token only on request
         await load(); render();
       }
+      if (k === 'srvnew') { srv_newModal({done: () => agSetupDraw(md)}); return; }  // 2.557.0 C (#4670)
       if (!a) { agSetupDraw(md); return; }
+      if (k === 'srv') { srv_editModal(a); return; }  // 2.557.0 C (#4670): key, model, instructions, latest runs
       if (k === 'token') { agTokenModal(a, `/api/my/agents/${a.id}/token`); return; }
       if (k === 'setup') { ains_setupModal(a, `/api/my/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (k === 'work') { awOpen(a); return; }  // 2.236.0 A (#2904-#2911)
@@ -528,6 +531,7 @@ function agSetupWire(md) {
       if (lk === 'agents') api('GET', '/api/admin/agents').then(j => { S.agOffer = j.scopes; }).catch(() => {});  // the agent dialog greys out what is no longer allowed
       return;
     }
+    if (e.target.id === 's-srvag') { srv_adminSwitch(e.target); return; }  // 2.557.0 C (#4670)
     if (e.target.id !== 's-uag' && e.target.id !== 's-uagmax') return;
     const body = e.target.id === 's-uag' ? {user_agents: e.target.checked} : {max_per_user: Math.max(1, Math.min(20, +e.target.value || 2))};
     try { await api('PUT', '/api/admin/agent-policy', body); toast(tr('Saved')); } catch { /* shown */ }

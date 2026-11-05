@@ -1065,6 +1065,8 @@ ROUTES = {
     "GET /api/agents/{}/data-lock": "agents", "PATCH /api/agents/{}/data-lock": "agents",
     # 2.235.0 A (#2891 #2901): the control of an agent and the undo of its decisions (owner / instance admin, else 404; p2235_a_control_test.py)
     "GET /api/agents/{}/control": "agents", "PATCH /api/agents/{}/control": "agents", "POST /api/agents/{}/control/history/{}/undo": "agents",
+    # 2.557.0 C (#4670): the setup of a server agent -- its defaults and the starter pack (owner / instance admin, else 404; p2557_c_srvstarter_test.py)
+    "GET /api/agents/server/defaults": "agents", "POST /api/agents/{}/server/starter": "agents",
     # 2.144.6 A (#2053): time entries to an invoice (office/timebill.py: the office area's client lists, release = office admin;
     # p21446_a_api_test.py)
     "GET /api/office/time-open": "office", "POST /api/office/docs/{}/time-release": "office",
@@ -1161,7 +1163,6 @@ def write_proven(route, texts):
 # shrink; a new write route needs its call, a route called now must leave the list)
 WRITE_UNPROVEN = set(x.strip() for x in """
 DELETE /api/account/export
-DELETE /api/agent-schedules/{}
 DELETE /api/books/{}/org
 DELETE /api/budget/cats/{}
 DELETE /api/budget/entries/{}

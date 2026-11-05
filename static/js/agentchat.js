@@ -1663,7 +1663,8 @@ function agWire(md) {
 // and use it); admins create both here, the owner of a personal one is set in the dialog ("Belongs to")
 function agNewChooser(anchor, done) {
   menu(anchor, [{label: tr('Team agent'), sub: tr('For projects with several people. Admins create it; the project owner decides who may address it.'), icon: 'users', fn: () => agModal(null, done, {kind: 'team'})},
-    {label: tr('Personal agent'), sub: tr('Only you see and use it; others in your projects cannot address it.'), icon: 'user', fn: () => agModal(null, done, {kind: 'personal'})}]);
+    {label: tr('Personal agent'), sub: tr('Only you see and use it; others in your projects cannot address it.'), icon: 'user', fn: () => agModal(null, done, {kind: 'personal'})},
+    {label: tr('Runs on the Kalmido server'), sub: tr('With your own API key of a model provider; no computer of your own.'), icon: 'cloud', fn: () => srv_newModal({admin: true, done})}]);  // 2.557.0 C (#4670)
 }
 function agModal(a, done, o = {}) {
   const personal = a ? !!a.owner : o.kind === 'personal';
@@ -1695,6 +1696,7 @@ function agModal(a, done, o = {}) {
     <div class="row"><label for="ag-url">${tr('Webhook URL')}</label><input id="ag-url" type="url" value="${esc(a?.webhook?.url || '')}" placeholder="${tr('optional: https://… (empty = the agent polls)')}" autocomplete="off" autocapitalize="off" spellcheck="false"></div>
     <div class="shint">${tr('With a webhook every event is POSTed there at once, signed like the webhooks. Without one the agent fetches its events: GET /api/v1/agent/events (with ?wait=60 it gets them within seconds).')}</div>
     ${a ? `<div class="shint keep">${tr('{0} answers when it next looks at its events (right away with a webhook or long-polling). It only sees the projects shared with it.', esc(a.name))}</div>` : ''}
+    ${a && srv_is(a) ? `<div class="row"><label></label><button class="btn sm" data-m="srv">${ic('cloud', 's')} ${tr('On the Kalmido server')}</button></div>` : ''}${''/* 2.557.0 C (#4670) */}
     ${a ? `<div class="row"><label></label><button class="btn sm" data-m="ains-setup">${ic('download', 's')} ${tr('Set up on a computer')}</button><button class="btn sm" data-m="token">${ic('key', 's')} ${tr('New API token')}</button>${a.webhook ? `<button class="btn sm" data-m="secret">${ic('key', 's')} ${tr('New signing secret')}</button>` : ''}</div>
     <div class="shint keep">${esc(trn('{0} project shared with it', '{0} projects shared with it', a.lists.length))}${a.lists.length ? ': ' + esc(a.lists.map(l => l.name).join(', ')) : ''}</div>` : ''}
     ${aiuLimFields(a)}
@@ -1732,6 +1734,7 @@ function agModal(a, done, o = {}) {
     try {
       if (m === 'token') { agTokenModal(a, `/api/admin/agents/${a.id}/token`); return; }
       if (m === 'aw') { awOpen(a); return; }  // 2.236.0 A (#2904-#2911)
+      if (m === 'srv') { srv_editModal(a); return; }  // 2.557.0 C (#4670)
       if (m === 'ains-setup') { ains_setupModal(a, `/api/admin/agents/${a.id}`); return; }  // 2.44.0 (#1517)
       if (m === 'secret') {
         if (!await askConfirm(tr('Create a new signing secret?'), tr('The receiver must use the new one from now on.'), {ok: tr('New secret'), danger: true})) return;

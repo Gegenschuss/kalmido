@@ -87,6 +87,7 @@ const av_whichHtml = () => `<details class="avwhich"><summary>${ic('help', 's')}
   <li>${esc(tr('Personal: it runs on your computer, with your Claude access and quota, in your working folder, and only you give it orders. It can still work in the workspace of an organisation.'))}</li>
   <li>${esc(tr('Team agent: colleagues give it orders themselves; it runs on a shared computer that is always on, with an account of the organisation. Its rules name who may give orders.'))}</li>
   <li>${esc(tr('Fewer people giving orders means less risk. A personal agent is gone while your computer is off.'))}</li>
+  <li>${esc(tr('On the Kalmido server: no computer of your own; Kalmido calls the model with your own API key and the agent only uses the Kalmido tools.'))}</li>
   <li>${esc(tr('Switching later needs no new setup: an admin changes “Belongs to” to team or person. Projects and history stay; adjust the rules in its CLAUDE.md.'))}</li></ul></details>`;
 
 // ---- 2.361.4 (#2928): the private area is the person's own: nobody else creates agents there
