@@ -18,7 +18,7 @@ import re
 
 from flask import g, has_request_context
 
-from ..core.objhooks import OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
+from ..core.objhooks import FOLLOW, OBJ, person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
 from ..core.access import Denied
 from ..core.db import iso, local_now, now_utc  # 2.488.0 (#4004): local_now knows the test clock
 from ..core.i18n import N_, tr, trn
@@ -318,7 +318,6 @@ def obj_nodes_follow(c, oid):
     shares (core/objects.obj_node_follow). The node stays the object's truth: a share taken back in the core stays taken
     back (its old member row is not read again), a share that lives only in the core stays (was: the node was deleted).
     Call after the object's org_id changed; the caller is in system_ctx."""
-    from ..core.objhooks import FOLLOW
     for reg in OBJ.values():
         if reg.get("members"):
             for (rid,) in c.execute(f"SELECT n.ref_id FROM fs_nodes n JOIN {reg['table']} o ON o.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=? "
