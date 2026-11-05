@@ -96,13 +96,14 @@ def _shares_role(c, ids, uid, agent, pre=None):
     now = _now()
     if agent:
         sql = f"""SELECT role FROM fs_shares WHERE node_id IN ({q}) AND (agent_id=? OR user_id=?)
-                  AND (expires_at IS NULL OR expires_at > ?)"""
+                  AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0"""  # 2.568.0 (#4739, review F6)
         args = (*ids, uid, uid, now)
     else:
         if not collab_all():
             return None
         sql = f"""SELECT role FROM fs_shares WHERE node_id IN ({q}) AND (expires_at IS NULL OR expires_at > ?)
-                  AND (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))"""
+                  AND (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))
+                  AND COALESCE(list_own, 0)=0"""  # 2.568.0 (#4739, review F6): a project's own member row opens no node
         args = (*ids, now, uid, uid)
     best = None
     for r in c.execute(sql, args):
@@ -244,11 +245,12 @@ class _FsPre:
             q = ",".join("?" * len(part))
             if agent:
                 sql = f"""SELECT node_id, role FROM fs_shares WHERE node_id IN ({q}) AND (agent_id=? OR user_id=?)
-                          AND (expires_at IS NULL OR expires_at > ?)"""
+                          AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0"""  # #4739 (review F6)
                 args = (*part, uid, uid, now)
             else:
                 sql = f"""SELECT node_id, role FROM fs_shares WHERE node_id IN ({q}) AND (expires_at IS NULL OR expires_at > ?)
-                          AND (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))"""
+                          AND (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))
+                          AND COALESCE(list_own, 0)=0"""  # #4739 (review F6)
                 args = (*part, now, uid, uid)
             for r in c.execute(sql, args):
                 out.setdefault(r[0], []).append(r[1])
@@ -438,7 +440,7 @@ def fs_visible_sql_c(c, uid):
     if agent:
         orgs = f"n.org_id IS NULL OR n.org_id = {int(ctx.agent_org_id)}" if ctx.agent_org_id else "n.org_id IS NULL"
         seed = (f"n.agent_id = {uid} OR n.id IN (SELECT node_id FROM fs_shares WHERE (agent_id = {uid} OR user_id = {uid}) "
-                f"AND (expires_at IS NULL OR expires_at > '{now}'))")
+                f"AND (expires_at IS NULL OR expires_at > '{now}') AND COALESCE(list_own, 0)=0)")  # 2.568.0 (#4739, review F6)
     else:
         oids = ",".join(str(int(x)) for x in ctx.org_ids) or "0"
         orgs = f"n.org_id IS NULL OR n.org_id IN ({oids})"
@@ -460,7 +462,8 @@ def fs_visible_sql_c(c, uid):
             seed += f" OR n.id IN ({','.join(str(int(x)) for x in roots if x)})"
         if collab_all():
             seed += (f" OR n.id IN (SELECT node_id FROM fs_shares WHERE (user_id = {uid} OR group_id IN "
-                     f"(SELECT group_id FROM group_members WHERE user_id = {uid})) AND (expires_at IS NULL OR expires_at > '{now}'))")
+                     f"(SELECT group_id FROM group_members WHERE user_id = {uid})) AND (expires_at IS NULL OR expires_at > '{now}') "
+                     f"AND COALESCE(list_own, 0)=0)")  # 2.568.0 (#4739, review F6): not "Shared with me" through a project's own row
     return (f"(WITH RECURSIVE fv(id) AS (SELECT n.id FROM fs_nodes n WHERE ({seed}) AND ({orgs}) "
             f"UNION SELECT n.id FROM fs_nodes n JOIN fv ON n.parent_id = fv.id WHERE ({orgs})), "
             f"fd(id) AS (SELECT id FROM fs_nodes WHERE deleted_at IS NOT NULL "

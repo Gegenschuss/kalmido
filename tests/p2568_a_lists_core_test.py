@@ -328,4 +328,16 @@ r = S["erik"].get(B + f"/api/lists/{L9}/history")
 check(r.status_code == 403 and r.json().get("error"), f"F5: a participant: 403 with a reason ({r.status_code} {r.text[:160]})")
 check(S["gina"].get(B + f"/api/lists/{L9}/history").ok, "a viewer with a personal share reads the history")
 
+# F6: a member's own row adds nothing in the file store (no "Shared with me", the node's role as before 2.568.0)
+FRED, Fd = freelancer(B, A, "fred")
+PN = node_of(PL)
+dbx("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)", (PL, FRED, "edit", "edit", 0, "2026-10-01T08:00:00Z"))
+check(core_row(PL, FIO) is not None and core_row(PL, FRED) is None and sees(Fd, PL), "F6: fiona with the core's row, fred as a member from before")
+for who, s_ in (("fiona", Fi), ("fred", Fd)):
+    items = s_.get(B + "/api/files?space=shared").json().get("items") or []
+    check(not any(x["id"] == PN for x in items), f"F6: {who} does not see the project's node under Shared with me {[x['id'] for x in items]}")
+nf, nd = Fi.get(B + f"/api/files/nodes/{PN}"), Fd.get(B + f"/api/files/nodes/{PN}")
+check(nf.status_code == nd.status_code and (nf.json().get("role") if nf.ok else None) == (nd.json().get("role") if nd.ok else None),
+      f"F6: the same role on the node with and without the core's row ({nf.status_code} / {nd.status_code})")
+
 sys.exit(done("p2568_a_lists_core"))

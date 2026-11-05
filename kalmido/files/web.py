@@ -81,7 +81,8 @@ def _shared_flags(c, ids):
     if not ids:
         return set()
     q = ",".join("?" * len(ids))
-    return {r[0] for r in c.execute(f"SELECT DISTINCT node_id FROM fs_shares WHERE node_id IN ({q})", list(ids))}
+    return {r[0] for r in c.execute(f"SELECT DISTINCT node_id FROM fs_shares WHERE node_id IN ({q}) AND COALESCE(list_own, 0)=0",
+                                    list(ids))}  # 2.568.0 (#4739, review F6): a project's member rows are no file store share
 
 
 def _items(c, rows, parent_role=None, above=None, can=False):

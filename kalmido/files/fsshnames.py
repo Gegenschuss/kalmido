@@ -24,7 +24,8 @@ def fs_share_with(c, nodes, above=()):
     ids = list({int(n["id"]) for n in nodes} | {int(a["id"]) for a in above})
     q = ",".join("?" * len(ids))
     rows = c.execute(f"SELECT node_id, user_id, group_id, agent_id FROM fs_shares WHERE node_id IN ({q}) "
-                     "AND (expires_at IS NULL OR expires_at > ?) ORDER BY id", (*ids, _now())).fetchall()
+                     "AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0 ORDER BY id",  # #4739 (review F6)
+                     (*ids, _now())).fetchall()
     uids = {r["user_id"] or r["agent_id"] for r in rows if r["user_id"] or r["agent_id"]}
     gids = {r["group_id"] for r in rows if r["group_id"]}
     names = {}
