@@ -444,7 +444,9 @@ def bk_euer(c, oid, year):
             a = dec(it["amount_home"] or 0)
             x = exp.setdefault("t:" + (it["category"] or "other"), {"label": tr("Travel expenses") + ": " + rk_cat_label(it["category"] or "other"),
                                                                     "v": [Decimal(0)] * 3, "count": 0})
-            x["v"] = [x["v"][0] + a, x["v"][1], x["v"][2] + a]  # travel receipts carry no input tax here
+            # 2.545.0 (#4387): a travel receipt with a VAT rate counts net + its input tax (a small business: gross, no input tax)
+            net, vat = _split(a, None if small else it.get("vat_pct"))
+            x["v"] = [x["v"][0] + net, x["v"][1] + vat, x["v"][2] + a]
             x["count"] += 1
     # 2.93.0 B (#1928): the mileage allowance of the logbook (business drives with a private car; no input tax)
     from .logbook import lb_allowance_year
@@ -577,6 +579,17 @@ def bk_ustva(c, oid, year, period):
         missing += rc["vat_pct"] is None
         items.append({"kind": "receipt", "node_id": rc["node_id"], "title": rc["title"], "date": rc["date"], "gross": dstr(rc["amount"]),
                       "vat": dstr(rc["vat"]), "vat_pct": rc["vat_pct"], "rc13b": rc["rc13b"] or None})
+    # 2.545.0 (#4387): the input tax of travel receipts with a VAT rate (by the receipt's day, else the trip's start)
+    for t in rk_trips(c, oid, year=str(year)):
+        for it in t["items"]:
+            day = it["date"] or t["date_from"] or ""
+            if not (frm <= day <= to) or not it.get("vat_pct"):
+                continue
+            gross = money(dec(it["amount_home"] or 0))
+            vat = _split(gross, it["vat_pct"])[1]
+            kz66 += vat
+            items.append({"kind": "travel", "trip_id": t["id"], "title": it.get("text") or rk_cat_label(it["category"] or "other"), "date": day,
+                          "gross": dstr(gross), "vat": dstr(vat), "vat_pct": it["vat_pct"]})
     # 2.534.0 (#4333): the input tax of the approved entertainment receipts counts in full (by the day of the meal)
     for m in ofc_meals_home(c, oid, frm, to, s):
         kz66 += m["vat"]

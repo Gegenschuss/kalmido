@@ -11,6 +11,8 @@ freelancer-matrix: office
  - a final invoice with a negative rest (-595.00): "to pay back" 595.00, a refund above it 409, a refund of 200.00 is booked
    negative (state partial, cash flow out kind refund, VAT base on cash basis -168), the rest makes it paid; another one is
    cancelled by its credit note (negative itself, was refused)
+ - travel receipts with a VAT rate: 107.00 train at 7 % and 119.00 hotel at 19 % count net in the income statement (100 + 7,
+   100 + 19) and with 26.00 input tax in field 66 of their month; one without a rate as before; a wrong rate answers 400
  - the same for a person without an organisation (own office)
 usage: p2545_c_buero_test.py <datadir>"""
 import os
@@ -210,6 +212,34 @@ fees(A, "Alpha")
 fees(Fr, "Frida")
 neg_rest(A, "Alpha")
 neg_rest(Fr, "Frida")
+
+
+# ---------------------------------------------------------------- travel receipts with input tax
+def travel_vat(s, who):
+    day = f"{Y}-04-02"
+    r = s.post(B + O + "/trips", json={"date_from": day, "dest": "Hamburg - Berlin", "purpose": "job",
+                                       "items": [{"date": day, "category": "train", "amount": "107", "vat_pct": "7"},
+                                                 {"date": day, "category": "hotel", "amount": "119", "vat_pct": "19"},
+                                                 {"date": day, "category": "taxi", "amount": "20"}]})
+    check(r.status_code == 201, f"{who}: a trip with VAT rates " + r.text[:200])
+    t = r.json()
+    by = {x["category"]: x for x in t.get("items", [])}
+    check(by.get("train", {}).get("vat_pct") == "7" and by.get("taxi", {}).get("vat_pct") is None, f"{who}: the rates are kept {list(by.values())[:3]}")
+    r = s.patch(B + O + f"/trips/{t['id']}/items/{by['taxi']['id']}", json={"vat_pct": "16"})
+    check(r.status_code == 400, f"{who}: a wrong rate answers 400 {r.status_code}")
+    eu = s.get(B + O + f"/books/euer?year={Y}").json()
+    ex = {x["key"]: x for x in eu["expenses"]}
+    check(ex.get("t:train", {}).get("net") == "100.00" and ex.get("t:train", {}).get("vat") == "7.00"
+          and ex.get("t:hotel", {}).get("net") == "100.00" and ex.get("t:hotel", {}).get("vat") == "19.00"
+          and ex.get("t:taxi", {}).get("net") == "20.00" and ex.get("t:taxi", {}).get("vat") == "0.00",
+          f"{who}: income statement: travel receipts net + input tax {[ex.get(k) for k in ('t:train', 't:hotel', 't:taxi')]}")
+    d = ustva(s, "m04")
+    check(d.get("kz", {}).get("66") == "26.00", f"{who}: field 66 with the travel input tax 7 + 19 {d.get('kz')}")
+    check(len([x for x in d.get("items", []) if x.get("kind") == "travel"]) == 2, f"{who}: the two travel receipts are listed {d.get('items')}")
+
+
+travel_vat(A, "Alpha")
+travel_vat(Fr, "Frida")
 
 print(f"p2545_c_buero: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

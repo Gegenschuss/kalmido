@@ -25,7 +25,7 @@ from ..core.errors import BadInput
 from .books import bk_gaps_text, ofc_meals_euer, ofc_meals_home  # 2.534.0 (#4333): ofc_meals_*
 from .calc import dec, dstr, money
 from .model import office_gate, office_need_feature, office_org, office_settings
-from .books import _fx as bk_fx, _home, bk_payments, bk_receipts, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
+from .books import _fx as bk_fx, _home, _split, bk_payments, bk_receipts, bk_csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import epdf_name, epdf_doc_files  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from functions
 from ..files.bulk import abm_zip_name, abm_send_zip, ABM_BUSY, ABM_ZIP_MAX_FILES, ABM_ZIP_MAX_MB, abm_too_big, abm_unique  # 2.369.5 (#2517): pulled up from functions
@@ -124,9 +124,11 @@ def bx_rows(c, oid, frm, to, gaps=None):
                     continue
                 seen.add(it["id"])
                 a = money(dec(it["amount_home"] or 0))
+                vp = None if s.get("small_business") else it.get("vat_pct")  # 2.545.0 (#4387): a travel receipt with a VAT rate: net + input tax
+                n_, t_ = _split(a, vp)
                 rows.append({"type": "travel", "date": day, "number": "", "counterparty": "", "text": it["text"] or tr_.get("purpose") or "",
-                             "category": rk_cat_label(it["category"] or "other"), "tax_pct": "", "net": -a, "tax": "", "gross": -a,
-                             "currency": home, "file": ""})
+                             "category": rk_cat_label(it["category"] or "other"), "tax_pct": dec(vp) if vp else "", "net": -n_, "tax": -t_ if vp else "",
+                             "gross": -a, "currency": home, "file": ""})
     # 2.534.0 (#4333): the approved entertainment receipts, two rows each: the deductible 70 % with the full input tax and
     # the 30 % that are not deductible (a small business: 70 / 30 of the gross amount, no input tax) -- gross adds up to the bill
     small = bool(s.get("small_business"))

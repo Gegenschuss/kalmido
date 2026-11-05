@@ -325,7 +325,9 @@ def dv_travel_rows(c, oid, d_from, d_to, st, s):
                     in_datev += 1
                     continue
                 k = DV_RK_KEY.get(it["category"] or "other", "other")
-                rows.append(_line(amount, dv_travel_account(st, k, own), gegen, "", day, f"R{t['id']}-{it['id']}",
+                # 2.545.0 (#4387): a travel receipt with a VAT rate gets the input tax key of the receipts (none for a small business)
+                bu = "" if s.get("small_business") else {**DV_BU_IN, **(st.get("bu_in") or {})}.get(it.get("vat_pct") or "", "")
+                rows.append(_line(amount, dv_travel_account(st, k, own), gegen, bu, day, f"R{t['id']}-{it['id']}",
                                   tr("Travel expenses") + ": " + rk_cat_label(it["category"] or "other") + " " + dest))
             vt = (t.get("vma") or {}).get("total")
             day = t["date_to"] or t["date_from"] or ""

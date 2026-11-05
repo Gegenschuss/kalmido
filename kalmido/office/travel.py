@@ -282,6 +282,12 @@ def rk_item_clean(c, oid, b, cur=None, home=None):
         out["datev"] = 1 if b.get("datev") and not own else (cur.get("datev", 0) if own and cur else 0)
     if "datev_no" in b or not cur:
         out["datev_no"] = _text(b.get("datev_no"), "datev_no", 60) if not own else ((cur or {}).get("datev_no") or "")
+    if "vat_pct" in b or not cur:  # 2.545.0 (#4387): the VAT rate of the receipt (None = no input tax, as before)
+        v = b.get("vat_pct")
+        v = None if v in (None, "") else str(v)
+        if v not in (None, "19", "7", "0"):
+            raise BadInput(tr("Invalid value: {0}", "vat_pct"))
+        out["vat_pct"] = v
     money_keys = ("amount", "currency", "fx_rate", "amount_home")
     if any(k in b for k in money_keys) or not cur:
         amt = _amount(b.get("amount", cur.get("amount")), "amount")
@@ -320,7 +326,8 @@ def _item_public(c, oid, r, docs):
     bd = docs.get(d.get("billed_doc_id")) if d.get("billed_doc_id") else None
     return {"id": d["id"], "trip_id": d["trip_id"], "date": d["date"], "category": d["category"], "amount": d["amount"], "currency": d["currency"],
             "fx_rate": format(dec(d["fx_rate"]).normalize(), "f") if d.get("fx_rate") is not None else None, "amount_home": d["amount_home"], "text": d["text"],
-            "datev": d["datev"], "datev_no": d["datev_no"], "billed": bd, "billed_at": d.get("billed_at") if bd else None}
+            "datev": d["datev"], "datev_no": d["datev_no"], "billed": bd, "billed_at": d.get("billed_at") if bd else None,
+            "vat_pct": d.get("vat_pct")}  # 2.545.0 (#4387)
 
 
 def _docs_map(c, oid):
@@ -558,7 +565,7 @@ def _item(c, oid, tid, iid):
     return r
 
 
-RK_LOCKED_KEYS = ("datev", "amount", "currency", "fx_rate", "amount_home", "date")
+RK_LOCKED_KEYS = ("datev", "amount", "currency", "fx_rate", "amount_home", "date", "vat_pct")  # 2.545.0 (#4387): + VAT rate
 
 
 def _rk_val(v):

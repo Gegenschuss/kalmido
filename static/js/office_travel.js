@@ -283,6 +283,7 @@ function rk_itemModal(t, i) {
     ${ofcRowF('rk-cur', tr('Currency'), ofcIn('rk-cur', cur, {max: 3, list: 'rk-curs'}))}<datalist id="rk-curs">${[home, ...(OFC.info?.pack?.currencies || ['EUR', 'USD', 'GBP', 'CHF'])].filter((x, k, a) => a.indexOf(x) === k).map(x => `<option value="${x}">`).join('')}</datalist>
     <div class="rkfx" ${cur === home ? 'hidden' : ''}>${ofcRowF('rk-fx', tr('Exchange rate (1 {0} = …)', home), ofcIn('rk-fx', i?.fx_rate ? fmtNum(+i.fx_rate, 4) : '', {num: true}))}
       <p class="muted ofchint rkfxout"></p></div>
+    ${ofcRowF('rk-vat', tr('VAT rate'), ofcSel('rk-vat', i?.vat_pct || '', [['', tr('no input tax')], ...['19', '7', '0'].map(v => [v, `${v} %`])]))}
     ${ofcRowF('rk-text', tr('Text'), ofcIn('rk-text', i?.text, {max: 300, ph: tr('e.g. ICE Hamburg – Berlin')}))}
     ${rk_dv() && ofr_lvOf('travel') !== 'own' ? `${ofcChk('rk-datev', tr('Receipt is in DATEV'), i?.datev)}
     ${ofcRowF('rk-dno', tr('DATEV receipt number'), ofcIn('rk-dno', i?.datev_no, {max: 60, ph: tr('optional')}))}` : ''}
@@ -302,15 +303,15 @@ function rk_itemModal(t, i) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/trips/${t.id}/items/${i.id}`); md.remove(); rk_reload();
-        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_reload(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no}); rk_reload(); });
+        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_reload(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no, vat_pct: o.vat_pct ?? null}); rk_reload(); });
         return;
       }
       const v = id => $(id, md)?.value ?? '';
       const c = v('#rk-cur').trim().toUpperCase() || home;
-      const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), ...($('#rk-datev', md) ? {datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')} : {})};  // 2.147.0 (#2460): DATEV off = its marks stay as saved
+      const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), vat_pct: v('#rk-vat') || null, ...($('#rk-datev', md) ? {datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')} : {})};  // 2.147.0 (#2460): DATEV off = its marks stay as saved
       if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'), true);
       if (i) {
-        const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no};
+        const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no, vat_pct: i.vat_pct ?? null};  // 2.545.0 (#4387): + VAT rate
         await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, body); md.remove(); rk_reload();
         toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, old); rk_reload(); });
       } else {
