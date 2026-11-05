@@ -64,8 +64,12 @@ const FEAT = 'cal,comments,collab,contacts,office,clients,sheets';
     await nav(B + '#office/settings');
     check(await ready(ev, `!!document.querySelector('#s-biz .ocf-slim') && document.querySelectorAll('#ocf-ch').length <= 1`, 80), '#2816: Settings: the slim line, one country choice on the screen');  // 2.470.0 (#3596): the dialog over office/start
     // 2.555.0 (#4664): in Settings the button stays on the page: to the country pack field under Packs (was: closed Settings, #3596)
-    await ev(`(() => { document.querySelector('#s-biz .ocf-slim [data-ocf="to-pack"]').click(); return 1; })()`);
-    check(await ready(ev, `!!document.querySelector('.smodal') && !!document.querySelector('#s-biz #os-pack')?.closest('.row.sflash')`, 60), '#4664: its button leads to the country pack field, Settings stay open');
+    // the form is drawn anew once its data is loaded (a click before that flashes a row that is then replaced): click until the
+    // field's row flashes - a real state, no fixed wait
+    check(await ready(ev, `(() => { const r = document.querySelector('#s-biz #os-pack')?.closest('.row'); if (r?.classList.contains('sflash')) return !!document.querySelector('.smodal'); document.querySelector('#s-biz .ocf-slim [data-ocf="to-pack"]')?.click(); return false; })()`, 60), '#4664: its button leads to the country pack field, Settings stay open');
+    // 2.555.0 (#4664): Settings stay open now - close them before the next pages (the phone's start list would see the dialog's slim line)
+    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); return 1; })()`);
+    if (!await ready(ev, `!document.querySelector('.smodal')`, 20)) await ev(`(() => { document.querySelector('.smodal')?.remove(); return 1; })()`);
     // ---- Tables: one heading, one new button
     await nav(B + '#sheets');
     check(await ready(ev, `!!document.querySelector('.shvov [data-shv="new"]')`, 80), '#2816: the tables overview');

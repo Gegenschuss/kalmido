@@ -89,11 +89,14 @@ function writeCatalogue() {
   check(!at?.querySelector('.pkc-desc b') && at?.querySelector('.pkc-desc i'), 'description: simple Markdown, no markup from the catalogue');
   check(/Verified/.test(card(d, 'industry/event')?.querySelector('.pkc-badge')?.textContent || ''), 'event: badge Verified');
   // search
-  const q = d.querySelector('#pkc-q'); q.value = 'austr'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+  // 2.555.0 (#4664): the field fresh each time - the settings form may be drawn anew once the catalogue is there (a held
+  // element would be a detached copy on a slow machine)
+  const typeQ = v => { const q = d.querySelector('#pkc-q'); q.value = v; q.dispatchEvent(new w.Event('input', {bubbles: true})); };
+  typeQ('austr');
   check(await until(() => cards(d).length === 1 && cards(d)[0] === 'country/AT'), 'search "austr": only AT ' + cards(d));
-  q.value = 'zzzz-none'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+  typeQ('zzzz-none');
   check(await until(() => !cards(d).length && /No pack matches/.test(d.querySelector('#pkc-body')?.textContent || '')), 'search without hits: the note');
-  q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+  typeQ('');
   await until(() => cards(d).length > 2);
   // kind filter
   click(w, d.querySelector('#pkc [data-pkc="kind"][data-kind="industry"]'));
