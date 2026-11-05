@@ -96,6 +96,8 @@ def dvb_otb_draft(c, oid, uid, did):
                    sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
 
 
+OTB_CHECK = {}  # 2.552.0 (#4561 B21): kind -> check(c, oid, ref) after a restore from the office trash (409 / 404 rolls it back);
+# set by the module of the kind (office/cardlines.py), which imports this one - no import back
 OTB_OUT = {}  # table -> [(column, referenced table, referenced column)]: its single-column ON DELETE SET NULL references
 
 
@@ -213,9 +215,8 @@ def otb_restore_route(tid):
     if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
         from .travel import rk_trash_check
         rk_trash_check(c, oid, kind, ref)
-    if kind == "cc_line":  # 2.552.0 (#4561 B21): a credit card position only into its statement while that is a draft
-        from .cardlines import cl_trash_check
-        cl_trash_check(c, oid, ref)
+    if kind in OTB_CHECK:  # 2.552.0 (#4561 B21): e.g. a credit card position only into its statement while that is a draft
+        OTB_CHECK[kind](c, oid, ref)
     if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
         since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
         for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",

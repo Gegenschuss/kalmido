@@ -7,7 +7,7 @@ from datetime import date
 from flask import g, has_app_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape, write_lock
+from ..core.pg import insert_id, like_escape, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, pvis, task_visible, vis_sql
@@ -364,7 +364,6 @@ def fd_moved_count(c, field_id=None, list_id=None):
     """2.552.0 (#4561 B12): how many tasks moved to another list since still hold a value of field field_id (or of a field of
     list list_id): the value stays hidden at the old field and goes when that field / list is deleted. A number only, in the
     system context (the task may lie in a list the person does not see)."""
-    from ..core.pg import system_ctx
     with system_ctx(c):
         return c.execute("SELECT COUNT(DISTINCT v.task_id) FROM task_field_values v JOIN list_fields f ON f.id=v.field_id "
                          "JOIN tasks t ON t.id=v.task_id WHERE t.list_id IS DISTINCT FROM f.list_id AND "

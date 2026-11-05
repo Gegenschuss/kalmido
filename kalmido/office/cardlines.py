@@ -26,7 +26,7 @@ from .books import bk_receipt_set_paid, bk_to_home, bk_ws
 from .calc import dec, dstr, money
 from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_stmt_row, cc_writable, cl_day)
 from .model import office_settings
-from .otrash import otb_put, otb_restore
+from .otrash import OTB_CHECK, otb_put, otb_restore
 from .rcsubmit import rsb_ingest
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
 
@@ -253,6 +253,9 @@ def cl_trash_check(c, oid, lid, uid=None, every=True):
     if not c.execute("SELECT 1 FROM office_cc_cards WHERE id=? AND org_id=? AND deleted_at IS NULL", (s["card_id"], oid)).fetchone():
         raise Denied(409, tr("This cannot be restored: something it refers to (a client, a service) is gone meanwhile."))  # 2.552.0 (#4561, review F4): the card was deleted
     return r["statement_id"]
+
+
+OTB_CHECK[CL_TRASH] = cl_trash_check  # 2.552.0 (#4561 B21): the office trash's restore checks the statement
 
 
 @app.post("/api/office/cards/trash/<int:tid>/restore")
