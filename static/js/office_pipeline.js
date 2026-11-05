@@ -156,8 +156,15 @@ function pp_modal(x, stage) {
       md.remove();
       if (x) {
         try { await pp_patch(x.id, body, tr('Saved'), x.updated_at || null); } catch (x2) {
-          // 2.560.0 C (#4700) kept: saved elsewhere meanwhile -> the card is back, the saved state opens (this input is not saved)
-          if (x2.status === 409 && x2.data?.row) { toast(tr('Changed in the meantime')); pp_reload(); pp_modal(x2.data.row); }
+          // 2.560.0 C (#4700) kept: saved elsewhere meanwhile -> the card is back, the dialog opens again with this input and the
+          // bar; "Reload" opens the saved state (this input is not saved)
+          if (x2.status === 409 && x2.data?.row) {
+            const m2 = pp_modal({...x, ...body}), el = $('.aerr', m2);
+            if (el) {
+              el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-pp-reload>${tr('Reload')}</button>`;
+              $('[data-pp-reload]', el).addEventListener('click', () => { m2.remove(); pp_reload(); pp_modal(x2.data.row); });
+            } else toast(tr('Changed in the meantime'));
+          }
           else if (x.updated_at && x2.message) toast(x2.message);  // rawFetch does not show it itself
         }
         return;

@@ -97,6 +97,21 @@ async function round(who, ck) {
   check(await until(() => toastHas(/Saved/)), `${who}: "Saved" after the answer`);
   unhold(w);
 
+  // ================= saved elsewhere meanwhile (#4700 on the at-once path): the row goes back, the dialog opens again with the input and "Reload"
+  check(await until(() => (LBrow => LBrow && LBrow.updated_at)(w.eval(`LB.drives.find(x => x.id === ${kiel.id})`))), `${who}: the row knows its version`);
+  const was = w.eval(`LB.drives.find(x => x.id === ${kiel.id}).updated_at`);
+  let o = null;
+  check(await until(async () => { o = await call(ck, 'PATCH', `/api/office/drives/${kiel.id}`, {purpose: 'Other tab'}); return o.http === 200 && o.updated_at && o.updated_at !== was; }), `${who}: another tab saved the drive`);
+  click(w, rowOf(/Hamburg/)); await until(() => dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Hafen');
+  dlg().querySelector('#lgb-dest').value = 'Kiel Nord'; click(w, dlg().querySelector('[data-m="save"]'));
+  check(await until(() => dlg()?.querySelector('[data-ofc-reload]')), `${who}: conflict: the dialog is open again with "Reload"`);
+  check(dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Nord' && /Changed in the meantime/.test(dlg()?.querySelector('.aerr')?.textContent || ''), `${who}: conflict: with the input of the person and the bar`);
+  check(await until(async () => (await onServer()).find(x => x.id === kiel.id)?.dest === 'Kiel Hafen'), `${who}: conflict: nothing was overwritten`);
+  check(await until(() => rowOf(/Hamburg/) && !/Kiel Nord/.test(rowOf(/Hamburg/).textContent)), `${who}: conflict: the row is back`);
+  click(w, dlg().querySelector('[data-ofc-reload]'));
+  check(await until(() => dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Hafen'), `${who}: Reload opens the saved drive`);
+  click(w, dlg()?.querySelector('[data-m="cancel"], .xclose, [data-m="close"]')); dlg()?.remove();
+
   // ================= delete: at once, a refusal brings the row back
   const del = async () => {
     click(w, rowOf(/Hamburg/)); await until(() => dlg()?.querySelector('[data-m="del"]'));

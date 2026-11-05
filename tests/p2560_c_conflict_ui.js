@@ -79,9 +79,11 @@ async function otherSave(url, body, was, method = 'PATCH') {
     check(o && o.title === 'Other title', 'the other tab renamed the deal');
     md.querySelector('#pp-note').value = 'this tab';
     click(w, md.querySelector('[data-m="save"]'));
-    await until(() => md.querySelector('[data-pp-reload]'), 40);
-    check(md.isConnected && /Changed in the meantime/.test(md.querySelector('.aerr')?.textContent || '') && md.querySelector('[data-pp-reload]'),
-      'conflict: the dialog stays open with "Changed in the meantime" and "Reload": ' + (md.querySelector('.aerr')?.textContent || ''));
+    // 2.559.0 (#4660): the dialog closes at once; the 409 opens it again with this tab's input and the bar (a new element)
+    await until(() => d.querySelector('.modal [data-pp-reload]'), 40);
+    md = d.querySelector('.modal [data-pp-reload]')?.closest('.modal') || md;
+    check(md.isConnected && /Changed in the meantime/.test(md.querySelector('.aerr')?.textContent || '') && md.querySelector('[data-pp-reload]') && md.querySelector('#pp-note')?.value === 'this tab',
+      'conflict: the dialog is open again with this tab\'s input, "Changed in the meantime" and "Reload": ' + (md.querySelector('.aerr')?.textContent || ''));
     const dj = (await call('GET', '/api/office/deals')).items.find(x => x.id === D.id);
     check(dj && dj.title === 'Other title' && dj.note !== 'this tab', 'conflict: nothing was overwritten ' + JSON.stringify(dj && [dj.title, dj.note]));
     const rl = md.querySelector('[data-pp-reload]');

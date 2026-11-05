@@ -313,7 +313,7 @@ function rk_tripModal(t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
           country: t.country, place: t.place, t_start: t.t_start, t_end: t.t_end, vma_days: t.vma_days, vma_off: t.vma_off};  // 2.95.0 A (#1932)
         // 2.560.0 D (#4700) kept: the save checks the version (409 = saved elsewhere meanwhile: row back, the saved one opens)
-        let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)), ofcDraw); } catch (x) { ofcVerLate(x, t.updated_at, row => { rk_reload(); rk_tripModal(row); }); return; }
+        let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)), ofcDraw); } catch (x) { ofcVerLate(x, t.updated_at, () => rk_tripModal({...t, ...body}), row => { rk_reload(); rk_tripModal(row); }); return; }
         rk_tripSet(j); rk_refresh();
         toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}`, ofcVerUndo(old, body, j))); rk_refresh(); });  // only the keys this save changed
       } else {
@@ -373,7 +373,7 @@ function rk_itemModal(t, i) {
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no, vat_pct: i.vat_pct ?? null};  // 2.545.0 (#4387): + VAT rate
         // 2.560.0 D (#4700) kept: the save checks the version (409: row back, the saved receipt opens)
-        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i)), ofcDraw); } catch (x) { ofcVerLate(x, i.updated_at, row => { rk_reload(); rk_itemModal(t, row); }); return; }
+        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i)), ofcDraw); } catch (x) { ofcVerLate(x, i.updated_at, () => rk_itemModal(t, {...i, ...body}), row => { rk_reload(); rk_itemModal(t, row); }); return; }
         rk_tripSet(j); rk_refresh();
         const now = j?.items?.find(x => x.id === i.id);
         toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerUndo(old, body, now))); rk_refresh(); });  // only the keys this save changed
@@ -720,10 +720,11 @@ function ofcVerUndo(old, body, now) {
   for (const k of Object.keys(old)) if (k in body && JSON.stringify(old[k] ?? null) !== JSON.stringify(body[k] ?? null)) b[k] = old[k];
   return ofcVerBody(b, now);
 }
-// 2.559.0 (#4660): the same 409 after a dialog that closed at once (the change is taken back already): say so and open the
-// saved version; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast
-function ofcVerLate(x, ver, reopen) {
-  if (x?.status === 409 && x.data?.row) { toast(tr('Changed in the meantime')); reopen(x.data.row); }
+// 2.559.0 (#4660): the same 409 after a dialog that closed at once (the change is taken back already): again() opens the
+// dialog once more with the person's input, the bar below says so with "Reload" (reopen: the saved state), nothing typed is
+// lost; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast
+function ofcVerLate(x, ver, again, reopen) {
+  if (x?.status === 409 && x.data?.row) { let m2 = null; try { m2 = again(); } catch { /* the toast below */ } if (!m2 || !ofcVerConflict(m2, x, reopen)) toast(tr('Changed in the meantime')); }
   else if (ver && x?.message) toast(x.message);
 }
 // a 409 of such a save: the dialog's error line says so with "Reload" (reopen: the dialog with the saved state); -> handled

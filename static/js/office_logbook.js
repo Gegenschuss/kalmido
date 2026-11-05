@@ -213,10 +213,10 @@ function lbDriveModal(d, fix) {
         const old = {day: d.day, vehicle_id: d.vehicle_id, start_place: d.start_place, dest: d.dest, purpose: d.purpose, odo_start: d.odo_start, odo_end: d.odo_end,
           km: d.km, kind: d.kind, client_id: d.client_id, project: d.project, user_id: d.user_id};
         // 2.559.0 (#4660): the dialog closes at once, the row shows the new values; the server's hints come as the toast after it
-        // 2.560.0 D (#4700) kept: the save checks the version; a 409 (saved elsewhere meanwhile) puts the row back and opens the saved one
+        // 2.560.0 D (#4700) kept: the save checks the version; a 409 (saved elsewhere meanwhile) puts the row back and opens the dialog again with the input and "Reload" (ofcVerLate)
         md.remove();
         let j; try { j = await optWrite(optSet(() => LB.drives?.find(x => x.id === d.id), lbRowVals(body)), () => (d.updated_at ? rawFetch : api)('PATCH', `/api/office/drives/${d.id}`, ofcVerBody(body, d)), ofcDraw); }
-        catch (x) { if (x?.status === 409 && x.data?.row) { toast(tr('Changed in the meantime')); lbReload(true); lbDriveModal(x.data.row); } else if (d.updated_at && x?.message) toast(x.message); return; }
+        catch (x) { ofcVerLate(x, d.updated_at, () => lbDriveModal({...d, ...body}), row => { lbReload(true); lbDriveModal(row); }); return; }
         const x = LB.drives?.find(y => y.id === d.id); if (x && j?.id === d.id) Object.assign(x, j);
         ofcDraw(); lbRefresh();
         // 2.93.0 B (#1928 review): a taken-over drive with other km -> the trip keeps the old km, said once here
@@ -237,6 +237,7 @@ function lbDriveModal(d, fix) {
       }
     } catch (x) { if (ofcVerConflict(md, x, row => { lbReload(true); lbDriveModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
+  return md;  // 2.559.0 (#4660): ofcVerLate opens it again after a 409
 }
 const LB_ACT = {create: N_('Created'), change: N_('Changed'), delete: N_('Deleted'), restore: N_('Restored'), trip: N_('Taken over into the travel expenses'),  // 2.93.0 B (#1928 review): trip
   corrected: N_('Corrected')};  // 2.152.0 C (#2169)
