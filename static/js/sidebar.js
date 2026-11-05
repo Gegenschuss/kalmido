@@ -37,6 +37,27 @@ function renderMultiBar() {
 // 2.270.0 D (#3028): {id: {field: the value this device saw}} for a multi-select change (server: batch "patch" data.prev)
 const btcPrev = (ids, data) => Object.fromEntries(ids.map(i => [i, S.tasks.get(i)]).filter(([, t]) => t).map(([i, t]) =>
   [i, Object.fromEntries(Object.keys(data).filter(k => k in t && k !== 'tags').map(k => [k, typeof t[k] === 'boolean' ? +t[k] : t[k] ?? null]))]));
+// 2.559.0 (#4659): the local change of a multi-select batch (optWrite's put); put.server = the server works out more (load after)
+function btcPut(action, data, ids) {
+  if (action === 'delete') return dgGone(ids);
+  if (action === 'complete') {
+    const st = data?.status ?? 2, now = new Date().toISOString(), ch = new Map();
+    let more = false;
+    for (const i of ids) {
+      const t = S.tasks.get(i); if (!t || t.status !== 0) continue;
+      if ((t.repeat && t.due) || t.blocking || children(i).length) more = true;
+      if (!(t.repeat && t.due)) ch.set(i, x => { x.status = st; x.completed_at = now; });
+    }
+    const put = dgLocal(ch); put.server = more; return put;
+  }
+  if (action !== 'patch') return dgLocal(new Map());
+  const {prev, add_tags, ...d} = data || {}, items = {};
+  for (const i of ids) {
+    const t = S.tasks.get(i); if (!t) continue;
+    items[i] = {...d, ...('due' in d && !d.due ? {due_time: null} : {}), ...(add_tags ? {tags: [...new Set([...(t.tags || []), ...add_tags])]} : {})};
+  }
+  return dgItemsPut(items);
+}
 async function batch(action, data, clear, ids = [...S.multi], note = '') {
   if (!ids.length) return;
   if (action === 'patch') {  // 2.36.0 (#1118): locked tasks keep their locked fields; the others change
@@ -53,12 +74,18 @@ async function batch(action, data, clear, ids = [...S.multi], note = '') {
   const snaps = ids.flatMap(withKids);
   const cs = action === 'complete' ? celeSnap(ids) : null;
   if (action === 'delete' && !data?.guard) data = {...data, guard: Object.fromEntries(ids.map(i => [i, S.tasks.get(i)?.updated_at]).filter(x => x[1]))};  // 2.272.0 B (#3045): changed by someone else since = stays
-  const j = await api('POST', '/api/tasks/batch', {ids, action, data});
+  // 2.559.0 (#4659): shown at once (dragmulti.js dgLocal), the request behind it; an error puts all back, the tasks the server
+  // kept (locked, changed elsewhere) come back from its answer; a state fetched again only in the background, where the
+  // server works something out (the next date of a recurring task, the tasks waiting on a completed one, subtasks)
+  const put = btcPut(action, data, ids);
+  if (clear) { S.multi.clear(); S.multiMode = false; }
+  let j;
+  try { j = await optWrite(put, () => api('POST', '/api/tasks/batch', {ids, action, data})); } catch { return; }
   if (j.errors?.length) toast(j.errors[0]);
   const twice = action === 'complete' ? (j.conflicts || []).filter(c => ['due', 'due_time', 'status'].includes(c.field)).length : 0;
   if (twice) note = [note, tr('Recurring task was already checked off, not advanced twice')].filter(Boolean).join(' · ');
-  if (clear) { S.multi.clear(); S.multiMode = false; }
-  await load(); render();
+  dgAfter(put, j);
+  if (action === 'complete' && put.server && !j.errors?.length && !(j.skipped?.length || j.conflicts?.length)) load().then(render, () => {});
   if (cs && !j.errors?.length) celeCheck(cs);
   if (j.errors?.length) return;
   const cf = action === 'delete' ? (j.conflicts || []).length : 0;  // 2.272.0 B (#3045)

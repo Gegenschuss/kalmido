@@ -108,9 +108,10 @@ async function doneCleanup() {
   const sel = may(pick(age)), skipped = ro(pick(age));
   if (!ok || !sel.length) return;
   const ids = sel.map(t => t.id), snaps = sel.map(snapTask);
+  const put = dgGone(ids);  // 2.559.0 (#4659): gone at once; an error brings them back, the ones the server kept come back (dragmulti.js)
   let j;
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'delete', data: {guard: Object.fromEntries(sel.filter(t => t.updated_at).map(t => [t.id, t.updated_at])), own_only: !oth}}); } catch { return; }  // 2.272.0 B (#3045), F: own_only (review M7)
-  await load(); render();
+  try { j = await optWrite(put, () => api('POST', '/api/tasks/batch', {ids, action: 'delete', data: {guard: Object.fromEntries(sel.filter(t => t.updated_at).map(t => [t.id, t.updated_at])), own_only: !oth}})); } catch { return; }  // 2.272.0 B (#3045), F: own_only (review M7)
+  dgAfter(put, j);
   const n = ids.length - (j.errors?.length || 0) - (j.conflicts?.length || 0) - (j.skipped?.length || 0);
   const kept = skipped + (j.errors?.length || 0) + (j.conflicts?.length || 0) + (j.skipped?.length || 0);
   const msg = trn('{0} completed task moved to the trash', '{0} completed tasks moved to the trash', n) + (kept ? ' · ' + trn('{0} task skipped', '{0} tasks skipped', kept) : '');

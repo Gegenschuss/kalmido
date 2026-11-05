@@ -94,14 +94,80 @@ function dgPick(o) {
   setTimeout(() => { if (!isMobile()) $('#dg-q', md).focus(); }, 50);
 }
 
+// 2.559.0 (#4659): a change of tasks shown at once, as optWrite's put (core.js): ch = Map id -> fn(t) that changes the task
+// here, or null = it leaves (the trash). Each run (again on top of a state fetched meanwhile) changes the task found then;
+// the values from before are kept once. The return of put() puts all of them back (an error), put.back(ids) only some
+// (the ones the server kept: skipped, conflicts).
+const dgCp = v => v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v;
+function dgLocal(ch) {
+  let old = null, ext = [];  // ext: the rows of S.extra (completed ones fetched for a view) that left, with their place
+  const back = only => {
+    for (const [id, o] of old || []) {
+      if (only && !only.includes(id)) continue;
+      const t = S.tasks.get(id);
+      if (!o.keys) { if (!t && o.in) S.tasks.set(id, snapTask(o.t)); continue; }
+      if (t) for (const k of o.keys) { if (k in o.t) t[k] = dgCp(o.t[k]); else delete t[k]; }
+    }
+    for (const [i, x] of ext) if ((!only || only.includes(x.id)) && S.extra && !S.extra.some(y => y.id === x.id)) S.extra.splice(Math.min(i, S.extra.length), 0, x);
+    _kidsIx = null;
+  };
+  const put = () => {
+    const first = !old; if (first) old = new Map();
+    for (const [id, fn] of ch) {
+      const inT = S.tasks.has(id), t = S.tasks.get(id) || (!fn && (S.extra || []).find(x => x.id === id)); if (!t) continue;
+      const s = first ? snapTask(t) : null;
+      if (fn) fn(t); else S.tasks.delete(id);
+      if (first) old.set(id, {t: s, in: inT, keys: fn ? Object.keys({...s, ...t}).filter(k => JSON.stringify(s[k]) !== JSON.stringify(t[k])) : null});
+    }
+    if (S.extra && [...ch.values()].includes(null)) {
+      if (first) S.extra.forEach((x, i) => { if (ch.has(x.id) && ch.get(x.id) === null) ext.push([i, x]); });
+      S.extra = S.extra.filter(x => !(ch.has(x.id) && ch.get(x.id) === null));
+    }
+    _kidsIx = null;
+    return () => back();
+  };
+  put.back = back;
+  return put;
+}
+// one item of a patch_each batch on the local task (as applyLocal does it offline)
+function dgItem(t, d) {
+  const {_prev, fields, ...b} = d || {}; Object.assign(t, b);
+  if (fields) { t.fields = {...(t.fields || {})}; for (const [k, v] of Object.entries(fields)) { if (v == null || v === '') delete t.fields[k]; else t.fields[k] = String(v); } }
+}
+// patch_each items at once; a task that moves to another list takes its subtasks along (the server does the same)
+function dgItemsPut(items) {
+  const ch = new Map();
+  for (const [id, d] of Object.entries(items)) {
+    ch.set(+id, t => dgItem(t, d));
+    if (d.list_id != null) for (const k of withKids(+id).slice(1)) if (!(k.id in items)) ch.set(k.id, t => { t.list_id = d.list_id; });
+  }
+  return dgLocal(ch);
+}
+// tasks to the trash at once, with their subtasks (any level, as the server's do_delete); back(ids) brings a kept one back
+// with its subtasks
+function dgGone(ids) {
+  const fam = new Map();
+  for (const id of ids) for (const k of withKids(id)) if (!fam.has(k.id)) fam.set(k.id, id);
+  const put = dgLocal(new Map([...fam.keys()].map(i => [i, null]))), b0 = put.back;
+  put.back = only => b0([...fam].filter(([i, r]) => only.includes(r) || only.includes(i)).map(([i]) => i));
+  return put;
+}
+// the server's answer to such a batch: the tasks it kept (locked, changed elsewhere) back here; with errors (which ones is
+// not told) the state again in the background, so the screen shows what the server has
+function dgAfter(put, j) {
+  const kept = [...(j?.skipped || []), ...(j?.conflicts || []).map(c => c.id)];
+  if (kept.length) { put.back(kept); render(); }
+  if (j?.errors?.length || kept.length) load().then(render, () => {});
+}
 // ---- several tasks: one patch_each batch = one history step
+// 2.559.0 (#4659): shown at once (dgItemsPut), the request behind it; an error puts the tasks back (no reload)
 async function dgApply(items, lab, notes = []) {
   const ids = Object.keys(items).map(Number);
   if (!ids.length) { toast(notes.filter(Boolean).join(' · ') || tr('Nothing to move')); return null; }
-  const snaps = ids.flatMap(withKids);
+  const snaps = ids.flatMap(withKids), put = dgItemsPut(items);
   let j;
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'patch_each', data: {items}}); } catch { await load().catch(() => {}); render(); return null; }
-  await load(); render();
+  try { j = await optWrite(put, () => api('POST', '/api/tasks/batch', {ids, action: 'patch_each', data: {items}})); } catch { return null; }
+  dgAfter(put, j);
   const pairs = snaps.filter(b => ids.includes(b.id)).map(b => [b, snapTask(S.tasks.get(b.id))]);
   const e = histFields(lab, pairs, {res: j, fields: [...UNDO_FIELDS, 'sort']});
   const fail = ids.length - (j?.count ?? ids.length);

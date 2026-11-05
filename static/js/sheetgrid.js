@@ -149,17 +149,18 @@ async function sgWrite(chg, label) {
   }
   const ids = Object.keys(items).map(Number);
   if (!ids.length) return 0;
-  const snaps = ids.map(id => snapTask(taskById(id)));
+  const snaps = ids.map(id => snapTask(taskById(id))), put = dgItemsPut(items);  // 2.559.0 (#4659): the cells show at once (dragmulti.js)
   let j;
-  try { j = await api('POST', '/api/tasks/batch', {ids, action: 'patch_each', data: {items}}); } catch { render(); return 0; }
+  try { j = await optWrite(put, () => api('POST', '/api/tasks/batch', {ids, action: 'patch_each', data: {items}})); } catch { return 0; }
   if (j?.errors?.length) toast(j.errors[0]);
+  dgAfter(put, j);
+  if (!j?.errors?.length && ids.some(id => fieldsOf(taskById(id)?.list_id).some(f => f.type === 'formula'))) load().then(render, () => {});  // the computed values, in the background
   // the step goes into the history at once (a quick Ctrl+Z undoes this one, not the one before): after = before + the change
   const after = b => { const d = items[b.id], a = snapTask(b); if (!d) return a; const {fields, ...rest} = d; Object.assign(a, rest);
     if (fields) { a.fields = {...(a.fields || {})}; for (const [k, v] of Object.entries(fields)) { if (v == null) delete a.fields[k]; else a.fields[k] = v; } } return a; };
   const pairs = snaps.filter(Boolean).filter(b => !(j?.skipped || []).includes(b.id)).map(b => [b, after(b)]);
   const e = histFields(label || trn('{0} cell changed', '{0} cells changed', chg.length), pairs, {res: j, fields: [...UNDO_FIELDS, 'title', 'fields']});
   if (e && !HIST.group) offerUndo(label || trn('{0} task changed', '{0} tasks changed', ids.length), e);
-  await load(); render();
   return ids.length;
 }
 // a value for every selected cell of the active cell's column kind (typing / Delete / a menu pick with a range)
