@@ -96,7 +96,9 @@ check(r.ok and j["line"]["id"] == LID and "gone" not in j and "note" not in j, f
 
 # the app shows the sentence: the trip's undo toasts restore_note, the card undo hands note to the history's message
 tj, cj, uj = kt_src("static/js/office_travel.js"), kt_src("static/js/office_cards.js"), kt_src("static/js/undo.js")
-check(tj.count("r?.restore_note") == 2, "UI: both trip deletes show restore_note after the undo")
+# 2.559.0 (#4660): both trip deletes (row menu, dialog) go through the one rk_tripDel (gone at once), its undo toasts restore_note
+check(tj.count("r?.restore_note") >= 1 and tj.count("rk_tripDel(t);") == 2 and "toast(r.restore_note)" in tj[tj.index("async function rk_tripDel"):][:900],
+      "UI: both trip deletes show restore_note after the undo")
 check("return r.note ? {note: r.note}" in cj and "return r?.note ? {note: r.note}" in cj, "UI: the card position's undo hands the note on")
 check("toast(note ||" in uj, "UI: the history's message says the note instead of 'Undone: …'")
 
