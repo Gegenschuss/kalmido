@@ -824,6 +824,9 @@ function outLater(e) {
 // computed fields), when no newer change of the same task waits behind it. true = settled, no whole new state needed.
 function outAnswer(e, j) {
   const w = OUT_LATER.get(e.k); if (w) { OUT_LATER.delete(e.k); w.res(j); }
+  // 2.551.0 (#4650): the calendar's ghosts of a recurring task were maybe fetched before the server had its new repeat / date
+  // (calendar.js ensureOcc): asked again with the next drawing, one still on its way is dropped
+  if (S.occ && e.method === 'PATCH' && /^\/api\/tasks\/\d+$/.test(e.url) && ['repeat', 'repeat_from', 'due', 'status'].some(k => k in (e.body || {}))) { S.occ.key = ''; S.occ.want = ''; }
   const m = j && e.method === 'PATCH' && /^\/api\/tasks\/(\d+)$/.exec(e.url);
   if (!m || j.id !== +m[1] || j.shifted?.length || j.chain?.skipped?.length) return false;
   if (j.conflicts?.length) {  // the calm bar under the field the detail shows (as a save straight from the detail did)
