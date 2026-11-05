@@ -71,8 +71,10 @@ check(bool(TID), "B21: the answer of the delete names the office trash copy (tra
 row = sql("SELECT kind, label FROM office_trash WHERE id=?", (TID or 0,))
 check(row and row[0][0] == "cc_line", f"B21: the copy is in the office trash as kind cc_line: {row}")
 check(row and "Tippfehler" not in row[0][1] and "2.50" not in row[0][1], f"B21: the label carries no sealed merchant / amount: {row}")
-check(A.post(B + f"{K}/trash/{TID}/restore").status_code == 404, "B21: another office cannot restore the copy (404)")
-r = Fr.post(B + f"{K}/trash/{TID}/restore")
+r = A.post(B + f"/api/office/cards/trash/{TID}/restore")
+check(r.status_code in (403, 404) and not sql("SELECT 1 FROM office_cc_lines WHERE id=?", (LID,)),
+      f"B21: another organisation cannot restore the copy (403 / 404, nothing back) {r.status_code} {r.text[:120]}")
+r = Fr.post(B + f"/api/office/cards/trash/{TID}/restore")
 check(r.ok and r.json()["line"]["id"] == LID and r.json()["line"]["merchant"] == "Tippfehler Beispiel" and r.json()["line"]["amount"] == "2.50",
       f"B21: the undo brings the position back with its id and values {r.status_code} {r.text[:200]}")
 check(not sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B21: the copy left the trash")
@@ -87,7 +89,7 @@ check(r.ok and r.json().get("kind") == "cc_line" and sql("SELECT 1 FROM office_c
 
 TID = del_line()
 check(Fr.patch(B + f"{K}/statements/{SID}", json={"total": "10.00"}).ok and Fr.post(B + f"{K}/statements/{SID}/confirm", json={}).ok, "B21: statement confirmed")
-r = Fr.post(B + f"{K}/trash/{TID}/restore")
+r = Fr.post(B + f"/api/office/cards/trash/{TID}/restore")
 check(r.status_code == 409 and not sql("SELECT 1 FROM office_cc_lines WHERE id=?", (LID,)), f"B21: a confirmed statement takes no position back (409) {r.status_code}")
 check(Fr.post(B + O + f"/trash/{TID}/restore").status_code == 409, "B21: the office trash refuses it as well (409)")
 check(sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B21: the copy stays in the trash after the refusal")
