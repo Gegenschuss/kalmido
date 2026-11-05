@@ -467,12 +467,43 @@ def _name_hit(a, b):
     return any(len(w) >= 3 and w in wb for w in _norm(a).split())
 
 
-def bnk_suggest(t, invoices, receipts, taken):
-    """At most 3 suggestions [{kind, id, label, amount, reason}] for open booking t (amount signed Decimal)."""
+def bnk_suggest_index(invoices, receipts):
+    """2.546.0 (#4186): where bnk_suggest finds its candidates without looking at every pair -- the invoices by (currency,
+    open amount), by the first word of their number and by the words of their client; the receipts by amount (cents) and by
+    the words of title + category. Positions in the lists, so bnk_suggest keeps their order (the same suggestions)."""
+    ix = {"i_amt": {}, "i_word": {}, "r_amt": {}, "r_word": {}}
+    for k, i in enumerate(invoices):
+        ix["i_amt"].setdefault((i["currency"], i["open"]), []).append(k)
+        nn = _norm(i["number"]) if i["number"] else ""
+        words = set(nn.split()[:1]) | {w for w in _norm(i["client"]).split() if len(w) >= 3}
+        for w in words:
+            ix["i_word"].setdefault(w, []).append(k)
+    for k, r in enumerate(receipts):
+        ix["r_amt"].setdefault(money(dec(r["amount"])), []).append(k)
+        for w in set(_norm(f"{r.get('title') or ''} {r.get('category') or ''}").split()):
+            ix["r_word"].setdefault(w, []).append(k)
+    return ix
+
+
+def _bnk_cands(ix, amt_key, words, amt_map, word_map):
+    """The positions that can score (same amount or a shared word), in list order."""
+    ks = set(ix[amt_map].get(amt_key, ()))
+    for w in words:
+        ks.update(ix[word_map].get(w, ()))
+    return sorted(ks)
+
+
+def bnk_suggest(t, invoices, receipts, taken, ix=None):
+    """At most 3 suggestions [{kind, id, label, amount, reason}] for open booking t (amount signed Decimal).
+    2.546.0 (#4186): ix = bnk_suggest_index(invoices, receipts): only the candidates that can score are looked at (a pair
+    without the same amount and without a shared word never reaches score 2); without ix every pair as before."""
     out = []
     amt = t["amount"]
     text = f"{t['counterpart']} {t['purpose']}"
     if amt > 0:
+        if ix is not None:  # number in the purpose (its first word is a word of the purpose) or a client word in the name
+            words = set(_norm(t["purpose"]).split()) | set(_norm(t["counterpart"] or text).split())
+            invoices = [invoices[k] for k in _bnk_cands(ix, (t["currency"], amt), words, "i_amt", "i_word")]
         for i in invoices:
             if i["currency"] != t["currency"] or amt > i["open"]:
                 continue
@@ -492,6 +523,9 @@ def bnk_suggest(t, invoices, receipts, taken):
                 out.append((score, {"kind": "invoice", "id": i["id"], "label": " · ".join(x for x in (i["number"], i["client"] or i["title"]) if x),
                                     "amount": dstr(i["open"]), "reason": ", ".join(why)}))
     elif amt < 0:
+        if ix is not None:  # the same amount or a word (3+ letters) of the counterpart in title / category
+            words = {w for w in _norm(t["counterpart"]).split() if len(w) >= 3} if t["counterpart"] else set()
+            receipts = [receipts[k] for k in _bnk_cands(ix, -amt, words, "r_amt", "r_word")]
         for r in receipts:
             if r["node_id"] in taken or r.get("paid_at"):
                 continue
@@ -591,10 +625,11 @@ def bnk_tx_list():
     rules, names = _br.br_rules(c, oid), _br.br_names(c, oid, {t["rule_id"] for t in rows if t["match_kind"]})  # 2.299.0 B (#3191)
     pol = pol_bank_info(c, oid)  # 2.469.0 (#3459)
     items = []
+    ix = bnk_suggest_index(invoices, receipts)  # 2.546.0 (#4186): candidates by amount / word, not every pair
     for t in rows:
         p = _tx_public(t, inv_lbl, rc_by_id, names, sps)
         if t["match_kind"] is None:
-            p["suggestions"] = bnk_suggest(t, invoices, receipts, taken)
+            p["suggestions"] = bnk_suggest(t, invoices, receipts, taken, ix)
             hit = pol_bank_hit(t, pol, _norm)
             if hit:  # 2.469.0 (#3459): a collective payout, never an invoice's money again
                 p["suggestions"] = [hit]

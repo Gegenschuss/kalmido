@@ -87,9 +87,11 @@ def fs_trash_root(chain):
     return None
 
 
-def _shares_role(c, ids, uid, agent):
+def _shares_role(c, ids, uid, agent, pre=None):
     if not ids:
         return None
+    if pre is not None:  # 2.546.0 (#4186): the shares of a whole listing, read once (fs_roles_many)
+        return pre.shares_role(c, ids, uid, agent)
     q = ",".join("?" * len(ids))
     now = _now()
     if agent:
@@ -108,7 +110,7 @@ def _shares_role(c, ids, uid, agent):
     return best
 
 
-def fs_role(c, nid, uid=None, chain=None):
+def fs_role(c, nid, uid=None, chain=None, pre=None):
     """'owner' | 'edit' | 'view' | None: the role account uid (default: the signed-in one) has on node nid -- inherited
     from the folders above, shares with an expiry, the organisation boundary and the agent rules (module docstring).
     Ignores the trash (need_node decides about deleted nodes).
@@ -123,15 +125,15 @@ def fs_role(c, nid, uid=None, chain=None):
     mails = {r["hub_mail_id"] for r in chain if r["hub_mail_id"]}
     if mails:
         from ..hub.hubmail import hbm_node_ok
-        if not all(hbm_node_ok(c, uid, m) for m in mails):
+        if not all((pre.mail_ok(c, uid, m) if pre is not None else hbm_node_ok(c, uid, m)) for m in mails):
             return None
     from .fslock import fsl_of_chain, fsl_token_request
-    if fsl_of_chain(c, chain) is not None and (acx_of(c, uid).role == "agent" or fsl_token_request()):
+    if (pre is None or pre.locks(c)) and fsl_of_chain(c, chain) is not None and (acx_of(c, uid).role == "agent" or fsl_token_request()):
         return None  # 2.353.0 A (#2758): agents never reach a locked folder (not even shared or their own); F (review M3): API tokens neither
-    return _fs_role(c, uid, chain)
+    return _fs_role(c, uid, chain, pre)
 
 
-def _fs_role(c, uid, chain):
+def _fs_role(c, uid, chain, pre=None):
     n = chain[0]
     org = n["org_id"]
     ctx = acx_of(c, uid)
@@ -143,14 +145,14 @@ def _fs_role(c, uid, chain):
             return None
     ids = [r["id"] for r in chain]
     if agent:
-        if org and _fs_receipt_hidden(c, uid, org, n):
+        if org and _fs_receipt_hidden(c, uid, org, n, pre):
             return None  # 2.187.1 A (#2735): a share alone is not enough for an organisation's receipt (the area receipts)
         role = "edit" if any(r["agent_id"] == uid for r in chain) else None
-        return _best(_shares_role(c, ids, uid, True), role)
-    if org and _fs_receipt_hidden(c, uid, org, n):
+        return _best(_shares_role(c, ids, uid, True, pre), role)
+    if org and _fs_receipt_hidden(c, uid, org, n, pre):
         return None  # 2.187.0 C (#2476)
     if org and org_limited(c, uid, org):
-        return _fs_limited_role(c, uid, org, chain, ids)  # 2.143.0 A (#2151)
+        return _fs_limited_role(c, uid, org, chain, ids, pre)  # 2.143.0 A (#2151)
     if n["owner_id"] == uid:
         return "owner"
     if org:
@@ -160,16 +162,18 @@ def _fs_role(c, uid, chain):
     for r in chain:
         if r["org_access"] in ("view", "edit") and org:
             role = _best(r["org_access"], role)
-    return _best(_shares_role(c, ids, uid, False), role)
+    return _best(_shares_role(c, ids, uid, False, pre), role)
 
 
-def _fs_receipt_hidden(c, uid, org, n):
+def _fs_receipt_hidden(c, uid, org, n, pre=None):
     """2.187.0 C (#2476): a receipt of organisation org (a file with an rc_receipts row) for a person ruled by office groups:
     only with the area receipts (level "own": only the receipts they uploaded). Everybody else as before.
     2.187.1 A (#2735): agents are always ruled by office groups (ofr_rights; no group = no area = no receipt)."""
     from ..office.rights import ofr_rights
     if not _fs_receipt_locked(ofr_rights(c, uid, org), uid, n):
         return False
+    if pre is not None:
+        return pre.is_receipt(c, n["id"])  # 2.546.0 (#4186)
     return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (n["id"],)).fetchone() is not None
 
 
@@ -204,28 +208,157 @@ def _fs_receipts_hidden_ids(c, uid, rows):
     return out
 
 
+class _FsPre:
+    """2.546.0 (#4186): what fs_role reads per node, read once for a whole listing of nodes (fs_roles_many) -- the same
+    rules, only the data comes from one query each: the shares of every node of the chains, the rc_receipts rows, whether
+    any folder is locked, the documents roots and open areas (once per organisation / tree root), the hub mail rule."""
+
+    def __init__(self, ids):
+        self.ids = set(ids)
+        self._shares = {}
+        self._rc = None
+        self._locks = None
+        self._roots, self._areas, self._mails = {}, {}, {}
+
+    def shares_role(self, c, ids, uid, agent):
+        key = (uid, bool(agent))
+        if key not in self._shares:
+            self._shares[key] = self._read_shares(c, uid, agent)
+        if self._shares[key] is None:
+            return None  # a person while sharing with colleagues is off (collab_all), as _shares_role
+        missing = [i for i in ids if i not in self.ids]
+        if missing:  # a node outside the prefetched chains (never for fs_roles_many itself): the single query, as before
+            return _shares_role(c, ids, uid, agent)
+        best = None
+        for i in ids:
+            for role in self._shares[key].get(i, ()):
+                best = _best(role if role in ("view", "edit") else "view", best)
+        return best
+
+    def _read_shares(self, c, uid, agent):
+        if not agent and not collab_all():
+            return None
+        now, out, ids = _now(), {}, sorted(self.ids)
+        for k in range(0, len(ids), 500):
+            part = ids[k:k + 500]
+            q = ",".join("?" * len(part))
+            if agent:
+                sql = f"""SELECT node_id, role FROM fs_shares WHERE node_id IN ({q}) AND (agent_id=? OR user_id=?)
+                          AND (expires_at IS NULL OR expires_at > ?)"""
+                args = (*part, uid, uid, now)
+            else:
+                sql = f"""SELECT node_id, role FROM fs_shares WHERE node_id IN ({q}) AND (expires_at IS NULL OR expires_at > ?)
+                          AND (user_id=? OR group_id IN (SELECT group_id FROM group_members WHERE user_id=?))"""
+                args = (*part, now, uid, uid)
+            for r in c.execute(sql, args):
+                out.setdefault(r[0], []).append(r[1])
+        return out
+
+    def is_receipt(self, c, nid):
+        if nid not in self.ids:
+            return c.execute("SELECT 1 FROM rc_receipts WHERE node_id=?", (nid,)).fetchone() is not None
+        if self._rc is None:
+            self._rc, ids = set(), sorted(self.ids)
+            for k in range(0, len(ids), 500):
+                part = ids[k:k + 500]
+                self._rc |= {x[0] for x in c.execute(f"SELECT node_id FROM rc_receipts WHERE node_id IN ({','.join('?' * len(part))})", part)}
+        return nid in self._rc
+
+    def locks(self, c):
+        if self._locks is None:
+            from .fslock import _fsl_any
+            self._locks = _fsl_any(c)
+        return self._locks
+
+    def docs_root(self, c, org):
+        if org not in self._roots:
+            self._roots[org] = _fs_docs_root(c, org)
+        return self._roots[org]
+
+    def open_area(self, c, chain):
+        k = chain[-1]["id"] if chain else None
+        if k not in self._areas:
+            self._areas[k] = _fs_open_area(c, chain)  # depends on the chain's root only (and its organisation)
+        return self._areas[k]
+
+    def mail_ok(self, c, uid, m):
+        if (uid, m) not in self._mails:
+            from ..hub.hubmail import hbm_node_ok
+            self._mails[(uid, m)] = hbm_node_ok(c, uid, m)
+        return self._mails[(uid, m)]
+
+
+def fs_chains(c, ids):
+    """2.546.0 (#4186): fs_chain for many nodes at once -> {nid: chain} (the same rows: the node first, then its ancestors up
+    to the root, at most CHAIN_MAX steps; a node that does not exist is missing). One query for the whole tree part."""
+    ids = sorted({int(i) for i in ids if i})
+    rows = {}
+    for k in range(0, len(ids), 500):
+        part = ids[k:k + 500]
+        seed = [i for i in part if i not in rows]
+        if not seed:
+            continue
+        for r in c.execute(f"""WITH RECURSIVE up(id) AS (SELECT id FROM fs_nodes WHERE id IN ({','.join('?' * len(seed))})
+                                  UNION SELECT n.parent_id FROM fs_nodes n JOIN up ON n.id=up.id WHERE n.parent_id IS NOT NULL)
+                                SELECT n.* FROM fs_nodes n WHERE n.id IN (SELECT id FROM up)""", seed).fetchall():
+            rows[r["id"]] = r
+    out = {}
+    for i in ids:
+        if i not in rows:
+            continue
+        chain, cur = [], i
+        for _lvl in range(CHAIN_MAX + 1):  # fs_chain: levels 0 .. CHAIN_MAX
+            r = rows.get(cur)
+            if r is None:
+                break
+            chain.append(r)
+            cur = r["parent_id"]
+            if cur is None:
+                break
+        out[i] = chain
+    return out
+
+
+def fs_roles_many(c, ids, uid):
+    """2.546.0 (#4186): {nid: (in_trash, role)} for many nodes -- fs_deleted(fs_chain) and fs_role of each, with the chains
+    and what fs_role reads per node fetched once for all of them (_FsPre). Nodes that do not exist: (False, None); in the trash: (True, None).
+    The rules are fs_role's own (the same function runs per node), only the reads are shared. uid falsy (0 / None): only
+    the trash is looked at, role None (no default to the signed-in person: bk_receipts' uid=0 means "all, for jobs")."""
+    chains = fs_chains(c, ids)
+    pre = _FsPre({r["id"] for ch in chains.values() for r in ch})
+    out = {}
+    for i in {int(x) for x in ids if x}:
+        ch = chains.get(i)
+        if not ch:
+            out[i] = (False, None)
+            continue
+        gone = fs_deleted(ch)
+        out[i] = (gone, fs_role(c, i, uid, chain=ch, pre=pre) if uid and not gone else None)  # in the trash: callers skip it first
+    return out
+
+
 def _fs_docs_root(c, org):
     from ..docs.store import doc_ws, root_id
     return root_id(c, doc_ws(org, None))
 
 
-def _fs_limited_role(c, uid, org, chain, ids):
+def _fs_limited_role(c, uid, org, chain, ids, pre=None):
     """2.143.0 A (#2151): the role of a guest / read-only / accounting person on a node of organisation org. Read-only: what
     a member sees, at most 'view'. Guest: only their own nodes and shares. Accounting: like a guest, plus the organisation's
     documents folder to read (receipts) and their own uploads there (the upload itself is the documents area's,
     docs/web.py). Review: a guest / accounting person corrects and removes their own nodes ('edit'); read-only stays 'view'."""
     rk = org_role_key(c, uid, org)
-    own = chain[0]["owner_id"] == uid and not _fs_open_area(c, chain)  # 2.200.0 A (#2747, review 4): an admin demoted keeps no area tree
+    own = chain[0]["owner_id"] == uid and not (pre.open_area(c, chain) if pre is not None else _fs_open_area(c, chain))  # 2.200.0 A (#2747, review 4): an admin demoted keeps no area tree
     role = ("view" if rk == "readonly" else "edit") if own else None
     if rk == "readonly":
         for r in chain:
             if r["org_access"] in ("view", "edit"):
                 role = "view"
     elif rk == "accounting":
-        root = _fs_docs_root(c, org)
+        root = pre.docs_root(c, org) if pre is not None else _fs_docs_root(c, org)
         if root and any(r["id"] == root for r in chain):
             role = _best(role, "view")  # own receipts stay 'edit' (review)
-    share = _shares_role(c, ids, uid, False)
+    share = _shares_role(c, ids, uid, False, pre)
     if rk == "readonly" and share:
         share = "view"
     return _best(share, role)
