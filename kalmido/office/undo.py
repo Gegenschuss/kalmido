@@ -25,8 +25,7 @@ from ..core.access import Denied
 from ..core.writes import OBJ_TRACK, UNDO_KEEP_H, _fp, _undo_args, obj_undo_post, obj_undo_pre, obj_undo_run, undo_scope
 from .model import MD, office_role, office_row, sr_public  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_locked, ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .owrite import ow_kind
-from .letters import lt_ctx, lt_public, lt_row  # 2.567.0 (#4711): the letters' session undo
+from .owrite import OW_UNDO_CTX, ow_kind
 from ..accounts.session import me  # 2.369.5 (#2517): pulled up from functions
 from ..team.clients import _gate, client_public, need_client  # 2.369.5 (#2517): pulled up from functions
 
@@ -52,20 +51,11 @@ def _md_scope(kind):
 # 2.190.0 R (#2496): a number drawn since stays on undo and never makes it fail; cached sums never make it fail either
 DOC_KEEP = {"office_docs": {"number"}}
 DOC_NOFP = {"office_docs": {"number", "totals"}}
-OUN_KINDS = {"doc": "office_doc", "client": "client", "letter": "office_letter", **{k: f"office_md_{k}" for k in MD}}
+OUN_KINDS = {"doc": "office_doc", "client": "client", "letter": "office_letter", **{k: f"office_md_{k}" for k in MD}}  # route kind -> core kind
 ow_kind("office_doc", "office_docs", scope=_doc_scope, keep=DOC_KEEP, nofp=DOC_NOFP)
 ow_kind("client", "clients", scope=lambda ref, oid: [("clients", "id=?", (ref,), False), ("office_client_contacts", "client_id=?", (ref,), True)])
-ow_kind("office_letter", "office_letters")
 for _k in MD:
     ow_kind(f"office_md_{_k}", MD[_k]["table"], scope=_md_scope(_k))
-
-
-OUN_CTX = {}  # 2.567.0 (#4711): undo kind -> ctx(ref) -> (c, uid, oid, after) of the modules on office/owrite.py (oun_ctx)
-
-
-def oun_ctx(kind, fn):
-    """A module on ow_write names how its kind is checked for an undo: fn(ref) -> (c, uid, oid, after(c) -> the answer)."""
-    OUN_CTX[kind] = fn
 
 
 def oun_kind(kind):
@@ -129,13 +119,8 @@ def _ctx(kind, ref):
         _gate(c)
         need_client(c, ref, uid)
         return c, uid, None, lambda c: client_public(c, uid, need_client(c, ref, uid), stats=True)
-    if kind == "letter":  # 2.567.0 (#4711): letters get the session undo (a draft only)
-        c, uid, oid = lt_ctx()
-        if lt_row(c, oid, ref)["status"] != "draft":
-            raise Denied(409, tr(OUN_FINAL))
-        return c, uid, oid, lambda c: lt_public(c, oid, lt_row(c, oid, ref))
-    if kind in OUN_CTX:
-        return OUN_CTX[kind](ref)
+    if kind in OW_UNDO_CTX:  # 2.567.0 (#4711): the letters and the other office rows on office/owrite.py
+        return OW_UNDO_CTX[kind](ref)
     if kind not in MD:
         raise Denied(404)
     from .web import _ctx as wctx

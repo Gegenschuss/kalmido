@@ -2335,9 +2335,11 @@ TOOLS += [
     ("list_letter_drafts", "2.153.0: the letters you made in the office, newest first (status draft by default; sent, delivered, all).",
      _obj({"status": {"type": "string", "enum": ["draft", "sent", "delivered", "all"]}, **_RB}),
      lambda api, a: api.call("GET", "/office/letters", _pick(a, ("status", "requested_by")))),
-    ("update_letter_draft", "2.153.0: change your own letter draft (only while it is a draft).",
-     _obj({"letter_id": S_ID, **_LTR}, ["letter_id"]),
-     lambda api, a: api.call("PATCH", f"/office/letters/{int(a['letter_id'])}", body=_pick(a, tuple(_LTR)))),
+    ("update_letter_draft", "2.153.0: change your own letter draft (only while it is a draft). 2.567.0: expect_updated_at (the "
+                            "updated_at of the letter as you read it) is required: 409 = a person changed it since, read it again.",
+     _obj({"letter_id": S_ID, **_LTR, "expect_updated_at": {"type": "string", "description": "updated_at of the letter as you read it"}},
+          ["letter_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/office/letters/{int(a['letter_id'])}", body=_pick(a, tuple(_LTR) + ("expect_updated_at",)))),
     ("link_letter_document", "2.153.0: link your letter draft with a document shared with you: kind answers (default, the letter answers "
                              "it) or reply (the document is the answer to the letter).",
      _obj({"letter_id": S_ID, "node_id": S_ID, "kind": {"type": "string", "enum": ["answers", "reply"]}, "requested_by": _RB["requested_by"]}, ["letter_id", "node_id"]),

@@ -582,7 +582,7 @@ draft the answer* at an incoming document shared with you, the event `letter_dra
 `requested_by` and an optional `note`: read the document (`get_document`), then create ONE `create_letter_draft` with
 `answers` = the `node_id` and `requested_by`: subject and text in the language of the document (no greeting line, no
 signature; recipient and reference line are prefilled from the document). `list_letter_drafts` shows the letters you made,
-`update_letter_draft` changes your own draft while it is one, `link_letter_document` links it with another document shared
+`update_letter_draft` changes your own draft while it is one (2.567.0: always with `expect_updated_at` from your last read; `409` = a person changed it since: read it again), `link_letter_document` links it with another document shared
 with you (`answers` or `reply`). You never send a letter, mark it as sent or delete one; a document that is not shared with
 you cannot be answered (ask the person to share it). Kalmido itself never phrases a letter: the formulation is yours.
 
