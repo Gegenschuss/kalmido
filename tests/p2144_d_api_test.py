@@ -112,8 +112,22 @@ check(CODE.replace("-", "") not in str(dbc.execute("SELECT value FROM settings W
 requests.get(B + "/api/auth/info", timeout=30)
 check(not dbc.execute("SELECT 1 FROM settings WHERE key='setup_code_start_hash'").fetchone(), "the operator's code stays the only one")
 dbc.execute("UPDATE settings SET value='1000' WHERE key='setup_code_op_until'")
+dbc.commit()
+
+
+def _starts():
+    lg0 = subprocess.run(["docker", "logs", CONTAINER], capture_output=True, text=True)
+    return (lg0.stdout + lg0.stderr).count("Setup code:")
+
+
+n_start, n_hits = _starts(), dbc.execute("SELECT COUNT(*) FROM rate_hits").fetchone()[0]
 r = s0.post(B + "/api/auth/setup", json=dict(SETUP, setup_code=CODE))
 check(r.status_code == 403 and "expired" in r.text, f"an expired operator code is refused {r.status_code} {r.text[:200]}")
+# 2.548.0 (#4518): the expired code is deleted, the process prints a start code again and the try counts as a failure
+check(dbc.execute("SELECT COUNT(*) FROM settings WHERE key IN ('setup_code_op_hash','setup_code_op_until')").fetchone()[0] == 0,
+      "#4518: an expired operator code is deleted from the database")
+check(_starts() == n_start + 1, f"#4518: after the expiry the process prints a new start code {_starts()} vs {n_start}")
+check(dbc.execute("SELECT COUNT(*) FROM rate_hits").fetchone()[0] > n_hits, "#4518: the expired code counts as a failed try")
 r = op("POST", "setup-code", TOKEN)
 CODE2 = r.json().get("setup_code", "") if r.ok else ""
 check(r.ok and CODE2 and CODE2 != CODE, "a new code")

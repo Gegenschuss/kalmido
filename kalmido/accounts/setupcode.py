@@ -118,25 +118,39 @@ def sh_code_check(c, code):
         return tr("Too many failed attempts, please wait a few minutes"), 429
     code = sh_norm(code) if isinstance(code, str) else ""
     got = _token_hash(code) if code else ""
+    dropped = False  # 2.750.0 (#4518): an expired operator's code was deleted
     if SH_CODE_ENV:  # a fixed code: unchanged, the operator's code does not apply
         wants = [_token_hash(sh_norm(SH_CODE_ENV))]
         op_hash = ""
     else:
         op_hash = gsetting(c, SH_OP_HASH)  # 2.144.0 D2 (#797): the operator's code, valid in every process
+        expired_hit = False
+        if op_hash:
+            try:
+                until = int(gsetting(c, SH_OP_UNTIL) or 0)
+            except ValueError:
+                until = 0
+            if until < time.time():
+                # 2.750.0 (#4518): an expired operator's code goes at once, so the process's start code comes back; the
+                # right but expired code counts as a failure. A refused setup commits the delete itself (the caller
+                # rolls back), a right start code takes it along with the setup's own commit.
+                expired_hit = bool(got) and hmac.compare_digest(got, op_hash)
+                c.execute("DELETE FROM settings WHERE key IN (?,?)", (SH_OP_HASH, SH_OP_UNTIL))
+                op_hash, dropped = "", True
         if not op_hash:
             sh_code_ensure(c)
-        wants = [_SH["hash"], op_hash, gsetting(c, SH_START_HASH)]  # 2.642.0 (#4975): + the code another process printed
-    if got and op_hash and hmac.compare_digest(got, op_hash):
-        try:
-            until = int(gsetting(c, SH_OP_UNTIL) or 0)
-        except ValueError:
-            until = 0
-        if until < time.time():
+        if expired_hit:
+            c.commit()
+            _rate_fail(keys)
             print("first setup: an expired operator setup code from", login_log_ip(client_ip()), flush=True)
             return tr("This setup code has expired. Ask your hoster for a new one."), 403
+        wants = [_SH["hash"], op_hash, gsetting(c, SH_START_HASH)]  # 2.642.0 (#4975): + the code another process printed
+    if got and op_hash and hmac.compare_digest(got, op_hash):
         c.execute("DELETE FROM settings WHERE key IN (?,?)", (SH_OP_HASH, SH_OP_UNTIL))  # used once: goes with the commit
         return None
     if not got or not any(w and hmac.compare_digest(got, w) for w in wants):
+        if dropped:
+            c.commit()  # 2.750.0 (#4518): the expired operator's code stays deleted
         _rate_fail(keys)
         print("first setup: wrong or missing setup code from", login_log_ip(client_ip()), flush=True)
         return tr("Wrong setup code. It is in the server log (docker compose logs kalmido)."), 403
