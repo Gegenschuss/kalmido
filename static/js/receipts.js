@@ -47,7 +47,8 @@ function rc_html() {
   return `${wrong}<h4 class="rc-h">${tr('Receipt')}</h4>${einv}${sug}${rc_confHtml(d)}
     <div class="row dc-f"><label for="rc-proj">${tr('Project')}</label>${projBtn}</div>
     <div class="row dc-f"><label for="rc-cat">${tr('Category')}</label><input id="rc-cat" data-rcf="category" value="${esc(r.category || '')}" maxlength="60" list="rc-cl" autocomplete="off" placeholder="${esc(tr('e.g. Travel, Material, Software'))}" ${w ? '' : 'disabled'}><datalist id="rc-cl">${d.categories.map(c => `<option value="${esc(c)}">`).join('')}</datalist></div>
-    <div class="row dc-f"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921)
+    <div class="row dc-f"><label for="rc-vat">${tr('VAT rate')}</label><select id="rc-vat" data-rcf="vat" ${w ? '' : 'disabled'}><option value="">${tr('unknown')}</option>${['19', '7', '0'].map(v => `<option value="${v}" ${r.vat_pct === v ? 'selected' : ''}>${v} %</option>`).join('')}</select></div>
+    <div class="row dc-f"><label for="rc-13b">${tr('Reverse charge')}</label><select id="rc-13b" data-rcf="rc13b" ${w ? '' : 'disabled'}>${[['', N_('No')], ['eu', N_('Service from a business in the EU (section 13b)')], ['other', N_('Other reverse charge (section 13b)')]].map(([v, t]) => `<option value="${v}" ${(r.rc13b || '') === v ? 'selected' : ''}>${tr(t)}</option>`).join('')}</select></div>`;  // 2.90.0 A (#1921); 2.545.0 (#4387): + reverse charge
 }
 // 2.540.0 (#4471): the receipt's project as a button with the project's icon and name (office_docproject.js dpj_rowHtml);
 // value = the list id (empty: none). A click opens tch_listPicker over the server's set (rc_state: the area's projects without
@@ -142,7 +143,7 @@ function rc_accBody(b) {
   box.querySelectorAll('[data-rcs]').forEach(f => { o[f.dataset.rcs] = f.value.trim(); });
   return o;
 }
-const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || '', vat_pct: RC.d?.receipt?.vat_pct ?? null});  // 2.90.0 A (#1921): + VAT rate
+const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || '', vat_pct: RC.d?.receipt?.vat_pct ?? null, rc13b: RC.d?.receipt?.rc13b || ''});  // 2.90.0 A (#1921): + VAT rate; 2.545.0 (#4387): + reverse charge
 async function rc_put(id, v) {
   const j = await api('PUT', `/api/docs/${id}/receipt`, v);
   if (RC.id === id) { RC.d = j; rc_draw(); }
@@ -157,6 +158,7 @@ document.addEventListener('change', async e => {
   const f = e.target.closest('.rc-slot [data-rcf]'); if (!f || !RC.d) return;
   const id = RC.id, from = rc_cur(), to = {...from};
   if (f.dataset.rcf === 'vat') to.vat_pct = f.value || null;  // 2.540.0 (#4471): the project has its own picker (rc_projPicker)
+  else if (f.dataset.rcf === 'rc13b') to.rc13b = f.value;  // 2.545.0 (#4387)
   else to.category = f.value.trim();
   try { await rc_put(id, to); } catch { rc_draw(); return; }
   const label = tr('Changed receipt');

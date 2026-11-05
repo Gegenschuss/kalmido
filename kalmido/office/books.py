@@ -45,6 +45,9 @@ PERIOD_RE = re.compile(r"^(m(0[1-9]|1[0-2])|q[1-4]|y)$")  # 2.122.0 D (#2315): y
 DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 # document groups of a document without VAT by its note (2.355.0 C #2844: + eu_goods = field 41, export = field 43)
 BK_NOVAT_GROUPS = ("small", "reverse", "abroad", "eu_goods", "export")
+# 2.545.0 (#4387): the reverse charge marks of a receipt (rc_receipts.rc13b, section 13b UStG): eu = a service of a business in
+# another EU state (section 13b (1), UStVA 46 / 47), other = section 13b (2) no. 1, 2, 4-12 (84 / 85); input tax of both: 67
+BK_RC13B = ("eu", "other")
 BK_LIST_MAX = 500  # rows behind the VAT return figures / of the receipts list
 # 2.355.0 C (#2841): the day a payment counts on: a reversal line (p, its payment o joined) on the day of its payment
 BK_PAY_DAY = "COALESCE(NULLIF(o.date, ''), p.date)"
@@ -134,7 +137,7 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
     day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
-    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
+    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
                      f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                      f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
                      (ws, frm, to)).fetchall()
@@ -161,8 +164,14 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
         cur, rate = bk_home_rate(r["currency"], s)
         gross = money(a / rate if rate else a)
         vat_pct = r["vat_pct"] if r["vat_pct"] in BK_VAT else None
+        rc13b = r["rc13b"] if r["rc13b"] in BK_RC13B else ""
+        rc13b_pct = None
+        if rc13b:  # 2.545.0 (#4387): the bill shows no VAT (the amount is net, no input tax paid to the supplier); the office
+            rc13b_pct = "7" if vat_pct == "7" else "19"  # owes it at its own rate: 7 when chosen, else 19 (bk_ustva 47 / 85 = 67)
+            vat_pct = "0"
         net, vat = _split(gross, vat_pct)
         out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
+                    "rc13b": rc13b, "rc13b_pct": rc13b_pct,
                     "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
                     "unrated": cur if rate is None else None,  # 2.189.0 B (#2475): a foreign receipt without office rate
                     "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None})  # 2.420.0 C (#3448)
@@ -542,11 +551,15 @@ def bk_ustva(c, oid, year, period):
             items.append({"kind": "skonto", "doc_id": r["id"], "number": r["number"], "date": sk["day"], "gross": dstr(money(minus)),
                           "source": "skonto"})
     kz66, missing = Decimal(0), 0
+    r13 = {"eu": [Decimal(0), Decimal(0)], "other": [Decimal(0), Decimal(0)]}  # 2.545.0 (#4387): [base, tax] of 46 / 47, 84 / 85
     for rc in bk_receipts(c, oid, frm, to, by="doc"):
+        if rc["rc13b"]:
+            x = r13[rc["rc13b"]]
+            x[0], x[1] = x[0] + rc["net"], x[1] + money(rc["net"] * dec(rc["rc13b_pct"]) / 100)
         kz66 += rc["vat"]
         missing += rc["vat_pct"] is None
         items.append({"kind": "receipt", "node_id": rc["node_id"], "title": rc["title"], "date": rc["date"], "gross": dstr(rc["amount"]),
-                      "vat": dstr(rc["vat"]), "vat_pct": rc["vat_pct"]})
+                      "vat": dstr(rc["vat"]), "vat_pct": rc["vat_pct"], "rc13b": rc["rc13b"] or None})
     # 2.534.0 (#4333): the input tax of the approved entertainment receipts counts in full (by the day of the meal)
     for m in ofc_meals_home(c, oid, frm, to, s):
         kz66 += m["vat"]
@@ -559,13 +572,19 @@ def bk_ustva(c, oid, year, period):
     kz36 = money(sum((sums[k][1] for k in others), Decimal(0)))  # mixed rates: the tax itself, not computed from the base
     t19, t7 = money(kz81 * 19 / 100), money(kz86 * 7 / 100)
     kz66 = money(kz66)
-    kz83 = t19 + t7 + kz36 - kz66
+    # 2.545.0 (#4387): section 13b as the recipient (BMF, Vordruckmuster USt 1 A 2026 of 29.12.2025): 46 / 84 = the base
+    # (whole euros), 47 / 85 = the tax owed (cents, summed per receipt at its rate), 67 = the same tax as input tax (section 15
+    # (1) no. 4 UStG) -- adds up to 0 in 83 for an office with full input tax deduction; the tax advisor checks (#1153)
+    kz47, kz85 = money(r13["eu"][1]), money(r13["other"][1])
+    kz67 = kz47 + kz85
+    kz83 = t19 + t7 + kz36 + kz47 + kz85 - kz66 - kz67
     e = lambda v: str(int(v))  # noqa: E731 -- bases: whole euros
     # 2.355.0 C (#2841, #2844): + 41 goods to EU businesses, 43 exports (tax-free with input tax), 48 other tax-free sales
     # (section 4 no. 8-28 UStG, without input tax), 60 reverse charge at home (section 13b) -- the tax advisor checks (#1153)
     kz = {"81": e(kz81), "86": e(kz86), "35": e(kz35), "36": dstr(kz36), "21": e(_euro_floor(b("reverse"))),
           "41": e(_euro_floor(b("eu_goods"))), "43": e(_euro_floor(b("export"))), "45": e(_euro_floor(b("abroad"))),
-          "48": e(_euro_floor(b("exempt"))), "60": e(_euro_floor(b("reverse_dom"))), "66": dstr(kz66), "83": dstr(kz83)}
+          "48": e(_euro_floor(b("exempt"))), "60": e(_euro_floor(b("reverse_dom"))), "66": dstr(kz66), "83": dstr(kz83),
+          "46": e(_euro_floor(r13["eu"][0])), "47": dstr(kz47), "84": e(_euro_floor(r13["other"][0])), "85": dstr(kz85), "67": dstr(kz67)}
     return dict(head, small_business=False, kz=kz, tax={"19": dstr(t19), "7": dstr(t7)},
                 exempt_other=dstr(money(b("exempt"))), missing_vat=missing, items=items[:BK_LIST_MAX], items_more=len(items) > BK_LIST_MAX)
 
@@ -573,7 +592,8 @@ def bk_ustva(c, oid, year, period):
 # ---------------------------------------------------------------- routes
 def _rc_public(rc):
     return {"node_id": rc["node_id"], "title": rc["title"], "date": rc["date"], "amount": dstr(rc["amount"]), "vat_pct": rc["vat_pct"],
-            "net": dstr(rc["net"]), "vat": dstr(rc["vat"]), "category": rc["category"], "paid_at": rc["paid_at"]}
+            "net": dstr(rc["net"]), "vat": dstr(rc["vat"]), "category": rc["category"], "paid_at": rc["paid_at"],
+            "rc13b": rc["rc13b"] or None}  # 2.545.0 (#4387)
 
 
 @app.get("/api/office/books")

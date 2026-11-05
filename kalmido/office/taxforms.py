@@ -92,6 +92,8 @@ TF_UST = {
            "calc_sub": (114, None), "calc_pre": (115, None), "due": (122, None), "left": (124, 816), "adv": (125, None), "final": (126, 820)}}
 TF_UST_SUMS = ("sum_tax", "sum_pre", "calc_sub", "due", "left", "final")
 TF_NO_YEAR = N_("There is no line assignment for the tax year {0} yet: the official form is not in Kalmido. Please use the figures of the income/expense statement.")
+# 2.545.0 (#4387): receipts with reverse charge (UStVA 46 / 84, 67) have no lines in TF_UST yet (the tax advisor, #1153)
+TF_13B = N_("Receipts with reverse charge (section 13b): base {0} / {1}, tax and input tax {2} each. They are not on the lines above yet; please enter them in the section 13b part of the form.")
 TF_NOTE = N_("Please check the figures before filing. Nothing is sent to ELSTER.")
 
 
@@ -216,6 +218,8 @@ def tf_ust(c, oid, year):
         notes.append(tr("Advance payments: the sum of the advance returns as Kalmido computes them, without a special advance payment. Please compare with what you filed."))
     elif mode == "none":
         notes.append(tr("Advance payments are 0 because no rhythm is set under tax dates. Please enter what you filed."))
+    if int(z["46"]) or int(z["84"]):  # 2.545.0 (#4387): no lines of the annual return for them yet (the tax advisor, #1153)
+        notes.append(tr(TF_13B, z["46"], z["84"], z["67"]))
     if int(z["48"]):
         notes.append(tr("Tax-free sales: please check the line and enter the section of the law on the form."))
     if d["currency"] != "EUR":

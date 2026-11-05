@@ -104,7 +104,7 @@ def rcl_all(c, oid, f, uid, own=False):
     home = _home(s)
     day = ("COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if f["by"] == "paid"
            else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))")
-    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.paid_at, r.category, r.list_id, r.list_name, d.doc_date, d.due_date, d.amount, d.currency, "
+    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.category, r.list_id, r.list_name, d.doc_date, d.due_date, d.amount, d.currency, "
                      f"d.sender_id, d.ws, d.extracted, d.rchk, d.rchk_at, d.rchk_ok, d.updated_at, d.type_id, r.set_at, r.submitted_by, r.checked_at, r.checked_by, n.name, n.mime, n.size, {day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id "
                      f"JOIN fs_nodes n ON n.id=r.node_id WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? "
                      + ("AND COALESCE(n.created_by, n.owner_id)=? " if own else "")
@@ -132,6 +132,8 @@ def rcl_all(c, oid, f, uid, own=False):
         cur = hc_code(r["currency"]) or (r["currency"] or "").strip().upper() or home  # 2.189.0 B (#2475): also "£"
         gross = money(bk_to_home(a, cur, s))
         vat_pct = r["vat_pct"] if r["vat_pct"] in BK_VAT else None
+        if r["rc13b"]:  # 2.545.0 (#4387): reverse charge -- no VAT on the bill, as books.bk_receipts
+            vat_pct = "0"
         net, vat = _split(gross, vat_pct)
         lid = r["list_id"]
         if lid and lid not in lists:

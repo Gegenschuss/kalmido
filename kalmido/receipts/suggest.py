@@ -212,6 +212,7 @@ def rc_state(c, node, m, uid):
     cur = {"project": {"id": lid, "name": _list_name(c, lid) if list_role(c, lid, uid) else None} if lid else None,
            "category": (r["category"] or None) if r else None, "set_by": _who(c, r["set_by"]) if r else None,
            "vat_pct": r["vat_pct"] if r else None, "paid_at": r["paid_at"] if r else None, "is_receipt": bool(r)}  # 2.90.0 A (#1921)
+    cur["rc13b"] = (r["rc13b"] or None) if r else None  # 2.545.0 (#4387): reverse charge mark (office/books.py BK_RC13B)
     cur["checked_at"] = r["checked_at"] if r else None  # 2.420.0 C (#3448): a person's tick (office/receiptlist.py)
     cur["checked_by"] = _who(c, r["checked_by"]) if r and r["checked_at"] else None
     sugs = [rc_sug_json(c, s, uid) for s in c.execute("SELECT * FROM rc_suggest WHERE node_id=? AND state='open' ORDER BY id", (node["id"],))]
@@ -269,15 +270,16 @@ def rc_get(nid):
 
 @app.put("/api/docs/<int:nid>/receipt")
 def rc_put(nid):
-    """{project_id: id|null, category: text, vat_pct?: "19"|"7"|"0"|null, keep?: bool} -- a person sets the assignment (role
-    edit); all empty = none. 2.90.0 A (#1921): vat_pct (left as it is when missing); keep = it stays a receipt when empty."""
+    """{project_id: id|null, category: text, vat_pct?: "19"|"7"|"0"|null, keep?: bool, rc13b?: ""|"eu"|"other"} -- a person sets
+    the assignment (role edit); all empty = none. 2.90.0 A (#1921): vat_pct (left as it is when missing); keep = it stays a receipt
+    when empty. 2.545.0 (#4387): rc13b = reverse charge (section 13b UStG; left as it is when missing; set = it stays a receipt)."""
     _person()
     c = db()
     uid = me()
     n, m = rc_doc(c, nid, write=True)
     rc_office_need(c, m, uid)  # 2.237.0 A (#2861)
     b = body()
-    extra = sorted(set(b) - {"project_id", "category", "vat_pct", "keep"})
+    extra = sorted(set(b) - {"project_id", "category", "vat_pct", "keep", "rc13b"})
     if extra:
         return err(tr("Unknown field: {0}", ", ".join(extra)[:200]))
     try:
@@ -285,10 +287,15 @@ def rc_put(nid):
         vat = rc_vat_clean(b["vat_pct"]) if "vat_pct" in b else _KEEP
     except BadInput as e:
         return err(str(e))
+    r13 = b.get("rc13b")  # 2.545.0 (#4387)
+    if "rc13b" in b and r13 not in (None, "", "eu", "other"):
+        return err(tr("Invalid value: {0}", "rc13b"))
     if lid and not rc_project_ok(c, lid, n, uid):
         return err(tr("Choose a project of this workspace"))
-    pl_receipt_need_open(c, nid, becoming=bool(cat or lid or b.get("keep") is True or vat not in (_KEEP, None)))  # 2.148.0 A (#2471)
-    rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True)
+    pl_receipt_need_open(c, nid, becoming=bool(cat or lid or b.get("keep") is True or bool(r13) or vat not in (_KEEP, None)))  # 2.148.0 A (#2471)
+    rc_set(c, n, m["ws"], lid, cat, uid, vat, keep=b.get("keep") is True or bool(r13))
+    if "rc13b" in b:
+        c.execute("UPDATE rc_receipts SET rc13b=? WHERE node_id=?", (r13 or "", nid))
     fs_log_add(c, nid, "receipt")
     bump(c)
     c.commit()
