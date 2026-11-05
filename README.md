@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.541.0** (2026-11-05):
-- **Trash**: comments, chat messages and habits go into the trash with their files; "Delete all times" can be restored.
-- **Office**: cash book and cash flow book invoices correctly; archive import recognises more invoice file names.
-- **Data safety**: CSV and bank imports name skipped rows; delete dialogs say what goes along.
-- **Backups**: the last three manual backups are kept; sign-in lock survives a restart.
+**2.543.0** (2026-11-05):
+- **Tables**: a trash view for rows, columns and tables; conflicting online changes show the conflict dialog instead of overwriting.
+- **Office**: entertainment receipts in EÜR and VAT; reverse charge worked out from the client's country; quotation mails warn when the terms are missing.
+- **Security**: support sessions cannot book or change accounts; locked projects keep no plain-text notes; sign-in and browser encryption hardened.
+- **Layout**: one width system on wide screens; booking pages can delete bookings.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -69,6 +69,10 @@ code** for the first account at the end. The scripts are in this repository: [in
 curl -fsSL https://kalmido.com/install.sh | sh
 ```
 
+If the port is busy, the installer prints the command to retry with another one, e.g. `KALMIDO_PORT=3050 ./update.sh` (or `curl ... | KALMIDO_PORT=3050 sh`); `PUBLIC_URL` follows while it is still `http://localhost:<port>`.
+
+**Uninstall:** `docker compose --profile '*' down -v`, `docker image rm <image> postgres:17 clamav/clamav:1.4`, then `sudo rm -rf` the folder (the database files belong to the container's user). Copy `data/backups/` and `secret/kalmido.key` first if you want them.
+
 The same without the website:
 
 ```sh
@@ -86,7 +90,7 @@ curl -fsSL https://github.com/Gegenschuss/kalmido/releases/latest/download/insta
 ```sh
 git clone https://github.com/Gegenschuss/kalmido.git
 cd kalmido
-git checkout "$(git tag --sort=-v:refname | head -n 1)"   # the latest release
+git checkout "$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/Gegenschuss/kalmido/releases/latest | sed 's#.*/##')"   # the latest release (same as the installer)
 cp .env.example .env        # set TZ, PUBLIC_URL and POSTGRES_PASSWORD at least
 mkdir -p data secret        # create them yourself, so the container (user 1000) may write them
 docker compose up -d --build
@@ -112,14 +116,16 @@ Open it: the first start shows a **setup page** that creates the first account (
 **one-time setup code** that only the server's log shows (`docker compose logs kalmido`, a framed block *Kalmido first
 setup*), so nobody else who reaches a fresh server first can make themselves its admin. The code works once; a
 restart prints a new one; wrong codes are rate limited like logins. For tests and automation only:
-`KALMIDO_SETUP_CODE=<fixed code>` or `KALMIDO_SETUP_CODE=off` in `.env`. A second step asks **what you want to use**, with three
-starting points:
+`KALMIDO_SETUP_CODE=<fixed code>` or `KALMIDO_SETUP_CODE=off` in `.env`. A second step asks **what you want to use**, with six starting points:
 
-| Preset | For | On |
+| Card | For | On |
 |---|---|---|
-| **Simple list** (preselected) | a plain to-do list, a household | projects, subtasks, reminders, the calendar |
-| **Just me** | one person who likes views | also timeline, kanban, matrix, habits, focus, statistics, project progress, comments |
-| **Projects & team** | small teams up to about ten people, e.g. an agency | everything: sharing, assigning, comments, time tracking, the Gantt timeline with dependencies, custom fields |
+| **For me** (preselected) | your own tasks | projects, reminders, the calendar, events and contacts; more views any time under *Settings > Modules* |
+| **Home** | your household and life | adds contracts, warranties and upkeep, staying in touch, health, a journal, trips, read later and the review of your day and week |
+| **Family** | a family | shared projects, a shopping list with shop areas, household chores taking turns, birthdays, a meal plan and accounts for children |
+| **Team** | small teams, for example an agency | sharing, assigning, comments, time tracking, a timeline with dependencies, custom fields, project progress and agents |
+| **Software projects** | a software team | everything of Team plus a software project: a board from backlog to done, bug and feature tickets, a repository |
+| **Office & finance** | a business | everything of Team plus clients, workload, forms and the office: services and rates, quotations with a calculator, text blocks and PDF documents |
 
 Under *Customize…* below the cards you can switch single modules on or off (the matching card stays highlighted),
 and pick the language; *Start* stays in view. The modules become the default for new users; collaboration and time tracking are switches for the whole
@@ -232,7 +238,7 @@ The pictures on this page show the light design; here are a few views in dark.
 
 ## Updating
 
-Kalmido follows [semantic versioning](https://semver.org/); every release is listed in [CHANGELOG.md](CHANGELOG.md)
+Every release is listed in [CHANGELOG.md](CHANGELOG.md)
 and on the [releases page](https://github.com/Gegenschuss/kalmido/releases). *Settings > Help* shows the running version
 and, since 2.27.0, the version of the app in that window. A window that was open across an update shows *New version
 available – Reload* and reloads by itself once nothing is being typed.
@@ -243,7 +249,9 @@ How to update depends on how you installed:
 |---|---|
 | the installer | `~/kalmido/update.sh` (Windows: `update.ps1`): backs up the database to `data/backups/` (from 2.37 a `pg_dump`; Windows: `update.ps1` also makes a `pg_dump` into `data/backups/`; only while the `db` service of this installation runs: with an external `DATABASE_URL`, or with Kalmido stopped, it warns and goes on without a copy), adds a database password to `.env` if missing, then fetches the latest release and restarts |
 | prebuilt image (`KALMIDO_IMAGE`) | set the new version in `KALMIDO_IMAGE` (or use `:latest`), then `docker compose pull && docker compose up -d` (2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`) |
-| git + local build | `git fetch --tags && git checkout "$(git tag -l 'latest-ok/*' --sort=-v:refname \| head -n 1)" && docker compose up -d --build` (takes the newest tested version; a `v*` tag can be newer; 2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
+| git + local build | `git fetch --tags && git checkout "$(curl -fsSI -o /dev/null -w '%{redirect_url}' https://github.com/Gegenschuss/kalmido/releases/latest \| sed 's#.*/##')" && docker compose up -d --build` (takes the latest release, the same one the installer takes; a newer `v*` tag may have no release yet; 2.149: `.env` needs a `COMPOSE_PROFILES` line, e.g. `COMPOSE_PROFILES=localdb,clamav`, and Docker Compose 2.20+; the installer adds it) |
+
+A version number alone does not tell you whether an update needs a step from you: read [docs/UPGRADING.md](docs/UPGRADING.md) first.
 
 Back up first (*Back up now*, see *Backups and restore*). The database migrates itself on start; going back is limited: see docs/UPGRADING.md (what each version needs, format limits, never below 2.149).
 
@@ -298,7 +306,7 @@ setup); an existing server keeps its setting. *Back up now* makes one at any tim
 project). You type `RESTORE` to confirm. Kalmido then:
 
 1. checks the archive completely: only the expected members (listed in docs/SELF-HOSTING.md, *Moving to a new server*),
-   no paths outside, no links, no folders), size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
+   no paths outside, no links, no folders, size and member limits (`KALMIDO_BACKUP_MAX_MB`), compression ratio (zip
    bombs), free disk space, every SHA-256 while extracting, the dump's table of contents and statements (only tables,
    data, sequences, indexes, constraints and plain defaults are taken; functions, triggers and access rules are always
    rebuilt by Kalmido), a schema version this Kalmido can migrate (a backup from a newer version is refused);
