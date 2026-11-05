@@ -178,6 +178,14 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   (`migr_kern4712`) gave every calendar / book with members its node, a new member gets it first. With a live node only the
   core's share counts, so a share taken back in the core (the file store's dialog, `obj_revoke_person`) stays taken back;
   without one the old row is still read. Stage 7 removes the old tables and the trigger.
+- The node is the truth as soon as it exists (review of 2.566.0): a node made by any path (the first member, a share in the
+  core, filing it in a folder) mirrors all member rows the object has at that moment; a node in the file store's trash is
+  still the node (no share counts then, the old rows are not read again), and while it carries shares it does not go there
+  on its own (the file store's protect hook), only with the object; a node removed for good first writes its shares to people
+  and agents back into the member rows (trigger `kalmido_kern_node_gone`). An object that becomes private (its owner leaves
+  without an heir, the organisation retires) keeps its node: it follows into the owner's private tree
+  (`accounts/orgretain.py obj_nodes_follow`). A workspace move checks the node's shares (`accounts/orgs.py obj_org_set`): a
+  person or agent who does not fit the new workspace, or a group's share, is a 409.
 - The calendar's settings are written by `obj_write`, the calendar goes into the core's trash with its events
   (`ev_cal_trash`, restore `POST /api/evcals/<id>/restore`, purged with the events' trash run). Events are no kind of their
   own (their series, attendees and iCalendar have rules of their own): every change runs under the series lock
