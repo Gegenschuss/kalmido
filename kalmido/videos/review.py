@@ -39,7 +39,7 @@ from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from function
 from ..team.clients import client_rows  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import office_role  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import org_sees_all, org_writes  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin, user_orgs  # 2.369.5 (#2517): pulled up from functions; 2.549.0 (#4536): user_orgs
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from ..office.signoff import sig_create, sig_expiry, sig_public, SIG_PREFIX, sig_lang, sig_open  # 2.369.5 (#2517): pulled up from functions
@@ -450,12 +450,18 @@ def vdr_trash():
     if vdr_is_agent(c, uid):
         raise Denied(404)  # like the other routes of the app for agents
     # a private review without a place is only its owner's; the rest is checked one by one (vdr_may, the tenant boundary first)
-    rows = c.execute("SELECT * FROM video_reviews WHERE deleted_at IS NOT NULL AND (org_id IS NOT NULL OR owner_id=? OR created_by=? "
-                     "OR task_id IS NOT NULL OR list_id IS NOT NULL OR client_id IS NOT NULL) ORDER BY deleted_at DESC, id DESC LIMIT 500",
-                     (uid, uid)).fetchall()
+    # 2.549.0 (#4536, review): organisation rows only of the person's own organisations, and no LIMIT before the check -
+    # on a hosted instance other tenants' rows could have pushed the own ones out (the trash is pruned, so it stays small)
+    orgs = [int(o) for o in user_orgs(c, uid)]
+    org_sql = f"org_id IN ({','.join('?' * len(orgs))})" if orgs else "1=0"
+    rows = c.execute("SELECT * FROM video_reviews WHERE deleted_at IS NOT NULL AND (" + org_sql + " OR (org_id IS NULL AND (owner_id=? "
+                     "OR created_by=? OR task_id IS NOT NULL OR list_id IS NOT NULL OR client_id IS NOT NULL))) ORDER BY deleted_at DESC, id DESC",
+                     (*orgs, uid, uid)).fetchall()
     out = []
     for r in rows:
-        if len(out) >= 200 or not vdr_may(c, uid, r):
+        if len(out) >= 200:
+            break
+        if not vdr_may(c, uid, r):
             continue
         vs = vdr_versions(c, r["id"])
         out.append({"id": r["id"], "title": r["title"], "org_id": r["org_id"], "space": vdr_space_key(r["org_id"]),
