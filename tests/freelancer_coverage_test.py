@@ -61,7 +61,8 @@ KINDS = {
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
-               "of such a person reads and comments them through the API v1"),
+               "of such a person reads and comments them through the API v1; p2549_c_vtrash_test.py (2.549.0): her video trash, a review "
+               "without a place restored into her project"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private workspace of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
@@ -820,6 +821,7 @@ ROUTES = {
     "DELETE /api/videos/{}/comments/{}": "videos", "POST /api/videos/{}/comments/{}/restore": "videos",
     "GET /api/videos/{}/export": "videos", "POST /api/videos/{}/signoff": "videos", "POST /api/videos/{}/signoffs/{}/revoke": "videos",
     "POST /api/videos/{}/move-space": "videos",
+    "GET /api/videos/trash": "videos",  # 2.549.0 (#4536): the video trash of the app (p2549_c_vtrash_test.py)
     # 2.99.1 C (#1959): video sign-offs for agents (videos/v1.py; p2991_c_api_test.py)
     "GET /api/v1/videos": "videos", "GET /api/v1/videos/{}": "videos", "POST /api/v1/videos/{}/comments": "videos",
     "PATCH /api/v1/videos/{}/comments/{}": "videos",

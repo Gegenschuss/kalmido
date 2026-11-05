@@ -177,3 +177,49 @@ async function trEmpty() {
   render();
   if (r.kept) toast(trn('{0} item stays: it is in a project of another owner', '{0} items stay: they are in projects of other owners', r.kept), null, 6000);  // 2.0.5 (#310)
 }
+// 2.549.0 (#4536): the video trash in the trash view (render.js viewHistory, stand-in lazyload.js LD_VIEW): video sign-offs in
+// their trash (the own ones, the organisation's ones one sees: GET /api/videos/trash), with the days until they go for good and
+// "Restore". One without a place (its task / project / client was deleted for good, videos/vdrescue.py) goes into a project of
+// its workspace chosen here, so it shows at that project again; without any project there it opens after the restore.
+const VTR = {items: null, days: 0, purge: true, at: 0};
+async function vtr_load(force) {
+  if (!force && VTR.at && Date.now() - VTR.at < 30000) return;
+  VTR.at = Date.now();
+  try { const j = await api('GET', '/api/videos/trash'); VTR.items = j.reviews || []; VTR.days = j.trash_days || 0; VTR.purge = j.purge_on !== false; } catch { VTR.items = VTR.items || []; return; }
+  if (S.route.key === 'trash') renderView();
+}
+const vtr_left = x => { if (!VTR.days || !VTR.purge || trashKeeps() || !x.deleted_at) return null; return Math.max(0, Math.ceil((Date.parse(x.deleted_at) + VTR.days * 864e5 - Date.now()) / 864e5)); };
+const vtr_place = x => x.list_id ? lname(listById(x.list_id)) || tr('Project') : x.task_id ? tr('Task') : x.client_id ? tr('Client') : tr('Without a place');
+function vtr_html() {
+  vtr_load();
+  const xs = (VTR.items || []).filter(x => wsObjIn({org_id: x.org_id}));
+  if (!xs.length) return '';
+  return `<div class="group vtrlist"><div class="ghead">${esc(tr('Video sign-offs'))} <span class="c">${xs.length}</span></div>`
+    + xs.map(x => { const d = vtr_left(x); return `<div class="mrow otrrow vtrrow" data-vtr="${+x.id}"><span class="n"><b>${esc(x.title || tr('Video'))}</b><small class="muted">${esc([tr('In the trash since {0}', fmtDate((x.deleted_at || '').slice(0, 10))), vtr_place(x), x.version ? 'v' + x.version : '', x.org_id && wsLabel(x.org_id), d != null ? trn('Deleted for good in {0} day', 'Deleted for good in {0} days', d) : ''].filter(Boolean).join(' · '))}</small></span>`
+      + `<span class="oadmb">${x.can_restore ? `<button type="button" class="btn sm" data-vtra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button>` : ''}</span></div>`; }).join('')
+    + (VTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Video sign-offs in the trash are deleted for good after {0} day.', 'Video sign-offs in the trash are deleted for good after {0} days.', VTR.days), !VTR.purge))}</div>` : '') + '</div>';
+}
+async function vtr_restore(id) {
+  const x = (VTR.items || []).find(y => y.id === id); if (!x) return;
+  let lid = null;
+  if (!x.task_id && !x.list_id && !x.client_id) {
+    const ls = (S.lists || []).filter(l => !l.is_inbox && !l.archived && !l.e2e && (l.org_id || null) === (x.org_id || null) && canEditList(l.id));
+    if (ls.length) {
+      lid = ls[0].id;
+      const html = `<p>${esc(tr('Its place was deleted for good. Choose the project it goes to.'))}</p><label class="fl">${esc(tr('Project'))}<select id="vtr-pl">${ls.map(l => `<option value="${l.id}">${esc(lname(l))}</option>`).join('')}</select></label>`;
+      if (!await askConfirm(tr('Restore “{0}”', x.title || tr('Video')), '', {html, ok: tr('Restore'),
+        after: md => md.addEventListener('change', e => { if (e.target.id === 'vtr-pl') lid = +e.target.value; })})) return;
+    }
+  }
+  try { await api('POST', `/api/videos/${id}/restore`, lid ? {list_id: lid} : {}); } catch { return; }  // api() said why
+  toast(tr('Restored'));
+  if (typeof vdr_forget === 'function') vdr_forget();  // the sections of the project / task show it again
+  VTR.items = VTR.items.filter(y => y.id !== id); VTR.at = 0;
+  renderView();
+  if (!lid && !x.task_id && !x.list_id && !x.client_id) loadModule('videos').then(() => vdr_open(id), () => {});  // no project to go to: it opens
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest?.('[data-vtra]'); if (!b) return;
+  e.preventDefault();
+  vtr_restore(+b.closest('[data-vtr]')?.dataset.vtr);
+});

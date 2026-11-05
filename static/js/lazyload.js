@@ -139,6 +139,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   tvc_micHtml: ['voice'], tvc_playerHtml: ['voice'],  // 2.139.0 B (#2128): the team chat's composer / an audio file load voice.js
   ntTrashHtml: ['notetrash'],  // 2.272.0 E1 (#3038)
   ms_clTrashHtml: ['trashui', 1], povTrashHtml: ['trashui'],  // 2.272.0 G (#3038)
+  vtr_html: ['trashui'],  // 2.549.0 (#4536): the video sign-offs in the trash view
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1]};  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
 // 2.102.0 C (#2208) scheduling polls (polls.js, module polls): the switch and the start points' clicks stay at start (moved
 // here): "Find a date" in the calendar bar and in a task (calevents.js), a client's "…" menu (tpo_forClient, a stand-in)

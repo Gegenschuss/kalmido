@@ -29,7 +29,7 @@ from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#
 from ..core.access import Denied, FULL_ROLES, WRITE_ROLES, acx_org_ok, list_role, task_visible
 from ..office.signoff import sig_people  # 2.266.0 (#2965)
 from ..core.db import body, db, err, iso, now_utc
-from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
+from ..core.retention import ret_on, ret_report, ret_trash_cut, ret_trash_days  # 2.272.0 A (#3026); 2.549.0 (#4536): ret_trash_days
 from ..core.i18n import N_, csv_dialect, tr
 from ..core.pg import insert_id, write_lock
 from ..accounts.session import me, rate_ip
@@ -441,13 +441,48 @@ def vdr_delete(vid):
     return jsonify(ok=True)
 
 
+@app.get("/api/videos/trash")
+def vdr_trash():
+    """2.549.0 (#4536): the reviews in the video trash the person may see (their own, the organisation's ones they see, those
+    at a task / project / client they see; the same vdr_may as restore) -> {reviews: [{id, title, org_id, space, task_id,
+    list_id, client_id, deleted_at, version, can_restore}], trash_days, purge_on}. The trash section of the app (trashui.js)."""
+    c, uid = db(), me()
+    if vdr_is_agent(c, uid):
+        raise Denied(404)  # like the other routes of the app for agents
+    # a private review without a place is only its owner's; the rest is checked one by one (vdr_may, the tenant boundary first)
+    rows = c.execute("SELECT * FROM video_reviews WHERE deleted_at IS NOT NULL AND (org_id IS NOT NULL OR owner_id=? OR created_by=? "
+                     "OR task_id IS NOT NULL OR list_id IS NOT NULL OR client_id IS NOT NULL) ORDER BY deleted_at DESC, id DESC LIMIT 500",
+                     (uid, uid)).fetchall()
+    out = []
+    for r in rows:
+        if len(out) >= 200 or not vdr_may(c, uid, r):
+            continue
+        vs = vdr_versions(c, r["id"])
+        out.append({"id": r["id"], "title": r["title"], "org_id": r["org_id"], "space": vdr_space_key(r["org_id"]),
+                    "task_id": r["task_id"], "list_id": r["list_id"], "client_id": r["client_id"], "deleted_at": r["deleted_at"],
+                    "version": vs[-1]["n"] if vs else 0, "can_restore": vdr_may(c, uid, r, write=True)})
+    return jsonify(reviews=out, trash_days=ret_trash_days(), purge_on=bool(ret_on("trash")))
+
+
 @app.post("/api/videos/<int:vid>/restore")
 def vdr_restore(vid):
+    """Back from the trash. 2.549.0 (#4536): {list_id?} = a review without a place (its task / project / client was deleted
+    for good, videos/vdrescue.py) goes into this project of its own workspace (the person may write there, not locked):
+    a review always has a place in the app again. Without it the review comes back where it hangs now (the undo)."""
     c, uid = db(), me()
     vdr_need(c, vid, deleted=True)
     r = vdr_reload(c, vid)
     if not vdr_may(c, uid, r, write=True):
         raise Denied(403)
+    b = body()
+    lid = b.get("list_id") if isinstance(b, dict) else None
+    if lid not in (None, "", 0):
+        if r["task_id"] or r["list_id"] or r["client_id"]:
+            raise Denied(409, tr("Invalid value: {0}", "list_id"))  # it has a place: it goes back there
+        o, _t, lid, _k = vdr_target(c, uid, {"list_id": lid})
+        if (o or None) != (r["org_id"] or None):
+            raise Denied(409, tr("Invalid value: {0}", "list_id"))  # another workspace: that is "Move to another workspace"
+        c.execute("UPDATE video_reviews SET list_id=? WHERE id=?", (lid, vid))
     c.execute("UPDATE video_reviews SET deleted_at=NULL WHERE id=?", (vid,))
     c.commit()
     return jsonify(vdr_dict(c, vdr_reload(c, vid), uid, full=True))
