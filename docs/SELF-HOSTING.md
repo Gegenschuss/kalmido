@@ -724,7 +724,7 @@ instead of naming a period, and no row counts down its days.
 
 **Legal periods (2.545).** What the law keeps (receipts and invoices 8 years, books 10, the logbook 8, sent business
 letters 6, from the end of the year) is locked for the law plus `KALMIDO_RETENTION_BUFFER_YEARS` (default 1 year; 0 =
-exactly the law, a negative value counts as 0). Settings > Server > Deletion runs shows the buffer. An office whose admin
+exactly the law, a negative value counts as 0). Settings > Organisation > Data > Deletion runs shows the buffer. An office whose admin
 switched on *Extend the lock* (office settings > Data, a tax audit is open) keeps all of it also after the period: no
 trash run, archive run, deletion of the organisation or of the account with that personal office removes it until the
 switch is off again (409 with the reason).
