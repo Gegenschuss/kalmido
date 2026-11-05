@@ -75,7 +75,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#lgb-dest').value = 'Lübeck Nord'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `/reason/.test(document.querySelector('.modal .aerr')?.textContent || '')`, 12), '#2169: without a reason the correction is not saved');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#lgb-fixnote').value = 'Falsches Ziel'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
-    check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.lgb-list .lgb-row').length === 2`), '#2169: the correction is saved, the old drive stays');
+    // 2.559.0 (#4660): the correction shows at once as a provisional row; the mark "Corrected" of the old drive comes with the list fetched after the answer
+    check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.lgb-list .lgb-row').length === 2 && /Corrected/.test(document.querySelector('.lgb-list').textContent)`), '#2169: the correction is saved, the old drive stays');
     const txt = await ev(`document.querySelector('.lgb-list').textContent`);
     check(/Corrected/.test(txt) && /Correction/.test(txt), '#2169: the list marks the corrected drive and the correction ' + txt.slice(0, 200));
     await shot('p2103-c-logbook.png');
