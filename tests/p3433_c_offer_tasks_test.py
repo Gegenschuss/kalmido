@@ -213,6 +213,8 @@ Q, Q2, L = scenario(A, "alice", shoot=True, member=Bo)
 check(Bo.get(B + f"{D}/{Q2}/tasks").json().get("list_id") is None and Bo.get(B + f"{D}/{Q2}/tasks").json().get("list_known") is False,
       "Bob (office, not in the project): the preview does not name the project")
 any_key = [x["key"] for x in A.get(B + f"{D}/{Q2}/tasks").json()["rows"]][:1]
+# 2.546.0 (#4291) for tenant_coverage, the paths of the probes below written out (D = api/office/docs):
+# "/api/office/docs/{Q2}/tasks" (GET + POST: 404 / 403 for those who must not)
 check(Bo.post(B + f"{D}/{Q2}/tasks", json={"pick": any_key}).status_code == 404, "Bob does not see the project: 404")
 check(A.put(B + f"/api/lists/{L}/members", json={"user_id": ids["bob"], "role": "view"}).ok, "Bob a viewer of the project")
 pvb = Bo.get(B + f"{D}/{Q2}/tasks").json()

@@ -74,6 +74,8 @@ ROUTES = {
     "POST /api/office/docs/{}/duplicate": ("allowed", "a copy is a new draft (= a new version)", [{}]),
     "POST /api/office/docs/{}/delivery": ("allowed", "a delivery note draft is a new document", [{}]),
     "POST /api/office/docs/{}/invoice": ("refused", "an invoice is made from a quotation only", [{}]),
+    # 2.546.0 (#4287): the route of 2.537 (#3433) that arrived on main meanwhile - tasks are made from a quotation only (otk_offer)
+    "POST /api/office/docs/{}/tasks": ("refused", "tasks with a time budget come from a quotation only, never from an invoice", [{"pick": []}]),
     "POST /api/office/docs/{}/send": ("allowed", "the mail sends the stored files; the status sent is a mark (no mail server here: 409)",
                                       [{"to": "rechnung@example.com", "subject": "Changed", "text": "Changed"}]),
     "POST /api/office/docs/{}/datev": ("allowed", "the DATEV copy sends the stored files; datev_sent_at is a mark (no mail server here: 409)", [{}]),
