@@ -241,6 +241,7 @@ class Conn:
         self._auto = release is not None  # pooled connections follow the request (hook); direct ones (init_db, CLI) keep theirs
         self._sp = itertools.count(1)
         self.closed = False
+        self.commits = 0  # 2.566.0 (#4706): commits of this connection (db.py lv_auto_bump: a write route that committed)
 
     # context (#1142 / RLS): who is asking
     def set_ctx(self, user_id=None, org_ids=(), role="user"):
@@ -344,6 +345,7 @@ class Conn:
 
     def commit(self):
         self._pg.commit()
+        self.commits += 1
 
     def rollback(self):
         self._pg.rollback()

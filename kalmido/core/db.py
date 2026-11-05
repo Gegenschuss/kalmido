@@ -1603,6 +1603,8 @@ def bump(c, area=None):
                   "RETURNING value", ("version:" + a,)).fetchone()
     if a.startswith("self:") and n and not lv_state_setting():  # the window that wrote learns its own counter (X-Kalmido-Lv): no full reload for it
         g.lv_self = int(n[0])
+    if has_request_context():
+        g.lv_bumped = True  # 2.566.0 (#4706): this request ticked (lv_auto_bump adds none)
 
 
 # 2.41.0 (#1376): route -> area (first match wins). Reactions / apply / decide on comments may change the task: not "comments".
@@ -1658,6 +1660,41 @@ def lv_self_header(resp):
     n = g.get("lv_self")
     if n is not None and resp.status_code < 400:
         resp.headers["X-Kalmido-Lv"] = f"self:{n}"
+    return resp
+
+
+# 2.566.0 (#4706): the after-hook of the core: a write route of these areas (or paths) that committed but forgot bump() still
+# moves the area counter (other devices reload), so a new route cannot leave them stale again. Not "tasks" / "comments" /
+# "time" (their routes stamp the delta rows with bump themselves), not "other" in general (sign-in, agent chat, admin).
+LV_AUTO = ("office", "calendar", "sheets", "wiki", "budget")
+LV_AUTO_PATHS = re.compile(r"^/api/(bookmarks|family/contacts)(/|$)")  # "other" routes that belong to it
+LV_AUTO_SKIP = re.compile(r"/(presence|preview|check|lookup|parse|validate|address|discover|split)$")  # write-shaped reads
+LV_WRITE = frozenset(("POST", "PUT", "PATCH", "DELETE"))
+
+
+@app.after_request
+def lv_auto_bump(resp):
+    """2.566.0 (#4706): see LV_AUTO. Only a successful write request whose connection committed and that did not tick
+    itself; a reading request returns at the first test. What the route left uncommitted is rolled back first (as close()
+    would), so the tick commits nothing else. A failure here never fails the request that already succeeded."""
+    if request.method not in LV_WRITE or resp.status_code >= 400 or g.get("lv_bumped"):
+        return resp
+    c = g.get("db")
+    if c is None or not getattr(c, "commits", 0) or c.closed or LV_AUTO_SKIP.search(request.path):
+        return resp
+    a = lv_area()
+    if a not in LV_AUTO and not LV_AUTO_PATHS.match(request.path):
+        return resp
+    try:
+        c.rollback()
+        bump(c, a)
+        c.commit()
+    except Exception as e:  # noqa: BLE001
+        try:
+            c.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        print("WARNING lv_auto_bump failed:", request.method, request.path, type(e).__name__, str(e)[:200], flush=True)
     return resp
 
 
