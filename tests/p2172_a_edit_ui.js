@@ -36,10 +36,11 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     await sleep(600);
     const r = await ev(`(() => { const t = document.querySelector('#wk-cm').getBoundingClientRect(), f = document.querySelector('.ntfoot').getBoundingClientRect(), tb = document.getElementById('tabs');
       const tt = tb && tb.offsetParent !== null ? tb.getBoundingClientRect().top : innerHeight;
-      return {h: t.height, top: t.top, free: Math.min(innerHeight, tt) - t.top, fb: f.bottom, ih: innerHeight, w: t.width, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth}; })()`);
+      return {h: t.height, top: t.top, free: Math.min(innerHeight, tt) - t.top, fb: f.bottom, ih: innerHeight, w: t.width, col: document.querySelector('.wkedwrap').getBoundingClientRect().width, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth}; })()`);
     check(r.h >= 0.7 * r.free, `${vw}: field height ${Math.round(r.h)} >= 70% of the free ${Math.round(r.free)}`);
     check(r.fb <= r.ih + 1, `${vw}: the footer line is visible (${Math.round(r.fb)} / ${r.ih})`);
-    check(r.sw <= r.vw + 1 && r.w >= 0.6 * r.vw, `${vw}: full width, nothing sticks out (${Math.round(r.w)} / ${r.vw})`);
+    // 2.554.0 (#4052): the editor fills the page's reading column (2.534.0 #4551: --w-lesen on a wide screen), not the window
+    check(r.sw <= r.vw + 1 && r.w >= r.col - 1 && r.w >= Math.min(0.6 * r.vw, 700), `${vw}: the whole column, nothing sticks out (${Math.round(r.w)} / ${Math.round(r.col)} / ${r.vw})`);
     await shot(`p2172_a_wiki_${vw}.png`);
   });
   console.log(`p2172_a_edit_ui: ${ok} ok, ${F.length} failed`);

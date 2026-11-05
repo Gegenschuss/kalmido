@@ -85,7 +85,7 @@ async function wk_loadPage(id, force) {
   try {
     let p; try { p = await rawFetch('GET', '/api/wiki/pages/' + id); if (typeof wkePage === 'function') await wkePage(p); }  // 2.64.3 B (#1817)
     catch (e) { if (!(e instanceof Offline) || !(p = await wko_page(id))) throw e; }  // 2.169.0 (#2671): offline = the page from the copy
-    p._v = WK.pgMk !== mk0 ? -1 : v0; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.pgLost = null; WK.space = p.space;
+    p._v = WK.pgMk !== mk0 ? -1 : v0; WK.pgErrFor = null; if (WK.pg?.id !== id) { WK.edit = !!WK.editNext && WK.editNext === id; WK.fresh = WK.edit ? id : 0; WK.editNext = null; } WK.pg = p; WK.pgErr = ''; WK.pgLost = null; WK.space = p.space;
     if (!WKO.cf[id]) await wko_cfLoad(p.space).catch(() => {});  // 2.527.0 (#4304 A18): a page opened directly shows its waiting draft too
   }
   catch (e) { if (e.message === 'auth') return; WK.pgErrFor = id + ':' + S.v; WK.pgLost = e.data?.code === 'wiki_unreadable' ? id : null;  // 2.139.0 C (#2386): the message names the way out, deleting stays possible
@@ -498,7 +498,7 @@ const wk_ro = () => !!LS.get('wkRo', '');
 const wk_typing = () => !!document.activeElement?.closest?.('#wk-cm, #wk-body');
 function wk_pageHtml(p) {
   const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
-  const edit = WK.edit = may && (asMd || (!wk_ro() && (WK.edit || !mob)));
+  const edit = WK.edit = may && (asMd || ((!wk_ro() || WK.fresh === p.id) && (WK.edit || !mob)));  // a page just made opens for writing, also with the lock
   return `<div class="nthead">${mob ? `<button type="button" class="iconbtn" data-wk="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
     <div class="wktitle">${wk_crumbs(p)}<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2></div>
     ${mob && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
@@ -998,7 +998,7 @@ document.addEventListener('change', e => {
 function wk_modeItems(p) {
   const asMd = WK.mdFor === p.id, ro = wk_ro(), sw = fn => async () => { await wk_flush(); fn(); renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); };
   return [...(ro ? [] : [asMd ? {label: tr('Back to the editor'), icon: 'edit', fn: sw(() => { WK.mdFor = 0; })} : {label: tr('Edit as Markdown'), icon: 'code', fn: sw(() => { WK.mdFor = p.id; WK.edit = true; })}]),
-    {label: tr('Read only'), icon: 'lock', on: ro, fn: sw(() => { if (ro) LS.del('wkRo'); else { LS.set('wkRo', '1'); WK.mdFor = 0; } WK.edit = false; })}];
+    {label: tr('Read only'), icon: 'lock', on: ro, fn: sw(() => { if (ro) LS.del('wkRo'); else { LS.set('wkRo', '1'); WK.mdFor = 0; WK.fresh = 0; } WK.edit = false; })}];
 }
 document.addEventListener('input', async e => {
   if (wk_isTa(e.target) && e.target.id === 'wk-body') { wk_queue(); wk_acUpdate(e.target); }  // 2.554.0 (#4052): the editor saves through its own listener (wkcm.js wkcm_upd)

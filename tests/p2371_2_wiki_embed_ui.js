@@ -89,7 +89,7 @@ const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = aw
   const jb = jp && (await call(CF, 'GET', '/api/wiki/pages/' + jp.id)).body;
   check(jb === `# ${today}\n\nvon Frida Test\n\n\n\nEnde`, 'from Templates/Tagesnotiz, placeholders filled ' + JSON.stringify(jb));
   check(await until(() => w.location.hash === '#wiki/' + jp?.id && w.eval('WK.edit') && w.eval('WK.pg && WK.pg.id') === jp?.id), 'the note opens for writing ' + w.location.hash);
-  w.eval('WK.edit = false; renderView()');
+  w.eval('WK.edit = false; WK.fresh = 0; renderView()');  // 2.554.0 (#4052): back to the read view of the lock (a page just made opens for writing despite it)
   d.querySelector('#view [data-wk="today"]')?.click();
   await sleep(800);
   const js = ((await call(CF, 'GET', '/api/wiki?space=private')).pages || []).filter(p => p.path.startsWith('journal/'));
