@@ -128,6 +128,22 @@ with tempfile.TemporaryDirectory() as tmp:
     check(unm == [] and order == ["i18n"], f"named only by a helper every suite loads: the fixed set, not all suites: {order} {unm}")
     check(r.skipped() == {"other_ui"}, f"skip.txt read as run_all.sh does: {r.skipped()}")
 
+# 2.553.0 (#4657): a too-broad file of tests/stages_areas.json takes the suites of its area instead of UNMAPPED
+areas = json.load(open(os.path.join(N, "stages_areas.json"), encoding="utf-8"))
+check(len(areas) >= 6, f"the area table is read: {len(areas)}")
+for pat, ss in areas:
+    check(not (set(ss) - KNOWN), f"area {pat}: every suite exists: {sorted(set(ss) - KNOWN)}")
+for f in ("kalmido/sheets/core.py", "static/css/docs.css", "static/css/office.css", "static/css/settings.css",
+          "kalmido/accounts/supportgrant.py", "kalmido/accounts/orginvite.py"):
+    if not os.path.exists(os.path.join(ROOT, f)):
+        continue
+    order, why, unm = stages.touched(repo, [f])
+    want = {s for pat, ss in areas if __import__("fnmatch").fnmatchcase(f, pat) for s in ss if s not in skip}
+    check(unm == [], f"{f}: not unmapped: {unm}")
+    check(want and want <= set(order), f"{f}: its area suites run: {sorted(want - set(order))}")
+    check(any("(#4657)" in w for w in why.values()), f"{f}: --why names the area")
+    check(len(order) < 40, f"{f}: not the whole run: {len(order)}")
+
 p = subprocess.run([sys.executable, os.path.join(N, "stages.py"), "--touched", "kalmido/core/schema.py", "static/app.css", "static/i18n/de.json"],
                    capture_output=True, text=True, cwd=ROOT)
 check(p.returncode == 0 and "UNMAPPED" not in p.stderr and " api" in " " + p.stdout, f"the command line: no UNMAPPED line: {p.stderr[-300:]}")

@@ -35,6 +35,7 @@ With a separate test runner, only the suites a branch touches (exit 3 = the chan
 import argparse
 import bisect
 import datetime
+import fnmatch
 import json
 import os
 import re
@@ -431,6 +432,24 @@ TOUCHED_FIXED = {
                      "p2209_a_layout_ui", "p2455_a_phone_ui"),
     "i18n": ("i18n", "quick_lang", "p2191_a_i18nsplit", "p2191_a_i18nsplit_ui", "p2191_f2_i18nrobust", "p2447_a_lang"),
 }
+# 2.553.0 (#4657): files that are "too broad" (a helper or stylesheet most suites touch by name) and that no rarest-name hit picks:
+# the suites that really check the area, by path pattern (fnmatch), in tests/stages_areas.json (a data file, so that the file names
+# in it do not make every suite that loads stages.py "name" them). Tried first in touched(); real office / invoice / login files
+# stay with their own (hard) suites - nothing is made soft here.
+AREAS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "stages_areas.json")
+
+
+def touched_area(repo, p):
+    """2.553.0 (#4657): {suite: why} of the first TOUCHED_AREAS row that matches p, None when no row does."""
+    with open(AREAS_FILE, encoding="utf-8") as fh:
+        areas = json.load(fh)
+    for pat, suites in areas:
+        if fnmatch.fnmatchcase(p, pat):
+            skip = repo.skipped()
+            return {s: f"area {pat} (#4657)" for s in suites if s in repo.group_of and s not in skip}
+    return None
+
+
 TOUCHED_VIA_COMMON_RE = re.compile(r" via tests/(?:boot\.js|ff\.js|kt\.py|dbx\.py|testclock\.py|testclock\.js)\b")
 TOUCHED_DB_CORE = {"schema", "db", "pg", "rls", "fkeys", "dlock"}
 TOUCHED_HITS_MAX = 10  # the suites a file adds by name on top of its group
@@ -555,6 +574,8 @@ def touched(repo, files, base=None, head=None):
                                      else "server module without a route a suite names")
             else:
                 res = own
+        if kind == "suites" and len(res) > TOUCHED_BROAD and touched_area(repo, f):  # 2.553.0 (#4657): the area's own suites
+            kind, res = "suites", touched_area(repo, f)
         if kind == "suites" and len(res) > TOUCHED_BROAD:  # a helper most areas use: that is the CI's full run
             kind, res = "full", f"too broad: {len(res)} suites"
             hits = smc_broad_hits(repo, f)  # 2.533.0 (#4332): the rarest-named suites instead of nothing
