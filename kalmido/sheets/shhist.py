@@ -12,7 +12,7 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.db import db, iso_ms, now_utc
-from ..core.i18n import tr
+from ..core.i18n import N_, tr
 from ..accounts.session import me
 from ..collab.comments import user_names
 from .shkinds import SHK_FILE_RE, shk_bool, shk_people  # 2.369.5 (#2517): pulled up from functions
@@ -37,6 +37,40 @@ def shh_log(c, book, xid, rid, cid, old, new, uid, agent_id, ts):
     book._shh_n = n + 1
     c.execute("INSERT INTO sheet_hist(sheet_id,cell_id,row_id,col_id,user_id,agent_id,old_raw,new_raw,at) VALUES(?,?,?,?,?,?,?,?,?)",
               (sid, xid, rid, cid, uid, agent_id, old or "", new or "", ts))
+
+
+# 2.564.0 (#4701): changes of the table itself in the same history (sheet_hist.what): their label
+SHH_META = {"title": N_("Title"), "tab": N_("Sheet"), "chart": N_("Chart"), "name": N_("Name"), "freeze": N_("Frozen value")}
+
+
+def shh_meta(c, sid, what, old, new, uid, cell=None):
+    """2.564.0 (#4701): a change of table sid that is no typed input (what = a key of SHH_META; cell = the cell row for name /
+    freeze), with the value before / after as text. Nothing when it stayed the same."""
+    old, new = "" if old is None else str(old), "" if new is None else str(new)
+    if old == new:
+        return
+    c.execute("INSERT INTO sheet_hist(sheet_id,cell_id,row_id,col_id,user_id,agent_id,old_raw,new_raw,at,what) VALUES(?,?,?,?,?,?,?,?,?,?)",
+              (sid, cell["id"] if cell else None, cell["row_id"] if cell else None, cell["col_id"] if cell else None, uid, None,
+               old, new, iso_ms(now_utc()), what))
+
+
+def _meta_text(c, what, raw, cols):
+    """2.564.0 (#4701): how a change of the table reads: a chart as its kind and columns, a freeze as yes / no."""
+    if not raw:
+        return ""
+    if what == "freeze":
+        return tr("Yes") if raw == "1" else tr("No")
+    if what == "chart":
+        import json
+        try:
+            ch = json.loads(raw)
+        except ValueError:
+            return raw
+        if not isinstance(ch, dict):
+            return raw
+        names = [(cols.get(y)["title"] if cols.get(y) else "?") for y in ch.get("y") or []]
+        return (tr("Line|chart") if ch.get("type") == "line" else tr("Bars")) + (": " + ", ".join(names) if names else "")
+    return raw
 
 
 def _text(c, sheet, book, col, raw, uid, people, files):
@@ -73,6 +107,12 @@ def shh_entries(c, sheet, rows, uid):
     for r in rows:
         col = cols.get(r["col_id"])
         x = book.cells.get(r["cell_id"])
+        if r["what"] in SHH_META:  # 2.564.0 (#4701): a change of the table (title, sheet name, chart) or of a cell's name / freeze
+            out.append({"id": r["id"], "at": r["at"], "user_id": r["user_id"], "user_name": names.get(r["user_id"], "") or tr("Unknown"),
+                        "agent": bool(r["agent_id"]), "cell_id": r["cell_id"], "row_id": r["row_id"], "col_id": r["col_id"],
+                        "addr": book.addr(x) if x and book.live(x) else None, "what": r["what"], "col_title": tr(SHH_META[r["what"]]),
+                        "old": _meta_text(c, r["what"], r["old_raw"], cols), "new": _meta_text(c, r["what"], r["new_raw"], cols)})
+            continue
         out.append({"id": r["id"], "at": r["at"], "user_id": r["user_id"], "user_name": names.get(r["user_id"], "") or tr("Unknown"),
                     "agent": bool(r["agent_id"]), "cell_id": r["cell_id"], "row_id": r["row_id"], "col_id": r["col_id"],
                     "addr": book.addr(x) if book.live(x) else None, "col_title": col["title"] if col else "",

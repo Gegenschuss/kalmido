@@ -216,7 +216,7 @@ async function shh_open(cell) {
   const val = v => v === '' || v == null ? `<span class="muted">${tr('(empty)')}</span>` : `<span class="shhv">${esc(v)}</span>`;
   /** @type {any} */
   const md = modal(`<h3>${cell ? esc(tr('History of cell {0}', cell.addr || '')) : tr('Recent changes')}</h3>
-    ${es.length ? `<ul class="shhlist">${es.map(x => `<li><div class="shhwho">${x.agent ? ic('bot', 's') : av(x.user_id, x.user_name, 'avatar shkav')}<b>${esc(x.user_name || '')}</b><span class="muted">${esc(relTime(x.at))}</span>${!cell && x.addr ? `<button type="button" class="linkbtn" data-shh-go="${x.row_id}:${x.col_id}">${esc(x.addr)}${x.col_title ? ' · ' + esc(x.col_title) : ''}</button>` : !cell ? `<span class="muted">${tr('Cell removed')}</span>` : ''}</div>
+    ${es.length ? `<ul class="shhlist">${es.map(x => `<li><div class="shhwho">${x.agent ? ic('bot', 's') : av(x.user_id, x.user_name, 'avatar shkav')}<b>${esc(x.user_name || '')}</b><span class="muted">${esc(relTime(x.at))}</span>${!cell && x.addr ? `<button type="button" class="linkbtn" data-shh-go="${x.row_id}:${x.col_id}">${esc(x.addr)}${x.col_title ? ' · ' + esc(x.col_title) : ''}</button>` : x.what && (!cell || x.col_title) ? `<span class="muted">${esc(x.col_title)}</span>` : !cell ? `<span class="muted">${tr('Cell removed')}</span>` : ''}</div>
       <div class="shhchg">${val(x.old)}<span class="shharr" aria-label="${esc(tr('becomes'))}">→</span>${val(x.new)}</div></li>`).join('')}</ul>` : `<p class="muted mhint">${tr('No changes recorded yet.')}</p>`}
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
   md.classList.add('shhmd');

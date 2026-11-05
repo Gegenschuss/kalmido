@@ -96,6 +96,8 @@ def sheets_get(sid):
 def sheets_patch(sid):
     """{title?, list_id? (null = detach)}"""
     c = db()
+    _need_w(c, sid)
+    write_lock(c, "sheet:" + str(sid))  # 2.564.0 (#4701): the table's own fields under its lock too, and in its history
     r = _need_w(c, sid)
     uid = me()
     b = body()
@@ -112,6 +114,10 @@ def sheets_patch(sid):
     f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
+        k = "tab_name" if "tab_name" in f else "title" if "title" in f else None  # 2.564.0 (#4701): a further sheet: its name
+        if k:
+            from .shhist import shh_meta
+            shh_meta(c, sid, "tab" if k == "tab_name" else "title", r[k], f[k], uid)
         if "list_id" in f:
             shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list
         if "title" in f and not r["book_id"]:

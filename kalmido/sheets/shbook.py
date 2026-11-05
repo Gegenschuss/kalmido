@@ -447,6 +447,10 @@ def sheets_tabs_patch(sid, tid):
     from .core import sh_touch
     c = db()
     first, uid = _need_book(c, sid, write=True)
+    _need_tab(c, first, tid)
+    from ..core.pg import write_lock
+    for x in sorted({first["id"], tid}):  # 2.564.0 (#4701): the table's lock (names / order of its sheets) and the sheet's own
+        write_lock(c, "sheet:" + str(x))
     r = _need_tab(c, first, tid)
     b = body()
     tabs = shb_rows(c, first["id"])
@@ -459,6 +463,8 @@ def sheets_tabs_patch(sid, tid):
             c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, tid))
         else:
             c.execute("UPDATE sheets SET tab_name=? WHERE id=?", (name, tid))
+        from .shhist import shh_meta
+        shh_meta(c, tid, "tab", shb_label(r), name, uid)  # 2.564.0 (#4701): in the sheet's history
     if "pos" in b:
         p = b.get("pos")
         if isinstance(p, bool) or not isinstance(p, int) or not 0 <= p < len(tabs):

@@ -38,7 +38,7 @@ from .shbook import (shb_cell_stats, shb_counts, shb_deleted, shb_dict, shb_disp
                      shb_check, shb_touch)  # 2.124.0 E (#2116): several sheets in one table
 from ..accounts.orgs import user_orgs  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_area, org_sees_all, org_readonly, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
-from .shhist import shh_log  # 2.369.5 (#2517): pulled up from functions
+from .shhist import shh_log, shh_meta  # 2.369.5 (#2517): pulled up from functions; 2.564.0 (#4701): shh_meta
 from .vars import SH_FIELD_HELP, sh_sources, _agent_cap  # 2.369.5 (#2517): pulled up from functions
 
 SH_KINDS = ("text", "number", "currency", "percent", "date", "select") + SHK_KINDS  # 2.124.0 B (#2110): + checkbox, person, link, file
@@ -1436,6 +1436,8 @@ def sh_set_name(c, sheet_row, cell_row, name, uid):
     name = (name or "").strip() if isinstance(name, (str, type(None))) else None
     if name is None:
         raise BadInput(tr("Invalid value: {0}", "name"))
+    write_lock(c, "sheet:" + str(sheet_row["id"]))  # 2.564.0 (#4701): under the sheet's lock like its inputs, and in its history
+    cell_row = c.execute("SELECT * FROM sheet_cells WHERE id=?", (cell_row["id"],)).fetchone()
     if name:
         if not sh_name_ok(name):
             raise BadInput(tr("Use letters, digits and _ only, starting with a letter (not like a cell address)"))
@@ -1446,11 +1448,14 @@ def sh_set_name(c, sheet_row, cell_row, name, uid):
         if name.lower() in book.slug_col:
             raise BadInput(tr("This name is already used in this table"))
     c.execute("UPDATE sheet_cells SET name=?, updated_by=?, updated_at=? WHERE id=?", (name or None, uid, iso_ms(now_utc()), cell_row["id"]))
+    shh_meta(c, sheet_row["id"], "name", cell_row["name"], name, uid, cell_row)
     sh_touch(c, sheet_row["id"], uid)
 
 
 def sh_freeze(c, sheet_row, cell_row, frozen, uid):
     """Freezes the cell's current value (evaluated for uid: a deliberate copy, like a typed number) or thaws it."""
+    write_lock(c, "sheet:" + str(sheet_row["id"]))  # 2.564.0 (#4701): under the sheet's lock like its inputs, and in its history
+    cell_row = c.execute("SELECT * FROM sheet_cells WHERE id=?", (cell_row["id"],)).fetchone()
     ts = iso_ms(now_utc())
     if frozen:
         book = ShBook(c, sheet_row)
@@ -1463,6 +1468,7 @@ def sh_freeze(c, sheet_row, cell_row, frozen, uid):
                   (sh_freeze_dump(v, res.get("display") or ""), uid, ts, cell_row["id"]))
     else:
         c.execute("UPDATE sheet_cells SET frozen=0, frozen_value=NULL, updated_by=?, updated_at=? WHERE id=?", (uid, ts, cell_row["id"]))
+    shh_meta(c, sheet_row["id"], "freeze", "1" if cell_row["frozen"] else "", "1" if frozen else "", uid, cell_row)
     sh_touch(c, sheet_row["id"], uid)
 
 

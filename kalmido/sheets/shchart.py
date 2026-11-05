@@ -18,6 +18,8 @@ from ..core.i18n import tr
 from ..accounts.session import me
 from ..core.errors import BadInput
 from .core import sh_need, sh_reload, sh_touch
+from ..core.pg import write_lock  # 2.564.0 (#4701)
+from .shhist import shh_meta  # 2.564.0 (#4701)
 
 SHC_TYPES = ("bar", "line")
 SHC_SERIES_MAX = 6
@@ -70,8 +72,11 @@ def sheets_chart_put(sid):
     need_feat("sheets")
     c = db()
     sh_need(c, sid, write=True)
+    write_lock(c, "sheet:" + str(sid))  # 2.564.0 (#4701): under the sheet's lock like its cells / columns, and in its history
     ch = shc_clean(c, sid, body().get("chart"))
+    was = c.execute("SELECT chart FROM sheets WHERE id=?", (sid,)).fetchone()[0] or ""
     c.execute("UPDATE sheets SET chart=? WHERE id=?", (json.dumps(ch) if ch else "", sid))
+    shh_meta(c, sid, "chart", was, json.dumps(ch) if ch else "", me())
     sh_touch(c, sid, me())
     c.commit()
     return jsonify(ok=True, rev=sh_reload(c, sid)["rev"], chart=ch)
