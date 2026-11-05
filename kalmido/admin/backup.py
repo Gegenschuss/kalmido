@@ -43,7 +43,7 @@ from ..tasks.lifecycle import UNDO_KEY
 from ..collab.integfail import integ_tell
 from ..collab.news import NEWS_CLEAN
 from ..accounts.users import need_admin
-from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
+from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST, dav_inst
 from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
 from ..api.common import hit_limit  # 2.581.0 (#4826): the core layer's counter (the passphrase check)
@@ -109,7 +109,10 @@ BK_CHUNK = 1024 * 1024
 BK_MAGIC = b"KALMIDO-BACKUP-ENC\x00"
 BK_SCRYPT = {"n": 2 ** 15, "r": 8, "p": 1}
 BK_CONFIRM = "RESTORE"
-BK_NAME_RE = re.compile(r"kalmido-backup-(\d{8})-(\d{6})-(auto|manual|safety)\.zip(\.enc)?")
+# 2.550.0 (#4517): + the instance id of this database (calendars/caldav.dav_inst, 8 hex) before the kind, so the off-site
+# clean-up (offsite.bko_prune) tells this server's backups from another server's in the same folder; names without it
+# (before 2.550) stay valid (listed, restored)
+BK_NAME_RE = re.compile(r"kalmido-backup-(\d{8})-(\d{6})-(?:([0-9a-f]{8})-)?(auto|manual|safety)\.zip(\.enc)?")
 BK_UPLOAD_RE = re.compile(r"upload-([a-f0-9]{24})")
 BK_DUMP = "kalmido.dump"    # format 2 (2.37.0, Postgres): pg_dump -Fc
 BK_LEGACY = "tasks.db"      # format 1 (up to 2.36, SQLite): listed / checked, not restored here
@@ -325,10 +328,20 @@ def bk_outside(base, prefix, listed):
     return out
 
 
-def bk_name(kind, encrypted):
+def bk_instance(c):
+    """2.550.0 (#4517): the instance id of this database (settings.dav_instance, the one of the CalDAV UIDs: random, no
+    secret), read from the database every time (another process may have made it meanwhile); made once when missing."""
+    v = gsetting(c, "dav_instance")
+    if re.fullmatch(r"[0-9a-f]{8}", v or ""):
+        return v
+    _DAV_INST.pop("i", None)
+    return dav_inst(c)
+
+
+def bk_name(kind, encrypted, inst=""):
     ts = local_now()
     for _ in range(120):
-        n = f"kalmido-backup-{ts.strftime('%Y%m%d-%H%M%S')}-{kind}.zip" + (".enc" if encrypted else "")
+        n = f"kalmido-backup-{ts.strftime('%Y%m%d-%H%M%S')}-" + (f"{inst}-" if inst else "") + f"{kind}.zip" + (".enc" if encrypted else "")  # 2.550.0 (#4517)
         if not os.path.exists(os.path.join(BK_DIR, n)):
             return n
         ts += timedelta(seconds=1)
@@ -482,6 +495,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
         if encrypt and len(pw) < 10:
             raise BackupError("no_passphrase")
         bk_tools_check(c)  # 2.359.3 (#2945)
+        inst = bk_instance(c)  # 2.550.0 (#4517): the instance id in the name and the manifest (made once, then kept)
         # 2.432.0 (#3584): every file is hashed first; only what the shared store does not hold yet needs room (before:
         # all files again, twice with encryption). The zip holds the database and the small files, so it stays small
         db_bytes = bk_db_bytes(c)
@@ -574,6 +588,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
                     "pack_files": npacks,  # 2.359.2 (#2895)
                     "skipped_files": sum(skipped.values()),  # 2.79.0 (#476 M8)
                     "missing_files": len(gone), "missing_paths": gone[:BK_MISSING_SHOWN]}  # 2.273.0 A (#3050)
+            meta["instance"] = inst  # 2.550.0 (#4517)
             if shared:  # 2.432.0 (#3584): the files kept once in the store, and which store (the key's salt is no secret)
                 meta.update(shared_files=len(shared), shared_bytes=sum(x[1] for x in shared), store_new_bytes=new,
                             store="plain" if key is None else key.desc)
@@ -582,7 +597,7 @@ def bk_create(kind="manual", c=None, keep_dump=None):
             z.writestr("manifest.json", json.dumps({**meta, "files": files, **({"shared": shared} if shared else {})}, ensure_ascii=False))
         if os.environ.get("KALMIDO_TEST") == "1" and os.environ.get("KALMIDO_TEST_BK_ZIP_DELAY"):  # tests only (2.281.0 D, #3118)
             time.sleep(float(os.environ["KALMIDO_TEST_BK_ZIP_DELAY"]))
-        name = bk_name(kind, encrypt)
+        name = bk_name(kind, encrypt, inst)
         final = os.path.join(BK_DIR, name)
         if shared:  # 2.432.0 (#3584): before the backup shows up, so the clean-up never sees it without its references
             bks.refs_write(BK_STORE, name, refs)
@@ -643,7 +658,7 @@ def bk_parse_name(n):
         dt = datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").replace(tzinfo=TZ)
     except ValueError:
         return None
-    return {"name": n, "at": dt, "kind": m.group(3), "encrypted": bool(m.group(4))}
+    return {"name": n, "at": dt, "kind": m.group(4), "encrypted": bool(m.group(5)), "instance": m.group(3) or ""}  # 2.550.0 (#4517)
 
 
 def bk_meta(path, encrypted):

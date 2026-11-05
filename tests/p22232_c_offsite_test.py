@@ -13,9 +13,20 @@ The off-site target of the backups (admin/offsite.py), its step-up and the expor
  - a restore keeps the current off-site target (bko_conf / bko_sec), not the one inside the backup
  - hosted (KALMIDO_HOSTED=1): 2.552.0 (#4596) the instance admin sets / tests / uses no target (403, GET hosted=true); a
    target saved before is refused when connecting ("blocked", no request reaches the fake); SFTP: no telling refused from timed out
+2.550.0 (#4517, audit F4-F6):
+ - backup names and manifest carry the instance id (settings.dav_instance); the off-site clean-up keeps another server's
+   backups (with its id or an old name this server does not know) and its shared files (another store key) in the same
+   folder; this server's own older ones (new name or an old name of a backup still here) go as before
+ - S3 like WebDAV only over https (http only to this machine): saving http to another host = 400; an S3 target saved with
+   http before is refused when connecting ("tls", no request)
+ - SFTP (a stand-in sftp, fake_offsite.py as /data/fakebin/sftp): a host key seen before a failed sign-in is not saved; an
+   expected fingerprint (ssh-keygen -lf form) that differs stops the test ("fp"), nothing saved; the right one saves it
 usage: p22232_c_offsite_test.py <datadir>      (a fresh container; P22232C_NOSTART=1 = the server already runs, no restart)"""
+import base64
+import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,8 +48,10 @@ DAVPASS, S3KEY, S3SECRET = "dav-password-for-the-test-7b1e", "AKFAKETESTKEY01", 
 OFF = B + "/api/admin/backups/offsite"
 RX = B + "/api/retention"
 
-fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_SECRET_KEY": KEY, "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_OFFSITE_TIMEOUT": "10"},
-      prefix="P22232C", data=DATA)
+# 2.550.0 (#4517): /data/fakebin first in the PATH: the sftp stand-in (fake_offsite.py) is put there below
+FAKEBIN_PATH = "/data/fakebin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin"
+fresh({"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_SECRET_KEY": KEY, "KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_OFFSITE_TIMEOUT": "10",
+       "PATH": FAKEBIN_PATH}, prefix="P22232C", data=DATA)
 time.sleep(0.8)
 s0 = requests.Session()
 s0.headers.update(H)
@@ -169,6 +182,108 @@ j = A.get(OFF).json()
 check(j.get("type") == "" and not j["webdav"]["url"] and not j["webdav"]["password_set"],
       f"#2892: no target and no credentials from the backup on an instance that had none {j.get('type')} {j.get('webdav')}")
 check(not dbx("SELECT key FROM settings WHERE key IN ('bko_conf', 'bko_sec')", data=DATA), "#2892: bko_conf / bko_sec not in the database")
+
+# ============================================================== 2.550.0 (#4517): two servers in one folder (F4)
+A = sess("alice")
+BKPASS = "a long backup passphrase for 4517"
+assert A.patch(B + "/api/admin/backups", json={"encrypt": True, "passphrase": BKPASS}).ok
+L4517 = A.post(B + "/api/lists", json={"name": "Offsite 4517"}).json()["id"]
+T4517 = A.post(B + "/api/tasks", json={"title": "with a shared file", "list_id": L4517}).json()["id"]
+r = A.post(B + f"/api/tasks/{T4517}/attachments", files={"file": ("pic.png", b"\x89PNG\r\n" + os.urandom(150 * 1024), "image/png")})
+check(r.ok, f"#4517 setup: a file above 64 KiB (a backup with shared files) {r.status_code}")
+DAVD = os.path.join(REM, "webdav", "dav", "bk")
+r = A.patch(OFF, json={"password": PW, "type": "webdav", "webdav": DAV1, "keep": 1})
+check(r.ok and not r.json()["missing"], f"#4517 setup: WebDAV target, keep 1 {r.text[:200]}")
+check(A.patch(OFF, json={"on": True}).ok, "#4517 setup: upload on")
+
+
+def backup_now():
+    before = {x["name"] for x in A.get(B + "/api/admin/backups").json()["items"]}
+    time.sleep(1.1)  # names carry the second
+    assert A.post(B + "/api/admin/backups").status_code == 202
+    new = until(lambda: not A.get(B + "/api/admin/backups").json()["running"]
+                and [x["name"] for x in A.get(B + "/api/admin/backups").json()["items"] if x["name"] not in before], 90)
+    return new[0] if new else ""
+
+
+n1 = backup_now()
+inst = (dbx("SELECT value FROM settings WHERE key='dav_instance'", data=DATA) or [{"value": ""}])[0]["value"]
+m = re.fullmatch(r"kalmido-backup-\d{8}-\d{6}-([0-9a-f]{8})-manual\.zip\.enc", n1 or "")
+check(bool(inst) and m is not None and m.group(1) == inst, f"#4517 the backup name carries the instance id {n1} {inst}")
+item = next((x for x in A.get(B + "/api/admin/backups").json()["items"] if x["name"] == n1), {})
+check(item.get("kind") == "manual" and item.get("encrypted") is True and item.get("shared_files", 0) >= 1,
+      f"#4517 the new name is listed as before (kind, encrypted) and has shared files {item}")
+OTHER = "0badc0de" if inst != "0badc0de" else "0badc0df"
+FOREIGN = {"new": f"kalmido-backup-20000101-000000-{OTHER}-auto.zip.enc",       # another server, with its id
+           "old": "kalmido-backup-20000102-000000-auto.zip.enc",                # a name of before 2.550 this server never had
+           "blob": "kalmido-blob-00000000000000ff-" + "ab" * 32}               # a shared file of another store key
+OWN = {"new": f"kalmido-backup-20000103-000000-{inst}-auto.zip.enc",            # this server's older one: goes (keep 1)
+       "old": "kalmido-backup-20000104-000000-auto.zip.enc"}                   # an old name of a backup still here: goes
+for n in (*FOREIGN.values(), *OWN.values()):
+    open(os.path.join(DAVD, n), "wb").write(b"a copy " + n.encode())
+LOCAL_OLD = os.path.join(DATA, "backups", OWN["old"])
+open(LOCAL_OLD, "wb").write(b"an old local backup")  # this server knows the old name (its backup is still here)
+r = until(lambda: (lambda r: r if r.status_code == 202 else None)(A.post(OFF + "/upload", json={"password": PW})), 60, 0.5)
+check(r is not None, "#4517 upload now (after an upload the backup thread may have started itself)")
+check(until(lambda: not os.path.exists(os.path.join(DAVD, OWN["new"])) and A.get(OFF).json().get("last_name") == n1
+            and not A.get(OFF).json()["running"], 90), f"#4517 the upload ran and the clean-up took this server's older one {A.get(OFF).json()}")
+left = sorted(os.listdir(DAVD))
+check(os.path.isfile(os.path.join(DAVD, n1)), f"#4517 the new backup is on the target {left}")
+check(not os.path.exists(os.path.join(DAVD, OWN["old"])), f"#4517 an old name of a backup this server still has goes as before {left}")
+check(os.path.isfile(os.path.join(DAVD, FOREIGN["new"])), f"#4517 F4: another server's backup (its own id) stays {left}")
+check(os.path.isfile(os.path.join(DAVD, FOREIGN["old"])), f"#4517 F4: an old name this server does not know stays {left}")
+check(os.path.isfile(os.path.join(DAVD, FOREIGN["blob"])), f"#4517 F4: another server's shared file stays {left}")
+check(any(n.startswith("kalmido-blob-") and n != FOREIGN["blob"] for n in left), f"#4517 this server's shared file is there {left}")
+kept = json.loads((dbx("SELECT value FROM settings WHERE key='bko_remote'", data=DATA) or [{"value": "[]"}])[0]["value"] or "[]")
+check(kept == [n1], f"#4517 the kept names (bko_remote) are this server's only {kept}")
+os.remove(LOCAL_OLD)
+check(A.patch(OFF, json={"on": False}).ok, "#4517 upload off again")
+
+# ============================================================== 2.550.0 (#4517): S3 only over https (F5)
+r = A.patch(OFF, json={"password": PW, "type": "s3", "s3": {"endpoint": "http://s3.example.com", "bucket": "kbk"}})
+check(r.status_code == 400 and "s3.endpoint" in r.text, f"#4517 F5: S3 over http to another host is refused {r.status_code} {r.text[:160]}")
+r = A.patch(OFF, json={"type": "s3", "s3": {"endpoint": "https://s3.example.com", "bucket": "kbk"}})
+check(r.ok and r.json()["s3"]["endpoint"] == "https://s3.example.com", f"#4517 S3 over https is fine {r.text[:160]}")
+r = A.patch(OFF, json={"s3": {"endpoint": "http://127.0.0.1:8093", "key": S3KEY, "secret": S3SECRET}})
+check(r.ok, f"#4517 S3 over http to this machine stays possible (the WebDAV rule) {r.text[:160]}")
+conf = json.loads(dbx("SELECT value FROM settings WHERE key='bko_conf'", data=DATA)[0]["value"])  # a target saved over http
+conf["s3"]["endpoint"] = "http://s3.example.com"                                                    # before 2.550 (the save refuses it now)
+dbx("UPDATE settings SET value=? WHERE key='bko_conf'", (json.dumps(conf),), data=DATA)
+j = A.post(OFF + "/test", json={"password": PW}).json()
+check(j.get("ok") is False and j.get("code") == "tls" and "https" in j.get("error", ""),
+      f"#4517 F5: an S3 target saved with http before is refused when connecting, with the reason {j.get('code')} {j.get('error')}")
+
+# ============================================================== 2.550.0 (#4517): SFTP host key only after a sign-in (F6)
+os.makedirs(os.path.join(DATA, "fakebin"), exist_ok=True)
+shutil.copy(os.path.join(N, "fake_offsite.py"), os.path.join(DATA, "fakebin", "sftp"))
+os.chmod(os.path.join(DATA, "fakebin", "sftp"), 0o755)
+raw = b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20" + os.urandom(32)
+open(os.path.join(REM, "sftp.key"), "w").write("ssh-ed25519 " + base64.b64encode(raw).decode())
+FP = "SHA256:" + base64.b64encode(hashlib.sha256(raw).digest()).decode().rstrip("=")
+WRONG = "SHA256:" + base64.b64encode(hashlib.sha256(b"another key").digest()).decode().rstrip("=")
+r = A.patch(OFF, json={"password": PW, "type": "sftp", "sftp": {"host": "127.0.0.1", "port": 2222, "user": "backup", "path": "bk"}})
+check(r.ok and r.json()["sftp"]["fingerprint"] == "", f"#4517 setup: SFTP target without a host key {r.text[:200]}")
+open(os.path.join(REM, "sftp.mode"), "w").write("denied")
+j = A.post(OFF + "/test", json={"password": PW}).json()
+check(j.get("ok") is False and j.get("code") == "auth", f"#4517 the sign-in fails (the stand-in sftp ran) {j.get('code')} {j.get('error')}")
+check(A.get(OFF).json()["sftp"]["fingerprint"] == "", f"#4517 F6: the host key seen before the failed sign-in is not saved {A.get(OFF).json()['sftp']}")
+check(j.get("seen_fingerprint") == "ssh-ed25519 " + FP, f"#4517 the answer shows the fingerprint it saw {j.get('seen_fingerprint')}")
+check(A.patch(OFF, json={"sftp": {"expect_fp": "not a fingerprint"}}).status_code == 400, "#4517 an expected fingerprint must look like SHA256:…")
+r = A.patch(OFF, json={"sftp": {"expect_fp": f"256 {WRONG} backup@example (ED25519)"}})
+check(r.ok and r.json()["sftp"]["expect_fp"] == WRONG, f"#4517 the ssh-keygen -lf line is taken, stored as SHA256:… {r.text[:200]}")
+open(os.path.join(REM, "sftp.mode"), "w").write("ok")
+j = A.post(OFF + "/test", json={"password": PW}).json()
+check(j.get("ok") is False and j.get("code") == "fp" and FP in j.get("error", ""),
+      f"#4517 F6: another fingerprint than the expected one stops the test, with the one seen {j.get('code')} {j.get('error')}")
+check(A.get(OFF).json()["sftp"]["fingerprint"] == "", "#4517 F6: nothing saved after the wrong fingerprint")
+check(A.patch(OFF, json={"sftp": {"expect_fp": FP}}).ok, "#4517 the right expected fingerprint")
+j = A.post(OFF + "/test", json={"password": PW}).json()
+check(j.get("ok") is True and A.get(OFF).json()["sftp"]["fingerprint"] == "ssh-ed25519 " + FP,
+      f"#4517 the matching server: the test signs in and its key is saved {j}")
+r = A.patch(OFF, json={"sftp": {"expect_fp": WRONG}})
+check(r.ok and r.json()["sftp"]["fingerprint"] == "" and "hostkey" in r.json()["missing"],
+      f"#4517 a new expected fingerprint the saved key does not have: the key goes, the next test checks again {r.text[:200]}")
+check(A.patch(OFF, json={"remove": True}).ok, "#4517 the target is removed again")
 
 # ============================================================== hosted: only public https
 if not nostart("P22232C"):

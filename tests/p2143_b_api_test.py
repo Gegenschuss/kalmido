@@ -208,7 +208,8 @@ assert A.patch(B + "/api/admin/backups", json={"encrypt": True}).ok
 # 2.143.0 B (#2152, review): the password goes in Basic auth: https only, plain http only to this machine
 check(A.patch(OFF, json={"password": PW, "webdav": {"url": "http://dav.example.com/bk"}}).status_code == 400, "#2152 review: WebDAV over http to another host is refused")
 check(A.patch(OFF, json={"password": PW, "webdav": {"url": "https://dav.example.com/bk"}}).ok, "#2152 review: WebDAV over https is accepted")
-check(A.patch(OFF, json={"password": PW, "s3": {"endpoint": "http://127.0.0.1:8093"}}).ok, "#2152 review: S3 http stays possible (signed, no password)")
+# 2.550.0 (#4517): S3 like WebDAV: http only to this machine (p22232_c_offsite checks the refusal for another host)
+check(A.patch(OFF, json={"password": PW, "s3": {"endpoint": "http://127.0.0.1:8093"}}).ok, "#2152 review: S3 http to this machine stays possible")
 r = A.patch(OFF, json={"password": PW, "type": "webdav", "webdav": {"url": "http://127.0.0.1:8094/dav/bk", "user": "kbk", "password": DAVPASS}})
 check(r.ok and r.json()["webdav"]["password_set"] and r.json()["webdav"]["user"] == "kbk", f"#2152 WebDAV saved {r.text[:200]}")
 no_secret(r.text, "#2152 PATCH WebDAV")
@@ -229,13 +230,16 @@ check(any(x["method"] == "PROPFIND" for x in remote_log("webdav")), "#2152 WebDA
 DAV = os.path.join(REM, "webdav", "dav", "bk")
 os.makedirs(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc"), exist_ok=True)
 open(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt"), "w").write("keep me")
-for d in ("20010101", "20020101"):
-    open(os.path.join(DAV, f"kalmido-backup-{d}-000000-auto.zip.enc"), "wb").write(b"old")
+# 2.550.0 (#4517): the clean-up takes only this server's backups: the planted older ones carry its instance id (from the name)
+INST = newest.split("-")[4] if len(newest.split("-")) > 5 else ""
+OLD1, OLD2 = (f"kalmido-backup-{d}-000000-{INST}-auto.zip.enc" for d in ("20010101", "20020101"))
+for n in (OLD1, OLD2):
+    open(os.path.join(DAV, n), "wb").write(b"old")
 check(A.post(OFF + "/upload", json={"password": PW}).status_code == 202, "#2152 review: upload now")
-until(lambda: not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc")) and not A.get(OFF).json()["running"], 40)
+until(lambda: not os.path.exists(os.path.join(DAV, OLD1)) and not A.get(OFF).json()["running"], 40)
 check(os.path.isfile(os.path.join(DAV, "kalmido-backup-20000101-000000-auto.zip.enc", "inside.txt")), "#2152 review: WebDAV: a folder with a backup name stays")
-check(not os.path.exists(os.path.join(DAV, "kalmido-backup-20010101-000000-auto.zip.enc"))
-      and os.path.isfile(os.path.join(DAV, "kalmido-backup-20020101-000000-auto.zip.enc")) and os.path.isfile(dav_file),
+check(not os.path.exists(os.path.join(DAV, OLD1))
+      and os.path.isfile(os.path.join(DAV, OLD2)) and os.path.isfile(dav_file),
       f"#2152 review: WebDAV keep 2 counts files only {sorted(os.listdir(DAV))}")
 # a slow target: "Upload now" while an upload runs = 409; the backup thread is not held by the upload (its schedule goes on)
 open(os.path.join(REM, "webdav.slow"), "w").write("10")

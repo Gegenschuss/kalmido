@@ -10,6 +10,10 @@ then the admin gets an alert; the next backup or "Upload now" starts again.
 yet (flat, kalmido-blob-<kid>-<name>: encrypted, the name shows no content hash), BEFORE the backup itself; after the
 clean-up of the old backups the shared files no kept backup refers to go too (bko_remote = the kept names, so their
 reference files stay on this server). A kept backup without a reference file here stops that clean-up (nothing goes).
+2.550.0 (#4517): the names carry the instance id of this database (backup.bk_instance); the clean-up rotates only this
+server's own backups (bko_mine) and shared files of its own store keys, so two servers may share one folder. S3 needs
+https like WebDAV (plain http only to this machine; a target saved before is refused when connecting). SFTP: the host key
+is saved only after a test that signed in, and an optional expected fingerprint (as ssh-keygen -lf shows it) must match.
 
 No new library: S3 with Signature V4 over http.client + hmac, WebDAV with PUT / PROPFIND / DELETE, SFTP through the sftp
 program (openssh-client) with a key pair this app makes (ed25519; the admin puts the public key on the target). The SFTP
@@ -62,7 +66,7 @@ from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
 from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
 from .hosting import hosted
 from ..notify.alerts import _clamp_int, _env_int, aa_now  # 2.662.0 (#4587): + _clamp_int
-from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_list, bk_passphrase, bk_test_gate, need_backups
+from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_instance, bk_list, bk_passphrase, bk_test_gate, need_backups
 from .backup import BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.662.0 (#4587)
 from ..core.pg import write_lock  # 2.662.0 (#4587)
 from . import bkstore as bks  # 2.432.0 (#3584)
@@ -84,7 +88,10 @@ BKO_ERR = {"conn": N_("The target could not be reached ({0})."),
            "sftp": N_("SFTP failed ({0})."),
            "blocked": N_("This server may only reach public addresses over https."),  # 2.223.2 C (#2871): hosted
            # 2.432.0 (#3584): a backup with shared files whose reference list is gone (the folder was changed by hand)
-           "refs": N_("The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again.")}
+           "refs": N_("The shared files of this backup are not known (its reference file is missing); the next backup is uploaded again."),
+           # 2.550.0 (#4517): S3 like WebDAV only over https (an S3 target saved with http before)
+           "tls": N_("The target’s address must use https (plain http only to this server itself). Change the address of the target."),
+           "fp": N_("The SFTP server’s fingerprint ({0}) is not the expected one. Nothing was saved: check the server and the expected fingerprint.")}
 _BKO = {"running": "", "for": "", "tries": 0, "next": 0.0}
 _BKO_LOCK = threading.Lock()
 
@@ -144,6 +151,15 @@ def bko_fingerprint(line):
         return ""
 
 
+def bko_fp_sha(v):
+    """2.550.0 (#4517): the 'SHA256:…' part of a fingerprint (a known_hosts line, 'type SHA256:…' or a line of
+    ssh-keygen -lf such as '256 SHA256:… comment (ED25519)'), '' without one."""
+    if v and len((v or "").split()) >= 3 and "SHA256:" not in v:
+        v = bko_fingerprint(v)
+    m = re.search(r"SHA256:([A-Za-z0-9+/]{43})(?![A-Za-z0-9+/])", v or "")
+    return f"SHA256:{m.group(1)}" if m else ""
+
+
 def bko_missing(conf, sec):
     """What the chosen target still lacks (field names; empty = complete)."""
     t, m = conf["type"], []
@@ -168,7 +184,8 @@ def bko_state(c):
                    "key_set": bool(sec.get("s3_key")), "secret_set": bool(sec.get("s3_secret"))},
             "webdav": {"url": dav.get("url", ""), "user": dav.get("user", ""), "password_set": bool(sec.get("dav_pass"))},
             "sftp": {"host": sf.get("host", ""), "port": sf.get("port", 22), "user": sf.get("user", ""), "path": sf.get("path", ""),
-                     "public_key": sf.get("pubkey", ""), "fingerprint": bko_fingerprint(sf.get("hostkey", ""))},
+                     "public_key": sf.get("pubkey", ""), "fingerprint": bko_fingerprint(sf.get("hostkey", "")),
+                     "expect_fp": sf.get("expect_fp", "")},  # 2.550.0 (#4517)
             "missing": bko_missing(conf, sec) if conf["type"] else [],
             "last_ok": gsetting(c, "bko_last_ok"), "last_name": gsetting(c, "bko_last_name"),
             "last_size": int(gsetting(c, "bko_last_size") or 0), "last_error": gsetting(c, "bko_last_error"),
@@ -353,12 +370,16 @@ def _check(kind, v):
         return v if re.fullmatch(r"[^\x00-\x1f\x7f\"\\*?\[\]{}]{0,300}", v) else None
     if kind == "secret":
         return v if 1 <= len(v) <= 500 and "\n" not in v else None
+    if kind == "fingerprint":  # 2.550.0 (#4517): stored as 'SHA256:…' (43 characters of base64, no padding)
+        return (bko_fp_sha(v) or None) if len(v) <= 300 else None
     return None
 
 
-FIELDS = {"s3": {"endpoint": "url", "region": "region", "bucket": "bucket", "prefix": "prefix"},
+# 2.550.0 (#4517): the S3 endpoint like the WebDAV address only over https (plain http only to this machine): signed
+# requests over http could be replayed for a quarter of an hour; SFTP + the optional expected fingerprint of the server
+FIELDS = {"s3": {"endpoint": "url_tls", "region": "region", "bucket": "bucket", "prefix": "prefix"},
           "webdav": {"url": "url_tls", "user": "user"},
-          "sftp": {"host": "host", "user": "sftp_user", "path": "path"}}
+          "sftp": {"host": "host", "user": "sftp_user", "path": "path", "expect_fp": "fingerprint"}}
 SECRETS = {"s3": {"key": "s3_key", "secret": "s3_secret"}, "webdav": {"password": "dav_pass"}}
 
 
@@ -590,6 +611,9 @@ class SFTP:
 
     def run(self, lines, accept_new=False):
         """-> (stdout, the known_hosts text after the run). OffsiteError on failure."""
+        want, hk = self.x.get("expect_fp"), self.x.get("hostkey")
+        if want and hk and bko_fp_sha(hk) != want:  # 2.550.0 (#4517): a saved key that is not the expected one is never used
+            raise OffsiteError("fp", bko_fingerprint(hk))
         pin = self.pin() if hosted() else ()  # 2.223.2 C (#2871)
         if not shutil.which("sftp"):
             raise OffsiteError("tool")
@@ -684,18 +708,44 @@ def bko_target(c, conf=None, sec=None):
     if [m for m in bko_missing(conf, sec) if m != "hostkey"]:  # SFTP without a host key: a test records it, an upload refuses
         raise OffsiteError("incomplete")
     x = conf[conf["type"]]
+    if conf["type"] in ("s3", "webdav") and _url(x.get("endpoint" if conf["type"] == "s3" else "url"), tls=True) is None:
+        raise OffsiteError("tls")  # 2.550.0 (#4517): saved before S3 needed https: refused, with the reason (the save refuses it now)
     return {"s3": S3, "webdav": WebDAV, "sftp": SFTP}[conf["type"]](x, sec)
 
 
-def bko_prune(tgt, keep, kept=None, just=None):
+def bko_mine(n, inst):
+    """2.550.0 (#4517): a name on the target that is one of THIS server's uploaded backups (encrypted, not a safety copy):
+    with an instance id: that of this database (inst); without one (named before 2.550): only when this server still
+    knows it (the backup is here, or its reference file of the shared store is). Another server's backup in the same
+    folder is never this server's to rotate: rather one old copy too many than someone else's backups gone."""
+    p = bk_parse_name(n)
+    if not p or not p["encrypted"] or p["kind"] == "safety":
+        return False
+    if p["instance"]:
+        return bool(inst) and p["instance"] == inst
+    return os.path.isfile(os.path.join(BK_DIR, n)) or bks.refs_read(BK_STORE, n) is not None
+
+
+def bko_own_kids():
+    """2.550.0 (#4517): the store keys of this server (.store/k-<kid>/key.json: random per server, kept for good): a
+    shared file on the target named with another kid belongs to another server's backups and is never deleted here."""
+    try:
+        return {d[2:] for d in os.listdir(BK_STORE) if d.startswith("k-") and os.path.isfile(os.path.join(BK_STORE, d, "key.json"))}
+    except OSError:
+        return set()
+
+
+def bko_prune(tgt, keep, kept=None, just=None, inst=""):
     """The newest `keep` backups on the target stay; older ones of this app's name pattern go. -> deleted names.
     2.432.0 (#3584): kept (a list) gets the names still there; then the shared files none of them refers to go -- not
-    when the listing lacks `just` (the backup uploaded right now: the listing is incomplete, review M1)."""
+    when the listing lacks `just` (the backup uploaded right now: the listing is incomplete, review M1).
+    2.550.0 (#4517): only this server's own backups (bko_mine, inst = bk_instance) count and go, and only shared files of
+    its own store keys (bko_own_kids): another server's copies and shared files in the same folder stay."""
     try:
         names = tgt.names()
     except OffsiteError:
         return []  # the upload itself went through; the clean-up is tried again after the next one
-    mine = sorted((n for n in names if BK_NAME_RE.fullmatch(n) and n.endswith(".enc") and "-safety." not in n), reverse=True)
+    mine = sorted((n for n in names if bko_mine(n, inst)), reverse=True)
     gone = []
     for n in mine[keep:]:
         try:
@@ -710,7 +760,8 @@ def bko_prune(tgt, keep, kept=None, just=None):
         kept[:] = left
     if just and just not in names:
         return gone
-    blobs = [n for n in names if bks.REMOTE_RE.fullmatch(n)]
+    kids = bko_own_kids()  # 2.550.0 (#4517)
+    blobs = [n for n in names if bks.REMOTE_RE.fullmatch(n) and bks.REMOTE_RE.fullmatch(n).group(1) in kids]
     need = set()
     for n in left:
         r = bks.refs_read(BK_STORE, n)
@@ -755,6 +806,7 @@ def bko_upload(force=False):
             if not x["encrypted"] or len(bk_passphrase(c)) < 10:
                 raise OffsiteError("not_encrypted")
             tgt = bko_target(c, conf)
+            inst = bk_instance(c)  # 2.550.0 (#4517): the clean-up below takes only this server's backups
             c.rollback()  # no open transaction while the (long) upload runs: a restore must not wait for it
             if (x["meta"] or {}).get("format_version") == 3:  # 2.432.0 (#3584): first the shared files the target lacks
                 # 2.549.0 (#4529): the readers' lock (shared, like a download) while store files are read: the clean-up
@@ -778,7 +830,7 @@ def bko_upload(force=False):
             if got != x["size"]:
                 raise OffsiteError("size", got, x["size"])
             kept = []
-            bko_prune(tgt, conf["keep"], kept, just=x["name"])
+            bko_prune(tgt, conf["keep"], kept, just=x["name"], inst=inst)
             if kept:
                 gset(c, "bko_remote", json.dumps(kept))  # 2.432.0 (#3584): their reference files stay here
         except OffsiteError as e:
@@ -974,6 +1026,8 @@ def offsite_set():
                 sec["sftp_key"], cur["pubkey"] = bko_keypair()
             if x.get("forget_host") is True or (cur.get("host"), cur.get("port")) != old_addr:
                 cur.pop("hostkey", None)  # another server (or the admin said so): the next test records its key
+            if cur.get("expect_fp") and cur.get("hostkey") and bko_fp_sha(cur["hostkey"]) != cur["expect_fp"]:
+                cur.pop("hostkey", None)  # 2.550.0 (#4517): a new expected fingerprint the saved key does not have: test again
     if conf["type"] == "sftp" and not sec.get("sftp_key"):
         sec["sftp_key"], conf["sftp"]["pubkey"] = bko_keypair()
     if "on" in b and not isinstance(b["on"], bool):
@@ -1027,14 +1081,19 @@ def offsite_test():
             try:
                 _, known = tgt.run([f'put "{tmp}" "{tgt.rp(name)}"', f'rm "{tgt.rp(name)}"'], accept_new=new)
             except OffsiteError as e:
-                known = getattr(e, "known", "")
-                if new and known.strip():  # the key was seen before the sign-in failed: keep it, show it
-                    conf["sftp"]["hostkey"] = known.strip().splitlines()[0]
-                    _save(c, conf)
-                    c.commit()
+                # 2.550.0 (#4517): the key seen before a sign-in that failed is shown, never saved (was: pinned after any
+                # try, so a wrong server first could hold the place); it is saved by the first test that signs in
+                seen = (getattr(e, "known", "") or "").strip()
+                if new and seen:
+                    out["seen_fingerprint"] = bko_fingerprint(seen.splitlines()[0])
                 raise
             if new and known.strip():
-                conf["sftp"]["hostkey"] = known.strip().splitlines()[0]
+                line = known.strip().splitlines()[0]
+                want = conf["sftp"].get("expect_fp")
+                if want and bko_fp_sha(line) != want:  # 2.550.0 (#4517): another key than the expected one: stop, save nothing
+                    out["seen_fingerprint"] = bko_fingerprint(line)
+                    raise OffsiteError("fp", bko_fingerprint(line))
+                conf["sftp"]["hostkey"] = line
                 _save(c, conf)
                 c.commit()
             out["fingerprint"] = bko_fingerprint(conf["sftp"].get("hostkey", ""))

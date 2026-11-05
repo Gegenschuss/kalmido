@@ -1136,7 +1136,8 @@ const BKO_TYPES = [['', N_('None|target')], ['s3', N_('S3-compatible storage')],
 const BKO_FIELDS = {s3: [['endpoint', N_('Endpoint'), 'url', 'https://s3.example.com'], ['region', N_('Region|storage'), 'text', 'us-east-1'], ['bucket', N_('Bucket'), 'text', ''], ['prefix', N_('Folder'), 'text', 'kalmido'],
   ['key', N_('Access key'), 'secret', 'key_set'], ['secret', N_('Secret key'), 'secret', 'secret_set']],
   webdav: [['url', N_('Address'), 'url', 'https://dav.example.com/backups'], ['user', N_('User name'), 'text', ''], ['password', N_('Password'), 'secret', 'password_set']],
-  sftp: [['host', N_('Server'), 'text', 'backup.example.com'], ['port', N_('Port'), 'number', '22'], ['user', N_('User name'), 'text', ''], ['path', N_('Folder'), 'text', 'backups']]};
+  sftp: [['host', N_('Server'), 'text', 'backup.example.com'], ['port', N_('Port'), 'number', '22'], ['user', N_('User name'), 'text', ''], ['path', N_('Folder'), 'text', 'backups'],
+    ['expect_fp', N_('Expected fingerprint'), 'text', 'SHA256:…']]};  // 2.550.0 (#4517): optional, as ssh-keygen -lf shows it
 async function bkoDraw(md, j) {
   const box = $('#s-bko', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/backups/offsite'); } catch { box.innerHTML = ''; return; } }
@@ -1155,7 +1156,8 @@ async function bkoDraw(md, j) {
     if (t === 'sftp') {
       h += `<div class="row bkokey"><label for="bko-pub">${tr('Public key')}</label><input type="text" id="bko-pub" readonly value="${esc(x.public_key || '')}"><button type="button" class="iconbtn" data-bko="copy" title="${tr('Copy')}" aria-label="${tr('Copy')}">${ic('copy', 's')}</button></div>`
         + hint(tr('Add this key to the file ~/.ssh/authorized_keys of the user on the server. Kalmido signs in only with this key.'))
-        + hint(x.fingerprint ? tr('Server fingerprint (saved): {0}', `<code>${esc(x.fingerprint)}</code>`) : tr('The first test shows the server’s fingerprint and saves it; after that only this server is accepted.'))
+        + hint(x.fingerprint ? tr('Server fingerprint (saved): {0}', `<code>${esc(x.fingerprint)}</code>`) : tr('The first test that signs in saves the server’s fingerprint; after that only this server is accepted.'))
+        + hint(tr('Optional: the fingerprint of the server’s host key from its administrator (ssh-keygen -lf). If set, a server with another key is refused and nothing is saved.'))  // 2.550.0 (#4517)
         + `<div class="row"><button type="button" class="btn sm" data-bko="newkey">${ic('key', 's')} ${tr('New key pair')}</button>${x.fingerprint ? `<button type="button" class="btn sm" data-bko="forget">${tr('Forget fingerprint')}</button>` : ''}</div>`;
     }
     h += `<div class="row"><label for="bko-keep">${tr('Keep')}</label><input type="number" class="aanum" id="bko-keep" min="1" max="365" value="${j.keep}"><span class="muted">${tr('newest backups on the target')}</span></div>

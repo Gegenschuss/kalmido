@@ -7,7 +7,11 @@ path, status, sig = the Signature V4 was checked and matched). S3 checks the sig
 style), the signed body hash and Content-MD5; WebDAV checks Basic auth. /data/fake-remote/<mode>.fail holding a number N:
 the next N uploads answer 500 (the number counts down).
 2.510.0 (#4286) like the real ones: an S3 list comes in pages (/data/fake-remote/s3.page holding a number N: N keys per page,
-default 1000 = max-keys, IsTruncated + NextContinuationToken) and honours the delimiter; a WebDAV PUT creates no folder (409)."""
+default 1000 = max-keys, IsTruncated + NextContinuationToken) and honours the delimiter; a WebDAV PUT creates no folder (409).
+2.550.0 (#4517): copied as /data/fakebin/sftp (first in the app's PATH, p22232_c_offsite_test.py) it stands in for the sftp
+program: the host key is /data/fake-remote/sftp.key ("ssh-ed25519 AAAA…"), checked against / added to the known_hosts file
+the app passes like OpenSSH does (StrictHostKeyChecking yes / accept-new); /data/fake-remote/sftp.mode "denied" = the
+sign-in fails after the host key was seen (Permission denied), else the batch succeeds. Each run is logged to sftp.log."""
 import base64
 import hashlib
 import hmac
@@ -21,6 +25,47 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qsl, quote, unquote, urlsplit
 from xml.sax.saxutils import escape
 
+
+
+def fake_sftp():
+    """2.550.0 (#4517): the sftp stand-in (see above); exit 255 with OpenSSH's messages on a refused host key / sign-in."""
+    args, opts = sys.argv[1:], {}
+    for i, a in enumerate(args[:-1]):
+        if a == "-o" and "=" in args[i + 1]:
+            k, v = args[i + 1].split("=", 1)
+            opts[k] = v
+    dest = args[-1]
+    host, port = dest.rsplit("@", 1)[-1], args[args.index("-P") + 1] if "-P" in args else "22"
+    alias = opts.get("HostKeyAlias") or (host if port == "22" else f"[{host}]:{port}")
+    base = "/data/fake-remote/sftp"
+    try:
+        mode = open(base + ".mode").read().strip()
+    except OSError:
+        mode = "ok"
+    key = open(base + ".key").read().strip()
+    kh = opts["UserKnownHostsFile"]
+    known = [ln.split() for ln in open(kh).read().splitlines() if ln.strip()]
+    mine = [x for x in known if x[0] == alias]
+    sys.stdin.read()
+    with open(base + ".log", "a") as f:
+        f.write(json.dumps({"strict": opts.get("StrictHostKeyChecking"), "mode": mode, "known": bool(mine)}) + "\n")
+    if mine and " ".join(mine[0][1:3]) != key:
+        print("@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@\nHost key verification failed.", file=sys.stderr)
+        sys.exit(255)
+    if not mine:
+        if opts.get("StrictHostKeyChecking") != "accept-new":
+            print("Host key verification failed.", file=sys.stderr)
+            sys.exit(255)
+        with open(kh, "a") as f:
+            f.write(f"{alias} {key}\n")
+    if mode == "denied":
+        print(f"{dest}: Permission denied (publickey).", file=sys.stderr)
+        sys.exit(255)
+    sys.exit(0)
+
+
+if os.path.basename(sys.argv[0]) == "sftp":
+    fake_sftp()
 MODE, PORT, USER, SECRET = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 ROOT = os.path.join("/data/fake-remote", MODE)
 os.makedirs(ROOT, exist_ok=True)

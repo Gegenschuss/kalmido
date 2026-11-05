@@ -652,19 +652,30 @@ docker compose up -d kalmido
 - **Offsite backups by pull.** Let a second machine pull the backup folder **with `.store`** (the server cannot delete them), encrypt them
   there (for example with `age`, or Kalmido's own *Encrypt backups*), and run a restore test now and then.
 - **Off-site target (2.143.0).** Settings > Server > Server > *Off-site backup*: one target per server --
-  S3-compatible storage (endpoint, region, bucket, folder, access key and secret key; requests signed with Signature V4;
+  S3-compatible storage (an `https://` endpoint -- plain `http://` only to `localhost`, since 2.550 as for WebDAV --, region,
+  bucket, folder, access key and secret key; requests signed with Signature V4;
   path-style addresses by default, switch them off for `bucket.s3.example.com`), WebDAV (an `https://` address -- plain
   `http://` only to `localhost` --, user name, password) or
   SFTP (server, port, user name, folder without `* ? [ ] { }`). For SFTP Kalmido makes an ed25519 key pair and shows the public key: add it to
-  `~/.ssh/authorized_keys` of that user; the first *Test connection* shows the server's fingerprint and saves it, after that
-  only this host key is accepted (*Forget fingerprint* after a planned change of the server). The image ships the `sftp`
+  `~/.ssh/authorized_keys` of that user; the first *Test connection* that signs in saves the server's fingerprint, after that
+  only this host key is accepted (*Forget fingerprint* after a planned change of the server). Since 2.550 a test whose
+  sign-in fails saves nothing (it only shows the fingerprint it saw), and the optional field *Expected fingerprint* takes
+  the server's fingerprint as `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` prints it on the server (`SHA256:…`):
+  a server with another key is then refused and nothing is saved. The image ships the `sftp`
   program (openssh-client); a server run outside the image needs it on the `PATH`.
+  - An S3 target saved with `http://` to another host before 2.550 is refused when connecting (the upload fails with
+    that reason and the admins get the alert): change its endpoint to `https://`.
   - Only encrypted backups are uploaded: the target cannot be switched on without *Encrypt backups* and its passphrase.
     The shared files go up first, as `kalmido-blob-…` files next to the backups (2.432.0).
   - After every backup (automatic or *Back up now*; not the safety copies of a restore) the backup thread uploads the
     newest one, checks its size on the target (S3: also `Content-MD5` and the signed SHA-256 of the body) and keeps the
     newest N backups there (default: the daily count kept locally); older files of Kalmido's backup name pattern are
-    deleted, nothing else in the folder (sub-folders are left alone). The upload runs beside the backup thread, so a
+    deleted, nothing else in the folder (sub-folders are left alone). Since 2.550 the backup names carry the instance id
+    of the server (8 hex characters after the time, for example `kalmido-backup-20261105-033000-1a2b3c4d-auto.zip.enc`;
+    it is also in the backup's manifest, `instance`): only this server's own backups count and go, so several servers
+    may share one folder. Another server's backups and its `kalmido-blob-…` files (another store key) stay. A name
+    without an id (before 2.550) goes only while this server still has that backup (or its list of shared files);
+    otherwise it stays on the target: delete such leftovers by hand once they are no longer needed. The upload runs beside the backup thread, so a
     slow target delays neither the schedule nor a restore. A failed upload is tried again up to 4 times (5, 10, 20 minutes apart), then
     the admins get an alert; the next backup or *Upload now* starts again. `KALMIDO_OFFSITE_TIMEOUT` (seconds per
     network step, default 120) and `KALMIDO_OFFSITE_RETRY_S` (first pause, default 300) tune it.

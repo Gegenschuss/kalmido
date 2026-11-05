@@ -215,7 +215,7 @@ const until = (fn, ms) => require('./boot').until(fn, {timeout: ms || 15000, ste
   await until(() => md.querySelectorAll('.bkrow').length === 1, 8000);
   check(md.querySelectorAll('.bkrow').length === 1 && /manual/.test(md.querySelector('.bkrow').textContent), 'back up now: the list shows it');
   const dl = md.querySelector('.bkrow a[download]');
-  check(dl && /^\/api\/admin\/backups\/kalmido-backup-\d{8}-\d{6}-manual\.zip\/download$/.test(dl.getAttribute('href')), 'download link');
+  check(dl && /^\/api\/admin\/backups\/kalmido-backup-\d{8}-\d{6}-(?:[0-9a-f]{8}-)?manual\.zip\/download$/.test(dl.getAttribute('href')), 'download link');  // 2.550.0 (#4517): + the instance id
   // 2.505.0 (#4302): the numbers of what would go again and the choice, delete again is the default; the choice travels with the restore
   w.eval(`window.__rf = rawFetch; window.__su = suApi; window.__sent = null;
     rawFetch = async (m, u, ...r) => /purged-preview/.test(u) ? {kinds: {tasks: 3, lists: 1}, total: 4, first: '2026-01-02T10:00:00+00:00', last: '2026-02-03T10:00:00+00:00', recent: 2, recent_days: 7, accounts: 1} : __rf(m, u, ...r);
