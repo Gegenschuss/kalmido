@@ -634,7 +634,11 @@ async function api(method, url, body) {
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   if (outNow(method, url, body)) {  // 2.537.0 (#4568)
-    const r = enqueue(method, url, body);
+    // 2.549.0 (#4568, #4305 A9): the base as an online change had it (oxbPrev: a custom field on its own, a value already shown
+    // is no base); without one an empty _prev, so the queue adds none of its own (a caller's own _prev stays as it is; offline
+    // the queue's own as before)
+    const ob = body._prev || !OUT.online ? body : (o => o.on ? o.body : {...body, _prev: {}})(oxbPrev(method, url, body));
+    const r = enqueue(method, url, ob);
     if (OUT.online && r?._q) r._q.live = 1;  // 2.551.0 (#4649): sent online: a refusal of its first try is said as api() said it (outFlush); offline after all / a later try = the dialog as before
     if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r;
   }
