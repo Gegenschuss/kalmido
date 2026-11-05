@@ -82,6 +82,13 @@ def channel(s, name, oid, members=(), open_=False):
     return r.json().get("id")
 
 
+def token(s, name):
+    """A personal API token of session s (scopes read + comments) -> its headers."""
+    r = s.post(B + "/api/me/tokens", json={"name": name, "scopes": ["read", "comments"], "expires_days": None})
+    check(r.ok and r.json().get("token"), f"setup: a personal token {name} {r.text[:120]}")
+    return {"Authorization": "Bearer " + (r.json().get("token") or "x")} if r.ok else {}
+
+
 def restart():
     """The next start of the server (core/db.py init_db runs collab/tcxcore.py tcx_core_sync)."""
     subprocess.run(["docker", "restart", CT], capture_output=True)
@@ -199,6 +206,12 @@ check(reads(Mi, C3), "group: mia (full member, in the group) reads the channel")
 check(C3 in {x.get("id") for x in Mi.get(B + "/api/team/channels").json().get("channels") or []}, "group: mia lists the channel")
 no(Gi.get(B + f"/api/team/rooms/{C3}/messages"), "group: a guest in the group does not read it (personal invitation needed)")
 no(Ol.get(B + f"/api/team/rooms/{C3}/messages"), "group: a group member of another organisation does not read it")
+OLH = token(Ol, "olga")
+no(Ol.delete(B + f"/api/team/rooms/{C3}/groups/{G}"), "boundary: a person of another organisation unshares the group")
+no(requests.delete(V + f"/team/rooms/{C3}/groups/{G}", headers=OLH), "boundary: ... through API v1")
+no(requests.delete(V + f"/team/rooms/{C3}/groups/{G}", headers=AGOH), "boundary: an agent of another organisation (API v1)")
+no(requests.delete(V + f"/team/rooms/{C3}/groups/{G}", headers=AGH), "group: an agent of the organisation does not manage groups")
+check(share(C3, G, "group_id") == "edit", "boundary: the group's share stays")
 j = A.get(B + "/api/team/channels").json()
 mine = {x["id"]: x for x in j.get("channels") or []}
 check(mine.get(C3, {}).get("groups") == [G], "group: the manager sees the group of the channel")
@@ -221,7 +234,8 @@ check(share(C1, AG, "agent_id") == "edit" and row(C1, AG), "agent: its share (ag
 check(reads(None, C1, AGH), "agent: reads the channel it was added to (API v1)")
 rooms = {x.get("id") for x in (requests.get(V + "/team/rooms", headers=AGH).json().get("data") or [])}
 check(C1 in rooms and OC not in rooms and C2 not in rooms, f"agent: lists only its channel ({sorted(x for x in rooms if x)})")
-no(A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": AGO}), "agent: an agent of another organisation cannot be added")
+r = A.post(B + f"/api/team/rooms/{C1}/members", json={"user_id": AGO})
+check(r.status_code in (400, 403, 404) and share(C1, AGO, "agent_id") is None, f"agent: an agent of another organisation cannot be added ({r.status_code})")
 
 # ================================================================== leaving the organisation
 check(row(C1, BOB) and share(C1, BOB), "leave org: bob is in C1 before")
@@ -249,8 +263,11 @@ else:
 # ================================================================== a person without an organisation
 FR, Fr = freelancer(B, A, "frida", features=FEAT)
 FE, Fe = freelancer(B, A, "fred", features=FEAT)
-r = A.post(B + "/api/admin/groups", json={"name": "Pair", "members": [FR, FE]})  # they work together (a group)
-check(r.ok, "freelancer: a group of the two " + r.text[:120])
+# they work together through a group of the instance (a group row, like p2281_a: the admin of the mode workspaces sees no freelancer)
+sql("INSERT INTO groups(name,oidc_group,created_at,created_by) VALUES('Pair','','2026-10-20T08:00:00',?)", (ALICE,), write=True)
+PG = sql("SELECT id FROM groups WHERE name='Pair'")[0][0]
+for x in (FR, FE):
+    sql("INSERT INTO group_members(group_id,user_id,added_at) VALUES(?,?,'2026-10-20T08:00:00')", (PG, x), write=True)
 r = Fr.post(B + "/api/team/channels", json={"name": "Own room", "org_id": None, "members": [FE]})
 check(r.status_code in (200, 201), "freelancer: a private channel with a coworker " + r.text[:160])
 PC = r.json().get("id")
@@ -262,5 +279,12 @@ check(not [x for x in items if x.get("ref_kind") == "tchat_room"], "freelancer: 
 check(Fr.delete(B + f"/api/team/rooms/{PC}/members/{FE}").ok, "freelancer: she removes him")
 check(share(PC, FE) is None and not row(PC, FE), "freelancer: share and row gone")
 no(Fe.get(B + f"/api/team/rooms/{PC}/messages"), "freelancer: he reads it no more")
+check(Fr.post(B + f"/api/team/rooms/{PC}/members", json={"group_id": PG}).ok and share(PC, PG, "group_id") == "edit",
+      "freelancer: she shares her private channel with the group")
+check(reads(Fe, PC), "freelancer: he reads it through the group")
+FRH = token(Fr, "frida")
+r = requests.delete(V + f"/team/rooms/{PC}/groups/{PG}", headers=FRH)
+check(r.status_code == 204 and share(PC, PG, "group_id") is None, f"freelancer: she unshares the group through API v1 ({r.status_code})")
+no(Fe.get(B + f"/api/team/rooms/{PC}/messages"), "freelancer: he reads it no more after the group")
 
-kt.done("p2565_c_kern_teamchat")
+sys.exit(kt.done("p2565_c_kern_teamchat"))

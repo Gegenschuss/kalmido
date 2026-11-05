@@ -932,6 +932,7 @@ API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
     "POST /team/groups": "2.113.1 (#2059): group conversations are between people; agents are refused (403)",
     "PATCH /team/rooms/{}": "2.113.1 (#2059): renaming / archiving a channel is for its creator or an organisation admin (people; agents 403)",
     "POST /team/rooms/{}/members": "2.113.1 (#2059): people add members (agents only by their owner / an organisation admin; agents 403)",
+    "DELETE /team/rooms/{}/groups/{}": "2.565.0 (#4719): sharing a channel with a group is for its managers (people; agents 403)",
     "GET /focus": "2.116.0 (#2067): focus sessions are private to a person; agent tokens get 403, so no tool (scripts with a personal token use it)",
     "GET /focus/stats": "2.116.0 (#2067): as GET /focus",
     "POST /focus/start": "2.116.0 (#2067): as GET /focus",
