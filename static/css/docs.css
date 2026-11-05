@@ -297,6 +297,8 @@
 /* 2.353.0 D (#2759): the file store's folders as cards (abdocs.js), the recognition line, the list / cards switch, the saved filters on phones */
 .abcards .dc-card{position:relative}
 .abcards .abcmenu{position:absolute;top:.25rem;right:.25rem;background:var(--bg2);border-radius:var(--radius)}
+.abcards .abcshw{position:absolute;top:.25rem;left:.25rem;max-width:calc(100% - 3.5rem);background:var(--bg2);border-radius:var(--radius)}  /* 2.558.0 (#4693) */
+.abcards .abcshw .abshw{min-height:2.25rem}
 .abcards .abcf .dc-ph svg{width:2rem;height:2rem}
 .abrecog{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-s)}
 .abrecog .linkbtn{margin-left:.25rem}

@@ -84,7 +84,10 @@ def _shared_flags(c, ids):
     return {r[0] for r in c.execute(f"SELECT DISTINCT node_id FROM fs_shares WHERE node_id IN ({q})", list(ids))}
 
 
-def _items(c, rows, parent_role=None):
+def _items(c, rows, parent_role=None, above=None, can=False):
+    """2.558.0 (#4693): above = the folders above the rows (the open folder first; () at a top) whose shares apply to them
+    too: the rows uid may share get share_with (files/fsshnames.py; None = not asked for: v1, search, trash); can: uid may
+    manage the shares of the rows without owning them (an area, fs_area_share)."""
     uid = me()
     rows = fs_ref_rows(c, uid, rows)  # 2.199.0 F (#2742, review): every listing (search, tags, shared, tops, trash, v1) without the reference nodes uid may not reach
     names = _names(c, [x for r in rows for x in (r["owner_id"], r["created_by"])])
@@ -97,12 +100,14 @@ def _items(c, rows, parent_role=None):
     lk = fsl_map(c, [r["id"] for r in rows])  # 2.353.0 A (#2758)
     if lk and not fsl_person_ok():
         rows = [r for r in rows if r["id"] not in lk]  # agents and API tokens: no node of a locked folder in any listing
-    out = []
+    out, sw_ids = [], []
     for r in rows:
         role = parent_role
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
         x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up, lk)
+        if above is not None and (role == "owner" or can):
+            sw_ids.append(r["id"])
         if r["id"] in xl and role == "owner":
             x["xl"] = True
         if r["kind"] == "link":
@@ -111,6 +116,13 @@ def _items(c, rows, parent_role=None):
             except Denied:  # nothing of an original the asker may not open (name, size, type, id)
                 x.update(name=tr("Linked file (no access)"), size=0, mime="", ref_id=None, no_access=True)
         out.append(x)
+    if sw_ids:  # 2.558.0 (#4693): the names of the shares, one bundled read for the whole listing (files/fsshnames.py)
+        from .fsshnames import fs_share_with
+        sw_set = set(sw_ids)
+        sw = fs_share_with(c, [r for r in rows if r["id"] in sw_set], above)
+        for x in out:
+            if x["id"] in sw:
+                x["share_with"] = sw[x["id"]]
     out.sort(key=fs_sort_key)  # 2.199.0 A (#2742): folders first, then by hand (sort_no), then by name
     from .fstags import dt_attach  # 2.122.0 B (#2099): the tags of each row
     return dt_attach(c, out)
@@ -164,7 +176,11 @@ def files_list():
         c.commit()
         chain = fs_chain(c, pid)
         from ..docs.recog import rc_list_extra
-        items, node = _items(c, rows, n["role"]), fs_node_json(c, n, n["role"])
+        can = n["role"] == "owner" or fs_area_share(c, uid, n)  # 2.558.0 (#4693): who may open the Share dialog sees the names
+        items, node = _items(c, rows, n["role"], chain, can), fs_node_json(c, n, n["role"])
+        if can:
+            from .fsshnames import fs_share_with
+            node["share_with"] = fs_share_with(c, [n], chain[1:])[n["id"]]
         rc_list_extra(c, chain, node, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759): recognition + documents (cards)
         return jsonify(items=items, node=node, crumbs=_crumbs(c, chain),
                        space=("org:%d" % n["org_id"]) if n["org_id"] else ("private" if n["owner_id"] == uid else "shared"))
@@ -194,7 +210,7 @@ def files_list():
                     if r["owner_id"] != uid and (r["parent_id"] not in vis) and not (r["parent_id"] is None and r["org_id"])]
         role = None
     rows = fsv_drop(c, rows)  # 2.429.0 (#3580): no root folder / shared folder of another area (knowledge, tables, office, ...)
-    items = _items(c, rows, role if role == "owner" else None)
+    items = _items(c, rows, role if role == "owner" else None, ())  # 2.558.0 (#4693): () = the names of the shares
     from ..docs.recog import rc_list_extra
     rc_list_extra(c, None, None, items, request.args.get("docs") == "1")  # 2.353.0 D (#2759)
     coll = fsv_collections(c, uid, oid) if space in ("private", "org") else []  # 2.429.0 (#3580): "From <area>", read-only

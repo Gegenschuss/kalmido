@@ -380,4 +380,4 @@ def files_scan():
     c.commit()
     rc_kick(added)
     rows = [c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()]
-    return jsonify(items=_items(c, rows)), 201
+    return jsonify(items=_items(c, rows, above=())), 201  # 2.558.0 (#4693): + share_with (the scan's end; its folder's shown by the client)

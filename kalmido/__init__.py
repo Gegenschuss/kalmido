@@ -250,6 +250,7 @@ ORDER = (
     "files.scan",  # 2.61.0 (#1818): virus scan of uploads (clamd), the later scan, the admin's scanner state
     "files.web",  # 2.48.0 (#1207): the file store's routes for the web app
     "files.fsviews",  # 2.429.0 (#3580): the file store shows only its own folders; "From <area>" collections (read-only)
+    "files.fsshnames",  # 2.558.0 (#4693): the names of a listing's shares, one bundled read (no routes)
     "files.fslock",  # 2.353.0 A (#2758): locked folders (names and contents encrypted in the browser)
     "files.fsmove",  # 2.96.0 A (#1941): files, folders and documents to the other workspace (private <-> organisation)
     "files.fstags",  # 2.122.0 B (#2099): tags of files and folders (the documents' tag set of the workspace)

@@ -31,10 +31,11 @@ function abd_toolsHtml(d, key) {
 // a card: a document = its tile of the documents (preview, sender, date, type, tags), other files and folders = name + picture
 function abd_card(n) {
   const menuBtn = `<span class="abcmenu"><button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots', 's')}</button></span>`;  // in a span: .dc-card>button is the tile
-  if (n.doc?.id && !abd_locked(n) && typeof dc_card === 'function') return dc_card(n.doc).replace(/<\/li>$/, menuBtn + '</li>');
+  const shc = typeof ab_shChip === 'function' ? ab_shChip(n, AB.data?.node?.owner_id) : '', sh = shc ? `<span class="abcshw">${shc}</span>` : '';  // 2.558.0 (#4693): the names, a click opens Share
+  if (n.doc?.id && !abd_locked(n) && typeof dc_card === 'function') return dc_card(n.doc).replace(/<\/li>$/, menuBtn + sh + '</li>');
   const img = n.kind === 'file' && !abd_locked(n) && ab_isImg(n) && !upLocked(n) ? `<img src="${esc(abd_thumbUrl(n))}" alt="" loading="lazy">` : '';
   const meta = abd_locked(n) ? '' : [n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(n.updated_at)].filter(Boolean).join(' · ');
-  return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}</li>`;
+  return `<li class="dc-card abcf"><button type="button" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''} aria-label="${esc(n.name)}"><span class="dc-th">${img || `<span class="dc-ph">${ab_icon(n)}</span>`}</span><span class="dc-ct"><b class="dc-nm">${esc(n.name)}</b>${meta ? `<span class="dc-mt">${esc(meta)}</span>` : ''}</span></button>${menuBtn}${sh}</li>`;
 }
 // 2.477.0 (#3936): a picture card shows the server's small preview, never the original (the version keeps the browser's copy fresh)
 const abd_thumbUrl = n => `/api/files/nodes/${n.id}/thumb?v=${encodeURIComponent(n.version || 1)}`;

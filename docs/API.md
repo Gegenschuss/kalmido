@@ -1720,7 +1720,7 @@ name), `GET /api/files/tagged?space=&tag=1,7&tag=3&mode=all|any&not=4` (the matc
 (write access, people only): a folder's own recognition switch (subfolders inherit it; without an own value anywhere up the
 path only the documents folder recognises) -- `on` makes its files documents at once (at most 500 per request) and every file
 uploaded or moved in later; `off` keeps the documents there. A file takes `on` only ("Recognise"). Answer `{recog: {on, own,
-from, root}, added}`; a locked folder: `409`. `GET /api/files?parent=` answers `node.recog_on` / `recog_from` / `recog_root`, each
+from, root}, added}`; a locked folder: `409`. 2.558.0 (#4693): `GET /api/files` (a folder or a space's top) and the scan's answer give each node the person may share `share_with: [{n: name, k: u | g | a | o}]` (people, groups, agents, the whole organisation; the live shares, those of the folders above included; the open folder: `node.share_with`), read once per listing; a receiver gets none (the owner stands in `owner`). `GET /api/files?parent=` answers `node.recog_on` / `recog_from` / `recog_root`, each
 folder and file `recog_on` (own switch: `recog`), each document `doc: {state, review}` (`&docs=1`: the document as in `GET
 /api/docs`, for the cards). `GET /api/files/search` also finds documents by sender, type and tags (`hit: doc`).
 

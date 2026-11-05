@@ -10,7 +10,10 @@ Since 2.48.0.
 a trash with undo and links to task and project files that keep the original's rights. Share a folder or file with
 people, groups or agents to view or edit, optionally until a date; shares are inherited by everything below and never
 leave the workspace. Agents see only what is shared with them, write their results into their own folder, and every
-agent access shows up in the file's history.
+agent access shows up in the file's history. Who a folder or file is shared with stands in plain sight (2.558.0, #4693): the open folder has
+"Share" on top and below it "Shared with Anna, Ben · agent X" (the shares of the folders above included) or "Only you";
+each row and card names its shares (from three on "Anna +2", a click opens the Share dialog), and the end of a scan says who
+sees the new file. Only who may share a node sees these names; whoever it is shared with sees "Shared by <name>".
 
 **Documents** (#1111) is the place for letters, invoices and contracts: drop PDFs, scans or photos, share them from the
 phone, forward them by mail or put them into *Documents/Inbox*. A **folder watcher** (Mac, Windows, Linux; upload-only key) scans from a desktop folder straight into Kalmido. Kalmido reads scans locally (German and English),

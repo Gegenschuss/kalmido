@@ -81,7 +81,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   md.querySelector('[data-m="close"]').click();
   w.eval(`go('ablage')`);
   await until(() => d.querySelector(`.abrow[data-abid="${FID}"] .abbadge`));
-  check(d.querySelector(`.abrow[data-abid="${FID}"] .abbadge`), 'the folder row shows the share symbol');
+  // 2.558.0 (#4693): the row names who it is shared with (was the bare symbol); a click opens the Share dialog
+  check(/Helper bot/.test(d.querySelector(`.abrow[data-abid="${FID}"] .abbadge.abshw`)?.textContent || ''), 'the folder row names the share (the agent)');
 
   // ================= delete -> trash -> undo
   const fnode = (await call('GET', `/api/files/nodes/${FID}`));

@@ -1,0 +1,7 @@
+/* Kalmido web client: the file store (ablage.js, loaded with its module, LD_CSS in lazyload.js). Its older rules stand in app.css. */
+/* 2.558.0 (#4693): who a row is shared with ("Anna +2", a click opens Share) and the line below a folder's head */
+.abshw,.abshby{align-items:center;gap:.25rem;max-width:12rem;font-size:var(--fs-b);white-space:nowrap}
+.abshw{min-height:2.75rem;padding:0 .375rem;border:0;border-radius:.5rem;background:none;color:inherit;cursor:pointer}
+.abshw:hover{background:var(--bg2);color:var(--text)}
+.abshw span,.abshby span{overflow:hidden;text-overflow:ellipsis}
+.abshline{display:flex;align-items:center;gap:.375rem;margin:.25rem 0 .5rem;font-size:var(--fs-b)}

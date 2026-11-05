@@ -92,7 +92,7 @@ function viewAblage() {
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
-  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
   AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
@@ -108,7 +108,7 @@ function viewAblage() {
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
-  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
+  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
 }
 // 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
 // Files the top folders of the shown workspace (several workspaces: each one first), a folder's subfolders loaded and drawn
@@ -196,9 +196,31 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-abc="open"]'); if (!b || !b.closest('.abview')) return;
   const f = AB.data?.groups?.[+b.dataset.g]?.items.find(x => x.id === +b.dataset.id); if (f) ab_collOpen(f);
 });
+// 2.558.0 (#4693): who a node is shared with, like the lists (render.js licShareTip): n.share_with (files/fsshnames.py, only
+// for who may share it: owner / an area) = [{n: name, k: u|g|a|o}], the folders above included. "Anna, Ben · agent X"
+const ab_shName = e => e.k === 'o' ? tr('Whole organisation') : e.n;
+function ab_shText(sw) {
+  const p = sw.filter(e => e.k !== 'a').map(ab_shName), a = sw.filter(e => e.k === 'a').map(e => e.n);
+  return [p.join(', '), a.length ? trn('agent {1}', 'agents {1}', a.length, a.join(', ')) : ''].filter(Boolean).join(' · ');
+}
+const ab_shShort = sw => { const x = sw.map(ab_shName); return x.length > 2 ? x[0] + ' ' + tr('+{0}', x.length - 1) : x.join(', '); };  // from three on "Anna +2"
+// the line of a folder's head / the scan's end: "Shared with …" / "Only you" (who may share), "Shared by <owner>" (a receiver)
+const ab_shLineTxt = n => n.share_with ? (n.share_with.length ? tr('Shared with {0}', ab_shText(n.share_with)) : tr('Only you')) : n.owner && n.owner_id !== S.me?.id ? tr('Shared by {0}', n.owner) : '';
+// the names in a row / on a card instead of the bare symbol; a click opens the Share dialog (fsshare.js)
+function ab_shChip(n, own) {
+  if (n.share_with?.length) { const t = tr('Shared with {0}', ab_shText(n.share_with)); return `<button type="button" class="abbadge abshw" data-ab="share" data-id="${n.id}" title="${esc(t)}" aria-label="${esc(t)}">${n.share_with.some(e => e.k === 'a') && !n.share_with.some(e => e.k !== 'a') ? ic('bot', 's') : ic('users', 's')}<span>${esc(ab_shShort(n.share_with))}</span></button>`; }
+  if (n.share_with || !n.shared) return '';
+  const by = n.owner && n.owner_id !== S.me?.id && n.owner_id !== own ? tr('Shared by {0}', n.owner) : '';  // a receiver: from whom (once per owner: not again inside their folder)
+  return by ? `<span class="abbadge abshby" title="${esc(by)}">${ic('users', 's')}<span>${esc(by)}</span></span>` : `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>`;
+}
+function ab_shHead(d) {  // the open folder: "Share" on top (who may share) and the line below it
+  const n = d?.node; if (!n || S.route.aus) return '';
+  const t = ab_shLineTxt(n); if (!t) return '';
+  return `<p class="muted abshline">${ic(n.share_with?.some(e => e.k === 'a') ? 'bot' : 'users', 's')}<span>${esc(t)}</span></p>`;
+}
 function ab_rowHtml(n, trash) {
   const meta = [n.path || '', n.kind === 'folder' ? '' : fmtSize(n.size || 0), ab_when(trash ? n.deleted_at : n.updated_at), n.created_by_name && n.created_by !== S.me?.id ? n.created_by_name : ''].filter(Boolean).join(' · ');
-  const badges = (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '')
+  const badges = (trash ? (n.shared ? `<span class="abbadge" title="${esc(tr('Shared'))}" aria-label="${esc(tr('Shared'))}">${ic('users', 's')}</span>` : '') : ab_shChip(n, AB.data?.node?.owner_id))  // 2.558.0 (#4693): the names
     + (n.agent_id ? `<span class="abbadge" title="${esc(tr('Folder of an agent'))}">${ic('bot', 's')}</span>` : '')
     + (n.version > 1 ? `<span class="abver" title="${esc(tr('Version {0}', n.version))}">v${n.version}</span>` : '')
     + upMarkHtml(n.up)  // 2.61.0 (#1818): not checked by the virus scanner yet / locked
@@ -422,6 +444,8 @@ document.addEventListener('click', e => {
   if (a === 'open' && n && b.closest('.ablist') && AB.selHere && (AB.selOn || (ms_modClick(e) && !isMobile()))) { e.preventDefault(); ab_smvPick(n.id, e.shiftKey); return; }  // 2.428.0 A (#3581)
   if (a === 'open' && n) { if (n.kind === 'folder') go('ablage/' + n.id); else ab_openFile(n); return; }
   if (a === 'menu' && n) { ab_menu(b, n); return; }
+  if (a === 'share') { e.preventDefault(); e.stopPropagation(); ab_share(+b.dataset.id); return; }  // 2.558.0 (#4693): the names / "Share" on top
+  if (a === 'scandone-x') { AB.scanDone = null; ab_draw(); return; }
   if (a === 'restore' && n) ab_restore(n);
 });
 // 2.210 B (#2757): a right click / long press on a row of the list or a folder of the panel = its "…" menu (ab_menu)
@@ -588,6 +612,11 @@ async function abm_download(ns) {
   }
   document.body.appendChild(a); a.click(); a.remove();
 }
+function ab_scanDoneHtml() {  // 2.558.0 (#4693): the end of a scan above the list, until closed or another folder opens
+  const x = AB.scanDone; if (!x) return '';
+  if (x.key !== ab_key(S.route)) { AB.scanDone = null; return ''; }
+  return `<div class="abscdone" role="status">${ic('check', 's')}<span><b>${esc(tr('“{0}” saved', x.name))}</b>${x.txt ? ' · ' + esc(x.txt) : ''}</span>${x.share ? `<button type="button" class="btn sm" data-ab="share" data-id="${x.id}">${ic('users', 's')} ${tr('Share…')}</button>` : ''}<button type="button" class="iconbtn" data-ab="scandone-x" aria-label="${esc(tr('Close'))}" title="${esc(tr('Close'))}">${ic('x', 's')}</button></div>`;
+}
 function abm_scan() {
   const parent = S.route.nid || null, space = ab_curSpace(), old = new Set((AB.data?.items || []).map(x => x.id));
   abm_scanOpen({parent, space, done: items => {
@@ -595,6 +624,9 @@ function abm_scan() {
     const created = items.filter(x => !old.has(x.id));
     if (!created.length) return;
     const ids = created.map(x => x.id);
+    // 2.558.0 (#4693): the end says who sees it now (the shares of the folder it went into) and offers Share
+    const fold = parent && AB.data?.node?.id === parent ? AB.data.node : null;
+    AB.scanDone = {id: created[0].id, name: created[0].name, key: ab_key(S.route), txt: ab_shLineTxt(fold || created[0]), share: !!(fold || created[0]).share_with};  // at the top: its own (none yet)
     offerUndo(tr('“{0}” saved', created[0].name), histAdd({label: tr('Scan'), undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
   }});
 }

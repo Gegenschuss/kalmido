@@ -12,3 +12,6 @@
 .absclbl{display:flex;flex-direction:column;gap:.25rem;margin-bottom:.75rem}
 .absclbl.chkl{flex-direction:row;align-items:center;gap:.5rem}
 @media (prefers-reduced-motion:reduce){ .abscimg img{transition:none} }
+/* 2.558.0 (#4693): the end of a scan above the folder's list: who sees it, Share */
+.abscdone{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.25rem 0 .5rem;padding:.375rem .5rem;border:.0625rem solid var(--line);border-radius:var(--radius);background:var(--bg2);font-size:var(--fs-b)}
+.abscdone>span{flex:1 1 12rem;min-width:0}
