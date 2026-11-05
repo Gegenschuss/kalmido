@@ -59,7 +59,7 @@ from ..calendars.subscriptions import _cal_connector, CalError, cal_ip_public
 from ..core.orgcrypt import RCK_FRESH_MIN, rck_step, rck_stepup
 from .hosting import hosted
 from ..notify.alerts import _env_int, aa_now
-from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_list, bk_passphrase, need_backups
+from .backup import BK_DIR, BK_NAME_RE, BK_STORE, bk_list, bk_passphrase, bk_test_gate, need_backups
 from . import bkstore as bks  # 2.432.0 (#3584)
 
 BKO_TYPES = ("s3", "webdav", "sftp")
@@ -693,16 +693,23 @@ def bko_upload(force=False):
             tgt = bko_target(c, conf)
             c.rollback()  # no open transaction while the (long) upload runs: a restore must not wait for it
             if (x["meta"] or {}).get("format_version") == 3:  # 2.432.0 (#3584): first the shared files the target lacks
-                refs = bks.refs_read(BK_STORE, x["name"])
-                if refs is None or any(bks.remote_name(r) is None for r in refs):
-                    raise OffsiteError("refs")
-                have = tgt.sizes() if hasattr(tgt, "sizes") else dict.fromkeys(tgt.names())
-                try:  # (a size on the target that differs = a broken upload there: sent again, review M2)
-                    todo = [(bks.remote_name(r), f) for r, f in ((r, bks.find(BK_STORE, r)) for r in sorted(refs))
-                            if bks.remote_name(r) not in have or have[bks.remote_name(r)] not in (None, os.path.getsize(f))]
-                except bks.StoreError:  # a shared file is gone from the store (by hand): counted like a failed upload
-                    raise OffsiteError("refs") from None
-                (tgt.put_many if hasattr(tgt, "put_many") else lambda items: put_many(tgt, items))(todo)
+                # 2.549.0 (#4529): the readers' lock (shared, like a download) while store files are read: the clean-up
+                # (bk_store_gc) meanwhile removes none and runs next time; a clean-up that runs right now is waited for
+                rlock = bks.lock(BK_STORE, wait=True, name=bks.READ_LOCK, shared=True) if os.path.isdir(BK_STORE) else None
+                try:
+                    refs = bks.refs_read(BK_STORE, x["name"])
+                    if refs is None or any(bks.remote_name(r) is None for r in refs):
+                        raise OffsiteError("refs")
+                    have = tgt.sizes() if hasattr(tgt, "sizes") else dict.fromkeys(tgt.names())
+                    try:  # (a size on the target that differs = a broken upload there: sent again, review M2)
+                        todo = [(bks.remote_name(r), f) for r, f in ((r, bks.find(BK_STORE, r)) for r in sorted(refs))
+                                if bks.remote_name(r) not in have or have[bks.remote_name(r)] not in (None, os.path.getsize(f))]
+                    except bks.StoreError:  # a shared file is gone from the store (by hand): counted like a failed upload
+                        raise OffsiteError("refs") from None
+                    bk_test_gate("KALMIDO_TEST_BKO_UP_GATE")
+                    (tgt.put_many if hasattr(tgt, "put_many") else lambda items: put_many(tgt, items))(todo)
+                finally:
+                    bks.unlock(rlock)
             got = tgt.put(x["name"], os.path.join(BK_DIR, x["name"]), x["size"])
             if got != x["size"]:
                 raise OffsiteError("size", got, x["size"])

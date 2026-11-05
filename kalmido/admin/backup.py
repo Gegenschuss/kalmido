@@ -785,10 +785,10 @@ def bk_read_lock():
     return fd
 
 
-def bk_test_gate():
+def bk_test_gate(env="KALMIDO_TEST_BK_DL_GATE"):
     """Tests only (2.525.0, #4303): a download waits before its first shared file until the file KALMIDO_TEST_BK_DL_GATE
-    exists (the test deletes the backup meanwhile)."""
-    gate = os.environ.get("KALMIDO_TEST_BK_DL_GATE") if os.environ.get("KALMIDO_TEST") == "1" else ""
+    exists (the test deletes the backup meanwhile). 2.549.0 (#4529): env=KALMIDO_TEST_BKO_UP_GATE for the off-site upload."""
+    gate = os.environ.get(env) if os.environ.get("KALMIDO_TEST") == "1" else ""
     end = time.monotonic() + 60
     while gate and not os.path.exists(gate) and time.monotonic() < end:
         time.sleep(0.05)

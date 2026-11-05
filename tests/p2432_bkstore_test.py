@@ -15,6 +15,8 @@
  - off-site (fake S3): the shared files go up once (kalmido-blob-<kid>-<name>), a second upload sends no file again; old
    ones go with the backups that needed them; the assembler (bkstore.py assemble) makes a complete file from the flat copy
  - a person without an organisation: her large file is one of the shared files (restored, downloaded)
+ - 2.549.0 (#4529): the off-site upload holds the readers' lock while it reads store files: a delete meanwhile removes none
+   (the shared file goes up complete), the next clean-up removes it
 usage: p2432_bkstore_test.py <datadir>        (P2432_NOSTART=1: the server already runs with the settings below)"""
 import base64
 import glob
@@ -48,8 +50,11 @@ S3KEY, S3SECRET = "AKFAKETESTKEY01", "s3-secret-for-the-test-9f2c"
 OFF = B + "/api/admin/backups/offsite"
 MAGIC, BLOB = b"KALMIDO-BACKUP-ENC\x00", b"KALMIDO-BLOB-ENC\x00"
 
-fresh({"KALMIDO_BACKUP_TICK": "1", "KALMIDO_BACKUP_MAX_MB": "20", "KALMIDO_OFFSITE_RETRY_S": "1", "KALMIDO_OFFSITE_TIMEOUT": "10"},
+fresh({"KALMIDO_BACKUP_TICK": "1", "KALMIDO_BACKUP_MAX_MB": "20", "KALMIDO_OFFSITE_RETRY_S": "1", "KALMIDO_OFFSITE_TIMEOUT": "10",
+       "KALMIDO_TEST_BKO_UP_GATE": "/data/up-gate"},  # 2.549.0 (#4529): the upload waits there (open until the last part)
       prefix="P2432", data=DATA)
+UPGATE = os.path.join(DATA, "up-gate")
+open(UPGATE, "w").close()
 s0 = requests.Session()
 s0.headers.update(H)
 assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": PW}).ok
@@ -325,4 +330,35 @@ check(any("continuation-token=" in json.loads(x).get("path", "") for x in open(o
       "2.510.0 (#4286): a list of several pages: the app asks for the next one")
 kid3 = members(dec(open(os.path.join(BK, o3["name"]), "rb").read(), PASS2)[1])[0]["store"]["kid"]
 check(all(b.startswith(f"kalmido-blob-{kid3}-") for b in blobs()), f"the files on the target carry the store key's id {kid3}")
+# 2.549.0 (#4529): the upload holds the readers' lock of the store while it reads store files: a delete meanwhile (its
+# clean-up) removes none of them, the shared file goes up complete; the next clean-up removes it
+
+
+def lock_free():
+    """True when nobody holds the readers' lock (inside the container, like p2525_a_backup)."""
+    code = ("import fcntl, os, sys\n"
+            "p = '/data/backups/.store/.read-lock'\n"
+            "if not os.path.exists(p): sys.exit(0)\n"
+            "fd = os.open(p, os.O_RDONLY)\n"
+            "try:\n    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)\n"
+            "except BlockingIOError:\n    sys.exit(1)\n")
+    return subprocess.run(["docker", "exec", CT, "python", "-c", code], capture_output=True).returncode == 0
+
+
+os.remove(UPGATE)
+T3 = A.post(B + "/api/tasks", json={"title": "during the upload", "list_id": L}).json()["id"]
+A.post(B + f"/api/tasks/{T3}/attachments", files={"file": ("during.bin", os.urandom(100 * 1024), "application/octet-stream")})
+before, nb = set(store_files("k-*")), len(blobs())
+o4 = backup_now()
+new4 = set(store_files("k-*")) - before
+check(o4.get("name") and len(new4) == 1, f"setup: a backup with one new shared file {o4.get('name')} {len(new4)}")
+check(until(lambda: not lock_free(), 30), "the running upload holds the readers' lock")
+d = A.delete(B + f"/api/admin/backups/{o4.get('name', '-')}")
+check(d.ok, f"the backup is deleted while it is uploaded {d.status_code}")
+check(all(os.path.isfile(f) for f in new4), "its store file stays while the upload reads it (the clean-up skips)")
+open(UPGATE, "w").close()
+check(until(lock_free, 30), "after the upload the lock is free")
+check(len(blobs()) == nb + 1, f"its shared file went up complete {len(blobs())} vs {nb}")
+d = A.delete(B + f"/api/admin/backups/{o2['name']}")  # the next clean-up
+check(d.ok and until(lambda: not any(os.path.isfile(f) for f in new4), 10), f"the next clean-up removes the file no backup needs any more {d.status_code}")
 sys.exit(done("p2432_bkstore"))
