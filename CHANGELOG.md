@@ -14,7 +14,51 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.544.0] - 2026-11-05
+## [2.546.0] - 2026-11-05
+
+Package 2.537 (Bündel: Neuer Tab / eigenes Fenster nur mit Maus, Bilder i, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Office: a quotation gets the button "Create tasks" next to its project. A preview with a tick per line turns each service line into a task in the project (a sub-quotation becomes a section, a shoot part one task per crew role) with its time in the "Budget h" field: hours = quantity, days = quantity x the project's day hours; flat rates and pieces get no budget unless you type one in. Without a project at the quotation it is created in the same step. Tasks never carry prices. For a new version the button reads "Update budget from quotation": new lines become tasks, changed lines get the new budget unless it was changed by hand, dropped lines are only marked, nothing is deleted. The project page shows the quotation's total budget in hours and net amount to people with office rights (#3433).
+- Task detail: the time block shows "Tracked X of Y h" against the task's budget (task and subtasks), yellow from 80 %, red above 100 %; members without admin rights see only their own time (#3433).
+
+### Changed
+- Phone and tablet: buttons that open a new tab or an own window (PDF preview "Open in new tab", the window button of tables) only appear on devices with a mouse; pictures open in the app's preview everywhere (file store, file search, documents) instead of a new tab (#4574).
+- Editing a task (title, description, date, tags, fields, priority, assignees) is shown and saved at once, online too: the change goes through the outbox and the server's answer (e.g. dependent tasks moved along) follows; a conflict opens the conflict dialog. Locked lists, moving to another list and deleting work as before (#4568).
+- A comment without files stands in the timeline at once as "Sending…", the box empties and the button stays free; if sending fails it stays with "Send again" and "Discard", without a duplicate on the second try. Comments with files, to the customer or by e-mail work as before (#4569).
+- Deleting an account: shared folders and files of the private file store go to the person with the longest-standing edit right on them, resealed for their account, contributions of others and recognised documents included; group shares stay group shares, public links and file requests of others on that branch end. Without such a person the branch goes with the account and the dialog says so (#4347).
+
+### Fixed
+- "Use mine" in the conflict dialog sends the shown other version as its base, so the same conflict no longer comes back at once (#4568).
+
+Package 2.546 (Bündel: Einreihen-Prüfung: Warten auf den einen Lint-Platz, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Tests: a finalised invoice stays unchanged on every write route under /api/office/docs/<id>, through undo and through the agent API (header, items and stored PDF compared; allowed routes listed with their reason); also for a person without an organisation (#4287)
+- Tests: the e-invoice CI job also validates files from the real finalising (ZUGFeRD and XRechnung: 19 / 7 %, discount, reverse charge, credit note) with veraPDF and KoSIT, with a minimum number of files; p2424_c joined the list (#4289)
+- Tests, rights guards: every non-GET operation with scope read is on a fixed list with its reason; the tenant coverage now requires the route path in the named suite, the old routes without one are on a list that may only shrink; foreign probe for the recovery passkey route (#4291)
+
+### Changed
+- Office: the books, the receipt list and the bank list are much faster with many receipts - visibility and trash are checked for the whole list at once (books: 12 queries per receipt before, now a fixed number), the books route computes the month from the year instead of twice, and bank suggestions only compare an entry with invoices / receipts that can match (same suggestions, same order) (#4186)
+
+### Fixed
+- Phone (320 px): Settings > Agents > Set up - the three fields for a new personal agent (display name, username, where it runs) stand one below the other at full width, the "Create agent" button under them; before they were squeezed to a letter each (#4491)
+
+Package 2.519 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main allein: p2356_b_import_target, Tabellen: Agenten-Rückgängig lässt die Da).
+### Fixed
+- Documents (computer): the open document's side pane stays below the page head while the list is scrolled, also when the list is short or scrolled to its end; its title and the close button stay visible and clickable, and the pane no longer reaches past the bottom of the window (#4467).
+- Sheets: undoing an agent's change of a file cell brings the cell's former file back out of the trash, so the trash run no longer deletes the file the cell shows again (#4386).
+- Mail in: an incoming HTML mail is turned into text in one linear pass (the HTML part cut to 2 MB first); a malformed mail with many unclosed script or style tags could stall every mail inbox of the instance and the background work. A mail is marked seen before its import, so one that is cut off does not come back every round (#4378).
+- Wiki: a folder or page made while the tree was loading no longer stays hidden because an older answer counted as the newest (#3715).
+- Tests: six flaky UI and API suites wait for a real state and run again (out of tests/skip.txt): p2425_c_ui (#4042), p21383_b_ui (#4045), p2190_family_ui (#4049), p23672_notify (#4050), p21445_b_api (#4053), p2451_a_office_rows_ui (#4054); p2200_a_wiki_tree_ui (#3715) too.
+
+Package 2.498 (Bündel: Handy 320 px: Kopfzeile verliert Titel und Glocke,, Sprache: letzte feste Texte im Wiki-Import und bei, Handy: Wechsel nach Privat v).
+### Changed
+- List icons and list header pictures count as used storage (Settings, Storage) and a full storage refuses them; older pictures are measured in the background. A header switched off counts no more, its file stays for undo (#3884).
+### Fixed
+- Phone, narrow screen (320 px): page title and bell stay visible in the header. On Projects "New project" becomes a plus sign; workspace and agents signs move into the "…" menu when space is short; in the sidebar the share signs and the progress ring give way, not the name; the chosen view tab shows its whole name or only its sign (#3854).
+- Phone: switching to another workspace from the menu on a project page stays in the new workspace (on Projects when the project is not there), instead of jumping back (#3863).
+- Wiki import: the reasons for skipped files follow the language of the person reading the report; the "function not switched on" check of the office keeps its text for later readers, e.g. a recurring invoice's error (#3858).
 
 Package 2.528 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Added
@@ -123,6 +167,10 @@ Package 2.539 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
 - Webhooks, notification channels, git and newsletter calls end after 15 s in total; a target that answers drop by drop no longer holds the delivery queue, and a target that timed out is tried once per round (#4379).
 - Tests: p264a_d_ui waits for the drawn "Understood" button before clicking (#4394).
+
+## [2.544.0] - 2026-11-05
+
+Not released (the CI of this version was red); its changes are listed under 2.546.0.
 
 ## [2.541.0] - 2026-11-05
 
@@ -1323,7 +1371,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.544.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.546.0...HEAD
+[2.546.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.546.0
 [2.544.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.544.0
 [2.541.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.541.0
 [2.535.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.535.0
