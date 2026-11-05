@@ -17,7 +17,9 @@ from ..core.config import app
 from ..core.access import Denied, need_feat
 from ..core.db import db
 from ..core.i18n import tr
-from ..core.conflict import need_version  # 2.564.0 (#4702)
+from ..core.conflict import Conflict, need_version  # 2.564.0 (#4702)
+from ..core.db import write_lock  # 2.564.0 (#4702)
+from .shhist import shh_meta  # 2.564.0 (#4702)
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_err, v1_json, v1_view
@@ -125,12 +127,23 @@ def v1_sheet_get(sid):
 @app.patch("/api/v1/sheets/<int:sid>")
 @v1_view
 def v1_sheet_patch(sid):
-    """{title?, list_id? (null = detach)}"""
+    """{title?, list_id? (null = detach), expect_rev?}. 2.564.0 (#4702): under the table's lock and in its history (as the web
+    route, #4701); an agent renaming sends expect_rev (the rev it read; else 400 version_required, old = 409 with "current")."""
     b = v1_json()
-    _check_fields(b, ("title", "list_id"))
+    _check_fields(b, ("title", "list_id", "expect_rev"))
     agent_id, batch = _write_ctx()
     c = db()
+    sh_need(c, sid, write=True)
+    write_lock(c, "sheet:" + str(sid))  # the same lock as the cells and the web route
     r = sh_need(c, sid, write=True)
+    if "title" in b:
+        need_version(b, "expect_rev", header=False)
+    er = b.get("expect_rev")
+    if er is not None:
+        if isinstance(er, bool) or not isinstance(er, int):
+            raise BadInput(tr("Invalid value: {0}", "expect_rev"))
+        if er != r["rev"]:
+            raise Conflict("current", _v1_sheet(c, r))
     f = {}
     if "title" in b:
         f["title"] = sh_clean_title(b["title"]) or r["title"]
@@ -144,6 +157,9 @@ def v1_sheet_patch(sid):
     f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
     if f:
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
+        k = "tab_name" if "tab_name" in f else "title" if "title" in f else None  # 2.564.0 (#4702): in the table's history
+        if k:
+            shh_meta(c, sid, "tab" if k == "tab_name" else "title", r[k], f[k], me())
         if "list_id" in f:
             shb_sync(c, sid)  # 2.124.0 E (#2116)
         if "title" in f and not r["book_id"]:
