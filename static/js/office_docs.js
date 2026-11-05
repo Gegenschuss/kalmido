@@ -674,8 +674,14 @@ async function ofd_save1(method, url, body, src) {
     body = {...body, expect_updated_at: ver};
   }
   if (body && typeof body === 'object' && ('lang' in body || 'reminder_level' in body)) OFD.langNotesShut = null;  // 2.482.0 (#3940): only a new language switch shows a closed note again
+  // 2.552.0 (#4547): positions and fields of the document are kept in this browser until the server has them (core.js fdWrite):
+  // the session ends during the save (401 -> sign-in -> reload) = sent after the sign-in under the same key and version
+  // (saved elsewhere since: 409, not overwritten); the page going away (ofd_unload) sends it with keepalive
+  const fk = ver && (method === 'PUT' || method === 'PATCH') ? fdWrite(method, url, body, {slot: `ofd.${method}.${url}`, send: !!OFD.unload}) : null;
+  if (fk && OFD.unload) return null;
   try {
-    const j = await rawFetch(method, url, body);
+    const j = await rawFetch(method, url, body, fk ? fdGet('fdw', fk)?.b?.k : undefined);
+    if (fk) fdDrop('fdw', fk);
     if (src && j) { const its = (j.part ? j.part.items : j.items) || []; src.forEach((x, i) => { if (!x.id && its[i]?.id) x.id = its[i].id; }); }
     if (OFD.doc && j && j.id === OFD.doc.id) OFD.doc = ofd_keepVia(j.items ? j : {...OFD.doc, ...j}); /* the status answer has no positions */ OFD.err = ''; if (j && j.lang_notes && !ofd_lnShut(j)) OFD.langNotes = {id: j.id, notes: j.lang_notes};  // 2.482.0 (#3940): a late answer does not reopen a closed note
     if (!ver && method !== 'GET' && OFD.doc && j && !j.updated_at && url.startsWith(`/api/office/docs/${OFD.doc.id}/`)) {  // a status / number / payment answer without the version: the current state
@@ -684,6 +690,7 @@ async function ofd_save1(method, url, body, src) {
     return j;
   }
   catch (x) {
+    if (fk && x.message !== 'auth') fdDrop('fdw', fk);  // 2.552.0 (#4547): refused / offline: the field keeps the input (ofdChange), not sent later
     if (x.status === 409 && x.data?.doc && OFD.doc && x.data.doc.id === OFD.doc.id) { OFD.conflict = {id: OFD.doc.id, doc: x.data.doc}; OFD.err = ''; return null; }
     if (x.status === 409 && x.data?.code === 'terms_missing') { OFD.err = ''; return {terms_missing: x.data, message: x.message}; }  // 2.534.0 (#4339): the send dialog asks (ofcSendTerms)
     OFD.err = x.message || tr('unknown'); toast(OFD.err); return null;
@@ -736,6 +743,36 @@ async function ofdChange(e) {
   (FG.d[fk] ||= {f: {}}).f[k] = v;
   if (typeof ost_mark === 'function') ost_mark(n, 'err', OFD.err);
 }
+// a position field's input into its line (d = the document or the open part); false = no such line
+function ofd_itSet(d, t) {
+  const it = d.items[+t.dataset.i]; if (!it) return false;
+  const k = t.dataset.k;
+  if (t.type === 'checkbox') it[k] = t.checked ? 1 : 0;
+  else if (['qty', 'rate', 'cost'].includes(k)) { const v = ofcNum(t.value); it[k] = v == null ? (k === 'qty' ? 1 : 0) : v; }
+  else it[k] = t.value;
+  if (k === 'unit' && it.unit !== 'percent' && !(+it.qty > 0)) it.qty = 1;  // 2.138.0 A (#2236): back from percent: quantity 1 when empty / 0
+  return true;
+}
+// 2.552.0 (#4547): the page goes (the reload of an ended session, a closed tab) while a position is typed in and not left yet
+// (no "change" yet): its input goes with keepalive and stays kept until the server has it (ofd_save1, core.js fdWrite)
+function ofd_unload() {
+  const t = document.activeElement;
+  if (!OFD.doc?.can_edit || !t?.closest?.('.ofdeditor') || t.dataset?.i == null || !t.dataset.k || t.type === 'checkbox' || t.tagName === 'SELECT' || t.value === t.defaultValue) return;
+  if (typeof tpf_ctx === 'function') tpf_ctx(t);
+  if (!ofd_itSet(typeof tpCur === 'function' ? tpCur() : OFD.doc, t)) return;
+  t.defaultValue = t.value;  // once (pagehide and a later bfcache leave)
+  OFD.unload = true;
+  try { ofdPutItems(); } finally { setTimeout(() => { OFD.unload = false; }, 0); }
+}
+addEventListener('pagehide', ofd_unload);
+// 2.552.0 (#4547): a kept write of the open document went out after the sign-in: shown as the server has it now
+addEventListener('fdw-sent', e => {
+  const u = String(e.detail?.url || ''), m = u.match(/^\/api\/(?:office\/docs|fsref\/office_doc)\/(\d+)\//) || u.match(/^\/api\/(?:office\/docs|fsref\/office_doc)\/(\d+)$/);
+  if (!m) return;
+  if (e.detail.err) toast(e.detail.err.status === 409 ? tr('Changed in the meantime') : e.detail.err.message || tr('unknown'));
+  const id = +m[1], again = () => { if ((OFD.doc?.id ?? OFD.docId) !== id) return; if (OFD.docLoading) setTimeout(again, 200); else ofdLoadDoc(id, true); };  // a load on its way may predate the write
+  again();
+});
 async function ofdChange0(e) {
   const t = e.target;
   if (t.id === 'ofd-trial') { OFD.trial = t.value; LS.set('ofdTrial', t.value); OFD.list = null; ofdLoadList(true); return; }  // 2.144.10 C (#2576)
@@ -747,12 +784,7 @@ async function ofdChange0(e) {
   if (t.dataset.tp && typeof tpChange === 'function') { await tpChange(t); return; }  // 2.47.0 (#1215): title / print of a part
   const d = typeof tpCur === 'function' ? tpCur() : OFD.doc;  // 2.47.0 (#1215): an open part's positions
   if (t.dataset.i != null && t.dataset.k) {  // a position
-    const it = d.items[+t.dataset.i]; if (!it) return;
-    const k = t.dataset.k;
-    if (t.type === 'checkbox') it[k] = t.checked ? 1 : 0;
-    else if (['qty', 'rate', 'cost'].includes(k)) { const v = ofcNum(t.value); it[k] = v == null ? (k === 'qty' ? 1 : 0) : v; }
-    else it[k] = t.value;
-    if (k === 'unit' && it.unit !== 'percent' && !(+it.qty > 0)) it.qty = 1;  // 2.138.0 A (#2236): back from percent: quantity 1 when empty / 0
+    if (!ofd_itSet(d, t)) return;
     await ofdPutItems(); return;
   }
   if (t.dataset.fld != null) {  // own fields

@@ -795,8 +795,10 @@ async function fdWriteFlush() {
         body = Object.fromEntries(Object.entries(body).filter(([k, v]) => String(cur?.[k] ?? '') === String(r.b.sv[k] ?? '') && String(cur?.[k] ?? '') !== String(v ?? '')));
         if (!Object.keys(body).length) { fdDrop('fdw', r.id); continue; }
       }
-      try { await rawFetch(r.b.method, r.b.url, body, r.b.k || r.id); fdDrop('fdw', r.id); }
-      catch (e) { if (e instanceof Offline || e.message === 'auth') return; if (!(e.status >= 500 || e.status === 429 || e.status === 408)) fdDrop('fdw', r.id); }
+      // 2.552.0 (#4547): 'fdw-sent' tells the open view (a document, a table) that a kept write went out (detail: url, res or err)
+      const sent = d => dispatchEvent(new CustomEvent('fdw-sent', {detail: {url: r.b.url, ...d}}));
+      try { const res = await rawFetch(r.b.method, r.b.url, body, r.b.k || r.id); fdDrop('fdw', r.id); sent({res}); }
+      catch (e) { if (e instanceof Offline || e.message === 'auth') return; if (!(e.status >= 500 || e.status === 429 || e.status === 408)) { fdDrop('fdw', r.id); sent({err: e}); } }
     }
   } finally { fdWriteFlush.busy = false; }
 }
