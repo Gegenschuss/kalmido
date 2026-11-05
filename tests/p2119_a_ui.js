@@ -90,7 +90,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     await ev(clk('.modal [data-bwm="save"]'));
     check(await ready(ev, `${getJ('/api/office/meals?year=' + y)}.then(j => j.meals.some(m => m.place_name === 'Osteria Muster' && m.status === 'draft' && m.calc.gross === '290.10' && m.guests.some(g => g.name === 'Rita Rot' && g.extra === 'Example AG, marketing')))`),
       'saved as a draft with its data');
-    check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('.bwlist li')].some(l => /Osteria Muster/.test(l.textContent) && l.querySelector('.bwdraft'))`), 'the list: the draft');
+    // 2.559.0 (#4660): the row shows before the answer (provisional, negative id): wait for the real id before opening it
+    check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('.bwlist li')].some(l => /Osteria Muster/.test(l.textContent) && l.querySelector('.bwdraft') && +l.querySelector('.ofcrow').dataset.id > 0)`), 'the list: the draft');
     const nid = (await meals(ev)).find(m => m.place_name === 'Osteria Muster').id;
 
     // ---- approve from the mask

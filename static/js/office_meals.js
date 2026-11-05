@@ -10,6 +10,49 @@ OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, /** @type {any}
 const BW_U = '/api/office/meals';
 const bw_reload = () => { BW.data = null; BW.rep = null; BW.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
 const bw_meal = id => (BW.data?.meals || []).find(m => m.id === id);
+// 2.559.0 (#4660): saving a draft, deleting and duplicating show at once (optWrite): the list changes locally, the request runs
+// behind it, a refusal puts the old state back (api() says why); the answer's receipt replaces the local one (sums), the list
+// (evaluation, choice lists) is fetched again in the background, the rows stay until the fresh ones are there. A new receipt
+// is a provisional row with a negative id until the answer. Approving stays waiting (it locks the stored receipt).
+const bw_refresh = () => { BW.rep = null; BW.gen++; if (BW.data) bw_load(); };
+const bw_wait = id => { if (!(+id < 0)) return false; toast(tr('Still syncing, try again in a moment')); return true; };  // a provisional row
+function bw_mealSet(m, was = m?.id) {  // the server's receipt in place of the local one (was: its provisional id)
+  const ms = BW.data?.meals; if (!ms || !m) return;
+  const k = ms.findIndex(x => x.id === was || x.id === m.id);
+  if (k >= 0) ms[k] = m; else ms.unshift(m);
+}
+function bw_local(b, m) {  // a body -> the fields the list shows (names of the office's people, the gross sum)
+  const ppl = BW.data?.people || [], nm = p => p?.id ? {id: p.id, name: ppl.find(x => x.id === p.id)?.name || ''} : p;
+  const gross = (b.amounts || []).reduce((s, l) => s + (+l.gross || 0), 0) + (+b.tip || 0);
+  return {...b, host: nm(b.host), guests: (b.guests || []).map(nm), calc: {...(m?.calc || {}), gross: gross.toFixed(2)}};
+}
+const bw_out = id => () => {  // put: the receipt out of the list (idempotent), back puts it where it was
+  const ms = BW.data?.meals, k = ms ? ms.findIndex(x => x.id === id) : -1; if (k < 0) return null;
+  const [o] = ms.splice(k, 1);
+  return () => { if (BW.data && !bw_meal(id)) BW.data.meals.splice(Math.min(k, BW.data.meals.length), 0, o); };
+};
+const bw_in = (tmp, m) => () => {  // put: a provisional receipt on top (idempotent), back takes it away
+  if (!BW.data) return null;
+  if (!bw_meal(tmp)) BW.data.meals.unshift({status: 'draft', locked: false, files: [], log: [], ...m, id: tmp});
+  return () => { if (BW.data) BW.data.meals = BW.data.meals.filter(x => x.id !== tmp); };
+};
+async function bw_saveNow(m, b, pend) {  // the button "Save draft": the dialog is already closed; -> the stored receipt or null
+  let j;
+  if (m) {
+    const old = bw_body(m);
+    try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => api('PATCH', `${BW_U}/${m.id}`, b), ofcDraw); } catch { return null; }
+    bw_mealSet(j); bw_refresh();
+    toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${m.id}`, old); bw_refresh(); });
+    return j;
+  }
+  const tmp = -Date.now();
+  try { j = await optWrite(bw_in(tmp, bw_local(b)), () => api('POST', BW_U, b), ofcDraw); } catch { return null; }
+  bw_mealSet(j, tmp);
+  if (pend) { try { j = await api('POST', `${BW_U}/${j.id}/file`, bw_fd(pend)); bw_mealSet(j); } catch { /* api() said why; the draft is stored */ } }
+  bw_refresh();
+  const id = j.id; toast(tr('Added'), async () => { await api('DELETE', `${BW_U}/${id}`); bw_refresh(); });
+  return j;
+}
 const bw_amt = n => ofcMoney(n);
 const bw_ppl = m => [m.host, ...(m.guests || [])].filter(p => p && p.name);
 const bw_pn = p => p.name + (p.extra ? ` (${p.extra})` : '');
@@ -28,10 +71,15 @@ function bw_shown() {
 async function bw_load() {
   if (BW.loading) return;
   BW.loading = true; const gen = BW.gen;
-  try { BW.data = await api('GET', BW_U + (BW.year ? `?year=${BW.year}` : '')); BW.err = null; }
-  catch (x) { BW.data = null; BW.err = x.message || tr('unknown'); }
+  let j = null, err = null;
+  try { j = await api('GET', BW_U + (BW.year ? `?year=${BW.year}` : '')); } catch (x) { err = x.message || tr('unknown'); }
   BW.loading = false;
-  if (gen !== BW.gen) { BW.data = null; return bw_load(); }  // its answer can predate the change (approve right after save: the list stayed a draft)
+  // its answer can predate the change (approve right after save: the list stayed a draft); 2.559.0 (#4660): it is dropped
+  // and the rows on screen stay until the fresh answer is there
+  if (gen !== BW.gen) return bw_load();
+  if (err && BW.data) { ofcDraw(); return; }  // 2.559.0 (#4660): a failed background reload keeps the rows (api() said why)
+  BW.data = j; BW.err = err;
+  if (j) for (const p of OPT) p.put();  // 2.559.0 (#4660): own changes still on the way stay on top of the fresh list
   ofcDraw();
 }
 
@@ -68,7 +116,7 @@ function bw_openPdf(m) {  // the receipt in the app's PDF viewer (like the other
   a.hidden = true; document.body.appendChild(a); a.click(); a.remove();
 }
 function bw_rowMenu(id, anchor) {
-  const m = bw_meal(+id); if (!m) return;
+  const m = bw_meal(+id); if (!m || bw_wait(id)) return;
   const can = ofcAdmin(), mine = can && !m.own_ro, label = bw_title(m);  // 2.187.1 B (#2735): own_ro = entered by somebody else for me
   menu(anchor, [
     {label: tr('Open'), icon: 'eye', fn: () => bw_modal(m)},
@@ -82,19 +130,20 @@ function bw_rowMenu(id, anchor) {
 }
 async function bw_delete(m, md) {
   if (!await askConfirm(tr('Delete the entertainment receipt “{0}”?', bw_title(m)), '', {ok: tr('Delete'), danger: true})) return;
-  try {
-    await api('DELETE', `${BW_U}/${m.id}`); md?.remove(); bw_reload();
-    toast(tr('Deleted'), async () => { await api('POST', `${BW_U}/${m.id}/restore`); bw_reload(); });
-  } catch (x) { toast(x.message || tr('unknown')); }
+  md?.remove();  // 2.559.0 (#4660): gone at once, a refusal brings it back (api() says why)
+  try { await optWrite(bw_out(m.id), () => api('DELETE', `${BW_U}/${m.id}`), ofcDraw); } catch { return; }
+  bw_refresh();
+  toast(tr('Deleted'), async () => { await api('POST', `${BW_U}/${m.id}/restore`); bw_refresh(); });
 }
 const BW_KEYS = ['date', 'place_name', 'place_address', 'occasion', 'host', 'guests', 'amounts', 'tip', 'note'];
 const bw_body = m => Object.fromEntries(BW_KEYS.map(k => [k, m[k]]));
 async function bw_dup(m) {  // a new draft with the same data (without the bill); opens it
-  try {
-    const j = await api('POST', BW_U, bw_body(m)); bw_reload();
-    toast(tr('Copy created'), async () => { await api('DELETE', `${BW_U}/${j.id}`); bw_reload(); });
-    bw_modal(j);
-  } catch (x) { toast(x.message || tr('unknown')); }
+  // 2.559.0 (#4660): the copy is a provisional row at once; the dialog opens with the stored copy after the answer
+  const tmp = -Date.now(), b = bw_body(m);
+  let j; try { j = await optWrite(bw_in(tmp, {...m, files: [], log: [], status: 'draft', locked: false, own_ro: 0, approved_at: null, approved_name: ''}), () => api('POST', BW_U, b), ofcDraw); } catch { return; }
+  bw_mealSet(j, tmp); bw_refresh();
+  toast(tr('Copy created'), async () => { await api('DELETE', `${BW_U}/${j.id}`); bw_refresh(); });
+  bw_modal(j);
 }
 async function bw_unlock(m, md) {
   const why = await askPrompt(tr('Undo the approval?'), '', {body: tr('The receipt becomes a draft again and can be changed. The log keeps who undid it, when and why.'), ok: tr('Undo approval'), input: {placeholder: tr('Reason (optional)'), max: 500}});
@@ -280,7 +329,7 @@ function bw_modal(m0) {
         toast(tr('Removed'), async () => { await api('POST', `${BW_U}/${id}/file/${fid}/restore`); bw_reload(); });
         return;
       }
-      if (a === 'save') { await save(); md.remove(); bw_reload(); return; }
+      if (a === 'save') { const v = collect(); md.remove(); bw_saveNow(m, v, pend); return; }  // 2.559.0 (#4660): closes at once
       if (a === 'approve') {
         const sig = $('#bw-sig', md) ? ($('#bw-sig', md).checked ? 1 : 0) : 0;  // 2.332.0 C (#3301)
         if (hostOk) { await bw_approve(m.id, sig); md.remove(); return; }  // 2.187.1 B (#2735): nothing to save
@@ -328,7 +377,7 @@ document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-bw]'); if (!b || b.tagName === 'INPUT') return;
   const a = b.dataset.bw;
   if (a === 'new') bw_modal(null);
-  else if (a === 'open') { const m = bw_meal(+b.dataset.id); if (m) bw_modal(m); }
+  else if (a === 'open') { const m = bw_meal(+b.dataset.id); if (m && !bw_wait(m.id)) bw_modal(m); }  // 2.559.0 (#4660): not a provisional row
   else if (a === 'rowmore') bw_rowMenu(b.dataset.id, b);
   else if (a === 'view') { BW.view = b.dataset.v; ofcDraw(); }
   else return;
