@@ -16570,6 +16570,7 @@
   "The marked fields show the current state; what you typed stays. Check and save again.": "De gemarkeerde velden tonen de huidige stand; wat je hebt getypt blijft behouden. Controleer en sla opnieuw op.",
   "This cannot be filed in a folder": "Dit kan niet in een map worden opgeslagen",
   "Only channels can be shared with a group": "Alleen kanalen kunnen met een groep worden gedeeld",
+  "Only a group you are in can be shared with this channel": "Alleen een groep waar je zelf in zit kan met dit kanaal worden gedeeld",
   "Send the version you read: {0}": "Stuur de versie mee die je hebt gelezen: {0}",
   "{0} changed the task although it is locked (agents are not bound by the lock)": "{0} heeft de taak gewijzigd hoewel ze vergrendeld is (de vergrendeling geldt niet voor agents)",
   "No billable, still open time of this project in this period": "Geen factureerbare, nog open tijd in dit project en deze periode",

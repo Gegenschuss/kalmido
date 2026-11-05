@@ -545,6 +545,10 @@ def tcx_group_add(c, r, b):
     if not tcx_insider(c, r, uid):
         raise Denied(403, tr(TCX_MEMBERS_ONLY))
     need_group(c, gid)
+    if not r["org_id"] and not c.execute("SELECT 1 FROM group_members WHERE group_id=? AND user_id=?", (gid, uid)).fetchone():
+        # 2.565.0 (#4719, review F1): a channel without an organisation has no full-member filter - its group must be one the
+        # sharer is in (they share a group with every member, as tcx_may_add asks of a person), not any group they may see
+        raise Denied(403, tr("Only a group you are in can be shared with this channel"))
     tcx_core_group_put(c, r["id"], gid, uid)
     c.commit()
     return jsonify(tcx_out(c, r, uid))

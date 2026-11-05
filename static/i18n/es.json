@@ -16570,6 +16570,7 @@
   "The marked fields show the current state; what you typed stays. Check and save again.": "Los campos marcados muestran el estado actual; lo que escribiste se mantiene. Revisa y guarda de nuevo.",
   "This cannot be filed in a folder": "Esto no se puede archivar en una carpeta",
   "Only channels can be shared with a group": "Solo los canales se pueden compartir con un grupo",
+  "Only a group you are in can be shared with this channel": "Con este canal solo se puede compartir un grupo del que formas parte",
   "Send the version you read: {0}": "Envía la versión que leíste: {0}",
   "{0} changed the task although it is locked (agents are not bound by the lock)": "{0} cambió la tarea aunque está bloqueada (el bloqueo no afecta a los agentes)",
   "No billable, still open time of this project in this period": "No hay tiempo facturable pendiente en este proyecto y periodo",

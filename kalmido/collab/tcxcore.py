@@ -90,7 +90,10 @@ def tcx_core_members_sql():
 
 def tcx_core_rooms_sql(uid):
     """SQL of the room ids uid is a member of through the core (a share with them, or with a group they are in)."""
-    return f"SELECT room_id FROM {tcx_core_members_sql()} cm WHERE cm.user_id = {int(uid)}"
+    u = int(uid)  # review F2: through a group only as a full member of the room's organisation (the poll signature counted the rest)
+    return (f"SELECT cm.room_id FROM {tcx_core_members_sql()} cm JOIN tchat_rooms rr ON rr.id = cm.room_id WHERE cm.user_id = {u} "
+            f"AND (cm.via = 0 OR rr.org_id IS NULL OR EXISTS (SELECT 1 FROM org_members om WHERE om.org_id = rr.org_id "
+            f"AND om.user_id = {u} AND om.role IN ('admin','member','readonly')))")
 
 
 def _key(c, uid):

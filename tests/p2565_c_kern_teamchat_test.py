@@ -260,6 +260,14 @@ if HAS4701:
 else:
     print("SKIP edit with an old version: the chat part of #4701 (package 2.564 D) is not in this branch yet")
 
+# review F1: a channel without an organisation has no full-member filter - only a group the sharer is in may be shared with it
+r = A.post(B + "/api/team/channels", json={"name": "No org room", "org_id": None, "members": []})
+check(r.status_code in (200, 201), "F1: alice makes a channel without an organisation " + r.text[:160])
+NC = r.json().get("id")
+r = A.post(B + f"/api/team/rooms/{NC}/members", json={"group_id": G})
+check(r.status_code == 403 and share(NC, G, "group_id") is None, f"F1: a group alice is not in is refused ({r.status_code})")
+no(Ol.get(B + f"/api/team/rooms/{NC}/messages"), "F1: olga (other organisation, in the group) does not read it")
+
 # ================================================================== a person without an organisation
 FR, Fr = freelancer(B, A, "frida", features=FEAT)
 FE, Fe = freelancer(B, A, "fred", features=FEAT)
