@@ -104,7 +104,8 @@ def quota_default_mb(c):
     return n
 
 
-def _user_bytes(c, uids):
+def _user_bytes(c, uids, cached=False):
+    """The bytes of uids' files. cached (2.549.0, #3139 / #3884): the list pictures from _PIC_CACHE (the /api/state badge)."""
     if not uids:
         return 0
     q = ",".join("?" * len(uids))
@@ -121,22 +122,43 @@ def _user_bytes(c, uids):
             for t in ("office_meal_files", "office_contract_files"))
     t_ = c.execute(f"SELECT COALESCE(SUM(size),0) FROM tchat_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.113.1 (#2059): team chat files
     t_ += c.execute(f"SELECT COALESCE(SUM(size),0) FROM template_files WHERE user_id IN ({q})", uids).fetchone()[0]  # 2.363.3 (#3134)
-    return int(a + b + d + e + g + h + k + t_ + _list_pic_bytes(c, uids, q))
+    return int(a + b + d + e + g + h + k + t_ + _list_pic_bytes(c, uids, q, cached))
 
 
-def _list_pic_bytes(c, uids, q):
+# 2.549.0 (#3139 / #3884): the list pictures of the storage badge in /api/state, per process for PIC_CACHE_S seconds: their
+# sum needs the system context (two context switches in every state, audit Q budget 4); the upload check and the storage
+# page (/api/me/storage, quota_guard) always measure fresh
+PIC_CACHE_S = 30
+_PIC_CACHE = {}
+_PIC_LOCK = threading.Lock()
+
+
+def _list_pic_bytes(c, uids, q, cached=False):
     """2.498.0 (#3884): a list's own icon and header picture count for who uploaded them, else (older pictures, the person
     is gone) for the owner of the list. System context: a person may have left the list they uploaded to; only a sum of the
     person's own bytes comes out. A list in the trash counts no more (as the other files), a header picture only while the
     list shows it: taking it off keeps the file for undo, but it is gone for the person."""
+    if cached:
+        key, now = tuple(sorted(uids)), time.monotonic()
+        with _PIC_LOCK:
+            hit = _PIC_CACHE.get(key)
+        if hit and hit[0] > now:
+            return hit[1]
+        n = _list_pic_bytes(c, uids, q)
+        with _PIC_LOCK:
+            if len(_PIC_CACHE) > 5000:
+                _PIC_CACHE.clear()
+            _PIC_CACHE[key] = (now + PIC_CACHE_S, n)
+        return n
     with system_ctx(c):
         return (c.execute(f"SELECT COALESCE(SUM(icon_size),0) FROM lists WHERE deleted_at IS NULL AND icon LIKE 'u:%' AND (icon_by IN ({q}) OR (icon_by IS NULL AND owner_id IN ({q})))", [*uids, *uids]).fetchone()[0]  # pg-ok: prefix marker u: is case-exact
                 + c.execute(f"""SELECT COALESCE(SUM(header_size),0) FROM lists WHERE deleted_at IS NULL AND header_style='image' AND header_file<>''
                                  AND (header_by IN ({q}) OR (header_by IS NULL AND owner_id IN ({q})))""", [*uids, *uids]).fetchone()[0])
 
 
-def quota_info(c, uid):
-    """{used, limit (bytes, null = unlimited), pct, level: ok | warn | high | full, pool: user | org, support}."""
+def quota_info(c, uid, cached=False):
+    """{used, limit (bytes, null = unlimited), pct, level: ok | warn | high | full, pool: user | org, support}.
+    cached (2.549.0, #3139): only for the badge of /api/state, the list pictures may be up to PIC_CACHE_S old."""
     u = c.execute("SELECT id, storage_quota_mb FROM users WHERE id=?", (uid,)).fetchone()
     if not u:
         return None
@@ -155,7 +177,7 @@ def quota_info(c, uid):
         pool = "user"
     mb = own if own is not None else quota_default_mb(c)
     limit = mb * 1024 * 1024 * (len(members) if pool == "org" else 1) if mb else None
-    used = _user_bytes(c, members)
+    used = _user_bytes(c, members, cached)
     pct = round(used * 100 / limit, 1) if limit else 0
     level = "ok" if not limit or pct < 80 else "warn" if pct < 95 else "high" if used < limit else "full"
     return {"used": used, "limit": limit, "pct": pct, "level": level, "pool": pool, "members": len(members) if pool == "org" else 1,

@@ -524,7 +524,7 @@ def lz_counts(c, uid, lids):
 
 def _quota(c, uid):
     from ..admin.hosting import quota_info
-    return quota_info(c, uid)
+    return quota_info(c, uid, cached=True)  # 2.549.0 (#3139): the list pictures from a short cache (admin/hosting.py)
 
 
 def _announce(c):
