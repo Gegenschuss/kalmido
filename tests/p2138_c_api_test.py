@@ -336,6 +336,23 @@ check(st.get("step") == "password" and st.get("recovery") is False and st.get("r
 check(show(A, ORG, password="wrong-one").status_code == 403, "wrong password 403")
 check(show(Ca, ORG).status_code == 403, "member 403")
 check(show(Da, ORG).status_code == 404, "other organisation 404")
+# 2.546.0 (#4291): the passkey challenge of the step-up, the same boundary. carol (member) and dave (admin of Beta) get a
+# passkey row, so without the admin check they would get a challenge (200): member 403, other organisation 404, its own 200
+for s_, uid_ in ((Ca, Ca.get(B + "/api/me").json()["id"]), (Da, ids["dave"])):
+    dbx("INSERT INTO webauthn_creds(user_id,cred_id,public_key,created_at) VALUES(?,?,?,?)",
+        (uid_, f"p4291-{uid_}", b"\x00", "2026-11-05T00:00:00Z"))
+PK = "/encryption/recovery/passkey"
+log0 = one("SELECT COUNT(*) FROM office_doc_log WHERE org_id=?", (ORG,))
+r = Ca.post(B + f"/api/orgs/{ORG}" + PK, json={})
+check(r.status_code == 403 and "challenge" not in r.text, f"passkey challenge: member 403 {r.status_code} {r.text[:80]}")
+r = Da.post(B + f"/api/orgs/{ORG}/encryption/recovery/passkey", json={})
+check(r.status_code == 404 and "challenge" not in r.text, f"passkey challenge: other organisation 404 {r.status_code} {r.text[:80]}")
+r = Da.post(B + f"/api/orgs/{ORG2}" + PK, json={})
+check(r.status_code == 200 and r.json().get("challenge"), f"passkey challenge: the own organisation's admin with a passkey 200 {r.status_code} {r.text[:80]}")
+check(A.post(B + f"/api/orgs/{ORG}" + PK, json={}).status_code == 409, "passkey challenge: an admin without a passkey 409")
+check(one("SELECT COUNT(*) FROM office_doc_log WHERE org_id=?", (ORG,)) == log0
+      and A.get(B + f"/api/orgs/{ORG}/encryption").json().get("recovery") is False, "passkey challenge: nothing changed in the organisation")
+dbx("DELETE FROM webauthn_creds WHERE cred_id LIKE 'p4291-%'")
 r = show(A, ORG)
 R1 = r.json().get("recovery_key", "") if r.ok else ""
 check(r.ok and R1.startswith("R2-") and len(R1.replace("-", "")) == 54 and R1.count("-") == 13 and r.json().get("new") is False
