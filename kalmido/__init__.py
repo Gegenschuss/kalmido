@@ -98,6 +98,7 @@ ORDER = (
     "personal.habits",
     "personal.timetrack",
     "personal.timewipe",  # 2.43.0 (#1434)
+    "personal.budgetwarn",  # 2.555.0 (#4570): the budget warning at 80 / 100 % (no routes)
     "accounts.settings",
     "accounts.whatsnew",  # 2.556.0 (#4685): "New for you" after an update (user settings whatsnew_seen / whatsnew_on)
     "lists.favorites",  # 2.40.0 (#1361)
