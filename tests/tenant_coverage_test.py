@@ -767,7 +767,7 @@ ROUTES = {
     # 2.42.0 (#828): an organisation's encryption state + recovery key (its admins only; p2420_b_api_test.py: member 403, other
     # organisation 404, agent refused); the instance switch org_encrypt is the operator's
     "GET /api/orgs/{}/encryption": "org", "POST /api/orgs/{}/encryption/recovery": "org",
-    "POST /api/orgs/{}/encryption/recovery/passkey": "org",  # 2.138.0 (#1972): the passkey challenge of the step-up (p2138_c_api_test.py)
+    "POST /api/orgs/{}/encryption/recovery/passkey": "org",  # 2.138.0 (#1972): the passkey challenge of the step-up (p2138_c_api_test.py: member 403, other organisation 404, 2.546.0 #4291)
     "GET /api/admin/orgcrypt": "admin", "PUT /api/admin/orgcrypt": "admin",
     # 2.42.0 (#833): the organisation export (its admins only; p2420_c_api_test.py: member 403, other organisation 404, agent refused)
     "GET /api/orgs/{}/export": "org", "GET /api/retention/org/{}": "org", "GET /api/retention/org/{}/export.zip": "org",
@@ -1344,7 +1344,83 @@ for k, (what, why) in KINDS.items():
         check(k in MARKED, f"kind {k}: no suite carries the marker 'tenant-matrix: {k}'")
     check(k in ROUTES.values(), f"kind {k}: no route uses it (stale)")
 
+# ---- 3. 2.546.0 (#4291): a marker alone is no proof -- the path of a matrix route has to appear in a suite named for it (the
+# suites in its kind's reason, in the comment on its line or in the comment block above its group). The routes that do not
+# meet it yet stand in tenant_coverage_legacy.txt: that list only shrinks (its length is LEGACY_COUNT; an entry that is proven
+# now or no route any more has to go, a new matrix route without its path in a named suite fails).
+SUITE_RX = re.compile(r"\b([\w.-]+\.(?:py|js))\b")
+
+
+def route_suites(src):
+    """{route: {suite file names}} from the source of ROUTES: the suites named on the route's line and in the comment block above it."""
+    body = src[src.index("\nROUTES = {"):]
+    body = body[:body.index("\n}\n")]
+    out, block, in_block = {}, set(), False
+    for line in body.splitlines():
+        s = line.strip()
+        if s.startswith("#"):
+            if not in_block:
+                block = set()
+            in_block = True
+            block |= set(SUITE_RX.findall(s))
+            continue
+        in_block = False
+        here = set(SUITE_RX.findall(line.split("#", 1)[1])) if "#" in line else set()
+        for r in re.findall(r'"((?:GET|POST|PUT|PATCH|DELETE|DAV) [^"]+)"\s*:', line):
+            out[r] = block | here
+    return out
+
+
+def path_rx(route):
+    """The path of a route as a pattern for a test's source: {} = an f-string field or a literal id; a v1 route also without
+    its /api/v1 prefix (the suites' Api helper adds it); the path ends at a quote or a query."""
+    p = route.split(" ", 1)[1]
+    seg = r"(?:\{[^{}\n]*\}|[^/\"'\s{}?#]+)"
+    rx = seg.join(re.escape(x) for x in p.split("{}"))
+    if p.startswith("/api/v1/"):
+        rx = r"(?:" + rx + r"|(?<=[\"'])" + seg.join(re.escape(x) for x in p[len("/api/v1"):].split("{}")) + r")"
+    return re.compile(rx + r"(?=[\"'?#]|$)", re.M)
+
+
+SRC_TEXT = {}
+
+
+def suite_text(name):
+    if name not in SRC_TEXT:
+        fn = os.path.join(N, name)
+        SRC_TEXT[name] = open(fn, encoding="utf-8").read() if os.path.isfile(fn) else ""
+    return SRC_TEXT[name]
+
+
+def unproven(routes, kinds, src):
+    """The matrix routes whose path appears in none of their named suites."""
+    named = route_suites(src)
+    out = set()
+    for r, k in routes.items():
+        what, why = kinds.get(k, ("", ""))
+        if what != "matrix":
+            continue
+        suites = set(SUITE_RX.findall(why)) | named.get(r, set())
+        rx = path_rx(r)
+        if not any(rx.search(suite_text(s)) for s in suites):
+            out.add(r)
+    return out
+
+
+LEGACY_FILE = os.path.join(N, "tenant_coverage_legacy.txt")
+LEGACY = [ln.strip() for ln in open(LEGACY_FILE, encoding="utf-8") if ln.strip() and not ln.startswith("#")]
+LEGACY_COUNT = 884  # 2.546.0 (#4291): the length of tenant_coverage_legacy.txt; lower it together with the file, never raise it
+UNPROVEN = unproven(ROUTES, KINDS, open(__file__, encoding="utf-8").read())
+check(len(LEGACY) == len(set(LEGACY)) and LEGACY == sorted(LEGACY), "tenant_coverage_legacy.txt: sorted, no entry twice")
+for r in sorted(UNPROVEN - set(LEGACY)):
+    check(False, f"{r}: its path appears in no suite named for kind {ROUTES[r]!r} -- test the route there (another organisation / "
+                 f"person: 403 / 404, nothing changed) or name the suite that does in the comment of its line")
+for r in sorted(set(LEGACY) - UNPROVEN):
+    check(False, f"tenant_coverage_legacy.txt names {r}, which is proven now (or no matrix route any more): remove it and lower LEGACY_COUNT")
+check(len(LEGACY) <= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries, more than LEGACY_COUNT {LEGACY_COUNT}: the list only shrinks")
+check(len(LEGACY) >= LEGACY_COUNT, f"tenant_coverage_legacy.txt has {len(LEGACY)} entries: lower LEGACY_COUNT to that")
+
 n_m = sum(1 for k in ROUTES.values() if KINDS.get(k, ("",))[0] == "matrix")
-print(f"tenant coverage: {len(FOUND)} routes, {n_m} in the cross-tenant matrix, {len(FOUND) - n_m} not relevant (with reason); "
-      f"{OKS[0]} ok, {len(FAILS)} failed")
+print(f"tenant coverage: {len(FOUND)} routes, {n_m} in the cross-tenant matrix, {len(FOUND) - n_m} not relevant (with reason), "
+      f"{n_m - len(UNPROVEN)} with their path in a named suite, {len(LEGACY)} legacy without; {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

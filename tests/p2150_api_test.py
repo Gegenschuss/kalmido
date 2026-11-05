@@ -182,6 +182,15 @@ ALLOWED = {"read", "tasks:write", "comments", "structure", "delete", "attachment
            "office", "pinboard", "layouts", "import", "sheets:read", "sheets:write", "docs:upload", "wiki:read", "wiki:write", "integrations"}  # 2.391.0 (#3362): integrations; 2.200.0 C (#1781): wiki; 2.207.0 (#2763): docs:upload; 2.89.0 (#1916): sheets; 2.68.0 (#1839): import; 2.55.0 (#1066): layouts; 2.21.0: calendar, contacts; 2.22.0: private; 2.48.0 (#1207): files; 2.51.0 (#1348): office (agents' drafts); 2.51.0 (#1352): pinboard
 ops = [(m.upper(), p, op["x-kalmido-scope"]) for p, ms in spec["paths"].items() for m, op in ms.items()]
 check(all(sc in ALLOWED for _, _, sc in ops), "every operation: a known scope")
+# 2.546.0 (#4291): scope read is the default of op(): a forgotten scope= lets a read-only token write. Every non-GET operation
+# that stays on read is named here with the reason it only reads; a new one without an entry fails (fix its scope instead).
+READ_NON_GET = {
+    ("POST", "/tasks/brief"): "builds the brief of a choice of tasks; reads only, the body is just the list of ids (integrations/taskbrief.py)",
+}
+ro_non_get = {(m, p) for m, p, sc in ops if sc == "read" and m != "GET"}
+check(not ro_non_get - set(READ_NON_GET), f"non-GET operations with scope read and no reason in READ_NON_GET: {sorted(ro_non_get - set(READ_NON_GET))}")
+check(not set(READ_NON_GET) - ro_non_get, f"READ_NON_GET names operations that are no read-scoped non-GET any more: {sorted(set(READ_NON_GET) - ro_non_get)}")
+check(all(len(why) > 20 for why in READ_NON_GET.values()), "READ_NON_GET: every entry has its reason")
 for pth in ("/lists/{id}/sections", "/sections/{id}", "/lists/{id}/sections/order", "/tasks/{id}/move", "/tasks/batch", "/tasks/{id}/skip",
             "/trash", "/tasks/{id}/restore", "/tasks/{id}/dependencies", "/tasks/{id}/dependencies/{blocker_id}", "/lists/{id}/fields",
             "/fields/{id}", "/templates", "/templates/{id}", "/templates/{id}/apply", "/comments/{id}", "/folders", "/folders/rename",
