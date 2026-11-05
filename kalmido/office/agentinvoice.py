@@ -25,7 +25,7 @@ from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..core.errors import BadInput
 from ..api.common import v1_err, v1_view
-from .agentdocs import _doc_v1, _flag_notify, _iid, _json, _list_ok, _log_doc, _notify, _v1_ref, _v1ctx, ofa_agent_on, ofa_items
+from .agentdocs import _doc_v1, _flag_notify, _iid, _json, _list_ok, _log_doc, _notify, _v1_ref, _v1ctx, ofa_agent_ok, ofa_items
 from .calc import calc_tax_day
 from .docs import _date, _put_items, _text, doc_create, doc_items, doc_row, pt_text, recalc
 from .invoices import inv_from_time, inv_missing, ofi_ref_keep
@@ -109,8 +109,7 @@ def v1_office_invoice_draft_post():
         if not office_can(c, uid, oid, "time", "view"):  # like the person's route (inv_from_time_post)
             raise Denied(403, tr(NO_RIGHT))
         if ofr_groups_of(c, oid, aid):  # an agent with office groups needs "Times to bill" too
-            from ..agents.core import agent_row
-            if not ofa_agent_on(c, agent_row(c, aid), oid, "time", "view"):
+            if not ofa_agent_ok(c, aid, oid, "time", "view"):  # the office's own check (its agent row under system_ctx)
                 raise Denied(403, tr(NO_RIGHT))
         f, t = ofv_period(b, True)
         ofv_client(c, lid, b["client_id"])

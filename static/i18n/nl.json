@@ -16553,7 +16553,7 @@
   "Quotations and invoices only as drafts: never finalise, number, send or cancel them. Send raw values only; Kalmido computes sums, VAT, numbers and the required e-invoice fields.": "Offertes en facturen alleen als concept: nooit afronden, nummeren, versturen of annuleren. Stuur alleen ruwe waarden; Kalmido berekent sommen, btw, nummers en de verplichte velden van de e-factuur.",
   "Give the agent the permission “Office drafts” first (its settings, permissions)": "Geef de agent eerst de machtiging ‘Kantoorconcepten’ (zijn instellingen, machtigingen)",
   "Switch on “May draft office documents” for the agent first (its settings, Office & finance)": "Zet eerst ‘Mag kantoordocumenten opstellen’ aan voor de agent (zijn instellingen, Kantoor & financiën)",
-  "Switch on the office for yourself first (Settings > Features)": "Zet eerst het kantoor voor jezelf aan (Instellingen > Functies)",
+  "Switch on the office for yourself first (Settings > Modules)": "Zet eerst het kantoor voor jezelf aan (Instellingen > Modules)",
   "Switch on “Agents may read office data” first (office settings, agents)": "Zet eerst ‘Agenten mogen kantoorgegevens lezen’ aan (kantoorinstellingen, agenten)",
   "Due billing on Mondays at 08:00": "Te factureren op maandag om 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Open tijd en vervallen facturen als herinnering; factuurconcepten pas na jouw Ja, nooit afgerond of verstuurd. Vereist de kantoorrechten van de agent (‘Kantoorconcepten’, ‘Mag kantoordocumenten opstellen’).",

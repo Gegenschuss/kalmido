@@ -16553,7 +16553,7 @@
   "Quotations and invoices only as drafts: never finalise, number, send or cancel them. Send raw values only; Kalmido computes sums, VAT, numbers and the required e-invoice fields.": "Angebote und Rechnungen nur als Entwurf: nie festschreiben, nummerieren, versenden oder stornieren. Schick nur Rohangaben; Summen, Steuer, Nummern und die Pflichtfelder der E-Rechnung rechnet Kalmido.",
   "Give the agent the permission “Office drafts” first (its settings, permissions)": "Gib dem Agenten zuerst die Berechtigung „Büro-Entwürfe“ (seine Einstellungen, Berechtigungen)",
   "Switch on “May draft office documents” for the agent first (its settings, Office & finance)": "Schalte für den Agenten zuerst „Darf Büro-Entwürfe anlegen“ ein (seine Einstellungen, Büro & Finanzen)",
-  "Switch on the office for yourself first (Settings > Features)": "Schalte zuerst das Büro für dich ein (Einstellungen > Funktionen)",
+  "Switch on the office for yourself first (Settings > Modules)": "Schalte zuerst das Büro für dich ein (Einstellungen > Module)",
   "Switch on “Agents may read office data” first (office settings, agents)": "Schalte zuerst „Agenten dürfen Büro-Daten lesen“ ein (Büro-Einstellungen, Agenten)",
   "Due billing on Mondays at 08:00": "Fällige Abrechnungen montags um 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Offene Zeit und fällige Rechnungen als Erinnerung; Rechnungsentwürfe erst nach deinem Ja, nie festgeschrieben oder versendet. Braucht die Büro-Rechte des Agenten („Büro-Entwürfe“, „Darf Büro-Entwürfe anlegen“).",

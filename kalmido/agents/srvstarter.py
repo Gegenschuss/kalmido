@@ -76,7 +76,7 @@ SRV_TEXTS = {  # one literal each (tools/i18n_check.py reads no joined strings)
 SRV_OFFICE_WHY = {
     "scope": N_("Give the agent the permission “Office drafts” first (its settings, permissions)"),
     "switch": N_("Switch on “May draft office documents” for the agent first (its settings, Office & finance)"),
-    "person": N_("Switch on the office for yourself first (Settings > Features)"),
+    "person": N_("Switch on the office for yourself first (Settings > Modules)"),
     # review 2.568.0 (M2): the person's own right (the route asks it too) and an agent with office groups (the groups decide)
     "member": N_("You do not work in this agent's office"),
     "right": N_("Give yourself the right “Quotations & invoices” in the office first"),

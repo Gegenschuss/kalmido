@@ -16553,7 +16553,7 @@
   "Quotations and invoices only as drafts: never finalise, number, send or cancel them. Send raw values only; Kalmido computes sums, VAT, numbers and the required e-invoice fields.": "Presupuestos y facturas solo como borrador: nunca los finalices, numeres, envíes ni anules. Envía solo valores en bruto; Kalmido calcula sumas, IVA, números y los campos obligatorios de la factura electrónica.",
   "Give the agent the permission “Office drafts” first (its settings, permissions)": "Da primero al agente el permiso «Borradores de oficina» (sus ajustes, permisos)",
   "Switch on “May draft office documents” for the agent first (its settings, Office & finance)": "Activa primero «Puede redactar documentos de oficina» para el agente (sus ajustes, Oficina y finanzas)",
-  "Switch on the office for yourself first (Settings > Features)": "Activa primero la oficina para ti (Ajustes > Funciones)",
+  "Switch on the office for yourself first (Settings > Modules)": "Activa primero la oficina para ti (Ajustes > Módulos)",
   "Switch on “Agents may read office data” first (office settings, agents)": "Activa primero «Los agentes pueden leer los datos de la oficina» (ajustes de la oficina, agentes)",
   "Due billing on Mondays at 08:00": "Facturación pendiente los lunes a las 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Tiempo abierto y facturas vencidas como recordatorio; borradores de factura solo tras tu Sí, nunca finalizados ni enviados. Necesita los permisos de oficina del agente («Borradores de oficina», «Puede redactar documentos de oficina»).",
