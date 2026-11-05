@@ -149,11 +149,13 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   const scIn = $('#cl-sc', md), nmIn = $('#cl-name', md);  // 2.433.0 (#3604): capitals while typing, the automatic code as placeholder
   if (scIn) { scIn.addEventListener('input', () => { scIn.value = scIn.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); }); nmIn?.addEventListener('input', () => { scIn.placeholder = cl_autoCode(nmIn.value); }); }
   const close = fgModal(md);  // 2.40.0 (#1371): the client card asks before unsaved input is lost
-  fdDialog(md, 'cl.' + (c?.id || 'new'), c?.updated_at || '');  // 2.527.0 (#4304 A5): the input survives an ended session / a closed tab
+  // 2.552.0 (#4547): + the contact persons (rows drawn by clkDraw) and the symbol (a hidden field set by its buttons)
+  const clX = () => { clkRead(md); return JSON.stringify({icon: $('#cl-icon', md)?.value ?? null, k: md._clk, rm: md._clkRm}); }, clX0 = clX();
+  fdDialog(md, 'cl.' + (c?.id || 'new'), c?.updated_at || '', {get: () => { const v = clX(); return v === clX0 ? undefined : JSON.parse(v); }, put: v => cl_fdPut(md, v)});  // 2.527.0 (#4304 A5): the input survives an ended session / a closed tab
   const num = numBody;  // 2.263.0 (#2976)
   md.addEventListener('click', async e => {
     const ib = e.target.closest('[data-clico]');
-    if (ib) { $('#cl-icon', md).value = ib.dataset.clico; for (const x of $$('[data-clico]', md)) { const on = x === ib; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); } return; }  // 2.218.0 C (#2804)
+    if (ib) { cl_icoSet(md, ib.dataset.clico); $('#cl-icon', md).dispatchEvent(new Event('change', {bubbles: true})); return; }  // 2.218.0 C (#2804); 2.552.0 (#4547): "change" = kept (fdDialog)
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
@@ -207,6 +209,18 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
   setTimeout(() => { if (!isTouch()) $('#cl-name', md)?.focus(); }, 50);
 }
 
+// 2.218.0 C (#2804): the chosen symbol (the hidden field and the pressed button)
+function cl_icoSet(md, v) {
+  const el = $('#cl-icon', md); if (!el) return;
+  el.value = v; for (const x of $$('[data-clico]', md)) { const on = x.dataset.clico === v; x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); }
+}
+// 2.552.0 (#4547): the kept contact persons and symbol back into the dialog (fdDialog)
+function cl_fdPut(md, v) {
+  if (!v || typeof v !== 'object') return;
+  if (Array.isArray(v.k)) { md._clk = v.k; md._clkRm = Array.isArray(v.rm) ? v.rm : []; clkDraw(md); }
+  if (typeof v.icon === 'string') cl_icoSet(md, v.icon);
+  const det = $('#cl-more', md); if (det && !det.open) det.open = true;
+}
 // 2.269.0 C (#3017): someone else saved the client in between -- a bar instead of overwriting; "Reload" opens the dialog with
 // the saved state (the own input of this dialog is not saved, the bar says so)
 function cl_conflict(md, cur, o) {
@@ -244,6 +258,7 @@ function clkDraw(md) {
   box.innerHTML = ks.map((k, i) => `<div class="clkc"><div class="oimgrid">${f(i, 'name', tr('Name'), k.name, 120, 'autocomplete="off"')}${f(i, 'role', tr('Function or department'), k.role, 120)}${f(i, 'email', tr('E-mail'), k.email, 200, 'type="email" autocomplete="off"')}${f(i, 'phone', tr('Phone'), k.phone, 60, 'type="tel" autocomplete="off"')}</div>
     <div class="lacts"><label class="chkl"><input type="radio" name="cl-kdef" data-clk="is_default" data-i="${i}" ${k.is_default ? 'checked' : ''}> ${tr('Default')}</label>${clk_invOn() ? `<label class="chkl"><input type="checkbox" data-clk="gets_invoices" data-i="${i}" ${k.gets_invoices ? 'checked' : ''}> ${tr('Gets invoices')}</label>` : ''}${ckl_html(md, k, i)}<span class="spacer"></span><button type="button" class="btn sm ghost" data-clk-rm="${i}" aria-label="${esc(tr('Remove {0}', k.name || tr('contact person')))}">${ic('trash', 's')} ${tr('Remove')}</button></div></div>`).join('')
     + `<button type="button" class="btn sm" data-clk-add>${ic('plus', 's')} ${tr('Add contact person')}</button>`;
+  box.dispatchEvent(new Event('change', {bubbles: true}));  // 2.552.0 (#4547): a row added / removed / linked is kept (fdDialog)
   if (!box._clkOn) {
     box._clkOn = true;
     box.addEventListener('click', e => {

@@ -99,7 +99,9 @@ function fgModal(md) {
 // kept in this browser while it is typed (core.js fdKeep, kind 'fdf', per account) and put back into the same fields when the
 // same dialog (key) opens again; base = the record's updated_at (saved elsewhere since: dropped with a hint). The dialog
 // leaving the page (saved, discarded, closed) drops it. Call after fgModal, so Cancel asks for what came back.
-function fdDialog(md, key, base = '') {
+// 2.552.0 (#4547): x = {get, put} for what is no plain field (rows drawn by the dialog, a picker): get() = its value while
+// changed (undefined = nothing to keep), put(v) puts it back; a change there fires "change" on the dialog
+function fdDialog(md, key, base = '', x) {
   const k = fdTake('fdf', key, undefined, base);
   if (k && typeof k === 'object') {
     let n = 0;
@@ -108,6 +110,7 @@ function fdDialog(md, key, base = '') {
       if (typeof k[fk] === 'boolean') f.checked = k[fk]; else f.value = k[fk];
       n++; const det = f.closest('details'); if (det && !det.open) det.open = true;
     }
+    if (x && k._fdx !== undefined) { try { x.put(k._fdx); n++; } catch { /* an older shape: the fields are back */ } }
     if (n) toast(tr('Your unsaved input is back'));
   }
   let t = 0, done = false;
@@ -115,6 +118,7 @@ function fdDialog(md, key, base = '') {
     clearTimeout(t); if (done) return;
     const o = {};
     for (const f of fgFields(md)) { if (f.type === 'password' || f.disabled) continue; const v = fgVal(f); if (v !== fgDef(f)) o[fgKey(f)] = v; }
+    const xv = x?.get(); if (xv !== undefined) o._fdx = xv;  // 2.552.0 (#4547)
     if (Object.keys(o).length) fdKeep('fdf', key, o, base); else fdDrop('fdf', key);
   };
   const soon = () => { clearTimeout(t); t = setTimeout(keep, 300); };
