@@ -12,9 +12,10 @@ class Conflict(Denied):
     """409 {"error", <key>: the current state}; the API answers code conflict (api/common.py v1_view reads v1_name)."""
     v1_name = "conflict"
 
-    def __init__(self, key, cur, who=None):
-        super().__init__(409, tr("Changed in the meantime by {0}", who) if who else tr("Changed in the meantime"))
+    def __init__(self, key, cur, who=None, msg=None):
+        super().__init__(409, msg or (tr("Changed in the meantime by {0}", who) if who else tr("Changed in the meantime")))
         self.key, self.cur = key, cur
+        self.v1_extra = {"current": cur}  # 2.564.0 (#4702): the API's answer (v1_view) carries the current state too, as core/objweb.py
 
 
 @app.errorhandler(Conflict)
@@ -60,3 +61,20 @@ def need_version(b, *fields, header=True):
     if header and (request.headers.get("If-Match") or "").strip():
         return
     raise VersionRequired(fields + (("If-Match",) if header else ()))
+
+
+def take_version(b, key="expect_updated_at"):
+    """2.564.0 (#4702): the version an API client read, under the name the area's own check reads (key): the body's key,
+    expect_updated_at or the header If-Match (W/"..." stripped). Agents must send one of them (need_version). Returns b."""
+    from flask import has_request_context, request
+    need_version(b, *dict.fromkeys((key, "expect_updated_at")))
+    if not isinstance(b, dict):
+        return b
+    alt = b.pop("expect_updated_at", None) if key != "expect_updated_at" else None
+    if b.get(key) in (None, "") and alt not in (None, ""):
+        b[key] = alt
+    if b.get(key) in (None, "") and has_request_context():
+        h = (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"')
+        if h:
+            b[key] = h
+    return b
