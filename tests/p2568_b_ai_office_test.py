@@ -262,8 +262,9 @@ def member(uid, gid):
 
 GB, BH = agent(Bo, "kibob", ["read", "office"])
 check(A.patch(B + f"{O}/agents/{GB}", json={"office_drafts": True}).ok, "bob's agent: the office switch on")
-for u in (BOB, GB):
-    check(A.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": u, "role": "edit"}).ok, f"the project shared with {u}")
+check(A.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": BOB, "role": "admin"}).ok, "the project shared with bob (project admin)")
+r = Bo.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": GB, "role": "edit"})  # only the owner shares with a personal agent
+check(r.ok, f"bob shares the project with his agent {r.status_code} {r.text[:160]}")
 entry(BOB, LP_ORG, None, D1, 1800)
 FT = {"client_id": CL_ORG, "from_time": True, "list_id": LP_ORG, "from": D9, "to": TODAY}
 FREE = {"client_id": CL_ORG, "items": [{"text": "Cut", "qty": 1, "price": 100}]}
