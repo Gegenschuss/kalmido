@@ -22,6 +22,9 @@ under Backups > Restore from a file.
 2.223.2 C (#2871): a hosted server (hosting.hosted()) reaches only public addresses over https (SFTP: a public host), checked
 when saving and again when connecting (the guard of the calendar subscriptions and webhooks); changing / testing / using
 the target needs the step-up (orgcrypt.stepup_need), switching the upload on / off and the count kept do not.
+2.552.0 (#4596): a hosted server has no off-site target of the instance admin at all (a backup holds every client's content, like
+the download that is refused there too): PATCH / test / upload answer 403 (bko_no_hosted), an upload does not run (a target saved
+before stays unused), GET shows the state with hosted=true. The operator keeps its copies outside the app (pull of the backup folder).
 """
 import base64
 import hashlib
@@ -171,7 +174,8 @@ def bko_state(c):
             "running": _BKO["running"] or ("queued" if bgj_pending(c, "offsite") else ""),  # 2.193.0 D (#2220): also queued / in the worker
             # 2.538.0 (#4367): on, but no backup has reached this target yet: until one has, the journal of deleted accounts
             # is not cleaned up (dataretention.lgc_journal_cut) -- the backup page says so
-            "upload_pending": bool(conf["on"] and conf["type"] and not gsetting(c, "bko_remote"))}
+            "upload_pending": bool(conf["on"] and conf["type"] and not gsetting(c, "bko_remote")),
+            "hosted": hosted()}  # 2.552.0 (#4596): the page shows only the note that the operator keeps the off-site copies
 
 
 def _where(conf):
@@ -668,6 +672,8 @@ def bko_prune(tgt, keep, kept=None, just=None):
 def bko_upload(force=False):
     """Uploads the newest backup when it is not on the target yet (own connection; any thread). Never raises.
     -> the uploaded name or None."""
+    if hosted():  # 2.552.0 (#4596): also a target saved before the server became hosted / before 2.552, and a queued job
+        return None
     if not _BKO_LOCK.acquire(blocking=False):
         return None
     c = None
@@ -748,7 +754,7 @@ def bko_upload(force=False):
 def bko_tick(c):
     """backup_tick (the backup thread): the upload of a new backup, or the next try of a failed one. The upload runs in
     its own thread, so a slow target never holds the backup thread (nor its gate: restore / maintenance wait for that)."""
-    if not gsetting(c, "bko_conf") or not bko_conf(c)["on"] or _BKO_LOCK.locked():
+    if hosted() or not gsetting(c, "bko_conf") or not bko_conf(c)["on"] or _BKO_LOCK.locked():  # 2.552.0 (#4596): hosted -> none
         return
     items = [x for x in bk_list() if x["kind"] != "safety"]
     if not items or items[0]["name"] == gsetting(c, "bko_last_name"):
@@ -825,6 +831,13 @@ def stepup_passkey():
 
 
 # ---- routes (instance admins; the backups switch KALMIDO_BACKUPS as for the backups themselves)
+def bko_no_hosted():
+    """2.552.0 (#4596, audit F7): hosted -> the instance admin neither sets, tests nor uses an off-site target: a backup holds
+    every client's content (the download is refused there too, backup.backups_download); the operator keeps the copies."""
+    if hosted():
+        raise Denied(403, tr("On a hosted instance the operator sets up the off-site backup"))
+
+
 @app.get("/api/admin/backups/offsite")
 def offsite_get():
     need_backups()
@@ -839,6 +852,7 @@ def offsite_set():
     webdav, sftp) needs the step-up (password / code / credential in the body); on, keep and remove do not (they send
     nothing anywhere new: the upload goes only to a target set up and tested with the step-up)."""
     need_backups()
+    bko_no_hosted()  # 2.552.0 (#4596)
     c, b = db(), body()
     if any(k in b for k in ("type", *BKO_TYPES)):  # 2.223.2 C (#2871)
         e = stepup_need(c, b)
@@ -935,6 +949,7 @@ def offsite_test():
     """Writes a small file to the target and deletes it again. SFTP: the first test records the server's host key (its
     fingerprint is in the answer); later tests require that key. -> {ok, error?, fingerprint?}"""
     need_backups()
+    bko_no_hosted()  # 2.552.0 (#4596)
     c = db()
     e = stepup_need(c, body())  # 2.223.2 C (#2871)
     if e is not None:
@@ -984,6 +999,7 @@ def offsite_test():
 def offsite_upload_now():
     """Uploads the newest backup now (in the background; GET shows the result)."""
     need_backups()
+    bko_no_hosted()  # 2.552.0 (#4596)
     c = db()
     e = stepup_need(c, body())  # 2.223.2 C (#2871)
     if e is not None:

@@ -680,6 +680,9 @@ docker compose up -d kalmido
     and *Upload now* ask for the password (and second factor) once more; a sign-in through a login provider confirms
     there. A restore keeps the current off-site settings. On a hosted instance the target must be a public `https://`
     address (no private, loopback or link-local addresses; checked on saving and on every connection).
+  - Since 2.552: on a hosted instance (`KALMIDO_HOSTED=1`) the instance admin sets up no off-site target at all: the
+    page shows only a note, saving, *Test connection* and *Upload now* are refused and a target saved before is not used.
+    The operator keeps the copies outside the app (*Offsite backups by pull* above).
   - Restoring from the target: download the backup **and the `kalmido-blob-…` files** there, assemble one complete file
     ([A copy of the backup folder elsewhere](#database-postgresql)) and use *Restore from a file*. The backup alone is not
     complete: the restore then stops with a message that shared files are missing.
@@ -2221,7 +2224,8 @@ the admin does not administer itself answers 403:
   only from that account's own session (Settings > Account), never by a matching e-mail address or user name alone.
 - **Agents of customers** (an organisation's agent, a customer's personal agent): only the kill switch (pause); no token,
   setup code, move, deletion or activity log. New agents of the admin never land in a customer's organisation.
-- **Content:** no backup download in the app (it holds every customer's content: keep it on the server and offsite), the
+- **Content:** no backup download in the app (it holds every customer's content: keep it on the server and offsite) and no
+  off-site target of the instance admin (2.552: the operator keeps the copies), the
   storage check without titles and file names, no takeover of a disabled customer's projects.
 
 The customers' own admins invite, set roles and manage their organisation as before. A self-hosted server (the default)

@@ -1067,6 +1067,7 @@ async function bkoDraw(md, j) {
   const box = $('#s-bko', md); if (!box) return;
   if (!j) { try { j = await api('GET', '/api/admin/backups/offsite'); } catch { box.innerHTML = ''; return; } }
   box._j = j;
+  if (j.hosted) { box.innerHTML = `<div class="shint">${tr('The off-site backup is set up by the operator.')}</div>`; return; }  // 2.552.0 (#4596): hosted, no form
   const t = j.type, x = j[t] || {}, hint = h => `<div class="shint">${h}</div>`;
   const field = ([k, label, kind, ph]) => `<div class="row"><label for="bko-${t}-${k}">${tr(label)}</label>${kind === 'secret'
     ? `<input type="password" id="bko-${t}-${k}" data-bkof="${k}" data-secret="1" autocomplete="new-password" placeholder="${x[ph] ? tr('set (unchanged)') : ''}">`

@@ -16309,6 +16309,8 @@
   "{0} created the task from a quotation": "{0} hat die Aufgabe aus einem Angebot angelegt",
   "{0}: the position is no longer in the quotation (the task stays)": "{0}: Die Position ist nicht mehr im Angebot (die Aufgabe bleibt)",
   "{0}: the position is in the quotation again": "{0}: Die Position ist wieder im Angebot",
+  "The off-site backup is set up by the operator.": "Die Sicherung außer Haus richtet der Betreiber ein.",
+  "On a hosted instance the operator sets up the off-site backup": "Auf einer gehosteten Instanz richtet der Betreiber die Sicherung außer Haus ein",
   "Release to remove": "Loslassen zum Entfernen",
   "This topic is not available. Use another one with at least 16 characters (the dice button makes one).": "Dieses Thema ist nicht verfügbar. Nimm ein anderes mit mindestens 16 Zeichen (der Würfel-Knopf erzeugt eines).",
   "This ntfy topic is not available. Choose another one.": "Dieses ntfy-Thema ist nicht verfügbar. Wähle ein anderes.",

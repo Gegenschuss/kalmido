@@ -11,8 +11,8 @@ The off-site target of the backups (admin/offsite.py), its step-up and the expor
    POST with the step-up -> a one-time ticket, GET with it -> the file; a GET without / with a used / another person's
    ticket = 403
  - a restore keeps the current off-site target (bko_conf / bko_sec), not the one inside the backup
- - hosted (KALMIDO_HOSTED=1): http, 169.254.169.254, 127.0.0.1, 10.x, localhost refused when saving (400); a target saved
-   before is refused when connecting ("blocked", no request reaches the fake); SFTP: no telling refused from timed out
+ - hosted (KALMIDO_HOSTED=1): 2.552.0 (#4596) the instance admin sets / tests / uses no target (403, GET hosted=true); a
+   target saved before is refused when connecting ("blocked", no request reaches the fake); SFTP: no telling refused from timed out
 usage: p22232_c_offsite_test.py <datadir>      (a fresh container; P22232C_NOSTART=1 = the server already runs, no restart)"""
 import json
 import os
@@ -76,6 +76,7 @@ A2 = sess("alice")  # another session of the same admin: no step-up of its own y
 r = A2.patch(OFF, json={"type": "webdav", "webdav": DAV1})
 check(r.status_code == 403 and r.json().get("need") == "password", f"step-up: the target without the password 403 need=password {r.status_code} {r.text[:200]}")
 check(A2.get(OFF).json().get("type") == "", "step-up: nothing saved without it")
+check(A2.get(OFF).json().get("hosted") is False, "#4596: self-hosted, GET says hosted=false (the form as before)")
 r = A2.patch(OFF, json={"type": "webdav", "webdav": DAV1, "password": "wrong-password"})
 check(r.status_code == 403 and A2.get(OFF).json().get("type") == "", f"step-up: a wrong password 403, nothing saved {r.status_code}")
 r = A.patch(OFF, json={"type": "webdav", "webdav": DAV1, "password": PW})
@@ -177,20 +178,29 @@ if not nostart("P22232C"):
     time.sleep(1.0)
     A = sess("alice")
     n0 = len(dav_log())
-    j = A.post(OFF + "/test", json={"password": PW}).json()
-    check(j.get("ok") is False and j.get("code") == "blocked", f"hosted: a target in the local network saved before is refused when connecting {j}")
-    check(len(dav_log()) == n0, "hosted: no request reached it")
-    for t, x in (("s3", {"endpoint": "http://s3.example.com"}), ("s3", {"endpoint": "https://169.254.169.254"}),
-                 ("s3", {"endpoint": "https://127.0.0.1:8093"}), ("s3", {"endpoint": "https://10.0.0.5:9000"}),
-                 ("s3", {"endpoint": "https://localhost"}), ("s3", {"endpoint": "https://[::1]:9000"}),
-                 ("webdav", {"url": "http://127.0.0.1:8094/dav/bk"}), ("webdav", {"url": "https://10.0.0.7/dav"}),
-                 ("sftp", {"host": "10.1.2.3"}), ("sftp", {"host": "127.0.0.1"}), ("sftp", {"host": "localhost"})):
-        r = A.patch(OFF, json={t: x})
-        check(r.status_code == 400 and "public addresses" in r.text, f"hosted: {t} {x} refused 400 {r.status_code} {r.text[:120]}")
-    check(A.patch(OFF, json={"s3": {"endpoint": "https://s3.example.com"}}).ok, "hosted: a public https address is fine")
-    r = A.patch(OFF, json={"s3": {"region": "eu-central-1", "bucket": "kbk", "prefix": "srv1"}})
-    check(r.ok, f"hosted: the other S3 fields as before (only addresses are checked) {r.status_code} {r.text[:120]}")
-    check(A.patch(OFF, json={"sftp": {"host": "sftp.example.com"}}).ok, "hosted: a public SFTP host name is fine (checked when connecting)")
+    # 2.552.0 (#4596): hosted, the instance admin sets, tests and uses no off-site target any more (the operator keeps the
+    # copies): PATCH / test / upload 403 with the step-up given, GET reads the state with hosted=true. Was: test "blocked"
+    # when connecting, addresses checked when saving (400) -- the guard when connecting stays (checked below).
+    j = A.get(OFF).json()
+    check(j.get("hosted") is True and j.get("type") == "webdav", f"#4596 hosted: GET shows the state, hosted=true {j.get('hosted')} {j.get('type')}")
+    r = A.post(OFF + "/test", json={"password": PW})
+    check(r.status_code == 403 and "operator" in r.text, f"#4596 hosted: Test 403 {r.status_code} {r.text[:160]}")
+    check(len(dav_log()) == n0, "#4596 hosted: no request reached the target")
+    r = A.post(OFF + "/upload", json={"password": PW})
+    check(r.status_code == 403 and "operator" in r.text, f"#4596 hosted: Upload now 403 {r.status_code} {r.text[:160]}")
+    for x in ({"type": "s3", "s3": {"endpoint": "https://s3.example.com"}, "password": PW}, {"webdav": {"url": "https://dav.example.com/bk"}, "password": PW},
+              {"sftp": {"host": "sftp.example.com"}, "password": PW}, {"on": True}, {"keep": 3}, {"remove": True}):
+        r = A.patch(OFF, json=x)
+        check(r.status_code == 403 and "operator" in r.text, f"#4596 hosted: PATCH {list(x)} 403 {r.status_code} {r.text[:160]}")
+    j = A.get(OFF).json()
+    check(j.get("type") == "webdav" and j["webdav"]["url"] == DAV1["url"] and j.get("keep") != 3, f"#4596 hosted: nothing changed {j.get('type')} {j.get('webdav')}")
+    code = ("from kalmido.admin.offsite import OffsiteError, _http, bko_upload\n"
+            "try:\n    _http('http', '127.0.0.1:8094', 'GET', '/dav/bk', {})\n    print('sent')\nexcept OffsiteError as e:\n    print(e.code)\n"
+            "print(bko_upload(force=True))")
+    r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+    out = r.stdout.strip().splitlines()[-2:]
+    check(out == ["blocked", "None"] and len(dav_log()) == n0,
+          f"hosted: the guard when connecting stays (#2871), the upload does not run (#4596) {out} {r.stderr[-200:]}")
     code = ("from kalmido.admin.offsite import sftp_error\n"
             "print(sftp_error('ssh: connect to host h port 22: Connection refused').text('en'))\n"
             "print(sftp_error('ssh: connect to host h port 22: Connection timed out').text('en'))")
