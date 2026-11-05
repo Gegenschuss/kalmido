@@ -36,7 +36,9 @@ def pdf_text():
 
 
 stored = pdf_text()
-check(Fr.post(f"{D}/{DID}/payments", json={"amount": 100, "date": "2026-10-20"}).status_code == 201, "a part payment")
+# 2.523.0 (#4082): a typed payment is not dated before the invoice (finalised today) - the invoice's own date
+r = Fr.post(f"{D}/{DID}/payments", json={"amount": 100, "date": str(Fr.get(f"{D}/{DID}").json()["date"])[:10]})
+check(r.status_code == 201, "a part payment " + r.text[:160])
 rd = Fr.get(f"{D}/{DID}/render").json()
 paid, due = rd["totals"]["rows"][-2:]
 check(rd["totals"]["paid"] == "100.00" and "1,090" in due[1] and paid[0] and due[0], f"the preview shows the payment state: {rd['totals']['rows']}")
