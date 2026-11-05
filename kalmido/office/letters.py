@@ -20,10 +20,10 @@ from flask import Response, g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_VERSION
 from ..core.pg import insert_id, write_lock
-from .owrite import ow_crypt, ow_kind, ow_undo_ctx, ow_write  # 2.567.0 (#4711): the office's write layer
+from ..core.conflict import ccf_check  # 2.269.0 C (#3017)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, err, iso, local_now, now_utc
+from ..core.db import body, bump, err, iso, iso_ms, local_now, now_utc
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from .letterhead import bp_letter  # 2.184.0 C (#2581)
@@ -341,9 +341,6 @@ def lt_profile_save(c, oid, uid, upd):
 
 
 # ---------------------------------------------------------------- the letters
-ow_kind("office_letter", "office_letters")  # 2.567.0 (#4711): history + session undo (office/undo.py kind "letter")
-
-
 def lt_create(c, oid, uid, data, agent_id=None):
     """A new draft letter in office area oid from data (dict, checked by lt_clean) -> its id. uid = the person (None for
     an agent; agent_id then names it). Date defaults to today, language to the office's document language, greeting /
@@ -376,26 +373,19 @@ def lt_create(c, oid, uid, data, agent_id=None):
     return lid
 
 
-def lt_update(c, oid, lid, data, draft_only=True, uid=None, version=False):
-    """Writes the checked columns of data into letter lid (400 when it is no draft and draft_only). No commit.
-    2.567.0 (#4711): through the office's write layer (office/owrite.py ow_write: lock, history, undo step, updated_by,
-    bump); version=True = the version check of a dialog / an agent (expect_updated_at in data; an agent must send it).
-    uid = who writes (default: the signed-in person)."""
-    dec, enc = ow_crypt("office_letters", oid)
-
-    def clean(c, b, cur):
-        if draft_only and cur["status"] != "draft":
-            raise BadInput(tr("Only a draft can be changed"))
-        return lt_clean(c, oid, b, cur)
-
-    def extra(c, cur, changed):
-        if "letter_date" in changed:  # 2.351.0 A (#2823): its node in a folder is named by the date
-            oft_renamed(c, LT_KIND, lid, lt_title(c, lid))
-
-    d, _ = ow_write(c, uid or lt_uid(), "office_letter", lid, data or {}, clean, oid=oid, dec=dec, enc=enc,
-                    public=lambda c, cur: lt_public(c, oid, cur), alias="letter", version=version, extra=extra,
-                    lock=f"office_letter_{int(lid)}")  # the lock of /sent, /delivered and the mail (lettermail.py)
-    return d
+def lt_update(c, oid, lid, data, draft_only=True):
+    """Writes the checked columns of data into letter lid (400 when it is no draft and draft_only). No commit."""
+    cur = lt_row(c, oid, lid)
+    if draft_only and cur["status"] != "draft":
+        raise BadInput(tr("Only a draft can be changed"))
+    row = lt_clean(c, oid, data or {}, cur)
+    if not row:
+        return cur
+    row["updated_at"] = iso_ms(now_utc())  # 2.269.0 C (#3017): milliseconds, the base of the next save
+    row = oc_enc_fields(c, oid, "office_letters", row)
+    c.execute(f"UPDATE office_letters SET {', '.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [cur["id"], oid])
+    bump(c)
+    return lt_row(c, oid, lid)
 
 
 # ---------------------------------------------------------------- the PDF: DIN 5008 form B (office/pdf.py's parts, like doctpl.dt_pdf)
@@ -842,18 +832,6 @@ def lt_profile_image_delete():
     return jsonify(lt_profile_public(c, oid, uid, lt_lang(c, oid)))
 
 
-def lt_undo_ctx(ref):
-    """2.567.0 (#4711): the session undo of a letter (office/undo.py, kind "letter"): its admins, a draft only."""
-    from .undo import OUN_FINAL
-    c, uid, oid = lt_ctx()
-    if lt_row(c, oid, ref)["status"] != "draft":
-        raise Denied(409, tr(OUN_FINAL))
-    return c, uid, oid, lambda c: lt_public(c, oid, lt_row(c, oid, ref))
-
-
-ow_undo_ctx("letter", lt_undo_ctx)
-
-
 @app.get("/api/office/letters/<int:lid>")
 def lt_get(lid):
     c, uid, oid = lt_ctx()
@@ -864,11 +842,14 @@ def lt_get(lid):
 def lt_patch(lid):
     """A draft's fields (lt_clean); a sent letter: 409 (a change = "Edit a copy")."""
     c, uid, oid = lt_ctx()
+    write_lock(c, f"office_letter_{int(lid)}")
     cur = lt_row(c, oid, lid)
     if cur["status"] != "draft":
         return err(tr("A sent letter cannot be changed any more. Edit a copy instead."), 409)
-    # 2.269.0 C (#3017) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current" + "letter"); history, session undo
-    d = lt_update(c, oid, lid, body(), uid=uid, version=True)
+    ccf_check(body(), cur["updated_at"], "letter", lambda: lt_public(c, oid, cur))  # 2.269.0 C (#3017): saved elsewhere meanwhile
+    d = lt_update(c, oid, lid, body())
+    if d.get("letter_date") != cur.get("letter_date"):  # 2.351.0 A (#2823): its node in a folder is named by the date
+        oft_renamed(c, LT_KIND, lid, lt_title(c, lid))
     c.commit()
     return jsonify(lt_public(c, oid, d))
 

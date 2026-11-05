@@ -7,7 +7,8 @@ from datetime import date
 from flask import g, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, system_ctx, table_columns
+from ..core.pg import insert_id, system_ctx, table_columns, write_lock
+from ..core.conflict import ccf_check
 from ..core.i18n import LANGS, N_, tr, trn
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, usettings
 from ..core.retention import ret_days
@@ -390,49 +391,39 @@ def _contacts_from_body(c, cid, oid, b, f):
 
 @app.patch("/api/clients/<int:cid>")
 def client_update(cid):
-    """2.567.0 (#4711): through the office's write layer (office/owrite.py ow_write): the lock, the version (409 with the
-    current client under "current" and "client"), only the fields sent, the undo step with the contact persons, the
-    history, updated_by, bump. The rights stay need_client's."""
-    from ..office.owrite import ow_write
     c = db()
     uid = me()
     _gate(c)
-    need_client(c, cid, uid)
-    b = body()
-    b = b if isinstance(b, dict) else {}
-    contacts = b.get("contacts") is not None or bool(b.get("contacts_removed"))
-    seen = {}
-
-    def clean(c, b, old):
-        f = clean_client(c, uid, b)
-        if "org_id" in f and f["org_id"] == old["org_id"]:
-            f.pop("org_id")  # unchanged (the dialog sends it with every save)
-        cl_bill_strip(c, uid, old["org_id"], f)  # 2.187.1 A (#2735)
-        if "org_id" in f:
-            cl_bill_strip(c, uid, f["org_id"], f)
-        if "org_id" in f:
-            h6c_client_move_ok(c, uid, need_client(c, cid, uid))
-            if cl_locked_docs(c, cid):  # 2.126.0 A (#1979 F7): its finalised documents keep it; 2.148.1 B (#2484): also a personal office's
-                raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along.")
-                             if old["org_id"] else tr(CL_LOCKED_PRIVATE))
-        seen["f"] = f
-        return f
-
-    def extra(c, old, changed):
-        f = seen.get("f") or {}
-        if "org_id" in changed:  # 2.40.0 (#1380, review): the contacts move with their client into the other workspace
-            c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (changed["org_id"][1], cid))
+    write_lock(c, f"clients-{cid}")  # 2.269.0 C (#3017): a second save with the same base waits, then sees the first one
+    old = need_client(c, cid, uid)
+    ccf_check(body(), old["updated_at"], "client", lambda: client_public(c, uid, old, stats=True))
+    from ..office.undo import oun_post, oun_pre
+    oun_pre(c, uid, None, "client", cid)  # 2.111.0 A (#2233): the state before, for "Saved · Undo"
+    f = clean_client(c, uid, body())
+    if "org_id" in f and f["org_id"] == old["org_id"]:
+        f.pop("org_id")  # unchanged (the dialog sends it with every save)
+    cl_bill_strip(c, uid, old["org_id"], f)  # 2.187.1 A (#2735)
+    if "org_id" in f:
+        cl_bill_strip(c, uid, f["org_id"], f)
+    if "org_id" in f:
+        h6c_client_move_ok(c, uid, old)
+        if cl_locked_docs(c, cid):  # 2.126.0 A (#1979 F7): its finalised documents keep it; 2.148.1 B (#2484): also a personal office's
+            raise Denied(409, tr("Finalised documents of this organisation refer to this client, so it stays here. “Move to another workspace…” in the office takes a copy along.")
+                         if old["org_id"] else tr(CL_LOCKED_PRIVATE))
+    if f or body().get("contacts") is not None or body().get("contacts_removed"):  # 2.269.0 C (#3017): milliseconds, a contact person change counts too
+        f["updated_at"] = iso_ms(now_utc())
+        c.execute(f"UPDATE clients SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), cid])
+        if "org_id" in f:  # 2.40.0 (#1380, review): the contacts move with their client into the other workspace
+            c.execute("UPDATE office_client_contacts SET org_id=? WHERE client_id=?", (f["org_id"], cid))
             from ..office.contacts_cl import ckl_unlink_client
             ckl_unlink_client(c, cid)  # 2.59.0 (#1735): the address books stay in the old workspace
             if _org_boundary(c):  # 2.86.0 (N11): the lists of the old workspace stay there and lose the client
-                c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (cid, changed["org_id"][1]))
-        _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], b, f)
-        if "address" in changed and f.get("address"):
-            cdn_fill_address(c, cid)
-
-    # 2.269.0 C (#3017): a contact person change counts too (force); 2.111.0 A (#2233): the step for "Saved · Undo"
-    ow_write(c, uid, "client", cid, b, clean, where="id=?", args=(cid,), alias="client", lock=f"clients-{cid}",
-             public=lambda c, cur: client_public(c, uid, need_client(c, cid, uid), stats=True), extra=extra, force=contacts)
+                c.execute("UPDATE lists SET client_id=NULL WHERE client_id=? AND org_id IS DISTINCT FROM ?", (cid, f["org_id"]))
+    _contacts_from_body(c, cid, need_client(c, cid, uid)["org_id"], body(), f)
+    if f.get("address"):
+        cdn_fill_address(c, cid)
+    bump(c)
+    oun_post(c)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))
 

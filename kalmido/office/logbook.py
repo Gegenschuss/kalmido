@@ -28,7 +28,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import body, bump, db, iso, local_now, local_stamp, now_utc
 from ..core.access import Denied
-from .owrite import ow_crypt, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save, pb_cl_live
@@ -142,10 +142,6 @@ def _veh_log(c, oid, action, vid, before, after):
 
 
 # ---------------------------------------------------------------- vehicles
-ow_kind("office_vehicle", "office_vehicles")  # 2.567.0 (#4711): history + undo of a vehicle
-ow_kind("office_drive", "office_drives")  # and of a drive
-
-
 def _vehicle(c, oid, vid):
     r = c.execute("SELECT * FROM office_vehicles WHERE id=? AND org_id=?", (vid, oid)).fetchone()
     if not r:
@@ -237,26 +233,20 @@ def lb_vehicle_post():
 def lb_vehicle_patch(vid):
     """Partial {name, plate, kind, odo_start, archived 0|1} (archived = the undo-able "delete")."""
     c, uid, oid = _ctx()
-    _vehicle(c, oid, vid)
+    write_lock(c, f"office_vehicles-{int(vid)}")  # 2.560.0 D (#4700): a second save with the same base waits, then sees the first
+    cur = _vehicle(c, oid, vid)
     b = _body()
-
-    st = {}
-
-    def clean(c, b, cur):
-        st["before"] = _veh_vals(next(v for v in lb_vehicles(c, oid) if v["id"] == vid))  # under the lock
-        return _vehicle_clean(b, cur)
-
-    def extra(c, cur, changed):  # the logbook's own change log stays
-        row = {k: z for k, (_, z) in changed.items()}
-        before = st["before"]
+    ccf_check(b, cur["updated_at"], "row", lambda: next(v for v in lb_vehicles(c, oid) if v["id"] == vid))  # saved elsewhere meanwhile: 409
+    row = _vehicle_clean(b, cur)
+    if row:
+        before = _veh_vals(next(v for v in lb_vehicles(c, oid) if v["id"] == vid))
         after = dict(before, **_veh_vals(dict(row, odo_start=_km_str(row["odo_start"]) if "odo_start" in row else before["odo_start"])))
         _veh_log(c, oid, "update", vid, before, after)
-
-    dec, enc = ow_crypt("office_vehicles", oid)
-    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
-    ow_write(c, uid, "office_vehicle", vid, b, clean, oid=oid, dec=dec, enc=enc, alias="row",
-             lock=f"office_vehicles-{int(vid)}", public=lambda c, cur: next(v for v in lb_vehicles(c, oid) if v["id"] == vid), extra=extra)
-    c.commit()
+        row["updated_at"] = iso(now_utc())
+        row = oc_enc_fields(c, oid, "office_vehicles", row)
+        c.execute(f"UPDATE office_vehicles SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [vid, oid])
+        bump(c)
+        c.commit()
     return jsonify(next(v for v in lb_vehicles(c, oid) if v["id"] == vid))
 
 
@@ -533,31 +523,25 @@ def lb_drive_post():
 def lb_drive_patch(did):
     """Partial drive (keys as POST); logs the values before of every changed field."""
     c, uid, oid = _ctx()
-    lbc_need_open(c, oid, oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did)))  # 2.152.0 C (#2169): closed -> 409 (a correction is a new drive)
+    write_lock(c, f"office_drives-{int(did)}")  # 2.560.0 D (#4700)
+    cur = oc_dec_fields(c, oid, "office_drives", _drive(c, oid, did))
+    lbc_need_open(c, oid, cur)  # 2.152.0 C (#2169): closed -> 409 (a correction is a new drive)
     b = _body()
-    st = {}
-
-    def clean(c, b, cur):
-        if cur["deleted_at"] or not lb_own_ok(cur):
-            raise Denied(404)
-        lbc_need_open(c, oid, cur)  # again under the lock
-        row = _drive_clean(c, oid, uid, b, cur)
-        moved = ("day" in row and row["day"] != cur["day"]) or ("vehicle_id" in row and row["vehicle_id"] != cur["vehicle_id"])
-        # review F8: also a change of the vehicle alone must not put the drive into a month closed for that vehicle
-        if moved and lbc_month_closed(lbc_closed(c, oid), row.get("vehicle_id", cur["vehicle_id"]), row.get("day", cur["day"])):
-            raise Denied(409, tr(LBC_MONTH_NEW))
-        before, after = _vals(cur), _vals(dict(cur, **row))
-        st["prev"] = {k: before[k] for k in LB_FIELDS if before[k] != after[k]}
-        return row if st["prev"] else {}
-
-    def extra(c, cur, changed):
-        _log(c, oid, did, "change", st["prev"], uid)  # the logbook's own log: the values before of every changed field
-
-    dec, enc = ow_crypt("office_drives", oid)
-    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
-    ow_write(c, uid, "office_drive", did, b, clean, oid=oid, dec=dec, enc=enc, alias="row", lock=f"office_drives-{int(did)}",
-             public=lambda c, cur: _one(c, oid, uid, did), extra=extra)
-    c.commit()
+    ccf_check(b, cur["updated_at"], "row", lambda: _one(c, oid, uid, did))  # saved elsewhere meanwhile: 409 with the drive
+    row = _drive_clean(c, oid, uid, b, cur)
+    moved = ("day" in row and row["day"] != cur["day"]) or ("vehicle_id" in row and row["vehicle_id"] != cur["vehicle_id"])
+    # review F8: also a change of the vehicle alone must not put the drive into a month closed for that vehicle
+    if moved and lbc_month_closed(lbc_closed(c, oid), row.get("vehicle_id", cur["vehicle_id"]), row.get("day", cur["day"])):
+        raise Denied(409, tr(LBC_MONTH_NEW))
+    before, after = _vals(cur), _vals(dict(cur, **row))
+    prev = {k: before[k] for k in LB_FIELDS if before[k] != after[k]}
+    if prev:
+        row["updated_at"] = iso(now_utc())
+        row = oc_enc_fields(c, oid, "office_drives", row)
+        c.execute(f"UPDATE office_drives SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [did, oid])
+        _log(c, oid, did, "change", prev, uid)
+        bump(c)
+        c.commit()
     return jsonify(_one(c, oid, uid, did))
 
 

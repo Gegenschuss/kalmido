@@ -14,8 +14,8 @@ from datetime import date
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
-from .owrite import ow_kind, ow_uid, ow_write  # 2.567.0 (#4711): the office's write layer
+from ..core.pg import insert_id, write_lock
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
@@ -236,21 +236,12 @@ def _one(c, oid, did):
     return pl2_public(c, oid, r, _offer_state(c, oid, [r["offer_id"]]), _client_names(c, oid))
 
 
-ow_kind("office_deal", "office_deals")  # 2.567.0 (#4711): history + undo of a deal / lead
-
-
-def pl2_write(c, oid, did, b, clean, uid=None, version=False, alias="row"):
-    """2.567.0 (#4711): THE write of a deal (office/owrite.py ow_write: lock, version, history, undo step, updated_by, bump).
-    clean(c, b, cur) -> the columns (cur = pl2_public of the row). Returns (row after as pl2_public, changed)."""
-    return ow_write(c, uid or ow_uid(), "office_deal", did, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
-                    dec=lambda c, r: pl2_public(c, oid, r), enc=lambda c, d: oc_enc_fields(c, oid, "office_deals", d),
-                    public=lambda c, cur: _one(c, oid, did), alias=alias, version=version, lock=f"office_deals-{int(did)}")
-
-
-def _update(c, oid, did, row, uid=None):
-    """The module's own writes (status hook, convert / unconvert): through pl2_write, without a version check."""
-    if row:
-        pl2_write(c, oid, did, {}, lambda c, b, cur: row, uid=uid)
+def _update(c, oid, did, row):
+    if not row:
+        return
+    row["updated_at"] = iso(now_utc())
+    row = oc_enc_fields(c, oid, "office_deals", row)
+    c.execute(f"UPDATE office_deals SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [did, oid])
 
 
 # ---------------------------------------------------------------- the hook of the quotation status
@@ -314,27 +305,23 @@ def pl2_patch(did):
     """Partial: the fields of POST + sort, offer_id (a quotation of the office area, null = unbound). Answers the deal and
     "before" = the old values of the keys changed (the client's undo patches them back)."""
     c, uid, oid = _ctx()
-    _row(c, oid, did)
+    write_lock(c, f"office_deals-{int(did)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
+    cur = pl2_public(c, oid, _row(c, oid, did))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    st = {}
-
-    def clean(c, b, cur):
-        row = pl2_clean(c, oid, b, cur)
-        if "offer_id" in b:
-            v = b.get("offer_id")
-            if v is not None and (not isinstance(v, int) or isinstance(v, bool) or not c.execute(
-                    "SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND trial=0", (v, oid)).fetchone()):  # 2.144.10 B (#2576)
-                raise BadInput(tr("Invalid value: {0}", "offer_id"))
-            row["offer_id"] = v
-        st["before"] = {k: cur.get(k) for k in row}
-        return row
-
-    # 2.560.0 C (#4700) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
-    pl2_write(c, oid, did, b, clean, uid=uid, version=True)
+    ccf_check(b, cur.get("updated_at"), "row", lambda: _one(c, oid, did))
+    row = pl2_clean(c, oid, b, cur)
+    if "offer_id" in b:
+        v = b.get("offer_id")
+        if v is not None and (not isinstance(v, int) or isinstance(v, bool) or not c.execute(
+                "SELECT 1 FROM office_docs WHERE id=? AND org_id=? AND kind='offer' AND trial=0", (v, oid)).fetchone()):  # 2.144.10 B (#2576)
+            raise BadInput(tr("Invalid value: {0}", "offer_id"))
+        row["offer_id"] = v
+    before = {k: cur.get(k) for k in row}
+    _update(c, oid, did, row)
+    bump(c)
     c.commit()
-    before = st.get("before") or {}
     return jsonify({**_one(c, oid, did), "before": before})
 
 
