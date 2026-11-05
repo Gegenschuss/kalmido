@@ -155,6 +155,19 @@ track(Da, t, 48, "member time")  # 0.8 of 1 h, booked by dave
 check(len([x for x in news(A, "task") if x["task_id"] == t]) == 1, "the time dave books tells the owner alice")
 check(news(Da) == [], "dave himself gets none (no admin)")
 
+# 2.555.0 (#4570, review F2): "delete all times" lowers the marks, so the next crossing tells again
+P4, task4 = project(A, "wipe")
+t = task4("Cut", 1)
+track(A, t, 60, "wipe")  # 1 of 1 h: over
+check(len([x for x in news(A, "task") if x["task_id"] == t]) == 1, "wipe: the first crossing tells")
+nm = A.get(B + "/api/state").json()
+name = next(x["name"] for x in nm["lists"] if x["id"] == P4)
+r = A.post(B + f"/api/lists/{P4}/time/delete-all", json={"confirm": name})
+check(r.ok and r.json().get("deleted") == 1, "wipe: delete all " + r.text[:120])
+check(task_level(A, t) == "ok", f"wipe: no time left: ok ({task_level(A, t)})")
+track(A, t, 60, "wipe")
+check(len([x for x in news(A, "task") if x["task_id"] == t]) == 2, "wipe: crossing again after the wipe tells again")
+
 FID, Fr = freelancer(B, A)
 case(Fr, "freelancer", others=False)
 

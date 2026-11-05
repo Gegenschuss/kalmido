@@ -15,11 +15,12 @@ down with it, so the notice comes again on the next crossing. Tasks: the entry's
 "Budget h" value of their own (a parent without one is no budget of its own; no notice per bare branch). Counted is
 everyone's time (not what one viewer sees): the notice is about the project, not about a person's share."""
 import json
+import logging
 import math
 
 from flask import g, has_request_context
 
-from ..core.config import PUBLIC_URL
+from ..core.config import PUBLIC_URL, app
 from ..core.db import iso_ms, now_utc
 from ..core.i18n import LANGS, lang, tr
 from ..core.pg import system_ctx
@@ -131,8 +132,9 @@ def bw_people(c, lid):
     return [u for i, u in enumerate(ids) if u not in ag and u not in ids[:i]]
 
 
-def _bw_tell(c, lid, tid, st):
-    """One News item (+ push) per person for a threshold crossed (st = the state of bw_states)."""
+def _bw_tell(c, lid, tid, st, pushes):
+    """One News item (+ push) per person for a threshold crossed (st = the state of bw_states). The pushes go into
+    `pushes` and reach g.pushes only once the savepoint of bw_check held (review #4570 F1: no push for a rolled-back notice)."""
     from ..collab.comments import collab_user
     from ..collab.news import notif_ok
     from ..collab.liste2eguard import le2b_list_locked
@@ -157,7 +159,7 @@ def _bw_tell(c, lid, tid, st):
             name = title or ("" if locked else (lst["name"] if lst else ""))
             head = tr("Budget exceeded", lg=lg) if data["level"] >= BW_OVER else tr("80 % of the budget used", lg=lg)
             msg = tr("{0}: {1} of {2} h tracked ({3} %)", name or tr("Project", lg=lg), f"{data['tracked_h']:g}", f"{st['h']:g}", st["pct"], lg=lg)
-            g.setdefault("pushes", []).append((uid, head, msg, f"{PUBLIC_URL}/#l/{lid}", push_prio(s)))
+            pushes.append((uid, head, msg, f"{PUBLIC_URL}/#l/{lid}", push_prio(s)))
 
 
 def bw_check(c, pairs):
@@ -171,21 +173,26 @@ def bw_check(c, pairs):
             if tid:
                 todo[int(lid)].add(int(tid))
     for lid, tids in todo.items():
+        pushes = []
         try:
             with c.savepoint(), system_ctx(c):  # everyone's entries and the owner / admins, whatever the writer sees
                 proj, tasks = bw_states(c, lid, tids)
                 if proj:
-                    _bw_step(c, "lists", lid, lid, None, proj)
+                    _bw_step(c, "lists", lid, lid, None, proj, pushes)
                 for tid, st in tasks.items():
-                    _bw_step(c, "tasks", tid, lid, tid, st)
-        except Exception as e:  # noqa: BLE001 - the time entry is what counts; the notice is extra
-            print("budget warning failed:", type(e).__name__, str(e)[:200], flush=True)
+                    _bw_step(c, "tasks", tid, lid, tid, st, pushes)
+        except Exception:  # noqa: BLE001 - the time entry is what counts; the notice is extra
+            # review #4570 F5: into the server's error log (admin alerts read it), not only stdout
+            logging.getLogger(app.name).exception("budget warning failed for list %s", lid)
+            continue
+        if pushes and has_request_context():
+            g.setdefault("pushes", []).extend(pushes)
 
 
-def _bw_step(c, table, rid, lid, tid, st):
+def _bw_step(c, table, rid, lid, tid, st, pushes):
     new = _bw_mark(st["level"])
     if new < st["mark"]:
         c.execute(f"UPDATE {table} SET budget_warn=? WHERE id=?", (new, rid))
     elif new > st["mark"]:  # only the request that raises the mark tells (two saves at once: one notice)
         if c.execute(f"UPDATE {table} SET budget_warn=? WHERE id=? AND budget_warn<?", (new, rid, new)).rowcount:
-            _bw_tell(c, lid, tid, st)
+            _bw_tell(c, lid, tid, st, pushes)

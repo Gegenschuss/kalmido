@@ -152,6 +152,9 @@ def tz_delete_all(lid):
     if back:  # 2.530.0 B (#4315): the Undo copy on the server, in the same transaction as the delete
         wid = insert_id(c, "INSERT INTO time_wipes(user_id,list_id,entries,n,seconds,deleted_at) VALUES(?,?,?,?,?,?)",
                         (uid, lid, json.dumps(back, ensure_ascii=False), len(back), sum(int(r["seconds"] or 0) for r in rows), iso(now_utc())))
+    if ids:  # 2.555.0 (#4570, review F2): the budget marks follow the wipe, so a later crossing tells again
+        from .budgetwarn import bw_check
+        bw_check(c, [(lid, None)] + [(lid, t) for t in {r["task_id"] for r in rows if r["task_id"]}])
     c.commit()
     return jsonify(ok=True, deleted=len(ids), seconds=prev["seconds"], billed=prev["billed"], entries=back, wipe=wid)
 
@@ -240,5 +243,8 @@ def tz_restore(lid):
                 continue
     if n:
         bump(c)
+    if n:  # 2.555.0 (#4570, review F2): restored hours count for the budget warning like new ones
+        from .budgetwarn import bw_check
+        bw_check(c, [(lid, None)] + [(lid, e.get("task_id")) for e in ents if isinstance(e, dict) and isinstance(e.get("task_id"), int)])
     c.commit()
     return jsonify(ok=True, restored=n, left=len(left))
