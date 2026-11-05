@@ -73,6 +73,7 @@ async function ctRoute(id) {
   if (id) await ctOpen(id); else if (isMobile()) { CT.sel = null; CT.card = null; ctDraw(); }
 }
 async function ctOpen(id) {
+  if (id < 0) return;  // 2.559.0 (#4660): a contact still being created (ct_saveOpt) opens once it is there
   CT.sel = id;
   try { CT.card = await api('GET', `/api/contacts/${id}`); } catch { CT.card = null; CT.sel = null; toast(tr('This contact does not exist or you cannot see it.')); }
   if (S.route.mod === 'contacts') ctDraw();
@@ -352,9 +353,10 @@ document.addEventListener('click', async e => {
     menu(b, [...fv2_menuRow('r:contact:' + c.id) /* 2.441.0 (#3592): opened beside the list a contact has no address of its own */, w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
       // 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links)
       if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
-      try { await api('DELETE', `/api/contacts/${c.id}`); } catch { return; }
-      CT.sel = null; CT.card = null; await load().catch(() => {}); if (isMobile()) go('contacts'); ctLoad();
-      toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } await load().catch(() => {}); ctLoad(); }); }},
+      // 2.559.0 (#4660): gone at once (ct_delOpt), no GET /api/state; an error brings it back
+      if (isMobile()) go('contacts');
+      try { await ct_delOpt(c); } catch { return; }
+      toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } ctLoad(); }); }},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
       typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
       ctk_clientItem(c, ctBook(c.book_id)),  // 2.119.1 B (#2082): create a client from the contact / open its client
@@ -563,16 +565,45 @@ async function ctEditor(c) {
       note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: fold ? st.book_id : +v('ct-bk') || st.book_id};
     if (!body.given && !body.family && !body.org && !body.fn) { toast(tr('A name or a company, please')); $('#ct-given', md).focus(); return; }
     if (!c && !await ctx_dupAsk(body, md)) return;  // 2.119.1 A (#2084): a look-alike first (the next Save creates it anyway)
+    // 2.559.0 (#4660): the dialog closes and the contact shows at once (ct_saveOpt), no GET /api/state; an error takes it back
+    LS.set('ctBook', body.book_id); md.remove();
     try {
-      const r = c ? await api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : await api('POST', '/api/contacts', body);
-      LS.set('ctBook', body.book_id);
-      md.remove(); CT.sel = r.id; CT.card = r;
+      const r = await ct_saveOpt(c, body);
       toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.4 C (#2378)
-      await load().catch(() => {}); ctLoad();
       if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
     } catch { /* api() showed it */ }
   });
   setTimeout(() => { if (!c && !isTouch()) $('#ct-given', md)?.focus(); }, 40);
+}
+// 2.559.0 (#4660): saving a contact (c = the one edited, null = new) shows at once (optWrite as #1501): its row and card carry the
+// typed values before the answer (a new one: a row with a temporary negative id, opened once the server's id is there); the
+// server's contact follows, the list again in the background (order, groups). No GET /api/state; an error puts the old state back
+const ct_row = (b, id, was) => ({...(was || {}), id, book_id: b.book_id, fn: b.fn || [b.given, b.family].filter(Boolean).join(' ') || b.org, given: b.given, family: b.family, org: b.org,
+  title: b.title, email: b.emails[0]?.value || '', phone: b.phones[0]?.value || '', photo: b.photo, groups: b.groups});
+async function ct_saveOpt(c, body) {
+  const tmp = c ? 0 : -Date.now();
+  const put = () => {
+    const o = {items: CT.items, total: CT.total, sel: CT.sel, card: CT.card};
+    if (c) {
+      if (CT.items) CT.items = CT.items.map(x => x.id === c.id ? ct_row(body, c.id, x) : x);
+      if (CT.card?.id === c.id) CT.card = {...CT.card, ...body, fn: ct_row(body, c.id).fn};
+    } else if (CT.items && !CT.items.some(x => x.id === tmp)) { CT.items = [ct_row(body, tmp), ...CT.items]; CT.total++; }
+    return () => Object.assign(CT, o);
+  };
+  const r = await optWrite(put, () => c ? api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : api('POST', '/api/contacts', body), ctDraw);
+  if (CT.items) CT.items = CT.items.map(x => x.id === tmp || x.id === r.id ? ct_row({...body, ...r, emails: r.emails || body.emails, phones: r.phones || body.phones}, r.id, x) : x);
+  if (!c || CT.sel === r.id) { CT.sel = r.id; CT.card = r; }
+  ctDraw(); ctLoad();  // the list from the server in the background (not awaited)
+  return r;
+}
+async function ct_delOpt(c) {
+  const put = () => {
+    const o = {items: CT.items, total: CT.total, sel: CT.sel, card: CT.card};
+    if (CT.items?.some(x => x.id === c.id)) { CT.items = CT.items.filter(x => x.id !== c.id); CT.total = Math.max(0, CT.total - 1); }
+    if (CT.sel === c.id) { CT.sel = null; CT.card = null; }
+    return () => Object.assign(CT, o);
+  };
+  return optWrite(put, () => api('DELETE', `/api/contacts/${c.id}`), ctDraw);
 }
 // 2.119.1 A (#2084): before a new contact is created, the address books one sees are asked for one with the same e-mail, phone
 // or name (POST /api/contacts/dupcheck, reads only). A hit shows a quiet note in the editor: open the one there, or Save again

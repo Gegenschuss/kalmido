@@ -39,8 +39,10 @@ function ctLinkPop(anchor, tid) {
     if (k) { kind = k.dataset.ctpk; $$('[data-ctpk]', p).forEach(x => { x.classList.toggle('on', x === k); x.setAttribute('aria-checked', String(x === k)); }); return; }
     if (e.target.closest('[data-ctpnew]')) { closePop(); ctEditor(null); return; }
     const c = e.target.closest('[data-ctpick]'); if (!c) return;
-    try { const j = await api('POST', `/api/tasks/${tid}/contacts`, {contact_id: +c.dataset.ctpick, kind}); S.tcontacts = {...(S.tcontacts || {}), [tid]: j.items}; } catch { return; }
-    closePop(); renderDetail();
+    // 2.559.0 (#4660): the chip shows at once (ct_linkOpt), an error takes it back
+    const cid = +c.dataset.ctpick, fn = $('.ctn b', c)?.textContent || '';
+    closePop();
+    ct_linkOpt(tid, l => [...l.filter(x => x.contact_id !== cid), {contact_id: cid, fn, kind}], () => api('POST', `/api/tasks/${tid}/contacts`, {contact_id: cid, kind})).catch(() => {});
   };
   setTimeout(() => { if (!isTouch()) $('#ctp-q')?.focus(); }, 30);
 }
@@ -53,8 +55,14 @@ document.addEventListener('click', async e => {
   if (u && S.sel) {
     e.preventDefault();
     const tid = S.sel, cid = +u.dataset.ctunlink;
-    try { await api('DELETE', `/api/tasks/${tid}/contacts/${cid}`); } catch { return; }
-    S.tcontacts = {...(S.tcontacts || {}), [tid]: ((S.tcontacts || {})[tid] || []).filter(x => x.contact_id !== cid)};
-    renderDetail();
+    ct_linkOpt(tid, l => l.filter(x => x.contact_id !== cid), () => api('DELETE', `/api/tasks/${tid}/contacts/${cid}`)).catch(() => {});  // 2.559.0 (#4660): at once
   }
 });
+// 2.559.0 (#4660): a contact linked to / unlinked from a task shows at once (optWrite as #1501): f changes the task's links in
+// S.tcontacts before the answer (again on a state that arrives meanwhile), the server's list follows; an error puts the old one back
+async function ct_linkOpt(tid, f, req) {
+  const put = () => { const was = (S.tcontacts || {})[tid]; S.tcontacts = {...(S.tcontacts || {}), [tid]: f(was || [])}; return () => { S.tcontacts = {...(S.tcontacts || {}), [tid]: was || []}; }; };
+  const j = await optWrite(put, req, () => { if (S.sel === tid) renderDetail(); });
+  if (Array.isArray(j?.items)) { S.tcontacts = {...(S.tcontacts || {}), [tid]: j.items}; if (S.sel === tid) renderDetail(); }
+  return j;
+}
