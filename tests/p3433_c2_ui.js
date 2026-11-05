@@ -14,6 +14,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
   await call(CK, 'POST', '/api/admin/setup', {lang: 'en', collab_all: true, time_all: true, modules: ['comments']});
   await call(CK, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'collab,time,fields,comments'});
   const P = (await call(CK, 'POST', '/api/lists', {name: 'Car spot', ptype: 'agency', time_tracking: true})).id;
+  await call(CK, 'POST', `/api/lists/${P}/fields`, {name: 'Budget h', type: 'number'}); // 2.551.0 (#3906): the agency type has no such field any more
   const fb = (await call(CK, 'GET', '/api/state')).fields.find(f => f.list_id === P && f.name === 'Budget h');
   const ep = (await call(CK, 'POST', '/api/tasks', {title: 'Episode', list_id: P, fields: {[fb.id]: '10'}})).id;
   const sub = (await call(CK, 'POST', '/api/tasks', {title: 'Cut', list_id: P, parent_id: ep})).id;
