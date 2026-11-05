@@ -1141,7 +1141,63 @@ def rot_fields(c, oid, k1, k2, stop=None):
             if len(rows) < BATCH:
                 break
             last = rows[-1]["rid"]
+    n += rot_trash(c, oid, k1, k2, bad, stop)
     return n, bad[0]
+
+
+def _rot_snap_jobs():
+    """2.558.0 (#4669): table -> [(column, kind, ctx)] of the sealed columns a copy in the office trash can hold."""
+    out = {}
+    for t, cols in oc.FIELDS.items():
+        if not t.startswith(FIELD_SETTLED):
+            out.setdefault(t, []).extend((col, "text", f"{t}.{col}") for col in cols)
+    out.setdefault("office_doc_items", []).append(("cost_enc", "text", "office_doc_items.cost_enc"))
+    for (t, col) in oc.JSON_KEYS:
+        out.setdefault(t, []).append((col, "json", f"{t}.{col}"))
+    return out
+
+
+def rot_snap(k1, k2, oid, snap, bad, jobs=None):
+    """2.558.0 (#4669): the copy snap of office/otrash.py (rows = [[table, [rows]]]) with every sealed value re-encrypted
+    from k1 to k2 in place. -> True when something changed; a value that opens with neither key counts in bad and stays."""
+    jobs = jobs or _rot_snap_jobs()
+    changed = False
+    for table, rows in snap.get("rows") or []:
+        for col, kind, ctx in jobs.get(table, ()):
+            for row in rows:
+                v = row.get(col)
+                new = _rot_value(k1, k2, oid, kind, ctx, None, v, bad)
+                if new != v:
+                    row[col] = new
+                    changed = True
+    return changed
+
+
+def rot_trash(c, oid, k1, k2, bad, stop=None):
+    """2.558.0 (#4669): the copies in the office trash of organisation oid (office_trash.snap) keep the rows' sealed
+    columns as stored; they are re-encrypted with the rest (compare and set, in batches), so a restore after a rotation
+    brings readable values back. -> changed copies (unreadable values are added to bad)."""
+    n, last, jobs = 0, 0, _rot_snap_jobs()
+    while True:
+        if stop and stop():
+            return n
+        with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+            write_lock(c, "orgcrypt")
+            rows = c.execute("SELECT id, snap FROM office_trash WHERE org_id=? AND snap LIKE ? AND id > ? "  # pg-ok: the prefix is case-exact
+                             f"ORDER BY id LIMIT {BATCH}", (oid, "%" + oc.PREFIX + "%", last)).fetchall()
+            for r in rows:
+                try:
+                    snap = json.loads(r["snap"] or "{}")
+                except ValueError:
+                    bad[0] += 1
+                    continue
+                if isinstance(snap, dict) and rot_snap(k1, k2, oid, snap, bad, jobs):
+                    n += c.execute("UPDATE office_trash SET snap=? WHERE id=? AND org_id=? AND snap=?",
+                                   (json.dumps(snap, default=str), r["id"], oid, r["snap"])).rowcount
+        c.commit()
+        if len(rows) < BATCH:
+            return n
+        last = rows[-1]["id"]
 
 
 def _rot_dirs():
