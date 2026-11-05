@@ -16,6 +16,9 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - deleting a calendar puts it into the trash with its events (gone from the lists, the range, CalDAV); only its owner restores
    it (a member 404), with exactly the events that went with it (#4707)
  - a person without an organisation: her own calendar shared with her agent, the trash and the restore as above
+ - review F4: member rows written while there was no node are all mirrored when the node comes; review F3: a node in the
+   file store's trash is still the node (a share taken back stays taken back), it does not go there alone while it carries
+   shares, and removed for good it writes its shares back into the member rows
  - the start's one-shot (migr_kern4712, a restart on the same data): members without a node get it and their core shares
 usage: p2566_c_kern_cal_test.py <datadir>"""
 import os
@@ -269,6 +272,33 @@ check(share("evcal", K4, GINA) == "view" and K4 in ids(Gi.get(B + "/api/evcals")
       "review F4: the imported calendar member got her core share with the node and keeps the calendar")
 check(share("address_book", B4, BOB) == "view" and B4 in ids(Bo.get(B + "/api/books")),
       "review F4: the imported book member got his core share with the node and keeps the book")
+
+# ================================================================== review F3: a node in the file store's trash is still the node
+K5 = A.post(B + "/api/evcals", json={"name": "Tidy plan"}).json()["id"]
+check(A.put(B + f"/api/evcals/{K5}/members", json={"user_id": BOB, "role": "edit"}).ok
+      and A.put(B + f"/api/evcals/{K5}/members", json={"user_id": GINA, "role": "view"}).ok, "F3: a calendar shared with bob and gina")
+N5 = node("evcal", K5)
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N5, BOB), write=True)  # taken back in the core (the file store's dialog)
+check(K5 not in ids(Bo.get(B + "/api/evcals")), "F3: bob taken back in the core")
+r = A.delete(B + f"/api/files/nodes/{N5}")
+check(r.status_code == 409, f"review F3: the calendar's entry with shares does not go into the file store's trash alone ({r.status_code})")
+sql("UPDATE fs_nodes SET deleted_at='2026-11-05T00:00:00+00:00' WHERE id=?", (N5,), write=True)  # there anyway (an older version)
+check(K5 not in ids(Bo.get(B + "/api/evcals")), "review F3: its node in the file store's trash -> bob's old member row is not read again")
+sql("DELETE FROM fs_nodes WHERE id=?", (N5,), write=True)  # the file store's trash emptied
+check(not sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K5, BOB)) and K5 not in ids(Bo.get(B + "/api/evcals")),
+      "review F3: the node removed for good takes bob's dead member row with it, he stays out")
+check(K5 in ids(Gi.get(B + "/api/evcals")), "review F3: gina, shared on the node, keeps the calendar through her row")
+B5 = A.post(B + "/api/books", json={"name": "Tidy book"}).json()["id"]
+check(A.put(B + f"/api/books/{B5}/members", json={"user_id": GINA, "role": "edit"}).ok, "F3: a book shared with gina")
+N6 = node("address_book", B5)
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N6, GINA), write=True)
+sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N6, BOB), write=True)  # only in the core
+check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")), "F3: gina taken back, bob shared in the core only")
+sql("UPDATE fs_nodes SET deleted_at='2026-11-05T00:00:00+00:00' WHERE id=?", (N6,), write=True)
+check(B5 not in ids(Gi.get(B + "/api/books")), "review F3: the book's node in the file store's trash -> gina's old row is not read again")
+sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
+check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
+      "review F3: the book's node removed for good: gina stays out, bob's core-only share lives on as his row")
 
 # ================================================================== the one-shot copy at the start (migr_kern4712)
 K3 = A.post(B + "/api/evcals", json={"name": "Before the update"}).json()["id"]

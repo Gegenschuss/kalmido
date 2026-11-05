@@ -15,6 +15,10 @@ in the system context (a member removing themselves need not see the organisatio
 Review F4: a node of the two kinds made by any path (the first member, a share in the core, filing it in a folder, an import)
 mirrors ALL member rows the object has at that moment (kalmido_kern_node_made fires the mirror with UPDATE ... SET role=role, as
 the one-shot does): rows written past cal_member_set / book_member_set while there was no node (import, repair) keep their access.
+Review F3: a node in the file store's trash is still the object's node (its shares count, the old rows are not read again); a
+node removed for good (the trash emptied, taken out of every folder, the organisation's tree gone) first writes its shares to
+people and agents back into the member rows (kalmido_kern_node_gone: rows without a share go, the others get its role), so the
+fallback reader then gives exactly what the node gave -- a share taken back in the core is not reopened.
 New columns, functions and triggers only (nullable or with a DEFAULT): an older version ignores the columns -- its calendars
 in the trash would show again --, the trigger keeps mirroring for it, nothing breaks; a backup restores them (kalmido_*).
 """
@@ -23,6 +27,9 @@ CREATE OR REPLACE FUNCTION kalmido_kern_mirror() RETURNS trigger LANGUAGE plpgsq
 DECLARE r JSONB; rid BIGINT; who BIGINT; nid BIGINT; ag BOOLEAN; prev TEXT;
 BEGIN
   r := CASE WHEN TG_OP = 'DELETE' THEN to_jsonb(OLD) ELSE to_jsonb(NEW) END;
+  IF current_setting('app.kern_sync', true) = '1' THEN
+    RETURN NULL;  -- review F3: kalmido_kern_node_gone writes the node's shares back into the rows (nothing to mirror)
+  END IF;
   rid := (r->>TG_ARGV[1])::BIGINT;
   who := (r->>'user_id')::BIGINT;
   prev := current_setting('app.role', true);
@@ -60,6 +67,39 @@ BEGIN
   RETURN NULL;
 END $$;
 CREATE OR REPLACE TRIGGER kalmido_kern_node_made AFTER INSERT ON fs_nodes FOR EACH ROW WHEN (NEW.kind = 'ref' AND NEW.ref_kind IN ('evcal', 'address_book')) EXECUTE FUNCTION kalmido_kern_node_made();
+CREATE OR REPLACE FUNCTION kalmido_kern_node_gone() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE prev TEXT; ts TEXT;
+BEGIN
+  prev := current_setting('app.role', true);
+  PERFORM set_config('app.role', 'system', true);
+  PERFORM set_config('app.kern_sync', '1', true);
+  ts := to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"+00:00"');
+  IF OLD.ref_kind = 'evcal' THEN
+    DELETE FROM ev_cal_members m WHERE m.cal_id = OLD.ref_id AND NOT EXISTS (SELECT 1 FROM fs_shares s WHERE s.node_id = OLD.id
+      AND COALESCE(s.user_id, s.agent_id) = m.user_id AND (s.expires_at IS NULL OR s.expires_at > ts));
+    UPDATE ev_cal_members m SET role = s.role FROM fs_shares s WHERE s.node_id = OLD.id AND COALESCE(s.user_id, s.agent_id) = m.user_id
+      AND m.cal_id = OLD.ref_id AND s.role IN ('view', 'edit') AND m.role <> s.role AND (s.expires_at IS NULL OR s.expires_at > ts);
+    INSERT INTO ev_cal_members(cal_id, user_id, role, added_at)
+      SELECT DISTINCT ON (u.id) OLD.ref_id, u.id, s.role, COALESCE(NULLIF(s.created_at, ''), ts) FROM fs_shares s
+      JOIN users u ON u.id = COALESCE(s.user_id, s.agent_id) JOIN ev_cals k ON k.id = OLD.ref_id AND k.owner_id <> u.id
+      WHERE s.node_id = OLD.id AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > ts)
+      ORDER BY u.id, (s.role = 'edit') DESC ON CONFLICT DO NOTHING;
+  ELSE
+    DELETE FROM book_members m WHERE m.book_id = OLD.ref_id AND NOT EXISTS (SELECT 1 FROM fs_shares s WHERE s.node_id = OLD.id
+      AND COALESCE(s.user_id, s.agent_id) = m.user_id AND (s.expires_at IS NULL OR s.expires_at > ts));
+    UPDATE book_members m SET role = s.role FROM fs_shares s WHERE s.node_id = OLD.id AND COALESCE(s.user_id, s.agent_id) = m.user_id
+      AND m.book_id = OLD.ref_id AND s.role IN ('view', 'edit') AND m.role <> s.role AND (s.expires_at IS NULL OR s.expires_at > ts);
+    INSERT INTO book_members(book_id, user_id, role, added_at)
+      SELECT DISTINCT ON (u.id) OLD.ref_id, u.id, s.role, COALESCE(NULLIF(s.created_at, ''), ts) FROM fs_shares s
+      JOIN users u ON u.id = COALESCE(s.user_id, s.agent_id) JOIN books b ON b.id = OLD.ref_id
+      WHERE s.node_id = OLD.id AND s.role IN ('view', 'edit') AND (s.expires_at IS NULL OR s.expires_at > ts)
+      ORDER BY u.id, (s.role = 'edit') DESC ON CONFLICT DO NOTHING;
+  END IF;
+  PERFORM set_config('app.kern_sync', '', true);
+  PERFORM set_config('app.role', COALESCE(prev, ''), true);
+  RETURN OLD;
+END $$;
+CREATE OR REPLACE TRIGGER kalmido_kern_node_gone BEFORE DELETE ON fs_nodes FOR EACH ROW WHEN (OLD.kind = 'ref' AND OLD.ref_kind IN ('evcal', 'address_book')) EXECUTE FUNCTION kalmido_kern_node_gone();
 """
 MIGRATIONS = [
     ("ev_cals", "rev", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 1"),

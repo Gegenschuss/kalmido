@@ -152,11 +152,11 @@ def bk_member_role(c, bid, uid):
 # keeps equal to book_members (core/migrations.d/4712_a.py). A book WITH a live node is shared only by its node (a share taken
 # back in the core stays taken back); the old member row is read only for a book without one (one release, stage 7 removes it).
 BK_KERN = {}  # node: contacts/ctkern.py bk_node_ensure (it loads after the shared core, ORDER)
-BK_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='address_book' AND n.ref_id={} AND n.deleted_at IS NULL"
+BK_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='address_book' AND n.ref_id={}"  # review F3: one in the file store's trash too
 
 
 def bk_has_node(c, bid):
-    """2.566.0 (#4712): has address book bid a live reference node (then its core shares count, not book_members)?"""
+    """2.566.0 (#4712): has address book bid a reference node (then its core shares count, not book_members; review F3: one in the file store's trash too)?"""
     with system_ctx(c):  # structure: whether the node exists, not what it holds
         return c.execute(BK_NODE_SQL.format("?"), (int(bid),)).fetchone() is not None
 

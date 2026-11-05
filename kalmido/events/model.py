@@ -99,12 +99,13 @@ def wall_s(dt):
 EV_KIND = "evcal"
 KERN = {}  # 2.566.0 (#4712): obj_role / obj_visible_sql / obj_node / obj_write and the calendar's trash of the shared core, filled
 #            by events/evkern.py (it loads after the areas, kalmido/__init__.py ORDER)
-EV_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='evcal' AND n.ref_id={} AND n.deleted_at IS NULL"
+EV_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='evcal' AND n.ref_id={}"  # review F3: one in the file store's trash too
 _CAL_COLS = ("id", "org_id", "owner_id", "deleted_at")
 
 
 def ev_has_node(c, cid):
-    """2.566.0 (#4712): has calendar cid a live reference node (then its core shares count, not ev_cal_members)?"""
+    """2.566.0 (#4712): has calendar cid a reference node (then its core shares count, not ev_cal_members; review F3: one in
+    the file store's trash too)?"""
     with system_ctx(c):  # structure: whether the node exists, not what it holds (an organisation's node too)
         return c.execute(EV_NODE_SQL.format("?"), (int(cid),)).fetchone() is not None
 

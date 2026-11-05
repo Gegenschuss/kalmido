@@ -230,12 +230,26 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                 return "stays"
         return on_trash(c, uid, rid, restore) if on_trash else None
 
+    if members and protect is None:  # review F3 (#4712): the node of a shared object stays out of the file store's trash alone
+        protect = _members_protect(kind)
     fsr = dict(label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
                protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
                content=content, cap=cap, listed=listed)
     fsr.update(fs_hooks or {})  # 2.566.0 (#4712)
     fs_ref_register(kind, **fsr)
     return reg
+
+
+def _members_protect(kind):
+    """2.566.0 (#4712, review F3): the file store's protect hook of a kind with an old member table: while its node carries
+    shares it does not go into the file store's trash on its own (its people would lose the object while the object itself
+    stays); it goes there with the object (obj_trash), a folder going into the trash leaves it one level up."""
+    def protect(c, rid):
+        with system_ctx(c):  # structure: whether the node carries a share
+            on = c.execute("SELECT 1 FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? "
+                           "LIMIT 1", (kind, int(rid))).fetchone()
+        return tr("This entry carries the shares of its calendar or address book: it goes into the trash only with it") if on else None
+    return protect
 
 
 def obj_reg(kind):
