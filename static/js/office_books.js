@@ -326,6 +326,7 @@ async function bkSheet(id, fresh) {
     <div class="foot"><a class="btn ghost" href="#docs/${id}">${tr('Open document')}</a>${!BK.billed[id] && r.is_receipt && doc.amount ? `<button class="btn ghost" data-m="bill">${tr('Bill on to a client …')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   md.classList.add('ofcdlg', 'bk-sheet');
   md.dataset.rxid = String(id);
+  if (typeof rcl_dock === 'function') rcl_dock(md);  // 2.557.0 A (#4553): beside the list of receipts on a wide area
   // 2.121.0 A (#2092): the recognised values (supplier, VAT rate, net / gross) with Take over (receipts.js of the documents)
   // 2.154.0 A (#1356): the agents' open suggestions of the receipt (Accept / Reject) and who confirmed one (receipts.js)
   if (rc.suggestions?.length || rc.confirmed) loadModule('docs').then(() => { if (typeof rc_bkSlot === 'function') rc_bkSlot(md, id, rc); }).catch(() => 0);

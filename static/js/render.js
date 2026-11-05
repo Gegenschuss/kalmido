@@ -701,6 +701,32 @@ if (typeof ResizeObserver !== 'undefined') {
   const topWatch = () => { const t = $('#top'); if (!t || topRO) return; topRO = new ResizeObserver(() => { if (t.clientWidth !== topW) fitTop(); }); topRO.observe(t); };
   domReady(topWatch);  // 2.191.0 B (#2505): defer
 } else addEventListener('resize', () => fitTop());
+// 2.557.0 A (#4553): list and detail side by side once the content area (#view, not the window) is at least 100rem wide:
+// #view gets the class lsdw (app.css / office.css lay the pair out; office_docs.js draws the list beside the open document,
+// office_books.js docks a receipt beside its list). Below it everything stays as before (the detail in place of the list).
+const LSD_REM = 100;
+const lsd_wide = () => !!$('#view')?.classList.contains('lsdw');
+function lsd_sync() {
+  const v = $('#view'); if (!v) return;
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, on = v.clientWidth >= LSD_REM * rem - 0.5 && !matchMedia('(max-width:767px)').matches;
+  if (on !== v.classList.contains('lsdw')) {
+    v.classList.toggle('lsdw', on);
+    if (typeof ofdDraw === 'function') ofdDraw();  // a quotation / invoice: with or without its list beside it
+  }
+  if (typeof rcl_dockSync === 'function') rcl_dockSync();  // a docked receipt follows the size of the area
+}
+if (typeof ResizeObserver !== 'undefined') domReady(() => { const v = $('#view'); if (v) new ResizeObserver(() => lsd_sync()).observe(v); lsd_sync(); });
+else addEventListener('resize', () => lsd_sync());
+// Esc (events.js, nothing else open) closes the detail of the pair, the list stays
+function lsd_esc() {
+  if (!lsd_wide() || S.sel) return false;
+  const r = S.route || {};
+  const back = sel => requestAnimationFrame(() => $(sel)?.focus());  // the row of the closed detail keeps the keyboard
+  if (r.mod === 'contacts' && typeof CT !== 'undefined' && CT.card && !CT.pick) { const id = CT.sel; CT.sel = null; CT.card = null; if (location.hash !== '#contacts') go('contacts'); else ctDraw(); back(`#view .ctrow[data-ctopen="${id}"]`); return true; }
+  if (r.mod === 'clients' && +r.client && !(typeof MSC !== 'undefined' && MSC.pick)) { const id = r.client; go('clients'); back(`#view .ctrow[data-clopen="${id}"]`); return true; }
+  if (r.mod === 'office' && r.id && ['offers', 'invoices'].includes(r.tab) && $('#view .lsd2')) { $('#view .lsd2 [data-ofd="back"]')?.click(); return true; }
+  return false;
+}
 // the header items that moved into "…" (tl3 - tl6), as menu items that click the hidden button
 function topFolded() {
   const l = topLevel(); if (l < 3) return [];

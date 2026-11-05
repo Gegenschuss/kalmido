@@ -99,11 +99,39 @@ function rclRow(r) {
     return `<li><label class="ofcrow rcl-pick"><input type="checkbox" class="rcl-pickin" data-id="${r.node_id}" ${RCL.sel.has(r.node_id) ? 'checked' : ''}>
       <span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b><small class="muted">${esc(sub)}</small></span>${chk}<span class="rksum">${ofcMoney(r.amount)}${orig}</span></label></li>`;
   }
-  return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
+  return `<li><button type="button" class="ofcrow" data-rcl="rc" data-id="${r.node_id}"${RCL.dockId === r.node_id ? ' aria-current="true"' : '' /* 2.557.0 A (#4553) */}><span class="ofcn"><b>${esc(r.title || tr('Receipt'))}</b>
     <small class="muted">${esc(sub)}</small></span>${chk}${r.einvoice ? `<span class="rotag">${tr('E-invoice')}</span>` : ''}${r.dup ? `<span class="rotag bk-dup">${tr('Possible duplicate')}</span>` : ''}${r.hints > (r.dup ? 1 : 0) ? `<span class="rotag rcl-hint">${tr('With hints')}</span>` : ''}${r.paid_at || !RCL.paidMark ? '' : `<span class="rotag rcl-open">${tr('Not paid')}</span>`}${r.submitted_by ? `<span class="rotag rcl-sub">${esc(tr('Handed in by {0}', r.submitted_by))}</span>` : ''}
     <span class="rksum">${ofcMoney(r.amount)}${orig}</span>${ic('chev', 's')}</button></li>`;
 }
 // 2.420.0 C (#3448): the bar of the multiple choice: "Select" -> {n} selected, Mark as checked, Remove check, Cancel
+// 2.557.0 A (#4553): a content area of 100rem and more (#view.lsdw, render.js lsd_sync): the receipt opens on the right beside
+// the list (about 40 % on the left) instead of in the middle; the list stays visible and clickable, a click on another row
+// replaces the receipt (unsaved changes ask first), Esc / Cancel close it and the list stays. Narrower = the dialog as before.
+const rcl_docked = () => $('.modal.bk-sheet.lsddock');
+async function rcl_open(id) {
+  const old = rcl_docked();
+  if (old) { if (+old.dataset.rxid === id) return; if (old._close) await old._close(); else modalClose(old); if (old.isConnected) return; }
+  bkSheet(id, false);
+}
+function rcl_mark() {
+  const id = RCL.dockId || 0;
+  for (const b of $$('#view [data-rcl="rc"]')) { if (+b.dataset.id === id) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); }
+}
+function rcl_dock(md) {
+  if (!rclHere() || typeof lsd_wide !== 'function' || !lsd_wide()) return;
+  md.classList.add('lsddock'); RCL.dockId = +md.dataset.rxid;
+  onRemove(md, () => { if (rcl_docked()) return; RCL.dockId = 0; document.body.classList.remove('rcldock'); rcl_mark(); });
+  rcl_dockSync(); rcl_mark();
+}
+function rcl_dockSync() {
+  const md = rcl_docked(); if (!md) return;
+  const wrap = $('#view > .ofwrap');
+  if (!rclHere() || !lsd_wide() || !wrap) { md.classList.remove('lsddock'); md.style.inset = ''; document.body.classList.remove('rcldock'); RCL.dockId = 0; rcl_mark(); return; }  // narrower again: the dialog in the middle
+  document.body.classList.add('rcldock');  // office.css: the list on the left 40 % of the pair
+  const r = wrap.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  md.style.inset = `${Math.round(r.top)}px ${Math.max(0, Math.round(innerWidth - r.right))}px 0 ${Math.round(r.left + r.width * .4 + rem)}px`;
+}
+window.addEventListener('hashchange', () => setTimeout(rcl_dockSync, 0));  // another page: the receipt goes back into the middle
 function rclSelBar() {
   if (!RCL.sel) return `<div class="ofcbar rcl-selbar"><button type="button" class="btn sm ghost" data-rcl="sel">${ic('check', 's')}<span>${tr('Select')}</span></button><span class="spacer"></span></div>`;
   const n = RCL.sel.size, off = !n || RCL.busy ? 'disabled' : '';
@@ -176,7 +204,7 @@ document.addEventListener('toggle', e => { const t = /** @type {any} */ (e.targe
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest?.('[data-rcl]'); if (!b || !rclHere()) return;
   const k = b.dataset.rcl;
-  if (k === 'rc') { bkSheet(+b.dataset.id, false); return; }
+  if (k === 'rc') { rcl_open(+b.dataset.id); return; }  // 2.557.0 A (#4553): beside the list on a wide area
   if (k === 'more') { b.disabled = true; rclLoad(true); return; }
   if (k === 'reset') { const d = rclDefault(); rclSet({category: '', supplier: '', project: '', novat: false, hints: false, q: '', status: d.status, checked: d.checked}); return; }
   // 2.420.0 C (#3448): the multiple choice

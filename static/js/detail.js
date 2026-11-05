@@ -151,7 +151,17 @@ const LIST_FLOOR_PX = 288, OLD_MAX = {chat: 44, side: 26};  // 18 rem; the forme
 const listFloor = () => (document.body.classList.contains('chat-open') && panelRem('chat') > OLD_MAX.chat) || panelRem('side') > OLD_MAX.side ? LIST_FLOOR_PX : LIST_SQUEEZE_PX;
 // 2.319.0 B (#3288): the app bar's width in rem (app.css --srW: narrower without its labels)
 const srW = () => document.documentElement.classList.contains('rail-nolabel') ? 3.25 : 4.5;
-const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : PW[k][0]; };
+// 2.557.0 A (#4553): the task panel's default width grows with the room of list + task (the window without the sidebar and an
+// open chat): clamp(25.5rem, 30 %, 48rem) - 1440 / 1600 px keep 25.5rem, 1920 about 31rem, 2560 about 43rem, 3840 48rem.
+// A width dragged by hand (pw.det) stays as it is, a double-click / Enter on the grip goes back to this growing default.
+function pw_std(k) {
+  if (k !== 'det') return PW[k][0];
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app'), b = document.body;
+  const side = !app || app.classList.contains('side-rail') ? 0 : (app.classList.contains('sb-b') ? srW() * rem : 0) + (app.classList.contains('sbb-nopan') ? 0 : panelRem('side') * rem);
+  const chat = b?.classList.contains('chat-open') && innerWidth >= 1000 ? panelRem('chat') * rem : 0;
+  return Math.max(PW.det[0], Math.min(PW.det[2], Math.floor((innerWidth - side - chat) * .3 / rem * 4) / 4));
+}
+const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : pw_std(k); };
 // 2.209.0 A (#2772): the widths in use when fitLayout had to shrink a panel (rem, null = the stored width)
 const PWE = {det: null, chat: null, sq: false};
 const panelEff = k => PWE[k] != null ? Math.round(Math.min(PWE[k], panelRem(k)) * 100) / 100 : panelRem(k);
@@ -178,7 +188,7 @@ function panelWish(k, v) {
 }
 function panelSet(k, v, quiet) {  // v = the width to show, in rem
   const x = v == null ? null : Math.round(Math.max(PW[k][1], Math.min(PW[k][2], panelWish(k, Math.max(PW[k][1], Math.min(panelMax(k), v))))) * 4) / 4;
-  if (x == null || x === PW[k][0]) LS.del('pw.' + k); else LS.set('pw.' + k, x);
+  if (x == null || x === pw_std(k)) LS.del('pw.' + k); else LS.set('pw.' + k, x);  // 2.557.0 A (#4553): pw_std (the growing default of the task panel)
   panelVars(); if (!quiet) fitLayout(); placeGrips();
 }
 let gripDrag = null;  // 2.87.9 (#1965): the panel whose grip is being dragged (placed on release, not per frame)

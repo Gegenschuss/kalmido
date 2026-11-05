@@ -968,6 +968,7 @@ document.addEventListener('keydown', async e => {
     if ($('#side.open')) { closeSide(); return; }  // 2.16.0 (#473): Esc closes the drawer
     if (/INPUT|TEXTAREA/.test(t.tagName)) { t.blur(); return; }
     if (S.sel) closeDetail();
+    else if (typeof lsd_esc === 'function') lsd_esc();  // 2.557.0 A (#4553): list and detail side by side -> the detail closes, the list stays
     return;
   }
   // 2.4.0 (#187): Ctrl+Space = quick capture from anywhere (also while typing somewhere else)

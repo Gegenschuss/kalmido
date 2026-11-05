@@ -179,12 +179,25 @@ function ofdOffersTab(el) {
     if (!OFC.data.services && !OFC.loading.services) setTimeout(() => ofcLoad('services'), 0);
     if (!OFC.data.texts && !OFC.loading.texts) setTimeout(() => ofcLoad('texts'), 0);
     if (!OFC.data.contracts && !OFC.loading.contracts) setTimeout(() => ofcLoad('contracts'), 0);
+    if (ofd_pairOn() && !OFD.list && !OFD.loading && OFD.doc?.id === id) setTimeout(ofdLoadList, 0);  // 2.557.0 A (#4553): the list beside the document (of the document's kind)
   } else { ofd_kindHash(); if (!OFD.list && !OFD.loading) setTimeout(ofdLoadList, 0); }
-  keepFocus(el, () => fl_set(el, id ? ofdEditorHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
+  keepFocus(el, () => fl_set(el, id ? ofd_pairHtml() : ofdListHtml()));  // 2.46.2 (#1718): morphed
+  const sl = id && $('.lsdl', el); if (sl && OFD.lsdTop) sl.scrollTop = OFD.lsdTop;  // 2.557.0 A (#4553): the list keeps its place when the next document opens
   if (id) el.querySelectorAll('textarea[data-grow-min]').forEach(t => ofcGrow(t, +t.dataset.grow || 3));  // 2.431.0 (#3594 review): a long subject wrapped by the field's width fits at once
   // 2.308.0 (#3251): the listeners sit on the tab body, not on a box inside it (the body and the box in it were both wired depending on timing: one click opened two dialogs)
   const host = el.closest('.ofcbody') || el;
   if (!host._ofd) { host._ofd = true; host.addEventListener('contextmenu', ofdCtx); if (!OFD.lp && typeof ms_longPress === 'function') OFD.lp = ms_longPress('#view .ofdrow', () => false, r => ofdRowMenu(r.dataset.id, r)); host.addEventListener('click', ofdClick); host.addEventListener('change', ofdChange); host.addEventListener('input', ofdInput); host.addEventListener('keydown', ofdKey); }
+}
+
+// 2.557.0 A (#4553): a content area of 100rem and more (#view.lsdw, render.js lsd_sync): the list of the document's kind stays
+// on the left (about 40 %), the document on the right; only the rows (no search / filter bar: their fields would clash with
+// the editor's), the open one marked. Below it the editor stands in place of the list as before.
+const ofd_pairOn = () => typeof lsd_wide === 'function' && lsd_wide() && OFD.kind !== 'archive';
+function ofd_pairHtml() {
+  const ed = ofdEditorHtml(); if (!ofd_pairOn()) return ed;
+  const l = OFD.list ? ofdListHtml() : '', i = l.indexOf('<ul class="ofclist ofdlist"'), id = S.route.id;
+  const rows = i < 0 ? `<p class="muted lempty">${OFD.list ? '' : tr('Loading…')}</p>` : l.slice(i).replace(`data-ofd="open" data-id="${id}">`, `data-ofd="open" data-id="${id}" aria-current="true">`);
+  return `<div class="lsd2"><nav class="lsdl" aria-label="${esc(ofdKindName(OFD.kind))}">${rows}</nav><div class="lsdr">${ed}</div></div>`;
 }
 
 // 2.356.0 C (#3004): the kind tab is part of the address (#office/offers/invoice): a new address (link, Back) chooses the tab,
@@ -865,7 +878,7 @@ async function ofdClick(e) {
   if (a === 'trash') { otb_open(); return; }  // 2.272.0 E2 (#3038)
   if (a === 'new') { await tri_new('offer'); return; }  // 2.380.0 B (#3418): created at once; 2.417.0 C (#3445): trial in the test mode
   if (a === 'new-ls' || a === 'to-ls') return ls_click(a, d);  // 2.120.0 D (#2089)
-  if (a === 'open') { if (typeof ms_lpRecent === 'function' && OFD.lp && ms_lpRecent(OFD.lp)) return; go(ofd_href(b.dataset.id)); return; }
+  if (a === 'open') { if (typeof ms_lpRecent === 'function' && OFD.lp && ms_lpRecent(OFD.lp)) return; OFD.lsdTop = b.closest('.lsdl')?.scrollTop || 0; go(ofd_href(b.dataset.id)); return; }  // 2.557.0 A (#4553): + the place of the list beside it
   if (a === 'rowmore') { ofdRowMenu(b.dataset.id, b); return; }
   if (a === 'back') { OFD.doc = null; OFD.list = null; go(`office/${ofd_sec()}/${OFD.kind}`); return; }  // 2.380.0 B (#3409): the area's list, its tab named (Back from a later tab returns here)
   if (a === 'kind') { OFD.kind = b.dataset.kind; OFD.status = ''; OFD.list = null; go(`office/${ofd_sec()}/${OFD.kind}`); return; }  // 2.356.0 C (#3004): a history step per tab
