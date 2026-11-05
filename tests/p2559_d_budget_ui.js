@@ -6,7 +6,7 @@
 //   away with the server's message; let through, the row carries the real id and the undo is offered
 // - Change: the dialog closes, the row shows the new amount before the answer; a refusal (400) puts the old amount back; saved
 //   elsewhere in between (a real 409): the row goes back and the dialog opens again with the input and "Reload"
-// - Delete with a receipt: the question comes first, then the row goes at once; a refusal brings it back
+// - Delete with a receipt: the row goes at once (2.567.0, #4707: no question, it waits in the trash); a refusal brings it back
 // - none of these actions fetches the whole state again (no GET /api/state)
 // The held answers wait in the page (window.fetch wrapped) until the test lets them go: every wait is on a real state.
 const path = require('path');
@@ -116,7 +116,7 @@ async function round(who, ck) {
   check(await until(() => toastHas(/Saved/)), `${who}: "Saved" after the answer`);
   unhold(w);
 
-  // ================= delete with a receipt: the question first, then at once; a refusal brings it back
+  // ================= delete with a receipt: at once (2.567.0 #4707: no question any more, the trash keeps it); a refusal brings it back
   const asked = []; w.confirm = t => { asked.push(t); return true; };
   const del = async () => {
     click(w, rowOf(/Books/)); await until(() => dlg()?.querySelector('[data-bg-del]'));
@@ -125,7 +125,8 @@ async function round(who, ck) {
   hold(w, /^DELETE \/api\/budget\/entries\/\d+$/);
   await del();
   check(await until(() => w.__held.length === 1), `${who}: Delete: the request is held`);
-  check(asked.length === 1 && /receipt/.test(asked[0]), `${who}: the question about the receipt came first ` + asked.join(' | '));
+  // 2.567.0 (#4707): the entry and its receipt go to the trash, so there is no question any more
+  check(asked.length === 0, `${who}: no question before the delete (the trash keeps the receipt) ` + asked.join(' | '));
   check(!dlg() && !rowOf(/Books/), `${who}: the dialog closed and the row is gone before the answer`);
   w.__held[0].fail('Refused for the test', 500);
   check(await until(() => rowOf(/Books/)), `${who}: the refusal brings the row back`);
