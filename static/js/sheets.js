@@ -416,7 +416,30 @@ function shvMerge(sid, r, sent) {
 
 // ---- writing (each action one Undo step)
 const shvRaw = (r, c) => shvCell(r, c)?.raw || '';
-async function shvSend(sid, cells) { const r = await rawFetch('PUT', `/api/sheets/${sid}/cells`, {cells}); shvMerge(sid, r, cells); return r; }
+// 2.552.0 (#4547): the input is kept in this browser until the server has it (core.js fdWrite): the session ends during the
+// write (401 -> sign-in -> reload) = sent after the sign-in under the same key (prev: a cell changed elsewhere since stays theirs)
+async function shvSend(sid, cells) {
+  const u = `/api/sheets/${sid}/cells`, fk = fdWrite('PUT', u, {cells}, {send: false});
+  let r; try { r = await rawFetch('PUT', u, {cells}, fdGet('fdw', fk)?.b?.k); } catch (e) { if (e.message !== 'auth') fdDrop('fdw', fk); throw e; }
+  fdDrop('fdw', fk); shvMerge(sid, r, cells); return r;
+}
+// 2.552.0 (#4547): the page goes while a cell is being edited (the reload of an ended session, a closed tab): its input goes
+// with keepalive and stays kept until the server has it
+function shv_unload() {
+  const ed = SHV.ed, sh = SHV.sh; if (!ed || !sh?.can_write) return;
+  const inp = ed.bar ? $('#shv-in') : $('#shv-ed'), v = inp ? inp.value : ed.val;
+  if (v === ed.orig) return;
+  fdWrite('PUT', `/api/sheets/${sh.id}/cells`, {cells: [{row_id: ed.r, col_id: ed.c, raw: v, prev: ed.orig}]}, {slot: `shv.${sh.id}.${ed.r}.${ed.c}`});
+  ed.orig = v;  // once (pagehide and a later bfcache leave)
+}
+addEventListener('pagehide', shv_unload);
+addEventListener('fdw-sent', e => {
+  const m = String(e.detail?.url || '').match(/^\/api\/sheets\/(\d+)\/cells$/); if (!m) return;
+  if (e.detail.err) toast(e.detail.err.message || tr('unknown'));
+  else if (e.detail.res?.conflicts?.length) toast(tr('Changed elsewhere in the meantime'));
+  const id = +m[1]; if (SHV.sh?.id !== id && S.route.sh !== id) return;
+  if (SHV.ed) SHV.stale = true; else shvLoad(id, true);  // a load on its way runs once more (SHV.again)
+});
 // 2.270.0 B (#3021): every write carries the input it replaces (prev); a cell changed elsewhere since stays as it is and is reported
 const shvAt = (r, x) => (r?.cells || []).find(c => c.row_id === x.row_id && c.col_id === x.col_id);
 async function shvSendStep(sid, to, from) {  // one way of an undo step: to = the inputs to write, from = what the cells hold now
