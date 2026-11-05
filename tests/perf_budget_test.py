@@ -36,8 +36,13 @@ check(all(k in d["measured"] for k in ("start_js_bytes", "start_js_gzip", "start
       "(a) 2.521.0 (#4391): everything is still measured")
 lim0 = json.load(open(BUDGET))
 OLD = ("start_js_bytes", "start_js_gzip", "start_css_bytes", "start_css_gzip", "start_i18n_bytes", "start_i18n_gzip", "start_scripts", "_raise_note")
-check(not [k for k in OLD if k in lim0] and lim0.get("decke_js_gzip") == 1050000 and lim0.get("decke_css_gzip") == 125000
-      and lim0.get("decke_i18n_gzip") == 320000 and lim0.get("decke_scripts") == 145, "(a) 2.521.0 (#4391): ceilings set, old limits gone")
+# 2.563.0 (#4742): the care job "Start pflegen" lowers the ceilings by what it saved (never up); the test holds them at most at the
+# values of 2.521.0 and at least at the measured start (only the project owner raises a ceiling)
+check(not [k for k in OLD if k in lim0] and 0 < lim0.get("decke_js_gzip", 0) <= 1050000 and 0 < lim0.get("decke_css_gzip", 0) <= 125000
+      and 0 < lim0.get("decke_i18n_gzip", 0) <= 320000 and 0 < lim0.get("decke_scripts", 0) <= 145, "(a) 2.521.0 (#4391): ceilings set, old limits gone")
+check(all(lim0[k] >= d["measured"][m] for k, m in (("decke_js_gzip", "start_js_gzip"), ("decke_css_gzip", "start_css_gzip"),
+                                                    ("decke_i18n_gzip", "start_i18n_gzip"), ("decke_scripts", "start_scripts"))),
+      "(a) 2.563.0 (#4742): no ceiling below the measured start")
 rc, out = run("--ratchet")
 check(rc == 2 and "gone" in out, "(a) 2.521.0 (#4391): --ratchet is refused, not passed silently: " + out)
 ci = open(os.path.join(ROOT, ".github", "workflows", "ci.yml"), encoding="utf-8").read()
