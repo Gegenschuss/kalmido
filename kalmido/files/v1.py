@@ -7,11 +7,13 @@ the node's history (fs_log), which the owner sees on the file. Writing needs the
 import base64
 import binascii
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app
 from ..core.i18n import tr
 from ..core.db import bump, db
+from ..core.db import write_lock  # 2.564.0 (#4702)
+from ..core.conflict import Conflict, need_version  # 2.564.0 (#4702)
 from ..accounts.session import me
 from ..core.access import Denied, acx_of
 from ..api.v1 import BadInput, UnknownFields
@@ -173,7 +175,8 @@ def v1_file_text(nid):
         ts_fill(c, "fs", nid, out)  # 2.61.0 (#1820): a scan / photo: the text recognised in the background
     fs_log_add(c, nid, "text")
     c.commit()
-    return jsonify({"id": nid, "name": n["name"], **out})
+    return jsonify({"id": nid, "name": n["name"], **out,  # 2.564.0 (#4702): the version to send back as expect_version
+                    **({"version": n.get("cur_version")} if n["kind"] == "file" else {})})
 
 
 def _content_arg(b):
@@ -255,16 +258,36 @@ def v1_file_create():
     return jsonify(_v1_node(c, need_node(c, nid))), 201
 
 
+def fs_version_check(c, nid, b):
+    """2.564.0 (#4702): the version check of a new file version (need_version for agents, then under the lock of the version
+    numbers, store.py _store_version): expect_version / If-Match differs from the file's current version -> Conflict."""
+    need_version(b, "expect_version")
+    ev = b.get("expect_version")
+    if ev is None and (request.headers.get("If-Match") or "").strip():
+        ev = request.headers["If-Match"].strip().removeprefix("W/").strip('"')
+        ev = int(ev) if ev.isdigit() else ev
+    if ev is None:
+        return
+    if isinstance(ev, bool) or not isinstance(ev, int):
+        raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    write_lock(c, f"fs_version:{int(nid)}")  # the same lock as the new number (the check and the write see no upload between)
+    if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != ev:
+        raise Conflict("current", _v1_node(c, need_node(c, nid)))
+
+
 @app.post("/api/v1/files/<int:nid>/versions")
 @v1_view
 def v1_file_version(nid):
-    """{content | content_base64, mime?}: a new version of the file (the older ones stay; role edit)."""
+    """{content | content_base64, mime?, expect_version?}: a new version of the file (the older ones stay; role edit).
+    2.564.0 (#4702): expect_version (or the header If-Match) = the version number the caller read ("version" of the file);
+    another version came meanwhile -> 409 conflict with the file now under "current". Required for agents."""
     v1_args(())
-    b = _v1_body(("content", "content_base64", "mime"))
+    b = _v1_body(("content", "content_base64", "mime", "expect_version"))
     c = db()
     n = need_node(c, nid, write=True)
     if n["kind"] != "file":
         raise Denied(409, tr("Not a file"))
+    fs_version_check(c, nid, b)
     data = _content_arg(b)
     try:
         no = fs_new_version(c, nid, data, b.get("mime") if isinstance(b.get("mime"), str) else None)
