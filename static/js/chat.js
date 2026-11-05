@@ -247,7 +247,7 @@ function tcMsgMenu(anchor, mid) {
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(list, m, 'team')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(list, m, 'team', true)},  // 2.41.0 (#1374)
     ...(m.enc ? [] : [{label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('team', m, () => tcPatch())}]),  // 2.42.0 (#909): not for encrypted ones
-    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; S.tc.editTh = inTh; tcPatch(); setTimeout(() => { const t = tth_editBox(); if (t) { t.focus(); autosize(t); } }, 0); }},
+    ...(mine && !(m.enc && !m._dec) ? [{label: tr('Edit'), icon: 'edit', fn: () => { S.tc.edit = mid; S.tc.editTh = inTh; S.tc.editVer = m.edited_at || m.created_at; tcPatch(); setTimeout(() => { const t = tth_editBox(); if (t) { t.focus(); autosize(t); } }, 0); }},
       {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => tcMsgDelete(mid)}] : [])]);
 }
 async function tcMsgDelete(mid) {
@@ -278,9 +278,17 @@ async function tcEditSave(mid) {
   try {
     const lk = le2eChanOn(S.tc.room), lv = lk ? tcMentions(v) : null;  // 2.64.2 (#1817): the list key, the current generation
     const enc = lk ? await le2eChanEnc(S.tc.room, lv) : m.enc ? await e2eDmEncrypt(S.tc.rid, v) : null; if ((lk || m.enc) && !enc) return;  // 2.42.0 (#909): encrypted again
-    r = await rawFetch('PATCH', `/api/team/messages/${mid}`, enc ? {enc} : {body: tcMentions(v)});
+    // 2.564.0 D (#4701): with the version the box opened with; 409 (edited on another device) = the reason and the current message
+    const ver = S.tc.edit === mid ? S.tc.editVer : null;
+    r = await rawFetch('PATCH', `/api/team/messages/${mid}`, {...(enc ? {enc} : {body: tcMentions(v)}), ...(ver ? {expect_updated_at: ver} : {})});
     if (enc) { r.body = lk ? lv : v; r._dec = true; E2E.dec[r.id + ':' + (r.edited_at || '')] = r.body; }
-  } catch (e) { toast(e.message); return; }
+  } catch (e) {
+    toast(e.message);
+    const cur = e.status === 409 ? e.data?.message : null;
+    if (cur && !cur.enc) { tth_each(mid, x => Object.assign(x, cur)); S.tc.editVer = cur.edited_at || cur.created_at; tcPatch(); }
+    else if (cur) { S.tc.edit = null; S.tc.editTh = false; await loadRoom(S.tc.rid); tcPatch(); }
+    return;
+  }
   tth_each(mid, x => Object.assign(x, r)); S.tc.edit = null; S.tc.editTh = false; tcPatch();
 }
 async function tcMute() {
@@ -688,8 +696,9 @@ async function tcx_settings() {
   modalA11y(md);
   const step = (label, undo, redo) => offerUndo(label, histAdd({label, undo: () => undo().then(() => tcx_refresh(rid)), redo: () => redo().then(() => tcx_refresh(rid))}));
   const patch = b => rawFetch('PATCH', `/api/team/rooms/${rid}`, b);
+  let ver = null;  // 2.564.0 D (#4701): the version the dialog shows; a save against an older one = 409, the reason and the current state
   const draw = () => {
-    const r = S.tc.room || room, mem = r.members || [], ids = new Set(mem.map(m => m.id));
+    const r = S.tc.room || room, mem = r.members || [], ids = new Set(mem.map(m => m.id)); ver = r.updated_at || null;
     const add = man && cand ? [...cand.people, ...cand.agents].filter(id => !ids.has(id) && id !== S.me.id) : [];
     $('#tcx-set', md).innerHTML = `<h3>${esc(ch ? tr('Channel settings') : tr('Group settings'))}</h3>
       ${man ? `<form class="tcxname row"><label for="tcx-name">${tr('Name')}</label><input type="text" id="tcx-name" maxlength="80" value="${esc(r.kind === 'group' ? r.custom_name || '' : r.name || '')}" ${ch ? '' : `placeholder="${esc(r.name || '')}"`}><button type="submit" class="btn sm">${tr('Save')}</button></form>` : `<p><b>${esc(r.name || '')}</b></p>`}
@@ -703,11 +712,11 @@ async function tcx_settings() {
   md.addEventListener('submit', async e => {
     e.preventDefault(); const was = room.kind === 'group' ? S.tc.room.custom_name || '' : S.tc.room.name, v = $('#tcx-name', md).value.trim();
     if (v === was || (ch && !v)) return;
-    if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {name: v})) return;
+    if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {name: v, ...(ver ? {expect_updated_at: ver} : {})})) { after(); return; }
     step(tr('Renamed to “{0}”', v || tr('the members')), () => patch({name: was}), () => patch({name: v})); after();
   });
   md.addEventListener('change', async e => {
-    if (e.target.id === 'tcx-open') { const on = e.target.checked; if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {open: on})) { e.target.checked = !on; return; }
+    if (e.target.id === 'tcx-open') { const on = e.target.checked; if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {open: on, ...(ver ? {expect_updated_at: ver} : {})})) { e.target.checked = !on; after(); return; }
       step(on ? tr('Open to the whole organisation') : tr('Invited people only'), () => patch({open: !on}), () => patch({open: on})); after(); }
     else if (e.target.id === 'tcx-add' && e.target.value) { const uid = +e.target.value;
       if (!await tcx_req('POST', `/api/team/rooms/${rid}/members`, {user_id: uid})) { e.target.value = ''; return; }

@@ -17,6 +17,7 @@ from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
 from ..collab.news import list_bells, notif_ok
 from ..core.errors import reject_unknown, BadInput
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..notify.push import notify, push_handled, push_prio, push_reachable_many, WD_TICKS
 from ..api.common import hit_limit, v1_args, v1_call, v1_json, v1_view
 from ..agents.core import agent_emit, AGENT_EVENT_COMMENT_CHARS, agent_ids, is_agent, listen_agents_of, need_person
@@ -808,9 +809,13 @@ def tchat_edit(mid):
     need_tchat(c)
     m, r = need_tmsg(c, mid, edit=True)
     need_dm_open(c, r)  # 2.266.0 (#2970): a frozen DM takes no edits (deleting one's own stays)
+    b = body()
+    # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); edited meantime -> 409 + the message
+    write_lock(c, f"tchat_msgs-{mid}")
+    m = c.execute("SELECT * FROM tchat_msgs WHERE id=?", (mid,)).fetchone()
     if m["deleted_at"]:
         return err(tr("The message was deleted"), 409)
-    b = body()
+    ccf_check(b, m["edited_at"] or m["created_at"], "message", lambda: tchat_msg_dict(c, m, tchat_rx(c, [mid])))
     text = b.get("body")
     if r["kind"] == "list":  # 2.64.2 C (#1817): a channel of a list with the lock: changed by encrypting it again
         from ..collab.liste2echan import le2c_edit

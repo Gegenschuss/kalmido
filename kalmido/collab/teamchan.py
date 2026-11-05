@@ -23,7 +23,7 @@ import uuid
 from flask import g, jsonify, request, Response
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
-from ..core.pg import insert_id, system_ctx
+from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.i18n import N_, tr
 from ..core.db import body, db, err, iso, iso_ms, now_utc
 from ..core.retention import ret_days, ret_on, ret_report  # 2.272.0 A (#3026)
@@ -33,6 +33,7 @@ from ..accounts.session import me
 from ..accounts.orgs import instance_mode, is_org_admin, user_orgs
 from ..collab.comments import user_names
 from ..core.errors import BadInput, reject_unknown
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
@@ -172,11 +173,17 @@ def tcx_room_brief(c, r, uid, mem=None):
     mem = tcx_members(c, r) if mem is None else mem  # 2.281.0 B (#3110): mem = tcx_members, when known
     d = {"name": tcx_group_name(c, r, uid, mem) if r["kind"] == "group" else r["name"], "members": len(mem),
          "org_id": r["org_id"], "open": bool(r["is_open"]), "archived": bool(r["archived_at"]), "joined": uid in mem,
-         "manage": tcx_can_manage(c, r, uid, mem), "created_by": r["created_by"]}
+         "manage": tcx_can_manage(c, r, uid, mem), "created_by": r["created_by"],
+         "updated_at": tcx_ver(r)}  # 2.564.0 D (#4701): the version the settings dialog sends back
     if r["kind"] == "group":
         d["member_ids"] = sorted(mem)
         d["custom_name"] = r["name"] or ""
     return d
+
+
+def tcx_ver(r):
+    """2.564.0 D (#4701): the version of a room's settings (updated_at, else created_at for a room never changed)."""
+    return (r["updated_at"] if "updated_at" in r.keys() else None) or r["created_at"]
 
 
 def tcx_sig(c, uid):
@@ -407,7 +414,10 @@ def tcx_room_patch(rid):
     if not tcx_can_manage(c, r, me()):
         raise Denied(403, tr("Only the creator of the channel or an admin of the organisation can change it"))
     b = body()
-    reject_unknown(b, ("name", "open", "archived"))
+    reject_unknown(b, ("name", "open", "archived", "expect_updated_at"))
+    write_lock(c, f"tchat_rooms-{rid}")  # 2.564.0 D (#4701): changed meantime (another manager, another device) -> 409 + the room
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
+    ccf_check(b, tcx_ver(r), "room", lambda: tcx_out(c, r))
     if r["kind"] == "group" and ("open" in b or "archived" in b):
         return err(tr("Invalid value: {0}", "open" if "open" in b else "archived"))
     if "name" in b:
@@ -423,6 +433,7 @@ def tcx_room_patch(rid):
         if not isinstance(b["archived"], bool):
             return err(tr("Invalid value: {0}", "archived"))
         c.execute("UPDATE tchat_rooms SET archived_at=? WHERE id=?", (iso(now_utc()) if b["archived"] else None, rid))
+    c.execute("UPDATE tchat_rooms SET updated_at=? WHERE id=?", (iso_ms(now_utc()), rid))
     c.commit()
     return jsonify(tcx_out(c, c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()))
 
@@ -781,7 +792,7 @@ def v1_tcx_group_new():
 def v1_tcx_room_patch(rid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("name", "open", "archived"))
+    reject_unknown(b, ("name", "open", "archived", "expect_updated_at"))
     return jsonify(v1_call(tcx_room_patch, rid, body=b))
 
 

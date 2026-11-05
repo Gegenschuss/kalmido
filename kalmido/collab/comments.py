@@ -22,6 +22,7 @@ from ..tasks.oneway import dec_list, gate_irreversible
 from .replies import reply_check, with_replies
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from .cmttrash import cmt_trash, cmt_restore
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 
 
 # ---------------------------------------------------------------- comments + activity timeline
@@ -397,7 +398,12 @@ def comment_update(cid):
     if r["user_id"] != me():
         return err(tr("Only the author can edit this comment"), 403)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
-    text = (web_fields(body(), {"body", "mentions"}, "PATCH /api/comments/{cid}").get("body") or "").strip()
+    b = web_fields(body(), {"body", "mentions", "expect_updated_at"}, "PATCH /api/comments/{cid}")
+    # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment
+    write_lock(c, f"comment-{cid}")
+    r = c.execute("SELECT * FROM comments WHERE id=?", (cid,)).fetchone()
+    ccf_check(b, r["edited_at"] or r["created_at"], "comment", lambda: comment_dict(r, att_dicts(c, "comment_id=?", (cid,))))
+    text = (b.get("body") or "").strip()
     from .liste2e import le2a_comment_in, le2a_text_max, le2e_mode
     if len(text) > le2a_text_max(text, MAX_COMMENT):  # 2.64.1 (#1817)
         return err(tr("The comment is too long (max. {0} characters)", MAX_COMMENT))
@@ -410,7 +416,7 @@ def comment_update(cid):
         text, mentions = clean_mentions(c, t["list_id"], text, t["id"]) if collab_all() else (text, [])
     old = {int(x) for x in (r["mentions"] or "").split(",") if x}
     c.execute("UPDATE comments SET body=?, mentions=?, edited_at=? WHERE id=?",
-              (text, ",".join(map(str, mentions)), iso(now_utc()), cid))
+              (text, ",".join(map(str, mentions)), iso_ms(now_utc()), cid))  # 2.564.0 D (#4701): ms, the version of the next edit
     new_m = [m for m in mentions if m not in old] if collab_all() else []
     if not t["deleted_at"]:  # 2.39.0 (#1179): agents that got this comment as an event learn the change (before new mentions)
         from ..agents.chat import med_comment_edited

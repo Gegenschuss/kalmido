@@ -620,11 +620,13 @@ document.addEventListener('click', async e => {
     case 'c-resend': case 'c-pdrop': cmtPendBtn(a); break;  // 2.537.0 (#4569): a comment that was not sent
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
     case 'mention-pick': mentionPick(+a.dataset.i); break;
-    case 'c-edit': S.cedit = +a.dataset.cid; drawTimeline(); setTimeout(() => { const i = $(`.c-edit-input[data-cid="${a.dataset.cid}"]`); if (i) { autosize(i); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); break;
+    case 'c-edit': S.cedit = +a.dataset.cid; S.cedVer = (o => o ? o.edited_at || o.created_at : null)((S.tl.comments || []).find(x => x.id === S.cedit)); drawTimeline(); setTimeout(() => { const i = $(`.c-edit-input[data-cid="${a.dataset.cid}"]`); if (i) { autosize(i); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); break;
     case 'c-edit-cancel': S.cedit = null; mentionClose(); drawTimeline(); break;
     case 'c-edit-save': {
       const cid = +a.dataset.cid, ta = $(`.c-edit-input[data-cid="${cid}"]`); if (!ta) break;
-      try { await capi('PATCH', `/api/comments/${cid}`, {body: encodeMentions(ta.value.trim(), S.tl.people)}); } catch { break; }
+      // 2.564.0 D (#4701): with the version the box opened with; 409 (edited elsewhere) = capi says why, the current text is loaded
+      const ver = S.cedit === cid ? S.cedVer : null;  // taken when the box opened (a reload of the timeline meanwhile does not move it)
+      try { await capi('PATCH', `/api/comments/${cid}`, {body: encodeMentions(ta.value.trim(), S.tl.people), ...(ver ? {expect_updated_at: ver} : {})}); } catch (x) { if (x.status === 409 && x.data?.comment) { const k = x.data.comment; S.cedVer = k.edited_at || k.created_at; await loadTimeline(S.sel); } break; }
       S.cedit = null; mentionClose(); await loadTimeline(S.sel); break;
     }
     case 'c-del': {
