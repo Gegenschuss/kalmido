@@ -250,7 +250,8 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
 function dc_paneHook(p) { dc_paneFit(p); if (p && !p._dcRm) { p._dcRm = true; p.remove = () => dc_paneClose(p); } }
 // 2.519.0 (#4467): the pane is as high as the visible part of the scroll box #view (below the page head), so it can stay
 // stuck at its top with the title and the close button in view, however far the list is scrolled
-function dc_paneFit(p) { const v = $('#view'); if (p && v && v.clientHeight) p.style.setProperty('--dc-vh', v.clientHeight + 'px'); }
+function dc_paneFit(p) { const v = $('#view'); if (p && v && v.clientHeight) p.style.setProperty('--dc-paneh', v.clientHeight + 'px'); }
+// (own variable: the reading view of 2.521 keeps its own height rule with --dc-vh, #4476)
 window.addEventListener('resize', () => dc_paneFit($('.dc-pane')));
 function dc_paneFill() {
   const p = $('.dc-pane'); if (!p) return;
