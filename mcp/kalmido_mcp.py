@@ -1192,6 +1192,9 @@ CT_IN = {"book_id": S_ID, "kind": {"type": "string", "enum": ["individual", "org
          "urls": {"type": "array", "items": {"type": "object"}}, "bday": {"type": "string", "description": "YYYY-MM-DD or --MM-DD"},
          "anniversary": {"type": "string"}, "groups": STRS}
 CT_KEYS = tuple(CT_IN)
+# 2.564.0 (#4702): the version an agent read (updated_at of get_event / get_contact / the office reads); required for agents
+_XV = {"expect_updated_at": {"type": "string", "description": "2.564.0: the updated_at you read; required (400 version_required without it). "
+                                                             "Changed since = 409 conflict with error.current: read it again, then decide"}}
 TOOLS += [
     ("list_event_calendars", "2.21.0 (module Events): the event calendars you see (own + shared) with your role.", _obj({}),
      lambda api, a: api.call("GET", "/event-calendars")),
@@ -1226,9 +1229,10 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/events/{int(a['event_id'])}")),
     ("create_event", "2.21.0: create an event (all day or with times; repeat, reminders, attendees: people of this server, contacts, addresses).",
      _obj(EV_IN, ["title", "start"]), lambda api, a: api.call("POST", "/events", body=_pick(a, EV_KEYS))),
-    ("update_event", "2.21.0: change an event; with occurrence only that date (title, location, description, all_day, start, end, status).",
-     _obj({"event_id": S_ID, **OCC, **EV_IN}, ["event_id"]),
-     lambda api, a: api.call("PATCH", f"/events/{int(a['event_id'])}", {"occurrence": a.get("occurrence")}, body=_pick(a, EV_KEYS))),
+    ("update_event", "2.21.0: change an event; with occurrence only that date (title, location, description, all_day, start, end, status). "
+                  "2.564.0: expect_updated_at = the updated_at of get_event (409 = a person changed it: read it again).",
+     _obj({"event_id": S_ID, **OCC, **EV_IN, **_XV}, ["event_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/events/{int(a['event_id'])}", {"occurrence": a.get("occurrence")}, body=_pick(a, EV_KEYS + tuple(_XV)))),
     ("delete_event", "2.21.0: delete an event (restorable for 30 days) or, with occurrence, leave out that date.",
      _obj({"event_id": S_ID, **OCC}, ["event_id"]),
      lambda api, a: api.call("DELETE", f"/events/{int(a['event_id'])}", {"occurrence": a.get("occurrence")})),
@@ -1274,8 +1278,8 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/contacts/{int(a['contact_id'])}")),
     ("create_contact", "2.21.0: create a contact (a name or a company).", _obj(CT_IN), lambda api, a: api.call("POST", "/contacts", body=_pick(a, CT_KEYS))),
     ("update_contact", "2.21.0: change a contact (only the fields given). 2.138.4: a new book_id for a contact of an imported address "
-                       "book makes a copy there (answer copied: true).", _obj({"contact_id": S_ID, **CT_IN}, ["contact_id"]),
-     lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS))),
+                       "book makes a copy there (answer copied: true).", _obj({"contact_id": S_ID, **CT_IN, **_XV}, ["contact_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/contacts/{int(a['contact_id'])}", body=_pick(a, CT_KEYS + tuple(_XV)))),
     ("delete_contact", "2.21.0: delete a contact. 2.272.0: it goes to the trash with its notes and links (bulk_contacts undelete brings it "
                        "back until the trash period ends).", _obj({"contact_id": S_ID}, ["contact_id"]),
      lambda api, a: api.call("DELETE", f"/contacts/{int(a['contact_id'])}")),
@@ -2275,7 +2279,7 @@ TOOLS += [
      _obj({**_ODRAFT, **_OTRIAL, **_CREF}, ["title"]), lambda api, a: api.call("POST", "/office/offers", body=_pick(a, tuple(_ODRAFT) + tuple(_OTRIAL) + tuple(_CREF)))),
     ("update_offer_draft", "2.51.0: change your own quotation draft while it is a draft (items replaces the whole list; 2.88.0: cashflow). Never status, number or sending. "
                            "2.269.0 / 2.270.0: send each kept position with its id (from get_office_document) and expect_updated_at (409 = a person changed it: read the draft again).",
-     _obj({"doc_id": S_ID, **_ODRAFT, **_OCF, **_OVER}, ["doc_id"]),
+     _obj({"doc_id": S_ID, **_ODRAFT, **_OCF, **_OVER}, ["doc_id", "expect_updated_at"]),  # 2.564.0 (#4702): the version required
      lambda api, a: api.call("PATCH", f"/office/offers/{int(a['doc_id'])}", body=_pick(a, tuple(_ODRAFT) + tuple(_OCF) + tuple(_OVER)))),
     ("draft_invoice_from_offer", "2.51.0: an invoice DRAFT from an accepted quotation (like a person's \"Create invoice\"; parts_mode for a quotation "
                                  "with parts). A person finalises and sends it. The event offer_accepted tells you when a quotation was accepted. "
