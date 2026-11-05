@@ -18,6 +18,7 @@ from flask import Response, jsonify, request
 
 from ..collab.comments import user_names
 from ..core.access import Denied
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.config import app
 from ..core.db import body, bump, iso, local_now, now_utc
 from ..core.errors import BadInput
@@ -114,7 +115,8 @@ def _card_public(c, oid, r):
     op = c.execute("SELECT COUNT(*) AS n FROM office_cc_lines l JOIN office_cc_statements s ON s.id=l.statement_id WHERE l.org_id=? AND s.card_id=? "
                    "AND s.deleted_at IS NULL AND s.state='confirmed' AND l.state='open'", (oid, r["id"])).fetchone()["n"]
     return {"id": r["id"], "holder_id": r["holder_id"], "holder": _holder(c, oid, r), "holder_name": r["holder_name"] or "", "provider": r["provider"],
-            "provider_name": CC_PROVIDERS.get(r["provider"], r["provider"]), "last4": r["last4"] or "", "account": r["account"] or "", "statements": n, "open": op}
+            "provider_name": CC_PROVIDERS.get(r["provider"], r["provider"]), "last4": r["last4"] or "", "account": r["account"] or "", "statements": n, "open": op,
+            "updated_at": r["updated_at"] or ""}  # 2.560.0 D (#4700): the dialog's version
 
 
 def _card_fields(c, oid, b, cur=None):
@@ -182,7 +184,10 @@ def cc_patch(cid):
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    v = _card_fields(c, oid, b, cc_card_row(c, oid, cid))
+    write_lock(c, f"office_cc_cards-{int(cid)}")  # 2.560.0 D (#4700): the merge of the stored card and the body under the row's lock
+    cur = cc_card_row(c, oid, cid)
+    ccf_check(b, cur["updated_at"], "row", lambda: _card_public(c, oid, cur))  # saved elsewhere meanwhile: 409 with the card, never overwritten
+    v = _card_fields(c, oid, b, cur)
     row = oc_enc_fields(c, oid, "office_cc_cards", dict(v))
     c.execute(f"UPDATE office_cc_cards SET {', '.join(k + '=?' for k in row)}, updated_at=? WHERE id=? AND org_id=?", (*row.values(), iso(now_utc()), cid, oid))
     ofx_log(c, oid, "update", target="cards", detail={"card": cid})
@@ -274,7 +279,8 @@ def cc_stmts(cid):
 def _line_insert(c, oid, sid, n, x, state=None):
     row = {"org_id": oid, "statement_id": sid, "sort": n, "day": x["day"], "booked": x.get("booked"), "merchant": x["merchant"], "amount": dstr(x["amount"]),
            "orig_amount": dstr(x["orig_amount"]) if x.get("orig_amount") is not None else "", "orig_currency": x.get("orig_currency") or "", "kind": x["kind"],
-           "state": state or ("noreceipt" if x["kind"] == "fee" else "open")}  # fees and interest need no receipt: the statement is the proof
+           "state": state or ("noreceipt" if x["kind"] == "fee" else "open"),  # fees and interest need no receipt: the statement is the proof
+           "updated_at": iso(now_utc())}  # 2.560.0 D (#4700): the position's version
     row = oc_enc_fields(c, oid, "office_cc_lines", row)
     return insert_id(c, f"INSERT INTO office_cc_lines({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
