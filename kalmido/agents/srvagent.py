@@ -360,7 +360,7 @@ def srv_runs_get(aid):
         return err(tr("Invalid value: {0}", "limit"))
     with system_ctx(c):  # the agent's own rows (srv_need decided)
         rows = c.execute("SELECT * FROM agent_runs WHERE agent_id=? ORDER BY id DESC LIMIT ?", (aid, limit)).fetchall()
-    return jsonify(runs=[{"id": r["id"], "trigger": r["trigger"], "state": r["state"], "started": r["started"], "ended": r["ended"],
+    return jsonify(runs=[{"id": r["id"], "trigger": r["cause"], "state": r["state"], "started": r["started"], "ended": r["ended"],
                           "steps": r["steps"], "tokens_in": r["tokens_in"], "tokens_out": r["tokens_out"],
                           "error": tr(r["error"]) if r["error"] else "", "model": r["model"]} for r in rows])
 

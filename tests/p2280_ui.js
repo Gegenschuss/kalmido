@@ -197,7 +197,8 @@ const V = B + 'api/v1';
   check(addBtn && /Add agent…/.test(addBtn.textContent), '#970: "Add agent…"');
   click(w, addBtn); await until(() => d.querySelector('#pop [role="menuitem"]'));
   const mi = [...d.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim());
-  check(mi.length === 2 && /Team agent/.test(mi[0]) && /Personal agent/.test(mi[1]) && /Only you see and use it/.test(mi[1]), '#970: the chooser explains team and personal ' + mi.join(' | '));
+  // 2.557.0 (#4670): a third choice, the agent that runs on the Kalmido server with its own API key
+  check(mi.length === 3 && /Team agent/.test(mi[0]) && /Personal agent/.test(mi[1]) && /Only you see and use it/.test(mi[1]) && /Runs on the Kalmido server/.test(mi[2]), '#970: the chooser explains team and personal ' + mi.join(' | '));
   click(w, d.querySelectorAll('#pop [role="menuitem"]')[1]); await until(() => d.querySelector('#ag-owner'));
   const agmd = d.querySelector('#ag-owner').closest('.modal');
   check(/New personal agent/.test(agmd.querySelector('h3').textContent) && agmd.querySelector('#ag-owner').value === '1' && /Only this person sees/.test(agmd.querySelector('#ag-ownhint').textContent), '#970/#965: a personal agent belongs to me, the hint says what that means');

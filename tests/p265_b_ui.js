@@ -25,7 +25,8 @@ const get = async u => (await fetch(B + u)).text();
 // 2.94.1 (#1929): apptbook.js (booking settings) loads with the calendar module
 // 2.156.0 (#2071): listcal.js (a list's calendar view) too; 2.164.0 (#2625): calgest.js (swipe / pinch)
 // 2.235.0 (#2891 #2902 #2903): agentcontrol / agentlock / agentrules = the sections of the agent dialog, same group
-const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
+// 2.557.0 (#4670): srvagent.js (the setup of a server agent) loads with agentchat
+const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 'agentcontrol', 'agentlock', 'agentrules', 'srvagent'], pdf: ['pdfview', 'docpreview'],  // 2.92.0 (#1926): the Word / Excel preview
   // 2.155.0 C (#2078): calendar + calyear (the year view)
   mindmap: ['mindmap'], wiki: ['wiki'], stats: ['stats'], calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'], docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docread'],  // 2.521.0 (#4476): docread.js (the reading view)  // 2.425.0 (#3453): docfetch.js  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letter modules load with the documents
   life: ['life'], integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline', 'roadmap'],

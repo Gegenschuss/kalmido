@@ -114,7 +114,7 @@ check(call(Gi, "get", f"/api/agents/{TEAM}/server").status_code == 404, "team ag
 
 
 def last_run():
-    rr = dbx("SELECT id, state, steps, tokens_in, tokens_out, error, trigger FROM agent_runs WHERE agent_id=? ORDER BY id DESC LIMIT 1", (AID,))
+    rr = dbx("SELECT id, state, steps, tokens_in, tokens_out, error, cause FROM agent_runs WHERE agent_id=? ORDER BY id DESC LIMIT 1", (AID,))
     return rr[0] if rr else None
 
 

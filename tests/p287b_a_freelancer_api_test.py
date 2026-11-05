@@ -69,6 +69,8 @@ EXPECT_4XX = {
     "GET /api/tasks/{}/note-lock": (404, "the note of the own task is not locked"),
     "GET /api/trash/lists/{}/export.zip": (404, "the own list is not in the trash"),
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
+    # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
+    "GET /api/agents/{}/server/models": (409, "no API key of a model provider stored for the own agent (an outside service)"),
 }
 # 2.421.0 A (#2936): GET routes of the matrix areas the sweep cannot fill (no id of an own object): may only shrink
 MAX_SKIPPED = 87  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires; 02.11.2026: 88 before the own webhook (2.391.0 #3362)

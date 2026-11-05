@@ -181,7 +181,7 @@ def _claim(c, aid, probe=False):
                 c.execute("SELECT COUNT(*) FROM agent_runs WHERE state='run'").fetchone()[0] >= SRV_PARALLEL:
             c.commit()
             return "busy"
-        rid = c.execute("""INSERT INTO agent_runs(agent_id, trigger, state, started, beat_at, model) VALUES(?,?,'run',?,?,?)
+        rid = c.execute("""INSERT INTO agent_runs(agent_id, cause, state, started, beat_at, model) VALUES(?,?,'run',?,?,?)
                            RETURNING id""", (aid, ev["event"], iso(now), iso(now), row["model"] or "")).fetchone()[0]
         c.execute("""DELETE FROM agent_runs WHERE agent_id=? AND id<=(SELECT id FROM agent_runs WHERE agent_id=? ORDER BY id DESC
                      LIMIT 1 OFFSET ?)""", (aid, aid, SRV_RUNS_KEEP))
