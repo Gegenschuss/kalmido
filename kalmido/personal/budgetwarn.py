@@ -25,6 +25,10 @@ from ..core.db import iso_ms, now_utc
 from ..core.i18n import LANGS, lang, tr
 from ..core.pg import system_ctx
 from ..core.access import MANAGE_ROLES
+from .timetrack import BUDGET_FIELD_NAMES
+from .timetrack import budget_parents
+from ..collab.comments import collab_user
+from ..collab.news import notif_ok
 
 BW_WARN, BW_OVER = 80, 100  # percent
 
@@ -42,7 +46,6 @@ def _bw_mark(level):
 
 
 def _bw_fields(c, lid):
-    from .timetrack import BUDGET_FIELD_NAMES
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
     return [r["id"] for r in c.execute("SELECT id, name FROM list_fields WHERE list_id=? AND type='number'", (lid,))
             if (r["name"] or "").strip().lower() in names]
@@ -75,7 +78,6 @@ def _bw_secs(c, where, args):
 def bw_states(c, lid, tids):
     """-> (project, {task_id: task}) with project / task = {h, s, level, pct, mark} (task: only the given tasks and the
     tasks above them that carry a budget value of their own); project None without a budget. Everyone's finished entries."""
-    from .timetrack import budget_parents
     lr = c.execute("SELECT id, budget_warn FROM lists WHERE id=? AND time_tracking=1", (lid,)).fetchone()
     if not lr:
         return None, {}
@@ -135,9 +137,7 @@ def bw_people(c, lid):
 def _bw_tell(c, lid, tid, st, pushes):
     """One News item (+ push) per person for a threshold crossed (st = the state of bw_states). The pushes go into
     `pushes` and reach g.pushes only once the savepoint of bw_check held (review #4570 F1: no push for a rolled-back notice)."""
-    from ..collab.comments import collab_user
-    from ..collab.news import notif_ok
-    from ..collab.liste2eguard import le2b_list_locked
+    from ..collab.liste2eguard import le2b_list_locked  # loaded after this module (kalmido/__init__.py ORDER)
     from ..notify.push import push_prio
     lst = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
     locked = le2b_list_locked(c, lid)  # a list with the lock: no title in the push (the News item resolves it in the app)

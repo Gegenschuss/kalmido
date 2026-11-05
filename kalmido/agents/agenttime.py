@@ -31,6 +31,7 @@ from ..agents.proposals import _p_int, _p_keys, _p_str, _p_list, prop_ready_noti
 from ..hub.agentdispo import adz_validate, adz_run, adz_undo  # 2.369.5 (#2517): pulled up from functions
 from ..personal.timesheet import tsl_check, tsl_is_locked  # 2.369.5 (#2517): pulled up from functions
 from ..agents.admin import agent_owner  # 2.369.5 (#2517): pulled up from functions
+from ..personal.budgetwarn import bw_check  # 2.555.0 (#4570)
 
 ATM_DAY_MAX_H = 12            # tracked hours of one day above this: implausible
 ATM_ENTRY_MAX_H = 10          # one entry longer than this: implausible
@@ -362,7 +363,6 @@ def atm_prop_run(c, j, sel, ed, rec):
         rec["copies"].append(list(row))
     if not rec["made"]:
         raise BadInput(tr("Select at least one entry"))
-    from ..personal.budgetwarn import bw_check
     bw_check(c, [(x[2], x[1]) for x in rec["copies"]])  # 2.555.0 (#4570): 80 / 100 % of the budget, once per threshold
     return rec
 
