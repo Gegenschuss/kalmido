@@ -417,6 +417,9 @@ def list_update(lid):
         b = {**b, "_prev": {k: v for k, v in b["_prev"].items() if k != "props"}}
     b, conflicts = lp_prev_conflicts(c, lid, role, b)  # 2.270.0 A (#3019): before anything is written (was: only LIST_FIELDS, late)
     given = set(b)  # 2.29.0 (#1030): what this request sets on its own (kept when the list moves into a folder)
+    from .lmcore import LMC_HIST, lmc_history, lmc_snap
+    lh_keys = tuple(k for k in LMC_HIST if k in given)
+    lh0 = lmc_snap(c, lid, lh_keys) if lh_keys else None  # 2.568.0 (#4739): the settings' history (before)
     tb_col_on = None  # 2.39.1 (#1293): modules the field columns switched on (None = no field columns sent)
     tidy0 = c.execute("SELECT agent_tidy, agent_members, agent_peers, agent_followup, folder, org_id FROM lists WHERE id=?", (lid,)).fetchone()
     if "agent_tidy" in b or "tidy_agent_id" in b:  # 2.0.0: "Agent may tidy up entries" (own permission rule, see
@@ -644,6 +647,8 @@ def list_update(lid):
         back = lmm_restore(c, lid, lmm0["org"])
         ended = lmm_after(c, lid, lmm0, me())
         pt_out = {**pt_out, **({"move_ended": ended} if ended else {}), **({"move_restored": back} if back else {})}
+    if lh0 is not None:  # 2.568.0 (#4739): before / after in the core's history (an agent's change is marked)
+        lmc_history(c, me(), lid, lh0, lmc_snap(c, lid, lh_keys))
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts, **pt_out, **pz_out)
