@@ -1417,7 +1417,6 @@ POST /api/office/packs/validate
 POST /api/office/receipts/tree/folders
 POST /api/office/trips/unbill
 POST /api/onboarding
-POST /api/orgs/{}/encryption/recovery/passkey
 POST /api/orgs/{}/export/file
 POST /api/paperless/import
 POST /api/paperless/stop
