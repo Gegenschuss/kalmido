@@ -35,6 +35,7 @@ FK_2103 = (
     # 2.152.0 (#2174, review B-M6): fk_ensure pauses its orphans instead of making them team agents
     ("habits", "user_id", "users", "CASCADE"),
     ("pomos", "user_id", "users", "CASCADE"),
+    ("task_offer_links", "doc_id", "office_docs", "SET NULL"),  # 2.552.0 (#4647): the table of 2.537 came without it
 )
 FK_INDEXED = {("rc_receipts", "list_id"), ("habits", "user_id"), ("pomos", "user_id")}  # schema.py has an index on these
 
