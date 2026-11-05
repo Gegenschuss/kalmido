@@ -5,7 +5,7 @@
 //   copy, own groups), Log; copies the template "Staff", changes a level (saved at once), gives a member "Staff" by the picker
 // - the member with "Staff" sees no Bank / Figures in the office menu (also before the office is loaded: LS ofmLv), a direct
 //   link to the bank shows the hint, Settings shows "My rights" (read only)
-// - a member without a group keeps exactly the menu of before; a group without the special "release" has no "Finalise"
+// - a member without a group keeps the menu of before (+ the own travel expenses, 2.545.0 #4592); a group without the special "release" has no "Finalise"
 // - phone width: one column, nothing sticks out to the side
 // - freelancer-matrix: office -- a person without an organisation opens the page without an error (own admin, own office)
 const path = require('path');
@@ -62,7 +62,8 @@ const FEAT = 'cal,comments,collab,office,clients,docs,contacts,time,travel';
     await nav(B + '#office/offers');
     check(await ready(ev, `!!(typeof OFC !== 'undefined' && OFC.info)`, 80), 'bob: the office loads');
     const before = await ev(items);
-    check(before.includes('offers') && !before.includes('bank') && !before.includes('kpi') && !before.includes('travel'), 'bob without a group: the menu of before ' + before);
+    // 2.545.0 (#4592, decision of 2026-11-04): "Previous access" works on the level "own" in the travel expenses, so its menu point shows
+    check(before.includes('offers') && !before.includes('bank') && !before.includes('kpi') && before.includes('travel'), 'bob without a group: the menu of before + the own trips ' + before);
 
     // ---- the org admin: Settings > Rights
     await fresh(ev, nav, 'alice');
