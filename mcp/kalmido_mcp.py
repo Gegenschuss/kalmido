@@ -2739,6 +2739,7 @@ TOOLSETS = {
         get_usage report_plan_usage get_plan_usage clear_plan_usage list_schedules list_rules get_me get_announcement list_news mark_news_read list_agents
         list_team_chats read_team_chat post_team_message list_team_channels leave_team_channel edit_team_message delete_team_message react_team_message
         pin_team_message mark_team_chat_read
+        list_objects get_object update_object
     """,
     "office": """
         get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer
