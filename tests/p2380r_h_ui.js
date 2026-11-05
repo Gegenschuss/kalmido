@@ -54,8 +54,8 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   const inv = d.querySelector('#ev-inv'); if (inv?.checked) inv.click();  // no mail needed here
   m.querySelector('#ev-title').value = 'Abstimmung Gaeste'; m.querySelector('[data-evm="save"]').click();
   check(await until(() => !d.querySelector('.evmodal')), 'saved');
-  const evs = await call('GET', '/api/events?from=2030-03-04&to=2030-03-04');
-  const e1 = (evs.items || []).find(x => x.title === 'Abstimmung Gaeste');
+  // 2.559.0 (#4659): a new event shows before the answer (the dialog closes at once): asked until the server has it
+  const e1 = await until(async () => ((await call('GET', '/api/events?from=2030-03-04&to=2030-03-04')).items || []).find(x => x.title === 'Abstimmung Gaeste'));
   const full = e1 ? await call('GET', `/api/events/${e1.eid}`) : {};
   check(full.guests_visible === true, '#3392: the event has the guest list visible ' + JSON.stringify(full).slice(0, 200));
   if (e1) {

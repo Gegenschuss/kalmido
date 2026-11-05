@@ -100,9 +100,10 @@ const LONG = 'Website relaunch 2026 for the client';
   check(!R(q2.id).querySelector('.rxrow .rxhint') && /counts as approval/.test(R(q2.id).querySelector('.rxrow [data-e="up"]').getAttribute('aria-label')) && /counts as rejection/.test(R(q2.id).querySelector('.rxrow [data-e="down"]').getAttribute('aria-label')), '2.7.2 kept: on the newest question 👍 / 👎 are named as approval / rejection (no hint since 2.30)');
   click(w, R(q2.id).querySelector('.rxrow [data-e="up"]'));
   check(await until(() => /Counted as approval/.test(R(q2.id)?.querySelector('.rxok')?.textContent || '')), 'one tap on 👍: "Counted as approval"');
-  check(/Approved/.test(d.querySelector('#toast')?.textContent || ''), 'and the toast "Approved"');
-  const ch = (await call('GET', `/api/agents/${AG}/chat`)).messages.find(m => m.id === q2.id);
-  check(ch && ch.reactions.some(r => r.emoji === 'up' && r.users.some(u => u.id === ME)), 'the server has the approval');
+  // 2.559.0 (#4659): the 👍 shows before the answer now; the toast and the server's row come with the answer: waited for
+  check(await until(() => /Approved/.test(d.querySelector('#toast')?.textContent || '')), 'and the toast "Approved"');
+  const hasUp = async () => { const m = (await call('GET', `/api/agents/${AG}/chat`)).messages.find(x => x.id === q2.id); return !!(m && m.reactions.some(r => r.emoji === 'up' && r.users.some(u => u.id === ME))); };
+  check(await until(hasUp), 'the server has the approval');
   w.eval('chatClose()'); w.close();
 
   // ================= jsdom: the team chat: reactions + an emptied message

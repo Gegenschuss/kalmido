@@ -179,8 +179,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // #1604: the 👍 is drawn only after the reaction POST answers (CI shards slower than 400 ms): wait for it
   click(w, up);
   check(await until(() => d.querySelector(`#chat-msgs .cmsg.ag[data-mid="a:${ans.id}"] .rx.on[data-e="up"]`)), 'my 👍 shows');
-  const evs = (await tcall('GET', `/agent/events?since=${cur}`, TOK)).data.filter(e => e.event === 'reaction');
-  check(evs.length && evs[evs.length - 1].data.approval === 'approved' && evs[evs.length - 1].data.chat_message.id === ans.id, 'the agent got the approval');
+  // 2.559.0 (#4659): the 👍 shows before the answer now, the event comes with the answer: waited for
+  let evs = [];
+  const gotIt = async () => { evs = (await tcall('GET', `/agent/events?since=${cur}`, TOK)).data.filter(e => e.event === 'reaction'); return evs.length && evs[evs.length - 1].data.approval === 'approved' && evs[evs.length - 1].data.chat_message.id === ans.id; };
+  check(await until(gotIt), 'the agent got the approval');
   // offline (no event poll for 5 minutes): "answers later"
   w.close();
   await call('POST', `/api/agents/${AG}/chat`, {body: 'Still there?'});

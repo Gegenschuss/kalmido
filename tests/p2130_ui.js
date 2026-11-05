@@ -82,7 +82,8 @@ const I18N = l => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'static'
   check(/counts as approval/.test(r3()?.querySelector('.rxrow [data-e="up"]')?.getAttribute('aria-label') || ''), 'A2: its 👍 says it counts as approval');
   click(w, r3().querySelector('.rxrow [data-e="up"]')); await until(() => r3()?.querySelector('.rxok'), 100);
   check(/Counted as approval/.test(r3()?.querySelector('.rxok')?.textContent || '') && !r3()?.querySelector('.rxhint') && r3()?.querySelector('.rxrow .rx.on[data-e="up"][aria-pressed="true"]'), 'A2: after 👍: "Counted as approval", 👍 pressed ' + (r3()?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 400));
-  check(/Approved/.test(d.querySelector('#toast')?.textContent || ''), 'A2: toast "Approved"');
+  // 2.559.0 (#4659): the 👍 shows before the answer now; the toast comes with the answer: waited for
+  check(await until(() => /Approved/.test(d.querySelector('#toast')?.textContent || '')), 'A2: toast "Approved"');
   w.close();
 
   // ================= A6: a waiting job in the agent pill's menu and in Today
