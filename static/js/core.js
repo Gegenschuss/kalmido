@@ -1423,6 +1423,7 @@ setInterval(async () => {
   try {
     if (OUT.q.length) { flush(); staleDraw(); return; }  // 2.13.0 (#453 A13): the chip says how many changes wait
     const {v, vs, n, c, t, ty, app, sp, a} = await api('GET', '/api/version');
+    S.vNow = v;  // 2.565.0 (#4705): the server's counter even while the state waits (typing): an open dialog's version watch (objsave.js dlgStale)
     const lpCh = lpChanged(a);  // 2.41.0 (#1376): the areas that changed since the last poll
     lpSkip(v, vs);  // 2.369.4 (#2507): changes only elsewhere: S.v follows, nothing is fetched
     if (sp !== undefined && sp !== S.stepsSig) { const first = S.stepsSig === undefined; S.stepsSig = sp; if (!first) stepsChanged(); }  // 2.32.0 (#1081)

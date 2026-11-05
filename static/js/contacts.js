@@ -492,7 +492,18 @@ document.addEventListener('keydown', e => {  // capture: before the global Esc (
 const bk_lpS = ms_longPress('#view .ctrow[data-ctopen]', () => !!CT.pick, r => bk_start(+r.dataset.ctopen));
 
 // ---- the editor
-async function ctEditor(c) {
+// 2.565.0 (#4705): an existing contact saves only the fields changed in the dialog, with the version it was opened on (objsave.js
+// saveDialog). Someone else saved meanwhile: the dialog comes back with the current contact, what was typed here over it and the
+// fields the other one changed marked (cf = that conflict); an open dialog shows the bar "Changed ..." with "Take over"
+const CT_FLD = {given: 'ct-given', family: 'ct-family', org: 'ct-org', title: 'ct-title', fn: 'ct-fn', nickname: 'ct-nick', dept: 'ct-dept', note: 'ct-note',
+  groups: 'ct-groups', photo: 'ct-ph', book_id: 'ct-bk'};
+function ctField(md, k) {
+  const el = CT_FLD[k] ? $('#' + CT_FLD[k], md) : ['bday', 'anniversary'].includes(k) ? $('#ct-' + k, md)?.closest('.row') : $(`[data-ctm="${k}"]`, md);
+  const d = el?.closest('details'); if (d) d.open = true;
+  return el || null;
+}
+async function ctEditor(c, cf) {
+  if (c && !cf) await loadModule('objsave').catch(() => { /* offline without the copy: saved as before */ });
   const books = (S.books || []).filter(b => ctWrite(b) && (wsObjIn(b) || (c && b.id === c.book_id)));  // 2.30.0 (#1036): of the shown workspace (+ the contact's own)
   const fold = !!c && !ctWrite(ctBook(c.book_id));  // 2.351.0 B (#2749): changed through its folder: stays in its address book
   if (!books.length && !fold) { try { const bk = await api('POST', '/api/books', {name: tr('Contacts'), org_id: wsDefaultOrg()}); await load(); books.push(bk); } catch { return; } }
@@ -530,6 +541,29 @@ async function ctEditor(c) {
       ${fold ? '' : `<div class="row"><label for="ct-bk">${tr('Address book')}</label><select id="ct-bk">${books.map(b => `<option value="${b.id}" ${b.id === st.book_id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></div>`}</details>
     <div class="foot"><span class="spacer"></span><button class="btn" data-ctm2="close">${tr('Cancel')}</button><button class="btn pri" data-ctm2="save">${tr('Save')}</button></div>`);
   md.classList.add('ctmodal');
+  const form = () => {  // what the dialog would save now
+    const v = id => $('#' + id, md)?.value.trim() || '';
+    const dt = k => { const d = $('#ct-' + k, md)?.value || ''; return !d ? '' : $(`#ct-${k}-noy`, md)?.checked ? `--${d.slice(5, 7)}-${d.slice(8, 10)}` : d; };
+    const clean = (k, addr) => (st[k] || []).map(x => ({...x})).filter(x => addr ? ['street', 'city', 'code', 'country'].some(f => (x[f] || '').trim()) : (x.value || '').trim());
+    return {given: v('ct-given'), family: v('ct-family'), org: v('ct-org'), title: v('ct-title'), fn: v('ct-fn'), nickname: v('ct-nick'), dept: v('ct-dept'),
+      phones: clean('phones'), emails: clean('emails'), urls: clean('urls'), addresses: clean('addresses', true), bday: dt('bday'), anniversary: dt('anniversary'),
+      note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: fold ? st.book_id : +v('ct-bk') || st.book_id};
+  };
+  // 2.565.0 (#4705): the state the dialog builds on (after a conflict: the server's) and the form as it opened (typed fields of
+  // before the conflict always count as changed)
+  const open = cf ? cf.cur : c, dlg = c && typeof saveDialog === 'function' ? {open, base: objBase(form(), cf?.mine)} : null;
+  const again = (cur, theirs, mine, both = []) => { md.remove(); ctEditor({...cur, ...mine}, {cur, theirs, mine, both}); };
+  if (dlg) {
+    const url = `/api/contacts/${c.id}`;
+    dlg.save = body => saveDialog(url, open, body, {exp: 'expect', key: 'contact', base: dlg.base,
+      send: x => rawFetch('PATCH', url, x).catch(e => { if (e.status !== 409 && e.message !== 'auth' && !e.shown) toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); throw e; })});
+    dlgStale(md, url, () => open.updated_at, cur => {
+      const mine = objDiff(dlg.base, form());
+      again(cur, Object.keys(form()).filter(k => !objSame(open[k], cur[k])), mine);
+    });
+    if (cf?.theirs.length) objMerge(md, cf, () => {}, {field: k => ctField(md, k),
+      take: keys => again(cf.cur, [], Object.fromEntries(Object.entries(cf.mine || {}).filter(([k]) => !keys.includes(k))))});
+  }
   const redraw = () => {  // the repeatable rows after adding / removing one
     const m = multi;
     for (const k of ['phones', 'emails', 'urls']) { const f = $(`[data-ctm="${k}"]`, md); if (f) f.outerHTML = m(k, f.querySelector('legend').textContent, f.querySelector('input')?.placeholder || (k === 'phones' ? '+49 …' : k === 'emails' ? 'name@example.org' : 'https://…'), k === 'phones' ? 'tel' : k === 'emails' ? 'email' : 'url'); }
@@ -557,21 +591,18 @@ async function ctEditor(c) {
     if (b.dataset.ctm2 === 'close') { md.remove(); return; }
     if (b.dataset.ctm2 === 'nophoto') { st.photo = ''; $('#ct-ph', md).innerHTML = ctAv(st, 'avatar ctav big'); b.remove(); return; }
     if (b.dataset.ctm2 !== 'save') return;
-    const v = id => $('#' + id, md)?.value.trim() || '';
-    const dt = k => { const d = $('#ct-' + k, md)?.value || ''; return !d ? '' : $(`#ct-${k}-noy`, md)?.checked ? `--${d.slice(5, 7)}-${d.slice(8, 10)}` : d; };
-    const clean = (k, addr) => (st[k] || []).map(x => ({...x})).filter(x => addr ? ['street', 'city', 'code', 'country'].some(f => (x[f] || '').trim()) : (x.value || '').trim());
-    const body = {given: v('ct-given'), family: v('ct-family'), org: v('ct-org'), title: v('ct-title'), fn: v('ct-fn'), nickname: v('ct-nick'), dept: v('ct-dept'),
-      phones: clean('phones'), emails: clean('emails'), urls: clean('urls'), addresses: clean('addresses', true), bday: dt('bday'), anniversary: dt('anniversary'),
-      note: $('#ct-note', md).value, groups: v('ct-groups').split(',').map(x => x.trim()).filter(Boolean), photo: st.photo || '', book_id: fold ? st.book_id : +v('ct-bk') || st.book_id};
+    const body = form();
     if (!body.given && !body.family && !body.org && !body.fn) { toast(tr('A name or a company, please')); $('#ct-given', md).focus(); return; }
     if (!c && !await ctx_dupAsk(body, md)) return;  // 2.119.1 A (#2084): a look-alike first (the next Save creates it anyway)
     // 2.559.0 (#4660): the dialog closes and the contact shows at once (ct_saveOpt), no GET /api/state; an error takes it back
     LS.set('ctBook', body.book_id); md.remove();
     try {
-      const r = await ct_saveOpt(c, body);
+      const r = await ct_saveOpt(c, body, dlg && (() => dlg.save(body).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; })));
       toast(r.copied ? tr('Copied from the imported address book') : c ? tr('Contact saved') : tr('Contact created'));  // 2.138.4 C (#2378)
       if (S.route.mod === 'contacts' && isMobile() && !c) go('contacts/' + r.id);
-    } catch { /* api() showed it */ }
+    } catch (e) {  // api() showed it; 2.565.0 (#4705): saved elsewhere meanwhile: the dialog again with the current contact + what was typed
+      if (e?.cf) { const x = e.cf; ctEditor({...x.cur, ...x.mine}, x); toast(tr('Changed by someone else in the meantime')); }
+    }
   });
   setTimeout(() => { if (!c && !isTouch()) $('#ct-given', md)?.focus(); }, 40);
 }
@@ -580,7 +611,7 @@ async function ctEditor(c) {
 // server's contact follows, the list again in the background (order, groups). No GET /api/state; an error puts the old state back
 const ct_row = (b, id, was) => ({...(was || {}), id, book_id: b.book_id, fn: b.fn || [b.given, b.family].filter(Boolean).join(' ') || b.org, given: b.given, family: b.family, org: b.org,
   title: b.title, email: b.emails[0]?.value || '', phone: b.phones[0]?.value || '', photo: b.photo, groups: b.groups});
-async function ct_saveOpt(c, body) {
+async function ct_saveOpt(c, body, req) {  // req: 2.565.0 (#4705) the dialog's own save (only the changed fields + version)
   const tmp = c ? 0 : -Date.now();
   const put = () => {
     const o = {items: CT.items, total: CT.total, sel: CT.sel, card: CT.card};
@@ -590,7 +621,7 @@ async function ct_saveOpt(c, body) {
     } else if (CT.items && !CT.items.some(x => x.id === tmp)) { CT.items = [ct_row(body, tmp), ...CT.items]; CT.total++; }
     return () => Object.assign(CT, o);
   };
-  const r = await optWrite(put, () => c ? api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : api('POST', '/api/contacts', body), ctDraw);
+  const r = await optWrite(put, req || (() => c ? api('PATCH', `/api/contacts/${c.id}`, {...body, expect: c.updated_at}) : api('POST', '/api/contacts', body)), ctDraw);
   if (CT.items) CT.items = CT.items.map(x => x.id === tmp || x.id === r.id ? ct_row({...body, ...r, emails: r.emails || body.emails, phones: r.phones || body.phones}, r.id, x) : x);
   if (!c || CT.sel === r.id) { CT.sel = r.id; CT.card = r; }
   ctDraw(); ctLoad();  // the list from the server in the background (not awaited)

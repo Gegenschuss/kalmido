@@ -16563,6 +16563,7 @@
   "Calibration: {0}": "Étalonnage : {0}",
   "Maintenance: {0}": "Maintenance : {0}",
   "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine",
+  "The marked fields show the current state; what you typed stays. Check and save again.": "Les champs marqués montrent l’état actuel ; ce que tu as saisi est conservé. Vérifie et enregistre à nouveau.",
   "This cannot be filed in a folder": "Cet élément ne peut pas être classé dans un dossier",
   "Only channels can be shared with a group": "Seuls les canaux peuvent être partagés avec un groupe",
   "Send the version you read: {0}": "Indique la version que tu as lue : {0}",

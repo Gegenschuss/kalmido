@@ -23,51 +23,82 @@ function objDiff(open, now) {
 function obj_hdr(method, url) {
   return method === 'PATCH' ? OBS.s[String(url).split('?')[0]]?.tok || '' : '';
 }
-/** @param {string} url @param {any} open @param {any} now */
-async function saveDialog(url, open, now) {
-  const d = objDiff(open, now);
+// 2.565.0 (#4705): o (all optional) for the areas not on the core yet (contacts, events; #4712 moves them):
+//   o.exp   the body key of the version (default expect_updated_at; contacts / events: expect)
+//   o.key   the key of the current state in the 409 answer (default current); missing there -> GET o.get (default url)
+//   o.base  what the dialog showed when it opened, in the shape of `now` (its form read once): the diff is taken against it
+//           (default `open`); OBJ_MINE in it = a field typed here before a conflict, always sent again
+//   o.view  the server's object -> the dialog's shape of `open` (e.g. one date of a series), for the fields someone else changed
+//   o.send  (body) -> the answer, instead of rawFetch PATCH url (api() with its toasts, an optimistic put)
+// the conflict carries `mine` too: the fields typed here, to be put over cur when the dialog is drawn again
+const OBJ_MINE = Object.freeze({mine: 1});
+// where a bar goes: the dialog's form / body, else its card (a modal() of dialogs.js) under its header line
+/** @param {HTMLElement} md @param {HTMLElement} b */
+function objBar(md, b) {
+  const box = md.querySelector('form, .mbody') || md.querySelector('.card') || md, h = box.querySelector(':scope > .lhdr');
+  if (h) h.after(b); else box.prepend(b);
+}
+/** @param {any} base @param {Record<string, any>} mine */
+const objBase = (base, mine) => ({...base, ...Object.fromEntries(Object.keys(mine || {}).map(k => [k, OBJ_MINE]))});
+/** @param {string} url @param {any} open @param {any} now @param {any} [o] */
+async function saveDialog(url, open, now, o = {}) {
+  const d = objDiff(o.base || open, now);
   if (!Object.keys(d).length) return open;
   try {
-    const j = await rawFetch('PATCH', url, {...d, expect_updated_at: open.updated_at});
+    const b = {...d, [o.exp || 'expect_updated_at']: open.updated_at};
+    const j = await (o.send ? o.send(b) : rawFetch('PATCH', url, b));
     const s = OBS.s[url]; if (s) s.seen = j.updated_at;
     return j;
   } catch (e) {
-    if (e.status !== 409 || !e.data?.current) throw e;
-    const cur = e.data.current, theirs = Object.keys(now).filter(k => !objSame(open[k], cur[k]));
-    return {conflict: {cur, theirs, both: theirs.filter(k => k in d && !objSame(d[k], cur[k]))}};
+    const k = o.key || 'current';
+    if (e.status !== 409 || (!e.data?.[k] && !o.key)) throw e;
+    let raw = e.data?.[k];
+    if (!raw) { try { raw = await rawFetch('GET', o.get || url.split('?')[0]); } catch { throw e; } }  // an older server: 409 without the state
+    const cur = o.view ? o.view(raw) : raw, theirs = Object.keys(now).filter(x => !objSame(open[x], cur[x]));
+    return {conflict: {cur, raw, theirs, mine: d, both: theirs.filter(x => x in d && !objSame(d[x], cur[x]))}};
   }
 }
 // the merge bar of a 409: the fields someone else changed get .obj-theirs and an outline (title = their value), "Take theirs" fills them in,
 // "Keep mine" leaves the input; both make cur the base of the next save (onBase(cur))
-/** @param {HTMLElement} md @param {{cur: any, theirs: string[], both: string[]}} cf @param {(cur: any) => void} onBase */
-function objMerge(md, cf, onBase) {
-  md.querySelector('.obj-merge')?.remove();
+// 2.565.0 (#4705): o.field(k) -> the element of field k (default [name=k]; a list of rows: its fieldset); o.take(keys) -> "Take
+// theirs" done by the dialog itself (it draws them, e.g. a list of rows) instead of filling the inputs; the bar says in words
+// that the marked fields show the current state and what was typed here stays
+/** @param {HTMLElement} md @param {{cur: any, theirs: string[], both: string[]}} cf @param {(cur: any) => void} onBase @param {any} [o] */
+function objMerge(md, cf, onBase, o = {}) {
+  md.querySelector('.obj-merge')?.remove(); md.querySelector('.obj-stale')?.remove();
   const b = document.createElement('div'); b.className = 'cfbar obj-merge'; b.setAttribute('role', 'alert');
-  b.innerHTML = `<span>${esc(tr('Changed by someone else in the meantime'))}</span><button type="button" class="btn sm" data-om="mine">${tr('Keep mine')}</button><button type="button" class="btn sm" data-om="theirs">${tr('Take theirs')}</button>`;
-  (md.querySelector('form, .mbody') || md).prepend(b);
-  const fs = cf.theirs.map(k => /** @type {HTMLInputElement|null} */ (md.querySelector(`[name="${CSS.escape(k)}"]`)));
-  fs.forEach((f, i) => { if (f) { f.classList.add('obj-theirs'); f.style.outline = '2px solid var(--st-wait)'; f.title = tr('Now: {0}', String(cf.cur[cf.theirs[i]] ?? '')); } });
+  b.innerHTML = `<span>${esc(tr('Changed by someone else in the meantime'))}${o.field ? ` ${esc(tr('The marked fields show the current state; what you typed stays. Check and save again.'))}` : ''}</span><button type="button" class="btn sm" data-om="mine">${tr('Keep mine')}</button><button type="button" class="btn sm" data-om="theirs">${tr('Take theirs')}</button>`;
+  objBar(md, b);
+  const fs = cf.theirs.map(k => /** @type {HTMLInputElement|null} */ (o.field ? o.field(k) : md.querySelector(`[name="${CSS.escape(k)}"]`)));
+  fs.forEach((f, i) => { if (f) { const v = cf.cur[cf.theirs[i]]; f.classList.add('obj-theirs'); f.style.outline = '2px solid var(--st-wait)'; if (v == null || typeof v !== 'object') f.title = tr('Now: {0}', String(v ?? '')); } });
   onBase(cf.cur);
   b.addEventListener('click', e => {
     const a = /** @type {HTMLElement} */ (e.target).closest('[data-om]')?.getAttribute('data-om'); if (!a) return;
+    if (a === 'theirs' && o.take) { b.remove(); o.take(cf.theirs); return; }
     if (a === 'theirs') fs.forEach((f, i) => { if (!f) return; const v = cf.cur[cf.theirs[i]]; if (f.type === 'checkbox') f.checked = !!v; else f.value = v ?? ''; f.dispatchEvent(new Event('input', {bubbles: true})); });
     fs.forEach(f => { if (f) { f.classList.remove('obj-theirs'); f.style.outline = ''; } }); b.remove();
   });
 }
 // the version watch of an open dialog: when the counter of the app moved (S.v), the object is read again; another updated_at
 // than the one the dialog works on = the calm bar "Changed by someone else in the meantime" (saving then shows the merge)
-/** @param {HTMLElement} md @param {string} url @param {() => string} base */
-function dlgStale(md, url, base) {
-  let v = S.v, busy = false;
+// 2.565.0 (#4705): the server's counter as the poll saw it last (S.vNow, core.js): while one types in the dialog the state is not
+// loaded (S.v stays), the bar comes anyway; onTake(cur) given: the bar has "Take over" (the dialog draws the current state with
+// what was typed over it, as after a 409)
+/** @param {HTMLElement} md @param {string} url @param {() => string} base @param {(cur: any) => void} [onTake] */
+function dlgStale(md, url, base, onTake) {
+  const vn = () => S.vNow ?? S.v;
+  let v = vn(), busy = false;
   const t = setInterval(async () => {
     if (!md.isConnected) { clearInterval(t); return; }
-    if (busy || S.v === v) return;
-    v = S.v; busy = true;
+    if (busy || vn() === v) return;
+    v = vn(); busy = true;
     try {
       const j = await rawFetch('GET', url);
-      if (j.updated_at !== base() && !md.querySelector('.obj-stale')) {
+      if (j.updated_at !== base() && md.isConnected && !md.querySelector('.obj-stale, .obj-merge')) {
         const b = document.createElement('div'); b.className = 'cfbar obj-stale'; b.setAttribute('role', 'status');
-        b.textContent = tr('Changed by someone else in the meantime'); (md.querySelector('form, .mbody') || md).prepend(b);
+        b.innerHTML = `<span>${esc(tr('Changed by someone else in the meantime'))}</span>${onTake ? `<button type="button" class="btn sm" data-os="take">${tr('Take over')}</button>` : ''}`;
+        if (onTake) b.querySelector('[data-os]')?.addEventListener('click', () => { b.remove(); onTake(j); });
+        objBar(md, b);
       }
     } catch { /* gone or no right any more: the save will say it */ } finally { busy = false; }
   }, 4000);

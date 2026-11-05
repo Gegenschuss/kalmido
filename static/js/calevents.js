@@ -239,6 +239,21 @@ function evSavePut(ev, occ, body) {
     return v;
   }));
 }
+// 2.565.0 (#4705): one date of a series as the editor shows it for "Only this date" (its own change or the series' values)
+function evOccView(ev, occ) {
+  const ov = (ev.overrides || []).find(x => x.rid === occ);
+  const end = ov?.end || (ev.all_day ? addDays(occ, Math.max(1, diffDays(ev.start.slice(0, 10), ev.end.slice(0, 10)))) : evAddMin(occ, evMin(ev.start, ev.end)));
+  return {title: ov?.title ?? ev.title, location: ov?.location ?? ev.location, description: ov?.description ?? ev.description, all_day: ov?.all_day ?? ev.all_day,
+    start: ov?.start || occ, end, updated_at: ev.updated_at};
+}
+// 2.565.0 (#4705): the editor's fields for the marks of a conflict (objsave.js objMerge)
+const EV_FLD = {title: 'ev-title', cal_id: 'ev-cal', location: 'ev-loc', description: 'ev-desc', tz: 'ev-tz', status: 'ev-status', url: 'ev-url', all_day: 'ev-allday', busy: 'ev-busy'};
+function evField(md, k) {
+  const el = EV_FLD[k] ? $('#' + EV_FLD[k], md)?.closest('.row') : k === 'start' ? $('#ev-sd', md)?.closest('.row') : k === 'end' ? $('#ev-ed', md)?.closest('.row')
+    : k === 'rrule' ? $('.evrep', md) : k === 'reminders' ? $('.evrems', md) : k === 'attendees' ? $('.evatts', md) : null;
+  const d = el?.closest('details'); if (d) d.open = true;
+  return el || null;
+}
 async function evEditor(o = {}) {
   const ev = o.ev || null, cals = evWritable().concat(ev && !evWritable().some(c => c.id === ev.cal_id) && evCal(ev.cal_id) ? [evCal(ev.cal_id)] : []);
   if (!cals.length && !o.dvw) { try { const c = await api('POST', '/api/evcals', {name: tr('Calendar'), org_id: wsDefaultOrg()}); await load(); cals.push(c); } catch { return; } }
@@ -259,7 +274,8 @@ async function evEditor(o = {}) {
       all_day: ov.all_day ?? st.all_day, start: st.occStart, end: st.occEnd});
   }
   const [people] = await Promise.all([evPeople(), loadModule('evinvite').catch(() => {}),  // 2.149.0 F (#2518): evinvite.js loads with the people
-    loadModule('calrrule').catch(() => { /* offline without the copy: the list has no own rules */ })]);  // 2.155.0 C (#2075)
+    loadModule('calrrule').catch(() => { /* offline without the copy: the list has no own rules */ }),  // 2.155.0 C (#2075)
+    ev ? loadModule('objsave').catch(() => { /* offline without the copy: saved as before */ }) : null]);  // 2.565.0 (#4705)
   const ppl = new Map(people.map(u => [u.id, u.display_name]));
   const atts = (st.attendees || []).map(a => ({...a}));
   const endDay = s => st.all_day ? addDays(s, -1) : s.slice(0, 10);  // all day: the shown end is the last day (stored exclusive)
@@ -305,6 +321,39 @@ async function evEditor(o = {}) {
     if (typeof evi_draw === 'function') evi_draw(md, atts);  // 2.111.0 B (#2056): the invitation switch (evinvite.js)
   };
   drawRems(); drawAtts(); rows(); if (typeof evi_init === 'function') evi_init(md, ev, atts);
+  // 2.565.0 (#4705): what the dialog would save now (sc = 'one': only this date's fields), read once as it opened (base); the
+  // event the dialog builds on is the server's one (after a conflict: the current one, o.cf.raw)
+  const form = sc => {
+    const ad = $('#ev-allday', md).checked, sd = val('ev-sd'), ed = val('ev-ed') || sd;
+    const body = {title: val('ev-title').trim() || tr('(no title)'), all_day: ad, location: val('ev-loc').trim(), description: val('ev-desc')};
+    if (ad) { body.start = sd; body.end = addDays(ed < sd ? sd : ed, 1); } else { body.start = `${sd}T${val('ev-stm') || '09:00'}`; body.end = `${ed}T${val('ev-etm') || '10:00'}`; }
+    if (sc === 'one') return body;
+    const rk = val('ev-rep');
+    let rule = rk === 'custom' ? rrBase(st.rrule) : rk ? evRepRule(rk, body.start) : '';
+    if (rule) rule = rrSetEnd(rule, {type: val('ev-repend'), val: val('ev-repend') === 'until' ? val('ev-until') : val('ev-count')});
+    Object.assign(body, {rrule: rule, reminders: st.reminders || [], cal_id: +val('ev-cal'), tz: val('ev-tz'), status: val('ev-status'), busy: $('#ev-busy', md).checked,
+      url: val('ev-url').trim() || null, task_id: st.task_id || null,
+      attendees: atts.map(a => a.user_id ? {user_id: a.user_id, partstat: a.partstat || 'needs-action'} : a.contact_id ? {contact_id: a.contact_id, partstat: a.partstat || 'needs-action'} : {email: a.email, name: a.name || '', partstat: a.partstat || 'needs-action'})});
+    if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
+    return body;
+  };
+  const srv = o.cf?.raw || ev, dlg = ev && !o.dvw && typeof saveDialog === 'function' ? {base: objBase(form(scope), o.cf?.mine)} : null;
+  const evAgain = (raw, mine, cf) => {  // the editor again on the current event, what was typed over it
+    const m = {...mine}; delete m.send_invites;
+    if (scope === 'one') { const ov = {rid: o.occ, ...evOccView(raw, o.occ), ...m}; delete ov.updated_at; return evEditor({ev: {...raw, overrides: [...(raw.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ, cf}); }
+    return evEditor({ev: {...raw, ...m, ...(m.attendees ? {attendees: atts} : {})}, occ: o.occ, cf});
+  };
+  if (dlg) {
+    const view = () => scope === 'one' ? (x => evOccView(x, o.occ)) : undefined, opened = () => scope === 'one' ? evOccView(srv, o.occ) : srv;
+    dlg.save = (url, body) => saveDialog(url, opened(), body, {exp: 'expect', key: 'event', base: dlg.base, view: view(), get: `/api/events/${ev.id}`,
+      send: x => rawFetch('PATCH', url, x).catch(e => { if (e.status !== 409 && e.message !== 'auth' && !e.shown) toast(e instanceof Offline ? tr('Offline: only works again with a connection') : e.message); throw e; })});
+    dlgStale(md, `/api/events/${ev.id}`, () => srv.updated_at, raw => {
+      const now = form(scope), cur = view() ? view()(raw) : raw, op = opened();
+      md.remove(); evAgain(raw, objDiff(dlg.base, now), {raw, cur, mine: objDiff(dlg.base, now), theirs: Object.keys(now).filter(k => !objSame(op[k], cur[k])), both: []});
+    });
+    if (o.cf?.theirs.length) objMerge(md, o.cf, () => {}, {field: k => evField(md, k),
+      take: keys => { md.remove(); evAgain(o.cf.raw, Object.fromEntries(Object.entries(o.cf.mine || {}).filter(([k]) => !keys.includes(k))), null); }});
+  }
   if (typeof crr_wire === 'function') crr_wire(md, st, () => val('ev-sd') || st.start);  // 2.155.0 C (#2075)
   const attList = async q => {  // suggestions: people of this server + contacts (name / e-mail)
     const opts = people.filter(u => !atts.some(a => a.user_id === u.id) && (!q || u.display_name.toLowerCase().includes(q.toLowerCase()))).slice(0, 8).map(u => ({v: u.display_name, k: 'u' + u.id}));
@@ -358,28 +407,20 @@ async function evEditor(o = {}) {
     else if (k === 'untask') { st.task_id = null; b.closest('.row').remove(); }
     else if (k === 'del') { md.remove(); evDelete(ev, o.occ); }
     else if (k === 'save') {
-      const ad = $('#ev-allday', md).checked, sd = val('ev-sd'), ed = val('ev-ed') || sd;
-      const body = {title: val('ev-title').trim() || tr('(no title)'), all_day: ad, location: val('ev-loc').trim(), description: val('ev-desc')};
-      if (ad) { body.start = sd; body.end = addDays(ed < sd ? sd : ed, 1); }
-      else {
-        body.start = `${sd}T${val('ev-stm') || '09:00'}`; body.end = `${ed}T${val('ev-etm') || '10:00'}`;
-        if (body.end < body.start) { toast(tr('The end must be after the start')); return; }
-      }
+      const sub = dvw_isSub(val('ev-cal')), body = form(scope === 'one' || sub ? 'one' : 'all');  // 2.565.0 (#4705): one reader of the form (form)
+      if (!body.all_day && body.end < body.start) { toast(tr('The end must be after the start')); return; }
       if (typeof evi_on === 'function' && evi_on(md)) body.send_invites = true;  // 2.111.0 B (#2056)
-      if (dvw_isSub(val('ev-cal'))) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
+      if (sub) { delete body.send_invites; b.disabled = true; if (await dvw_save(o, val('ev-cal'), body)) md.remove(); else b.disabled = false; return; }  // 2.52.0 (#1128): a subscribed CalDAV calendar
       let req;
+      // 2.565.0 (#4705): an existing event sends only what was changed in the dialog, with the version it builds on; a conflict
+      // comes back as e.cf (the dialog again on the current event)
+      const dsave = url => () => dlg.save(url, body).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; });
       if (scope === 'one') {
-        req = () => api('PATCH', `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`, {...body, expect: ev.updated_at});  // 2.273.0 C (#3051): like the series
+        const url = `/api/events/${ev.id}?occ=${encodeURIComponent(o.occ)}`;
+        req = dlg ? dsave(url) : () => api('PATCH', url, {...body, expect: srv.updated_at});  // 2.273.0 C (#3051): like the series
       } else {
-        const rk = val('ev-rep');
-        let rule = rk === 'custom' ? rrBase(st.rrule) : rk ? evRepRule(rk, body.start) : '';
-        if (rule) rule = rrSetEnd(rule, {type: val('ev-repend'), val: val('ev-repend') === 'until' ? val('ev-until') : val('ev-count')});
-        Object.assign(body, {rrule: rule, reminders: st.reminders || [], cal_id: +val('ev-cal'), tz: val('ev-tz'), status: val('ev-status'), busy: $('#ev-busy', md).checked,
-          url: val('ev-url').trim() || null, task_id: st.task_id || null,
-          attendees: atts.map(a => a.user_id ? {user_id: a.user_id, partstat: a.partstat || 'needs-action'} : a.contact_id ? {contact_id: a.contact_id, partstat: a.partstat || 'needs-action'} : {email: a.email, name: a.name || '', partstat: a.partstat || 'needs-action'})});
-        if (typeof evi_gv === 'function') { const gv = evi_gv(md); if (gv !== null) body.guests_visible = gv; }  // 2.380 H (#3392)
         if (body.url && !validUrl(body.url)) { toast(tr('The link must start with http:// or https://')); return; }
-        req = () => ev ? api('PATCH', `/api/events/${ev.id}`, {...body, expect: ev.updated_at}) : api('POST', '/api/events', body);
+        req = ev && dlg ? dsave(`/api/events/${ev.id}`) : () => ev ? api('PATCH', `/api/events/${ev.id}`, {...body, expect: srv.updated_at}) : api('POST', '/api/events', body);
         LS.set('evCal', body.cal_id);
       }
       // 2.559.0 (#4659): the dialog closes at once and the event stands (a new one as a stand-in with a negative id until the
@@ -387,7 +428,9 @@ async function evEditor(o = {}) {
       md.remove();
       const put = ev ? evSavePut(ev, scope === 'one' ? o.occ : null, body) : evNewPut(body, atts.length);
       let j;
-      try { j = await evOpt(put, req, render); } catch {  // nothing typed is lost (a conflict 409 too: api() said why)
+      try { j = await evOpt(put, req, render); } catch (e) {  // nothing typed is lost (a conflict 409 too: api() said why)
+        if (e?.cf) { toast(tr('Changed by someone else in the meantime')); evAgain(e.cf.raw, e.cf.mine, e.cf); return; }  // 2.565.0 (#4705)
+        if (dlg) { const mine = objDiff(dlg.base, body); evAgain(srv, mine, {raw: srv, cur: srv, mine, theirs: [], both: []}); return; }  // what was typed stays "changed" for the next save
         // "Only this date": what was typed comes back as that date's own change (the editor then saves only it again)
         const ov = {rid: o.occ, title: body.title, location: body.location, description: body.description, all_day: body.all_day, start: body.start, end: body.end};
         evEditor(!ev ? {...o, ...body, attendees: atts} : scope === 'one' ? {ev: {...ev, overrides: [...(ev.overrides || []).filter(x => x.rid !== o.occ), ov]}, occ: o.occ}

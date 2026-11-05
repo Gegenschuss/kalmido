@@ -16563,6 +16563,7 @@
   "Calibration: {0}": "Kalibratie: {0}",
   "Maintenance: {0}": "Onderhoud: {0}",
   "The agent's data lock leaves this area out": "De gegevensblokkade van de agent laat dit gebied weg",
+  "The marked fields show the current state; what you typed stays. Check and save again.": "De gemarkeerde velden tonen de huidige stand; wat je hebt getypt blijft behouden. Controleer en sla opnieuw op.",
   "This cannot be filed in a folder": "Dit kan niet in een map worden opgeslagen",
   "Only channels can be shared with a group": "Alleen kanalen kunnen met een groep worden gedeeld",
   "Send the version you read: {0}": "Stuur de versie mee die je hebt gelezen: {0}",
