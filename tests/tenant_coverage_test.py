@@ -1312,7 +1312,7 @@ ROUTES = {
     "GET /api/office/bank/noreceipt": "office", "GET /api/office/bank/noreceipt/count": "office",
     "GET /api/office/bank/noreceipt/reminder": "office", "PUT /api/office/bank/noreceipt/reminder": "office",
     # 2.470.0 (#3596): the bank accounts of an office (pr2470_a_bankacc_test.py: another organisation 404, a person without an organisation the same)
-    "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",  # 2.545.0 (#4595): the own office only
+    "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",  # 2.545.0 (#4595): the own office only, another office cross-checked in p2545_b_rethold_test.py
     "GET /api/office/settings/bank-accounts": "office", "POST /api/office/settings/bank-accounts": "office", "PUT /api/office/settings/bank-accounts/{}": "office",
     "POST /api/office/settings/bank-accounts/{}/default": "office", "POST /api/office/settings/bank-accounts/{}/archive": "office",
     "POST /api/office/settings/bank-accounts/{}/restore": "office",
