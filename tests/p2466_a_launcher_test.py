@@ -28,14 +28,17 @@ TMP = tempfile.mkdtemp(prefix="kalmido-p2466a-")
 os.chdir(TMP)
 
 # ---- #1722: suggestion buttons end at a word with "…", at most 80 characters
-LONG = "Run the full test suite on the test machine and then compare the results with the last release build"
+# 2.565.0 (#4713): a button holds 200 characters now (LABEL_MAX), the long texts grew with it
+LONG = ("Run the full test suite on the test machine and then compare the results with the last release build, "
+        "then write down every difference you find and send me a short list of the open points before the next release")
 cut = ar.label_cut(LONG)
-check(len(cut) <= 80 and cut.endswith("…"), f"a long suggestion is at most 80 characters and ends with …: {cut!r}")
+check(ar.LABEL_MAX == 200 and len(cut) <= 200 and cut.endswith("…"), f"a long suggestion is at most 200 characters and ends with …: {cut!r}")
 check(LONG.startswith(cut[:-1]) and LONG[len(cut) - 1] == " ", f"cut at a word, never mid-word: {cut!r}")
 check(ar.label_cut("Show the log") == "Show the log", "a short suggestion stays as it is")
 check(ar.label_cut("  Show   the\nlog ") == "Show the log", "whitespace is folded")
-check(ar.label_cut("Deploy it now, " + "x" * 64 + " tail") == "Deploy it now…", "punctuation before the … is dropped")
-check(len(ar.label_cut("y" * 120)) == 80, "one long word: cut hard at 80")
+check(ar.label_cut("Deploy it now, " + "x" * 184 + " tail") == "Deploy it now…", "punctuation before the … is dropped")
+check(len(ar.label_cut("y" * 250)) == 200, "one long word: cut hard at 200")
+check(ar.label_cut("z" * 120) == "z" * 120, "#4713: 120 characters stay whole (was cut at 80)")
 tb = ar.split_tail_blocks("Done.\n\n```suggest\n1. " + LONG + "\n```")
 check(tb[2] == [cut], f"the parser cuts at a word too: {tb[2]}")
 
@@ -60,9 +63,9 @@ api.chat(7, "Done.", suggest=[LONG])
 api.comment(5, "Done.", suggest=[LONG])
 check([b["choices"][0]["label"] for b in cap.bodies] == [cut, cut], f"chat and comment buttons use the cut label: {cap.bodies}")
 p = ar.build_prompt([{"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "hi"}}}], 7)
-check("at most 80 characters" in p, "the chat prompt names the 80-character limit")
+check("at most 200 characters" in p, "the chat prompt names the 200-character limit (2.565.0 #4713, was 80)")
 p = ar.build_prompt([{"event": "comment", "data": {"task": {"id": 5}}}], None)
-check("at most 80 characters" in p, "the task prompt names the 80-character limit")
+check("at most 200 characters" in p, "the task prompt names the 200-character limit (2.565.0 #4713, was 80)")
 
 # ---- #1714: exactly one suggestion per answer (chat and task runs); the parser still takes up to three
 p = ar.build_prompt([{"event": "chat", "data": {"user": {"id": 7, "name": "Ann"}, "message": {"id": 1, "body": "hi"}}}], 7)
@@ -73,7 +76,7 @@ check("at most ONE next step" in p and "up to three" not in p, "the task prompt 
 tb = ar.split_tail_blocks("Done.\n\n```suggest\nA\nB\nC\nD\n```")
 check(tb[2] == ["A", "B", "C"], f"own rules that give three still work (at most three taken): {tb[2]}")
 tpl = open(os.path.join(MCP, "CLAUDE.template.md"), encoding="utf-8").read()
-check("exactly **one** suggestion" in tpl and "80 characters" in tpl, "the template says one suggestion, 80 characters")
+check("exactly **one** suggestion" in tpl and "200 characters" in tpl, "the template says one suggestion, 200 characters (2.565.0 #4713)")
 
 # ---- #1715: the fixed rules block in front of every run; the project's CLAUDE.md is never touched
 CALLS = os.path.join(TMP, "calls.jsonl")

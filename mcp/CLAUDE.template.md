@@ -146,7 +146,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   them for 24 h as "collected", a press on one comes as `chat_choice` with `collected: true` - an answer to that older
   question); take back buttons that are no longer current
   with `withdraw_chat_choices`. A host that posts your answer for you (the launcher's event mode, 2.40.0) turns a final
-  block ` ```suggest ` (one line per suggestion) into the button. A button holds at most **80 characters**: keep the
+  block ` ```suggest ` (one line per suggestion) into the button. A button holds at most **200 characters** (servers before 2.565.0: 80); the text wraps, keep the
   suggestion shorter (a longer one is cut at a word with "…" and the person sends the cut text).
 - A long chat answer worth keeping (a plan, a release draft, a summary to review later): send it with `offer_save: true`
   (`send_chat`, 2.37.0). The person gets the button *Save as task* under it and decides; never save a message yourself.

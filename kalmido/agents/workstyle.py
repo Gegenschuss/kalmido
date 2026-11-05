@@ -364,7 +364,7 @@ PUSH_BURST_SKIP.append(ws_burst_skip)
 
 
 # ---------------------------------------------------------------- 2.236.0 B (#2911): the next step as one button
-WS_NEXT_MAX, WS_NEXT_LOOKBACK = 80, 20
+WS_NEXT_MAX, WS_NEXT_LOOKBACK = 200, 20  # 2.565.0 (#4713): 200 characters like every answer button (was 80)
 
 
 def ws_next_step(c, aid, uid, b):

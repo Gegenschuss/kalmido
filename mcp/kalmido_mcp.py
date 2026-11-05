@@ -779,7 +779,7 @@ TOOLS = [
            "choices": {"type": "array", "maxItems": 8, "description": "2.41.0: answer buttons under the comment (suggestions for the person's "
                        "answer; a press is sent as the person's comment and reaches you as a comment event with answer). Only the newest "
                        "question of a task stays live", "items": {"type": "object", "properties": {
-                           "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+                           "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 200},
                            "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
            "multi": {"type": "boolean", "description": "2.41.0: the person may pick several buttons"},
            "portal": {"type": "boolean", "description": "2.63.0: a public answer to the customer of a customer report (the task has a "
@@ -797,7 +797,7 @@ TOOLS = [
                                  "comment with answer.approval approved | rejected. No answer is never a yes. Close it with "
                                  "withdraw_comment_choices when it is no longer needed.",
      _obj({"task_id": S_ID, "title": {"type": "string", "maxLength": 200}, "what": {"type": "string", "maxLength": 1000},
-           "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
+           "yes_label": {"type": "string", "maxLength": 200}, "no_label": {"type": "string", "maxLength": 200},
            "body": {"type": "string", "description": "the comment's text above the card (default: the title)"}, "reply_to": S_ID,
            "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}}, ["task_id", "title"]), t_request_comment_approval),
     ("withdraw_comment_choices", "2.41.0: take back the open answer buttons / approval card of one of your comments (comment_id); "
@@ -1011,7 +1011,7 @@ TOOLS = [
                   "line in the middle of the chat instead of a message (no push, never unread, at most 200 characters, no buttons; "
                   "at most one file, which a tap on the line opens), e.g. 'New session, summary taken over (22:10)' after your "
                   "host started a fresh session; older servers answer 400 -- then send nothing. "
-                  "next_step (2.236.0, #2911): the next step you suggest, at most 80 characters -- shown as ONE button at the end of the "
+                  "next_step (2.236.0, #2911): the next step you suggest, at most 200 characters (servers before 2.565.0: 80) -- shown as ONE button at the end of the "
                   "message (when your work style has next_step on; the answer tells next_step_dropped: off | repeat | conflict | full). "
                   "limit (2.236.0, #2909): true = this message reports a limit (a one-way step, a refusal, a stop, an error); with work "
                   "style push 'limits' only such messages (and approvals / permission questions) send a push. Older servers answer 400 "
@@ -1031,12 +1031,12 @@ TOOLS = [
                                                        "Older servers answer 400 -- then send it without"},
            "permission": {"type": "boolean"}, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800},
            "choices": {"type": "array", "maxItems": 8, "items": {"type": "object", "properties": {
-               "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+               "id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 200},
                "style": {"type": "string", "enum": ["default", "primary", "danger"]}}, "required": ["id", "label"]}},
            "multi": {"type": "boolean"},
            "offer_save": {"type": "boolean", "description": "2.37.0: offer the person the button 'Save as task' under this message"},
            "kind": {"type": "string", "enum": ["message", "notice"], "description": "2.41.0: notice = a small grey line (session / summary notes)"},
-           "next_step": {"type": "string", "minLength": 1, "maxLength": 80, "description": "2.236.0: the next step as one button at the end"},
+           "next_step": {"type": "string", "minLength": 1, "maxLength": 200, "description": "2.236.0: the next step as one button at the end"},
            "limit": {"type": "boolean", "description": "2.236.0: this message reports a limit (may push with work style push 'limits')"},
            "files": {"type": "array", "maxItems": 10, "items": {"type": "object", "properties": {
                "name": {"type": "string"}, "base64": {"type": "string"}, "mime": {"type": "string"}}, "required": ["name", "base64"]}}},
@@ -1058,7 +1058,7 @@ TOOLS = [
                                                      "body": {"type": "object", "description": "the exact body of the call (none = no body)"}},
                     "required": ["method", "path"]},
            "recommend": {"type": "string", "enum": ["yes", "no"]}, "one_way": {"type": "boolean"},
-           "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80},
+           "yes_label": {"type": "string", "maxLength": 200}, "no_label": {"type": "string", "maxLength": 200},
            "body": {"type": "string", "description": "optional text above the card (default: the title)"}, "task_id": S_ID,
            "reply_to": S_ID, "job_id": S_ID, "expires_in": {"type": "integer", "minimum": 10, "maximum": 604800}},
           ["user_id", "title"]), t_request_chat_approval),

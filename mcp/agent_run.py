@@ -1077,7 +1077,7 @@ def build_prompt(evs, chat_uid, extra=None):
                    "proposal, variants, \"shall I ...?\"), end your answer with "
                    "a block ```approval (first line: what you want to do, optional further lines: what happens on yes) "
                    "and wait: only a yes is a yes, silence never is. Otherwise end your answer with exactly ONE short suggestion "
-                   "for the person's next message in a final block ```suggest (one line, at most 80 characters): it becomes an "
+                   "for the person's next message in a final block ```suggest (one line, at most 200 characters): it becomes an "
                    "answer button. Never offer a step that an earlier, still visible message already offers; then offer the "
                    "next-best different one. Commands, code "
                    "and configuration the person should run or paste go into their own fenced code block with a language (one block per place, one "
@@ -1085,7 +1085,7 @@ def build_prompt(evs, chat_uid, extra=None):
     else:
         out.append("This is a task event: answer on the task itself (comment) with the Kalmido tools; your final text "
                    "is not posted anywhere. To ask for a decision there, use request_comment_approval (a card with Yes / No); "
-                   "offer at most ONE next step as an add_comment choice (an answer button, at most 80 characters). Alternatively end your final "
+                   "offer at most ONE next step as an add_comment choice (an answer button, at most 200 characters). Alternatively end your final "
                    "text with a block ```approval or ```suggest: then that text is posted as your comment on the task "
                    "with the card / buttons (do not post it again yourself).")
     out += reply_style_hint(evs, chat_uid)  # kalmido-capability: reply_style (2.491.0, #2849)
@@ -1521,7 +1521,7 @@ def split_tail_blocks(text):
     return "\n".join(lines).rstrip(), appr, [s for s in sugg if s], done
 
 
-LABEL_MAX = 80  # the server keeps 80 characters of a button label
+LABEL_MAX = 200  # 2.565.0 (#4713): the server keeps 200 characters of a button label (older servers cut at 80 themselves)
 
 
 def label_cut(s, n=LABEL_MAX):

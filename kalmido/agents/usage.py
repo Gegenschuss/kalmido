@@ -1205,7 +1205,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                 "job of this part job (your job for this person, else 400); the job keeps it, the app gives the "
                                                                 "part the leader's colour, a little lighter"},
                                                  "choices": {"type": "array", "maxItems": 8, "description": "2.28.0 (#1005): answer buttons; the person's answer comes as the event chat_choice (message_id, choice_ids, labels)",
-                                                             "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 80},
+                                                             "items": {"type": "object", "required": ["id", "label"], "properties": {"id": {"type": "string", "maxLength": 40}, "label": {"type": "string", "maxLength": 200},
                                                                                                                                     "style": {"type": "string", "enum": ["default", "primary", "danger"]}}}},
                                                  "multi": {"type": "boolean", "description": "several buttons may be chosen"},
                                                  "permission": {"type": "boolean", "description": "2.30.0 (#1041): a permission question: buttons Allow / Deny "
@@ -1221,7 +1221,7 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                  "limit": {"type": "boolean", "description": "2.236.0 B (#2909): this message reports a limit (a one-way "
                                                            "step, a refusal, a stop, an error): with the work style push \"limits\" only such messages, "
                                                            "approval requests and permission questions push"},
-                                                 "next_step": {"type": "string", "maxLength": 80, "description": "2.236.0 B (#2911): the next step as ONE "
+                                                 "next_step": {"type": "string", "maxLength": 200, "description": "2.236.0 B (#2911): the next step as ONE "
                                                                "answer button at the end (id next, next: true; after your choices, at most 8 in all). "
                                                                "Dropped (the message stays, the answer says next_step_dropped off | repeat | conflict | "
                                                                "full) when next_step is off in the work style, the same text was a next button in the "
@@ -1238,12 +1238,12 @@ def agent_spec(paths, schemas, op, ok, errs, ref, q, pid, nul, page):
                                                                              "(answer the open ones first). MCP request_chat_approval",
                                                               "properties": {"title": {"type": "string", "maxLength": 200, "description": "what is to be approved"},
                                                                              "what": {"type": "string", "maxLength": 1000, "description": "what happens on yes"},
-                                                                             "yes_label": {"type": "string", "maxLength": 80}, "no_label": {"type": "string", "maxLength": 80}}}}}},
+                                                                             "yes_label": {"type": "string", "maxLength": 200}, "no_label": {"type": "string", "maxLength": 200}}}}}},
                                              "multipart/form-data": {"schema": {"type": "object", "properties": {
                                                  "body": {"type": "string"}, "task_id": {"type": "integer"}, "reply_to": {"type": "integer"},
                                                  "job_id": {"type": "integer"}, "job_parent": {"type": "integer"},  # 2.59.0 (#1827)
                                                  "approval": {"type": "string", "description": "2.35.0 (#1103): the approval object as a JSON string"},
-                                                 "limit": {"type": "string", "description": "2.236.0 B (#2909): true / false"}, "next_step": {"type": "string", "maxLength": 80},
+                                                 "limit": {"type": "string", "description": "2.236.0 B (#2909): true / false"}, "next_step": {"type": "string", "maxLength": 200},
                                                  "source": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,23}$"},  # 2.388.0 (#3341)
                                                  "file": {"type": "array", "items": {"type": "string", "format": "binary"}}}}}}}}},
         "/agent/usage": {  # 2.1.1 (#326)

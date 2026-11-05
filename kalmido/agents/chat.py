@@ -375,7 +375,8 @@ def _jload(v):
         return None
 
 
-CHOICES_MAX, CHOICE_LABEL_MAX, CHOICE_ID_RE = 8, 80, re.compile(r"[A-Za-z0-9_.:-]{1,40}")
+# 2.565.0 (#4713): a button label holds 200 characters (was 80); longer ones are cut hard, clients sending 80 stay valid
+CHOICES_MAX, CHOICE_LABEL_MAX, CHOICE_ID_RE = 8, 200, re.compile(r"[A-Za-z0-9_.:-]{1,40}")
 CHOICE_STYLES = ("default", "primary", "danger")
 # 2.30.0 (#1041): a permission question = buttons allow / deny (given, or added by permission: true); expires_in: seconds
 PERM_IDS, PERM_EXPIRES_MAX = ("allow", "deny"), 7 * 86400

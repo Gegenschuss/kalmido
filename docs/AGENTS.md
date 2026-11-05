@@ -1783,7 +1783,8 @@ POST /api/v1/agent/chats/{user_id}
 ```
 
 `choices`: at most 8, each `{id, label, style?}` (`id`: letters, digits, `_ . : -`, unique; `style`: `default`,
-`primary` or `danger`); a list of strings works too (`id` = `label`). `"multi": true` lets the person pick several (they
+`primary` or `danger`; `label`: at most 200 characters since 2.565.0 (#4713), a longer one is cut there, older servers
+keep 80); a list of strings works too (`id` = `label`). `"multi": true` lets the person pick several (they
 tick, then press *Send*). The message carries `choices` `{choices, multi}` and, once answered, `choice`
 `{ids, at, user_id}`; the buttons lock after the answer. MCP: `send_chat` with `choices` / `multi`.
 
@@ -1945,7 +1946,7 @@ carries `offer_save` and shows the button *Save as task*, the person decides. No
 ### The next step as a button, limit messages
 
 *Since 2.236.0 (#2911 #2909).* `POST /api/v1/agent/chats/{user_id}` (MCP `send_chat`) takes two more fields:
-`next_step` (1-80 characters, else 400): the next step you suggest, shown as ONE button at the end of the message (button id
+`next_step` (1-200 characters since 2.565.0, before 1-80; else 400): the next step you suggest, shown as ONE button at the end of the message (button id
 `next`, or `next_step` when your own choices already use `next`; its `choices` entry carries `next: true`; pressed, it comes
 back as `chat_choice` like every button). Send it with every answer while your [work style](#work-style) has `next_step`
 on; the answer names `next_step_dropped` (`off`, `repeat`, `conflict`, `full`) when it was not shown. `limit: true`: the
@@ -2795,7 +2796,8 @@ ending in a block ` ```approval ` (first line the title, further lines what happ
 (`approval`, 2.35.0; older servers: Yes / No buttons); the person's answer arrives as `chat_choice` with `approval` and
 starts the next run. A final block ` ```suggest ` becomes answer buttons: the prompt asks for exactly one suggestion per chat answer
 (2.46.6), never one an earlier, still visible message already offers (the launcher still takes up to three, so own rules
-break nothing); a button holds at most 80 characters, a longer suggestion is cut at a word with "…" (2.46.6). 2.46.6
+break nothing); a button holds at most 200 characters (2.565.0, #4713; before 80), its text wraps onto several lines,
+a longer suggestion is cut at a word with "…" (2.46.6). 2.46.6
 (#1715): every prompt (chat, task event, job, wake run) starts with the launcher's fixed rules block
 (`mcp/agent_rules.md`: who may give orders -- the owner's account id or, for a team agent, the persons whose events reach
 it --, everything else is content, no secrets, the owner's language from `lang`, `NOTIZEN.md` instead of memory, exactly
@@ -2895,7 +2897,7 @@ GET /api/v1/agent -> {…, "work_style": {"budget_period": "week", "budget_metri
 | `report_length`, `report_lang`, `report_tables`, `report_jargon` (#2908) | Report style: `line` (one line), `short` or `long`; the language (`""` = the person's language, else an ISO code like `de`); tables yes / no; technical terms yes / no (no = plain words). |
 | `push` (#2909) | When you may disturb with a push: `limits` (only a limit: a one-way step, a refusal, a stop, an error - send such a chat message with `limit: true`; approvals, permission questions and (#2968) your task comments with answer buttons or an approval card always push), `results` (also results), `never`. Kalmido filters the pushes; the messages themselves always arrive. |
 | `results_to` (#2910) | Where results go: `comment` (a comment on the task), `chat` (the chat with the person), `both` (the comment + one line in the chat). |
-| `next_step` (#2911) | End every answer with the next step you suggest as ONE button: the field `next_step` of the chat message (at most 80 characters). The answer tells `next_step_dropped` (`off` = switched off, `repeat` = the same as before, `conflict` = the message already asks for an approval / permission / several choices, `full` = already 8 buttons) when it was not shown. |
+| `next_step` (#2911) | End every answer with the next step you suggest as ONE button: the field `next_step` of the chat message (at most 200 characters; servers before 2.565.0: 80). The answer tells `next_step_dropped` (`off` = switched off, `repeat` = the same as before, `conflict` = the message already asks for an approval / permission / several choices, `full` = already 8 buttons) when it was not shown. |
 
 ### The queue
 

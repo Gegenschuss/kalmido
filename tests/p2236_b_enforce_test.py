@@ -6,7 +6,7 @@
  - #2905 quiet window for messages: pushes are counted, not sent; when the window ends ONE push "<agent>: N messages during
    the quiet hours", the count goes
  - #2911 next_step: one answer button {id next, next: true} after the agent's own choices; dropped with next_step_dropped
-   off / repeat / conflict / full (the message stays); 81 characters or not a text -> 400; a press reaches the agent as
+   off / repeat / conflict / full (the message stays); 201 characters (2.565.0, before 81) or not a text -> 400; a press reaches the agent as
    chat_choice
  - #2904 the owner's budget (personal agents of a member and of a person without organisation): one notice at warn_pct
    and one when used up (News + push to the owner, once per period), then 429 + Retry-After + "Budget reached" except the
@@ -161,7 +161,8 @@ check(r.status_code == 201 and r.json().get("next_step_dropped") == "conflict", 
 r = say(body="May I?", choices=["allow", "deny"], next_step="Go on")
 check(r.status_code == 201 and r.json().get("next_step_dropped") == "conflict", "#2911 review: an older host's allow / deny question -> conflict " + r.text[:200])
 check(say(body="x", choices='"oops"', next_step="Go").status_code == 400, "#2911 review: choices not a list stays 400 with next_step")
-check(say(body="x", next_step="y" * 81).status_code == 400 and say(body="x", next_step=5).status_code == 400, "#2911: too long / not a text -> 400")
+# 2.565.0 (#4713): a button holds 200 characters now (was 80), so 201 is the first one too long
+check(say(body="x", next_step="y" * 201).status_code == 400 and say(body="x", next_step=5).status_code == 400, "#2911: too long / not a text -> 400")
 ws({"next_step": False})
 r = say(body="Off now", next_step="A brand new step")
 check(r.status_code == 201 and r.json().get("next_step_dropped") == "off" and r.json()["body"] == "Off now", "#2911: next_step off -> dropped, the message stays")

@@ -684,7 +684,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
   folder (it exits with code 3; a stale lock never blocks). 2.443.0: stopping the launcher (TERM / INT) also ends a run in
   progress with everything it started; its event runs again at the next start.
 - **Suggestions** (2.40.0): a final block ` ```suggest ` becomes answer buttons under the answer (servers without
-  buttons: a numbered line). 2.46.6: the prompt asks for exactly one suggestion per answer, at most 80 characters, never
+  buttons: a numbered line). 2.46.6: the prompt asks for exactly one suggestion per answer, at most 200 characters (2.565.0; before 80), never
   one an earlier, still visible message already offers; the launcher still takes up to three lines, and a longer label is
   cut at a word with "…". A pressed button comes back as `chat_choice` with its label; a next message that is only the
   number (`1`) picks that suggestion too.

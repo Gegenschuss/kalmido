@@ -39,10 +39,12 @@ function ccApvState(ch, ans, st, t) {
 }
 // answer buttons / suggestions (not an approval card): o = {ch, ans, sel (Set of picked ids, multi), attrs(id), pen(c) (the
 // pen next to an open suggestion: its html, or ''), send (the attributes of "Send" with multi), done (the text after an answer)}
+// 2.565.0 (#4713): a long label (up to 200 characters) -> class cchl: the button takes the full width on a phone
+const ccIsLong = c => String(c.label || '').length > 40;
 function ccButtons(o) {
   const {ch, ans} = o, ids = new Set(ans?.ids || []), multi = !!ch.multi, sel = o.sel || new Set();
-  const btn = c => `<button type="button" class="cchb ${c.style ? 'st-' + esc(c.style) : ''} ${ids.has(c.id) || sel.has(c.id) ? 'on' : ''}" ${o.attrs(c.id)} ${ans ? 'disabled' : ''} ${multi ? `aria-pressed="${sel.has(c.id)}"` : ''}>${ids.has(c.id) ? ic('check', 's') : ''}<span>${esc(c.label)}</span></button>`;
-  const pen = c => { const p = o.pen ? o.pen(c) : ''; return p ? `<span class="cchw">${btn(c)}${p}</span>` : btn(c); };
+  const btn = c => `<button type="button" class="cchb${ccIsLong(c) ? ' cchl' : ''} ${c.style ? 'st-' + esc(c.style) : ''} ${ids.has(c.id) || sel.has(c.id) ? 'on' : ''}" ${o.attrs(c.id)} ${ans ? 'disabled' : ''} ${multi ? `aria-pressed="${sel.has(c.id)}"` : ''}>${ids.has(c.id) ? ic('check', 's') : ''}<span>${esc(c.label)}</span></button>`;
+  const pen = c => { const p = o.pen ? o.pen(c) : ''; return p ? `<span class="cchw${ccIsLong(c) ? ' cchl' : ''}">${btn(c)}${p}</span>` : btn(c); };
   return `<div class="cchoices ${ans ? 'done' : ''}" role="group" aria-label="${esc(tr('Answer'))}">${ch.choices.map(ans ? btn : pen).join('')}${multi && !ans && o.send ? `<button type="button" class="btn sm pri cchsend" ${o.send} ${sel.size ? '' : 'disabled'}>${ic('send', 's')} ${tr('Send')}</button>` : ''}${ans ? `<small class="muted cchans">${esc(o.done || tr('Answered'))} · ${fmtWhen(ans.at)}</small>` : ''}</div>`;
 }
 
