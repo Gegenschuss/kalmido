@@ -763,7 +763,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `edit_team_message`, `empty_trash`, `export_brief`, `export_data`, `export_ics`, `export_vcards`, `freebusy`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_delivery_report`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_filed_mail`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,
-`get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_queue`,
+`get_life`, `get_list`, `get_me`, `get_milestone`, `get_note`, `get_object`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_queue`,
 `get_playbook`, `get_poll`, `get_project_overview`, `get_reply_style`, `get_review`, `get_roadmap`, `get_rules`, `get_storage`, `get_task`, `get_task_events`, `get_time_gaps`, `get_timer`,
 `get_usage`, `get_velocity`, `get_video_review`, `get_view_layout`, `get_waiting`, `get_weekly_status`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`,
 `ingredients_to_shopping`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_environments`,
@@ -771,7 +771,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_calendar_events`, `list_chats`, `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`,
 `list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_flow`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
-`list_notepads`, `list_notes`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
+`list_notepads`, `list_notes`, `list_objects`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
 `list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
@@ -790,10 +790,12 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,
 `unshare_list_from_group`, `unwatch_task`, `update_address_book`, `update_client`, `update_comment`, `update_contact`,
 `update_document`, `update_event`, `update_event_calendar`, `update_field`, `update_filter`, `update_form`,
-`update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_notepad`,
+`update_habit`, `update_job`, `update_letter_draft`, `update_list`, `update_list_tag`, `update_milestone`, `update_note`, `update_object`, `update_notepad`,
 `update_offer_draft`, `update_office_lead`, `update_project_link`, `update_reward`, `update_task`, `update_template`, `update_time_entry`,
 `upload_attachment`, `upload_project_file`, `wait_for_events`, `watch_task`, `wiki_create`, `wiki_files`, `wiki_list`, `wiki_read`, `wiki_read_file`, `wiki_write`,
 `withdraw_chat_choices`, `withdraw_comment_choices`, `write_file`, `write_journal`, `write_status_pad`
 <!-- kalmido-tool-index:end -->
+
+2.558.0: areas built on the shared core (meetings, planners, team projects ...) share their objects with you through `list_objects` / `get_object` (a `kind` and the object's id); `update_object` changes only the fields you send and ALWAYS needs `expect_updated_at` from your last `get_object` (400 without it; 409 = a person changed it since: read it again, merge, retry).
 
 2.391.0: the set-up tools `list_webhooks`, `create_webhook`, `update_webhook`, `delete_webhook`, `rotate_webhook_secret`, `test_webhook`, `get_webhook_log`, `list_api_tokens`, `create_api_token`, `revoke_api_token`, `add_repo_connection`, `update_repo_connection`, `remove_repo_connection`, `set_repo_version_field` need the scope `integrations`, which an agent never gets: they are for a person's own MCP client (toolset `integrations`), not for you - do not try them.

@@ -128,6 +128,7 @@ UMZ_LEFT_USERS = {
     # anew on the target (consent page); on deleting the account (or the agent) both go by foreign key (ON DELETE CASCADE)
     "oauth_codes": _U_SECRET, "oauth_grants": _U_SECRET,
     "time_wipes": _U_DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times" (until the trash period ends)
+    "obj_history": _U_DERIVED, "obj_undo": _U_DERIVED, "obj_revoked": _U_SHARE,  # 2.558.0 (#4709): the core's history / undo steps, revoked shares
     "dav_sync": _U_DERIVED, "dav_sync2": _U_DERIVED, "dl_changes": _U_DERIVED, "list_activity": _U_DERIVED, "rss_items": _U_DERIVED, "sheet_lastvals": _U_DERIVED,
     "book_members": _U_SHARE, "ev_cal_members": _U_SHARE, "folder_people": _U_SHARE, "fs_shares": _U_SHARE, "group_members": _U_SHARE, "sheet_shares": _U_SHARE,
     "office_archive_log": _U_ORG, "office_doc_log": _U_ORG, "office_drives": _U_ORG, "office_letter_profiles": _U_ORG, "office_meal_log": _U_ORG,

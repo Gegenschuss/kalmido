@@ -470,6 +470,7 @@ OX_LEFT = {
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,
     "rc_suggest": _DERIVED, "task_bell": _PERSONAL, "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times"
+    "obj_history": _DERIVED, "obj_undo": "undo steps of one day", "obj_revoked": "shares taken back (not_included)",  # 2.558.0 (#4709): the core's working data
     "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
     "wiki_spaces": "the lock of a space (client_encrypted names it)",
     # list column

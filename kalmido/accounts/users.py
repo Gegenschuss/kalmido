@@ -581,6 +581,8 @@ def _user_purge(c, uid, made):
     bkr_journal(c, uid)  # 2.152.0 B (#2172): the journal of deleted accounts (a restore deletes them again)
     for o in rck_admin_orgs(c, uid):  # 2.539.0 (#4373): an admin who saw an organisation's recovery key goes (before the log forgets the id)
         rck_admin_gone(c, o, uid)
+    from ..core.objects import obj_revoke_person
+    obj_revoke_person(c, uid, None, "delete")  # 2.558.0 (#4709): its undo steps and revoked rows, its name in the core's history
     # 2.152.0 A (#2164): the personal office is dismantled with its files, or retired when it keeps invoices / receipts by
     # law; agents, organisation calendars, time of organisation projects, direct messages, mentions, logs, the inbox
     files = upg_personal(c, uid)

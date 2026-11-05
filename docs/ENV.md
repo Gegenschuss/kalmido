@@ -365,6 +365,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_TEST_MODE` | `0` | Test containers only: allows the test switches of the organisation key tool (1); left alone in a server's .env it is ignored. |
 | `KALMIDO_TEST_NOW` | `(empty)` | Test containers only (with KALMIDO_TEST=1): the server clock starts at this ISO time and runs on from there. |
 | `KALMIDO_TEST_NOW_AT` | `(empty)` | Test containers only: the real Unix second KALMIDO_TEST_NOW belongs to (app and worker share one shifted clock). |
+| `KALMIDO_TEST_OBJ` | `0` | Test containers only (with KALMIDO_TEST=1): registers the test kind 'objprobe' of the shared core (2.558.0, core/objects.py). |
 | `KALMIDO_TEST_PG_DUMP_VERSION` | `(empty)` | Test containers only (with KALMIDO_TEST=1): plays the output of pg_dump --version in the check before a backup (2.359.3, #2945). |
 | `KALMIDO_TEST_RATE_WINDOW_S` | `60` | Test containers only (with KALMIDO_TEST=1): seconds of the request rate window instead of a minute. |
 | `KALMIDO_TEST_ROT_ABORT` | `(empty)` | Tests: stop the key rotation right after the switch (1). |

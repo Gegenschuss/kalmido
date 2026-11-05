@@ -2620,6 +2620,20 @@ TOOLS += [
      _obj({"list_id": S_ID, "field": {"type": ["string", "integer"]}}, ["list_id", "field"]),
      lambda api, a: api.call("PUT", f"/lists/{_id(a, 'list_id')}/repos/version-field", body={"field": a["field"]})),
 ]
+TOOLS += [  # 2.558.0 (#4709): objects of the areas built on the shared core (only what is shared with the agent)
+    ("list_objects", "2.558.0: the objects of one kind (an area built on the shared core, e.g. meetings) shared with you, newest change first.",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 20}}, ["kind"]),
+     lambda api, a: api.call("GET", f"/agent/objects/{str(a['kind'])}")),
+    ("get_object", "2.558.0: one object of a kind with its fields and updated_at (send it back as expect_updated_at when changing).",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 20}, "object_id": S_ID}, ["kind", "object_id"]),
+     lambda api, a: api.call("GET", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}")),
+    ("update_object", "2.558.0: change the fields given in values (only those); expect_updated_at (from get_object) is required: "
+                      "without it 400, when someone changed the object since 409 with the current state (read it, merge, try again).",
+     _obj({"kind": {"type": "string", "minLength": 1, "maxLength": 20}, "object_id": S_ID, "values": {"type": "object"},
+           "expect_updated_at": {"type": "string"}}, ["kind", "object_id", "values", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/agent/objects/{str(a['kind'])}/{_id(a, 'object_id')}",
+                             body={**(a.get("values") or {}), "expect_updated_at": a["expect_updated_at"]})),
+]
 TOOL_MAP = {t[0]: t for t in TOOLS}
 
 
@@ -2665,6 +2679,7 @@ TOOL_SCOPES["time"] += ("check_time_entries", "time_from_events", "propose_time_
 TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2.51.0 (#1355)
 TOOL_SCOPES["calendar"] += ("list_polls", "get_poll", "create_poll")  # 2.484.0 (#2200)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
+TOOL_SCOPES["agent"] += ("list_objects", "get_object", "update_object")  # 2.558.0 (#4709): the agent routes of the core objects
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["structure"] += ("set_dwell_limits",)  # 2.553.0 C (#3538)
 TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.138.1 (#2059)

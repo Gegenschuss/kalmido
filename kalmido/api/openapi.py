@@ -815,6 +815,8 @@ def openapi_spec():
     events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#659)
     from ..calendars.pollsv1 import polls_spec
     polls_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.484.0 (#2200)
+    from ..core.objweb import objects_spec
+    objects_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.558.0 (#4709): the core objects for agents
     contacts_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.21.0 (#658)
     life_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.22.0 (#663)
     team_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#419)

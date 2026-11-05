@@ -1560,8 +1560,8 @@ def uset(c, uid, key, value):
               "ON CONFLICT(user_id,key) DO UPDATE SET value=excluded.value", (uid, key, str(value)))
 
 
-def bump(c):
-    area = lv_area()
+def bump(c, area=None):
+    area = area or lv_area()  # 2.558.0 (#4709): a core object names its area (core/objects.py obj_register area=)
     r = c.execute("UPDATE settings SET value=CAST(CAST(value AS BIGINT)+1 AS TEXT) WHERE key='version' RETURNING value").fetchone()
     if r:  # 2.42.0 (#1376): the task changes of this transaction belong to the new version (GET /api/state/delta)
         from ..tasks.delta import dl_scope, dl_stamp

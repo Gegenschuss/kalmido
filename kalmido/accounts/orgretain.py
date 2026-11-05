@@ -335,6 +335,8 @@ def odl_retire(c, oid, until, gone=None):
         adm = [str(r[0]) for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
                                             "AND m.role='admin' AND COALESCE(u.kind, 'user')!='agent' AND m.user_id!=? ORDER BY m.user_id",
                                             (oid, int(gone or 0))).fetchall()]
+        from ..core.objects import obj_revoke_person
+        obj_revoke_person(c, None, oid, "retire")  # 2.558.0 (#4709): every share on its nodes, every membership of its rooms (restorable rows)
         c.execute("UPDATE agents SET org_id=NULL WHERE org_id=?", (oid,))
         odl_public_off(c, oid)  # 2.360.4 (#3243)
         odl_members_off(c, oid)  # 2.560.0 (#4697): before org_id=NULL (then the organisation's boundary no longer holds)

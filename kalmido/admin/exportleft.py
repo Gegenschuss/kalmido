@@ -30,6 +30,7 @@ UMZ_LEFT_TABLES = {
     "agent_server": _AGENT, "agent_runs": _AGENT,  # 2.557.0 B (#4670): a server agent's settings (its key sealed) and runs
     "task_offer_links": _DERIVED,  # 2.537.0 C (#3433): where a task came from in a quotation (the budget itself is in its field)
     "time_wipes": _DERIVED,  # 2.530.0 B (#4315): the Undo copy of "Delete all times" (working data until the trash period ends)
+    "obj_history": _DERIVED, "obj_undo": _DERIVED, "obj_revoked": _SHARE,  # 2.558.0 (#4709): the core's change history / undo steps (the areas export their objects), revoked shares
     "comment_trash_text": _DERIVED, "tchat_trash_text": _DERIVED,  # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends)
     "task_mail": _SERVER,  # 2.393.2 B (#3375): Message-IDs of tasks (the reply addresses are signed with this server's key)
     "budget_meta": _DERIVED, "contact_occ": _DERIVED, "dav_meta": _DERIVED, "dav_sync": _DERIVED, "dav_sync2": _DERIVED, "dl_changes": _DERIVED,

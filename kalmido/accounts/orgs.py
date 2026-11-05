@@ -1502,6 +1502,8 @@ def org_member_put(oid):
         acx_drop()  # 2.143.0 A (#2151): the cached roles of this request
         if cur["role"] != role:
             org_role_news(c, oid, uid, role)  # 2.367.4 (#2974)
+            from ..core.objects import obj_revoke_person
+            obj_revoke_person(c, uid, oid, "role", role=role)  # 2.558.0 (#4709): a guest / accounting leaves the open channels joined
             if cur["role"] == "admin":
                 rck_admin_gone(c, oid, uid)  # 2.539.0 (#4373)
             org_open_chan_off(c, oid, uid, role)  # 2.560.0 (#4698 b)
@@ -1656,6 +1658,8 @@ def org_leave(c, oid, uid, heir, back=None):
     with system_ctx(c):  # 2.223.2 B (#2860): their office rights groups go too (coming back = no old groups)
         c.execute("DELETE FROM office_rgroup_members WHERE org_id=? AND user_id IN (%s)" % ",".join("?" * (len(ags) + 1)), (oid, uid, *ags))
         c.execute("DELETE FROM doc_fetchers WHERE org_id=? AND user_id=?", (oid, uid))  # 2.425.0 (#3453 review): their receipt fetchers end (coming back = no old key)
+    from ..core.objects import obj_revoke_person
+    obj_revoke_person(c, uid, oid, "leave", heir=heir)  # 2.558.0 (#4709): the core's revocation (file store shares, team chat rooms, core objects)
     c.execute("DELETE FROM org_members WHERE org_id=? AND user_id=?", (oid, uid))
     if was_admin:  # 2.539.0 (#4373): an admin who saw the recovery key leaves: the other admins are asked to renew it
         rck_admin_gone(c, oid, uid)

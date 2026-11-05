@@ -118,6 +118,7 @@ TABLES = (
     "rss_feeds",  # 2.172.0 B (#2677): feeds (NULL = private, the app checks user_id; articles / read marks hang on feed_id)
     "reading_orgs",  # 2.172.0 B (#2677): the read-later project of an organisation
     "life_trip_costs",  # 2.173.0 A (#2680): the office trip of a trip project (org_id = the office area)
+    "obj_history", "obj_undo", "obj_revoked",  # 2.558.0 (#4709): the core's history, undo steps and revoked rows (NULL = a private object)
 )
 OWN_POLICY = ("orgs", "org_members")
 POLICY = "kalmido_org"
