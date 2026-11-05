@@ -182,6 +182,8 @@ Fr.post(B + "/api/files/upload", data={"parent_id": str(HF)}, files={"file": ("m
 sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, subject, created_at, folder_id, deleted_at) VALUES(NULL,?,?,?,?,?,?,?)",
     (FID, f"u{FID}", "old-1@example.com", "Invented", OLD, HF, OLD), write=True)
 HM = one("SELECT id FROM hub_mails WHERE message_id='old-1@example.com'")
+# 2.549.0 (#4637): the folder is stamped with its mail, as hbm_file does for a fresh folder
+sql("UPDATE fs_nodes SET hub_mail_id=? WHERE id=?", (HM, HF), write=True)
 sql("INSERT INTO hub_words(mail_id, h) VALUES(?, 'abc123')", (HM,), write=True)
 sql("INSERT INTO hub_mails(org_id, owner_id, ws, message_id, created_at, deleted_at) VALUES(NULL,?,?,?,?,?)",
     (FID, f"u{FID}", "fresh-1@example.com", ago(0), ago(0)), write=True)
