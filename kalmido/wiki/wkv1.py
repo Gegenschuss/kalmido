@@ -18,13 +18,14 @@ Every read, write and creation by an agent is noted in the history of the page's
 import json
 import os
 
-from flask import g, jsonify
+from flask import g, jsonify, request
 
 from ..core.config import app, ATT_DIR
 from ..core.access import Denied, acx_of
 from ..core.db import bump, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, reject_unknown
 from ..core.i18n import tr
+from ..core.conflict import need_version  # 2.564.0 (#4702)
 from ..accounts.session import me
 from ..api.common import V1Error, v1_args, v1_call, v1_err, v1_json, v1_out, v1_view
 from ..collab.comments import user_names
@@ -211,7 +212,7 @@ def _conflict(c, uid, r, role, path):
 @app.patch("/api/v1/wiki/pages/<int:pid>")
 @v1_view
 def wkv_update(pid):
-    """{body, expect_updated_at?} -- the new text (role edit). A person's token may also rename: path (the full path), relink."""
+    """{body, expect_updated_at?} -- the new text (role edit). 2.564.0 (#4702): required for agents (or the header If-Match). A person's token may also rename: path (the full path), relink."""
     b = v1_json()
     c = db()
     uid = me()
@@ -222,11 +223,12 @@ def wkv_update(pid):
         raise Denied(403, tr("Through a share only the page's text can change here"))  # 2.200.0 F (#1781, review 2)
     if "body" in b:
         wiki_body(b)  # the size check before anything else
-    exp = b.get("expect_updated_at")
+    need_version(b, "expect_updated_at")  # 2.564.0 (#4702): an agent says which version it read (or If-Match)
+    exp = b.get("expect_updated_at") or (request.headers.get("If-Match") or "").strip().removeprefix("W/").strip('"') or None
     if exp and exp != r["updated_at"]:
         return _conflict(c, uid, r, role, path)
     try:
-        v1_call(wiki_update, pid, body=dict(b))
+        v1_call(wiki_update, pid, body={**b, **({"expect_updated_at": exp} if exp else {})})  # 2.564.0 (#4702): + If-Match
     except V1Error as e:  # 2.200.0 F (#1781, review 5): saved in between (wiki_update checks it in its UPDATE)
         if exp and e.resp.status_code == 409:
             r, role, path = wkv_need(c, uid, pid)

@@ -250,7 +250,11 @@ check(L.get(Q1) == "Clients/Acme/Contacts" and Q2 in L, f"her token: her pages, 
 check(lst(da) == {} and read(da, Q1) == 404, "her own agent: nothing without a share")
 fshare(Fl, CL, agent_id=DA, role="edit")
 check(lst(da) == {Q1: "Clients/Acme/Contacts"} and read(da, Q1).get("body") == "Jane", "her agent with the folder share reads")
-check(write(da, Q1, body="Jane Doe").status_code == 200, "and writes")
+# 2.564.0 (#4702): an agent writes only with the version it read (400 version_required without)
+r = write(da, Q1, body="Jane Doe")
+check(r.status_code == 400 and r.json()["error"]["code"] == "version_required" and "expect_updated_at" in r.json()["error"]["fields"],
+      f"#4702: her agent without expect_updated_at: 400 version_required {r.status_code} {r.text[:160]}")
+check(write(da, Q1, body="Jane Doe", expect_updated_at=read(da, Q1)["updated_at"]).status_code == 200, "and writes")
 r = create(da, CL, "Globex", "new client")
 check(r.status_code == 201 and r.json().get("space") == "private", f"and creates in her private folder ({r.status_code} {r.text[:160]})")
 Q3 = r.json().get("id") if r.status_code == 201 else 0
