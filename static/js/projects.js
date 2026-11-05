@@ -61,10 +61,13 @@ function timeSumHtml(lists, name = '') {
   const h = sec / 3600, dh = new Set(ls.map(dayHOf));
   const dtxt = Math.abs(days - 1) < .05 ? tr('{0} day|time', fmtNum(1)) : tr('{0} days|time', fmtNum(days));
   const tip = [tr('Tracked: {0}', fmtDur(sec)), dh.size === 1 ? tr('{0} at {1} h per day', dtxt, fmtNum([...dh][0])) : tr('{0}, each project with its own hours per day', dtxt),
-    bud ? tr('Budget: {0} h', fmtNum(bud)) : ''].filter(Boolean).join(' · ');
-  const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0;
-  return `<span class="tsum ${bud && h > bud ? 'over' : ''}" role="button" tabindex="0" data-tsum="${ls.map(l => l.id).join(',')}" data-tsum-name="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}</span>`;
+    bud ? tr('Budget: {0} h', fmtNum(bud)) : '', pbw_level(h, bud) ? tr(BUDGET_TXT[pbw_level(h, bud)]) : ''].filter(Boolean).join(' · ');
+  const pct = bud ? Math.min(100, Math.round(h / bud * 100)) : 0, lv = pbw_level(h, bud);  // 2.555.0 (#4570): 80 % warn, 100 % over
+  return `<span class="tsum ${lv}" role="button" tabindex="0" data-tsum="${ls.map(l => l.id).join(',')}" data-tsum-name="${esc(name)}" title="${esc(tip)}" aria-label="${esc(tip)}">${ic('clock', 's')}<span class="tsl">${tr('Tracked')}</span><b>${esc(fmtNum(h))} h</b><span class="tsd">${esc(dtxt)}</span>${bud ? `<span class="tbud" role="img" aria-label="${esc(tr('{0} % of the budget', Math.round(h / bud * 100)))}"><i style="width:${pct}%"></i></span><span class="tbn">${esc(fmtNum(h))}/${esc(fmtNum(bud))} h</span>` : ''}${lv ? `<span class="tbw" data-tbw="${lv}">${esc(tr(BUDGET_TXT[lv]))}</span>` : ''}</span>`;
 }
+// 2.555.0 (#4570): the budget level of tracked hours h against bud like the server (personal/budgetwarn.py bw_level, rounded
+// percent): '' (no budget, below 80 %) | warn | over
+const pbw_level = (h, bud) => { if (!(bud > 0)) return ''; const pc = Math.round(h / bud * 100); return pc >= 100 ? 'over' : pc >= 80 ? 'warn' : ''; };
 function folderHead(f) {
   const ts = timeSumHtml(folderLists(f), fName(f)), sh = collab() ? folderShrHtml(f) : '';  // 2.41.0 (#1428): the share symbols on the phone too
   const sht = sh ? (sh.match(/title="([^"]*)"/) || [])[1] || '' : '';

@@ -3840,7 +3840,9 @@ with the scope it needs). The tools:
   `update_project_link`, `delete_project_link`, `reorder_project_links`, `add_milestone`, `update_milestone`,
   `delete_milestone`, `list_project_files`, `upload_project_file`, `delete_project_file`, `list_repos`, `list_build_status` (2.151.0), `list_environments` (2.60.0), `set_deployment` (2.60.0)
   (2.270.0: pass `expect_updated_at` = `description_at` from `get_project_overview` to `set_project_overview`; when someone saved
-  the description since, the call is refused with 409 and the current overview in `error.current`: read it, merge, send again)
+  the description since, the call is refused with 409 and the current overview in `error.current`: read it, merge, send again;
+  2.555.0: its `time` carries `budget_level` `none` / `ok` / `warn` from 80 % / `over` from 100 % of `budget_h` and `budget_pct`,
+  the same rule as the app; time an agent books counts towards the owner's and admins' budget notice, agents get none themselves)
 - time and habits: `get_timer`, `start_timer`, `stop_timer`, `list_time_entries`, `get_time_gaps` (2.34.0), `add_time_entry`, `update_time_entry`,
   `delete_time_entry`, `list_habits`, `create_habit`, `update_habit`, `delete_habit`, `check_in_habit`, `get_habit_stats` (2.138.1). 2.144.6: time entries
   carry `billable` (settable in `add_time_entry` / `update_time_entry`) and `billed` (on an invoice: only the note changes)

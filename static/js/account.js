@@ -150,11 +150,13 @@ NOTIF_ROWS.push(['limits', N_('E-mail limits of public pages'), N_('your client 
 NOTIF_ROWS.push(['notice', N_('Notices from the server'), N_('a maintenance notice sent as a push')]);  // 2.367.4 (#2974): push only
 NOTIF_ROWS.push(['office', N_('Payments and overdue invoices'), N_('a payment was booked on an invoice of your office, an invoice is past its due date (no push for that)'), 'office']);  // 2.367.4 (#2972)
 NOTIF_ROWS.push(['calsub', N_('Calendar subscriptions'), N_('a calendar you subscribed to failed three times in a row')]);  // 2.367.2 (#2969): News only
+NOTIF_ROWS.push(['timebudget', N_('Budget warnings'), N_('a project or task of yours reached 80 % or 100 % of its budget in hours (once per threshold)')]);  // 2.555.0 (#4570)
 const NM_GROUP = {comment: 'comment', reply: 'comment', follow: 'comment', mention: 'mention', assign: 'assign', complete: 'complete', status: 'status', share: 'share', unblock: 'unblock'};
 const NM_PRIMARY = ['comment', 'mention', 'assign', 'complete', 'status', 'share', 'unblock'];
 const NM_NEWS_NEW = {newtask: 0, approval: 1, followup: 1, usage: 1, proposal: 1, errreport: 1, signoff: 1, limits: 1, calsub: 1, office: 1};  // 2.266.0 (#2965): signoff
 const NM_PUSH = {comment: 1, reply: 1, follow: 1, mention: 1, assign: 1, newtask: 0, complete: 1, status: 0, share: 0, unblock: 1, approval: 1, followup: 1, reminder: 1, usage: 1, proposal: 1, nag: 1, chat: 1, errreport: 1, signoff: 1, office: 1, notice: 1};
 const NM_SOCIAL = ['comment', 'reply', 'follow', 'mention', 'assign', 'newtask', 'complete', 'status', 'share', 'unblock', 'approval', 'proposal', 'chat', 'errreport'];
+/** @type {any} */ (NM_NEWS_NEW).timebudget = 1; /** @type {any} */ (NM_PUSH).timebudget = 1; NM_SOCIAL.push('timebudget');  // 2.555.0 (#4570): News + push on by default, needs the collaboration module like the News
 const nmStored = s => { try { const o = JSON.parse(s.notify || '{}'); return o && typeof o === 'object' ? o : {}; } catch { return {}; } };
 function notifMatrix(s) {
   const nk = new Set(String(s.news_kinds ?? 'mention,assign,comment,complete,unblock,share,status').split(',')), o = nmStored(s), out = {};

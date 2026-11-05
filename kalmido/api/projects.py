@@ -230,7 +230,8 @@ def overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                                 "members": {"type": "array", "items": {"type": "object"}, "description": "Owner + members with role "
                                             "(empty while collaboration is off)"},
                                 "status": {"type": "object", "description": "current, note, at, history (newest first, at most 10)"},
-                                "time": nul("object", description="seconds, budget_h, day_hours (null while time tracking is off)")}},
+                                "time": nul("object", description="seconds, budget_h, day_hours, budget_level (none | ok | warn from 80 % | "
+                                            "over from 100 % of budget_h, 2.555.0), budget_pct (null without a budget); null while time tracking is off")}},
     })
     body_link = {"type": "object", "required": ["url"], "additionalProperties": False,
                  "properties": {"title": {"type": "string", "maxLength": OV_TITLE_MAX}, "url": {"type": "string", "format": "uri"}}}

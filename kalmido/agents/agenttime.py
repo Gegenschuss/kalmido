@@ -362,6 +362,8 @@ def atm_prop_run(c, j, sel, ed, rec):
         rec["copies"].append(list(row))
     if not rec["made"]:
         raise BadInput(tr("Select at least one entry"))
+    from ..personal.budgetwarn import bw_check
+    bw_check(c, [(x[2], x[1]) for x in rec["copies"]])  # 2.555.0 (#4570): 80 / 100 % of the budget, once per threshold
     return rec
 
 

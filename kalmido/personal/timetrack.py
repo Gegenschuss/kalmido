@@ -393,8 +393,9 @@ def task_budget(c, uid, tid, lid):
     s = c.execute(f"""SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND task_id IN ({q})
                       AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} AND {n43_own_sql(uid, adm, "")}""",
                   (*ids, uid, uid, uid)).fetchone()[0]
-    pct = round(s / 3600 / b * 100)
-    return {"h": b, "s": s, "pct": pct, "level": "over" if pct >= 100 else "warn" if pct >= 80 else "ok", "own": own}
+    from .budgetwarn import bw_level  # 2.555.0 (#4570): one rule for the task, the project and the notice
+    level, pct = bw_level(s, b)
+    return {"h": b, "s": s, "pct": pct, "level": level, "own": own}
 
 
 def stop_timer(c, r, at, ts):
@@ -437,6 +438,8 @@ def time_start():
                      int((end - at).total_seconds()) if end else 0, note, cid, ts, ts))
     from ..integrations.webhooks import who_note
     who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a timer started
+    from .budgetwarn import bw_check
+    bw_check(c, ([(run["list_id"], run["task_id"])] if stopped else []) + ([(lid, tid)] if end else []))  # 2.555.0 (#4570)
     bump(c)
     c.commit()
     return jsonify(entry=one_entry(c, eid), stopped=stopped, timer=time_running(c, uid))
@@ -472,6 +475,9 @@ def time_stop():
         sec = stop_timer(c, r, at, iso(ref))
     if sec == 0:  # started and stopped within the same second (misclick): nothing to keep
         c.execute("DELETE FROM time_entries WHERE id=?", (r["id"],))
+    elif sec is not None:
+        from .budgetwarn import bw_check
+        bw_check(c, [(r["list_id"], r["task_id"])])  # 2.555.0 (#4570): 80 / 100 % of the budget, once per threshold
     bump(c)
     c.commit()
     return jsonify(entry=one_entry(c, r["id"]), timer=time_running(c, uid), discarded=sec == 0)
@@ -542,6 +548,8 @@ def time_create():
         return jsonify(one_entry(c, r["id"]))
     from ..integrations.webhooks import who_note
     who_note("time.created", "time", eid)  # 2.115.0 A (#2061): a manual entry
+    from .budgetwarn import bw_check
+    bw_check(c, [(lid, tid)])  # 2.555.0 (#4570)
     bump(c)
     c.commit()
     return jsonify(one_entry(c, eid))
@@ -640,6 +648,9 @@ def time_update(eid):
         guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
         if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso(now_utc()), eid)).rowcount == 0:
             tbill_lost(c, eid, False)
+        if r["end"] is not None:  # 2.555.0 (#4570): a finished entry changed its time or its place (the old place too)
+            from .budgetwarn import bw_check
+            bw_check(c, [(r["list_id"], r["task_id"]), (lid, tid if "task_id" in b or "list_id" in b else r["task_id"])])
         bump(c)
         c.commit()
     return jsonify(one_entry(c, eid))
@@ -659,6 +670,8 @@ def time_delete(eid):
     old = one_entry(c, eid)
     if c.execute("DELETE FROM time_entries WHERE id=? AND billed_doc_id IS NULL", (eid,)).rowcount == 0:
         tbill_lost(c, eid, True)  # 2.144.6 A (#2053 review 1): billed between the check and the delete
+    from .budgetwarn import bw_check
+    bw_check(c, [(r["list_id"], r["task_id"])])  # 2.555.0 (#4570): the share falls: the mark goes down with it
     bump(c)
     c.commit()
     return jsonify(ok=True, entry=old)
@@ -686,9 +699,12 @@ def focus_to_entry(c, pid):
     if tsl_is_locked(c, uid, p["start"]):
         return None  # 2.125.0 B (#2119): a closed month gets no new entries
     ts = iso(now_utc())
-    return insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,source,pomo_id,created_at,updated_at)
-                        VALUES(?,?,?,?,?,?,?,'focus',?,?,?)""",
-                     (uid, p["task_id"], t["list_id"], t["title"], p["start"], p["end"], sec, pid, ts, ts))
+    eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,source,pomo_id,created_at,updated_at)
+                       VALUES(?,?,?,?,?,?,?,'focus',?,?,?)""",
+                    (uid, p["task_id"], t["list_id"], t["title"], p["start"], p["end"], sec, pid, ts, ts))
+    from .budgetwarn import bw_check
+    bw_check(c, [(t["list_id"], p["task_id"])])  # 2.555.0 (#4570)
+    return eid
 
 
 def local_bounds(d1, d2, tz=None):

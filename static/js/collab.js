@@ -294,6 +294,8 @@ function newsText(it, U) {
     case 'docpaid': return tr('Payment received: {0}', q([d.number, d.client].filter(Boolean).join(', ')));  // 2.367.4 (#2972)
     case 'docoverdue': return d.n > 1 ? tr('{0} invoices are overdue', d.n) : tr('Invoice overdue: {0}', q([d.number, d.client].filter(Boolean).join(', ')));
     case 'calsub': return tr('Your calendar subscription {0} keeps failing. Its events may be out of date.', q(d.name || ''));  // 2.367.2 (#2969)
+    case 'budgetwarn': { const nm = q(d.scope === 'task' ? it.task_title || '' : newsListName(it)), hh = esc(tr('{0} of {1} h', fmtNum(d.tracked_h ?? 0, 1), fmtNum(d.h ?? 0, 1)));  // 2.555.0 (#4570)
+      return d.level >= 100 ? tr('{0} is over its budget: {1}', nm, hh) : tr('{0} reached 80 % of its budget: {1}', nm, hh); }
     case 'abshare': return d.role === 'edit' ? tr('{0} shared the address book {1} with you', who, q(d.name || '')) : tr('{0} shared the address book {1} with you (view only)', who, q(d.name || ''));  // 2.21.0 (#658)
     case 'status': return d.status ? tr('{0} set {1} to {2}', who, q(newsListName(it)), `<span class="stpill st-${esc(d.status)} inl"><i></i>${esc(statusLabel(d.status))}</span>`) : tr('{0} cleared the status of {1}', who, q(newsListName(it)));
   }

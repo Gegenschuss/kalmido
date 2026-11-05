@@ -2983,6 +2983,8 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 .tsum.over .tbud i{background:var(--p5)}
 .tsum .tbn{font:var(--fs-xs) var(--mono);font-variant-numeric:tabular-nums}
 .tsum.over .tbn{color:var(--p5)}
+.tsum .tbw{font-size:var(--fs-xs);font-weight:600;color:var(--text)}.tsum.warn .tbud i{background:var(--p3)}.tsum.over .tbw{color:var(--danger)}  /* 2.555.0 (#4570): the budget warning */
+@media (max-width:30rem){ .lhead .tsum .tbw{display:none} }  /* 2.555.0 (#4570): the phone's header keeps the coloured bar, the project page the text */
 .lhead.fhd{padding-top:.25rem}
 @media (max-width:30rem){ .tsum .tbn{display:none} .lhead{flex-wrap:wrap;row-gap:.25rem} }
 /* #414: the shopping & packing list hint with its cart */

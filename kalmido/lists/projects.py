@@ -290,6 +290,8 @@ def overview_build(c, lid, uid):
         t = time_list_totals(c, uid).get(lid) or {"s": 0, "b": None}
         dh = lst["day_hours"] or time_day_h(c)
         out["time"] = {"seconds": t["s"] or 0, "budget_h": t["b"], "day_hours": dh}
+        from ..personal.budgetwarn import bw_level  # 2.555.0 (#4570): none | ok | warn (80 %) | over (100 %), as the app shows it
+        out["time"]["budget_level"], out["time"]["budget_pct"] = bw_level(t["s"] or 0, t["b"])
     return out
 
 
