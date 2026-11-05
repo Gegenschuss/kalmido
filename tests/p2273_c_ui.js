@@ -64,6 +64,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   ta.dispatchEvent(new w.Event('input', {bubbles: true}));
   check(w.eval('verDraft()'), 'typed but not saved: the automatic reload waits (a draft)');
   await w.eval('mdToSubtasks()');
+  // 2.549.0 (#4568): the description's save goes through the outbox online too (2.537.0), the subtasks and the step queue behind it
+  check(await until(() => w.eval('!OUT.q.length && !OUT.flushing')), 'the outbox sent the description, the subtasks and the step');
   const st = await call('GET', `/api/tasks/${t.id}`);
   const subs = (await call('GET', '/api/state')).tasks.filter(x => x.parent_id === t.id).map(x => x.title).sort();
   check(/Call the hotel/.test(st.content || '') && !/- \[ \]/.test(st.content || ''), 'after the step the server has the typed text and no open checklist line: ' + JSON.stringify(st.content));

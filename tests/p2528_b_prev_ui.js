@@ -28,6 +28,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   const w = await boot({user: 'alice'});
   check(await until(() => w.eval(`!!S.tasks.get(${T3})`)), 'the window knows the tasks');
   const srv = async id => call('GET', `/api/tasks/${id}`);
+  // 2.549.0 (#4568): a task's change goes through the outbox online too (2.537.0): its answer (conflicts, the server's values) comes once it is sent
+  const drained = () => until(() => w.eval('!OUT.q.length && !OUT.flushing'));
   // the window still shows the old value (as when the other device's change has not arrived yet), then changes it online
   const stale = (id, js) => w.eval(`(() => { const t = S.tasks.get(${id}); ${js}; return 1; })()`);
   const sent = [];
@@ -37,7 +39,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   // priority: the other device set High, this one (still showing None) sets Low -> High stays, a conflict waits
   await call('PATCH', `/api/tasks/${T1}`, {priority: 5});
   await stale(T1, 't.priority = 0');
-  await w.eval(`patchTask(${T1}, {priority: 1})`);
+  await w.eval(`patchTask(${T1}, {priority: 1})`); await drained();
   let s = await srv(T1);
   check(s.priority === 5, 'A9: the other device\'s priority stays (no silent last write) ' + s.priority);
   check(sent.at(-1)?.b?._prev?.priority === 0, 'A9: the online PATCH carries what this device saw ' + JSON.stringify(sent.at(-1)));
@@ -51,17 +53,17 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
 
   // date: no other change meanwhile -> applied, no conflict
   const n0 = w.eval('S.conflicts.length');
-  await w.eval(`patchTask(${T1}, {due: '2027-03-01'})`);
+  await w.eval(`patchTask(${T1}, {due: '2027-03-01'})`); await drained();
   check((await srv(T1)).due === '2027-03-01' && w.eval('S.conflicts.length') === n0, 'A9: a change without one elsewhere goes through');
   // a caller that showed the value before sending it (the window has the new value already): no false conflict
   await stale(T1, "t.due = '2027-03-05'");
-  await w.eval(`patchTask(${T1}, {due: '2027-03-05'})`);
+  await w.eval(`patchTask(${T1}, {due: '2027-03-05'})`); await drained();
   check((await srv(T1)).due === '2027-03-05' && w.eval('S.conflicts.length') === n0, 'A9: an already shown value is no base (no false conflict) ' + w.eval('JSON.stringify(S.conflicts)'));
 
   // personal tags: the other device added "b", this one (still showing ["a"]) sends ["a", "c"] -> "b" is not lost
   await call('PATCH', `/api/tasks/${T2}`, {tags: ['a', 'b']});
   await stale(T2, "t.tags = ['a']");
-  await w.eval(`patchTask(${T2}, {tags: ['a', 'c']})`);
+  await w.eval(`patchTask(${T2}, {tags: ['a', 'c']})`); await drained();
   s = await srv(T2);
   check(JSON.stringify([...s.tags].sort()) === '["a","b"]', 'A9: the tag added elsewhere stays ' + JSON.stringify(s.tags));
   check(w.eval(`S.conflicts.some(c => c.tid === ${T2} && c.field === 'tags')`), 'A9: tags conflict in the dialog');
@@ -69,7 +71,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   // list tags (server: compared too since 2.528.0)
   await call('PATCH', `/api/tasks/${T2}`, {ltags: ['blue']});
   await stale(T2, 't.ltags = []');
-  await w.eval(`patchTask(${T2}, {ltags: ['green']})`);
+  await w.eval(`patchTask(${T2}, {ltags: ['green']})`); await drained();
   s = await srv(T2);
   check(JSON.stringify(s.ltags) === '["blue"]', 'A9: the list tag set elsewhere stays ' + JSON.stringify(s.ltags));
   check(w.eval(`S.conflicts.some(c => c.tid === ${T2} && c.field === 'ltags')`), 'A9: list tags conflict in the dialog');
@@ -77,7 +79,7 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   // custom field
   await call('PATCH', `/api/tasks/${T3}`, {fields: {[FLD]: 'large'}});
   await stale(T3, `t.fields = {}`);
-  await w.eval(`patchTask(${T3}, {fields: {${FLD}: 'small'}})`);
+  await w.eval(`patchTask(${T3}, {fields: {${FLD}: 'small'}})`); await drained();
   s = await srv(T3);
   check(s.fields?.[FLD] === 'large', 'A9: the field value set elsewhere stays ' + JSON.stringify(s.fields));
   check(w.eval(`S.conflicts.some(c => c.tid === ${T3} && c.field === 'field:${FLD}')`), 'A9: field conflict in the dialog');

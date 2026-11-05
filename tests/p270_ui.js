@@ -101,7 +101,8 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const ns = pop.querySelector('#p-nag');
   // 2.152.2 (#2624): project instead of list
   check(ns && [...ns.options].map(o => o.value).join() === ',off,5,10,15,30,60,1d' && /as the project \(Off\)/.test(ns.options[0].textContent), 'Repeat reminder: list default + off + intervals: ' + [...ns.options].map(o => o.textContent).join('|'));
-  ns.value = '15'; change(w, ns); await sleep(900);
+  // 2.549.0 (#4568): the popover's changes go through the outbox online too (2.537.0): read the server once it is empty
+  ns.value = '15'; change(w, ns); await sleep(300); await until(() => w.eval('!OUT.q.length && !OUT.flushing'));
   let t2 = await task(D2);
   check(t2.reminders.split(',').includes('30240') && t2.deadline === 2 && t2.nag === '15', `saved at once: ${t2.reminders} deadline ${t2.deadline} nag ${t2.nag}`);
   click(w, d.querySelector('#pop [data-q="done"]')); await sleep(300);
@@ -111,7 +112,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   check(ddl && /days left/.test(ddl.textContent) && /Repeat reminder: every 15 min/.test(ddl.textContent), 'task panel: countdown + repeat line: ' + ddl?.textContent);
   w.eval('closeDetail()');
   // the push button "Stop reminding" (no service worker / session): the app at #nagoff/<id>
-  w.location.hash = '#nagoff/' + D2; await sleep(900);
+  w.location.hash = '#nagoff/' + D2; await sleep(900); await until(() => w.eval('!OUT.q.length && !OUT.flushing'));
   check((await task(D2)).nag === 'off' && /No more repeated reminders/.test(d.querySelector('#toast').textContent), '#nagoff: switched off + toast');
   // ================= #413 settings + the list default
   w.eval(`settingsModal('notify')`); await sleep(500);
