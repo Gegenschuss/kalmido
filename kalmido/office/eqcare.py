@@ -86,7 +86,11 @@ def eqc_task(c, eid, tid, part):
     """The task tid made for part of device eid (its fam says so), else None."""
     if not tid:
         return None
-    t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    return _ours(c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), eid, part)
+
+
+def _ours(t, eid, part):
+    """t when its fam marks it as the task of part of device eid, else None."""
     if not t:
         return None
     try:
@@ -209,15 +213,26 @@ def eqc_end(c, oid, eid):
 
 def eqc_enrich(c, rows):
     """Admin rows of GET /api/office/equipment[/<id>]: warranty_task / per maintenance task = {id, due, done} of its task
-    (the next date of a repeating task moves on when it is done)."""
+    (the next date of a repeating task moves on when it is done). 2.558.0 D (#4591, review F6): the tasks of the whole list in
+    one query per 500 ids, not one per device and maintenance."""
+    want = set()
     for r in rows:
-        t = eqc_task(c, r.get("id"), r.get("warranty_task_id"), "warranty")
+        want.add(r.get("warranty_task_id"))
+        want.update(x.get("task_id") for x in _maint(r.get("maint")) if isinstance(x, dict))
+    ids = sorted(i for i in want if isinstance(i, int) and i > 0)
+    got = {}
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        got.update((t["id"], t) for t in c.execute(f"SELECT id, due, status, deleted_at, fam FROM tasks WHERE id IN ({','.join('?' * len(part))})",
+                                                   part).fetchall())
+    for r in rows:
+        t = _ours(got.get(r.get("warranty_task_id")), r.get("id"), "warranty")
         r["warranty_task"] = {"id": t["id"], "due": t["due"], "done": t["status"] != 0 or bool(t["deleted_at"])} if t else None
         items = []
         for x in _maint(r.get("maint")):
             if not isinstance(x, dict):
                 continue
-            t = eqc_task(c, r.get("id"), x.get("task_id"), f"maint:{x.get('id')}")
+            t = _ours(got.get(x.get("task_id")), r.get("id"), f"maint:{x.get('id')}")
             items.append({**x, "task": {"id": t["id"], "due": t["due"], "done": t["status"] != 0 or bool(t["deleted_at"])} if t else None})
         r["maint"] = items
     return rows

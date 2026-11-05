@@ -734,4 +734,41 @@ def _f_bank(c, run, uid, data, who):
             c.execute("UPDATE office_bank_tx SET payment_id=NULL, matched_by=NULL WHERE id=?", (nid,))
 
 
-FINISH = [_f_docs, _f_runs, _f_bank, _f_datev_guids]
+def _f_equipment(c, run, uid, data, who):
+    """2.558.0 D (#4591, review F5): the warranty / maintenance tasks of a device that came along stay its tasks. The task mark
+    (tasks.fam) is never taken from a file (acctimport UMZ_DROP), so it is set again here, only for a task of this import whose
+    old mark named this device and part; maint[].task_id goes through the task map like warranty_task_id. A task that stayed
+    behind (an inbox is never exported) or names something else is dropped, and the device makes its open tasks anew in the
+    importing admin's inbox (office/eqcare.py eqc_sync), so no device comes in without its dates and none twice."""
+    from ..office.eqcare import eqc_sync
+    fams = {}
+    for t in data.get("tasks") or []:
+        f = _oi_json(t.get("fam"), {}) if isinstance(t, dict) else {}
+        if isinstance(f, dict) and f.get("kind") == "equipment":
+            fams[str(t.get("id"))] = f
+
+    def keep(old_tid, old_eid, nid, part):
+        new = run.m("tasks", old_tid) if old_tid is not None else None
+        f = fams.get(str(old_tid))
+        if not new or not f or str(f.get("office_equipment")) != str(old_eid) or f.get("part") != part:
+            return None
+        c.execute("UPDATE tasks SET fam=? WHERE id=?", (json.dumps({"kind": "equipment", "office_equipment": nid, "part": part}), new))
+        return new
+
+    for src in (data.get("oi") or {}).get("office/equipment.json") or []:
+        nid = run.m("office_equipment", src.get("id")) if isinstance(src, dict) else None
+        r = c.execute("SELECT id, org_id, archived, warranty_until, maint FROM office_equipment WHERE id=?", (nid,)).fetchone() if nid else None
+        if not r or not (r["warranty_until"] or (r["maint"] or "[]") != "[]"):
+            continue
+        items = _oi_json(r["maint"], [])
+        items = [x for x in items if isinstance(x, dict)] if isinstance(items, list) else []
+        for x in items:
+            x["task_id"] = keep(x.get("task_id"), src.get("id"), nid, f"maint:{x.get('id')}")
+        wt = keep(src.get("warranty_task_id"), src.get("id"), nid, "warranty")
+        c.execute("UPDATE office_equipment SET warranty_task_id=?, maint=? WHERE id=?", (wt, json.dumps(items, ensure_ascii=False), nid))
+        row = dict(r)
+        row.update(warranty_task_id=wt, maint=json.dumps(items, ensure_ascii=False))
+        eqc_sync(c, r["org_id"], nid, before=row, revive=True, uid=uid)  # dropped ones made anew (not overdue), kept ones stay
+
+
+FINISH = [_f_docs, _f_runs, _f_bank, _f_datev_guids, _f_equipment]  # 2.558.0 D (#4591, review F5): + _f_equipment
