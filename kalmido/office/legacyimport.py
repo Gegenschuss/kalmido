@@ -1087,7 +1087,7 @@ def fx_undo(c, oid, uid, r):
         n = fci_remove(c, oid, ids, uid)  # 2.567.0 (#4707): who took it back (office trash)
     elif kind == "trips":
         from .vmaimport import vmi_remove
-        n = vmi_remove(c, oid, ids)["deleted"]
+        n = vmi_remove(c, oid, ids, uid)["deleted"]  # 2.567.0 (#4707)
     else:
         from .leads import lead_bin
         n = lead_bin(c, oid, ids)

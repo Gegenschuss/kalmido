@@ -38,6 +38,7 @@ from .legacyimport import _col_index, _local, _rels, _xml, _sheet, _in_rph, _upl
 from .travel import rk_trips, rka_purposes, rka_purposes_adopt, _trip, _trip_need_open  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .olock import olk_trip_item_reason  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_MANY, OTB_UNDO, otb_put  # 2.567.0 (#4707)
 
 VMI_FILE_MAX = 2 * 1024 * 1024
 VMI_SHEETS_MAX = 30
@@ -534,11 +535,12 @@ def vmi_import_post():
     return jsonify(created=len(ids), ids=ids, skipped=len(trips) - len(ids)), 201
 
 
-def vmi_remove(c, oid, ids):
+def vmi_remove(c, oid, ids, uid=None):
     """Deletes these trips of the office with their receipts; a trip with a receipt billed on to a client or locked
     (olk_trip_item_reason) stays (skipped). 2.272.0 C (#3027): only trips unchanged since they were made (updated_at =
     created_at, no receipts, no drive or trip project pointing at them) go; the others stay (kept) -- an undo takes back the
-    import, never what was added since. -> {deleted, trips (as they were), skipped, kept}. No commit."""
+    import, never what was added since. 2.567.0 (#4707): the trips that go first into the office trash as ONE entry (restore
+    brings the import back whole; uid = who took it back). -> {deleted, trips (as they were), skipped, kept, trash_id}. No commit."""
     if not ids:
         return {"deleted": 0, "trips": [], "skipped": [], "kept": []}
     q = ",".join("?" * len(ids))
@@ -557,10 +559,33 @@ def vmi_remove(c, oid, ids):
     for i in gone:
         _trip_need_open(c, oid, _trip(c, oid, i))  # 2.148.0 A (#2471)
     old = [t for i in gone for t in rk_trips(c, oid, trip_id=i)]
+    tid = otb_put(c, oid, uid, VMI_TRASH, "office_trips", gone, tr("Import") + f" · {len(gone)}", sub="import") if gone else None
     if gone:
         c.execute(f"DELETE FROM office_trip_items WHERE org_id=? AND trip_id IN ({','.join('?' * len(gone))})", [oid] + gone)
         c.execute(f"DELETE FROM office_trips WHERE org_id=? AND id IN ({','.join('?' * len(gone))})", [oid] + gone)
-    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept)}
+    return {"deleted": len(gone), "trips": old, "skipped": sorted(mine & billed), "kept": sorted(kept), "trash_id": tid}
+
+
+def vmi_trash_back(c, oid, ids):
+    """2.567.0 (#4707): after the restore of an import of trips taken back (OTB_MANY): every trip only into open months (as
+    the single trip, travel.rk_trash_check; else 409 and the restore is rolled back), its import run counts as not undone again."""
+    for i in ids:
+        _trip_need_open(c, oid, _trip(c, oid, i))
+    c.execute("""UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE org_id=? AND undone_at IS NOT NULL AND id IN
+                 (SELECT import_run_id FROM office_trips WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[])) AND import_run_id IS NOT NULL)""",
+              (oid, oid, list(ids)))
+
+
+VMI_TRASH = "trip_import"  # 2.567.0 (#4707): kind of an import of trips taken back, in the office trash
+OTB_MANY[VMI_TRASH] = vmi_trash_back
+
+
+def _vmi_ctx():
+    from .travel import _ctx
+    return _ctx()
+
+
+OTB_UNDO[VMI_TRASH] = _vmi_ctx  # the toast's undo: the rights of the trips, as taking it back
 
 
 @app.post("/api/office/trips/delete")
@@ -572,7 +597,7 @@ def vmi_delete_many():
     ids = b.get("ids") if isinstance(b, dict) else None
     if not isinstance(ids, list) or len(ids) > VMI_IMPORT_MAX or not all(isinstance(x, int) and not isinstance(x, bool) for x in ids):
         raise BadInput(tr("Invalid data"))
-    out = vmi_remove(c, oid, sorted(set(ids)))
+    out = vmi_remove(c, oid, sorted(set(ids)), uid)
     fx_settle(c, oid, uid, "trips")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
