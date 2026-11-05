@@ -105,7 +105,11 @@ async function tpo_edit(p = null, o = {}) {
         let r; try { r = (await rawFetch('PATCH', `/api/polls/${p.id}`, {...b, expect_updated_at: p.updated_at})).poll; }
         catch (x) { if (x.status === 409 && x.data?.poll) { md.remove(); toast(x.message); tpo_show(x.data.poll); return; } throw x; }
         md.remove();
-        histToast(tr('Poll saved'), histAdd({label: tr('Poll “{0}” changed', r.title), undo: () => api('PATCH', `/api/polls/${p.id}`, was), redo: () => api('PATCH', `/api/polls/${p.id}`, b)}));
+        // 2.566.0 (#4704): only the changed keys, against the version the step before left (core.js undoStep): changed or
+        // voted on since -> "Changed elsewhere, not undone", nothing written over
+        let ver = r.updated_at || '';
+        const lbl = tr('Poll “{0}” changed', r.title), st = (x, from) => undoStep(`/api/polls/${p.id}`, x, ver, {now: from, label: lbl, then: j => { ver = j?.poll?.updated_at || ver; }});
+        histToast(tr('Poll saved'), histAdd({label: lbl, undo: () => st(was, b), redo: () => st(b, was)}));
         tpo_show(r);
       } else {
         const sp = $('#tpo-sp', md)?.value || (spaces.length ? sp0 : 'private');
@@ -190,8 +194,9 @@ function tpo_target(p) {  // the calendar of the chosen event (for the redo of a
   return p.event_cal_id ? {cal_id: p.event_cal_id} : {};
 }
 async function tpo_patch(p, body, msg, back) {
-  try { await api('PATCH', `/api/polls/${p.id}`, body); } catch { return; }
-  if (back) histToast(msg, histAdd({label: msg, undo: () => api('PATCH', `/api/polls/${p.id}`, back), redo: () => api('PATCH', `/api/polls/${p.id}`, body)}));
+  let ver; try { ver = (await api('PATCH', `/api/polls/${p.id}`, body))?.poll?.updated_at || ''; } catch { return; }
+  const then = j => { ver = j?.poll?.updated_at || ver; };  // 2.566.0 (#4704): against the step's version (core.js undoStep)
+  if (back) histToast(msg, histAdd({label: msg, undo: () => undoStep(`/api/polls/${p.id}`, back, ver, {label: msg, then}), redo: () => undoStep(`/api/polls/${p.id}`, body, ver, {label: msg, then})}));
   else toast(msg);
 }
 async function tpo_delete(p, md) {
