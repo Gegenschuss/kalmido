@@ -92,6 +92,8 @@ const ds = n => { const d = new Date(); d.setDate(d.getDate() + n); return  /* 2
   await sleep(500);
   change(w, d.querySelector(`#detail [data-cf="${FD.id}"]`), ds(5));
   await sleep(500);
+  // 2.551.0 (#4649): the changes go through the outbox online too (#4568): read once it is empty, not after a fixed time
+  await until(() => !w.eval('OUT.q.length') && !w.eval('OUT.flushing'));
   let tv = (await call('GET', '/api/state')).tasks.find(t => t.id === t2).fields;
   check(tv[FS.id] === OPT.Doing && tv[FB.id] === '1234.5' && tv[FC.id] === '1' && tv[FP.id] === String(BOB) && tv[FD.id] === ds(5), 'values saved: ' + JSON.stringify(tv));
   change(w, d.querySelector(`#detail [data-cf="${FB.id}"]`), 'abc'); await idle(w);

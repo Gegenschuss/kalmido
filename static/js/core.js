@@ -635,7 +635,7 @@ async function api(method, url, body) {
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   if (outNow(method, url, body)) {  // 2.537.0 (#4568)
     const r = enqueue(method, url, body);
-    if (OUT.online && r?._q) r._q.live = 1;  // 2.551.0 (#4649): sent online: a refusal is said as api() said it (outFlush)
+    if (OUT.online && r?._q) r._q.live = 1;  // 2.551.0 (#4649): sent online: a refusal of its first try is said as api() said it (outFlush); offline after all / a later try = the dialog as before
     if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r;
   }
   const ox = oxbPrev(method, url, body); body = ox.body;  // 2.528.0 B (#4305)
@@ -985,7 +985,7 @@ async function outFlush() {
         e.res = j;
         if (outAnswer(e, j)) sentTk++;  // 2.537.0 (#4568): the answer for the one who wrote it
       } catch (err) {
-        if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
+        if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; delete e.live; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         // 2.359.0 A (#3023): a server error (5xx, the maintenance / restore 503, too many requests 429, a timeout 408) is no
         // answer about the change: it stays first in the queue and goes again later (the idempotency key keeps a write the
         // server did apply from being applied twice). Only an entry that failed with a 500 OUT_MAX_TRIES times in a row goes
@@ -993,16 +993,17 @@ async function outFlush() {
         const st = err.status || 0;
         if (st >= 500 || st === 429 || st === 408) {
           const tries = (e.tries || 0) + 1;
-          if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; e.tries = tries; }); outRetry(); return; }
+          if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; delete e.live; e.tries = tries; }); outRetry(); return; }  // 2.551.0 (#4649): a later try is no "at once" any more (a refusal then waits in the dialog)
         }
         if (err.data?.code === 'skip_stale') {  // 2.528.0 (#4305 B1): skipped elsewhere already = not skipped twice, the current date
           if (err.data.task && typeof putTask === 'function') putTask(err.data.task);
           setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; outAnswer(e, null); continue;  // 2.537.0 (#4568): its waiter hears it
         }
-        // 2.551.0 (#4649): a change sent online that the server refused (a wrong value, no right, deleted: 4xx, not a 409 conflict)
-        // is said with the server's words as api() did before #4568; the page goes back to the server's state (load), nothing
-        // waits in the conflicts dialog, its caller hears it (outFail)
-        if (e.live && st >= 400 && st < 500 && st !== 409 && !wiki && !ntU(e.url)) {
+        // 2.551.0 (#4649): a change sent online whose value the server refused (400 / 422, e.g. "number expected": sending it again
+        // would only be refused again) is said with the server's words as api() did before #4568; the page goes back to the
+        // server's state (load), nothing waits in the conflicts dialog, its caller hears it (outFail). Deleted elsewhere (404), no
+        // right (403), a conflict (409): the dialog as before, the change is kept there
+        if (e.live && (st === 400 || st === 422) && !wiki && !ntU(e.url)) {
           console.warn('outbox: refused', e, err); if (globalThis.document) $('#detail .dsaved')?.classList.remove('on');  // its "Saved" was too early
           if (err.message !== 'auth' && !err.shown) { if (err.data?.out_request && typeof oor_ask === 'function') toast(err.message, () => oor_ask(err.data.out_request), 10000, tr('Ask an admin')); else toast(err.message); }
           outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.err = err; e.done = true; refused.push(e); continue;
