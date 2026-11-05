@@ -420,10 +420,11 @@ coding agents, building files, own tools.
   model call is made for them, and the agent does not pause; its own limits and its owner's budget hold on top.
 - **The circle limit** of `agents/safety.py` holds unchanged: a team agent in two projects with different people is a
   bridge (`409 agent_bridge`), see [Who may address an agent](#who-may-address-an-agent).
-- **Proposals in a team project** (kinds `subtasks`, `extract`, `cleanup` of the project): everyone with write rights in
-  the project sees them (`GET /api/proposals/<id>`, *Waiting for me*, `GET /api/lists/<id>/agent-proposals` ->
-  `{proposals: [{id, kind, title, state, agent, by, updated_at}]}`), applies or discards them; undo / redo: who asked or
-  who applied. Read-only members, other organisations and people outside the project get 404.
+- **Proposals in a team project** (kinds `subtasks`, `extract`, `cleanup` of the project, made by a TEAM server agent):
+  everyone with write rights in the project sees them (`GET /api/proposals/<id>`, *Waiting for me*,
+  `GET /api/lists/<id>/agent-proposals` -> `{proposals: [{id, kind, title, state, agent, by, updated_at}]}`) and applies
+  them; only who asked discards; undo / redo: who asked or who applied. Read-only members, other organisations and people
+  outside the project get 404. Proposals of a personal server agent stay with its owner, also in a shared project.
 
 Paths used below:
 
