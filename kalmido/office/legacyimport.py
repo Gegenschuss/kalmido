@@ -1084,7 +1084,7 @@ def fx_undo(c, oid, uid, r):
     ids = [x[0] for x in c.execute(f"SELECT t.id FROM {table} t WHERE t.org_id=? AND t.import_run_id=?{alive} ORDER BY t.id", (oid, r["id"]))]
     if kind == "fixed_costs":
         from .fixedimport import fci_remove
-        n = fci_remove(c, oid, ids)
+        n = fci_remove(c, oid, ids, uid)  # 2.567.0 (#4707): who took it back (office trash)
     elif kind == "trips":
         from .vmaimport import vmi_remove
         n = vmi_remove(c, oid, ids)["deleted"]

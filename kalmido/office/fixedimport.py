@@ -19,7 +19,7 @@ import zipfile
 from datetime import date, timedelta
 from xml.sax.saxutils import escape
 
-from flask import Response, jsonify
+from flask import Response, g, jsonify
 
 from ..core.config import PUBLIC_URL, app
 from ..core.db import body, bump, iso, local_now, now_utc, write_lock
@@ -34,6 +34,7 @@ from .legacyimport import _upload, fi_book, fx_run, fx_settle
 from .model import office_settings, office_settings_lock, office_settings_save
 from ..core.access import my_inbox  # 2.149.0 G (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_MANY, OTB_UNDO, otb_put  # 2.567.0 (#4707)
 from .model import office_on, pb_owner  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 
@@ -313,16 +314,33 @@ def fci_import_post():
     return jsonify(created=len(ids), ids=ids, skipped=len(items) - len(ids)), 201  # 2.269.0 D (#3046): + skipped (already there)
 
 
-def fci_remove(c, oid, ids):
+def fci_remove(c, oid, ids, uid=None):
     """2.272.0 C (#3027): deletes the fixed costs `ids` of the area unchanged since they were made (updated_at = created_at, no
     reminder sent). 2.370.4 (#3089 N15): and made within the undo window (FCI_UNDO_HOURS) - an older row stays.
-    -> how many went. No commit."""
+    2.567.0 (#4707): the ones that go first into the office trash as ONE entry (restore brings the import back whole; uid =
+    who took it back). -> how many went. No commit."""
     if not ids:
         return 0
     q = ",".join("?" * len(ids))
     cut = iso(now_utc() - timedelta(hours=FCI_UNDO_HOURS))
-    return c.execute(f"""DELETE FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=?
-                         AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id)""", [oid] + ids + [cut]).rowcount
+    gone = [r[0] for r in c.execute(f"""SELECT id FROM office_fixed_costs f WHERE org_id=? AND id IN ({q}) AND updated_at=created_at AND created_at>=?
+                                        AND NOT EXISTS (SELECT 1 FROM office_sub_reminders r WHERE r.fixed_id=f.id) ORDER BY id""", [oid] + ids + [cut]).fetchall()]
+    if not gone:
+        return 0
+    otb_put(c, oid, uid, FCI_TRASH, "office_fixed_costs", gone, tr("Import") + f" · {len(gone)}", sub="import")
+    return c.execute("DELETE FROM office_fixed_costs WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[]))", (oid, gone)).rowcount
+
+
+def fci_trash_back(c, oid, ids):
+    """2.567.0 (#4707): after the restore of an import taken back (OTB_MANY): its import run counts as not undone again."""
+    c.execute("""UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE org_id=? AND undone_at IS NOT NULL AND id IN
+                 (SELECT import_run_id FROM office_fixed_costs WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[])) AND import_run_id IS NOT NULL)""",
+              (oid, oid, list(ids)))
+
+
+FCI_TRASH = "fixed_import"  # 2.567.0 (#4707): kind of an import of fixed costs taken back, in the office trash
+OTB_MANY[FCI_TRASH] = fci_trash_back
+OTB_UNDO[FCI_TRASH] = _ctx  # the office admin, as taking it back
 
 
 @app.post("/api/office/fixed-costs/delete")
@@ -338,11 +356,11 @@ def fci_delete_many():
     ids = sorted(set(ids))
     q = ",".join("?" * len(ids))
     have = c.execute(f"SELECT COUNT(*) FROM office_fixed_costs WHERE org_id=? AND id IN ({q})", [oid] + ids).fetchone()[0] if ids else 0
-    n = fci_remove(c, oid, ids)
+    n = fci_remove(c, oid, ids, uid)
     fx_settle(c, oid, uid, "fixed_costs")  # 2.363.2 (#3104)
     bump(c)
     c.commit()
-    return jsonify(ok=True, deleted=n, kept=have - n)
+    return jsonify(ok=True, deleted=n, kept=have - n, trash_id=g.get("otb_id") if n else None)  # 2.567.0 (#4707)
 
 
 # ---------------------------------------------------------------- the template
