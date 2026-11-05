@@ -218,7 +218,8 @@ for f in ("books.py", "kpi.py", "cashflow.py", "bkexport.py", "datev.py", "taxda
 ov = A.get(B + BA).json()
 check(ov["runs"] and {f["name"] for f in ov["runs"][0]["files"]} >= {"document.xml", f"EXTF_Buchungsstapel_{Y1}.csv"},
       "the file names readable in the view (decrypted)")
-check([y["year"] for y in ov["years"]] == [Y2, Y1] and ov["years"][1]["docs"] == 1 and ov["years"][1]["keep_until"] == f"{Y1 + 10}-12-31",
+# 2.545.0 (#4595): the periods are the law + 1 year buffer (KALMIDO_RETENTION_BUFFER_YEARS default)
+check([y["year"] for y in ov["years"]] == [Y2, Y1] and ov["years"][1]["docs"] == 1 and ov["years"][1]["keep_until"] == f"{Y1 + 11}-12-31",
       f"years, newest first, with receipts and the end of keeping {ov['years']}")
 check(ov["runs"] and ov["runs"][0]["id"] == RUN and len(ov["runs"][0]["files"]) == 5 and ov["runs"][0]["user_name"] == "Alice Admin",
       f"the run with its files {ov['runs'][:1]}")

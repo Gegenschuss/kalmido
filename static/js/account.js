@@ -1009,7 +1009,7 @@ async function retStatus(md) {
   const ks = Object.entries(j.kinds || {}), off = ks.some(([, v]) => !v.on);
   const li = ([k, v]) => `<li><b>${esc(tr(RET_KIND[k] || k))}</b> <span class="muted">${esc(v.on ? tr('deletes') : tr('counts only'))} · ${esc(!v.last ? tr('not run yet')
     : v.on ? trn('{0} item deleted in the last pass', '{0} items deleted in the last pass', due(v)) : trn('{0} item would have been deleted in the last pass', '{0} items would have been deleted in the last pass', due(v)))}</span></li>`;
-  box.innerHTML = `<h4 id="s-ret-h">${tr('Deletion runs')}</h4>${off ? `<div class="shint">${esc(tr('Runs that only count delete nothing, not even after the trash period. Switch them on with {0} in the .env file and restart the server.', `${j.general_switch || 'KALMIDO_RETENTION_PURGE'}=1`))}</div>` : ''}<ul class="stol">${ks.map(li).join('')}</ul>`;
+  box.innerHTML = `<h4 id="s-ret-h">${tr('Deletion runs')}</h4>${off ? `<div class="shint">${esc(tr('Runs that only count delete nothing, not even after the trash period. Switch them on with {0} in the .env file and restart the server.', `${j.general_switch || 'KALMIDO_RETENTION_PURGE'}=1`))}</div>` : ''}<ul class="stol">${ks.map(li).join('')}</ul>${j.env_buffer ? `<div class="shint" id="s-ret-buf">${esc(tr('Records kept by law (receipts, books, logbook, business letters) are kept {0} years longer than the law asks. Change it with {1} in the .env file (0 = exactly the law, never shorter).', j.buffer_years, j.env_buffer))}</div>` : ''}`;  // 2.545.0 (#4595)
 }
 async function stoCheck(md) {
   const box = $('#s-sto', md); if (!box) return;

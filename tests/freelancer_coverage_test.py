@@ -102,6 +102,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.545.0 (#4595): the switch "Extend the lock" of the own office (p2545_b_rethold_test.py as the freelancer)
+    "GET /api/office/settings/retention-hold": "office", "PUT /api/office/settings/retention-hold": "office",
     # 2.394.0 B (#3377): the issue import of a project's own repository (p2394_b_git_issues_test.py as the freelancer)
     "POST /api/repos/{}/issues/import": "tasks",
     # 2.530.0 C (#4315): the undo of deleting a trip / a travel receipt from the office trash (p2530_c_office_trash_test.py)

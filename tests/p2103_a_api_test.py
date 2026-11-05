@@ -67,6 +67,7 @@ def office_dir(oid):
     return os.path.join(DATA, "office", str(oid))
 
 
+# 2.545.0 (#4595): the periods are the law + 1 year buffer (KALMIDO_RETENTION_BUFFER_YEARS default)
 def lock_doc(did, day="2026-03-02", number="RE-2026-001"):
     """A finalised document (the state the finalising leaves; finalising itself is tested in the office suites)."""
     sql("UPDATE office_docs SET locked_at=?, status='issued', number=?, date=? WHERE id=?",
@@ -143,8 +144,8 @@ check(DOC, "frida: a document " + r.text[:160])
 lock_doc(DOC)
 info = A.get(B + f"/api/users/{FRI}/delete-info").json()
 p = info.get("purge") or {}
-check(p.get("office") == "keep" and p.get("kept_until") == "2036-12-31" and p.get("kept", {}).get("documents") == 1,
-      f"delete-info: the personal office keeps 1 document until 2036-12-31 {p}")
+check(p.get("office") == "keep" and p.get("kept_until") == "2037-12-31" and p.get("kept", {}).get("documents") == 1,
+      f"delete-info: the personal office keeps 1 document until 2037-12-31 {p}")
 # 2.186.0 A (#2599): the office is retired (its records stay): no retention step, no waiver noted
 check(info.get("retention", {}).get("state") == "retire", f"delete-info: the records are retired {info.get('retention')}")
 r = A.delete(B + f"/api/users/{FRI}")
@@ -153,14 +154,14 @@ check(not sql("SELECT 1 FROM retention_log WHERE subject=?", (f"user:{FRI}",)), 
 if not r.ok:
     app_log()
 row = sql("SELECT personal_of, retired_at IS NOT NULL, retain_until, retired_personal, name FROM orgs WHERE id=?", (PR,))
-check(row and row[0][0] is None and row[0][1] and row[0][2] == "2036-12-31" and row[0][3] == 1 and row[0][4] == "Frida",
-      f"frida: the personal office is retired until 2036-12-31 {row}")
+check(row and row[0][0] is None and row[0][1] and row[0][2] == "2037-12-31" and row[0][3] == 1 and row[0][4] == "Frida",
+      f"frida: the personal office is retired until 2037-12-31 {row}")
 check(not sql("SELECT 1 FROM users WHERE id=?", (FRI,)), "frida: the account itself is gone")
 check(sql("SELECT number FROM office_docs WHERE id=?", (DOC,)) == [("RE-2026-001",)], "frida: the finalised invoice is kept")
 check(os.path.isdir(office_dir(PR)), "frida: the office folder (logo) is kept")
 check(not sql("SELECT 1 FROM org_members WHERE org_id=?", (PR,)), "retired: nobody is a member")
 orgs = {o["id"]: o for o in A.get(B + "/api/admin/orgs").json()["orgs"]}
-check(PR in orgs and orgs[PR]["retain_until"] == "2036-12-31" and orgs[PR]["retired_personal"] is True and orgs[PR]["retired_at"],
+check(PR in orgs and orgs[PR]["retain_until"] == "2037-12-31" and orgs[PR]["retired_personal"] is True and orgs[PR]["retired_at"],
       f"instance admin: the organisations list shows it with 'kept until' {orgs.get(PR)}")
 check(all(w.get("id") != PR for w in (Bo.get(B + "/api/me").json().get("workspaces") or [])), "bob: not among his workspaces")
 check(Bo.get(B + f"/api/orgs/{PR}/export").status_code in (403, 404), "bob: no export of it")
@@ -169,10 +170,10 @@ check(Bo.get(B + "/api/admin/orgs").status_code == 403, "bob: no admin list")
 check(A.get(B + f"/api/orgs/{PR}/export").status_code in (403, 404) and A.post(B + f"/api/orgs/{PR}/export").status_code in (403, 404),
       "instance admin: no export of the retired office of a deleted person")
 r = A.delete(B + f"/api/admin/orgs/{PR}?confirm=1")
-check(r.status_code == 409 and "2036-12-31" in r.text, "retired: not deleted before the period ends " + r.text[:160])
+check(r.status_code == 409 and "2037-12-31" in r.text, "retired: not deleted before the period ends " + r.text[:160])
 check(A.patch(B + f"/api/admin/orgs/{PR}", json={"name": "Taken over"}).status_code == 409, "retired: no change (read only)")
 di = A.get(B + f"/api/admin/orgs/{PR}/delete-info").json()
-check(di.get("retired") is True and di.get("kept_until") == "2036-12-31" and di.get("can_export") is False, f"delete-info of the retired office {di}")  # 2.152.0 (#2164): review A4
+check(di.get("retired") is True and di.get("kept_until") == "2037-12-31" and di.get("can_export") is False, f"delete-info of the retired office {di}")  # 2.152.0 (#2164): review A4
 r = A.put(B + f"/api/orgs/{PR}/members", json={"email": "bob@example.com", "role": "member"})
 check(r.status_code in (403, 404), "retired: nobody can be added as a member " + str(r.status_code))
 
@@ -259,7 +260,7 @@ r = A.post(B + O + f"/cashbooks/{j['books'][0]['id']}/entries", json={"day": j["
 check(r.status_code == 201, "Delta: a cash book entry " + r.text[:160])
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 r = A.delete(B + f"/api/admin/orgs/{DEL}")
-check(r.status_code == 409 and r.json().get("kept", {}).get("cash") == 1 and r.json().get("retain_until") == f"{int(j['today'][:4]) + 10}-12-31"
+check(r.status_code == 409 and r.json().get("kept", {}).get("cash") == 1 and r.json().get("retain_until") == f"{int(j['today'][:4]) + 11}-12-31"
       and "1 cash book entry" in r.json().get("error", ""), "review A6: the cash book is kept by law (retired, not deleted) " + r.text[:200])
 
 # 2.152.0 (#2167, review A8): an invoice of 2014 (period over at the end of 2024) keeps nothing: deleted, not retired
@@ -287,14 +288,14 @@ lock_doc(GDOC, "2025-11-20", "RE-2025-042")
 A.post(B + O + "/logo", files={"file": ("logo.png", picture(), "image/png")})
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 r = A.delete(B + f"/api/admin/orgs/{GAM}")
-check(r.status_code == 409 and r.json().get("retain_until") == "2035-12-31" and r.json().get("kept", {}).get("documents") == 1,
-      "Gamma: 409, kept by law until 2035-12-31 " + r.text[:200])
+check(r.status_code == 409 and r.json().get("retain_until") == "2036-12-31" and r.json().get("kept", {}).get("documents") == 1,
+      "Gamma: 409, kept by law until 2036-12-31 " + r.text[:200])
 # 2.152.0 (#2167, review A7): a mailbox and a newsletter connection of Gamma (rows only, the services are tested elsewhere)
 NOW = datetime.now(timezone.utc).isoformat(timespec="seconds")
 sql("INSERT INTO hub_mailboxes(org_id, owner_id, ws, active, created_at, updated_at) VALUES(?,?,?,1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
 sql("INSERT INTO nl_conns(org_id, owner_id, ws, kind, auto, created_at, updated_at) VALUES(?,?,?,'listmonk',1,?,?)", (GAM, ALICE, f"org:{GAM}", NOW, NOW), write=True)
 r = A.delete(B + f"/api/admin/orgs/{GAM}?confirm=1")
-check(r.ok and r.json().get("retired") is True and r.json().get("retain_until") == "2035-12-31", "Gamma: retired " + r.text[:160])
+check(r.ok and r.json().get("retired") is True and r.json().get("retain_until") == "2036-12-31", "Gamma: retired " + r.text[:160])
 check(not sql("SELECT 1 FROM org_members WHERE org_id=?", (GAM,)) and sql("SELECT 1 FROM office_docs WHERE id=?", (GDOC,)),
       "Gamma: members out, the invoice stays")
 check(sql("SELECT active FROM hub_mailboxes WHERE org_id=?", (GAM,)) == [(0,)] and sql("SELECT auto FROM nl_conns WHERE org_id=?", (GAM,)) == [(0,)],

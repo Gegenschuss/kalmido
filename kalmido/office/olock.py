@@ -5,6 +5,9 @@ kept from the end of the calendar year they belong to. Kalmido locks such rows (
 them: travel receipts ticked "in DATEV" or billed on a finalised document, booked receipts of the document store
 (receipts/suggest.py olk_fs_locked), logbook drives (office/logbook.py). Corrections stay possible where the law wants
 them traceable (a reversal payment, a correcting drive). The periods: core/retention.py RET_LEGAL_YEARS.
+2.545.0 (#4595): the periods are core/retention.py ret_keep_years (the law + the operator's buffer); the switch "Extend the
+lock" of an office (orgs.ret_hold_at, olk_held) keeps everything kept by law of it beyond its period while it is on (a tax
+audit is open): the deleting runs and routes ask olk_held / olk_need_unheld, olk_fs_locked(hold=True) answers OLK_HOLD_DAY.
 """
 import contextvars
 import re
@@ -13,11 +16,12 @@ from datetime import date
 from ..core.access import Denied
 from ..core.db import now_utc
 from ..core.i18n import N_, short_day, tr
-from ..core.retention import RET_LEGAL_YEARS
+from ..core.retention import RET_HELD_ANY, ret_held, ret_held_text, ret_keep_years, ret_need_unheld, ret_person_office
 
 OLK_DATEV = N_("This receipt is in DATEV and has to be kept: it can no longer be deleted.")
 OLK_BILLED = N_("This receipt was billed on a finalised document and has to be kept: it can no longer be deleted.")
 OLK_KEPT = N_("Kept by law until {0}: this can no longer be deleted.")
+OLK_HOLD_DAY = date(9999, 12, 31)  # what olk_fs_locked(hold=True) answers for a lock that only the switch keeps
 # 2.152.0 (#2164 #2167, review A2): set while the hosted instance deletes an organisation / account after the retention
 # export or waiver (admin/retexport.py rx_gate): it keeps nothing for others, so the purge hook of booked receipts stands
 # aside (self-hosting keeps the lock: there the booked rows were retired / moved first)
@@ -25,11 +29,12 @@ OLK_BYPASS = contextvars.ContextVar("olk_bypass", default=False)
 
 
 def olk_until(day, kind):
-    """The last day of the legal period of a row dated day (ISO text, at least YYYY): 31 Dec of year + N, else None."""
+    """The last day of the legal period of a row dated day (ISO text, at least YYYY): 31 Dec of year + N, else None.
+    2.545.0 (#4595): N = ret_keep_years(kind), the law + the operator's buffer."""
     m = re.match(r"(\d{4})", str(day or ""))
     if not m:
         return None
-    return date(int(m.group(1)) + RET_LEGAL_YEARS[kind], 12, 31)
+    return date(int(m.group(1)) + ret_keep_years(kind), 12, 31)
 
 
 def olk_active(until):
@@ -38,7 +43,17 @@ def olk_active(until):
 
 
 def olk_kept_text(until):
+    if until == OLK_HOLD_DAY:  # 2.545.0 (#4595): only the switch "Extend the lock" keeps it
+        return tr(RET_HELD_ANY)
     return tr(OLK_KEPT, short_day(until, year=True))
+
+
+# 2.545.0 (#4595): the switch itself lives in core/retention.py (accounts/ asks it too); the names of this module stay
+olk_held, olk_held_text, olk_need_unheld, olk_person_office = ret_held, ret_held_text, ret_need_unheld, ret_person_office
+
+
+# 2.545.0 (#4595): a deleting run over many offices leaves out the rows of the offices whose lock is extended
+OLK_NOT_HELD = "org_id NOT IN (SELECT id FROM orgs WHERE ret_hold_at IS NOT NULL)"
 
 
 def olk_trip_item_reason(c, oid, r):

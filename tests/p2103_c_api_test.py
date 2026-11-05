@@ -179,7 +179,8 @@ R_BOOKED = receipt("software.pdf", "19")
 R_OPEN = receipt("kasse.pdf", None)
 R_OLD = receipt("alt.pdf", "7", "2015-03-01")
 r = purge(R_BOOKED)
-until = f"31 Dec {int(DAY(5)[:4]) + 8}"  # English (the person's language): "31 Dec <year>"
+# 2.545.0 (#4595): the periods are the law + 1 year buffer (KALMIDO_RETENTION_BUFFER_YEARS default)
+until = f"31 Dec {int(DAY(5)[:4]) + 9}"  # English (the person's language): "31 Dec <year>"
 check(r.status_code == 409 and "Kept by law until" in r.text and until in r.text, f"#2168: a booked receipt goes into the trash, deleted for good 409 until {until} " + r.text[:200])
 check(sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_BOOKED,)) and sql("SELECT 1 FROM rc_receipts WHERE node_id=?", (R_BOOKED,)), "#2168: the booked receipt and its booking stay")
 check(A.post(B + f"/api/files/nodes/{R_BOOKED}/restore").ok, "#2168: the booked receipt comes back from the trash")
@@ -197,7 +198,7 @@ check(paths and not any(os.path.exists(os.path.join(DATA, "attachments", p)) for
 check(purge(R_OLD).ok, "#2168: a booked receipt of 2015 (period over at the end of 2023) is deleted for good")
 out = in_app(f"from kalmido.core.pg import system_ctx\nfrom kalmido.receipts.suggest import olk_fs_locked\n"
              f"with system_ctx(c):\n    print('until', olk_fs_locked(c, {R_BOOKED}))")  # like the trash run: across the organisations
-check(f"until {int(DAY(5)[:4]) + 8}-12-31" in out, "#2168: olk_fs_locked answers the last day for the trash run " + out[-300:])
+check(f"until {int(DAY(5)[:4]) + 9}-12-31" in out, "#2168: olk_fs_locked answers the last day for the trash run " + out[-300:])
 
 # ---------------------------------------------------------------- #2168 the undo of an old-invoice import
 

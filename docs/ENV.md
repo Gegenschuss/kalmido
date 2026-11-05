@@ -327,6 +327,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_PURGE_FILES` | `(empty)` | Switch for files without a record only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_PURGE_LOGS` | `(empty)` | Switch for the logs only; empty = KALMIDO_RETENTION_PURGE. |
 | `KALMIDO_PURGE_TRASH` | `(empty)` | Switch for the trash only; empty = KALMIDO_RETENTION_PURGE. |
+| `KALMIDO_RETENTION_BUFFER_YEARS` | `1` | Years added to the legal retention periods (receipts 8, books 10, logbook 8, business letters 6 years); 0 = exactly the law, never below it, at most 30. |
 | `KALMIDO_RETENTION_PURGE` | `0` | Switch: really delete what is past its retention time (off = only count and report; the trash then says nothing is deleted). The installer writes 1 into a new .env. |
 | `KALMIDO_SAFETY_BACKUP_DAYS` | `30` | Days the safety backups taken before a restore or an update are kept. |
 | `KALMIDO_STORAGE_QUOTA_MB` | `(empty)` | Storage per person in MB (empty / 0 = unlimited; admins can set it in the app). |

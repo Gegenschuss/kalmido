@@ -141,7 +141,8 @@ check(r.ok and not r.json().get("block"), "#2600: a receipt without booking can 
 r = A.put(B + f"/api/docs/{R1}/receipt", json={"category": "", "vat_pct": None})
 check(r.ok and not r.json()["receipt"]["is_receipt"], "#2600: VAT rate and category removed: no receipt in the books any more " + r.text[:200])
 ku = sql("SELECT kept_until FROM doc_meta WHERE node_id=?", (R1,))
-check(ku and ku[0][0] == f"{int(DAY(5)[:4]) + 8}-12-31", f"#2600: kept_until holds the period {ku}")
+# 2.545.0 (#4595): + 1 year buffer
+check(ku and ku[0][0] == f"{int(DAY(5)[:4]) + 9}-12-31", f"#2600: kept_until holds the period {ku}")
 r = purge(A, R1)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2600: deleting it for good is still refused " + r.text[:200])
 R2 = receipt(A, WSO, "bezahlt.pdf", None)
@@ -174,16 +175,17 @@ r = purge(A, R_CASH)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#2733: the receipt taken off a cash book entry stays kept " + r.text[:200])
 out = in_app(f"from kalmido.receipts.suggest import olk_fs_maybe\nprint('kept', sorted(olk_fs_maybe(c, [{R_CASH}])))")
 check(f"kept [{R_CASH}]" in out, "#2733: the filter also sees kept_until " + out[-300:])
+# 2.545.0 (#4595): the periods are the law + 1 year buffer: 2013 (was 2014) so the archived item's period (2016 + 9) is over
 sql("INSERT INTO office_equipment(org_id, name, purchase_date, life_months, receipt_node_id, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
-    (ORG, "Kamera", "2014-02-01", 36, R_EQ, ts, ts), write=True)
+    (ORG, "Kamera", "2013-02-01", 36, R_EQ, ts, ts), write=True)
 r = purge(A, R_EQ)
-check(r.status_code == 409 and f"31 Dec {TODAY.year + 8}" in r.text,
+check(r.status_code == 409 and f"31 Dec {TODAY.year + 9}" in r.text,
       "#2600: the receipt of an item in use is kept (from this year while it is not archived) " + r.text[:200])
 sql("UPDATE office_equipment SET archived=1 WHERE receipt_node_id=?", (R_EQ,), write=True)
 # 2.355.0 (#2845): an open receipt not booked yet is kept on its own (from its arrival) -- the document here is no receipt
 # any more, so only the equipment item could keep it
 sql("DELETE FROM rc_receipts WHERE node_id=?", (R_EQ,), write=True)
-check(purge(A, R_EQ).ok, "#2600: an archived item of 2014 (36 months, period over) no longer keeps its receipt")
+check(purge(A, R_EQ).ok, "#2600: an archived item of 2013 (36 months, period over) no longer keeps its receipt")
 # 2.490.0 (#3796): deleting an item of the equipment list or swapping its receipt keeps the old receipt's lock (doc_meta.kept_until,
 # like #2733 for the cash book); before, the lock read the item live and was gone with it
 EQ = "/api/office/equipment"

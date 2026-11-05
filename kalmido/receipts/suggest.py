@@ -24,7 +24,7 @@ from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_json, v1_view
 from ..files.store import fs_log_add, fs_on_delete, fs_subtree, need_node
 from ..docs import store as S
-from ..office.olock import OLK_BYPASS, olk_active, olk_kept_text, olk_until
+from ..office.olock import OLK_BYPASS, OLK_HOLD_DAY, olk_active, olk_held, olk_kept_text, olk_person_office, olk_until
 from ..office.einvoice_in import ei_rc_offer, ei_take  # 2.185.0 A (#2583)
 
 RC_CAT_MAX = 60
@@ -560,7 +560,7 @@ _rc_hook()
 
 
 # ---------------------------------------------------------------- 2.152.0 C (#2168): booked receipts are kept by law
-def olk_fs_locked(c, node_id, arrival=False):
+def olk_fs_locked(c, node_id, arrival=False, hold=False):
     """The last day (ISO) a booked receipt (paid or with its VAT rate set) has to be kept, while that period runs; else None.
     The period runs from the end of the receipt's year (its document date, else paid / assigned day). Moving it into the
     trash stays possible; deleting it for good (the trash's purge, the trash period run) is refused until then.
@@ -568,7 +568,9 @@ def olk_fs_locked(c, node_id, arrival=False):
     purchase year plus the useful life; while the item is not archived, at least from this year), one billed on a
     finalised / sent document, and the lock kept when its payment day / VAT rate were removed later (doc_meta.kept_until).
     2.355.0 B (#2845): arrival=True (deleting for good, olk_on_delete) also keeps an open receipt not booked yet and an
-    e-invoice received into an office from their arrival; moving them and the folder trash stay as before."""
+    e-invoice received into an office from their arrival; moving them and the folder trash stay as before.
+    2.545.0 (#4595): hold=True (deleting for good): a lock whose period is over still holds while the switch "Extend the
+    lock" of the receipt's office is on -- the answer is then OLK_HOLD_DAY (olk_kept_text names the switch)."""
     nid = int(node_id)
     r = c.execute("""SELECT r.paid_at, r.vat_pct, r.set_at, r.billed_doc_id, r.billed_at, r.ws, r.org_id, m.doc_date FROM rc_receipts r
                      LEFT JOIN doc_meta m ON m.node_id=r.node_id WHERE r.node_id=?""", (nid,)).fetchone()
@@ -599,7 +601,20 @@ def olk_fs_locked(c, node_id, arrival=False):
         year = int(m.group(1)) + -(-int(a["life_months"] or 0) // 12) if m else this_year
         ends.append(olk_until(str(max(year, this_year) if not a["archived"] else year), "receipt"))
     until = max((e for e in ends if e), default=None)
-    return until.isoformat() if olk_active(until) else None
+    if olk_active(until):
+        return until.isoformat()
+    if hold and until and olk_held(c, olk_fs_office(c, nid)):  # 2.545.0 (#4595)
+        return OLK_HOLD_DAY.isoformat()
+    return None
+
+
+def olk_fs_office(c, nid):
+    """2.545.0 (#4595): the office a file of the store belongs to: its organisation, else the personal office of its owner."""
+    with system_ctx(c):
+        n = c.execute("SELECT org_id, owner_id FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
+    if not n:
+        return None
+    return n["org_id"] or olk_person_office(c, n["owner_id"])
 
 def olk_fs_maybe(c, ids):
     """2.360.3 (#2733): those of the nodes ids that olk_fs_locked (without arrival) can find locked at all: kept_until, a
@@ -684,7 +699,7 @@ def olk_on_delete(c, nid):
         return
     n = c.execute("SELECT kind FROM fs_nodes WHERE id=?", (int(nid),)).fetchone()
     for i in (fs_subtree(c, nid) if n and n["kind"] == "folder" else [nid]):
-        until = olk_fs_locked(c, i, arrival=True)  # 2.355.0 B (#2845)
+        until = olk_fs_locked(c, i, arrival=True, hold=True)  # 2.355.0 B (#2845); 2.545.0 (#4595): + the extended lock
         if until:
             raise Denied(409, olk_kept_text(date.fromisoformat(until)))
 

@@ -101,7 +101,8 @@ MINE, SEAL = sig(None, FID, "My cut", "accepted", T, "Eva Customer"), sig(None, 
 got = A.get(B + "/api/videos/signoffs/orphaned")
 ids = {x["id"]: x for x in got.json().get("signoffs", [])}
 check(got.ok and set(ids) == {OP, DONE, OLD}, f"the office admin sees the organisation's records {got.text[:200]}")
-check(ids[DONE]["signer_name"] == "Dana Customer" and ids[DONE]["kept_until"] == "2032-12-31" and ids[OP]["kept_until"] is None, f"kept by law: named {ids[DONE]}")
+# 2.545.0 (#4595): the periods are the law + 1 year buffer (KALMIDO_RETENTION_BUFFER_YEARS default)
+check(ids[DONE]["signer_name"] == "Dana Customer" and ids[DONE]["kept_until"] == "2033-12-31" and ids[OP]["kept_until"] is None, f"kept by law: named {ids[DONE]}")
 check(not Ca.get(B + "/api/videos/signoffs/orphaned").json()["signoffs"], "a member sees none (and no other person's)")
 check(Ca.delete(B + f"/api/videos/signoffs/orphaned/{OP}").status_code == 404, "a member deletes none")
 check(A.delete(B + f"/api/videos/signoffs/orphaned/{DONE}").status_code == 409, "a signed record stays inside its legal period")

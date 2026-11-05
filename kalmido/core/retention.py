@@ -8,6 +8,8 @@ KALMIDO_RETENTION_PURGE=1 (all kinds) or KALMIDO_PURGE_<KIND>=1 / =0 (one kind, 
 
 Periods (days) per kind: RET_DAYS, each overridable by its env variable (RET_ENV). Legal retention (receipts, books,
 the logbook: RET_LEGAL_YEARS) is never a purge: those rows are locked, not deleted (#2168 #2169).
+2.545.0 (#4595): every lock keeps ret_keep_years(kind) = the law + the operator's buffer (KALMIDO_RETENTION_BUFFER_YEARS,
+default 1 year, never below the law); the one source for olock.olk_until, orgretain, signoff and bookarch.
 
 Expired credentials (sessions, tokens, codes past their end) are no data of a person any more and go without the switch.
 
@@ -54,7 +56,11 @@ import os
 import time
 from datetime import timedelta
 
+from .errors import Denied
 from .db import gset, iso, now_utc
+from .env import env_int
+from .i18n import N_, short_day, tr
+from .pg import system_ctx
 
 RET_KINDS = ("trash", "logs", "backups", "files", "chat")
 RET_DAYS = {
@@ -68,6 +74,10 @@ RET_ENV = {"trash": "KALMIDO_TRASH_DAYS", "logs": "KALMIDO_LOG_DAYS", "backups":
            "files": "KALMIDO_ORPHAN_DAYS", "chat": "KALMIDO_CHAT_KEEP_DAYS"}
 # Legal retention in Germany (section 147 AO, section 257 HGB, section 14b UStG): receipts 8 years (since 2025), books 10
 RET_LEGAL_YEARS = {"receipt": 8, "book": 10, "logbook": 8, "letter": 6}  # 2.184.0 A (#2628): sent business letters (section 257 HGB)
+# 2.545.0 (#4595, decision of 04.11.2026): the periods kept are the law plus a buffer the operator sets (never below the law)
+RET_BUFFER_ENV = "KALMIDO_RETENTION_BUFFER_YEARS"
+RET_BUFFER_YEARS = 1
+RET_BUFFER_MAX = 30
 RET_ON_VALUES = ("1", "on", "true", "yes")
 RET_OFF_VALUES = ("0", "off", "false", "no")
 
@@ -79,6 +89,57 @@ def ret_days(kind):
         return max(0, int(raw)) if raw else RET_DAYS[kind]
     except ValueError:
         return RET_DAYS[kind]
+
+
+def ret_buffer_years():
+    """2.545.0 (#4595): the years the operator adds to every legal period (env, default 1); below 0 = 0 (never under the law)."""
+    return env_int(RET_BUFFER_ENV, RET_BUFFER_YEARS, 0, RET_BUFFER_MAX)
+
+
+def ret_keep_years(kind):
+    """2.545.0 (#4595): how many years after the end of its calendar year a row of kind (receipt, book, logbook, letter) is kept:
+    the law (RET_LEGAL_YEARS) plus the operator's buffer. Every retention lock asks this one."""
+    return RET_LEGAL_YEARS[kind] + ret_buffer_years()
+
+
+# 2.545.0 (#4595): the switch "Extend the lock" of an office (orgs.ret_hold_at, office/rethold.py): a tax audit is open, nothing
+# kept by law is deleted, also after its period (office/olock.py, accounts/orgretain.py, accounts/orgs.py ask it)
+RET_HELD = N_("Deleting is paused: the retention lock of this office is extended (since {0}). Switch it off in the office settings first.")
+RET_HELD_ANY = N_("Deleting is paused: the retention lock of this office is extended. Switch it off in the office settings first.")
+
+
+def ret_held(c, oid):
+    """2.545.0 (#4595): since when (ISO time) the switch "Extend the lock" of office oid (an organisation or a personal office)
+    is on, else None. Structure only, read as system (the deleting run or person need not be a member)."""
+    if not oid:
+        return None
+    with system_ctx(c):
+        r = c.execute("SELECT ret_hold_at FROM orgs WHERE id=?", (int(oid),)).fetchone()
+    return (r[0] or None) if r else None
+
+
+def ret_held_text(at):
+    from datetime import datetime  # noqa: PLC0415
+    try:
+        return tr(RET_HELD, short_day(datetime.fromisoformat(str(at)[:19]).date(), year=True))
+    except ValueError:
+        return tr(RET_HELD_ANY)
+
+
+def ret_need_unheld(c, oid):
+    """2.545.0 (#4595): 409 with the reason while the switch "Extend the lock" of office oid is on."""
+    at = ret_held(c, oid)
+    if at:
+        raise Denied(409, ret_held_text(at))
+
+
+def ret_person_office(c, uid):
+    """2.545.0 (#4595): the personal office of person uid (orgs.personal_of), else None."""
+    if not uid:
+        return None
+    with system_ctx(c):
+        r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (int(uid),)).fetchone()
+    return r[0] if r else None
 
 
 def ret_trash_days():
@@ -141,4 +202,6 @@ def ret_status(c):
         last = max(runs.values(), key=lambda v: v.get("at") or "", default=None)
         out[k] = {"on": ret_on(k), "days": ret_days(k), "env_days": RET_ENV[k], "env_switch": f"KALMIDO_PURGE_{k.upper()}",
                   "last": last, "runs": runs}
-    return {"general_switch": "KALMIDO_RETENTION_PURGE", "kinds": out, "legal_years": RET_LEGAL_YEARS}
+    return {"general_switch": "KALMIDO_RETENTION_PURGE", "kinds": out, "legal_years": RET_LEGAL_YEARS,
+            # 2.545.0 (#4595): the periods really kept (law + buffer) and the variable of the buffer
+            "buffer_years": ret_buffer_years(), "env_buffer": RET_BUFFER_ENV, "keep_years": {k: ret_keep_years(k) for k in RET_LEGAL_YEARS}}

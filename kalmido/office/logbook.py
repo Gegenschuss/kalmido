@@ -33,7 +33,7 @@ from .calc import calc_lang, dec, dstr, fmt_point, money
 from .model import ofx_name1, office_gate, office_org, office_settings, office_settings_lock, office_settings_save, pb_cl_live
 from ..personal.timesheet import tz_of
 from .pdf import pdf_paper_ns  # 2.357.0 A (#3156): the office's paper size
-from .olock import olk_active, olk_until
+from .olock import olk_active, olk_held, olk_until
 from .rights import ofr_own_uid
 
 LB_VEH_KINDS = ("private", "company")
@@ -336,8 +336,9 @@ LBC_LIVE = "id NOT IN (SELECT corrects_id FROM office_drives WHERE org_id=? AND 
 
 def lbc_purge_ok(c, r):
     """May a deleted drive row r go for good (a trash period run)? Only after the legal period (8 years from the end of its
-    year, core/retention.py RET_LEGAL_YEARS["logbook"])."""
-    return not olk_active(olk_until(r["day"] or (r["created_at"] or "")[:10], "logbook"))
+    year, core/retention.py RET_LEGAL_YEARS["logbook"]; 2.545.0 (#4595): + the buffer, ret_keep_years), and not while the
+    switch "Extend the lock" of its office is on."""
+    return not olk_active(olk_until(r["day"] or (r["created_at"] or "")[:10], "logbook")) and not olk_held(c, r["org_id"])
 
 
 def _drive_clean(c, oid, uid, b, cur=None):

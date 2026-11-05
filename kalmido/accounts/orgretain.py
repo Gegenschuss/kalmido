@@ -3,7 +3,7 @@ when it is deleted.
 
 odl_retention(c, oid) counts the office data under a legal retention period (finalised documents and archive entries:
 books, cash book, bank statements: 10 years; booked receipts, receipts of trips taken into DATEV, entertainment receipts, the logbook: 8 years -- core/retention.py
-RET_LEGAL_YEARS, from the end of the calendar year) and gives the latest end. An organisation with such data is not
+RET_LEGAL_YEARS, 2.545.0 (#4595): + the buffer, ret_keep_years, from the end of the calendar year) and gives the latest end. An organisation with such data is not
 deleted but retired (orgs.retired_at / retain_until): members out, data and key stay, nobody sees it in the app any more
 but the instance admins (list "Organisations": kept until ..., export only); the watchdog removes it for good after
 retain_until (odl_retired_prune, kind "trash", switch ret_on). Without such data the deletion goes as before, after a
@@ -24,7 +24,7 @@ from ..core.i18n import N_, tr, trn
 from ..core.merges import mg_fk_refs
 from ..core.pg import system_ctx
 from ..core.env import env_bool  # 2.399.0 (#2687): the hosting switch (KALMIDO_HOSTED)
-from ..core.retention import RET_LEGAL_YEARS, ret_on, ret_report
+from ..core.retention import ret_keep_years, ret_need_unheld, ret_on, ret_person_office, ret_report
 from ..core.orgcrypt import oc_drop_key  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
 from .pictures import avatar_drop_file, org_icon_drop_file  # 2.369.5 (#2517): pulled up from functions
@@ -150,7 +150,7 @@ def _until(kind, years):
     """The latest end of the periods of rows from `years`; None when there is none or it is over already (2.152.0 #2167,
     review A8: an expired period keeps nothing, it neither retires an organisation nor a personal office)."""
     ys = [y for y in (_year(v) for v in years) if y]
-    end = f"{max(ys) + RET_LEGAL_YEARS[kind]}-12-31" if ys else None
+    end = f"{max(ys) + ret_keep_years(kind)}-12-31" if ys else None  # 2.545.0 (#4595): the law + the buffer
     return end if end and end >= local_now().date().isoformat() else None
 
 
@@ -400,7 +400,7 @@ def odl_retired_prune(c, force=False):
     today = local_now().date().isoformat()
     with system_ctx(c):  # retention run over every organisation (no person's context, nothing handed out)
         due = [r[0] for r in c.execute("SELECT id FROM orgs WHERE retired_at IS NOT NULL AND retain_until IS NOT NULL "
-                                       "AND retain_until!='' AND retain_until<?", (today,)).fetchall()]
+                                       "AND retain_until!='' AND retain_until<? AND ret_hold_at IS NULL", (today,)).fetchall()]  # 2.545.0 (#4595): not while held
     on, n = ret_on("trash"), 0
     for oid in due if on else ():
         until = odl_retention(c, oid)["until"]
@@ -447,6 +447,7 @@ def upg_personal(c, uid):
     instance admin keeps them). The caller commits."""
     if upg_heirless(c, uid):  # 2.239.0 C (#2866): before anything changes (files are copied below)
         raise Denied(409, tr(UPG_NO_HEIR))
+    ret_need_unheld(c, ret_person_office(c, uid))  # 2.545.0 (#4595): the extended lock of the personal office stops it
     poid, ret, nodes = upg_personal_state(c, uid)
     if not ret["until"]:
         return odl_dismantle(c, poid) if poid else []

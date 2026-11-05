@@ -310,6 +310,7 @@ VARS = (
     _v("KALMIDO_SAFETY_BACKUP_DAYS", "30", "Days the safety backups taken before a restore or an update are kept.", "hosting"),
     _v("KALMIDO_ORPHAN_DAYS", "1", "Days a file without a record must be old before the sweep removes it.", "hosting"),
     _v("KALMIDO_CHAT_KEEP_DAYS", "0", "Days agent chat messages are kept (0 = no day limit, only the count limit).", "hosting"),
+    _v("KALMIDO_RETENTION_BUFFER_YEARS", "1", "Years added to the legal retention periods (receipts 8, books 10, logbook 8, business letters 6 years); 0 = exactly the law, never below it, at most 30.", "hosting"),  # 2.545.0 (#4595)
     _v("KALMIDO_PURGE_LOGS", "", "Switch for the logs only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
     _v("KALMIDO_PURGE_BACKUPS", "", "Switch for the safety backups only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),
     _v("KALMIDO_PURGE_FILES", "", "Switch for files without a record only; empty = KALMIDO_RETENTION_PURGE.", "hosting"),

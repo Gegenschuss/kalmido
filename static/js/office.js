@@ -591,6 +591,7 @@ function ofcSettingsHtml() {
     </fieldset>${ost_p('access')}
     ${adm ? `<h3>${tr('Access log')}</h3><p class="muted">${tr('Who opened, printed, changed or exported documents and master data of this organisation.')}</p>${ofcLogHtml()}${ofcChainHtml()}` : ''}
     </fieldset>${ost_p('data')}
+    ${adm ? rthHtml() : ''}${''/* 2.545.0 (#4595): the switch "Extend the lock" */}
     ${adm && OFC.info.personal && (OFC.info.can_move || OFC.info.move_orgs?.length) ? `<h3>${tr('Transfer into an organisation')}</h3>${''/* 2.144.6 C (#2436): one section, one word (übertragen) for both ways */}
     ${OFC.info.can_move ? `<p class="muted">${tr('Documents, numbers, settings, master data and clients go with it. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-move">${ic('building', 's')} ${tr('Transfer into a new organisation…')}</button></div>` : ''}
     ${OFC.info.move_orgs?.length ? `<p class="muted">${tr('Finalised invoices stay locked and keep their numbers. This cannot be undone.')}</p><div class="lacts"><button type="button" class="btn sm" data-ofc="pb-transfer">${ic('building', 's')} ${tr('Transfer into an organisation…')}</button></div>` : ''}` : ''}
@@ -599,6 +600,25 @@ function ofcSettingsHtml() {
     ${adm && OFC.info.personal && typeof rxBoxHtml === 'function' ? rxBoxHtml('me') : ''}${''/* 2.146.0 D (#2468): the retention export of the own records */}
     </fieldset>
   </form>`;
+}
+// 2.545.0 (#4595): the switch "Extend the lock" (a tax audit is open): nothing this office keeps by law is deleted while it is on,
+// also after its period; its own route (not a field of the settings form: data-fg-skip), each step in the office log
+function rthHtml() {
+  setTimeout(() => rthLoad(), 0);
+  return `<h3 id="os-rth-h">${tr('Extend the lock')}</h3><div id="os-rth" data-fg-skip><div class="muted mhint">${tr('Loading…')}</div></div>`;
+}
+async function rthLoad(j) {
+  const box = $('#os-rth'); if (!box) return;
+  if (typeof OFD_ACTIONS === 'object') OFD_ACTIONS.retention_hold = N_('retention lock extended / ended');  // the office log's word
+  if (!j) { try { j = await api('GET', '/api/office/settings/retention-hold'); } catch { box.innerHTML = ''; return; } }
+  const ky = j.keep_years || {};
+  box.innerHTML = `<div class="featgrid"><label class="wide"><input type="checkbox" id="rth-on" ${j.on ? 'checked' : ''}><span>${tr('Extend the lock (tax audit)')}<small class="muted">${tr('While a tax audit is open: nothing this office keeps by law is deleted, not even after its period, until you switch it off again.')}</small></span></label></div>
+    ${j.on ? `<div class="shint cnote" id="rth-since">${esc(tr('On since {0} ({1}).', fmtStamp(new Date(j.since)), j.by_name || '?'))}</div>` : ''}
+    <div class="shint">${esc(tr('Kept from the end of the year: invoices and receipts {0} years, books {1} years, the logbook {2} years, business letters {3} years.', ky.receipt, ky.book, ky.logbook, ky.letter))}</div>`;
+  $('#rth-on', box).onchange = async e => {
+    const el = e.target, on = el.checked; el.disabled = true;
+    try { await rthLoad(await api('PUT', '/api/office/settings/retention-hold', {on})); } catch (x) { el.checked = !on; el.disabled = false; toast(x.message); }
+  };
 }
 // 2.147.0 (#2461): the e-invoice format -- only the formats the country pack offers (the base pack: ZUGFeRD / Factur-X)
 function ofcEinvRow(s) {

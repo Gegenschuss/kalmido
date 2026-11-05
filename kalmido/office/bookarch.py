@@ -18,7 +18,7 @@ the bookings of the chosen period along.
 Flow like the other imports: POST .../check = the preview (counts per year, debit = credit control, nothing written), POST
 .../import = one run in office_import_runs (kind "datev_archive"), POST .../runs/<id>/undo removes everything of the run
 (2.530.0 C, #4315: within 24 hours of the import only; the files stay on disk until the trash period ended, ba_retention_tick). Office admins only (a personal office: its owner; groups: the area "books"), never agents
-(office_gate). Retention: 10 years from the end of the archived year (core/retention.py RET_LEGAL_YEARS "book", also the
+(office_gate). Retention: 10 years (+ the buffer, 2.545.0 #4595) from the end of the archived year (core/retention.py ret_keep_years("book"), also the
 receipt images: the careful side), then deleted for good (ba_retention_tick, the watchdog; only while ret_on("trash"))."""
 import hashlib
 import json
@@ -37,7 +37,8 @@ from ..core.db import bump, iso, local_now, now_utc, parse_iso
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields, oc_send_file, oc_seal
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.retention import RET_LEGAL_YEARS, ret_due, ret_on, ret_report, ret_trash_cut
+from ..core.retention import ret_due, ret_keep_years, ret_on, ret_report, ret_trash_cut
+from .olock import OLK_NOT_HELD  # 2.545.0 (#4595)
 from ..core.zipread import ZipLimit, is_zip, zip_read, base_name
 from ..personal.timetrack import BadInput
 from .model import office_ctx, office_need_feature
@@ -703,7 +704,7 @@ def ba_overview(c, oid):
         nd = c.execute("SELECT COUNT(*) FROM office_bookarch_docs d JOIN office_import_runs r ON r.id=d.run_id WHERE d.org_id=? AND d.year=? "
                        "AND r.undone_at IS NULL", (oid, r["year"])).fetchone()[0]
         years.append({"year": r["year"], "bookings": r["n"], "first": r["first"] or "", "last": r["last"] or "", "docs": nd,
-                      "keep_until": f"{int(r['year']) + RET_LEGAL_YEARS['book']}-12-31"})
+                      "keep_until": f"{int(r['year']) + ret_keep_years('book')}-12-31"})  # 2.545.0 (#4595): + the buffer
     runs, users = [], {}
     for r in c.execute("SELECT * FROM office_import_runs WHERE org_id=? AND kind=? ORDER BY id DESC LIMIT 100", (oid, BA_KIND)):
         if r["created_by"] and r["created_by"] not in users:
@@ -727,11 +728,12 @@ def ba_retention_tick(c, force=False):
     for good with their receipt images and original files -- only while ret_on("trash"), else counted (run "bookarch")."""
     if not ret_due("bookarch", 86400, force):
         return 0
-    cut = local_now().year - RET_LEGAL_YEARS["book"] - 1  # year Y is kept until 31.12. of Y + 10
+    cut = local_now().year - ret_keep_years("book") - 1  # year Y is kept until 31.12. of Y + 10 (2.545.0 #4595: + the buffer)
+    held = OLK_NOT_HELD  # 2.545.0 (#4595): an office whose lock is extended (a tax audit) keeps its archived years
     with system_ctx(c):  # the purge works across every office area (no content leaves it)
-        due = c.execute("SELECT org_id, COUNT(*) AS n FROM office_bookarch WHERE year<=? GROUP BY org_id", (cut,)).fetchall()
-        nd = c.execute("SELECT COUNT(*) FROM office_bookarch_docs WHERE year<=?", (cut,)).fetchone()[0]
-        nf = c.execute("SELECT COUNT(*) FROM office_bookarch_files WHERE year<=?", (cut,)).fetchone()[0]
+        due = c.execute(f"SELECT org_id, COUNT(*) AS n FROM office_bookarch WHERE year<=? AND {held} GROUP BY org_id", (cut,)).fetchall()
+        nd = c.execute(f"SELECT COUNT(*) FROM office_bookarch_docs WHERE year<=? AND {held}", (cut,)).fetchone()[0]
+        nf = c.execute(f"SELECT COUNT(*) FROM office_bookarch_files WHERE year<=? AND {held}", (cut,)).fetchone()[0]
         counts = {"archive_bookings": sum(r["n"] for r in due), "archive_docs": nd, "archive_files": nf}
         undone = ba_trash_files(c)  # 2.530.0 C (#4315, B15): the files of undone runs after the trash period
         counts["archive_undone_files"] = sum(len(n) for runs in undone.values() for _rid, n in runs)
@@ -745,13 +747,13 @@ def ba_retention_tick(c, force=False):
                 names.setdefault(oid, []).extend(n)
                 ba_trash_forget(c, rid)
         for t in ("office_bookarch_docs", "office_bookarch_files"):
-            for r in c.execute(f"SELECT org_id, file FROM {t} WHERE year<=?", (cut,)):
+            for r in c.execute(f"SELECT org_id, file FROM {t} WHERE year<=? AND {held}", (cut,)):
                 names.setdefault(r["org_id"], []).append(r["file"])
         for t in BA_TABLES:
-            c.execute(f"DELETE FROM {t} WHERE year<=?", (cut,))
+            c.execute(f"DELETE FROM {t} WHERE year<=? AND {held}", (cut,))
         # what has no year (labels / master data of an upload without a batch) goes once the office has no archived booking left
         old = f"{cut + 1}-01-01"
-        lone = "org_id NOT IN (SELECT org_id FROM office_bookarch) AND run_id IN (SELECT id FROM office_import_runs WHERE created_at<?)"
+        lone = f"org_id NOT IN (SELECT org_id FROM office_bookarch) AND {held} AND run_id IN (SELECT id FROM office_import_runs WHERE created_at<?)"
         for r in c.execute(f"SELECT org_id, file FROM office_bookarch_files WHERE year IS NULL AND {lone}", (old,)):
             names.setdefault(r["org_id"], []).append(r["file"])
         for t in ("office_bookarch_accts", "office_bookarch_files"):

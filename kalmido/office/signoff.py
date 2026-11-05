@@ -35,7 +35,8 @@ from ..accounts.login import auth_key, seal, unseal
 from ..api.common import hit_budget, hit_limit
 from ..notify.alerts import aa_count
 from ..core.errors import BadInput
-from ..core.retention import RET_LEGAL_YEARS
+from ..core.retention import ret_keep_years
+from .olock import olk_need_unheld, olk_person_office  # 2.545.0 (#4595)
 from ..tasks.validation import valid_date
 from ..lists.public import PUB_ACTOR, PUB_TOKEN_RE, pub_gone, pub_html, pub_limited, public_links_on
 from .docs import odoc_render, prd_strip_detail, doc_row, odoc_set_status  # 2.369.5 (#2517): pulled up from functions
@@ -376,7 +377,7 @@ def sig_gone_kept(c, r):
     office = r["org_id"] or c.execute("SELECT 1 FROM orgs WHERE personal_of=?", (r["created_by"],)).fetchone()
     if not office or not (r["signed_at"] or r["state"] == "accepted"):
         return None
-    return f"{int((r['signed_at'] or r['created_at'])[:4]) + RET_LEGAL_YEARS['letter']}-12-31"
+    return f"{int((r['signed_at'] or r['created_at'])[:4]) + ret_keep_years('letter')}-12-31"  # 2.545.0 (#4595): + the buffer
 
 
 def sig_gone_out(c, r):
@@ -420,6 +421,8 @@ def sig_gone_delete(sid):
     kept = sig_gone_kept(c, r)
     if kept and kept >= iso(now_utc())[:10]:
         raise Denied(409, tr("This record is kept until {0} by law", kept))
+    if kept:  # 2.545.0 (#4595): the switch "Extend the lock" of its office keeps it after the period too
+        olk_need_unheld(c, r["org_id"] or olk_person_office(c, r["created_by"]))
     c.execute("DELETE FROM office_signoffs WHERE id=?", (sid,))
     if r["org_id"]:
         ofx_log(c, r["org_id"], "signoff_delete", target="video", detail={"signoff": sid})

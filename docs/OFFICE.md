@@ -2793,6 +2793,17 @@ Routes: `GET / POST / PUT / DELETE /api/office/letterhead` (state, multipart `fi
 with `m1` / `m2` = `[top, right, bottom, left]` in mm, removal), `POST /api/office/letterhead/restore` (`{file}`: the
 previous file again, the undo) and `GET /api/office/letterhead/preview` (the sample as PDF).
 
+## Retention periods and "Extend the lock"
+
+*Since 2.545.0.* Kalmido keeps what the law keeps (receipts and invoices 8 years, books 10, the logbook 8, sent business
+letters 6, each from the end of its year) one year longer by default: the server operator sets this buffer with
+`KALMIDO_RETENTION_BUFFER_YEARS` (0 = exactly the law, never shorter). Office settings > Data > **Extend the lock**
+(office admins; a person without an organisation for the own office): while a tax audit is open, nothing the office keeps
+by law is deleted, not even after its period, until the switch is off again. Deleting such a receipt for good, an archived
+DATEV year, a decided approval record, the organisation or the account with that personal office answers 409 with the
+reason. Switching on and off goes into the office log. Routes: `GET / PUT /api/office/settings/retention-hold`
+(`{on}` -> `{on, since, by_name, keep_years, buffer_years}`). Have the periods confirmed by your tax advisor.
+
 ## Retention export before deleting an account or an organisation
 
 *Since 2.146.0.*

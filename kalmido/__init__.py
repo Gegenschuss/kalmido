@@ -380,6 +380,7 @@ ORDER = (
     "office.bank",  # 2.90.0 B (#1921): bank reconciliation: CSV / CAMT import, matching bookings to invoices and receipts
     "office.bankrules",  # 2.299.0 B (#3191): bank rules: marking bookings by rule, rules learned from confirmations
     "office.bankacc",  # 2.470.0 (#3596): the bank accounts of an office as master data
+    "office.rethold",  # 2.545.0 (#4595): the switch "Extend the lock" (tax audit) of an office
     "office.banknorc",  # 2.299.0 C (#3192): bank bookings without a receipt: the list, the counter, the reminder task
     "office.bankvend",  # 2.425.0 B (#3451): recurring providers of the bank bookings, their missing invoices
     "office.ccread",  # 2.444.0 (#3447): reading a credit card statement (PDF), one reader per provider's layout

@@ -20,6 +20,7 @@ from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn
 from .pictures import org_icon_tok, org_icon_url, AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path  # 2.369.5 (#2517): pulled up from functions
 from ..core.i18n import trn  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
+from ..core.retention import ret_need_unheld  # 2.545.0 (#4595)
 
 
 # ---------------------------------------------------------------- 2.22.0 (#752): organisations
@@ -1168,6 +1169,7 @@ def org_delete(oid):
         n = c.execute("SELECT COUNT(*) FROM lists WHERE org_id=?", (oid,)).fetchone()[0]
         if n:
             return err(tr("This organisation still has {0} projects: their owners move or delete them first", n), 409)
+        ret_need_unheld(c, oid)  # 2.545.0 (#4595): not while the switch "Extend the lock" is on
         info = odl_delete_info(c, oid)
         if info["kept_until"] and info["kept_until"] > (odl_retired(c, oid) or ""):  # 2.239.0 C (#2874): the newer period is noted
             c.execute("UPDATE orgs SET retain_until=? WHERE id=?", (info["kept_until"], oid))

@@ -398,7 +398,8 @@ ts = testclock.now().isoformat(timespec="seconds")
 sql("INSERT INTO office_equipment(org_id, name, purchase_date, life_months, created_at, updated_at) VALUES(?,?,?,?,?,?)",
     (ORG, "Kamera", f"{TODAY.year - 1}-03-01", 36, ts, ts), write=True)
 out = in_app(f"from kalmido.accounts.orgretain import odl_retention\nr = odl_retention(c, {ORG})\nprint('RET', r['counts'].get('assets'), r['until'])")
-check(f"RET 1 {TODAY.year - 1 + 3 + 10}-12-31" in out, "#2845: the asset register counts, from the year of its last depreciation " + out[-300:])
+# 2.545.0 (#4595): the periods are the law + 1 year buffer (KALMIDO_RETENTION_BUFFER_YEARS default)
+check(f"RET 1 {TODAY.year - 1 + 3 + 11}-12-31" in out, "#2845: the asset register counts, from the year of its last depreciation " + out[-300:])
 out = in_app(f"from kalmido.core.config import app as fl\nfrom kalmido.office.meals import bw_years\n"
              f"with fl.test_request_context():\n    print('BW', bw_years(c, {ORG}))")
 check("BW 8" in out, "entertainment receipts: 8 years " + out[-300:])

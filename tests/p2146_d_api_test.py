@@ -319,7 +319,7 @@ if not os.environ.get("P2146D_NOHOSTED"):
     check(not sql("SELECT 1 FROM lists WHERE id=?", (BL,)) and not sql("SELECT 1 FROM budget_files WHERE list_id=?", (BL,)), "hosted, exported: project + receipt rows gone")
     check(not os.path.exists(BFULL), "hosted, exported: the receipt file is gone from the disk")
 
-    # the waiver: the project waits in the trash until the end of 2034 (receipt of 2026 + 8 years)
+    # the waiver: the project waits in the trash until the end of 2035 (receipt of 2026 + 8 years + 1 year buffer, 2.545.0 #4595)
     r = A.post(B + "/api/users", json={"orgs": [], "username": "paula", "display_name": "Paula Example", "password": "password123"})
     PID = r.json()["id"]
     Pa = sess("paula")
@@ -337,8 +337,8 @@ if not os.environ.get("P2146D_NOHOSTED"):
     r = A.delete(B + f"/api/users/{PID}", params={"lists": "delete", "confirm": "paula", "retention": "waived"})
     check(r.ok and not sql("SELECT 1 FROM users WHERE id=?", (PID,)), "hosted: with the waiver the account goes " + r.text[:200])
     row = sql("SELECT deleted_at IS NOT NULL, retain_until, archived FROM lists WHERE id=?", (PL,))
-    check(row == [(True, "2034-12-31", 1)] and sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and os.path.isfile(PFULL),
-          f"hosted, waived: the project stays in the trash until 2034-12-31 with its receipt {row}")
+    check(row == [(True, "2035-12-31", 1)] and sql("SELECT 1 FROM budget_files WHERE list_id=?", (PL,)) and os.path.isfile(PFULL),
+          f"hosted, waived: the project stays in the trash until 2035-12-31 with its receipt {row}")
     check(sql("SELECT kind FROM retention_log WHERE subject=?", (f"user:{PID}",)) == [("waiver",)], "hosted, waived: the waiver is noted")
 
     # 2.186.1 (#2732): the custodian (the deleting instance admin) owns the kept private project, resealed for her account
@@ -347,7 +347,7 @@ if not os.environ.get("P2146D_NOHOSTED"):
           "hosted, waived: booking and receipt resealed for alice's account")
     r = A.get(B + "/api/trash/lists")
     mine = [x for x in r.json().get("lists", []) if x["id"] == PL]
-    check(r.ok and len(mine) == 1 and mine[0]["held"] is True and mine[0]["retain_until"] == "2034-12-31", f"alice sees the kept project in her trash {mine}")
+    check(r.ok and len(mine) == 1 and mine[0]["held"] is True and mine[0]["retain_until"] == "2035-12-31", f"alice sees the kept project in her trash {mine}")
     check(not sql("SELECT 1 FROM list_members WHERE list_id=?", (PL,)), "review M1: the shares of the kept project end")
     Bo = sess("bob")
     check(not [x for x in Bo.get(B + "/api/trash/lists").json().get("lists", []) if x["id"] == PL], "bob does not see it")
