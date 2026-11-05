@@ -109,10 +109,9 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   hold(w, /^DELETE \/api\/fields\/\d+$/);
   w.eval(`fieldModal(${L}, fieldById(${FB}), () => {})`);
   await until(() => d.querySelector('#fd-name'));
+  w.__asked = ''; w.confirm = m => { w.__asked = String(m); return true; };  // boot.js dialogBridge answers the question with it
   lastModal(d).querySelector('[data-m="del"]').click();
-  const okBtn = await until(() => { const m = lastModal(d); return m && /Delete the field/.test(m.textContent) && /1 task with a value/.test(m.textContent) && [...m.querySelectorAll('button')].find(b => b.textContent.trim() === 'Delete' && b.dataset.m !== 'del'); });
-  check(!!okBtn, 'delete asks first, with the count of the server');
-  okBtn?.click();
+  check(await until(() => w.__asked) && /Delete the field/.test(w.__asked) && /\(1 task with a value\)/.test(w.__asked), 'delete asks first, with the count of the server: ' + w.__asked);
   check(await until(() => w.__held.length === 1), 'the delete is on its way (held)');
   check(!w.eval(`!!fieldById(${FB})`) && !d.querySelector(`#tc-${T} .lc[data-k="f:${FB}"]`) && !d.querySelector('#fd-name'), 'the field and its column are gone at once');
   check((await fieldsOnServer(CA, L)).length === 1, 'the server has it still');
