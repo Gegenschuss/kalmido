@@ -1063,8 +1063,10 @@ def member_rejoin(c, oid, uid, rows):
         if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
             member_folder_adopt(c, lid, uid)
-            from .lmcore import lmc_share
-            lmc_share(c, uid, lid, uid, role, None)  # 2.568.0 (#4739): the core's share row (leaving took it into obj_revoked)
+            from .lmcore import lmc_rejoin_actor, lmc_share
+            # 2.568.0 (#4739): the core's share row (leaving took it into obj_revoked); review F7: by who shared it then (the
+            # taken row), else the system (None) -- never uid as if they had shared it with themselves
+            lmc_share(c, lmc_rejoin_actor(c, lid, uid), lid, uid, role, None)
     if back:
         grp_sync(c, back)
         acx_drop()

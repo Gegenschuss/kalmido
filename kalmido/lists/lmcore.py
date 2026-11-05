@@ -119,6 +119,17 @@ def lmc_unshare(c, actor, lid, uid):
         return obj_unshare(c, actor, LMC_KIND, int(lid), s["id"], checked=True)
 
 
+def lmc_rejoin_actor(c, lid, uid):
+    """2.568.0 (#4739, review F7): who shared project lid with uid before uid left the organisation (created_by of the row the
+    core took, obj_revoked) -- None (the system) when no such row is left."""
+    for (j,) in c.execute("SELECT row_json FROM obj_revoked WHERE src='fs_shares' AND kind=? AND ref_id=? AND user_id=? ORDER BY id DESC",
+                          (LMC_KIND, int(lid), int(uid))).fetchall():
+        s = json.loads(j)
+        if s.get("list_own") and s.get("created_by") and int(s["created_by"]) != int(uid):
+            return int(s["created_by"])
+    return None
+
+
 def _on_restore(c, uid, lid, share):
     """obj_share_restore put uid's (the target's) own member row back (list_own, a person / an agent: core/objects.py, review
     F2): the project's own rules of a share decide (member_set: the workspace, one agent per project, the lock, a child ...);

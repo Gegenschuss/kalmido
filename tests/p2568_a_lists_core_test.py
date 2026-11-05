@@ -328,6 +328,16 @@ r = S["erik"].get(B + f"/api/lists/{L9}/history")
 check(r.status_code == 403 and r.json().get("error"), f"F5: a participant: 403 with a reason ({r.status_code} {r.text[:160]})")
 check(S["gina"].get(B + f"/api/lists/{L9}/history").ok, "a viewer with a personal share reads the history")
 
+# F7: coming back to the organisation: the core's row names who shared it then, not the person
+CR = dbx("""SELECT s.created_by FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='list' AND n.ref_id=?
+            AND s.user_id=? AND s.list_own=1""", (L1, uid["carl"]))
+check(CR == [], "F7: carl (left the organisation) has no row on the harbour plan")
+r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "carl@example.com", "role": "member"})
+CR = dbx("""SELECT s.created_by FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='list' AND n.ref_id=?
+            AND s.user_id=? AND s.list_own=1""", (L1, uid["carl"]))
+check(r.ok and role_of(L1, "carl") == "edit" and CR and CR[0][0] == ALICE,
+      f"F7: carl back: his row is by alice who shared it, not by himself {CR} " + r.text[:160])
+
 # F6: a member's own row adds nothing in the file store (no "Shared with me", the node's role as before 2.568.0)
 FRED, Fd = freelancer(B, A, "fred")
 PN = node_of(PL)
