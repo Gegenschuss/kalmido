@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.562.0",
+   "date": "2026-11-05",
+   "items": [
+    {
+     "de": "In der Ablage siehst du direkt an Ordner, Datei und Kachel, mit wem sie geteilt sind, und teilst mit einem Klick.",
+     "en": "In Files you see right on a folder, file or card who it is shared with, and share with one click."
+    },
+    {
+     "de": "Geräte im Büro-Inventar erinnern an das Garantie-Ende und an Wartungen als Aufgaben.",
+     "en": "Office equipment reminds you of the warranty end and of maintenance as tasks."
+    },
+    {
+     "de": "Viele Aktionen erscheinen jetzt sofort, ohne auf den Server zu warten - von der Tabellenansicht über Termine bis zu Belegen.",
+     "en": "Many actions now show at once without waiting for the server - from the table view to events and receipts."
+    },
+    {
+     "de": "Dialoge für Budget, Fahrtenbuch, Kontakte, Projektstatus, Reisekosten und mehr schließen sofort, ein Fehler setzt die Änderung zurück.",
+     "en": "Dialogs for budget, logbook, contacts, project status, travel expenses and more close at once; an error takes the change back."
+    }
+   ]
+  },
+  {
    "version": "2.560.0",
    "date": "2026-11-05",
    "items": [

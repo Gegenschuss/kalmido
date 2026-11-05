@@ -14,7 +14,38 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.560.0] - 2026-11-05
+## [2.562.0] - 2026-11-05
+
+Package 2.553 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Audit-Lücken gesammelt: 180x Aufgabe ohne Beleg-Co).
+### Added
+- Delete your own account (#1413): Settings > Account > "Delete account" asks for your password (plus the app code when it is on), offers the data export first and lets you choose for each own project: hand it over to a member or delete it with you. The account is locked for 7 days; the login page then only offers "Cancel deletion", a mail with a cancel link comes at once and a reminder one day before. After 7 days a background run hands over or deletes the projects as chosen and deletes the account. The last admin of an organisation and the only server admin cannot delete themselves.
+- Requests by e-mail (#3460): a project's form dialog has the switch "Requests by e-mail" with its own request address. A mail to it becomes a task and a portal ticket; the sender gets a confirmation with the status link. Public answers on the ticket go out by mail (ticket reference in the subject), internal comments never; the customer's reply becomes a comment on the same ticket only when reference and sender match. Unverified senders still become a ticket, marked "sender not verified". Optional mail when the ticket is done.
+- Agent API and MCP (#3538): v1 sections carry and take the column time limits `dwell_warn_h` / `dwell_alert_h`, v1 tasks carry `section_at` and `field_at`; new MCP tool `set_dwell_limits`, `create_section` takes both limits.
+### Changed
+- Test selection (#4657): `tests/stages.py --touched` maps files that were "too broad" (sheets, support grant, organisation invitation, office / docs / settings CSS) to their area's suites via `tests/stages_areas.json`, so a package no longer runs as hard only because of them.
+
+CI-Fix 2.560 (p2187_a_rights_ui).
+### Fixed
+- Tests: the rights UI suite expects the travel expenses in the office menu of a member without a group, since members work on their own trips there (#4592); bank and key figures stay hidden.
+
+Package 2.558 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Files: sharing is visible like in the lists - a folder has "Share" on top and "Shared with Anna, Ben · agent X" / "Only you" below (inherited shares included); file rows and cards show the names instead of an empty icon (from three on "Anna +2", a click opens the Share dialog); after a scan a bar names who sees the new file and offers "Share…"; receivers see "Shared by <name>". Names of shares go only to who may open the Share dialog (#4693).
+- Office equipment: warranty end and maintenance (inspection, service, calibration, other; every N months) become tasks like private devices - the warranty end a due task with a reminder 30 days before, each maintenance a recurring task with a reminder 7 days before; archived or deleted equipment completes its tasks, restoring starts them again; also in the personal office of freelancers (#4591).
+- Shared core stage 1 for new areas: one object register (on the file store's reference nodes), one role function (owner, organisation role, shares of people / groups / agents with expiry, data lock, token allow list, trash), revocation in one place (leaving an organisation, role change, retiring, account deletion), one write path with version check (409, agents must send the version), history, session undo and trash, generic routes `/api/obj/<kind>/…`, agent routes `/api/v1/agent/objects/<kind>` and MCP tools `list_objects` / `get_object` / `update_object`; client helper `objsave.js` loaded on demand; guide `docs/dev/kern.md` (#4709).
+
+### Changed
+- Leaving an organisation now also removes the person's file shares on organisation nodes and their organisation chat rooms; a downgrade to guest or accounting leaves the open channels the person joined; retiring takes all shares of the organisation; deleting an account hands its organisation objects of the shared core to an heir (#4709).
+
+### Fixed
+- Key rotation re-encrypts the copies in the office trash: a card line or expense restored after a rotation is readable again; trash copies that open with no key are counted as `trash_unreadable` and do not hold the rotation back (#4669).
+
+Package 2.559 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Changed
+- Everyday actions show at once instead of waiting for the server: table view cells, dragging several tasks, the multi-select action and deleting the selection, new and deleted sections (a new one has a stand-in until its id comes), emoji reactions on comments and in the agent chat; calendar events created, changed, dragged and deleted, calendars shown or hidden; document fields and "Checked" (the next document opens at once); receipts ticked as checked, edited or checked in bulk. An error puts the old state back with the server's reason, no full reload afterwards (#4659).
+- More dialogs close at once with the row already there: budget entries, logbook trips (the server's hint comes as a toast after the answer), project status, dependencies (also by dragging), waiting on someone, contacts saved / deleted / linked to a task, tasks into a sprint or the backlog, travel expenses and the DATEV tick, entertainment receipts, pipeline deals (dragging included), read later, feed items read and bookmarks. Errors take the change back; cash book entries and timer starts still wait for the server on purpose (#4660).
 
 Package 2.554 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -126,6 +157,10 @@ Package 2.545 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: 
 ### Fixed
 - The live poll no longer fetches the whole state a second time while a load is already on its way; it waits for it and catches up at most once (#4483).
 - The menu path check covers README.md again; examples/README.md names today's menu (#4384).
+
+## [2.560.0] - 2026-11-05
+
+Not released (the CI of this version was red); its changes are listed under 2.562.0.
 
 ## [2.551.0] - 2026-11-05
 
@@ -1521,7 +1556,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.560.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.562.0...HEAD
+[2.562.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.562.0
 [2.560.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.560.0
 [2.551.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.551.0
 [2.549.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.549.0
