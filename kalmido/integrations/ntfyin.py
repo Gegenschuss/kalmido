@@ -13,7 +13,7 @@ import urllib.parse
 
 from flask import jsonify
 
-from ..core.config import app, MAX_FILE_MB, NTFY_URL, ntfy_inbox_allowed, _origin
+from ..core.config import app, MAX_FILE_MB, NTFY_URL, ntfy_inbox_allowed, ntfy_topic_taken, _origin
 from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, iso, now_utc
 from ..collab.integfail import INTEG_FAILS, integ_tell
@@ -35,6 +35,7 @@ def ni_new_topic():
     return "kalmido-" + secrets.token_urlsafe(18)[:24]
 
 
+NI_TAKEN = N_("This topic is not available. Use another one with at least 16 characters (the dice button makes one).")
 NI_HTTPS = N_("The ntfy server needs https:// (http:// only for hosts an admin allowed)")
 
 
@@ -99,6 +100,9 @@ def ni_put():
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
     if enabled and not ntfy_inbox_allowed(url or NTFY_URL, topic):
         return err(tr("This topic on the public ntfy.sh can be guessed, anyone could publish to it. Use at least 16 characters (the dice button makes one) or an own ntfy server."))
+    # 2.549.0 (#4515): too short on the default server, a push topic or another person's inbox: one neutral answer (no oracle)
+    if enabled and (not ntfy_inbox_allowed(url or NTFY_URL, topic, person=True) or ntfy_topic_taken(c, uid, topic, url)):
+        return err(tr(NI_TAKEN))
     token = old["token"] if old else ""
     if "token" in b:
         t = str(b["token"] or "").strip()

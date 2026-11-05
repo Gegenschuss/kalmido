@@ -244,5 +244,47 @@ publish([{"topic": ftopic, "id": "f1", "message": "Frida shares"}])
 got = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Frida shares'"))
 check(got and got[0][0] == FID, "freelancer: arrives in the own basket")
 
+# 2.549.0 (#4515, audit F1+F2): an inbox topic is no push topic and no other person's inbox on the same server; the length
+# counts on the default server too (NTFY_URL, here 127.0.0.1:9999); one neutral answer; the duplicate check is per recipient
+bob_push = dbx("SELECT value FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (ids["bob"],))[0][0]
+check(bob_push, "setup: bob has a push topic")
+r_push = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push})
+check(r_push.status_code == 400, f"another person's push topic as an inbox (default server) refused ({r_push.status_code})")
+r_short = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carol-short"})
+check(r_short.status_code == 400, f"a short topic on the default server refused ({r_short.status_code})")
+check(r_push.json().get("error") == r_short.json().get("error") and "bob" not in r_push.text.lower(),
+      f"the same neutral answer, no hint whose ({r_push.text[:120]} / {r_short.text[:120]})")
+r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": ftopic, "url": STUB})
+check(r.status_code == 400 and r.json().get("error") == r_push.json().get("error"), f"another person's inbox on the same server refused ({r.status_code})")
+r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": ftopic.upper(), "url": STUB + "/"})
+check(r.status_code == 400, f"... also in other case / with a slash ({r.status_code})")
+r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push, "url": STUB})
+check(r.ok, f"the same name on an own server (no push goes there) is fine ({r.status_code} {r.text[:100]})")
+own_push = dbx("SELECT value FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (FID,))[0][0]
+r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": own_push, "url": ""})
+check(r.status_code == 400, f"freelancer: the own push topic as the inbox refused (would loop) ({r.status_code})")
+r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push})
+check(r.status_code == 400, f"freelancer: another person's push topic refused ({r.status_code})")
+Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": ftopic, "url": STUB})
+# the other way round: an admin sets a push topic that is an inbox on the default server
+r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carols-default-server-inbox-4515", "url": ""})
+check(r.ok, f"carol: a long topic on the default server ({r.status_code} {r.text[:100]})")
+r = A.patch(B + "/api/users/%d" % ids["bob"], json={"ntfy_topic": "carols-default-server-inbox-4515"})
+check(r.status_code == 400 and "carol" not in r.text.lower(), f"push topic = someone's inbox refused ({r.status_code})")
+check(dbx("SELECT value FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (ids["bob"],))[0][0] == bob_push, "bob's push topic unchanged")
+r = A.post(B + "/api/users", json={"username": "dave4515", "display_name": "Dave", "password": "password123", "ntfy_topic": "carols-default-server-inbox-4515"})
+check(r.status_code == 400 and not dbx("SELECT 1 FROM users WHERE username='dave4515'"), f"... also for a new person ({r.status_code})")
+r = A.patch(B + "/api/users/%d" % ids["bob"], json={"ntfy_topic": bob_push + "x"})
+check(r.ok, f"a free push topic is fine ({r.status_code})")
+# the same message id on two people's topics: both get it (before: the second was skipped as a duplicate)
+Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carols-dup-topic-4515-abc", "url": STUB})
+publish([{"topic": "carols-dup-topic-4515-abc", "id": "dup4515", "message": "Dup for carol"},
+         {"topic": ftopic, "id": "dup4515", "message": "Dup for frida"}])
+got_c = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Dup for carol'"))
+got_f = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Dup for frida'"))
+check(got_c and got_c[0][0] == ids["carol"], f"the id arrives at carol {got_c}")
+check(got_f and got_f[0][0] == FID, f"freelancer: the same id arrives at frida too {got_f}")
+Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
+
 print(f"p2142_c_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)

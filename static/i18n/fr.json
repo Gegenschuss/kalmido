@@ -16287,6 +16287,8 @@
   "{0} created the task from a quotation": "{0} a créé la tâche à partir d’un devis",
   "{0}: the position is no longer in the quotation (the task stays)": "{0} : la position n’est plus dans le devis (la tâche reste)",
   "{0}: the position is in the quotation again": "{0} : la position est de nouveau dans le devis",
+  "This topic is not available. Use another one with at least 16 characters (the dice button makes one).": "Ce sujet n'est pas disponible. Utilisez-en un autre d'au moins 16 caractères (le bouton dé en crée un).",
+  "This ntfy topic is not available. Choose another one.": "Ce sujet ntfy n'est pas disponible. Choisissez-en un autre.",
   "Without a place": "Sans emplacement",
   "Deleted for good in {0} day": ["Supprimé définitivement dans {0} jour", "Supprimé définitivement dans {0} jours"],
   "Video sign-offs in the trash are deleted for good after {0} day.": ["Les validations vidéo dans la corbeille sont supprimées définitivement après {0} jour.", "Les validations vidéo dans la corbeille sont supprimées définitivement après {0} jours."],

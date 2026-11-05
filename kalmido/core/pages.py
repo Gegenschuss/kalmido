@@ -378,7 +378,8 @@ def ntfy_inbox_import(c, m, who=None):
     the environment's inbox (NTFY_INBOX_*) and its user as before."""
     mid = m["id"]
     uid = who["uid"] if who else inbox_user(c)
-    if uid and not c.execute("SELECT 1 FROM tasks WHERE tt_id=?", ("ntfy:" + mid,)).fetchone():
+    # 2.549.0 (#4515, audit F2): the same message id counts as done only among the recipient's own tasks (before: anyone's = lost)
+    if uid and not c.execute("SELECT 1 FROM tasks WHERE tt_id=? AND created_by=?", ("ntfy:" + mid, uid)).fetchone():
         att = m.get("attachment") or None
         msg = (m.get("message") or "").strip()
         if att and any(msg.startswith(p) for p in SHARE_PLACEHOLDERS):  # ntfy / Android placeholder texts

@@ -16288,6 +16288,8 @@
   "{0} created the task from a quotation": "{0} ha creato l’attività da un preventivo",
   "{0}: the position is no longer in the quotation (the task stays)": "{0}: la posizione non è più nel preventivo (l’attività resta)",
   "{0}: the position is in the quotation again": "{0}: la posizione è di nuovo nel preventivo",
+  "This topic is not available. Use another one with at least 16 characters (the dice button makes one).": "Questo argomento non è disponibile. Usane un altro con almeno 16 caratteri (il pulsante del dado ne crea uno).",
+  "This ntfy topic is not available. Choose another one.": "Questo argomento ntfy non è disponibile. Scegline un altro.",
   "Without a place": "Senza posizione",
   "Deleted for good in {0} day": ["Eliminato definitivamente tra {0} giorno", "Eliminato definitivamente tra {0} giorni"],
   "Video sign-offs in the trash are deleted for good after {0} day.": ["Le approvazioni video nel cestino vengono eliminate definitivamente dopo {0} giorno.", "Le approvazioni video nel cestino vengono eliminate definitivamente dopo {0} giorni."],

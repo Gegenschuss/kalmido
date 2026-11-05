@@ -16287,6 +16287,8 @@
   "{0} created the task from a quotation": "{0} heeft de taak uit een offerte aangemaakt",
   "{0}: the position is no longer in the quotation (the task stays)": "{0}: de positie staat niet meer in de offerte (de taak blijft)",
   "{0}: the position is in the quotation again": "{0}: de positie staat weer in de offerte",
+  "This topic is not available. Use another one with at least 16 characters (the dice button makes one).": "Dit onderwerp is niet beschikbaar. Gebruik een ander met minstens 16 tekens (de dobbelsteenknop maakt er een).",
+  "This ntfy topic is not available. Choose another one.": "Dit ntfy-onderwerp is niet beschikbaar. Kies een ander.",
   "Without a place": "Zonder plek",
   "Deleted for good in {0} day": ["Definitief verwijderd over {0} dag", "Definitief verwijderd over {0} dagen"],
   "Video sign-offs in the trash are deleted for good after {0} day.": ["Video-goedkeuringen in de prullenbak worden na {0} dag definitief verwijderd.", "Video-goedkeuringen in de prullenbak worden na {0} dagen definitief verwijderd."],

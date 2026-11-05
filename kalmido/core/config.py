@@ -280,14 +280,38 @@ def ntfy_attachment_url(u):
     return None
 
 
-def ntfy_inbox_allowed(url=None, topic=None):
+def ntfy_inbox_allowed(url=None, topic=None, person=False):
     """The share inbox imports whatever is published to the topic: refuse a guessable topic on the
     public ntfy.sh (anyone could publish there). 2.142.0 C (#2150): url / topic of a person's own inbox (default: the environment's)."""
     url, topic = NTFY_IN["url"] if url is None else url, NTFY_IN["topic"] if topic is None else topic
     host = (urllib.parse.urlsplit(url).hostname or "").lower()
     if host in ("ntfy.sh", "www.ntfy.sh") and (len(topic) < 16 or topic.lower() == "inbox"):
         return False
+    # 2.549.0 (#4515, audit F2): a person's own inbox on the default server (NTFY_URL) needs the same length: anyone with
+    # access to that server could otherwise guess it (the environment's inbox, url None, stays as it was)
+    if person and _ntfy_base(url) == _ntfy_base(NTFY_URL) and (len(topic) < 16 or topic.lower() == "inbox"):
+        return False
     return True
+
+
+def _ntfy_base(url):
+    return (url or NTFY_URL).strip().rstrip("/").lower()
+
+
+def ntfy_topic_taken(c, uid, topic, url=None, push=False):
+    """2.549.0 (#4515, audit F1): True when a topic belongs elsewhere. A share inbox (push=False, url = its own server,
+    '' = NTFY_URL) may be no push topic on NTFY_URL (the pushes of that account, the own included, would land as tasks)
+    and no other person's inbox on the same server. A push topic (push=True, always on NTFY_URL) may be no inbox there.
+    Topics compared without case (stricter than ntfy). The callers answer neutrally: never whose it is."""
+    t = (topic or "").strip().lower()
+    if not t:
+        return False
+    base = _ntfy_base(None if push else url)
+    for r in c.execute("SELECT url FROM ntfy_inboxes WHERE lower(topic)=? AND user_id IS DISTINCT FROM ?", (t, None if push else uid)):
+        if _ntfy_base(r[0]) == base:
+            return True
+    return not push and base == _ntfy_base(None) and bool(
+        c.execute("SELECT 1 FROM user_settings WHERE key='ntfy_topic' AND lower(value)=? LIMIT 1", (t,)).fetchone())
 
 
 def _nets(s):
