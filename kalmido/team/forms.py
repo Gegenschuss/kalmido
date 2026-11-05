@@ -571,10 +571,11 @@ def frm_mail_ok(c, ehash, email, fid=None):
     return (fid is None or r81c_form_mail_day(c, fid)) and mail_budget(c, None, email)
 
 
-def r81c_form_mail_day(c, fid):
-    """2.81.0 (#1866): at most FRM_MAIL_DAY confirmation mails per form and day (counted in mail_counts like mail_budget)."""
+def r81c_form_mail_day(c, fid, key=None):
+    """2.81.0 (#1866): at most FRM_MAIL_DAY confirmation mails per form and day (counted in mail_counts like mail_budget).
+    2.553.0 B (#3460): key = another counter (the request address of a list, integrations/reqmail.py)."""
     day = now_utc().strftime("%Y-%m-%d")
-    k = f"fm:{fid}"
+    k = key or f"fm:{fid}"
     r = c.execute("SELECT n, day FROM mail_counts WHERE k=?", (k,)).fetchone()
     if r and r[1] == day and r[0] >= FRM_MAIL_DAY:
         return False

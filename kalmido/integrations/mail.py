@@ -28,7 +28,7 @@ from ..tasks.validation import as_int, log_act
 from ..collab.news import news_unread
 from ..accounts.users import need_admin
 from ..notify.alerts import aa_count, aa_err, aa_fail, aa_ok
-from ..agents.core import need_person
+from ..agents.core import agent_added_events, agent_comment_events, need_person  # 2.553.0 B (#3460): the events also for integrations/reqmail.py
 from ..collab.teamchat import tchat_unread
 from ..core.env import env_bool
 from ..core.mailframe import MAIL_ACC, Safe, mail_html  # noqa: F401  2.420.0 B (#3499): the one mail frame (re-exported here)
@@ -337,7 +337,6 @@ def mail_import(c, raw, pre=None):
         tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url) VALUES(?,?,?,?,?,?,?,?,?)",
                         (lid, title[:300], content, srt, ts, ts, "mail:" + mid, uid, url if valid_url(url) else None))
         log_act(c, tid, "created", uid=uid)
-        from ..agents.core import agent_added_events
         agent_added_events(c, tid, source="mail")  # 2.23.0 (#795)
     else:
         tid = new_inbox_task(c, uid, title, content, "mail:" + mid, url)

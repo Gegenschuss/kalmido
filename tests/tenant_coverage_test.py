@@ -194,6 +194,7 @@ KINDS = {
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
     "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403; "
+                "p2553_b_reqmail_test.py (2.553.0 #3460): the request address of a project: another person 404, a mail to it lands only in its own project / space, a ticket reference sent to another project's address never reaches the ticket; "
                 "p2141_a_api_test.py (2.141.0): another organisation's mailbox 404, a member 403, a workspace mailbox files into its own workspace only (a foreign token counts as none), compose / send for another organisation's mail or client 404, agents 403; "
                 "2.141.0 B: p2141_b_api_test.py the HTML view / task / event from a mail of another organisation 404, into a list / calendar of another workspace 409, the mail of a task only with the mail's rights; "
                 "2.483.0 (#1902): p2483_a_mail_api_test.py the API v1 for agents / tokens: another organisation's client / project / mail 404, a project not shared with the agent 404, \"Not assigned\" never"),
@@ -1243,6 +1244,7 @@ ROUTES = {
     "GET /api/hubmail/inbox": "hubmail", "GET /api/hubmail/mails/{}": "hubmail", "GET /api/hubmail/mails/{}/files/{}": "hubmail",
     "GET /api/hubmail/targets": "hubmail", "POST /api/hubmail/mails/{}/assign": "hubmail", "DELETE /api/hubmail/mails/{}": "hubmail",
     "POST /api/hubmail/mails/{}/restore": "hubmail",
+    "GET /api/lists/{}/request-mail": "hubmail", "PATCH /api/lists/{}/request-mail": "hubmail",  # 2.553.0 B (#3460): p2553_b_reqmail_test.py
     "GET /api/v1/mails": "hubmail", "GET /api/v1/mails/{}": "hubmail",  # 2.483.0 (#1902): read only, p2483_a_mail_api_test.py
     # 2.141.0 B (#2140, #2139): the HTML view, a task / an event from a mail (only into lists / calendars of the mail's workspace), the mail of a task / event
     "GET /api/hubmail/mails/{}/html": "hubmail", "GET /api/hubmail/mails/{}/make": "hubmail", "POST /api/hubmail/mails/{}/task": "hubmail",

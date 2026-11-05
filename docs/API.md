@@ -1279,6 +1279,15 @@ the mails to the reporter on / off. `GET /clients/{id}` adds `tickets` (`task_id
 the person sees). The reporter's pages are server-rendered HTML without an account: `/p/{token}` (status, public answers,
 answer form, "All my reports"), `/p/{token}/stop` (mails off), `/portal/login/{token}` (one-time sign-in link by mail, 30 min)
 and `/portal` (the reporter's tickets of the same space, cookie for 7 days).
+2.553.0 (#3460) requests by e-mail (web app only, no `/api/v1`): `GET|PATCH /api/lists/{id}/request-mail` (owner / project
+admins, people only) `{on, done_mail, address, available, why}`; `PATCH` `{on?, done_mail?, renew?}` (booleans; `409` where a project
+cannot have it: no mail on the server, the customer portal off, not a project, end-to-end encryption). On = one request address of
+the project: a mail to it becomes a task of exactly that project plus a ticket (the timeline's `ticket` then carries `via: "mail"`,
+`unverified` when the receiving mail server did not confirm the sender's domain, and for writers `ref`, the reference
+`T<id>-<check>` in the subject of its mails); the sender gets one confirmation with the status link. Public answers go out by mail
+with the reference, Reply-To = the request address and the thread headers; a reply becomes a comment of that ticket only when the
+reference (subject or In-Reply-To / References) AND the sender (the reporter) fit, else it is a new ticket. Automatic mails get no
+confirmation and never become comments. `done_mail` (default off) = also a mail when the ticket is done.
 2.120.0 (#2088): with the office setting `portal_docs` (`PUT /office/settings`, office admins, default 0) `/portal` also
 lists the sent documents of the signed-in address's clients in that space, each as `/portal/docs/{id}/pdf` (anything else:
 404); `POST /office/clients/{id}/portal-link` `{to?: "invoice" | "main"}` (members of the office) mails the client the

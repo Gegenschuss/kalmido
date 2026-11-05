@@ -758,9 +758,15 @@ def hbm_mail_import(c, msg, raw):
         r = next((x for x in (c.execute("SELECT * FROM hub_tokens WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
         if not r:
             return None
-        out = _import(c, r, msg, raw, mail_text)
+        if r["kind"] == "ticket":  # 2.553.0 B (#3460): a list's request address -> a portal ticket (integrations/reqmail.py)
+            out = HBM_TICKET_HOOK["take"](c, r, msg, raw) if HBM_TICKET_HOOK else 0
+        else:
+            out = _import(c, r, msg, raw, mail_text)
     c.commit()
     return out
+
+
+HBM_TICKET_HOOK = {}  # 2.553.0 B (#3460): integrations/reqmail.py (take = a mail to a list's request address)
 
 
 def hbm_from_verified(msg, addr):
@@ -808,6 +814,8 @@ def _holder_ok(c, kind, uid, org, cid, lid):
         org = l["org_id"]
         cl = _visible_client(c, uid, l["client_id"]) if l["client_id"] else None
         cid = cl["id"] if cl and (cl["org_id"] or None) == (org or None) else None
+    elif kind != "inbox":
+        return None  # 2.553.0 B (#3460): a request address ('ticket') files no mail (integrations/reqmail.py takes it)
     if org and int(org) not in acx_of(c, uid).org_ids:
         return None  # no longer a member
     return org, cid
@@ -835,7 +843,13 @@ def hbm_heir(c, r, not_uid=None):
 def hbm_user_purge(c, uid):
     """Account uid goes (accounts/users.py): its client / project addresses pass to another person who may receive, so mails to
     them are not lost; the rest goes with the account (foreign key)."""
-    for r in c.execute("SELECT * FROM hub_tokens WHERE user_id=? AND kind IN ('client', 'list')", (uid,)).fetchall():
+    for r in c.execute("SELECT * FROM hub_tokens WHERE user_id=? AND kind IN ('client', 'list', 'ticket')", (uid,)).fetchall():
+        if r["kind"] == "ticket":  # 2.553.0 B (#3460): a list's request address is the list's: it passes to the list's owner
+            o = c.execute("SELECT owner_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+            h = o[0] if o and o[0] != uid else hbm_heir(c, {**dict(r), "kind": "list"}, not_uid=uid)
+            if h:
+                c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))
+            continue
         h = hbm_heir(c, r, not_uid=uid)
         if h:
             c.execute("UPDATE hub_tokens SET user_id=? WHERE token=?", (h, r["token"]))

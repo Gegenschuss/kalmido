@@ -82,6 +82,13 @@ def pt_create(c, task_id, list_row, form_id=None, name="", email="", client_id=N
     return tid, tok
 
 
+def pt_ref(c, p):
+    """2.553.0 B (#3460): the reference of ticket p (id, token_hash) in the subject of its mails: "T<id>-<check>" (check = an
+    HMAC with the server key over the ticket, no bare number; integrations/reqmail.py matches a reply by it)."""
+    sig = hmac.new(auth_key(c), f"portal-ticket-ref:{int(p['id'])}:{p['token_hash']}".encode(), hashlib.sha256).hexdigest()[:8]
+    return f"T{int(p['id'])}-{sig}"
+
+
 def pt_email(c, row):
     """The reporter's address of a portal_tickets row ('' when none was given)."""
     return unseal(c, "portal-email", row["email"]) if row["email"] else ""
@@ -683,12 +690,15 @@ def pt_ticket_info(c, tid, uid):
     if not p:
         return None
     w = task_visible(c, tid, uid, write=True)
-    d = {"id": p["id"], "name": p["name"], "created_at": p["created_at"], "can_write": bool(w), "client_id": p["client_id"]}
+    d = {"id": p["id"], "name": p["name"], "created_at": p["created_at"], "can_write": bool(w), "client_id": p["client_id"],
+         "via": p["via"] or "form", "unverified": bool(p["unverified"])}  # 2.553.0 B (#3460): by e-mail, the sender not verified
     if p["client_id"]:
         cl = c.execute("SELECT name FROM clients WHERE id=?", (p["client_id"],)).fetchone()
         d["client_name"] = cl["name"] if cl else None
     if w:
         d.update(email=pt_email(c, p), url=pt_status_url(pt_token(c, p)), notify=bool(p["notify"]), last_seen_at=p["last_seen_at"])
+        if p["via"] == "mail":
+            d["ref"] = pt_ref(c, p)  # 2.553.0 B (#3460)
     return d
 
 
@@ -739,6 +749,9 @@ def pt_client_tickets(c, uid, cid):
     return out
 
 
+PT_MAIL_HOOK = {}  # 2.553.0 B (#3460): integrations/reqmail.py (out = the mail of a ticket that came in by e-mail)
+
+
 # ---- mails to the reporter: a public answer and "done" (only with notify and an address; at most one mail per ticket
 # within PT_MAIL_GAP -- what happened in between goes out together). The watchdog (notify/push.py) calls this.
 def pt_mail_tick(c):
@@ -750,7 +763,7 @@ def pt_mail_tick(c):
     cut = iso(now - timedelta(seconds=PT_MAIL_GAP))
     mails = []
     with system_ctx(c):  # the reporters of every organisation (the watchdog is nobody's request)
-        rows = c.execute(f"""SELECT p.*, t.title, t.status, l.owner_id AS l_owner FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
+        rows = c.execute(f"""SELECT p.*, t.title, t.status, l.owner_id AS l_owner, l.req_mail_done AS l_done FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
                              JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
                              WHERE p.notify=1 AND p.email!='' AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()}
                              AND (p.last_mail_at IS NULL OR p.last_mail_at<=?)
@@ -761,7 +774,8 @@ def pt_mail_tick(c):
         for p in rows:
             since = parse_iso(p["last_mail_at"] or p["created_at"])
             new = [a for a in pt_answers(c, p["task_id"]) if not a["customer"] and parse_iso(a["at"]) > since]
-            done = p["status"] == 2 and p["mailed_status"] != 2
+            # 2.553.0 B (#3460): a ticket by e-mail gets the done mail only with the list's switch (default off)
+            done = p["status"] == 2 and p["mailed_status"] != 2 and (p["via"] != "mail" or bool(p["l_done"]))
             if not new and not done:  # reopened without news: only remember the state
                 c.execute("UPDATE portal_tickets SET mailed_status=? WHERE id=?", (p["status"], p["id"]))
                 continue
@@ -783,7 +797,9 @@ def pt_mail_tick(c):
             text = "\n\n".join([head, *body_, tr("Status and answers: {0}", url, lg=lg), foot])
             hfoot = html.escape(tr("You get this e-mail because you sent the report.", lg=lg)) + \
                 f' <a href="{html.escape(stop)}">{html.escape(tr("No more e-mails about this report", lg=lg))}</a>'
-            mails.append((em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj), stop))
+            m = (em, subj, text, _pt_mail_html([head, *body_], url, tr("Show the report", lg=lg), hfoot, subj), stop)
+            # 2.553.0 B (#3460): a ticket by e-mail: its reference in the subject, Reply-To and the thread headers
+            mails.append(PT_MAIL_HOOK["out"](c, p, *m) if p["via"] == "mail" and PT_MAIL_HOOK else ("mail:portal", *m))
         c.commit()
     for m in mails:
-        bgj_add("mail:portal", *m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)
+        bgj_add(*m)  # 2.193.0 D (#2220): the queue in the database (the worker sends it)

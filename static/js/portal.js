@@ -13,7 +13,10 @@ function ptl_boxHtml(t) {
   const cl = k.client_name ? ` · <a href="#client/${k.client_id}">${esc(k.client_name)}</a>` : '';
   const acts = k.can_write ? `<div class="ptlacts"><button type="button" class="btn sm" data-ptl="copy">${ic('link', 's')} ${tr('Copy the status link')}</button>
     ${k.email ? `<label class="chkl ptlmail"><input type="checkbox" data-ptl="notify" ${k.notify ? 'checked' : ''}> ${tr('E-mails to the client')}</label>` : ''}</div>` : '';
-  return `<section class="ptlbox" aria-label="${esc(tr('Client report'))}"><div class="ptlh">${ic('megaphone', 's')}<b>${tr('Client report')}</b><span class="muted">${esc(fmtWhen(k.created_at))}</span></div>
+  // 2.553.0 B (#3460): a request by e-mail says so (with its reference), a sender the mail server did not confirm is marked
+  const via = k.via === 'mail' ? `<span class="rotag ptltag">${ic('mail', 's')}<span class="ptlt">${tr('by e-mail')}${k.ref ? ' · ' + esc(k.ref) : ''}</span></span>` : '';
+  const unv = k.unverified ? `<span class="rotag ptltag warn" title="${esc(tr('The receiving e-mail server did not confirm the sender’s address: it may be forged.'))}">${ic('alert', 's')}<span class="ptlt">${tr('sender not verified')}</span></span>` : '';
+  return `<section class="ptlbox" aria-label="${esc(tr('Client report'))}"><div class="ptlh">${ic('megaphone', 's')}<b>${tr('Client report')}</b><span class="muted">${esc(fmtWhen(k.created_at))}</span>${via}${unv}</div>
     <p class="ptlwho">${k.name ? esc(k.name) : `<span class="muted">${esc(tr('Without a name'))}</span>`}${k.email ? ` · <a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}${cl}</p>${acts}</section>`;
 }
 function ptl_switchHtml(t) {

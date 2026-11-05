@@ -441,7 +441,8 @@ async function formsModal(lid) {
   const md = modal(`<div class="lhdr"><h3>${tr('Forms')} · ${esc(lname(l))}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     ${j.forms.length ? '' : `<p class="muted">${tr('A form is a link with a small page (subject, description, name, e-mail): what someone sends becomes a task in this project. Agents of the project sort it in.')}</p>`}
     <div class="members" id="fm-list">${j.forms.map(row).join('') || `<div class="muted mhint">${tr('No form yet.')}</div>`}</div>
-    <div class="row"><button class="btn sm" data-fm="new">${ic('plus', 's')} ${tr('New form')}</button></div>`);
+    <div class="row"><button class="btn sm" data-fm="new">${ic('plus', 's')} ${tr('New form')}</button></div><div id="fm-rqm"></div>`);
+  rqm_load(md, lid);  // 2.553.0 B (#3460): requests by e-mail
   const edit = f => {
     const ed = modal(`<h3>${f ? tr('Edit form') : tr('New form')}</h3>
       <div class="row"><label for="fm-title">${tr('Title')}</label><input id="fm-title" maxlength="120" value="${esc(f?.title || '')}" placeholder="${esc(tr('e.g. IT request, bug report'))}"></div>
@@ -488,6 +489,35 @@ async function formsModal(lid) {
     if (b.dataset.fm === 'edit' && f) edit(f);
     if (b.dataset.fm === 'copy' && f) { try { await navigator.clipboard.writeText(f.url); toast(tr('Copied')); } catch { toast(f.url, null, 8000); } }
   });
+}
+// 2.553.0 B (#3460): the project's switch "Requests by e-mail" below its forms: one request address; a mail to it becomes a task with
+// a status link for the sender, the public answers go back by mail, the sender's replies become comments of the same request
+const rqm_why = w => w === 'portal' ? tr('Public links are turned off on this server') : w === 'kind' ? tr('Only projects have an e-mail address')
+  : w === 'e2e' ? tr('Not available in a project with end-to-end encryption') : tr('E-mail to tasks is not set up on this server');
+async function rqm_load(md, lid) {
+  const box = $('#fm-rqm', md); if (!box) return;
+  let st; try { st = await api('GET', `/api/lists/${lid}/request-mail`); } catch { box.innerHTML = ''; return; }
+  const off = !st.available && !st.on;
+  box.innerHTML = `<section class="rqmbox" aria-label="${esc(tr('Requests by e-mail'))}"><h4>${ic('mail', 's')} ${tr('Requests by e-mail')}</h4>
+    <label class="chkl"><input type="checkbox" data-rqm="on" ${st.on ? 'checked' : ''} ${off ? 'disabled' : ''}> ${tr('Accept requests by e-mail')}</label>
+    <p class="muted mhint">${tr('An e-mail to the request address becomes a task with a status link for the sender. Your answers “To the client” go back by e-mail, the sender’s replies become comments of the same request. Internal comments never leave the app.')}</p>
+    ${off ? `<p class="muted mhint">${esc(rqm_why(st.why))}</p>` : ''}
+    ${st.on && st.address ? `<div class="row"><input readonly value="${esc(st.address)}" aria-label="${esc(tr('Request address'))}"><button type="button" class="btn sm" data-rqm="copy">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-rqm="renew">${tr('New address')}</button></div>
+    <label class="chkl"><input type="checkbox" data-rqm="done" ${st.done_mail ? 'checked' : ''}> ${tr('Also an e-mail to the sender when the request is done')}</label>` : ''}</section>`;
+  box.onchange = async e => {
+    const k = e.target.dataset.rqm; if (k !== 'on' && k !== 'done') return;
+    try { await api('PATCH', `/api/lists/${lid}/request-mail`, k === 'on' ? {on: e.target.checked} : {done_mail: e.target.checked}); } catch { e.target.checked = !e.target.checked; return; }
+    rqm_load(md, lid);
+  };
+  box.onclick = async e => {
+    const k = e.target.closest('[data-rqm]')?.dataset.rqm;
+    if (k === 'copy') { try { await navigator.clipboard.writeText(st.address); toast(tr('Copied')); } catch { toast(st.address, null, 8000); } }
+    if (k === 'renew') {
+      if (!await askConfirm(tr('Make a new address?'), tr('The old address stops working at once.'), {ok: tr('New address')})) return;
+      try { await api('PATCH', `/api/lists/${lid}/request-mail`, {renew: true}); } catch { return; }
+      rqm_load(md, lid);
+    }
+  };
 }
 // a QR code made on the server (the forms' link: the sign-in link brings its own)
 function qrModal(url, title, svg) {

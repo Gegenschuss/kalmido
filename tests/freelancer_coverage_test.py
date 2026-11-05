@@ -1107,6 +1107,8 @@ ROUTES = {
     "GET /api/office/cards/reminder": "office", "PUT /api/office/cards/reminder": "office",
     # 2.425.0 B (#3451): recurring providers of the bank bookings (p2425_b_api_test.py as a person without an organisation)
     "GET /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors": "office", "PUT /api/office/bank/vendors/settings": "office",
+    # 2.553.0 B (#3460): requests by e-mail of a project (p2553_b_reqmail_test.py, freelancer-matrix: hub: her own project's request address)
+    "GET /api/lists/{}/request-mail": "hub", "PATCH /api/lists/{}/request-mail": "hub",
 }
 
 

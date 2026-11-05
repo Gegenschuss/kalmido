@@ -429,6 +429,7 @@ ORDER = (
     "accounts.discover",  # 2.49.0 (#1106): finding people by e-mail, connection requests
     "admin.hosting",
     "integrations.taskmail",  # 2.393.2 B (#3375): replies by e-mail become comments, answers to the reporter
+    "integrations.reqmail",  # 2.553.0 B (#3460): requests by e-mail become portal tickets, answers and replies by mail
     "admin.clientip",  # 2.33.0 (#834)
     "tasks.stale",  # 2.34.0 (#266)
     "personal.timegaps",  # 2.34.0 (#269)
