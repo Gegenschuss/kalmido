@@ -985,27 +985,35 @@ async function noteNew() {
   S.nt.newId = r.id; go('note/' + r.id);
   setTimeout(() => { const t = $('#nt-title'); if (t) { t.focus(); t.select(); } }, 120);
 }
-function noteMenu(anchor) {
-  const n = noteCur(); if (!n) return;
-  const others = S.lists.filter(l => !l.archived && l.id !== n.list_id && canEditList(l.id) && notesOn(l));
-  menu(anchor, [{label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
-    ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
+// 2.551.0 (#4607): the menu of one note by its id: the "…" of the open note (id empty = that one) and a right click / long press
+// on a note card (notesall.js nt_cardMenu). A card's menu also has Open and Pin; the open note keeps its own pin button.
+function noteMenu(anchor, id) {
+  const card = id != null, n = card ? (S.nt.notes || []).find(x => x.id === id) || (S.notes || []).find(x => x.id === id) : noteCur(); if (!n) return;
+  const rw = card ? canEditList(n.list_id) : S.nt.mayWrite, back = () => { if (S.route.mod === 'notes' && S.nt.id === n.id) go('notes/' + n.list_id); else renderView(); };
+  const others = rw ? S.lists.filter(l => !l.archived && l.id !== n.list_id && canEditList(l.id) && notesOn(l)) : [];
+  menu(anchor, [...(card ? [{label: tr('Open'), icon: 'eye', act: 'm-open', fn: () => go('note/' + n.id)},
+      ...(rw ? [{label: n.pinned ? tr('Unpin') : tr('Pin'), icon: 'pin', act: 'm-pin', fn: () => ntWrite(n, {pinned: !n.pinned}).then(r => {
+        if (!r.queued) for (const x of [(S.nt.notes || []).find(y => y.id === n.id), (S.notes || []).find(y => y.id === n.id)]) if (x) x.pinned = r.pinned;
+        renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message))}] : [])] : []),
+    {label: tr('Copy link'), icon: 'link', act: 'm-copy-link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
+    ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', act: 'm-move', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
       let r; try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); } catch (e) {
         // 2.477.0 (#3881): out of the private list "Notes" to other people only after the warning that names them
         if (!(e.status === 409 && e.data?.code === 'quicknote_share')) { toast(e.message); return; }
         if (!await qn_shareAsk(e.data.people || [], l)) return;
         try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id, share_ok: true}); } catch (e2) { toast(e2.message); return; }
       }
-      Object.assign(n, r);
-      await load(); toast(tr('Moved to {0}', lname(l))); go('note/' + n.id); }})}] : []),
-    '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: async () => {
+      const from = n.list_id; Object.assign(n, r);
+      if (card && S.nt.lid === from && S.nt.notes) S.nt.notes = S.nt.notes.filter(x => x.id !== n.id);  // a card: it leaves the list shown
+      await load(); toast(tr('Moved to {0}', lname(l))); if (card) renderView(); else go('note/' + n.id); }})}] : []),
+    ...(rw ? ['-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', act: 'm-delete', fn: async () => {
       let r; try { r = await rawFetch('DELETE', `/api/notes/${n.id}`); } catch (e) { toast(e.message); return; }
-      S.nt.notes = S.nt.notes.filter(x => x.id !== n.id); S.notes = (S.notes || []).filter(x => x.id !== n.id);
-      go('notes/' + n.list_id); setTimeout(() => { if (document) $('#nt-q')?.focus(); }, 80);  // 2.17.2: the focus stays in the notes
+      S.nt.notes = (S.nt.notes || []).filter(x => x.id !== n.id); S.notes = (S.notes || []).filter(x => x.id !== n.id);
+      back(); setTimeout(() => { if (document) $('#nt-q')?.focus(); }, 80);  // 2.17.2: the focus stays in the notes
       toast(tr('Note deleted'), async () => {  // 2.272.0 E1 (#3038): undo = out of the trash (the same note, its id and links stay)
-        try { const x = await rawFetch('POST', `/api/notes/${r.note.id}/restore`); S.nt.notes = [x, ...S.nt.notes]; await load(); go('note/' + x.id); setTimeout(() => { if (document) $('#nt-title')?.focus(); }, 120); } catch (e) { toast(e.message); }
+        try { const x = await rawFetch('POST', `/api/notes/${r.note.id}/restore`); if (S.nt.lid === x.list_id) S.nt.notes = [x, ...(S.nt.notes || [])]; await load(); if (card) { renderView(); return; } go('note/' + x.id); setTimeout(() => { if (document) $('#nt-title')?.focus(); }, 120); } catch (e) { toast(e.message); }
       });
-    }}]);
+    }}] : [])], null, null, n.title);
 }
 document.addEventListener('input', e => {
   if (e.target.id === 'nt-q') {

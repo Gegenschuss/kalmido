@@ -71,6 +71,10 @@ document.addEventListener('change', e => {
   if (S.sbn.q.trim()) sb_notesSearch();
   if (o3a_orgView()) renderView(); else sb_notesPatch();  // 2.398.0 (#3405): the privacy line follows the filter
 });
+// 2.551.0 (#4607): a right click (computer) or a long press (phone) on a note card opens that note's menu (chat.js noteMenu,
+// on the phone the sheet with its title); the click ending the press does not open the note. Cards of the trash are no links.
+const nt_cardMenu = r => { const id = +(r.getAttribute('href') || '').replace('#note/', ''); if (!id) return false; noteMenu(r, id); return true; };
+cm_bind('#view a.ntcard[href^="#note/"]', nt_cardMenu);
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="note-new"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();
