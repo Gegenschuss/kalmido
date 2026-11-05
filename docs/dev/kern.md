@@ -85,7 +85,8 @@ goes down to guest / accounting (the open channels they joined), when an organis
 every room membership) and when an account is deleted (its organisation objects go to the heir, `upg_heir`, before the
 account and its `owner_id` cascade; its private ones go with it; when other people are left but no admin or member who may take them,
 the deletion is refused as for calendars, `upg_heirless`). What goes waits 30 days in `obj_revoked`; a manager can put a
-share back (`obj_share_restore`).
+share back (`obj_share_restore`). Retiring an organisation takes every share of the file store on its nodes for good:
+there is no way back out of the retirement, so after the 30 days those rows are gone (its export has no shares then).
 
 ## 4. Saving
 
