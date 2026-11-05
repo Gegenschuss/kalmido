@@ -466,7 +466,7 @@ def mail_fetch(M, folder, importer, max_bytes=None, box="", delete=False, prefet
         if delete and done:
             M.uid("STORE", u, "+FLAGS", "(\\Seen \\Deleted)")
             gone.append(u)
-        else:
+        elif not raw:  # 2.549.0 (#4378): a fetched mail was marked seen before it was handled, once is enough
             M.uid("STORE", u, "+FLAGS", "(\\Seen)")
     if gone:
         mail_expunge(M, gone)
