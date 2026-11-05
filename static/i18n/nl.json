@@ -16543,6 +16543,7 @@
   "Calibration: {0}": "Kalibratie: {0}",
   "Maintenance: {0}": "Onderhoud: {0}",
   "The agent's data lock leaves this area out": "De gegevensblokkade van de agent laat dit gebied weg",
+  "Send the version you read: {0}": "Stuur de versie mee die je hebt gelezen: {0}",
   "No billable, still open time of this project in this period": "Geen factureerbare, nog open tijd in dit project en deze periode",
   "task_id needs list_id": "task_id heeft list_id nodig",
   "client_id is needed": "client_id is nodig",
