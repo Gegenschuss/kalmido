@@ -24,6 +24,7 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
   const CA = await login('alice');
   await call(CA, 'POST', '/api/admin/setup', {org_name: 'Nordwind', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  await require('./boot').officeWs({Cookie: CA});  // 2.543.0 (#4606): the office of the organisation ("All" with Private + one organisation = the overview of the areas)
   const fu = await call(CA, 'POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   check(fu.http < 300, 'a person without organisation ' + fu.http);
   const CF = await login('frida');

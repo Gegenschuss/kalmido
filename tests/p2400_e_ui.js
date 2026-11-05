@@ -29,6 +29,7 @@ const FEAT = 'cal,comments,collab,office,clients';
   // 2.46.0 (#1592): no organisation from the start any more: the setup creates the one these tests use (id 1), new people join it
   await call(CA, 'POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call(CA, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
+  await require('./boot').officeWs({Cookie: CA});  // 2.543.0 (#4606): the office of the organisation ("All" with Private + one organisation = the overview of the areas)
   const st = await call(CA, 'GET', '/api/office/settings');
   check(st.http === 200 && st.settings.producing_on === 0 && st.settings.raw_on === 0, '#1379: a new organisation starts with producing / raw data off');
   await call(CA, 'PUT', '/api/office/settings', {company: {name: 'Studio Nordlicht GmbH'}, lang: 'en', company_fields: {name: 'Studio Nordlicht GmbH', city: 'Köln'}});
