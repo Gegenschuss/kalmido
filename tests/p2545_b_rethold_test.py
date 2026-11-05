@@ -3,6 +3,7 @@
 """2.545.0 B API tests (#4595): the legal retention periods get a buffer (default 1 year, the operator sets it, never below
 the law) and an office can switch on "Extend the lock" (a tax audit is open): nothing kept by law is deleted while it is on,
 not even after its period. Own container (start.sh). Invented people, firms and figures only (example.com).
+tenant-matrix: office
 freelancer-matrix: office
  - the default: the law + 1 year (GET /api/admin/retention keep_years, the lock of a booked receipt ends 31 Dec <year + 9>)
  - ret_keep_years: an operator value below 0 counts as 0 (exactly the law), 2 = the law + 2, a broken value = the default
@@ -175,14 +176,17 @@ check(purge(A, R_OLD2).ok and not sql("SELECT 1 FROM fs_nodes WHERE id=?", (R_OL
 # ---------------------------------------------------------------- the same for a person without an organisation
 FID, Fr = freelancer(B, A)
 Fr.get(B + O + "/settings")
+check(A.put(B + RH, json={"on": True}).json().get("on") is True and Fr.get(B + "/api/office/settings/retention-hold").json().get("on") is False,
+      "another office's switch (Alpha on) does not reach the freelancer's own office")
 F_OLD1, F_OLD2 = receipt(Fr, "private", "frei-alt1.pdf", OLD), receipt(Fr, "private", "frei-alt2.pdf", OLD)
 check(purge(Fr, F_OLD1).ok, "freelancer: switch off, a booked receipt of 2015 goes")
-j = Fr.put(B + RH, json={"on": True}).json()
+j = Fr.put(B + "/api/office/settings/retention-hold", json={"on": True}).json()
 check(j.get("on") is True, f"freelancer: the switch of the own office {j}")
 r = purge(Fr, F_OLD2)
 check(r.status_code == 409 and "Deleting is paused" in r.text, "freelancer: switch on, the receipt past its period stays " + r.text[:200])
-check(Fr.put(B + RH, json={"on": False}).json().get("on") is False and purge(Fr, F_OLD2).ok, "freelancer: switch off, it goes")
-check(A.get(B + RH).json().get("on") is False, "the organisation's switch is its own")
+check(Fr.put(B + "/api/office/settings/retention-hold", json={"on": False}).json().get("on") is False and purge(Fr, F_OLD2).ok, "freelancer: switch off, it goes")
+check(A.get(B + RH).json().get("on") is True, "the freelancer's switch did not touch Alpha's")
+check(A.put(B + RH, json={"on": False}).json().get("on") is False, "Alpha off again")
 
 print(f"p2545_b_rethold: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 for f in FAILS:
