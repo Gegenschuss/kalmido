@@ -182,6 +182,30 @@ check(bz.get("account") is True, f"#4643: account export: a failing look at the 
 check(bz.get("org") is True, f"#4643: organisation export: a failing look at the queue counts it as running {bz}")
 check(bz.get("contacts") == 503, f"#4643: contacts import state: a failing look at the queue is 503, not 404 {bz}")
 
+# 2.547.0 (#4295, #4053): a look at the queue that fails (the database busy for a moment) never makes a running import look
+# ended: the state stays "running" (not "interrupted", the app would offer a second start next to the first) -- account and
+# knowledge import alike
+bz = py(f"""
+import json, os, shutil
+from kalmido.admin import acctimport as ai, wkimport as wi
+def boom(*a, **k):
+    raise RuntimeError("p4295: no answer from the database")
+ai.bgj_busy = wi.bgj_busy = boom
+out = {{}}
+for name, mod in (("account", ai), ("wiki", wi)):
+    d = mod._dir({ALICE}, "4295000000000000000000ab")
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    mod.umz_write_state(d, {{"state": "running", "size": 64, "received": 64}})
+    v = mod._view({ALICE}, "4295000000000000000000ab", mod._st({ALICE}, "4295000000000000000000ab"))
+    out[name] = [v.get("state"), v.get("error"), mod._busy({ALICE})]
+    shutil.rmtree(d, ignore_errors=True)
+print(json.dumps(out))
+""")[1]
+check(bz.get("account", [None])[0] == "running" and not bz["account"][1] and bz["account"][2] is True,
+      f"#4295: account import: a failing look at the queue keeps it running {bz}")
+check(bz.get("wiki", [None])[0] == "running" and not bz["wiki"][1] and bz["wiki"][2] is True,
+      f"#4295: knowledge import: a failing look at the queue keeps it running {bz}")
+
 # ---------------------------------------------------------------- long slots: full with exports / imports, mails still go
 lg = py("""
 import json

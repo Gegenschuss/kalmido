@@ -99,8 +99,8 @@ def _busy(uid, c=None):
         return True
     try:
         return bgj_busy("wki:import", user_id=int(uid), c=c)
-    except Exception:  # noqa: BLE001 -- no database: only this process' thread counts
-        return False
+    except Exception:  # noqa: BLE001 -- 2.547.0 (#4295): no answer from the database counts as busy (was: not busy; a running import
+        return True    # of another process then looked "interrupted", a second start / the clean-up could go next to it)
 
 
 def _need(uid, iid):
