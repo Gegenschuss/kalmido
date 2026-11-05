@@ -104,3 +104,14 @@ The folder watcher downloads (`/app/folderwatch/`, built from `folderwatch/`) ar
 standard library. Each file contains the Go runtime and standard library, Copyright 2009 The Go Authors, BSD 3-Clause
 License. The full license text ships next to the downloads as `/app/folderwatch/LICENSE-Go.txt` (copied unchanged from
 the Go toolchain of the build) and is at [go.dev/LICENSE](https://go.dev/LICENSE).
+
+## CodeMirror 6 (the editor of knowledge pages, 2.554.0)
+
+Knowledge pages are edited with [CodeMirror 6](https://codemirror.net/) (Copyright Marijn Haverbeke and others, MIT
+License): the npm packages `@codemirror/state`, `@codemirror/view`, `@codemirror/commands`, `@codemirror/language`,
+`@codemirror/search`, `@lezer/common`, `@lezer/lr`, `@lezer/highlight`, `@lezer/markdown` and their small helpers
+`crelt`, `style-mod`, `w3c-keyname` and `@marijn/find-cluster-break` (all MIT). They are bundled into one file,
+`static/vendor/codemirror/codemirror.min.js`, by `tools/build_codemirror.sh` from the exact versions in
+`tools/codemirror/package-lock.json`; the folder holds every package's license text (`LICENSE`) and a `README` with the
+versions, the checksum and the update steps. Served by Kalmido itself and only loaded when a page is edited; the browser
+never loads it from a third party.

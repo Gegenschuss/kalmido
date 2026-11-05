@@ -1,0 +1,20 @@
+{
+  "name": "kalmido-codemirror-bundle",
+  "private": true,
+  "version": "0.0.0",
+  "dependencies": {
+    "@codemirror/commands": "6.11.1",
+    "@codemirror/language": "6.13.1",
+    "@codemirror/search": "6.7.2",
+    "@codemirror/state": "6.7.6",
+    "@codemirror/view": "6.43.15",
+    "@lezer/common": "1.5.5",
+    "@lezer/highlight": "1.2.5",
+    "@lezer/markdown": "1.8.1"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "description": "Build input of static/vendor/codemirror (tools/build_codemirror.sh); never installed by the app",
+  "license": "MIT"
+}
