@@ -34,6 +34,8 @@ Interface:
   lf_root(c, uid, org_id, create=True) -> node id | None   the "Projects" root of a workspace
   lf_place(c, lid) -> node id | None      the list's node where its path says (created / moved); caller commits
   lf_want(c, lid, lr=None) -> {uid: role} the roles the folders give (filtered as above, without list_folder_skip)
+  lf_own_expired(c, lid) -> {uid}         2.568.0 (#4739): whose own member share (the core's row, list_own) ran out
+  lf_own_stale(c, lid) -> n               2.568.0 (#4739): the core's own member rows without an own role go
   lf_lists_below(c, nid) -> [list ids]    the lists filed below node nid (nid itself when it is a list's node)
   lf_folder_repath(c, owner, old, new)    the folder nodes of owner at path old (every tree) move to path new
   lf_folder_dissolve(c, owner, path)      the folder nodes at path go, their content one level up (POST /api/folders/delete)
@@ -360,8 +362,9 @@ def lf_sync_owner(c, owner):
 # ---------------------------------------------------------------- rights through the folders
 def _share_rows(c, ids):
     q = ",".join("?" * len(ids))
+    # 2.568.0 (#4739): a project's own member share (list_own) is list_members.own_role, not a folder's role
     return c.execute(f"""SELECT user_id, group_id, agent_id, role, list_role FROM fs_shares WHERE node_id IN ({q})
-                         AND (expires_at IS NULL OR expires_at > ?)""", (*ids, _now())).fetchall()
+                         AND (expires_at IS NULL OR expires_at > ?) AND COALESCE(list_own, 0)=0""", (*ids, _now())).fetchall()
 
 
 def lf_want(c, lid, lr=None):
@@ -412,6 +415,32 @@ def lf_want(c, lid, lr=None):
                 role = "participant"
             out[u] = role
     return out
+
+
+def lf_own_expired(c, lid):
+    """2.568.0 (#4739): {uid} whose own member share of list lid (the core's row, fs_shares.list_own on its node) ran out --
+    grp_sync ends their own role (lf_expire_tick finds the lists)."""
+    with system_ctx(c):
+        return {r[0] for r in c.execute("""SELECT COALESCE(s.user_id, s.agent_id) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id
+                                           WHERE n.kind='ref' AND n.ref_kind=? AND n.ref_id=? AND s.list_own=1
+                                           AND s.expires_at IS NOT NULL AND s.expires_at <= ?""", (LF_KIND, int(lid), _now()))}
+
+
+def lf_own_stale(c, lid):
+    """2.568.0 (#4739): the core's own member rows (list_own) of list lid whose person has no own role there any more (the
+    owner now, a role ended on another way than the members dialog, an expiry) go into obj_revoked like a share taken back
+    (restorable for 30 days): such a row opens nothing, it would only leave the project's node visible in the file store."""
+    with system_ctx(c):
+        ids = [r[0] for r in c.execute("""SELECT s.id FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind=?
+                                          AND n.ref_id=? AND s.list_own=1 AND NOT EXISTS (SELECT 1 FROM list_members m WHERE
+                                          m.list_id=n.ref_id AND m.user_id=COALESCE(s.user_id, s.agent_id) AND m.own_role IS NOT NULL)""",
+                                       (LF_KIND, int(lid))).fetchall()]
+        if not ids:
+            return 0
+        from ..core.objects import _take  # the core's revocation (a later module)
+        org = c.execute("SELECT org_id FROM lists WHERE id=?", (int(lid),)).fetchone()
+        return _take(c, "fs_shares", f"id IN ({','.join(str(int(x)) for x in ids)})", (), "unshare", None,
+                     org[0] if org else None, "user_id", kind=LF_KIND)
 
 
 def lf_skips(c, lid):
@@ -593,7 +622,11 @@ def lf_expire_tick(c):
             lids.update(lf_lists_below(c, r[0]))
         if lids:
             q = ",".join(str(int(x)) for x in sorted(lids))
-            lids = {r[0] for r in c.execute(f"SELECT DISTINCT list_id FROM list_members WHERE frole IS NOT NULL AND list_id IN ({q})")}
+            lids = {r[0] for r in c.execute(f"SELECT DISTINCT list_id FROM list_members WHERE frole IS NOT NULL AND list_id IN ({q})")} | \
+                {r[0] for r in c.execute(  # 2.568.0 (#4739): a project's own member share ran out (lf_own_expired)
+                    f"""SELECT DISTINCT m.list_id FROM list_members m JOIN fs_nodes n ON n.kind='ref' AND n.ref_kind='list' AND n.ref_id=m.list_id
+                        JOIN fs_shares s ON s.node_id=n.id AND s.list_own=1 AND COALESCE(s.user_id, s.agent_id)=m.user_id
+                        WHERE m.own_role IS NOT NULL AND s.expires_at IS NOT NULL AND s.expires_at <= ? AND m.list_id IN ({q})""", (now,))}
     lf_resync(c, lids, actor=0)
     if lids:
         bump(c)  # 2.352.0 F (#2748, review N1): the clients drop the lists at once

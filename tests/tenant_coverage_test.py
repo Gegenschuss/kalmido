@@ -733,6 +733,7 @@ ROUTES = {
     "PUT /api/lists/{}/groups/{}": "list", "DELETE /api/lists/{}/groups/{}": "list", "POST /api/lists": "list",
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",
     "PUT /api/lists/{}/members": "list", "DELETE /api/lists/{}/members/{}": "list", "GET /api/lists/{}/owner": "list",
+    "GET /api/lists/{}/shares": "list", "POST /api/lists/{}/shares/{}/restore": "list", "GET /api/lists/{}/history": "list",  # 2.568.0 (#4739): p2568_a_lists_core_test.py
     "POST /api/lists/{}/owner": "list", "PUT /api/lists/{}/bell": "list", "POST /api/lists/{}/status": "list",
     "GET /api/lists/{}/status": "list", "GET /api/lists/{}/overview": "list", "GET /api/lists/{}/overview/history": "list", "PATCH /api/lists/{}/overview": "list", "GET /api/lists/{}/layout": "list", "PUT /api/lists/{}/layout": "list",
     "POST /api/lists/{}/links": "list", "PATCH /api/lists/{}/links/{}": "list", "DELETE /api/lists/{}/links/{}": "list",

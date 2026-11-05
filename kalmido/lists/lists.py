@@ -873,8 +873,10 @@ def _agent_bridge_blocks(c, lid, uid):
 
 @app.put("/api/lists/<int:lid>/members")
 def member_set(lid):
-    """{user_id, role: admin|edit|participant|view} -- the owner or a list admin shares the list (or changes a member's
-    role). The owner is no member row: nobody can change or remove the owner."""
+    """{user_id, role: admin|edit|participant|view, expires_at?: YYYY-MM-DD | ISO time | null} -- the owner or a list admin
+    shares the list (or changes a member's role). The owner is no member row: nobody can change or remove the owner.
+    2.568.0 (#4739): the share is a row of the shared core too (lists/lmcore.py: expiry, history, restorable when taken away);
+    expires_at left out keeps the expiry the share has."""
     from ..lists.groups import role_max
     from ..collab.comments import user_names
     from ..collab.news import list_push, news_add
@@ -891,6 +893,13 @@ def member_set(lid):
     role = b.get("role", "edit")
     if role not in ROLES:
         return err(tr("Role must be admin, edit, participant or view"))
+    from .lmcore import _KEEP, lmc_share
+    exp = _KEEP
+    if "expires_at" in b:  # 2.568.0 (#4739): a share that runs out (the core's row; grp_sync / the watchdog end the role)
+        from ..files.web import _expiry
+        exp = _expiry(b.get("expires_at"), b.get("tz"))
+        if exp is not None and str(exp) <= iso(now_utc()):
+            return err(tr("Invalid value: {0}", "expires_at"))
     if role == "admin" and c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone():
         return err(tr("An agent cannot be a project admin"))
     if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (b.get("user_id"),)).fetchone() and \
@@ -920,8 +929,8 @@ def member_set(lid):
             # 2.30.0 (#919): would connect lists with different people through the list's agent -> nothing happens, nothing is revealed
             return jsonify(ok=True, by_email=True)
         uid = r[0]
-    elif not may_see(c, me(), uid):
-        return err(tr("unknown person"), 404)
+    elif not may_see(c, me(), uid) and g.get("lmc_restore") != uid:  # 2.568.0 (#4739): a share put back (lmcore._on_restore)
+        return err(tr("unknown person"), 404)  # reaches who it reached before (e.g. shared by e-mail address)
     u = c.execute("SELECT id FROM users WHERE id=? AND disabled=0", (uid,)).fetchone()
     if not u or uid == me() or personal_agent_foreign(c, uid, me()):  # 2.7.2 (#420): only the owner shares with a personal agent
         return err(tr("unknown person"), 404)
@@ -965,6 +974,7 @@ def member_set(lid):
         if c.execute("SELECT 1 FROM users WHERE id=? AND kind='agent'", (uid,)).fetchone():
             from ..admin.hosting import agent_joined_notice
             agent_joined_notice(c, lid, uid, me())  # 2.24.0 (#896)
+    lmc_share(c, me(), lid, uid, role, exp)  # 2.568.0 (#4739): the core's share row (list_members stays the role table)
     if reach:
         from ..lists.groups import grp_sync
         grp_sync(c, [lid])
@@ -1046,6 +1056,8 @@ def member_rejoin(c, oid, uid, rows):
         if role and c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?) ON CONFLICT DO NOTHING",
                               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc()))).rowcount:
             member_folder_adopt(c, lid, uid)
+            from .lmcore import lmc_share
+            lmc_share(c, uid, lid, uid, role, None)  # 2.568.0 (#4739): the core's share row (leaving took it into obj_revoked)
     if back:
         grp_sync(c, back)
         acx_drop()
@@ -1257,6 +1269,8 @@ def agent_share_add(c, lid, aid, actor):
     lname = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, aid, "edit", "edit", my_max_sort(c, aid) + 1, iso(now_utc())))
+    from .lmcore import lmc_share
+    lmc_share(c, actor, lid, aid, "edit")  # 2.568.0 (#4739): the core's share row, as PUT .../members
     news_add(c, aid, "share", list_id=lid, data={"role": "edit", "name": lname}, actor=actor)
     wh_note_list(lid, "list.shared", {"member_id": aid, "role": "edit"})
     from ..admin.hosting import agent_joined_notice
@@ -1453,12 +1467,15 @@ def member_remove(lid, uid):
         return jsonify(assigned=c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND assignee_id=?", (lid, uid)).fetchone()[0],
                        values=c.execute("SELECT COUNT(*) FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields "
                                         "WHERE list_id=? AND type='person')", (str(uid), lid)).fetchone()[0])
+    from .lmcore import lmc_unshare
     if via_group:  # 2.10.0 (#441): access via a group stays; only the personal share goes
         # 2.64.1 (#1817): not as a participant in a list with the lock (the person leaves it)
+        rev = lmc_unshare(c, me(), lid, uid)  # 2.568.0 (#4739): the core's row goes into obj_revoked (restorable)
         c.execute("UPDATE list_members SET own_role=NULL, role=grole WHERE list_id=? AND user_id=?", (lid, uid))
         bump(c)
         c.commit()
-        return jsonify(ok=True, via_group=True)
+        return jsonify(ok=True, via_group=True, **({"revoked_id": rev} if rev else {}))
+    rev = lmc_unshare(c, me(), lid, uid)  # 2.568.0 (#4739): the core's row goes into obj_revoked (restorable), before the row
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
     dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end
@@ -1474,4 +1491,4 @@ def member_remove(lid, uid):
                  data={"name": c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()[0]})
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, **({"revoked_id": rev} if rev else {}))

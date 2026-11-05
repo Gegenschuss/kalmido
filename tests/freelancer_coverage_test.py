@@ -461,6 +461,7 @@ ROUTES = {
     "PUT /api/lists/{}/groups/{}": "lists", "PUT /api/lists/{}/header": "lists", "PUT /api/lists/{}/icon": "lists",
     "PUT /api/lists/{}/in-mine": "lists", "PUT /api/lists/{}/layout": "lists", "PUT /api/lists/{}/links/order": "lists",
     "PUT /api/lists/{}/members": "lists", "PUT /api/lists/{}/notify-template": "lists",
+    "GET /api/lists/{}/shares": "lists", "POST /api/lists/{}/shares/{}/restore": "lists", "GET /api/lists/{}/history": "lists",  # 2.568.0 (#4739)
     "PUT /api/lists/{}/page-style": "lists", "PUT /api/lists/{}/playbook": "lists", "PUT /api/lists/{}/public-link": "lists",
     "PUT /api/lists/{}/review": "lists", "PUT /api/lists/{}/sprint-settings": "lists",
     "PUT /api/v1/lists/{}/groups/{}": "lists", "PUT /api/v1/lists/{}/links/order": "lists",

@@ -127,7 +127,7 @@ def grp_sync(c, lids, actor=None):
     from ..integrations.webhooks import wh_note_list
     from ..agents.core import agent_ids
     from ..agents.safety import bridge_blocks
-    from .lffolder import lf_place, lf_skips, lf_want  # 2.352.0 A (#2748): the roles through the list's folders (frole)
+    from .lffolder import lf_own_expired, lf_own_stale, lf_place, lf_skips, lf_want  # 2.352.0 A (#2748): the roles through the list's folders (frole)
     actor = actor if actor is not None else (me() if has_request_context() and getattr(g, "user", None) else None)
     agents = agent_ids(c)
     kids = {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1")}
@@ -150,6 +150,7 @@ def grp_sync(c, lids, actor=None):
         if not lr["is_inbox"]:
             lf_place(c, lid)
         skips = lf_skips(c, lid)
+        gone = lf_own_expired(c, lid)  # 2.568.0 (#4739): a member share of the core that ran out ends the own role
         fwant = {u: r for u, r in lf_want(c, lid).items() if u not in skips}
         for uid in [u for u in fwant if u not in rows and u not in want]:
             if bridge_blocks(c, lid, uid):  # 2.30.0 (#919) for a folder's share too
@@ -163,6 +164,8 @@ def grp_sync(c, lids, actor=None):
             own = None
             if r is not None:  # 2.352.0 A (#2748): a row only through folders (frole) has no own role either
                 own = r["own_role"] if r["own_role"] is not None else (r["role"] if r["grole"] is None and r["frole"] is None else None)
+                if uid in gone:
+                    own = None
             eff = role_max(own, gr, fr)
             if eff and uid in kids:  # 2.19.0 (#653)
                 eff, gr, fr = "participant", ("participant" if gr else gr), ("participant" if fr else fr)
@@ -201,6 +204,7 @@ def grp_sync(c, lids, actor=None):
                 c.execute("UPDATE list_members SET role=?, own_role=?, grole=?, frole=? WHERE list_id=? AND user_id=?", (eff, own, gr, fr, lid, uid))
                 if r["role"] != eff:
                     news_add(c, uid, "role", list_id=lid, actor=actor, data={"role": eff, "old": r["role"], "name": lr["name"]})
+        lf_own_stale(c, lid)  # 2.568.0 (#4739): the core's member rows follow list_members (the role table)
         # a group assignment stays only while that group still has access to the list
         gids = {x[0] for x in grp_shares_of_list(c, lid)}
         for t in c.execute("SELECT id, assignee_group_id FROM tasks WHERE list_id=? AND assignee_group_id IS NOT NULL", (lid,)).fetchall():

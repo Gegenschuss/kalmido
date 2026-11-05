@@ -55,6 +55,13 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
 - `routes=False` when the area brings its own routes only (then it calls the same functions).
 - Hooks for areas with rules of their own (stage 2 / 3): `base_role` (+ its `visible` SQL), `space`, `cap`, `hidden`,
   `dl_area` (an agent's data lock), `undo_scope` (more tables than the main row), `public`, `protect`, `on_trash`, `content`.
+- An old area that keeps its own role table and reference kind (stage 6, the projects, `kalmido/lists/lmcore.py`):
+  `fsref=False` (the area's registration in files/fsref.py stays; the shares of its node are already in its base role, so
+  `obj_role` does not read them again), `share_cols` (its own columns on `fs_shares`, e.g. `list_role` / `list_own`, put back
+  by `obj_share_restore`), `on_restore` (the area puts its role table right under its own rules after a restore, or refuses),
+  `on_revoke` (its part of `obj_revoke_person`) and `list_col` (the column a token's project limit is checked against). Its
+  routes call `obj_share(..., extra=..., checked=True)` / `obj_unshare(..., checked=True)` after checking the right and the
+  target themselves.
 
 The kind is registered with the file store's reference nodes at the same time (files/fsref.py): the object can lie in
 folders, and a folder share opens it.
@@ -151,3 +158,8 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
 - Agents' changes as a proposal a person accepts (proposal kind `obj_patch`): the first area that needs it adds it
   (agents/proposals.py); stage 1 has the direct write with the version.
 - Old areas: nothing moves yet (stage 2: office and clients #4711, stage 3: calendars and contacts #4712).
+- Stage 6 (2.568.0, #4739): the projects' shares (members, the project's agent) are share rows of the core on the project's
+  node (expiry, created_by, taken back into `obj_revoked`, restorable: `GET /api/lists/<id>/shares`,
+  `POST /api/lists/<id>/shares/<rid>/restore`); `list_members` stays the role table every reader uses. A group's share gives
+  a guest / accounting person no project role in an organisation. The history of a project's settings (columns, sums, key
+  figures, properties, ticket template, agent members): `GET /api/lists/<id>/history`.

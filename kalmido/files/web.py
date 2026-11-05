@@ -332,8 +332,11 @@ def _versions(c, nid):
              "created_at": r["created_at"]} for r in rows]
 
 
-def _shares(c, nid):
-    rows = c.execute("SELECT * FROM fs_shares WHERE node_id=? ORDER BY id", (nid,)).fetchall()
+def _shares(c, nid, own=False):
+    # 2.568.0 (#4739): a project's own member shares (list_own, written by its members dialog through the core) are no shares
+    # of this dialog; own=True lists them too (core/objects.py obj_shares)
+    rows = c.execute("SELECT * FROM fs_shares WHERE node_id=?" + ("" if own else " AND COALESCE(list_own, 0)=0") + " ORDER BY id",
+                     (nid,)).fetchall()
     names = _names(c, [r["user_id"] or r["agent_id"] for r in rows])
     gq = [r["group_id"] for r in rows if r["group_id"]]
     gn = {}
@@ -841,12 +844,12 @@ def files_share_add(nid):
     pool = {"user_id": t["people"], "group_id": t["groups"], "agent_id": t["agents"]}[key]
     if not any(x["id"] == tid for x in pool):
         return err(tr("Only people, groups and agents of the same workspace can get a share"), 409)
-    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?", (nid, tid)).fetchone()
+    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=? AND COALESCE(list_own, 0)=0", (nid, tid)).fetchone()  # #4739
     if old:
         c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, exp, old[0]))
         sid = old[0]
     else:
-        if c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=?", (nid,)).fetchone()[0] >= SHARE_MAX:
+        if c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=? AND COALESCE(list_own, 0)=0", (nid,)).fetchone()[0] >= SHARE_MAX:
             return err(tr("Too many shares"), 409)
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at) VALUES(?,?,?,?,?,?)",
                         (nid, tid, role, exp, me(), _now()))
@@ -877,7 +880,7 @@ def _agent_event(c, aid, n, role):
 @app.patch("/api/files/shares/<int:sid>")
 def files_share_patch(sid):
     c = db()
-    s = c.execute("SELECT * FROM fs_shares WHERE id=?", (sid,)).fetchone()
+    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0", (sid,)).fetchone()  # #4739: the members dialog's
     if not s:
         raise Denied(404)
     _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
@@ -910,7 +913,7 @@ def files_share_patch(sid):
 @app.delete("/api/files/shares/<int:sid>")
 def files_share_delete(sid):
     c = db()
-    s = c.execute("SELECT * FROM fs_shares WHERE id=?", (sid,)).fetchone()
+    s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0", (sid,)).fetchone()  # #4739: the members dialog's
     if not s:
         raise Denied(404)
     _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)

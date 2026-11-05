@@ -32,7 +32,8 @@ accounting nothing (only personal shares).
 Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 use them):
   obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
-               protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage")
+               protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
+               fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id")
       fields     {name: cleaner} -- what obj_create / obj_write may set; cleaner(c, value, row) -> the clean value (raise
                  BadInput); helpers f_text / f_int / f_bool / f_choice / f_date below
       space      f(c, id) -> (org_id | None, owner_id) | None (default: the row's columns)
@@ -44,12 +45,25 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
       undo_scope f(id, org_id) -> [(table, where, args, several rows?)] for undo of more than the main row (office/undo.py)
       public     f(c, uid, row, role) -> dict: the object as the client / the API see it (default: obj_public)
       routes     the generic routes /api/obj/<kind>/... and /api/v1/agent/objects/<kind>/... (core/objweb.py) serve the kind
+      2.568.0 (#4739, stage 6 lists) -- for an old area that already has its own reference kind and keeps its role table:
+      fsref      False: the kind keeps its own registration in files/fsref.py (the core does not replace it) and the area
+                 materializes the shares of its node into its base role (lists: lists/lffolder.py -> list_members), so obj_role
+                 does not read the node's shares a second time, and obj_node never makes a node (the area places it)
+      share_cols columns of fs_shares the area writes on its shares (obj_share extra=) and obj_share_restore puts back
+      on_restore f(c, uid, id, share) after obj_share_restore put a share back (share = the row as it was): the area puts its
+                 role table right under its own rules (raise Denied to refuse: the caller does not commit); with it the
+                 core leaves the target check to the area
+      on_revoke  f(c, uid, org, reason, role=None) -> {what: n}: called by obj_revoke_person after the core's own part
+      list_col   the column an API token's list limit is checked against (lists: their own id)
   obj_role(c, uid, kind, id, row=None) -> None | 'view' | 'edit' | 'manage'
   obj_need(c, uid, kind, id, need="view" | "write" | "manage", trash=False) -> (row, role); Denied 404 / 403
   obj_visible_sql(c, uid, kind) -> "(SELECT id ...)" the ids uid sees (not in the trash), ids inlined, no ? parameters
   obj_rows(c, uid, kind, where="", args=(), trash=False) -> [(row, role)] the visible objects (trash=True: the trash uid manages)
-  obj_share(c, uid, kind, id, key, target, role="view", expires_at=None) -> share id   (key user_id | group_id | agent_id)
-  obj_unshare(c, uid, kind, id, sid) -> revoked id  (the share goes into obj_revoked: obj_share_restore puts it back)
+  obj_share(c, uid, kind, id, key, target, role="view", expires_at=None, extra=None, checked=False) -> share id
+      (key user_id | group_id | agent_id; extra: the kind's share_cols; checked=True: the area's route checked the rights and
+      the target itself under rules of its own -- the core writes the share row, its log and nothing else, #4739)
+  obj_unshare(c, uid, kind, id, sid, checked=False) -> revoked id  (the share goes into obj_revoked: obj_share_restore puts it
+      back; checked=True: the area checked the right itself, e.g. a member leaving a list)
   obj_share_restore(c, uid, kind, id, rid) -> share id
   obj_shares(c, uid, kind, id) -> {shares, inherited, revoked}
   obj_revoke_person(c, uid, org, reason, heir=None, role=None) -> {table: rows} -- reason 'leave' (uid leaves org: its shares
@@ -151,7 +165,8 @@ def f_date(null=True):
 # ---------------------------------------------------------------- the register
 def obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
-                 protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage"):
+                 protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
+                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id"):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload)."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
@@ -164,8 +179,13 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     reg = {"kind": kind, "table": table, "label": label, "fields": dict(fields), "space": space, "title": title, "base_role": base_role,
            "visible": visible, "cap": cap, "hidden": hidden, "org_access": org_access, "area": area, "scopes": tuple(scopes),
            "dl_area": dl_area, "feat": feat, "undo_scope": undo_scope, "public": public, "routes": bool(routes), "trash_role": trash_role,
-           "open_url": open_url or (lambda rid: f"obj/{kind}/{int(rid)}")}
+           "open_url": open_url or (lambda rid: f"obj/{kind}/{int(rid)}"),
+           # 2.568.0 (#4739): an old area with its own reference kind and role table (module docstring)
+           "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
+           "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id"}
     OBJ[kind] = reg
+    if not fsref:
+        return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays
 
     def fsr_base(c, uid, rid):  # the folders ask for the area's role: the core's, without the shares, 'manage' counts as 'edit'
         row = obj_row(c, kind, rid)
@@ -271,7 +291,8 @@ def _gate(c, uid, reg, row):
             return False
     lim = _req_token_lists(uid)
     if lim is not None:
-        if "list_id" not in row.keys() or row["list_id"] not in lim:
+        col = reg["list_col"]  # 2.568.0 (#4739): a list itself is checked by its own id
+        if col not in row.keys() or row[col] not in lim:
             return False
     return True
 
@@ -347,7 +368,7 @@ def obj_role(c, uid, kind, rid, row=None, pre=None):
     if row is not None and _gate(c, uid, reg, row):
         base = _base(c, uid, reg, row)
         # review F3: a share gives at most 'edit' -- the chain is read only when the area's own role is below it
-        share = _share_role(c, uid, reg, row, pre=pre) if OBJ_RANK[base] < OBJ_RANK["edit"] else None
+        share = _share_role(c, uid, reg, row, pre=pre) if OBJ_RANK[base] < OBJ_RANK["edit"] and reg["fsref"] else None  # #4739
         out = base if OBJ_RANK[base] >= OBJ_RANK[share] else share
         if row["deleted_at"] and out != "manage":
             out = None  # step 4: the trash only for who may restore it
@@ -520,7 +541,7 @@ def obj_node(c, uid, kind, rid, make=False):
     tree (it then shows in the file store like every filed object)."""
     reg = obj_reg(kind)
     n = fs_ref_node(c, kind, rid)
-    if n is not None or not make:
+    if n is not None or not make or not reg["fsref"]:  # 2.568.0 (#4739): such an area places its nodes itself
         return n
     sp = obj_space(c, kind, rid)
     if not sp:
@@ -542,33 +563,63 @@ def _pool_ok(c, n, key, tid, uid=None):
     return any(x["id"] == tid for x in pool)
 
 
-def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
+def _share_extra(reg, extra):
+    """2.568.0 (#4739): the kind's own share columns of extra ({} for none; another column is a programming error)."""
+    extra = dict(extra or {})
+    bad = [k for k in extra if k not in reg["share_cols"]]
+    if bad:
+        raise ValueError(f"obj_share {reg['kind']}: not a share column of the kind: {bad}")
+    return extra
+
+
+def _share_match(reg, extra):
+    """2.568.0 (#4739): the SQL that tells a share row of the area's own (share_cols carry a marker) from other rows of the node
+    with the same target (e.g. a list's own member share beside a share made in the file store's dialog)."""
+    if "list_own" in reg["share_cols"]:
+        return " AND COALESCE(list_own, 0)=?", (1 if (extra or {}).get("list_own") else 0,)
+    return "", ()
+
+
+def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None, extra=None, checked=False):
     """Share the object with ONE person / group / agent (key user_id | group_id | agent_id): needs 'manage'; the same target
-    again changes role / expiry. Returns the share id."""
-    row, _ = obj_need(c, uid, kind, rid, "manage")
-    if acx_of(c, uid).role == "agent":
-        raise Denied(403)
+    again changes role / expiry. Returns the share id. 2.568.0 (#4739): extra = the kind's share_cols; checked=True = the area's
+    route checked the right, the target and its own rules (lists: owner / list admin, the workspace, one agent per list ...)."""
+    reg = obj_reg(kind)
+    extra = _share_extra(reg, extra)
+    if checked:
+        row = obj_row(c, kind, rid)
+        if row is None:
+            raise Denied(404)
+    else:
+        row, _ = obj_need(c, uid, kind, rid, "manage")
+        if acx_of(c, uid).role == "agent":
+            raise Denied(403)
     if key not in ("user_id", "group_id", "agent_id") or role not in ("view", "edit"):
         raise BadInput(tr("Invalid data"))
     if isinstance(target, bool) or not isinstance(target, int):
         raise BadInput(tr("Invalid value: {0}", key))
     n = obj_node(c, uid, kind, rid, make=True)
-    if not _pool_ok(c, n, key, target, uid):
+    if n is None:
+        raise Denied(404)  # #4739: an area that places its nodes itself has none for it (a list's basket)
+    if not checked and not _pool_ok(c, n, key, target, uid):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
-    if key == "agent_id":
+    if key == "agent_id" and not checked:  # #4739: checked = the area's own rules for agents (lists: the lock, the bridge)
         if fl_is_locked(c, n["id"]):
             raise fsl_denied("fs_locked_agent")
-    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], target)).fetchone()
+    mq, ma = _share_match(reg, extra)
+    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], target, *ma)).fetchone()
     if old:
         c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, expires_at, old[0]))
         sid = old[0]
     else:
-        if c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=?", (n["id"],)).fetchone()[0] >= OBJ_SHARE_MAX:
+        if not checked and c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=?", (n["id"],)).fetchone()[0] >= OBJ_SHARE_MAX:
             raise Denied(409, tr("Too many shares"))
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
                         (n["id"], target, role, expires_at, uid, iso(now_utc()), _by_role(c, uid, row["org_id"] or None)))
-        if key == "agent_id":
+        if key == "agent_id" and not checked:
             _agent_event(c, target, n, role)
+    for k, v in extra.items():
+        c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
     fs_log_add(c, n["id"], "share", f"{key[:-3]}:{target}:{role}")
     obj_forget()
     return sid
@@ -584,10 +635,16 @@ def _revoked_prune(c):
     c.execute("DELETE FROM obj_revoked WHERE created_at<?", (iso(now_utc() - timedelta(days=OBJ_REVOKED_DAYS)),))
 
 
-def obj_unshare(c, uid, kind, rid, sid):
+def obj_unshare(c, uid, kind, rid, sid, checked=False):
     """Take the share sid of the object's own node back (needs 'manage'): it goes into obj_revoked, restorable. Returns the
-    obj_revoked id. Shares of the folders above are the file store's (its dialog)."""
-    row, _ = obj_need(c, uid, kind, rid, "manage")
+    obj_revoked id. Shares of the folders above are the file store's (its dialog). 2.568.0 (#4739): checked=True = the area
+    checked the right itself (a member leaving a list on their own)."""
+    if checked:
+        row = obj_row(c, kind, rid)
+        if row is None:
+            raise Denied(404)
+    else:
+        row, _ = obj_need(c, uid, kind, rid, "manage")
     n = obj_node(c, uid, kind, rid)
     s = c.execute("SELECT * FROM fs_shares WHERE id=? AND node_id=?", (int(sid), n["id"] if n else 0)).fetchone()
     if not s:
@@ -609,17 +666,28 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
         raise Denied(404)
     s = json.loads(r["row_json"])
     key = next((k for k in ("user_id", "group_id", "agent_id") if s.get(k)), None)
+    reg = obj_reg(kind)
     n = obj_node(c, uid, kind, rid, make=True)
-    if not key or not _pool_ok(c, n, key, int(s[key]), uid):
+    if n is None:
+        raise Denied(404)  # #4739: an area that places its nodes itself has none for it
+    # 2.568.0 (#4739): with an on_restore hook the area checks the target under its own rules (below)
+    if not key or (reg["on_restore"] is None and not _pool_ok(c, n, key, int(s[key]), uid)):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
-    if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(s[key]))).fetchone():
+    extra = {k: s.get(k) for k in reg["share_cols"] if k in s}
+    mq, ma = _share_match(reg, extra)
+    if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(s[key]), *ma)).fetchone():
         c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
         raise Denied(409, tr("Already shared"))
     sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
                     (n["id"], int(s[key]), s.get("role") if s.get("role") in ("view", "edit") else "view", s.get("expires_at"),
                      s.get("created_by"), s.get("created_at") or iso(now_utc()), s.get("by_role")))
+    for k, v in extra.items():
+        c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
     c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
     obj_forget()
+    if reg["on_restore"]:
+        s2 = dict(s, id=sid)
+        reg["on_restore"](c, uid, int(rid), s2)
     return sid
 
 
@@ -631,7 +699,7 @@ def obj_shares(c, uid, kind, rid):
     if n is None:
         own, inh = [], []
     else:
-        own, inh = _shares(c, n["id"]), _inherited_shares(c, fs_chain(c, n["id"]))
+        own, inh = _shares(c, n["id"], own=True), _inherited_shares(c, fs_chain(c, n["id"]))  # #4739: + an area's own
     rev = []
     for r in c.execute("SELECT * FROM obj_revoked WHERE src='fs_shares' AND kind=? AND ref_id=? ORDER BY id DESC LIMIT 50", (kind, int(rid))):
         s = json.loads(r["row_json"])
@@ -711,6 +779,9 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
             c.execute("UPDATE obj_history SET user_id=NULL WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_revoked SET by_id=NULL WHERE by_id=?", (int(uid),))
             c.execute("DELETE FROM obj_revoked WHERE user_id=?", (int(uid),))
+    for reg in list(OBJ.values()):  # 2.568.0 (#4739): an old area's own role table (lists: list_members through groups)
+        if reg["on_revoke"]:
+            out.update(reg["on_revoke"](c, uid, org, reason, role=role) or {})
     obj_forget()
     return out
 
