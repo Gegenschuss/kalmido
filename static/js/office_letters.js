@@ -181,7 +181,7 @@ async function ltSave(d, quiet) {
   try {
     if (!same) Object.assign(t, await rawFetch('PATCH', `/api/office/letters/${t.id}`, t.updated_at ? {...b, expect_updated_at: t.updated_at} : b));
     lt_keepDrop(t.id);
-    if (!quiet) { LT.undo = null; toast(tr('Saved'), async () => { await api('PATCH', `/api/office/letters/${t.id}`, old); LT.cur = null; LT.data = null; ofcDraw(); }); }
+    if (!quiet) { LT.undo = null; const now = ltSnap(t), at = t.updated_at; toast(tr('Saved'), async () => { await undoWrite(`/api/office/letters/${t.id}`, old, at, {now, label: t.subject || tr('Letter')}); LT.cur = null; LT.data = null; ofcDraw(); }); }  // 2.566.0 (#4704): only the changed keys, against the own save's version
     else if (!same && !(LT.undo && LT.undo.id === t.id)) LT.undo = {id: t.id, v: old};
     const el = $('#lt-err'); if (el) el.textContent = '';
     return true;

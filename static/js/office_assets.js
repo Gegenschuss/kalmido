@@ -167,11 +167,15 @@ function astBody(md) {
       kind: $('select', row).value, label: $('.ast-ml', row).value.trim(), every_months: +$('.ast-me input', row).value || 12, next: $('[data-ast-next]', row)?.value || ''}))} : {})};
 }
 // one undo step for a saved device: the fields before back (members never edit)
-function astUndo(r, body) {
-  const url = `${AST_URL}/${r.id}`, old = {};
-  for (const k of Object.keys(body)) old[k] = r[k] ?? null;
-  const go = b => api('PATCH', url, b).then(() => ofcReload('equipment'));
-  offerUndo(tr('Saved'), histAdd({label: tr('Edit device'), undo: () => go(old), redo: () => go(body)}));
+// 2.566.0 (#4704): only the keys this save changed, each way against the version the step before left (sv = the save's
+// answer); changed elsewhere since -> "Changed elsewhere, not undone" (core.js undoStep), never written over
+function astUndo(r, body, sv) {
+  const url = `${AST_URL}/${r.id}`, old = {}, now = {...body};
+  delete now.expect_updated_at;
+  for (const k of Object.keys(now)) old[k] = r[k] ?? null;
+  let ver = sv?.updated_at || '';
+  const go = (b, from) => undoStep(url, b, ver, {now: from, label: tr('Edit device'), then: j => { ver = j?.updated_at || ver; }}).finally(() => ofcReload('equipment'));
+  offerUndo(tr('Saved'), histAdd({label: tr('Edit device'), undo: () => go(old, now), redo: () => go(now, old)}));
 }
 
 // ---- 2.140.0 B (#2136): the own private device linked with this piece of equipment (life/devlink.py; the device side is

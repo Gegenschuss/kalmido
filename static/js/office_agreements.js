@@ -170,11 +170,8 @@ async function agrSave(a, body) {
   const j = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/agreements/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); agrReload();
   const now = agrBody(j), keys = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
   let ver = j.updated_at;
-  const step = async src => {
-    try { ver = (await rawFetch('PATCH', `/api/office/agreements/${a.id}`, {...Object.fromEntries(keys.map(k => [k, src[k]])), expect_updated_at: ver})).updated_at; }
-    catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
-    agrReload();
-  };
+  // 2.566.0 (#4704): core.js undoStep - changed elsewhere since -> "Changed elsewhere, not undone", the step leaves the history
+  const step = src => undoStep(`/api/office/agreements/${a.id}`, Object.fromEntries(keys.map(k => [k, src[k]])), ver, {label: tr('Contract changed'), then: x => { ver = x.updated_at || ver; }}).finally(agrReload);
   if (!keys.length) { toast(tr('Saved')); return j; }
   offerUndo(tr('Saved'), histAdd({label: tr('Contract changed'), undo: () => step(old), redo: () => step(now)}));
   return j;

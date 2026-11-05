@@ -16564,6 +16564,7 @@
   "Calibration: {0}": "Calibrazione: {0}",
   "Maintenance: {0}": "Manutenzione: {0}",
   "The agent's data lock leaves this area out": "Il blocco dati dell'agente esclude quest'area",
+  "Changed elsewhere, not undone": "Modificato altrove, non annullato",
   "Model per routine": "Modello per routine",
   "A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.": "Una routine del pacchetto iniziale può usare un modello proprio, ad es. uno più economico per il briefing. Vuoto = il modello dell’agente.",
   "Like the agent": "Come l’agente",

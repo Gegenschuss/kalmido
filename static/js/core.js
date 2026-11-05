@@ -659,6 +659,36 @@ async function api(method, url, body) {
     throw e;
   }
 }
+// 2.566.0 (#4704): an undo (or redo) of a save as a second write that never overwrites what someone else saved meanwhile:
+// only the keys this step changed go back (old = the values before, o.now = what the save sent; without o.now all of old),
+// with expect_updated_at = seenAt (the updated_at of the own save's answer; empty = an old row without one, no check).
+// o.method PATCH (default) | PUT, o.full = all of old (a PUT route that needs the whole state), o.label = what the message
+// names, o.hist = a history step (no own message: it returns {none, skipped}). -> the answer; changed since (409 with the
+// current state) -> null and "Changed elsewhere, not undone"; any other error is said and thrown (like api())
+async function undoWrite(url, old, seenAt, o = {}) {
+  const now = o.now, back = {};
+  for (const k of Object.keys(old || {})) if (o.full || !now || (k in now && JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null))) back[k] = old[k];
+  if (!Object.keys(back).length) return {};
+  try { return await rawFetch(o.method || 'PATCH', url, seenAt ? {...back, expect_updated_at: seenAt} : back); }
+  catch (x) {
+    if (x?.status === 409 && x.data && Object.keys(x.data).some(k => k !== 'error' && k !== 'code')) {
+      if (!o.hist) toast(o.label ? tr('Changed elsewhere, not undone: {0}', o.label) : tr('Changed elsewhere, not undone'));
+      return null;
+    }
+    if (x instanceof Offline) toast(tr('Offline: only works again with a connection'));
+    else if (x?.message !== 'auth' && !x?.shown) toast(x?.message || tr('unknown'));
+    if (x) x.shown = true;
+    throw x;
+  }
+}
+// the same as a history step's undo / redo: changed since -> {none, skipped: [label]} (histStep says "Changed elsewhere, not
+// undone: …" and drops the step); ok -> {} (j = the answer through o.then)
+async function undoStep(url, old, seenAt, o = {}) {
+  const j = await undoWrite(url, old, seenAt, {...o, hist: true});
+  if (j === null) return {none: true, skipped: [o.label || tr('Change')]};
+  if (o.then) await o.then(j);
+  return {};
+}
 // 2.436.0 (#3620): "View as member": the one place the own admin marks read as a member's (display only; settings.js mvSet)
 const MV = {me: null};
 const mvOn = () => S.settings?.member_view === '1';

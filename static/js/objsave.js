@@ -7,7 +7,7 @@
 //   saveDialog(url, open, now)   sends ONLY the fields that differ from `open`, with expect_updated_at = open.updated_at ->
 //                                the saved object; 409 -> {conflict: {cur, theirs, both}} (objMerge draws the bar: the fields
 //                                someone else changed are marked, the next save goes against cur)
-//   undoWrite(url, old, seenAt)  an undo as a second write: the old values against the version seen (409 = changed since)
+//   undoWrite(url, old, seenAt)  an undo as a second write: core.js (2.566.0, #4704: shared by every toast / history undo)
 //   objUndo(url, op)             the server's session undo of the dialog (POST <url>/undo, op undo | redo | all | redoall)
 //   objClose(url)                the dialog is gone: its session ends
 const OBS = {s: {}};
@@ -113,10 +113,6 @@ function objOpen(md, url, open, key) {
 }
 /** @param {string} url */
 function objClose(url) { delete OBS.s[url]; }
-/** @param {string} url @param {any} old @param {string} seenAt */
-async function undoWrite(url, old, seenAt) {
-  return rawFetch('PATCH', url, {...old, expect_updated_at: seenAt});
-}
 /** @param {string} url @param {string} [op] */
 async function objUndo(url, op = 'undo') {
   const s = OBS.s[url]; if (!s) throw new Error(tr('Nothing to undo'));

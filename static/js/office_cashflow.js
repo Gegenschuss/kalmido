@@ -146,7 +146,7 @@ function rk_fixedModal(f) {
         // the changed keys, with the version this save left
         const sv = await (f.updated_at ? rawFetch : api)('PATCH', `/api/office/fixed-costs/${f.id}`, f.updated_at ? {...body, expect_updated_at: f.updated_at} : body); md.remove(); rk_cfReload();
         const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(sv?.[k] ?? null)));
-        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/fixed-costs/${f.id}`, {...back, expect_updated_at: sv.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } rk_cfReload(); });
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { await undoWrite(`/api/office/fixed-costs/${f.id}`, back, sv.updated_at, {label: f.label}).catch(() => null); rk_cfReload(); });  // 2.566.0 (#4704): core.js undoWrite
         else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/fixed-costs', body); md.remove(); rk_cfReload();
@@ -313,11 +313,8 @@ function cfs_modal(a, mo) {
         const sv = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/cashflow/adjust/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); md.remove(); rk_cfReload();
         const now = keep(sv), ks = Object.keys(old).filter(k => String(old[k] ?? '') !== String(now[k] ?? ''));
         let ver = sv.updated_at;
-        const step = async src => {
-          try { ver = (await rawFetch('PATCH', `/api/office/cashflow/adjust/${a.id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).updated_at; }
-          catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
-          rk_cfReload();
-        };
+        // 2.566.0 (#4704): core.js undoStep - changed elsewhere since -> "Changed elsewhere, not undone" and the step leaves the history
+        const step = src => undoStep(`/api/office/cashflow/adjust/${a.id}`, Object.fromEntries(ks.map(k => [k, src[k]])), ver, {label: tr('Correction changed'), then: j => { ver = j.updated_at || ver; }}).finally(rk_cfReload);
         if (ks.length) offerUndo(tr('Saved'), histAdd({label: tr('Correction changed'), undo: () => step(old), redo: () => step(now)}));
         else toast(tr('Saved'));
       } else {

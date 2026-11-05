@@ -69,8 +69,7 @@ async function aboPatch(id, body, old, msg) {
 }
 // 2.560.0 C (#4700): an undo writes back only the keys that changed, with the version the save left (changed again meanwhile -> a hint)
 async function aboUndo(id, back, sv) {
-  try { await rawFetch('PATCH', `/api/office/fixed-costs/${id}`, sv?.updated_at ? {...back, expect_updated_at: sv.updated_at} : back); }
-  catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
+  await undoWrite(`/api/office/fixed-costs/${id}`, back, sv?.updated_at, {label: sv?.label}).catch(() => null);  // 2.566.0 (#4704): core.js undoWrite
   aboReload();
 }
 const aboChanged = (old, sv) => Object.fromEntries(Object.entries(old).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(sv?.[k] ?? null)));

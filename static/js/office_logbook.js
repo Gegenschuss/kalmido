@@ -129,7 +129,7 @@ function lbVehModal(v) {
       if (v) {
         const old = {name: v.name, plate: v.plate, kind: v.kind, odo_start: v.odo_start};
         const now = await (v.updated_at ? rawFetch : api)('PATCH', `/api/office/vehicles/${v.id}`, ofcVerBody(body, v)); md.remove(); lbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/vehicles/${v.id}`, ofcVerUndo(old, body, now)); lbReload(true); });  // only the keys this save changed
+        toast(tr('Saved'), async () => { await undoWrite(`/api/office/vehicles/${v.id}`, old, now?.updated_at, {now: body, label: v.name}).catch(() => null); lbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
         const j = await api('POST', '/api/office/vehicles', body); md.remove(); LB.vid = j.id; LB.view = 'drives'; lbReload(true);
         toast(tr('Added'), async () => { await api('PATCH', `/api/office/vehicles/${j.id}`, {archived: 1}); lbReload(true); });
@@ -220,7 +220,7 @@ function lbDriveModal(d, fix) {
         const x = LB.drives?.find(y => y.id === d.id); if (x && j?.id === d.id) Object.assign(x, j);
         ofcDraw(); lbRefresh();
         // 2.93.0 B (#1928 review): a taken-over drive with other km -> the trip keeps the old km, said once here
-        toast(j.trip_hint || (j.warn ? lbWarn(j.warn) : tr('Saved')), async () => { await api('PATCH', `/api/office/drives/${d.id}`, ofcVerUndo(old, body, j)); lbReload(true); });  // only the keys this save changed
+        toast(j.trip_hint || (j.warn ? lbWarn(j.warn) : tr('Saved')), async () => { await undoWrite(`/api/office/drives/${d.id}`, old, j?.updated_at, {now: body}).catch(() => null); lbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
         if (fix) { body.corrects_id = fix.id; body.correct_note = val('#lgb-fixnote').trim(); if (!body.correct_note) { $('.aerr', md).textContent = tr('A correction needs its reason'); return; } }
         // 2.559.0 (#4660): the dialog closes at once, a provisional row (negative id) shows in the list; the real one after the answer

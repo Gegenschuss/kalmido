@@ -745,7 +745,8 @@ async function waitClear(id) {
   const t = taskById(id); if (!t || !t.waiting_at) return;
   const before = {note: t.wait_note || '', until: t.wait_until || null};
   try { await waitOpt(id, null); } catch { return; }  // 2.559.0 (#4660): at once
-  toast(tr('No longer waiting'), () => waitOpt(id, before).catch(() => {}));
+  // 2.566.0 (#4704): marked as waiting again meanwhile (elsewhere, another note) -> that one stays, said like any undo
+  toast(tr('No longer waiting'), () => taskById(id)?.waiting_at ? toast(tr('Changed elsewhere, not undone: {0}', taskById(id).title || tr('Task'))) : waitOpt(id, before).catch(() => {}));
 }
 // 2.24.0 (UX-09): ONE task menu in a fixed order (right-click, "…" in the row / the task panel, "All…" of the short
 // menus): date · priority · assignee · time · list / section · waiting · pin · More… · delete. The short

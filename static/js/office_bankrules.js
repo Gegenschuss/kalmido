@@ -104,11 +104,8 @@ async function brl_put(id, body, was) {
   const j = await (was?.updated_at ? rawFetch : api)('PUT', `/api/office/bank/rules/${id}`, was?.updated_at ? {...body, expect_updated_at: was.updated_at} : body); brl_stale(); brl_load();
   const old = brl_body(was), now = brl_body(j.rule), ks = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
   let ver = j.rule.updated_at;
-  const step = async src => {
-    try { ver = (await rawFetch('PUT', `/api/office/bank/rules/${id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).rule.updated_at; }
-    catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || tr('unknown')); }
-    brl_load();
-  };
+  // 2.566.0 (#4704): core.js undoStep (PUT takes only the keys sent) - changed elsewhere since -> said, the step leaves the history
+  const step = src => undoStep(`/api/office/bank/rules/${id}`, Object.fromEntries(ks.map(k => [k, src[k]])), ver, {method: 'PUT', label: tr('Bank rule changed'), then: x => { ver = x.rule?.updated_at || ver; }}).finally(brl_load);
   if (!ks.length) { toast(tr('Saved')); return; }
   offerUndo(tr('Saved'), histAdd({label: tr('Bank rule changed'), undo: () => step(old), redo: () => step(now)}));
 }

@@ -101,9 +101,11 @@ async function ltkRefLine() {
   const old = LTK.d?.ref_line || '';
   const d = await api('PATCH', `/api/office/letters/${lid}`, {ref_line: line}).catch(() => null); if (!d) return;
   LTK.d = {...LTK.d, ...d}; ltkDraw(); ltkReloadLetter();
+  let ver = d.updated_at || '';
   histToast(tr('Reference line filled in'), histAdd({label: tr('Reference line filled in'),
-    undo: async () => { await api('PATCH', `/api/office/letters/${lid}`, {ref_line: old}); ltkReloadLetter(); return {}; },
-    redo: async () => { await api('PATCH', `/api/office/letters/${lid}`, {ref_line: line}); ltkReloadLetter(); return {}; }}));
+    // 2.566.0 (#4704): each way against the version the step before left (core.js undoStep): changed elsewhere since -> said, kept
+    undo: () => undoStep(`/api/office/letters/${lid}`, {ref_line: old}, ver, {label: tr('Reference line filled in'), then: x => { ver = x.updated_at || ver; }}).finally(ltkReloadLetter),
+    redo: () => undoStep(`/api/office/letters/${lid}`, {ref_line: line}, ver, {label: tr('Reference line filled in'), then: x => { ver = x.updated_at || ver; }}).finally(ltkReloadLetter)}));
 }
 document.addEventListener('click', e => {
   const b = /** @type {any} */ (e.target).closest('.ltk [data-ltk]'); if (!b) return;

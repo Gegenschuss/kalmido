@@ -77,7 +77,7 @@ async function pp_patch(id, body, msg = tr('Saved'), expect = null) {  // 2.559.
   const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => (expect ? rawFetch : api)('PATCH', `/api/office/deals/${id}`, expect ? {...body, expect_updated_at: expect} : body), ofcDraw);
   pp_itemSet(j); pp_refresh();
   const before = Object.fromEntries(Object.entries(j.before || {}).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(j[k] ?? null)));
-  if (Object.keys(before).length) toast(msg, async () => { try { pp_itemSet(await rawFetch('PATCH', `/api/office/deals/${id}`, {...before, expect_updated_at: j.updated_at})); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } pp_refresh(); });
+  if (Object.keys(before).length) toast(msg, async () => { const r = await undoWrite(`/api/office/deals/${id}`, before, j.updated_at, {label: j.title}).catch(() => null); if (r?.id) pp_itemSet(r); pp_refresh(); });  // 2.566.0 (#4704): core.js undoWrite
   else toast(msg);
   return j;
 }
@@ -135,7 +135,7 @@ function pp_modal(x, stage) {
       if (b.dataset.m === 'offer') {
         const j = await api('POST', `/api/office/deals/${x.id}/offer`); md.remove(); pp_reload();
         if (typeof OFD === 'object') { OFD.list = null; OFD.kind = 'offer'; }
-        toast(tr('Quotation draft created'), async () => { await api('DELETE', `/api/office/docs/${j.doc_id}`); await api('PATCH', `/api/office/deals/${x.id}`, {offer_id: null, stage: x.stage, probability: x.probability}); pp_reload(); });
+        toast(tr('Quotation draft created'), async () => { await api('DELETE', `/api/office/docs/${j.doc_id}`); await undoWrite(`/api/office/deals/${x.id}`, {offer_id: null, stage: x.stage, probability: x.probability}, j.deal?.updated_at, {label: x.title}).catch(() => null); pp_reload(); });  // 2.566.0 (#4704): the deal against the version the offer left
         go(`office/offers/${j.doc_id}`);
         return;
       }
@@ -144,7 +144,7 @@ function pp_modal(x, stage) {
         const j = await api('POST', `/api/office/deals/${x.id}/project`); md.remove(); pp_reload();
         if (typeof load === 'function') await load();
         if (typeof modulesOnToast === 'function') modulesOnToast(j.modules_on);
-        toast(tr('Project created'), async () => { await api('PATCH', `/api/lists/${j.list_id}`, {archived: true}); await api('PATCH', `/api/office/deals/${x.id}`, {list_id: null}); pp_reload(); if (typeof load === 'function') await load(); });
+        toast(tr('Project created'), async () => { await api('PATCH', `/api/lists/${j.list_id}`, {archived: true}); await undoWrite(`/api/office/deals/${x.id}`, {list_id: null}, j.deal?.updated_at, {label: x.title}).catch(() => null); pp_reload(); if (typeof load === 'function') await load(); });  // 2.566.0 (#4704): the deal against the version the project left
         return;
       }
       const v = id => $(id, md)?.value ?? '';

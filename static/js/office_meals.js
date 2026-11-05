@@ -43,7 +43,7 @@ async function bw_saveNow(m, b, pend) {  // the button "Save draft": the dialog 
     // 2.560.0 D (#4700) kept: the draft's save checks the version too (409: the receipt is back, the dialog opens again with the input and "Reload")
     try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => (m.updated_at ? rawFetch : api)('PATCH', `${BW_U}/${m.id}`, ofcVerBody(b, m)), ofcDraw); } catch (x) { ofcVerLate(x, m.updated_at, () => bw_modal({...m, ...b}), row => { bw_reload(); bw_modal(row); }); return null; }
     bw_mealSet(j); bw_refresh();
-    const now = j; toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${m.id}`, ofcVerUndo(old, b, now)); bw_refresh(); });  // only the keys this save changed
+    const now = j; toast(tr('Saved'), async () => { await undoWrite(`${BW_U}/${m.id}`, old, now?.updated_at, {now: b}).catch(() => null); bw_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
     return j;
   }
   const tmp = -Date.now();
@@ -278,7 +278,7 @@ function bw_modal(m0) {
     if (m) {
       const old = bw_body(m);
       m = await (m.updated_at ? rawFetch : api)('PATCH', `${BW_U}/${m.id}`, ofcVerBody(b, m));  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409, never overwritten
-      const id = m.id, now = m; toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${id}`, ofcVerUndo(old, b, now)); bw_reload(); });  // only the keys this save changed
+      const id = m.id, now = m; toast(tr('Saved'), async () => { await undoWrite(`${BW_U}/${id}`, old, now?.updated_at, {now: b}).catch(() => null); bw_reload(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
     } else {
       m = await api('POST', BW_U, b);
       if (pend) { try { m = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(pend)); } catch (x) { toast(x.message || ''); } }

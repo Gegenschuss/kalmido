@@ -315,7 +315,7 @@ function rk_tripModal(t) {
         // 2.560.0 D (#4700) kept: the save checks the version (409 = saved elsewhere meanwhile: row back, the saved one opens)
         let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)), ofcDraw); } catch (x) { ofcVerLate(x, t.updated_at, () => rk_tripModal({...t, ...body}), row => { rk_reload(); rk_tripModal(row); }); return; }
         rk_tripSet(j); rk_refresh();
-        toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}`, ofcVerUndo(old, body, j))); rk_refresh(); });  // only the keys this save changed
+        toast(tr('Saved'), async () => { const r = await undoWrite(`/api/office/trips/${t.id}`, old, j?.updated_at, {now: body}).catch(() => null); if (r?.id) rk_tripSet(r); rk_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
         const tmp = -Date.now();
         const put = () => { if (!RK.data) return null; if (!rk_trip(tmp)) RK.data.trips.unshift({...loc, id: tmp, items: [], total: '0.00', missing: 0, unbilled: 0}); return () => { if (RK.data) RK.data.trips = RK.data.trips.filter(x => x.id !== tmp); if (RK.open === tmp) RK.open = null; }; };
@@ -376,7 +376,7 @@ function rk_itemModal(t, i) {
         let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i)), ofcDraw); } catch (x) { ofcVerLate(x, i.updated_at, () => rk_itemModal(t, {...i, ...body}), row => { rk_reload(); rk_itemModal(t, row); }); return; }
         rk_tripSet(j); rk_refresh();
         const now = j?.items?.find(x => x.id === i.id);
-        toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerUndo(old, body, now))); rk_refresh(); });  // only the keys this save changed
+        toast(tr('Saved'), async () => { const r = await undoWrite(`/api/office/trips/${t.id}/items/${i.id}`, old, now?.updated_at, {now: body}).catch(() => null); if (r?.id) rk_tripSet(r); rk_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
         const tmp = -Date.now();
         let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.some(x => x.id === tmp) ? its : [...its, {...loc, id: tmp, trip_id: t.id, billed: null}]), () => api('POST', `/api/office/trips/${t.id}/items`, body), ofcDraw); } catch { return; }
@@ -589,8 +589,8 @@ async function rk_vmaDaysModal(t) {  // per day: country (+ city) and the meals 
     }
     const old = t.vma_days || [];
     try {
-      await api('PATCH', `/api/office/trips/${t.id}`, {vma_days: days}); md.remove(); rk_reload();
-      toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}`, {vma_days: old}); rk_reload(); });
+      const j = await api('PATCH', `/api/office/trips/${t.id}`, {vma_days: days}); md.remove(); rk_reload();
+      toast(tr('Saved'), async () => { await undoWrite(`/api/office/trips/${t.id}`, {vma_days: old}, j?.updated_at).catch(() => null); rk_reload(); });  // 2.566.0 (#4704): against this save's version
     } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
 }
@@ -715,11 +715,7 @@ document.addEventListener('click', e => {
 // with the current row under "current" (2.567.0 #4711; "row" of the older routes), never overwritten), the undo writes back only the keys this save changed, with the new
 // version. Without a version (an old row) the save goes as before.
 function ofcVerBody(body, r) { return r?.updated_at ? {...body, expect_updated_at: r.updated_at} : body; }
-function ofcVerUndo(old, body, now) {
-  const b = {};
-  for (const k of Object.keys(old)) if (k in body && JSON.stringify(old[k] ?? null) !== JSON.stringify(body[k] ?? null)) b[k] = old[k];
-  return ofcVerBody(b, now);
-}
+// 2.566.0 (#4704): the undo of these saves is core.js undoWrite(url, old, version, {now: body}) (ofcVerUndo went into it)
 // 2.559.0 (#4660): the same 409 after a dialog that closed at once (the change is taken back already): again() opens the
 // dialog once more with the person's input, the bar below says so with "Reload" (reopen: the saved state), nothing typed is
 // lost; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast

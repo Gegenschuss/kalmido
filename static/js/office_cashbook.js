@@ -174,7 +174,7 @@ async function cbEntryModal(e) {
       const j = await api('PATCH', `/api/office/cash-entries/${e.id}`, ofcVerBody(body, e)); md.remove(); cbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409 (still through api(): the cash book waits, running numbers)
       // 2.533.0 (#4337): an entry that booked its invoice's payment just now has no undo (its amount / day / invoice are fixed: cancel it)
       if (j?.paid && !e.paid) toast(tr('Saved'));
-      else toast(tr('Saved'), async () => { await api('PATCH', `/api/office/cash-entries/${e.id}`, ofcVerUndo(old, body, j)); cbReload(true); });  // only the keys this save changed
+      else toast(tr('Saved'), async () => { await undoWrite(`/api/office/cash-entries/${e.id}`, old, j?.updated_at, {now: body}).catch(() => null); cbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
     } catch (x) { if (ofcVerConflict(md, x, row => { cbReload(true); cbEntryModal(row); })) return; const el = cb$('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
 }

@@ -235,7 +235,7 @@ function dtTplModal(t) {
         const old = {name: t.name, kind: t.kind, lang: t.lang, sign: t.sign, body: t.body};
         const sv = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/doc-templates/${t.id}`, t.updated_at ? {...body, expect_updated_at: t.updated_at} : body); md.remove(); dtReload();
         const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => String(v ?? '') !== String(sv?.[k] ?? '')));
-        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/doc-templates/${t.id}`, {...back, expect_updated_at: sv.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } dtReload(); });
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { await undoWrite(`/api/office/doc-templates/${t.id}`, back, sv.updated_at, {label: t.name}).catch(() => null); dtReload(); });  // 2.566.0 (#4704): core.js undoWrite
         else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/doc-templates', body); md.remove(); dtReload();
@@ -301,7 +301,7 @@ async function dtSave(d, quiet) {
     if (!quiet) {
       DT.undo = null;
       const back = dtChangedKeys(old, d);  // the undo writes back only what this save changed, with the version check
-      if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/gen-docs/${d.id}`, {...back, expect_updated_at: d.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } dtReload(); });
+      if (Object.keys(back).length) toast(tr('Saved'), async () => { await undoWrite(`/api/office/gen-docs/${d.id}`, back, d.updated_at, {label: d.title}).catch(() => null); dtReload(); });  // 2.566.0 (#4704): core.js undoWrite
       else toast(tr('Saved'));
     } else if (!same && !(DT.undo && DT.undo.id === d.id)) DT.undo = {id: d.id, v: old};
     const el = $('#dt-err'); if (el) el.textContent = '';

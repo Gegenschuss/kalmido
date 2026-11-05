@@ -133,12 +133,13 @@ run(A, "org", AID)
 
 # the dialogs send the version, show the conflict bar and undo only the changed keys (the client side, read from the files)
 tj = kt_src("static/js/office_travel.js")
-check("function ofcVerBody" in tj and "function ofcVerUndo" in tj and "function ofcVerConflict" in tj, "UI: the shared helpers are there")
+# 2.566.0 (#4704): ofcVerUndo went into core.js undoWrite (only the changed keys, against the save's version)
+check("function ofcVerBody" in tj and "function ofcVerConflict" in tj and "async function undoWrite" in kt_src("static/js/core.js"), "UI: the shared helpers are there")
 for f, n in (("office_travel.js", 2), ("office_logbook.js", 2), ("office_cashbook.js", 1), ("office_cards.js", 2), ("office_meals.js", 1)):
     js = kt_src("static/js/" + f)
     check(js.count("ofcVerBody(") >= n and js.count("ofcVerConflict(") >= n, f"UI: {f} sends expect_updated_at and shows the conflict bar")
 for f in ("office_travel.js", "office_logbook.js", "office_cashbook.js", "office_meals.js"):
-    check("ofcVerUndo(old" in kt_src("static/js/" + f), f"UI: {f}'s undo writes back only the changed keys")
+    check("undoWrite(" in kt_src("static/js/" + f) and "{now: b" in kt_src("static/js/" + f), f"UI: {f}'s undo writes back only the changed keys")  # 2.566.0 (#4704)
 check("api('PATCH', `/api/office/cash-entries/${e.id}`, ofcVerBody(" in kt_src("static/js/office_cashbook.js"), "UI: the cash book still saves through the waiting api()")
 
 sys.exit(done("p2560_d_conflict"))
