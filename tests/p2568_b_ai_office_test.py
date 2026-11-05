@@ -232,7 +232,7 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
         check(r.status_code == 404, f"the organisation's agent with the freelancer's project: 404 ({r.status_code} {r.text[:120]})")
         check(not dbx("SELECT 1 FROM office_docs WHERE client_id=? AND agent_id=?", (CL, AG_ORG)), "nothing made with another office's client")
     else:
-        AG_ORG, AH0_ORG, LP_ORG, CL_ORG = G, AH, LP, CL
+        AG_ORG, AH0_ORG, CL_ORG = G, AH, CL
 
 # ---- review 2.568.0 (M1b): in an organisation the office rights groups decide, for the person and for the agent
 r = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob Staff", "password": "password123", "email": "bob@example.com"})
@@ -262,11 +262,13 @@ def member(uid, gid):
 
 GB, BH = agent(Bo, "kibob", ["read", "office"])
 check(A.patch(B + f"{O}/agents/{GB}", json={"office_drafts": True}).ok, "bob's agent: the office switch on")
-check(A.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": BOB, "role": "admin"}).ok, "the project shared with bob (project admin)")
-r = Bo.put(B + f"/api/lists/{LP_ORG}/members", json={"user_id": GB, "role": "edit"})  # only the owner shares with a personal agent
+LB = A.post(B + "/api/lists", json={"name": "Bob's project", "org_id": ORG}).json()["id"]  # one agent per project: a project of its own
+check(A.patch(B + f"/api/lists/{LB}", json={"client_id": CL_ORG}).ok, "bob's project has the client")
+check(A.put(B + f"/api/lists/{LB}/members", json={"user_id": BOB, "role": "admin"}).ok, "the project shared with bob (project admin)")
+r = Bo.put(B + f"/api/lists/{LB}/members", json={"user_id": GB, "role": "edit"})  # only the owner shares with a personal agent
 check(r.ok, f"bob shares the project with his agent {r.status_code} {r.text[:160]}")
-entry(BOB, LP_ORG, None, D1, 1800)
-FT = {"client_id": CL_ORG, "from_time": True, "list_id": LP_ORG, "from": D9, "to": TODAY}
+entry(BOB, LB, None, D1, 1800)
+FT = {"client_id": CL_ORG, "from_time": True, "list_id": LB, "from": D9, "to": TODAY}
 FREE = {"client_id": CL_ORG, "items": [{"text": "Cut", "qty": 1, "price": 100}]}
 GV = group("Look only", offers="view", time="view")
 member(BOB, GV)
