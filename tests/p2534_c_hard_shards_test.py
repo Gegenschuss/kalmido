@@ -50,6 +50,14 @@ check(shards.split_plan(costs, [], 4, 0, 10) == (old, 0) and shards.split_plan(c
       "no hard group or --hard-target-min 0 = the old plan")
 plan, h = shards.split_plan([100.0, 200.0], [0, 1], 4, 30, 10)
 check(h == 1 and len(plan) == 1, "only hard groups: no empty soft shard")
+# 2.556 (#4388): --total N = exactly N shards in all (H hard + N-H others), --shards / --target-min do not count
+plan, h = shards.split_plan(costs, [0, 1, 2, 3], 28, 30, 10, total=6)
+check(h == 3 and len(plan) == 6 and [k for k, _, _ in plan] == list(range(1, 7)), f"total 6 = 3 hard + 3 others: {h} {len(plan)}")
+check({i for k, idx, _ in plan if k <= h for i in idx} == {0, 1, 2, 3}, "with total the hard shards still hold the hard groups")
+plan, h = shards.split_plan(costs, [], 28, 30, 10, total=5)
+check(h == 0 and len(plan) == 5, "total without hard groups = exactly total shards")
+plan, h = shards.split_plan(costs, [0, 1, 2, 3], 28, 30, 1, hard_most=8, total=4)
+check(h == 3 and len(plan) == 4, f"many hard shards leave at least one for the others: {h} {len(plan)}")
 
 # 4. --assign on the real tree (estimates only): "# hard H" first, every hard group on 1..H, no soft one there
 tmp = tempfile.mkdtemp(prefix="p2534c-")
@@ -100,6 +108,9 @@ try:
     hh, n = int(o.get("hard") or 0), int(o.get("count") or 0)
     check(hh >= 1 and n == len(mx) and [x["shard"] for x in mx] == list(range(1, n + 1)), f"matrix 1..{n} in order, {hh} hard")
     check([x["hart"] for x in mx] == [" hart"] * hh + [""] * (n - hh), "the hard shards first, marked ' hart'")
+    # 2.556 (#4388): the full run plans exactly 20 shards in all (GitHub runs ~20 at once), limit 60 min
+    check(n == 20, f"full run: 20 shards in all, hard ones included: {n}")
+    check(re.search(r"needs: plan\n\s+timeout-minutes: 60\b", ci), "the shard job has the 60 min limit")
     tpl = re.search(r"^\s+name: (Test suites \$\{\{ matrix\.shard \}\}.*)$", ci, re.M)
     check(bool(tpl) and "${{ matrix.hart }}" in tpl.group(1), "the shard job name carries matrix.hart")
     check("include: ${{ fromJSON(needs.plan.outputs.matrix) }}" in ci, "the matrix of the shard job is the plan's list")

@@ -22,6 +22,8 @@ hand-set markers are off. 2.179 (#2691): CI takes the assignment (--assign) from
     --hard-file F  the patterns (fnmatch, lower case, one per line, # comments; default tests/hard_suites.txt beside
                  --run-all); a missing file = no hard groups (one plan for all)
     --hard-shards K  the most hard shards (default 8)
+    --total N    #4388: exactly N shards in all - the hard ones 1..H (as --hard-target-min needs) and N-H others, no
+                 --target-min for those (the full run of ci.yml: GitHub runs about 20 at once, more only queue); 0 = off
     --cut-shards F  #4327: the shard numbers of `gh run view --json jobs` (file, - = stdin) that were cancelled or timed out, one
                  per line (ci.yml job "plan" leaves their times out); a list without jobs is an error (exit 2)
 Groups without a measurement count as DEFAULT_SUITE_S per suite plus DEFAULT_FRESH_S (shown as "estimated").
@@ -151,20 +153,22 @@ def is_hard(g, pats):
     return any(fnmatch.fnmatch(x.lower(), p) for x in [g[0], *g[1]] for p in pats)
 
 
-def split_plan(costs, hard, n, target_min, hard_target_min, hard_most=HARD_SHARDS_MAX):
+def split_plan(costs, hard, n, target_min, hard_target_min, hard_most=HARD_SHARDS_MAX, total=0):
     """#4557: [(shard number, [group indexes], seconds)] with the hard groups (HARD: their indexes) on their own shards 1..H
     (as many as HARD_TARGET_MIN minutes each need, at most HARD_MOST) and the others on H+1.. (as many as TARGET_MIN need, at
-    most N; N when TARGET_MIN is 0), each part spread by lpt(). -> (plan, H); H = 0 without hard groups (the old plan)."""
+    most N; N when TARGET_MIN is 0), each part spread by lpt(). -> (plan, H); H = 0 without hard groups (the old plan).
+    #4388: TOTAL > 0 = exactly TOTAL shards in all (never more than groups): the others get TOTAL - H (at least 1), TARGET_MIN
+    and N do not count."""
     hard = sorted(set(hard))
     soft = [i for i in range(len(costs)) if i not in set(hard)]
     if not hard or hard_target_min <= 0:
-        m = shard_count(costs, n, target_min) if target_min > 0 else n
+        m = min(total, len(costs)) if total > 0 else shard_count(costs, n, target_min) if target_min > 0 else n
         return lpt(costs, m), 0
-    h = shard_count([costs[i] for i in hard], max(1, hard_most), hard_target_min)
+    h = shard_count([costs[i] for i in hard], max(1, min(hard_most, total - 1) if total > 1 else hard_most), hard_target_min)
     plan = [(k, [hard[i] for i in idx], s) for k, idx, s in lpt([costs[i] for i in hard], h)]
     if soft:
         sc = [costs[i] for i in soft]
-        m = shard_count(sc, n, target_min) if target_min > 0 else n
+        m = (max(1, min(total - h, len(sc))) if total > 0 else shard_count(sc, n, target_min) if target_min > 0 else n)
         plan += [(h + k, [soft[i] for i in idx], s) for k, idx, s in lpt(sc, m)]
     return plan, h
 
@@ -196,6 +200,7 @@ def main(argv=None):
     ap.add_argument("--hard-target-min", type=float, default=0, metavar="M")
     ap.add_argument("--hard-file", metavar="F")
     ap.add_argument("--hard-shards", type=int, default=HARD_SHARDS_MAX, metavar="K")
+    ap.add_argument("--total", type=int, default=0, metavar="N")
     ap.add_argument("timings", nargs="*")
     a = ap.parse_args(argv)
     if a.cut_shards:
@@ -229,7 +234,8 @@ def main(argv=None):
     pats = hard_patterns(a.hard_file or os.path.join(os.path.dirname(os.path.abspath(a.run_all)), "hard_suites.txt"))
     hard = [i for i, g in enumerate(gs) if is_hard(g, pats)] if a.hard_target_min > 0 else []
     # job/2398: the full run too (--shards = the most), it grew past 20 x 30 min (CI 2.493.0: 2 shards at 50 min)
-    plan, nh = split_plan(costs, hard, n, a.target_min, a.hard_target_min, a.hard_shards)
+    # #4388: the full run with --total 20 (fixed, the limit of ci.yml 60 min) instead of up to 28 x 30 min that queued
+    plan, nh = split_plan(costs, hard, n, a.target_min, a.hard_target_min, a.hard_shards, a.total)
     n = len(plan)
     if a.assign:
         if a.only is not None:
