@@ -7,9 +7,10 @@ from ..core.db import db
 from ..accounts.session import me
 from ..core.access import need_feat
 from ..tasks.validation import as_int
+from ..core.conflict import take_version
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
-from ..events.model import EV_PARTSTAT, EV_ROLES, EV_STATUS, need_evcal
+from ..events.model import EV_PARTSTAT, EV_ROLES, EV_STATUS, need_evcal, need_event
 from ..events.ics import ics_export, import_ics, IMPORT_MAX_BYTES
 from ..events.web import (
     occ_arg, op_cal_delete, op_cal_edit, op_cal_new, op_cals, op_event, op_event_delete, op_event_edit, op_event_new,
@@ -130,7 +131,9 @@ def v1_event(eid):
 def v1_event_edit(eid):
     v1_args(("occurrence",))
     need_feat("events")
-    return jsonify(op_event_edit(db(), me(), eid, v1_json(), occ_arg()))
+    need_event(db(), eid, write=True)  # 2.564.0 (#4702): a foreign / read-only event stays 404 / 403 before the version rule
+    b = take_version(v1_json(), "expect")  # expect / expect_updated_at / If-Match; required for agents
+    return jsonify(op_event_edit(db(), me(), eid, b, occ_arg()))
 
 
 @app.delete("/api/v1/events/<int:eid>")
@@ -274,7 +277,10 @@ def events_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
         "patch": op("Change an event (the whole series), or with ?occurrence= only that occurrence (title, location, description, all_day, "
                     "start, end, status)", E, ok(ref("Event")) | errs("400", "403", "404", "409"), [eid_p, occ_q],
                     body={**ev_in, "properties": {**ev_in["properties"], "expect": {"type": "string", "description": "updated_at of the copy "
-                                                                                  "the change is based on (409 when it changed meanwhile)"}}}, scope=S),
+                                                                                  "the change is based on (409 with error.current when it changed meanwhile; "
+                                                                                  "2.564.0: also as expect_updated_at or the header If-Match, required for "
+                                                                                  "agent accounts: 400 version_required)"},
+                                                  "expect_updated_at": {"type": "string", "description": "2.564.0: the same as expect"}}}, scope=S),
         "delete": op("Delete an event (restorable for 30 days), or with ?occurrence= leave out that occurrence", E,
                      {"204": {"description": "Deleted"}} | errs("400", "403", "404"), [eid_p, occ_q], scope=S)}
     paths["/events/{id}/restore"] = {"post": op("Restore a deleted event", E, ok(ref("Event")) | errs("403", "404"), [eid_p], scope=S)}

@@ -143,7 +143,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
     if isinstance(b, dict) and b.get("expect"):  # 2.273.0 C (#3051): the copy's change time checked under the row lock (also one occurrence)
         r = c.execute("SELECT * FROM events WHERE id=? FOR UPDATE", (eid,)).fetchone() or r
         if occ and b.pop("expect") != r["updated_at"]:
-            raise Denied(409, tr("The event was changed meanwhile"))
+            raise _ev_conflict(c, r, uid)
     if occ:
         ev_occ_change(c, r, occ, b)
         c.commit()
@@ -151,7 +151,7 @@ def op_event_edit(c, uid, eid, b, occ=None):
         return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
     _unknown(b, EV_KEYS + ("expect",))
     if b.get("expect") and b["expect"] != r["updated_at"]:  # the editor's copy is older: refuse instead of overwriting
-        raise Denied(409, tr("The event was changed meanwhile"))
+        raise _ev_conflict(c, r, uid)
     if "cal_id" in b and b["cal_id"] not in (None, "") and as_int(b["cal_id"], "cal_id", 1) != r["cal_id"]:
         nc = as_int(b["cal_id"], "cal_id", 1)
         nk, _ = need_evcal(c, nc, write=True)
@@ -175,6 +175,12 @@ def op_event_edit(c, uid, eid, b, occ=None):
     c.commit()
     evi_after_save(c, uid, eid, snap, send)
     return ev_dict(c, c.execute("SELECT * FROM events WHERE id=?", (eid,)).fetchone(), uid)
+
+
+def _ev_conflict(c, r, uid):
+    """2.564.0 (#4702): 409 with the event as it is now (key "event"; the API: error.current), as the shared core's Conflict."""
+    from ..core.conflict import Conflict
+    return Conflict("event", ev_dict(c, r, uid), msg=tr("The event was changed meanwhile"))
 
 
 def op_event_delete(c, uid, eid, occ=None):
