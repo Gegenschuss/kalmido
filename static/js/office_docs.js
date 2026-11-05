@@ -1342,13 +1342,15 @@ async function otb_restore(tid, after) {
   let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { toast(x.message || tr('unknown')); return; }
   toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
+  if (j.kind === 'trip_import' && typeof RK !== 'undefined') RK.data = null;  // 2.567.0 (#4707): the kinds of the cash flow / imports
+  if (['fixed_cost', 'fixed_import', 'cf_start', 'cf_adjust'].includes(j.kind)) { if (typeof RKF !== 'undefined') RKF.data = null; if (typeof ABO !== 'undefined') ABO.data = null; if (j.kind === 'cf_start' && typeof CFS !== 'undefined') CFS.oid = null; }  /* cfs_settingsHtml loads it again */
   if (j.kind === 'cc_line' && typeof ccStale === 'function') ccStale();  // 2.552.0 (#4561 B21)
   if (j.kind === 'doc') { OFD.list = null; go(`office/offers/${j.id}`); }  /* a quotation's address; an invoice moves on to its area (ofdLoadDoc) */ else if (typeof ofcReload === 'function') ofcReload(j.kind);
   if (after) after();
 }
 async function otb_open() {
   let d; try { d = await api('GET', '/api/office/trash'); } catch (x) { toast(x.message || tr('unknown')); return; }
-  const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
+  const row = x => `<li data-id="${x.id}"><span class="an">${esc(x.kind === 'doc' ? ofdKindName(x.sub, true) : x.kind === 'trip' ? tr('Trip') : x.kind === 'trip_item' ? tr('Receipt') : x.kind === 'cc_line' ? tr('Credit card position') : ({fixed_cost: tr('Fixed cost'), fixed_import: tr('Fixed costs'), cf_start: tr('Starting balance'), cf_adjust: tr('Correction'), letter_link: tr('Letter'), trip_import: tr('Trips')})[x.kind] || tr('Master data'))}${x.label ? ' · ' + esc(x.label) : ''}</span> <span class="muted">${esc(fmtDayAbs(x.deleted_at.slice(0, 10)))}</span>
     <button type="button" class="linkbtn" data-m="restore">${esc(tr('Restore'))}</button> <button type="button" class="linkbtn" data-m="purge">${esc(tr('Delete for good'))}</button></li>`;
   const md = modal(`<h3>${esc(tr('Trash'))}</h3>${d.items.length ? `<ul class="atrash otblist">${d.items.map(row).join('')}</ul>` : `<p class="muted">${esc(tr('The trash is empty'))}</p>`}
     <p class="muted">${esc(trashNote(tr('Items in the trash are deleted for good after {0} days.', d.days)))}</p><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button></div>`);
