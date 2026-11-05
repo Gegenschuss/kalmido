@@ -6,7 +6,7 @@ Every package appends its new texts at the end of the five language files, so tw
 conflicted there although they never touched the same key. Merged by key: a key only one side added / changed / removed is
 taken; the same key changed differently on both sides stays a conflict (the file is left with the usual <<<<<<< markers
 around those keys, exit 1). The line-per-key layout and the key order of "ours" are kept, new keys of "theirs" follow at
-the end (before the closing brace), as the files are written by hand.
+the end (before the closing brace) unless they have a predecessor in theirs: then they follow it (#4564).
 
 Register once per clone (worktrees share it; .gitattributes names the driver):
     git config merge.i18n.name "Kalmido translations by key"
@@ -42,7 +42,14 @@ def merge(base, ours, theirs):
     if b is None or o is None or t is None:
         return None, []
     res, conflicts = {}, []
-    for k in list(o) + [k for k in t if k not in o]:
+    # 2.549.0 (#4564): a new key of theirs goes behind its predecessor in theirs (only without one: at the end), so a key
+    # renamed in the middle keeps its place and one merge of two commits equals two merges of one commit each
+    order, prev = list(o), None
+    for k in t:
+        if k not in o:
+            order.insert(order.index(prev) + 1 if prev in order else len(order), k)
+        prev = k
+    for k in order:
         bo, oo, to = b.get(k), o.get(k), t.get(k)
         if oo == to:
             v = oo
@@ -79,11 +86,22 @@ def selftest():
     m, c = merge("[1]\n", j(("A", "a")), j(("A", "b")))
     ok3 = m is None
     m, c = merge(j(("A", "a")), j(("A", "a"), ("B", "b")), j(("A", "a"), ("C", "c")))
-    ok4 = not c and json.loads(m) == {"A": "a", "B": "b", "C": "c"} and m.index('"B"') < m.index('"C"')
-    for n, ok in (("union of additions, theirs change + removal", ok1), ("same key changed on both sides = conflict", ok2),
-                  ("other layout = not ours", ok3), ("both append at the end", ok4)):
+    ok4 = not c and json.loads(m) == {"A": "a", "B": "b", "C": "c"} and m.index('"C"') < m.index('"B"')  # C follows A (its predecessor in theirs)
+    base = j(("A", "a"), ("B", "b"), ("C", "c"))
+    m, c = merge(base, base, j(("A", "a"), ("B2", "b"), ("C", "c")))
+    ok5 = not c and list(json.loads(m)) == ["A", "B2", "C"]
+    t1 = j(("A", "a"), ("X", "x"), ("B", "b"), ("C", "c"))
+    t2 = j(("A", "a"), ("X", "x"), ("Y", "y"), ("B", "b"), ("C", "c"))
+    ours = j(("A", "a"), ("B", "b"), ("C", "c"), ("M", "m"))
+    one, c1 = merge(base, ours, t2)
+    mid, c2 = merge(base, ours, t1)
+    two, c3 = merge(t1, mid, t2)
+    ok6 = not (c1 or c2 or c3) and one == two and list(json.loads(one)) == ["A", "X", "Y", "B", "C", "M"]
+    for n, ok in (("key renamed in the middle keeps its place", ok5), ("two commits vs. one commit: same order", ok6),
+                  ("union of additions, theirs change + removal", ok1), ("same key changed on both sides = conflict", ok2),
+                  ("other layout = not ours", ok3), ("both add behind A: theirs follows its predecessor", ok4)):
         print(("ok   " if ok else "FAIL ") + n)
-    return 0 if ok1 and ok2 and ok3 and ok4 else 1
+    return 0 if ok1 and ok2 and ok3 and ok4 and ok5 and ok6 else 1
 
 
 def main(argv):
