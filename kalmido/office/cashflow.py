@@ -223,7 +223,8 @@ def rk_fixed_patch(fid):
         raise BadInput(tr("Invalid data"))
     ow_write(c, uid, "office_fixed_cost", fid, b, lambda c, b, cur: rk_fixed_clean(b, cur, c=c, oid=oid), oid=oid,  # 2.91.0 B (#1924)
              dec=lambda c, r: oc_dec_fields(c, oid, "office_fixed_costs", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_fixed_costs", v),
-             alias="row", public=lambda c, cur: _fixed_public(c, oid, _fixed_row(c, oid, fid)))
+             alias="row", lock=f"office_fixed_costs-{int(fid)}",  # the same lock as the delete (#4707)
+             public=lambda c, cur: _fixed_public(c, oid, _fixed_row(c, oid, fid)))
     c.commit()
     return jsonify(_fixed_public(c, oid, _fixed_row(c, oid, fid)))
 
