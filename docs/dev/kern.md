@@ -176,3 +176,19 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
   `POST /api/lists/<id>/shares/<rid>/restore`); `list_members` stays the role table every reader uses. A group's share gives
   a guest / accounting person no project role in an organisation. The history of a project's settings (columns, sums, key
   figures, properties, ticket template, agent members): `GET /api/lists/<id>/history`.
+
+## Stage 4: tables and knowledge pages (2.565.0, #4717)
+
+Tables and knowledge pages keep the reference kinds of the file store they had (`sheet`, `wiki`; they are not `obj_register`ed),
+but their shares with people and agents are core shares now: rows of `fs_shares` on the table's / page's / folder's reference
+node, written and taken back with `obj_node_share` / `obj_node_unshare` (core/objects.py: the share row, `obj_revoked`, the
+log; the area checks who may share and with whom first, as `obj_share` does with `obj_need`). A table in no folder gets its
+node at the top of its workspace's tree (sheets/shshare.py `shs_node`); taking a table out of a folder keeps its node with its
+own shares (files/fsref.py `fs_ref_place`). A share of a knowledge folder is a share of the folder's node (and of the page of
+the same name), no longer a path prefix, so it follows renames, moves and a restore as "Name (2)".
+
+The old rows (`sheet_shares`, `wiki_shares` kind person) stay as the share's card (the dialog's id, an address typed in, the
+switch "show pictures") with `core_id` (+ `core_id2`) and give nothing themselves; a row not moved yet (`core_id` NULL) is
+read as before for one release (core first, then the old row). The one-shot `migr_core4717` (core/db.py) and the areas
+(`shs_core_move`, `wsh_core_move`) copy them forward. Public links of pages stay rows of `wiki_shares` (no share with an
+account). Not moved yet: the tables' and pages' own fields (title, name) still save through their areas, not `obj_write`.

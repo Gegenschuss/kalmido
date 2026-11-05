@@ -17,6 +17,13 @@ must belong to the table's workspace, never a health / budget list's table, its 
 it to another workspace, manage its shares or carry rows over (step 2): shs_need_own. Leaving an organisation and moving
 the table between workspaces end the shares (org_leave, sheets/shmove.py); a deleted account takes the rows picked by name
 along, an address row stays open without access (shs_forget): a row that goes would tell the address had an account.
+
+2.565.0 (#4717, the shared core stage 4): the right itself is a core share -- a row of fs_shares (person: user_id, agent:
+agent_id; read = view, write = edit) on the table's reference node (core/objects.py obj_node_share; a table in no folder gets
+its node at the top of its workspace's tree, shs_node, as core objects do). A row of sheet_shares is the share's card (the
+dialog's id, an address typed in) and names its core share (core_id); it gives nothing itself any more. Reading: the core
+share first, else -- one release long, for rows not moved yet (core_id NULL) -- the old row (shs_roles_of). Ending a share
+takes the core share back (obj_node_unshare: obj_revoked) and marks / removes the card, so the old row reopens nothing.
 """
 from flask import g, has_request_context, jsonify
 
@@ -37,6 +44,11 @@ SHS_ROLES = ("read", "write")
 SHS_MAX = 200
 SHS_ONLY_OWN = N_("Only people who may change this table through its workspace can do this")
 SHS_SEAL = "sheet-share"  # purpose of email_seal / email_key
+SHS_CORE = {"read": "view", "write": "edit"}  # 2.565.0 (#4717): the card's role -> the core share's
+SHS_CARD = {"view": "read", "edit": "write"}
+# 2.565.0 (#4717): a card counts while it is not revoked and its core share is still there (one taken back elsewhere -- the
+# file store's dialog, obj_revoke_person -- ends it too); a card not moved yet (core_id NULL) as before
+SHS_LIVE = "{a}revoked_at IS NULL AND ({a}core_id IS NULL OR EXISTS (SELECT 1 FROM fs_shares f WHERE f.id={a}core_id))"
 
 
 def _cache(uid):
@@ -51,10 +63,28 @@ def shs_drop_cache():
         g.pop("shs_cache", None)
 
 
+def _core_roles(c, uid):
+    """2.565.0 (#4717): {sheet id: read | write} of uid's live core shares -- fs_shares on the tables' own reference nodes
+    (person or agent), the node in the table's workspace (fsref _same_space), not in the trash."""
+    from ..files.store import _now
+    rows = c.execute("""SELECT n.ref_id, s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id JOIN sheets t ON t.id=n.ref_id
+                        WHERE n.kind='ref' AND n.ref_kind='sheet' AND n.deleted_at IS NULL AND (s.user_id=? OR s.agent_id=?)
+                        AND (s.expires_at IS NULL OR s.expires_at>?) AND COALESCE(t.org_id,0)=COALESCE(n.org_id,0)
+                        AND (t.org_id IS NOT NULL OR n.owner_id=t.owner_id)""", (uid, uid, _now())).fetchall()
+    out = {}
+    for sid, role in rows:
+        role = SHS_CARD.get(role)
+        if role and out.get(sid) != "write":
+            out[sid] = role
+    return out
+
+
 def shs_roles_of(c, uid):
     got = _cache(uid)
     if got is None:
-        got = {r[0]: r[1] for r in c.execute("SELECT sheet_id, role FROM sheet_shares WHERE user_id=? AND revoked_at IS NULL", (uid,))}
+        got = _core_roles(c, uid)  # 2.565.0 (#4717): the core first, then the old rows not moved yet (one release)
+        for sid, role in c.execute("SELECT sheet_id, role FROM sheet_shares WHERE user_id=? AND revoked_at IS NULL AND core_id IS NULL", (uid,)):
+            got.setdefault(sid, role)
         if has_request_context():
             g.setdefault("shs_cache", {})[uid] = got
     return got
@@ -127,7 +157,7 @@ def shs_marks(c, uid, rows, out):
     ids = [r["id"] for r in rows]
     n = {}
     if ids:
-        n = {x[0]: x[1] for x in c.execute(f"SELECT sheet_id, COUNT(*) FROM sheet_shares WHERE revoked_at IS NULL AND sheet_id IN "
+        n = {x[0]: x[1] for x in c.execute(f"SELECT sheet_id, COUNT(*) FROM sheet_shares WHERE {SHS_LIVE.format(a='')} AND sheet_id IN "
                                            f"({','.join('?' * len(ids))}) GROUP BY sheet_id", ids)}
     mine = shs_roles_of(c, uid)
     for r, d in zip(rows, out):
@@ -142,7 +172,7 @@ def shs_flags(c, r, uid):
     """For GET /api/sheets/<id>: shared_in (only through a share), can_share."""
     own = sh_may(c, uid, r, share=False)
     return {"shared_in": not own, "can_share": own and sh_may(c, uid, r, write=True, share=False),
-            "shared": c.execute("SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND revoked_at IS NULL", (r["id"],)).fetchone()[0]}
+            "shared": c.execute(f"SELECT COUNT(*) FROM sheet_shares WHERE sheet_id=? AND {SHS_LIVE.format(a='')}", (r["id"],)).fetchone()[0]}
 
 
 def shs_targets(c, r, uid):
@@ -169,8 +199,9 @@ def shs_targets(c, r, uid):
 
 
 def shs_list(c, sid):
-    rows = c.execute("SELECT s.*, u.kind FROM sheet_shares s LEFT JOIN users u ON u.id=s.user_id WHERE s.sheet_id=? AND s.revoked_at IS NULL "
-                     "ORDER BY s.id", (sid,)).fetchall()
+    # 2.565.0 (#4717): the role is the core share's (changed in the file store's dialog too)
+    rows = c.execute("SELECT s.*, u.kind, f.role AS core_role FROM sheet_shares s LEFT JOIN users u ON u.id=s.user_id "
+                     f"LEFT JOIN fs_shares f ON f.id=s.core_id WHERE s.sheet_id=? AND {SHS_LIVE.format(a='s.')} ORDER BY s.id", (sid,)).fetchall()
     names = user_names(c, {x["user_id"] for x in rows if x["user_id"] and not x["email_key"]})
     out = []
     for x in rows:
@@ -179,7 +210,7 @@ def shs_list(c, sid):
             out.append({"id": x["id"], "user_id": None, "name": em, "email": em, "role": x["role"], "agent": False,
                         "state": "invited", "created_at": x["created_at"]})
         else:
-            out.append({"id": x["id"], "user_id": x["user_id"], "name": names.get(x["user_id"], ""), "role": x["role"],
+            out.append({"id": x["id"], "user_id": x["user_id"], "name": names.get(x["user_id"], ""), "role": SHS_CARD.get(x["core_role"], x["role"]),
                         "agent": (x["kind"] or "") == "agent", "state": "active", "created_at": x["created_at"]})
     return out
 
@@ -202,6 +233,7 @@ def _bind(c, r, shid, tid, by):
     if other:
         c.execute("DELETE FROM sheet_shares WHERE id=?", (other["id"],))
     c.execute("UPDATE sheet_shares SET user_id=? WHERE id=?", (tid, shid))
+    shs_core_put(c, by, r, shid)  # 2.565.0 (#4717): the right is the core share
     return True
 
 
@@ -245,6 +277,81 @@ def _tell_unshared(c, sid, uids):
             print(f"WARNING sheet_unshared event for agent {aid}: {e}", flush=True)
 
 
+# ---------------------------------------------------------------- 2.565.0 (#4717): the core share of a card
+def shs_node(c, uid, r):
+    """The reference node of table r (its first sheet) that carries its core shares; a table in no folder gets one at the top
+    of its workspace's tree (core/objects.py obj_node: private = the table's owner's tree; an organisation's: owned by uid
+    when uid is a member, else by one of its admins, files/fsroots.py). The tables' panel shows such a table in no folder
+    (shf_marks: no folder above the node)."""
+    from ..files.fsref import fs_ref_node
+    from ..files.store import _free_name, _now, fs_log_add, safe_fs_name
+    n = fs_ref_node(c, "sheet", r["id"])
+    if n is not None:
+        return n
+    org = r["org_id"] or None
+    if org:
+        with system_ctx(c):  # is uid a person of the organisation (structure)?
+            mem = uid and c.execute("SELECT 1 FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.user_id=? "
+                                    "AND COALESCE(u.kind,'')!='agent'", (org, uid)).fetchone()
+        if mem:
+            owner = uid
+        else:
+            from ..files.fsroots import _org_owner
+            owner = _org_owner(c, org, uid or 0)
+    else:
+        owner = r["owner_id"]
+    nm = safe_fs_name(r["title"] or "") or tr("Table")
+    ts = _now()
+    nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
+                          VALUES(NULL,'ref',?,?,?,'sheet',?,?,?,?)""", (_free_name(c, None, owner, org, nm), owner, org, r["id"], uid or owner, ts, ts))
+    fs_log_add(c, nid, "create")
+    return c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+
+
+def shs_core_put(c, uid, r, shid, event=True):
+    """The card shid (bound to an account, not revoked) of table r gets its core share (again: role kept in step); returns
+    the core share's id or None (an open address row)."""
+    from ..core.objects import obj_node_share
+    x = c.execute("SELECT * FROM sheet_shares WHERE id=?", (shid,)).fetchone()
+    if x is None or not x["user_id"] or x["revoked_at"]:
+        return None
+    key = "agent_id" if _agent_row(c, x["user_id"]) is not None else "user_id"
+    n = shs_node(c, uid, r)
+    fid = obj_node_share(c, uid, n, key, x["user_id"], SHS_CORE.get(x["role"], "view"), None, r["org_id"] or None, event=event)
+    c.execute("UPDATE sheet_shares SET core_id=? WHERE id=?", (fid, shid))
+    shs_drop_cache()
+    return fid
+
+
+def shs_core_drop(c, uid, x, reason="unshare"):
+    """Takes the core share of card x (a row) back (obj_revoked, core/objects.py obj_node_unshare); the caller marks the card."""
+    if not x["core_id"]:
+        return
+    from ..core.objects import obj_node_unshare
+    n = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (x["core_id"],)).fetchone()
+    if n is not None:
+        obj_node_unshare(c, uid, n, x["core_id"], kind="sheet", ref_id=x["sheet_id"], org=x["org_id"], reason=reason)
+    shs_drop_cache()
+
+
+def shs_core_move(c, sheet_id=None):
+    """The forward copy (one-shot migr_core4717 in core/db.py init_db, and for a table coming back from the trash or handed
+    on to an heir): every live card bound to an account without a core share gets one. Idempotent; a table in the trash
+    waits (its fallback row reads as before until it comes back). Returns how many."""
+    q = ("SELECT s.id, s.sheet_id, s.created_by FROM sheet_shares s JOIN sheets t ON t.id=s.sheet_id WHERE s.revoked_at IS NULL "
+         "AND s.core_id IS NULL AND s.user_id IS NOT NULL AND t.deleted_at IS NULL AND t.book_id IS NULL")
+    n = 0
+    with system_ctx(c):  # every workspace's tables (a start-up step / the table's own route checked the rights)
+        for x in c.execute(q + (" AND s.sheet_id=?" if sheet_id else "") + " ORDER BY s.id", (sheet_id,) if sheet_id else ()).fetchall():
+            r = c.execute("SELECT * FROM sheets WHERE id=?", (x["sheet_id"],)).fetchone()
+            try:
+                with c.savepoint():
+                    n += bool(shs_core_put(c, x["created_by"], r, x["id"], event=False))
+            except Denied:  # too many shares on the node: the old row keeps working (fallback)
+                pass
+    return n
+
+
 def shs_end(c, sid, user_ids=None):
     """Revoke the live shares of sheet sid (only those of user_ids when given). Returns how many ended."""
     q, args = "UPDATE sheet_shares SET revoked_at=? WHERE sheet_id=? AND revoked_at IS NULL", [iso_ms(now_utc()), sid]
@@ -253,7 +360,9 @@ def shs_end(c, sid, user_ids=None):
             return 0
         q += f" AND user_id IN ({','.join('?' * len(user_ids))})"
         args += list(user_ids)
-    n = c.execute(q + " RETURNING user_id", args).fetchall()
+    n = c.execute(q + " RETURNING user_id, id, core_id, sheet_id, org_id", args).fetchall()
+    for x in n:
+        shs_core_drop(c, None, x)  # 2.565.0 (#4717)
     shs_drop_cache()
     _tell_unshared(c, sid, [x[0] for x in n])
     return len(n)
@@ -265,7 +374,9 @@ def shs_leave(c, oid, uids):
         # 2.360.2 M (#2561): an address row stays listed as it was (open again): a row that goes would name the leaver's address
         c.execute(f"UPDATE sheet_shares SET user_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({','.join('?' * len(uids))})", [oid, *uids])
         ended = c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))}) "
-                          "RETURNING sheet_id, user_id", [iso_ms(now_utc()), oid, *uids]).fetchall()
+                          "RETURNING sheet_id, user_id, core_id, org_id", [iso_ms(now_utc()), oid, *uids]).fetchall()
+        for x in ended:
+            shs_core_drop(c, None, x, "leave")  # 2.565.0 (#4717): obj_revoke_person takes the same core share (whoever comes first)
         shs_drop_cache()
         for x in ended:
             _tell_unshared(c, x[0], [x[1]])
@@ -341,6 +452,7 @@ def sheets_shares_add(sid):
             return err(tr("Too many shares"), 409)
         shid = insert_id(c, "INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,?,?,?,?,?)",
                          (sid, r["org_id"], tid, role, uid, ts))
+    shs_core_put(c, uid, r, shid, event=False)  # 2.565.0 (#4717): the right is the core share (the agent hears of it below)
     shs_drop_cache()
     if is_new and any(a["id"] == tid for a in t["agents"]):
         _tell_shared(c, tid, r, role)
@@ -364,12 +476,14 @@ def _by_email(c, r, uid, em, role):
     x = c.execute("SELECT id FROM users WHERE lower(email)=? AND disabled=0 AND COALESCE(kind,'user')!='agent'", (em,)).fetchone()
     if x and not (old and old["user_id"]):
         _bind(c, r, shid, x[0], uid)
+    elif old and old["user_id"]:
+        shs_core_put(c, uid, r, shid)  # 2.565.0 (#4717): the bound row comes back / changes role: its core share follows
     shs_drop_cache()
     return _answer(c, sid, 201, by_email=True)
 
 
 def _need_share(c, sid, shid):
-    x = c.execute("SELECT * FROM sheet_shares WHERE id=? AND sheet_id=? AND revoked_at IS NULL", (shid, sid)).fetchone()
+    x = c.execute(f"SELECT * FROM sheet_shares WHERE id=? AND sheet_id=? AND {SHS_LIVE.format(a='')}", (shid, sid)).fetchone()
     if not x:
         raise Denied(404)
     return x
@@ -380,12 +494,13 @@ def sheets_shares_patch(sid, shid):
     """{role: read | write}"""
     need_feat("sheets")
     c = db()
-    _manage(c, sid)
+    r, _uid = _manage(c, sid)
     _need_share(c, sid, shid)
     role = body().get("role")
     if role not in SHS_ROLES:
         return err(tr("Invalid value: {0}", "role"))
     c.execute("UPDATE sheet_shares SET role=? WHERE id=?", (role, shid))
+    shs_core_put(c, me(), r, shid)  # 2.565.0 (#4717): the core share's role (a card not moved yet gets its core share now)
     shs_drop_cache()
     return _answer(c, sid)
 
@@ -397,6 +512,7 @@ def sheets_shares_delete(sid, shid):
     c = db()
     _manage(c, sid)
     x = _need_share(c, sid, shid)
+    shs_core_drop(c, me(), x)  # 2.565.0 (#4717): the core share goes (obj_revoked), the card below
     if x["email_key"]:  # 2.360.2 M (#2561): the address is not kept (Undo = POST the address again)
         c.execute("DELETE FROM sheet_shares WHERE id=?", (shid,))
     else:

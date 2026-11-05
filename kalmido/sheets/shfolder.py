@@ -237,8 +237,9 @@ def shf_marks(c, uid, rows, out):
         return seen[pid]
     for r, d in zip(rows, out):
         n = nodes.get(r["id"])
-        if n is not None and not _sees(n["parent_id"]):
-            n = None  # 2.306.0 D3 (#2875): folder / node only for who sees the folder
+        if n is not None and (n["parent_id"] is None or not _sees(n["parent_id"])):
+            n = None  # 2.306.0 D3 (#2875): folder / node only for who sees the folder; 2.565.0 (#4717): a node at the top of the
+            # tree (it carries the table's core shares, shshare.py shs_node) is no folder
         d["folder_id"] = n["parent_id"] if n is not None else None
         d["fnode"], d["fsort"] = (n["id"], n["sort_no"]) if n is not None else (None, None)  # its node (sorting by hand)
         if n is not None and not d.get("shared_in") and not sh_may(c, uid, r, fold=False):

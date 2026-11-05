@@ -1168,6 +1168,16 @@ def init_db(guard=True, load=None):
             gset(c, "migr_notiftpl2330", "1")
             if nl or nf:
                 print("notification templates: shared lists", nl, "and folders", nf, "kept on \"all\" (#927)", flush=True)
+        # 2.565.0 (#4717), once (forward copy, no one-way step): the shares of tables and of private knowledge pages / folders with
+        # people become core shares on their reference nodes (sheets/shshare.py shs_core_move, wiki/wkshare.py wsh_core_move); the
+        # old rows stay their cards and are read as before where nothing could move yet (an older version reads them as before)
+        if gsetting(c, "migr_core4717") != "1":
+            from ..sheets.shshare import shs_core_move
+            from ..wiki.wkshare import wsh_core_move
+            n = (shs_core_move(c), wsh_core_move(c))
+            gset(c, "migr_core4717", "1")
+            if any(n):
+                print("shares onto the shared core (#4717): tables", n[0], "knowledge cards", n[1], flush=True)
         clk("before_users")
         for (uid,) in c.execute("SELECT id FROM users ORDER BY id").fetchall():
             ensure_inbox(c, uid)

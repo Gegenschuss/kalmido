@@ -282,6 +282,16 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
         if not fs_deleted(chain) and _same_space(sp, n) and ROLE_RANK[fs_role(c, n["id"], uid, chain=chain)] < ROLE_RANK["edit"]:
             raise Denied(403)  # taking it out of a folder takes the folder's shares away: edit there too
     if not parent_id:
+        if n is not None and _same_space(sp, n) and c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (n["id"],)).fetchone():
+            # 2.565.0 (#4717): the object's own shares lie on its node (core shares of tables, core objects): out of the folder it
+            # goes to the top of its workspace's tree with them (no folder above it any more), instead of losing them
+            owner = (uid if n["org_id"] else sp[1]) or n["owner_id"]
+            c.execute("UPDATE fs_nodes SET parent_id=NULL, owner_id=?, name=?, sort_no=NULL, deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?",
+                      (owner, _free_name(c, None, owner, n["org_id"], n["name"], skip=n["id"]), _now(), n["id"]))
+            fs_log_add(c, n["id"], "move", "")
+            if was_trash:
+                fs_ref_trashed(c, uid, n, True)
+            return None
         if n is not None:
             c.execute("DELETE FROM fs_nodes WHERE id=?", (n["id"],))
         return None

@@ -147,6 +147,8 @@ def sheets_restore(sid):
         from .shbook import sheets_tabs_restore
         return sheets_tabs_restore(r["book_id"], sid)
     c.execute("UPDATE sheets SET deleted_at=NULL WHERE id=?", (sid,))
+    from .shshare import shs_core_move
+    shs_core_move(c, sid)  # 2.565.0 (#4717): its old share rows not moved yet get their core shares
     sh_touch(c, sid, me())
     return _done(c, sid)
 

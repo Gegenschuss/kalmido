@@ -48,7 +48,7 @@ from ..sheets.core import sh_touch
 from ..sheets.shbook import shb_move
 from ..sheets.shfolder import SHF_KIND, shf_after_move
 from ..sheets.shkinds import shk_move_files
-from ..sheets.shshare import shs_drop_cache
+from ..sheets.shshare import shs_core_move, shs_drop_cache
 from ..wiki.wikie2e import wke_mode
 from ..wiki.wkfolder import WKF_KIND, WKF_SEEN, wkf_node_of, wkf_sync
 from ..wiki.wkhist import wkh_drop_unreadable, wsb_body_or
@@ -235,6 +235,10 @@ def _sheets(c, items, new_paths, old_paths):
             c.execute("""INSERT INTO sheet_shares(sheet_id,org_id,user_id,role,created_by,created_at) VALUES(?,NULL,?,?,?,?)
                          ON CONFLICT (sheet_id, user_id) DO UPDATE SET role=excluded.role, revoked_at=NULL WHERE sheet_shares.revoked_at IS NOT NULL""",
                       (sid, u, "write" if role == "edit" else "read", heir, iso_ms(now_utc())))
+        # 2.565.0 (#4717): the shares are core shares on the table's node -- the old node went with the move above, so every live
+        # row gets its core share anew in the heir's tree (shshare.py shs_core_move)
+        c.execute("UPDATE sheet_shares SET core_id=NULL WHERE sheet_id=? AND revoked_at IS NULL", (sid,))
+        shs_core_move(c, sid)
         sh_touch(c, sid, heir)
     shs_drop_cache()
 

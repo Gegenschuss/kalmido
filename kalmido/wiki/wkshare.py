@@ -15,7 +15,17 @@ Rights: creating, changing and revoking = the write right in the space (a privat
 (wiki/wikie2e.py: texts encrypted in the browser) has no shares: the server cannot read the text (409 when creating; existing
 shares stop serving when a space gets locked). Renaming a page or a folder takes its shares along (wiki_update / wiki_move);
 moving pages to the other workspace (wkmove.py) ends their shares. Revoke = revoked_at (the app's Undo restores it).
-The text is read only through wiki_dict (the page's one reading place)."""
+The text is read only through wiki_dict (the page's one reading place).
+
+2.565.0 (#4717, the shared core stage 4): a person share is a core share -- a row of fs_shares ('view') on the page's
+reference node, a folder share on the folder's node (+ the node of the page of the same name, which the folder share
+covered by its path too): wiki_shares.core_id / core_id2 (core/objects.py obj_node_share). So it follows the page / the folder
+through renames, moves within the tree and a restore as "Name (2)" (#4668), and "Shared with me" reads it like every share of
+the knowledge trees (wkfshare.py wkfs_rows). The person row stays the share's card (the dialog's id, the address typed in,
+the switch "show pictures", the News item) and gives nothing itself; a card not moved yet (core_id NULL) is read as before for
+one release (fallback: wsh_guest_rows, wsh_person_shares). Revoking takes the core share back (obj_revoked) and marks the
+card; a core share taken back elsewhere (the file store's dialog) ends the card too (wsh_cut). Link shares stay rows of
+wiki_shares (a public link is no share with an account), with the maker's rule of 2.560.0 (#4698 c, WSH_MAKER)."""
 import html
 import os
 import re
@@ -108,8 +118,9 @@ def wsh_gone(c, rows):
 
 
 def wsh_dict(c, r, names, target=None, gone=()):
+    cut = wsh_cut(c, [r]) if r["kind"] == "person" and not r["revoked_at"] else ()  # 2.565.0 (#4717)
     d = {"id": r["id"], "kind": r["kind"], "space": wiki_space_key(r["org_id"]), "path": r["path"], "folder": bool(r["is_folder"]),
-         "expires_at": r["expires_at"], "expired": wsh_expired(r), "revoked": bool(r["revoked_at"]), "created_at": r["created_at"],
+         "expires_at": r["expires_at"], "expired": wsh_expired(r), "revoked": bool(r["revoked_at"]) or r["id"] in cut, "created_at": r["created_at"],
          "created_by": r["created_by"], "created_by_name": names.get(r["created_by"], ""), "views": r["views"], "last_used_at": r["last_used_at"],
          "ended": r["id"] in gone,  # 2.126.2 B (#2358): its maker is no longer in the organisation -- the link does not work
          "images": bool(r["images"])}  # 2.380 H (#2356): the pictures of the file store embedded in the page are shown
@@ -129,8 +140,23 @@ def wsh_dict(c, r, names, target=None, gone=()):
     return d
 
 
+# 2.565.0 (#4717): a person card whose core share(s) were all taken back elsewhere has ended ({a} = wiki_shares' alias + '.')
+WSH_CORE_LIVE = ("({a}kind<>'person' OR ({a}core_id IS NULL AND {a}core_id2 IS NULL) OR EXISTS (SELECT 1 FROM fs_shares f "
+                 "WHERE f.id IN ({a}core_id, {a}core_id2)))")
+
+
+def wsh_cut(c, rows):
+    """2.565.0 (#4717): ids of the person cards among rows whose core shares are all gone (they count as revoked)."""
+    ids = [r["id"] for r in rows if r["kind"] == "person" and (r["core_id"] or r["core_id2"])]
+    if not ids:
+        return set()
+    q = ",".join("?" * len(ids))
+    ok = {x[0] for x in c.execute(f"SELECT id FROM wiki_shares WHERE id IN ({q}) AND {WSH_CORE_LIVE.format(a='')}", ids)}
+    return {i for i in ids if i not in ok}
+
+
 def wsh_rows(c, oid, owner, live=True):
-    w = "COALESCE(org_id,0)=? AND COALESCE(owner_id,0)=? AND revoked_at IS NULL"
+    w = "COALESCE(org_id,0)=? AND COALESCE(owner_id,0)=? AND revoked_at IS NULL AND " + WSH_CORE_LIVE.format(a="")
     a = [oid or 0, 0 if oid else owner]
     if live:  # 2.126.2 B (#2358): a link whose maker left the organisation counts as ended too (mark, WSH_MAX)
         w += " AND (expires_at IS NULL OR expires_at>?) AND " + WSH_MAKER.format(a="wiki_shares")
@@ -191,7 +217,88 @@ def wsh_end_moved(c, oid, owner, paths, folder=None, dry=False):
         if (not r["is_folder"] and p in keys) or (f and (p == f or p.startswith(f + "/"))):
             n += 1
             if not dry:
+                wsh_core_drop(c, me(), r)  # 2.565.0 (#4717): the core share goes too (a folder node left behind opens nothing)
                 c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (ts, r["id"]))
+    return n
+
+
+# ---------------------------------------------------------------- 2.565.0 (#4717): the core share of a person card
+def _wsh_tree(c, owner):
+    """{lower folder path: folder node} of the private knowledge tree of owner (empty without one)."""
+    from .wkfolder import _subtree, _walk, wkf_root
+    root = wkf_root(c, owner, None)
+    if not root:
+        return {}
+    rows = _subtree(c, root)
+    fp = _walk(rows, root)
+    return {fp[n["id"]][0].lower(): n for n in rows if n["kind"] == "folder" and n["id"] != root and n["id"] in fp and not fp[n["id"]][1]}
+
+
+def wsh_nodes(c, r):
+    """The reference nodes card r (a person share of a private space) becomes core shares on: [page node] for a page share,
+    [folder node, node of the page of the same name] for a folder share (each when there)."""
+    from .wkfolder import wkf_node_of
+    owner = r["owner_id"]
+    out = []
+    if not r["is_folder"]:
+        pid = r["page_id"]
+        if pid is None:  # a row of an older version (by name): the live page of that name
+            x = c.execute("SELECT id FROM wiki_pages WHERE org_id IS NULL AND owner_id=? AND lower(path)=lower(?) AND deleted_at IS NULL",
+                          (owner, r["path"])).fetchone()
+            pid = x[0] if x else None
+        n = wkf_node_of(c, pid) if pid else None
+        return [n] if n is not None else []
+    f = _wsh_tree(c, owner).get(r["path"].lower())
+    if f is not None:
+        out.append(f)
+    x = c.execute("SELECT id FROM wiki_pages WHERE org_id IS NULL AND owner_id=? AND lower(path)=lower(?) AND deleted_at IS NULL",
+                  (owner, r["path"])).fetchone()
+    n = wkf_node_of(c, x[0]) if x else None
+    if n is not None:
+        out.append(n)
+    return out
+
+
+def wsh_core_put(c, uid, sid):
+    """Card sid (a live person share of a private space, bound to an account) gets its core share(s) -- again: expiry kept in
+    step. Returns the number of core shares (0: no node yet, the card is read as before)."""
+    from ..core.objects import obj_node_share
+    r = c.execute("SELECT * FROM wiki_shares WHERE id=?", (sid,)).fetchone()
+    if r is None or r["kind"] != "person" or r["org_id"] is not None or not r["user_id"] or r["revoked_at"]:
+        return 0
+    ids = [obj_node_share(c, uid or r["created_by"] or r["owner_id"], n, "user_id", r["user_id"], "view", r["expires_at"], None)
+           for n in wsh_nodes(c, r)[:2]]
+    if ids:
+        c.execute("UPDATE wiki_shares SET core_id=?, core_id2=? WHERE id=?", (ids[0], ids[1] if len(ids) > 1 else None, sid))
+    return len(ids)
+
+
+def wsh_core_drop(c, uid, r, reason="unshare"):
+    """Takes the core share(s) of card r (a row) back (obj_revoked, core/objects.py obj_node_unshare); the caller marks the card."""
+    from ..core.objects import obj_node_unshare
+    for fid in (r["core_id"], r["core_id2"]) if r["kind"] == "person" else ():
+        n = c.execute("SELECT n.* FROM fs_nodes n JOIN fs_shares f ON f.node_id=n.id WHERE f.id=?", (fid,)).fetchone() if fid else None
+        if n is not None:
+            obj_node_unshare(c, uid, n, fid, kind="wiki", ref_id=n["ref_id"] if n["kind"] == "ref" else None, reason=reason)
+
+
+def wsh_core_move(c, owner=None):
+    """The forward copy (one-shot migr_core4717 in core/db.py init_db; the index of a private space moves what is left once
+    its tree is there): every live, not revoked person card without a core share gets one. Idempotent; a card whose page /
+    folder has no node yet waits (read as before). Returns how many."""
+    q = ("SELECT s.id, s.created_by, s.owner_id FROM wiki_shares s JOIN users u ON u.id=s.owner_id AND u.disabled=0 WHERE s.kind='person' "
+         "AND s.org_id IS NULL AND s.user_id IS NOT NULL AND s.revoked_at IS NULL AND s.core_id IS NULL AND s.core_id2 IS NULL")
+    n = 0
+    with system_ctx(c):  # every person's private space (a start-up step); the index passes its own owner
+        rows = c.execute(q + (" AND s.owner_id=?" if owner else "") + " ORDER BY s.id", (owner,) if owner else ()).fetchall()
+        for x in rows:
+            if wsh_locked(c, None, x["owner_id"]):
+                continue  # a space with the lock shares nothing (its old rows give nothing either)
+            try:
+                with c.savepoint():
+                    n += bool(wsh_core_put(c, x["created_by"] or x["owner_id"], x["id"]))
+            except Denied:  # too many shares on the node: the old row keeps working (fallback)
+                pass
     return n
 
 
@@ -365,11 +472,16 @@ def wsh_create():
         if old:  # 2.126.2 B (#2355): the same live share again: no second News item
             c.execute("UPDATE wiki_shares SET expires_at=?, images=? WHERE id=?", (exp, imgs, old["id"]))
             sid = old["id"]
+            wsh_core_put(c, uid, sid)  # 2.565.0 (#4717): the core share's expiry follows
         else:
             # 2.123.0 (#2104): by e-mail address the typed address is kept (sealed) and shown instead of the account's name
             sid = insert_id(c, "INSERT INTO wiki_shares(org_id,owner_id,path,is_folder,kind,user_id,token,expires_at,created_by,created_at,page_id,images) "
                                "VALUES(NULL,?,?,?,'person',?,?,?,?,?,?,?)", (owner, path, 1 if folder else 0, who,
                                                                            seal(c, WSH_SEAL + "mail", str(b["email"]).strip()[:200]) if by_mail else "", exp, uid, ts, page, imgs))
+            # 2.565.0 (#4717): the right is a core share on the page's / folder's node (the tree first: a page made just now)
+            from .wkfolder import wkf_sync
+            wkf_sync(c, uid, None)
+            wsh_core_put(c, uid, sid)
             # 2.126.2 B (#2355): a News item for exactly that person (the sharing row of their settings; no push); only the
             # path they may read now
             news_add(c, who, "wiki_shared", data={"path": path, "folder": bool(folder)})
@@ -410,6 +522,8 @@ def wsh_update(sid):
             c.execute("UPDATE wiki_shares SET expires_at=? WHERE id=?", (wsh_expiry(b.get("expires")), sid))
         if "images" in b:  # 2.380 H (#2356)
             c.execute("UPDATE wiki_shares SET images=? WHERE id=?", (wsh_images(b["images"]), sid))
+        if "expires" in b and r["kind"] == "person" and not wsh_cut(c, [r]):
+            wsh_core_put(c, me(), sid)  # 2.565.0 (#4717): the core share's expiry follows (a card not moved yet moves now)
         bump(c)
         c.commit()
     return jsonify(wsh_one(c, sid))
@@ -421,6 +535,7 @@ def wsh_revoke(sid):
     c = db()
     r = wsh_need(c, sid)
     if not r["revoked_at"]:
+        wsh_core_drop(c, me(), r)  # 2.565.0 (#4717): the core share goes at once (obj_revoked), the card is marked
         c.execute("UPDATE wiki_shares SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
         bump(c)
         c.commit()
@@ -436,8 +551,11 @@ def wsh_restore(sid):
         return jsonify(error=tr("Public links are turned off on this server")), 409
     if wsh_locked(c, r["org_id"], r["owner_id"]):
         return jsonify(error=tr("Pages of a workspace encrypted in the browser cannot be shared."), code="wiki_e2e_share"), 409
-    if r["revoked_at"]:
+    cut = r["kind"] == "person" and not r["revoked_at"] and bool(wsh_cut(c, [r]))  # 2.565.0 (#4717): ended elsewhere
+    if r["revoked_at"] or cut:
         c.execute("UPDATE wiki_shares SET revoked_at=NULL WHERE id=?", (sid,))
+        if r["kind"] == "person":
+            wsh_core_put(c, me(), sid)  # 2.565.0 (#4717): the core share comes back
         bump(c)
         c.commit()
     return jsonify(wsh_one(c, sid))
@@ -449,7 +567,8 @@ def wsh_guest_rows(c, uid, pid=None):
     a = ([pid] if pid else []) + [uid, iso(now_utc())]
     return c.execute(f"SELECT p.* FROM wiki_pages p WHERE p.org_id IS NULL AND p.deleted_at IS NULL AND {wsh_open_sql()}" + (" AND p.id=?" if pid else "")
                      + f" AND EXISTS (SELECT 1 FROM wiki_shares s JOIN users o ON o.id=s.owner_id AND o.disabled=0 WHERE s.kind='person' "
-                     f"AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER}) ORDER BY p.owner_id, lower(p.path) LIMIT {WSH_PAGES}", a).fetchall()
+                     f"AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER} AND s.core_id IS NULL AND s.core_id2 IS NULL) "
+                     f"ORDER BY p.owner_id, lower(p.path) LIMIT {WSH_PAGES}", a).fetchall()  # 2.565.0 (#4717): only cards not moved (fallback)
 
 
 def wsh_reach(c, uid):
@@ -524,10 +643,27 @@ def wsh_shared_file(fid, name=None):
 
 
 def wsh_person_shares(c, uid, pid):
-    """2.380 H (#2356): the live person shares that give uid the page pid (their switch "show embedded pictures")."""
-    return c.execute(f"SELECT s.* FROM wiki_shares s JOIN wiki_pages p ON p.id=? JOIN users o ON o.id=s.owner_id AND o.disabled=0 "
-                     f"WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER}",
-                     (pid, uid, iso(now_utc()))).fetchall()
+    """2.380 H (#2356): the live person shares that give uid the page pid (their switch "show embedded pictures").
+    2.565.0 (#4717): a moved card counts when its core share's node is the page's node or a folder above it; a card not moved
+    yet by its path (fallback)."""
+    ts = iso(now_utc())
+    out = c.execute(f"SELECT s.* FROM wiki_shares s JOIN wiki_pages p ON p.id=? JOIN users o ON o.id=s.owner_id AND o.disabled=0 "
+                    f"WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL AND {wsh_live()} AND {WSH_COVER} "
+                    f"AND s.core_id IS NULL AND s.core_id2 IS NULL", (pid, uid, ts)).fetchall()
+    core = c.execute("SELECT s.*, f.node_id AS core_node FROM wiki_shares s JOIN fs_shares f ON f.id IN (s.core_id, s.core_id2) "
+                     "JOIN users o ON o.id=s.owner_id AND o.disabled=0 WHERE s.kind='person' AND s.user_id=? AND s.org_id IS NULL "
+                     "AND s.revoked_at IS NULL AND (f.expires_at IS NULL OR f.expires_at>?)", (uid, ts)).fetchall()
+    if core:
+        from ..files.store import fs_chain
+        from .wkfolder import wkf_node_of
+        n = wkf_node_of(c, pid)
+        up = {x["id"] for x in fs_chain(c, n["id"])} if n is not None else set()
+        seen = {r["id"] for r in out}
+        for r in core:
+            if r["core_node"] in up and r["id"] not in seen:
+                seen.add(r["id"])
+                out.append(r)
+    return out
 
 
 @app.get("/api/wiki/shared/pages/<int:pid>/img/<int:nid>")

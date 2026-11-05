@@ -65,6 +65,9 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
   obj_unshare(c, uid, kind, id, sid, checked=False) -> revoked id  (the share goes into obj_revoked: obj_share_restore puts it
       back; checked=True: the area checked the right itself, e.g. a member leaving a list)
   obj_share_restore(c, uid, kind, id, rid) -> share id
+  obj_node_share(c, uid, node, key, target, role, expires_at, org) / obj_node_unshare(c, uid, node, sid, kind, ref_id, org)
+      2.565.0 (#4717): the bare share row on a reference node (no rights check: the caller's) -- for the old areas whose
+      reference kind is the file store's own (wiki pages, tables, stage 4); obj_share / obj_unshare use them too
   obj_shares(c, uid, kind, id) -> {shares, inherited, revoked}
   obj_gate(c, uid, kind, row) -> bool   steps 1 + 2 of obj_role for a row the area listed itself (2.565.0, #4719)
   obj_token_lists(uid) -> set | None    the list limit of uid's own API token in this request (step 2)
@@ -615,11 +618,24 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None, extr
         raise Denied(404)  # #4739: an area that places its nodes itself has none for it (a list's basket)
     if not checked and not _pool_ok(c, n, key, target, uid):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
-    if key == "agent_id" and not checked:  # #4739: checked = the area's own rules for agents (lists: the lock, the bridge)
+    return obj_node_share(c, uid, n, key, target, role, expires_at, row["org_id"] or None, event=not checked, checked=checked,
+                          match=_share_match(reg, extra), extra=extra)
+
+
+def obj_node_share(c, uid, n, key, target, role="view", expires_at=None, org=None, event=True, checked=False, match=None,
+                   extra=None):
+    """2.565.0 (#4717): the share row itself on reference node n (a row) -- obj_share's write, also for the old areas whose
+    reference kind is the file store's own (wiki pages, tables: stage 4), which check who may share and with whom by their own
+    rules first (the caller did). The same target again changes role / expiry; event=False: an agent hears of a new share from
+    the caller (or not at all: a migration). Returns the share id. 2.568.0 (#4739): checked=True = the area's own rules for
+    agents and the share limit (lists: the lock, the bridge); match = _share_match's SQL, extra = the kind's share_cols."""
+    if key not in ("user_id", "group_id", "agent_id") or role not in ("view", "edit"):
+        raise BadInput(tr("Invalid data"))
+    if key == "agent_id" and not checked:
         if fl_is_locked(c, n["id"]):
             raise fsl_denied("fs_locked_agent")
-    mq, ma = _share_match(reg, extra)
-    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], target, *ma)).fetchone()
+    mq, ma = match or ("", ())
+    old = c.execute(f"SELECT id FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(target), *ma)).fetchone()
     if old:
         c.execute("UPDATE fs_shares SET role=?, expires_at=? WHERE id=?", (role, expires_at, old[0]))
         sid = old[0]
@@ -627,12 +643,12 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None, extr
         if not checked and c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=?", (n["id"],)).fetchone()[0] >= OBJ_SHARE_MAX:
             raise Denied(409, tr("Too many shares"))
         sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
-                        (n["id"], target, role, expires_at, uid, iso(now_utc()), _by_role(c, uid, row["org_id"] or None)))
-        if key == "agent_id" and not checked:
-            _agent_event(c, target, n, role)
-    for k, v in extra.items():
+                        (n["id"], int(target), role, expires_at, uid, iso(now_utc()), _by_role(c, uid, org) if uid else None))
+        if key == "agent_id" and event and not checked:
+            _agent_event(c, int(target), n, role)
+    for k, v in (extra or {}).items():
         c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
-    fs_log_add(c, n["id"], "share", f"{key[:-3]}:{target}:{role}")
+    fs_log_add(c, n["id"], "share", f"{key[:-3]}:{int(target)}:{role}")
     obj_forget()
     return sid
 
@@ -658,11 +674,21 @@ def obj_unshare(c, uid, kind, rid, sid, checked=False):
     else:
         row, _ = obj_need(c, uid, kind, rid, "manage")
     n = obj_node(c, uid, kind, rid)
+    out = obj_node_unshare(c, uid, n, sid, kind=kind, ref_id=int(rid), org=row["org_id"] or None)
+    if out is None:
+        raise Denied(404)
+    return out
+
+
+def obj_node_unshare(c, uid, n, sid, kind=None, ref_id=None, org=None, reason="unshare"):
+    """2.565.0 (#4717): take share sid of reference node n (a row) back -- obj_unshare's step, also for the old areas of stage
+    4 (the caller checked who may): the row goes into obj_revoked (restorable for OBJ_REVOKED_DAYS) and is deleted. Returns
+    the obj_revoked id, None when node n has no such share."""
     s = c.execute("SELECT * FROM fs_shares WHERE id=? AND node_id=?", (int(sid), n["id"] if n else 0)).fetchone()
     if not s:
-        raise Denied(404)
+        return None
     _revoked_prune(c)
-    out = _revoked_add(c, "fs_shares", s, "unshare", uid, org=row["org_id"] or None, uid=s["user_id"] or s["agent_id"], kind=kind, ref_id=int(rid))
+    out = _revoked_add(c, "fs_shares", s, reason, uid, org=org, uid=s["user_id"] or s["agent_id"], kind=kind, ref_id=ref_id)
     c.execute("DELETE FROM fs_shares WHERE id=?", (s["id"],))
     fs_log_add(c, n["id"], "unshare", str(s["id"]))
     obj_forget()

@@ -452,6 +452,8 @@ def _sheet_link(c, run, src, d, ctx):
 
 
 def _sheet_share(c, run, src, d, ctx):
+    if "core_id" in d:  # 2.565.0 (#4717): the id of the source's core share means nothing here (its fs_shares row comes with the store)
+        d["core_id"] = None
     return d if d["user_id"] is not None and _not_agent(c, d["user_id"]) else None  # 2.360.2 M (#2561): an open address row never
 
 
