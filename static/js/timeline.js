@@ -560,13 +560,13 @@ async function tlCommit(d) {
   if (mode === 'm') { due = addDays(t.due, days); start = t.start ? addDays(t.start, days) : null; }
   if (mode === 'r') { due = addDays(t.due, days); if (due < s0) due = s0; if (!t.start && due !== t.due && due > t.due) start = t.due; }
   if (mode === 'l') { start = addDays(s0, days); if (start >= due) start = null; }
-  const before = snapTask(t);
+  const before = snapTask(t), due0 = t.due;  // 2.551.0 (#4653): the outbox shows the change at once in t itself (applyLocal)
   let r;
   try { r = await patchTask(t.id, {start, due}, true); } catch { render(); return; }
   const msg = tr('Date: {0}', start && start < due ? `${fmtDayAbs(start)} – ${fmtDayAbs(due)}` : dayLabel(due));
   // 2.67.0 B (#1865): earlier: the chain stays (said in the one toast; a second toast would replace its Undo - review),
   // "Pull the chain in" stays in the bar menu and the task panel
-  shiftUndo(before, r, dch_afterEarlier(t, t.due, due) ? [msg, tr('The waiting tasks stay where they are')].join(' · ') : msg);
+  shiftUndo(before, r, dch_afterEarlier(t, due0, due) ? [msg, tr('The waiting tasks stay where they are')].join(' · ') : msg);
 }
 // 2.193.0 B (#2219): bars on drag.js, one way for finger and mouse. Touch: hold a bar ~0.3 s, then drag; grabbed near
 // an end = change start / due, middle = move; held and let go without moving = the bar menu (connect, remove
