@@ -16,6 +16,7 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - deleting a calendar puts it into the trash with its events (gone from the lists, the range, CalDAV); only its owner restores
    it (a member 404), with exactly the events that went with it (#4707)
  - a person without an organisation: her own calendar shared with her agent, the trash and the restore as above
+ - the start's one-shot (migr_kern4712, a restart on the same data): members without a node get it and their core shares
 usage: p2566_c_kern_cal_test.py <datadir>"""
 import os
 import sys
@@ -254,5 +255,21 @@ check(F.delete(B + f"/api/evcals/{FK}").ok and FK not in ids(F.get(B + "/api/evc
 check(FK not in ids(ag("/event-calendars")), "freelancer: gone for her agent too")
 check(F.post(B + f"/api/evcals/{FK}/restore").ok and FK in ids(F.get(B + "/api/evcals")) and F.get(B + f"/api/events/{FE['id']}").ok,
       "freelancer: restored with its event")
+
+# ================================================================== the one-shot copy at the start (migr_kern4712)
+K3 = A.post(B + "/api/evcals", json={"name": "Before the update"}).json()["id"]
+B3 = A.post(B + "/api/books", json={"name": "Old book"}).json()["id"]
+sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'edit','2026-11-01T00:00:00+00:00')", (K3, BOB), write=True)
+sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (B3, BOB), write=True)
+sql("UPDATE ev_cals SET updated_at='' WHERE id=?", (K3,), write=True)
+check(node("evcal", K3) is None and node("address_book", B3) is None, "rows of an older version: members without a node")
+sql("DELETE FROM settings WHERE key='migr_kern4712'", write=True)
+if kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_API_RATE": "100000"}, prefix="P2566C", keep=True):
+    check(share("evcal", K3, BOB) == "edit" and share("address_book", B3, BOB) == "view",
+          "#4712: the start's one-shot gave them their nodes and copied the members into the core's shares")
+    check(sql("SELECT updated_at<>'' FROM ev_cals WHERE id=?", (K3,)) == [(True,)], "#4712: the one-shot set the calendar's version")
+    check(sql("SELECT value FROM settings WHERE key='migr_kern4712'") == [("1",)], "#4712: and set its flag")
+    Bo2 = sess("bob")
+    check(K3 in ids(Bo2.get(B + "/api/evcals")) and B3 in ids(Bo2.get(B + "/api/books")), "#4712: bob keeps both after the copy")
 
 sys.exit(kt.done("p2566_c_kern_cal"))
