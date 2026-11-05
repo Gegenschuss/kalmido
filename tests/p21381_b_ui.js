@@ -18,6 +18,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {org_name: 'Kalmido', lang: 'en', collab_all: true, modules: ['cal', 'comments']});
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'cal,comments,collab,clients,office'});
+  await require('./boot').officeWs({Cookie: CK});  // 2.543.0 (#4606): go('office/...') opens the office of the organisation ("All" with Private + one organisation = the overview of the areas)
   const w = await boot({hash: 'inbox'}), d = w.document;
   await until(() => d.querySelector('#side'), 60);
   w.eval(`go('office/settings')`);

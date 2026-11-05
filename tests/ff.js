@@ -2,7 +2,7 @@
 // instead of one per suite). 2.501.0 (#4296): no firefox on PATH = a failed check (it used to end green with only a log line);
 // KALMIDO_SKIP_FIREFOX=1 leaves the browser part out on purpose, with a line that run_all.sh counts as partly skipped.
 //   const firefox = require('./ff')({tag: 'p272', check, shots: 'P272_SHOTS'});
-//   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle}) => { ... }, touch);
+//   await firefox(async ({cmd, ev, nav, ctx, shot, drag, until, idle, officeWs}) => { ... }, touch);
 // touch: true = a touch screen (coarse pointer, touch events), false = a mouse, undefined = Firefox's defaults.
 // A Firefox that does not answer in time (seen on CI runners) gets new tries on another port with a new profile (2.7.1, first in
 // p221; #4346: connectS, the seconds each try waits). Every Firefox has really ended before the next one starts and before its
@@ -11,7 +11,7 @@ const {spawn, execFileSync} = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path'), net = require('net');
 const WS = globalThis.WebSocket || require('ws');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const {clockOffset, shiftedDate} = require('./boot');  // 2.381.0 (#2713)
+const {clockOffset, shiftedDate, B} = require('./boot');  // 2.381.0 (#2713)
 // 2.284.0 A (#3120): a port the system hands out free - a random one of 9300-9899 could be the port of another suite's Firefox
 // on the same machine (parallel places / shards): the connection went to that one ("session.new: Maximum number of active sessions")
 const freePort = () => new Promise(res => { const s = net.createServer(); s.on('error', () => res(9300 + Math.floor(Math.random() * 600)));
@@ -41,7 +41,19 @@ const noFirefox = (tag, check) => {
 // prefs: extra Firefox preferences for one suite (2.13.0)
 // 2.53.0 (#1410): nav() loads the modules the app loads on demand (settings, contacts, office) after each page load, so
 // suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
-module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS = [45, 60, 90]}) => async function firefox(fn, touch) {
+// 2.543.0 (#4606): "All workspaces" with Private + exactly one organisation shows the overview of the areas in the office; the
+// suites written before open the office the server chose there (that organisation's). nav() to an address #office... saves that
+// workspace first, from the page that is open (it holds the login), like boot.js officeWs - only in exactly this case. allWs: true
+// leaves it out (a suite of the overview); a suite that walks into the office by a click calls officeWs() itself.
+const OFFICE_WS = `(async () => {
+  const B = ${JSON.stringify(B)}; if (!location.href.startsWith(B)) return false;
+  const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
+  const j = await (await fetch(B + 'api/state', {headers: H})).json().catch(() => ({}));
+  const ws = (j.me && j.me.workspaces) || [], cur = (j.settings && j.settings.workspace) || 'all';
+  if (!j.workspaces || ws.length !== 1 || /^(private|org:\\d+)$/.test(cur)) return false;
+  return (await fetch(B + 'api/settings', {method: 'PATCH', headers: H, body: JSON.stringify({workspace: 'org:' + ws[0].id})})).ok;
+})()`;
+module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS = [45, 60, 90], allWs = false}) => async function firefox(fn, touch) {
   if (noFirefox(tag, check)) return;
   const base = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
   const prefs = [['browser.shell.checkDefaultBrowser', false], ['datareporting.policy.dataSubmissionEnabled', false], ['ui.prefersReducedMotion', 1],
@@ -123,8 +135,11 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
     // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows
     // it: p2100_ui, p21144_d_ui, p270_ui) - after 40 s the same navigate once more instead of 120 s and a failed suite
+    const officeWs = () => ev(OFFICE_WS).catch(() => false);  // 2.543.0 (#4606)
     const nav = async url => {
       let r;
+      // 2.543.0 (#4606): an app already open here keeps "All" in memory on a mere change of the hash: a new load after the change
+      if (!allWs && /#office(\/|$)/.test(String(url)) && await officeWs() && !/static\/icon\.svg/.test(await ev('location.href').catch(() => ''))) await cmd('browsingContext.navigate', {context: ctx, url: B + 'static/icon.svg', wait: 'complete'}, 40000);
       for (let k = 0; ; k++) {
         try { r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'}, k < 2 ? 40000 : 120000); break; } catch (e) {
           if (k >= 2 || !/no answer within/.test(e.message)) throw e;
@@ -174,7 +189,7 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
       if (!ok) console.log(`ff idle: still loading after ${timeout} ms:`, await ev(`[...(window.__net?.open?.values() || [])].slice(0, 5).join(' ')`).catch(() => '?'));
       return ok;
     };
-    await fn({cmd, ev, nav, ctx, shot, drag, until, idle});
+    await fn({cmd, ev, nav, ctx, shot, drag, until, idle, officeWs});
   } catch (e) { check(false, 'Firefox: ' + e.message); } finally {
     try { ws && ws.close(); } catch { /* gone */ }
     await stop(ff);
