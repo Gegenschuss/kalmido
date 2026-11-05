@@ -60,6 +60,14 @@
 .agguidebox{margin-top:.25rem}
 .myagnew{gap:.5rem;flex-wrap:wrap}
 .myagnew input{flex:1 1 9rem;min-width:0}
+/* 2.546.0 (#4491): in the settings dialog `.modal .row input{flex:1}` (basis 0) won over the 9rem basis, so at 320 px the three
+   fields stood side by side a letter wide; under 480 px they stand one below the other at full width, the button under them */
+.modal .row.myagnew input{flex:1 1 9rem;min-width:0}
+@media (max-width:479px) {
+  .row.myagnew,.modal .row.myagnew{flex-direction:column;align-items:stretch}
+  .row.myagnew>input,.modal .row.myagnew>input{flex:0 0 auto;width:100%}
+  .row.myagnew>button{align-self:flex-start}
+}
 .aboutapp.off>span>b{color:var(--p3)}
 .ssres{position:absolute;right:.875rem;top:calc(100% - .25rem);z-index:5;width:min(24rem,calc(100% - 1.75rem));max-height:60dvh;overflow-y:auto;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius);box-shadow:var(--shadow);padding:.25rem;display:flex;flex-direction:column}
 .ssres.hidden{display:none}
