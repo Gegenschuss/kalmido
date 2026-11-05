@@ -1208,3 +1208,15 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .ofc-chain{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-top:.75rem}
 .ofc-chain p{margin:0}
 .ofc-chain .bad{color:var(--danger)}
+/* 2.555.0 A (#4554): a quotation / invoice (also credit note, delivery note, reminder) in a wide office page: the head (at most
+   --w-form) with the project row below it on the left, the positions with texts and own fields beside it on the right; everything
+   after (fees, payments, history) below at the full width. The order stays the DOM order (no order:), so the tab order is
+   head, project, positions. Below 80rem of the page (1440 px with the sidebar, tablets, phones) it stays one column. */
+.ofcbody:has(>.ofdeditor),.pboffers:has(>.ofdeditor){container:ofded / inline-size}
+@container ofded (min-width:80rem){
+  .ofdeditor{display:grid;grid-template-columns:minmax(0,var(--w-form)) minmax(0,1fr);grid-template-rows:auto 1fr;gap:.75rem 1.5rem;align-items:start}  /* the second row takes what the long positions add, so the project row stays right under the head */
+  .ofdeditor>*{grid-column:1 / -1}
+  .ofdeditor>.ofdfs:first-child{grid-column:1;grid-row:1}
+  .ofdeditor>.ofdfs:first-child+.dpjrow{grid-column:1;grid-row:2}
+  .ofdeditor>.ofdfs:first-child~.ofdfs{grid-column:2;grid-row:1 / span 2}
+}
