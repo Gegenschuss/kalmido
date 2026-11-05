@@ -21,7 +21,7 @@ Interface:
   ow_write(c, uid, kind, rid, b, clean, *, where=..., args=..., dec=None, enc=None, public=None, alias=None,
            version=True, extra=None, force=False) -> (row after (dec'd dict), {column: (before, after)})
   ow_check(b, have, cur, alias=None)                            the version check alone (OwConflict)
-  ow_crypt(table, oid) -> (dec, enc)                            for a table with encrypted columns (core/orgcrypt.py)
+  ow_crypt(table, office) -> (dec, enc)                         for a table with encrypted columns (core/orgcrypt.py)
   ow_undo_ctx(kind, fn)                                         the session undo of the kind (office/undo.py route)
   ow_history(c, kind, rid, limit=50) -> the entries (the caller checked the rights to read the row)
   ow_is_agent(c, uid) -> bool, ow_uid() -> the signed-in account or None"""
