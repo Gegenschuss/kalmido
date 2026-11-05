@@ -14,7 +14,7 @@ file store since 2.351.0 (contacts/ctfolder.py), so its folder shares ARE the co
   (on_trash None: a node coming back never restores a book in its trash -- contacts/web.py does, with its contacts).
 No generic routes (routes=False): the address book's own routes (contacts/web.py, contacts/v1.py, CardDAV) stay."""
 from ..core.i18n import N_
-from ..core.objects import obj_node, obj_register
+from ..core.objects import obj_node, obj_node_follow, obj_register
 from ..core.pg import system_ctx
 from .ctfolder import CTF_BOOK, _book, _book_base, _book_content, _book_space, _book_title, _cap, _gate, _hidden, ctf_root
 from .model import BK_KERN, BK_NODE_SQL, book_role
@@ -45,7 +45,7 @@ def bk_node_ensure(c, uid, bid):
         return obj_node(c, uid or b["owner_id"], CTF_BOOK, bid, make=True, parent=root)
 
 
-BK_KERN["node"] = bk_node_ensure
+BK_KERN.update(node=bk_node_ensure, follow=obj_node_follow)
 obj_register(CTF_BOOK, "books", label=N_("Address book"), fields={}, title=_book_title, base_role=_base, visible=_visible,
              hidden=_hidden(CTF_BOOK), cap=_cap, content=_book_content, dl_area="contacts", scopes=("contacts", "contacts"),
              routes=False, members=("book_members", "book_id"), open_url=lambda bid: f"contacts/b/{int(bid)}",

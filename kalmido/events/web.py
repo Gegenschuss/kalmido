@@ -25,7 +25,6 @@ from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pull
 from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 from ..events.model import EV_CALS_MAX, EV_KIND, KERN, ev_has_node, ev_role  # 2.566.0 (#4712): the shared core (events/evkern.py fills KERN)
 from ..files.fsref import fs_ref_rename  # 2.566.0 (#4712)
-from ..files.store import _free_name  # 2.566.0 (#4712)
 from ..core.pg import system_ctx  # 2.566.0 (#4712)
 from ..core.retention import ret_trash_days  # 2.566.0 (#4707)
 
@@ -54,7 +53,7 @@ def op_cal_edit(c, uid, cid, b):
     cal, role = need_evcal(c, cid)
     if "org_id" in b:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
         if obj_org_set(c, "ev_cals", "cal_id", "ev_cal_members", cid, b["org_id"], "cal"):
-            ev_node_follow(c, cid)
+            KERN["follow"](c, EV_KIND, cid)  # 2.566.0 (#4712): its node (and the shares on it) follow
             cal_touch(c, cid)
     f = {k: b[k] for k in ("name", "color", "description") if k in b}
     if f:
@@ -115,18 +114,6 @@ def op_cal_restore(c, uid, cid):
     bump(c)
     c.commit()
     return cal_public(c, c.execute("SELECT * FROM ev_cals WHERE id=?", (cid,)).fetchone(), uid)
-
-
-def ev_node_follow(c, cid):
-    """2.566.0 (#4712): the calendar moved into another workspace (obj_org_set, its members fit there): its reference node
-    follows to the top of that workspace's tree, so its shares (the members) stay valid; without a node nothing to do."""
-    with system_ctx(c):
-        k = c.execute("SELECT org_id, owner_id FROM ev_cals WHERE id=?", (cid,)).fetchone()
-        n = c.execute("SELECT id, name FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (EV_KIND, cid)).fetchone()
-        if k is None or n is None:
-            return
-        c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, parent_id=NULL, name=? WHERE id=?",
-                  (k["org_id"], k["owner_id"], _free_name(c, None, k["owner_id"], k["org_id"], n["name"], skip=n["id"]), n["id"]))
 
 
 def op_member_set(c, uid, cid, b):

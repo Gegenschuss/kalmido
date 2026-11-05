@@ -585,6 +585,21 @@ def obj_node(c, uid, kind, rid, make=False, parent=None):
     return c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
 
 
+def obj_node_follow(c, kind, rid):
+    """2.566.0 (#4712): the object moved into another workspace (its area checked that its shares fit there, e.g. obj_org_set):
+    its reference node follows to the top of that workspace's tree with the shares on it (a node in the old tree gives
+    nothing, files/fsref.py _same_space). Nothing without a node. No rights check; the caller commits."""
+    sp = obj_space(c, kind, rid)
+    with system_ctx(c):  # structure: the node may lie in the tree the object just left
+        n = c.execute("SELECT id, name FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (kind, int(rid))).fetchone()
+        if sp is None or n is None:
+            return
+        org, owner = sp
+        c.execute("UPDATE fs_nodes SET org_id=?, owner_id=?, parent_id=NULL, name=? WHERE id=?",
+                  (org, owner, _free_name(c, None, owner, org, n["name"], skip=n["id"]), n["id"]))
+    obj_forget()
+
+
 def _pool_ok(c, n, key, tid, uid=None):
     """Is target (key, tid) one uid (default the signed-in person) may share node n with (files/web.py: the same workspace
     only)? Review F5: obj_share / obj_share_restore pass their own uid."""

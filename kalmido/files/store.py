@@ -33,6 +33,7 @@ from ..core.db import insert_id, iso, now_utc, write_lock, db
 from ..core.access import Denied, acx_of, collab_all
 from ..core.orgcrypt import oc_read_file, oc_write_file, oc_user_space
 from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.objhooks import OBJ  # 2.566.0 (#4712): the kinds of the shared core (fs_org_live)
 
 FS_DIR = "files"  # below ATT_DIR
 FS_VERSIONS_KEEP = 20  # 2.152.0 D (#2173): older versions of a file go (rows; the stored file by the orphan clean-up) while ret_on("files")
@@ -939,7 +940,15 @@ def fs_org_live(c, oid):
                               UNION ALL
                               SELECT n.id, l.area FROM fs_nodes n JOIN live l ON n.parent_id=l.id WHERE n.org_id=? AND n.deleted_at IS NULL)
                             SELECT COUNT(*) FROM live JOIN fs_nodes x ON x.id=live.id
-                            WHERE NOT (live.area AND x.kind IN ('folder', 'ref'))""", (int(oid), int(oid), int(oid))).fetchone()[0]
+                            WHERE NOT (live.area AND x.kind IN ('folder', 'ref'))""" + _core_refs_out(), (int(oid), int(oid), int(oid))).fetchone()[0]
+
+
+def _core_refs_out():
+    """2.566.0 (#4712): the reference nodes of the kinds moving onto the shared core with their member table (calendars,
+    address books: core/objhooks.OBJ members=) are where their shares hang, no content of the file store -- the objects are
+    their areas' (they stay with their owners)."""
+    kinds = sorted(k for k, r in OBJ.items() if r.get("members") and k.replace("_", "").isalnum())  # the register's names ([a-z][a-z0-9_]*)
+    return (" AND NOT (x.kind = 'ref' AND x.ref_kind IN (" + ",".join(f"'{k}'" for k in kinds) + "))") if kinds else ""
 
 
 def fs_org_purge(c, oid):

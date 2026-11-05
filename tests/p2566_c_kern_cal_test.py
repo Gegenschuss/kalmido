@@ -7,6 +7,7 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - a share taken back in the core (the node's share gone, the old member row still there) is not reopened by the old row
    (regression: before, ev_cal_members / book_members alone gave the access); sharing again brings it back
  - an old member row of a calendar WITHOUT a node is still read (the fallback of one release)
+ - a workspace move of a calendar / book: its node follows with the shares, the member keeps it
  - leaving the organisation: the core's revocation takes the member rows and the shares (restorable rows in obj_revoked) (#4697)
  - an agent with the data lock "calendar" / "contacts" sees nothing of a calendar / book shared with it through the core (#4699)
  - two writers: an event saved with an old version (expect, and the core's name expect_updated_at) -> 409 with the event as it is,
@@ -135,6 +136,15 @@ check(A.put(B + f"/api/books/{BK}/members", json={"user_id": GINA, "role": "edit
 sql("DELETE FROM book_members WHERE book_id=? AND user_id=?", (BK, GINA), write=True)
 check(share("address_book", BK, GINA) is None and BK not in ids(Gi.get(B + "/api/books")), "#4712: the old row deleted -> the core share goes too")
 check(A.put(B + f"/api/books/{BK}/members", json={"user_id": GINA, "role": "edit"}).ok, "gina back in the book")
+
+# a workspace move: the node follows with its shares (the members keep the object)
+for kind, url, rid, who, sx in (("evcal", "evcals", K, BOB, Bo), ("address_book", "books", BK, GINA, Gi)):
+    check(A.patch(B + f"/api/{url}/{rid}", json={"org_id": None}).ok, f"{kind}: moved into alice's private space")
+    check(sql("SELECT org_id FROM fs_nodes WHERE id=?", (node(kind, rid),)) == [(None,)] and share(kind, rid, who) == "edit",
+          f"#4712: {kind}: its node followed into the private tree with the share")
+    check(rid in ids(sx.get(B + f"/api/{url}")), f"#4712: {kind}: the member keeps it after the move")
+    check(A.patch(B + f"/api/{url}/{rid}", json={"org_id": ORG}).ok and sql("SELECT org_id FROM fs_nodes WHERE id=?", (node(kind, rid),)) == [(ORG,)]
+          and rid in ids(sx.get(B + f"/api/{url}")), f"#4712: {kind}: and back into the organisation")
 
 # ================================================================== two writers (#4703, #4705)
 old = E1["updated_at"]

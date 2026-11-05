@@ -398,7 +398,7 @@ ROUTES = {
     "GET /api/v1/event-calendars/{}/export": "calendar", "GET /api/evcals": "calendar", "POST /api/evcals": "calendar",
     "PATCH /api/evcals/{}": "calendar", "DELETE /api/evcals/{}": "calendar", "PUT /api/evcals/{}/members": "calendar",
     "DELETE /api/evcals/{}/members/{}": "calendar", "GET /api/evcals/{}/export.ics": "calendar",
-    "GET /api/evcals/trash": "own", "POST /api/evcals/{}/restore": "calendar",  # 2.566.0 (#4707): the owner's own trash, need_evcal(trash=True)
+    "GET /api/evcals/trash": "own", "POST /api/evcals/{}/restore": "calendar",  # 2.566.0 (#4707): the owner's own trash, need_evcal(trash=True); a member / another person 404 in p2566_c_kern_cal_test.py
     "GET /api/evinvite": "calendar", "GET /api/evcals/{}/feed": "calendar", "POST /api/evcals/{}/feed": "calendar",  # 2.111.0 B (#2056)
     "GET /api/events/freebusy": "calendar",  # 2.155.0 B (#2077): spans only, colleagues of the same organisation
     "GET /api/v1/events/freebusy": "calendar",  # 2.467.0 (#2586): the same; an agent only about the people shared with it

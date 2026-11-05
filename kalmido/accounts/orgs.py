@@ -18,6 +18,7 @@ from ..core.orgcrypt import oc_send_file, oc_write_file, rck_admin_gone, rck_org
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from .navmenus import nav_clean_org, nav_org_off  # 2.418.0 (#3560)
 from .orgretain import Nn_, odl_former  # 2.186.0 A (#2599); 2.414.0 (#3502): Nn_ marks the plural pair below
+from .orgretain import obj_nodes_off  # 2.566.0 (#4712)
 from .pictures import org_icon_tok, org_icon_url, AVATAR_MAX_MB, LIST_ICON_DIR, list_icon_process, org_icon_drop_file, org_icon_path  # 2.369.5 (#2517): pulled up from functions
 from ..core.i18n import trn  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import unlink_files  # 2.369.5 (#2517): pulled up from functions
@@ -1647,6 +1648,8 @@ def org_leave(c, oid, uid, heir, back=None):
                 c.execute(f"DELETE FROM {mt} WHERE {key}=? AND user_id=?", (xid, heir))
                 c.execute(f"UPDATE {table} SET owner_id=? WHERE id=?", (heir, xid))
             else:
+                with system_ctx(c):  # 2.566.0 (#4712): it leaves the organisation's tree: its node goes, its old member rows count again
+                    obj_nodes_off(c, "id=?", (xid,), table=table)
                 c.execute(f"UPDATE {table} SET org_id=NULL WHERE id=?", (xid,))
     # 2.566.0 (#4712): their (and their agents') member rows and shares of the organisation's calendars and address books
     # are the shared core's revocation (person_revoked 'leave' below: members= of the kinds, restorable rows)

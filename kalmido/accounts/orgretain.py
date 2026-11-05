@@ -311,6 +311,18 @@ def odl_public_off(c, oid):
     c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
 
 
+def obj_nodes_off(c, where, args, table=None):
+    """2.566.0 (#4712): the reference nodes of the calendars / address books (the kinds of the shared core with an old
+    member table, core/objhooks.OBJ members=) whose rows match where (on their table) are removed: such an object leaves
+    the organisation's tree (it becomes private), its node and the shares on it go with it, and its old member rows are
+    read again (events/model.py ev_role, contacts/model.py book_role: without a node). table: only that kind's table (where
+    names its rows); None: every such kind. The caller is in system_ctx."""
+    for reg in OBJ.values():
+        if reg.get("members") and table in (None, reg["table"]):
+            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id IN (SELECT id FROM {reg['table']} WHERE {where})",
+                      (reg["kind"], *args))
+
+
 def odl_members_off(c, oid):
     """2.560.0 (#4697): before organisation oid's calendars and address books become private (odl_retire, odl_dismantle):
     every member row of somebody else than the owner (former colleagues, the organisation's agents, other people's agents)
@@ -318,7 +330,9 @@ def odl_members_off(c, oid):
     owner keeps the object; their own personal agents stay with it (the owner's delegates). The caller is in system_ctx.
     2.566.0 (#4712): the member rows and the shares of the calendars' / books' nodes are the shared core's revocation
     (person_revoked 'retire', core/objects.py obj_revoke_person: members= of the kinds, restorable rows), which both callers
-    run first; only the invitations stay here (they are the events' own data, not a share)."""
+    run first; only the invitations stay here (they are the events' own data, not a share). Their reference nodes in the
+    organisation's tree go as well (obj_nodes_off): the objects become private, the owner's own agents' rows count again."""
+    obj_nodes_off(c, "org_id=?", (oid,))
     c.execute("DELETE FROM event_attendees WHERE user_id IS NOT NULL AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
               "WHERE k.org_id=? AND k.owner_id!=event_attendees.user_id AND NOT EXISTS (SELECT 1 FROM agents a WHERE "
               "a.user_id=event_attendees.user_id AND a.owner_id=k.owner_id))", (oid,))

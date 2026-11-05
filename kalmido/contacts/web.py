@@ -27,6 +27,7 @@ from ..accounts.orgs import user_orgs
 from ..accounts.bgjobs import bgj_active, bgj_add, bgj_busy, bgj_current, bgj_fn, bgj_progress, bgj_state  # 2.370.3 (#2760)
 from ..core.zipread import base_name, is_zip, zip_read, ZipLimit  # 2.149.0 G (#2517): pulled up from functions
 from ..contacts.model import task_contacts  # 2.369.5 (#2517): pulled up from functions
+from ..contacts.model import BK_KERN  # 2.566.0 (#4712): the shared core (contacts/ctkern.py fills it)
 from ..core.pages import too_large  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
@@ -90,6 +91,7 @@ def op_book_edit(c, uid, bid, b):
         raise Denied(409, tr("An address book of an organisation stays in it"))
     if "org_id" in b and not bk["owner_org_id"]:  # 2.30.0 (#1036): the owner moves it into another workspace (409 while a member does not fit)
         if obj_org_set(c, "books", "book_id", "book_members", bid, b["org_id"], "book"):
+            BK_KERN["follow"](c, "address_book", bid)  # 2.566.0 (#4712): its node (and the shares on it) follow (contacts/ctkern.py)
             book_touch(c, bid)
     f = book_fields({k: b[k] for k in ("name", "color") if k in b})
     if "birthdays_list_id" in b:  # birthdays + anniversaries of this book's contacts become tasks of this list ('' / null = off)

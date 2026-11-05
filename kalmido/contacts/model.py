@@ -122,16 +122,28 @@ def _book_role(c, uid, b, trash=False):
         if b["org_id"] != b["owner_org_id"]:
             return None  # never across the boundary (the nightly check counts such a row)
         role = obk_org_role(c, uid, b["owner_org_id"], b["org_role"])
-        r = (c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone()
-             if collab_all() and not bk_has_node(c, b["id"]) else None)  # 2.566.0 (#4712): with a live node its shares are the core's
+        r = bk_member_role(c, b["id"], uid) if collab_all() else None  # 2.566.0 (#4712): the share of its own node, else the old row
+        r = (r,) if r else None
         return max(role, r[0] if r else None, key=lambda x: BOOK_RANK.get(x, 0))
     if b["owner_id"] != uid and c.execute("SELECT disabled FROM users WHERE id=?", (b["owner_id"],)).fetchone()[0]:
         return None  # a disabled owner's address books are gone for the members too (like in the lists of books)
     if b["owner_id"] == uid:
         return "owner"
-    if not collab_all() or bk_has_node(c, b["id"]):
-        return None  # 2.566.0 (#4712): a book with a live node is shared by its node (book_role's folder way = the core's share)
-    r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone()
+    if not collab_all():
+        return None
+    return bk_member_role(c, b["id"], uid)  # 2.566.0 (#4712)
+
+
+def bk_member_role(c, bid, uid):
+    """2.566.0 (#4712): uid's own share of the book (what book_members was): a book with a live node -- the share of exactly
+    that node to the person / agent (not a folder's above it: those are book_role's fold); without one the old member row."""
+    if bk_has_node(c, bid):
+        with system_ctx(c):  # the share rows of the book's own node (it may lie in a tree the asker reads only through it)
+            r = c.execute("SELECT s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' AND n.ref_kind='address_book' "
+                          "AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id=? OR s.agent_id=?) AND (s.expires_at IS NULL OR s.expires_at>?) "
+                          "ORDER BY s.role='edit' DESC LIMIT 1", (int(bid), int(uid), int(uid), iso(now_utc()))).fetchone()
+        return r[0] if r and r[0] in BOOK_ROLES else None
+    r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone()
     return r[0] if r else None
 
 
