@@ -566,11 +566,35 @@ function dc_cur(d, f, only) {  // the value of a field as the server takes it ba
   if (f === 'custom_fields') return Object.fromEntries((d.custom_fields || []).filter(x => !only || String(x.id) in only).map(x => [x.id, x.value ?? null]));  // only the changed ones (their marks stay)
   return d[f] ?? '';
 }
+// 2.559.0 (#4659): the open document with the new values as the sheet shows them, before the answer (sender / type / tags by name,
+// a known folder, custom fields); what the server alone knows (a new folder, the next archive number) waits for its answer
+function dc_localDoc(d, body) {
+  const x = {...d}, set = DC.set || {};
+  for (const [k, v] of Object.entries(body)) {
+    if (k === 'sender' || k === 'type') x[k] = v ? (d[k]?.name === v ? d[k] : {name: v}) : null;
+    else if (k === 'tags') x.tags = (v || []).map(n => (d.tags || []).find(t => t.name === n) || (set.tags || []).find(t => t.name === n) || {name: n});
+    else if (k === 'folder') { if (v === '' || v == null) x.folder = null; else if (typeof v === 'number') { const f = (set.folders || []).find(y => y.id === v); if (f) x.folder = f; } }
+    else if (k === 'custom_fields') x.custom_fields = (d.custom_fields || []).map(f => String(f.id) in v ? {...f, value: v[f.id]} : f);
+    else if (!(k === 'asn' && v === 'next')) x[k] = v;
+  }
+  return x;
+}
+// 2.559.0 (#4659): the changes of a document still on their way (id -> bodies): an earlier answer keeps the later ones on top
+const DC_PEND = new Map();
 async function dc_patch(id, body, label) {
   const before = DC.doc && DC.doc.id === id ? Object.fromEntries(Object.keys(body).map(k => [k, dc_cur(DC.doc, k, body[k])])) : null;
+  const d0 = DC.doc?.id === id ? DC.doc : null, pend = DC_PEND.get(id) || [];
+  DC_PEND.set(id, pend); pend.push(body);
+  const done = () => { pend.splice(pend.indexOf(body), 1); if (!pend.length && DC_PEND.get(id) === pend) DC_PEND.delete(id); };
+  if (d0) { DC.doc = dc_localDoc(d0, body); dc_mdDraw($('.dc-md')); }  // at once, the request behind it
   let d;
-  try { d = await api('PATCH', `/api/docs/${id}`, body); } catch { dc_mdDraw($('.dc-md')); return; }
-  if (DC.doc?.id === id) { DC.doc = d; dc_mdDraw($('.dc-md')); }
+  try { d = await api('PATCH', `/api/docs/${id}`, body); } catch {  // the fields of this change as they were (the others stay)
+    done();
+    if (d0 && DC.doc?.id === id) DC.doc = {...DC.doc, ...Object.fromEntries(Object.keys(body).map(k => [k, d0[k]]))};
+    dc_mdDraw($('.dc-md')); return;
+  }
+  done();
+  if (DC.doc?.id === id) { DC.doc = pend.reduce(dc_localDoc, d); dc_mdDraw($('.dc-md')); }
   if (before) {
     const put = v => async () => { const x = await api('PATCH', `/api/docs/${id}`, v); if (DC.doc?.id === id) { DC.doc = x; dc_mdDraw($('.dc-md')); } dc_load(); return {}; };
     histToast(label, histAdd({label, undo: put(before), redo: put(body)}));
@@ -679,13 +703,25 @@ async function dc_mdClick(e) {
   }
   if (a === 'checked') {
     const ds = DC.docs || [], ci = ds.findIndex(x => x.id === d.id), nx = ci < 0 ? null : ds[ci + 1] || ds[ci - 1], nxDir = nx && ds[ci + 1] ? 1 : -1;
-    const x = await api('POST', `/api/docs/${d.id}/review`, {done: true}).catch(() => null); if (!x) return;
-    DC.doc = {...d, ...x, text: d.text}; dc_mdDraw(md); dc_load();
+    // 2.559.0 (#4659): checked at once (the sheet, the card, the counter); in "To review" the next document follows at once, the
+    // request runs behind it; an error marks it "To review" again (api() said why)
+    const it = ds[ci], rv = DC.review;
+    if (it) it.review = false;
+    if (DC.review > 0) DC.review--;
+    DC.doc = {...d, review: false}; dc_mdDraw(md); dc_draw();
+    // 2.476.0 (#3935): in "To review" the next document follows at once (the one before at the end, none left = back to the list)
+    if (DC.f.review) { if (nx && S.route.mod === 'docs') dc_goTo(nx.id, nxDir); else md.remove(); }
+    const x = await api('POST', `/api/docs/${d.id}/review`, {done: true}).catch(() => null);
+    if (!x) {
+      if (it) it.review = d.review; DC.review = rv;
+      if (DC.doc?.id === d.id) { DC.doc = d; dc_mdDraw($('.dc-md')); }
+      dc_draw(); return;
+    }
+    if (DC.doc?.id === d.id) { DC.doc = {...DC.doc, ...x, text: d.text}; dc_mdDraw($('.dc-md')); }
+    dc_load();
     histToast(tr('Marked as checked'), histAdd({label: tr('Marked as checked'),
       undo: async () => { await api('POST', `/api/docs/${d.id}/review`, {done: false}); dc_load(); return {}; },
       redo: async () => { await api('POST', `/api/docs/${d.id}/review`, {done: true}); dc_load(); return {}; }}));
-    // 2.476.0 (#3935): in "To review" the next document follows at once (the one before at the end, none left = back to the list)
-    if (DC.f.review) { if (nx && S.route.mod === 'docs') dc_goTo(nx.id, nxDir); else md.remove(); }
     return;
   }
   if (a === 'task') { await dc_newTask(d, md); return; }
