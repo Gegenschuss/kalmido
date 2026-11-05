@@ -184,7 +184,8 @@ def cfs_adjust_patch(aid):
         raise BadInput(tr("Invalid data"))
     ow_write(c, uid, "office_cf_adjust", aid, b, lambda c, b, cur: _adj_clean(b, cur), oid=oid,
              dec=lambda c, r: oc_dec_fields(c, oid, "office_cf_adjust", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_cf_adjust", v),
-             alias="row", public=lambda c, cur: _adj_public(c, oid, _adj_row(c, oid, aid)))
+             alias="row", lock=f"office_cf_adjust-{int(aid)}",  # the same lock as the delete (#4707)
+             public=lambda c, cur: _adj_public(c, oid, _adj_row(c, oid, aid)))
     c.commit()
     return jsonify(_adj_public(c, oid, _adj_row(c, oid, aid)))
 
