@@ -265,14 +265,20 @@ check(F.post(B + f"/api/evcals/{FK}/restore").ok and FK in ids(F.get(B + "/api/e
 
 # ================================================================== review F4: rows written while there was no node
 # (an import / a repair past cal_member_set): the node made later mirrors them all, nobody loses the access silently
+r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})
+assert r.ok, r.text
+IVY = r.json()["id"]
+Iv = sess("ivy")
+Iv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "ivy@example.com", "role": "member"}).ok, "ivy (a member of the organisation, alice sees her) joins the organisation")
 K4 = A.post(B + "/api/evcals", json={"name": "Imported plan"}).json()["id"]
 B4 = A.post(B + "/api/books", json={"name": "Imported book"}).json()["id"]
-sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (K4, GINA), write=True)
+sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (K4, IVY), write=True)
 sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (B4, BOB), write=True)
 check(node("evcal", K4) is None and node("address_book", B4) is None, "F4: imported member rows, no node yet")
 check(A.put(B + f"/api/evcals/{K4}/members", json={"user_id": BOB, "role": "edit"}).ok
-      and A.put(B + f"/api/books/{B4}/members", json={"user_id": GINA, "role": "edit"}).ok, "F4: then a member through the app")
-check(share("evcal", K4, GINA) == "view" and K4 in ids(Gi.get(B + "/api/evcals")),
+      and A.put(B + f"/api/books/{B4}/members", json={"user_id": IVY, "role": "edit"}).ok, "F4: then a member through the app")
+check(share("evcal", K4, IVY) == "view" and K4 in ids(Iv.get(B + "/api/evcals")),
       "review F4: the imported calendar member got her core share with the node and keeps the calendar")
 check(share("address_book", B4, BOB) == "view" and B4 in ids(Bo.get(B + "/api/books")),
       "review F4: the imported book member got his core share with the node and keeps the book")
@@ -280,7 +286,7 @@ check(share("address_book", B4, BOB) == "view" and B4 in ids(Bo.get(B + "/api/bo
 # ================================================================== review F3: a node in the file store's trash is still the node
 K5 = A.post(B + "/api/evcals", json={"name": "Tidy plan"}).json()["id"]
 check(A.put(B + f"/api/evcals/{K5}/members", json={"user_id": BOB, "role": "edit"}).ok
-      and A.put(B + f"/api/evcals/{K5}/members", json={"user_id": GINA, "role": "view"}).ok, "F3: a calendar shared with bob and gina")
+      and A.put(B + f"/api/evcals/{K5}/members", json={"user_id": IVY, "role": "view"}).ok, "F3: a calendar shared with bob and ivy")
 N5 = node("evcal", K5)
 sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N5, BOB), write=True)  # taken back in the core (the file store's dialog)
 check(K5 not in ids(Bo.get(B + "/api/evcals")), "F3: bob taken back in the core")
@@ -291,21 +297,21 @@ check(K5 not in ids(Bo.get(B + "/api/evcals")), "review F3: its node in the file
 sql("DELETE FROM fs_nodes WHERE id=?", (N5,), write=True)  # the file store's trash emptied
 check(not sql("SELECT 1 FROM ev_cal_members WHERE cal_id=? AND user_id=?", (K5, BOB)) and K5 not in ids(Bo.get(B + "/api/evcals")),
       "review F3: the node removed for good takes bob's dead member row with it, he stays out")
-check(K5 in ids(Gi.get(B + "/api/evcals")), "review F3: gina, shared on the node, keeps the calendar through her row")
+check(K5 in ids(Iv.get(B + "/api/evcals")), "review F3: ivy, shared on the node, keeps the calendar through her row")
 B5 = A.post(B + "/api/books", json={"name": "Tidy book"}).json()["id"]
-check(A.put(B + f"/api/books/{B5}/members", json={"user_id": GINA, "role": "edit"}).ok, "F3: a book shared with gina")
+check(A.put(B + f"/api/books/{B5}/members", json={"user_id": IVY, "role": "edit"}).ok, "F3: a book shared with ivy")
 N6 = node("address_book", B5)
-sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N6, GINA), write=True)
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N6, IVY), write=True)
 sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N6, BOB), write=True)  # only in the core
-check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")), "F3: gina taken back, bob shared in the core only")
+check(B5 not in ids(Iv.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")), "F3: ivy taken back, bob shared in the core only")
 sql("UPDATE fs_nodes SET deleted_at='2026-11-05T00:00:00+00:00' WHERE id=?", (N6,), write=True)
-check(B5 not in ids(Gi.get(B + "/api/books")), "review F3: the book's node in the file store's trash -> gina's old row is not read again")
+check(B5 not in ids(Iv.get(B + "/api/books")), "review F3: the book's node in the file store's trash -> ivy's old row is not read again")
 sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
-check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
-      "review F3: the book's node removed for good: gina stays out, bob's core-only share lives on as his row")
+check(B5 not in ids(Iv.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
+      "review F3: the book's node removed for good: ivy stays out, bob's core-only share lives on as his row")
 
 # ================================================================== review F5: a book's share only in the core goes in the members dialog
-check(A.put(B + f"/api/books/{B5}/members", json={"user_id": GINA, "role": "view"}).ok, "F5: the tidy book shared with gina again")
+check(A.put(B + f"/api/books/{B5}/members", json={"user_id": IVY, "role": "view"}).ok, "F5: the tidy book shared with ivy again")
 N9 = node("address_book", B5)
 check(N9 is not None and share("address_book", B5, BOB) == "view", "F5: its new node mirrored bob's row as well (F4)")
 sql("DELETE FROM book_members WHERE book_id=? AND user_id=?", (B5, BOB), write=True)
@@ -342,12 +348,6 @@ check(A.patch(B + f"/api/evcals/{K7}", json={"org_id": ORG2}).ok and sql("SELECT
       "F2: without them the move works, the node follows")
 
 # ================================================================== review F1: the owner leaves the organisation without an heir
-r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})
-assert r.ok, r.text
-IVY = r.json()["id"]
-Iv = sess("ivy")
-Iv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
-check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "ivy@example.com", "role": "member"}).ok, "F1: ivy joins the organisation")
 K6 = A.post(B + "/api/evcals", json={"name": "Team rota", "org_id": ORG}).json()["id"]
 check(A.put(B + f"/api/evcals/{K6}/members", json={"user_id": BOB, "role": "edit"}).ok, "F1: the organisation's calendar shared with bob")
 N7 = node("evcal", K6)
