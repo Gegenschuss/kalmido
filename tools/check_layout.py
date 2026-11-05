@@ -197,6 +197,7 @@ TENANT_EXEMPT = {
     "sheet_lastvals": "2.89.0 (#1916): the last value of a cell one person saw (their own rows, bound through the cell's sheet)",
     "sheet_hist": "2.124.0 B (#2112): the change history of a table's cells (bound through sheet_id -> sheets.org_id, read only with the sheet)",
     "space_moves": "2.96.0 (#1941): a page / table moved between workspaces (both sides; read only through the object's visibility: wiki/wkmove.py, sheets/shmove.py)",
+    "doc_office_moves": "2.547.0 (#4434): the undo of one person's receipts move into the office (read and written only for user_id = the signed-in person, docs/areamove.py; the documents carry the workspace)",
     "deleted_accounts": "2.152.0 B (#2172): the instance's journal of deleted accounts (hashes only), read by the restore alone, never by a person",
     "folder_people": "the owner's folder shared with people: every list share goes through the workspace rule (_folder_member_add)",
     "folder_agents": "2.41.0 (#1420): the agents of an owner's folder; every list share goes through the workspace rule (folder_apply / list_agent_set)",
