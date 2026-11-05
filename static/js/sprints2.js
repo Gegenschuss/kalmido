@@ -44,7 +44,7 @@ async function spr_cfgPut(lid, cfg) {
 }
 async function spr_cfgSet(lid, ch, lab) {
   const l = spr_list(lid), before = {...(l?.sprint_cfg || {on: false, weeks: 2, dow: 0, carry: true})};
-  let j; try { j = await spr_cfgPut(lid, ch); } catch { return null; }
+  let j; try { j = await spr_cfgPut(lid, ch); } catch (e) { if (/** @type {any} */ (e)?.status === 409) { await load(); render(); } return null; }  // 2.564.0 D (#4701): saved meantime: the current settings
   const after = j.settings;
   offerUndo(lab || tr('Saved'), histAdd({label: tr('Changed setting: {0}', tr('Sprints')), sett: true,
     undo: () => spr_cfgPut(lid, {on: before.on, weeks: before.weeks, dow: before.dow, carry: before.carry}), redo: () => spr_cfgPut(lid, after)}));
@@ -64,8 +64,10 @@ function spr_cfgModal(lid) {
   md.addEventListener('click', async (/** @type {any} */ e) => {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
-    const j = await spr_cfgSet(lid, {on: $('#sp-on', md).checked, weeks: +$('#sp-w', md).value, dow: +$('#sp-d', md).value, carry: $('#sp-c', md).checked});
+    // 2.564.0 D (#4701): against the version the dialog opened with; 409 = the reason (api) and the dialog opens again with the current settings
+    const j = await spr_cfgSet(lid, {on: $('#sp-on', md).checked, weeks: +$('#sp-w', md).value, dow: +$('#sp-d', md).value, carry: $('#sp-c', md).checked, ...(c.updated_at ? {expect_updated_at: c.updated_at} : {})});
     if (j) md.remove();
+    else if ((spr_list(lid)?.sprint_cfg || {}).updated_at !== c.updated_at) { md.remove(); spr_cfgModal(lid); }
   });
 }
 
@@ -84,7 +86,11 @@ function spr_editModal(l, s) {
     if (b.dataset.m === 'del') { md.remove(); spr_delete(l, s); return; }
     const before = {name: s.title === tr('Sprint {0}', s.num) ? '' : s.title || '', goal: s.goal || '', ...(s.state !== 'closed' ? {start: s.start, end: s.end} : {})};
     const after = {name: $('#se-n', md).value.trim(), goal: $('#se-g', md).value.trim(), ...(s.state !== 'closed' ? {start: $('#se-s', md).value, end: $('#se-e', md).value} : {})};
-    try { await spr_patch(s.id, after); } catch { return; }
+    // 2.564.0 D (#4701): against the version the dialog opened with; 409 = the reason (api) and the current sprint opens
+    try { await spr_patch(s.id, {...after, ...(s.updated_at ? {expect_updated_at: s.updated_at} : {})}); } catch (x) {
+      if (x?.status === 409) { md.remove(); await load(); render(); const n = spr_byId(spr_list(l.id), s.id); if (n) spr_editModal(spr_list(l.id), n); }
+      return;
+    }
     md.remove();
     offerUndo(tr('Saved'), histAdd({label: tr('{0} changed', spr_name(s)), undo: () => spr_patch(s.id, before), redo: () => spr_patch(s.id, after)}));
   });

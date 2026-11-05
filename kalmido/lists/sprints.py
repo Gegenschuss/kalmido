@@ -17,7 +17,8 @@ from flask import jsonify, request
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import N_, tr
-from ..core.db import body, bump, db, err, iso, local_day, local_now, now_utc
+from ..core.db import body, bump, db, err, iso, iso_ms, local_day, local_now, now_utc
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..accounts.session import me
 from ..core.access import Denied, is_project, list_role, need_list, pvis, WRITE_ROLES
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -50,7 +51,14 @@ def spr_cfg(raw):
             out["dow"] = v["dow"]
         if isinstance(v.get("carry"), bool):
             out["carry"] = v["carry"]
+        if isinstance(v.get("updated_at"), str):  # 2.564.0 D (#4701): the version the settings dialog sends back
+            out["updated_at"] = v["updated_at"]
     return out
+
+
+def spr_ver(s):
+    """2.564.0 D (#4701): the version of a sprint (updated_at, else created_at for one never edited)."""
+    return (s["updated_at"] if "updated_at" in s.keys() else None) or s["created_at"]
 
 
 def spr_today():
@@ -150,13 +158,14 @@ def spr_dict(c, s, uid=None, rows=None):
                   points_added=sum(pts.get(i, 0) for i in rv["added"]))
     return {"id": s["id"], "list_id": s["list_id"], "num": s["num"], "name": s["name"], "title": spr_title(s),
             "start": s["start"], "end": s["end_day"], "goal": s["goal"], "state": s["state"],
-            "closed_at": s["closed_at"], "created_at": s["created_at"], "review": rv, "progress": spr_progress(rows)}
+            "closed_at": s["closed_at"], "created_at": s["created_at"], "review": rv, "progress": spr_progress(rows),
+            "updated_at": spr_ver(s)}  # 2.564.0 D (#4701)
 
 
 def spr_brief(s):
     """The compact form in /api/state (no counts: the client counts the tasks it has)."""
     return {"id": s["id"], "num": s["num"], "title": spr_title(s), "start": s["start"], "end": s["end_day"],
-            "goal": s["goal"], "state": s["state"]}
+            "goal": s["goal"], "state": s["state"], "updated_at": spr_ver(s)}  # 2.564.0 D (#4701): the edit dialog's version
 
 
 def spr_of_lists(c, rows):
@@ -390,7 +399,9 @@ def sprint_settings(lid):
     spr_need_project(c, lid)
     write_lock(c, f"sprints:{lid}")
     cur = spr_cfg(c.execute("SELECT sprint_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0])
+    ccf_check(b, cur.get("updated_at") or "", "settings", lambda: cur)  # 2.564.0 D (#4701): saved meantime elsewhere -> 409 + the settings
     new = dict(cur)
+    new["updated_at"] = iso_ms(now_utc())
     for k in ("on", "carry"):
         if k in b:
             if not isinstance(b[k], bool):
@@ -466,10 +477,12 @@ def sprint_update(sid):
     s = spr_row(c, sid)
     if not s:
         raise Denied(404)
+    ccf_check(b, spr_ver(s), "sprint", lambda: spr_dict(c, s, me()))  # 2.564.0 D (#4701): saved meantime elsewhere -> 409 + the sprint
     if s["state"] == "closed" and ("start" in b or "end" in b):
         return err(tr("A closed sprint keeps its dates"), 409)
     f = spr_clean_fields(b, s)
     if f:
+        f["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE sprints SET {','.join(k + '=?' for k in f)} WHERE id=?", (*f.values(), sid))
         bump(c)
     c.commit()
