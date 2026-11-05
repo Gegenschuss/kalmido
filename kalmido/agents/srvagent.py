@@ -214,7 +214,7 @@ def srv_need(c, aid):
         return a
     if g.user["is_admin"]:
         try:
-            with system_ctx(c):
+            with system_ctx(c):  # the instance admin reaches team agents of every organisation (need_agent_admin decides)
                 return need_agent_admin(c, aid, cred=True)
         except Denied:  # review 2.557.0: a support access learns nothing about the agent either (404, not 403)
             raise Denied(404) from None
@@ -292,7 +292,7 @@ def srv_put(aid):
     c.commit()
     print("server agent", aid, "settings", ",".join(sorted(sets)) or "-",
           "key replaced" if key is not None else "key deleted" if b.get("delete_key") is True else "", "by user", me(), flush=True)
-    with system_ctx(c):
+    with system_ctx(c):  # the agent's own row after the change (srv_need decided who may)
         return jsonify(srv_dict(c, agent_row(c, aid)))
 
 

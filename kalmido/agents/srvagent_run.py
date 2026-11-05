@@ -241,7 +241,7 @@ def _run(aid, rid):
             raise _Stop("failed", N_("An error in the server agent"))
         c = connect()
         try:
-            with system_ctx(c):
+            with system_ctx(c):  # the worker's own read of its agent and key (no request, no person); it acts only through the token
                 a, row = agent_row(c, aid), srv_row(c, aid)
                 key = srv_key(c, aid, row)
                 model = row["model"] or ""
