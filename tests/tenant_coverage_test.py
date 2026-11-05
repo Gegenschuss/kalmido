@@ -1348,7 +1348,9 @@ for k, (what, why) in KINDS.items():
 # suites in its kind's reason, in the comment on its line or in the comment block above its group). The routes that do not
 # meet it yet stand in tenant_coverage_legacy.txt: that list only shrinks (its length is LEGACY_COUNT; an entry that is proven
 # now or no route any more has to go, a new matrix route without its path in a named suite fails).
-SUITE_RX = re.compile(r"\b([\w.-]+\.(?:py|js))\b")
+# 2.546.0 (#4291, Fable review finding 3): only test file names count as a named suite - a source file named in a comment
+# (files/web.py, v1.py, ...) must not become proof the day a tests/ file of that name appears
+SUITE_RX = re.compile(r"\b(\w+_(?:test|ui)\.(?:py|js))\b")
 
 
 def route_suites(src):
