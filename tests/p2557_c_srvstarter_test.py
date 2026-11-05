@@ -68,7 +68,8 @@ check(d["enabled_instance"] is True and d["provider"] == SP, f"defaults: allowed
 check(d["default_model"] == "claude-sonnet-5-5", f"defaults: the model of the decision of 05.11.2026 ({d['default_model']})")
 check(d["default_name"] == "Kalmido AI" and "only" in d["default_instructions"] and "outside Kalmido" in d["default_instructions"],
       "defaults: the name and the instructions (Kalmido only)")
-check(d["starter"] == ["briefing", "tidy", "docs", "meetings", "followup"] and d["followup_days"] == 5, f"defaults: the starter pack {d['starter']}")
+# 2.568.0 (#4673): + office (tests/p2568_b_ai_office_test.py)
+check(d["starter"] == ["briefing", "tidy", "docs", "meetings", "followup", "office"] and d["followup_days"] == 5, f"defaults: the starter pack {d['starter']}")
 F.patch(B + "/api/settings", json={"lang": "de"})
 check(F.get(B + "/api/agents/server/defaults").json()["default_name"] == "Kalmido-KI", "defaults in German: Kalmido-KI")
 F.patch(B + "/api/settings", json={"lang": "en"})
