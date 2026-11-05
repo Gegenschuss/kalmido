@@ -582,6 +582,7 @@ function cf_val(el, f) {
   return v;
 }
 async function saveField(el) {
+  if (+el.dataset.cf < 0) { const r = await fdReal(+el.dataset.cf); if (!r) return; el.dataset.cf = r; }  // 2.554.0 B (#4658): a new field's value waits for its real id
   const t = taskById(S.sel), fid = +el.dataset.cf, f = fieldById(fid); if (!t || !f) return;
   if (!canEdit(t)) { roToast(); renderDetail(); return; }
   const v = cf_val(el, f);
@@ -618,6 +619,105 @@ document.addEventListener('DOMContentLoaded', () => {
     c.t.fields = {...c.t.fields, [c.f.id]: c.v};
   }, () => !!cf_typing()?.locked);
 });
+// 2.554.0 B (#4658): a field is added, changed and deleted at once on screen (optimistic, core.js optWrite), the server follows;
+// an error takes it back (api() said why). A new field carries a stand-in id below 0 until the answer brings the real one
+// (FD_TMP: stand-in -> promise of the real id, FD_REAL: stand-in -> real id); a value typed into its cell waits for it
+// (fdReal), the stand-in never goes to the server. done(field, final): drawn at once (final false) and after the answer (true,
+// field null = taken back). Each step is in the history (Ctrl+Z); a deleted field comes back with the values of the tasks loaded here.
+const FD_TMP = new Map(), FD_REAL = new Map();
+let fdSeq = 0;
+async function fdReal(fid) {
+  if (!(fid < 0)) return fid;
+  if (FD_REAL.has(fid)) return FD_REAL.get(fid);
+  return FD_TMP.has(fid) ? await FD_TMP.get(fid) : null;
+}
+const fdDef = j => ({id: j.id, list_id: j.list_id, name: j.name, type: j.type, options: j.options || {}, pinned: j.pinned, sort: j.sort});
+// what POST /api/lists/{lid}/fields needs to make the field f again (undo of a delete, redo of an add)
+const fdBody = f => ({name: f.name, type: f.type, pinned: !!f.pinned, options: JSON.parse(JSON.stringify(f.options || {})), ...(f.type === 'formula' ? {formula: f.options?.formula || ''} : {})});
+function fdCreate(lid, body, done) {
+  const tmp = -1e9 - (++fdSeq), k = 'f:' + tmp;
+  const nf = {id: tmp, list_id: lid, name: body.name, type: body.type, options: JSON.parse(JSON.stringify(body.options || {})), pinned: body.pinned ? 1 : 0, sort: Math.max(0, ...fieldsAll(lid).map(x => +x.sort || 0)) + 1};
+  let real = null;
+  const put = () => {  // again on top of a state fetched meanwhile (core.js OPT), not once the answer is there
+    if (real) return null;
+    if (!fieldById(tmp)) S.fields = [...(S.fields || []), nf];
+    const l = listById(lid);
+    if (l && Array.isArray(l.columns) && !l.columns.includes(k) && l.columns.length < 40) l.columns = [...l.columns, k];  // like the server: a list with own columns shows it last
+    return () => { S.fields = (S.fields || []).filter(x => x.id !== tmp); const m = listById(lid); if (m && Array.isArray(m.columns)) m.columns = m.columns.filter(x => x !== k); };
+  };
+  const pr = optWrite(put, async () => {
+    const j = await api('POST', `/api/lists/${lid}/fields`, body);
+    real = j.id; FD_REAL.set(tmp, j.id);
+    S.fields = [...(S.fields || []).filter(x => x.id !== tmp && x.id !== j.id), fdDef(j)];  // the stand-in -> the real field (with the options' ids)
+    const l = listById(lid);
+    if (l && Array.isArray(l.columns)) l.columns = l.columns.includes('f:' + j.id) ? l.columns.filter(x => x !== k) : l.columns.map(x => x === k ? 'f:' + j.id : x);
+    return j;
+  });
+  FD_TMP.set(tmp, pr.then(j => j.id, () => null));
+  done?.(nf, false);
+  pr.then(async j => {
+    if (j.modules_on?.length || j.type === 'formula') { try { await load(); } catch { /* offline: the next load */ } }  // the module switched on / the computed values
+    render(); done?.(fieldById(j.id) || fdDef(j), true);
+    let id = j.id;
+    histAdd({label: tr('New field') + ': ' + qn(j.name), lids: [lid],
+      undo: async () => { await api('DELETE', '/api/fields/' + id); return {}; },
+      redo: async () => { id = (await api('POST', `/api/lists/${lid}/fields`, body)).id; return {}; }});
+  }, () => done?.(null, true)).finally(() => FD_TMP.delete(tmp));
+  return pr;
+}
+function fdEdit(f, body, done) {
+  const old = {name: f.name, options: JSON.parse(JSON.stringify(f.options || {})), pinned: f.pinned};
+  const vals = {name: body.name, pinned: body.pinned ? 1 : 0, ...(f.type === 'formula' ? {} : {options: JSON.parse(JSON.stringify(body.options || {}))})};  // a formula's options the server works out
+  const pr = optWrite(optSet(() => fieldById(f.id), vals), () => api('PATCH', '/api/fields/' + f.id, body));
+  done?.(fieldById(f.id), false);
+  pr.then(async j => {
+    const x = fieldById(f.id); if (x && j?.id) Object.assign(x, fdDef(j));
+    if (f.type === 'select' || f.type === 'multiselect') {  // removed options are cleared in all tasks (the server did it)
+      const keep = new Set((x?.options?.options || []).map(o => o.id));
+      for (const t of S.tasks.values()) {
+        const v = t.fields?.[f.id]; if (v == null) continue;
+        const left = String(v).split(',').filter(i => keep.has(i)).join(',');
+        if (left !== String(v)) { t.fields = {...t.fields}; if (left && f.type === 'multiselect') t.fields[f.id] = left; else delete t.fields[f.id]; }
+      }
+    }
+    if (f.type === 'formula') { try { await load(); } catch { /* offline */ } }  // the computed values
+    render(); done?.(fieldById(f.id), true);
+    const back = {name: old.name, pinned: !!old.pinned, options: old.options, ...(f.type === 'formula' ? {formula: old.options.formula || ''} : {})};
+    const go = b => async () => { await api('PATCH', '/api/fields/' + f.id, b); return {}; };
+    histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back), redo: go(body)});
+  }, () => done?.(fieldById(f.id), true));
+  return pr;
+}
+function fdDelete(f, done) {
+  const vals = {}, lid = f.list_id;
+  let was = null;
+  const put = () => {
+    const x = fieldById(f.id); if (!x) return null;
+    was = was || JSON.parse(JSON.stringify(x));
+    S.fields = (S.fields || []).filter(y => y.id !== f.id);
+    for (const t of S.tasks.values()) if (t.fields?.[f.id] != null) { if (!(t.id in vals)) vals[t.id] = t.fields[f.id]; t.fields = {...t.fields}; delete t.fields[f.id]; }
+    return () => {
+      if (!fieldById(f.id)) S.fields = [...(S.fields || []), was];
+      for (const [tid, v] of Object.entries(vals)) { const t = S.tasks.get(+tid); if (t) t.fields = {...t.fields, [f.id]: v}; }
+    };
+  };
+  const pr = optWrite(put, () => api('DELETE', '/api/fields/' + f.id));
+  done?.(null, false);
+  pr.then(() => {
+    done?.(null, true);
+    if (!was) return;
+    let id = f.id;
+    const e = histAdd({label: tr('Delete field') + ': ' + qn(was.name), lids: [lid],
+      undo: async () => {  // the field again (same name, type, options with their ids), then the values of the tasks loaded here
+        id = (await api('POST', `/api/lists/${lid}/fields`, fdBody(was))).id;
+        const items = Object.fromEntries(Object.entries(vals).filter(([tid]) => S.tasks.has(+tid)).map(([tid, v]) => [tid, {fields: {[id]: v}}]));
+        return Object.keys(items).length ? histBatch('patch_each', Object.keys(items), {items}) : {};
+      },
+      redo: async () => { await api('DELETE', '/api/fields/' + id); return {}; }});
+    histToast(tr('“{0}” deleted', was.name), e);
+  }, () => done?.(fieldById(f.id), true));
+  return pr;
+}
 function fieldModal(lid, f, done) {
   const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}])), stages: !!f?.options?.stages};  // 2.410.0 A (#3514): + stages
   const md = modal(`<h3>${edit ? tr('Edit field') : tr('New field')}</h3>
@@ -653,20 +753,27 @@ function fieldModal(lid, f, done) {
     if (a === 'opt-add') { st.opts.push({id: '', name: '', color: LCOLORS[(st.opts.length % (LCOLORS.length - 1)) + 1]}); extra(); $$('[data-oname]', md).pop()?.focus(); return; }
     if (a === 'close') { md.remove(); return; }
     if (a === 'fd-cols') { colModal(lid); return; }  // 2.40.0 (#1429): own columns decide what the rows show
+    if ((a === 'del' || a === 'save') && edit && f.id < 0) { await fdReal(f.id); f = fieldById(FD_REAL.get(f.id)) || f; if (f.id < 0) return; }  // 2.554.0 B (#4658): a field still on its way: its real id first
     if (a === 'del') {
       // 2.40.0 (#1192): the server counts every task with a value (also those not loaded here); the local count if offline
       const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
       if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
-      try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
-      md.remove(); await load(); render(); done && done(); return;
+      md.remove(); fdDelete(f, done); return;  // 2.554.0 B (#4658): gone at once, the server follows (fdDelete)
     }
     if (a === 'save') {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
       const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' || st.type === 'multiselect' ? {options: st.opts.filter(o => o.name.trim()), ...(st.type === 'select' ? {stages: st.stages} : {})} : cfkModalOpts(md, st.type);  // 2.156.0 B (#2069)
       const body = {name, options, pinned: $('#fd-pin', md).checked};
       if (st.type === 'formula') Object.assign(body, fxModalBody(md));  // 2.43.0 (#1328): the server checks it (position / field name)
-      try { await api(edit ? 'PATCH' : 'POST', edit ? '/api/fields/' + f.id : `/api/lists/${lid}/fields`, edit ? body : {...body, type: st.type}); } catch { return; }
-      md.remove(); await load(); render(); done && done();
+      // 2.554.0 B (#4658): the dialog closes and the field shows at once (fdCreate / fdEdit); offline it stays open (fields need the server)
+      // what the server would refuse is said here, the dialog stays: a selection without options, a third pinned field, field 21
+      if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
+      if ((st.type === 'select' || st.type === 'multiselect') && !options.options.length) { toast(tr('A selection field needs at least one option')); return; }
+      if (body.pinned && !(edit && f.pinned) && fieldsAll(lid).filter(x => x.pinned && x.id !== f?.id).length >= 2) { toast(tr('At most {0} fields can be shown on the task rows', 2)); return; }
+      if (!edit && fieldsAll(lid).length >= 20) { toast(tr('At most {0} fields per project', 20)); return; }
+      const pr = edit ? fdEdit(f, body, done) : fdCreate(lid, {...body, type: st.type}, done);
+      if (st.type === 'formula') { try { await pr; } catch { return; } }  // only the server reads a formula: the dialog stays open until it took it (an error names the position)
+      md.remove();
     }
   });
   const optMove = (i, j) => {  // #1193: option i to place j (the order is the order of the select and of sorting by the field)

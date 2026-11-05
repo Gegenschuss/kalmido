@@ -78,6 +78,7 @@ function tcVal(f, raw) {  // typed text -> the stored value (null = empty)
   return v;
 }
 async function tcSave(tid, fid, v) {
+  if (fid < 0) { fid = await fdReal(fid); if (!fid) { render(); return; } }  // 2.554.0 B (#4658): a new field's value waits for its real id
   const t = taskById(tid); if (!t) return;
   const old = t.fields?.[fid] ?? null;
   if (old === v) { render(); return; }
@@ -158,17 +159,18 @@ function tcFieldBtns(k, name) {
     `<button type="button" class="iconbtn colfd" data-colfd="${esc(k.slice(2))}" title="${esc(tr('Delete field'))}" aria-label="${esc(tr('Delete field') + ': ' + name)}">${ic('trash', 's')}</button>`;
 }
 async function tcFieldAct(l, b, resync) {
-  const f = fieldById(+(b.dataset.colfe || b.dataset.colfd)); if (!f) return;
+  let f = fieldById(+(b.dataset.colfe || b.dataset.colfd)); if (!f) return;
+  if (f.id < 0) { f = fieldById(await fdReal(f.id)); if (!f) return; }  // 2.554.0 B (#4658): a new field still on its way
   if (b.dataset.colfe) { fieldModal(l.id, f, () => resync(null, 'f:' + f.id)); return; }
   // 2.530.0 B (#4316): the server counts every task with a value (done, not loaded, in the trash), like projects.js; local only offline
   const n = await api('GET', `/api/fields/${f.id}/count`).then(j => j.tasks, () => [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length);
   if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
-  try { await api('DELETE', '/api/fields/' + f.id); } catch { return; }
-  await load(); render(); resync();
+  fdDelete(f, () => resync());  // 2.554.0 B (#4658): gone at once, back on an error (projects.js)
 }
 function tcFieldAdd(l, resync) {
   const had = new Set(fieldsAll(l.id).map(f => f.id)), off = !fieldsOn();
-  fieldModal(l.id, null, async () => {
+  fieldModal(l.id, null, async (f0, final) => {
+    if (!final || !f0) { resync(f0 && 'f:' + f0.id, f0 && 'f:' + f0.id); return; }  // 2.554.0 B (#4658): at once with its stand-in id, the real one after the answer
     if (off && !fieldsOn()) { try { await api('PATCH', '/api/settings', {set_delta: {features: {add: ['fields']}}}); } catch { /* the server said why */ } }
     if (off) { try { await load(); } catch { /* offline */ } render(); toast(tr('Custom fields are switched on now (Settings > Modules)')); }
     const nf = fieldsAll(l.id).find(f => !had.has(f.id)); if (!nf) { resync(); return; }

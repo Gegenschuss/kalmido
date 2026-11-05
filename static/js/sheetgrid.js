@@ -88,7 +88,7 @@ document.addEventListener('focusin', e => {
 function sgKind(k) {
   if (k === 'title' || k === 'due' || k === 'who') return k;
   const f = k.startsWith('f:') ? fieldById(+k.slice(2)) : null;
-  return f && f.type !== 'formula' ? 'f' : null;
+  return f && f.type !== 'formula' && f.id > 0 ? 'f' : null;  // 2.554.0 B (#4658): a new field still on its way (stand-in id) takes no range / paste yet
 }
 function sgGet(t, k) {  // the stored value of a cell
   if (k === 'title') return t.title;
