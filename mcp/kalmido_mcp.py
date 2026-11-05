@@ -1855,7 +1855,7 @@ TOOLS += [
     ("create_note", "2.17.0: write a note in a project (owner, project admins, members).", _obj({"list_id": S_ID, **NOTE_IN}, ["list_id", "title"]),
      lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/notes", body=_pick(a, ("title", "body", "tags", "pinned")))),
     ("update_note", "2.17.0: change a note; list_id moves it; expect_updated_at (from get_note) refuses with 409 when someone changed it "
-                    "in between (the answer carries the current note).",
+                    "in between (the answer carries the current note). 2.564.0: required for agents when title, body or tags change.",
      _obj({"note_id": S_ID, **NOTE_IN, "list_id": S_ID, "expect_updated_at": {"type": "string"}}, ["note_id"]),
      lambda api, a: api.call("PATCH", f"/notes/{int(a['note_id'])}", body=_pick(a, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at")))),
     ("delete_note", "2.17.0: delete a note. 2.272.0: it goes to the trash (restore_note brings it back until the trash period ends).",
@@ -2199,9 +2199,10 @@ TOOLS += [
      lambda api, a: api.call("GET", f"/documents/{int(a['document_id'])}")),
     ("update_document", "2.48.0: set fields of a document (needs edit): date, due, amount, currency, sender, type, tags, custom_fields (2.153.0). Your values "
                         "are marked as set by an agent; where the workspace leaves a feature to an agent they become suggestions "
-                        "in To review for a person to accept. Never moves a document.",
-     _obj({"document_id": S_ID, **_DOC}, ["document_id"]),
-     lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC)))),
+                        "in To review for a person to accept. Never moves a document. 2.564.0: expect_updated_at (updated_at from "
+                        "get_document) is required; someone changed it since -> 409 with the current document.",
+     _obj({"document_id": S_ID, **_DOC, "expect_updated_at": {"type": "string"}}, ["document_id", "expect_updated_at"]),
+     lambda api, a: api.call("PATCH", f"/documents/{int(a['document_id'])}", body=_pick(a, tuple(_DOC) + ("expect_updated_at",)))),
 ]
 
 TOOLS += [

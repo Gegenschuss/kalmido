@@ -1073,12 +1073,19 @@ Read first, send the version back:
 | Knowledge | `PATCH /api/v1/wiki/pages/{id}` (MCP `wiki_write`) | `expect_updated_at` or `If-Match` | `updated_at` of `wiki_read` |
 | Tables | `PUT /api/v1/sheets/{id}/cells` (MCP `sheet_set_cells`) | `expect_rev`, or `prev` with every cell | `rev` / the cells of `sheet_read` |
 | Files | `POST /api/v1/files/{id}/versions` (MCP `write_file` with `file_id`) | `expect_version` or `If-Match` | `version` of `list_files` / `read_file` |
+| Documents | `PATCH /api/v1/documents/{id}` (MCP `update_document`) | `expect_updated_at` or `If-Match` | `updated_at` of `get_document` |
+| Notes | `PATCH /api/v1/notes/{id}` with `title`, `body` or `tags` (MCP `update_note`) | `expect_updated_at` | `updated_at` of `get_note` |
+| Events, contacts | `PATCH /api/v1/events/{id}`, `/contacts/{id}` (MCP `update_event`, `update_contact`) | `expect_updated_at` (or `expect`, `If-Match`) | `updated_at` of the event / contact |
+| Office drafts | quotation draft, letter draft, lead (MCP `update_offer_draft`, `update_letter_draft`, `update_office_lead`) | `expect_updated_at` | `updated_at` of the draft / lead |
 
 Content fields of a task: `title`, `notes`, `due`, `due_time`, `start`, `deadline`, `deadline_in_today`, `plan_start`,
 `duration`, `priority`, `repeat`, `repeat_from`, `assignee_id`, `assignee_group_id`, `rotation`, `list_tags`, `tags`,
 `people`, `fields`, `type`, `milestone`, `milestone_id`, `family`, `reviewer_id`, `url`, `points`, `snippets`. State steps
 need no version: moving (`list_id`, `section_id`, `parent_id`, `sprint_id`, `POST .../move`), `pinned`, `locked`,
 `stars`, reminders, the delegation, `delivery`, `irreversible`, `shift_chain`, completing and reopening.
+
+With `_prev` alone (no `expect_updated_at` / `If-Match`) every content field you change must be in `_prev` (in a batch: in
+the entry of every id); an empty `_prev` counts as no version.
 
 Example: `PATCH /api/v1/tasks/42` `{"title": "New title", "expect_updated_at": "2026-11-05T10:00:00.123Z"}`.
 

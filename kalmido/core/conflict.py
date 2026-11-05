@@ -56,11 +56,19 @@ def need_version(b, *fields, header=True):
     from ..agents.core import is_agent
     if not has_request_context() or not (is_agent(getattr(g, "user", None)) or g.get("ofa_agent")):  # ofa_agent: an agent acting as
         return  # a person in the office (office/agentdocs.py _as_person swaps g.user)
-    if isinstance(b, dict) and any(b.get(k) not in (None, "") for k in fields):
+    # review 2.564.0: an empty _prev {} / [] says nothing about what was read -> as if missing
+    if isinstance(b, dict) and any(b.get(k) not in (None, "") and b.get(k) != {} and b.get(k) != [] for k in fields):
         return
     if header and (request.headers.get("If-Match") or "").strip():
         return
     raise VersionRequired(fields + (("If-Match",) if header else ()))
+
+
+def version_rule():
+    """2.564.0 (#4702): True when the current request must carry a version (an agent account, need_version)."""
+    from flask import g, has_request_context
+    from ..agents.core import is_agent
+    return has_request_context() and bool(is_agent(getattr(g, "user", None)) or g.get("ofa_agent"))
 
 
 def take_version(b, key="expect_updated_at"):

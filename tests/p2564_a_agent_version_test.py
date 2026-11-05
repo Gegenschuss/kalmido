@@ -94,6 +94,12 @@ def tasks_round(who, h, lid, person):
     check(call(h, "GET", f"/tasks/{T}").json()["notes"] == "The person's text", f"{who}: the person's change stays")
     r = call(h, "PATCH", f"/tasks/{T}", json={"title": "x", "_prev": {"title": "Plan the shoot"}})
     check(r.ok and r.json()["title"] == "x", f"{who}: _prev counts as the version {r.status_code} {r.text[:200]}")
+    # review 2.564.0: an empty _prev or one without the changed field is no version
+    r = call(h, "PATCH", f"/tasks/{T}", json={"notes": "Agent text", "_prev": {}})
+    check(vreq(r), f"{who}: an empty _prev: 400 version_required {r.status_code} {r.text[:200]}")
+    r = call(h, "PATCH", f"/tasks/{T}", json={"title": "y", "notes": "Agent text", "_prev": {"title": "x"}})
+    check(vreq(r) and "_prev.notes" in r.json()["error"]["fields"], f"{who}: _prev without the changed notes: 400 {r.status_code} {r.text[:200]}")
+    check(call(h, "GET", f"/tasks/{T}").json()["notes"] == "The person's text", f"{who}: the person's text stays")
     cur = call(h, "GET", f"/tasks/{T}").json()
     r = call(h, "PATCH", f"/tasks/{T}", hdr={"If-Match": '"' + cur["updated_at"] + '"'}, json={"due": "2027-03-01"})
     check(r.ok and r.json()["due"] == "2027-03-01", f"{who}: If-Match counts as the version {r.status_code} {r.text[:200]}")
@@ -127,12 +133,47 @@ check(vreq(r), f"batch without _prev: 400 version_required {r.status_code} {r.te
 r = call(AGH, "POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"title": "x"}, "_prev": {str(BT[0]): {"title": "Batch 0"}}})
 check(vreq(r) and [A.get(B + f"/api/tasks/{i}").json()["title"] for i in BT] == ["Batch 0", "Batch 1"],
       f"batch with _prev for one of two: 400, nothing changes {r.status_code} {r.text[:200]}")
+r = call(AGH, "POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"title": "x", "due": "2027-05-01"},
+                                           "_prev": {str(i): {"title": f"Batch {n}"} for n, i in enumerate(BT)}})
+check(vreq(r) and [A.get(B + f"/api/tasks/{i}").json()["due"] for i in BT] == ["2027-04-01"] * 2,
+      f"review: batch _prev without the changed due: 400, nothing changes {r.status_code} {r.text[:200]}")
 r = call(AGH, "POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"title": "x"}, "_prev": {str(i): {"title": f"Batch {n}"} for n, i in enumerate(BT)}})
 check(r.ok and r.json()["count"] == 2, f"batch with _prev for all: writes {r.status_code} {r.text[:200]}")
 r = call(AGH, "POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"pinned": True}})
 check(r.ok and r.json()["count"] == 2, f"batch state step without _prev: as before {r.status_code} {r.text[:200]}")
 r = call(PH, "POST", "/tasks/batch", json={"ids": BT, "action": "update", "changes": {"title": "y"}})
 check(r.ok and r.json()["count"] == 2, f"a person's batch without _prev: as before {r.status_code} {r.text[:200]}")
+
+# review 2.564.0: notes of a list - a text change needs the version, moving / pinning does not
+r = call(AGH, "POST", f"/lists/{L}/notes", json={"title": "Call sheet", "body": "First"})
+check(r.ok, f"setup: the agent's note {r.status_code} {r.text[:200]}")
+NID = (r.json() or {}).get("id")
+seen = call(AGH, "GET", f"/notes/{NID}").json()
+check(A.patch(B + f"/api/notes/{NID}", json={"body": "The person's text"}).ok or
+      call(PH, "PATCH", f"/notes/{NID}", json={"body": "The person's text"}).ok, "setup: a person changes the note")
+r = call(AGH, "PATCH", f"/notes/{NID}", json={"body": "Agent text"})
+check(vreq(r), f"note without a version: 400 version_required {r.status_code} {r.text[:200]}")
+r = call(AGH, "PATCH", f"/notes/{NID}", json={"pinned": True})
+check(r.ok, f"note pin without a version: as before {r.status_code} {r.text[:200]}")
+cur = call(AGH, "GET", f"/notes/{NID}").json()
+r = call(AGH, "PATCH", f"/notes/{NID}", json={"body": "Agent text", "expect_updated_at": cur.get("updated_at")})
+check(r.ok and r.json().get("body") == "Agent text", f"note with the current version writes {r.status_code} {r.text[:200]}")
+
+# review 2.564.0: a document's fields (receipts) - the same version as the app's document sheet
+import base64  # noqa: E402
+r = call(AGH, "POST", "/documents", json={"name": "receipt.txt", "mime": "text/plain",
+                                          "content_base64": base64.b64encode(b"Invoice 42 total 19.00 EUR").decode()})
+DOC = (r.json() or {}).get("id") if r.ok else None
+check(DOC, f"setup: the agent's document {r.status_code} {r.text[:200]}")
+if DOC:
+    r = call(AGH, "PATCH", f"/documents/{DOC}", json={"amount": "19.00"})
+    check(vreq(r), f"document without a version: 400 version_required {r.status_code} {r.text[:200]}")
+    cur = call(AGH, "GET", f"/documents/{DOC}").json()
+    r = call(AGH, "PATCH", f"/documents/{DOC}", json={"amount": "19.00", "expect_updated_at": cur.get("updated_at")})
+    check(r.ok, f"document with the current version writes {r.status_code} {r.text[:200]}")
+    if cur.get("state") not in ("wait", "run"):
+        r = call(AGH, "PATCH", f"/documents/{DOC}", json={"amount": "20.00", "expect_updated_at": cur.get("updated_at")})
+        check(conflict(r), f"document with an old version: 409 {r.status_code} {r.text[:200]}")
 
 # ================================================================== knowledge page
 r = A.post(B + "/api/wiki/pages", json={"space": SP, "path": "Team/Plan", "body": "First"})

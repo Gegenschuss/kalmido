@@ -768,7 +768,9 @@ def v1_office_offer_patch(did):
         old = doc_items(c, did, oid)
         ofa_match_ids(items, old)
         before = ofx_items_brief(old)
-        kept = _put_items(c, oid, r, items, False, flags, keep=False if exp else "agent")  # 2.269.0 A (#3012): billed receipts' positions stay
+        kept = _put_items(c, oid, r, items, False, flags, keep="agent")  # 2.269.0 A (#3012): billed receipts' positions stay
+        # review 2.564.0 (#4702): every agent sends a version now, so "with a version = left-out billed positions are deleted"
+        # would have become the normal case; they stay for agents (a person removes them in the app)
         after = ofx_items_brief(doc_items(c, did, oid))
         if before != after:
             ofx_log(c, oid, "items", doc_id=did, detail={"before": before, "after": after})

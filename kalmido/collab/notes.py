@@ -373,6 +373,9 @@ def v1_note_update(nid):
     reject_unknown(b, ("title", "body", "tags", "pinned", "list_id", "expect_updated_at", "share_ok"))  # 2.477.0 (#3881): share_ok
     from .liste2e import le2a_api_refuse
     le2a_api_refuse(db(), need_note(db(), nid)["list_id"], b.get("list_id"))  # 2.64.1 (#1817)
+    if {"title", "body", "tags"} & set(b):  # review 2.564.0 (#4702): an agent's text change says what it read (moving, pinning stay free)
+        from ..core.conflict import need_version
+        need_version(b, "expect_updated_at", header=False)
     j = v1_call(note_update, nid, body=b)
     return jsonify({k: v for k, v in j.items() if k != "updated_by_name"})
 

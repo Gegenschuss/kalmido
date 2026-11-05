@@ -40,7 +40,7 @@ from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_m
 from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
-from ..core.conflict import need_version  # 2.564.0 (#4702)
+from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
 from ..calendars.caldav import apppw_delete, apppw_list, dav_info
@@ -1331,6 +1331,15 @@ def v1_task_need_version(b, fields=("expect_updated_at", "_prev"), header=True):
     """2.564.0 (#4702): b = the raw body of a task change (API names) -> need_version when it touches a versioned field."""
     if isinstance(b, dict) and any(k in b for k in V1_TASK_VERSIONED):
         need_version(b, *fields, header=header)
+        # review 2.564.0: with _prev alone (no expect_updated_at / If-Match) every changed content field is in _prev,
+        # else a field missing there is written without a comparison
+        p = b.get("_prev")
+        if isinstance(p, dict) and version_rule() and b.get("expect_updated_at") in (None, "") \
+                and not (header and (request.headers.get("If-Match") or "").strip()):
+            have = set(p) | ({"notes", "content"} if {"notes", "content"} & set(p) else set())
+            miss = sorted(k for k in b if k in V1_TASK_VERSIONED and k not in have)
+            if miss:
+                raise VersionRequired(tuple("_prev." + k for k in miss))
 
 
 @app.patch("/api/v1/tasks/<int:tid>")

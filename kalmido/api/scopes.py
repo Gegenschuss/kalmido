@@ -684,6 +684,13 @@ def v1_task_batch():
     if act == "update" and is_agent(g.user) and any(k in b["changes"] for k in V1_TASK_VERSIONED) \
             and {str(i) for i in ids} - set(prev):  # 2.564.0 (#4702): a task of the batch without what the agent read
         raise VersionRequired(("_prev",))
+    if act == "update" and is_agent(g.user) and "_prev" in b:  # review 2.564.0: each task's _prev names every changed
+        chg = {k for k in b["changes"] if k in V1_TASK_VERSIONED}  # content field (else it is written without a comparison)
+        for k, v in _v1_batch_per(b["_prev"], "_prev", ids).items():
+            have = set(v) if isinstance(v, dict) else set()
+            have |= {"notes", "content"} if {"notes", "content"} & have else set()
+            if chg - have:
+                raise VersionRequired(tuple(f"_prev.{k}.{f}" for f in sorted(chg - have)))
     c = db()
     ids = list(dict.fromkeys(ids))
     vis = [i for i in ids if task_visible(c, i, me())]

@@ -168,13 +168,25 @@ def v1_doc_patch(nid):
     """Set fields (role edit): date, due, amount, currency, sender, type, tags (names), text (only while none was
     recognised), custom_fields {id or name: value} (2.153.0). An agent's values are marked "set by an agent"; features on level agent become suggestions."""
     b = v1_json()
-    extra = sorted(k for k in b if k not in V1_FIELDS)
+    extra = sorted(k for k in b if k not in V1_FIELDS + ("expect_updated_at",))  # review 2.564.0 (#4702): + the version read
     if extra:
         raise UnknownFields(extra)
     c = db()
     need_node(c, nid, write=True)
     if not S.meta_row(c, nid):
         raise Denied(404)
+    # review 2.564.0 (#4702, #4701): the same version as the document sheet of the app (docs_patch): agents must send it,
+    # a stale one -> 409 with the document; while the recognition runs no check (it keeps values set by hand)
+    from ..core.conflict import ccf_check, need_version
+    from ..core.pg import write_lock
+    need_version(b, "expect_updated_at")
+    if not b.get("expect_updated_at") and (request.headers.get("If-Match") or "").strip():
+        b = {**b, "expect_updated_at": request.headers["If-Match"].strip().removeprefix("W/").strip('"')}
+    write_lock(c, f"doc_meta-{nid}")
+    m0, n0 = S.meta_row(c, nid), need_node(c, nid)
+    if m0["state"] not in ("wait", "run"):
+        ccf_check(b, m0["updated_at"], "current", lambda: _v1_doc(c, m0, n0, full=True, role=n0["role"]))
+    b = {k: v for k, v in b.items() if k != "expect_updated_at"}
     if "tags" in b and not isinstance(b["tags"], list):
         raise BadInput(tr("Invalid value: {0}", "tags"))
     from ..agents.core import is_agent
@@ -182,6 +194,8 @@ def v1_doc_patch(nid):
     e = doc_update(c, nid, b, me(), by="agent" if is_agent(g.user) else None)
     if e:
         raise BadInput(e[0].get_json().get("error") or tr("Invalid value: {0}", "document"))
+    from ..core.db import iso_ms, now_utc
+    c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))  # review 2.564.0: a new version, as docs_patch
     fs_log_add(c, nid, "edit", ",".join(sorted(b))[:200])
     bump(c)
     c.commit()
