@@ -22,10 +22,11 @@ import requests
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
 from freelancer_fixture import freelancer  # noqa: E402
-from kt import B, check, dbx, done, sess  # noqa: E402
+from kt import B, check, dbx, docker_logs_on_first_fail, done, sess  # noqa: E402
 from obj_probe import K, agent, ids, new, role, start  # noqa: E402
 
 start("OBJCORE")
+docker_logs_on_first_fail()
 assert sess().post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
 A.post(B + "/api/admin/setup", json={"org_name": "Example Studio", "lang": "en", "collab_all": True, "modules": ["cal", "comments", "collab"]})
@@ -76,8 +77,8 @@ r = Ca.get(B + f"/api/obj/{K}/{P1}/shares")
 check(r.ok and [x["user_id"] for x in r.json()["shares"]] == [uid["bob"]], f"the shares of the object {r.text[:200]}")
 check(dbx("SELECT by_role FROM fs_shares WHERE id=?", (SB,))[0][0] == "owner", "the share notes the role of who made it (by_role)")
 r = Ca.delete(B + f"/api/obj/{K}/{P1}/shares/{SB}")
-check(r.ok and role(Bo, P1) == 404 and len(r.json()["revoked"]) == 1 if r.ok else False, f"taken back: bob nothing, restorable ({r.status_code})")
-RV = r.json().get("revoked") if r.ok else 0
+RV = r.json().get("revoked_id") if r.ok else 0
+check(r.ok and role(Bo, P1) == 404 and [x["id"] for x in r.json()["revoked"]] == [RV] if r.ok else False, f"taken back: bob nothing, restorable ({r.status_code})")
 check(Bo.post(B + f"/api/obj/{K}/{P1}/shares/{RV}/restore").status_code == 404, "bob cannot restore it")
 r = Ca.post(B + f"/api/obj/{K}/{P1}/shares/{RV}/restore")
 check(r.ok and role(Bo, P1) == "edit", f"restored: bob edit again ({r.status_code} {r.text[:160]})")
@@ -174,7 +175,7 @@ check(r.status_code == 201 and FA.role(FP["id"]) == "edit" and [x["id"] for x in
 check(Fr.get(B + f"/api/obj/{K}/{FP['id']}/shares").ok and Fr.get(B + f"/api/obj/{K}/{FP['id']}/history").ok, "her shares and history")
 r = Fr.delete(B + f"/api/obj/{K}/{FP['id']}/shares/{r.json().get('id')}")
 check(r.ok and FA.role(FP["id"]) == 404, "taken back from her agent")
-check(Fr.post(B + f"/api/obj/{K}/{FP['id']}/shares/{r.json().get('revoked')}/restore").ok and FA.role(FP["id"]) == "edit", "and given back")
+check(Fr.post(B + f"/api/obj/{K}/{FP['id']}/shares/{r.json().get('revoked_id')}/restore").ok and FA.role(FP["id"]) == "edit", "and given back")
 check(role(A, FP["id"]) == 404 and role(Ol, FP["id"]) == 404 and AG.role(FP["id"]) == 404, "nobody else reaches it")
 
 sys.exit(done("obj_core"))

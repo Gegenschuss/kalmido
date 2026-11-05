@@ -151,7 +151,7 @@ def obj_unshare_route(kind, rid, sid):
     c, uid = db(), me()
     rev = obj_unshare(c, uid, kind, rid, sid)
     c.commit()
-    return jsonify(revoked=rev, **obj_shares(c, uid, kind, rid))
+    return jsonify(revoked_id=rev, **obj_shares(c, uid, kind, rid))
 
 
 @app.post("/api/obj/<kind>/<int:rid>/shares/<int:revoked_id>/restore")
