@@ -137,7 +137,8 @@ def _fs_branches(c, uid):
     roots = {r[0] for r in c.execute("SELECT node_id FROM fs_area_roots WHERE node_id IS NOT NULL")}
     found = []
     for (nid,) in c.execute("""SELECT DISTINCT n.id FROM fs_nodes n JOIN fs_shares s ON s.node_id=n.id WHERE n.owner_id=? AND n.org_id IS NULL
-                               AND COALESCE(s.user_id, s.group_id) IS NOT NULL AND (s.expires_at IS NULL OR s.expires_at>?)""",
+                               AND COALESCE(s.user_id, s.group_id) IS NOT NULL AND (s.expires_at IS NULL OR s.expires_at>?)
+                               AND NOT (n.kind='ref' AND n.ref_kind='sheet')""",  # 2.565.0 (#4717): a table's own node carries its shares: the table counts above
                             (uid, iso(now_utc()))).fetchall():
         chain = fs_chain(c, nid)
         if chain and not fs_deleted(chain) and not ({x["id"] for x in chain} & roots):

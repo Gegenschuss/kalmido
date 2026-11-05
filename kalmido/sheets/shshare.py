@@ -372,7 +372,11 @@ def shs_leave(c, oid, uids):
     """org_leave's hook: the shares of organisation oid's tables held by the leaver (and their agents) end."""
     if uids:
         # 2.360.2 M (#2561): an address row stays listed as it was (open again): a row that goes would name the leaver's address
-        c.execute(f"UPDATE sheet_shares SET user_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({','.join('?' * len(uids))})", [oid, *uids])
+        q = ','.join('?' * len(uids))
+        for x in c.execute(f"SELECT sheet_id, core_id, org_id FROM sheet_shares WHERE org_id=? AND email_key!='' AND core_id IS NOT NULL "
+                           f"AND user_id IN ({q})", [oid, *uids]).fetchall():
+            shs_core_drop(c, None, x, "leave")  # 2.565.0 (#4717): its core share goes, the open row holds none
+        c.execute(f"UPDATE sheet_shares SET user_id=NULL, core_id=NULL WHERE org_id=? AND email_key!='' AND user_id IN ({q})", [oid, *uids])
         ended = c.execute(f"UPDATE sheet_shares SET revoked_at=? WHERE org_id=? AND revoked_at IS NULL AND user_id IN ({','.join('?' * len(uids))}) "
                           "RETURNING sheet_id, user_id, core_id, org_id", [iso_ms(now_utc()), oid, *uids]).fetchall()
         for x in ended:
@@ -385,7 +389,7 @@ def shs_leave(c, oid, uids):
 def shs_forget(c, uid):
     """2.453.0 (#3781): before an account is deleted its address rows open again (address kept, no access), like shs_leave;
     the rows picked by name go with the account (foreign key)."""
-    c.execute("UPDATE sheet_shares SET user_id=NULL WHERE user_id=? AND email_key!=''", (uid,))
+    c.execute("UPDATE sheet_shares SET user_id=NULL, core_id=NULL WHERE user_id=? AND email_key!=''", (uid,))  # 2.565.0 (#4717): the core share goes with the account
     shs_drop_cache()
 
 
@@ -439,7 +443,7 @@ def sheets_shares_add(sid):
         return err(tr("Only people and agents of the same workspace can get a share"), 409)
     old = c.execute("SELECT id, revoked_at, email_key FROM sheet_shares WHERE sheet_id=? AND user_id=?", (sid, tid)).fetchone()
     if old and old["email_key"]:  # 2.360.2 M (#2561): the address row stays as it is, the person gets a row of their own
-        c.execute("UPDATE sheet_shares SET user_id=NULL WHERE id=?", (old["id"],))
+        c.execute("UPDATE sheet_shares SET user_id=NULL, core_id=NULL WHERE id=?", (old["id"],))  # 2.565.0 (#4717): the core share is the new row's
         old = None
     ts = iso_ms(now_utc())
     is_new = not old or old["revoked_at"] is not None

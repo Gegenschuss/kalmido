@@ -130,9 +130,14 @@ check(r.ok and 'type="checkbox" disabled checked' in r.json().get("html", "") an
       "#2104: check boxes and emphasis " + r.text[:300])
 r = Da.get(B + f"/api/wiki/shared/files/{pic}/sketch.png")
 check(r.ok and r.content == PNG, f"#2104: the guest reads the shared picture {r.status_code}")
-for x in (f"/api/wiki/shared/files/{spdf}", f"/api/wiki/shared/pages/{secret}", f"/api/wiki/shared/pages/{ab}", f"/api/wiki/pages/{plan}",
-          f"/api/wiki/files/{pic}"):
+for x in (f"/api/wiki/shared/files/{spdf}", f"/api/wiki/shared/pages/{secret}", f"/api/wiki/shared/pages/{ab}"):
     check(Da.get(B + x).status_code == 404, "#2104: the guest gets nothing else: " + x)
+# 2.565.0 (#4717): the person share is a core share of the folder's node now (like a share of the file store's dialog,
+# #2747): the shared page and its file also open through the app's own routes -- the path only from the shared folder on
+r = Da.get(B + f"/api/wiki/pages/{plan}")
+check(r.ok and r.json().get("path") == "Customer A/Plan" and Da.get(B + f"/api/wiki/files/{pic}").ok,
+      "#2104 / #4717: the shared page and its file through the app's routes " + r.text[:160])
+check(Da.get(B + f"/api/wiki/pages/{secret}").status_code == 404, "#2104 / #4717: ... a page not shared not")
 check(not Da.get(B + "/api/wiki/search", params={"q": "customer"}).json().get("pages"), "#2104: the guest's search does not find shared pages")
 check(not Da.get(B + "/api/wiki", params={"space": "private"}).json().get("pages"), "#2104: the guest's own index stays his own")
 check(Bo.get(B + f"/api/wiki/shared/pages/{plan}").status_code == 404 and not shared(Bo), "#2104: somebody else sees nothing")
