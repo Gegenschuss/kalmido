@@ -79,7 +79,7 @@ function astCare(r) {
   if (!ofcAdmin()) return '';
   return `<details class="ast-sec ast-care" ${r?.warranty_until || r?.maint?.length ? 'open' : ''}><summary>${tr('Warranty and maintenance')}</summary>
     <div class="row"><label id="of-warranty_untill">${tr('Warranty until')}</label>${dateIn('of-warranty_until', r?.warranty_until || '', {label: tr('Warranty until'), empty: tr('optional')})}${astTaskLink(r?.warranty_task)}</div>
-    <p class="muted">${esc(tr('Every date becomes a task in your inbox with a reminder; a maintenance repeats.'))}</p>
+    <p class="muted">${esc(tr('Every date becomes a task in your basket with a reminder; a maintenance repeats.'))}</p>
     <div class="ast-maint">${(r?.maint || []).map(astMaintRow).join('')}</div>
     <button type="button" class="btn sm" data-ast="m-add">${ic('plus', 's')} ${tr('Add maintenance')}</button></details>`;
 }

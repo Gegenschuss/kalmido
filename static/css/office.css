@@ -633,8 +633,8 @@ button.dun-hint:focus-visible{outline:.125rem solid var(--accent);outline-offset
 .ast-note{margin:.375rem 0 0;font-size:var(--fs-s)}
 .ast-sec{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--line2)}
 .ast-sec>summary{min-height:2.75rem;display:flex;align-items:center;font-weight:500;cursor:pointer}
-.ast-mrow{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;padding:.4rem 0;border-bottom:1px solid var(--line2)}
-.ast-mrow .ast-ml{flex:1 1 8rem;min-width:0}.ast-me input{width:3.5rem}.ast-task{font-size:.85rem;margin-left:.4rem}  /* 2.558.0 C (#4591) */
+.ast-mrow{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem;padding:.375rem 0;border-bottom:1px solid var(--line2)}
+.ast-mrow .ast-ml{flex:1 1 8rem;min-width:0}.ast-me input{width:3.5rem}.ast-task{font-size:var(--fs-s);margin-left:.375rem}  /* 2.558.0 C (#4591) */
 .ast-rc{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ast-hint:empty{display:none}
 .ast-hint{margin:.25rem 0;font-size:var(--fs-s)}
