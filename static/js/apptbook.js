@@ -118,9 +118,14 @@ async function apbSave() {
   try { APB.data = await api('PUT', '/api/appt/page', D.exists && D.page.updated_at ? {...body, expect_updated_at: D.page.updated_at} : body); }
   catch (x) { if (x.status === 409 && x.data?.current) { APB.data = x.data.current; apbDraw(); } const e2 = $('.aerr', APB.md); if (e2) e2.textContent = x.message || ''; return; }
   apbDraw();
-  offerUndo(tr('Saved'), histAdd({label: tr('Booking page changed'),
-    undo: async () => { if (old) await api('PUT', '/api/appt/page', old); if (APB.md?.isConnected) apbReload(); },
-    redo: async () => { await api('PUT', '/api/appt/page', body); if (APB.md?.isConnected) apbReload(); }}));
+  // 2.566.0 (#4704): undo / redo send only the changed keys against the version the step before left (core.js undoStep):
+  // changed on another device since -> "Changed elsewhere, not undone", that change stays
+  let ver = APB.data?.page?.updated_at || '';
+  const lbl = tr('Booking page changed'), after = () => { if (APB.md?.isConnected) apbReload(); };
+  const st = (b, from) => undoStep('/api/appt/page', b, ver, {method: 'PUT', now: from, label: lbl, then: j => { ver = j?.page?.updated_at || ver; }}).finally(after);
+  offerUndo(tr('Saved'), histAdd({label: lbl,
+    undo: async () => { if (old) return st(old, body); after(); return {}; },
+    redo: () => st(body, old || undefined)}));
 }
 async function apbToggle(cb) {
   const on = cb.checked;
@@ -198,8 +203,10 @@ async function apbTypeSave(t, body) {
   }
   const old = apbTypeBody(t);
   const j = await api('PATCH', `/api/appt/types/${t.id}`, t.updated_at ? {...body, expect_updated_at: t.updated_at} : body); apbReload();  // 2.564.0 D (#4701)
-  offerUndo(tr('Saved'), histAdd({label: tr('Appointment type changed'), undo: async () => { await api('PATCH', `/api/appt/types/${t.id}`, old); apbReload(); },
-    redo: async () => { await api('PATCH', `/api/appt/types/${t.id}`, body); apbReload(); }}));
+  // 2.566.0 (#4704): only the changed keys, against the version the step before left (core.js undoStep)
+  let ver = j?.updated_at || '';
+  const st = (b, from) => undoStep(`/api/appt/types/${t.id}`, b, ver, {now: from, label: t.name || tr('Appointment type changed'), then: x => { ver = x?.updated_at || ver; }}).finally(apbReload);
+  offerUndo(tr('Saved'), histAdd({label: tr('Appointment type changed'), undo: () => st(old, body), redo: () => st(body, old)}));
   return j;
 }
 async function apbTypeDelete(t) {

@@ -188,8 +188,11 @@ function bg_entryModal(e) {
       return;
     }
     const x = BG.data?.entries.find(y => y.id === id); if (x && r?.id === id) Object.assign(x, r);  // the new updated_at (the next save's check)
-    histAdd({label: tr('Entry “{0}” changed', title), undo: async () => { await api('PATCH', `/api/budget/entries/${id}`, before); bg_after(); },
-      redo: async () => { await api('PATCH', `/api/budget/entries/${id}`, body); bg_after(); }});
+    // 2.566.0 (#4704): undo / redo send only the changed keys against the version the step before left (core.js undoStep):
+    // someone else changed the entry since -> "Changed elsewhere, not undone", their change stays
+    let ver = r?.updated_at || '';
+    const st = (b, from) => undoStep(`/api/budget/entries/${id}`, b, ver, {now: from, label: title, then: j => { ver = j?.updated_at || ver; }}).finally(bg_after);
+    histAdd({label: tr('Entry “{0}” changed', title), undo: () => st(before, body), redo: () => st(body, before)});
     toast(tr('Saved')); bg_refresh();
   }, e ? null : '#bg-amt');
   bg_kindWire(md, 'bg-kind', k => { const s = $('#bg-cat', md); s.innerHTML = bg_catOpts(k, +s.value || null); });
@@ -253,9 +256,12 @@ function bg_catsModal() {
   const redraw = async () => { await bg_load(); const w = $('.bgcwrap', md); if (w) w.innerHTML = listHtml(); };
   const patch = async (id, body, before, label) => {
     const cur = cats().find(x => x.id === id);
-    try { const j = await rawFetch('PATCH', `/api/budget/cats/${id}`, cur?.updated_at ? {...body, expect_updated_at: cur.updated_at} : body); if (cur) cur.updated_at = j.updated_at; }  // 2.370.2 (#3088)
+    let ver = '';
+    try { const j = await rawFetch('PATCH', `/api/budget/cats/${id}`, cur?.updated_at ? {...body, expect_updated_at: cur.updated_at} : body); if (cur) cur.updated_at = j.updated_at; ver = j.updated_at || ''; }  // 2.370.2 (#3088)
     catch (x) { if (x.status === 409 && x.data?.category) { toast(tr('Changed in the meantime')); await redraw(); } throw x; }
-    histAdd({label, undo: async () => { await api('PATCH', `/api/budget/cats/${id}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/cats/${id}`, body); bg_after(); }});
+    // 2.566.0 (#4704): each way against the version the step before left (core.js undoStep), changed since -> said, kept
+    const st = b => undoStep(`/api/budget/cats/${id}`, b, ver, {label, then: j => { ver = j?.updated_at || ver; const x = cats().find(y => y.id === id); if (x && j?.updated_at) x.updated_at = j.updated_at; }}).finally(bg_after);
+    histAdd({label, undo: () => st(before), redo: () => st(body)});
   };
   // 2.456.0 (#3837): a category to another place, by the arrows and by dragging: the changed places, ONE undo step
   const moveTo = async (c, to) => {
@@ -338,9 +344,10 @@ async function bg_recModal() {
     if (ed) { $('.bgrfw', md).innerHTML = formHtml(items.find(x => x.id === +ed.dataset.redit)); wireForm(); $('#bg-rt', md).focus(); return; }
     if (sy) {
       const r = items.find(x => x.id === +sy.dataset.rsync); if (!r) return;
-      try { await api('PATCH', `/api/budget/recurring/${r.id}`, {sync_contract: true}); } catch { return; }
-      const before = {amount: r.amount, per: r.per};
-      offerUndo(tr('Matched to the contract'), histAdd({label: tr('“{0}” matched to the contract', r.title), undo: async () => { await api('PATCH', `/api/budget/recurring/${r.id}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/recurring/${r.id}`, {sync_contract: true}); bg_after(); }}));
+      let ver; try { ver = (await api('PATCH', `/api/budget/recurring/${r.id}`, {sync_contract: true}))?.updated_at || ''; } catch { return; }
+      const before = {amount: r.amount, per: r.per}, lbl = tr('“{0}” matched to the contract', r.title), then = j => { ver = j?.updated_at || ver; };
+      // 2.566.0 (#4704): against the version the step before left (core.js undoStep), changed since -> said, kept
+      offerUndo(tr('Matched to the contract'), histAdd({label: lbl, undo: () => undoStep(`/api/budget/recurring/${r.id}`, before, ver, {label: lbl, then}).finally(bg_after), redo: () => undoStep(`/api/budget/recurring/${r.id}`, {sync_contract: true}, ver, {label: lbl, then}).finally(bg_after)}));
       return refresh();
     }
     if (del) {
@@ -363,14 +370,17 @@ async function bg_recModal() {
       try {
         if (rid) {
           const r0 = items.find(x => x.id === rid), before = pickR(r0);
-          try { await rawFetch('PATCH', `/api/budget/recurring/${rid}`, r0?.updated_at ? {...body, expect_updated_at: r0.updated_at} : body); }  // 2.269.0 C (#3017)
+          let ver = '';
+          try { ver = (await rawFetch('PATCH', `/api/budget/recurring/${rid}`, r0?.updated_at ? {...body, expect_updated_at: r0.updated_at} : body))?.updated_at || ''; }  // 2.269.0 C (#3017)
           catch (x) {
             if (x.status !== 409 || !x.data?.item) throw x;
             const cur = x.data.item;
             lifeConflict(md, () => { items = items.map(y => y.id === cur.id ? cur : y); $('.bgrwrap', md).innerHTML = listHtml(); $('.bgrfw', md).innerHTML = formHtml(cur); wireForm(); lifeErr(md, {message: ''}); });
             return;
           }
-          histAdd({label: tr('Recurring entry “{0}” changed', title), undo: async () => { await api('PATCH', `/api/budget/recurring/${rid}`, before); bg_after(); }, redo: async () => { await api('PATCH', `/api/budget/recurring/${rid}`, body); bg_after(); }});
+          // 2.566.0 (#4704): only the changed keys, against the version the step before left (core.js undoStep)
+          const st = (b, from) => undoStep(`/api/budget/recurring/${rid}`, b, ver, {now: from, label: title, then: j => { ver = j?.updated_at || ver; }}).finally(bg_after);
+          histAdd({label: tr('Recurring entry “{0}” changed', title), undo: () => st(before, body), redo: () => st(body, before)});
         } else {
           let cur = await api('POST', `/api/budget/${lid}/recurring`, body);
           histAdd({label: tr('New recurring entry “{0}”', title), undo: async () => { await api('DELETE', `/api/budget/recurring/${cur.id}`); bg_after(); }, redo: async () => { cur = await api('POST', `/api/budget/${lid}/recurring`, body); bg_after(); }});

@@ -75,13 +75,16 @@ async function cg_commit(e, patch, scope) {
     if (r !== ev.rrule) { fwd.rrule = r; back.rrule = ev.rrule; }
   }
   const url = `/api/events/${ev.id}` + (one ? `?occ=${encodeURIComponent(e.occ)}` : '');
-  // 2.565.0 (#4703): every step sends the version it builds on (also "only this date", the undo and the redo): a series another
-  // device changed meanwhile answers 409 (api() says why), the calendar shows the event as it is now, nothing is overwritten
+  // 2.565.0 (#4703): every step sends the version it builds on (also "only this date"): a series another device changed
+  // meanwhile answers 409 (api() says why), the calendar shows the event as it is now, nothing is overwritten
   const re = () => { calInvalidate(); renderView(); };
-  let at = ev.updated_at;
-  const send = b => api('PATCH', url, {...b, expect: at}).then(j => { if (j?.updated_at) at = j.updated_at; return j; }, x => { if (x?.status === 409) re(); throw x; });
-  try { await send(fwd); } catch { return false; }
-  offerUndo(tr('Event changed'), histAdd({label: tr('Times of “{0}”', ev.title || tr('(no title)')), undo: () => send(back), redo: () => send(fwd), post: re}));
+  let j; try { j = await api('PATCH', url, {...fwd, expect: ev.updated_at}); } catch (x) { if (x?.status === 409) re(); return false; }
+  // 2.566.0 (#4704): undo / redo against the version the step before left (the events' key expect, core.js undoStep):
+  // changed elsewhere since -> "Changed elsewhere, not undone", the other change stays
+  const lbl = tr('Times of “{0}”', ev.title || tr('(no title)'));
+  let ver = j?.updated_at || '';
+  const st = b => undoStep(url, b, ver, {verKey: 'expect', label: lbl, then: x => { ver = x?.updated_at || ver; }});
+  offerUndo(tr('Event changed'), histAdd({label: lbl, undo: () => st(back), redo: () => st(fwd), post: re}));
   return true;
 }
 

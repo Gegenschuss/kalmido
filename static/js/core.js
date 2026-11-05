@@ -663,15 +663,16 @@ async function api(method, url, body) {
 // only the keys this step changed go back (old = the values before, o.now = what the save sent; without o.now all of old),
 // with expect_updated_at = seenAt (the updated_at of the own save's answer; empty = an old row without one, no check).
 // o.method PATCH (default) | PUT, o.full = all of old (a PUT route that needs the whole state), o.label = what the message
-// names, o.hist = a history step (no own message: it returns {none, skipped}). -> the answer; changed since (409 with the
-// current state) -> null and "Changed elsewhere, not undone"; any other error is said and thrown (like api())
+// names, o.hist = a history step (no own message: it returns {none, skipped}), o.verKey = a route with its own version key
+// (the events: expect; their 409 carries no state). -> the answer; changed since (409 with the current state, or any 409
+// of a verKey route) -> null and "Changed elsewhere, not undone"; any other error is said and thrown (like api())
 async function undoWrite(url, old, seenAt, o = {}) {
   const now = o.now, back = {};
   for (const k of Object.keys(old || {})) if (o.full || !now || (k in now && JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null))) back[k] = old[k];
-  if (!Object.keys(back).length) return {};
-  try { return await rawFetch(o.method || 'PATCH', url, seenAt ? {...back, expect_updated_at: seenAt} : back); }
+  if (!Object.keys(back).length && !o.full) return {};  // nothing changed: nothing to send (o.full: a POST without fields)
+  try { return await rawFetch(o.method || 'PATCH', url, seenAt ? {...back, [o.verKey || 'expect_updated_at']: seenAt} : back); }
   catch (x) {
-    if (x?.status === 409 && x.data && Object.keys(x.data).some(k => k !== 'error' && k !== 'code')) {
+    if (x?.status === 409 && ((o.verKey && seenAt) || (x.data && Object.keys(x.data).some(k => k !== 'error' && k !== 'code')))) {
       if (!o.hist) toast(o.label ? tr('Changed elsewhere, not undone: {0}', o.label) : tr('Changed elsewhere, not undone'));
       return null;
     }

@@ -79,9 +79,13 @@ async function wkh_restore(p, vid) {
   const put = r => { if (WK.pg?.id === p.id) Object.assign(WK.pg, r, {backlinks: WK.pg.backlinks}); wk_after(sp); return r; };
   let r; try { r = put(await rawFetch('POST', `/api/wiki/pages/${p.id}/versions/${vid}/restore`, {expect_updated_at: (WK.pg?.id === p.id ? WK.pg : p).updated_at})); }
   catch (e) { toast(e.status === 409 ? tr('The page was changed in the meantime. Open the history again.') : e.message); if (e.status === 409) wk_after(sp); return false; }
-  const e = histAdd({label: tr('Restored version of {0}', qn(wk_base(r.path))), ids: [], snaps: [], lids: [], wsp: sp,
-    undo: async () => { put(await rawFetch('PATCH', '/api/wiki/pages/' + p.id, {body: before})); return {skipped: []}; },
-    redo: async () => { put(await rawFetch('POST', `/api/wiki/pages/${p.id}/versions/${vid}/restore`, {})); return {skipped: []}; }});
+  // 2.566.0 (#4704): undo / redo against the version the step before left (core.js undoStep): the page saved by someone else
+  // since -> "Changed elsewhere, not undone", their text stays
+  let ver = r.updated_at || '';
+  const lbl = tr('Restored version of {0}', qn(wk_base(r.path))), then = x => { if (x?.id) { put(x); ver = x.updated_at || ver; } };
+  const e = histAdd({label: lbl, ids: [], snaps: [], lids: [], wsp: sp,
+    undo: () => undoStep('/api/wiki/pages/' + p.id, {body: before}, ver, {label: lbl, then}),
+    redo: () => undoStep(`/api/wiki/pages/${p.id}/versions/${vid}/restore`, {}, ver, {method: 'POST', full: true, label: lbl, then})});
   histToast(tr('Version restored'), e);
   return true;
 }
