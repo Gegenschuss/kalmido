@@ -968,7 +968,7 @@ function keepFocus(root, fn) {
   return r;
 }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
-    rowRove(); rowMoreWatch(); vl_after(); vm_after(); td_lcSweep(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
+    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   lzGate();  // 2.369.2 (#3136): a view of the start set loads the lists it shows first (liveparts.js)

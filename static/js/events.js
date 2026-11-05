@@ -557,6 +557,7 @@ document.addEventListener('click', async e => {
     case 'refresh': refreshNow(); break;
     case 'chat-unyield': closeDetail(); setTimeout(() => $('#chat-in')?.focus(), 30); break;  // 2.13.2 (#478 N1)
     case 'agband': LS.set('agband', LS.get('agband', true) === false); renderView(); break;
+    case 'agb-more': go('agents'); break;  // 2.556.0 (#4663): "+N" of the agent band
     case 'side-group': sideGroupToggle(a.dataset.g); break;
     case 'copy-id': copyTaskLink(+a.dataset.id); break;  // 2.13.0
     case 'ids-toggle': { const lid = +a.dataset.id; LS.set('ids.' + lid, !idsOn(lid)); render(); break; }

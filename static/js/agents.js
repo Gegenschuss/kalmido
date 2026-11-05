@@ -128,6 +128,26 @@ function agentChip() {
 // line) and the first job waiting for my approval (👍 = approve, ✕ = reject, the same as in the Agents view). Folds per
 // device (LS agband). While the band is on screen the header leaves out its agent dots (no duplicate).
 const BAND_KEYS = ['inbox', 'today', 'tomorrow', 'week', 'all', 'assigned', 'doable'];
+// 2.556.0 (#4663): the band follows its own width (CSS container query in app.css), not the window's. Every agent box is at least
+// AGB_MIN rem wide: as many as fit are shown, the rest is one "+N" that opens the Agents page. A waiting-job cell takes 1.35 shares
+// (as in the CSS) while the band is wide, a row of its own below 30rem.
+const AGB_MIN = 8, AGB_MORE = 3;
+function agb_fit() {
+  const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+  for (const band of document.querySelectorAll('#view .agband')) {
+    const box = band.querySelector('.agb-cells'), more = box && box.querySelector('.agb-more'), w = box ? box.clientWidth / rem : 0;
+    if (!box || !more || !w) continue;  // folded, or the cells are hidden at a tiny width (only the dots show)
+    const cells = [...box.querySelectorAll('.agb-a')], share = box.querySelector('.agb-w') && band.clientWidth / rem >= 30 ? 1.35 : 0;
+    let fit = Math.max(1, Math.floor(w / AGB_MIN - share + 1e-6));
+    if (cells.length > fit) fit = Math.max(1, Math.floor((w - AGB_MORE) / AGB_MIN - share + 1e-6));
+    if (cells.length <= fit) fit = cells.length;
+    cells.forEach((c, i) => { c.hidden = i >= fit; });
+    const n = cells.length - fit;
+    more.hidden = !n; if (n) { more.textContent = '+' + n; more.setAttribute('aria-label', tr('Agents') + ' +' + n); }
+  }
+}
+const agbRO = typeof ResizeObserver === 'function' ? new ResizeObserver(() => agb_fit()) : null;  // the band's own width (a column narrows without the window changing)
+function agb_after() { if (!agbRO) { agb_fit(); return; } agbRO.disconnect(); for (const b of document.querySelectorAll('#view .agband')) agbRO.observe(b); agb_fit(); }
 function bandAgents() {
   if (isMobile() || S.route.mod !== 'tasks' || !feat('agents')) return [];
   // 2.366.0 (#3000): an agent that never connected takes no row over the tasks (its grey dot in the header says it) until it asks something
@@ -184,14 +204,14 @@ function agBandHtml() {
     const p = kids.length ? Math.round(100 * kids.filter(x => x.status).length / kids.length) : null;
     // 2.30.0 (#1039): a status without a task (a chat answer) stays in the chat and the header chip, not in a list's band
     const what = t ? `<span class="mono">#${t.id}</span> ${esc(t.title)}` : esc(st === 'offline' ? agentSt(a) : '–');
-    return `<button class="agb-a hs-${st}" data-act="team-agent" data-aid="${a.id}"${acw_attr(a.org_id)} title="${esc(agentHstLine(a))}"><span class="agb-h">${hdot(st)}<b>${esc(a.name)}</b><span class="muted">${esc(tr(AG_HST[st]))}</span></span><span class="agb-t">${what}</span><span class="agb-p ${st === 'working' && p === null ? 'run' : ''}" aria-hidden="true"><i style="width:${p ?? (st === 'working' ? 40 : 0)}%"></i></span></button>`;
+    return `<button class="agb-a hs-${st}" data-act="team-agent" data-aid="${a.id}"${acw_attr(a.org_id)} title="${esc(agentHstLine(a) + (t ? ' · #' + t.id + ' ' + t.title : ''))}"><span class="agb-h">${hdot(st)}<b>${esc(a.name)}</b><span class="muted">${esc(tr(AG_HST[st]))}</span></span><span class="agb-t">${what}</span><span class="agb-p ${st === 'working' && p === null ? 'run' : ''}" aria-hidden="true"><i style="width:${p ?? (st === 'working' ? 40 : 0)}%"></i></span></button>`;
   };
   // 2.13.2 (#478 N7): in Today the card "… waits for you" shows the same jobs: the band leaves its waiting cell out there
   const wait = job && !(S.route.key === 'today' && waitCard()) ? `<div class="agb-w" role="group" aria-label="${esc(tr('{0} waits for you', job.agent_name))}"><div class="agb-wi"><span class="agb-h">${hdot('waiting')}<b>${esc(tr('{0} waits for you', job.agent_name))}</b></span><span class="agb-t">${job.task_id ? `<span class="mono">#${job.task_id}</span> ` : ''}${esc(job.title)}</span></div>${job.kind
     ? `<button class="btn sm pri" data-act="prop-open" data-jid="${job.id}">${tr('Review the proposal')}</button>`
     : `<button class="btn sm pri agb-ok" data-act="job-do" data-jid="${job.id}" data-a="approve" aria-label="${esc(tr('Approve'))}">${thumbIc(true)} ${tr('Yes|approve')}</button><button class="iconbtn agb-no" data-act="job-do" data-jid="${job.id}" data-a="reject" title="${esc(tr('Reject'))}" aria-label="${esc(tr('Reject'))}">${thumbIc(false)}</button>`}</div>` : '';
   const sum = ags.map(a => hdot(agentHst(a))).join('');
-  return `<section class="agband ${open ? '' : 'closed'}" aria-label="${esc(tr('Agents live'))}"><button class="agb-tog" data-act="agband" aria-expanded="${open}" title="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}" aria-label="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}">${ic('chev', 's')}${open ? '' : `<span class="agb-sum">${sum}<span>${esc(ags.map(a => a.name).join(', '))}</span></span>`}</button>${open ? `<div class="agb-cells">${ags.map(cell).join('')}${wait}</div>` : (job ? `<span class="agb-wmini">${hdot('waiting')}${esc(tr('{0} waits for you', job.agent_name))}</span>` : '')}</section>`;
+  return `<section class="agband ${open ? '' : 'closed'}" aria-label="${esc(tr('Agents live'))}"><button class="agb-tog" data-act="agband" aria-expanded="${open}" title="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}" aria-label="${esc(open ? tr('Fold the agents') : tr('Show the agents'))}">${ic('chev', 's')}${open ? `<span class="agb-sum agb-sumn">${sum}</span>` : `<span class="agb-sum">${sum}<span>${esc(ags.map(a => a.name).join(', '))}</span></span>`}</button>${open ? `<div class="agb-cells">${ags.map(cell).join('')}<button class="agb-more" data-act="agb-more" hidden title="${esc(tr('Agents'))}"></button>${wait}</div>` : (job ? `<span class="agb-wmini">${hdot('waiting')}${esc(tr('{0} waits for you', job.agent_name))}</span>` : '')}</section>`;
 }
 // 2.6.0 (K01): the agent pill and the running indicator merged into one compact chip (shown from header level tl2 on):
 // bot + number, dot + time; a tap opens the one that is there, or a menu with both
