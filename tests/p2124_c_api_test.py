@@ -218,7 +218,7 @@ check(ta.put(V + f"/sheets/{OS}/cells", json={"cells": [{"cell": "A1", "raw": "7
 check(ta.patch(V + f"/sheets/{OS}", json={"list_id": None}).status_code == 403, "the agent cannot detach it")
 check(na.get(V + f"/sheets/{OS}").status_code == 404, "another agent without the share: 404")
 Bo.patch(B + f"/api/sheets/{OS}/shares/{SHA}", json={"role": "write"})
-r = ta.put(V + f"/sheets/{OS}/cells", json={"cells": [{"cell": "A1", "raw": "7"}]})
+r = ta.put(V + f"/sheets/{OS}/cells", json={"cells": [{"cell": "A1", "raw": "7"}], "expect_rev": ta.get(V + f"/sheets/{OS}").json()["rev"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok, "write: the agent writes (one batch) " + r.text[:200])
 Bo.delete(B + f"/api/sheets/{OS}/shares/{SHA}")
 check(ta.get(V + f"/sheets/{OS}").status_code == 404, "stopped: the agent's access ends at once")
@@ -263,7 +263,7 @@ t = shares(Fl, FS).json()
 check(any(a["id"] == DA for a in t.get("agents", [])) and not any(a["id"] in (TA, BB) for a in t.get("agents", [])),
       "freelancer: her own agent is a target, no organisation agents")
 check(share(Fl, FS, user_id=DA, role="write").status_code == 201, "freelancer shares with her own agent")
-check(da.get(V + f"/sheets/{FS}").ok and da.put(V + f"/sheets/{FS}/cells", json={"cells": [{"cell": "A1", "raw": "3"}]}).ok,
+check(da.get(V + f"/sheets/{FS}").ok and da.put(V + f"/sheets/{FS}/cells", json={"cells": [{"cell": "A1", "raw": "3"}], "expect_rev": da.get(V + f"/sheets/{FS}").json()["rev"]}).ok,  # 2.564.0 (#4702): an agent sends the version it read
       "her agent reads and writes it")
 check(share(Fl, FS, user_id=TA, role="read").status_code == 409, "freelancer: an organisation's agent never")
 sh = shares(Fl, FS).json()["shares"]

@@ -17,6 +17,7 @@ from ..core.config import app
 from ..core.access import Denied, need_feat
 from ..core.db import db
 from ..core.i18n import tr
+from ..core.conflict import need_version  # 2.564.0 (#4702)
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_err, v1_json, v1_view
@@ -164,6 +165,8 @@ def v1_sheet_cells(sid):
     r = sh_need(c, sid, write=True)
     if not isinstance(b.get("cells"), list) or not b["cells"]:
         raise BadInput(tr("Invalid value: {0}", "cells"))
+    if not all(isinstance(d, dict) and "prev" in d for d in b["cells"]):  # 2.564.0 (#4702): an agent sends expect_rev or
+        need_version(b, "expect_rev", "prev", header=False)  # a "prev" with every cell (what it read)
     cur = sh_rev_conflict(c, r, b)
     if cur:  # the API's error format: {error: {code, message, rev, cells}}
         return v1_err(409, cur["error"], rev=cur["rev"], cells=cur["cells"])

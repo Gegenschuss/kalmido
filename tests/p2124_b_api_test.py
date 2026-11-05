@@ -231,7 +231,7 @@ check(Ca.get(B + f"/api/sheets/{LS}/history").ok, "#2112: a reader of the list r
 # the agent: new kinds through v1, its batch, undo by a person
 r = ag.post(V + f"/sheets/{LS}/columns", json={"title": "Who", "kind": "person"})
 check(r.status_code in (200, 201), "#2110: v1: an agent adds a person column " + r.text[:200])
-r = ag.put(V + f"/sheets/{LS}/cells", json={"cells": [{"row_id": LR[0], "col_id": LC, "raw": "1"}]})
+r = ag.put(V + f"/sheets/{LS}/cells", json={"cells": [{"row_id": LR[0], "col_id": LC, "raw": "1"}], "expect_rev": ag.get(V + f"/sheets/{LS}").json()["rev"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and r.json().get("batch"), "agent: a checkbox through v1 " + r.text[:200])
 BATCH = r.json().get("batch")
 check(ag.put(V + f"/sheets/{LS}/cells", json={"cells": [{"row_id": LR[0], "col_id": LC, "raw": "perhaps"}]}).status_code == 400, "#2110: v1: a checkbox refuses perhaps")

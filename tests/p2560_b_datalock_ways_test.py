@@ -167,7 +167,7 @@ check(F.get(B + f"/api/contacts/{CT}").ok, "the owner still sees the contact")
 lock(lists=[], areas={"travel": False, "calendar": False, "contacts": False})
 for sid in (S1, S2):
     check(ag("get", f"/sheets/{sid}").status_code == 200, f"opened: table {sid} readable")
-check(ag("put", f"/sheets/{S1}/cells", json={"cells": [{"cell": "A1", "raw": "x"}]}).status_code == 200, "opened: the agent writes S1")
+check(ag("put", f"/sheets/{S1}/cells", json={"cells": [{"cell": "A1", "raw": "x"}], "expect_rev": ag("get", f"/sheets/{S1}").json()["rev"]}).status_code == 200, "opened: the agent writes S1")  # 2.564.0 (#4702): an agent sends the version it read
 check(ag("get", f"/files/{NODE2}/content").status_code == 200, "opened: the filed table through the file store")
 check(ev_ids() >= {E_PLAIN, E_PROJ, E_TRIP}, "opened: every event again")
 check(any(x["id"] == CT for x in ag("get", "/contacts").json().get("data", [])), "opened: the contact again")

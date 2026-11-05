@@ -288,7 +288,7 @@ check(r.status_code == 201 and r.json().get("batch") and r.json().get("book_id")
 AS, BAT = (r.json()["id"], r.json()["batch"]) if r.ok else (0, "")
 r = ta.get(V + f"/sheets/{AT}/tabs")
 check(r.ok and [t["id"] for t in r.json()["data"]] == [AT, AS], "the agent lists the sheets " + r.text[:200])
-check(ta.put(V + f"/sheets/{AT}/cells", json={"cells": [{"cell": "A1", "raw": "=SUMME(Data!A1:A2)"}]}).ok, "a formula into its sheet")
+check(ta.put(V + f"/sheets/{AT}/cells", json={"cells": [{"cell": "A1", "raw": "=SUMME(Data!A1:A2)"}], "expect_rev": ta.get(V + f"/sheets/{AT}").json()["rev"]}).ok, "a formula into its sheet")  # 2.564.0 (#4702): an agent sends the version it read
 check(at(ta.get(V + f"/sheets/{AT}").json(), "A1").get("value") == 3, "... = 3")
 check(AT in [x["id"] for x in ta.get(V + "/sheets").json()["data"]] and AS not in [x["id"] for x in ta.get(V + "/sheets").json()["data"]],
       "API v1 list: the table, not its further sheet")

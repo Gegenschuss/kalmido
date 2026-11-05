@@ -89,7 +89,7 @@ def case(who, s, ag, sid):
     check(s.put(B + f"/api/sheets/{sid}/cells", json={"cells": [{"row_id": rows[1], "col_id": col, "raw": ""}]}).ok,
           f"{who}: the second cell emptied (its file into the trash)")
     check(deleted(f1) is None and deleted(f2) is not None, f"{who}: setup: only the spare file in the trash {deleted(f1)} {deleted(f2)}")
-    r = ag.put(V + f"/sheets/{sid}/cells", json={"cells": [{"row_id": rows[0], "col_id": col, "raw": f"file:{f2}"}]})
+    r = ag.put(V + f"/sheets/{sid}/cells", json={"cells": [{"row_id": rows[0], "col_id": col, "raw": f"file:{f2}"}], "expect_rev": ag.get(V + f"/sheets/{sid}").json()["rev"]})  # 2.564.0 (#4702): an agent sends the version it read
     check(r.ok and r.json().get("batch"), f"{who}: the agent points the cell at the spare file " + r.text[:200])
     batch = r.json().get("batch")
     check(deleted(f1) is not None and deleted(f2) is None, f"{who}: the agent's change swapped the files in the trash")

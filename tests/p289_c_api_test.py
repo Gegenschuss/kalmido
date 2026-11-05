@@ -125,14 +125,14 @@ check(SID in [x["id"] for x in ta.get(V + "/sheets").json()["data"]], "the agent
 check(SID in [x["id"] for x in ta.get(V + "/sheets", params={"list_id": W}).json()["data"]], "the agent lists the tables of the shared list")
 
 # cells, undo by the person, undo by the agent
-r = ta.put(V + f"/sheets/{SID}/cells", json={"cells": [{"cell": "B1", "raw": "12"}]})
+r = ta.put(V + f"/sheets/{SID}/cells", json={"cells": [{"cell": "B1", "raw": "12"}], "expect_rev": ta.get(V + f"/sheets/{SID}").json()["rev"]})  # 2.564.0 (#4702): an agent sends the version it read
 b2 = r.json().get("batch")
 check(r.ok and b2 and b2 != BATCH0, "set cells: a new batch " + r.text[:200])
 check(any(x["addr"] == "D1" and x["value"] == 1140 for x in r.json()["cells"]), "the depending cell comes along")
 r = Bo.post(B + f"/api/sheets/{SID}/batches/{b2}/undo")
 check(r.ok, "the person takes the agent's call back " + r.text[:200])
 check(cells(Bo.get(B + f"/api/sheets/{SID}").json())["B1"]["value"] == 10, "the former input is back")
-r = ta.put(V + f"/sheets/{SID}/cells", json={"cells": [{"cell": "A1", "raw": "Kamera A"}]})
+r = ta.put(V + f"/sheets/{SID}/cells", json={"cells": [{"cell": "A1", "raw": "Kamera A"}], "expect_rev": ta.get(V + f"/sheets/{SID}").json()["rev"]})  # 2.564.0 (#4702): an agent sends the version it read
 b3 = r.json().get("batch")
 check(ta.post(V + f"/sheets/{SID}/batches/{b3}/undo").json().get("undone") == 1, "the agent takes back its own call")
 check(cells(ta.get(V + f"/sheets/{SID}").json())["A1"]["value"] == "Kamera", "... the cell is as before")
