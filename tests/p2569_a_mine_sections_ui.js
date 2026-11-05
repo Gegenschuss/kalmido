@@ -96,6 +96,13 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const top = () => heads().find(x => !/Recently assigned/.test(x.textContent));
   check(await until(() => top() && /This week/.test(top().textContent) && top().closest('.group').querySelector(`.trow[data-id="${TE}"]`) && top().closest('.group').querySelector(`.trow[data-id="${TA}"]`)),
     '(7) without Now: the overdue tasks stay in the topmost section, nothing moves them ' + heads().map(x => x.textContent.trim()).join(' | '));
+  // (4) desktop: the project as a column instead of the grey line (this device)
+  const pc = () => w.eval(`topMoreItems().find(x => x.label === 'Project as a column')`);
+  check(pc() && !pc().on, '(4) "…" offers "Project as a column"');
+  w.eval(`topMoreItems().find(x => x.label === 'Project as a column').fn()`);
+  check(await until(() => d.querySelector(`#view .trow[data-id="${TB}"] .c-list`) && !d.querySelector(`#view .trow[data-id="${TB}"] .mosub`)), '(4) the column "Project", no grey line');
+  w.eval(`topMoreItems().find(x => x.label === 'Project as a column').fn()`);
+  check(await until(() => d.querySelector(`#view .trow[data-id="${TB}"] .mosub`)), '(4) off again: the grey line "List › Section"');
   const TF = await mk('Brand new overdue', {due: '2020-01-04'});
   await w.eval('load().then(render)');
   check(await until(() => inSec(/Recently assigned/, TF)), '(7) without Now a new overdue task stands in "Recently assigned"');
@@ -115,8 +122,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   const CI = await login('fiona');
   await call(CI, 'PATCH', '/api/settings', {lang: 'en', tour: 'done'});
   const LI = (await call(CI, 'POST', '/api/lists', {name: 'A rather long project name for a small screen'})).id;
-  for (const t of ['Call the plumber about the kitchen sink', 'Renew the passport']) await call(CI, 'POST', '/api/tasks', {title: t, list_id: LI});
-  await call(CI, 'POST', '/api/tasks', {title: 'Overdue invoice', list_id: LI, due: '2020-01-02'});
+  const FI = (await call(CI, 'GET', '/api/state')).me.id;  // assigned to her: "My tasks" with collaboration on
+  for (const t of ['Call the plumber about the kitchen sink', 'Renew the passport']) await call(CI, 'POST', '/api/tasks', {title: t, list_id: LI, assignee_id: FI});
+  await call(CI, 'POST', '/api/tasks', {title: 'Overdue invoice', list_id: LI, due: '2020-01-02', assignee_id: FI});
 
   await firefox(async o => {
     const {cmd, ev, ctx, nav} = o;
@@ -126,7 +134,9 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'fiona', password: 'password123'})}).then(r => r.status)`) === 200, 'login fiona');
     await nav(B + '#assigned');
-    check(await ready(`document.querySelectorAll('#view .ghead[data-key^="ms:"]').length >= 4 && !!document.querySelector('#view [data-mse-add]')`), '320 px: the sections are there');
+    const there = await ready(`document.querySelectorAll('#view .ghead[data-key^="ms:"]').length >= 4 && !!document.querySelector('#view [data-mse-add]')`);
+    if (!there) await o.shot('p2569a-320-missing.png');
+    check(there, '320 px: the sections are there ' + await ev(`JSON.stringify({h: location.hash, k: S.route?.key, m: S.route?.mod, own: typeof moOwn === 'function' && moOwn(), secs: S.mineSecs?.list?.length, heads: [...document.querySelectorAll('#view .ghead')].map(x => x.dataset.key), add: !!document.querySelector('#view [data-mse-add]')})`).catch(e => String(e)));
     const box = await ev(`(() => { const b = e => { const x = e.getBoundingClientRect(); return {l: Math.round(x.left), r: Math.round(x.right)}; };
       return {vw: innerWidth, sw: document.documentElement.scrollWidth, heads: [...document.querySelectorAll('#view .ghead[data-key^="ms:"]')].map(b),
         dots: [...document.querySelectorAll('#view [data-mse-menu]')].map(b), add: b(document.querySelector('#view [data-mse-add]'))}; })()`);
