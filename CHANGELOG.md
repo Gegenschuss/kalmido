@@ -14,7 +14,36 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.546.0] - 2026-11-05
+## [2.549.0] - 2026-11-05
+
+Package 2.531 (Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main a).
+### Added
+- Office > Log: new button "Check: chain intact". Every finalised invoice, credit note and dunning letter now carries a hash chained to the previous document of the same office and number range; the check recomputes the whole chain and names the first document that differs (e.g. after a change directly in the database). Quotes and test documents stay outside the chain. Existing finalised documents are chained once at the first start (#4497)
+- Office: tax rates of a country pack can carry a validity date; drafts use the rate valid on the day of service (service end, else the invoice date). The German pack knows the 2020 cut (16 % / 5 % from 01.07. to 31.12.2020). Finalised documents keep their rates (#4498)
+- Settings > Account > Move account: the export page lists what is not in the file (open: "What is not in the file (n)"), including the trash of files, knowledge pages, sheets and address books (#4317)
+- Account export: family links and connections are part of the file; the import never creates a family link (it names them in a warning) and asks for each connection again as an open request (#4317)
+### Fixed
+- Account import: the notes "these areas stay on the old server" and on locked folders always come first and no longer drop out after 50 warnings (#4317)
+- Account import: parts of the file the import never reads (activity, notifications, sessions ...) no longer count against the size limits, so the export of a long used account can be imported (#4317)
+- Account import: approver, reviewer, "waiting for" and the delegated agent of a task are mapped like the assignee; what cannot be mapped is named in a warning instead of vanishing (#4317)
+- Account import: a journal day that already has an entry gets the file's entry below it (with a divider and the source date) instead of losing it; undo removes it again (#4317)
+- Account import: rows the server refuses are counted per area in the warnings; importing the same file again no longer adds child rows (tags, dependencies, habit logs ...) twice (#4317)
+- Account import: the preview counts comments and files of tasks in the trash among what stays behind (#4317)
+
+Package 2.549 (Bündel: CI rot in 2.544.0: p2190_a_sessions erwartet noch,, Bündel: Einreihen-Prüfung: Warten auf den einen Lint-Platz, Sammelpaket: Aufgabe).
+
+### Added
+- Trash view: a new section "Video sign-offs" lists video reviews in their trash (own and the organisation's ones you may see) with the days left; "Restore" brings them back, a review without a place asks for a project of its workspace (`GET /api/videos/trash`, `POST /api/videos/ID/restore` takes an optional `list_id`) (#4536).
+
+### Changed
+- ntfy share inbox: the inbox topic may not be a push topic or another person's inbox topic, the minimum length applies on the default server too, and a push topic that is already an inbox topic is refused; the message does not tell who uses it (#4515).
+- i18n merge driver: a new or renamed key from theirs lands behind its predecessor instead of at the end, so split commits give the same order (#4564).
+
+### Fixed
+- ntfy share inbox: the duplicate check counts only the recipient's own tasks, a message to two people reaches both (#4515).
+- Off-site upload holds the backup store's readers' lock while it reads store files, a cleanup in between no longer breaks the upload (#4529).
+- PDF preview: when the pdf.js worker hangs or fails, the preview ends after 15 s in the message with a Download button instead of "Loading…" for ever (#4578).
+- Tests: the own password change ends app passwords by default (#4639); the mail folder test stamps hub_mail_id (#4637); the shared page test checks exact paths of the hidden text file (#4636).
 
 Package 2.537 (Bündel: Neuer Tab / eigenes Fenster nur mit Maus, Bilder i, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 
@@ -167,6 +196,10 @@ Package 2.539 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Fixed
 - Webhooks, notification channels, git and newsletter calls end after 15 s in total; a target that answers drop by drop no longer holds the delivery queue, and a target that timed out is tried once per round (#4379).
 - Tests: p264a_d_ui waits for the drawn "Understood" button before clicking (#4394).
+
+## [2.546.0] - 2026-11-05
+
+Not released (the CI of this version was red); its changes are listed under 2.549.0.
 
 ## [2.544.0] - 2026-11-05
 
@@ -1371,7 +1404,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.546.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.549.0...HEAD
+[2.549.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.549.0
 [2.546.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.546.0
 [2.544.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.544.0
 [2.541.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.541.0
