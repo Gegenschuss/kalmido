@@ -114,7 +114,9 @@ const apbBody = p => ({slug: p.slug, title: p.title, intro: p.intro, cal_id: p.c
 async function apbSave() {
   const md = APB.md, D = APB.data, old = D.exists ? apbBody(D.page) : null, body = apbRead();
   const er = $('.aerr', md); if (er) er.textContent = '';
-  try { APB.data = await api('PUT', '/api/appt/page', body); } catch (x) { if (er) er.textContent = x.message || ''; return; }
+  // 2.564.0 D (#4701): against the version the page was loaded with; 409 = saved meantime elsewhere: the current page and the reason
+  try { APB.data = await api('PUT', '/api/appt/page', D.exists && D.page.updated_at ? {...body, expect_updated_at: D.page.updated_at} : body); }
+  catch (x) { if (x.status === 409 && x.data?.current) { APB.data = x.data.current; apbDraw(); } const e2 = $('.aerr', APB.md); if (e2) e2.textContent = x.message || ''; return; }
   apbDraw();
   offerUndo(tr('Saved'), histAdd({label: tr('Booking page changed'),
     undo: async () => { if (old) await api('PUT', '/api/appt/page', old); if (APB.md?.isConnected) apbReload(); },
@@ -181,7 +183,10 @@ function apbTypeDlg(t) {
     if (b.dataset.m === 'close') { close(); return; }
     const body = {name: v('#apt-name'), duration_min: +v('#apt-dur') || 0, buffer_min: +v('#apt-buf') || 0, notice_h: +v('#apt-notice') || 0, days_ahead: +v('#apt-days') || 0,
       location: v('#apt-loc'), note: v('#apt-note'), active: !!$('#apt-active', md)?.checked};
-    try { await apbTypeSave(t, body); md.remove(); } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    try { await apbTypeSave(t, body); md.remove(); } catch (x) {
+      if (x.status === 409 && x.data?.type) { md.remove(); apbReload(); apbTypeDlg(x.data.type); return; }  // 2.564.0 D (#4701): the current type (api() said why)
+      const el = $('.aerr', md); if (el) el.textContent = x.message || '';
+    }
   });
 }
 async function apbTypeSave(t, body) {
@@ -192,7 +197,7 @@ async function apbTypeSave(t, body) {
     return j;
   }
   const old = apbTypeBody(t);
-  const j = await api('PATCH', `/api/appt/types/${t.id}`, body); apbReload();
+  const j = await api('PATCH', `/api/appt/types/${t.id}`, t.updated_at ? {...body, expect_updated_at: t.updated_at} : body); apbReload();  // 2.564.0 D (#4701)
   offerUndo(tr('Saved'), histAdd({label: tr('Appointment type changed'), undo: async () => { await api('PATCH', `/api/appt/types/${t.id}`, old); apbReload(); },
     redo: async () => { await api('PATCH', `/api/appt/types/${t.id}`, body); apbReload(); }}));
   return j;

@@ -25,12 +25,13 @@ from flask import g, jsonify, redirect, request
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..core.i18n import browser_lang, LANGS, N_, short_day, tr
 from ..collab.comments import lang_of  # 2.367.5 (#2980)
-from ..core.db import body, bump, db, err, iso, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, iso, iso_ms, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, like_escape, system_ctx, write_lock
 from ..core.access import acx_token_bind, Denied, need_feat
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, rate_ip
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..core.mailframe import mail_html
 from ..tasks.validation import as_int, valid_date, valid_hm
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
@@ -191,7 +192,7 @@ def apb_page_out(c, uid, p):
     cals = [{"id": k["id"], "name": k["name"], "color": k["color"]} for k in cals_for(c, uid) if k["role"] in ("owner", "edit")]
     d = {"slug": p["slug"], "enabled": bool(p["enabled"]), "title": p["title"], "intro": p["intro"], "cal_id": p["cal_id"],
          "office_org_id": p["office_org_id"], "hours": apb_hours(p), "tz": p["tz"] or getattr(TZ, "key", ""),
-         "url": apb_url(p["slug"])} if p else \
+         "url": apb_url(p["slug"]), "updated_at": p["updated_at"]} if p else \
         {"slug": apb_slug_suggest(c, uid), "enabled": False, "title": "", "intro": "", "cal_id": None, "office_org_id": None,
          "hours": DEFAULT_HOURS, "tz": getattr(TZ, "key", ""), "url": None}
     return {"page": d, "exists": bool(p), "calendars": cals, "offices": apb_offices(c, uid), "mail_ok": apb_mail_on(),
@@ -223,6 +224,7 @@ def apb_page_put():
             pb_personal(c, uid)
     write_lock(c, f"appt:{uid}")
     p = apb_page_row(c, uid)
+    ccf_check(b, p["updated_at"] if p else "", "current", lambda: apb_page_out(c, uid, p))  # 2.564.0 D (#4701): saved meantime elsewhere -> 409
     f = {}
     try:
         if "slug" in b or not p:
@@ -270,7 +272,7 @@ def apb_page_put():
         cid = f.get("cal_id", p["cal_id"] if p else None)
         if not cid or not apb_cal_ok(c, uid, cid):
             f["cal_id"] = default_cal(c, uid)
-    ts = iso(now_utc())
+    ts = iso_ms(now_utc())  # 2.564.0 D (#4701): the version of the next save
     if not p:
         cols = {"user_id": uid, "slug": f.pop("slug"), "hours": json.dumps(DEFAULT_HOURS), "tz": getattr(TZ, "key", ""),
                 "created_at": ts, "updated_at": ts, **f}
@@ -316,7 +318,8 @@ def apb_type_fields(b, create=False):
 
 def apb_type_out(r):
     return {"id": r["id"], "name": r["name"], "duration_min": r["duration_min"], "buffer_min": r["buffer_min"], "notice_h": r["notice_h"],
-            "days_ahead": r["days_ahead"], "location": r["location"], "note": r["note"], "active": bool(r["active"]), "sort": r["sort"]}
+            "days_ahead": r["days_ahead"], "location": r["location"], "note": r["note"], "active": bool(r["active"]), "sort": r["sort"],
+            "updated_at": r["updated_at"]}  # 2.564.0 D (#4701): the version the dialog sends back
 
 
 def apb_type_row(c, uid, tid, deleted=False):
@@ -362,12 +365,15 @@ def apb_type_edit(tid):
     uid = apb_gate(c)
     apb_type_row(c, uid, tid)
     b = body()
+    write_lock(c, f"appt_types-{tid}")  # 2.564.0 D (#4701): saved meantime elsewhere -> 409 + the type
+    r = apb_type_row(c, uid, tid)
+    ccf_check(b, r["updated_at"], "type", lambda: apb_type_out(r))
     try:
         f = apb_type_fields(b if isinstance(b, dict) else {})
     except BadInput as x:
         return err(str(x))
     if f:
-        f["updated_at"] = iso(now_utc())
+        f["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE appt_types SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), tid])
         bump(c)
         c.commit()
