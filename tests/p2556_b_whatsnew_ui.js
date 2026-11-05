@@ -17,7 +17,7 @@ let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
 const dbx = (sql, args = []) => JSON.parse(execFileSync('python3', [path.join(__dirname, 'dbx.py'), DATA, sql, JSON.stringify(args)]).toString() || '[]');
 const WN = path.join(DATA, 'whatsnew-test.json');
-const seen = uid => (dbx("SELECT value FROM user_settings WHERE user_id=? AND key='whatsnew_seen'", [uid])[0] || [])[0];
+const seen = uid => dbx("SELECT value FROM user_settings WHERE user_id=? AND key='whatsnew_seen'", [uid])[0]?.value;
 const setSeen = (uid, v) => dbx("INSERT INTO user_settings(user_id, key, value) VALUES(?, 'whatsnew_seen', ?) ON CONFLICT(user_id, key) DO UPDATE SET value=excluded.value", [uid, v]);
 
 (async () => {
@@ -42,7 +42,7 @@ const setSeen = (uid, v) => dbx("INSERT INTO user_settings(user_id, key, value) 
   const heads = [...d.querySelectorAll('.wnmd .wnhead')].map(h => h.textContent);
   const lab = v => 'v' + v.split('.').filter((p, i) => i < 2 || +p).join('.');
   check(heads.length === 2 && heads[0].startsWith(lab(CUR) + ' · ') && heads[1].startsWith(lab(V(MI - 1)) + ' · '), 'two version lines, the newest on top: ' + heads.join(' | '));
-  check(/05.?11/.test(heads[0]) && /04.?11/.test(heads[1]), 'each line names its date (day and month): ' + heads.join(' | '));
+  check(/(05\D11|11\D05)\D?$/.test(heads[0]) && /(04\D11|11\D04)\D?$/.test(heads[1]), 'each line names its date (day and month): ' + heads.join(' | '));
   const items = [...d.querySelectorAll('.wnmd .wnver')].map(s => [...s.querySelectorAll('li')].map(l => l.textContent));
   check(JSON.stringify(items) === JSON.stringify([['Newest sentence', 'Second sentence'], ['Middle sentence']]), 'the sentences under their version: ' + JSON.stringify(items));
   check(!d.querySelector('.wnmd .wnolder') && !d.body.textContent.includes('Old sentence'), 'no "Older changes" and no older version: the file reaches the seen one');

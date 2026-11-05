@@ -67,7 +67,7 @@ def news(s):
 def run(who, s, uid):
     write(FILE)
     # ---- a new person: the running version, no dialog
-    check(seen_db(uid) is None, f"{who}: no seen version at the start")
+    check(seen_db(uid) in (None, ""), f"{who}: no seen version at the start (a new account stores the default '') {seen_db(uid)!r}")
     j = news(s)
     check(j.get("versions") == [] and j.get("seen") == CUR and j.get("current") == CUR, f"{who}: new person: nothing to show, seen = running {j}")
     check(seen_db(uid) == CUR, f"{who}: new person: the running version is stored ({seen_db(uid)})")
