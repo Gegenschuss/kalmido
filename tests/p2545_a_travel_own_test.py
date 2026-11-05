@@ -181,6 +181,8 @@ check(Fr.get(B + f"{T}/report?by=month&format=csv").status_code == 200, "freelan
 check(Fr.get(B + f"{T}/bill-docs").status_code == 200, "freelancer: billing documents")
 check(Fr.post(B + f"{T}/purposes", json={"name": "Recherche"}).status_code == 201, "freelancer: an own purpose")
 check(Fr.patch(B + f"{T}/{TA}", json={"dest": "X"}).status_code == 404, "freelancer: Alpha's trip 404")
-check(Fr.delete(B + f"{T}/{TF}").ok, "freelancer: deletes it")
+check(Fr.delete(B + f"{T}/{TF}").status_code == 409, "freelancer: a trip with a receipt in DATEV stays (kept by law, 409)")
+TF2 = Fr.post(B + T, json={"date_from": TD, "date_to": TD, "dest": "Ohne Beleg"}).json()["id"]
+check(Fr.delete(B + f"{T}/{TF2}").ok and TF2 not in (ids_of(Fr) or []), "freelancer: deletes a trip")
 
 raise SystemExit(kt.done("p2545_a_travel_own"))
