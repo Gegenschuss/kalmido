@@ -1109,11 +1109,11 @@ for (const ev of ['pointerdown', 'mousedown']) document.addEventListener(ev, e =
 document.addEventListener('keydown', e => {
   if (e.target.id !== 'chat-in') return;
   if (e.key === 'Enter' && (e.ctrlKey || e.metaKey) && !e.isComposing) { e.preventDefault(); chatSend(); }  // 2.94.0 (#2024)
-  if (e.key === 'Escape' && !isMobile()) { e.preventDefault(); chatClose(); }
+  if (e.key === 'Escape' && !e.shiftKey && !isMobile()) { e.preventDefault(); chatClose(); }  // 2.556.0 (#4666): Shift+Esc is Stop, it never closes the window
 }, true);
 document.addEventListener('input', e => { if (e.target.id === 'chat-in') { S.drafts['chat:' + S.chat.aid] = e.target.value; autosize(e.target); } });
 // 2.144.0 A (#2412): Stop while the agent works for me (typing dots or the status working; in a job's history: while the
-// job runs): a button next to Send, at the computer also Esc, Ctrl+C without a selection (Mac: Ctrl+C always, Cmd+.). The
+// job runs): a button next to Send, at the computer also Shift+Esc (2.556.0, #4666: plain Esc no longer stops), Ctrl+C without a selection (Mac: Ctrl+C always, Cmd+.). The
 // event 'abort' goes to the agent (a job's history: only that job's current step); the button waits until the agent is
 // idle again (at most 20 s). The keys only while the chat is open and the agent works; an open dialog / menu, the reply
 // quote and editing a message keep their Esc.
@@ -1130,14 +1130,14 @@ function chatBusy(a) {
 // 2.144.0 A2 (#2412): the wait after Stop belongs to that agent (and job), not to the chat window
 const chatAbortKey = () => `${S.chat.aid}:${S.chat.job?.id || ''}`;
 const chatAbortWaits = () => S.chat.abortAt?.k === chatAbortKey() && Date.now() - S.chat.abortAt.t < CHAT_ABORT_WAIT;
-const chatAbortTip = () => tr('Stop the answer ({0})', IS_MAC ? 'Esc · Ctrl+C · Cmd+.' : 'Esc · Ctrl+C');
+const chatAbortTip = () => tr('Stop the answer ({0})', IS_MAC ? 'Shift+Esc · Ctrl+C · Cmd+.' : 'Shift+Esc · Ctrl+C');
 // 2.411.0 (#3446): on every device Stop left the box: it is the first entry of the header's ⋯ menu (red, only
 // while the agent works for me, "Stopping…" while it waits); the ⋯ button carries a red dot meanwhile (jcd_fbtnHtml); the keys stay
 function chatStopItem(a) {
   if (!chatBusy(a)) return [];
   const wait = chatAbortWaits();
   return [{label: wait ? tr('Stopping…') : tr('Stop the answer'), icon: 'stop', cls: 'chmi-stop', dis: wait, title: wait ? '' : chatAbortTip(),
-    keys: wait ? '' : 'Esc', fn: () => chatAbort()}, '-'];
+    keys: wait ? '' : 'Shift+Esc', fn: () => chatAbort()}, '-'];
 }
 function chatAbortSync() {
   if (!$('#jcd-fbtn')) return;
@@ -1157,8 +1157,10 @@ setInterval(() => { if (S.chat.aid && !document.hidden) chatAbortSync(); }, 1000
 document.addEventListener('click', e => { if (e.target.closest?.('[data-act="chat-abort"]')) { e.preventDefault(); chatAbort(); } });
 const chatHasSel = t => !!String(window.getSelection?.() || '') || (!!t && /^(TEXTAREA|INPUT)$/.test(t.tagName) && t.selectionStart !== t.selectionEnd);
 window.addEventListener('keydown', e => {
-  if (e.defaultPrevented || e.isComposing || e.repeat || e.altKey || e.shiftKey) return;
-  const isEsc = e.key === 'Escape' && !e.ctrlKey && !e.metaKey, isCC = e.ctrlKey && !e.metaKey && (e.key === 'c' || e.key === 'C'), isDot = IS_MAC && e.metaKey && !e.ctrlKey && e.key === '.';
+  if (e.defaultPrevented || e.isComposing || e.repeat || e.altKey) return;
+  // 2.556.0 (#4666): Stop is Shift+Esc (plain Esc did it too easily and now does what it does without a running answer); Ctrl+C / Cmd+. stay without Shift
+  const isEsc = e.key === 'Escape' && e.shiftKey && !e.ctrlKey && !e.metaKey, isCC = e.ctrlKey && !e.metaKey && (e.key === 'c' || e.key === 'C'), isDot = IS_MAC && e.metaKey && !e.ctrlKey && e.key === '.';
+  if (e.shiftKey && !isEsc) return;
   if (!isEsc && !isCC && !isDot) return;
   if (!S.chat.aid || !$('#chat-msgs') || !chatBusy(agentById(S.chat.aid))) return;
   const t = e.target, inChat = t === document.body || t === document.documentElement || !!t.closest?.('#achat, .chview');

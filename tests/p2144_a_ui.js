@@ -148,7 +148,7 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   check(busy() && /Stop the answer/.test(fbtn().title), 'working: the ⋯ button has the dot and names Stop (#3446)');
   let it = await stopIt();
   const all = [...d.querySelectorAll('#pop:not(.hidden) [role=menuitem]')];
-  check(it && all[0] === it && !it.disabled && /Stop the answer/.test(it.textContent) && /Esc/.test(it.title) && /Ctrl\+C/.test(it.title), 'Stop: the first menu entry, the tooltip names the keys (#3446)');
+  check(it && all[0] === it && !it.disabled && /Stop the answer/.test(it.textContent) && /Shift\+Esc/.test(it.title) && /Ctrl\+C/.test(it.title), 'Stop: the first menu entry, the tooltip names the keys (#3446)');
   click(w, it);
   await until(async () => (await aborts()).length === 1);
   let ab = await aborts();
@@ -160,11 +160,13 @@ const key = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown'
   w.eval('agentPoll()');
   await until(() => !busy());
   check(!busy(), 'confirmed by the agent: the dot goes');
-  // Esc in the box sends it too
+  // 2.556.0 (#4666): plain Esc no longer stops (it did too easily); Shift+Esc in the box sends it
   await working();
-  ci().focus(); key(w, ci(), 'Escape');
+  key(w, d.body, 'Escape'); await sleep(600);
+  check((await aborts()).length === 1 && !w.eval('chatAbortWaits()'), 'plain Esc while working: no abort');
+  ci().focus(); key(w, ci(), 'Escape', {shiftKey: true});
   await until(async () => (await aborts()).length === 2);
-  check((await aborts()).length === 2 && d.querySelector('#chat-msgs'), 'Esc while working: abort, the chat stays open');
+  check((await aborts()).length === 2 && d.querySelector('#chat-msgs'), 'Shift+Esc while working: abort, the chat stays open');
   await v1('POST', '/agent/aborted', {}); w.eval('agentPoll()'); await until(() => !busy());
   // Ctrl+C with a selection stays Copy (Windows / Linux); an open menu keeps its Esc
   await working();

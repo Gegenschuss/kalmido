@@ -609,7 +609,7 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Model and permission mode**: the model from the stream's init event and the run's `--permission-mode`
   (default / plan = ask, everything else = auto) go into the chat header (`PUT /api/v1/agent/status`).
 - **Status and typing dots** while a run lasts, idle afterwards, error when it failed.
-- **Stop** (2.144.0): the Stop button in the chat (or Esc / Ctrl+C there) sends the event `abort`; the launcher ends the
+- **Stop** (2.144.0): the Stop button in the chat (or Shift+Esc / Ctrl+C there) sends the event `abort`; the launcher ends the
   running command with everything it started, confirms with `POST /api/v1/agent/aborted` and writes one short line into
   the chat. A Stop in a job's history is passed on as a note only (stop the job itself with Stop on its card). Only the person the
   running answer is for (or the agent's owner / `KALMIDO_OWNER_IDS` / `KALMIDO_PERM_USER`) can stop it; another person's
