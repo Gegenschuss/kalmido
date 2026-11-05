@@ -12,7 +12,10 @@ events/model.py ev_kern_copy) gives every calendar / address book with members i
 book_role); the old row is read only for an object without a node, one release long (stage 7 removes the tables). So a share
 taken back in the core (the file store's share dialog, obj_revoke_person) is not reopened by the old row. The trigger works
 in the system context (a member removing themselves need not see the organisation's node) and restores the caller's.
-New columns, a function and triggers only (nullable or with a DEFAULT): an older version ignores the columns -- its calendars
+Review F4: a node of the two kinds made by any path (the first member, a share in the core, filing it in a folder, an import)
+mirrors ALL member rows the object has at that moment (kalmido_kern_node_made fires the mirror with UPDATE ... SET role=role, as
+the one-shot does): rows written past cal_member_set / book_member_set while there was no node (import, repair) keep their access.
+New columns, functions and triggers only (nullable or with a DEFAULT): an older version ignores the columns -- its calendars
 in the trash would show again --, the trigger keeps mirroring for it, nothing breaks; a backup restores them (kalmido_*).
 """
 SCHEMA = """
@@ -43,6 +46,20 @@ BEGIN
 END $$;
 CREATE OR REPLACE TRIGGER kalmido_kern_mirror_cal AFTER INSERT OR DELETE OR UPDATE OF role ON ev_cal_members FOR EACH ROW EXECUTE FUNCTION kalmido_kern_mirror('evcal', 'cal_id');
 CREATE OR REPLACE TRIGGER kalmido_kern_mirror_book AFTER INSERT OR DELETE OR UPDATE OF role ON book_members FOR EACH ROW EXECUTE FUNCTION kalmido_kern_mirror('address_book', 'book_id');
+CREATE OR REPLACE FUNCTION kalmido_kern_node_made() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE prev TEXT;
+BEGIN
+  prev := current_setting('app.role', true);
+  PERFORM set_config('app.role', 'system', true);
+  IF NEW.ref_kind = 'evcal' THEN
+    UPDATE ev_cal_members SET role = role WHERE cal_id = NEW.ref_id;
+  ELSE
+    UPDATE book_members SET role = role WHERE book_id = NEW.ref_id;
+  END IF;
+  PERFORM set_config('app.role', COALESCE(prev, ''), true);
+  RETURN NULL;
+END $$;
+CREATE OR REPLACE TRIGGER kalmido_kern_node_made AFTER INSERT ON fs_nodes FOR EACH ROW WHEN (NEW.kind = 'ref' AND NEW.ref_kind IN ('evcal', 'address_book')) EXECUTE FUNCTION kalmido_kern_node_made();
 """
 MIGRATIONS = [
     ("ev_cals", "rev", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 1"),

@@ -256,6 +256,20 @@ check(FK not in ids(ag("/event-calendars")), "freelancer: gone for her agent too
 check(F.post(B + f"/api/evcals/{FK}/restore").ok and FK in ids(F.get(B + "/api/evcals")) and F.get(B + f"/api/events/{FE['id']}").ok,
       "freelancer: restored with its event")
 
+# ================================================================== review F4: rows written while there was no node
+# (an import / a repair past cal_member_set): the node made later mirrors them all, nobody loses the access silently
+K4 = A.post(B + "/api/evcals", json={"name": "Imported plan"}).json()["id"]
+B4 = A.post(B + "/api/books", json={"name": "Imported book"}).json()["id"]
+sql("INSERT INTO ev_cal_members(cal_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (K4, GINA), write=True)
+sql("INSERT INTO book_members(book_id,user_id,role,added_at) VALUES(?,?,'view','2026-11-01T00:00:00+00:00')", (B4, BOB), write=True)
+check(node("evcal", K4) is None and node("address_book", B4) is None, "F4: imported member rows, no node yet")
+check(A.put(B + f"/api/evcals/{K4}/members", json={"user_id": BOB, "role": "edit"}).ok
+      and A.put(B + f"/api/books/{B4}/members", json={"user_id": GINA, "role": "edit"}).ok, "F4: then a member through the app")
+check(share("evcal", K4, GINA) == "view" and K4 in ids(Gi.get(B + "/api/evcals")),
+      "review F4: the imported calendar member got her core share with the node and keeps the calendar")
+check(share("address_book", B4, BOB) == "view" and B4 in ids(Bo.get(B + "/api/books")),
+      "review F4: the imported book member got his core share with the node and keeps the book")
+
 # ================================================================== the one-shot copy at the start (migr_kern4712)
 K3 = A.post(B + "/api/evcals", json={"name": "Before the update"}).json()["id"]
 B3 = A.post(B + "/api/books", json={"name": "Old book"}).json()["id"]
