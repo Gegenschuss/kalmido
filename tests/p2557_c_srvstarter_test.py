@@ -10,6 +10,8 @@
  - the instance switch server_agents_off (PATCH /api/admin/settings, about): off -> defaults say so, starter 403
  - the same as a person without an organisation (freelancer-matrix: agents)
 usage: p2557_c_srvstarter_test.py <datadir>      (KMT_NOSTART=1 / P2557C_NOSTART=1: a running server)"""
+import sys
+
 import requests
 
 from freelancer_fixture import freelancer
@@ -149,4 +151,4 @@ check(A.patch(B + "/api/admin/settings", json={"server_agents_off": "yes"}).stat
 r = A.patch(B + "/api/admin/settings", json={"server_agents_off": False})
 check(r.ok and r.json().get("server_agents_off") is False, "the instance switch on again")
 check(F.get(B + "/api/agents/server/defaults").json()["enabled_instance"] is True, "defaults: allowed again")
-done()
+sys.exit(done("p2557_c_srvstarter"))

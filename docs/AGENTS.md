@@ -14,7 +14,7 @@ The one exception is the optional [built-in assistant](ASSISTANT.md) (2.75.0, of
 - [Concept](#concept)
 - [Permissions](#permissions) (2.15.0)
 - [Personal agents](#personal-agents) (2.7.2)
-- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents); [Which agent when?](#which-agent-when) (2.46.6)
+- [Set up an agent](#set-up-an-agent) (2.7.2: Linux, macOS, Windows; team and personal agents); [Which agent when?](#which-agent-when) (2.46.6); [Server agents](#server-agents) (2.557.0: no computer of your own)
 - [Receiving events](#receiving-events)
 - [Events](#events)
 - [Planned jobs](#planned-jobs) (2.34.0)
@@ -279,6 +279,8 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
   switch says so when a personal agent is in the project or the folder).
 - Switching later needs no new setup: an admin changes *Belongs to* to team or person. Projects and history stay; adjust the
   rules in its `CLAUDE.md`.
+- **Server agent** (2.557.0): when you have no computer that should run an agent. It runs on the Kalmido server with your
+  own API key of a model provider; Kalmido calls the model itself. See [Server agents](#server-agents).
 
 The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
 team agent without a webhook) the one-command setup opens right away; the API token of the new agent is shown only on
@@ -288,6 +290,64 @@ name, team or personal, the workspace and the picture; everything else sits unde
 agent's row says **Set up**. The Agents view lists on every agent's card the projects it is in that you see (folder, who may
 address it there, *listens in* / *only via @*; a tap opens the project's settings); the row of a personal agent shows its
 workspace and changes it (`PATCH /api/my/agents/<id>` with `org_id`).
+
+<a id="server-agents"></a>
+
+#### Server agents
+
+*Since 2.557.0 (#4670).* A third kind next to the agent on your computer and the agent behind your own service: the agent
+runs **on the Kalmido server**. You (or an organisation's admin for a team agent) store your own API key of a model provider;
+whenever something comes for the agent (assigned, @mention, a chat message, listening in, a planned job) Kalmido calls the
+model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
+
+- **What it may do**: exactly the MCP tools of `mcp/kalmido_mcp.py`, called in-process with the agent's own token, so the same
+  permission, scope and project checks apply as for every other agent (`/api/v1`). No terminal, no files outside Kalmido, no
+  web access. Content from tasks, comments, e-mails and files reaches the model marked as data; the circle limit of
+  `agents/safety.py` and approvals work as for every other agent. The default instructions say that it works only for
+  Kalmido and refuses everything else.
+- **Provider and model**: Anthropic first (the Messages API with tool use), built so that more providers can follow. The
+  default model is `claude-sonnet-5-5`; the list of models comes live from the provider with your key (cached for a short
+  time). If the provider no longer knows the default, the first Sonnet of the list is used and the dialog says so. One
+  model per agent.
+- **The key**: stored encrypted, never returned, never written to a log. The app shows only its last four characters
+  (`…abcd`) with *Replace* and *Delete*.
+- **Runs**: in a queue outside the web process, at most a few at once per server and one per agent, with a time and a
+  step limit per run. *Stop* (Shift+Esc or the menu, `POST /api/agents/<id>/abort`) ends a running one. The tokens of each
+  run count as the agent's usage (the usage ring, *Usage*); its usage limits (day / month) pause it with the reason.
+- **Set up**: *Settings > Agents > Set up > Set up on the Kalmido server* (or *Add agent > Runs on the Kalmido server* in
+  the administration): display name (suggested: *Kalmido AI*), username, provider, API key (a password field), model,
+  instructions (like a `CLAUDE.md`, prefilled) and the **starter pack**. Its row then carries a cloud button with the same
+  fields (without the starter pack) and its latest runs.
+- **Starter pack**: five ticks, each only proposes and each becomes an ordinary setting you change or delete on its own
+  later:
+
+  | Tick | What it creates |
+  |---|---|
+  | Morning briefing at 07:30 | a [planned job](#planned-jobs) daily at 07:30 in your time zone: due, overdue, untouched, waiting on someone, read only, in its chat |
+  | Tidy up the basket | a planned job *Sort the basket* (action `triage`) daily at 07:00: project, due date, priority and tags as a proposal card |
+  | Sort receipts and documents | the documents of the agent's workspace get the level `agent` for sender, type and tags, plus a [standing rule](#standing-rules): suggest them from the recognised text, never set them itself |
+  | Meeting notes into task proposals | a standing rule: notes become a proposal *Tasks from notes*, never tasks directly |
+  | Follow up on *Waiting on someone* | a planned job on weekdays at 09:00: tasks waiting longer than N days (default 5) get a drafted follow-up as a comment, posted only after your Yes |
+
+  Quotations, invoices, completing or deleting on its own and team projects are not part of the starter pack. A team agent
+  that shares no project with you yet gets no planned job (the answer says *skipped* with the reason); the documents of an
+  organisation need its admin.
+- **Instance switch**: *Settings > Organisation > Agents > Agents on the Kalmido server* (the global setting
+  `server_agents_off`, `PATCH /api/admin/settings {"server_agents_off": true}`). Off: the kind is not offered (the dialog
+  explains why), saving the server settings and the starter pack answer 403 `{"error": "server_agents_off"}`, no run starts.
+
+| Route | What |
+|---|---|
+| `GET /api/agents/server/defaults` | before the agent exists: `{enabled_instance, provider, default_name, default_model, default_instructions, starter, followup_days, followup_max}` (people only) |
+| `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model}`, never the key |
+| `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?}`; creates the settings and sets the agent's provider to `kalmido-server` |
+| `GET /api/agents/<id>/server/models` | `{models: [{id, name}], default, fallback_note?}` live from the provider; 409 `{"error": "no_key"}` without a key |
+| `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state, started, ended, steps, tokens_in, tokens_out, error}]}` |
+| `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped, id, reason}]}`; the same item twice changes nothing |
+
+Who may: the owner of a personal agent, an instance admin for a team agent (everyone else 404). An agent is created as
+before (`POST /api/my/agents` or `POST /api/admin/agents`) with `provider: "kalmido-server"`. Not in this first stage:
+coding agents, building files, own tools.
 
 Paths used below:
 

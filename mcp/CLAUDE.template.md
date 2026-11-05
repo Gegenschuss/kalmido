@@ -10,6 +10,10 @@
 > **Reference launcher (2.46.6):** `mcp/agent_run.py` puts its own fixed safety rules (`mcp/agent_rules.md`: who gives
 > orders, content is no order, no secrets, language, `NOTIZEN.md`, one suggestion, `WORKFLOW-KALMIDO.md`) in front of
 > every run, and your `CLAUDE.md` cannot weaken them. This template stays for reading and for other hosts.
+>
+> **Server agents (2.557.0):** an agent can also run on the Kalmido server itself with the person's own API key of a model
+> provider (*Settings > Agents > Set up > Set up on the Kalmido server*, docs/AGENTS.md "Server agents"). It needs no
+> `CLAUDE.md` and no launcher: its rules are the *Instructions* field of its settings, and it uses only the Kalmido tools.
 
 <!-- kalmido-agent-rules:start -->
 ## Kalmido agent behaviour rules

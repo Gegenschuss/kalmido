@@ -21,6 +21,7 @@ subscription or API key. Kalmido provides:
 ## Contents
 
 - [Before you start](#before-you-start)
+- [Without a computer: an agent on the Kalmido server](#without-a-computer-an-agent-on-the-kalmido-server) (2.557.0)
 - [Quickest: one command on your computer](#quickest-one-command-on-your-computer) (2.44.0)
 - [Path A: let Claude Code set it up](#path-a-let-claude-code-set-it-up)
 - [Path B: do it yourself](#path-b-do-it-yourself)
@@ -63,6 +64,20 @@ The examples use these names; change them if you like, but consistently:
 | Service | `kalmido-agent.service` | a systemd user unit |
 
 `~` always means the home directory of the agent user.
+
+## Without a computer: an agent on the Kalmido server
+
+2.557.0 (#4670): if no computer of yours should run an agent, let Kalmido run it. *Settings > Agents > Set up > Set up on
+the Kalmido server* asks for a display name (suggested: *Kalmido AI*), your own API key of a model provider (Anthropic
+first), the model (default `claude-sonnet-5-5`, the list comes live from the provider once the key is saved) and its
+instructions (prefilled: it works only for Kalmido, with the Kalmido tools within its permissions, no web, no terminal, no
+other services). Five ticks add the starter pack (morning briefing, tidy up the basket, sort receipts and documents,
+meeting notes into task proposals, follow up after N days); each only proposes and stays changeable on its own. Nothing of
+the paths below is needed: no user, no firewall, no Claude Code, no launcher, no `CLAUDE.md` file (the rules of
+`mcp/CLAUDE.template.md` are what the instructions field is for). The key is stored encrypted and shown only as its last
+four characters. Its usage is billed to you by the provider; Kalmido counts it as the agent's usage and its limits pause
+it. A server admin can switch the kind off for the whole server (*Settings > Organisation > Agents*). Details and the
+routes: [AGENTS.md, Server agents](AGENTS.md#server-agents).
 
 ## Quickest: one command on your computer
 
