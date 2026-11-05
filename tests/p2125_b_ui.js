@@ -44,9 +44,10 @@ const FEAT = 'time,collab,comments';
   check(await until(async () => (await sheet()) === 'closed'), 'Close month: the server holds it closed');
   check(await until(() => d.querySelector('.tslcard [data-tsl="reopen"]')), 'the card offers Reopen');
   if (!d.querySelector('.timev .terow')) d.querySelector('[data-act="tv-entries"]')?.click();
-  const row = await until(() => [...d.querySelectorAll('.timev .terow')].find(r => /survey/.test(r.textContent)));
-  check(row && row.querySelector('.tslock') && !row.querySelector('[data-act="te-edit"]') && !row.querySelector('[data-act="te-del"]'),
-    'the entry shows a lock, no edit / delete');
+  // CI red of 2.560 / 2.562 (slower runner): the list may still show the row drawn before the close; waited for the lock
+  const locked = r => r.querySelector('.tslock') && !r.querySelector('[data-act="te-edit"]') && !r.querySelector('[data-act="te-del"]');
+  const row = await until(() => [...d.querySelectorAll('.timev .terow')].find(r => /survey/.test(r.textContent) && locked(r)));
+  check(row && locked(row), 'the entry shows a lock, no edit / delete ' + ([...d.querySelectorAll('.timev .terow')].find(r => /survey/.test(r.textContent))?.innerHTML || '-').replace(/<svg.*?<\/svg>/g, '').slice(0, 300));
   await w.eval(`histStep('undo')`);
   check(await until(async () => (await sheet()) === 'open'), 'Undo: open again (one step)');
   await w.eval(`histStep('redo')`);

@@ -141,8 +141,9 @@ function browser() {
   check(bar && /changed elsewhere/.test(bar.textContent), 'conflict: the bar at the page');
   let asked = '';
   w.confirm = t => { asked = String(t); return true; };  // the harness answers the app's dialogs through confirm (boot.js): "Keep mine"
-  bar?.querySelector('[data-wk="cfshow"]')?.click();
-  await until(() => asked, 40);
+  // CI red of 2.560 / 2.562 (slower runner): a redraw meanwhile (the reload of the conflicts above, the live poll) replaces
+  // the bar, a click on the old one went nowhere: the button of the bar on the page now (up to three times, each waits for the question)
+  for (let i = 0; i < 3 && !asked; i++) { (await until(() => d.querySelector('#view .wkocf [data-wk="cfshow"]'), 40))?.click(); await until(() => asked, 40); }
   check(/Keep your version or take theirs/.test(asked) && /Mine offline/.test(asked) && /Theirs online/.test(asked), 'conflict: "Compare" shows both versions ' + asked.slice(0, 300));
   const kept = await until(async () => (await call('GET', `/api/wiki/pages/${P1}`)).body === 'Mine offline', 40);
   check(kept, 'conflict: "Keep mine" saves my version');
