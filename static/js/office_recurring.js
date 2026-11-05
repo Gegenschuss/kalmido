@@ -112,9 +112,9 @@ function rinSheet(d, s) {
       try { sv = await rawFetch('PATCH', `/api/office/series/${s.id}`, s.updated_at ? {...b, expect_updated_at: s.updated_at} : b); }
       catch (x) {
         const el = $('.aerr', m);
-        if (!el || x.status !== 409 || !x.data?.row) throw x;
+        if (!el || x.status !== 409 || !(x.data?.current || x.data?.row)) throw x;  // 2.567.0 D (#4711): + "current" of the core's write layer
         el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-rin-reload>${tr('Reload')}</button>`;
-        $('[data-rin-reload]', el).addEventListener('click', () => { m.remove(); rinReload(); rinSheet(d, x.data.row); });
+        $('[data-rin-reload]', el).addEventListener('click', () => { m.remove(); rinReload(); rinSheet(d, x.data.current || x.data.row); });
         return false;
       }
       const ks = Object.keys(old).filter(k => String(old[k] ?? '') !== String(sv[k] ?? '')), now = Object.fromEntries(ks.map(k => [k, sv[k]]));

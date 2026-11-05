@@ -26,7 +26,6 @@ from ..core.i18n import LANGS, N_, lang, short_day, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
 from ..core.errors import BadInput, err_stored
 from .calc import dec, dstr, fmt_money, money
@@ -57,6 +56,9 @@ from .mailsig import ofm_sender  # 2.369.5 (#2517): pulled up from functions
 from .fixedimport import fci_people  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 from .cashflow import _fx  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+
+ow_kind("office_inv_series", "office_inv_series")
 
 
 def _j(s):
@@ -623,13 +625,14 @@ def rin_create():
 @app.patch("/api/office/series/<int:sid>")
 def rin_patch(sid):
     """{every?, start?, until?, auto_send?, active?, title?, template_id?, next_date?} -> the series. A changed schedule
-    starts again after the last period that has its invoice (else at start)."""
+    starts again after the last period that has its invoice (else at start). 2.567.0 D (#4711): through office/owrite.py
+    ow_write -- version (409 with the series under "current"), only the columns that change, history, updated_by, bump."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_series_{int(sid)}")
-    cur = rin_row(c, oid, sid)
-    ccf_check(body(), cur["updated_at"], "row", lambda: rin_public(c, oid, cur))  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409
-    row = rin_clean(c, oid, body(), cur)
-    if row:
+    write_lock(c, f"office_series_{int(sid)}")  # the series' own lock: never in between a run (rin_run / the tick)
+    b = body()
+
+    def clean(c, b, cur):
+        row = rin_clean(c, oid, b, cur)
         if ("start" in row or "every" in row) and "next_date" not in row:
             st, ev = row.get("start", cur["start"]), row.get("every", cur["every"])
             last = _last_made(c, oid, sid)
@@ -638,13 +641,15 @@ def rin_patch(sid):
             nd, un = row.get("next_date", cur["next_date"]), row.get("until", cur["until"])
             if un and nd > un:
                 raise Denied(409, tr("The series has ended; set a later end first"))
-        row["updated_at"] = iso(now_utc())
-        before = {k: cur[k] for k in row if k in cur.keys() and k != "updated_at"}
-        c.execute(f"UPDATE office_inv_series SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [sid, oid])
-        ofx_log(c, oid, "series_update", target="series", doc_id=cur["template_id"], detail={"series_id": sid, "before": before,
-                                                                                             "after": {k: v for k, v in row.items() if k != "updated_at"}})
-        bump(c)
-        c.commit()
+        return row
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+    row, changed = ow_write(c, uid, "office_inv_series", sid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
+                            public=lambda c, cur: rin_public(c, oid, rin_row(c, oid, sid)))
+    if changed:
+        ofx_log(c, oid, "series_update", target="series", doc_id=row["template_id"], detail={"series_id": sid, "before": {k: v[0] for k, v in changed.items()},
+                                                                                            "after": {k: v[1] for k, v in changed.items()}})
+    c.commit()
     return jsonify(rin_public(c, oid, rin_row(c, oid, sid)))
 
 
