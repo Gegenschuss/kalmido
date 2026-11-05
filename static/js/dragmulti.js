@@ -36,15 +36,29 @@ function dgDepOk(w, b) {
   return !!wt && !!bt && w !== b && w > 0 && b > 0 && canEdit(wt) && dFor(wt) && dFor(bt);
 }
 // pairs [[waiting, blocker], ...]: added one by one (the server checks rights and loops), one history step for all
+// 2.559.0 (#4660): shown at once (the waiting task's blockers, the counts of both), the requests behind it; all refused = all
+// back, some refused (a loop, no right) = the state again in the background (no GET before the screen shows it)
 async function dgDepAdd(pairs) {
-  const ok = [], errs = [];
-  for (const [w, b] of pairs) {
-    if ((S.tasks.get(w)?.blockers || []).includes(b)) continue;
-    try { await api('POST', '/api/deps', {task_id: w, blocker_id: b}); ok.push([w, b]); } catch (e) { errs.push(e?.message || ''); }
+  const ok = [], errs = [], todo = [], seen = new Set();
+  for (const [w, b] of pairs) { const k = w + ':' + b; if (!seen.has(k) && !(S.tasks.get(w)?.blockers || []).includes(b)) { seen.add(k); todo.push([w, b]); } }
+  if (!todo.length) { toast(tr('Already waiting on it')); return; }
+  const fns = new Map(), on = (id, f) => { if (!fns.has(id)) fns.set(id, []); fns.get(id).push(f); };
+  for (const [w, b] of todo) {
+    const bo = S.tasks.get(b)?.status === 0, wo = S.tasks.get(w)?.status === 0;
+    on(w, t => { if ((t.blockers || []).includes(b)) return; t.blockers = [...(t.blockers || []), b]; if (bo) t.blocked = (t.blocked || 0) + 1; });
+    on(b, t => { if (wo) t.blocking = (t.blocking || 0) + 1; });
   }
-  if (!ok.length) { if (!errs.length) toast(tr('Already waiting on it')); return; }
-  await load(); render();
-  if (S.sel && ok.some(p => p.includes(S.sel))) loadDeps(S.sel);
+  const put = dgLocal(new Map([...fns].map(([id, fs]) => [id, t => fs.forEach(f => f(t))])));
+  try {
+    await optWrite(put, async () => {
+      for (const [w, b] of todo) {
+        try { await api('POST', '/api/deps', {task_id: w, blocker_id: b}); ok.push([w, b]); } catch (e) { errs.push(e?.message || ''); }
+      }
+      if (!ok.length) throw new Error(errs[0] || '');
+    });
+  } catch { return; }
+  if (errs.length) load().then(render, () => {});
+  if (S.sel && todo.some(p => p.includes(S.sel))) loadDeps(S.sel);
   const [w0, b0] = ok[0], tw = S.tasks.get(w0), tb = S.tasks.get(b0);
   const lab = ok.length === 1 ? tr('“{0}” waits on “{1}”', dgShort(tw?.title), dgShort(tb?.title)) : trn('{0} task waits on “{1}”', '{0} tasks wait on “{1}”', ok.length, dgShort(tb?.title));
   const go = add => async () => {
