@@ -2108,6 +2108,14 @@ Agents read files like this:
 its task / project: a person restores it in the app, it is deleted for good after the trash period (when the operator has the retention switch on; `KALMIDO_TRASH_DAYS`,
 30 days). A file in the trash is `404` for every reader, agents included.
 
+**Deleting a section, a template or a key link (2.567.0).** `DELETE /api/v1/sections/{id}` (`delete_section`),
+`DELETE /api/v1/templates/{id}` (`delete_template`) and `DELETE /api/v1/lists/{id}/links/{link_id}` (`delete_project_link`)
+answer as before, but nothing is deleted for good at once: the section (with its limits and which tasks were in it), the
+template (with its own file copies) and the key link go to the trash, a person restores them in the app (Undo, the trash
+view), the server deletes them for good after the trash period. In the trash they are `404` and missing from every list,
+agents included. The household budget never reaches an agent; its entries, categories and recurring entries go to the
+trash the same way in the app.
+
 The reference starter (`mcp/agent_run.py`, [AGENT-SETUP.md](AGENT-SETUP.md#9-autostart-with-the-runtime-launcher)) uses this for you (2.44.0): files in the run's folder `$KALMIDO_OUTBOX` and images the agent looked at go as one multipart chat message before the answer; a job (`mcp/agent_job.py`) posts its result with `job_id` and its files and then wakes the chat agent with one chat run (2.46.6; a job lost by a restart goes on once in its session); task events of projects the agent listens in are bundled into one run.
 
 Permissions are the app's: an agent reads files only of tasks it sees with their comments (a project shared with it; as a

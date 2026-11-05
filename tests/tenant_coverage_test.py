@@ -190,7 +190,8 @@ KINDS = {
     "devlink": ("matrix", "p2140_b_api_test.py: another person's device, link or equipment of another office area 404; taking over "
                           "into an organisation only as its admin (403); a link of another person never shows on the equipment"),
     "budget": ("matrix", "p272_a_budget_api_test.py: categories, entries, templates, contracts, import and receipts by id of another "
-                         "person's budget 404, read-only shared = no change, agents / tokens without the scope private never"),
+                         "person's budget 404, read-only shared = no change, agents / tokens without the scope private never; "
+                         "p2567_a_trash_test.py (2.567.0 #4707: restoring from the budget's trash: a stranger 404, read-only 403)"),
     # 2.73.0 A (#661): the accounts of one person on other Kalmido servers (accounts/servers.py) -- private per person
     "servers": ("matrix", "p273_a_api_test.py: the server accounts of another person 404 (read, change, delete, restore, data, tasks, move); agents 403; nothing of another person's tasks moves"),
     # 2.84.0 A (#1198): mails filed with a client / project (hub/hubmail.py hbm_can: the client / list / recipient, always in the mail's workspace)
@@ -343,6 +344,9 @@ ROUTES = {
     # 2.102.0 A (#1988): the list trash -- only lists the person may restore (otr_can: owner / list admin / the org's admins,
     # members only), by id the same 404 for every other list (p2102_a_api_test.py)
     "GET /api/trash/lists": "aggregate", "POST /api/trash/lists/{}/restore": "list", "DELETE /api/trash/lists/{}": "list",
+    # 2.567.0 A (#4707): the trash of sections, sprints, key links, templates and budget rows (p2567_a_trash_test.py)
+    "GET /api/trash/parts": "aggregate", "POST /api/sections/{}/restore": "list", "POST /api/sprints/{}/restore": "list",  # p2567_a_trash_test.py
+    "POST /api/lists/{}/links/{}/restore": "list", "POST /api/templates/{}/restore": "template",  # p2567_a_trash_test.py
     "GET /api/trash/lists/{}/export.zip": "list",  # 2.186.1 (#2732)
     "POST /api/trash/lists/{}/export.zip": "list",  # 2.223.2 C (#2871): its step-up
     # ---- attachment (16)
@@ -1227,6 +1231,9 @@ ROUTES = {
     "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
     "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",
     "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
+    # 2.567.0 A (#4707): the budget's trash (p2567_a_trash_test.py: a stranger 404, read-only 403)
+    "POST /api/budget/cats/{}/restore": "budget", "POST /api/budget/entries/{}/restore": "budget",  # p2567_a_trash_test.py
+    "POST /api/budget/recurring/{}/restore": "budget",  # p2567_a_trash_test.py
     "GET /api/budget/{}/contracts": "budget", "POST /api/budget/{}/contracts": "budget",
     "POST /api/budget/{}/import/parse": "budget", "POST /api/budget/{}/import/commit": "budget",
     # 2.146.0 C (#2455): the import runs of a budget (p2146_c_api_test.py: another person 404)

@@ -191,8 +191,9 @@ r = A.post(B + f"/api/templates/{TT}/apply", json={"list_id": L})
 check(r.ok and r.json()["task"]["assignee_id"] == uid["bob"] and len(atts(r.json()["task"]["id"])) == 1, "after the edit: assignee and file are still there")
 dpaths = [x[0] for x in dbx("SELECT path FROM template_files WHERE template_id=?", (TT,))]
 assert A.delete(B + f"/api/templates/{TT}").ok
-check(dbx("SELECT 1 FROM template_files WHERE template_id=?", (TT,)) == [], "template deleted: its rows go")
-check(not any(os.path.exists(os.path.join(DATA, "attachments", p)) for p in dpaths), "template deleted: its files go")
+# 2.567.0 (#4707): a deleted template waits in the trash with its files; they go with it after the trash period (p2567_a_trash_test.py)
+check(len(dbx("SELECT 1 FROM template_files WHERE template_id=?", (TT,))) == len(dpaths), "template deleted: its rows wait in the trash")
+check(all(os.path.exists(os.path.join(DATA, "attachments", p)) for p in dpaths), "template deleted: its files wait in the trash")
 check(Ca.get(B + "/api/templates").json()["templates"] == [], "tenant: a stranger sees no template")
 
 # freelancer-matrix: lists, tasks, files, personal

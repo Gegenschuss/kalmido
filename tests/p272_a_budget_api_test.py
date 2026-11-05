@@ -7,7 +7,7 @@
  - contracts -> templates, taken, contract_changed and syncing
  - the bank import: semicolon + German numbers with a preamble and a BOM, comma + dot with debit / credit columns,
    trailing minus, broken rows, duplicates on the second import, a remembered mapping, the limits
- - receipts: upload, download, delete; deleting an entry removes its files
+ - receipts: upload, download, delete; deleting an entry keeps its files in the trash (2.567.0, #4707)
  - tenant-matrix: budget -- a stranger 404 everywhere (also with ids of the budget in their own routes), a read-only member
    reads but never writes, a writing family member writes, an agent never (also as a member), a token without the scope
    private never, a budget cannot be shared with an agent
@@ -330,7 +330,8 @@ E9 = entry(A, L, title="With receipt", amount=3, day="2026-09-02").json()["id"]
 F9 = A.post(B + f"/api/budget/entries/{E9}/files", files=[("file", ("r.txt", b"gone", "text/plain"))]).json()["files"][0]["id"]
 p9 = os.path.join(DATA, "attachments", one("SELECT path FROM budget_files WHERE id=?", (F9,)))
 A.delete(B + f"/api/budget/entries/{E9}")
-check(not os.path.exists(p9) and one("SELECT COUNT(*) FROM budget_files WHERE id=?", (F9,)) == 0, "deleting an entry removes its receipts")
+# 2.567.0 (#4707): the entry goes to the trash, its receipt waits with it until the trash period (p2567_a_trash_test.py)
+check(os.path.exists(p9) and one("SELECT COUNT(*) FROM budget_files WHERE id=?", (F9,)) == 1, "deleting an entry keeps its receipts in the trash")
 
 # ================================================================ tenant-matrix: budget
 DL = Da.post(B + "/api/budget/lists", json={"name": "Dave money"}).json()["list_id"]

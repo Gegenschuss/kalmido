@@ -269,6 +269,10 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.567.0 A (#4707): sections, planned sprints, key links and templates in the trash are restored by a person (Undo, the trash "
+     "view) -- an agent's delete puts them into that trash, the way back stays with people (like the files and comments)",
+     ("=GET /api/trash/parts", "=POST /api/sections/{}/restore", "=POST /api/sprints/{}/restore", "=POST /api/lists/{}/links/{}/restore",
+      "=POST /api/templates/{}/restore")),
     ("2.558.0 (#4709): the core objects' own management stays with people -- creating, the trash, deleting, the editor's undo session and who it is shared with (an agent changes what is shared with it, never its shares or its existence)",
      ("=POST /api/obj/{}", "=POST /api/obj/{}/{}/trash", "=POST /api/obj/{}/{}/restore", "=DELETE /api/obj/{}/{}", "=GET /api/obj/{}/{}/history",
       "=POST /api/obj/{}/{}/undo", "=GET /api/obj/{}/{}/shares", "=POST /api/obj/{}/{}/shares", "=DELETE /api/obj/{}/{}/shares/{}",

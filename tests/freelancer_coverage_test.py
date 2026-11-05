@@ -656,6 +656,8 @@ ROUTES = {
     "PATCH /api/supporter/nudge": "personal", "PATCH /api/v1/family/rewards/{}": "personal",
     "POST /api/budget/entries/{}/files": "personal", "POST /api/budget/lists": "personal",
     "POST /api/budget/recurring/{}/book": "personal", "POST /api/budget/{}/cats": "personal",
+    "POST /api/budget/cats/{}/restore": "personal", "POST /api/budget/entries/{}/restore": "personal",  # 2.567.0 A (#4707)
+    "POST /api/budget/recurring/{}/restore": "personal",
     "POST /api/budget/{}/contracts": "personal", "POST /api/budget/{}/entries": "personal",
     "POST /api/budget/{}/import/commit": "personal", "POST /api/budget/{}/import/parse": "personal",
     # 2.146.0 C (#2455): an import run listed / taken back (p2146_c_api_test.py)
@@ -750,6 +752,9 @@ ROUTES = {
     "GET /api/trash/purge-info": "tasks",  # 2.530.0 D (#4316): the numbers before deleting for good (p2530_d_cascade_test.py, freelancer-matrix: tasks)
     # 2.102.0 A (#1988): the list trash (p2102_a_api_test.py: a person without an organisation deletes / restores / purges)
     "GET /api/trash/lists": "lists", "POST /api/trash/lists/{}/restore": "lists", "DELETE /api/trash/lists/{}": "lists",
+    # 2.567.0 A (#4707): the trash of sections, sprints, key links, templates (p2567_a_trash_test.py)
+    "GET /api/trash/parts": "lists", "POST /api/sections/{}/restore": "lists", "POST /api/sprints/{}/restore": "tasks",
+    "POST /api/lists/{}/links/{}/restore": "lists", "POST /api/templates/{}/restore": "lists",
     "GET /api/trash/lists/{}/export.zip": "office",  # 2.186.1 (#2732): a kept project for its custodian (p2146_d_api)
     "POST /api/trash/lists/{}/export.zip": "office",  # 2.223.2 C (#2871): its step-up (a one-time ticket)
     "DELETE /api/v1/attachments/{}": "tasks",
@@ -1174,10 +1179,7 @@ def write_proven(route, texts):
 WRITE_UNPROVEN = set(x.strip() for x in """
 DELETE /api/account/export
 DELETE /api/books/{}/org
-DELETE /api/budget/cats/{}
-DELETE /api/budget/entries/{}
 DELETE /api/budget/files/{}
-DELETE /api/budget/recurring/{}
 DELETE /api/calendars/{}
 DELETE /api/calendars/{}/events
 DELETE /api/chat-files/{}
@@ -1202,7 +1204,6 @@ DELETE /api/list-checks/{}
 DELETE /api/lists/{}/favorite
 DELETE /api/lists/{}/groups/{}
 DELETE /api/lists/{}/icon
-DELETE /api/lists/{}/links/{}
 DELETE /api/lists/{}/milestones/{}
 DELETE /api/lists/{}/public-link
 DELETE /api/me/avatar
@@ -1321,11 +1322,7 @@ POST /api/agents/{}/share-all
 POST /api/agents/{}/wake
 POST /api/assistant/run
 POST /api/briefing/read
-POST /api/budget/entries/{}/files
-POST /api/budget/recurring/{}/book
-POST /api/budget/{}/cats
 POST /api/budget/{}/contracts
-POST /api/budget/{}/recurring
 POST /api/calendars
 POST /api/calendars/discover
 POST /api/calendars/{}/events
@@ -1394,7 +1391,6 @@ POST /api/lists/{}/sections/order
 POST /api/lists/{}/shift
 POST /api/lists/{}/shop-areas
 POST /api/lists/{}/signoffs/{}/revoke
-POST /api/lists/{}/sprints
 POST /api/lists/{}/tags/promote
 POST /api/lists/{}/time/restore
 POST /api/me/drop-token
