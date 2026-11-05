@@ -949,7 +949,7 @@ async function outFlush() {
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
-        let j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
+        let j = await rawFetch(e.method, url, body, e.ik || e.k);  // 2.270.0 C (#3022): the same key as the service worker's send; 2.551.0 (#4646): ik = the rebased send's own
         sent++; OUT.tries = 0; OUT.retryAt = 0;
         if (ntU(e.url)) sentNt++;  // 2.536.0 (#4567): a note's change (they go out online too now)
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
@@ -960,7 +960,8 @@ async function outFlush() {
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
           const own = j.conflicts.filter(c => ownVal(cfTid(c, j.id) + ':' + c.field, c.server) && body && c.field in body);  // 2.527.0 (#4304): the entry's task
-          if (own.length === j.conflicts.length && !e.rebased) { outSave(() => { e.rebased = true; e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; }); continue; }
+          // 2.551.0 (#4646): with a new idempotency key (the same one would only bring back the stored answer with its conflict)
+          if (own.length === j.conflicts.length && !e.rebased) { outSave(() => { e.rebased = true; e.ik = outKey(); e.body = {...body, _prev: Object.fromEntries(own.map(c => [c.field, c.server]))}; }); continue; }
           addConflicts(j.id, j.conflicts, j.title);
         }
         if (j && j.skipped) skipped++;
