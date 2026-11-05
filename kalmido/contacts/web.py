@@ -32,6 +32,7 @@ from ..accounts.orgs import obj_org_set  # 2.369.5 (#2517): pulled up from funct
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2a_gen_refuse  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 
 # 2.41.0 (#1437): never above the request limit (MAX_CONTENT_LENGTH answers 413 before the route), whole MB for the message
 VCF_MAX = min(20, (app.config.get("MAX_CONTENT_LENGTH") or 0) // (1024 * 1024) or 20) * 1024 * 1024
@@ -245,7 +246,6 @@ def op_contact_edit(c, uid, cid, b):
     _unknown(b, CT_KEYS + ("expect",))
     r = c.execute("SELECT * FROM contacts WHERE id=? FOR UPDATE", (cid,)).fetchone() or r  # 2.273.0 C (#3048): expect checked under the row lock
     if b.get("expect") and b["expect"] != r["updated_at"]:  # 2.564.0 (#4702): with the contact as it is now (the shared core's Conflict)
-        from ..core.conflict import Conflict
         raise Conflict("contact", contact_dict(c, r, uid), msg=tr("The contact was changed meanwhile"))
     b = {k: v for k, v in b.items() if k != "expect"}
     if "book_id" in b and b["book_id"] not in (None, "") and as_int(b["book_id"], "book_id", 1) != r["book_id"]:

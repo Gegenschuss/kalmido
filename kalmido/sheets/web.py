@@ -23,6 +23,7 @@ from ..core.retention import ret_on, ret_trash_days
 from ..core.serializers import unlink_files
 from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
+from .shhist import shh_meta  # 2.564.0 (#4701/#4702)
 
 
 def _int(v, what):
@@ -116,7 +117,6 @@ def sheets_patch(sid):
         c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
         k = "tab_name" if "tab_name" in f else "title" if "title" in f else None  # 2.564.0 (#4701): a further sheet: its name
         if k:
-            from .shhist import shh_meta
             shh_meta(c, sid, "tab" if k == "tab_name" else "title", r[k], f[k], uid)
         if "list_id" in f:
             shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list

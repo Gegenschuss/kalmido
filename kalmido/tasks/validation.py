@@ -13,6 +13,7 @@ from ..core.db import iso_ms, now_utc, parse_iso
 from ..core.pages import valid_link
 from ..api.common import act_via  # 2.149.0 G (#2517): pulled up from functions
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..core.conflict import agent_account  # 2.564.0 (#4702)
 
 
 # ---------------------------------------------------------------- tasks
@@ -553,8 +554,7 @@ def lock_problem(c, cur, f, b=None):
 def lock_bypass_agent():
     """2.564.0 (#4702): an agent account writing through the API: not bound by the lock (the decision of #4702), but its
     change of a locked field is marked in the task's history as locked_bypass (lock_problem)."""
-    from ..agents.core import is_agent
-    return has_request_context() and is_agent(getattr(g, "user", None))
+    return has_request_context() and agent_account(getattr(g, "user", None))
 
 
 def descendants(c, tid):

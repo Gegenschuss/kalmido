@@ -52,10 +52,9 @@ def need_version(b, *fields, header=True):
     /api/v1 and MCP. b = the request body (or a dict of the parameters that may carry a version); fields = the keys that
     carry one ("expect_updated_at", "_prev", "expect_rev" ...); header = the header If-Match counts too. People's tokens
     and the app stay as they were (old clients). Call it before the write; raises VersionRequired when nothing is given."""
-    from flask import g, has_request_context, request
-    from ..agents.core import is_agent
-    if not has_request_context() or not (is_agent(getattr(g, "user", None)) or g.get("ofa_agent")):  # ofa_agent: an agent acting as
-        return  # a person in the office (office/agentdocs.py _as_person swaps g.user)
+    from flask import request
+    if not version_rule():
+        return
     # review 2.564.0: an empty _prev {} / [] says nothing about what was read -> as if missing
     if isinstance(b, dict) and any(b.get(k) not in (None, "") and b.get(k) != {} and b.get(k) != [] for k in fields):
         return
@@ -64,11 +63,20 @@ def need_version(b, *fields, header=True):
     raise VersionRequired(fields + (("If-Match",) if header else ()))
 
 
+def agent_account(u):
+    """2.564.0 (#4702): u (a users row) is an agent account - the same test as agents.core.is_agent, here in the core so
+    lower layers (core, tasks) need no upward import."""
+    try:
+        return bool(u) and (u["kind"] or "user") == "agent"
+    except (KeyError, IndexError, TypeError):
+        return False
+
+
 def version_rule():
-    """2.564.0 (#4702): True when the current request must carry a version (an agent account, need_version)."""
+    """2.564.0 (#4702): True when the current request must carry a version: an agent account, or an agent acting as a
+    person in the office (g.ofa_agent; office/agentdocs.py _as_person swaps g.user)."""
     from flask import g, has_request_context
-    from ..agents.core import is_agent
-    return has_request_context() and bool(is_agent(getattr(g, "user", None)) or g.get("ofa_agent"))
+    return has_request_context() and bool(agent_account(getattr(g, "user", None)) or g.get("ofa_agent"))
 
 
 def take_version(b, key="expect_updated_at"):

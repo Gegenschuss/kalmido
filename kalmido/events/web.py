@@ -22,6 +22,7 @@ from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.tasks import task_create  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import obj_org_set, ws_fit_problem  # 2.369.5 (#2517): pulled up from functions
+from ..core.conflict import Conflict  # 2.564.0 (#4701/#4702)
 
 
 def _unknown(b, allowed):
@@ -179,7 +180,6 @@ def op_event_edit(c, uid, eid, b, occ=None):
 
 def _ev_conflict(c, r, uid):
     """2.564.0 (#4702): 409 with the event as it is now (key "event"; the API: error.current), as the shared core's Conflict."""
-    from ..core.conflict import Conflict
     return Conflict("event", ev_dict(c, r, uid), msg=tr("The event was changed meanwhile"))
 
 

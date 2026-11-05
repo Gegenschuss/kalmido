@@ -28,6 +28,8 @@ from ..core.errors import BadInput
 from .formula import ShErr
 from .shfuncs import _Grid, _book_of, shf_spend, SHF_WORK_BUDGET  # 2.369.5 (#2517): pulled up from functions
 from .shkinds import shk_move_files  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import write_lock  # 2.564.0 (#4701/#4702)
+from .shhist import shh_meta  # 2.564.0 (#4701/#4702)
 
 SHB_TABS_MAX = 30          # sheets of one table
 SHB_NAME_MAX = 100
@@ -448,7 +450,6 @@ def sheets_tabs_patch(sid, tid):
     c = db()
     first, uid = _need_book(c, sid, write=True)
     _need_tab(c, first, tid)
-    from ..core.pg import write_lock
     for x in sorted({first["id"], tid}):  # 2.564.0 (#4701): the table's lock (names / order of its sheets) and the sheet's own
         write_lock(c, "sheet:" + str(x))
     r = _need_tab(c, first, tid)
@@ -463,7 +464,6 @@ def sheets_tabs_patch(sid, tid):
             c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, tid))
         else:
             c.execute("UPDATE sheets SET tab_name=? WHERE id=?", (name, tid))
-        from .shhist import shh_meta
         shh_meta(c, tid, "tab", shb_label(r), name, uid)  # 2.564.0 (#4701): in the sheet's history
     if "pos" in b:
         p = b.get("pos")

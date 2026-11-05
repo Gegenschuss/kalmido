@@ -15,6 +15,7 @@ from ..core.retention import ret_days
 from ..api.v1 import API_PAGE_MAX, v1_limit
 from ..api.common import cursor_dec, cursor_enc, v1_args, v1_call, v1_json, v1_view
 from ..core.i18n import LANGS  # 2.369.5 (#2517): pulled up from functions
+from ..core.conflict import need_version  # 2.564.0 (#4701/#4702)
 
 
 # ---------------------------------------------------------------- 2.17.0 (#442): notes of a list / project
@@ -374,7 +375,6 @@ def v1_note_update(nid):
     from .liste2e import le2a_api_refuse
     le2a_api_refuse(db(), need_note(db(), nid)["list_id"], b.get("list_id"))  # 2.64.1 (#1817)
     if {"title", "body", "tags"} & set(b):  # review 2.564.0 (#4702): an agent's text change says what it read (moving, pinning stay free)
-        from ..core.conflict import need_version
         need_version(b, "expect_updated_at", header=False)
     j = v1_call(note_update, nid, body=b)
     return jsonify({k: v for k, v in j.items() if k != "updated_by_name"})

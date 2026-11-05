@@ -26,6 +26,9 @@ from ..files.upsafe import h6d_read  # 2.369.5 (#2517): pulled up from functions
 from ..files.web import fs_agent_folder  # 2.369.5 (#2517): pulled up from functions
 from .web import ws_param  # 2.369.5 (#2517): pulled up from functions
 from ..office.einvoice_in import ei_api  # 2.369.5 (#2517): pulled up from functions
+from ..core.conflict import ccf_check, need_version  # 2.564.0 (#4701/#4702)
+from ..core.pg import write_lock  # 2.564.0 (#4701/#4702)
+from ..core.db import iso_ms, now_utc  # 2.564.0 (#4701/#4702)
 
 CREATE_FIELDS = ("name", "title", "mime", "content_base64", "parent_id", "ws", "sender", "type", "tags", "date", "due", "amount", "currency")
 V1_FIELDS = ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "custom_fields")  # 2.153.0 (#2179): + custom_fields
@@ -177,8 +180,6 @@ def v1_doc_patch(nid):
         raise Denied(404)
     # review 2.564.0 (#4702, #4701): the same version as the document sheet of the app (docs_patch): agents must send it,
     # a stale one -> 409 with the document; while the recognition runs no check (it keeps values set by hand)
-    from ..core.conflict import ccf_check, need_version
-    from ..core.pg import write_lock
     need_version(b, "expect_updated_at")
     if not b.get("expect_updated_at") and (request.headers.get("If-Match") or "").strip():
         b = {**b, "expect_updated_at": request.headers["If-Match"].strip().removeprefix("W/").strip('"')}
@@ -194,7 +195,6 @@ def v1_doc_patch(nid):
     e = doc_update(c, nid, b, me(), by="agent" if is_agent(g.user) else None)
     if e:
         raise BadInput(e[0].get_json().get("error") or tr("Invalid value: {0}", "document"))
-    from ..core.db import iso_ms, now_utc
     c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))  # review 2.564.0: a new version, as docs_patch
     fs_log_add(c, nid, "edit", ",".join(sorted(b))[:200])
     bump(c)
