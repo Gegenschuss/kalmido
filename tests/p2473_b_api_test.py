@@ -10,7 +10,7 @@ companies, people and figures only.
    with a part invoice is no longer in the plan), purchases of accepted quotations, travel receipts and fixed costs
    (once / monthly / quarterly / yearly, end date) land in the right month as actual or planned; 3 / 6 months; fixed costs
    CRUD + encrypted
- - rights: a member gets 403 everywhere, another organisation sees nothing and reaches nothing (404)
+ - rights: a member gets 403 everywhere except their own travel expenses (2.545.0, #4592), another organisation sees nothing and reaches nothing (404)
 usage: p2473_b_api_test.py <datadir>"""
 import base64
 import csv
@@ -170,9 +170,15 @@ check(rows and all(str(a).startswith("kenc1:") and str(b).startswith("kenc1:") f
 rows = sql("SELECT people, note FROM office_trips WHERE id=?", (TRB["id"],))
 check(str(rows[0][0]).startswith("kenc1:") and str(rows[0][1]).startswith("kenc1:"), "#1022: participants and note encrypted at rest")
 # rights
-check(all(x.status_code == 403 for x in (Bo.get(B + T), Bo.post(B + T, json={"date_from": "2025-09-01"}), Bo.patch(B + T + f"/{TRB['id']}", json={"dest": "x"}),
-                                          Bo.get(B + f"{T}/report?by=month"), Bo.post(B + f"{T}/bill", json={"doc_id": Q["id"], "item_ids": [1]}))),
-      "#1022: a member gets 403 (admins only)")
+# 2.545.0 (#4592): a member enters their own trips (level "own"); someone else's trip stays read-only, billing stays with admins
+check(all(x.status_code == 403 for x in (Bo.patch(B + T + f"/{TRB['id']}", json={"dest": "x"}),
+                                          Bo.post(B + f"{T}/bill", json={"doc_id": Q["id"], "item_ids": [1]}))),
+      "#1022: a member changes no trip of somebody else and bills nothing (403)")
+check(Bo.get(B + T).ok and Bo.get(B + f"{T}/report?by=month").ok, "#4592: a member reads the list and the report of their own trips")
+r = Bo.post(B + T, json={"date_from": "2025-09-01"})
+check(r.status_code == 201, "#4592: a member enters their own trip " + r.text[:160])
+if r.status_code == 201:
+    check(Bo.delete(B + T + f"/{r.json()['id']}").ok, "#4592: a member deletes their own trip")
 check(Ca.get(B + T).json()["trips"] == [], "#1022: another organisation sees no trips")
 check(Ca.patch(B + T + f"/{TRB['id']}", json={"dest": "x"}).status_code == 404 and Ca.delete(B + T + f"/{TRB['id']}").status_code == 404
       and Ca.post(B + f"{T}/{TRB['id']}/items", json={"amount": 1}).status_code == 404, "#1022: another organisation reaches nothing (404)")

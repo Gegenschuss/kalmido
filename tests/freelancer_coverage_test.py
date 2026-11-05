@@ -1270,7 +1270,6 @@ PATCH /api/notepads/{}
 PATCH /api/office/cashflow/adjust/{}
 PATCH /api/office/meals/choices/{}
 PATCH /api/office/trips/purposes/{}
-PATCH /api/office/trips/{}/items/{}
 PATCH /api/office/vehicles/{}
 PATCH /api/servers/self
 PATCH /api/servers/{}
@@ -1420,7 +1419,6 @@ POST /api/office/packs/install
 POST /api/office/packs/installed/{}/{}/restore
 POST /api/office/packs/validate
 POST /api/office/receipts/tree/folders
-POST /api/office/trips/unbill
 POST /api/onboarding
 POST /api/orgs/{}/export/file
 POST /api/paperless/import
