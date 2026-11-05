@@ -9,14 +9,9 @@ import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import pins  # noqa: E402
-
-fails = []
-
-
-def check(cond, msg):
-    if not cond:
-        fails.append(msg)
+from kt import check, done  # noqa: E402
 
 
 names = dict(pins.osv_targets())
@@ -42,7 +37,4 @@ for rel in ("Dockerfile", "embed/Dockerfile"):
     # the final stage of Dockerfile starts at its last FROM; the removal must sit in that stage
     check(rm > text.rfind("\nFROM "), f"{rel}: the removal is not in the final stage")
 
-if fails:
-    print("\n".join("FAIL: " + f for f in fails))
-    sys.exit(1)
-print("p2554_d_pins_test ok")
+sys.exit(done("p2554_d_pins_test"))
