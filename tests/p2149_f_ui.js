@@ -46,7 +46,8 @@ const FILES = Object.values(MOVED).flat();
     const own = ((mods.match(new RegExp(`\\b${m}: \\[([^\\]]*)\\]`)) || [, ''])[1].match(/'[\w-]+'/g) || []).map(x => x.slice(1, -1));
     check(fs.every(f => own.includes(f) && LAZY.includes(f) && !tags.includes(f)), `module ${m}: ${fs.join(', ')} in LD_MODS + LAZY, no script tag (${own.join(' ')})`);
   }
-  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients', 'clientpage', 'render', 'sprints'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
+  // 2.563.0 (#4742): clientpage.js loads on demand now (module clientpage); the start part of the e-mail filing moved to lazyload.js
+  check(['quickadd', 'dayplan', 'git', 'projects', 'lazyload', 'calevents', 'time', 'clients', 'render', 'sprints'].every(f => tags.includes(f)), 'the start parts of the split files stay at start');
 
   // ================= setup
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

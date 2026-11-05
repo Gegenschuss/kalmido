@@ -85,12 +85,13 @@ const LD_MODS = {
   sideviews: ['sideviews'],  // 2.156.0 D (#2186): saved views of the sidebar (favtiles.js has the stand-ins)
   notetrash: ['notetrash'],  // 2.272.0 E1 (#3038): the notes of a project in the trash (chat.js draws the button)
   trashui: ['trashui'],  // 2.272.0 G (#3038): the trash dialogs / views of 2.272.0 (start budget)
+  clientpage: ['clientpage'],  // 2.563.0 (#4742): Office > Clients (the list and the client's card), on its view; the office, the contacts and the trash use its globals (LD_NEED)
   whatsnew: ['whatsnew'],  // 2.556.0 (#4685): the dialog "New for you" after an update (wn_boot below loads it only when there is news)
 };
 // 2.65.0 (#1823): modules a module needs before its own files (their globals are used while it draws): the settings dialog
 // draws the agent panes (agentchat.js), the calendars (calview.js) and the tokens / webhooks (integrations.js), the agent chat
 // uses the token dialogs, a knowledge page embeds mind maps; 2.87.9 (#1936): Paperless-ngx (paperless.js) is in Integrations
-const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'ablage', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop'], office: ['asstprop', 'ofundo', 'ablage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
+const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook', 'docs', 'timesheet', 'team', 'ablage', 'family'], agentchat: ['integrations'], wiki: ['mindmap'], docs: ['ablage', 'tagsel', 'asstprop'], office: ['asstprop', 'ofundo', 'ablage', 'clientpage'], contacts: ['clientpage'], trashui: ['clientpage'], sheets: ['ofundo'], fsshare: ['ablage'], filereq: ['ablage'], tagsel: ['ablage'], fslock: ['ablage']};  // 2.122.0 B: docs -> tagsel; 2.126.1 A (#2123): docs / office -> asstprop
 // 2.501.0 (#4198): module ablage: settings (the sharing defaults), docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
@@ -118,7 +119,8 @@ const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCou
   sprints: ['spr_assign', 'spr_pick', 'spr_cfgModal', 'spr_cfgSet', 'spr_closeModal', 'spr_moreMenu']};  // 2.149.0 F (#2518)
 // 2.65.0 (#1823): functions that only update what the module drew: before it is loaded there is nothing to update (no loading)
 const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 'chatTypers', 'chatStHtml'], timeline: ['tlKbSync', 'tlAfterRender', 'rmAfterRender'],
-  timesheet: ['tsl_printNote']};  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
+  timesheet: ['tsl_printNote'],  // 2.149.0 F (#2518): the printed timesheet's month line (nothing before the card loaded the month)
+  clientpage: ['ms_clDraw', 'ms_clDirty', 'ms_clLive']};  // 2.563.0 (#4742): the client page redraws / reloads only what it drew
 // drawing functions: the stand-in draws "Loading…" (views) or nothing (parts of another view), loads, and redraws the view
 // 2.65.0 (#1824): module -> its stylesheets in static/css/ (the same files as LAZY_CSS in sw.js, same order); loadModule loads
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
@@ -142,7 +144,8 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   ntTrashHtml: ['notetrash'],  // 2.272.0 E1 (#3038)
   ms_clTrashHtml: ['trashui', 1], povTrashHtml: ['trashui'],  // 2.272.0 G (#3038)
   vtr_html: ['trashui'],  // 2.549.0 (#4536): the video sign-offs in the trash view
-  tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1]};  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
+  tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1],
+  ms_clView: ['clientpage', 1]};  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the
 // server is asked what is new since then; only when there is something the dialog's module loads (whatsnew.js). Nothing at
 // all on a server without the feature (no whatsnew_seen), for agents, in a second window or the capture page.
@@ -320,6 +323,35 @@ window.wk_palAdd = () => { if (feat('wiki')) loadModule('wiki').catch(() => {});
 // the module when they are drawn and draw again once it is there
 window.vdr_taskHtml = t => { if (t?.id > 0) loadModule('videos').then(() => { if (S.sel === t.id && vdr_rows('task_id', t.id, () => vdr_redrawTask(t.id))) vdr_redrawTask(t.id); }, () => {}); return ''; };  // 2.96.3: one redraw, focus kept
 window.vdr_projHtml = window.vdr_clientHtml = () => { ld_later('videos'); return ''; };
+// 2.563.0 (#4742) the client page (clientpage.js, module clientpage) loads on demand: the start part of the e-mail filing that
+// lived there stays at start (moved here unchanged from clientpage.js, 2.149.0 F #2518): the link to the mail a task / an event
+// was made from, its click, the stand-ins of the client's card and the project page
+// the mail a task / an event was made from: "E-mail: <subject>" (a tap opens it); only "E-mail" for who may not read the
+// mail (the server sends neither subject nor id then). Filled after the answer (cached a minute), the detail is not redrawn
+const HBML = {};  // 'task:<id>' | 'event:<id>' -> {at, links}
+function hbm_linkHtml(kind, id) {
+  if (!(id > 0)) return '';
+  const k = `${kind}:${id}`, c = HBML[k];
+  if (!c || Date.now() - c.at > 60000) hbm_linkLoad(k);
+  return `<div class="hbmlnk" data-hbmlnk="${k}">${c ? hbm_linkInner(c.links) : ''}</div>`;
+}
+const hbm_linkInner = links => (links || []).map(x => x.mail_id
+  ? `<button type="button" class="linkbtn" data-hbmopen="${x.mail_id}" data-hbmk="link">${ic('mail', 's')}<span>${esc(tr('E-mail: {0}', x.subject || tr('(no subject)')))}</span></button>`
+  : `<span class="muted">${ic('mail', 's')} ${tr('E-mail')}</span>`).join('');
+async function hbm_linkLoad(k) {
+  const [kind, id] = k.split(':');
+  HBML[k] = {at: Date.now(), links: HBML[k]?.links || []};
+  let j; try { j = await rawFetch('GET', `/api/hubmail/links?${kind}_id=${id}`); } catch { return; }
+  HBML[k] = {at: Date.now(), links: j.links || []};
+  for (const el of document.querySelectorAll(`[data-hbmlnk="${k}"]`)) el.innerHTML = hbm_linkInner(j.links);
+}
+const hbm_taskLinkHtml = t => t && !t.context ? hbm_linkHtml('task', t.id) : '';
+document.addEventListener('click', e => {
+  const o = /** @type {HTMLElement} */ (/** @type {HTMLElement} */ (e.target).closest?.('[data-hbmopen]')); if (!o) return;
+  e.preventDefault(); if (o.closest('#pop') && typeof closePop === 'function') closePop(); hbm_open(+o.dataset.hbmopen, o.dataset.hbmk);
+});
+window.hbm_clientHtml = c => { if (c) ld_later('hubmail'); return ''; };
+window.hbm_projHtml = l => { if (l && !l.is_inbox && !l.e2e && !l.life && !l.family) ld_later('hubmail'); return ''; };
 // 2.394.0 C (#3377): the history lines of the issue sync (gitrepo.js): the task panel draws again once the module is there
 window.gsy_actText = () => { loadModule('gitrepo').then(() => S.sel && renderDetail(), () => {}); return ''; };
 window.wk_mentionHtml = t => { if (feat('wiki') && t?.id > 0) loadModule('wiki').then(() => { if (S.sel === t.id) renderDetail(); }, () => {}); return ''; };

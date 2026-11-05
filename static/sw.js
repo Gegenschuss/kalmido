@@ -24,7 +24,7 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/lysets.js', '/static/js/tapdone.js', '/static/js/props.js', '/static/js/listhead.js', '/static/js/purposemods.js',
   '/static/js/calevents.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js',
   '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js', '/static/js/lyprop.js',
-  '/static/js/clientpage.js', '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js',
+  '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js',
   '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js',
   '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js',
   '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js',
@@ -69,7 +69,7 @@ const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supp
   '/static/js/hubmailbox.js', '/static/js/listprint.js', '/static/js/evinvite.js', '/static/js/projtime.js', '/static/js/envs.js',
   '/static/js/dpmodal.js', '/static/js/gitrepo.js', '/static/js/timesheet.js', '/static/js/absence.js', '/static/js/leave.js', '/static/js/dispo.js',
   '/static/js/hubmail.js', '/static/js/msvview.js', '/static/js/sprints2.js', '/static/js/sideviews.js', '/static/js/notetrash.js',
-  '/static/js/trashui.js', '/static/js/whatsnew.js'];
+  '/static/js/trashui.js', '/static/js/clientpage.js', '/static/js/whatsnew.js'];
 // 2.45.0 (#1529): the new cache is filled completely first (addAll fails on any non-2xx -> this install is dropped and the
 // old worker and cache stay); old caches are deleted only when the new one holds the whole shell
 // 2.65.0 (#1824): the stylesheets of the modules loaded on demand (static/css/, LD_CSS in lazyload.js, same order)

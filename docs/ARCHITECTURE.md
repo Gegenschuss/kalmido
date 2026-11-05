@@ -623,7 +623,8 @@ settings sections), `ctlinks.js` (the contacts in the task panel) and `officeOn`
 | `life` + `budget.js` | 2.149.0 F (#2518) | the budget view (it needed life.js already) |
 | `settings` + `servers.js` | 2.149.0 F | Settings > Account > other servers |
 | `msvview` | `msvview.js` | 2.149.0 F: only with a linked server (the start asks `/api/servers` once) or a list of one; `S.msvv` and the stand-ins in `render.js` |
-| `hubmail` | `hubmail.js` | 2.149.0 F: the e-mail filing; the mail link of a task / event stays in `clientpage.js` |
+| `hubmail` | `hubmail.js` | 2.149.0 F: the e-mail filing; the mail link of a task / event stays at start (`lazyload.js` since 2.563.0, before in `clientpage.js`) |
+| `clientpage` | `clientpage.js` | 2.563.0 (#4742): Office > Clients (the list, the client's card); the office, the contacts and the trash dialogs load it first (`LD_NEED`) |
 | `timesheet` | `timesheet.js` | 2.149.0 F: the time page's card, Settings (`LD_NEED`); News texts / lock mark in `time.js` |
 | `team` | `absence.js`, `leave.js`, `dispo.js` | 2.149.0 F: the tabs Absences / Disposition, vacation, Settings (`LD_NEED`); tabs, `dp_on`, day hint in `clients.js` |
 | `listprint`, `evinvite`, `projtime`, `envs` | one file each | 2.149.0 F: "Print", the event editor, the "Tracked" figure (its click stays in `projects.js`), a project's environments (row texts in `quickadd.js`) |
