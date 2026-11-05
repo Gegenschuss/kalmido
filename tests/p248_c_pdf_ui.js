@@ -113,7 +113,7 @@ async function upload(tid, name, buf) {
     };
     const failOf = async () => {
       let r = null;
-      for (let i = 0; i < 60; i++) { r = await ev(`(() => { const m = document.querySelector('.lightbox.pview'); return m ? {fail: m.querySelector('.pvfail')?.textContent.trim() || '', dl: !!m.querySelector('.pvfail a[download]'), loading: !!m.querySelector('.tvmsg')} : null; })()`); if (r?.fail) break; await sleep(250); }
+      for (let i = 0; i < 60; i++) { r = await ev(`(() => { const m = document.querySelector('.lightbox.pview'); return m ? {fail: m.querySelector('.pvfail p')?.textContent.trim() || '', dl: !!m.querySelector('.pvfail a[download]'), loading: !!m.querySelector('.tvmsg')} : null; })()`); if (r?.fail) break; await sleep(250); }
       return r;
     };
     const href = `document.querySelector('.att.file a[title="contract.pdf"]').getAttribute('href')`;
