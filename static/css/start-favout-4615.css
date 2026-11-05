@@ -1,0 +1,7 @@
+/* 2.551.0 (#4615): a favourite tile dragged out of the head bar (favtiles.js fv2_outSet): crossed out (an X over the icon),
+   the bar says "Release to remove". A start file: the bar is drawn at start. */
+.fv2bar .fv2-tile.fv2-out{opacity:1;color:var(--danger);background:color-mix(in srgb,var(--danger) 12%,transparent)}
+.fv2bar .fv2-tile.fv2-out>.i,.fv2bar .fv2-tile.fv2-out .sic,.fv2bar .fv2-tile.fv2-out .lic,.fv2bar .fv2-tile.fv2-out .fv2-av{opacity:.45}
+.fv2bar .fv2-tile.fv2-out::after{content:'';position:absolute;inset:.25rem;pointer-events:none;background:linear-gradient(45deg,transparent calc(50% - 1px),var(--danger) calc(50% - 1px),var(--danger) calc(50% + 1px),transparent calc(50% + 1px)),linear-gradient(-45deg,transparent calc(50% - 1px),var(--danger) calc(50% - 1px),var(--danger) calc(50% + 1px),transparent calc(50% + 1px))}
+.fv2bar.fv2-outing{position:relative}
+.fv2bar.fv2-outing::after{content:attr(data-out);position:absolute;right:.5rem;top:50%;transform:translateY(-50%);padding:.125rem .5rem;border-radius:.375rem;background:var(--bg);box-shadow:0 0 0 1px var(--line);color:var(--danger);font-size:var(--fs-xs);font-weight:500;white-space:nowrap;pointer-events:none}

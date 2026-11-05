@@ -1,0 +1,3 @@
+/* 2.551.0 (#4607): a note card (chat.js ntCardsHtml, notesall.js sb_noteCardsHtml): a long press opens the note's menu
+   (notesall.js nt_cardMenu), not the browser's link preview. A start file: the notes list is drawn without a module of its own. */
+.ntcard[href]{-webkit-touch-callout:none}
