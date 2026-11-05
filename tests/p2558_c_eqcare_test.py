@@ -10,6 +10,7 @@ workspaces). Invented names only. freelancer-matrix: office
  - a member never gets the warranty or maintenance fields
  - deleted into the office trash: the tasks are done; restored: new open tasks
  - a person without an organisation: the same in the personal office (tasks in the own inbox)
+ - 2.558.0 D (#4591, review F1): a done maintenance task keeps its moved date through a save, the archive and the trash
 usage: p2558_c_eqcare_test.py <datadir>"""
 import json
 import os
@@ -122,6 +123,42 @@ def case(s, who, uid, member=None):
     check(r.status_code == 400, f"{who}: an unknown kind 400 {r.status_code}")
 
 
+
+
+def moved_on(s, who):
+    """2.558.0 D (#4591, review F1): a maintenance task done moves on in the same row; a save without the maintenance, the
+    archive and the office trash never set it back to the old date, and a task made again is never overdue."""
+    r = s.post(B + O + "/equipment", json={"name": f"Drucker {who}", "maint": [{"kind": "service", "every_months": 3, "next": M1}]})
+    eid = r.json()["id"]
+    mt = s.get(B + O + f"/equipment/{eid}").json()["maint"][0]["task"]["id"]
+    r = s.post(B + f"/api/tasks/{mt}/complete")
+    d1 = task(mt)["due"]
+    check(r.ok and task(mt)["status"] == 0 and d1 > M1, f"{who}: done, the repeating task moved on {r.status_code} {d1}")
+    r = s.patch(B + O + f"/equipment/{eid}", json={"name": f"Drucker {who} 2"})
+    check(r.ok and task(mt)["due"] == d1 and "2" in task(mt)["title"], f"{who}: a save without the maintenance keeps the date {task(mt)}")
+    g = s.get(B + O + f"/equipment/{eid}").json()
+    check(g["maint"][0]["next"] == d1, f"{who}: the stored next follows the task {g['maint']}")
+    s.patch(B + O + f"/equipment/{eid}", json={"archived": 1})
+    s.patch(B + O + f"/equipment/{eid}", json={"archived": 0})
+    t2 = s.get(B + O + f"/equipment/{eid}").json()["maint"][0]["task"]["id"]
+    check(t2 != mt and task(t2)["status"] == 0 and task(t2)["due"] == d1, f"{who}: out of the archive at the moved date {task(t2)}")
+    s.post(B + f"/api/tasks/{t2}/complete")
+    d2 = task(t2)["due"]
+    tid = s.delete(B + O + f"/equipment/{eid}").json().get("trash_id")
+    s.post(B + O + f"/trash/{tid}/restore")
+    t3 = s.get(B + O + f"/equipment/{eid}").json()["maint"][0]["task"]["id"]
+    check(d2 > d1 and task(t3)["status"] == 0 and task(t3)["due"] == d2, f"{who}: restored from the trash at the moved date {d2} {task(t3)}")
+    # an overdue maintenance comes back at today, not in the past
+    past = (date.today() - timedelta(days=20)).isoformat()
+    eid = s.post(B + O + "/equipment", json={"name": f"Waage {who}", "maint": [{"kind": "calibration", "every_months": 12, "next": past}]}).json()["id"]
+    s.patch(B + O + f"/equipment/{eid}", json={"archived": 1})
+    s.patch(B + O + f"/equipment/{eid}", json={"archived": 0})
+    t4 = s.get(B + O + f"/equipment/{eid}").json()["maint"][0]["task"]["id"]
+    check(task(t4)["status"] == 0 and task(t4)["due"] >= date.today().isoformat(), f"{who}: revived, never overdue {task(t4)}")
+
+
 case(A, "alice", ALICE, member=Bo)
 case(Fr, "frida", FID)
+moved_on(A, "alice")
+moved_on(Fr, "frida")
 sys.exit(done("p2558_c_eqcare"))

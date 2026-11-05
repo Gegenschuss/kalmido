@@ -104,13 +104,19 @@ def _end(c, t):
     log_act(c, t["id"], "complete")
 
 
-def _slot(c, uid, eid, part, tid, spec, changed):
-    """Keeps the task of one date in step. spec None = no task wanted. -> the task id to store (None = none)."""
-    t = eqc_task(c, eid, tid, part)
+def _live(t):
+    return bool(t) and t["status"] == 0 and not t["deleted_at"]
+
+
+def _slot(c, uid, eid, part, tid, spec, changed, t=False):
+    """Keeps the task of one date in step. spec None = no task wanted. -> the task id to store (None = none).
+    2.558.0 D (#4591, review F1): an open task keeps its due date unless the date (or interval) really changed -- a repeating
+    task moves on in the same row when it is done, a save without that change never sets it back. t: the task already read."""
+    t = eqc_task(c, eid, tid, part) if t is False else t
     if spec is None:
         _end(c, t)
         return None
-    live = t and t["status"] == 0 and not t["deleted_at"]
+    live = _live(t)
     if t and not live and not changed:
         return t["id"]  # done by a person (or ended): stays done until its date changes
     fam = {"kind": "equipment", "office_equipment": eid, "part": part}
@@ -118,6 +124,8 @@ def _slot(c, uid, eid, part, tid, spec, changed):
         if not c.execute(f"SELECT 1 FROM lists WHERE id=? AND id IN {wr_sql()}", (t["list_id"], uid, uid)).fetchone():
             return t["id"]  # another admin's list this one may not change: the task stays as it is
         sets = {"title": spec["title"][:500], "due": spec["due"], "reminders": spec["reminders"], "repeat": spec["repeat"]}
+        if not changed:
+            sets.pop("due")  # 2.558.0 D (#4591, review F1)
         if any(str(t[k] or "") != str(v or "") for k, v in sets.items()):
             sets["updated_at"] = iso(now_utc())
             c.execute(f"UPDATE tasks SET {','.join(k + '=?' for k in sets)} WHERE id=?", [*sets.values(), t["id"]])
@@ -128,15 +136,20 @@ def _slot(c, uid, eid, part, tid, spec, changed):
                    deadline=spec["deadline"], content=content)
 
 
-def eqc_sync(c, oid, eid, before=None, revive=False):
+def eqc_sync(c, oid, eid, before=None, revive=False, uid=None):
     """After a save of device eid of office oid (before = the row before, None for a new one): the stored maintenance
-    list gets its ids, the tasks follow (made, changed, ended). revive: a restored device starts its tasks again."""
+    list gets its ids, the tasks follow (made, changed, ended). revive: a restored device starts its tasks again.
+    2.558.0 D (#4591, review F1): an unchanged maintenance takes "next" from its open task (done -> it moved on); a task made
+    again for a revived device (archive, office trash) starts at the latest of next, the old task's date and today, never
+    overdue. uid: whose inbox gets new tasks (default the person saving; the org import passes the importing admin)."""
     r = c.execute("SELECT id, name, archived, warranty_until, warranty_task_id, maint FROM office_equipment WHERE id=? AND org_id=?",
                   (eid, oid)).fetchone()
     if not r:
         return
-    uid = me()
+    uid = uid or me()
     lg = lang(c, uid)
+    if revive and not before:  # restored from the office trash: its own stored list names the old tasks (ids kept)
+        before = dict(r)
     before = before or {}
     off = bool(int(r["archived"] or 0))
     revive = revive or (bool(int(before.get("archived") or 0)) and not off)  # taken out of the archive: its tasks start again
@@ -144,7 +157,10 @@ def eqc_sync(c, oid, eid, before=None, revive=False):
     w = r["warranty_until"] or ""
     spec = None if off or not w else {"title": tr("Warranty ends: {0}", name, lg=lg), "due": w, "reminders": _reminders(EQC_WARRANTY_LEAD),
                                       "repeat": "", "deadline": 2}
-    wt = _slot(c, uid, eid, "warranty", r["warranty_task_id"], spec, revive or w != (before.get("warranty_until") or ""))
+    t = eqc_task(c, eid, r["warranty_task_id"], "warranty")
+    if spec and revive and not _live(t) and w < local_now().date().isoformat():
+        spec = None  # 2.558.0 D (#4591, review F1): revived with the warranty already over -- nothing left to remind of
+    wt = _slot(c, uid, eid, "warranty", r["warranty_task_id"], spec, revive or w != (before.get("warranty_until") or ""), t)
     old = {x.get("id"): x for x in _maint(before.get("maint")) if isinstance(x, dict) and x.get("id")}
     items = _maint(r["maint"])
     top = max([x.get("id") or 0 for x in items if isinstance(x, dict) and isinstance(x.get("id"), int)] + list(old) + [0])
@@ -162,9 +178,16 @@ def eqc_sync(c, oid, eid, before=None, revive=False):
         if rep and rr_problem(rep):
             rep = ""
         what = tr(EQC_KINDS[x["kind"]], name, lg=lg) if not x.get("label") else f"{x['label']}: {name}"
+        part = f"maint:{x['id']}"
+        t = eqc_task(c, eid, tid, part)
+        edited = any(str(prev.get(k)) != str(x.get(k)) for k in ("next", "every_months"))
+        changed = revive or edited
+        if _live(t) and not edited and t["due"]:
+            x["next"] = str(t["due"])[:10]  # 2.558.0 D (#4591, review F1): done in the meantime, the task moved on
+        elif revive and not off and not _live(t):
+            x["next"] = max(x["next"], str(t["due"] or "")[:10] if t else "", local_now().date().isoformat())
         sp = None if off else {"title": what, "due": x["next"], "reminders": _reminders(int(x.get("lead_days") or 0)), "repeat": rep, "deadline": 0}
-        changed = revive or any(str(prev.get(k)) != str(x.get(k)) for k in ("next", "every_months"))
-        x["task_id"] = _slot(c, uid, eid, f"maint:{x['id']}", tid, sp, changed)
+        x["task_id"] = _slot(c, uid, eid, part, tid, sp, changed, t)
         out.append(x)
     for mid, x in old.items():  # a maintenance taken out: its task ends
         if mid not in keep:
