@@ -278,9 +278,10 @@ r = A.patch(B + "/api/users/%d" % ids["bob"], json={"ntfy_topic": bob_push + "x"
 check(r.ok, f"a free push topic is fine ({r.status_code})")
 # the same message id on two people's topics: both get it (before: the second was skipped as a duplicate)
 Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carols-dup-topic-4515-abc", "url": STUB})
+publish([{"topic": "carols-dup-topic-4515-abc", "id": "dup4515", "message": "Dup for carol"}])
+got_c = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Dup for carol'"))  # first carol's (committed), then frida's
 publish([{"topic": "carols-dup-topic-4515-abc", "id": "dup4515", "message": "Dup for carol"},
          {"topic": ftopic, "id": "dup4515", "message": "Dup for frida"}])
-got_c = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Dup for carol'"))
 got_f = until(lambda: dbx("SELECT created_by FROM tasks WHERE title='Dup for frida'"))
 check(got_c and got_c[0][0] == ids["carol"], f"the id arrives at carol {got_c}")
 check(got_f and got_f[0][0] == FID, f"freelancer: the same id arrives at frida too {got_f}")
