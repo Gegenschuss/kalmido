@@ -34,6 +34,7 @@ from datetime import date
 from flask import Response, jsonify, request
 
 from ..core.access import Denied
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
@@ -611,12 +612,13 @@ def bw_meal_post():
 @app.patch("/api/office/meals/<int:mid>")
 def bw_meal_patch(mid):
     c, uid, oid = _ctx()
-    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval (2.560.0 D, #4700: also the version check's lock)
     r = _meal(c, oid, mid)
     _need_draft(r)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, r["updated_at"], "row", lambda: _one(c, oid, mid))  # 2.560.0 D (#4700): saved elsewhere meanwhile: 409 with the receipt, never overwritten
     row = bw_clean(c, oid, uid, b, oc_dec_fields(c, oid, "office_meals", r))
     if row:
         from .periodlock import period_need_open

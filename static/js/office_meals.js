@@ -227,8 +227,8 @@ function bw_modal(m0) {
     const b = collect();
     if (m) {
       const old = bw_body(m);
-      m = await api('PATCH', `${BW_U}/${m.id}`, b);
-      const id = m.id; toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${id}`, old); bw_reload(); });
+      m = await (m.updated_at ? rawFetch : api)('PATCH', `${BW_U}/${m.id}`, ofcVerBody(b, m));  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409, never overwritten
+      const id = m.id, now = m; toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${id}`, ofcVerUndo(old, b, now)); bw_reload(); });  // only the keys this save changed
     } else {
       m = await api('POST', BW_U, b);
       if (pend) { try { m = await api('POST', `${BW_U}/${m.id}/file`, bw_fd(pend)); } catch (x) { toast(x.message || ''); } }
@@ -288,7 +288,7 @@ function bw_modal(m0) {
         try { await bw_approve(m.id, sig); md.remove(); }
         catch (x) { md.remove(); bw_modal(m).querySelector('.aerr').textContent = tr('Saved as a draft.') + ' ' + (x.message || ''); }
       }
-    } catch (x) { err(x.message); }
+    } catch (x) { if (ofcVerConflict(md, x, row => { bw_reload(); bw_modal(row); })) return; err(x.message); }  // 2.560.0 D (#4700)
   });
   place(); host(); sum();
   return md;
