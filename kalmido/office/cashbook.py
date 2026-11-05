@@ -27,6 +27,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import N_, csv_dialect, lang, tr
 from ..core.db import bump, db, iso, local_day, local_stamp, now_utc
 from ..core.access import Denied
+from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.errors import BadInput
 from .calc import calc_lang, dec, dstr, money
 from .logbook import _body, _day, _id, _text
@@ -526,6 +527,9 @@ def cb_entry_patch(eid):
     if book["archived"]:  # 2.121.0 review N1: an archived box takes no changes (like no new entries)
         raise _locked(N_("This cash box is archived."))
     cur = oc_dec_fields(c, oid, "office_cash_entries", _entry(c, oid, eid))
+    b = _body()
+    write_lock(c, f"office_cash_entries-{int(eid)}")  # 2.560.0 D (#4700): (under the box's lock) the row's own, like the other office dialogs
+    ccf_check(b, cur["updated_at"], "row", lambda: _one(c, oid, uid, eid))  # saved elsewhere meanwhile: 409 with the entry, never overwritten
     last = cb_last_closed(c, bid)
     if last and cur["day"] <= last:
         raise _locked(N_("This entry lies on a closed day and cannot change any more; cancel it instead."))
@@ -533,7 +537,7 @@ def cb_entry_patch(eid):
     rows = _rows(c, oid, bid)
     if cur.get("storno_of") or any(r.get("storno_of") == eid for r in rows):
         raise _locked(N_("A cancelled entry or a cancellation cannot change."))
-    row = _entry_clean(c, oid, uid, _body(), cur)
+    row = _entry_clean(c, oid, uid, b, cur)
     before, after = _vals(cur), _vals(dict(cur, **row))
     prev = {k: before[k] for k in CB_FIELDS if before[k] != after[k]}
     if cur.get("payment_id") and set(prev) & {"day", "dir", "amount", "invoice_id"}:  # 2.355.0 B (#2843)
