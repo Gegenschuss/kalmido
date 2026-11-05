@@ -845,6 +845,8 @@ def openapi_spec():
     env_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.60.0 D (#1514)
     from ..office.agentdocs import ofa_spec
     ofa_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.51.0 A (#1348, #1350)
+    from ..office.agentinvoice import ofv_spec
+    ofv_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.568.0 B (#4673): an agent's invoice draft without a quotation
     from ..office.leads import lead_spec
     lead_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.94.0 A (#1930): leads for agents
     from ..office.letteragent import lta_spec

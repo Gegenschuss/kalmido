@@ -2287,6 +2287,18 @@ TOOLS += [
            "inv_type": {"type": "string", "enum": ["", "progress", "final"]}, "amount": {"type": "number"}, "pct": {"type": "number"},
            "force": {"type": "boolean"}, **_RB, **_CREF}, ["offer_id"]),
      lambda api, a: api.call("POST", f"/office/offers/{int(a['offer_id'])}/invoice", body=_pick(a, ("parts_mode", "notify", "inv_type", "amount", "pct", "force", "requested_by", "client_ref")))),
+    # 2.568.0 B (#4673): an invoice draft without a quotation (the time of one project, or free positions); Kalmido computes everything
+    ("create_invoice_draft", "2.568.0: an invoice DRAFT without a quotation (no number, never finalised or sent): client_id and either "
+                             "from_time = true with list_id (the project; task_id = only one task) and the service period from .. to (the "
+                             "billable, still open time becomes one position per project with the client's hourly rate, bound to the draft so "
+                             "it is never billed twice; 409 no_time when there is none) or free positions in items like create_offer_draft. "
+                             "Send raw values only: Kalmido computes sums, VAT and the number (only when a person finalises). missing = what "
+                             "finalising still needs: tell the person. A person finalises and sends it.",
+     _obj({"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "list_id": {**S_ID, "description": "The project"},
+           "task_id": {**S_ID, "description": "Only the time of this task (from_time)"}, "from_time": {"type": "boolean"}, "from": D, "to": D,
+           "items": {"type": "array", "items": _OITEM}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["client_id"]),
+     lambda api, a: api.call("POST", "/office/invoices", body=_pick(a, ("client_id", "title", "intro", "list_id", "task_id", "from_time", "from", "to",
+                                                                         "items", "notify", "requested_by", "client_ref")))),
     ("draft_reminder", "2.51.0: a reminder DRAFT over open, finalised invoices of one client (level 1 payment reminder, 2 reminder, 3 final reminder). "
                        "Never sent by you: a person checks and sends it. 2.355: only invoices past their due date (409 otherwise).",
      _obj({"invoice_ids": {"type": "array", "items": S_ID, "minItems": 1}, "level": {"type": "integer", "enum": [1, 2, 3]}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["invoice_ids"]),
@@ -2675,6 +2687,7 @@ TOOL_SCOPES = {
     "files:write": ("write_file", "create_file_folder", "create_document"),
     "office": ("get_office", "list_office_data", "list_office_documents", "get_office_document", "create_offer_draft", "update_offer_draft",
                "draft_invoice_from_offer", "draft_reminder", "suggest_payment", "list_payment_suggestions",
+               "create_invoice_draft",  # 2.568.0 (#4673)
                "list_office_leads", "create_office_lead", "update_office_lead",
                "create_letter_draft", "list_letter_drafts", "update_letter_draft", "link_letter_document",
                "list_invoice_series", "get_office_subscriptions"),  # 2.51.0 (#1348, #1350); 2.94.0 (#1930): leads; 2.153.0 (#2031): letters; 2.483.0 (#2007): series, subscriptions
@@ -2749,6 +2762,7 @@ TOOLSETS = {
     """,
     "office": """
         get_office list_office_data list_office_documents get_office_document create_offer_draft update_offer_draft draft_invoice_from_offer
+        create_invoice_draft
         draft_reminder suggest_payment list_payment_suggestions list_office_leads create_office_lead update_office_lead create_letter_draft
         list_letter_drafts update_letter_draft link_letter_document suggest_receipt list_receipt_suggestions
         list_invoice_series get_office_subscriptions list_filed_mails get_filed_mail

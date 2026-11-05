@@ -704,6 +704,9 @@ def inv_from_time(c, oid, uid, b):
     # 2.144.6 A (#2053): only billable, still open entries; they are bound to the draft (office/timebill.py)
     from .timebill import tbill_items, tbill_take, tbill_where
     sql, args = tbill_where(c, oid, uid, cid, d_from, d_to, b.get("project_id"))
+    if b.get("task_id"):  # 2.568.0 (#4673): only the time of one task (an agent's invoice draft from a task, office/agentinvoice.py)
+        sql += " AND e.task_id=?"
+        args.append(int(b["task_id"]))
     s = office_settings(c, oid)
     row = inv_new_row(c, oid, s, "invoice", s.get("lang") or "de")
     row.update(client_id=cid, recipient=json.dumps({k: v for k, v in _recipient_from_client(dict(cl), None, cdn_home(c, oid)).items() if k != "missing"}, ensure_ascii=False), service_from=d_from, service_to=d_to,

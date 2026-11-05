@@ -412,6 +412,7 @@ ORDER = (
     "office.procdoc",  # 2.148.0 C (#2472): the procedure documentation (GoBD), prefilled, versions, Markdown / PDF
     "office.taxdates",  # 2.90.0 C (#1922): tax dates as recurring tasks (VAT return, income tax prepayments, trade tax)
     "office.agentdocs",  # 2.51.0 A (#1348, #1350): agents in the office: drafts, payment suggestions, the switches (API v1 + routes)
+    "office.agentinvoice",  # 2.568.0 B (#4673): an agent's invoice draft without a quotation (time of a project / free positions)
     "office.agreements",  # 2.92.0 A (#1925): business contracts and insurances (term, notice, contribution, cash flow, deadline task)
     "office.contractfiles",  # 2.117.0 B (#2285): PDF files of a framework contract (upload, view, replace, trash)
     "office.agrref",  # 2.351.0 B (#2749): framework contract PDFs and contracts & insurance in folders (reference kinds)
