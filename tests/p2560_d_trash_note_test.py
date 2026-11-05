@@ -10,10 +10,12 @@ usage: p2560_d_trash_note_test.py <datadir>      (KMT_NOSTART=1: a running serve
 import os
 from datetime import date
 
+import requests
+
 import dbx as dbxm
 import kt
 from kt import B, DATA, check, done
-from freelancer_fixture import freelancer
+from freelancer_fixture import FEATURES, freelancer
 
 O = "/api/office"
 SRC = os.environ.get("KALMIDO_SRC") or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -38,8 +40,13 @@ def sql(q, args=()):
 
 
 kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2560D")
-A = kt.setup()
-A.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+s0 = requests.Session()
+s0.headers.update(kt.H)
+assert s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": kt.PASSWORD}).ok
+A = kt.sess("alice")
+A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})  # Alice admins the organisation Alpha
+A = kt.sess("alice")
+check(A.patch(B + "/api/settings", json={"lang": "en", "tour": "done", "features": FEATURES}).ok, "setup: Alice's features")
 FID, Fr = freelancer(B, A)
 D = date.today().isoformat()
 
