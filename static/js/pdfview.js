@@ -196,7 +196,8 @@ async function pdfView(o) {
     const r = o.data ? null : await fetch(url, {credentials: 'same-origin'});  // 2.353.0 A (#2758): o.data = bytes decrypted in the browser
     if (r && !r.ok) throw new Error(r.status === 404 || r.status === 410 ? tr('File damaged or missing') : tr('Could not load the file'));
     const data = o.data || new Uint8Array(await r.arrayBuffer());
-    const lib = await pv_timed(pv_load());
+    // 2.549.0 (#4578, review): a library import that timed out is forgotten, the next opening tries again
+    const lib = await pv_timed(pv_load()).catch(e => { if (e.name === 'PvTimeout') pv_lib = null; throw e; });
     if (my !== gen || !m.isConnected) return;
     // isEvalSupported off: pdf.js never builds code from the file; no scripting, links stay inert (no annotation layer)
     const task = lib.getDocument({data, isEvalSupported: false, enableScripting: false, disableAutoFetch: true, stopAtErrors: false, useSystemFonts: true});
