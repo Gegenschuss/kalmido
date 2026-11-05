@@ -43,16 +43,20 @@ const noFirefox = (tag, check) => {
 // suites can call their functions directly; lazy: true leaves them to the app (tests/p253_a_ui.js)
 // 2.543.0 (#4606): "All workspaces" with Private + exactly one organisation shows the overview of the areas in the office; the
 // suites written before open the office the server chose there (that organisation's). nav() to an address #office... saves that
-// workspace first, from the page that is open (it holds the login), like boot.js officeWs - only in exactly this case. allWs: true
-// leaves it out (a suite of the overview); a suite that walks into the office by a click calls officeWs() itself.
-const OFFICE_WS = `(async () => {
+// workspace first, from the page that is open (it holds the login), like boot.js officeWs - only in exactly this case - and the
+// next nav() to another address puts "All" back (if it is still that workspace), so the other views stay as the suite knew them
+// (p21383_a: the bookmarks after the cash flow). allWs: true leaves it out (a suite of the overview); a suite that walks into the
+// office by a click calls officeWs() itself (that one stays).
+const WS_IN_PAGE = `async (to) => {
   const B = ${JSON.stringify(B)}; if (!location.href.startsWith(B)) return false;
   const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
   const j = await (await fetch(B + 'api/state', {headers: H})).json().catch(() => ({}));
   const ws = (j.me && j.me.workspaces) || [], cur = (j.settings && j.settings.workspace) || 'all';
-  if (!j.workspaces || ws.length !== 1 || /^(private|org:\\d+)$/.test(cur)) return false;
-  return (await fetch(B + 'api/settings', {method: 'PATCH', headers: H, body: JSON.stringify({workspace: 'org:' + ws[0].id})})).ok;
-})()`;
+  if (to) { if (cur !== to) return false; to = 'all'; }
+  else if (!j.workspaces || ws.length !== 1 || /^(private|org:\\d+)$/.test(cur)) return false;
+  else to = 'org:' + ws[0].id;
+  return (await fetch(B + 'api/settings', {method: 'PATCH', headers: H, body: JSON.stringify({workspace: to})})).ok && to;
+}`;
 module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS = [45, 60, 90], allWs = false}) => async function firefox(fn, touch) {
   if (noFirefox(tag, check)) return;
   const base = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), `kalmido-${tag}-`));
@@ -135,11 +139,17 @@ module.exports = ({tag, check, shots, prefs: extra = [], lazy = false, connectS 
     const ev = async expr => { const r = await cmd('script.evaluate', {expression: expr, target: {context: ctx}, awaitPromise: true, resultOwnership: 'none', serializationOptions: {maxObjectDepth: 6}}); if (r.type === 'exception') throw new Error('JS: ' + r.exceptionDetails.text); return unwrap(r.result); };
     // 2.161.2 CI fix: on a slow runner a navigate now and then never answers (an earlier page load that commits late swallows
     // it: p2100_ui, p21144_d_ui, p270_ui) - after 40 s the same navigate once more instead of 120 s and a failed suite
-    const officeWs = () => ev(OFFICE_WS).catch(() => false);  // 2.543.0 (#4606)
+    let wsBack = false;  // 2.543.0 (#4606): the workspace nav() set for the office, put back to "All" on the next other address
+    const wsSet = to => ev(`(${WS_IN_PAGE})(${JSON.stringify(to)})`).catch(() => false);
+    const officeWs = () => wsSet(null);
     const nav = async url => {
       let r;
-      // 2.543.0 (#4606): an app already open here keeps "All" in memory on a mere change of the hash: a new load after the change
-      if (!allWs && /#office(\/|$)/.test(String(url)) && await officeWs() && !/static\/icon\.svg/.test(await ev('location.href').catch(() => ''))) await cmd('browsingContext.navigate', {context: ctx, url: B + 'static/icon.svg', wait: 'complete'}, 40000);
+      // 2.543.0 (#4606): an app already open here keeps the old workspace in memory on a mere change of the hash: a new load after a change
+      if (!allWs && !/static\/icon\.svg/.test(String(url))) {
+        const office = /#office(\/|$)/.test(String(url)), to = office ? await officeWs() : wsBack && await wsSet(wsBack);
+        if (office ? to : wsBack) wsBack = office && to;
+        if (to && !/static\/icon\.svg/.test(await ev('location.href').catch(() => ''))) await cmd('browsingContext.navigate', {context: ctx, url: B + 'static/icon.svg', wait: 'complete'}, 40000);
+      }
       for (let k = 0; ; k++) {
         try { r = await cmd('browsingContext.navigate', {context: ctx, url, wait: 'complete'}, k < 2 ? 40000 : 120000); break; } catch (e) {
           if (k >= 2 || !/no answer within/.test(e.message)) throw e;
