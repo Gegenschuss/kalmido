@@ -49,10 +49,9 @@ const notesOf = async lid => (await call('GET', `/api/lists/${lid}/notes`)).note
   check(await until(() => w.eval("S.route.mod === 'tasks'")), 'left the note');
   check((await call('GET', '/api/notes/' + N1)).title === 'Groceries', 'left with text: it stays');
 
-  // ================= the fixed row, not among the projects; no share button
+  // ================= 2.556.0 (#4665): no fixed row "Notes" under Plan any more (was a fixed row, #3881); the list is not among the projects either
   w.eval('renderSide()');
-  const row = $(`#side .srow.sqn[data-go="notes/${Q}"]`);
-  check(!!row && /Notes/.test(row.textContent), 'a fixed row Notes in the sidebar');
+  check(!$('#side .srow.sqn') && !$(`#side [data-go="notes/${Q}"][data-qn]`) && !w.eval(`typeof qn_sideRow !== 'undefined'`), 'no fixed row Notes under Plan in the sidebar');
   check(!$(`#side .srow[data-list="${Q}"]`), '… not among the projects');
   check(w.eval(`shareOk(listById(${Q}))`) === false, 'no share button for the list Notes');
   const sh = await call('PUT', `/api/lists/${Q}/members`, {user_id: 1, role: 'edit'});

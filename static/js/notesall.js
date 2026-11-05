@@ -198,11 +198,5 @@ function qn_heal(lid) {
 async function qn_shareAsk(people, l) {
   return askDialog({title: tr('Move the note to {0}?', lname(l)), html: `<p><b>${esc(tr('After the move these people see this note:'))}</b></p><ul class="qnwho">${people.map(p => `<li><b>${esc(p)}</b></li>`).join('')}</ul><p class="muted">${esc(tr('The list Notes itself stays private.'))}</p>`, ok: tr('Move'), cancel: tr('Cancel')});
 }
-// the fixed row of the list "Notes" in the sidebar's Plan (computer and the phone's drawer), under the basket
-function qn_sideRow() {
-  const l = qn_list(); if (!l || S.me?.kid) return '';
-  const on = S.route.mod === 'notes' && S.nt.lid === l.id, n = (S.notes || []).filter(x => x.list_id === l.id).length;
-  return `<button class="srow smod sqn ${on ? 'on' : ''}" data-go="notes/${l.id}" data-qn="1">${ic('edit')}<span class="n">${esc(lname(l))}</span><span class="c">${n || ''}</span></button>`;
-}
 // the phone: holding the Plus button = a quick note (a tap stays a new task)
 const QN_FAB = ms_longPress('#fab', () => false, () => qn_new());

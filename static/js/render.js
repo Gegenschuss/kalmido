@@ -327,7 +327,6 @@ const sideLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && !l.qui
 // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
 const sideFolderShown = (lists, x) => wsCur() === 'all' || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
 const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
-  ['qnotes', qn_sideRow()],  // 2.477.0 (#3881): the private list "Notes", a fixed row under the basket
   ['assigned', hasPeers() || c.assigned || (onTasks && k === 'assigned') ? row('assigned', ic('user'), tr('My tasks'), c.assigned) : ''],  // 2.40.0 (#1344): right under the basket; 2.364.0 D (#3036): alone only while something is assigned
   ['today', row('today', ic('sun'), tr('Today'), msvvCount(c.today, 'today'))], ['tomorrow', row('tomorrow', ic('sunrise'), tr('Tomorrow'), c.tomorrow)],
   ['week', row('week', ic('week'), tr('Next 7 days'), c.week)], ['doable', row('doable', ic('zap'), tr('Now doable'), c.doable)],
