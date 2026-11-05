@@ -125,6 +125,24 @@ out = run_purge(True)
 check(not one("SELECT 1 FROM field_trash WHERE id=?", (TR2,)), f"trash run, switch on: the old field is gone for good {out[-200:]}")
 check(F.post(B + f"/api/fields/trash/{TR2}/restore").status_code == 404, "after the trash run: nothing to restore")
 
+# 2.550.0 (#4528, review F1): a task value comes back only to a task that is still there (not one gone to the trash since)
+r = F.post(B + f"/api/lists/{L}/fields", json={"name": "Blocked by", "type": "task"})
+check(r.ok, f"review F1 setup: a task field {r.text[:160]}")
+FT = r.json()["id"]
+TX, TY = task(F, L, "Fence first"), task(F, L, "Gate")
+check(F.patch(B + f"/api/tasks/{TY}", json={"fields": {str(FT): str(TX)}}).ok and val(TY, FT) == str(TX), "review F1 setup: a task value")
+TRT = F.delete(B + f"/api/fields/{FT}").json().get("trash_id")
+check(F.delete(B + f"/api/tasks/{TX}").ok, "review F1 setup: the task it pointed at goes into the trash")
+r = F.post(B + f"/api/fields/trash/{TRT}/restore")
+check(r.ok and val(TY, FT) is None, f"review F1: no task value back that points at a task in the trash {r.text[:160]} {val(TY, FT)}")
+# 2.550.0 (#4528, review F2): the field trash keeps at most 100 deleted fields per project, the oldest go first
+dbx("INSERT INTO field_trash(list_id,field_id,name,type,deleted_at) SELECT ?, 900000 + g, 'old', 'text', ? FROM generate_series(1, 100) g",
+    (L, ago(1)))
+check(F.delete(B + f"/api/fields/{FT}").ok, "review F2: one more field deleted")
+check(one("SELECT COUNT(*) FROM field_trash WHERE list_id=?", (L,)) == 100 and one("SELECT 1 FROM field_trash WHERE list_id=? AND field_id=?", (L, FT)),
+      f"review F2: at most 100 rows, the newest stays {one('SELECT COUNT(*) FROM field_trash WHERE list_id=?', (L,))}")
+dbx("DELETE FROM field_trash WHERE list_id=? AND field_id > 900000", (L,))
+
 # ================================================================== removing a member and adding them again
 FP = F.post(B + f"/api/lists/{L}/fields", json={"name": "Owner", "type": "person"}).json()["id"]
 TA1, TA2 = task(F, L, "Dig the bed", assignee_id=BID), task(F, L, "Buy soil", assignee_id=BID)

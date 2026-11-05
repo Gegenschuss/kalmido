@@ -510,6 +510,9 @@ def fx_used_by(c, fid):
             if "{#%d}" % fid in (json.loads(f["options"] or "{}").get("expr") or "")]
 
 
+FTR_MAX = 100  # 2.550.0 (#4528, review F2): deleted fields kept per project (the trash list shows up to 100 as well)
+
+
 @app.delete("/api/fields/<int:fid>")
 def field_delete(fid):
     """2.550.0 (#4528): the field goes into the field trash (field_trash: its definition and every value, also of tasks in the
@@ -521,6 +524,9 @@ def field_delete(fid):
     tid = insert_id(c, "INSERT INTO field_trash(list_id,field_id,name,type,def,vals,n,grouped,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (r["list_id"], fid, r["name"], r["type"], json.dumps({k: r[k] for k in ("options", "pinned", "sort", "created_at")}),
                      json.dumps(vals, ensure_ascii=False), len({v[0] for v in vals}), 1 if grouped else 0, fd_uid(), iso(now_utc())))
+    # review F2: at most FTR_MAX rows per project in the field trash, the oldest go first (no unbounded growth by delete loops)
+    c.execute("DELETE FROM field_trash WHERE list_id=? AND id NOT IN (SELECT id FROM field_trash WHERE list_id=? "
+              "ORDER BY deleted_at DESC, id DESC LIMIT ?)", (r["list_id"], r["list_id"], FTR_MAX))
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
     c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))  # 2.144.0 A2 (#2414): no grouping by a gone field
@@ -578,9 +584,14 @@ def field_trash_restore(tid):
     vals = json.loads(r["vals"] or "[]")
     live = {x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND id = ANY(CAST(? AS BIGINT[]))",
                                     (lid, st_ids([v[0] for v in vals])))} if vals else set()
-    people = {str(x) for x in list_people(c, lid)} if r["type"] == "person" else None
+    people = None
+    if r["type"] == "person":  # review F1: the rule of fd_value (without collaboration only the owner)
+        people = {str(x) for x in list_people(c, lid) if collab_all() or list_role(c, lid, x) == "owner"}
     n = 0
     for t, v in vals:
+        if r["type"] == "task" and not (str(v).isdigit() and c.execute(  # review F1: a task value only to a task still there and visible
+                "SELECT 1 FROM tasks WHERE id=? AND deleted_at IS NULL", (int(v),)).fetchone() and task_visible(c, int(v), fd_uid())):
+            continue
         if t in live and (people is None or v in people):
             n += c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (t, fid, v)).rowcount
     if r["grouped"]:
