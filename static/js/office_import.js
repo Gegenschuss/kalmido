@@ -277,8 +277,8 @@ function oimArchiveListHtml(q) {
   if (!items.length) return (OIM.cl || paid ? sum0 : '') + `<div class="empty nempty eact">${ic('archive')}<span>${q || OIM.cl || paid ? tr('Nothing matches.') : tr('No archived documents. Old invoices and quotations are added under Settings > Company & office > Data > Import legacy data.')}</span>${q ? '' : imp}</div>`;
   // 2.40.0 (#1366): the row shows the PDF in the browser, the button next to it downloads it
   return sum0 + `<ul class="ofclist ofdlist oimarch" role="list">${items.map(r => `<li><a class="ofcrow ofdrow" data-arch="${r.id}" href="/api/office/legacy/archive/${r.id}/pdf" target="_blank" rel="noopener"${typeof pv_attr === 'function' ? pv_attr({url: `/api/office/legacy/archive/${r.id}/pdf`, name: (r.number || tr('Document')) + '.pdf', dlUrl: `/api/office/legacy/archive/${r.id}/pdf?download=1`, arch: isMobile() && !r.copy ? r.id : undefined /* 2.451.0 (#3834): the phone's way to Correct without a long press */}) : ''}>
-    <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
-    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b><small class="rotag">${ic('archive', 's')}${r.copy ? esc(oim_copyLabel(r.copy)) : tr('Archive|documents') + (r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : '')}</small></span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a>${r.copy ? '' : `<button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button>`}</li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
+    <span class="ofcn"><b>${esc(r.number || r.copy?.number || r.file_name)}${r.client || r.client_name ? ` · ${esc(r.client || r.client_name)}` : ''}</b><small class="muted">${oim_archTag(r, 'ofdst') /* 2.543.0 (#4473): phones: the label in the meta line */}${esc([r.kind === 'offer' ? tr('Quotation') : tr('Invoice'), r.project, r.date ? fmtDateLoc(r.date) : ''].filter(Boolean).join(' · '))}</small></span>
+    <span class="ofdsum"><b>${r.amount != null ? esc(ofcMoney(r.amount)) : ''}</b>${oim_archTag(r, 'ofdsr')}</span>${ic('file', 's')}</a><a class="ib oimdl" href="/api/office/legacy/archive/${r.id}/pdf?download=1" download aria-label="${esc(tr('Download PDF'))}" title="${esc(tr('Download PDF'))}">${ic('download', 's')}</a>${r.copy ? '' : `<button type="button" class="ib oimdl" data-oim="arch-edit" data-id="${r.id}" aria-label="${esc(tr('Correct archived document'))}" title="${esc(tr('Correct archived document'))}">${ic('edit', 's')}</button>`}</li>`).join('')}</ul>` + `<div class="lacts">${imp}</div>`;
 }
 
 // 2.451.0 (#3834): the row menu (long press, right click): what the phone hides from the row
@@ -289,6 +289,8 @@ function oim_rowMenu(id, row) {
 }
 
 // 2.97.0 C (#2049): a read-only copy taken along by a move between offices (office/officemove.py): view and PDF only
+// 2.543.0 (#4473): the archive label of a row: under the amount (ofdsr, desktop) and in the meta line (ofdst, phones)
+const oim_archTag = (r, c) => `<small class="rotag ${c}">${ic('archive', 's')}${r.copy ? esc(oim_copyLabel(r.copy)) : tr('Archive|documents') + (r.kind === 'invoice' ? ' · ' + (r.paid ? tr('Paid') : tr('open')) : '')}</small>`;
 const oim_copyLabel = cp => tr('Read-only copy from {0}', cp.from === 'private' ? tr('Private|workspace') : (cp.name || tr('Organisation')));
 
 // ---- actions

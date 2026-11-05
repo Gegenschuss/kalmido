@@ -113,6 +113,16 @@
 }
 .ofdrow .ofdsum{display:flex;flex-direction:column;align-items:flex-end;gap:.125rem;flex:0 0 auto}
 .ofdrow .ofdsum b{font-variant-numeric:tabular-nums;white-space:nowrap}
+/* 2.543.0 (#4473): phones: one row = title + meta line: the amount with "net" / "gross" small behind it on the right, the status
+   label (ofdst) at the start of the meta line instead of under the amount (ofdsr); not the wrap of the receipt rows (#3852) */
+.ofdrow .ofdst,.ofdrow .oil_amt .ofdshort{display:none}
+@media (max-width:599px){
+  .ofcrow.ofdrow:has(.ofdst){flex-wrap:nowrap}.ofcrow.ofdrow:has(.ofdst) .ofcn{flex:1 1 auto}
+  .ofdrow:has(.ofdst) .ofdsum{flex-direction:row;flex-wrap:wrap;align-items:baseline;justify-content:flex-end;column-gap:.25rem;row-gap:0;max-width:60%}
+  .ofdrow:has(.ofdst) .ofdsum>small:not(.oil_amt){flex-basis:100%;text-align:right}
+  .ofdrow .ofdsum>.ofdsr,.ofdrow .oil_amt .ofdlong{display:none}
+  .ofdrow .ofcn .ofdst{display:inline-flex;margin-right:.375rem}.ofdrow .oil_amt .ofdshort{display:inline}
+}
 .ofdhead{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .75rem}
 .ofdhead .ofdnum{display:flex;align-items:center;gap:.5rem;font-size:var(--fs-l)}
 .ofdhead .ofdstat{min-height:var(--fld-h)}
