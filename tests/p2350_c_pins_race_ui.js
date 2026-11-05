@@ -80,6 +80,46 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await w.eval('load()');
   check(want(w.eval(`sbp_ids('side_people')`)) === want(P), 'the next reload agrees');
   await idle(w);
+
+  // ================= 2.545.0 (#4483): the live poll's load(true) while another load() is on its way
+  // a write elsewhere lands while load() waits for its answer; the poll (load(true, v) with the version it saw, called here
+  // directly so the count does not hang on its 4 s beat; the page is in the background, the real poll stays quiet) does
+  // not fetch /api/state again: it takes that answer, and fetches once more only when the answer predates the version
+  Object.defineProperty(w.document, 'hidden', {configurable: true, get: () => true});
+  check(await until(() => w.eval('!td_polling && !OUT.q.length && !OUT.flushing')), 'no live poll / queue on its way (4483)');
+  await idle(w, {quiet: 400});
+  let k = 0;
+  const race = async before => {  // before: the answer is fetched before the write lands (it predates the new version)
+    let go, n = 0; const held = new Promise(r => { go = r; });
+    w.fetch = async (u, o = {}) => {
+      if ((o.method || 'GET') !== 'GET' || !/\/api\/state(\?|$)/.test(String(u))) return f0(u, o);
+      n++;
+      if (n > 1) return f0(u, o);  // the catch-up fetch
+      let r = before ? await f0(u, o) : null;
+      await call('POST', '/api/tasks', {title: 'Elsewhere ' + k++, list_id: L});  // a change made elsewhere
+      if (!r) r = await f0(u, o);
+      const body = await r.text(); await held;
+      return new Response(body, {status: 200, headers: {'Content-Type': 'application/json'}});
+    };
+    w.__l1 = w.eval('load()');
+    check(await until(() => n === 1), 'the first load() asks once ' + n);
+    const v = await until(async () => { const x = (await call('GET', '/api/version')).v; return x > w.eval('S.v') && x; });
+    check(v, 'the server has a newer version than the page');
+    w.__l2 = w.eval(`load(true, ${v})`);
+    go();
+    await w.__l1; const r2 = await w.__l2; w.fetch = f0;
+    // the catch-up is a live-update reload (?auto=1): the server may brake it (the page loaded a moment ago), then the poll
+    // keeps the change pending and asks again on its next beat
+    check(w.eval('S.v') === v || (before && r2 === 'brake'), 'the page shows the newer version (or the catch-up is braked) ' + w.eval('S.v') + ' ' + v + ' ' + r2);
+    check(w.eval('ld_run') === null, 'no load() is left on its way');
+    return n;
+  };
+  const n1 = await race(false);
+  check(n1 === 1, 'the answer already holds the change: the live poll fetches nothing more ' + n1);
+  const n2 = await race(true);
+  check(n2 === 2, 'the answer predates the change: the live poll fetches once more, not twice ' + n2);
+  delete w.document.hidden;
+  await idle(w);
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

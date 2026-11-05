@@ -1312,7 +1312,18 @@ function optSet(get, vals) {
 }
 // auto: 2.280.0 A (#3109) a reload of the live update (not after an own action): the server may hold it back ({brake}: it
 // loaded this person's whole state a moment ago); nothing changes then and the next poll asks again
-async function load(auto) {
+// 2.545.0 (#4483): a reload of the live update while another load() is on its way does not fetch /api/state a second time:
+// it waits for that one and fetches once more only when the version the poll saw (want) is still newer afterwards
+let ld_run = null;
+async function load(auto, want) {
+  if (auto && ld_run) {
+    const r = await ld_run.catch(() => {});
+    if (ld_run || r === 'brake' || !(want > (S.v || 0))) { if (ld_run) await ld_run.catch(() => {}); return r; }
+  }
+  const p = ld_go(auto); ld_run = p;
+  try { return await p; } finally { if (ld_run === p) ld_run = null; }
+}
+async function ld_go(auto) {
   let j;
   try {
     let crossed = false;
@@ -1416,7 +1427,7 @@ setInterval(async () => {
     const chg = v !== S.v || (n !== undefined && collab() && n !== S.news?.sig);
     // 2.41.0 (#1376): only light areas: their parts, the rest bundled; 2.42.0 (#1376): the tasks area: only the changed tasks (delta)
     if (chg && v !== S.v && !editing() && (lpLive(v, lpCh, n) || await lpDelta(v, lpCh, n))) { /* drawn there */ }
-    else if (chg && !editing()) { S.viewStale = lpHold(); const lpBack = lpFull(); S.lpN.state++; if (await load(true) === 'brake') lpBack(); td_renderSoon(); }  // 2.40.0 (#1430): bundled; 2.280.0 F (#3109): braked: the follow-up stays; #3402: a held element keeps the view stale (drawn after letting go)
+    else if (chg && !editing()) { S.viewStale = lpHold(); const lpBack = lpFull(); S.lpN.state++; if (await load(true, v) === 'brake') lpBack(); td_renderSoon(); }  // 2.40.0 (#1430): bundled; 2.280.0 F (#3109): braked: the follow-up stays; #3402: a held element keeps the view stale (drawn after letting go)
     else if (v !== S.v && editing() && S.sel > 0 && (cmtOn() || collab()) && S.tl.id === S.sel && S.tlPollV !== v) { S.tlPollV = v; loadTimeline(S.sel); agentPoll(); }  // 1.9.0
     else if (chg && editing() && S.chat.aid && collab() && S.chatPollV !== `${v}/${n}`) { S.chatPollV = `${v}/${n}`; chatLoad(); agentPoll(); }  // 2.12.2 (#451): typing, the chat still updates (patched)
     else if (S.viewStale && !editing()) viewSafeRender();
