@@ -4079,6 +4079,7 @@ someone switches them on: story points per project (`points_on`, the owner), a W
 | Story points of a task (`1, 2, 3, 5, 8, 13`, `null` = none) | `PATCH /api/v1/tasks/{id}` `{points}` | `update_task` / `create_task` (`points`) | tasks:write |
 | Story points on in a project (the owner) | `PATCH /api/v1/lists/{id}` `{points_on}` | `update_list` (`points_on`) | structure |
 | The WIP limit of a kanban column (`null` / `0` = none) | `PATCH /api/v1/sections/{id}` `{wip_limit, wip_hard}` | `set_wip_limit` | structure |
+| The time limits of a kanban column (2.553.0): hours until a card's time in it turns yellow / red (`null` / `0` = none, red above yellow); tasks carry `section_at` (since when in the column) and `field_at` (`{field id: since when}`) | `PATCH /api/v1/sections/{id}` `{dwell_warn_h, dwell_alert_h}` | `set_dwell_limits` | structure |
 | Completed points of the last closed sprints and their average | `GET /api/v1/lists/{id}/velocity` | `get_velocity` | read |
 | Flow figures: lead / cycle time (median, 85 %), cumulative flow, bug trend (2.393.2) | `GET /api/v1/lists/{id}/flow?days=30\|90` | `list_flow` | read |
 

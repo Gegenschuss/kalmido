@@ -517,7 +517,10 @@ proposals (or your own notepads).
 ### Story points and WIP limits (2.60.0)
 In projects with story points on (`points_on`) a task can carry `points` (1, 2, 3, 5, 8, 13); set them with `update_task` only
 when the project's rules or a person ask, never overwrite a person's estimate. A section's `wip_limit` (`set_wip_limit`) is a hint
-for the kanban column, moving stays allowed; with `wip_hard` set, a column over its limit takes no new job (409 `wip_full`). `get_velocity` gives the completed points of the last closed sprints and their
+for the kanban column, moving stays allowed; with `wip_hard` set, a column over its limit takes no new job (409 `wip_full`).
+2.553.0: `set_dwell_limits` sets a column's time limits (`dwell_warn_h` / `dwell_alert_h`, hours until a card's time turns yellow /
+red, `null` / `0` = none); tasks carry `section_at` (since when in their column) and `field_at` (since when each field has its value).
+`get_velocity` gives the completed points of the last closed sprints and their
 average: a planning aid, never a measure of a person. `list_flow` (2.393.2) gives lead time, cycle time (median, 85 %), the
 cumulative flow per column and the bug trend of the last 30 / 90 days: describe the flow, never measure a person.
 
@@ -780,7 +783,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
-`sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_list_columns`, `set_list_review`,
+`sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
 `set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,

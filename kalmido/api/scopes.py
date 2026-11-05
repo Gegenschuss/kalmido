@@ -24,6 +24,7 @@ from ..lists.sections import (
     _folder_paths, filter_create, filter_delete, filter_update, folder_delete, folder_rename, section_create,
     section_delete, section_update, sections_order,
 )
+from ..lists.sections import DW_KEYS  # 2.553.0 C (#3538)
 from ..tasks.validation import as_int
 from ..tasks.tasks import task_update
 from ..tasks.lifecycle import task_restore, task_skip, trash_empty, tre_plan  # 2.530.0 D (#4316): tre_plan
@@ -507,7 +508,8 @@ def _v1_body(allowed):
 
 def v1_section(r):
     return {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "sort": r["sort"],
-            "wip_limit": r["wip_limit"], "wip_hard": bool(r["wip_hard"])}  # 2.60.0 (#1510): null = no limit; 2.392.0 A (#3367): wip_hard
+            "wip_limit": r["wip_limit"], "wip_hard": bool(r["wip_hard"]),  # 2.60.0 (#1510): null = no limit; 2.392.0 A (#3367): wip_hard
+            "dwell_warn_h": r["dwell_warn_h"], "dwell_alert_h": r["dwell_alert_h"]}  # 2.553.0 C (#3538): time limits (hours, null = none)
 
 
 @app.get("/api/v1/lists/<int:lid>/sections")
@@ -524,10 +526,11 @@ def v1_sections(lid):
 def v1_section_create(lid):
     """{name, before_id?}: a new section at the end (or in front of section before_id)."""
     v1_args(())
-    b = _v1_body(("name", "before_id", "wip_limit", "wip_hard"))
+    b = _v1_body(("name", "before_id", "wip_limit", "wip_hard", *DW_KEYS))  # 2.553.0 C (#3538): + dwell_warn_h / dwell_alert_h
     c = db()
     need_list(c, lid)
     fwd = {"list_id": lid, "name": b.get("name"), "wip_limit": b.get("wip_limit"), "wip_hard": b.get("wip_hard")}  # 2.60.0 (#1510); 2.392.0 A (#3367)
+    fwd.update({k: b[k] for k in DW_KEYS if k in b})
     if b.get("before_id") is not None:
         bid = as_int(b["before_id"], "before_id", 1)
         cur = c.execute("SELECT id, sort FROM sections WHERE list_id=? ORDER BY sort, id", (lid,)).fetchall()
@@ -543,10 +546,11 @@ def v1_section_create(lid):
 @v1_view
 def v1_section_update(sid):
     v1_args(())
-    b = _v1_body(("name", "wip_limit", "wip_hard"))  # 2.60.0 (#1510): + wip_limit (null = no limit); 2.392.0 A (#3367): + wip_hard
-    if not any(k in b for k in ("name", "wip_limit", "wip_hard")):
+    keys = ("name", "wip_limit", "wip_hard", *DW_KEYS)  # 2.553.0 C (#3538): + dwell_warn_h / dwell_alert_h (the checks of section_update)
+    b = _v1_body(keys)  # 2.60.0 (#1510): + wip_limit (null = no limit); 2.392.0 A (#3367): + wip_hard
+    if not any(k in b for k in keys):
         raise BadInput(tr("Nothing to change"))
-    v1_call(section_update, sid, body={k: b[k] for k in ("name", "wip_limit", "wip_hard") if k in b})
+    v1_call(section_update, sid, body={k: b[k] for k in keys if k in b})
     return jsonify(v1_section(db().execute("SELECT * FROM sections WHERE id=?", (sid,)).fetchone()))
 
 
@@ -1311,8 +1315,13 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                                           "moving stays allowed); null = no limit"),
                                                          "wip_hard": {"type": "boolean", "description": "2.392.0: true = while the column holds "
                                                                       "more open tasks than wip_limit, an agent cannot start a job on a task "
-                                                                      "of this project (409 wip_full); default false"}}}
+                                                                      "of this project (409 wip_full); default false"},
+                                                         "dwell_warn_h": nul("integer", minimum=1, maximum=8760, description="2.553.0: hours "
+                                                                             "in the column after which a card's time turns yellow; null = none"),
+                                                         "dwell_alert_h": nul("integer", minimum=1, maximum=8760, description="2.553.0: hours "
+                                                                              "after which it turns red (above dwell_warn_h); null = none")}}
     schemas["SectionPage"] = page("Section")
+    DW_IN = {k: nul("integer", minimum=0, maximum=8760) for k in DW_KEYS}  # 2.553.0 C (#3538): 0 / null = no time limit
     schemas["Field"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
                                                        "sort": {"type": "number"},
@@ -1344,7 +1353,7 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                        [lp], scope="structure", body={"type": "object", "required": ["name"], "properties": {
                            "name": {"type": "string", "maxLength": 200}, "before_id": {"type": "integer"},
                            "wip_limit": nul("integer", minimum=0, maximum=999),
-                           "wip_hard": {"type": "boolean"}}})},  # 2.60.0 (#1510); 2.392.0 A (#3367)
+                           "wip_hard": {"type": "boolean"}, **DW_IN}})},  # 2.60.0 (#1510); 2.392.0 A (#3367); 2.553.0 C (#3538): DW_IN
         "/lists/{id}/sections/order": {"put": op("Reorder all sections of a project", S, ok(ref("SectionPage")) | errs("400", "403", "404"), [lp],
                                                  scope="structure", body={"type": "object", "required": ["ids"], "properties": {"ids": ids}},
                                                  desc="ids: every section of the project exactly once, in the new order.")},
@@ -1353,9 +1362,11 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "patch": op("Rename a section / set its WIP limit", S, ok(ref("Section")) | errs("400", "403", "404"), [pid("id", "Section id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"},
                                                                                    "wip_limit": nul("integer", minimum=0, maximum=999),
-                                                                                   "wip_hard": {"type": "boolean"}}},
+                                                                                   "wip_hard": {"type": "boolean"}, **DW_IN}},
                         desc="wip_limit: the most open tasks the kanban column should hold (a hint only); null or 0 = no limit. "
-                             "wip_hard (2.392.0, #3367): true = while the column is over the limit, an agent cannot start a new job on its tasks."),
+                             "wip_hard (2.392.0, #3367): true = while the column is over the limit, an agent cannot start a new job on its tasks. "
+                             "dwell_warn_h / dwell_alert_h (2.553.0, #3538): hours in the column after which a card's time turns yellow / red "
+                             "(1 to 8760, red above yellow; null or 0 = none; one of them alone keeps the other)."),
             "delete": op("Delete a section (its tasks stay in the project)", S, ok(obj) | errs("403", "404"), [pid("id", "Section id")], scope="delete")},
         "/tasks/{id}/move": {"post": op("Move a task: project, section, parent and place", T, ok(ref("Task")) | errs("400", "403", "404"), [pid()],
                                         scope="tasks:write", body={"type": "object", "properties": {

@@ -218,6 +218,11 @@ def openapi_spec():
                                           "to you; the task counts in its queue, it gets the event assigned with delegated true")
     task_props["watchers"] = {"type": "array", "items": {"type": "integer"}, "description": "2.473.0: who watches the task (read only here; "
                               "POST /tasks/{id}/watchers, DELETE /tasks/{id}/watchers/{user_id}). They get its comments and status changes"}
+    # 2.553.0 C (#3538): the time in the board column and since when each field has its value (read only)
+    task_props["section_at"] = nul("string", description="2.553.0: since when the task is in its board column (section or project "
+                                   "changed; ISO time, UTC); null = not known. Read only")
+    task_props["field_at"] = {"type": "object", "additionalProperties": {"type": "string"}, "description": "2.553.0: {field id: "
+                              "since when the field has its value (ISO time, UTC)}; a field missing here = not known. Read only"}
     task_in = {k: v for k, v in task_props.items() if k in V1_TASK_IN}
     task_in["priority"] = {"oneOf": [prio, {"type": "integer", "enum": list(PRIORITIES)}]}
     task_in["reminders"] = {"oneOf": [{"type": "array", "items": {"type": "integer"}}, {"type": "string"}]}

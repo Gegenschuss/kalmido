@@ -200,6 +200,7 @@ def _cd_name(cd):
 # ---------------------------------------------------------------- tools
 
 S_ID = {"type": "integer", "minimum": 1}
+_DW_H = {"type": ["integer", "null"], "minimum": 0, "maximum": 8760}  # 2.553.0 C (#3538): a column time limit in hours (null / 0 = none)
 PRIO = {"type": "string", "enum": ["none", "low", "medium", "high"]}
 STRS = {"type": "array", "items": {"type": "string"}}
 TASK_FIELDS = {
@@ -1550,9 +1551,11 @@ TOOLS += [
     ("list_sections", "Sections of a project in order.", _obj({"list_id": S_ID}, ["list_id"]),
      lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/sections")),
     ("create_section", "Create a section in a project (at the end, or before section before_id). 2.60.0: wip_limit = the most open tasks "
-                       "the kanban column should hold (a hint only; null / 0 = none).",
+                       "the kanban column should hold (a hint only; null / 0 = none). 2.553.0: dwell_warn_h / dwell_alert_h = its time "
+                       "limits (see set_dwell_limits).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}, "before_id": S_ID,
-           "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999}}, ["list_id", "name"]),
+           "wip_limit": {"type": ["integer", "null"], "minimum": 0, "maximum": 999},
+           "dwell_warn_h": _DW_H, "dwell_alert_h": _DW_H}, ["list_id", "name"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/sections", body=_without(a, "list_id"))),
     ("rename_section", "Rename a section.", _obj({"section_id": S_ID, "name": {"type": "string", "minLength": 1, "maxLength": 200}},
                                                  ["section_id", "name"]),
@@ -2422,6 +2425,13 @@ TOOLS += [
           ["section_id", "wip_limit"]),
      lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}",
                              body={"wip_limit": a.get("wip_limit"), **({"wip_hard": a["wip_hard"]} if "wip_hard" in a else {})})),
+    # 2.553.0 C (#3538): the time limits of a kanban column (the card's time in the column turns yellow / red)
+    ("set_dwell_limits", "2.553.0: set the time limits of a section (kanban column): dwell_warn_h = hours in the column after which a "
+                         "card's time turns yellow, dwell_alert_h = after which it turns red (1 to 8760, red above yellow). null or 0 = "
+                         "none; a limit left out stays as it is. A hint only, moving stays allowed. Tasks carry section_at (since when "
+                         "in their column) and field_at (since when each field has its value).",
+     _obj({"section_id": S_ID, "dwell_warn_h": _DW_H, "dwell_alert_h": _DW_H}, ["section_id"]),
+     lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body=_pick(a, ("dwell_warn_h", "dwell_alert_h")))),
     ("get_velocity", "2.60.0: the velocity of a project: completed story points (and tasks) of its last up to 6 closed sprints and their "
                      "average, a planning aid for the next sprint.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
@@ -2656,6 +2666,7 @@ TOOL_SCOPES["calendar"] += ("get_dispo", "get_dispo_free", "propose_shoot")  # 2
 TOOL_SCOPES["calendar"] += ("list_polls", "get_poll", "create_poll")  # 2.484.0 (#2200)
 TOOL_SCOPES["layouts"] = ("list_layout_blocks", "get_view_layout", "propose_layout")  # 2.55.0 (#1066)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
+TOOL_SCOPES["structure"] += ("set_dwell_limits",)  # 2.553.0 C (#3538)
 TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.138.1 (#2059)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
@@ -2700,7 +2711,7 @@ TOOLSETS = {
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
         set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status
-        list_layout_blocks get_view_layout propose_layout set_wip_limit get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
+        list_layout_blocks get_view_layout propose_layout set_wip_limit set_dwell_limits get_velocity list_flow propose_import propose_rule list_video_reviews get_video_review
         add_video_comment set_video_comment_done get_workload get_absences get_day_plan get_day_review
     """,
     "code": """

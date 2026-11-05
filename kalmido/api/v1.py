@@ -313,6 +313,7 @@ def task_core(r, tags, fields):
             "irreversible": irr_view(r) if "irreversible" in r.keys() else None,  # 2.392.0 C (#3370): {reason, yes_by, yes_at}, null = no one-way step
             "delivery": dv_view(r),  # 2.392.2 (#3365): {state, note, job_id, task_id, since, by}, null = nothing said
             "remind_at": r["remind_at"] if "remind_at" in r.keys() else None,  # 2.111.0 C (#2057): fixed-time reminder
+            "section_at": r["section_at"] if "section_at" in r.keys() else None,  # 2.553.0 C (#3538): since when in its board column (null = not known)
             # 2.390.0 B (#3355): the sprint (null = backlog), the reviewer and the review state (pending | approved | changes)
             "sprint_id": r["sprint_id"] if "sprint_id" in r.keys() else None,
             "reviewer_id": r["reviewer_id"] if "reviewer_id" in r.keys() else None,
@@ -346,6 +347,7 @@ def v1_task(d):
     out["list_tags"] = d.get("ltags") or []
     out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
     out["partial_until"] = d.get("partial_until")  # 2.392.0 B (#3364): done in part: only this version completes it
+    out["field_at"] = d.get("field_at") or {}  # 2.553.0 C (#3538): {field id: since when it has its value}, a field absent = not known
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -371,6 +373,9 @@ def task_for(c, row, uid):
     if row["list_id"]:  # 2.43.0 (#1328): formula fields are computed (read-only for agents too)
         fields = fx_fill(c, {row["id"]: fields}, {row["id"]: row["list_id"]}).get(row["id"], fields)
     out = {**task_core(row, tags, fields), "list_tags": ltag_names(c, row["id"]), "key": tk_key(c, row)}  # 2.390.0 (#3353): key
+    out["field_at"] = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.set_at FROM task_field_values v JOIN list_fields f
+                                                          ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=? AND v.set_at IS NOT NULL""",
+                                                       (row["id"], row["list_id"]))}  # 2.553.0 C (#3538): as in v1_task
     from ..tasks.watchers import wat_users
     out["watchers"] = sorted(wat_users(c, row["id"]))  # 2.473.0 (#3357): webhook payloads and agent events too
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
