@@ -121,7 +121,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
 - **Groups** (2.10.0): an admin creates groups (*Office*, *Field team*; optionally synced from a sign-in group of the
   OIDC provider). Share a project or a whole folder with a group and a role: whoever joins gets access, whoever leaves loses
   it, and a person's role is the higher of their own and the group's. Assign a task to a group, "whoever has time": it is
-  in *Assigned to me* for every member until one of them takes it. Groups appear under *Team* in the sidebar
+  in *Assigned to me* for every member until one of them takes it. Groups appear under *People* in the sidebar
 - **Shared project tags** besides your personal tags: tags that belong to a project, with a colour per project, visible to
   everyone in it (`1.9.0`, `bug`, `Client X`). In shared projects the tag input suggests project tags first; your personal
   tags keep a small person icon, and one click turns a personal tag into a project tag. Filters, the sidebar and the API
@@ -263,7 +263,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
 | | |
 |---|---|
 | <img src="palette.png" alt="Command palette with actions for the selected task"> | <img src="celebration.png" alt="The Kalmido figure with a checkmark and confetti after Today was cleared"> |
-| Command palette | The heron celebrates |
+| Command palette | The Kalmido figure celebrates |
 
 <p align="center"><img src="appearance.png" width="760" alt="Settings, Appearance tab with a live preview, theme, color scheme, density and font size"></p>
 

@@ -56,6 +56,7 @@ the app has not yet been tested by people who use a screen reader every day (see
   touch screens). The account picture sits next to the search at the bottom without dots; the connection dot only
   appears offline or while changes go out (its state stays in the picture's name and the account menu), the update dot
   only at Settings. *Start* is in the account menu and in the search (Mod+K).
+<!-- unklar (#4494): 'next to the search at the bottom' holds for the older sidebar (static/js/render.js:517, .sbdock); line 61 says the account picture is in the head bar on a computer (sidebar B). Which layout is the default was not clearly shown in the code, so the text stays. -->
 - **One head bar over everything (2.152.3).** On a computer a low bar runs across the top above the bar of the areas,
   the panel and the page: the Kalmido sign with the shown workspace (dot, name, arrow) on the left, the search
   (*Search*; Mod+K in its tooltip and the shortcut overview, 2.290.0), the bell, the connection dot and the account picture on the right. The workspace

@@ -23,7 +23,7 @@ week create one; a click opens it (details, your answer, *Edit*, *Delete*, *Prep
   an event* in a task's panel.
 - **People's availability** (2.155): while you invite, a free / busy bar shows you and every invited person of your
   organisation for the day - only busy and away times, never titles or places.
-- **Holidays and absences** (2.155): the public holidays of your state (Germany by state, Austria) and your absences show
+- **Holidays and absences** (2.155): the public holidays of your country or state (Germany and Austria by state; also Switzerland, France, Spain, Italy and the Netherlands) and your absences show
   in the calendar, your team's on request as "away" only; the state can be set per person, also without an
   organisation. Your absences and holidays are also a subscription link for the phone's calendar app.
 - **On the phone**: each calendar is a calendar in the phone's own app (CalDAV), changes go both ways; invitations come
