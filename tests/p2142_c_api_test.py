@@ -266,6 +266,14 @@ check(r.status_code == 400, f"freelancer: the own push topic as the inbox refuse
 r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push, "url": ""})
 check(r.status_code == 400, f"freelancer: another person's push topic refused ({r.status_code})")
 Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": ftopic, "url": STUB})
+# 2.549.0 (#4515, review): one server in every spelling - the default port spelled out, host case, a trailing dot or slash
+code = """
+from kalmido.core.config import _ntfy_base as b
+print(b('https://ntfy.example.com:443') == b('https://NTFY.example.com/') == b('https://ntfy.example.com.'),
+      b('http://h.example:80') == b('http://h.example'), b('https://h.example:8443') != b('https://h.example'))
+"""
+r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", code], capture_output=True, text=True, timeout=120)
+check(r.stdout.strip().splitlines()[-1:] == ["True True True"], f"the server is compared in every spelling ({r.stdout[-200:]} {r.stderr[-300:]})")
 # the other way round: an admin sets a push topic that is an inbox on the default server
 r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carols-default-server-inbox-4515", "url": ""})
 check(r.ok, f"carol: a long topic on the default server ({r.status_code} {r.text[:100]})")

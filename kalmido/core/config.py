@@ -295,7 +295,16 @@ def ntfy_inbox_allowed(url=None, topic=None, person=False):
 
 
 def _ntfy_base(url):
-    return (url or NTFY_URL).strip().rstrip("/").lower()
+    # 2.549.0 (#4515, review): one server in every spelling - scheme and host without case, the default port spelled
+    # out (https://h:443 = https://h), no trailing dot or slash; otherwise ':443' slipped past the checks below
+    raw = (url or NTFY_URL).strip()
+    try:
+        p = urllib.parse.urlsplit(raw if "://" in raw else "https://" + raw)
+        scheme = (p.scheme or "https").lower()
+        port = p.port or (443 if scheme == "https" else 80)
+        return f"{scheme}://{(p.hostname or '').rstrip('.')}:{port}{p.path.rstrip('/')}"
+    except ValueError:
+        return raw.rstrip("/").lower()
 
 
 def ntfy_topic_taken(c, uid, topic, url=None, push=False):
@@ -307,6 +316,9 @@ def ntfy_topic_taken(c, uid, topic, url=None, push=False):
     if not t:
         return False
     base = _ntfy_base(None if push else url)
+    # 2.549.0 (#4515, review): the environment's inbox (NTFY_INBOX_*) is taken as well
+    if NTFY_IN["url"] and NTFY_IN["topic"] and t == NTFY_IN["topic"].strip().lower() and _ntfy_base(NTFY_IN["url"]) == base:
+        return True
     for r in c.execute("SELECT url FROM ntfy_inboxes WHERE lower(topic)=? AND user_id IS DISTINCT FROM ?", (t, None if push else uid)):
         if _ntfy_base(r[0]) == base:
             return True
