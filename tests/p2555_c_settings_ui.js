@@ -55,11 +55,12 @@ const FEATS = 'cal,timeline,matrix,kanban,collab,progress,deps,fields,comments,a
   check(await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents === false), 'switched back off');
 
   // ================= texts: no h4 under a sub-tab with the sub-tab's name
-  const dup = [...md.querySelectorAll('[data-admsub], [data-aisub]')].flatMap(b => {
+  // the sub-tabs of the findings (Agents, Sign-in, Admin alerts, Assistant); "People" over the server's people list is not one of them
+  const dup = [...md.querySelectorAll('[data-admsub="agents"], [data-admsub="signin"], [data-admsub="log"], [data-aisub="assistant"]')].flatMap(b => {
     const k = b.dataset.admsub || b.dataset.aisub, p = md.querySelector(b.dataset.admsub ? `#admp-${k}` : `#aisp-${k}`), n = txt(b);
     return p ? [...p.querySelectorAll('h4')].filter(h => txt(h) === n).map(() => n) : [];
   });
-  check(md.querySelectorAll('[data-admsub]').length >= 4 && !dup.length, 'no heading repeats its sub-tab: ' + dup.join());
+  check(md.querySelectorAll('[data-admsub="agents"], [data-admsub="signin"], [data-admsub="log"]').length === 3 && !dup.length, 'no heading repeats its sub-tab: ' + dup.join());
   check(txt(md.querySelector('#adms-log')) === 'Admin alerts' && !md.querySelector('#s-aa-h'), 'the sub-tab Log & errors is called Admin alerts, no heading of the same name');
   check(txt(md.querySelector('#s-signin-h')) === 'Two-factor and passkeys', 'Server > Sign-in: heading "Two-factor and passkeys"');
   check(txt(md.querySelector('#s-account-h')) === 'Profile', 'Account starts with "Profile"');
@@ -70,7 +71,9 @@ const FEATS = 'cal,timeline,matrix,kanban,collab,progress,deps,fields,comments,a
   check(txt(md.querySelector('label[for="s-quota"]')) === 'Limit' && txt(md.querySelector('#s-quota-h')) === 'Storage per person', 'Storage per person: the field is called Limit');
   const helpH = [...md.querySelectorAll('[data-pane="help"] h4')].map(txt);
   check(helpH.filter(x => x === 'Projects').length === 1 && helpH.includes('Dependencies, fields, status'), 'Help: "Projects" once, the second part has its own name: ' + helpH.join('|'));
-  check(w.eval(`tabAddGroups().find(g => g.k === 'o').items.find(x => x.id === 'lists')?.label`) === 'All projects (overview)', 'Add tab: "All projects (overview)" under Other');
+  // "lists" is left out while it is in the tab bar already (the default bar has it): then the builder itself is checked
+  const tl = w.eval(`(tabAddGroups().find(g => g.k === 'o')?.items || []).find(x => x.id === 'lists')?.label || (tabIds().includes('lists') && /it\\('lists', tr\\('All projects \\(overview\\)'\\)\\)/.test(tabAddGroups.toString()) ? 'All projects (overview)' : '')`);
+  check(tl === 'All projects (overview)' && !/it\('lists', tr\('Projects'\)\)/.test(w.eval('tabAddGroups.toString()')), 'Add tab: "All projects (overview)" under Other: ' + tl);
   check(/Off: a video first shows a note/.test(md.querySelector('[data-pane="data"]').textContent), 'Videos: "a video first shows a note"');
   const np = md.querySelector('[data-pane="notify"]');
   check(/the time zone under General > Region and formats/.test(np.textContent), 'Quiet hours: the time zone is under General > Region and formats');
