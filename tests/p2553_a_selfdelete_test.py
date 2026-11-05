@@ -13,12 +13,16 @@
  - refused: the last admin of an organisation, the only server admin
 Invented names only.
 usage: p2553_a_selfdelete_test.py <datadir>"""
+import base64
 import email
+import hashlib
+import hmac
 import email.policy
 import json
 import os
 import re
 import shutil
+import struct
 import subprocess
 import sys
 import time
@@ -42,6 +46,13 @@ def write(q, args=()):
     c.execute(q, args)
     c.commit()
     c.close()
+
+
+def totp(secret, step):
+    key = base64.b32decode(secret + "=" * (-len(secret) % 8))
+    mac = hmac.new(key, struct.pack(">Q", step), hashlib.sha1).digest()
+    o = mac[-1] & 15
+    return str((struct.unpack(">I", mac[o:o + 4])[0] & 0x7FFFFFFF) % 10 ** 6).zfill(6)
 
 
 def mails():
@@ -93,6 +104,21 @@ j = Ca.get(B + "/api/account/delete").json()
 check(j.get("can") is False and "Garden Studio" in j.get("reason", ""), f"the last admin of an organisation: refused with its name {j}")
 r = Ca.post(B + "/api/account/delete", json={"password": PW, "lists": {}})
 check(r.status_code == 409 and not dbx("SELECT delete_at FROM users WHERE id=?", (CID,))[0][0], f"... and asking changes nothing ({r.status_code})")
+
+# ---------------------------------------------------------------- review N2: an app code confirms once
+TID = A.post(B + "/api/users", json={"username": "tina", "display_name": "Tina", "password": PW, "email": "tina@example.com", "orgs": []}).json()["id"]
+Ti = sess("tina")
+r = Ti.post(B + "/api/me/2fa/totp", json={"password": PW})
+SEC = (r.json().get("secret") or "").replace(" ", "")
+step0 = int(time.time() // 30)
+check(bool(SEC) and Ti.post(B + "/api/me/2fa/totp/confirm", json={"code": totp(SEC, step0)}).ok, "setup: tina has the authenticator app")
+TL = Ti.post(B + "/api/lists", json={"name": "Tina's list"}).json()["id"]
+check(Ti.post(B + "/api/account/delete", json={"password": PW}).json().get("code_needed") is True, "with the app: the code is asked for")
+CODE = totp(SEC, step0 + 1)
+r = Ti.post(B + "/api/account/delete", json={"password": PW, "code": CODE, "lists": {}})
+check(r.status_code == 409, f"the right code, but no choice for her project: refused ({r.status_code})")
+r = Ti.post(B + "/api/account/delete", json={"password": PW, "code": CODE, "lists": {str(TL): {"delete": True}}})
+check(r.status_code == 403 and not dbx("SELECT delete_at FROM users WHERE id=?", (TID,))[0][0], f"the same code a second time: refused ({r.status_code})")
 
 # ---------------------------------------------------------------- own projects: one shared with bob, one private
 L1 = Fr.post(B + "/api/lists", json={"name": "Garden plan"}).json()["id"]
@@ -153,6 +179,8 @@ check(bool(m) and cancel_token(m[0]) and "backup" in m[0]["text"].lower(), f"the
 
 # ---------------------------------------------------------------- the cancel link lifts everything
 check(s.post(B + "/api/auth/delete-cancel", json={"token": "999.nope"}).status_code == 403, "a wrong link does nothing")
+# review N1: an endless number in the link is a wrong link (403), never a server error
+check(s.post(B + "/api/auth/delete-cancel", json={"token": "9" * 40 + ".nope"}).status_code == 403, "a too long number: 403, no 500")
 r = s.post(B + "/api/auth/delete-cancel", json={"token": cancel_token(m[0])})
 check(r.ok, f"the cancel link {r.status_code} {r.text[:120]}")
 check(dbx("SELECT disabled, delete_at, delete_plan FROM users WHERE id=?", (FID,))[0] == (0, None, ""), "unlocked, nothing planned")
@@ -181,7 +209,16 @@ check(bool(until(lambda: not dbx("SELECT delete_at FROM users WHERE id=?", (FID,
 # ---------------------------------------------------------------- the final run (no waiting: delete_at in the past)
 Fr = login(B, "frida")
 check(Fr.post(B + "/api/account/delete", json={"password": PW, "lists": CHOICE}).ok, "asked for the last time")
+# 2.553.0 (#1413, review M2): a record to keep that came after the request (a receipt in the project deleted along) passed no
+# export or waiver - the final run waits (notes the try) instead of deleting it
+write("INSERT INTO budget_entries(list_id, day, created_at, updated_at) VALUES(?, '2026-11-05', '2026-11-05T00:00:00+00:00', '2026-11-05T00:00:00+00:00')", (L2,))
+BE = dbx("SELECT id FROM budget_entries WHERE list_id=?", (L2,))[0][0]
+write("INSERT INTO budget_files(entry_id, list_id, name, path, created_at) VALUES(?, ?, 'r.pdf', 'x/r.pdf', '2026-11-05T00:00:00+00:00')", (BE, L2))
 write("UPDATE users SET delete_at='2000-01-01T00:00:00+00:00' WHERE id=?", (FID,))
+tried = until(lambda: '"tried"' in (dbx("SELECT delete_plan FROM users WHERE id=?", (FID,)) or [("",)])[0][0], 30)
+check(bool(tried) and dbx("SELECT 1 FROM lists WHERE id=?", (L2,)), "a receipt after the request: the final run waits, nothing deleted")
+write("DELETE FROM budget_entries WHERE id=?", (BE,))
+write("UPDATE users SET delete_plan=replace(delete_plan, '\"tried\"', '\"tried_old\"') WHERE id=?", (FID,))
 gone = until(lambda: not dbx("SELECT 1 FROM users WHERE id=?", (FID,)), 30)
 check(bool(gone), "the watchdog deleted the account " + str(dbx("SELECT delete_plan FROM users WHERE id=?", (FID,))))
 check(dbx("SELECT owner_id FROM lists WHERE id=?", (L1,)) == [(BOB,)], "the shared project went to bob")

@@ -40,7 +40,7 @@ from ..accounts.useradmin import ua8_foreign, ua8_list_info, ua8_owned
 from ..accounts.orgretain import UPG_NO_HEIR, upg_heirless, upg_info
 from .backup import BK_ON_ENV, _clamp_int, bk_weekly_max
 from .hosting import hosted
-from .retexport import rx_gate, rx_subject, rx_user_info
+from .retexport import rx_counts, rx_gate, rx_subject, rx_user_info
 
 SDL_DAYS = 7  # fixed (decided 13.10.2026)
 SDL_REMIND = timedelta(days=1)  # the reminder mail one day before
@@ -130,7 +130,10 @@ def _confirm(c, u, b):
             code = b.get("code")
             if not code:
                 return jsonify(error=tr("Enter the code from your authenticator app"), code_needed=True), 403
-            if not ((secret and totp_match(secret, code, u["totp_step"])) or rc_use(c, u["id"], code)):
+            st = totp_match(secret, code, u["totp_step"]) if secret else None
+            # review N2: like the login, a code counts once (its step is written; a second use in the window fails)
+            ok = bool(st) and c.execute("UPDATE users SET totp_step=? WHERE id=? AND totp_step<?", (st, u["id"], st)).rowcount == 1
+            if not (ok or rc_use(c, u["id"], code)):
                 _rate_fail(_rate_keys(u["username"]))
                 return err(tr("Wrong code"), 403)
         return None
@@ -188,8 +191,8 @@ def sdl_request():
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
     uid = u["id"]
     e = _confirm(c, u, b)
+    c.commit()  # a used recovery code stays used; review N2: a used app code too (also when a later check refuses)
     if e:
-        c.commit()  # a used recovery code stays used
         return e
     reason = sdl_refusal(c, u)
     if reason:
@@ -223,7 +226,8 @@ def sdl_request():
         paused = [r[0] for r in c.execute("SELECT user_id FROM agents WHERE owner_id=? AND enabled=1 ORDER BY user_id", (uid,)).fetchall()]
         if paused:
             c.execute("UPDATE agents SET enabled=0 WHERE owner_id=? AND enabled=1", (uid,))
-    plan = {"lists": choice, "how": how, "along": along, "agents": paused, "toks": [tkh_hash(tok)], "asked": iso(now_utc())}
+    plan = {"lists": choice, "how": how, "along": along, "agents": paused, "toks": [tkh_hash(tok)], "asked": iso(now_utc()),
+            "rx": rx_counts(c, rx_subject(c, "user", uid), along)}  # review M2: the records to keep the gate saw when it was asked for
     c.execute("UPDATE users SET disabled=1, delete_at=?, delete_plan=? WHERE id=?", (at, json.dumps(plan), uid))
     ses_end(c, uid)  # every session, this one too
     bump(c)
@@ -257,7 +261,7 @@ def sdl_cancel():
         if e:
             return e
         uid, _, secret = tok.partition(".")
-        u = c.execute("SELECT * FROM users WHERE id=? AND delete_at IS NOT NULL", (int(uid),)).fetchone() if uid.isdigit() else None
+        u = c.execute("SELECT * FROM users WHERE id=? AND delete_at IS NOT NULL", (int(uid),)).fetchone() if uid.isdigit() and len(uid) <= 18 else None  # review N1: no BIGINT overflow
         ok = bool(u and secret and any(tkh_match(secret, h) for h in sdl_plan(u).get("toks") or []))
     else:
         username = str(b.get("username") or "").strip().lower()
@@ -378,6 +382,13 @@ def _settle(c, uid, plan):
     return None, (icons, files, N_("{0} deleted the account {1}: {2} projects handed over, {3} deleted along."), [moved, gone])
 
 
+class SdlWait(Exception):
+    """review M2: the final deletion waits (the reason is the text)."""
+
+    def text(self):
+        return str(self.args[0]) if self.args else ""
+
+
 def sdl_run(c, uid):
     """The final deletion of uid (its delete_at passed). True when it went; else the plan notes the try (SDL_RETRY)."""
     with system_ctx(c):
@@ -391,6 +402,12 @@ def sdl_run(c, uid):
     with app.test_request_context("/api/account/delete/run"):
         g.db, g.pushes, g.user, g.auth_via = c, [], u, None  # the person's own step (me() = the account, as when it asked)
         try:
+            # review M2: records to keep that came after the request (e.g. receipts others filed in a project deleted along)
+            # passed no export or waiver - then it waits and the admins are told (tried again every hour)
+            now_rx = rx_counts(c, rx_subject(c, "user", uid), bool(plan.get("along")))
+            old_rx = plan.get("rx") or {}
+            if any(n > int(old_rx.get(k) or 0) for k, n in now_rx.items()):
+                raise SdlWait("retention: records to keep came after the request")
             with system_ctx(c):  # across organisations, like the hosting operator's deletion (admin/operator.py)
                 code, answer, _n = user_delete_run(c, uid, {"t": N_("the account holder")}, along=bool(plan.get("along")),
                                                    settle=lambda: _settle(c, uid, plan), how="requested")
