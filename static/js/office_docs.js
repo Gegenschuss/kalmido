@@ -1295,7 +1295,7 @@ function ofd_fltHtml() {
 // 2.272.0 E2 (#3038): the office trash - deleted drafts and master data, restore or delete for good, the trash period
 async function otb_restore(tid, after) {
   let j; try { j = await api('POST', `/api/office/trash/${tid}/restore`); } catch (x) { toast(x.message || tr('unknown')); return; }
-  toast(tr('Restored'));
+  toast(j.note || tr('Restored'));  // 2.552.0 (#4561 B19): a draft whose client is gone for good comes back without one
   if (j.kind === 'trip' || j.kind === 'trip_item') { if (typeof RK !== 'undefined') RK.data = null; }  // 2.530.0 C (#4315)
   if (j.kind === 'cc_line' && typeof ccStale === 'function') ccStale();  // 2.552.0 (#4561 B21)
   if (j.kind === 'doc') { OFD.list = null; go(`office/offers/${j.id}`); }  /* a quotation's address; an invoice moves on to its area (ofdLoadDoc) */ else if (typeof ofcReload === 'function') ofcReload(j.kind);

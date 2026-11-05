@@ -16310,6 +16310,7 @@
   "{0}: the position is no longer in the quotation (the task stays)": "{0} : la position n’est plus dans le devis (la tâche reste)",
   "{0}: the position is in the quotation again": "{0} : la position est de nouveau dans le devis",
   "Credit card position": "Ligne de carte de crédit",
+  "Restored without a client: the client was deleted for good meanwhile.": "Restauré sans client : le client a été supprimé définitivement entre-temps.",
   "The off-site backup is set up by the operator.": "La sauvegarde externe est configurée par l'exploitant.",
   "On a hosted instance the operator sets up the off-site backup": "Sur une instance hébergée, l'exploitant configure la sauvegarde externe",
   "Release to remove": "Relâchez pour retirer",

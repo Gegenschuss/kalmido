@@ -6,6 +6,7 @@ organisation (tests/freelancer_fixture.py) does every step that exists for her.
 freelancer-matrix: office, wiki, tasks
  - B21: a deleted credit card position goes into the office trash first (label without the sealed merchant / amount); the
    undo route and the office trash bring it back with its id; another office 404; a confirmed statement takes none back (409)
+ - B19: a draft in the office trash whose client was deleted for good since comes back without the client, the answer says so
 usage: p2552_b_dataloss_test.py <datadir>      (KMT_NOSTART=1: a running server)"""
 import os
 import sys
@@ -80,5 +81,26 @@ r = Fr.post(B + f"{K}/trash/{TID}/restore")
 check(r.status_code == 409 and not sql("SELECT 1 FROM office_cc_lines WHERE id=?", (LID,)), f"B21: a confirmed statement takes no position back (409) {r.status_code}")
 check(Fr.post(B + O + f"/trash/{TID}/restore").status_code == 409, "B21: the office trash refuses it as well (409)")
 check(sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B21: the copy stays in the trash after the refusal")
+
+# ================================================================== B19 a draft whose client is gone for good comes back without it
+CID = Fr.post(B + "/api/clients", json={"name": "Weggangskunde GmbH", "email": "weg@example.com"}).json()["id"]
+r = Fr.post(B + O + "/docs", json={"project_title": "Fruehling Beispiel", "client_id": CID})
+check(r.status_code == 201, f"B19: a draft with a client {r.status_code} {r.text[:160]}")
+DID = r.json()["id"]
+check(sql("SELECT client_id FROM office_docs WHERE id=?", (DID,))[0][0] == CID, "B19: the draft names the client")
+r = Fr.delete(B + O + f"/docs/{DID}")
+TID = r.json().get("trash_id") if r.ok else None
+check(bool(TID), f"B19: the draft is in the office trash {r.status_code} {r.text[:160]}")
+check(Fr.delete(B + f"/api/clients/{CID}").ok, "B19: the client goes to the trash")
+r = Fr.delete(B + f"/api/clients/{CID}/purge")
+check(r.ok and not sql("SELECT 1 FROM clients WHERE id=?", (CID,)), f"B19: the client is deleted for good {r.status_code} {r.text[:160]}")
+r = Fr.post(B + O + f"/trash/{TID}/restore")
+j = r.json() if r.ok else {}
+check(r.ok and j.get("id") == DID, f"B19: the draft comes back (was 409) {r.status_code} {r.text[:200]}")
+check("client_id" in (j.get("gone") or []) and "without a client" in (j.get("note") or ""), f"B19: the answer says it came back without the client: {j}")
+row = sql("SELECT client_id, project_title FROM office_docs WHERE id=?", (DID,))
+check(row and row[0][0] is None, f"B19: the draft has no client now: {row}")
+check(Fr.get(B + O + f"/docs/{DID}").ok, "B19: the draft opens")
+check(not sql("SELECT 1 FROM office_trash WHERE id=?", (TID,)), "B19: the copy left the trash")
 
 sys.exit(done("p2552_b_dataloss"))

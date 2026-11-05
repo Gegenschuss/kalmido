@@ -96,14 +96,31 @@ def dvb_otb_draft(c, oid, uid, did):
                    sub=r["kind"], extra_nulls=[("time_entries", "billed_doc_id", did, te)] if te else ())
 
 
+OTB_OUT = {}  # table -> [(column, referenced table, referenced column)]: its single-column ON DELETE SET NULL references
+
+
+def otb_dangling(c, table, row):
+    """2.552.0 (#4561 B19): the columns of row whose ON DELETE SET NULL reference points at a row gone for good since (a client
+    purged after the draft went to the trash). Emptying them is what the database had done had the row still been there."""
+    if table not in OTB_OUT:
+        OTB_OUT[table] = [(r[0], r[1], r[2]) for r in c.execute(
+            "SELECT a.attname, cl.relname, fa.attname FROM pg_constraint co JOIN pg_class cl ON cl.oid=co.confrelid "  # pg-ok: catalog oid (Postgres only)
+            "JOIN pg_attribute a ON a.attrelid=co.conrelid AND a.attnum=co.conkey[1] "
+            "JOIN pg_attribute fa ON fa.attrelid=co.confrelid AND fa.attnum=co.confkey[1] WHERE co.contype='f' "
+            "AND co.conrelid=CAST(? AS regclass) AND array_length(co.conkey, 1)=1 AND co.confdeltype='n' ORDER BY a.attname", (table,)).fetchall()]
+    return [col for col, ref, rcol in OTB_OUT[table]
+            if row.get(col) is not None and not c.execute(f"SELECT 1 FROM {ref} WHERE {rcol}=?", (row[col],)).fetchone()]
+
+
 def _insert(c, table, row):
     if table == "office_docs":  # 2.370.2 (#3088): the same request may have made a new document meanwhile (ofi_ref_doc)
         row = {**row, "client_ref": None}
     c.execute(f"INSERT INTO {table}({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
 
 
-def otb_restore(c, oid, tid):
-    """Writes trash copy tid of office area oid back (the caller checked the rights and commits). -> (kind, ref_id)"""
+def otb_restore(c, oid, tid, notes=None):
+    """Writes trash copy tid of office area oid back (the caller checked the rights and commits). -> (kind, ref_id); notes (a
+    dict) gets "gone": [columns emptied because what they named is gone for good] (2.552.0, #4561 B19)."""
     r = c.execute("SELECT * FROM office_trash WHERE id=? AND org_id=? FOR UPDATE", (tid, oid)).fetchone()
     if not r:
         raise Denied(404)
@@ -125,7 +142,12 @@ def otb_restore(c, oid, tid):
                         row["series_id"] = None  # the series made this period again meanwhile
                 if "updated_at" in cols:
                     row["updated_at"] = iso(now_utc())
-                try:  # 2.272.0 F (#3038, review E2-M2): a client / service it points at is gone for good since: 409, not 500
+                gone = otb_dangling(c, table, row)  # 2.552.0 (#4561 B19): a client gone for good since: back without it, the answer says so
+                for col in gone:
+                    row[col] = None
+                if notes is not None and gone:
+                    notes["gone"] = gone
+                try:  # 2.272.0 F (#3038, review E2-M2): something else it needs is gone for good since: 409, not 500
                     with c.savepoint():
                         _insert(c, table, row)
                 except IntegrityError:
@@ -181,7 +203,8 @@ def otb_restore_route(tid):
     write_lock(c, f"office_trash_{int(tid)}")
     _need_kind(c, uid, oid, tid)
     t0 = c.execute("SELECT deleted_at FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
-    kind, ref = otb_restore(c, oid, tid)
+    notes = {}
+    kind, ref = otb_restore(c, oid, tid, notes)
     if kind in ("trip", "trip_item"):  # 2.530.0 C (#4315, B17): a trip / travel receipt only into open months
         from .travel import rk_trash_check
         rk_trash_check(c, oid, kind, ref)
@@ -197,7 +220,10 @@ def otb_restore_route(tid):
     ofx_log(c, oid, "restore", **({"doc_id": ref} if kind == "doc" else {"target": kind}), detail={"id": ref})
     bump(c)
     c.commit()
-    return jsonify(ok=True, kind=kind, id=ref)
+    out = {"gone": notes["gone"]} if notes.get("gone") else {}
+    if "client_id" in out.get("gone", ()):  # 2.552.0 (#4561 B19): the app shows this sentence
+        out["note"] = tr("Restored without a client: the client was deleted for good meanwhile.")
+    return jsonify(ok=True, kind=kind, id=ref, **out)
 
 
 @app.delete("/api/office/trash/<int:tid>")
