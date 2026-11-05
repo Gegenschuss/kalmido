@@ -98,7 +98,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ready(ev, `${getJ('/api/office/trips?year=2025')}.then(j => j.trips.filter(t => t.dest === 'Kiel').length === 2 && j.trips.filter(t => t.dest === 'Kiel').some(t => !t.items.length))`), 'Duplicate: a copy without receipts');
     check(await ready(ev, `!!document.querySelector('.rkhead') && /Kiel/.test(document.querySelector('.rkhead').textContent)`), 'the copy opens');
     await ev(clk('[data-rk="back"]'));
-    await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 4`);
+    // 2.559.0 (#4660): the copy is a provisional row (negative id) until the answer: wait for the real ids
+    await ready(ev, `document.querySelectorAll('.rklist .ofcrow').length === 4 && [...document.querySelectorAll('.rklist .ofcrow')].every(b => +b.dataset.id > 0)`);
     await ev(`(() => { [...document.querySelectorAll('.rklist li')].find(l => /Kiel/.test(l.textContent) && !/30/.test(l.textContent)).querySelector('[data-rk="rowmore"]').click(); return 1; })()`);
     await ready(ev, `!!document.querySelector('#pop .menu-list button.danger')`);
     await ev(clk('#pop .menu-list button.danger'));

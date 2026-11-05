@@ -7,6 +7,47 @@ const RK = {data: null, loading: false, err: null, year: String(new Date().getFu
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['travel', 'plane', N_('Travel expenses'), 1, () => rk_travelHtml(), 'money', 'money.travel']);  // admins only; 2.380 F (#3411): [6] the switch
 const RK_BY = [['month', N_('Month')], ['year', N_('Year')], ['person', N_('Person')], ['project', N_('Project')], ['client', N_('Client')], ['category', N_('Category')], ['purpose', N_('Purpose')]];  // 2.117.0 A (#2292): + purpose
 const rk_reload = () => { RK.data = null; RK.rep = null; RK.gen++; ofcDraw(); };  // CI of the train: gen = a load running during a reload is fetched again
+// 2.559.0 (#4660): trips, receipts and the tick "in DATEV" show at once (optWrite): the list changes locally, the request runs
+// behind it, a refusal puts the old state back (api() says why). The server's trip from the answer replaces the local one
+// (sums, per diem); the list itself (badge "not in DATEV", evaluation) is fetched again in the background, the rows stay
+// until the fresh ones are there. A new trip / receipt is a provisional row with a negative id until the answer.
+const rk_refresh = () => { RK.rep = null; RK.gen++; if (RK.data) rk_load(); };
+const rk_wait = id => { if (+id >= 0) return false; toast(tr('Still syncing, try again in a moment')); return true; };  // a provisional row
+function rk_tripSet(t, was = t?.id) {  // the server's trip in place of the local one (was: its provisional id)
+  const ts = RK.data?.trips; if (!ts || !t) return;
+  const k = ts.findIndex(x => x.id === was || x.id === t.id);
+  if (k >= 0) ts[k] = {...ts[k], ...t}; else ts.unshift(t);
+  if (RK.open === was) RK.open = t.id;
+}
+// the people of a body ({id} | {name}) with their names, as the server stores them
+const rk_pplLocal = ps => (ps || []).map(p => p.id ? {id: p.id, name: (RK.data?.people || []).find(x => x.id === p.id)?.name || ''} : p);
+function rk_itemLocal(b) {  // a receipt body -> the fields the list shows (amount in the office currency: by the rate)
+  const a = +b.amount || 0, fx = +b.fx_rate || 0, home = !b.currency || b.currency === rk_home();
+  return {...b, amount: a.toFixed(2), amount_home: (home || !fx ? a : a / fx).toFixed(2), datev: b.datev ?? 0};
+}
+// put for the receipts of trip tid: fn(items) changes them; the trip's sum and count "not in DATEV" (and the badge) follow.
+// Idempotent: fn must find its row by id (insert only when missing, remove by filter).
+const rk_itemsPut = (tid, fn) => () => {
+  const t = rk_trip(tid); if (!t) return null;
+  const was = {items: t.items, total: t.total, missing: t.missing}, gm = RK.data.missing;
+  t.items = fn((t.items || []).map(i => ({...i})));
+  const miss = t.items.filter(i => !i.datev).length;
+  t.total = t.items.reduce((s, i) => s + (+i.amount_home || 0), 0).toFixed(2);
+  RK.data.missing = (gm || 0) + miss - (was.missing || 0); t.missing = miss;
+  return () => { const x = rk_trip(tid); if (x) Object.assign(x, was); if (RK.data) RK.data.missing = gm; };
+};
+// put that takes trip id out of the list (idempotent), back puts it where it was
+const rk_tripOut = id => () => {
+  const ts = RK.data?.trips, k = ts ? ts.findIndex(x => x.id === id) : -1; if (k < 0) return null;
+  const [o] = ts.splice(k, 1), open = RK.open === id; if (open) RK.open = null;
+  if (RK.data) RK.data.missing = (RK.data.missing || 0) - (o.missing || 0);
+  return () => { if (!RK.data) return; if (!rk_trip(id)) RK.data.trips.splice(Math.min(k, RK.data.trips.length), 0, o); RK.data.missing = (RK.data.missing || 0) + (o.missing || 0); if (open) RK.open = id; };
+};
+async function rk_tripDel(t) {  // after the question: gone at once, the undo after the answer
+  let j; try { j = await optWrite(rk_tripOut(t.id), () => api('DELETE', `/api/office/trips/${t.id}`), ofcDraw); } catch { return; }
+  rk_refresh();
+  toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_refresh(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
+}
 const rk_cat = k => (RK.data?.categories || []).find(c => c.key === k)?.label || k;
 const rk_home = () => RK.data?.currency || ofcCur();
 const rk_amt = (n, cur) => !cur || cur === rk_home() ? ofcMoney(n) : `${fmtNum(+n, 2)} ${esc(cur)}`;
@@ -31,10 +72,15 @@ const rk_purpose = t => [t.purpose === 'acquisition' ? tr('Acquisition / researc
 async function rk_load() {
   if (RK.loading) return;
   RK.loading = true; const gen = RK.gen;
-  try { RK.data = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); RK.err = null; if (RK.person && rk_persons().length < 2) RK.person = ''; }
-  catch (x) { RK.data = null; RK.err = x.message || tr('unknown'); }
+  let j = null, err = null;
+  try { j = await api('GET', '/api/office/trips' + (RK.year ? `?year=${RK.year}` : '')); } catch (x) { err = x.message || tr('unknown'); }
   RK.loading = false;
-  if (gen !== RK.gen) { RK.data = null; return rk_load(); }  // its answer can predate the change (approve right after save: the list stayed a draft)
+  // its answer can predate the change (approve right after save: the list stayed a draft); 2.559.0 (#4660): it is dropped
+  // and the rows on screen stay until the fresh answer is there
+  if (gen !== RK.gen) return rk_load();
+  if (err && RK.data) { ofcDraw(); return; }  // 2.559.0 (#4660): a failed background reload keeps the rows (api() said why)
+  RK.data = j; RK.err = err; if (j && RK.person && rk_persons().length < 2) RK.person = '';
+  if (j) for (const p of OPT) p.put();  // 2.559.0 (#4660): own changes still on the way stay on top of the fresh list
   ofcDraw();
 }
 async function rk_loadReport() {
@@ -109,7 +155,7 @@ function rk_reportHtml() {
 // 2.117.0 A (#2287): the arrow of a trip row opens the row menu (like the quotations); a tap on the row still opens the trip
 const rk_rowBtn = t => `<button type="button" class="iconbtn ofdrmore rkmore" data-rk="rowmore" data-id="${t.id}" aria-haspopup="menu" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('chev', 's')}</button>`;
 function rk_rowMenu(id, anchor) {
-  const t = rk_trip(+id); if (!t) return;
+  const t = rk_trip(+id); if (!t || rk_wait(id)) return;
   const label = t.dest || rk_span(t), adm = ofcAdmin(), can = adm && !t.own_ro;  // 2.187.1 B (#2735): own_ro = read only
   menu(anchor, [
     {label: tr('Open'), icon: 'eye', fn: () => { RK.open = t.id; RK.sel.clear(); ofcDraw(); }},
@@ -120,19 +166,18 @@ function rk_rowMenu(id, anchor) {
     can ? '-' : null,
     can ? {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
       if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', label), '', {ok: tr('Delete'), danger: true})) return;
-      try {
-        const j = await api('DELETE', `/api/office/trips/${t.id}`); rk_reload();
-        toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
-      } catch (x) { toast(x.message || tr('unknown')); }
+      rk_tripDel(t);  // 2.559.0 (#4660): gone at once
     }} : null]);
 }
 async function rk_dup(t) {  // a new trip with the same data, without the receipts; opens it
   const keys = ['date_from', 'date_to', 'dest', 'overnight', 'people', 'purpose', 'client_id', 'project', 'km', 'note', 'country', 'place', 't_start', 't_end', 'vma_days', 'vma_off'];
-  try {
-    const j = await api('POST', '/api/office/trips', Object.fromEntries(keys.map(k => [k, t[k]])));
-    RK.open = j.id; RK.sel.clear(); rk_reload();
-    toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
-  } catch (x) { toast(x.message || tr('unknown')); }
+  const body = Object.fromEntries(keys.map(k => [k, t[k]])), tmp = -Date.now();
+  // 2.559.0 (#4660): the copy shows at once (provisional, opened), the answer's trip replaces it, a refusal takes it away
+  const put = () => { if (!RK.data) return null; if (!rk_trip(tmp)) RK.data.trips.unshift({...t, id: tmp, items: [], total: '0.00', missing: 0, unbilled: 0, own_ro: 0}); return () => { if (RK.data) RK.data.trips = RK.data.trips.filter(x => x.id !== tmp); if (RK.open === tmp) RK.open = null; }; };
+  RK.open = tmp; RK.sel.clear();
+  let j; try { j = await optWrite(put, () => api('POST', '/api/office/trips', body), ofcDraw); } catch { return; }
+  rk_tripSet(j, tmp); rk_refresh();
+  toast(tr('Copy created'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); if (RK.open === j.id) RK.open = null; rk_refresh(); });
 }
 // 2.451.0 (#3834): on a phone the arrow is hidden (office.css), a long press opens the menu like on the quotations
 const rk_lp = ms_longPress('.rklist .ofcrow[data-rk="open"]', () => false, r => rk_rowMenu(r.dataset.id, r));
@@ -253,22 +298,31 @@ function rk_tripModal(t) {
       if (b.dataset.m === 'move') { md.remove(); ofm_move({what: 'travel', ids: [t.id], from: ofm_officeFrom(), label: qn(t.dest || rk_span(t)), after: async () => { RK.open = null; rk_reload(); }}); return; }  // 2.97.0 C (#2049)
       if (b.dataset.m === 'del') {
         if (!await askConfirm(tr('Delete the trip “{0}” with its receipts?', t.dest || rk_span(t)), '', {ok: tr('Delete'), danger: true})) return;
-        const j = await api('DELETE', `/api/office/trips/${t.id}`); md.remove(); RK.open = null; rk_reload();
-        toast(tr('Deleted'), async () => { const r = await (j.trash_id ? api('POST', `/api/office/trips/trash/${j.trash_id}/restore`) : api('POST', '/api/office/trips', j.trip)); rk_reload(); if (r?.restore_note) toast(r.restore_note); });  // 2.530.0 C (#4315): from the office trash; 2.560.0 (#4667): the sentence when its client is gone for good
+        md.remove(); RK.open = null; rk_tripDel(t);  // 2.559.0 (#4660): gone at once
         return;
       }
       const v = id => $(id, md)?.value ?? '';
       const people = [...$$('[data-pid]', md).filter(x => x.checked).map(x => ({id: +x.dataset.pid})), ...v('#rk-free').split(',').map(s => s.trim()).filter(Boolean).map(name => ({name}))];
       const body = {date_from: v('#rk-from'), date_to: v('#rk-to'), dest: v('#rk-dest'), overnight: $('#rk-over', md).checked ? 1 : 0, people, purpose: await rk_purposeVal(md),
         client_id: +v('#rk-client') || null, project: ofcProjVal(md, 'rk-project'), km: ofcNum(v('#rk-km')), note: v('#rk-note'), ...rk_vmaDlgBody(md)};
+      // 2.559.0 (#4660): the dialog closes at once, the trip shows the new values (a new one: a provisional row, opened);
+      // the answer's trip replaces it (sums, per diem), a refusal puts the trip before back (api() says why)
+      const loc = {...body, people: rk_pplLocal(body.people), km: body.km == null ? null : String(body.km)};
+      md.remove();
       if (t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
           country: t.country, place: t.place, t_start: t.t_start, t_end: t.t_end, vma_days: t.vma_days, vma_off: t.vma_off};  // 2.95.0 A (#1932)
-        const now = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)); md.remove(); rk_reload();  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409, never overwritten
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}`, ofcVerUndo(old, body, now)); rk_reload(); });  // only the keys this save changed
+        // 2.560.0 D (#4700) kept: the save checks the version (409 = saved elsewhere meanwhile: row back, the saved one opens)
+        let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)), ofcDraw); } catch (x) { ofcVerLate(x, t.updated_at, row => { rk_reload(); rk_tripModal(row); }); return; }
+        rk_tripSet(j); rk_refresh();
+        toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}`, ofcVerUndo(old, body, j))); rk_refresh(); });  // only the keys this save changed
       } else {
-        const j = await api('POST', '/api/office/trips', body); md.remove(); RK.open = j.id; rk_reload();
-        toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); RK.open = null; rk_reload(); });
+        const tmp = -Date.now();
+        const put = () => { if (!RK.data) return null; if (!rk_trip(tmp)) RK.data.trips.unshift({...loc, id: tmp, items: [], total: '0.00', missing: 0, unbilled: 0}); return () => { if (RK.data) RK.data.trips = RK.data.trips.filter(x => x.id !== tmp); if (RK.open === tmp) RK.open = null; }; };
+        RK.open = tmp;
+        let j; try { j = await optWrite(put, () => api('POST', '/api/office/trips', body), ofcDraw); } catch { return; }
+        rk_tripSet(j, tmp); rk_refresh();
+        toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); if (RK.open === j.id) RK.open = null; rk_refresh(); });
       }
     } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_tripModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
@@ -301,29 +355,40 @@ function rk_itemModal(t, i) {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { close(); return; }
     try {
-      if (b.dataset.m === 'del') {
-        const j = await api('DELETE', `/api/office/trips/${t.id}/items/${i.id}`); md.remove(); rk_reload();
-        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_reload(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no, vat_pct: o.vat_pct ?? null}); rk_reload(); });
+      if (b.dataset.m === 'del') {  // 2.559.0 (#4660): gone at once, a refusal brings it back
+        md.remove();
+        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.filter(x => x.id !== i.id)), () => api('DELETE', `/api/office/trips/${t.id}/items/${i.id}`), ofcDraw); } catch { return; }
+        rk_tripSet(j.trip); rk_refresh();
+        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trips/trash/${j.trash_id}/restore`); rk_refresh(); return; } await api('POST', `/api/office/trips/${t.id}/items`, {date: o.date, category: o.category, amount: o.amount, currency: o.currency, fx_rate: o.fx_rate, amount_home: o.amount_home, text: o.text, datev: o.datev, datev_no: o.datev_no, vat_pct: o.vat_pct ?? null}); rk_refresh(); });
         return;
       }
       const v = id => $(id, md)?.value ?? '';
       const c = v('#rk-cur').trim().toUpperCase() || home;
       const body = {date: v('#rk-date'), category: v('#rk-cat'), amount: ofcNum(v('#rk-amt')), currency: c, text: v('#rk-text'), vat_pct: v('#rk-vat') || null, ...($('#rk-datev', md) ? {datev: $('#rk-datev', md).checked ? 1 : 0, datev_no: v('#rk-dno')} : {})};  // 2.147.0 (#2460): DATEV off = its marks stay as saved
       if (c !== home) body.fx_rate = ofcNum(v('#rk-fx'), true);
+      // 2.559.0 (#4660): the dialog closes at once, the receipt shows (a new one: provisional, negative id); the answer's
+      // trip replaces the local one (amount in the office currency, sum), a refusal puts the receipts before back
+      const loc = rk_itemLocal({datev: i?.datev ?? 0, ...body, currency: c});
+      md.remove();
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no, vat_pct: i.vat_pct ?? null};  // 2.545.0 (#4387): + VAT rate
-        const now = (await (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i))).items?.find(x => x.id === i.id); md.remove(); rk_reload();  // 2.560.0 D (#4700)
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerUndo(old, body, now)); rk_reload(); });  // only the keys this save changed
+        // 2.560.0 D (#4700) kept: the save checks the version (409: row back, the saved receipt opens)
+        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i)), ofcDraw); } catch (x) { ofcVerLate(x, i.updated_at, row => { rk_reload(); rk_itemModal(t, row); }); return; }
+        rk_tripSet(j); rk_refresh();
+        const now = j?.items?.find(x => x.id === i.id);
+        toast(tr('Saved'), async () => { rk_tripSet(await api('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerUndo(old, body, now))); rk_refresh(); });  // only the keys this save changed
       } else {
-        const j = await api('POST', `/api/office/trips/${t.id}/items`, body); md.remove(); rk_reload();
-        toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${t.id}/items/${j.item_id}`); rk_reload(); });
+        const tmp = -Date.now();
+        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.some(x => x.id === tmp) ? its : [...its, {...loc, id: tmp, trip_id: t.id, billed: null}]), () => api('POST', `/api/office/trips/${t.id}/items`, body), ofcDraw); } catch { return; }
+        rk_tripSet(j); rk_refresh();
+        toast(tr('Added'), async () => { rk_tripSet(await api('DELETE', `/api/office/trips/${t.id}/items/${j.item_id}`).then(x => x.trip)); rk_refresh(); });
       }
     } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_itemModal(t, row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
   });
   return md;
 }
 async function rk_billModal(t) {
-  const ids = t.items.filter(i => RK.sel.has(i.id) && !i.billed).map(i => i.id); if (!ids.length) return;
+  const ids = t.items.filter(i => RK.sel.has(i.id) && !i.billed && i.id > 0).map(i => i.id); if (!ids.length) return;  // 2.559.0 (#4660): not the provisional ones
   let docs = [];
   try { docs = (await api('GET', `/api/office/trips/bill-docs${t.client_id ? `?client_id=${t.client_id}` : ''}`)).docs || []; } catch (x) { toast(x.message || ''); return; }
   const kind = d => d.kind === 'invoice' ? tr('Invoice') : tr('Quotation');
@@ -355,9 +420,9 @@ document.addEventListener('click', e => {
   else if (a === 'open') { RK.open = +b.dataset.id; RK.sel.clear(); ofcDraw(); }
   else if (a === 'rowmore') rk_rowMenu(b.dataset.id, b);  // 2.117.0 A (#2287)
   else if (a === 'back') { RK.open = null; RK.sel.clear(); ofcDraw(); }
-  else if (a === 'edit' && t) rk_tripModal(t);
-  else if (a === 'add' && t) rk_itemModal(t, null);
-  else if (a === 'item' && t) { const i = t.items.find(x => x.id === +b.dataset.id); if (i) rk_itemModal(t, i); }
+  else if (a === 'edit' && t) { if (!rk_wait(t.id)) rk_tripModal(t); }  // 2.559.0 (#4660): not on a provisional trip / receipt
+  else if (a === 'add' && t) { if (!rk_wait(t.id)) rk_itemModal(t, null); }
+  else if (a === 'item' && t) { const i = t.items.find(x => x.id === +b.dataset.id); if (i && !rk_wait(i.id)) rk_itemModal(t, i); }
   else if (a === 'bill' && t) rk_billModal(t);
   else if (a === 'close') { RK.sel.clear(); ofcDraw(); }  // 2.428.0 A (#3581)
   else if (a === 'all' && t) { const op = t.items.filter(i => !i.billed), on = op.every(i => RK.sel.has(i.id)); RK.sel.clear(); if (!on) op.forEach(i => RK.sel.add(i.id)); ofcDraw(); }
@@ -375,10 +440,12 @@ document.addEventListener('change', async e => {
   if (x.dataset?.rk === 'sel') { if (x.checked) RK.sel.add(+x.dataset.id); else RK.sel.delete(+x.dataset.id); ofcDraw(); return; }
   if (x.dataset?.rk !== 'datev' || !RK.open) return;
   const tid = RK.open, iid = +x.dataset.id, on = x.checked ? 1 : 0;
-  try {
-    await api('PATCH', `/api/office/trips/${tid}/items/${iid}`, {datev: on}); rk_reload();
-    toast(on ? tr('Ticked as in DATEV') : tr('Tick removed'), async () => { await api('PATCH', `/api/office/trips/${tid}/items/${iid}`, {datev: on ? 0 : 1}); rk_reload(); });
-  } catch (y) { x.checked = !on; toast(y.message || ''); }
+  if (rk_wait(iid)) { x.checked = !on; return; }
+  // 2.559.0 (#4660): the tick, the count "not in DATEV" and the badge show at once; a refusal unticks it (api() says why)
+  const tick = v => rk_itemsPut(tid, its => its.map(i => i.id === iid ? {...i, datev: v} : i));
+  let j; try { j = await optWrite(tick(on), () => api('PATCH', `/api/office/trips/${tid}/items/${iid}`, {datev: on}), ofcDraw); } catch { return; }
+  rk_tripSet(j); rk_refresh();
+  toast(on ? tr('Ticked as in DATEV') : tr('Tick removed'), async () => { rk_tripSet(await optWrite(tick(on ? 0 : 1), () => api('PATCH', `/api/office/trips/${tid}/items/${iid}`, {datev: on ? 0 : 1}), ofcDraw)); rk_refresh(); });
 });
 
 // ---- 2.95.0 A (#1932): the per diem (Verpflegungsmehraufwand) of a trip and its report (part A fills this block; server
@@ -554,7 +621,7 @@ function rk_vmaRepHtml() {  // the evaluation: per diem per person of the year (
 }
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-rkv="days"]'); if (!b) return;
-  const t = rk_trip(+b.dataset.id); if (t) { e.preventDefault(); rk_vmaDaysModal(t); }
+  const t = rk_trip(+b.dataset.id); if (t) { e.preventDefault(); if (!rk_wait(t.id)) rk_vmaDaysModal(t); }  // 2.559.0 (#4660): not on a provisional trip
 });
 document.addEventListener('toggle', e => {
   const d = e.target; if (d?.dataset?.rkv !== 'person') return;
@@ -652,6 +719,12 @@ function ofcVerUndo(old, body, now) {
   const b = {};
   for (const k of Object.keys(old)) if (k in body && JSON.stringify(old[k] ?? null) !== JSON.stringify(body[k] ?? null)) b[k] = old[k];
   return ofcVerBody(b, now);
+}
+// 2.559.0 (#4660): the same 409 after a dialog that closed at once (the change is taken back already): say so and open the
+// saved version; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast
+function ofcVerLate(x, ver, reopen) {
+  if (x?.status === 409 && x.data?.row) { toast(tr('Changed in the meantime')); reopen(x.data.row); }
+  else if (ver && x?.message) toast(x.message);
 }
 // a 409 of such a save: the dialog's error line says so with "Reload" (reopen: the dialog with the saved state); -> handled
 function ofcVerConflict(md, x, reopen) {

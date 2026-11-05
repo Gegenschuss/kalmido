@@ -64,7 +64,8 @@ const today = TC.today();
     check(await ready(ev, `!!document.querySelector('.modal #rk-amt')`), '#1022: the receipt dialog');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#rk-cat').value = 'taxi'; m.querySelector('#rk-amt').value = '18,50'; m.querySelector('#rk-text').value = 'Taxi Bahnhof'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.rkits .rkit').length === 3`), '#1022: the new receipt is in the list');
-    check(await ev(`fetch('/api/office/trips', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.trips[0].total === '368.40' && j.trips[0].items.some(i => i.category === 'taxi' && i.amount === '18.50'))`),
+    // 2.559.0 (#4660): the receipt shows before the answer: wait for the server
+    check(await ready(ev, `fetch('/api/office/trips', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.trips[0].total === '368.40' && j.trips[0].items.some(i => i.category === 'taxi' && i.amount === '18.50'))`),
       '#1022: saved with category and amount (comma accepted)');
     // phone width
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
