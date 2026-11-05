@@ -10,6 +10,7 @@ from ..accounts.session import me
 from ..core.access import Denied, dlg_gone, my_max_sort, need_collab, need_list, qn_private, ROLES, task_visible
 from ..lists.lists import clean_folder, folder_under
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
+from ..accounts.orgroles import org_role_key  # 2.568.0 (#4739)
 from ..lists.lists import _in_folder, member_folder_adopt  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -83,6 +84,15 @@ def grp_shares_of_lists(c, rows):
     return out, names
 
 
+def grp_org_limited(c, org_id, uid):
+    """2.568.0 (#4739, audit A-F10): a group's share never gives a guest / an accounting person of the list's organisation a
+    role there (accounts/orgroles.py: they see in the organisation only what is shared with them personally); a private list
+    (org_id None) keeps the group's share. Used by grp_sync (group_shares) and lffolder.lf_want (a group's folder share)."""
+    if not org_id:
+        return False
+    return org_role_key(c, uid, org_id) in ("guest", "accounting")
+
+
 def grp_list_ids(c, gid=None, owner=None):
     """Lists touched by the shares of group gid (or by the folder shares of owner): the ones grp_sync must look at."""
     ids = set()
@@ -122,7 +132,7 @@ def grp_sync(c, lids, actor=None):
     agents = agent_ids(c)
     kids = {r[0] for r in c.execute("SELECT id FROM users WHERE kid=1")}
     for lid in sorted({int(x) for x in lids if x}):
-        lr = c.execute("SELECT id, owner_id, name, is_inbox, e2e FROM lists WHERE id=?", (lid,)).fetchone()
+        lr = c.execute("SELECT id, owner_id, org_id, name, is_inbox, e2e FROM lists WHERE id=?", (lid,)).fetchone()
         if not lr:
             continue
         want, gname = {}, {}
@@ -131,6 +141,8 @@ def grp_sync(c, lids, actor=None):
             for gid, role, _via in grp_shares_of_list(c, lid):
                 for uid in grp_members(c, gid):
                     if uid == lr["owner_id"] or uid in agents or ws_member_problem(c, lid, uid):  # 2.28.0 (#935): of the list's workspace only
+                        continue
+                    if grp_org_limited(c, lr["org_id"], uid):  # 2.568.0 (#4739, A-F10): a guest / accounting person: no role via a group
                         continue
                     if role_max(want.get(uid), role) != want.get(uid):
                         want[uid], gname[uid] = role_max(want.get(uid), role), gid

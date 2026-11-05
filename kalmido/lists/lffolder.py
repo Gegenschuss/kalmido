@@ -58,7 +58,7 @@ from ..accounts.session import me
 from ..files import store as fs_store
 from ..files.fsref import fs_ref_may_file, fs_ref_need_move, fs_ref_node, fs_ref_node_role, fs_ref_register, fs_ref_role
 from ..files.fsroots import fs_area_root, fs_area_root_of, fs_area_rule
-from .groups import grp_sync
+from .groups import grp_org_limited, grp_sync
 from .sections import folder_rename_do
 from ..files.store import DEPTH_MAX, _now, fs_chain, fs_deleted, fs_height, fs_log_add, fs_role, safe_fs_name
 
@@ -385,7 +385,8 @@ def lf_want(c, lid, lr=None):
             role = s["list_role"] if s["list_role"] in LIST_ROLES else ("edit" if s["role"] == "edit" else "view")
             who = [s["user_id"]] if s["user_id"] else [s["agent_id"]] if s["agent_id"] else \
                 [r[0] for r in c.execute("""SELECT m.user_id FROM group_members m JOIN users u ON u.id=m.user_id
-                                            WHERE m.group_id=? AND u.kind!='agent'""", (s["group_id"],))]
+                                            WHERE m.group_id=? AND u.kind!='agent'""", (s["group_id"],))
+                 if not grp_org_limited(c, lr["org_id"], r[0])]  # 2.568.0 (#4739, A-F10): no guest / accounting via a group
             for u in who:
                 if u and u != lr["owner_id"]:
                     cand[u] = _rmax(cand.get(u), role)
