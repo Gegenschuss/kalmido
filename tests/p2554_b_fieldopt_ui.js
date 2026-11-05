@@ -122,6 +122,26 @@ const lastModal = d => [...d.querySelectorAll('.modal')].pop();
   const FB2 = (await fieldsOnServer(CA, L)).find(f => f.name === 'Budget 2026')?.id;
   check(await until(async () => (await call(CA, 'GET', `/api/tasks/${T}`)).fields?.[FB2] === 'B-17'), 'with the value of the task');
   check(await until(() => d.querySelector(`#tc-${T} .lc[data-k="f:${FB2}"]`)), 'and its column again');
+
+  // ================= "Show in the task rows" in the list dialog on a field still on its way waits for its real id
+  hold(w, /^POST \/api\/lists\/\d+\/fields$/);
+  w.eval(`fieldModal(${L}, null, () => {})`);
+  await until(() => d.querySelector('#fd-name'));
+  d.querySelector('#fd-name').value = 'Pinme';
+  lastModal(d).querySelector('[data-m="save"]').click();
+  check(await until(() => w.__held.length === 1), 'the pin field request is held');
+  const tmp3 = w.eval(`(S.fields.find(f => f.name === 'Pinme') || {}).id`);
+  w.eval(`listModal(${L})`);
+  const pinB = await until(() => d.querySelector(`.lmodal [data-fpin="${tmp3}"]`));
+  check(!!pinB && tmp3 < 0, 'the list dialog shows the new field with its pin button');
+  w.__sent = []; const f2 = w.fetch; w.fetch = (u, o = {}) => { w.__sent.push(`${o.method || 'GET'} ${u}`); return f2(u, o); };
+  pinB?.click();
+  await sleep(0);  // nothing to wait for: the click must not send anything while the answer is held
+  check(!w.__sent.some(s => /\/api\/fields\/-/.test(s)), 'no request with the stand-in id: ' + w.__sent.join(' | '));
+  w.__held[0].go();
+  check(await until(async () => (await fieldsOnServer(CA, L)).some(f => f.name === 'Pinme' && f.pinned)), 'after the answer the pin reaches the server under the real id');
+  w.fetch = f2; unhold(w);
+  lastModal(d)?.remove();
   w.close();
 
   // ================= a person without an organisation: the same at once

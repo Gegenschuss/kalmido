@@ -1186,6 +1186,11 @@ function listModal(id, folder = '', o = {}) {
     const b = e.target.closest('button'); if (!b) return;
     if (b.dataset.m === 'field-add') { fieldModal(id, null, drawFields); return; }  // 2.39.1 (#1217): no project needed any more
     if (b.dataset.fedit) { fieldModal(id, fieldById(+b.dataset.fedit), drawFields); return; }
+    // 2.554.0 (#4658): a new field still on its way (stand-in id below 0): pin / order wait for the real ids, a stand-in never goes to the server
+    if ((b.dataset.fpin || b.dataset.fup) && typeof fdReal === 'function' && fieldsOf(id).some(f => f.id < 0)) {
+      for (const k of ['fpin', 'fup']) if (+b.dataset[k] < 0) { const r = await fdReal(+b.dataset[k]); if (!r) return; b.dataset[k] = r; }
+      await Promise.all(fieldsOf(id).filter(f => f.id < 0).map(f => fdReal(f.id)));
+    }
     if (b.dataset.fpin) {
       const f = fieldById(+b.dataset.fpin);
       // 2.41.2 (#1501): pinned / order at once (optimistic), no GET /api/state afterwards
