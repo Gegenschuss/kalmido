@@ -63,10 +63,11 @@ def route(s, who, name, url, first, second, method="PATCH", same=None):
     check(t1 and t1 != t0, p + f"the answer brings the new updated_at {t0} -> {t1}")
     # device A, opened before: its expect is old -> 409 with the current state, nothing written
     r = s.request(method, B + url, json={**second, "expect_updated_at": t0})
-    check(r.status_code == 409 and isinstance(r.json().get("row"), dict) and r.json()["row"].get("updated_at") == t1,
+    cur = (r.json().get("current") or r.json().get("row")) if r.status_code == 409 else None  # 2.567.0 (#4711): "current" of the core's write layer, "row" of the older routes
+    check(r.status_code == 409 and isinstance(cur, dict) and cur.get("updated_at") == t1,
           p + f"an old expect_updated_at: 409 with the current row {r.status_code} {r.text[:200]}")
     if r.status_code == 409 and same:
-        check(same(r.json()["row"]), p + f"the 409 shows device B's change {r.json()['row']}")
+        check(same(cur), p + f"the 409 shows device B's change {cur}")
     # after "Reload": the fresh version -> 200, and the next save with the answer's version passes too (the own autosave)
     r = s.request(method, B + url, json={**second, "expect_updated_at": t1})
     check(r.ok, p + f"the fresh expect_updated_at: 200 {r.status_code} {r.text[:200]}")

@@ -129,9 +129,9 @@ function aboModal(f) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
         el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-abo-reload>${tr('Reload')}</button>`;
-        $('[data-abo-reload]', el).addEventListener('click', () => { md.remove(); aboReload(); aboModal(x.data.row); });
+        $('[data-abo-reload]', el).addEventListener('click', () => { md.remove(); aboReload(); aboModal(x.data.current || x.data.row); });
         return;
       }
       el.textContent = x.message || '';

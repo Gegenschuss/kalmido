@@ -21,7 +21,6 @@ from flask import jsonify, request
 
 from ..core.config import app
 from ..core.pg import insert_id, write_lock
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
@@ -45,10 +44,13 @@ from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from .otrash import OTB_UNDO, otb_put  # noqa: E402  2.567.0 (#4707): a deleted fixed cost goes into the office trash
 
 RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash
 OTB_UNDO[RK_FIXED_TRASH] = _ctx  # the toast's undo: the office admin, as deleting it
+
+ow_kind("office_fixed_cost", "office_fixed_costs")
 
 
 def _j(s):
@@ -213,20 +215,16 @@ def _fixed_row(c, oid, fid):
 
 @app.patch("/api/office/fixed-costs/<int:fid>")
 def rk_fixed_patch(fid):
+    """2.567.0 D (#4711): through office/owrite.py ow_write -- lock, version (expect_updated_at; 409 with the entry under
+    "current"), only the fields sent (also the subscription fields of office/subs.py), history, updated_by, bump."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_fixed_costs-{int(fid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
-    cur = _fixed_public(c, oid, _fixed_row(c, oid, fid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, cur.get("updated_at"), "row", lambda: cur)
-    row = rk_fixed_clean(b, cur, c=c, oid=oid)  # 2.91.0 B (#1924)
-    if row:
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_fixed_costs", row)
-        c.execute(f"UPDATE office_fixed_costs SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [fid, oid])
-        bump(c)
-        c.commit()
+    ow_write(c, uid, "office_fixed_cost", fid, b, lambda c, b, cur: rk_fixed_clean(b, cur, c=c, oid=oid), oid=oid,  # 2.91.0 B (#1924)
+             dec=lambda c, r: oc_dec_fields(c, oid, "office_fixed_costs", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_fixed_costs", v),
+             public=lambda c, cur: _fixed_public(c, oid, _fixed_row(c, oid, fid)))
+    c.commit()
     return jsonify(_fixed_public(c, oid, _fixed_row(c, oid, fid)))
 
 

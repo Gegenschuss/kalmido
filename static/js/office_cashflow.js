@@ -154,9 +154,9 @@ function rk_fixedModal(f) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
         el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cf-reload>${tr('Reload')}</button>`;
-        $('[data-cf-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); rk_fixedModal(x.data.row); });
+        $('[data-cf-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); rk_fixedModal(x.data.current || x.data.row); });
         return;
       }
       el.textContent = x.message || '';
@@ -328,9 +328,9 @@ function cfs_modal(a, mo) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
         el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cfs-reload>${tr('Reload')}</button>`;
-        $('[data-cfs-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); cfs_modal(x.data.row); });
+        $('[data-cfs-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); cfs_modal(x.data.current || x.data.row); });
         return;
       }
       el.textContent = x.message || '';

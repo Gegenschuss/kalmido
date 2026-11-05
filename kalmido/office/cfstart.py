@@ -23,7 +23,6 @@ from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
@@ -33,6 +32,9 @@ from .otrash import OTB_UNDO, otb_put  # 2.567.0 (#4707): the start balance and 
 CFS_TRASH_START, CFS_TRASH_ADJ = "cf_start", "cf_adjust"  # 2.567.0 (#4707): their kinds in the office trash
 OTB_UNDO[CFS_TRASH_START] = OTB_UNDO[CFS_TRASH_ADJ] = _ctx  # the toast's undo: the office admin, as deleting them
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the corrections save through the core's write layer
+
+ow_kind("office_cf_adjust", "office_cf_adjust")
 
 CFS_DIRS = ("in", "out")
 CFS_MAX_MONTH = 50  # corrections per month
@@ -175,20 +177,15 @@ def cfs_adjust_post():
 
 @app.patch("/api/office/cashflow/adjust/<int:aid>")
 def cfs_adjust_patch(aid):
+    """2.567.0 D (#4711): through ow_write (409 with the correction under "current", only the fields sent, history)."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_cf_adjust-{int(aid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
-    old = _adj_public(c, oid, _adj_row(c, oid, aid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, old.get("updated_at"), "row", lambda: old)
-    row = _adj_clean(b, old)
-    if row:
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_cf_adjust", row)
-        c.execute(f"UPDATE office_cf_adjust SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [aid, oid])
-        bump(c)
-        c.commit()
+    ow_write(c, uid, "office_cf_adjust", aid, b, lambda c, b, cur: _adj_clean(b, cur), oid=oid,
+             dec=lambda c, r: oc_dec_fields(c, oid, "office_cf_adjust", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_cf_adjust", v),
+             public=lambda c, cur: _adj_public(c, oid, _adj_row(c, oid, aid)))
+    c.commit()
     return jsonify(_adj_public(c, oid, _adj_row(c, oid, aid)))
 
 
