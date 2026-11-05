@@ -26,7 +26,7 @@ from .letterlinks import ltl_link, ltl_prefill, LTL_KINDS  # 2.369.5 (#2517): pu
 LTA_EVENT = "letter_draft_requested"
 LTA_FIELDS = ("client_id", "rcpt_name", "rcpt_address", "rcpt_email", "letter_date", "subject", "body", "ref_line", "greeting", "lang")
 LTA_IN = LTA_FIELDS + ("answers", "notify")
-LTA_PATCH = LTA_FIELDS + ("notify",)
+LTA_PATCH = LTA_FIELDS + ("notify", "expect_updated_at")  # 2.567.0 (#4711): the version is required (the updated_at read)
 LTA_NOTE_MAX = 1000
 LTA_ADMIN_ONLY = N_("Letters are for the admins of the office: the person you act for must be one")
 LTA_SHARE_FIRST = N_("Share the document with the agent first")
@@ -257,7 +257,9 @@ def v1_letter_get(lid):
 @app.patch("/api/v1/office/letters/<int:lid>")
 @v1_view
 def v1_letter_patch(lid):
-    """Only your own draft, only while it is a draft (400 after sending): the fields of the create call except answers."""
+    """Only your own draft, only while it is a draft (400 after sending): the fields of the create call except answers.
+    2.567.0 (#4711): expect_updated_at (the updated_at you read) is required: 400 without, 409 + the current letter under
+    "current" when a person changed it meanwhile."""
     from .agentdocs import _json
     b = _json(LTA_PATCH)
     c = db()
@@ -267,7 +269,9 @@ def v1_letter_patch(lid):
     aid, oid, uid = _v1ctx(c, b.get("requested_by"), write=True)
     write_lock(c, f"office_letter_{int(lid)}")
     _own(c, oid, aid, lid)
-    d = lt_update(c, oid, lid, {k: b[k] for k in LTA_FIELDS if k in b})
+    # 2.567.0 (#4711): only with the version read (400 without, 409 with the current state when a person saved meanwhile);
+    # the history marks the agent's change
+    d = lt_update(c, oid, lid, {k: b[k] for k in LTA_PATCH if k in b and k != "notify"}, uid=aid, version=True)
     out = lta_v1(c, oid, aid, d)
     if notify:
         out["chat_message_id"] = _notify(c, aid, uid, d)

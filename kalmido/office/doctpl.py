@@ -29,7 +29,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, local_now, now_utc
 from ..core.access import Denied, need_list, vis_sql
 from ..core.errors import BadInput
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
+from .owrite import ow_crypt, ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from .model import office_gate, office_org, office_settings, pb_cl_live, pb_cl_sql, pb_owner, trial_flag
 from .doctpl_samples import DMA_SAMPLES, SAMPLE_MT, sample_langs, sample_text  # 2.117.0 B (#2283); 2.449.0 (#3768)
 from .doclang import DOC_LANGS, doc_lg  # 2.185.0 C (#2520)
@@ -712,6 +712,10 @@ def dt_tpl_public(r):
             "sign": int(r["sign"] or 0), "archived": int(r["archived"] or 0), "created_at": r["created_at"], "updated_at": r["updated_at"]}
 
 
+ow_kind("office_doctpl", "office_doc_templates")  # 2.567.0 (#4711): history + undo of a document template
+ow_kind("office_gendoc", "office_gen_docs")  # and of a generated document (a draft)
+
+
 def dt_tpl(c, oid, tid):
     r = c.execute("SELECT * FROM office_doc_templates WHERE id=? AND org_id=?", (_iid(tid, "id"), oid)).fetchone()
     if not r:
@@ -817,19 +821,15 @@ def dt_tpl_post():
 @app.patch("/api/office/doc-templates/<int:tid>")
 def dt_tpl_patch(tid):
     c, uid, oid = _ctx()
-    write_lock(c, f"office_doc_templates-{int(tid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
-    cur = dt_tpl(c, oid, tid)
+    dt_tpl(c, oid, tid)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, cur["updated_at"], "row", lambda: dt_tpl_public(cur))
-    row = dt_tpl_clean(c, oid, b, cur)
-    if row:
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_doc_templates", row)
-        c.execute(f"UPDATE office_doc_templates SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [tid, oid])
-        bump(c)
-        c.commit()
+    dec, enc = ow_crypt("office_doc_templates", oid)
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"), history, undo step
+    ow_write(c, uid, "office_doctpl", tid, b, lambda c, b, cur: dt_tpl_clean(c, oid, b, cur), oid=oid, dec=dec, enc=enc, alias="row",
+             lock=f"office_doc_templates-{int(tid)}", public=lambda c, cur: dt_tpl_public(cur))
+    c.commit()
     return jsonify(dt_tpl_public(dt_tpl(c, oid, tid)))
 
 
@@ -1025,35 +1025,39 @@ def dt_doc_post():
 def dt_doc_patch(gid):
     """A draft's {title, body, client_id, list_id, doc_id, sign}; a finished document: 409 (a new version = Edit a copy)."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_gen_doc_{int(gid)}")
-    cur = dt_doc(c, oid, gid)
-    if cur["status"] != "draft":
+    if dt_doc(c, oid, gid)["status"] != "draft":
         return err(tr("A finished document cannot be changed any more. Edit a copy instead."), 409)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, cur["updated_at"], "row", lambda: dt_doc_public(c, oid, cur))  # 2.560.0 C (#4700): two tabs' autosaves never overwrite each other
-    row = {}
-    if any(k in b for k in ("client_id", "list_id", "doc_id")):
-        row.update(dt_refs(c, oid, b, cur))
-    if "title" in b:
-        row["title"] = _text(b.get("title"), "title", TITLE_MAX) or dt_kind_label(cur["kind"])
-    if "body" in b:
-        row["body"] = dt_body(b.get("body"))
-    if "sign" in b:
-        row["sign"] = 1 if b.get("sign") else 0
-    if "sign_image" in b:  # 2.357.0 C (#3158): the own signature on / off
-        row["sign_uid"] = dt_sign_uid(b.get("sign_image"), uid)
-    if "lang" in b:
-        row["lang"] = dt_lang(c, oid, b.get("lang"))
-    if row:
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_gen_docs", row)
-        c.execute(f"UPDATE office_gen_docs SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [gid, oid])
-        if "title" in row:  # 2.351.0 A (#2823): its node in a folder takes the new title
-            oft_renamed(c, GD_KIND, gid, row["title"])
-        bump(c)
-        c.commit()
+
+    def clean(c, b, cur):
+        if cur["status"] != "draft":  # finished meanwhile (under the lock)
+            raise Denied(409, tr("A finished document cannot be changed any more. Edit a copy instead."))
+        row = {}
+        if any(k in b for k in ("client_id", "list_id", "doc_id")):
+            row.update(dt_refs(c, oid, b, cur))
+        if "title" in b:
+            row["title"] = _text(b.get("title"), "title", TITLE_MAX) or dt_kind_label(cur["kind"])
+        if "body" in b:
+            row["body"] = dt_body(b.get("body"))
+        if "sign" in b:
+            row["sign"] = 1 if b.get("sign") else 0
+        if "sign_image" in b:  # 2.357.0 C (#3158): the own signature on / off
+            row["sign_uid"] = dt_sign_uid(b.get("sign_image"), uid)
+        if "lang" in b:
+            row["lang"] = dt_lang(c, oid, b.get("lang"))
+        return row
+
+    def extra(c, cur, changed):
+        if "title" in changed:  # 2.351.0 A (#2823): its node in a folder takes the new title
+            oft_renamed(c, GD_KIND, gid, changed["title"][1])
+
+    dec, enc = ow_crypt("office_gen_docs", oid)
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): two tabs' autosaves never overwrite each other (409 "current" + "row"); history, undo step
+    ow_write(c, uid, "office_gendoc", gid, b, clean, oid=oid, dec=dec, enc=enc, alias="row", lock=f"office_gen_doc_{int(gid)}",
+             public=lambda c, cur: dt_doc_public(c, oid, dt_doc(c, oid, gid)), extra=extra)
+    c.commit()
     return jsonify(dt_doc_public(c, oid, dt_doc(c, oid, gid)))
 
 

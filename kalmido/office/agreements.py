@@ -32,7 +32,7 @@ from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
 from ..core.access import Denied, list_role, list_roles, my_inbox, need_list, wr_sql
 from ..core.errors import BadInput
-from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
+from .owrite import ow_kind, ow_write  # 2.567.0 (#4711): the office's write layer
 from ..files.fsref import fs_ref_rename
 from .oftref import oft_dropped  # 2.351.0 F (#2749)
 from .calc import dec, dstr, money
@@ -310,6 +310,9 @@ def bk_task_sync(c, oid, uid, r, want=None, lid=None, revive=False, new_end=Fals
 
 
 # ---------------------------------------------------------------- read
+ow_kind("office_agreement", "office_agreements")  # 2.567.0 (#4711): history + undo of a business contract
+
+
 def bk_dec(c, oid, row):
     d = oc_dec_fields(c, oid, "office_agreements", row)
     return {k: d.get(k) for k in row.keys()}
@@ -471,30 +474,35 @@ def agr_post():
 def agr_patch(aid):
     """Office admin. Any field of POST, archived 0|1, task 0|1, list_id -> the contract. The deadline task follows."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_agreements-{int(aid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
-    cur = bk_dec(c, oid, _row(c, oid, aid))
+    _row(c, oid, aid)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, cur.get("updated_at"), "row", lambda: bk_public(c, oid, uid, _row(c, oid, aid)))
-    row = bk_clean(c, oid, uid, b, cur)
-    revive = False
-    if "archived" in b:
-        v = b.get("archived")
-        if v not in (0, 1, True, False, "0", "1"):
-            raise BadInput(tr("Invalid value: {0}", "archived"))
-        row["archived"] = 1 if v in (1, True, "1") else 0
-        revive = cur.get("archived") and not row["archived"]
-    if "ends" in row and row["ends"] and int(row.get("renew_months", cur.get("renew_months")) or 0):
-        row["ends"] = bk_deadline({**cur, **row})["ends"]
-    if row:
-        row["updated_at"] = iso(now_utc())
-        enc = oc_enc_fields(c, oid, "office_agreements", row)
-        c.execute(f"UPDATE office_agreements SET {','.join(k + '=?' for k in enc)} WHERE id=? AND org_id=?", list(enc.values()) + [aid, oid])
-        if row.get("name"):
-            fs_ref_rename(c, "office_agreement", aid, row["name"])  # 2.351.0 B (#2749): the name on its folder node (office/agrref.py)
-    _save_task(c, oid, uid, aid, b, revive=revive, new_end="ends" in row and row["ends"] != cur.get("ends"))
-    bump(c)
+    st = {"revive": False, "ends": False}
+
+    def clean(c, b, cur):
+        row = bk_clean(c, oid, uid, b, cur)
+        if "archived" in b:
+            v = b.get("archived")
+            if v not in (0, 1, True, False, "0", "1"):
+                raise BadInput(tr("Invalid value: {0}", "archived"))
+            row["archived"] = 1 if v in (1, True, "1") else 0
+            st["revive"] = bool(cur.get("archived") and not row["archived"])
+        if "ends" in row and row["ends"] and int(row.get("renew_months", cur.get("renew_months")) or 0):
+            row["ends"] = bk_deadline({**cur, **row})["ends"]
+        st["ends"] = "ends" in row and row["ends"] != cur.get("ends")
+        return row
+
+    def extra(c, cur, changed):
+        if changed.get("name", (None, None))[1]:
+            fs_ref_rename(c, "office_agreement", aid, changed["name"][1])  # 2.351.0 B (#2749): the name on its folder node (office/agrref.py)
+        _save_task(c, oid, uid, aid, b, revive=st["revive"], new_end=st["ends"])
+
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"), history,
+    # undo step, updated_by; the deadline task follows also when only task / list_id were sent (force)
+    ow_write(c, uid, "office_agreement", aid, b, clean, oid=oid, dec=lambda c, r: bk_dec(c, oid, r),
+             enc=lambda c, d: oc_enc_fields(c, oid, "office_agreements", d), alias="row", lock=f"office_agreements-{int(aid)}",
+             public=lambda c, cur: bk_public(c, oid, uid, _row(c, oid, aid)), extra=extra, force=True)
     c.commit()
     return jsonify(bk_public(c, oid, uid, _row(c, oid, aid)))
 
