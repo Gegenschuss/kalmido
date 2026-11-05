@@ -122,16 +122,42 @@ def _book_role(c, uid, b, trash=False):
         if b["org_id"] != b["owner_org_id"]:
             return None  # never across the boundary (the nightly check counts such a row)
         role = obk_org_role(c, uid, b["owner_org_id"], b["org_role"])
-        r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone() if collab_all() else None
+        r = (c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone()
+             if collab_all() and not bk_has_node(c, b["id"]) else None)  # 2.566.0 (#4712): with a live node its shares are the core's
         return max(role, r[0] if r else None, key=lambda x: BOOK_RANK.get(x, 0))
     if b["owner_id"] != uid and c.execute("SELECT disabled FROM users WHERE id=?", (b["owner_id"],)).fetchone()[0]:
         return None  # a disabled owner's address books are gone for the members too (like in the lists of books)
     if b["owner_id"] == uid:
         return "owner"
-    if not collab_all():
-        return None
+    if not collab_all() or bk_has_node(c, b["id"]):
+        return None  # 2.566.0 (#4712): a book with a live node is shared by its node (book_role's folder way = the core's share)
     r = c.execute("SELECT role FROM book_members WHERE book_id=? AND user_id=?", (b["id"], uid)).fetchone()
     return r[0] if r else None
+
+
+# 2.566.0 (#4712): an address book is an object kind of the shared core ('address_book', contacts/ctkern.py). Its shares are
+# rows of fs_shares on its reference node (the folder way of 2.351.0, ctf_node_role), which the trigger kalmido_kern_mirror
+# keeps equal to book_members (core/migrations.d/4712_a.py). A book WITH a live node is shared only by its node (a share taken
+# back in the core stays taken back); the old member row is read only for a book without one (one release, stage 7 removes it).
+BK_KERN = {}  # node: contacts/ctkern.py bk_node_ensure (it loads after the shared core, ORDER)
+BK_NODE_SQL = "SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND n.ref_kind='address_book' AND n.ref_id={} AND n.deleted_at IS NULL"
+
+
+def bk_has_node(c, bid):
+    """2.566.0 (#4712): has address book bid a live reference node (then its core shares count, not book_members)?"""
+    with system_ctx(c):  # structure: whether the node exists, not what it holds
+        return c.execute(BK_NODE_SQL.format("?"), (int(bid),)).fetchone() is not None
+
+
+def book_members_of(c, bid):
+    """[{user_id, role}] of the book's members: the shares of its live node (people and agents), else the old rows."""
+    if bk_has_node(c, bid):
+        with system_ctx(c):  # the manager's view of its own book's shares (the node may lie in an organisation's tree)
+            return [{"user_id": m[0], "role": m[1]} for m in c.execute(
+                "SELECT COALESCE(s.user_id, s.agent_id), s.role FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE n.kind='ref' "
+                "AND n.ref_kind='address_book' AND n.ref_id=? AND n.deleted_at IS NULL AND (s.user_id IS NOT NULL OR s.agent_id IS NOT NULL) "
+                "ORDER BY s.created_at, s.id", (int(bid),)).fetchall()]
+    return [{"user_id": m[0], "role": m[1]} for m in c.execute("SELECT user_id, role FROM book_members WHERE book_id=? ORDER BY added_at", (bid,))]
 
 
 def need_book(c, bid, write=False, manage=False, uid=None, trash=False):
@@ -164,7 +190,8 @@ def my_book_ids(c, uid, fold=True):
                 out[r[0]] = role
     if collab_all():
         for r in c.execute("SELECT m.book_id, m.role, b.org_id, b.owner_org_id FROM book_members m JOIN books b ON b.id=m.book_id "
-                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL) AND b.deleted_at IS NULL", (uid,)):
+                           "JOIN users u ON u.id=b.owner_id WHERE m.user_id=? AND (u.disabled=0 OR b.owner_org_id IS NOT NULL) AND b.deleted_at IS NULL "
+                           f"AND NOT EXISTS ({BK_NODE_SQL.format('m.book_id')})", (uid,)):  # 2.566.0 (#4712): the others by the fold below
             if acx_org_ok(c, uid, r[2]) and (not r[3] or r[3] == r[2]):  # 2.36.2 (#1142): organisation books only for its members
                 if BOOK_RANK.get(r[1], 0) > BOOK_RANK.get(out.get(r[0]), 0):  # 2.52.0 C (#1438): the better of share + organisation role
                     out[r[0]] = r[1]
@@ -191,8 +218,9 @@ def book_public(c, b, uid, names=None):
     d["org_owned"], d["org_role"] = bool(oo), (b["org_role"] if oo else None)
     d["can_org"] = bool(not oo and role == "owner" and b["org_id"] and not b["src_id"] and obk_can_take(c, uid, b["org_id"]))
     if role == "owner":
-        d["members"] = [{"user_id": m[0], "role": m[1]} for m in
-                        c.execute("SELECT user_id, role FROM book_members WHERE book_id=? ORDER BY added_at", (b["id"],))]
+        d["members"] = book_members_of(c, b["id"])  # 2.566.0 (#4712)
+    if "updated_at" in b.keys():
+        d["updated_at"] = b["updated_at"]  # 2.566.0 (#4712): the version a change sends back (expect_updated_at)
     return d
 
 
@@ -237,8 +265,9 @@ def book_create(c, uid, b, src_id=None):
     used = [r[0] for r in c.execute("SELECT color FROM books WHERE owner_id=?", (uid,))]
     col = f.get("color") or next((x for x in BOOK_COLORS if x not in used), BOOK_COLORS[0])
     ts = iso_ms(now_utc())
-    return insert_id(c, "INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at,org_id) VALUES(?,?,?,?,?,?,?)",
-                     (uid, f["name"], col, src_id, ts, ts, oid))
+    return insert_id(c, "INSERT INTO books(owner_id,name,color,src_id,created_at,changed_at,org_id,created_by,updated_at,updated_by) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?)",  # 2.566.0 (#4712): the core's columns
+                     (uid, f["name"], col, src_id, ts, ts, oid, uid, ts, uid))
 
 
 def bk_max_check(c, uid):
@@ -280,6 +309,7 @@ def book_member_set(c, bid, uid, role):
         p = ws_fit_problem(c, b["org_id"], uid, "book")  # 2.30.0 (#1036, B3): an organisation's address book only inside it
         if p:
             raise Denied(409, p)
+    BK_KERN["node"](c, me(), bid)  # 2.566.0 (#4712): its node first (contacts/ctkern.py), the trigger mirrors the row into its shares
     if c.execute("SELECT 1 FROM book_members WHERE book_id=? AND user_id=?", (bid, uid)).fetchone():
         c.execute("UPDATE book_members SET role=? WHERE book_id=? AND user_id=?", (role, bid, uid))
     else:

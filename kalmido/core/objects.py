@@ -175,10 +175,17 @@ def f_date(null=True):
 def obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
-                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True):
+                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True, members=None,
+                 fs_hooks=None):
     """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
     2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
-    folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take."""
+    folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take.
+    2.566.0 (#4712, stage 3): members = (table, key column) of the area's old member table while it moves onto the core (one
+    release a fallback reader, its rows mirrored into the shares of the object's node by a trigger, migrations.d/4712_a.py):
+    obj_revoke_person takes its rows with the shares (leave: the person and their agents; retire: everyone but the owner
+    and the owner's own agents), so a fallback row never opens what the core closed. fs_hooks = keyword arguments of fs_ref_register that replace the core's
+    (base_role, on_trash, content_gate ...): a kind the file store knew before the core keeps its folder rules (contacts:
+    filing and sharing the book's node stay with who manages it, files/fsref.py 2.199.0 F)."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if base_role is not None and visible is None:
@@ -193,7 +200,10 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
            "listed": bool(listed), "open_url": open_url or (lambda rid: f"obj/{kind}/{int(rid)}"),
            # 2.568.0 (#4739): an old area with its own reference kind and role table (module docstring)
            "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
-           "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id"}
+           "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id",
+           "members": tuple(members) if members else None}  # 2.566.0 (#4712)
+    if members and (len(members) != 2 or not all(_TABLE.fullmatch(x or "") for x in members)):
+        raise ValueError(f"obj_register {kind}: members must be (table, key column)")
     OBJ[kind] = reg
     if not fsref:
         return reg  # 2.568.0 (#4739): the area's own registration in files/fsref.py stays
@@ -220,9 +230,11 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
                 return "stays"
         return on_trash(c, uid, rid, restore) if on_trash else None
 
-    fs_ref_register(kind, label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
-                    protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
-                    content=content, cap=cap, listed=listed)
+    fsr = dict(label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
+               protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
+               content=content, cap=cap, listed=listed)
+    fsr.update(fs_hooks or {})  # 2.566.0 (#4712)
+    fs_ref_register(kind, **fsr)
     return reg
 
 
@@ -551,9 +563,10 @@ def _by_role(c, uid, org):
     return (org_role_key(c, uid, org) or "") if org else "owner"
 
 
-def obj_node(c, uid, kind, rid, make=False):
+def obj_node(c, uid, kind, rid, make=False, parent=None):
     """The reference node of the object (a row); make: an object in no folder gets its node at the top of its workspace's
-    tree (it then shows in the file store like every filed object)."""
+    tree (it then shows in the file store like every filed object). 2.566.0 (#4712): parent = the folder (of the object's
+    workspace, the caller's choice: an area's root folder) instead of the top."""
     reg = obj_reg(kind)
     n = fs_ref_node(c, kind, rid)
     if n is not None or not make or not reg["fsref"]:  # 2.568.0 (#4739): such an area places its nodes itself
@@ -564,9 +577,10 @@ def obj_node(c, uid, kind, rid, make=False):
     org, owner = sp
     nm = safe_fs_name(obj_title(c, kind, rid) or tr(reg["label"])) or tr(reg["label"])
     ts = iso(now_utc())
+    pid = int(parent) if parent else None
     nid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,ref_kind,ref_id,created_by,created_at,updated_at)
-                          VALUES(NULL,'ref',?,?,?,?,?,?,?,?)""",
-                    (_free_name(c, None, owner, org, nm), owner, org, kind, int(rid), uid, ts, ts))
+                          VALUES(?,'ref',?,?,?,?,?,?,?,?)""",
+                    (pid, _free_name(c, pid, owner, org, nm), owner, org, kind, int(rid), uid, ts, ts))
     fs_log_add(c, nid, "create")
     return c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
 
@@ -871,6 +885,11 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                      (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", f"user_id IN ({q}) AND room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)",
                                          (*ppl, int(org)), reason, by, int(org), "user_id")
+            for reg in OBJ.values():  # 2.566.0 (#4712): the old member tables of kinds moving onto the core (ev_cal_members ...)
+                if reg["members"]:
+                    mt, key = reg["members"]
+                    out[mt] = _take(c, mt, f"user_id IN ({q}) AND {key} IN (SELECT id FROM {reg['table']} WHERE org_id=?)",
+                                    (*ppl, int(org)), reason, by, int(org), "user_id", kind=reg["kind"])
             c.execute("DELETE FROM obj_undo WHERE user_id=? AND org_id=?", (int(uid), int(org)))
             if heir and heir != uid:
                 for reg in OBJ.values():
@@ -892,6 +911,13 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
             out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (int(org),), reason, by, int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", "room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)", (int(org),),
                                          reason, by, int(org), "user_id")
+            for reg in OBJ.values():  # 2.566.0 (#4712, #4697): everyone but the owner and the owner's own agents (their delegates)
+                if reg["members"]:
+                    mt, key = reg["members"]
+                    out[mt] = _take(c, mt, f"{key} IN (SELECT id FROM {reg['table']} WHERE org_id=?) AND NOT EXISTS (SELECT 1 FROM "
+                                    f"{reg['table']} k WHERE k.id={mt}.{key} AND (k.owner_id={mt}.user_id OR EXISTS (SELECT 1 FROM "
+                                    f"agents a WHERE a.user_id={mt}.user_id AND a.owner_id=k.owner_id)))",
+                                    (int(org),), reason, by, int(org), "user_id", kind=reg["kind"])
             c.execute("DELETE FROM obj_undo WHERE org_id=?", (int(org),))
         elif reason == "delete" and uid:
             for reg in OBJ.values():  # review F1: an organisation's object stays with it, the heir owns it (owner_id cascades)

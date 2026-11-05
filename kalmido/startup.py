@@ -30,6 +30,8 @@ init_db()
 _c = connect()
 try:
     migrate_family_events(_c)  # 2.21.0 (#659), once: the family events of 2.19 (tasks with people) become events
+    from .events.evkern import ev_kern_copy
+    ev_kern_copy(_c)  # 2.566.0 (#4712), once: calendars / address books with members get their shares in the shared core
     mig_flags_sync(_c)  # 2.102.0 D (#1996): a one-shot of just now (its flag) into kalmido_migrations
     _c.commit()
 finally:
