@@ -22,7 +22,7 @@ from ..core.access import need_feat, acx_token_bind
 from ..core.errors import BadInput
 from ..events.model import ev_role, need_evcal
 from ..calendars.icalfeed import ics_text  # 2.369.5 (#2517): pulled up from functions
-from ..events.ics import ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
+from ..events.ics import ev_dl_drop, ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
 from ..notify.alerts import aa_count  # 2.369.5 (#2517): pulled up from functions
 
 EVF_FAIL_LIMIT = 30  # wrong links per client address within the login fail window, then 429 (as calendars/icalfeed.py)
@@ -59,9 +59,10 @@ def evf_extra(extra):
     return "\n".join(out)
 
 
-def evf_build(c, cal):
+def evf_build(c, cal, uid=None):
     lines, tzs = [], set()
-    for r in c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id LIMIT ?", (cal["id"], EVF_MAX)).fetchall():
+    rows = c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id LIMIT ?", (cal["id"], EVF_MAX)).fetchall()
+    for r in ev_dl_drop(c, uid, rows):  # 2.560.0 (#4699): an agent's link leaves the events of its locked tasks out
         try:
             L, t = ev_lines(c, {**dict(r), "reminders": "", "extra": evf_extra(r["extra"]), "guests_visible": 0}, [])  # 2.380 H (#3392): not in a feed
         except (ValueError, TypeError) as e:  # one broken row never breaks the whole feed
@@ -101,7 +102,7 @@ def evf_feed(token):
         return _nf()
     if "events" not in (usettings(c, f["user_id"]).get("features") or "").split(","):  # 2.111.0 review: module off = links off
         return _nf()
-    return Response(evf_build(c, cal), content_type="text/calendar; charset=utf-8",
+    return Response(evf_build(c, cal, f["user_id"]), content_type="text/calendar; charset=utf-8",
                     headers={"Cache-Control": "private, no-store", "Content-Disposition": 'inline; filename="calendar.ics"',
                              "X-Robots-Tag": "noindex"})
 

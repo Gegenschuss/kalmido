@@ -100,7 +100,7 @@ def v1_evcal_export(cid):
     v1_args(())
     c = db()
     need_evcal(c, cid)
-    return jsonify(ics=ics_export(c, cid))
+    return jsonify(ics=ics_export(c, cid, me()))
 
 
 @app.get("/api/v1/events")

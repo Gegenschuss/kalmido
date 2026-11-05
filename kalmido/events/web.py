@@ -306,7 +306,7 @@ def evcals_member_rm(cid, uid):
 def evcals_export(cid):
     c = db()
     cal, role = need_evcal(c, cid)
-    r = Response(ics_export(c, cid), 200, content_type="text/calendar; charset=utf-8")
+    r = Response(ics_export(c, cid, me()), 200, content_type="text/calendar; charset=utf-8")
     r.headers["Content-Disposition"] = 'attachment; filename="calendar-%d.ics"' % cid
     return r
 

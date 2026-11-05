@@ -133,6 +133,17 @@ for eid in (E_PROJ, E_TRIP):
     check(ag("patch", f"/events/{eid}", json={"title": "x"}).status_code == 404, f"event {eid}: PATCH 404")
 check(ag("get", f"/events/{E_PLAIN}").status_code == 200, "the plain event stays readable")
 check(F.get(B + f"/api/events/{E_PROJ}").ok, "the owner still sees the project's event")
+# Fable review F1/F2 (2.560.0): the calendar's export and the agent's own feed link leave them out too
+r = ag("get", f"/event-calendars/{CAL}/export")
+check(r.status_code == 200, f"export {r.status_code} {r.text[:120]}")
+ics = r.json().get("ics") or ""
+check("Plain meeting" in ics and "Project meeting" not in ics and "Airport" not in ics, "the export: only the plain event")
+dbx("INSERT INTO ev_cal_feeds(cal_id, user_id, secret, created_at) VALUES(?,?,?,?)", (CAL, FA, "p2560bsecret", "2026-11-05T00:00:00Z"))
+FEED = dbx("SELECT id FROM ev_cal_feeds WHERE user_id=? AND cal_id=?", (FA, CAL))[0][0]
+r = requests.get(B + f"/ical/ev/{FEED}.p2560bsecret.ics", timeout=30)
+check(r.status_code == 200 and "Plain meeting" in r.text, f"the agent's feed works {r.status_code}")
+check("Project meeting" not in r.text and "Airport" not in r.text, "the agent's feed: no event of a locked task")
+check("Project meeting" in F.get(B + f"/api/evcals/{CAL}/export.ics").text, "the owner's export keeps the project's event")
 
 # ---------------------------------------------------------------- (c) the areas calendar and contacts
 lock(areas={"calendar": True, "contacts": True})

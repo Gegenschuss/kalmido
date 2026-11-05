@@ -16,6 +16,7 @@ from ..core.pages import valid_url
 from ..tasks.validation import REM_COUNT, REM_MAX, REM_MIN, rr_feasible, rr_norm, rr_problem, valid_date
 from ..calendars.icalfeed import ics_dur, ics_fold, ics_text, ics_utc, ics_vtimezone
 from ..core.errors import BadInput
+from ..core.dlock import dl_of, dl_tasks_locked  # 2.560.0 (#4699)
 from ..events.model import (
     _span, att_rows, ev_att_ok, ev_store, ev_zone, is_occ, one_line, rule_local, EV_DESC_MAX, EV_LOC_MAX, EV_TITLE_MAX, need_evcal, ov_list, tz_ok, wall, wall_s,
 )
@@ -721,8 +722,18 @@ def evcal_import(cid):
     return jsonify(res)
 
 
-def ics_export(c, cal_id):
+def ev_dl_drop(c, uid, rows):
+    """2.560.0 (#4699, Fable review F1/F2): rows without the events whose task agent uid's data lock covers (like ev_range),
+    one query; people keep every row."""
+    if not uid or not dl_of(c, uid):
+        return rows
+    gone = dl_tasks_locked(c, uid, [r["task_id"] for r in rows if r["task_id"]])
+    return [r for r in rows if not (r["task_id"] and int(r["task_id"]) in gone)] if gone else rows
+
+
+def ics_export(c, cal_id, uid=None):
     rows = c.execute("SELECT * FROM events WHERE cal_id=? AND deleted_at IS NULL ORDER BY id", (cal_id,)).fetchall()
+    rows = ev_dl_drop(c, uid, rows)  # 2.560.0 (#4699): an agent's export leaves the events of its locked tasks out
     atts = att_rows(c, [r["id"] for r in rows])
     lines, tzs = [], set()
     for r in rows:
