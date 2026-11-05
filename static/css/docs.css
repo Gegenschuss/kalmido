@@ -341,7 +341,7 @@
 .dc-bar{--bh:var(--tb-h)}
 .dc-bar .ctsearch,.dc-bar .btn,.dc-bar .iconbtn,.dc-bar .dc-up,.dc-bar .dc-sortb{min-height:var(--bh);height:var(--bh);box-sizing:border-box}
 .dc-bar .iconbtn{width:var(--bh)}
-.dc-bar .dc-seg{height:var(--bh);box-sizing:border-box;align-items:stretch}
+.dc-bar .dc-seg{height:var(--bh);box-sizing:border-box;align-items:stretch;padding:0;border:0;box-shadow:inset 0 0 0 1px var(--line2)}  /* the frame drawn inside: the buttons fill the whole height (44 px targets on a phone) */
 .dc-bar .dc-seg button{min-height:0;height:auto}
 .dc-up,.dc-acts2 [data-dc="scan"],.dc-sortb{min-height:var(--tb-h)}
 .dc-seg button{min-height:0}

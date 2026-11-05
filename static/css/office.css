@@ -1153,14 +1153,12 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .ofdbar .ctsearch,.ofdbar select,.ofdbar .btn,.ofcbar .ctsearch,.ofcbar .btn,.ofcbar select{min-height:var(--tb-h);height:var(--tb-h);box-sizing:border-box}
 .ofcbar .chkl{min-height:var(--tb-h)}
 .rcl-f select,.rcl-f input[type=search],.rcl-f .dpbtn,.rcl-f .dpw input{min-height:var(--tb-h);box-sizing:border-box}
-.rcl-f .seg{height:var(--tb-h);box-sizing:border-box;align-items:stretch}
+.rcl-f .seg{height:var(--tb-h);box-sizing:border-box;align-items:stretch;padding:0;border:0;box-shadow:inset 0 0 0 1px var(--line2)}
 .rcl-f .seg button{min-height:0}
 .rcl-exp .btn{min-height:var(--tb-h)}
 .rcl-filters>summary{min-height:var(--tb-h)}
 .rcl-novat,.rcl-hints{min-height:var(--tb-h);display:inline-flex;align-items:center;gap:.5rem}
 .rcl-grid{align-items:flex-end}
-.ofdkinds{height:var(--tb-h);box-sizing:border-box;align-items:stretch}
-.ofdkinds button{min-height:0}
 @media (max-width:767px) {
   .ofdkinds{display:flex;flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none}
   .ofdkinds button{flex:none;white-space:nowrap}

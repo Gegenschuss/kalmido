@@ -82,7 +82,8 @@ input::placeholder,textarea::placeholder{color:var(--muted)}
 input:placeholder-shown{text-overflow:ellipsis}  /* 2.458.0 (#3855): a hint too long for a narrow field is cut with "…" */
 /* 2.87.9 (#1952): one size and height for the fields of every form (the special fields - quick add, search, chat input, inline titles - have their own class rules and keep them); touch screens 16 px against the iOS zoom */
 :root{--fld-fs:var(--fs-b);--fld-h:2.25rem;--tb-h:2.5rem}
-@media (pointer:coarse){ :root{--fld-fs:max(1rem,16px);--fld-h:2.75rem;--tb-h:2.75rem} }  /* 2.540.0 (#4472): one height for every control of a toolbar */
+@media (pointer:coarse){ :root{--fld-fs:max(1rem,16px);--fld-h:2.75rem} }  /* 2.540.0 (#4472): one height for every control of a toolbar */
+@media (max-width:767px),(pointer:coarse){ :root{--tb-h:2.75rem} }  /* 2.540.0 (#4472): toolbars on a phone keep the 44 px targets of the phone rules (also without a touch pointer) */
 input:where(:not([type=checkbox],[type=radio],[type=range],[type=color],[type=file],[type=hidden])),select,textarea{font-size:var(--fld-fs)}
 input:where(:not([type=checkbox],[type=radio],[type=range],[type=color],[type=file],[type=hidden])),select{min-height:var(--fld-h);box-sizing:border-box}
 .modal .row .btn:not(.sm){height:2rem}  /* 2.224.0 C (#2816): dialog buttons 32 px on a computer, the field height only on touch */

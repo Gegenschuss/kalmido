@@ -52,7 +52,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
         await nav(B + '#' + hash); await ready(ev, sel);
         fs[key] = (await ev(FIELD))[key];
         // 2.413.0 (#3496, einreihen): on touch the input itself is 44 px (p2210_ui), its 1 px frame makes the field 2 px taller
-        check(fs[key] && fs[key].icon && fs[key].h > fs[key].fld - .6 && fs[key].h < fs[key].fld + (touch ? 2.6 : .6), `${W}: ${hash}: search field is .ctsearch with an icon and the field height ` + JSON.stringify(fs[key]));
+        // 2.540.0 (#4472): the search of the documents stands in a toolbar: it has the toolbar's height (40 px, 44 on touch), not the field's
+        const want = key === 'dc' ? [(touch ? 44 : 40) - .6, (touch ? 44 : 40) + .6] : [fs[key] && fs[key].fld - .6, fs[key] && fs[key].fld + (touch ? 2.6 : .6)];
+        check(fs[key] && fs[key].icon && fs[key].h > want[0] && fs[key].h < want[1], `${W}: ${hash}: search field is .ctsearch with an icon and the field height ` + JSON.stringify(fs[key]));
         if (W === 1270) await shot(`p2413b-${hash}.png`);
       }
       // the knowledge page's main button
