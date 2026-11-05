@@ -16312,7 +16312,6 @@
   "Adding them again within {0} day offers to restore it.": ["Wer die Person innerhalb von {0} Tag wieder hinzufügt, kann es wiederherstellen.", "Wer die Person innerhalb von {0} Tagen wieder hinzufügt, kann es wiederherstellen."],
   "Field restored": "Feld wiederhergestellt",
   "The field goes into the trash with its values; the project settings can restore it.": "Das Feld kommt mit seinen Werten in den Papierkorb; in den Projekteinstellungen lässt es sich wiederherstellen.",
-  "Field deleted": "Feld gelöscht",
   "Deleted fields (kept for {0} day)": ["Gelöschte Felder (bleiben {0} Tag)", "Gelöschte Felder (bleiben {0} Tage)"],
   "{0} task with a value": ["{0} Aufgabe mit Wert", "{0} Aufgaben mit Wert"],
   "Restore the field {0}": "Feld {0} wiederherstellen",

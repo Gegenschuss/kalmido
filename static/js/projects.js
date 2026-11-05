@@ -898,9 +898,6 @@ async function ftrRestore(tid) {
   try { await api('POST', `/api/fields/trash/${tid}/restore`); } catch { return false; }
   await load(); render(); return true;
 }
-function ftrToast(j, after) {
-  if (j?.trash_id) toast(tr('Field deleted'), async () => { if (await ftrRestore(j.trash_id)) after?.(); });
-}
 async function ftrDraw(box, lid) {
   if (!box) return;
   let j; try { j = await rawFetch('GET', `/api/lists/${lid}/fields/trash`); } catch { box.hidden = true; return; }

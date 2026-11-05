@@ -16312,7 +16312,6 @@
   "Adding them again within {0} day offers to restore it.": ["Wie de persoon binnen {0} dag weer toevoegt, kan het herstellen.", "Wie de persoon binnen {0} dagen weer toevoegt, kan het herstellen."],
   "Field restored": "Veld hersteld",
   "The field goes into the trash with its values; the project settings can restore it.": "Het veld gaat met zijn waarden naar de prullenbak; in de projectinstellingen kun je het herstellen.",
-  "Field deleted": "Veld verwijderd",
   "Deleted fields (kept for {0} day)": ["Verwijderde velden (blijven {0} dag)", "Verwijderde velden (blijven {0} dagen)"],
   "{0} task with a value": ["{0} taak met een waarde", "{0} taken met een waarde"],
   "Restore the field {0}": "Veld {0} herstellen",

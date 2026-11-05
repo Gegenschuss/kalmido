@@ -16312,7 +16312,6 @@
   "Adding them again within {0} day offers to restore it.": ["Si se vuelve a añadir en {0} día, se puede restaurar.", "Si se vuelve a añadir en {0} días, se puede restaurar."],
   "Field restored": "Campo restaurado",
   "The field goes into the trash with its values; the project settings can restore it.": "El campo va a la papelera con sus valores; se puede restaurar en los ajustes del proyecto.",
-  "Field deleted": "Campo eliminado",
   "Deleted fields (kept for {0} day)": ["Campos eliminados (se guardan {0} día)", "Campos eliminados (se guardan {0} días)"],
   "{0} task with a value": ["{0} tarea con valor", "{0} tareas con valor"],
   "Restore the field {0}": "Restaurar el campo {0}",

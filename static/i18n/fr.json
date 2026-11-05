@@ -16312,7 +16312,6 @@
   "Adding them again within {0} day offers to restore it.": ["En la rajoutant dans un délai de {0} jour, on peut le restaurer.", "En la rajoutant dans un délai de {0} jours, on peut le restaurer."],
   "Field restored": "Champ restauré",
   "The field goes into the trash with its values; the project settings can restore it.": "Le champ va dans la corbeille avec ses valeurs ; les paramètres du projet permettent de le restaurer.",
-  "Field deleted": "Champ supprimé",
   "Deleted fields (kept for {0} day)": ["Champs supprimés (conservés {0} jour)", "Champs supprimés (conservés {0} jours)"],
   "{0} task with a value": ["{0} tâche avec une valeur", "{0} tâches avec une valeur"],
   "Restore the field {0}": "Restaurer le champ {0}",

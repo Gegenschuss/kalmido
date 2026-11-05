@@ -1,6 +1,6 @@
 // kalmido-suite:
 // 2.550.0 (#4528) UI, own container (start.sh). jsdom: deleting a field in its dialog says it goes into the trash, the toast's
-// Undo brings it back with its value; the project settings list a deleted field with "Restore"; the share dialog shows the
+// Undo (the field's own step, 2.554.0 #4658) brings it back from the trash with its id and value; the project settings list a deleted field with "Restore"; the share dialog shows the
 // way back for a member added again after a removal, and its question restores the assignment.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -41,7 +41,7 @@ const FEAT = 'cal,comments,collab,fields';
   await until(() => asked.length);
   check(/Delete the field/.test(asked[0] || '') && /goes into the trash with its values/.test(asked[0] || ''), 'the question says the field goes into the trash ' + asked[0]);
   check(await until(async () => !(await hasField())), 'deleted');
-  const undo = await until(() => !d.querySelector('#toast').classList.contains('hidden') && /Field deleted/.test(d.querySelector('#toast').textContent) && d.querySelector('#toast button'));
+  const undo = await until(() => !d.querySelector('#toast').classList.contains('hidden') && /“Budget” deleted/.test(d.querySelector('#toast').textContent) && d.querySelector('#toast button'));
   check(undo && /Undo/.test(undo.textContent), 'the toast offers Undo');
   click(w, undo);
   check(await until(async () => await hasField() && String(await fval()) === '12'), 'Undo: the field and its value are back');
