@@ -144,8 +144,22 @@ function rc_accBody(b) {
   return o;
 }
 const rc_cur = () => ({project_id: RC.d?.receipt?.project?.id || null, category: RC.d?.receipt?.category || '', vat_pct: RC.d?.receipt?.vat_pct ?? null, rc13b: RC.d?.receipt?.rc13b || ''});  // 2.90.0 A (#1921): + VAT rate; 2.545.0 (#4387): + reverse charge
+// 2.559.0 (#4659): the slot shows the new values at once (optWrite), the server's answer replaces them; a refusal puts the
+// values before back (api() said why)
+function rc_putLocal(id, v) {
+  return () => {
+    const r = RC.id === id ? RC.d?.receipt : null; if (!r) return null;
+    const old = {category: r.category, vat_pct: r.vat_pct, rc13b: r.rc13b, project: r.project};
+    if ('category' in v) r.category = v.category;
+    if ('vat_pct' in v) r.vat_pct = v.vat_pct == null ? null : String(v.vat_pct);
+    if ('rc13b' in v) r.rc13b = v.rc13b;
+    if ('project_id' in v && (v.project_id || null) !== (r.project?.id || null)) r.project = v.project_id ? (RC.d.projects || []).find(p => p.id === v.project_id) || {id: v.project_id} : null;
+    return () => { if (RC.d?.receipt === r) Object.assign(r, old); };
+  };
+}
 async function rc_put(id, v) {
-  const j = await api('PUT', `/api/docs/${id}/receipt`, v);
+  const draw = () => { if (RC.id === id) rc_draw(); };
+  const j = await optWrite(rc_putLocal(id, v), () => api('PUT', `/api/docs/${id}/receipt`, v), draw);
   if (RC.id === id) { RC.d = j; rc_draw(); }
   return {};
 }

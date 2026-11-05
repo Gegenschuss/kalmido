@@ -53,6 +53,20 @@ async function bkLoadUstva() {
   ofcDraw();
 }
 const bkReload = () => { BK.info = null; BK.euer = null; if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null; if (typeof rclReload === 'function') rclReload(); ofcDraw(); };  // 2.276.0 A (#3039): + the receipts list; 2.356.0 D (#3129): + handed in  // 2.114.1 B (#2018): receipts count in the cash flow
+// 2.559.0 (#4659): a change of a receipt shows at once (optWrite): the rows of the receipt in the lists on screen (this month,
+// all receipts) get the new values, the requests run behind it; afterwards the lists are fetched again in the background (the
+// rows stay until the fresh ones are there: sums and the income statement are the server's)
+const bkRows = id => [...(BK.info?.receipts || []), ...(BK.info?.missing || []), ...(typeof RCL === 'object' ? RCL.rows || [] : [])].filter(r => r.node_id === id);
+const bkRowsPut = (ids, vals) => () => {
+  const old = [];
+  for (const id of ids) for (const r of bkRows(id)) { old.push([r, Object.fromEntries(Object.keys(vals).map(k => [k, r[k]]))]); Object.assign(r, vals); }
+  return () => old.forEach(([r, o]) => Object.assign(r, o));
+};
+const bkRefresh = () => {
+  if (typeof RSB === 'object') RSB.inRows = null; if (typeof RKF === 'object') RKF.data = null;
+  if (typeof rclReload === 'function') rclReload();
+  if (BK.info && S.route?.mod === 'office' && ofcTab() === 'books') bkLoad(); else { BK.info = null; BK.euer = null; ofcDraw(); }
+};
 
 function bkTabHtml() {
   if (bkSub() === 'procdoc' && typeof pdHtml === 'function') return pdHtml();  // 2.148.0 C (#2472): the procedure documentation
@@ -349,11 +363,10 @@ async function bkSheet(id, fresh) {
     if (v('#bk-amount').trim() && amt == null) { $('.aerr', md).textContent = tr('Invalid value: {0}', tr('Amount')); return; }
     const before = {doc: {amount: doc.amount || '', date: doc.date || ''}, rc: {project_id: r.project?.id || null, category: r.category || '', vat_pct: r.vat_pct ?? null, keep: !!r.is_receipt}};
     const after = {doc: {amount: amt == null ? '' : amt.toFixed(2), date: v('#bk-date')}, rc: {project_id: r.project?.id || null, category: v('#bk-cat').trim(), vat_pct: v('#bk-vat') || null, keep: true}};
-    b.disabled = true;
-    try { await bkSave(id, after); } catch (x) { b.disabled = false; $('.aerr', md).textContent = x.message || ''; return; }
+    // 2.559.0 (#4659): the sheet closes at once, the rows show the new values; a refusal puts them back (api() says why)
     md.remove();
     const label = tr('Changed receipt');
-    histToast(label, histAdd({label, undo: () => bkSave(id, before), redo: () => bkSave(id, after)}));
+    bkSave(id, after).then(() => histToast(label, histAdd({label, undo: () => bkSave(id, before), redo: () => bkSave(id, after)})), () => {});
   });
   if (fresh) setTimeout(() => $('#bk-cat', md)?.focus(), 0);
 }
@@ -437,24 +450,29 @@ function bkRxAfter(id) {  // 2.121.0 A (#2092): taken over / undone -> the sheet
 // 2.420.0 C (#3448): the tick "Checked" of a receipt (who + when, like DATEV; office/receiptlist.py). Only people tick it;
 // in a locked month the server refuses (409) and the box goes back. One undo step.
 const bkChkTxt = r => r.checked_at ? tr('Checked by {0} on {1}', r.checked_by?.name || r.checked_by || '?', fmtDateLoc(String(r.checked_at).slice(0, 10))) : '';
+// 2.559.0 (#4659): at once -- the box stays usable, the line "Checked by ..." and the rows show the tick before the answer; a
+// refusal (locked month) puts box, line and rows back with the server's reason
+const bkChkStamp = on => on ? {checked_at: new Date().toISOString(), checked_by: S.me?.display_name || ''} : {checked_at: null, checked_by: null};
 async function bkChkPut(id, on) {
-  const j = await api('POST', '/api/office/books/receipts/checked', {node_ids: [id], checked: on});
-  bkReload();
+  const j = await optWrite(bkRowsPut([id], bkChkStamp(on)), () => api('POST', '/api/office/books/receipts/checked', {node_ids: [id], checked: on}), ofcDraw);
+  bkRefresh();
   return j.rows?.[0] || {};
 }
 async function bkChkSet(md, id, on) {
-  const box = $('#bk-chk', md), el = $('.bk-chkby', md);
-  if (box) box.disabled = true;
-  let x; try { x = await bkChkPut(id, on); } catch (err) { if (box) { box.checked = !on; box.disabled = false; } $('.aerr', md).textContent = err.message || ''; return; }
-  if (box) box.disabled = false;
-  if (el) el.textContent = bkChkTxt(x);
+  const box = $('#bk-chk', md), el = $('.bk-chkby', md), was = el?.textContent || '';
+  if (el) el.textContent = bkChkTxt(bkChkStamp(on));
+  let x; try { x = await bkChkPut(id, on); } catch (err) { if (box) box.checked = !on; if (el) el.textContent = was; const a = $('.aerr', md); if (a) a.textContent = err.message || ''; return; }
+  if (el && box?.checked === on) el.textContent = bkChkTxt(x);
   const label = on ? tr('Receipt marked as checked') : tr('Check removed');
   histToast(label, histAdd({label, undo: async () => { await bkChkPut(id, !on); return {}; }, redo: async () => { await bkChkPut(id, on); return {}; }}));
 }
+// 2.559.0 (#4659): the rows show the new values at once, both requests run behind it; the lists follow in the background
+// (bkRefresh, also after a refusal: the first request may have gone through)
 async function bkSave(id, v) {
-  await api('PATCH', `/api/docs/${id}`, v.doc);
-  await api('PUT', `/api/docs/${id}/receipt`, v.rc);
-  bkReload();  // 2.110.0 B (#2055): the receipts list too (rclReload)
+  const vals = {amount: v.doc.amount || null, date: v.doc.date || null, category: v.rc.category, vat_pct: v.rc.vat_pct ?? null};
+  try {
+    await optWrite(bkRowsPut([id], vals), async () => { await api('PATCH', `/api/docs/${id}`, v.doc); await api('PUT', `/api/docs/${id}/receipt`, v.rc); }, ofcDraw);
+  } finally { bkRefresh(); }  // 2.110.0 B (#2055): the receipts list too (rclReload)
   return {};
 }
 async function bkPoll(id, md, touched, n) {  // the recognition runs in the background: fill what the person has not typed yet

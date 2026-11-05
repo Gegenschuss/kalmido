@@ -120,7 +120,8 @@ const today = TC.today();
       m.querySelector('#bk-date').value = '${today}'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.bk-sheet') && [...document.querySelectorAll('[data-rcl="rc"]')].some(b => /119\\.00/.test(b.textContent))`, 80), '#3039: the receipt is a row of the list');
     await shot('p2276a-receipts-row.png');
-    const st2 = await call(CK.carol, 'GET', '/api/office/settings');
+    // 2.559.0 (#4659): the row shows before the server stored it -- asked until it knows the receipt
+    let st2 = {}; for (let i = 0; i < 60 && st2.used?.receipt !== true; i++) { st2 = await call(CK.carol, 'GET', '/api/office/settings'); if (st2.used?.receipt !== true) await sleep(250); }
     check(st2.used?.receipt === true && st2.used?.invoice === false, 'the server knows the first receipt ' + JSON.stringify(st2.used));
     await nav(B + 'static/icon.svg'); await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && ${money} === 'true' && !!document.querySelector('#side [data-ofm="cashflow"]')`, 80), '#3039: with a receipt Money is open on its own and shows the cash flow');

@@ -87,7 +87,8 @@ const today = TC.today();
       const d = m.querySelector('#bk-date'); d.value = '${today}'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.bk-sheet') && [...document.querySelectorAll('[data-bk="rc"]')].some(b => /Software/.test(b.textContent) && /119\\.00/.test(b.textContent))`, 60),
       'the receipt is in the list of the month with category and amount');
-    check(await ev(`${api('GET', `/api/office/books/euer?year=${year}`)}.then(j => j.expenses.some(x => x.label === 'Software' && x.vat === '19.00'))`), 'the receipt counts in the EUeR with 19 % input tax');
+    // 2.559.0 (#4659): the row shows before the server stored it -- asked until the income statement has it
+    check(await ready(ev, `${api('GET', `/api/office/books/euer?year=${year}`)}.then(j => j.expenses.some(x => x.label === 'Software' && x.vat === '19.00'))`), 'the receipt counts in the EUeR with 19 % input tax');
     // the basis switch; 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes, the bookkeeping links there
     check(await ev(`!document.querySelector('.office [data-bk="basis"]') && !!document.querySelector('.office [data-setgo="biz-tax"]')`), 'the bookkeeping links to its settings');
     await ev(`(() => { document.querySelector('.office [data-setgo="biz-tax"]').click(); return 1; })()`);

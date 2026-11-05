@@ -53,6 +53,7 @@ async function receipt(ck, ws, name, amount, day) {
   const R1 = await receipt(CA, ws, 'papier.pdf', '119.00', today);
   const R2 = await receipt(CA, ws, 'toner.pdf', '59.50', today);
   const R3 = await receipt(CA, ws, 'kabel.pdf', '23.80', today);
+  const serverIs = async fn => { for (let i = 0; i < 60; i++) { if (fn(await checkedIds())) return true; await sleep(250); } return false; };  // 2.559.0 (#4659)
   const checkedIds = async () => ((await call(CA, 'GET', '/api/office/books/receipts?checked=yes')).rows || []).map(x => x.node_id).sort((a, b) => a - b);
 
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
@@ -78,13 +79,14 @@ async function receipt(ck, ws, name, amount, day) {
     await shot('p24200-c-select.png');
     await ev(click('.rcl-selbar [data-rcl="chk"]'));
     check(await ready(ev, `${marks} === 2 && !document.querySelector('.rcl-pickin')`, 60), 'Mark as checked: two rows carry "Checked", the choice ends ' + await ev(marks));
-    check(JSON.stringify(await checkedIds()) === JSON.stringify([R1, R2].sort((a, b) => a - b)), 'stored on the server');
+    // 2.559.0 (#4659): the rows show the tick before the answer -- the server is asked until it has it
+    check(await serverIs(ids => JSON.stringify(ids) === JSON.stringify([R1, R2].sort((a, b) => a - b))), 'stored on the server');
     check(await ev(`/Checked by Alice/.test(document.querySelector('.rcl-chk')?.title || '')`), 'the mark tells who checked');
     // undo of the toast
     check(await ready(ev, `/2 receipts marked as checked/.test(document.querySelector('#toast:not(.hidden)')?.textContent || '') && !!document.querySelector('#toast:not(.hidden) button:not(.tx)')`), 'the toast tells it and offers Undo');
     await ev(click('#toast:not(.hidden) button:not(.tx)'));
     check(await ready(ev, `${marks} === 0`, 60), 'Undo takes the ticks back');
-    check((await checkedIds()).length === 0, 'Undo: nothing checked on the server');
+    check(await serverIs(ids => ids.length === 0), 'Undo: nothing checked on the server');  // 2.559.0 (#4659): see above
     // tick all three, remove the check of one
     await ev(click('.rcl-selbar [data-rcl="sel"]'));
     await ready(ev, `document.querySelectorAll('.rcl-pickin').length === 3`);
@@ -110,7 +112,7 @@ async function receipt(ck, ws, name, amount, day) {
     check(await ready(ev, `!!document.querySelector('.bk-sheet #bk-chk') && !document.querySelector('.bk-sheet #bk-chk').checked`, 60), 'the receipt sheet has the box Checked (empty)');
     await ev(click('.bk-sheet #bk-chk'));
     check(await ready(ev, `/Checked by Alice on/.test(document.querySelector('.bk-sheet .bk-chkby')?.textContent || '')`, 60), 'ticked in the sheet: who and when');
-    check((await checkedIds()).includes(R3), 'the sheet stores the tick at once');
+    check(await serverIs(ids => ids.includes(R3)), 'the sheet stores the tick at once');  // 2.559.0 (#4659): the line shows before the answer
     await shot('p24200-c-sheet.png');
     await ev(click('.bk-sheet [data-m="close"]'));
     check(await ready(ev, `${marks} === 3`, 60), 'the list follows the sheet');

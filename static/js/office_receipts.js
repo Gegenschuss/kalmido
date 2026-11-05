@@ -143,16 +143,18 @@ function rclSelBar() {
     <button type="button" class="btn sm ghost" data-rcl="selx">${tr('Cancel')}</button></div>`;
 }
 // tick / untick receipts as checked (one undo step: only the receipts whose state changed go back)
+// 2.559.0 (#4659): at once (optWrite): the rows carry the tick before the answer, a refusal takes it back; the lists follow in
+// the background (bkRefresh: the rows stay until the fresh ones are there)
 async function rclChecked(ids, on) {
-  const j = await api('POST', '/api/office/books/receipts/checked', {node_ids: ids, checked: on});
-  if (typeof bkReload === 'function') bkReload(); else rclReload();  // (bkReload reads the receipts list again too)
+  const put = typeof bkRowsPut === 'function' ? bkRowsPut(ids, bkChkStamp(on)) : () => null;
+  const j = await optWrite(put, () => api('POST', '/api/office/books/receipts/checked', {node_ids: ids, checked: on}), ofcDraw);
+  if (typeof bkRefresh === 'function') bkRefresh(); else rclReload();  // (bkRefresh reads the receipts list again too)
   return j;
 }
 async function rclCheckSel(on) {
   const ids = [...(RCL.sel || [])]; if (!ids.length || RCL.busy) return;
-  RCL.busy = true; ofcDraw();
-  let j; try { j = await rclChecked(ids, on); } catch (x) { RCL.busy = false; ofcDraw(); toast(x.message || tr('unknown')); return; }
-  RCL.busy = false; RCL.sel = null; ofcDraw();
+  const sel = RCL.sel; RCL.sel = null;  // 2.559.0 (#4659): the choice closes at once, a refusal brings it back
+  let j; try { j = await rclChecked(ids, on); } catch { if (!RCL.sel) RCL.sel = sel; ofcDraw(); return; }  // api() said why
   const ch = j.changed || [];
   if (!ch.length) { toast(on ? tr('Already checked') : tr('Not checked')); return; }
   const label = on ? trn('{0} receipt marked as checked', '{0} receipts marked as checked', ch.length) : trn('Check removed from {0} receipt', 'Check removed from {0} receipts', ch.length);
