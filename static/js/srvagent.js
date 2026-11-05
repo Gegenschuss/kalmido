@@ -56,7 +56,7 @@ function srv_starterHtml(d) {
 // "New agent" > "Runs on the Kalmido server". o.admin: from the administration (team agent or my own), else my personal agent
 async function srv_newModal(o = {}) {
   let d; try { d = await srv_defaults(true); } catch { toast(tr('Only available online.')); return; }
-  const md = modal(`<h3>${tr('New agent on the Kalmido server')}</h3>
+  const md = /** @type {any} */ (modal(`<h3>${tr('New agent on the Kalmido server')}</h3>
     <div class="shint keep">${esc(tr('Kalmido calls the model itself with your own API key whenever something comes for the agent (assigned, @mention, chat, listening in, a planned job). No computer of your own is needed.'))}</div>
     ${d.enabled_instance ? `${o.admin ? `<div class="row"><label for="srv-own">${tr('Belongs to')}</label><select id="srv-own"><option value="me">${esc(tr('Personal agent of {0}', S.me?.display_name || ''))}</option><option value="team">${tr('Team agent')}</option></select></div>` : ''}
     <div class="row"><label for="srv-name">${tr('Display name')}</label><input id="srv-name" value="${esc(d.default_name || '')}" maxlength="60"></div>
@@ -64,7 +64,7 @@ async function srv_newModal(o = {}) {
     <div class="shint keep" id="srv-userhint" hidden></div>
     ${srv_fieldsHtml(d, true)}
     ${srv_starterHtml(d)}` : srv_offHtml()}
-    <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${d.enabled_instance ? `<button class="btn pri" data-m="srv-ok">${tr('Create')}</button>` : ''}</div>`);
+    <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${d.enabled_instance ? `<button class="btn pri" data-m="srv-ok">${tr('Create')}</button>` : ''}</div>`));
   userNameFollow(md, 'srv-name', 'srv-user', 'srv-userhint');
   const un0 = $('#srv-user', md); if (un0) un0.value = slugUser(d.default_name || '');
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
@@ -104,11 +104,11 @@ async function srv_newModal(o = {}) {
 }
 // the server settings of an agent (the same fields, no starter pack) + its latest runs; notes = what failed while creating it
 async function srv_editModal(a, notes) {
-  const md = modal(`<h3>${esc(tr('{0} on the Kalmido server', a.name))}</h3>
+  const md = /** @type {any} */ (modal(`<h3>${esc(tr('{0} on the Kalmido server', a.name))}</h3>
     ${notes?.length ? `<div class="calerr" role="alert">${notes.map(esc).join('<br>')}</div>` : ''}
     <div id="srv-ed"><div class="muted mhint">${tr('Loading…')}</div></div>
     <h4 id="srv-runs-h">${tr('Latest runs')}</h4><div class="srvruns" id="srv-runs" role="list" aria-labelledby="srv-runs-h"><div class="muted mhint">${tr('Loading…')}</div></div>
-    <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="srv-save" hidden>${tr('Save')}</button></div>`);
+    <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="srv-save" hidden>${tr('Save')}</button></div>`));
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
   let j = null;
   const draw = async () => {
