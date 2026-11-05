@@ -71,6 +71,13 @@ EXPECT_4XX = {
     "GET /api/v1/office/letters/{}": (404, "an agent reads only the letters it drafted itself; the freelancer wrote this one"),
     # 2.557.0 (#4670): the own agent has no provider key stored (the provider would be an outside service)
     "GET /api/agents/{}/server/models": (409, "no API key of a model provider stored for the own agent (an outside service)"),
+    # 2.558.0 (#4709): no area on the shared core yet (see SUBST)
+    "GET /api/obj/{}": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
+    "GET /api/obj/{}/{}": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
+    "GET /api/obj/{}/{}/history": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
+    "GET /api/obj/{}/{}/shares": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
+    "GET /api/v1/agent/objects/{}": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
+    "GET /api/v1/agent/objects/{}/{}": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
 }
 # 2.421.0 A (#2936): GET routes of the matrix areas the sweep cannot fill (no id of an own object): may only shrink
 MAX_SKIPPED = 87  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires; 02.11.2026: 88 before the own webhook (2.391.0 #3362)
@@ -103,7 +110,7 @@ OL = A.post(B + "/api/lists", json={"name": "Nordwind board", "org_id": ORG}).js
 OT = A.post(B + "/api/tasks", json={"list_id": OL, "title": "Org-only task"}).json()["id"]
 A.put(B + "/api/admin/agent-policy", json={"user_agents": True})  # the server's switch (the same for everybody)
 FID, F = freelancer(B, A)
-IDS = {}
+IDS = {"objkind": "objprobe"}  # 2.558.0 (#4709): the kind for the shared core's routes (SUBST)
 
 # ================================================================== tasks + lists in the private workspace
 # freelancer-matrix: tasks, lists
@@ -294,6 +301,11 @@ for _ in range(480):  # the account export of "own" runs in the background: its 
 # ================================================================== the sweep: every GET of the matrix areas
 # the placeholders: the path up to "{}" -> the id of the freelancer's own object (first match wins)
 SUBST = [
+    # 2.558.0 (#4709): the routes of the shared core name a kind; no area is registered on the core yet (the test kind
+    # objprobe exists only with KALMIDO_TEST_OBJ, obj_core_test.py / obj_write_test.py): the sweep calls them with it and an id
+    # of the setup and expects 404 (EXPECT_4XX) -- the first real area on the core makes them stale, then its objects go here
+    (r"/api/obj/$", "objkind"), (r"/api/obj/objprobe/$", "list"),
+    (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
     (r"/api/v1/agent/chats/$", "me"),  # 2.491.0 (#2849): the agent (its token) reads the reply style wishes of its own person
