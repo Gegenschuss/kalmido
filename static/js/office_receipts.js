@@ -227,7 +227,7 @@ function rcp_tabHtml() {
   if (!ofcAdmin()) return OFC.info?.submit ? rsb_tabHtml() : ofcLockedHtml();  // 2.356.0 D (#3129, #3006): members hand in receipts
   const ks = typeof ofm_all === 'function' ? ofm_all().filter(i => ['meals', 'travel'].includes(i.key) && i.on() && ofm_need(i) && ofm_ok(i)) : [];
   const kinds = ks.length ? `<nav class="rcp-kinds" aria-label="${esc(tr('Other receipts'))}">${ks.map(i => `<a class="btn sm ghost" href="#${i.go}" data-rcp="${i.key}">${ic(i.icon, 's')}<span>${esc(tr(i.name))}</span></a>`).join('')}</nav>` : '';
-  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${rcn_html()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office
+  return `<div class="rcp">${typeof bkPhotoHtml === 'function' ? bkPhotoHtml() : ''}${kinds}${rsb_inHtml()}${amv_html()}${rcn_html()}${rclHtml(true)}</div>`;  // 2.356.0 D (#3129): + handed in; 2.522.0 (#4433): + new in the office; 2.547.0 (#4434): + the old receipts' move
 }
 
 // ---- 2.522.0 (#4433): "New in the office" -- the documents the general input sorted into the office (or a person moved there)
@@ -248,6 +248,76 @@ function rcn_html() {
   return `<section class="rcn" aria-labelledby="rcn-h"><h3 class="ofcgrp" id="rcn-h">${tr('New in the office')}</h3>
     <ul class="ofclist rcn-list" role="list">${RCN.rows.map(d => `<li class="ofcrow rcn-row"><a href="#docs/${d.id}" class="ofcn"><b>${esc(d.sender?.name || d.name)}</b><small class="muted">${esc([d.date ? fmtDateLoc(d.date) : '', d.amount ? curMoney(d.amount, d.currency) : ''].filter(Boolean).join(' · '))}</small></a></li>`).join('')}</ul></section>`;
 }
+
+// ---- 2.547.0 (#4434): the old receipts of the own documents into the office, once (docs/areamove.py): a hint with the number,
+// the preview (each row "Move" / "Stays", preset by the server: the tag Tax and every doubt stay), one click moves, one undo of
+// the whole move for 30 days. Nothing moves by itself.
+const AMV = {key: '', info: null, loading: false};
+async function amv_load(key) {
+  AMV.loading = true;
+  try { const j = await api('GET', '/api/docs/office-move?count=1'); if (AMV.key === key) AMV.info = j; }
+  catch { if (AMV.key === key) AMV.info = {n: 0}; }
+  AMV.loading = false; ofcDraw();
+}
+const amv_undoKey = id => 'kalmido.amv.undo.' + id;
+function amv_html() {
+  const key = String(OFC.info?.org_id || '');
+  if (AMV.key !== key) Object.assign(AMV, {key, info: null});
+  if (!AMV.info) { if (!AMV.loading) setTimeout(() => amv_load(key), 0); return ''; }
+  const i = AMV.info, u = i.undo;
+  let seen = false; try { seen = !!(u && localStorage.getItem(amv_undoKey(u.id))); } catch { /* private mode */ }
+  if (u && !seen) {
+    return `<div class="shint amv" role="group"><span>${esc(trn('{0} receipt was moved from your documents into the office.', '{0} receipts were moved from your documents into the office.', u.n))} <small class="muted">${esc(tr('Undo possible until {0}', fmtDateLoc(String(u.until).slice(0, 10))))}</small></span>
+      <button type="button" class="btn sm ghost" data-amv="undo">${ic('undo', 's')} ${tr('Undo')}</button><button type="button" class="btn sm ghost" data-amv="seen">${tr('Hide')}</button></div>`;
+  }
+  if (!i.n || i.hidden) return '';
+  return `<div class="shint amv" role="group"><span>${esc(trn('{0} receipt is still in your documents', '{0} receipts are still in your documents', i.n))}</span>
+    <button type="button" class="btn sm" data-amv="open">${tr('Show')}</button><button type="button" class="btn sm ghost" data-amv="hide">${tr('Hide')}</button></div>`;
+}
+const amv_again = () => { AMV.info = null; RCN.rows = null; ofcDraw(); };
+function amv_row(x) {
+  const why = [x.why, x.tax ? tr('Tag Tax') : '', x.sure ? '' : tr('Not sure'), x.block || ''].filter(Boolean).join(' · ');
+  return `<li class="amv-row"><span class="amv-n"><b>${esc(x.name)}</b><small class="muted">${esc(why)}</small></span>
+    <select data-amv-id="${x.id}" aria-label="${esc(x.name)}" ${x.block ? 'disabled' : ''}><option value="move" ${x.pick === 'move' ? 'selected' : ''}>${tr('Move')}</option><option value="stay" ${x.pick === 'move' ? '' : 'selected'}>${tr('Stays')}</option></select></li>`;
+}
+async function amv_open() {
+  let j; try { j = await api('GET', '/api/docs/office-move'); } catch { return; }
+  const md = modal(`<h3>${tr('Move receipts into the office')}</h3>
+    <p class="muted">${esc(tr('These documents in your own documents are receipts. Only your click moves them; you can undo the whole move for 30 days.'))}</p>
+    <ul class="list amv-list" role="list">${(j.items || []).map(amv_row).join('')}</ul>
+    ${j.more ? `<p class="muted">${esc(trn('{0} more receipt follows after this move', '{0} more receipts follow after this move', j.more))}</p>` : ''}
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="go">${ic('check', 's')} <span class="amv-go"></span></button></div>`);
+  md.classList.add('amvmd');
+  const ids = () => $$('select[data-amv-id]', md).filter(s => !s.disabled && s.value === 'move').map(s => +s.dataset.amvId);
+  const sync = () => { const n = ids().length; $('.amv-go', md).textContent = trn('Move {0} receipt', 'Move {0} receipts', n); $('[data-m="go"]', md).disabled = !n; };
+  sync();
+  md.addEventListener('change', sync);
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    b.disabled = true;
+    let r; try { r = await api('POST', '/api/docs/office-move', {ids: ids()}); } catch { b.disabled = false; return; }
+    md.remove();
+    toast(trn('{0} receipt moved into the office', '{0} receipts moved into the office', r.moved) + (r.stayed?.length ? ' · ' + trn('{0} stays', '{0} stay', r.stayed.length) : ''));
+    amv_again();
+  });
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-amv]'); if (!b) return;
+  const k = b.dataset.amv, u = AMV.info?.undo;
+  if (k === 'open') { amv_open(); return; }
+  if (k === 'seen' && u) { try { localStorage.setItem(amv_undoKey(u.id), '1'); } catch { /* private mode */ } ofcDraw(); return; }
+  b.disabled = true;
+  try {
+    if (k === 'hide') await api('POST', '/api/docs/office-move/hide');
+    if (k === 'undo' && u) {
+      if (!await askConfirm(tr('Undo the move?'), tr('The receipts go back into your own documents, to their folders. A receipt changed since stays in the office.'), {ok: tr('Undo')})) { b.disabled = false; return; }
+      const r = await api('POST', `/api/docs/office-move/${u.id}/undo`);
+      toast(trn('{0} receipt is back in your documents', '{0} receipts are back in your documents', r.back) + (r.stayed?.length ? ' · ' + trn('{0} stays', '{0} stay', r.stayed.length) : ''));
+    }
+  } catch { b.disabled = false; return; }
+  amv_again();
+});
 
 // ---- 2.356.0 D (#3129): "Submit receipt" (#office/receipts, rcp_tabHtml) for the people who may hand in a receipt but do not see the
 // bookkeeping (GET /api/office/settings submit): a photo or a file to the bookkeeping, below only the person's own receipts

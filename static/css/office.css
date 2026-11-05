@@ -1121,6 +1121,11 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .oflg.closed .oflgt .fcar{transform:rotate(-90deg)}
 .oflgt:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:var(--radius)}
 .rcp-kinds{display:flex;flex-wrap:wrap;gap:.5rem;margin:0 0 1rem}
+/* 2.547.0 (#4434): the hint and the preview of the old receipts' move into the office */
+.shint.amv{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:0 0 1rem}
+.amvmd .amv-list{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto}
+.amv-row{display:flex;align-items:center;justify-content:space-between;gap:.75rem;padding:.4rem 0;border-bottom:1px solid var(--line)}
+.amv-n{display:flex;flex-direction:column;min-width:0;overflow-wrap:anywhere}
 /* 2.356.0 D (#3006, #3129): the members' line (why Money is short, the way to hand in receipts), locked company fields,
    "Submit receipt" with the person's own receipts and their status */
 .ofcmbr{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .625rem;margin:0 0 .75rem;font-size:var(--fs-s)}

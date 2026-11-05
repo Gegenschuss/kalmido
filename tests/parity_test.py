@@ -722,6 +722,10 @@ APP_ONLY = [
     # 2.522.0 (#4433): the area of a document (office / private) is moved by people only; agents never sort or move it
     ("2.522.0 (#4433): a person moves a document between the office and the private file store (Move to office, Wrong area); "
      "agents get 403, the server sorts the general input itself", ("=POST /api/docs/{}/area",)),
+    # 2.547.0 (#4434): the one move of the old receipts into the office is a person's preview and click; agents get 403
+    ("2.547.0 (#4434): a person moves the old receipts of the own documents into the office once (preview, undo 30 days); "
+     "agents get 403", ("=GET /api/docs/office-move", "=POST /api/docs/office-move", "=POST /api/docs/office-move/hide",
+                        "=POST /api/docs/office-move/{}/undo")),
     ("2.146.0 A (#2451): the readable HTML view of a received e-invoice is for people in the browser; agents read the same values "
      "as `extracted` of GET /documents/{id} and the file itself", ("=GET /api/docs/{}/einvoice",)),
     # 2.121.0 (#2095): the hint on a receipt which cash entries point at it -- part of the cash book, which is office admins only

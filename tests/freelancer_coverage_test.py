@@ -363,6 +363,8 @@ ROUTES = {
     "POST /api/v1/fetcher/documents": "files",
     "POST /api/docs/{}/receipt/einvoice": "files",  # 2.185.0 A (#2583)
     "POST /api/docs/{}/area": "files",  # 2.522.0 (#4433): "Move to office" / "Wrong area" in the personal office (p4433_a_area_test.py)
+    # 2.547.0 (#4434): the old receipts into the personal office once, with its undo (p4434_a_umzug_test.py)
+    "GET /api/docs/office-move": "files", "POST /api/docs/office-move": "files", "POST /api/docs/office-move/hide": "files", "POST /api/docs/office-move/{}/undo": "files",
     # ---- hub (27)
     "DELETE /api/hubmail/address": "hub", "DELETE /api/hubmail/mails/{}": "hub", "DELETE /api/team/absences/{}": "hub",
     "DELETE /api/team/dispo/bookings/{}": "hub", "GET /api/hubmail/inbox": "hub", "GET /api/hubmail/mails": "hub",
