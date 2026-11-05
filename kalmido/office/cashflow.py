@@ -20,7 +20,8 @@ from datetime import date
 from flask import jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.i18n import tr
 from ..core.db import body, bump, db, iso, local_now, now_utc
@@ -128,7 +129,7 @@ def rk_fixed_clean(b, cur=None, c=None, oid=None):
 
 def _fixed_public(c, oid, r):
     d = oc_dec_fields(c, oid, "office_fixed_costs", r)
-    out = {k: d.get(k) for k in ("id", "label", "amount", "start", "until", "repeat", "category", "vat_rate")}
+    out = {k: d.get(k) for k in ("id", "label", "amount", "start", "until", "repeat", "category", "vat_rate", "updated_at")}  # 2.560.0 C (#4700): + updated_at
     out["category"], out["vat_rate"] = out["category"] or "", int(out["vat_rate"] or 0)  # 2.67.0 (#1838)
     out["gross"] = dstr(fci_gross(out["amount"], out["vat_rate"]))
     from .subs import abo_public
@@ -209,10 +210,12 @@ def _fixed_row(c, oid, fid):
 @app.patch("/api/office/fixed-costs/<int:fid>")
 def rk_fixed_patch(fid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_fixed_costs-{int(fid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
     cur = _fixed_public(c, oid, _fixed_row(c, oid, fid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, cur.get("updated_at"), "row", lambda: cur)
     row = rk_fixed_clean(b, cur, c=c, oid=oid)  # 2.91.0 B (#1924)
     if row:
         row["updated_at"] = iso(now_utc())

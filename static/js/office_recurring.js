@@ -105,9 +105,26 @@ function rinSheet(d, s) {
     const b = {title: $('#ofd-rin-title', m).value.trim(), every: $('[data-rin-every].on', m)?.dataset.rinEvery || 'monthly', start: $('#ofd-rin-start', m).value,
       until: $('#ofd-rin-until', m).value || '', auto_send: $('#ofd-rin-auto', m).checked ? 1 : 0};
     if (s) {
+      // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar); undo / redo write only the
+      // keys that changed, each with the version the step before left
       const old = {title: s.title, every: s.every, start: s.start, until: s.until, auto_send: s.auto_send, next_date: s.next_date};
-      await rawFetch('PATCH', `/api/office/series/${s.id}`, b);
-      offerUndo(tr('Saved'), histAdd({label: tr('Invoice series changed'), undo: () => rinPatch(s.id, old), redo: () => rinPatch(s.id, b)}));
+      let sv;
+      try { sv = await rawFetch('PATCH', `/api/office/series/${s.id}`, s.updated_at ? {...b, expect_updated_at: s.updated_at} : b); }
+      catch (x) {
+        const el = $('.aerr', m);
+        if (!el || x.status !== 409 || !x.data?.row) throw x;
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-rin-reload>${tr('Reload')}</button>`;
+        $('[data-rin-reload]', el).addEventListener('click', () => { m.remove(); rinReload(); rinSheet(d, x.data.row); });
+        return false;
+      }
+      const ks = Object.keys(old).filter(k => String(old[k] ?? '') !== String(sv[k] ?? '')), now = Object.fromEntries(ks.map(k => [k, sv[k]]));
+      let ver = sv.updated_at;
+      const step = async src => {
+        try { ver = (await rawFetch('PATCH', `/api/office/series/${s.id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).updated_at; }
+        catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || tr('unknown')); }
+        rinReload();
+      };
+      if (ks.length) offerUndo(tr('Saved'), histAdd({label: tr('Invoice series changed'), undo: () => step(old), redo: () => step(now)}));
     } else {
       const j = await rawFetch('POST', '/api/office/series', {...b, template_id: d.id});
       RIN.open = true;

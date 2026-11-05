@@ -142,13 +142,25 @@ function rk_fixedModal(f) {
       const body = {label: v('#cf-label'), amount: ofcNum(v('#cf-amount')), repeat: v('#cf-repeat'), start: v('#cf-start'), until: v('#cf-until'), category: v('#cf-category'), vat_rate: +v('#cf-vat') || 0};
       if (f) {
         const old = {label: f.label, amount: f.amount, repeat: f.repeat, start: f.start, until: f.until, category: f.category || '', vat_rate: f.vat_rate || 0};
-        await api('PATCH', `/api/office/fixed-costs/${f.id}`, body); md.remove(); rk_cfReload();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/fixed-costs/${f.id}`, old); rk_cfReload(); });
+        // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar); the undo writes back only
+        // the changed keys, with the version this save left
+        const sv = await (f.updated_at ? rawFetch : api)('PATCH', `/api/office/fixed-costs/${f.id}`, f.updated_at ? {...body, expect_updated_at: f.updated_at} : body); md.remove(); rk_cfReload();
+        const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(sv?.[k] ?? null)));
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/fixed-costs/${f.id}`, {...back, expect_updated_at: sv.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } rk_cfReload(); });
+        else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/fixed-costs', body); md.remove(); rk_cfReload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/fixed-costs/${j.id}`); rk_cfReload(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cf-reload>${tr('Reload')}</button>`;
+        $('[data-cf-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); rk_fixedModal(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
   return md;
 }
@@ -296,17 +308,33 @@ function cfs_modal(a, mo) {
       const v = id => $(id, md)?.value ?? '';
       const body = {month: a?.month || mo, dir: v('#cfs-dir'), amount: cfs_amt(v('#cfs-amount')), note: v('#cfs-note')};
       if (a) {
+        // 2.560.0 C (#4700): with expect_updated_at; undo / redo write only the changed keys, each with the version the step before left
         const old = keep(a);
-        await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, body); md.remove(); rk_cfReload();
-        offerUndo(tr('Saved'), histAdd({label: tr('Correction changed'), undo: async () => { await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, old); rk_cfReload(); },
-          redo: async () => { await api('PATCH', `/api/office/cashflow/adjust/${a.id}`, body); rk_cfReload(); }}));
+        const sv = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/cashflow/adjust/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); md.remove(); rk_cfReload();
+        const now = keep(sv), ks = Object.keys(old).filter(k => String(old[k] ?? '') !== String(now[k] ?? ''));
+        let ver = sv.updated_at;
+        const step = async src => {
+          try { ver = (await rawFetch('PATCH', `/api/office/cashflow/adjust/${a.id}`, {...Object.fromEntries(ks.map(k => [k, src[k]])), ...(ver ? {expect_updated_at: ver} : {})})).updated_at; }
+          catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
+          rk_cfReload();
+        };
+        if (ks.length) offerUndo(tr('Saved'), histAdd({label: tr('Correction changed'), undo: () => step(old), redo: () => step(now)}));
+        else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/cashflow/adjust', body); md.remove(); rk_cfReload();
         let id = j.id;
         offerUndo(tr('Added'), histAdd({label: tr('Correction added'), undo: async () => { await api('DELETE', `/api/office/cashflow/adjust/${id}`); rk_cfReload(); },
           redo: async () => { id = (await api('POST', '/api/office/cashflow/adjust', body)).id; rk_cfReload(); }}));
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cfs-reload>${tr('Reload')}</button>`;
+        $('[data-cfs-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); cfs_modal(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
 }
 document.addEventListener('click', e => {

@@ -64,9 +64,16 @@ function aboCandHtml(d) {
 }
 
 async function aboPatch(id, body, old, msg) {
-  await api('PATCH', `/api/office/fixed-costs/${id}`, body); aboReload();
-  toast(msg, async () => { await api('PATCH', `/api/office/fixed-costs/${id}`, old); aboReload(); });
+  const sv = await api('PATCH', `/api/office/fixed-costs/${id}`, body); aboReload();
+  toast(msg, () => aboUndo(id, old, sv));
 }
+// 2.560.0 C (#4700): an undo writes back only the keys that changed, with the version the save left (changed again meanwhile -> a hint)
+async function aboUndo(id, back, sv) {
+  try { await rawFetch('PATCH', `/api/office/fixed-costs/${id}`, sv?.updated_at ? {...back, expect_updated_at: sv.updated_at} : back); }
+  catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); }
+  aboReload();
+}
+const aboChanged = (old, sv) => Object.fromEntries(Object.entries(old).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(sv?.[k] ?? null)));
 function aboModal(f) {
   const d = ABO.data || {}, ppl = d.people || [], rp = d.remind_people || [];
   const ids = new Set((f?.seats || []).filter(x => typeof x === 'number')), free = (f?.seats || []).filter(x => typeof x === 'string');
@@ -112,13 +119,23 @@ function aboModal(f) {
         remind_days: Math.max(0, Math.round(+v('#abo-rdays') || 0)), remind_user: +v('#abo-ruser') || null, url: v('#abo-url').trim()};
       if (f) {
         const old = {label: f.label, amount: f.amount, repeat: f.repeat, start: f.start, until: f.until, category: f.category || '', vat_rate: f.vat_rate || 0, ...aboFields(f)};
-        await api('PATCH', `/api/office/fixed-costs/${f.id}`, body); md.remove(); aboReload();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/fixed-costs/${f.id}`, old); aboReload(); });
+        // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten)
+        const sv = await (f.updated_at ? rawFetch : api)('PATCH', `/api/office/fixed-costs/${f.id}`, f.updated_at ? {...body, expect_updated_at: f.updated_at} : body); md.remove(); aboReload();
+        const back = aboChanged(old, sv);
+        if (Object.keys(back).length) toast(tr('Saved'), () => aboUndo(f.id, back, sv)); else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/fixed-costs', body); md.remove(); aboReload();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/fixed-costs/${j.id}`); aboReload(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-abo-reload>${tr('Reload')}</button>`;
+        $('[data-abo-reload]', el).addEventListener('click', () => { md.remove(); aboReload(); aboModal(x.data.row); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
   return md;
 }

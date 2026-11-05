@@ -26,6 +26,7 @@ from ..core.i18n import LANGS, N_, lang, short_day, tr, tr_stored, trn
 from .doclang import doc_lg  # 2.185.0 C (#2520)
 from .pdfweb import epdf_sweep  # 2.355.0 A (#2847)
 from ..core.pg import insert_id, system_ctx, write_lock
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.orgcrypt import oc_item_store, oc_dec_fields
 from ..core.errors import BadInput, err_stored
 from .calc import dec, dstr, fmt_money, money
@@ -626,6 +627,7 @@ def rin_patch(sid):
     c, uid, oid = _ctx()
     write_lock(c, f"office_series_{int(sid)}")
     cur = rin_row(c, oid, sid)
+    ccf_check(body(), cur["updated_at"], "row", lambda: rin_public(c, oid, cur))  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409
     row = rin_clean(c, oid, body(), cur)
     if row:
         if ("start" in row or "every" in row) and "next_date" not in row:

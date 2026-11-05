@@ -23,6 +23,7 @@ from ..core.db import body, bump, iso, local_now, now_utc, write_lock
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import insert_id
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.errors import BadInput
 from .calc import dec, dstr, money
 from .cashflow import DATE_RE, MONTH_RE, _add_months, _ctx
@@ -113,7 +114,8 @@ def cfs_start_delete():
 # ---------------------------------------------------------------- corrections by hand
 def _adj_public(c, oid, r):
     d = oc_dec_fields(c, oid, "office_cf_adjust", r)
-    return {"id": d["id"], "month": d["month"], "dir": d["dir"], "amount": dstr(dec(d["amount"])), "note": d["note"] or "", "manual": True}
+    return {"id": d["id"], "month": d["month"], "dir": d["dir"], "amount": dstr(dec(d["amount"])), "note": d["note"] or "", "manual": True,
+            "updated_at": d.get("updated_at")}  # 2.560.0 C (#4700): the version the dialog sends back
 
 
 def cfs_adjust(c, oid, first_month, last_month):
@@ -167,10 +169,12 @@ def cfs_adjust_post():
 @app.patch("/api/office/cashflow/adjust/<int:aid>")
 def cfs_adjust_patch(aid):
     c, uid, oid = _ctx()
+    write_lock(c, f"office_cf_adjust-{int(aid)}")  # 2.560.0 C (#4700): saved elsewhere meanwhile -> 409, never overwritten
     old = _adj_public(c, oid, _adj_row(c, oid, aid))
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
+    ccf_check(b, old.get("updated_at"), "row", lambda: old)
     row = _adj_clean(b, old)
     if row:
         row["updated_at"] = iso(now_utc())
