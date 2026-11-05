@@ -659,8 +659,9 @@ function waitDialog(id) {
   mtWaitSugg(md, $('#w-note', md));  // 2.41.0 (#1205): the recent entries (before the field's own Enter)
   const save = async () => {
     const body = {note: $('#w-note', md).value.trim(), until: $('#w-until', md).value || null};
-    try { putTask(await api('PUT', `/api/tasks/${id}/waiting`, body)); } catch { return; }
-    md.remove(); render(); if (S.sel === id) renderDetail(); toast(tr('Waiting on someone'));
+    md.remove();  // 2.559.0 (#4660): shown at once, an error takes it back (waitOpt)
+    try { await waitOpt(id, body); } catch { return; }
+    toast(tr('Waiting on someone'));
   };
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-m]'); if (!b) return;
@@ -725,12 +726,22 @@ function mtWaitSugg(md, inp) {
   md.addEventListener('focusout', e => { const r = e.relatedTarget; if (open && r && r !== inp && !box.contains(r)) close(); });  // e.g. Tab to the date
   if (isMobile()) show(); else mtWsLoad();
 }
+// 2.559.0 (#4660): "Waiting on someone" set (body {note, until}) or ended (body null) shows at once (optWrite as #1501): the task
+// carries it before the answer, no GET /api/state afterwards; the server's task follows; an error (api() says why) takes it back
+async function waitOpt(id, body) {
+  const t = taskById(id); if (!t) return null;
+  const vals = body ? {waiting_at: t.waiting_at || new Date().toISOString(), wait_note: String(body.note || '').slice(0, 300), wait_until: body.until || null, wait_by: S.me?.id ?? null}
+    : {waiting_at: null, wait_note: '', wait_until: null, wait_by: null};
+  const draw = () => { render(); if (S.sel === id) renderDetail(); };
+  const j = await optWrite(optSet(() => taskById(id), vals), () => body ? api('PUT', `/api/tasks/${id}/waiting`, body) : api('DELETE', `/api/tasks/${id}/waiting`), draw);
+  if (j?.id === id) { putTask(j); draw(); }
+  return j;
+}
 async function waitClear(id) {
   const t = taskById(id); if (!t || !t.waiting_at) return;
   const before = {note: t.wait_note || '', until: t.wait_until || null};
-  try { putTask(await api('DELETE', `/api/tasks/${id}/waiting`)); } catch { return; }
-  render(); if (S.sel === id) renderDetail();
-  toast(tr('No longer waiting'), async () => { putTask(await api('PUT', `/api/tasks/${id}/waiting`, before)); render(); if (S.sel === id) renderDetail(); });
+  try { await waitOpt(id, null); } catch { return; }  // 2.559.0 (#4660): at once
+  toast(tr('No longer waiting'), () => waitOpt(id, before).catch(() => {}));
 }
 // 2.24.0 (UX-09): ONE task menu in a fixed order (right-click, "…" in the row / the task panel, "All…" of the short
 // menus): date · priority · assignee · time · list / section · waiting · pin · More… · delete. The short
