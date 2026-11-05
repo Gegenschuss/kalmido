@@ -32,7 +32,8 @@ function dcr_btnHtml() {
 }
 function dcr_wrapAttr(pane) {  // the class and the kept widths of .dc-wrap (inside its class attribute)
   if (!pane || isMobile()) return '';
-  const st = Object.values(DCR_GRIPS).map(g => { const px = +LS.get(g.k, 0); return px > 0 ? `${g.v}:${Math.round(px)}px` : ''; }).filter(Boolean).join(';');
+  // 2.547.0 (#4492): while a grip is dragged, a redraw (a live update, the preview loaded) keeps the dragged width, not the kept one
+  const st = Object.entries(DCR_GRIPS).map(([w, g]) => { const px = DCR.drag?.which === w && DCR.drag.cur != null ? DCR.drag.cur : +LS.get(g.k, 0); return px > 0 ? `${g.v}:${Math.round(px)}px` : ''; }).filter(Boolean).join(';');
   return (dcr_on() ? ' dc-read' : '') + (st ? `" style="${st}` : '');
 }
 const dcr_gripHtml = (which, label) => `<button type="button" class="dc-grip" data-dcgrip="${which}" aria-label="${esc(label + ': ' + tr('Resize (arrow keys; double-click: default size)'))}" title="${esc(tr('Drag to resize · double-click: default size'))}"></button>`;
@@ -195,13 +196,17 @@ function dcr_gripSet(which, px, save) {
   else {
     px = Math.round(Math.max(g.min * dcr_rem(), Math.min(dcr_gripMax(g, which, wrap), px)));
     wrap.style.setProperty(g.v, px + 'px');
-    if (save) LS.set(g.k, px);
+    if (save) LS.set(g.k, px); else if (DCR.drag?.which === which) DCR.drag.cur = px;  // 2.547.0 (#4492): see dcr_wrapAttr
   }
   dcr_fitPv();
 }
 const dcr_fitPv = () => { const b = $('.dc-pane .dc-rv'); if (b) requestAnimationFrame(() => dcr_layout(b)); };
+// 2.547.0 (#4492): the width the grip set last when it set one (the part takes it exactly: no grow, no shrink). Firefox applies
+// a changed width only with the next frame - measured before (a drag or an arrow key right after the one before), the old
+// width came back and the drag landed on the width before it or one in between
 function dcr_gripNow(which) {  // the width it sets, as it stands
-  const wrap = $('.dc-wrap');
+  const wrap = $('.dc-wrap'), set = parseFloat(wrap?.style.getPropertyValue(DCR_GRIPS[which]?.v || '') || '');
+  if (set > 0) return set;
   if (which === 'pane') return $('.dc-pane', wrap)?.getBoundingClientRect().width || 0;
   if (which === 'list') return $('.dc-view', wrap)?.getBoundingClientRect().width || 0;
   return $('.dc-props', wrap)?.getBoundingClientRect().width || 0;
@@ -210,7 +215,7 @@ document.addEventListener('pointerdown', e => {
   const gr = /** @type {any} */ (e.target).closest?.('[data-dcgrip]'); if (!gr || e.button !== 0) return;
   e.preventDefault();
   const which = gr.dataset.dcgrip;
-  DCR.drag = {which, x0: e.clientX, w0: dcr_gripNow(which), px: null};
+  DCR.drag = {which, x0: e.clientX, w0: dcr_gripNow(which), px: null, cur: null};
   try { gr.setPointerCapture(e.pointerId); } catch { /* a synthetic event */ }
   document.documentElement.classList.add('dc-resizing');
 });

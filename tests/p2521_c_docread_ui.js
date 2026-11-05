@@ -165,7 +165,7 @@ const WIDE = {'(min-width:64rem)': true};  // jsdom: a computer window wide enou
   m.close();
 
   // ================= Firefox: the real layout
-  await firefox(async ({cmd, ev, nav, ctx, shot, idle}) => {
+  await firefox(async ({cmd, ev, nav, ctx, shot, idle, drag}) => {
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); return 1; })()`);
     check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
@@ -173,8 +173,10 @@ const WIDE = {'(min-width:64rem)': true};  // jsdom: a computer window wide enou
     const R = sel => `(() => { const e = document.querySelector('${sel}'); if (!e) return null; const r = e.getBoundingClientRect(); return {l: Math.round(r.left), r: Math.round(r.right), t: Math.round(r.top), b: Math.round(r.bottom), w: Math.round(r.width), h: Math.round(r.height)}; })()`;
     for (const [W, Hh] of [[1280, 860], [2900, 1400]]) {
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: W, height: Hh}});
+      check(await wait(`innerWidth === ${W} && innerHeight === ${Hh}`, 40), `Firefox ${W}: the window has its size`);  // 2.547.0 (#4492): wait for the real size, not the call
       await nav(B + (W === 1280 ? '#docs' : `#docs/${order[0]}`));
       check(await wait(`document.querySelectorAll('.dc-card').length === 4`), `Firefox ${W}: four cards`);
+      check(await wait(`Math.abs(document.querySelector('#view').getBoundingClientRect().bottom - innerHeight) <= 2`, 40), `Firefox ${W}: the page laid out at the window's height`);  // 2.547.0 (#4492): a state, not the call
       if (W === 1280) {
         await ev(`(document.querySelector('.dc-view [data-dc="read"]').click(), 1)`);
       }
@@ -214,6 +216,19 @@ const WIDE = {'(min-width:64rem)': true};  // jsdom: a computer window wide enou
     check(Math.abs(+(await ev(`localStorage.getItem('tasks.dc.readW')`)) - w1) <= 1, 'Firefox: the width kept on this device');
     await nav(B + `#docs/${order[0]}`);
     check(await wait(`!!document.querySelector('.dc-wrap.dc-read .dc-pane .dc-rv') && Math.abs(document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect().width - ${w1}) <= 2`), 'Firefox: after a reload the same width');
+    // 2.547.0 (#4492): the step taken out in 2.521.0 is back, with its cause fixed. Firefox applies a changed width only with the
+    // next frame; the grip measured the shown width when it was taken again, so a drag right after the one before (no frame in
+    // between) started from the old width and landed on the width before or one in between - mostly the first drag after a
+    // reload (the width from the page's HTML). Right after the reload, far right and pulled back at once, in one go: the list
+    // lands on the width the drag says and keeps it
+    const back = await ev(`(() => { const g = document.querySelector('[data-dcgrip="list"]'), r = g.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + 40;
+      const pd = (t, cx) => (t === 'pointerdown' ? g : document).dispatchEvent(new PointerEvent(t, {bubbles: true, button: 0, clientX: cx, clientY: y, pointerId: 79}));
+      pd('pointerdown', x); pd('pointermove', x + 2000); pd('pointerup', x + 2000);
+      const max = parseFloat(document.querySelector('.dc-wrap').style.getPropertyValue('--dc-rl')), dx = ${w1} - max;
+      pd('pointerdown', x); pd('pointermove', x + dx); pd('pointerup', x + dx);
+      return {max, kept: +localStorage.getItem('tasks.dc.readW')}; })()`);
+    check(back.max > w1 && Math.abs(back.kept - w1) <= 1, `#4492 Firefox: far right and pulled back at once: kept ${back.kept} (want ${w1}, widest ${back.max})`);
+    check(await wait(`Math.abs(document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect().width - ${w1}) <= 2`, 20), `#4492 Firefox: ... and the list shows that width`);
     // far to the right: the pane keeps its room (30rem); the list stops there
     const far = `(() => { const g = document.querySelector('[data-dcgrip="list"]'), r = g.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + 40;
       g.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, clientX: x, clientY: y, pointerId: 77}));
@@ -222,6 +237,26 @@ const WIDE = {'(min-width:64rem)': true};  // jsdom: a computer window wide enou
     await ev(far.replace(/DX/g, '2000'));
     const pf = await ev(R('.dc-pane'));
     check(pf && pf.w >= 470, 'Firefox: dragged far, the pane keeps at least 30rem ' + JSON.stringify(pf));
+    // the same with real pointer input, as a person drags: far right, then back at once
+    const gr0 = await ev(R('[data-dcgrip="list"]'));
+    await drag((gr0.l + gr0.r) / 2, gr0.t + 40, 1270 - (gr0.l + gr0.r) / 2, 0);
+    check(await wait(`Math.abs(document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect().width - ${back.max}) <= 2`, 20), `#4492 Firefox: dragged far right again, the list at its widest (${back.max})`);
+    const gr1 = await ev(R('[data-dcgrip="list"]'));
+    await drag((gr1.l + gr1.r) / 2, gr1.t + 40, w1 - back.max, 0);
+    await wait(`Math.abs(document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect().width - ${w1}) <= 2 && Math.abs(+localStorage.getItem('tasks.dc.readW') - ${w1}) <= 2`, 20);
+    const wb = (await ev(R('.dc-wrap > .dc-view'))).w, kb = +(await ev(`localStorage.getItem('tasks.dc.readW')`));
+    check(Math.abs(wb - w1) <= 2 && Math.abs(kb - w1) <= 2, `#4492 Firefox: pulled back right after the far drag (real pointer): ${wb} (want ${w1}, kept ${kb})`);
+    // 2.547.0 (#4492): a redraw of the view while the grip is held (a live update, the preview loaded) keeps the dragged width
+    // (before, the list jumped back to the kept width until the next move)
+    const mid = await ev(`(async () => { const g = document.querySelector('[data-dcgrip="list"]'), r = g.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + 40;
+      g.dispatchEvent(new PointerEvent('pointerdown', {bubbles: true, button: 0, clientX: x, clientY: y, pointerId: 78}));
+      document.dispatchEvent(new PointerEvent('pointermove', {bubbles: true, clientX: x - 40, clientY: y, pointerId: 78}));
+      dc_draw();
+      await new Promise(f => requestAnimationFrame(() => requestAnimationFrame(f)));  // the width shows with the next frame
+      const w = Math.round(document.querySelector('.dc-wrap > .dc-view').getBoundingClientRect().width);
+      document.dispatchEvent(new PointerEvent('pointerup', {bubbles: true, clientX: x - 40, clientY: y, pointerId: 78})); return w; })()`);
+    check(Math.abs(mid - (wb - 40)) <= 2, `#4492 Firefox: a redraw while dragging keeps the dragged width (${wb} - 40 -> ${mid})`);
+    check(await wait(`Math.abs(+localStorage.getItem('tasks.dc.readW') - ${wb - 40}) <= 2`, 20), '#4492 Firefox: the width after that drag is kept');
     // the full screen leafs, the pane follows
     await ev(`(document.querySelector('.dc-pane .dc-acts [data-dc="view"]').click(), 1)`);
     check(await wait(`!!document.querySelector('.lightbox.pview .pvpage canvas')`, 80), 'Firefox: Show opens the full screen');
