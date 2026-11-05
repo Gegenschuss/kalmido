@@ -65,7 +65,9 @@ async function scenario(tag, user, ck) {
   check(md.querySelector('#srv-model').value === 'claude-sonnet-5-5', 'the default model' + T);
   check(/outside Kalmido/.test(md.querySelector('#srv-ins').value), 'the instructions: Kalmido only' + T);
   const ticks = [...md.querySelectorAll('[data-srv-st]')];
-  check(ticks.length === 5 && ticks.every(x => x.checked) && md.querySelector('#srv-fdays').value === '5', 'five starter ticks, follow-up after 5 days' + T);
+  // 2.568.0 (#4673): + the office tick, off by default (it needs the agent's office rights)
+  check(ticks.length === 6 && ticks.filter(x => x.dataset.srvSt !== 'office').every(x => x.checked) && !md.querySelector('[data-srv-st="office"]').checked
+    && md.querySelector('#srv-fdays').value === '5', 'five starter ticks on, office off, follow-up after 5 days' + T);
   // without a key: refused, nothing created
   click(w, md.querySelector('[data-m="srv-ok"]'));
   check(md.isConnected && !log.length, 'without a key: nothing is sent' + T);

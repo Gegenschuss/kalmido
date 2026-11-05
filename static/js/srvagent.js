@@ -11,7 +11,9 @@ const SRV_ST = [['briefing', N_('Morning briefing at 07:30'), N_('Daily in its c
   ['tidy', N_('Tidy up the basket'), N_('Project, due date, priority and tags as a proposal.')],
   ['docs', N_('Sort receipts and documents'), N_('Sender, type and tags suggested from the recognised text.')],
   ['meetings', N_('Meeting notes into task proposals'), N_('Notes become a proposal “Tasks from notes”, never tasks directly.')],
-  ['followup', N_('Follow up on “Waiting on someone”'), N_('A drafted follow-up as a comment, posted only after your Yes.')]];
+  ['followup', N_('Follow up on “Waiting on someone”'), N_('A drafted follow-up as a comment, posted only after your Yes.')],
+  // 2.568.0 (#4673): off by default; it grants no office rights itself (skipped with the reason until the agent has them)
+  ['office', N_('Due billing on Mondays at 08:00'), N_('Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).')]];
 let srv_def = null;
 async function srv_defaults(fresh) {
   if (!srv_def || fresh) srv_def = await api('GET', '/api/agents/server/defaults');
@@ -50,7 +52,7 @@ async function srv_modelsFill(md, aid, cur) {
 function srv_starterHtml(d) {
   return `<fieldset class="srvst"><legend>${tr('Starter pack')}</legend>
     <div class="shint keep">${esc(tr('Each one only proposes; you decide. Later you change or remove each on its own (planned jobs, standing rules, documents).'))}</div>
-    ${SRV_ST.map(([k, n, h]) => `<label class="chkl srvsti"><input type="checkbox" data-srv-st="${k}" checked><span>${esc(tr(n))}<small class="muted">${esc(tr(h))}</small></span></label>${k === 'followup'
+    ${SRV_ST.map(([k, n, h]) => `<label class="chkl srvsti"><input type="checkbox" data-srv-st="${k}" ${k === 'office' ? '' : 'checked'}><span>${esc(tr(n))}<small class="muted">${esc(tr(h))}</small></span></label>${k === 'followup'
       ? `<div class="row srvfd"><label for="srv-fdays">${tr('after|days')}</label><input id="srv-fdays" type="number" inputmode="numeric" class="numin" min="1" max="${d.followup_max || 60}" value="${d.followup_days || 5}"><span class="muted">${tr('days')}</span></div>` : ''}`).join('')}</fieldset>`;
 }
 // "New agent" > "Runs on the Kalmido server". o.admin: from the administration (team agent or my own), else my personal agent
@@ -107,6 +109,8 @@ async function srv_editModal(a, notes) {
   const md = /** @type {any} */ (modal(`<h3>${esc(tr('{0} on the Kalmido server', a.name))}</h3>
     ${notes?.length ? `<div class="calerr" role="alert">${notes.map(esc).join('<br>')}</div>` : ''}
     <div id="srv-ed"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="row srvoffice"><button type="button" class="btn sm" data-srv="office">${ic('plus', 's')} ${tr('Due billing on Mondays at 08:00')}</button></div>
+    <div class="shint keep">${esc(tr('Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).'))}</div>
     <h4 id="srv-runs-h">${tr('Latest runs')}</h4><div class="srvruns" id="srv-runs" role="list" aria-labelledby="srv-runs-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="srv-save" hidden>${tr('Save')}</button></div>`));
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
@@ -134,6 +138,12 @@ async function srv_editModal(a, notes) {
       if (b.dataset.srv === 'delkey') {
         if (!await askConfirm(tr('Delete the API key?'), tr('The agent stops working on the server until you save a new key.'), {ok: tr('Delete'), danger: true})) return;
         await calReq('PUT', `/api/agents/${a.id}/server`, {delete_key: true}); toast(tr('Deleted')); await draw(); return;
+      }
+      if (b.dataset.srv === 'office') {  // 2.568.0 (#4673): the starter item office later, once the agent has the office rights
+        b.disabled = true; show('');
+        const x = ((await calReq('POST', `/api/agents/${a.id}/server/starter`, {items: ['office']})).items || [])[0] || {};
+        if (x.state === 'skipped') show(x.reason || ''); else toast(x.state === 'exists' ? tr('Already set up') : tr('Saved'));
+        return;
       }
       if (b.dataset.m === 'srv-save') {
         const key = $('#srv-key', md)?.value.trim() || '';
