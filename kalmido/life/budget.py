@@ -92,7 +92,10 @@ def bud_obj(c, uid, table, oid, write=True):
         oid = int(oid)
     except (TypeError, ValueError):
         raise Denied(404) from None
-    r = c.execute(f"SELECT * FROM {table} WHERE id=?", (oid,)).fetchone()
+    live = " AND deleted_at IS NULL" if table in BUD_TABLES else ""  # 2.567.0 A (#4707): a row in the trash is gone here
+    if table == "budget_files":  # 2.567.0 A (#4707): the receipts of an entry in the trash wait with it
+        live = " AND entry_id IN (SELECT id FROM budget_entries WHERE deleted_at IS NULL)"
+    r = c.execute(f"SELECT * FROM {table} WHERE id=?{live}", (oid,)).fetchone()
     if not r:
         raise Denied(404)
     bud_need_list(c, uid, r["list_id"], write)
@@ -305,7 +308,7 @@ def _cat_of(c, lid, v):
         return None
     if isinstance(v, bool) or not isinstance(v, int):
         raise BadInput(tr("Invalid value: {0}", "cat_id"))
-    if not c.execute("SELECT 1 FROM budget_cats WHERE id=? AND list_id=?", (v, lid)).fetchone():
+    if not c.execute("SELECT 1 FROM budget_cats WHERE id=? AND list_id=? AND deleted_at IS NULL", (v, lid)).fetchone():
         raise BadInput(tr("Invalid value: {0}", "cat_id"))
     return v
 
@@ -315,7 +318,7 @@ def _rec_of(c, lid, v):
         return None
     if isinstance(v, bool) or not isinstance(v, int):
         raise BadInput(tr("Invalid value: {0}", "recurring_id"))
-    r = c.execute("SELECT * FROM budget_recurring WHERE id=? AND list_id=?", (v, lid)).fetchone()
+    r = c.execute("SELECT * FROM budget_recurring WHERE id=? AND list_id=? AND deleted_at IS NULL", (v, lid)).fetchone()
     if not r:
         raise BadInput(tr("Invalid value: {0}", "recurring_id"))
     return r
@@ -382,7 +385,7 @@ def _limit(v):
 def cat_create(c, uid, lid, b):
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid, True)
-    if c.execute("SELECT COUNT(*) FROM budget_cats WHERE list_id=?", (lid,)).fetchone()[0] >= BUD_CATS_MAX:
+    if c.execute("SELECT COUNT(*) FROM budget_cats WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= BUD_CATS_MAX:
         raise BadInput(tr("Too many categories"))
     name = _txt(b.get("name"), BUD_CAT_MAX, "name", need=True)
     kind = _kind(b.get("kind"))
@@ -422,15 +425,48 @@ def cat_update(c, uid, cid, b):
 
 
 def cat_delete(c, uid, cid):
-    """Deletes a category; its entries and templates stay without one (ON DELETE SET NULL) -> {cat, entry_ids,
-    recurring_ids}: what the app's undo needs (the category created again, the rows linked back with PATCH)."""
+    """Moves a category to the trash (2.567.0 A, #4707: no longer the hard delete); its entries and templates stay without
+    one as before, the link waits in trash_cat_id -> {cat, entry_ids, recurring_ids, trash: true}. The app's undo is
+    POST /api/budget/cats/<id>/restore (cat_restore hangs the rows back)."""
     bud_need_on(c, uid)
     r = bud_obj(c, uid, "budget_cats", cid)
     out = {"cat": cat_get(c, r["id"]),
-           "entry_ids": [x[0] for x in c.execute("SELECT id FROM budget_entries WHERE cat_id=? ORDER BY id", (r["id"],))],
-           "recurring_ids": [x[0] for x in c.execute("SELECT id FROM budget_recurring WHERE cat_id=? ORDER BY id", (r["id"],))]}
-    c.execute("DELETE FROM budget_cats WHERE id=?", (r["id"],))
+           "entry_ids": [x[0] for x in c.execute("SELECT id FROM budget_entries WHERE cat_id=? AND deleted_at IS NULL ORDER BY id",
+                                                 (r["id"],))],
+           "recurring_ids": [x[0] for x in c.execute("SELECT id FROM budget_recurring WHERE cat_id=? AND deleted_at IS NULL ORDER BY id",
+                                                     (r["id"],))], "trash": True}
+    c.execute("UPDATE budget_cats SET deleted_at=?, deleted_by=? WHERE id=?", (_ts(), uid, r["id"]))
+    for t in ("budget_entries", "budget_recurring"):  # the rows in the trash too: their link waits with the category
+        c.execute(f"UPDATE {t} SET trash_cat_id=cat_id, cat_id=NULL WHERE cat_id=?", (r["id"],))
     return out
+
+
+def bud_trashed(c, uid, table, oid):
+    """2.567.0 A (#4707): the row of table in the trash with id oid, its list checked for changes; 404 otherwise."""
+    try:
+        oid = int(oid)
+    except (TypeError, ValueError):
+        raise Denied(404) from None
+    r = c.execute(f"SELECT * FROM {table} WHERE id=? AND deleted_at IS NOT NULL", (oid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    bud_need_list(c, uid, r["list_id"], True)
+    return r
+
+
+def cat_restore(c, uid, cid):
+    """2.567.0 A (#4707): the category comes back from the trash; the entries and templates that lost it (and were not
+    given another one meanwhile) get it again -> the category."""
+    bud_need_on(c, uid)
+    _ccf_lock(c, "budget_cats", cid)
+    r = bud_trashed(c, uid, "budget_cats", cid)
+    if c.execute("SELECT COUNT(*) FROM budget_cats WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= BUD_CATS_MAX:
+        raise BadInput(tr("Too many categories"))
+    c.execute("UPDATE budget_cats SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (_ts(), r["id"]))
+    for t in ("budget_entries", "budget_recurring"):
+        c.execute(f"UPDATE {t} SET cat_id=trash_cat_id WHERE trash_cat_id=? AND cat_id IS NULL", (r["id"],))
+        c.execute(f"UPDATE {t} SET trash_cat_id=NULL WHERE trash_cat_id=?", (r["id"],))
+    return cat_get(c, r["id"])
 
 
 # ---------------------------------------------------------------- entries
@@ -542,13 +578,32 @@ def entry_update(c, uid, eid, b):
 
 
 def entry_delete(c, uid, eid):
-    """Deletes an entry (its receipts too) -> (the entry as it was, the file paths to remove after the commit)."""
+    """Moves an entry to the trash (2.567.0 A, #4707: no longer the hard delete): its receipts stay until it is deleted for
+    good (bud_trash_tick); a booked template month is free again (the link waits in trash_rec_id) -> (the entry as it
+    was, [] -- no file to remove any more; kept for the callers)."""
     bud_need_on(c, uid)
+    _ccf_lock(c, "budget_entries", eid)
     r = bud_obj(c, uid, "budget_entries", eid)
     out = entry_get(c, r["id"])
-    paths = [x[0] for x in c.execute("SELECT path FROM budget_files WHERE entry_id=?", (r["id"],))]
-    c.execute("DELETE FROM budget_entries WHERE id=?", (r["id"],))
-    return out, paths
+    c.execute("UPDATE budget_entries SET deleted_at=?, deleted_by=?, trash_rec_id=COALESCE(recurring_id, trash_rec_id), recurring_id=NULL "
+              "WHERE id=?", (_ts(), uid, r["id"]))
+    return out, []
+
+
+def entry_restore(c, uid, eid):
+    """2.567.0 A (#4707): the entry comes back from the trash with its receipts and its template link -- unless the template's
+    month was booked again meanwhile: then it comes back as a plain entry (nothing is lost, the person sees both)."""
+    bud_need_on(c, uid)
+    _ccf_lock(c, "budget_entries", eid)
+    r = bud_trashed(c, uid, "budget_entries", eid)
+    rid = r["trash_rec_id"]
+    c.execute("UPDATE budget_entries SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), r["id"]))
+    if rid and c.execute("SELECT 1 FROM budget_recurring WHERE id=? AND deleted_at IS NULL", (rid,)).fetchone():
+        if r["rmonth"] and not _booked(c, rid, r["rmonth"]):
+            c.execute("UPDATE budget_entries SET recurring_id=?, trash_rec_id=NULL WHERE id=?", (rid, r["id"]))
+        else:
+            c.execute("UPDATE budget_entries SET trash_rec_id=NULL, rmonth='' WHERE id=?", (r["id"],))
+    return entry_get(c, r["id"])
 
 
 # ---------------------------------------------------------------- recurring templates
@@ -588,7 +643,7 @@ def rec_out(d, contracts=None):
 
 
 def _rec_rows(c, lid):
-    return [bud_dec(c, "budget_recurring", r) for r in c.execute("SELECT * FROM budget_recurring WHERE list_id=? ORDER BY id", (lid,))]
+    return [bud_dec(c, "budget_recurring", r) for r in c.execute("SELECT * FROM budget_recurring WHERE list_id=? AND deleted_at IS NULL ORDER BY id", (lid,))]
 
 
 def rec_list(c, uid, lid):
@@ -628,7 +683,7 @@ def _rec_vals(c, lid, b, old=None):
 
 
 def rec_insert(c, uid, lid, v, contract_task_id=None):
-    if c.execute("SELECT COUNT(*) FROM budget_recurring WHERE list_id=?", (lid,)).fetchone()[0] >= BUD_REC_MAX:
+    if c.execute("SELECT COUNT(*) FROM budget_recurring WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= BUD_REC_MAX:
         raise BadInput(tr("Too many recurring items"))
     enc, sid = bud_enc(c, "budget_recurring", bud_sid(c, lid), {k: v[k] for k in oc.FIELDS["budget_recurring"]})
     ts = _ts()
@@ -668,12 +723,44 @@ def rec_update(c, uid, rid, b):
 
 
 def rec_delete(c, uid, rid):
-    """Deletes a template; booked entries stay (recurring_id -> NULL)."""
+    """Moves a template to the trash (2.567.0 A, #4707: no longer the hard delete); booked entries stay (recurring_id ->
+    NULL as before, the link waits in trash_rec_id)."""
     bud_need_on(c, uid)
+    _ccf_lock(c, "budget_recurring", rid)
     r = bud_obj(c, uid, "budget_recurring", rid)
     out = rec_get(c, uid, r["id"])
-    c.execute("DELETE FROM budget_recurring WHERE id=?", (r["id"],))
+    c.execute("UPDATE budget_recurring SET deleted_at=?, deleted_by=? WHERE id=?", (_ts(), uid, r["id"]))
+    c.execute("UPDATE budget_entries SET trash_rec_id=recurring_id, recurring_id=NULL WHERE recurring_id=?", (r["id"],))
     return out
+
+
+def rec_restore(c, uid, rid):
+    """2.567.0 A (#4707): the template comes back from the trash (with its contract link); the entries booked from it are
+    linked again (those not in the trash themselves)."""
+    bud_need_on(c, uid)
+    _ccf_lock(c, "budget_recurring", rid)
+    r = bud_trashed(c, uid, "budget_recurring", rid)
+    if c.execute("SELECT COUNT(*) FROM budget_recurring WHERE list_id=? AND deleted_at IS NULL", (r["list_id"],)).fetchone()[0] >= BUD_REC_MAX:
+        raise BadInput(tr("Too many recurring items"))
+    c.execute("UPDATE budget_recurring SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso_ms(now_utc()), r["id"]))
+    c.execute("UPDATE budget_entries SET recurring_id=trash_rec_id, trash_rec_id=NULL WHERE trash_rec_id=? AND deleted_at IS NULL "
+              "AND recurring_id IS NULL AND rmonth<>''", (r["id"],))
+    return rec_get(c, uid, r["id"])
+
+
+def bud_trash_tick(c, cut, purge):
+    """2.567.0 A (#4707): the budget rows in the trash since before cut (files/trashpurge.py tp_tick, system context):
+    counted, and with purge deleted for good -- entries first (their receipt rows cascade; the files are removed after the
+    commit), then templates and categories (the links waiting on them are emptied by ON DELETE SET NULL).
+    -> ({budget_entries, budget_recurring, budget_cats}, file paths)."""
+    counts, paths = {}, []
+    if purge:
+        paths = [x[0] for x in c.execute("SELECT f.path FROM budget_files f JOIN budget_entries e ON e.id=f.entry_id "
+                                         "WHERE e.deleted_at IS NOT NULL AND e.deleted_at<?", (cut,))]
+    for t in ("budget_entries", "budget_recurring", "budget_cats"):
+        w = f"FROM {t} WHERE deleted_at IS NOT NULL AND deleted_at<?"
+        counts[t] = c.execute(f"DELETE {w}", (cut,)).rowcount if purge else c.execute(f"SELECT COUNT(*) {w}", (cut,)).fetchone()[0]
+    return counts, paths
 
 
 def rec_book(c, uid, rid, b):
@@ -704,7 +791,7 @@ def bud_contracts(c, uid, lid):
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid)
     org = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    taken = {r[0] for r in c.execute("SELECT contract_task_id FROM budget_recurring WHERE list_id=? AND contract_task_id IS NOT NULL", (lid,))}
+    taken = {r[0] for r in c.execute("SELECT contract_task_id FROM budget_recurring WHERE list_id=? AND contract_task_id IS NOT NULL AND deleted_at IS NULL", (lid,))}
     out = []
     for tid, (t, torg) in _contracts(c, uid).items():
         if torg != org:
@@ -748,13 +835,13 @@ def bud_contracts_take(c, uid, lid, b):
 # ---------------------------------------------------------------- the month
 def _entries(c, lid, lo, hi):
     """The decrypted entries of list lid with lo <= month <= hi."""
-    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND day>=? AND day<? ORDER BY day DESC, id DESC",
+    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND day>=? AND day<? AND deleted_at IS NULL ORDER BY day DESC, id DESC",
                      (lid, f"{lo}-01", f"{_mstr(_mi(hi) + 1)}-01")).fetchall()
     return [bud_dec(c, "budget_entries", r) for r in rows]
 
 
 def _cats(c, lid):
-    return [bud_dec(c, "budget_cats", r) for r in c.execute("SELECT * FROM budget_cats WHERE list_id=? ORDER BY sort, id", (lid,))]
+    return [bud_dec(c, "budget_cats", r) for r in c.execute("SELECT * FROM budget_cats WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))]
 
 
 def _signed(e, kind):
@@ -1014,7 +1101,7 @@ def _meta_put(c, lid, hk, mapping):
 def _suggest_maps(c, lid):
     """{counterpart: cat_id}, {title: cat_id} from the list's earlier entries (the newest wins)."""
     by_cp, by_title = {}, {}
-    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND cat_id IS NOT NULL ORDER BY id DESC LIMIT 3000", (lid,)).fetchall()
+    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND cat_id IS NOT NULL AND deleted_at IS NULL ORDER BY id DESC LIMIT 3000", (lid,)).fetchall()
     for r in rows:
         d = bud_dec(c, "budget_entries", r)
         if d["counterpart"]:
@@ -1026,7 +1113,7 @@ def _suggest_maps(c, lid):
 def _dkey_counts(c, lid):
     """{dkey: n} of the list's entries, and the spaces their keys came from."""
     counts, sids = {}, set()
-    for r in c.execute("SELECT dkey, sid FROM budget_entries WHERE list_id=?", (lid,)):
+    for r in c.execute("SELECT dkey, sid FROM budget_entries WHERE list_id=? AND deleted_at IS NULL", (lid,)):
         counts[r[0]] = counts.get(r[0], 0) + 1
         sids.add(int(r[1] or 0))
     return counts, sids
@@ -1035,7 +1122,7 @@ def _dkey_counts(c, lid):
 def _open_recs(c, lid):
     """{month: [template rows due and not booked]} -- computed per month when asked."""
     recs = _rec_rows(c, lid)
-    booked = {(r[0], r[1]) for r in c.execute("SELECT recurring_id, rmonth FROM budget_entries WHERE list_id=? AND recurring_id IS NOT NULL",
+    booked = {(r[0], r[1]) for r in c.execute("SELECT recurring_id, rmonth FROM budget_entries WHERE list_id=? AND recurring_id IS NOT NULL AND deleted_at IS NULL",
                                                (lid,))}
     cache = {}
 
@@ -1084,7 +1171,7 @@ class _Dups:
         self.sid = bud_sid(c, lid)
         self.sids |= {self.sid}
         self.ik, self.refs = {}, {}
-        for r in c.execute("SELECT ikey, rkeys, day FROM budget_entries WHERE list_id=?", (lid,)):
+        for r in c.execute("SELECT ikey, rkeys, day FROM budget_entries WHERE list_id=? AND deleted_at IS NULL", (lid,)):
             if r[0]:
                 self.ik[r[0]] = self.ik.get(r[0], 0) + 1
             if r[1]:
@@ -1310,7 +1397,7 @@ def bud_import_commit(c, uid, lid, b):
 def _run_entries(c, lid, run):
     """The entries of an import run still there: (untouched ids, [edited entries]) -- edited = changed after the import
     or with a receipt."""
-    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND import_run=? ORDER BY day, id", (lid, run)).fetchall()
+    rows = c.execute("SELECT * FROM budget_entries WHERE list_id=? AND import_run=? AND deleted_at IS NULL ORDER BY day, id", (lid, run)).fetchall()
     with_files = {r[0] for r in c.execute("SELECT DISTINCT entry_id FROM budget_files WHERE list_id=?", (lid,))} if rows else set()
     plain, edited = [], []
     for r in rows:
@@ -1326,7 +1413,7 @@ def bud_import_runs(c, uid, lid):
     bud_need_on(c, uid)
     bud_need_list(c, uid, lid, True)
     left = {}
-    for r in c.execute("SELECT import_run, COUNT(*) FROM budget_entries WHERE list_id=? AND import_run<>'' GROUP BY import_run", (lid,)):
+    for r in c.execute("SELECT import_run, COUNT(*) FROM budget_entries WHERE list_id=? AND import_run<>'' AND deleted_at IS NULL GROUP BY import_run", (lid,)):
         left[r[0]] = r[1]
     out = []
     for x in reversed(_runs(c, lid)):
@@ -1375,8 +1462,8 @@ def bud_export(c, uid):
         out.append({"list_id": lid, "name": l["name"], "categories": [cat_out(d) for d in _cats(c, lid)],
                     "recurring": [rec_out(d) for d in _rec_rows(c, lid)],
                     "entries": [entry_out(bud_dec(c, "budget_entries", r)) for r in
-                                c.execute("SELECT * FROM budget_entries WHERE list_id=? ORDER BY day, id", (lid,))],
-                    "files": [dict(r) for r in c.execute("SELECT id, entry_id, name, mime, size, created_at FROM budget_files WHERE list_id=?",
+                                c.execute("SELECT * FROM budget_entries WHERE list_id=? AND deleted_at IS NULL ORDER BY day, id", (lid,))],
+                    "files": [dict(r) for r in c.execute("SELECT id, entry_id, name, mime, size, created_at FROM budget_files WHERE list_id=? AND entry_id IN (SELECT id FROM budget_entries WHERE deleted_at IS NULL)",
                                                          (lid,))]})
     return out
 

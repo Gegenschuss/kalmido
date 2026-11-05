@@ -49,7 +49,7 @@ def tx_list(c, lid, base, dup, x):
                  "ltags": [{"name": t["name"], "color": t["color"], "sort": t["sort"]}
                            for t in c.execute("SELECT name, color, sort FROM list_tags WHERE list_id=? ORDER BY sort, id", (lid,))],
                  "links": [{"title": t["title"], "url": t["url"]}
-                           for t in c.execute("SELECT title, url FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]}
+                           for t in c.execute("SELECT title, url FROM list_links WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))]}
     return idx
 
 

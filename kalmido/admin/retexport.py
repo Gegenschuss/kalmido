@@ -464,6 +464,7 @@ def _project_receipts(c, z, sub):
     """The receipt files of the lists (budget_files) + project-receipts.csv."""
     q, a = sub["lists"]
     rows = c.execute(f"SELECT f.*, l.name AS list_name FROM budget_files f JOIN lists l ON l.id=f.list_id WHERE f.list_id IN ({q}) "
+                     "AND f.entry_id IN (SELECT id FROM budget_entries WHERE deleted_at IS NULL) "  # 2.567.0 A (#4707): not those in the trash
                      "ORDER BY f.list_id, f.id", a).fetchall()
     out = []
     for r in rows:
@@ -493,7 +494,8 @@ def _project_bookings(c, z, sub):
     q, a = sub["lists"]
     cats = {r["id"]: r["name"] for r in c.execute(f"SELECT id, name FROM budget_cats WHERE list_id IN ({q})", a).fetchall()}
     out = []
-    for r in c.execute(f"SELECT * FROM budget_entries WHERE list_id IN ({q}) ORDER BY list_id, day, id", a).fetchall():
+    # 2.567.0 A (#4707): not the entries in the trash
+    for r in c.execute(f"SELECT * FROM budget_entries WHERE list_id IN ({q}) AND deleted_at IS NULL ORDER BY list_id, day, id", a).fetchall():
         d = bud_dec(c, "budget_entries", r)
         out.append({"id": d["id"], "list_id": d["list_id"], "day": d["day"], "kind": d["kind"], "amount": d["amount"],
                     "title": d["title"], "counterpart": d["counterpart"], "note": d["note"],

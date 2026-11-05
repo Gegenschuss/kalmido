@@ -51,7 +51,7 @@ def v1_ov_links(lid):
     v1_args(())
     c = db()
     need_overview(c, lid)
-    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))],
+    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))],
                    next_cursor=None)
 
 

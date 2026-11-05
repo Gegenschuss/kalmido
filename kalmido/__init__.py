@@ -199,6 +199,7 @@ ORDER = (
     "integrations.errorreports",
     "api.projects",
     "lists.sprints",  # 2.60.0 (#343): sprints of project lists (after api.v1: it has token routes)
+    "lists.parttrash",  # 2.567.0 A (#4707): sections / sprints in the trash, the trash view of the other parts
     "lists.flow",  # 2.393.2 A (#3374): flow figures of a project (imported by lists.kpis)
     "lists.kpis",  # 2.43.0 (#1328): sum row + key figures (web + token API)
     "lists.orgvis",  # 2.46.0 (#1603): organisation lists visible to the whole organisation

@@ -359,8 +359,8 @@ def sections_order(lid):
 
 @app.delete("/api/sections/<int:sid>")
 def section_delete(sid):
-    """Deletes a section, its tasks stay (without a section). Returns the section and the ids of its tasks (the undo
-    recreates it with them). Optional body {_prev: {name, tasks}} (undo / redo): only while the section still has that
+    """Deletes a section, its tasks stay (without a section). Returns the section and the ids of its tasks; 2.567.0 A (#4707):
+    a copy waits in the trash (trash: true), the undo is POST /api/sections/<id>/restore (same id, limits, tasks). Optional body {_prev: {name, tasks}} (undo / redo): only while the section still has that
     name and exactly those tasks, else nothing happens and the answer carries a conflict."""
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034)
@@ -376,7 +376,9 @@ def section_delete(sid):
                            conflicts=[{"field": "section", "server": {"name": sec["name"], "tasks": tids}, "mine": prev}])
     # 2.272.0 E2 (#3038): its tasks in the trash remember the section's name (restoring one puts it back, lifecycle.py restore_task)
     c.execute("UPDATE tasks SET trash_section=? WHERE section_id=? AND deleted_at IS NOT NULL", (sec["name"], sid))
+    from .parttrash import lpt_section_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sections/<id>/restore)
+    lpt_section_put(c, sid, me())
     c.execute("DELETE FROM sections WHERE id=?", (sid,))
     bump(c)
     c.commit()
-    return jsonify(ok=True, section=sec, tasks=tids, conflicts=[])
+    return jsonify(ok=True, section=sec, tasks=tids, conflicts=[], trash=True)

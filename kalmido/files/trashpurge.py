@@ -5,7 +5,9 @@ file store's trash when the mail was deleted -- 2.536.0, #4338 -- and follows th
 columns, pipeline deals, invoice series, the
 tombstones of deleted team chat messages and the emptied rows of deleted comments (2.530.0 A, #4315: with their kept text and
 files, collab/cmttrash.py); since 2.223.3 A (#2879) also absences,
-disposition bookings, scheduling polls with their votes, appointment types and file requests.
+disposition bookings, scheduling polls with their votes, appointment types and file requests; since 2.567.0 A (#4707) the
+household budget (life/budget.py bud_trash_tick: entries with their receipts, templates, categories) and the project
+/ task templates (lists/templates.py tpl_trash_tick, with their file copies).
 
 Like every retention run it only counts while ret_on("trash") is off (core/retention.py) and reports the numbers per
 area (GET /api/admin/retention). A node a hook of fs_on_delete refuses (Denied: legal retention of a booked receipt,
@@ -19,6 +21,8 @@ from ..core.access import Denied
 from ..core.retention import ret_on, ret_report, ret_trash_cut
 from ..tasks.atttrash import atr_tick  # 2.272.0 E2 (#3038)
 from ..office.otrash import otb_tick  # 2.272.0 E2 (#3038)
+from ..life.budget import bud_trash_tick  # 2.567.0 A (#4707)
+from ..lists.templates import tpl_trash_tick  # 2.567.0 A (#4707)
 from ..files.store import fs_purge, fs_purge_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
 from ..collab.cmttrash import tcx_trash_paths
@@ -62,6 +66,9 @@ TP_PLAIN = (
     # 2.530.0 B (#4315): deleted habits (their logs cascade) and the Undo copies of "Delete all times of this project"
     ("habits", "habits", ""),
     ("time_wipes", "time_wipes", ""),
+    # 2.567.0 A (#4707): the key links of project lists, the copies of deleted sections / planned sprints (lists/parttrash.py)
+    ("list_links", "list_links", ""),
+    ("list_parts", "list_part_trash", ""),
 )
 
 
@@ -120,6 +127,21 @@ def tp_tick(c, force=False):
         counts.update(fc)
         paths += fp
         counts["office"] = otb_tick(c, cut, purge)  # 2.272.0 E2 (#3038): document drafts and master data (rows only)
+        try:  # 2.567.0 A (#4707): household budget entries (with their receipts), templates, categories
+            with c.savepoint():
+                bc, bp = bud_trash_tick(c, cut, purge)
+            counts.update(bc)
+            paths += bp
+        except Exception as e:  # noqa: BLE001 - like the plain areas below: this one waits for the next run
+            print("trash purge: budget", type(e).__name__, flush=True)
+            counts["budget_err"] = 1
+        try:  # 2.567.0 A (#4707): project / task templates (with their file copies)
+            with c.savepoint():
+                counts["templates"], tpp = tpl_trash_tick(c, cut, purge)
+            paths += tpp
+        except Exception as e:  # noqa: BLE001
+            print("trash purge: templates", type(e).__name__, flush=True)
+            counts["templates_err"] = 1
         for key, table, extra in TP_PLAIN:
             if extra is None:  # 2.223.3 (#2878): clients -- the same hold rule as deleting a client
                 from ..team.clients import cl_hold_sql

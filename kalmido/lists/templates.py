@@ -319,7 +319,7 @@ def tpl_dict(r):
 
 
 def need_template(c, tid):
-    r = c.execute("SELECT * FROM templates WHERE id=? AND user_id=?", (tid, me())).fetchone()
+    r = c.execute("SELECT * FROM templates WHERE id=? AND user_id=? AND deleted_at IS NULL", (tid, me())).fetchone()  # 2.567.0 A (#4707)
     if not r:
         raise Denied(404)
     return r
@@ -328,7 +328,7 @@ def need_template(c, tid):
 @app.get("/api/templates")
 def templates_list():
     return jsonify(templates=[tpl_dict(r) for r in db().execute(
-        "SELECT * FROM templates WHERE user_id=? ORDER BY kind DESC, lower(name), id", (me(),))])
+        "SELECT * FROM templates WHERE user_id=? AND deleted_at IS NULL ORDER BY kind DESC, lower(name), id", (me(),))])
 
 
 def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None):
@@ -393,7 +393,7 @@ def template_create():
     b = body()
     c = db()
     uid = me()
-    if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=?", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
+    if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
         return err(tr("At most {0} templates", TPL_MAX_PER_USER))
     base = local_now().date()
     extra = {}  # 2.363.3 (#3134): what stays on the server (tplextra)
@@ -479,14 +479,43 @@ def template_update(tid):
 
 @app.delete("/api/templates/<int:tid>")
 def template_delete(tid):
+    """2.567.0 A (#4707): the template goes to the trash with its own file copies (no longer deleted at once); the undo is
+    POST /api/templates/<id>/restore, after the trash period tpl_trash_tick deletes it for good -> {ok, id, trash}."""
     c = db()
     need_template(c, tid)
-    files = tx_paths(c, tid)  # 2.363.3 (#3134): its own copies
-    c.execute("DELETE FROM templates WHERE id=?", (tid,))
+    c.execute("UPDATE templates SET deleted_at=?, deleted_by=? WHERE id=?", (iso(now_utc()), me(), tid))
     bump(c)
     c.commit()
-    unlink_files(files)
-    return jsonify(ok=True)
+    return jsonify(ok=True, id=tid, trash=True)
+
+
+@app.post("/api/templates/<int:tid>/restore")
+def template_restore(tid):
+    """2.567.0 A (#4707): a template of the person's trash comes back -> the template (404: not theirs / not in the trash)."""
+    c = db()
+    uid = me()
+    write_lock(c, f"templates-{int(tid)}")
+    if not c.execute("SELECT 1 FROM templates WHERE id=? AND user_id=? AND deleted_at IS NOT NULL", (tid, uid)).fetchone():
+        raise Denied(404)
+    if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
+        return err(tr("At most {0} templates", TPL_MAX_PER_USER))
+    c.execute("UPDATE templates SET deleted_at=NULL, deleted_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    bump(c)
+    c.commit()
+    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
+
+
+def tpl_trash_tick(c, cut, purge):
+    """2.567.0 A (#4707): templates in the trash since before cut (files/trashpurge.py tp_tick, system context): counted, and
+    with purge deleted for good (template_files cascade) -> (count, the paths of their file copies to remove after the commit)."""
+    ids = [r[0] for r in c.execute("SELECT id FROM templates WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,))]
+    if not purge or not ids:
+        return len(ids), []
+    paths = []
+    for tid in ids:
+        paths += tx_paths(c, tid)
+        c.execute("DELETE FROM templates WHERE id=?", (tid,))
+    return len(ids), paths
 
 
 def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, made=None):

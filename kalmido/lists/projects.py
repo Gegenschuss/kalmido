@@ -237,7 +237,7 @@ def overview_build(c, lid, uid):
     from ..agents.core import agent_ids
     role = list_role(c, lid, uid)
     lst = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
-    links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))]
+    links = [ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))]
     from .envs import env_for_lists
     envs = env_for_lists(c, [lid])
     msr = ms_rows(c, [lid])
@@ -382,7 +382,7 @@ def ov_link_add(lid):
     c = db()
     need_overview(c, lid, write=True)
     title, url = ov_link_clean(b)
-    if c.execute("SELECT COUNT(*) FROM list_links WHERE list_id=?", (lid,)).fetchone()[0] >= OV_LINKS_MAX:
+    if c.execute("SELECT COUNT(*) FROM list_links WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= OV_LINKS_MAX:
         return err(tr("At most {0} links", OV_LINKS_MAX), 409)
     srt = c.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM list_links WHERE list_id=?", (lid,)).fetchone()[0]
     nid = insert_id(c, "INSERT INTO list_links(list_id,title,url,sort,created_by,created_at) VALUES(?,?,?,?,?,?)",
@@ -393,7 +393,8 @@ def ov_link_add(lid):
 
 
 def need_ov_row(c, table, lid, rid):
-    r = c.execute(f"SELECT * FROM {table} WHERE id=? AND list_id=?", (rid, lid)).fetchone()
+    live = " AND deleted_at IS NULL" if table == "list_links" else ""  # 2.567.0 A (#4707): a link in the trash is gone here
+    r = c.execute(f"SELECT * FROM {table} WHERE id=? AND list_id=?{live}", (rid, lid)).fetchone()
     if not r:
         raise Denied(404)
     return r
@@ -417,10 +418,26 @@ def ov_link_delete(lid, rid):
     c = db()
     need_overview(c, lid, write=True)
     need_ov_row(c, "list_links", lid, rid)
-    c.execute("DELETE FROM list_links WHERE id=?", (rid,))
+    # 2.567.0 A (#4707): into the trash (the undo: POST .../restore; files/trashpurge.py deletes it after the trash period)
+    c.execute("UPDATE list_links SET deleted_at=?, deleted_by=? WHERE id=?", (iso(now_utc()), me(), rid))
     bump(c)
     c.commit()
-    return jsonify(ok=True)
+    return jsonify(ok=True, id=rid, trash=True)
+
+
+@app.post("/api/lists/<int:lid>/links/<int:rid>/restore")
+def ov_link_restore(lid, rid):
+    """2.567.0 A (#4707): a key link of the list's trash comes back at its place -> the link (edit rights, as deleting)."""
+    c = db()
+    need_overview(c, lid, write=True)
+    if not c.execute("SELECT 1 FROM list_links WHERE id=? AND list_id=? AND deleted_at IS NOT NULL", (rid, lid)).fetchone():
+        raise Denied(404)
+    if c.execute("SELECT COUNT(*) FROM list_links WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= OV_LINKS_MAX:
+        return err(tr("At most {0} links", OV_LINKS_MAX), 409)
+    c.execute("UPDATE list_links SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (rid,))
+    bump(c)
+    c.commit()
+    return jsonify(ov_link_dict(c.execute("SELECT * FROM list_links WHERE id=?", (rid,)).fetchone()))
 
 
 @app.put("/api/lists/<int:lid>/links/order")
@@ -430,14 +447,14 @@ def ov_link_order(lid):
     c = db()
     need_overview(c, lid, write=True)
     ids = b.get("ids")
-    have = [r[0] for r in c.execute("SELECT id FROM list_links WHERE list_id=?", (lid,))]
+    have = [r[0] for r in c.execute("SELECT id FROM list_links WHERE list_id=? AND deleted_at IS NULL", (lid,))]
     if not isinstance(ids, list) or any(not isinstance(x, int) or isinstance(x, bool) for x in ids) or sorted(ids) != sorted(have):
         raise BadInput(tr("Invalid value: {0}", "ids"))
     for i, x in enumerate(ids):
         c.execute("UPDATE list_links SET sort=? WHERE id=?", (i + 1, x))
     bump(c)
     c.commit()
-    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? ORDER BY sort, id", (lid,))])
+    return jsonify(data=[ov_link_dict(r) for r in c.execute("SELECT * FROM list_links WHERE list_id=? AND deleted_at IS NULL ORDER BY sort, id", (lid,))])
 
 
 def ov_ms_clean(b, old=None):

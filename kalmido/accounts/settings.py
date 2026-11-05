@@ -801,7 +801,7 @@ def umz_export_queries(uid):
     q = {
         "lists": ("SELECT * FROM lists WHERE owner_id=? AND (deleted_at IS NULL OR org_id IS NULL)", (uid,)),
         "list_members": (f"SELECT * FROM list_members WHERE list_id IN {own}", (uid,)),
-        "sections": (f"SELECT * FROM sections WHERE list_id IN {own}", (uid,)),
+        "sections": (f"SELECT * FROM sections WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),  # 2.567.0 A (#4707): not the trash
         "list_envs": (f"SELECT id, list_id, name, sort, auto_close, created_at, deleted_at FROM list_envs WHERE list_id IN {own}", (uid,)),  # 2.60.0 (#1514): never the hook token
         "env_deploys": (f"SELECT * FROM env_deploys WHERE env_id IN (SELECT id FROM list_envs WHERE list_id IN {own})", (uid,)),
         "tasks": (f"SELECT * FROM tasks WHERE list_id IN {own}", (uid,)),
@@ -822,14 +822,14 @@ def umz_export_queries(uid):
         "task_enc_notes": ("SELECT * FROM task_enc_notes WHERE user_id=?", (uid,)),
         "notes": (f"SELECT * FROM notes WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),
         "settings": ("SELECT key, value FROM user_settings WHERE user_id=? AND key NOT ILIKE 'sup_key%'", (uid,)),  # 2.74.0 (#338): never the licence key
-        "templates": ("SELECT id, kind, name, data, extra, created_at, updated_at FROM templates WHERE user_id=?", (uid,)),  # 2.463.0 (#3860): extra through tx_export
+        "templates": ("SELECT id, kind, name, data, extra, created_at, updated_at FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)),  # 2.463.0 (#3860): extra through tx_export
         "time_entries": ("SELECT * FROM time_entries WHERE user_id=? ORDER BY start", (uid,)),
         "list_fields": (f"SELECT * FROM list_fields WHERE list_id IN {own}", (uid,)),
         "task_field_values": (f"SELECT * FROM task_field_values WHERE task_id IN {task_ids}", (uid,)),
         "task_deps": (f"SELECT * FROM task_deps WHERE task_id IN {task_ids} OR blocker_id IN {task_ids}", (uid, uid)),
         "list_status": (f"SELECT * FROM list_status WHERE list_id IN {own}", (uid,)),
         # 2.7.1 (#410): the overview of project lists (project files stay in data/attachments/lists/)
-        "list_links": (f"SELECT * FROM list_links WHERE list_id IN {own}", (uid,)),
+        "list_links": (f"SELECT * FROM list_links WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),  # 2.567.0 A (#4707)
         "list_milestones": (f"SELECT * FROM list_milestones WHERE list_id IN {own}", (uid,)),
         "list_files": (f"SELECT * FROM list_files WHERE list_id IN {own}", (uid,)),
         "list_layouts": ("SELECT * FROM list_layouts WHERE user_id=?", (uid,)),

@@ -478,8 +478,8 @@ def sprint_update(sid):
 
 @app.delete("/api/sprints/<int:sid>")
 def sprint_delete(sid):
-    """Removes a planned sprint (its tasks go back to the backlog). Returns the sprint and its task ids: the undo creates it
-    again with them (POST /api/lists/<id>/sprints with tasks)."""
+    """Removes a planned sprint (its tasks go back to the backlog). Returns the sprint and its task ids; 2.567.0 A (#4707): a
+    copy waits in the trash (trash: true), the undo is POST /api/sprints/<id>/restore (same id, its tasks)."""
     c = db()
     s = need_sprint(c, sid, write=True)
     write_lock(c, f"sprints:{s['list_id']}")  # 2.273.0 B (#3051): a sprint started meanwhile is not removed
@@ -490,11 +490,13 @@ def sprint_delete(sid):
         return err(tr("Only a planned sprint can be removed"), 409)
     d = spr_dict(c, s, me())
     tids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE sprint_id=?", (sid,))]
+    from .parttrash import lpt_sprint_put  # 2.567.0 A (#4707): a copy into the trash (POST /api/sprints/<id>/restore)
+    lpt_sprint_put(c, sid, me())
     c.execute("UPDATE tasks SET sprint_id=NULL, sprint_at=NULL WHERE sprint_id=?", (sid,))
     c.execute("DELETE FROM sprints WHERE id=?", (sid,))
     bump(c)
     c.commit()
-    return jsonify(ok=True, sprint=d, tasks=tids)
+    return jsonify(ok=True, sprint=d, tasks=tids, trash=True)
 
 
 @app.post("/api/sprints/<int:sid>/start")

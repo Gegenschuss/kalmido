@@ -15,6 +15,7 @@ from ..life.budget import (
     bud_list_create, bud_month,
     bud_month_view, bud_need_on, bud_obj, bud_overview, bud_this_month, cat_create, cat_delete, cat_update, entry_create,
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
+    cat_restore, entry_restore, rec_restore,  # 2.567.0 A (#4707): the trash
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.attachments import send_stored  # 2.369.5 (#2517): pulled up from functions
@@ -75,9 +76,17 @@ def budget_cat_patch(cid):
 
 @app.delete("/api/budget/cats/<int:cid>")
 def budget_cat_delete(cid):
-    """-> {ok, cat, entry_ids, recurring_ids}: the deleted category and the rows that lost it (for the undo)."""
+    """-> {ok, cat, entry_ids, recurring_ids, trash}: the category in the trash and the rows that lost it (2.567.0 A, #4707:
+    the undo is POST .../restore)."""
     c, uid = db(), me()
     return _done(c, {"ok": True, **cat_delete(c, uid, cid)})
+
+
+@app.post("/api/budget/cats/<int:cid>/restore")
+def budget_cat_restore(cid):
+    """2.567.0 A (#4707): the category back from the trash, its entries and templates hung back on it -> the category."""
+    c, uid = db(), me()
+    return _done(c, cat_restore(c, uid, cid))
 
 
 @app.post("/api/budget/<int:lid>/entries")
@@ -95,13 +104,18 @@ def budget_entry_patch(eid):
 
 @app.delete("/api/budget/entries/<int:eid>")
 def budget_entry_delete(eid):
-    """-> {ok, entry}: the entry as it was (the app's undo creates it again; its receipts are gone)."""
+    """-> {ok, entry, trash}: the entry as it was, now in the trash with its receipts (2.567.0 A, #4707: the undo is
+    POST .../restore; deleted for good after the trash period)."""
     c, uid = db(), me()
-    out, paths = entry_delete(c, uid, eid)
-    bump(c)
-    c.commit()
-    unlink_files(paths)
-    return jsonify(ok=True, entry=out)
+    out, _paths = entry_delete(c, uid, eid)
+    return _done(c, {"ok": True, "entry": out, "trash": True})
+
+
+@app.post("/api/budget/entries/<int:eid>/restore")
+def budget_entry_restore(eid):
+    """2.567.0 A (#4707): the entry back from the trash (receipts, template link) -> the entry."""
+    c, uid = db(), me()
+    return _done(c, entry_restore(c, uid, eid))
 
 
 @app.get("/api/budget/<int:lid>/recurring")
@@ -126,10 +140,18 @@ def budget_rec_patch(rid):
 
 @app.delete("/api/budget/recurring/<int:rid>")
 def budget_rec_delete(rid):
-    """-> {ok, item}: booked entries stay (without the link)."""
+    """-> {ok, item, trash}: booked entries stay (without the link); 2.567.0 A (#4707): the template waits in the trash,
+    the undo is POST .../restore."""
     c, uid = db(), me()
     out = rec_delete(c, uid, rid)
-    return _done(c, {"ok": True, "item": out})
+    return _done(c, {"ok": True, "item": out, "trash": True})
+
+
+@app.post("/api/budget/recurring/<int:rid>/restore")
+def budget_rec_restore(rid):
+    """2.567.0 A (#4707): the template back from the trash, the entries booked from it linked again -> the template."""
+    c, uid = db(), me()
+    return _done(c, rec_restore(c, uid, rid))
 
 
 @app.post("/api/budget/recurring/<int:rid>/book")
