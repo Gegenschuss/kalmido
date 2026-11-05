@@ -75,6 +75,7 @@ const setSeen = (uid, v) => dbx("INSERT INTO user_settings(user_id, key, value) 
   w.close();
 
   // ================= no file: no dialog, no error
+  // (CI red of 2.562.0 / 2.563.0: the release fills the shipped static/whatsnew.json; a test container reads only its data dir's example file since #4685)
   fs.unlinkSync(WN);
   setSeen(ME, V(MI - 3));
   const e0 = errs.length;
