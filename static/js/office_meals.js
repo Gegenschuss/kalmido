@@ -40,9 +40,10 @@ async function bw_saveNow(m, b, pend) {  // the button "Save draft": the dialog 
   let j;
   if (m) {
     const old = bw_body(m);
-    try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => api('PATCH', `${BW_U}/${m.id}`, b), ofcDraw); } catch { return null; }
+    // 2.560.0 D (#4700) kept: the draft's save checks the version too (409: the receipt is back, the saved one opens)
+    try { j = await optWrite(optSet(() => bw_meal(m.id), bw_local(b, m)), () => (m.updated_at ? rawFetch : api)('PATCH', `${BW_U}/${m.id}`, ofcVerBody(b, m)), ofcDraw); } catch (x) { ofcVerLate(x, m.updated_at, row => { bw_reload(); bw_modal(row); }); return null; }
     bw_mealSet(j); bw_refresh();
-    toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${m.id}`, old); bw_refresh(); });
+    const now = j; toast(tr('Saved'), async () => { await api('PATCH', `${BW_U}/${m.id}`, ofcVerUndo(old, b, now)); bw_refresh(); });  // only the keys this save changed
     return j;
   }
   const tmp = -Date.now();
