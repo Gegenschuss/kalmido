@@ -128,7 +128,9 @@ const card = (i, fn, extra = '') => `BEGIN:VCARD\r\nVERSION:3.0\r\nUID:ui${i}\r\
     await shot('p21191a-dup-note.png');
     await click(ev, '.modal [data-ctm2="save"]');
     check(await ready(ev, `!document.querySelector('.modal #ct-given')`), '#2084: the second Save creates it');
-    check((await call(CC, 'GET', '/api/contacts?limit=1')).total === n0 + 1, '#2084: ... one more contact');
+    // 2.559.0 (#4660): the dialog closes before the server's answer (the contact shows at once) - wait for the POST on the slower runner
+    let n1 = 0; for (let i = 0; i < 40 && n1 !== n0 + 1; i++) { n1 = (await call(CC, 'GET', '/api/contacts?limit=1')).total; if (n1 !== n0 + 1) await sleep(250); }
+    check(n1 === n0 + 1, `#2084: ... one more contact ${n0} -> ${n1}`);
     // the name opens the one there
     await click(ev, '#view [data-ct="new"]');
     await ready(ev, `!!document.querySelector('.modal #ct-given')`);
