@@ -123,7 +123,8 @@ async function firefox(fn) {
   w.eval(`settingsModal('users')`);
   md = await until(() => d.querySelector('.smodal #aa-on') && d.querySelector('.smodal'));
   const aa = md.querySelector('#s-aa');
-  check(/Admin alerts/.test(aa.textContent) && !/Admin alerts via ntfy/.test(aa.textContent) && /over their own notification channel/.test(aa.textContent) && /alice: ntfy/.test(aa.textContent), 'admin alerts: the real destination per admin: ' + aa.textContent.slice(0, 300));
+  // 2.555.0 (#4664): the switch says "Send alerts" (the sub-tab is called Admin alerts)
+  check(/Send alerts/.test(aa.textContent) && !/Admin alerts via ntfy/.test(aa.textContent) && /over their own notification channel/.test(aa.textContent) && /alice: ntfy/.test(aa.textContent), 'admin alerts: the real destination per admin: ' + aa.textContent.slice(0, 300));
   // the "nowhere yet" hint for an admin without a device or a chosen topic (drawn from a fake answer)
   const j0 = await call('GET', '/api/admin/alerts');
   await w.eval(`aaDraw(document.querySelector('.smodal'), ${JSON.stringify({...j0, env: true, on: true, admins: [{username: 'alice', topic: '', devices: 0, me: true}]})})`);

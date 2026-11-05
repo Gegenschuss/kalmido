@@ -212,7 +212,7 @@ work apart.
 
 **For organisations (admins)**
 
-- Default: members may **not** connect agents of their own (*Members may connect agents* is off). Switch it on only
+- Default: members may **not** connect agents of their own (*Settings > Organisation > Agents*, *People may create their own agents* is off). Switch it on only
   when there is a rule for it.
 - Agree in the team which AI providers are allowed (privacy, customer data).
 - Share projects with customer data only with agents whose provider has a data processing agreement with you, or with a

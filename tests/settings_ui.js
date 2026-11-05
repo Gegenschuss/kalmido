@@ -28,7 +28,7 @@ const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: tr
   check(md.querySelector('[data-pane="modules"] [data-feat="collab"]') && /Share projects, assign tasks, @mentions/.test(md.querySelector('[data-pane="modules"]').textContent) && md.querySelector('[data-pane="modules"] [data-feat="comments"]'), 'collab switch with explanation under Modules');
   check(md.querySelector('[data-pane="modules"] #s-collaball')?.checked === true, 'admin: instance switch shown next to it (Modules), on');
   check(/Kalmido v\d+\.\d+\.\d+/.test(md.querySelector('[data-pane="help"]').textContent), 'help: version line');
-  check(md.querySelector('[data-pane="notify"] #s-allday') && md.querySelector('[data-pane="notify"] #s-digest') && md.querySelector('[data-pane="notify"] [data-m="test"]'), 'notifications pane: topic test, reminders, digest');
+  check(md.querySelector('[data-pane="notify"] #s-allday') && md.querySelector('[data-pane="notify"] #s-digest') && md.querySelector('[data-pane="notify"] [data-m="ptest"], [data-pane="notify"] [data-m="test"]'), 'notifications pane: topic test, reminders, digest')  // 2.555.0 (#4664): with Web Push the test is "Test all channels";
   check(md.querySelector('[data-pane="data"] #s-import') && !md.querySelector('[data-pane="data"] [data-m="purge"]'), 'data pane: import; 2.7.0 (#405 S4): "Delete all completed" only in the Completed view');
   check(md.querySelector('[data-pane="account"] #a-name') && md.querySelector('[data-pane="account"] [data-m="go-share"]'), 'account pane (2.7.0: the upload token is a link to Share from your phone)');
   // last section remembered

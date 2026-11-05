@@ -111,7 +111,7 @@ function storageHtml() {
 }
 function accountHtml() {
   const m = S.me, pw = m.auth === 'session' || m.has_password;
-  return `<h4 id="s-account-h">${tr('Account')}</h4>
+  return `<h4 id="s-account-h">${tr('Profile')}</h4>${''/* 2.555.0 C (#4664): the section is called Account already */}
     <div class="row"><label>${tr('Signed in as')}</label><span class="acct">${av(m.id, m.display_name)}<b>${esc(m.display_name)}</b> <span class="muted">${esc(m.username)}${m.auth === 'proxy' ? ' · ' + tr('via single sign-on') : ''}</span></span></div>
     ${sup_accountRow()}${''/* 2.74.0 (#338): the supporter badge (self-hosted only) */}
     <div class="row"><label for="a-name">${tr('Display name')}</label><input id="a-name" value="${esc(m.display_name)}" maxlength="60" autocomplete="name" enterkeyhint="done"></div>
@@ -122,7 +122,7 @@ function accountHtml() {
     ${storageHtml()}
     ${dsc_rowHtml()}${''/* 2.49.0 (#1106): People: find, requests, findable by e-mail */}
     ${wsPaneOn() ? (lmOrgPaneOn() ? lmOrgLinkHtml() : wsPaneHtml(t => `<div class="shint">${t}</div>`)) : S.me?.kid ? '' : wsp_paneHtml() /* 2.138.2 C (#2389, P4): without an organisation the colour of Private is chosen here */}
-    ${mvHas() ? `<h4 id="s-mview-h">${tr('View as member')}</h4><div class="row"><label class="chkl"><input type="checkbox" id="s-mview" ${mvOn() ? 'checked' : ''}> ${tr('View as member')}</label></div>
+    ${mvHas() ? `<h4 id="s-mview-h">${tr('View as member')}</h4><div class="row"><label class="chkl"><input type="checkbox" id="s-mview" ${mvOn() ? 'checked' : ''}> ${tr('Show Kalmido as a member sees it')}</label></div>
     <div class="shint">${tr('Kalmido looks like it does for a member: settings and administration of your organisations and of the server are hidden; your private area, your own agents and the daily office work stay. Only the display changes, your rights stay the same. The way back is at the bottom of the settings and in the account menu.')}</div>` : ''}${''/* 2.436.0 (#3620) */}
     ${tfaHtml()}
     ${typeof officeOn === 'function' && officeOn() ? `<h4 id="s-sig-h">${tr('Signature for letters')}</h4>

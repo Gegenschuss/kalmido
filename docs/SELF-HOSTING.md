@@ -466,7 +466,7 @@ deleted from `docker-compose.yml`, which every update restored). Needs Docker Co
 
   Without that role row-level security cannot be enforced. With several organisations (or `KALMIDO_INSTANCE_MODE=workspaces`
   set) Kalmido then refuses to start (exit code 3, the log says what to do); with at most one it starts, but raises a
-  security alert on every start and shows a notice under *Settings > Server > Log & errors > Admin alerts*.
+  security alert on every start and shows a notice under *Settings > Server > Admin alerts*.
 - **One role for several databases.** `kalmido_app` belongs to the whole server; several Kalmido databases on one
   server share it, which is fine (the policies depend on the session, not on the role).
 
@@ -1362,7 +1362,7 @@ a security alert. API (instance admins): `PATCH /api/admin/settings {"public_lin
 
 Uptime monitoring tells you when the app is down, not when someone got in while it keeps running. Two layers help.
 
-**In the app (2.36.2).** Kalmido reports security events through the admin alerts (*Settings > Server > Log & errors > Admin alerts*, kind *Security events*, can be switched off like the other kinds; same cooldown and hourly cap):
+**In the app (2.36.2).** Kalmido reports security events through the admin alerts (*Settings > Server > Admin alerts*, kind *Security events*, can be switched off like the other kinds; same cooldown and hourly cap):
 
 - a new instance admin, however the flag was set (a role change, a new account, single sign-on group sync, a change in
   the database)

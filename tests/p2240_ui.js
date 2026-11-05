@@ -222,8 +222,9 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   check(!md.querySelector('[data-admp="server"]').hidden && w.__store['tasks.admSub'] === '"server"', '#826: a sub-tab opens and is remembered');
   check(md.querySelector('#s-quota').value === '1' && md.querySelector('#s-support').value === 'help@example.com' && md.querySelector('#s-ann-text') && md.querySelector('#s-maillim'), '#910 / #907 / #899: Server: storage, support address, notice, mail limit');
   click(w, md.querySelector('[data-admsub="agents"]')); await sleep(100);  // 2.364.0 C (#3041): the switch is under Organisation > Agents
-  const oa = md.querySelector('#s-orgagents');
-  check(oa && !oa.checked && /Members may connect agents/.test(oa.closest('label').textContent), '#896: Organisation: "Members may connect agents", off by default');
+  // 2.555.0 (#4664): ONE switch for user_agents (s-uag, "People may create their own agents"); the second (s-orgagents) is gone
+  const oa = await until(() => md.querySelector('#admp-agents #s-uag'));
+  check(oa && !oa.checked && /People may create their own agents/.test(oa.closest('label').textContent) && !md.querySelector('#s-orgagents'), '#896: Organisation > Agents: one switch "People may create their own agents", off by default');
   oa.checked = true; oa.dispatchEvent(new w.Event('change', {bubbles: true}));
   // 2.32.0: wait for the PUT instead of a fixed 400 ms (failed once on a slow CI runner)
   check(await until(async () => (await call('GET', '/api/admin/agent-policy')).user_agents === true), '#896: the switch sets the policy');

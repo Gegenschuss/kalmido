@@ -133,7 +133,8 @@ async function uiTests() {
   check(/No device subscribed for push yet\. Until then, notifications go to your ntfy topic\./.test(text(p.querySelector('#s-wpstate'))) && !p.querySelector('#s-wpstate').classList.contains('warn'), 'no device yet: the neutral "until then … ntfy topic" hint (2.5.2: not red)');
   check(p.querySelector('#s-wpdev') && !p.querySelector('#s-wpdev').checked && !p.querySelector('[data-m="wp-test"]'), 'toggle off, no device test button yet');
   check(/Your browser asks for permission once/.test(text(p)), 'permission hint');
-  check(p.querySelector('.topic') && p.querySelector('[data-m="test"]'), 'ntfy topic + ntfy test still there');
+  // 2.555.0 (#4664): with Web Push the channel test "Test all channels" covers ntfy; no third test button at the topic
+  check(p.querySelector('.topic') && p.querySelector('[data-m="ptest"]') && !p.querySelector('[data-m="test"]'), 'ntfy topic + the one channel test');
   // turn on
   const tg = p.querySelector('#s-wpdev'); tg.checked = true; tg.dispatchEvent(new w.Event('change', {bubbles: true})); await sleep(1200);
   check(f.asked === 1 && f.subscribed.length === 1 && f.subscribed[0].userVisibleOnly === true, 'toggle: permission asked, subscribed (userVisibleOnly)');
@@ -142,7 +143,8 @@ async function uiTests() {
   let subs = (await api(w, 'GET', '/api/push/subs')).subs;
   check(subs.length === 1 && subs[0].label === 'Chrome on Android' && subs[0].endpoint === 'http://127.0.0.1:9997/push/ui-1', 'server: device stored with label "Chrome on Android"');
   p = w.document.querySelector('.smodal [data-pane="notify"]');
-  check(p.querySelector('#s-wpdev').checked && p.querySelector('[data-m="wp-test"]'), 'toggle on + "Send test to this device"');
+  // 2.555.0 (#4664): the device test once (in the status line on top), not again under "This device"
+  check(p.querySelector('#s-wpdev').checked && p.querySelectorAll('[data-m="wp-test"]').length === 1 && p.querySelector('#s-pushnow [data-m="wp-test"]'), 'toggle on + one "Send test" for this device');
   check(/Web Push to 1 device\. ntfy only if no device accepts a push\./.test(text(p.querySelector('#s-wpstate'))), 'state: Web Push to 1 device');
   check(/Chrome on Android/.test(text(p.querySelector('.wpdevs'))) && p.querySelector('.wpdevs .devtag'), 'device list: this device tagged');
   check(/Notifications on for this device/.test(text(w.document.querySelector('#toast'))), 'toast: on');

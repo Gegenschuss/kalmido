@@ -127,13 +127,13 @@ document.addEventListener('click', e => {
 });
 
 // ---- Settings > Agents > Built-in assistant (2.489.0, #2664: was its own section)
-function asst_paneHtml(hint) {
+function asst_paneHtml(hint, inTab) {  // 2.555.0 C (#4664): under the sub-tab "Assistant" no second heading of the same name
   if (!asst_avail()) return '';
   const a = S.assistant, on = new Set(a.list_ids || []);
   const ls = S.lists.filter(asst_canList).sort((x, y) => cmpText(x.name, y.name));
-  return `<h4 id="s-asst-h">${tr('Assistant')}</h4>
+  return `${inTab ? '' : `<h4 id="s-asst-h">${tr('Assistant')}</h4>`}
     ${hint(tr('Summarises, drafts replies, suggests tags and dates, sorts the basket and plans your day. Everything only as a proposal: the assistant changes nothing by itself.'))}
-    <div class="row"><label>${tr('Assistant')}</label><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
+    <div class="row"><label class="chkl"><input type="checkbox" id="s-asst-on" ${a.on ? 'checked' : ''}> ${tr('Use the assistant')}</label></div>
     <div class="shint keep asstprov">${ic('info', 's')} <span>${esc(tr('Shared projects and the texts you choose are sent to {0} ({1}).', a.provider || '', a.host || ''))} ${esc(tr('Model: {0}', a.model || ''))}</span></div>
     <h4 id="s-asst-lists-h">${tr('Projects the assistant may read')}</h4>
     ${hint(tr('Only tasks of the projects ticked here go to the assistant, and only when you ask it. Basket tasks go only when you pick them yourself; health projects and locked notes never.'))}

@@ -60,7 +60,8 @@ with tempfile.TemporaryDirectory() as d:
         check(r.returncode == 1 and word in r.stdout, f"check_menupaths.py reports {word}: {r.stdout[-300:]}")
     good = os.path.join(d, "good.md")
     with open(good, "w", encoding="utf-8") as f:
-        f.write("*Settings > Organisation > People*, Settings > Server > Log & errors, *Settings > Modules* shows.\n"
+        # 2.555.0 (#4664): the sub-tab Log & errors is called Admin alerts
+        f.write("*Settings > Organisation > People*, Settings > Server > Admin alerts, *Settings > Modules* shows.\n"
                 "On the iPhone: Settings > Apps > Calendar. Mac: System Settings > Internet Accounts. Office > Settings > Packs.\n")
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_menupaths.py"), good], capture_output=True, text=True)
     check(r.returncode == 0, f"check_menupaths.py passes today's menu and other apps' paths: {r.stdout[-300:]}")

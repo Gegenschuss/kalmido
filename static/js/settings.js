@@ -9,7 +9,7 @@ function wpState(md, j = md._wp) {
   // 2.499.0 (#4215): on Web Push the public ntfy.sh gets no fallback, the message stays in the app
   const noFb = j.ntfy_public && ch !== 'both';
   el.textContent = ch === 'ntfy' ? tr('Everything goes to ntfy.')
-    : !n ? (j.ntfy && !noFb ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” above.'))
+    : !n ? (j.ntfy && !noFb ? tr('No device subscribed for push yet. Until then, notifications go to your ntfy topic.') : tr('No device subscribed for push yet. Turn on “Notify on this device” below.'))
     : ch === 'both' ? trn('Web Push to {0} device and ntfy.', 'Web Push to {0} devices and ntfy.', n)
     : noFb ? trn('Web Push to {0} device.', 'Web Push to {0} devices.', n)
     : trn('Web Push to {0} device. ntfy only if no device accepts a push.', 'Web Push to {0} devices. ntfy only if no device accepts a push.', n);
@@ -23,11 +23,13 @@ async function wpDraw(md) {
   const sub = await wpSub(), mine = sub && j.subs.find(x => x.endpoint === sub.endpoint);
   const hint = t => `<div class="shint">${t}</div>`;
   let h = '';
-  if (shellIOS()) h += hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
+  // 2.555.0 C (#4664): the iPhone app / a browser without Web Push: the sentence stands once, in the status line on top (#s-pushnow)
+  const top = !!$('#s-pushnow', md);
+  if (shellIOS()) h += top ? '' : hintK(tr('Notifications are not available in the iPhone app yet.'));  // 2.435.0 B (#3578)
   else if (isIOS() && !isStandalone()) h += hintK(tr('Add Kalmido to your Home Screen to get notifications on iPhone: Share > Add to Home Screen (iOS 16.4 or newer), then open it from there and turn it on here.'));
-  else if (!wpSupported()) h += hintK(tr('This browser does not support Web Push'));
+  else if (!wpSupported()) h += top ? '' : hintK(tr('This browser does not support Web Push'));
   else {
-    h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;
+    h += `<div class="row"><label>${tr('Web Push')}</label><label class="chkl"><input type="checkbox" id="s-wpdev" ${mine ? 'checked' : ''}> ${tr('Notify on this device')}</label>${mine && !top ? `<button class="btn sm" data-m="wp-test" data-sub="${mine.id}">${ic('bell', 's')} ${tr('Send test to this device')}</button>` : ''}</div>`;  // 2.555.0 C (#4664): the device test once
     if (Notification.permission === 'denied') h += hintK(tr('Notifications are blocked for this site. Allow them in the browser or system settings.'));
     else if (!mine) h += hint(tr('Your browser asks for permission once. Pushes arrive even when Kalmido is closed.'));
   }
@@ -378,7 +380,7 @@ function aiHtml(hint, want) {
     <div class="aiu" id="s-aiu"></div>`) : ''}
     ${pane('setup', agSetupPaneHtml(hint))}
     ${pane('safe', agSafeHtml())}
-    ${subs.some(x => x[0] === 'assistant') ? pane('assistant', asst_paneHtml(hint)) : ''}`;
+    ${subs.some(x => x[0] === 'assistant') ? pane('assistant', asst_paneHtml(hint, true)) : ''}`;
 }
 // ---- 2.7.2 (#420) Settings > Agents > Set up: my personal agents (when an admin allows them), the admins' switch for
 // that, and the two guides (a team agent on a server / a personal agent on your own computer), each for Linux, macOS and
@@ -413,9 +415,9 @@ function agTeamWhy(adm) {
 function agAdminPaneHtml(hint) {
   return `${hint(tr('Server-wide rules for every agent. Agents themselves are created under Settings > Agents: Status (team) or Set up (personal).'))}
     <h4 id="s-uag-h">${tr('Personal agents for everyone')}</h4>
-    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag"><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
+    <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-uag" ${S.about?.user_agents ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('People may create their own agents')}</span></label></div>
     <div class="row"><label for="s-uagmax">${tr('Per person at most')}</label><input id="s-uagmax" type="number" inputmode="numeric" min="1" max="20" value="2" class="numin"></div>
-    ${hint(tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.'))}
+    ${hint(tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.') + ' ' + tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.') + ' ' + tr('You see every agent under Status and can pause or delete it.')) /* 2.555.0 C (#4664): the one hint (was twice, with a second switch) */}
     <h4 id="s-mcpr-h">${tr('Hosted MCP access')}</h4>
     <div class="row"><label class="chkl swl"><span class="swc"><input type="checkbox" id="s-mcpr" ${S.about?.mcp_remote ? 'checked' : ''}><span class="swt" aria-hidden="true"></span></span><span>${tr('Apps may connect to agents with a sign-in (OAuth)')}</span></label></div>
     ${hint(tr('On: apps with an MCP connector connect to this server at /mcp; a signed-in person chooses one of their agents, and the app gets exactly its permissions (revocable under Settings > Agents). Off: /mcp and the sign-in addresses do not exist.'))}
@@ -534,7 +536,7 @@ function agSetupWire(md) {
     if (e.target.id === 's-srvag') { srv_adminSwitch(e.target); return; }  // 2.557.0 C (#4670)
     if (e.target.id !== 's-uag' && e.target.id !== 's-uagmax') return;
     const body = e.target.id === 's-uag' ? {user_agents: e.target.checked} : {max_per_user: Math.max(1, Math.min(20, +e.target.value || 2))};
-    try { await api('PUT', '/api/admin/agent-policy', body); toast(tr('Saved')); } catch { /* shown */ }
+    try { const j = await api('PUT', '/api/admin/agent-policy', body); if (j && 'user_agents' in j) S.about = {...S.about, user_agents: j.user_agents}; toast(tr('Saved')); } catch { if (e.target.type === 'checkbox') e.target.checked = !e.target.checked; }  // 2.555.0 C (#4664): the one switch
     agSetupDraw(md);
   });
 }
@@ -568,7 +570,7 @@ function aiSubShow(md, want, save) {
 // (users / agents / signin / server / log; the old "Organisation" sub-tab is split into People, Agents and Data = odata);
 // the 4th field is the area. A jump to a sub-tab of the other area (settingsModal focus, data-admsub, data-adopen) opens it.
 const ADM_SUBS = [['users', 'users', N_('People|admin'), 'org'], ['agents', 'bot', N_('Agents'), 'org'], ['odata', 'download', N_('Data'), 'org'],
-  ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Log & errors'), 'users']];
+  ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Admin alerts'), 'users']];  // 2.555.0 C (#4664): the sub-tab holds only the admin alerts (key stays log)
 const ad_subSec = k => (ADM_SUBS.find(x => x[0] === k) || [])[3];
 const ad_admFocus = f => ({users: 'users', odata: 'odata', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
 const ad_subKey = sec => sec === 'org' ? 'orgSub' : 'admSub';  // remembered per device and area
@@ -604,13 +606,12 @@ function ad_secDraw(md) {
 // 2.364.0 C (#3041): Organisation > Data: the encryption, export and retention export of the organisations I administer
 // (wsPaneDraw fills it; before inside each organisation under People)
 const wsDataHtml = hint => `<h4 id="s-wsdata-h">${tr('Organisation data')}</h4>${hint(tr('Encryption, recovery key and export of each organisation you manage.'))}<div id="s-wsdata" class="wsdata" aria-labelledby="s-wsdata-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
-// Organisation: whether members may connect their own agents (#896, the policy user_agents of #420, off by default)
-function orgAgentsHtml(hint) {
-  if (!S.api?.enabled) return '';
-  return `<h4 id="s-orgag-h">${tr('Agents')}</h4>
-    <div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgagents" ${S.about?.user_agents ? 'checked' : ''}><span>${tr('Members may connect agents')}<small class="muted">${tr('People can then connect their own AI agent (their own provider, key and computer) and share projects with it. They are responsible for what that provider receives; everyone in a project is told when an agent joins it and where it runs.')} ${tr('On: everyone on this server, in every workspace. Off: in an organisation its admins decide (Settings > Organisation > People), in the private area each person themselves.')}</small></span></label></div>`;
-}
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
+// 2.555.0 C (#4664): Settings > Server > Server in one place (first draw and the redraw after publishing a notice)
+// 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks; 2.46.6 (#1710): + the update check result (was Help)
+function serverPaneHtml(chk, hint) {
+  return instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + (typeof asst_admHtml === 'function' ? asst_admHtml() : '');
+}
 function hostHtml(hint) {
   const a = S.about || {}, ann = a.announce_all || {};
   const gb = mb => mb ? (mb >= 1024 ? fmtNum(mb / 1024, 1) + ' GB' : mb + ' MB') : tr('unlimited');
@@ -624,7 +625,7 @@ function hostHtml(hint) {
     <div class="row"><span class="spacer"></span>${ann.text ? `<button class="btn sm" data-m="ann-clear">${ic('x', 's')} ${tr('Remove')}</button>` : ''}<button class="btn sm pri" data-m="ann-save">${ic('check', 's')} ${tr('Publish')}</button></div>
     <h4 id="s-quota-h">${tr('Storage per person')}</h4>
     ${hint(tr('From 80 % a warning, at 100 % no new uploads (nothing is deleted). Empty = the server default ({0}).', gb(a.storage_quota_env)))}
-    <div class="row"><label for="s-quota">${tr('Storage per person')}</label><input id="s-quota" inputmode="numeric" class="numin" value="${a.storage_quota_mb == null ? '' : esc(String(a.storage_quota_mb))}" placeholder="${esc(String(a.storage_quota_env || 0))}"><span class="muted">${tr('MB (0 = unlimited)')}</span></div>
+    <div class="row"><label for="s-quota">${tr('Limit|storage')}</label>${''/* 2.555.0 C (#4664): the heading says Storage per person */}<input id="s-quota" inputmode="numeric" class="numin" value="${a.storage_quota_mb == null ? '' : esc(String(a.storage_quota_mb))}" placeholder="${esc(String(a.storage_quota_env || 0))}"><span class="muted">${tr('MB (0 = unlimited)')}</span></div>
     <div class="row"><label for="s-qpool">${tr('Shared by')}</label><select id="s-qpool"><option value="user">${tr('each person on their own')}</option><option value="org" ${a.storage_pool === 'org' ? 'selected' : ''}>${tr('the organisation (amount × members)')}</option></select></div>
     <div class="row"><label for="s-support">${tr('Support address')}</label><input id="s-support" type="email" value="${esc(a.support_email || '')}" placeholder="${esc(a.support_email_env || 'support@example.com')}" autocomplete="off"></div>
     <h4 id="s-legal-h">${tr('Privacy and imprint')}</h4>
@@ -657,10 +658,6 @@ async function hostSave(md, patch, label) {
 function hostWire(md) {
   md.addEventListener('change', async e => {
     const id = e.target.id;
-    if (id === 's-orgagents') {
-      try { const j = await api('PUT', '/api/admin/agent-policy', {user_agents: e.target.checked}); S.about = {...S.about, user_agents: j.user_agents}; toast(e.target.checked ? tr('Members may connect agents') : tr('Only admins connect agents')); } catch { e.target.checked = !e.target.checked; }
-      return;
-    }
     if (id === 's-quota') { const v = e.target.value.trim(); if (v !== '' && !/^\d+$/.test(v)) { toast(tr('Invalid value: {0}', tr('Storage per person'))); return; } hostSave(md, {storage_quota_mb: v === '' ? null : +v}, tr('Saved')); return; }
     if (id === 's-qpool') { hostSave(md, {storage_pool: e.target.value}, tr('Saved')); return; }
     if (id === 's-support') { hostSave(md, {support_email: e.target.value.trim()}, tr('Saved')); return; }
@@ -676,7 +673,8 @@ function hostWire(md) {
     try { await api('PUT', '/api/admin/announcement', body); } catch { return; }
     try { const j = await api('GET', '/api/about'); S.about = {...S.about, ...j}; } catch { /* keep */ }
     await load(); render(); toast(body.text ? tr('Notice published') : tr('Notice removed'));
-    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = instanceHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`) + hostHtml(t => `<div class="shint">${t}</div>`); }  // 2.364.0 C (#3041): backups are under Organisation > Data
+    // 2.555.0 C (#4664): the same builder as the first draw, so updates, related tasks and the assistant stay; their boxes load again
+    const p = $('[data-admp="server"]', md); if (p) { p.innerHTML = serverPaneHtml((id, on, label) => `<label class="chkl"><input type="checkbox" id="${id}" ${on ? 'checked' : ''}> ${label}</label>`, t => `<div class="shint">${t}</div>`); if (typeof rt9_adminDraw === 'function') rt9_adminDraw(md); if (typeof asst_admDraw === 'function') asst_admDraw(md); }  // 2.364.0 C (#3041): backups are under Organisation > Data
   });
 }
 function settingsModal(focus) {
@@ -694,7 +692,7 @@ function settingsModal(focus) {
     // 2.39.1 (#1188): Settings > Organisation; 2.364.0 C (#3041): + the server admins' People, Agents and Data (was Administration)
     org: S.me && (lmOrgPaneOn() || S.me.is_admin) ? admSubsHtml('org', {
       users: (lmOrgPaneOn() ? wsPaneHtml(hint) : '') + (S.me.is_admin ? usersHtml() + grpHtml() + orphHtml() + orgsHtml() + actHtml() : ''),
-      agents: S.me.is_admin ? orgAgentsHtml(hint) + ad_agentsHtml(hint) : '',  // 2.46.6 (#1710)
+      agents: S.me.is_admin ? ad_agentsHtml(hint) : '',  // 2.46.6 (#1710); 2.555.0 C (#4664): one switch for user_agents (s-uag), no second one
       odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) + bkHtml() + stoHtml() : '')}, ad_admFocus(focus)) : '',
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
@@ -702,9 +700,9 @@ function settingsModal(focus) {
       <h4 id="s-wacc-h">${tr('Colour of the workspace')}</h4><div class="row">${chk('s-wacc', s.ws_accent !== '0', tr('Interface in the colour of the workspace'))}</div>
       ${hint(tr('Main buttons, the active navigation, ticks, progress and focus take the colour of the workspace shown; Private keeps the accent colour. In “All workspaces” tasks and lists show the colour of their workspace, everything else the accent colour. Off: always the accent colour.')) /* 2.490.0 B (#4026) */}
       <h4 id="s-lemo-h">${tr('New projects')}</h4><div class="row">${chk('s-lemo', s.list_emoji !== '0', tr('Suggest icons for new projects'))}</div>
+      ${hint(tr('A new project gets an icon matching its name; existing projects keep theirs.')) /* 2.555.0 C (#4664): each hint under its own switch */}
       <div class="row">${chk('s-sdn', s.show_done_new !== '0', tr('Hide completed tasks in new projects'))}</div>
       ${hint(tr('A new project hides its completed tasks; its “…” menu shows them again. A folder default goes first.'))}
-      ${hint(tr('A new project gets an icon matching its name; existing projects keep theirs.'))}
       <h4 id="s-sdd-h">${tr('Completed tasks')}</h4><div class="row"><label for="s-sdd">${tr('In projects and views')}</label><select id="s-sdd"><option value="1">${tr('Show completed')}</option><option value="0" ${s.show_done_default === '0' ? 'selected' : ''}>${tr('Hide completed')}</option></select></div>
       ${hint(tr('The default for every project and view; a folder or a single project can choose otherwise.'))}
       <h4>${tr('Tips')}</h4><div class="row"><label>${tr('Hints')}</label><button class="btn sm" data-m="hints-reset">${ic('undo', 's')} ${tr('Show tips again')}</button></div>
@@ -726,9 +724,9 @@ function settingsModal(focus) {
       <div class="navlist sidecfg" id="s-sidebar"></div>
       <div class="row" style="margin-top:.5rem"><span class="spacer"></span><button class="btn sm" data-m="side-reset">${tr('Default')}</button></div>
       <div class="row"><label for="s-sideic">${tr('Project icons')}</label><select id="s-sideic">${[['line', N_('Lines')], ['emoji', N_('Emoji')], ['dot', N_('Dot')]].map(([v, n]) => `<option value="${v}" ${(s.side_icons || 'line') === v ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+      ${hint(tr('Lines: a calm grey icon instead of the emoji, its dot in the project colour. Dot: only the project colour.')) /* 2.555.0 C (#4664): under the icon choice */}
       <div class="row">${chk('s-sideprog', s.side_progress !== '0', tr('Progress in the sidebar'))}</div>
       ${hint(tr('Applies to the thin line and the progress rings.')) /* 2.118.0 (#2297) */}
-      ${hint(tr('Lines: a calm grey icon instead of the emoji, its dot in the project colour. Dot: only the project colour.'))}
       ${rsy_sideSetHtml(chk) /* 2.56.1 (#1799) */}${lc_favSetHtml(chk, hint)}${sv_setHtml() /* 2.156.0 D (#2186) */}`,
     general: `<h4 id="s-lang-h">${tr('Language')}</h4>
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
@@ -755,14 +753,14 @@ function settingsModal(focus) {
       ${typeof wt_setHtml === 'function' ? wt_setHtml(s, hint) : ''}`,
     modules: modulesHtml(hint),
     notify: `${S.webpush?.enabled ? `<div class="pushnow" id="s-pushnow" role="status" aria-live="polite"></div>` : ''}${S.webpush?.enabled ? `<h4>${tr('Delivery')}</h4>
-      <div class="row"><label for="s-pushch">${tr('Channel|push')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Send test')}</button></div>
+      <div class="row"><label for="s-pushch">${tr('Channel|push')}</label><select id="s-pushch">${[['webpush', N_('Web Push')], ['ntfy', 'ntfy'], ['both', N_('Both')]].map(([v, n]) => `<option value="${v}" ${(s.push_channel || 'webpush') === v ? 'selected' : ''}>${v === 'ntfy' ? n : tr(n)}</option>`).join('')}</select><button class="btn sm" data-m="ptest">${ic('bell', 's')} ${tr('Test all channels')}</button></div>
       ${prio}
       <div class="shint wpstate" id="s-wpstate"></div>
       ${hint(tr('No extra app needed. Turn it on below on every device that should ring.'))}
       <h4>${tr('This device')}</h4>
       <div id="s-wp"><div class="muted">${tr('Loading…')}</div></div>` : ''}
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
-      <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code><button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button></div>
+      <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code>${S.webpush?.enabled ? '' : `<button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button>`}</div>${''/* 2.555.0 C (#4664): with Web Push "Test all channels" above covers ntfy */}
       ${S.webpush?.enabled ? '' : prio}
       ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', signed in with the ntfy sign-in your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-ntfyin"></div>
@@ -778,7 +776,7 @@ function settingsModal(focus) {
       ${hint(tr('One push with the numbers of your briefing (the first block of Today).'))}
       <h4 id="s-quiet-h">${tr('Quiet hours (all pushes)')}</h4>
       <div class="row"><label for="s-qfrom">${tr('Quiet from')}</label>${timeIn('s-qfrom', s.quiet_from ?? '22:00', {label: tr('Quiet from'), empty: tr('none')})}<label for="s-qto" class="qtol">${tr('until|time')}</label>${timeIn('s-qto', s.quiet_to ?? '07:00', {label: tr('Quiet until'), empty: tr('none')})}</div>
-      ${hint(tr('No pushes during these hours, on your clock (the time zone of your time tracking settings). The bell keeps everything; one summary when they end. Urgent tasks, focus timers and times you set yourself (digest, briefing) still come.'))}
+      ${hint(tr('No pushes during these hours, on your clock (the time zone under General > Region and formats). The bell keeps everything; one summary when they end. Urgent tasks, focus timers and times you set yourself (digest, briefing) still come.'))}
       ${hint(tr('A task or a project can repeat its reminder until done (date dialog or project dialog). Nothing repeats during the quiet hours.'))}`,
     integr: integrCardsHtml() + calsHtml(chk, hint) + (typeof famDavHtml === 'function' ? famDavHtml() : '') + `<h4 id="s-ical-h">${tr('Calendar subscription')}</h4>
       ${hint(tr('Read-only. Calendar apps fetch changes every few hours.'))}
@@ -812,13 +810,13 @@ function settingsModal(focus) {
       <div class="row" id="s-imp-keyrow" hidden><label for="s-imp-key">${tr('API key')}</label><input type="password" id="s-imp-key" autocomplete="off" spellcheck="false" maxlength="300"><button class="btn sm" data-imp="key">${tr('Preview')}</button></div>
       <div id="s-imp-out"></div>
       <div class="members" id="s-imp-hist"></div>
-      <h4>${tr('Export')}</h4>
-      <div class="row"><label>${tr('Export')}</label><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
+      <h4 id="s-exp-h">${tr('Export')}</h4>${''/* 2.555.0 C (#4664): no row label of the same name */}
+      <div class="row" role="group" aria-labelledby="s-exp-h"><a class="btn sm" href="/api/export.json" download>${ic('download', 's')} ${tr('Download JSON')}</a><a class="btn sm" href="/api/export/todoist.zip" download>${ic('download', 's')} ${tr('Todoist CSV')}</a><a class="btn sm" href="/api/export/markdown.zip" download>${ic('download', 's')} ${tr('Markdown')}</a></div>
       ${hint(tr('One file per project in a ZIP: Todoist CSV for the import of Todoist, Markdown as checklists for any notes app. Projects locked with a password stay out.'))}
       <h4 id="s-pmeta-h">${tr('Photos')}</h4><div class="row">${chk('s-pmeta', s.photo_meta_strip !== '0', tr('Remove location data from photos'))}</div>
       ${hint(tr('Also removes camera details and capture time. In an organisation its admins decide.'))}
       <h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
-      ${hint(tr('Off: a video sign-off first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}
+      ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}
       ${xl_stdHtml(hint)}${''/* 2.470.0 (#3596) */}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
@@ -828,7 +826,7 @@ function settingsModal(focus) {
     ai: aiPaneOn() ? aiHtml(hint, {agents: 'agents', agentdots: 'agents', usage: 'usage', agentsetup: 'setup', assistant: 'assistant'}[focus]) : asst_paneHtml(hint),  // 2.7.0 (#405 S2); 2.489.0 (#2664): the assistant alone while the agents are off
     users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
-      server: instanceHtml(chk, hint) + ad_updHtml(hint) + hostHtml(hint) + (typeof rt9_adminHtml === 'function' ? rt9_adminHtml(hint) : '') + asst_admHtml(),  // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks  // 2.46.6 (#1710): + the update check result (was Help)
+      server: serverPaneHtml(chk, hint),  // 2.555.0 C (#4664): one builder for the first draw and the redraw after "Publish"
       log: aaHtml()}, ad_admFocus(focus)) : '',
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
@@ -853,7 +851,7 @@ function settingsModal(focus) {
       <h4>${tr('Templates')}</h4>
       <div class="shelp">${tr('Task menu (…) or project dialog > Save as template. The template button in the add bar creates the task in the current project, Projects > + > New project from template a whole project. Manage them under Settings > Data.')}</div>
       ${timeOn() ? `<h4>${tr('Time tracking')}</h4><div class="shelp">${tr('Start a timer from a task (detail panel, task menu …) or add time by hand; the running timer shows in the top bar on every device. Sidebar > Time tracking: hours per project and task for a week, month or any range, CSV export and a printable timesheet. In shared projects everyone sees the time of all members, but only changes their own entries. Finished focus sessions on a task count as time unless a timer ran at the same time.')}</div>` : ''}
-      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Projects')}</h4><div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (project dialog, owner and project admins): text, number, selection, date, checkbox, person or link per task; show up to two in the task rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the project header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all projects.')}</div>` : ''}
+      ${depsOn() || fieldsOn() || progressOn() ? `<h4>${tr('Dependencies, fields, status')}</h4>${''/* 2.555.0 C (#4664): the first one is called Projects */}<div class="shelp">${tr('<b>Dependencies:</b> in a task, “Waiting on…” > “Another task” picks the tasks that have to be done first; the task shows “blocked” until they are, and whoever it is assigned to gets a message once the last one is done. “Waiting on…” > “Someone outside” marks a task that waits on a person (a client, an office, a delivery) with a follow-up day. <b>Custom fields</b> (project dialog, owner and project admins): text, number, selection, date, checkbox, person or link per task; show up to two in the task rows, sort and filter by them. <b>Status and progress</b> (Project progress module): the project header shows the progress; with collaboration, owner and editors set a status with a short note, and the project status (“Where is it stuck?”) lists overdue, blocked and unassigned tasks of all projects.')}</div>` : ''}
       ${feat('stats') ? `<h4>${tr('Statistics')}</h4><div class="shelp">${tr('Sidebar > Statistics (or pin it as a tab): completions per week / day and per project, on-time rate, overdue trend, focus time and habit streaks of the last 12 weeks.')}</div>` : ''}
       <h4>${tr('Gestures (phone)')}</h4>
       <div class="shelp">${tr('Swipe right: complete · swipe left: snooze / delete · long-press: selects the task (a bar with Move, Date, Complete and More; tap more tasks to add them, drag them by the grip) · long-press and drag: reorder, move to another column, quadrant or onto a day; drag to the left edge and hold briefly to open the projects (dropping a subtask there = standalone task in that project).')}</div>`,
@@ -1408,7 +1406,7 @@ function cer_html(a, hint) {
   const ls = a.client_errors_lists || [], cur = a.client_errors_list || 0;
   return `<h4 id="s-cer-h">${tr('Errors in the browser')}</h4>
     ${hint(tr('An unexpected error in the app becomes a bug ticket in this project: only the message, the place in the code, the version and the open area; never texts of tasks or form values. To choose from: projects with error reports on (project dialog > Repository).'))}
-    <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}</select></div>`;
+    <div class="row"><label for="s-cerlist">${tr('Report to')}</label><select id="s-cerlist"><option value="0">${tr('Off')}</option>${ls.map(l => `<option value="${l.id}"${l.id === cur ? ' selected' : ''}>${esc(l.name)}</option>`).join('')}${cur && !ls.some(l => l.id === cur) ? `<option value="${cur}" selected>${tr('(Project of another admin)')}</option>` : ''}</select></div>`;  // 2.555.0 C (#4664): reports running into a project not in my list are not shown as Off
 }
 async function cer_setList(el) {
   const from = (S.about || {}).client_errors_list || 0, to = +el.value || 0;
@@ -1419,7 +1417,8 @@ async function cer_setList(el) {
 }
 // Settings > Users > Whole server > Admin alerts: operational warnings to the admins via ntfy (server side, own
 // "Save"; loaded when the pane opens). Recent alerts below, with "Clear".
-const aaHtml = () => `<h4 id="s-aa-h">${tr('Admin alerts')}</h4><div id="s-aa"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+// 2.555.0 C (#4664): the sub-tab is called Admin alerts: no heading of the same name under it
+const aaHtml = () => `<div id="s-aa" aria-labelledby="adms-log"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 const AA_STATE = {sent: N_('delivered'), failed: N_('not delivered'), queued: N_('waiting for the summary'), summarized: N_('in the summary'), capped: N_('hourly limit reached'), listed: N_('only listed (no device or topic yet)')};
 function aaWhen(x) { return x ? fmtStamp(new Date(x)) : ''; }  // 2.368.0 B (#2982): one locale source
 async function aaDraw(md, j) {
@@ -1432,7 +1431,7 @@ async function aaDraw(md, j) {
     : j.admins.length ? tr('Goes to each admin over their own notification channel: {0}.', j.admins.map(a => `${esc(a.username)}: ${via(a)}`).join(', ')) : '';
   const meA = j.admins.find(a => a.me), meNone = !j.topic && meA && !meA.devices && !meA.topic;
   let h = j.env ? '' : hint(tr('Admin alerts are switched off by the server operator.') + ' (KALMIDO_ADMIN_ALERTS=0)');
-  h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Admin alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
+  h += `<div class="featgrid"><label class="wide"><input type="checkbox" id="aa-on" ${j.on && j.env ? 'checked' : ''} ${j.env ? '' : 'disabled'}><span>${tr('Send alerts')}<small class="muted">${tr('Warnings about the server go to the admins over their own notification channel (Web Push to their devices, ntfy only if they chose it or an admin topic is set): updates, delivery problems, watchdog errors, integrations, security events, disk space. Only counts, ids, usernames, device labels and error classes, never task contents.')}</small></span></label></div>
     ${meNone && j.on && j.env ? `<div class="shint aanone">${ic('bell', 's')} <span>${tr('No device subscribed for push yet. Until you subscribe one, admin alerts are only listed here.')}</span> <button class="btn sm" data-aa="notify">${tr('Subscribe this device')}</button></div>` : ''}
     <div class="row"><label for="aa-topic">${tr('Admin topic')}</label><input id="aa-topic" value="${esc(j.topic)}" autocapitalize="off" placeholder="${tr('empty = each admin’s own topic')}" ${j.topic_env ? 'readonly' : ''}></div>
     ${rc || j.topic_env ? `<div class="shint iiok">${(j.topic_env ? tr('Set by the server operator.') + ' (KALMIDO_ADMIN_TOPIC) ' : '') + rc}</div>` : ''}
@@ -1624,7 +1623,7 @@ function tabAddGroups() {
   grp('folder', N_('Folders'), folderNames().map(f => it('folder:' + f, fDisp(f), {ic: 'folder'})));
   grp('tag', N_('Tags'), Object.keys(counts().tags).sort(cmpText).map(t => it('tag:' + t, '#' + t, {ic: 'tag'})));
   grp('o', N_('Other'), [it('home', tr('Start|home')), teamOn() && it('team', tr('Team chat')), collab() && it('news', tr('News')), feat('agents') && agentsOn() && it('agents', tr('Agents')),
-    overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('Projects')), it('settings', tr('Settings'))]);
+    overviewOn() && it('overview', tr('Project status')), feat('wiki') && it('wiki', tr('Knowledge pages')), it('search', tr('Search')), it('lists', tr('All projects (overview)')), it('settings', tr('Settings'))]);  // 2.555.0 C (#4664): not a second "Projects" beside the group
   return out;
 }
 function tabAddSheet(onPick) {

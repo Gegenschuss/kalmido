@@ -16,7 +16,8 @@ const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Conte
   w.eval(`settingsModal('users')`); await sleep(800);
   let md = d.querySelector('.smodal');
   const box = md.querySelector('#s-aa');
-  check(box && md.querySelector('#s-aa-h')?.textContent === 'Admin alerts', 'users pane: Admin alerts section');
+  // 2.555.0 (#4664): the sub-tab is called Admin alerts (was Log & errors), no heading of the same name under it
+  check(box && md.querySelector('#adms-log')?.textContent.trim() === 'Admin alerts' && !md.querySelector('#s-aa-h'), 'users pane: Admin alerts section');
   check(md.querySelector('#aa-on')?.checked === true, 'switch on');
   const topic = md.querySelector('#aa-topic');
   check(topic && topic.readOnly && topic.value === 'env-admins' && [...box.querySelectorAll('.shint')].some(h => /Set by the server operator/.test(h.textContent) && /KALMIDO_ADMIN_TOPIC/.test(h.textContent) && h.classList.contains('iisrc')), 'env topic: read-only with a note (2.6.0, K23: plain words; 2.13.2 #478: note and variable behind the (i))');
@@ -68,7 +69,8 @@ const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Conte
   // German
   w = await boot({user: 'carol'}); d = w.document;
   w.eval(`settingsModal('users')`); await sleep(800); md = d.querySelector('.smodal');
-  check(md.querySelector('#s-aa-h')?.textContent === 'Admin-Warnungen' && /Warnungen zum Server gehen an die Admins über ihren eigenen Benachrichtigungskanal/.test(md.querySelector('#s-aa').textContent)
+  // 2.555.0 (#4664): the sub-tab carries the name
+  check(md.querySelector('#adms-log')?.textContent.trim() === 'Admin-Warnungen' && /Warnungen zum Server gehen an die Admins über ihren eigenen Benachrichtigungskanal/.test(md.querySelector('#s-aa').textContent)
     && /Sicherheitsereignisse/.test(md.querySelector('#aa-kinds').textContent), 'German labels');
   md.remove(); w.close();
   // non-admin

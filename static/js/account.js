@@ -901,10 +901,10 @@ function signupScreen(el, logo, info) {
   });
   setTimeout(() => $('#su-name', el)?.focus(), 50);
 }
-// ---- Settings > Users > Whole server: sign-in (2FA policy, passkey login, OIDC)
+// ---- Settings > Users > Whole server: sign-in (2FA policy, passkey login, OIDC) (2.555.0 C, #4664: heading "Two-factor and passkeys", the sub-tab is called Sign-in)
 function signinHtml(hint) {
   const a = S.about || {}, o = a.oidc || {};
-  let h = `<h4 id="s-signin-h">${tr('Sign-in')}</h4>
+  let h = `<h4 id="s-signin-h">${tr('Two-factor and passkeys')}</h4>
     <div class="featgrid">
       <label class="wide"><input type="checkbox" id="s-2fareq" ${a.twofa_required ? 'checked' : ''}><span>${tr('Require two-factor authentication for built-in sign-ins')}<small class="muted">${tr('Everyone who signs in with a password must set up an authenticator app or a passkey at the next sign-in. Single sign-on sign-ins (sign-in proxy, OIDC) are not affected: there the sign-in provider is responsible.')}</small></span></label>
       <label class="wide"><input type="checkbox" id="s-pklogin" ${a.passkey_login !== false ? 'checked' : ''}><span>${tr('Allow signing in with a passkey without the password')}<small class="muted">${tr('A passkey someone added in Settings > Account then also works on its own (the device asks for the fingerprint, face or PIN).')}</small></span></label>

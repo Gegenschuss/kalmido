@@ -615,7 +615,7 @@ async function kks_draw(md) {
     <div class="row"><label>${tr('When ticked')}</label><label class="chkl"><input type="checkbox" id="kk-arch" ${cur.connected && !cur.archive ? '' : 'checked'}> ${tr('archive the bookmark in Karakeep')}</label></div>
     ${cur.error ? `<p class="aerr">${esc(cur.error_text || cur.error)}</p>` : ''}
     <div class="aerr" role="alert" data-kks="err"></div>
-    <div class="row">${cur.connected ? `<button type="button" class="btn sm" data-kks="sync">${ic('sync', 's')} ${tr('Fetch now')}</button><button type="button" class="btn sm danger" data-kks="del">${tr('Disconnect')}</button>` : ''}<span class="spacer"></span><button type="button" class="btn sm pri" data-kks="save">${cur.connected ? tr('Save') : tr('Connect')}</button></div>`;
+    <div class="row">${cur.connected ? `<button type="button" class="btn sm" data-kks="sync">${ic('sync', 's')} ${tr('Fetch now')}</button><button type="button" class="btn sm danger" data-kks="del">${tr('Disconnect')}</button>` : ''}${cur.connected ? '' : `<span class="spacer"></span><button type="button" class="btn sm pri" data-kks="save">${tr('Connect')}</button>`}</div>`;  // 2.555.0 C (#4664): connected = the fields save themselves (change), "Connect" only the first time
   if (box._on) return;
   box._on = true;
   box.addEventListener('click', async e => {
@@ -635,6 +635,24 @@ async function kks_draw(md) {
     } catch (x) { err.textContent = x?.message || ''; }
     b.disabled = false;
     kks_draw(box.parentElement);
+  });
+  // 2.555.0 C (#4664): the autosave rule: once connected, a changed field is saved at once (the same PUT, only that field;
+  // address and key go together, the server keeps the key only for the same server). A refused value stays in the field.
+  box.addEventListener('change', async e => {
+    const el = e.target, c = box._cur || {}; if (!c.connected || !el.id?.startsWith('kk-')) return;
+    const err = $('[data-kks="err"]', box), v = id => $(id, box)?.value?.trim() ?? '';
+    let body;
+    if (el.id === 'kk-url' || el.id === 'kk-tok') {
+      if (!v('#kk-url')) { err.textContent = tr('Please enter the address'); return; }
+      body = {url: v('#kk-url'), ...(v('#kk-tok') ? {token: v('#kk-tok')} : {})};
+    } else if (el.id === 'kk-list') body = {list_id: +el.value};
+    else if (el.id === 'kk-arch') body = {archive: el.checked};
+    else return;
+    err.textContent = '';
+    try { await rawFetch('PUT', '/api/life/karakeep', body); } catch (x) { err.textContent = x?.message || ''; return; }
+    toast(tr('Saved'));
+    if (body.url) { try { await kksFetch(box); await load(); } catch { /* shown in the box */ } if (typeof lifeReload === 'function') lifeReload(); kks_draw(box.parentElement); }
+    else box._cur = {...c, ...(body.list_id ? {list_id: body.list_id} : {}), ...('archive' in body ? {archive: body.archive} : {})};
   });
 }
 // ---- the newsletter service of the shown workspace (newsletter.js draws into .nwl-set, loaded with the module Contacts)

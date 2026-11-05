@@ -81,7 +81,8 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   check(!md.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"], #s-ws .oxbox, .ocadm`) && md.querySelectorAll(`.ocbox[data-ocorg="${ORG}"]`).length === 1, 'the recovery key once (not under People, not under the server switch)');
   check(od.querySelector('#s-bk-h') && od.querySelector('#s-orgenc') && !md.querySelector('[data-pane="users"] #s-bk'), 'Data: backups and the encryption switch (no longer under Server)');
   // Agents: the members' switch and the server-wide rules together
-  check(md.querySelector('#admp-agents #s-orgagents') && md.querySelector('#admp-agents #s-uag'), 'Agents: "Members may connect agents" and the rules for every agent');
+  // 2.555.0 (#4664): one switch for user_agents (the second one, s-orgagents, is gone)
+  check(!md.querySelector('#s-orgagents') && md.querySelectorAll('#admp-agents #s-uag').length === 1, 'Agents: one switch for personal agents and the rules for every agent');
   // a jump into the other area
   w.eval(`document.querySelectorAll('.modal').forEach(m => m.remove()); settingsModal('server')`);
   md = await until(() => d.querySelector('.smodal'));
