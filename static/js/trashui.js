@@ -220,6 +220,37 @@ async function vtr_restore(id) {
   renderView();
   if (!lid && !x.task_id && !x.list_id && !x.client_id) loadModule('videos').then(() => vdr_open(id), () => {});  // no project to go to: it opens
 }
+// 2.567.0 A (#4707): the other parts in their trash (GET /api/trash/parts, lists/parttrash.py): sections, planned sprints, key
+// links, templates and the rows of a budget -- each with "Restore", so a delete is undone from another device too
+const PTR = {items: null, days: 0, at: 0};
+const PTR_KIND = {section: [() => tr('Section'), x => `/api/sections/${x.id}/restore`], sprint: [() => tr('Sprint'), x => `/api/sprints/${x.id}/restore`],
+  link: [() => tr('Link'), x => `/api/lists/${x.list_id}/links/${x.id}/restore`], template: [() => tr('Template'), x => `/api/templates/${x.id}/restore`],
+  budget_entry: [() => tr('Budget entry'), x => `/api/budget/entries/${x.id}/restore`], budget_cat: [() => tr('Budget category'), x => `/api/budget/cats/${x.id}/restore`],
+  budget_rec: [() => tr('Recurring entry'), x => `/api/budget/recurring/${x.id}/restore`]};
+async function ptr_load(force) {
+  if (!force && PTR.at && Date.now() - PTR.at < 30000) return;
+  PTR.at = Date.now();
+  try { const j = await api('GET', '/api/trash/parts'); PTR.items = j.items || []; PTR.days = j.days || 0; } catch { PTR.items = PTR.items || []; return; }
+  if (S.route.key === 'trash') renderView();
+}
+function ptr_html() {
+  ptr_load();
+  const xs = (PTR.items || []).filter(x => PTR_KIND[x.kind]);
+  if (!xs.length) return '';
+  return `<div class="group otrlists ptrlist"><div class="ghead">${esc(tr('Other deleted items'))} <span class="c">${xs.length}</span></div>`
+    + xs.map((x, i) => `<div class="mrow otrrow" data-ptr="${i}"><span class="n"><b>${esc(x.name || PTR_KIND[x.kind][0]())}</b><small class="muted">${esc([PTR_KIND[x.kind][0](), x.list, tr('Deleted {0} by {1}', fmtWhen(x.deleted_at), x.by_name || '?')].filter(Boolean).join(' · '))}</small></span>`
+      + `<span class="oadmb"><button type="button" class="btn sm" data-ptra="restore">${ic('undo', 's')}<span>${tr('Restore')}</span></button></span></div>`).join('')
+    + (PTR.days ? `<div class="muted otrnote">${esc(trashNote(trn('Deleted items are deleted for good after {0} day.', 'Deleted items are deleted for good after {0} days.', PTR.days)))}</div>` : '') + '</div>';
+}
+document.addEventListener('click', async e => {
+  const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-ptra]'); if (!(b instanceof HTMLElement)) return;
+  e.preventDefault();
+  const xs = (PTR.items || []).filter(y => PTR_KIND[y.kind]), x = xs[+(/** @type {HTMLElement|null} */ (b.closest('[data-ptr]')))?.dataset.ptr];
+  if (!x) return;
+  try { await api('POST', PTR_KIND[x.kind][1](x)); } catch { return; }  // api() said why
+  toast(tr('Restored')); PTR.items = (PTR.items || []).filter(y => y !== x); PTR.at = 0;
+  await load(); render();
+});
 document.addEventListener('click', e => {
   const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-vtra]'); if (!(b instanceof HTMLElement)) return;
   e.preventDefault();

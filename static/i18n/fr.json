@@ -10250,7 +10250,6 @@
   "{0} row read": ["{0} ligne lue", "{0} lignes lues"],
   "{0} row skipped": ["{0} ligne ignorée", "{0} lignes ignorées"],
   "Take over {0} entry": ["Reprendre {0} opération", "Reprendre {0} opérations"],
-  "The {0} receipt is deleted with it and cannot be brought back.": ["Le {0} justificatif est supprimé avec et ne peut pas être récupéré.", "Les {0} justificatifs sont supprimés avec et ne peuvent pas être récupérés."],
   "Limit per month": "Plafond mensuel",
   "A budget is private: it cannot be shared with an agent": "Un budget est privé : il ne peut pas être partagé avec un agent",
   "At most {0} rows per import": "Au plus {0} lignes par import",
@@ -16544,5 +16543,12 @@
   "Calibration: {0}": "Étalonnage : {0}",
   "Maintenance: {0}": "Maintenance : {0}",
   "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine",
+  "Budget entry": "Écriture du budget",
+  "Budget category": "Catégorie du budget",
+  "Recurring entry": "Écriture récurrente",
+  "Other deleted items": "Autres éléments supprimés",
+  "Deleted items are deleted for good after {0} day.": ["Les éléments supprimés sont effacés définitivement après {0} jour.", "Les éléments supprimés sont effacés définitivement après {0} jours."],
+  "Template “{0}” deleted": "Modèle « {0} » supprimé",
+  "Link “{0}” removed": "Lien « {0} » retiré",
   "Set again meanwhile: the earlier value was not restored.": "Redéfini entre-temps : l'ancienne valeur n'a pas été restaurée."
 }

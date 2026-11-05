@@ -201,8 +201,8 @@ function bg_entryModal(e) {
   md.addEventListener('click', async ev => {
     const del = ev.target.closest('[data-bg-del]'), fdel = ev.target.closest('[data-bgf-del]');
     if (del) {
-      if (e.files?.length && !await askConfirm(tr('Delete “{0}”?', e.title), trn('The {0} receipt is deleted with it and cannot be brought back.', 'The {0} receipts are deleted with it and cannot be brought back.', e.files.length), {ok: tr('Delete'), danger: true})) return;
-      md.remove(); bg_delEntry(e);  // 2.559.0 (#4660): the question stays, then the entry goes at once
+      // 2.567.0 A (#4707): no question any more -- the entry and its receipts wait in the trash, the toast takes them back
+      md.remove(); bg_delEntry(e);  // 2.559.0 (#4660): the entry goes at once
     } else if (fdel) {
       const f = (e.files || []).find(x => x.id === +fdel.dataset.bgfDel); if (!f) return;
       if (!await askConfirm(tr('Delete “{0}”?', f.name), tr('The receipt cannot be brought back.'), {ok: tr('Delete'), danger: true})) return;
@@ -222,7 +222,8 @@ function bg_entryModal(e) {
 async function bg_delEntry(e) {
   let r; try { r = await optWrite(bg_entCut(e.id), () => api('DELETE', `/api/budget/entries/${e.id}`), bg_draw); } catch { return; }
   let cur = r.entry || e;
-  offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), undo: async () => { cur = await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },
+  // 2.567.0 A (#4707): the entry waits in the trash with its receipts; the undo takes it back out (another device too)
+  offerUndo(tr('Deleted: {0}', e.title), histAdd({label: tr('Entry “{0}” deleted', e.title), undo: async () => { cur = r.trash ? await api('POST', `/api/budget/entries/${cur.id}/restore`) : await api('POST', `/api/budget/${cur.list_id}/entries`, bg_body(cur)); bg_after(); },
     redo: async () => { await api('DELETE', `/api/budget/entries/${cur.id}`); bg_after(); }}));
   bg_refresh();
 }
@@ -290,7 +291,8 @@ function bg_catsModal() {
         for (const id of j?.entry_ids || []) await api('PATCH', `/api/budget/entries/${id}`, {cat_id: cur.id}).catch(() => { bad++; });
         for (const id of j?.recurring_ids || []) await api('PATCH', `/api/budget/recurring/${id}`, {cat_id: cur.id}).catch(() => { bad++; });
         return bad; };
-      offerUndo(tr('Deleted: {0}', c.name), histAdd({label: tr('Category “{0}” deleted', c.name), undo: async () => { const bad = await rehang(gone); bg_after(); return bad ? {skipped: [c.name]} : {}; },
+      // 2.567.0 A (#4707): the category waits in the trash; the server hangs its entries back on restore
+      offerUndo(tr('Deleted: {0}', c.name), histAdd({label: tr('Category “{0}” deleted', c.name), undo: async () => { if (gone?.trash) { cur = await api('POST', `/api/budget/cats/${cur.id}/restore`); bg_after(); return {}; } const bad = await rehang(gone); bg_after(); return bad ? {skipped: [c.name]} : {}; },
         redo: async () => { gone = await api('DELETE', `/api/budget/cats/${cur.id}`); bg_after(); }}));
       redraw();
     } else if (add) {
@@ -344,9 +346,10 @@ async function bg_recModal() {
     if (del) {
       const r = items.find(x => x.id === +del.dataset.rdel); if (!r) return;
       if (!await askConfirm(tr('Delete “{0}”?', r.title), tr('Entries booked from it stay.'), {ok: tr('Delete'), danger: true})) return;
-      try { await api('DELETE', `/api/budget/recurring/${r.id}`); } catch { return; }
+      let gone; try { gone = await api('DELETE', `/api/budget/recurring/${r.id}`); } catch { return; }
       let cur = r;
-      offerUndo(tr('Deleted: {0}', r.title), histAdd({label: tr('Recurring entry “{0}” deleted', r.title), undo: async () => { cur = await bg_recBack(lid, cur, pickR(cur)); bg_after(); }, redo: async () => { await api('DELETE', `/api/budget/recurring/${cur.id}`); bg_after(); }}));
+      // 2.567.0 A (#4707): the template waits in the trash (contract link, booked entries); the undo takes it back out
+      offerUndo(tr('Deleted: {0}', r.title), histAdd({label: tr('Recurring entry “{0}” deleted', r.title), undo: async () => { cur = gone?.trash ? await api('POST', `/api/budget/recurring/${cur.id}/restore`) : await bg_recBack(lid, cur, pickR(cur)); bg_after(); }, redo: async () => { await api('DELETE', `/api/budget/recurring/${cur.id}`); bg_after(); }}));
       return refresh();
     }
     if (ev.target.closest('[data-rsave]')) {

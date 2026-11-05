@@ -270,8 +270,9 @@ async function sectionDelete(sid) {
   const sec = r.section || {name: s0.name, sort: s0.sort, list_id: s0.list_id}, nm = qn(sec.name.slice(0, 40));
   const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [],
     undo: async x => {
-      const j = await api('POST', '/api/sections', {list_id: sec.list_id, name: sec.name, sort: sec.sort, wip_limit: sec.wip_limit ?? null, tasks: x.tasks.map(rid)});
-      HIST.secmap.set(secId(x.sid), j.id); x.tasks = j.moved || [];
+      // 2.567.0 A (#4707): the section waits in the trash: back with the same id, its limits and the tasks still free
+      const j = r.trash ? await api('POST', `/api/sections/${secId(x.sid)}/restore`) : await api('POST', '/api/sections', {list_id: sec.list_id, name: sec.name, sort: sec.sort, wip_limit: sec.wip_limit ?? null, tasks: x.tasks.map(rid)});
+      if (j.id !== secId(x.sid)) HIST.secmap.set(secId(x.sid), j.id); x.tasks = j.moved || [];
       return {skipped: (j.skipped || []).map(t => `${histTitle(t)}: ${tr('Section')}`)};
     },
     redo: async x => {

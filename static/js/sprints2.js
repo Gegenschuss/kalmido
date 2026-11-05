@@ -102,7 +102,8 @@ async function spr_delete(l, s) {
   let j; try { j = await api('DELETE', `/api/sprints/${s.id}`); } catch { return; }
   await load(); render();
   let sid = null;
-  const back = async () => { const k = await api('POST', `/api/lists/${l.id}/sprints`, {name: j.sprint.name, goal: j.sprint.goal, start: j.sprint.start, end: j.sprint.end, tasks: j.tasks}); sid = k.id; await load(); render(); };
+  // 2.567.0 A (#4707): the sprint waits in the trash: the undo takes it back out (same id, its tasks), also from another device
+  const back = async () => { if (j.trash) { await api('POST', `/api/sprints/${s.id}/restore`); sid = s.id; } else { const k = await api('POST', `/api/lists/${l.id}/sprints`, {name: j.sprint.name, goal: j.sprint.goal, start: j.sprint.start, end: j.sprint.end, tasks: j.tasks}); sid = k.id; } await load(); render(); };
   const again = async () => { if (sid) await api('DELETE', `/api/sprints/${sid}`); await load(); render(); };
   offerUndo(tr('{0} removed', spr_name(s)), histAdd({label: tr('{0} removed', spr_name(s)), undo: back, redo: again}));
 }

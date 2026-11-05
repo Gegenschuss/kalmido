@@ -144,6 +144,7 @@ const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewConta
   ntTrashHtml: ['notetrash'],  // 2.272.0 E1 (#3038)
   ms_clTrashHtml: ['trashui', 1], povTrashHtml: ['trashui'],  // 2.272.0 G (#3038)
   vtr_html: ['trashui'],  // 2.549.0 (#4536): the video sign-offs in the trash view
+  ptr_html: ['trashui'],  // 2.567.0 A (#4707): sections, sprints, links, templates and budget rows in the trash view
   tsl_card: ['timesheet'], hbm_hubView: ['hubmail', 1],  // 2.149.0 F (#2518): the time page's timesheet card (it fetches the month itself)
   ms_clView: ['clientpage', 1]};  // 2.563.0 (#4742): Office > Clients (clients.js viewClients)
 // 2.556.0 (#4685) "New for you": once per new version (the version seen last is a user setting, accounts/whatsnew.py) the

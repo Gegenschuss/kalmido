@@ -1955,7 +1955,7 @@ const ttpLeft = t => { const d = S.hist?.days; if (!d || !t.deleted_at || S.hist
 function viewHistory() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
-  const otr = trash ? otr_html() + vtr_html() : '';  // 2.102.0 A (#1988): "Deleted lists" above the tasks; 2.549.0 (#4536): + video sign-offs (trashui.js)
+  const otr = trash ? otr_html() + vtr_html() + ptr_html() : '';  // 2.102.0 A (#1988): "Deleted lists" above the tasks; 2.549.0 (#4536): + video sign-offs (trashui.js); 2.567.0 A (#4707): + the other parts
   if (!arr.length) return otr + (otr ? '' : `<div class="empty">${ic(trash ? 'trash' : 'done')}${trash ? tr('Trash is empty.') : tr('Nothing completed yet.')}</div>`);
   if (trash) {  // 2.0.5: what "Empty" leaves behind (shared lists of other owners) is said up front and marked per row
     const kept = S.hist?.k === 'trash' && S.hist.kept != null ? S.hist.kept : arr.filter(t => t.keep).length;  // 2.40.0 (#1432): the whole trash

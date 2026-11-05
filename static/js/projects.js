@@ -354,7 +354,10 @@ function povLinkModal(l, x) {
     const b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     try {
-      if (b.dataset.m === 'del') await povApi('DELETE', `/api/lists/${l.id}/links/${x.id}`);
+      if (b.dataset.m === 'del') {  // 2.567.0 A (#4707): the link waits in the trash, the toast takes it back
+        await povApi('DELETE', `/api/lists/${l.id}/links/${x.id}`);
+        offerUndo(tr('Link removed'), histAdd({label: tr('Link “{0}” removed', x.title || x.url), undo: async () => { await povApi('POST', `/api/lists/${l.id}/links/${x.id}/restore`); }, redo: async () => { await povApi('DELETE', `/api/lists/${l.id}/links/${x.id}`); }}));
+      }
       else await povApi(x ? 'PATCH' : 'POST', `/api/lists/${l.id}/links${x ? '/' + x.id : ''}`, {url: $('#pl-url', md).value.trim(), title: $('#pl-ttl', md).value.trim()});
     } catch { return; }
     md.remove();

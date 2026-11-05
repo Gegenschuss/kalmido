@@ -160,7 +160,10 @@ function templateModal(tp, done) {
         await api('PATCH', '/api/templates/' + tp.id, {name, data});
       }
     } catch { return; }  // api() showed it
-    md.remove(); await load(); render(); done && done(); toast(b.dataset.m === 'del' ? tr('Template deleted') : tr('Saved'));
+    md.remove(); await load(); render(); done && done();
+    // 2.567.0 A (#4707): a deleted template waits in the trash: the toast and the undo history take it back out
+    if (b.dataset.m === 'del') offerUndo(tr('Template deleted'), histAdd({label: tr('Template “{0}” deleted', tp.name), undo: async () => { await api('POST', `/api/templates/${tp.id}/restore`); await load(); render(); done && done(); }, redo: async () => { await api('DELETE', '/api/templates/' + tp.id); await load(); render(); done && done(); }}));
+    else toast(tr('Saved'));
   });
   if (!isTouch()) setTimeout(() => $('#tp-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }

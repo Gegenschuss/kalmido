@@ -10250,7 +10250,6 @@
   "{0} row read": ["{0} regel gelezen", "{0} regels gelezen"],
   "{0} row skipped": ["{0} regel overgeslagen", "{0} regels overgeslagen"],
   "Take over {0} entry": ["{0} post overnemen", "{0} posten overnemen"],
-  "The {0} receipt is deleted with it and cannot be brought back.": ["De {0} bon wordt mee verwijderd en kan niet terug.", "De {0} bonnen worden mee verwijderd en kunnen niet terug."],
   "Limit per month": "Maandlimiet",
   "A budget is private: it cannot be shared with an agent": "Een budget is privé: het kan niet met een agent worden gedeeld",
   "At most {0} rows per import": "Maximaal {0} regels per import",
@@ -16544,5 +16543,12 @@
   "Calibration: {0}": "Kalibratie: {0}",
   "Maintenance: {0}": "Onderhoud: {0}",
   "The agent's data lock leaves this area out": "De gegevensblokkade van de agent laat dit gebied weg",
+  "Budget entry": "Budgetpost",
+  "Budget category": "Budgetcategorie",
+  "Recurring entry": "Terugkerende post",
+  "Other deleted items": "Andere verwijderde items",
+  "Deleted items are deleted for good after {0} day.": ["Verwijderde items worden na {0} dag definitief verwijderd.", "Verwijderde items worden na {0} dagen definitief verwijderd."],
+  "Template “{0}” deleted": "Sjabloon ‘{0}’ verwijderd",
+  "Link “{0}” removed": "Link ‘{0}’ verwijderd",
   "Set again meanwhile: the earlier value was not restored.": "Intussen opnieuw ingesteld: de eerdere waarde is niet hersteld."
 }

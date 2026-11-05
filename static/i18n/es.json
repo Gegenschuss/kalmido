@@ -10250,7 +10250,6 @@
   "{0} row read": ["{0} fila leída", "{0} filas leídas"],
   "{0} row skipped": ["{0} fila omitida", "{0} filas omitidas"],
   "Take over {0} entry": ["Incorporar {0} movimiento", "Incorporar {0} movimientos"],
-  "The {0} receipt is deleted with it and cannot be brought back.": ["El {0} justificante se borra con él y no se puede recuperar.", "Los {0} justificantes se borran con él y no se pueden recuperar."],
   "Limit per month": "Límite mensual",
   "A budget is private: it cannot be shared with an agent": "Un presupuesto es privado: no se puede compartir con un agente",
   "At most {0} rows per import": "Como máximo {0} filas por importación",
@@ -16544,5 +16543,12 @@
   "Calibration: {0}": "Calibración: {0}",
   "Maintenance: {0}": "Mantenimiento: {0}",
   "The agent's data lock leaves this area out": "El bloqueo de datos del agente excluye esta área",
+  "Budget entry": "Movimiento del presupuesto",
+  "Budget category": "Categoría del presupuesto",
+  "Recurring entry": "Movimiento periódico",
+  "Other deleted items": "Otros elementos eliminados",
+  "Deleted items are deleted for good after {0} day.": ["Los elementos eliminados se borran definitivamente tras {0} día.", "Los elementos eliminados se borran definitivamente tras {0} días."],
+  "Template “{0}” deleted": "Plantilla «{0}» eliminada",
+  "Link “{0}” removed": "Enlace «{0}» quitado",
   "Set again meanwhile: the earlier value was not restored.": "Se ha vuelto a establecer entretanto: el valor anterior no se ha restaurado."
 }
