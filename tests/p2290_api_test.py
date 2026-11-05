@@ -233,6 +233,14 @@ check(lists_of(A)[M["id"]]["org_id"] == ORG and CL in members(A, M["id"]), "#103
 M2 = A.post(B + "/api/lists", json={"name": "Dragged", "org_id": None}).json()
 A.post(B + "/api/lists/reorder", json={"ids": [M2["id"]], "folder": {str(M2["id"]): "Clients"}, "folder_adopt": [M2["id"]]})
 check(lists_of(A)[M2["id"]]["org_id"] == ORG, "#1030: ... also dragged in the sidebar")
+# 2.551.0 (#4640): moved in without the question (nothing about workspace / agent to confirm): time tracking follows the folder
+A.put(B + "/api/folders/props", json={"folder": "TTFolder", "props": {"time_tracking": 1}, "apply": "new"})
+M3 = A.post(B + "/api/lists", json={"name": "TTMover", "time_tracking": 0}).json()
+A.patch(B + f"/api/lists/{M3['id']}", json={"folder": "TTFolder"})  # no folder_adopt
+check(lists_of(A)[M3["id"]].get("time_tracking") == 1, "#4640: a list moved in without a question takes the folder's time tracking (rollback test: 0 without the fix)")
+M4 = A.post(B + "/api/lists", json={"name": "TTOwn", "time_tracking": 0}).json()
+A.patch(B + f"/api/lists/{M4['id']}", json={"folder": "TTFolder", "time_tracking": 0})
+check(lists_of(A)[M4["id"]].get("time_tracking") == 0, "#4640: ... an explicit value of the same request stays")
 # validation
 check(A.put(B + "/api/folders/props", json={"folder": "Clients", "props": {"color": "red"}}).status_code == 400, "#1030: unknown settings are refused")
 check(A.put(B + "/api/folders/props", json={"folder": "Clients", "props": {"org_id": 999}}).status_code == 409, "#1030: a workspace one does not belong to is refused")

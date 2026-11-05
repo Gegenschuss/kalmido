@@ -522,6 +522,8 @@ def lm_folder_keep(c, lid, keep=(), uid=None):
     if lc_done_differs(c, uid, lid, eff):  # 2.46.1 (#1422): an own "Show / Hide completed" of the list
         diff.add("hide_done")
     c.execute("UPDATE lists SET folder_own=? WHERE id=?", (json.dumps(sorted(k for k in diff if k in eff)), lid))
+    if "time_tracking" in eff and "time_tracking" not in keep:  # 2.551.0 (#4640): no question for it, so the list takes the folder's
+        folder_apply(c, lid, keys=["time_tracking"], uid=uid)
 
 
 def lm_folder_moved(c, lid, adopt, keep=()):

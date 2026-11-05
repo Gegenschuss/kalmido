@@ -595,7 +595,7 @@ def list_update(lid):
             if vals["folder"] != (tidy0["folder"] if tidy0 else None):  # really moved (the dialog sends the folder with every save)
                 # 2.39.1 (#1188): the folder's settings only with folder_adopt (the app asked first), else the list keeps its own
                 lm_folder_moved(c, lid, b.get("folder_adopt") is True,
-                                keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members") if k in given)
+                                keep=tuple(k for k in ("org_id", "agent_tidy", "agent_members", "time_tracking") if k in given)
                                 + (("agent_listen",) if "listen_agent_ids" in given else ()))
     else:
         # 2.39.1 (#1188): a list admin archives / restores (deleting needs the archive); 2.40.0 (#1431): and renames / recolours it
