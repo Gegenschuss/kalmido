@@ -144,7 +144,9 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
                 {"client_id": CL, "from_time": "yes", "list_id": LP, "from": D9, "to": TODAY},
                 {"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY, "items": [{"text": "x", "qty": 1, "price": 1}]},
                 {"from_time": True, "list_id": LP, "from": D9, "to": TODAY},  # no client
-                {"client_id": CL, "items": [], "status": "final"}, {"client_id": CL, "items": [], "number": "RE-1"}):
+                {"client_id": CL, "items": [], "status": "final"}, {"client_id": CL, "items": [], "number": "RE-1"},
+                # review 2.568.0 (N1): task_id without from_time is refused, not dropped
+                {"client_id": CL, "list_id": LP, "task_id": T1, "items": [{"text": "x", "qty": 1, "price": 1}]}):
         r = requests.post(INV, headers=AH, json=bad)
         check(r.status_code == 400, f"{who}: wrong input {bad}: 400 ({r.status_code} {r.text[:120]})")
 

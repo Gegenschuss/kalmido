@@ -16561,6 +16561,7 @@
   "Give yourself the right “Quotations & invoices” in the office first": "Geef jezelf eerst in het kantoor het recht „Offertes en facturen”",
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Zet de agent eerst in een rechtengroep van het kantoor met „Offertes en facturen” (bewerken)",
   "You do not work in this agent's office": "Je werkt niet in het kantoor van deze agent",
+  "task_id needs from_time": "task_id heeft from_time nodig",
   "Budget entry": "Budgetpost",
   "Budget category": "Budgetcategorie",
   "Recurring entry": "Terugkerende post",

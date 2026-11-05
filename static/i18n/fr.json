@@ -16561,6 +16561,7 @@
   "Give yourself the right “Quotations & invoices” in the office first": "Donne-toi d’abord le droit « Devis et factures » dans le bureau",
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Place d’abord l’agent dans un groupe de droits du bureau avec « Devis et factures » (modifier)",
   "You do not work in this agent's office": "Tu ne travailles pas dans le bureau de cet agent",
+  "task_id needs from_time": "task_id nécessite from_time",
   "Budget entry": "Écriture du budget",
   "Budget category": "Catégorie du budget",
   "Recurring entry": "Écriture récurrente",

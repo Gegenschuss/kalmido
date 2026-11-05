@@ -86,6 +86,8 @@ def v1_office_invoice_draft_post():
         raise BadInput(tr("client_id is needed"))
     lid = _list_ok(c, oid, uid, b.get("list_id"), aid)  # the person and the agent itself see the project
     tid = ofv_task(c, lid, b.get("task_id"))
+    if tid and not ft:  # review 2.568.0 (N1): a free draft never belongs to a task -- say so instead of dropping it
+        raise BadInput(tr("task_id needs from_time"))
     stat = None
     if ft:
         if not lid:
