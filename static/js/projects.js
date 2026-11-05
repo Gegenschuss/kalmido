@@ -505,6 +505,43 @@ function waitOnMenu(anchor, id) {
     t.waiting_at ? {label: tr('Waiting on someone'), icon: 'hourglass', sub: waitLabel(t) || tr('Change'), fn: () => waitDialog(id)}
       : {label: tr('Someone outside…'), icon: 'hourglass', sub: tr('with a day to follow up'), fn: () => waitDialog(id)}]);
 }
+// 2.559.0 (#4660): "w waits on b" added / removed shows at once (optWrite as #1501): the waiting task's blockers, the blocker's
+// count, the open detail panel (S.dp) and the timeline's arrows change before the answer; no GET /api/state afterwards, the panel's
+// rows (hidden ones, the server's order) come again in the background. b = 0 (remove): the blockers the user cannot see
+function depOptPut(w, b, add) {
+  let old = null;
+  const row = t => ({id: t.id, title: t.title, status: t.status, list_id: t.list_id, due: t.due, assignee_id: t.assignee_id, hidden: false});
+  return () => {
+    const wt = S.tasks.get(w), bt = b > 0 ? S.tasks.get(b) : null, D = S.dp, A = S.depAll;
+    if (!old) old = {wt: wt && {blockers: wt.blockers, blocked: wt.blocked}, bt: bt && {blocking: bt.blocking}, D, by: D.blocked_by, bing: D.blocking, A, edges: A?.edges};
+    const has = (wt?.blockers || []).includes(b), chg = wt ? (add ? b > 0 && !has : b === 0 || has) : !old.done;
+    old.done = true;
+    if (wt && chg) {
+      if (add) { wt.blockers = [...(wt.blockers || []), b]; if (!bt || bt.status === 0) wt.blocked = (wt.blocked || 0) + 1; }
+      else if (b > 0) { wt.blockers = wt.blockers.filter(x => x !== b); wt.blocked = Math.max(0, (wt.blocked || 0) - 1); }
+      else wt.blocked = (wt.blockers || []).length;
+    }
+    if (bt && chg) bt.blocking = Math.max(0, (bt.blocking || 0) + (add ? 1 : -1));
+    if (D.id === w && D.blocked_by) D.blocked_by = add ? (D.blocked_by.some(x => x.id === b) || !bt ? D.blocked_by : [...D.blocked_by, row(bt)]) : D.blocked_by.filter(x => b > 0 ? x.id !== b : !x.hidden);
+    if (D.id === b && D.blocking && b > 0) D.blocking = add ? (D.blocking.some(x => x.id === w) || !wt ? D.blocking : [...D.blocking, row(wt)]) : D.blocking.filter(x => x.id !== w);
+    if (A?.edges && b > 0) A.edges = add ? (A.edges.some(([x, y]) => x === w && y === b) ? A.edges : [...A.edges, [w, b]]) : A.edges.filter(([x, y]) => !(x === w && y === b));
+    return () => {
+      const x = S.tasks.get(w), y = b > 0 ? S.tasks.get(b) : null;
+      if (x && old.wt) Object.assign(x, old.wt);
+      if (y && old.bt) Object.assign(y, old.bt);
+      if (S.dp === old.D) Object.assign(S.dp, {blocked_by: old.by, blocking: old.bing});
+      if (old.A && S.depAll === old.A) old.A.edges = old.edges;
+    };
+  };
+}
+async function depOpt(w, b, add) {
+  const draw = () => { render(); drawDeps(); if (typeof tlArrows === 'function' && S.depAll) tlArrows(); };
+  const j = await optWrite(depOptPut(w, b, add), () => add ? api('POST', '/api/deps', {task_id: w, blocker_id: b}) : api('DELETE', `/api/deps/${w}/${b}`), draw);
+  const wt = S.tasks.get(w);  // the server's count (hidden / closed blockers) once it is there
+  if (wt && j?.task?.id === w) { wt.blocked = j.task.blocked ?? wt.blocked; if (Array.isArray(j.task.blockers)) wt.blockers = j.task.blockers; }
+  if (S.sel === w || S.sel === b) loadDeps(S.sel);  // in the background, not awaited
+  return j;
+}
 function depPicker(tid, dir) {
   const D = S.dp.id === tid ? S.dp : {blocked_by: [], blocking: []};
   const have = new Set((dir === 'by' ? D.blocked_by : D.blocking).filter(x => x.id).map(x => x.id));
@@ -535,8 +572,8 @@ function depPicker(tid, dir) {
     if (b.dataset.m === 'close') { md.remove(); return; }
     if (b.dataset.pick) {
       const x = +b.dataset.pick;
-      try { await api('POST', '/api/deps', dir === 'by' ? {task_id: tid, blocker_id: x} : {task_id: x, blocker_id: tid}); } catch { return; }
-      md.remove(); await load(); render(); loadDeps(tid);
+      md.remove();  // 2.559.0 (#4660): at once, an error takes it back (depOpt)
+      depOpt(dir === 'by' ? tid : x, dir === 'by' ? x : tid, true).catch(() => {});
     }
   });
   setTimeout(() => { if (!isMobile()) $('#dp-q', md).focus(); }, 50);

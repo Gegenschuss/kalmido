@@ -546,8 +546,7 @@ document.addEventListener('click', async e => {
     case 'shop-on': hintDone('shop'); setShopList(id); break;  // 2.396.0 (#3385)
     case 'dep-rm': {
       const b = +a.dataset.b;
-      try { await api('DELETE', `/api/deps/${id}/${b}`); } catch { break; }
-      await load(); render(); loadDeps(S.sel); break;
+      depOpt(id, b, false).catch(() => {}); break;  // 2.559.0 (#4660): at once, an error takes it back
     }
     case 'open-dep': openTaskById(id); break;
     case 'folder-toggle': { const f = a.dataset.folder; foldSet(f, !foldClosed(f)); renderSide(); break; }

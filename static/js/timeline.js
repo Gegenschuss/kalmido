@@ -283,15 +283,11 @@ async function tlConnect(b, w) {
   const wt = S.tasks.get(w), bt = S.tasks.get(b);
   if (!wt || !bt) return;
   if ((wt.blockers || []).includes(b)) { toast(tr('“{0}” is already blocked by “{1}”', wt.title, bt.title)); return; }
-  try { await api('POST', '/api/deps', {task_id: w, blocker_id: b}); } catch { return; }  // api() showed the server's reason
-  await load(); render();
-  if (S.sel === w || S.sel === b) loadDeps(S.sel);
+  try { await depOpt(w, b, true); } catch { return; }  // api() showed the server's reason; 2.559.0 (#4660): shown at once, no load()
   toast(tr('“{0}” is now blocked by “{1}”', wt.title, bt.title));
 }
 async function tlUnlink(w, b) {
-  try { await api('DELETE', `/api/deps/${w}/${b}`); } catch { return; }
-  await load(); render();
-  if (S.sel === w || S.sel === b) loadDeps(S.sel);
+  try { await depOpt(w, b, false); } catch { return; }  // 2.559.0 (#4660): shown at once, no load()
   toast(tr('Dependency removed'));
 }
 function tlDepPop(g) {
