@@ -99,7 +99,7 @@ async function srv_newModal(o = {}) {
   let d; try { d = await srv_defaults(true); } catch { toast(tr('Only available online.')); return; }
   const md = /** @type {any} */ (modal(`<h3>${tr('New agent on the Kalmido server')}</h3>
     <div class="shint keep">${esc(tr('Kalmido calls the model itself with your own API key whenever something comes for the agent (assigned, @mention, chat, listening in, a planned job). No computer of your own is needed.'))}</div>
-    ${d.enabled_instance ? `${o.admin ? `<div class="row"><label for="srv-own">${tr('Belongs to')}</label><select id="srv-own"><option value="me">${esc(tr('Personal agent of {0}', S.me?.display_name || ''))}</option><option value="team">${tr('Team agent')}</option></select></div>` : ''}
+    ${d.enabled_instance ? `${o.admin ? `<div class="row"><label for="srv-own">${tr('Belongs to')}</label><select id="srv-own"><option value="me">${esc(tr('Personal agent of {0}', S.me?.display_name || ''))}</option><option value="team">${tr('Team agent')}</option></select></div>` : srv_teamOwnHtml()}
     <div class="row"><label for="srv-name">${tr('Display name')}</label><input id="srv-name" value="${esc(d.default_name || '')}" maxlength="60"></div>
     <div class="row"><label for="srv-user">${tr('Username')}</label><input id="srv-user" class="unin" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="32"></div>
     <div class="shint keep" id="srv-userhint" hidden></div>
@@ -123,7 +123,8 @@ async function srv_newModal(o = {}) {
     let r;
     try {
       const nb = {username: un, display_name: name, provider: SRV_PROV};
-      r = o.admin ? await calReq('POST', '/api/admin/agents', team ? nb : {...nb, owner_id: S.me?.id}) : await calReq('POST', '/api/my/agents', nb);
+      const torg = o.admin ? 0 : +String($('#srv-own', md)?.value || '').replace('org:', '') || 0;  // 2.569.0 B (#4675): a team agent of my organisation
+      r = torg ? await calReq('POST', `/api/orgs/${torg}/server-agents`, {username: un, display_name: name}) : o.admin ? await calReq('POST', '/api/admin/agents', team ? nb : {...nb, owner_id: S.me?.id}) : await calReq('POST', '/api/my/agents', nb);
     } catch (x) { show(x.message); b.disabled = false; return; }
     // the agent exists from here on: a later step that fails is said, the agent stays (its settings open again from its row)
     const fails = [];
@@ -150,6 +151,7 @@ async function srv_editModal(a, notes) {
     <div id="srv-ed"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="row srvoffice"><button type="button" class="btn sm" data-srv="office">${ic('plus', 's')} ${tr('Due billing on Mondays at 08:00')}</button></div>
     <div class="shint keep">${esc(tr('Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).'))}</div>
+    <div id="srv-team"></div>
     <h4 id="srv-runs-h">${tr('Latest runs')}</h4><div class="srvruns" id="srv-runs" role="list" aria-labelledby="srv-runs-h"><div class="muted mhint">${tr('Loading…')}</div></div>
     <div class="foot"><div class="calerr" role="alert" id="srv-err" hidden></div><span class="spacer"></span><button class="btn" data-m="close">${tr('Close')}</button><button class="btn pri" data-m="srv-save" hidden>${tr('Save')}</button></div>`));
   const err = $('#srv-err', md), show = m => { err.textContent = m || ''; err.hidden = !m; };
@@ -193,7 +195,7 @@ async function srv_editModal(a, notes) {
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }
   });
-  draw(); runs();
+  draw(); runs(); srv_teamFill(md, a);
   return md;
 }
 const srv_stateTxt = s => tr(({queued: N_('queued|run'), run: N_('running|run'), running: N_('running|run'), done: N_('done|run'), failed: N_('failed|run'), error: N_('failed|run'), aborted: N_('stopped|run'), paused: N_('paused|run')})[s] || s || '');  // agent_runs.state (srvagent_run.py)
@@ -220,4 +222,30 @@ async function srv_adminSwitch(el) {
     if (j && j.version) S.about = j;
     srv_def = null; toast(tr('Saved'));
   } catch { el.checked = !on; }
+}
+// 2.569.0 B (#4675): a team agent of an organisation on the server - its admins create it (POST /api/orgs/<id>/server-agents) and
+// set a limit per member (GET / PUT /api/agents/<id>/server/team); members give it orders where a project opens it to them
+const srv_teamOrgs = () => (S.me?.workspaces || []).filter(w => w.role === 'admin');
+function srv_teamOwnHtml() {
+  const os = srv_teamOrgs(); if (!os.length) return '';
+  return `<div class="row"><label for="srv-own">${tr('Belongs to')}</label><select id="srv-own"><option value="me">${esc(tr('Personal agent of {0}', S.me?.display_name || ''))}</option>${os.map(w => `<option value="org:${w.id}">${esc(tr('Team agent of {0}', w.name || ''))}</option>`).join('')}</select></div>
+    <div class="shint keep">${esc(tr('A team agent works with the key you store here; members give it orders where a project opens it to them (“Members may see and use the agent”). Your personal agent takes orders only from you, also in shared projects.'))}</div>`;
+}
+async function srv_teamFill(md, a) {
+  const box = $('#srv-team', md); if (!box) return;
+  let j; try { j = await rawFetch('GET', `/api/agents/${a.id}/server/team`); } catch { return; }  // a personal agent (400) or no admin: nothing
+  if (!md.isConnected || !j?.team) return;
+  const lim = j.member_limit, per = lim?.period || j.period || 'month';
+  box.innerHTML = `<h4 id="srv-team-h">${tr('Limit per member')}</h4>
+    <div class="shint keep">${esc(tr('Its usage goes on the key stored here. A member over the limit gets an answer that says so; the requests of the others still run.'))}</div>
+    <div class="row"><label for="srv-mlim">${tr('Tokens')}</label><input id="srv-mlim" type="number" inputmode="numeric" class="numin" min="1" value="${lim?.hard ?? ''}" placeholder="${esc(tr('none'))}">
+      <select id="srv-mper" aria-label="${esc(tr('Period'))}"><option value="day" ${per === 'day' ? 'selected' : ''}>${tr('per day')}</option><option value="month" ${per === 'month' ? 'selected' : ''}>${tr('per month')}</option></select>
+      <button type="button" class="btn sm" id="srv-mlim-save">${tr('Save')}</button></div>
+    <div class="srvruns" role="list" aria-labelledby="srv-team-h">${(j.members || []).map(m => `<div class="mrow" role="listitem"><span class="n">${esc(m.name || '')} <small class="muted">${esc(tr('{0} tokens', fmtTok(m.used || 0)))}${m.reached ? ' · ' + esc(tr('limit reached')) : ''}</small></span></div>`).join('')}</div>`;
+  $('#srv-mlim-save', md).addEventListener('click', async ev => {
+    const b = /** @type {any} */ (ev.currentTarget), v = +$('#srv-mlim', md).value || 0;
+    b.disabled = true;
+    try { await calReq('PUT', `/api/agents/${a.id}/server/team`, {member_limit: v > 0 ? {period: $('#srv-mper', md).value, hard: Math.round(v)} : null}); toast(tr('Saved')); srv_teamFill(md, a); }
+    catch (x) { toast(x.message); } finally { b.disabled = false; }
+  });
 }

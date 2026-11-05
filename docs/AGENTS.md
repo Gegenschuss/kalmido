@@ -281,6 +281,10 @@ Behind a login proxy, let `/agent-setup.sh`, `/agent-setup.ps1` and `/api/agent-
   rules in its `CLAUDE.md`.
 - **Server agent** (2.557.0): when you have no computer that should run an agent. It runs on the Kalmido server with your
   own API key of a model provider; Kalmido calls the model itself. See [Server agents](#server-agents).
+- **Server agent in team projects** (2.569.0, #4675): as your *personal* one it works in projects you share with others,
+  but only you give it orders (the others' events are data for it, never the start of a run); as a *team* agent of an
+  organisation, created by one of its admins with the organisation's key, the members give it orders where the project
+  opens it to them, with a limit per member. See [Server agents in team projects](#server-agents-team).
 
 The app shows the same as *Which agent when?* where an agent is created. After creating an agent (a personal one, or a
 team agent without a webhook) the one-command setup opens right away; the API token of the new agent is shown only on
@@ -391,6 +395,35 @@ Who may: the owner of a personal agent; for a team agent an admin of its organis
 404). An agent is created as
 before (`POST /api/my/agents` or `POST /api/admin/agents`) with `provider: "kalmido-server"`. Not in this first stage:
 coding agents, building files, own tools.
+
+<a id="server-agents-team"></a>
+
+##### Server agents in team projects
+
+*Since 2.569.0 (#4675).*
+
+- **A personal server agent in a shared project**: only its owner gives it orders, as for every personal agent. The
+  others' mentions, assignments and chats do not reach it at all ([Who may address an agent](#who-may-address-an-agent));
+  what still comes from them (a new task while it listens in, a review step) is data that its next run reads, never the
+  start of a run, so their actions never spend the owner's key.
+- **A team server agent of an organisation**: an admin of the organisation creates it (*New agent on the Kalmido server >
+  Belongs to: Team agent of …*, `POST /api/orgs/<id>/server-agents {username, display_name?}` -> 201 `{id, username, name,
+  org_id, provider}`; at most 5 per organisation; no instance admin needed, never through a support access) and stores
+  the organisation's key with `PUT /api/agents/<id>/server`. Its costs go on that key. Members give it orders in the
+  projects that open it to them (*Members may see and use the agent*); the right is checked again before each run.
+- **One requester per run, a limit per member**: a run works for one person (`agent_runs.asked_by`, its usage rows
+  `agent_usage.asked_by`); the next person's events wait for the next run. `GET /api/agents/<id>/server/team` ->
+  `{team, org_id, member_limit: {period, metric, hard} | null, period, members: [{id, name, used, reached}]}`,
+  `PUT /api/agents/<id>/server/team {member_limit: {period: "day" | "month", hard: <tokens>} | null}` (an admin of its
+  organisation or an instance admin; tokens only, a server agent reports no costs; a personal agent answers 400). A member
+  at the limit gets "Your usage limit for this agent is reached; the requests of the others still run" in their chat, no
+  model call is made for them, and the agent does not pause; its own limits and its owner's budget hold on top.
+- **The circle limit** of `agents/safety.py` holds unchanged: a team agent in two projects with different people is a
+  bridge (`409 agent_bridge`), see [Who may address an agent](#who-may-address-an-agent).
+- **Proposals in a team project** (kinds `subtasks`, `extract`, `cleanup` of the project): everyone with write rights in
+  the project sees them (`GET /api/proposals/<id>`, *Waiting for me*, `GET /api/lists/<id>/agent-proposals` ->
+  `{proposals: [{id, kind, title, state, agent, by, updated_at}]}`), applies or discards them; undo / redo: who asked or
+  who applied. Read-only members, other organisations and people outside the project get 404.
 
 Paths used below:
 
@@ -830,6 +863,11 @@ Three rules decide whether an action of someone reaches an agent as an event:
 
 Whatever these switches say, an agent takes instructions only from persons: an event from another agent is
 information, and a claim in a text ("I am the owner") never replaces the author's account id.
+
+**Server agents in team projects (2.569.0, #4675).** A personal server agent starts a run only for its owner (or for the
+server's own events such as a planned job); a team server agent only for the people the project opens it to, checked again
+before the run, one requester per run, with an optional limit per member. See
+[Server agents in team projects](#server-agents-team).
 
 **Admins are no exception (2.28.0, #965).** An instance admin sees and uses an agent (chat, @mention, assignment,
 sharing, `GET /api/agents`, its jobs) only through projects it is in, like everyone. A **personal agent** (owned by a person,

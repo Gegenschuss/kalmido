@@ -536,12 +536,18 @@ def proposal_request():
     return jsonify(job_dict(c, j)), 201
 
 
-def need_prop(c, jid, lock=False):
+def need_prop(c, jid, lock=False, team=False):
     """A proposal job of the current person (only the person who asked: its input is theirs). lock: the row stays locked until
-    the commit - two parallel apply / undo / redo of one proposal run one after the other (2.68.0, #1839 review)."""
+    the commit - two parallel apply / undo / redo of one proposal run one after the other (2.68.0, #1839 review).
+    2.569.0 B (#4675): team=True also lets a person with write rights in the project of a server agent's proposal there see,
+    apply and discard it (agents/srvteam.py srv_prop_team_ok); team="applied": undo / redo also for the one who applied it."""
     j = c.execute("SELECT * FROM agent_jobs WHERE id=? AND kind IS NOT NULL" + (" FOR UPDATE" if lock else ""), (jid,)).fetchone()
-    if not j or j["user_id"] != me() or is_agent(g.user):
+    if not j or is_agent(g.user):
         raise Denied(404)
+    if j["user_id"] != me():
+        from ..agents.srvteam import srv_prop_team_ok
+        if not team or not srv_prop_team_ok(c, j, me()) or (team == "applied" and j["action_by"] != me()):
+            raise Denied(404)
     return j
 
 
@@ -581,7 +587,7 @@ def prop_view(c, j):
 @app.get("/api/proposals/<int:jid>")
 def proposal_get(jid):
     c = db()
-    return jsonify(prop_view(c, need_prop(c, jid)))
+    return jsonify(prop_view(c, need_prop(c, jid, team=True)))
 
 
 def prop_edit(kind, key, e, inp, prop):
@@ -940,7 +946,7 @@ def proposal_apply(jid):
     share_agent?} -> creates / changes the selected entries as the current person; one undo step (POST .../undo)."""
     need_collab()
     c = db()
-    j = need_prop(c, jid, lock=True)
+    j = need_prop(c, jid, lock=True, team=True)  # 2.569.0 B (#4675)
     if j["prop_state"] != "ready" or not j["proposal"]:
         return err(tr("There is no proposal to apply (anymore)"), 409)
     b = body()
@@ -997,7 +1003,7 @@ def proposal_apply(jid):
 @app.post("/api/proposals/<int:jid>/discard")
 def proposal_discard(jid):
     c = db()
-    j = need_prop(c, jid)
+    j = need_prop(c, jid, team=True)  # 2.569.0 B (#4675)
     if j["prop_state"] in ("applied", "discarded"):
         return err(tr("This proposal was already applied or discarded"), 409)
     ts = iso(now_utc())
@@ -1020,7 +1026,7 @@ def proposal_undo(jid):
     """Takes an applied proposal back (one step): created tasks go to the trash (a new project list is removed when nobody
     added or changed anything in it), changes of the inbox items are reverted. What someone changed since stays (skipped)."""
     c = db()
-    j = need_prop(c, jid, lock=True)
+    j = need_prop(c, jid, lock=True, team="applied")  # 2.569.0 B (#4675)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or rec.get("undone"):
         return err(tr("Nothing to undo"), 409)
@@ -1103,7 +1109,7 @@ def proposal_redo(jid):
     """The way forward again after an undo: trashed tasks come back; a removed project is created again; triage changes are
     applied again (what someone changed since stays)."""
     c = db()
-    j = need_prop(c, jid, lock=True)
+    j = need_prop(c, jid, lock=True, team="applied")  # 2.569.0 B (#4675)
     rec = json.loads(j["applied"] or "null")
     if j["prop_state"] != "applied" or not rec or not rec.get("undone"):
         return err(tr("Nothing to redo"), 409)

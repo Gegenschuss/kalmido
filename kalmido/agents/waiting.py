@@ -29,6 +29,7 @@ from ..tasks.briefing import brief_blocked, brief_lists
 from .chat import chat_approvals_of
 from .core import agent_shares, is_agent, is_approver, job_may_act, need_person
 from .watch import watch_open
+from .srvteam import srv_prop_team_ok  # 2.569.0 B (#4675): a server agent's proposal in a team project
 
 WAIT_SCAN = 500
 
@@ -77,7 +78,7 @@ def _jobs(s):
         conds.append("agent_id=?")
         args.append(s.agent_id)
     if not c.execute("SELECT is_admin FROM users WHERE id=?", (uid,)).fetchone()[0]:  # an admin acts on the jobs of every agent it reaches
-        conds.append(f"(user_id=? OR task_id IN (SELECT id FROM tasks WHERE list_id IN ({s.ql})))")
+        conds.append(f"(user_id=? OR task_id IN (SELECT id FROM tasks WHERE list_id IN ({s.ql})) OR (kind IS NOT NULL AND list_id IN ({s.ql})))")  # 2.569.0 B (#4675)
         args.append(uid)
     rows = c.execute(f"SELECT * FROM agent_jobs WHERE {' AND '.join(conds)} ORDER BY updated_at DESC, id DESC LIMIT {WAIT_SCAN}", args).fetchall()
     tasks = s.tasks(j["task_id"] for j in rows)
@@ -85,7 +86,7 @@ def _jobs(s):
     for j in rows:
         if s.hidden(j["task_id"], tasks):
             continue
-        ok = (j["user_id"] == uid and j["prop_state"] == "ready") if j["kind"] else job_may_act(c, j, uid, "approve")
+        ok = ((j["user_id"] == uid or srv_prop_team_ok(c, j, uid)) and j["prop_state"] == "ready") if j["kind"] else job_may_act(c, j, uid, "approve")  # 2.569.0 B (#4675)
         if ok:
             out.append(_item("job", j["id"], j["title"], j["updated_at"], tasks.get(j["task_id"]), agent_id=j["agent_id"],
                              agent_name=names.get(j["agent_id"], ""), proposal=bool(j["kind"])))

@@ -260,6 +260,8 @@ ROUTES = {
     "GET /api/my/mcp-grants": "agent", "DELETE /api/my/mcp-grants/{}": "agent",
     "GET /api/agents/{}/server": "agent", "PUT /api/agents/{}/server": "agent",  # 2.557.0 B (#4670): the server agent, p2557_b_srvagent_test.py (another person 404)
     "GET /api/agents/{}/server/models": "agent", "GET /api/agents/{}/server/runs": "agent",  # p2557_b_srvagent_test.py
+    "GET /api/agents/{}/server/team": "agent", "PUT /api/agents/{}/server/team": "agent",  # 2.569.0 B (#4675): p2569_b_srvteam_test.py
+    "GET /api/lists/{}/agent-proposals": "agent", "POST /api/orgs/{}/server-agents": "agent",  # p2569_b_srvteam_test.py (another organisation 404)
     "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
     "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",
     "GET /api/my/agents": "agent", "POST /api/my/agents": "agent", "PATCH /api/my/agents/{}": "agent",

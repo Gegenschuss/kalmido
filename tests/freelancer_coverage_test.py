@@ -137,6 +137,9 @@ ROUTES = {
     # 2.557.0 B (#4670): the server agent (p2557_b_srvagent_test.py: the person without an organisation sets up her own one)
     "GET /api/agents/{}/server": "agents", "PUT /api/agents/{}/server": "agents", "GET /api/agents/{}/server/models": "agents",
     "GET /api/agents/{}/server/runs": "agents",
+    # 2.569.0 B (#4675): team projects (p2569_b_srvteam_test.py: her personal one has no limits per member, no team agent of her own)
+    "GET /api/agents/{}/server/team": "agents", "PUT /api/agents/{}/server/team": "agents", "GET /api/lists/{}/agent-proposals": "agents",
+    "POST /api/orgs/{}/server-agents": "orgadmin",
     # 2.391.0 C (#3362): setting up integrations through /api/v1 (p2391_c_setup_api_test.py as the freelancer; an organisation's webhooks: its admins)
     "GET /api/v1/me/tokens": "own", "POST /api/v1/me/tokens": "own", "DELETE /api/v1/me/tokens/{}": "own",
     "GET /api/v1/me/webhooks": "own", "POST /api/v1/me/webhooks": "own", "PATCH /api/v1/me/webhooks/{}": "own",

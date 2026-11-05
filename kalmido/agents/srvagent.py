@@ -444,7 +444,8 @@ def srv_event(c, a, event, actor=None):
     work queues a run (agents/srvagent_run.py). An event made by another agent never starts a run (two server agents must not
     keep each other busy: an agent gives no orders to another one, #928); the next run reads it as data."""
     from .srvagent_run import srv_abort, srv_kick, SRV_TRIGGERS
+    from .srvteam import srv_kick_ok  # 2.569.0 B (#4675): another person's event never starts a personal agent's run
     if event == "abort":
         srv_abort(c, a["user_id"])
-    elif event in SRV_TRIGGERS and not (isinstance(actor, dict) and actor.get("kind") == "agent"):
+    elif event in SRV_TRIGGERS and not (isinstance(actor, dict) and actor.get("kind") == "agent") and srv_kick_ok(a, actor):
         srv_kick(a["user_id"])

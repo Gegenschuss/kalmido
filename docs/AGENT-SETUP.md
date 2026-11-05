@@ -87,6 +87,11 @@ four characters. Its usage is billed to you by the provider; Kalmido counts it a
 it. A server admin can switch the kind off for the whole server (*Settings > Organisation > Agents*). Details and the
 routes: [AGENTS.md, Server agents](AGENTS.md#server-agents).
 
+**For a team (2.569.0, #4675):** an admin of an organisation picks *Belongs to: Team agent of <organisation>* in the same
+dialog (no server admin needed) and stores the organisation's key; its costs go on that key. Members give it orders in the
+projects whose owner switched on *Members may see and use the agent*; its settings carry a *Limit per member* (tokens per
+day or month). A personal agent on the server stays yours in shared projects too: only you give it orders.
+
 ## Quickest: one command on your computer
 
 2.44.0 (#1517): for a project agent on your own Mac, Windows PC or Linux computer, *Settings > Agents >* (agent) *> Set up

@@ -181,6 +181,7 @@ ORDER = (
     "agents.srvweb",  # 2.571.0 D (#4676): read-only web research of the server agent (web tools, VIES, the gate of a web run)
     "agents.srvagent",  # 2.557.0 B (#4670): the server agent (settings, provider, routes; after agents.mcpremote)
     "agents.srvagent_run",  # 2.557.0 B (#4670): its runs (a queue row of the worker)
+    "agents.srvteam",  # 2.569.0 B (#4675): the server agent in team projects (routes; after agents.srvagent_run)
     "lists.playbook",  # 2.39.0 (#1168)
     "tasks.attachtext",  # 2.34.0 (#368)
     "tasks.snippets",  # 2.35.0 (#1095)

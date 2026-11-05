@@ -49,6 +49,7 @@ from ..agents.mcpremote import _inproc_cls, mcpr_module
 from .srvagent import ProviderError, srv_flow_models, srv_key, srv_models, srv_off, srv_pick_default, srv_provider, srv_row, srv_defaults, SRV_PROVIDER
 from .srvstarter import SRV_BRIEF_AT, SRV_FLOWS, SRV_FOLLOWUP_AT, SRV_TEXTS
 from .srvweb import SRV_VIES_TOOL, SRV_WEB_FRAME, SRV_WEB_REMIND, srv_vies_result, srv_web_on, srv_web_scan, srv_web_state, srv_web_tools  # 2.571.0 D
+from .srvteam import srv_batch, srv_member_block, srv_run_asker, srv_usage_mark, SRV_FOREIGN_SQL  # 2.569.0 B (#4675): team projects
 
 SRV_PARALLEL = env_int("KALMIDO_SRVAGENT_PARALLEL", 2, lo=1, hi=64)   # runs at once on this server
 SRV_RUN_S = env_int("KALMIDO_SRVAGENT_RUN_S", 300, lo=10, hi=3600)     # s of one run at most
@@ -161,7 +162,7 @@ def srv_run_job(aid, again=0):
 def _pending(c, aid, cursor):
     """The first event after cursor that asks for work (not made by another agent: srvagent.srv_event), or None."""
     return c.execute(f"""SELECT id, event FROM agent_events WHERE agent_id=? AND id>? AND event IN ({','.join('?' * len(SRV_TRIGGERS))})
-                         AND COALESCE(payload::jsonb->'actor'->>'kind', '')<>'agent' ORDER BY id LIMIT 1""",
+                         AND COALESCE(payload::jsonb->'actor'->>'kind', '')<>'agent' AND NOT {SRV_FOREIGN_SQL} ORDER BY id LIMIT 1""",
                      (aid, cursor, *SRV_TRIGGERS)).fetchone()
 
 
@@ -301,14 +302,24 @@ def _run(aid, rid):
             model = fm
         if flow or fm:
             _db(lambda c: c.execute("UPDATE agent_runs SET flow=?, model=? WHERE id=?", (flow, model, rid)))
+        # 2.569.0 B (#4675): one requester per run (a team agent: the next person's events wait for the next run), only who may
+        work, cut, who = _db(lambda c: srv_batch(c, aid, data, SRV_TRIGGERS))
+        if cut is not None:
+            new_cursor = min(new_cursor, cut)
+            data = [e for e in data if not isinstance(e, dict) or not isinstance(e.get("seq"), int) or e["seq"] <= cut]
         # the events are taken: a failed run never works the same events off again (no loop of costs)
         _db(lambda c: c.execute("UPDATE agent_server SET cursor=GREATEST(cursor, ?) WHERE agent_id=?", (new_cursor, aid)))
-        work = [e for e in data if isinstance(e, dict) and e.get("event") in SRV_TRIGGERS and (e.get("actor") or {}).get("kind") != "agent"]
         if not work:
             return
+        _db(lambda c: srv_run_asker(c, rid, who))
         asker = _asker(work)
         if asker:
             lang = _db(lambda c: usettings(c, asker)["lang"]) or lang
+        mwhy = _db(lambda c: srv_member_block(c, aid, who))  # 2.569.0 B (#4675): this member's limit; the others go on
+        if mwhy:
+            asker = asker or who
+            lang = _db(lambda c: usettings(c, asker)["lang"]) or lang
+            raise _Stop("failed", mwhy)
         prov = srv_provider(provider, key)
         system = (instructions.strip() + "\n\n" + SRV_FRAME.format(name=name, aid=aid)).strip()
         tools, allowed = _tools(mod, api)
@@ -460,6 +471,9 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
         why = _limit_reached(aid)
         if why:
             return "paused", why, sent
+        mwhy = _db(lambda c: srv_member_block(c, aid, None, rid=rid))
+        if mwhy:  # 2.569.0 B (#4675): the member's limit within the run; the agent itself does not pause
+            return "failed", mwhy, sent
         if asker:
             try:
                 api.call("POST", "/agent/typing", body={"chat_user_id": asker})
@@ -514,6 +528,7 @@ def _usage(api, aid, rid, model, u, flow=""):
         r = api.call("POST", "/agent/usage", body={"model": model, "input_tokens": u["input"], "output_tokens": u["output"],
                                                    "cache_read_tokens": u["cache_read"], "cache_write_tokens": u["cache_write"],
                                                    "note": f"server agent run {rid}"})
+        _db(lambda c: srv_usage_mark(c, aid, rid, (r or {}).get("id") if isinstance(r, dict) else None))  # 2.569.0 B (#4675): per member
     except Exception as e:  # noqa: BLE001 -- the run's row keeps the numbers
         print("server agent", aid, "usage not reported:", type(e).__name__, flush=True)
         return
