@@ -1350,6 +1350,7 @@ def sh_create(c, uid, space, title, list_id=None, columns=None, rows=None, agent
         sh_add_rows(c, r, rows, uid, agent_id=None, batch=None)
         if agent_id and batch:  # the cells belong to the agent's call (Undo = the whole sheet to the trash)
             c.execute("UPDATE sheet_cells SET agent_id=?, agent_batch=? WHERE sheet_id=?", (agent_id, batch, sid))
+    sh_touch(c, sid, uid)  # 2.566.0 (#4706): a new table moves the area counter (other devices' table lists reload)
     return sid
 
 

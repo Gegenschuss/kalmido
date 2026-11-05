@@ -618,6 +618,7 @@ def pub_set(lid):
         c.execute("""INSERT INTO public_links(list_id,token_hash,token,mode,notes,password_hash,pw_rev,expires_at,created_by,created_at,cv_show)
                      VALUES(?,?,?,?,?,?,?,?,?,?,?)""", (lid, h, sealed, mode, 1 if notes else 0, pw_hash, rev, exp, me(), iso(now_utc()), show))
         print("public link created for list", lid, "mode", mode, flush=True)
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(enabled=True, link=pub_public(c, c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()))
 
@@ -632,6 +633,7 @@ def pub_regen(lid):
     _, h, sealed = pub_new_token(c, lid)
     c.execute("UPDATE public_links SET token_hash=?, token=?, pw_rev=pw_rev+1, views=0, last_used_at=NULL, created_at=? WHERE list_id=?",
               (h, sealed, iso(now_utc()), lid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(enabled=public_links_on(c, "lists"), link=pub_public(c, c.execute("SELECT * FROM public_links WHERE list_id=?", (lid,)).fetchone()))
 
@@ -641,6 +643,7 @@ def pub_delete(lid):
     c = db()
     need_list(c, lid, owner=True)
     c.execute("DELETE FROM public_links WHERE list_id=?", (lid,))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(enabled=public_links_on(c, "lists"), link=None)
 

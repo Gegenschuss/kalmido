@@ -602,12 +602,14 @@ def family_contacts_add():
     sid = insert_id(c, """INSERT INTO contact_srcs(user_id,name,url,url_hint,username,password,list_id,lead,created_at)
                        VALUES(?,?,?,?,?,?,?,?,?)""", (uid, name.strip()[:100], cal_seal(c, uid, url), cal_url_hint(url), user.strip(),
                                                      cal_seal(c, uid, pw), lid, lead, iso(now_utc())))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     contacts_sync(c, sid)
     r = c.execute("SELECT * FROM contact_srcs WHERE id=?", (sid,)).fetchone()
     if r["status"] != "ok":
         e = contact_err_text(r["error"])
         c.execute("DELETE FROM contact_srcs WHERE id=?", (sid,))
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
         return jsonify(error=e, code=r["error"].split(":", 1)[0]), 400
     return jsonify(contact_public(c, r)), 201
@@ -647,6 +649,7 @@ def family_contacts_edit(sid):
         upd.update(writeback=int(b["writeback"]), wb_err="")
     if upd:
         c.execute(f"UPDATE contact_srcs SET {', '.join(k + '=?' for k in upd)} WHERE id=?", (*upd.values(), sid))
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     return jsonify(contact_public(c, need_contact(c, sid)))
 
@@ -657,6 +660,7 @@ def family_contacts_delete(sid):
     c = db()
     need_contact(c, sid)
     c.execute("DELETE FROM contact_srcs WHERE id=?", (sid,))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True)
 

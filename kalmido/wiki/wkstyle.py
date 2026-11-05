@@ -9,7 +9,7 @@ stores a known value. Older versions ignore both columns."""
 from flask import g, jsonify
 
 from ..core.config import app
-from ..core.db import body, db
+from ..core.db import body, bump, db
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -52,5 +52,6 @@ def wiki_style_put():
         c.execute("UPDATE orgs SET wiki_style=? WHERE id=?", (st, oid))
     else:
         c.execute("UPDATE users SET wiki_style=? WHERE id=?", (st, uid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(space=wiki_space_key(oid), style=st)

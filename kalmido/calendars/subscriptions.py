@@ -29,7 +29,7 @@ from flask import jsonify, request
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
 from ..core.pg import insert_id, write_lock
 from ..core.i18n import lang, N_, tr
-from ..core.db import ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
+from ..core.db import bump, ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
@@ -1164,12 +1164,14 @@ def cal_create():
     made, errors = [], []
     for url, f in todo:
         sid = _cal_insert(c, uid, kind, url, f, user or "", pw or "")
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
         cal_sync(c, sid, force=True)
         r = c.execute("SELECT * FROM cal_subs WHERE id=?", (sid,)).fetchone()
         if r["status"] != "ok":
             errors.append({"name": f.get("name") or "", "code": r["error"].split(":", 1)[0], "error": cal_err_text(r["error"])})
             c.execute("DELETE FROM cal_subs WHERE id=?", (sid,))
+            bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
             c.commit()
         else:
             made.append(sid)
@@ -1208,6 +1210,7 @@ def cal_update(sid):
     if upd:
         upd["changed_at"] = upd["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE cal_subs SET {', '.join(k + '=?' for k in upd)} WHERE id=? AND user_id=?", (*upd.values(), sid, me()))
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     if resync and CAL_ON:
         if not cal_rate(me(), sid):
@@ -1221,6 +1224,7 @@ def cal_delete(sid):
     c = db()
     need_calsub(c, sid)
     c.execute("DELETE FROM cal_subs WHERE id=? AND user_id=?", (sid, me()))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(cal_list(c, me()))
 

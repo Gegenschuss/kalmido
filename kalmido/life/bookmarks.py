@@ -14,7 +14,7 @@ from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, ATT_DIR, APP_NAME, APP_VERSION
 from ..core.i18n import N_, tr, trn
-from ..core.db import body, connect, db, iso, iso_ms, now_utc
+from ..core.db import body, bump, connect, db, iso, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied
@@ -703,6 +703,7 @@ def bm_move(c, uid, b):
                   (to, uid, rel, ts, uid if to and not r["org_id"] else None, r["id"]))  # 2.365.1 (#3395): accounts/orgback.py
         c.execute("INSERT INTO space_moves(kind,obj_id,from_org,to_org,by_id,at,detail) VALUES('bookmark',?,?,?,?,?,?)",
                   (r["id"], r["org_id"], to, uid, ts, json.dumps({"owner": r["user_id"]})))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     for rel in old_files:
         bm_rm_file(rel)
@@ -750,6 +751,7 @@ def bookmarks_post():
     if not isinstance(b, dict) or "image_url" in b:
         raise BadInput(tr("Invalid value: {0}", "body"))
     r, existed = bm_create(c, uid, b)
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     if not existed and cal_rate(uid):  # 2.97.0 review (M1): beyond the limit the watchdog fetches it later
         bm_kick([r["id"]])
@@ -769,6 +771,7 @@ def bookmark_patch(bid):
     bm_need(c, uid)
     old = c.execute("SELECT image FROM bookmarks WHERE id=?", (bid,)).fetchone()
     r, refetch = bm_patch(c, uid, bid, body())
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     if refetch and old and old["image"] and old["image"] != r["image"]:
         bm_rm_file(old["image"])  # 2.97.0 review (L2): the old link's picture
@@ -784,6 +787,7 @@ def bookmark_delete(bid):
     bm_need(c, uid)
     bm_get(c, uid, bid, write=True)
     c.execute("UPDATE bookmarks SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify({"ok": True, "id": bid})
 
@@ -797,6 +801,7 @@ def bookmark_restore(bid):
                  (r["user_id"], r["org_id"], r["url_key"])).fetchone():
         raise Denied(409, tr("This link is already saved"))
     c.execute("UPDATE bookmarks SET deleted_at=NULL WHERE id=?", (bid,))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(bm_out(c, uid, c.execute("SELECT * FROM bookmarks WHERE id=?", (bid,)).fetchone(), full=True))
 
@@ -810,6 +815,7 @@ def bookmark_refresh(bid):
     if not cal_rate(uid):
         raise Denied(429, tr("Too many requests, please slow down"))
     c.execute("UPDATE bookmarks SET preview='pending', preview_error='', updated_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     bm_kick([bid])
     return jsonify(bm_out(c, uid, c.execute("SELECT * FROM bookmarks WHERE id=?", (bid,)).fetchone(), full=True))
