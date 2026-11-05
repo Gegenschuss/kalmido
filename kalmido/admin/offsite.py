@@ -760,6 +760,13 @@ def bko_prune(tgt, keep, kept=None, just=None, inst=""):
         kept[:] = left
     if just and just not in names:
         return gone
+    # 2.550.0 (#4517, review F1): an old name without instance id that this server no longer knows may be one of its own
+    # backups from before 2.550 that still needs its shared files: while one lies on the target, no shared file goes
+    # (it would stay looking restorable and fail with missing files); the admin deletes such old copies by hand.
+    for n in names:
+        p = bk_parse_name(n)
+        if p and p["encrypted"] and p["kind"] != "safety" and not p["instance"] and n not in mine:
+            return gone
     kids = bko_own_kids()  # 2.550.0 (#4517)
     blobs = [n for n in names if bks.REMOTE_RE.fullmatch(n) and bks.REMOTE_RE.fullmatch(n).group(1) in kids]
     need = set()

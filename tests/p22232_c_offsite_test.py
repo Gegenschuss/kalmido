@@ -221,6 +221,11 @@ OWN = {"new": f"kalmido-backup-20000103-000000-{inst}-auto.zip.enc",            
        "old": "kalmido-backup-20000104-000000-auto.zip.enc"}                   # an old name of a backup still here: goes
 for n in (*FOREIGN.values(), *OWN.values()):
     open(os.path.join(DAVD, n), "wb").write(b"a copy " + n.encode())
+# 2.550.0 (#4517, review F1): a shared file of this server's own store key that no kept backup names - the unknown old
+# name above may be this server's own backup of before 2.550 that needs it: while that name lies there, it stays
+OWN_KID = next(d[2:] for d in os.listdir(os.path.join(DATA, "backups", ".store")) if d.startswith("k-"))
+OWN["orphan"] = f"kalmido-blob-{OWN_KID}-" + "cd" * 32
+open(os.path.join(DAVD, OWN["orphan"]), "wb").write(b"an old shared file")
 LOCAL_OLD = os.path.join(DATA, "backups", OWN["old"])
 open(LOCAL_OLD, "wb").write(b"an old local backup")  # this server knows the old name (its backup is still here)
 r = until(lambda: (lambda r: r if r.status_code == 202 else None)(A.post(OFF + "/upload", json={"password": PW})), 60, 0.5)
@@ -234,6 +239,8 @@ check(os.path.isfile(os.path.join(DAVD, FOREIGN["new"])), f"#4517 F4: another se
 check(os.path.isfile(os.path.join(DAVD, FOREIGN["old"])), f"#4517 F4: an old name this server does not know stays {left}")
 check(os.path.isfile(os.path.join(DAVD, FOREIGN["blob"])), f"#4517 F4: another server's shared file stays {left}")
 check(any(n.startswith("kalmido-blob-") and n != FOREIGN["blob"] for n in left), f"#4517 this server's shared file is there {left}")
+check(os.path.isfile(os.path.join(DAVD, OWN["orphan"])),
+      f"#4517 review F1: while an unknown old name lies there, no shared file of this server goes (it may need it) {left}")
 kept = json.loads((dbx("SELECT value FROM settings WHERE key='bko_remote'", data=DATA) or [{"value": "[]"}])[0]["value"] or "[]")
 check(kept == [n1], f"#4517 the kept names (bko_remote) are this server's only {kept}")
 os.remove(LOCAL_OLD)

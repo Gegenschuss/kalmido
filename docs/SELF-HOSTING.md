@@ -675,7 +675,10 @@ docker compose up -d kalmido
     it is also in the backup's manifest, `instance`): only this server's own backups count and go, so several servers
     may share one folder. Another server's backups and its `kalmido-blob-…` files (another store key) stay. A name
     without an id (before 2.550) goes only while this server still has that backup (or its list of shared files);
-    otherwise it stays on the target: delete such leftovers by hand once they are no longer needed. The upload runs beside the backup thread, so a
+    otherwise it stays on the target, and while such an old name lies there no `kalmido-blob-…` file is deleted (the old
+    backup may still need them): delete such leftovers by hand once they are no longer needed. A server restored from
+    another server's backup takes over its instance id and store key and counts as the same server: never point two such
+    servers (for example a test copy of the live server) at one off-site folder. The upload runs beside the backup thread, so a
     slow target delays neither the schedule nor a restore. A failed upload is tried again up to 4 times (5, 10, 20 minutes apart), then
     the admins get an alert; the next backup or *Upload now* starts again. `KALMIDO_OFFSITE_TIMEOUT` (seconds per
     network step, default 120) and `KALMIDO_OFFSITE_RETRY_S` (first pause, default 300) tune it.
