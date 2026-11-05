@@ -42,6 +42,8 @@ from ..core.db import body, db, err, gsetting, iso, now_utc
 from ..core.access import Denied
 from ..core.env import env_int
 from ..accounts.session import me
+from ..accounts.supportgrant import sga_is_support  # 2.557.0 (2nd review)
+from .srvstarter import SRV_DEFAULT_INSTRUCTIONS, SRV_DEFAULT_MODEL  # 2.557.0: the bridge of the parts is gone
 from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin
 from ..agents.core import agent_row, need_person, RUNTIME_MODEL_MAX, RUNTIME_MODEL_RE
@@ -59,21 +61,8 @@ KEY_RE = re.compile(r"[\x21-\x7e]+")  # printable ASCII without spaces (it goes 
 
 
 def srv_defaults():
-    """(default model, default instructions). Teil C keeps them in agents/srvstarter.py (SRV_DEFAULT_MODEL,
-    SRV_DEFAULT_INSTRUCTIONS); read at call time so that file decides once it is there."""
-    try:
-        from . import srvstarter
-        return srvstarter.SRV_DEFAULT_MODEL, srvstarter.SRV_DEFAULT_INSTRUCTIONS
-    except (ImportError, AttributeError):
-        return _FALLBACK_MODEL, _FALLBACK_INSTRUCTIONS
-
-
-_FALLBACK_MODEL = "claude-sonnet-5-5"
-_FALLBACK_INSTRUCTIONS = (
-    "You are Kalmido-KI, a personal assistant that works only inside Kalmido. You work exclusively with the Kalmido tools you "
-    "are given (tasks, projects, comments, chat, briefings and office data within your rights). Politely refuse every request "
-    "outside Kalmido: no web, no terminal, no other services. Answer in the language of the person who wrote to you. Propose "
-    "rather than act on your own: ask in the chat before changing or deleting something that matters.")
+    """(default model, default instructions): kept in agents/srvstarter.py (SRV_DEFAULT_MODEL, SRV_DEFAULT_INSTRUCTIONS)."""
+    return SRV_DEFAULT_MODEL, SRV_DEFAULT_INSTRUCTIONS
 
 
 def srv_off(c):
@@ -344,6 +333,8 @@ def srv_pick_default(ms):
 def srv_models_get(aid):
     c = db()
     srv_need(c, aid)
+    if sga_is_support(c):  # 2nd review 2.557.0: a support session never spends the customer's key at the provider
+        raise Denied(404)
     if srv_off(c):  # review 2.557.0: switched off = no call to the provider with the owner's key either
         return jsonify(error="server_agents_off", message=tr("Server agents are switched off on this server")), 403
     try:

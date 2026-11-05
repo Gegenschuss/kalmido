@@ -99,9 +99,12 @@ def srv_abort(c, aid):
     """Stop: the running run of agent aid ends at its next look (at most about a second later). The caller commits."""
     with system_ctx(c):  # the agent's own run row (the abort route checked who may stop it)
         c.execute("UPDATE agent_runs SET abort_at=? WHERE agent_id=? AND state='run' AND abort_at IS NULL", (iso(now_utc()), aid))
-        # review 2.557.0: Stop also before the queued run took its place - what was asked until now is not done
-        c.execute("""UPDATE agent_server SET cursor=GREATEST(cursor, (SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?))
-                     WHERE agent_id=?""", (aid, aid))
+        # review 2.557.0: Stop also before the queued run took its place - what was asked until now is not done. Only for the
+        # owner of a personal agent (2nd review): on a team agent one member's Stop must not drop the others' requests
+        a = agent_row(c, aid)
+        if a and a["owner_id"] and has_request_context() and g.get("user") is not None and a["owner_id"] == g.user["id"]:
+            c.execute("""UPDATE agent_server SET cursor=GREATEST(cursor, (SELECT COALESCE(MAX(id), 0) FROM agent_events
+                         WHERE agent_id=?)) WHERE agent_id=?""", (aid, aid))
 
 
 class _Stop(Exception):

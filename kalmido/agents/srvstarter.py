@@ -34,6 +34,9 @@ from ..core.db import body, bump, db, err, gsetting, iso, now_utc, usettings
 from ..core.pg import insert_id
 from ..core.errors import BadInput, UnknownFields
 from ..accounts.session import me
+from ..accounts.orgs import is_org_admin
+from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in
+from ..agents.agentrules import _insert as ar_insert, ar_changed
 from ..agents.core import agent_shares, need_person
 
 SRV_PROVIDER = "kalmido-server"
@@ -73,7 +76,6 @@ def _tz(c, uid):
 
 def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None):
     """A planned job of uid for agent aid (agents/schedules.py, the same checks as the dialog) -> (state, id, reason)."""
-    from ..agents.schedules import SCHED_MAX, _sched_set_next, sched_in
     if not agent_shares(c, aid, uid):
         return "skipped", None, tr("Share a project with the agent first")
     r = c.execute("SELECT id FROM agent_schedules WHERE agent_id=? AND user_id=? AND title=? AND list_check=0", (aid, uid, title)).fetchone()
@@ -93,11 +95,13 @@ def _plan(c, aid, uid, title, prompt, freq, hm, action="chat", days=None):
 
 def _rule(c, aid, text):
     """A standing rule of agent aid added by the person (source manual, agents/agentrules.py) -> (state, id, reason)."""
-    from ..agents.agentrules import _insert as ar_insert, ar_changed
     r = c.execute("SELECT id FROM agent_rules WHERE agent_id=? AND body=?", (aid, text)).fetchone()
     if r:
         return "exists", r[0], None
-    row = ar_insert(c, aid, text, ("", None, None, None, ""))
+    try:
+        row = ar_insert(c, aid, text, ("", None, None, None, ""))
+    except BadInput as e:  # 2nd review 2.557.0: the rule limit skips this item like SCHED_MAX does, the others stay
+        return "skipped", None, str(e)
     ar_changed(c, aid, "added")
     return "created", row["id"], None
 
@@ -105,7 +109,6 @@ def _rule(c, aid, text):
 def _docs(c, a, uid, text):
     """Level "agent" for sender, type and tags in the documents of the agent's workspace + the standing rule."""
     from ..docs import store as DS
-    from ..accounts.orgs import is_org_admin
     oid = a["org_id"]
     if oid and not is_org_admin(c, uid, oid):
         return "skipped", None, tr("Only admins of this workspace can change this")
