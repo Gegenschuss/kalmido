@@ -261,15 +261,15 @@ g4 = mk(A, G2, "Outside the limit", D(3))
 for w in (g2, g3, g4):
     dep(A, w, g1)
 A.patch(B + f"/api/admin/agents/{AG}", json={"list_ids": [G]})
-r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(2)})
+r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(2), "expect_updated_at": requests.get(V + f"/tasks/{g1}", headers=AGH).json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 j = r.json()
 check(r.ok and [m["id"] for m in j["chain"]["moved"]] == [g2] and row(g2)["due"] == D(3), f"v1 agent: the shared waiting task moves: {r.text[:300]}")
 check(len(j["chain"]["skipped"]) == 2 and all(x["hidden"] and x["id"] is None for x in j["chain"]["skipped"])
       and "Not shared" not in r.text and "Outside the limit" not in r.text and row(g3)["due"] == D(3) and row(g4)["due"] == D(3),
       f"v1 agent: a list not shared and one outside the limit stay, without titles: {j['chain']['skipped']}")
-r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(4), "shift_chain": False})
+r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(4), "shift_chain": False, "expect_updated_at": requests.get(V + f"/tasks/{g1}", headers=AGH).json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and "chain" not in r.json() and row(g2)["due"] == D(3), "v1: shift_chain false: nothing moves, no chain field")
-r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(5), "shift_chain": "no"})
+r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"due": D(5), "shift_chain": "no", "expect_updated_at": requests.get(V + f"/tasks/{g1}", headers=AGH).json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.status_code == 400 and row(g1)["due"] == D(4), f"v1: shift_chain must be a boolean ({r.status_code})")
 r = requests.patch(V + f"/tasks/{g1}", headers=AGH, json={"shift_chain": True})
 check(r.status_code == 400, "v1: shift_chain alone is nothing to change")

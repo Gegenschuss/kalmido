@@ -167,7 +167,7 @@ all_read(A)
 # other agent actions stay Activity: completing, assigning
 check(A.patch(B + "/api/settings", json={"news_kinds": "mention,assign,comment,unblock,share,status,complete"}).ok, "News about completions on")
 T4 = A.post(B + "/api/tasks", json={"title": "Agent completes", "list_id": W["id"]}).json()["id"]
-check(requests.patch(V + f"/tasks/{T4}", headers=CLH, json={"assignee_id": ALICE}).ok, "agent assigns the task to alice")
+check(requests.patch(V + f"/tasks/{T4}", headers=CLH, json={"assignee_id": ALICE, "expect_updated_at": requests.get(V + f"/tasks/{T4}", headers=CLH).json()["updated_at"]}).ok, "agent assigns the task to alice")  # 2.564.0 (#4702): an agent sends the version it read
 check(requests.post(V + f"/tasks/{T4}/complete", headers=CLH).ok, "agent completes the task")
 nj = A.get(B + "/api/news").json()
 kinds = sorted(x["kind"] for x in nj["items"] if x.get("task_id") == T4 and not x["read"])

@@ -16,6 +16,7 @@
  - the same as a team agent of an instance admin; another person gets 404 (freelancer-matrix: agents)
 usage: p2235_a_control_api_test.py <datadir>      (KMT_NOSTART=1 / P2235A_NOSTART=1: a running server)"""
 import os
+import re
 import sys
 from datetime import timedelta, timezone
 
@@ -69,7 +70,12 @@ def hist(s, aid):
 def run(who, S, UID, AID, H, L):
     """The whole round for one agent (personal of a freelancer / a team agent of the instance admin) in its project L."""
     def api(method, path, h=None, **kw):
-        return requests.request(method, V + path, headers={**H, **(h or {})}, **kw)
+        h = {**H, **(h or {})}
+        if method == "PATCH" and re.fullmatch(r"/tasks/\d+", path) and "If-Match" not in h:  # 2.564.0 (#4702): an agent sends the
+            got = requests.get(V + path, headers=H)  # version it read; as a header, so an approval card's bound body stays the same
+            if got.ok:
+                h["If-Match"] = got.json()["updated_at"]
+        return requests.request(method, V + path, headers=h, **kw)
 
     def card(step, recommend=None, one_way=None, title="May I?"):
         ap = {"title": title, **({"step": step} if step else {})}

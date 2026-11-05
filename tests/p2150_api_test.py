@@ -376,7 +376,7 @@ rows = A.get(B + f"/api/admin/agents/{AG}/audit", params={"limit": 200}).json()[
 check(any(x.get("scope") == "structure" for x in rows) and any(x.get("scope") == "agent" for x in rows), "audit rows carry the scope")
 
 # ================================================================== security: batch / move into foreign lists
-r = cl.post("/tasks/batch", {"ids": [TP, TC], "action": "update", "changes": {"title": "pwned"}})
+r = cl.post("/tasks/batch", {"ids": [TP, TC], "action": "update", "changes": {"title": "pwned"}, "_prev": {str(TP): {"title": "x"}, str(TC): {"title": "x"}}})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and r.json()["count"] == 0 and dbx("SELECT title FROM tasks WHERE id=?", (TC,))[0][0] == "carol's", "batch: invisible tasks untouched")
 r = cl.post("/tasks/batch", {"ids": [T[2]], "action": "update", "changes": {"list_id": CAR}})
 check(r.json()["count"] == 0 and dbx("SELECT list_id FROM tasks WHERE id=?", (T[2],))[0][0] == L, f"batch: no move into a list it does not see {r.text[:200]}")

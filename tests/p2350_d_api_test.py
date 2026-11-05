@@ -93,7 +93,8 @@ check(json.loads(dbx("SELECT snippets FROM tasks WHERE id=?", (T,))[0][0])[0]["c
 first = sn[0]
 # claude changes only the second one: the first keeps author + time
 time.sleep(1.1)
-r = requests.patch(V + f"/tasks/{T}", headers=CLH, json={"snippets": [first, {**sn[1], "code": "KeyError: 'id' (fixed?)"}]})
+r = requests.patch(V + f"/tasks/{T}", headers=CLH, json={"snippets": [first, {**sn[1], "code": "KeyError: 'id' (fixed?)"}],
+                                                         "expect_updated_at": requests.get(V + f"/tasks/{T}", headers=CLH).json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok, "#1095: the agent replaces the list " + r.text[:200])
 s2 = r.json()["snippets"]
 check(s2[0]["id"] == first["id"] and s2[0]["by"] == ALICE and s2[0]["updated_at"] == first["updated_at"], "#1095: an unchanged snippet keeps author and time")

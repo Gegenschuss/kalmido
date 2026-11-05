@@ -199,9 +199,9 @@ check(dbx("SELECT points_on FROM lists WHERE id=?", (P,))[0][0] == 1, f"points_o
 # API v1
 r = AGS.get(V + f"/tasks/{T1}")
 check(r.ok and r.json().get("points") == 5, "v1: the task carries points")
-r = AGS.patch(V + f"/tasks/{T1}", json={"points": 3})
+r = AGS.patch(V + f"/tasks/{T1}", json={"points": 3, "expect_updated_at": AGS.get(V + f"/tasks/{T1}").json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and r.json().get("points") == 3, f"v1: the agent changes the points ({r.text[:100]})")
-r = AGS.patch(V + f"/tasks/{T1}", json={"points": 4})
+r = AGS.patch(V + f"/tasks/{T1}", json={"points": 4, "expect_updated_at": AGS.get(V + f"/tasks/{T1}").json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.status_code == 400, f"v1: points 4 -> 400 ({r.status_code})")
 r = AGS.post(V + "/tasks", json={"list_id": P, "title": "API task", "points": 2})
 check(r.status_code == 201 and r.json().get("points") == 2, f"v1: create with points ({r.text[:100]})")

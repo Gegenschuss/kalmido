@@ -152,7 +152,7 @@ check(cl.get("/tasks", params={"list_id": L, "q": "SEARCH-WORD-0815"}).status_co
 r = cl.post("/tasks", json={"title": SECRET, "list_id": L})
 check(r.status_code == 201, f"agent: create a task ({r.status_code})")
 NT = r.json()["id"]
-check(cl.patch(f"/tasks/{NT}", json={"notes": "secret notes"}).ok, "agent: patch a task")
+check(cl.patch(f"/tasks/{NT}", json={"notes": "secret notes", "expect_updated_at": cl.get(f"/tasks/{NT}").json()["updated_at"]}).ok, "agent: patch a task")  # 2.564.0 (#4702): an agent sends the version it read
 check(cl.get("/nope").status_code == 404, "agent: an unknown route 404")
 check(cl.get("/tasks/999999").status_code == 404, "agent: a task it cannot see 404")
 check(cl2.get("/lists").ok, "second agent: GET /lists")

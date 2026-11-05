@@ -122,9 +122,9 @@ check(Bo.get(B + f"/api/tasks/{TP}/note-lock").status_code in (403, 404), "read:
 r = AG.get(f"/tasks/{TP}")
 check(r.ok and r.json().get("note_locked") is True and r.json().get("notes") == "" and nb["ct"] not in r.text,
       "agent: sees note_locked and an empty note " + r.text[:200])
-r = AG.patch(f"/tasks/{TP}", json={"notes": "agent writes over it"})
+r = AG.patch(f"/tasks/{TP}", json={"notes": "agent writes over it", "expect_updated_at": AG.get(f"/tasks/{TP}").json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.status_code == 409 and "locked" in r.text, "agent: PATCH notes on a locked note = 409 with a clear message " + r.text[:200])
-r = AG.patch(f"/tasks/{TP}", json={"title": "Garden plan"})
+r = AG.patch(f"/tasks/{TP}", json={"title": "Garden plan", "expect_updated_at": AG.get(f"/tasks/{TP}").json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and r.json().get("note_locked") is True, "agent: other fields still change " + r.text[:200])
 check(dbx("SELECT content FROM tasks WHERE id=?", (TP,))[0][0] == "", "agent: the note stays empty")
 r = A.patch(B + f"/api/tasks/{TP}", json={"content": "typed over"})

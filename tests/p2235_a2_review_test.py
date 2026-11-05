@@ -12,6 +12,7 @@
 freelancer-matrix: agents (the personal agent belongs to a person without an organisation)
 usage: p2235_a2_review_test.py <datadir>      (KMT_NOSTART=1 / P2235A2_NOSTART=1: a running server)"""
 import os
+import re
 import sys
 from datetime import timedelta, timezone
 
@@ -88,7 +89,12 @@ check(F.put(B + f"/api/lists/{FL}/members", json={"user_id": FA, "role": "edit"}
 
 
 def fapi(method, path, mid=None, **kw):
-    return requests.request(method, V + path, headers={**FH, **({HDR: str(mid)} if mid else {})}, **kw)
+    h = {**FH, **({HDR: str(mid)} if mid else {})}
+    if method == "PATCH" and re.fullmatch(r"/tasks/\d+", path):  # 2.564.0 (#4702): the version the agent read, as a header
+        got = requests.get(V + path, headers=FH)  # (an approval card binds the body)
+        if got.ok:
+            h["If-Match"] = got.json()["updated_at"]
+    return requests.request(method, V + path, headers=h, **kw)
 
 
 ctl(F, FA, {"level": "routine"})

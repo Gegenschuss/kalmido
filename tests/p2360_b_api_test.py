@@ -135,7 +135,7 @@ check(Bo.patch(B + f"/api/tasks/{RT}", json={"locked": False}).ok and Bo.post(B 
       and dbx("SELECT due FROM tasks WHERE id=?", (RT,))[0][0] == "2030-03-11", "unlocked: skip moves to the next date")
 
 # ================================================================== the agent API is not bound
-r = requests.patch(V + f"/tasks/{T}", headers=CLH, json={"title": "Agent plan v2", "due": "2030-04-04"})
+r = requests.patch(V + f"/tasks/{T}", headers=CLH, json={"title": "Agent plan v2", "due": "2030-04-04", "expect_updated_at": requests.get(V + f"/tasks/{T}", headers=CLH).json()["updated_at"]})  # 2.564.0 (#4702): an agent sends the version it read
 check(r.ok and r.json()["title"] == "Agent plan v2" and r.json()["locked"] is True, "the agent changes a locked task through the API " + r.text[:120])
 r = requests.patch(V + f"/tasks/{T}", headers={"Authorization": "Bearer " + pat}, json={"priority": "high"})
 check(r.ok, "a personal access token too (the lock guards the app only)")

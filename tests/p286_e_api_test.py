@@ -202,7 +202,7 @@ BA, BAH = agent("batcher", ["read", "tasks:write"])
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": BA, "role": "edit"}).ok, "setup: the agent edits the list")
 check(A.put(B + f"/api/lists/{W}/members", json={"user_id": uid["bob"], "role": "edit"}).ok, "setup: bob edits the list")
 TS = [task(W, f"Dish {i}") for i in range(12)]
-r = requests.post(V + "/tasks/batch", headers=BAH, json={"ids": TS, "action": "update", "changes": {"priority": 3}})
+r = requests.post(V + "/tasks/batch", headers=BAH, json={"ids": TS, "action": "update", "changes": {"priority": 3}, "_prev": {str(i): {"priority": "none"} for i in TS}})  # 2.564.0 (#4702): an agent sends the version it read
 ttl = r.json().get("job", {}).get("title", "") if r.status_code == 202 else ""
 check(r.status_code == 202 and "12" in ttl, f"N30: a batch of 12 waits for approval {r.status_code} {r.text[:160]}")
 check("priority" in ttl and "Kitchen (12)" in ttl, f"N30: the card names the field and the list with its count {ttl!r}")
