@@ -282,4 +282,18 @@ rc, out = watchdog_round()
 check(rc == 0 and core_row(L3, uid["gina"]) is None and revoked_of(L3, uid["gina"])[:1] and revoked_of(L3, uid["gina"])[0][1] == "unshare",
       f"F1: the watchdog round takes a core row without its list_members row {out}")
 
+L9 = new_list(A, "Review board")
+for who, rl in (("dora", "admin"), ("gina", "view"), ("erik", "edit")):
+    check(A.put(B + f"/api/lists/{L9}/members", json={"user_id": uid[who], "role": rl}).ok, f"setup: {who} {rl} on the review board")
+N9 = node_of(L9)
+
+# F4: an expired share is 'expired' (no actor)
+check(A.put(B + f"/api/lists/{L9}/members", json={"user_id": uid["erik"], "role": "edit", "expires_at": "2099-12-31"}).ok, "erik until 2099")
+dbx("UPDATE fs_shares SET expires_at=? WHERE list_own=1 AND user_id=? AND node_id=?", ("2000-01-01T00:00:00Z", uid["erik"], N9))
+rc, out = watchdog_round()
+rv = revoked_of(L9, uid["erik"])
+check(rc == 0 and not sees(S["erik"], L9) and rv and rv[0][1] == "expired" and rv[0][2] is None, f"F4: the expired row is 'expired', by nobody {rv[:1]} {out}")
+sh = A.get(B + f"/api/lists/{L9}/shares").json()
+check(any(x["id"] == rv[0][0] and x["reason"] == "expired" for x in sh["revoked"]), "F4: GET .../shares tells the expiry from a removal")
+
 sys.exit(done("p2568_a_lists_core"))

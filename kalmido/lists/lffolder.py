@@ -439,8 +439,11 @@ def lf_own_stale(c, lid):
             return 0
         from ..core.objects import _take  # the core's revocation (a later module)
         org = c.execute("SELECT org_id FROM lists WHERE id=?", (int(lid),)).fetchone()
-        return _take(c, "fs_shares", f"id IN ({','.join(str(int(x)) for x in ids)})", (), "unshare", None,
-                     org[0] if org else None, "user_id", kind=LF_KIND)
+        q = ",".join(str(int(x)) for x in ids)
+        # 2.568.0 (#4739, review F4): a row that ran out is 'expired' (no actor), not a share someone took back
+        n = _take(c, "fs_shares", f"id IN ({q}) AND expires_at IS NOT NULL AND expires_at <= ?", (_now(),), "expired", None,
+                  org[0] if org else None, "user_id", kind=LF_KIND)
+        return n + _take(c, "fs_shares", f"id IN ({q})", (), "unshare", None, org[0] if org else None, "user_id", kind=LF_KIND)
 
 
 def lf_skips(c, lid):

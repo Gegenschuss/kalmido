@@ -96,7 +96,7 @@ OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
 OBJ_REVOKED_DAYS = 30  # rows taken away stay restorable this long (obj_revoked)
 OBJ_SHARE_MAX = 200
-OBJ_REASONS = ("leave", "role", "retire", "delete", "unshare")
+OBJ_REASONS = ("leave", "role", "retire", "delete", "unshare", "expired")  # 2.568.0 (#4739, review F4): + an expiry ran out
 OBJ_COLS = ("id", "org_id", "owner_id", "rev", "created_at", "created_by", "updated_at", "updated_by", "deleted_at", "deleted_by")
 _NAME = re.compile(r"[a-z][a-z0-9_]{0,19}")
 _TABLE = re.compile(r"[a-z][a-z0-9_]{0,62}")
@@ -738,7 +738,7 @@ def _actor():
 def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
     """What a person (and their agents) loses in one place (module docstring); runs beside the old loops of org_leave /
     org_member_put / odl_retire / the account deletion, which stay as they are. Returns {what: number of rows}."""
-    if reason not in OBJ_REASONS or reason == "unshare":
+    if reason not in OBJ_REASONS or reason in ("unshare", "expired"):  # the two of one share (obj_unshare, an area's expiry)
         raise ValueError(f"obj_revoke_person: unknown reason {reason!r}")
     out = {}
     by = _actor()
