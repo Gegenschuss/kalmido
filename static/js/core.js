@@ -635,7 +635,8 @@ async function api(method, url, body) {
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
   if (outNow(method, url, body)) { const r = enqueue(method, url, body); if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r; }  // 2.537.0 (#4568)
   const ox = oxbPrev(method, url, body); body = ox.body;  // 2.528.0 B (#4305)
-  try { const j = await rawFetch(method, url, body, oxaKey(body)); if (ox.on && j?.conflicts?.length) addConflicts(j.id || +url.split('/').pop(), j.conflicts, j.title); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
+  try { let j = await rawFetch(method, url, body, oxaKey(body)); if (ox.on && j?.conflicts?.length && typeof le2eRekeyConflicts === 'function') j = await le2eRekeyConflicts(url, body, j, b2 => rawFetch(method, url, b2));  // 2.543.0 (#4632): a key change is no conflict
+    if (ox.on && j?.conflicts?.length) addConflicts(j.id || +url.split('/').pop(), j.conflicts, j.title); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
     if (e instanceof Offline) {
       if (queueable(method, url) && !(body instanceof FormData)) return enqueue(method, url, body);
@@ -948,13 +949,14 @@ async function outFlush() {
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
-        const j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
+        let j = await rawFetch(e.method, url, body, e.k);  // 2.270.0 C (#3022): the same key as the service worker's send
         sent++; OUT.tries = 0; OUT.retryAt = 0;
         if (ntU(e.url)) sentNt++;  // 2.536.0 (#4567): a note's change (they go out online too now)
         if (wiki && typeof wkoSent === 'function') await wkoSent(e, j).catch(() => {});
         if (typeof ntSent === 'function' && NT_URL.test(e.url)) ntSent(e, j);  // 2.143.0 C (#2153): notes (chat.js)
         if (e.tmp) { idmap[e.tmp] = j.id; HIST.ids[e.tmp] = j.id; LS.set('idmap', idmap); obxMeta('idmap', idmap); if (S.sel === e.tmp) S.sel = j.id; }  // 2.143.0 C (#2153): the service worker maps with it too
         if (j && j.conflicts?.length && e.url === '/api/tasks/batch' && body?.action === 'complete') { skipped++; j.conflicts = []; }  // 2.270.0 C (#3022): already ticked = not advanced twice
+        if (j && j.conflicts?.length && typeof le2eRekeyConflicts === 'function') j = await le2eRekeyConflicts(url, body, j, b2 => rawFetch(e.method, url, b2));  // 2.543.0 (#4632): a key change is no conflict
         if (j && j.conflicts?.length) {
           // 2.13.0: a "conflict" with a text this device sent itself (its answer got lost) is replayed on top of it
           const own = j.conflicts.filter(c => ownVal(cfTid(c, j.id) + ':' + c.field, c.server) && body && c.field in body);  // 2.527.0 (#4304): the entry's task

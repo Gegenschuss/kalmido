@@ -377,6 +377,27 @@ function le2eIn(j, url) {
   le2eWalk(j, le2eUrlLid(url || ''), 0);
   return j;
 }
+// 2.543.0 (#4632): a key change re-encrypts every text: the server holds the same text under a new cipher. A device that still
+// knows the old cipher (the live update not here yet, or the device that re-encrypted) sends it as _prev, and the server reports a
+// conflict although nobody changed the text. Such a conflict (both ciphers open to the same text with the keys held here) is
+// sent once more with the server's cipher as _prev; a real one (another text, or a cipher that does not open here) stays.
+async function le2eRekeyConflicts(url, body, j, send) {
+  const m = /^\/api\/tasks\/(\d+)$/.exec(url || ''), prev = body && typeof body === 'object' ? body._prev : null;
+  if (!m || !prev || !Array.isArray(j?.conflicts) || !j.conflicts.length) return j;
+  const lid = j.list_id ?? le2eUrlLid(url); if (!lid || !le2eOn(lid)) return j;
+  const real = [], again = {}, base = {};
+  for (const c of j.conflicts) {
+    const p = c.field, old = prev[p], cur = j._enc?.[p];
+    let same = false;
+    if (LE2E_TASK.includes(p) && p in body && le2eIs(old) && le2eIs(cur) && old !== cur) {
+      try { same = await le2eDec(lid, p, old) === await le2eDec(lid, p, cur); } catch { /* does not open here: a real conflict */ }
+    }
+    if (same) { again[p] = body[p]; base[p] = cur; } else real.push(c);
+  }
+  if (!Object.keys(again).length) return j;
+  const j2 = await send({...again, _prev: base});
+  return {...j2, conflicts: [...real, ...(j2?.conflicts || [])]};
+}
 function le2eWait(c, lid, cands) {
   if (LE2E.bad.has(c) || LE2E.q.has(c)) return;
   LE2E.q.set(c, {lid, cands});

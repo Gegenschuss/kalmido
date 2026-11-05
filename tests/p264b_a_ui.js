@@ -83,13 +83,21 @@ const gen = v => typeof v === 'string' && v.startsWith('e2e1:') ? JSON.parse(v.s
     const tl = (await call('GET', `/api/tasks/${T}/timeline`)).j;
     check((tl.comments || []).length === 1 && gen(tl.comments[0].body) === 2, 'the comment is of generation 2');
     check(await ev(`S.tasks.get(${T})?.title === '${M} first task' && listById(${L}).e2e_gen === 2`), 'alice still reads the task');
-    await ev(`api('PATCH', '/api/tasks/${T}', {title: '${M} renamed'}).then(j => (putTask(j), 1))`);
+    // 2.543.0 (#4632): this page still holds the cipher of generation 1 (the re-encryption wrote generation 2 on the server); since
+    // 2.528.0 B (#4305) the change carries it as _prev: the same text under a new cipher is no conflict, the new title is saved
+    const cf = await ev(`api('PATCH', '/api/tasks/${T}', {title: '${M} renamed'}).then(j => (putTask(j), (j.conflicts || []).map(c => c.field).join(',')))`);
+    check(cf === '', 'a change after the key change is no conflict ' + cf);
+    check(await ev(`rawFetch('GET', '/api/state').then(st => le2eDec(${L}, 'title', st.tasks.find(t => t.id === ${T}).title))`) === `${M} renamed`, 'the server holds the new title');
     const row = ((await call('GET', '/api/state')).j.tasks || []).find(t => t.id === T);
     check(gen(row?.title) === 2, 'a new text uses generation 2');
     // the button "Change the key now" (nobody left): generation 3, the re-encryption follows on its own
     check(await ev(`le2eRotate(${L}, true).then(r => r, e => e.code || e.message)`) === true, 'a manual key change');
     check(!!await waitSrv(async () => { const j = (await call('GET', `/api/lists/${L}/e2e`)).j; return j.gen === 3 && j.reenc === 0 && j.rotate === 0; }),
       'manual key change: generation 3, re-encrypted');
+    // 2.543.0 (#4632): a real conflict stays one: a text changed elsewhere meanwhile is not overwritten after a key change either
+    check((await call('PATCH', `/api/tasks/${TO}`, {title: await ev(`le2eEnc(${L}, 'title', '${M} from elsewhere')`)})).status === 200, 'another device renames the other task');
+    check(await ev(`api('PATCH', '/api/tasks/${TO}', {title: '${M} mine'}).then(j => (j.conflicts || []).map(c => c.field).join(','))`) === 'title', 'a real conflict after the key change stays a conflict');
+    check(await ev(`rawFetch('GET', '/api/state').then(st => le2eDec(${L}, 'title', st.tasks.find(t => t.id === ${TO}).title))`) === `${M} from elsewhere`, 'the text from elsewhere is kept');
   });
   const G = (await call('GET', `/api/lists/${L}/e2e`)).j.gen;
   // an old text of generation 1 (as a backup or an unconverted row would hold it), written by Alice's session
