@@ -45,7 +45,7 @@ from ..calendars.subscriptions import CAL_ERR, CAL_SEND_S, cal_until  # 2.369.5 
 from ..collab.integfail import integ_org_admins, integ_tell  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import comment_plain, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import _need_org_admin  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.login import seal, unseal  # 2.369.5 (#2517): pulled up from functions; 2.547.0 (#4516): + unseal
 from ..accounts.session import _rate_blocked, _rate_fail  # 2.369.5 (#2517): pulled up from functions
 from ..notify.push import _wd_fail  # 2.369.5 (#2517): pulled up from functions
 from ..calendars.apptbook import apb_mail_line  # 2.369.5 (#2517): pulled up from functions
@@ -142,9 +142,9 @@ def chn_hint(kind, t):
 
 def chn_hint_migrate(c):
     """2.547.0 (#4516), at every start, a no-op once done: hints from before still end in " …" + the last four characters of the
-    secret. From the sealed address where it opens (chn_hint), else cut back to what came before " …". One-way: the old ends go."""
+    secret. From the sealed address where it opens (chn_hint), else cut back to what came before " …". One-way: the old ends go.
+    Called once when the delivery loop starts (chn_loop), not from core/db.py init_db (no upward import from the core)."""
     for r in c.execute("SELECT id, kind, target, hint FROM notify_channels WHERE hint LIKE '%…%'").fetchall():
-        from ..accounts.login import unseal
         try:
             h = chn_hint(r["kind"], json.loads(unseal(c, f"channel:{r['id']}", r["target"]) or "{}"))
         except Exception:  # noqa: BLE001 -- an address that does not open (another key, a broken row): the safe part only
@@ -305,7 +305,23 @@ def chn_off_tell(c, ch, what):
                click="settings/users" if ch["org_id"] else "settings/newskinds", focus="users" if ch["org_id"] else "newskinds")
 
 
+def chn_hint_start():
+    """2.547.0 (#4516): chn_hint_migrate once at the start of the delivery loop, its own connection."""
+    try:
+        with GATE.bg():
+            c = connect()
+            try:
+                with system_ctx(c):  # start of the background loop: the hints of every person's and organisation's channels
+                    chn_hint_migrate(c)
+                c.commit()
+            finally:
+                c.close()
+    except Exception as e:  # noqa: BLE001
+        print("channels hint error:", type(e).__name__, flush=True)
+
+
 def chn_loop():
+    chn_hint_start()
     while True:
         _CH_WAKE.wait(CH_TICK)
         _CH_WAKE.clear()
