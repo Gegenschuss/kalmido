@@ -11,6 +11,7 @@
 import os
 import subprocess
 import sys
+import time
 
 import requests
 
@@ -79,8 +80,13 @@ def tasks_round(who, h, lid, person):
     T = person.post(B + "/api/tasks", json={"title": "Plan the shoot", "list_id": lid, "content": "Start"}).json()["id"]
     seen = call(h, "GET", f"/tasks/{T}").json()
     check(seen.get("updated_at"), f"{who}: get_task carries updated_at")
-    check(person.patch(B + f"/api/tasks/{T}", json={"content": "The person's text"}).ok,
-          f"{who}: setup: the person changes the description")
+    for i in range(50):  # updated_at counts whole seconds: the person saves until the task's version moved on (a real state)
+        check(person.patch(B + f"/api/tasks/{T}", json={"content": "The person's draft" if i % 2 else "The person's text"}).ok,
+              f"{who}: setup: the person changes the description")
+        if call(h, "GET", f"/tasks/{T}").json()["updated_at"] != seen["updated_at"]:
+            break
+        time.sleep(0.1)
+    check(person.patch(B + f"/api/tasks/{T}", json={"content": "The person's text"}).ok, f"{who}: setup: the person's last text")
     r = call(h, "PATCH", f"/tasks/{T}", json={"notes": "Agent text"})
     check(vreq(r) and "expect_updated_at" in r.json()["error"]["fields"], f"{who}: no version: 400 version_required {r.status_code} {r.text[:200]}")
     r = call(h, "PATCH", f"/tasks/{T}", json={"notes": "Agent text", "expect_updated_at": seen["updated_at"]})
