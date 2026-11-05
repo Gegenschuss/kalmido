@@ -248,9 +248,9 @@ check(got and got[0][0] == FID, "freelancer: arrives in the own basket")
 # counts on the default server too (NTFY_URL, here 127.0.0.1:9999); one neutral answer; the duplicate check is per recipient
 bob_push = dbx("SELECT value FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (ids["bob"],))[0][0]
 check(bob_push, "setup: bob has a push topic")
-r_push = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push})
+r_push = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push, "url": ""})  # (url "": the default server, carol had her own)
 check(r_push.status_code == 400, f"another person's push topic as an inbox (default server) refused ({r_push.status_code})")
-r_short = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carol-short"})
+r_short = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": "carol-short", "url": ""})
 check(r_short.status_code == 400, f"a short topic on the default server refused ({r_short.status_code})")
 check(r_push.json().get("error") == r_short.json().get("error") and "bob" not in r_push.text.lower(),
       f"the same neutral answer, no hint whose ({r_push.text[:120]} / {r_short.text[:120]})")
@@ -263,7 +263,7 @@ check(r.ok, f"the same name on an own server (no push goes there) is fine ({r.st
 own_push = dbx("SELECT value FROM user_settings WHERE user_id=? AND key='ntfy_topic'", (FID,))[0][0]
 r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": own_push, "url": ""})
 check(r.status_code == 400, f"freelancer: the own push topic as the inbox refused (would loop) ({r.status_code})")
-r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push})
+r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": bob_push, "url": ""})
 check(r.status_code == 400, f"freelancer: another person's push topic refused ({r.status_code})")
 Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": ftopic, "url": STUB})
 # the other way round: an admin sets a push topic that is an inbox on the default server
