@@ -502,7 +502,7 @@ def wkf_trash_follow(c, oid, owner, src, dst):
     w, a = wiki_space_sql(oid, owner)
     pre = like_escape(src.lower()) + "/%"
     n = 0
-    for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w} AND (lower(path)=? OR lower(path) LIKE ? ESCAPE '\\')",
+    for p in c.execute(f"SELECT id, path FROM wiki_pages WHERE deleted_at IS NOT NULL AND {w} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')",
                        [*a, src.lower(), pre]).fetchall():  # 2.552.0 (#4561, review F5): the folder's own page as in wiki_move
         if str(p["path"]).startswith("e2e1:"):
             continue
