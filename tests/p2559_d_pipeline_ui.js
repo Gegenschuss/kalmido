@@ -62,7 +62,8 @@ async function round(who, ck) {
   hold(w, /^POST \/api\/office\/deals$/);
   await add();
   check(await until(() => w.__held.length === 1), `${who}: New enquiry: the request is held`);
-  check(!dlg() && cardOf(/Messefilm/, 'inquiry') && +cardOf(/Messefilm/).dataset.id < 0 && /2,500/.test(cardOf(/Messefilm/).textContent) && !loading(),
+  // the answer is held: waited on the drawn card (a redraw of the office between two looks once made a single look fail)
+  check(await until(() => { const c = cardOf(/Messefilm/, 'inquiry'); return !dlg() && c && +c.dataset.id < 0 && /2,500/.test(c.textContent) && !loading(); }),
     `${who}: the dialog closed and the card (provisional id, 2,500) stands in "Enquiry" before the answer: ` + [!dlg(), cardOf(/Messefilm/)?.parentElement?.closest('[data-pipcol]')?.dataset.pipcol, cardOf(/Messefilm/)?.dataset.id, cardOf(/Messefilm/)?.textContent, loading()].join(' / '));
   check(!(await deals()).some(x => x.title === 'Messefilm'), `${who}: the server has no deal yet`);
   w.__held[0].fail('Refused for the test', 500);
