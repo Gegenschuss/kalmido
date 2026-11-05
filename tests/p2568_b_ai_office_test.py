@@ -29,7 +29,7 @@ from kt import B, H, check, dbx, done, fresh, setup
 KEY = base64.b64encode(os.urandom(32)).decode()
 O = "/api/office"
 D = O + "/docs"
-V = B + "/api/v1/office"
+INV = B + "/api/v1/office/invoices"  # tests/tenant_coverage_test.py finds the route by its literal path
 SP = "kalmido-server"
 TEST_IBAN = "DE02120300000000202051"
 T0 = date.today()
@@ -99,18 +99,18 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     G0, H0 = agent(S, f"ki0{len(who)}", ["read"])
     x = starter(S, G0)
     check(x.get("state") == "skipped" and "Office drafts" in (x.get("reason") or ""), f"{who}: no scope office -> skipped, names the permission {x}")
-    r = requests.post(V + "/invoices", headers=H0, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
+    r = requests.post(INV, headers=H0, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
     check(r.status_code == 403, f"{who}: an agent without the scope office: 403 ({r.status_code} {r.text[:160]})")
     G, AH = agent(S, f"ki1{len(who)}", ["read", "office"])
     x = starter(S, G)
     check(x.get("state") == "skipped" and "May draft office documents" in (x.get("reason") or ""), f"{who}: office switch off -> skipped {x}")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "items": [{"text": "Cut", "qty": 1, "price": 100}]})
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "items": [{"text": "Cut", "qty": 1, "price": 100}]})
     check(r.status_code == 403, f"{who}: the agent's office switch off: 403 ({r.status_code})")
     check(S.patch(B + f"{O}/agents/{G}", json={"office_drafts": True}).ok, f"{who}: the agent's office switch on")
     S.put(B + O + "/settings", json={"agents_read": 0})
     x = starter(S, G)
     check(x.get("state") == "skipped" and "Agents may read office data" in (x.get("reason") or ""), f"{who}: privacy switch off -> skipped {x}")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "items": [{"text": "Cut", "qty": 1, "price": 100}]})
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "items": [{"text": "Cut", "qty": 1, "price": 100}]})
     check(r.status_code == 403, f"{who}: the area's privacy switch off: 403 ({r.status_code})")
     check(S.put(B + O + "/settings", json={"agents_read": 1}).ok, f"{who}: agents may read office data")
     n_plans, n_rules = len(S.get(B + f"/api/agents/{G}/schedules").json()["data"]), len(S.get(B + f"/api/agents/{G}/rules").json()["rules"])
@@ -128,7 +128,7 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
 
     # ---- the agent must see the project
     check(S.put(B + f"/api/lists/{LP}/members", json={"user_id": G, "role": "edit"}).ok, f"{who}: the project shared with the agent")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "from_time": True, "list_id": LH, "from": D9, "to": TODAY})
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LH, "from": D9, "to": TODAY})
     check(r.status_code == 404, f"{who}: a project the agent does not see: 404 ({r.status_code} {r.text[:160]})")
     for bad in ({"client_id": CL, "from_time": True, "from": D9, "to": TODAY},  # no project
                 {"client_id": CL, "from_time": True, "list_id": LP},  # no period
@@ -137,11 +137,11 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
                 {"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY, "items": [{"text": "x", "qty": 1, "price": 1}]},
                 {"from_time": True, "list_id": LP, "from": D9, "to": TODAY},  # no client
                 {"client_id": CL, "items": [], "status": "final"}, {"client_id": CL, "items": [], "number": "RE-1"}):
-        r = requests.post(V + "/invoices", headers=AH, json=bad)
+        r = requests.post(INV, headers=AH, json=bad)
         check(r.status_code == 400, f"{who}: wrong input {bad}: 400 ({r.status_code} {r.text[:120]})")
 
     # ---- from the time of one task, then the rest of the project (never twice)
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": T1, "from": D9, "to": TODAY,
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": T1, "from": D9, "to": TODAY,
                                                          "title": "Film edit", "client_ref": f"ref-{who}"})
     check(r.status_code == 201, f"{who}: an invoice draft from the task's time {r.status_code} {r.text[:300]}")
     j = r.json() if r.status_code == 201 else {}
@@ -156,19 +156,19 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     check(float(tot.get("net") or 0) == 160.0 and float(tot.get("gross") or 0) == 190.4, f"{who}: net and gross computed by Kalmido (19 % VAT) {tot.get('net')} {tot.get('gross')}")
     check(j.get("missing") == [], f"{who}: nothing missing before finalising {j.get('missing')}")
     check(head(I1)["number"] == "", f"{who}: no number in the database")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": T1, "from": D9, "to": TODAY,
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": T1, "from": D9, "to": TODAY,
                                                          "client_ref": f"ref-{who}"})
     check(r.status_code == 200 and (r.json().get("doc") or {}).get("id") == I1, f"{who}: the same client_ref again: the same draft ({r.status_code})")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
     check(r.status_code == 201, f"{who}: the rest of the project's time {r.status_code} {r.text[:200]}")
     I2 = (r.json().get("doc") or {}).get("id") if r.status_code == 201 else None
     its = [i for i in ((r.json().get("doc") or {}).get("items") or []) if i.get("kind") == "service"] if I2 else []
     check(len(its) == 1 and float(its[0]["qty"]) == 1.0, f"{who}: only the 1 h left, the task's 2 h are on the first draft {its}")
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
+    r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
     check(r.status_code == 409 and r.json()["error"]["code"] == "no_time", f"{who}: nothing open any more: 409 no_time ({r.status_code} {r.text[:160]})")
 
     # ---- free positions
-    r = requests.post(V + "/invoices", headers=AH, json={"client_id": CL2, "title": "Workshop", "from": D9, "to": TODAY, "notify": True,
+    r = requests.post(INV, headers=AH, json={"client_id": CL2, "title": "Workshop", "from": D9, "to": TODAY, "notify": True,
                                                          "items": [{"text": "Workshop day", "qty": 2, "unit": "day", "price": 500}]})
     check(r.status_code == 201, f"{who}: a free invoice draft {r.status_code} {r.text[:300]}")
     j = r.json() if r.status_code == 201 else {}
@@ -202,7 +202,7 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
 
     # ---- another person's agent finds nothing of it (tenant-matrix: office)
     if S is F:
-        r = requests.post(V + "/invoices", headers=AH0_ORG, json={"client_id": CL, "items": [{"text": "x", "qty": 1, "price": 1}]})
+        r = requests.post(INV, headers=AH0_ORG, json={"client_id": CL, "items": [{"text": "x", "qty": 1, "price": 1}]})
         check(r.status_code in (400, 403, 404), f"the organisation's agent with the freelancer's client: refused ({r.status_code})")
         check(not dbx("SELECT 1 FROM office_docs WHERE client_id=? AND agent_id=?", (CL, AG_ORG)), "nothing made with another office's client")
     else:
