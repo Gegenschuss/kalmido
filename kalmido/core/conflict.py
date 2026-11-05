@@ -54,8 +54,8 @@ def need_version(b, *fields, header=True):
     and the app stay as they were (old clients). Call it before the write; raises VersionRequired when nothing is given."""
     from flask import g, has_request_context, request
     from ..agents.core import is_agent
-    if not has_request_context() or not is_agent(getattr(g, "user", None)):
-        return
+    if not has_request_context() or not (is_agent(getattr(g, "user", None)) or g.get("ofa_agent")):  # ofa_agent: an agent acting as
+        return  # a person in the office (office/agentdocs.py _as_person swaps g.user)
     if isinstance(b, dict) and any(b.get(k) not in (None, "") for k in fields):
         return
     if header and (request.headers.get("If-Match") or "").strip():
