@@ -250,6 +250,12 @@ exports.until = async (fn, {timeout = 15000, step = 100} = {}) => {
 exports.untilEl = (w, sel, text = null, timeout = 15000) => { if (typeof text === 'number') [text, timeout] = [null, text];
   return exports.until(() => [...w.document.querySelectorAll(sel)]
   .find(e => text == null || (text instanceof RegExp ? text.test(e.textContent) : e.textContent.includes(text))) || null, {timeout}); };
+// 2.551.0 (#4599): test anchors. New UI tests address buttons and menu items by a data-act anchor, not by their visible text (the text
+// changes with wording and language). The name comes from the i18n key (= the English text): lower case, every run of characters that
+// are not letters or digits becomes one '-', no '-' at the ends: actName('Add to favourites') = 'add-to-favourites'. Text stays part of a
+// test only where the text itself is checked. untilAct(w, name[, ms]) waits for the first [data-act="name"] and returns it (null on timeout).
+exports.actName = key => String(key).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-+|-+$/g, '');
+exports.untilAct = (w, name, timeout = 15000) => exports.until(() => w.document.querySelector(`[data-act="${exports.actName(name)}"]`), {timeout});
 // 2.504.0 (#4085): the app records a history step only after the server's answer (often after a reload too), so a suite that sees the
 // change on the server and calls histStep at once finds no step yet and undoes nothing. n0 = HIST.undo.length before the action;
 // true once the new step is there and no other step is running (histStep drops a call while one runs).

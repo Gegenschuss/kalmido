@@ -53,6 +53,12 @@ a test for what you change; security fixes need a regression test in `tests/secu
 - **bandit locally**, as CI does: `pip install bandit && bandit -q --severity-level high -r app.py kalmido tools`.
 - **Push tests** (`webpush`, `webpush_ui`) decrypt the payloads with `http-ece` from `tests/requirements.txt`;
   install that file, not only `requests`.
+- **Anchors in new UI tests (data-act).** New UI tests click buttons and menu items through their `data-act` anchor, not
+  through their visible text: `untilAct(w, 'Add to favourites')` (`tests/boot.js`, jsdom) or `act(ev, 'Add to favourites')`
+  (`tests/ff.js`, Firefox). The name comes from the i18n key (the English text): lower case, each run of characters that
+  are not letters or digits becomes one `-`, none at the ends (`add-to-favourites`); give the element that `data-act` in
+  the app if it has none. The text stays part of a test only where the text itself is checked. Old tests are not
+  rewritten; change them when you touch them anyway.
 - **Close headless browsers.** UI tests and your own checks with a headless browser must close it at the end (also on
   errors, e.g. in a `finally`); left-over browser processes slowly fill memory and swap.
 

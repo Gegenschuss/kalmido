@@ -241,4 +241,17 @@ module.exports.undoToast = async (ev, text, {after = null, n = 60} = {}) => {
   await ev(`(() => { document.querySelector('#toast button:not(.tx)').click(); return 1; })()`);
   return after ? ready(after) : true;
 };
+// 2.551.0 (#4599): the same anchor as boot.js untilAct for Firefox suites: wait for [data-act="<name>"] (name = boot.js actName of the
+// i18n key, a ready-made anchor name is kept as it is), then click it (opts.click false: only wait). opts.n: tries of 250 ms. Returns true when found.
+module.exports.act = async (ev, name, {click = true, n = 60} = {}) => {
+  const sel = JSON.stringify(`[data-act="${require('./boot').actName(name)}"]`);
+  for (let i = 0; i < n; i++) {
+    if (await ev(`!!document.querySelector(${sel})`).catch(() => false)) {
+      if (click) await ev(`(() => { document.querySelector(${sel}).click(); return 1; })()`);
+      return true;
+    }
+    await sleep(250);
+  }
+  return false;
+};
 module.exports.noFirefox = noFirefox;
