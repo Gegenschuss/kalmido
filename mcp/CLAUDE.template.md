@@ -337,7 +337,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
   area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,
   `list_office_documents`, `get_office_document`, `create_offer_draft` / `update_offer_draft` (your own drafts),
-  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`; 2.356.0: `409` `invoice_exists` = it has an invoice already, ask the person and send `force` only on their yes), `draft_reminder`, `suggest_payment` /
+  `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`; 2.356.0: `409` `invoice_exists` = it has an invoice already, ask the person and send `force` only on their yes),
+  2.568.0 `create_invoice_draft` (an invoice draft without a quotation: `from_time` + `list_id` (+ `task_id`) + `from` / `to` = the open, billable time of that project, or free `items`; send raw values only, Kalmido computes sums, VAT and hours, `missing` = what finalising still needs: tell the person; `409` `no_time` = nothing open), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
   let you. Since 2.187.0 your office access comes from the office rights groups (Settings > Company & office > Rights in the office): without a
@@ -753,7 +754,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
 `create_event_calendar`, `create_field`, `create_file_folder`, `create_filter`, `create_form`, `create_habit`,
-`create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
+`create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`, `create_note`, `create_notepad`, `create_offer_draft`, `create_office_lead`,
 `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`, `create_text_file`, `create_trip`,
 `decide_reward`, `delete_address_book`, `delete_attachment`, `delete_chat_attachment`, `delete_client`,
 `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`,

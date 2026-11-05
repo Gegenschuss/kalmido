@@ -341,10 +341,15 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   | Sort receipts and documents | the documents of the agent's workspace get the level `agent` for sender, type and tags, plus a [standing rule](#standing-rules): suggest them from the recognised text, never set them itself |
   | Meeting notes into task proposals | a standing rule: notes become a proposal *Tasks from notes*, never tasks directly |
   | Follow up on *Waiting on someone* | a planned job on weekdays at 09:00: tasks waiting longer than N days (default 5) get a drafted follow-up as a comment, posted only after your Yes |
+  | Due billing on Mondays at 08:00 (2.568.0, off by default) | a planned job weekly on Mondays at 08:00 *Due billing*: billable time not billed yet, due invoice series and subscriptions as one reminder in its chat that offers an invoice draft (made only after your Yes on an approval card), plus a standing rule: quotations and invoices only as drafts, never finalised, numbered, sent or cancelled |
 
-  Quotations, invoices, completing or deleting on its own and team projects are not part of the starter pack. A team agent
-  that shares no project with you yet gets no planned job (the answer says *skipped* with the reason); the documents of an
-  organisation need its admin.
+  The office tick grants no office rights itself: it is *skipped* with the reason until the agent has the scope `office`
+  (permission *Office drafts*), its switch *May draft office documents* (or office groups), you work in that office and the
+  office allows *Agents may read office data* ([Office: drafts only](#office-drafts-only)). Once they are given, the button *Due
+  billing on Mondays at 08:00* in the agent's server settings sets it up later. Finalising, numbering, sending and
+  cancelling stay with the person; completing or deleting on its own and team projects are not part of the starter pack.
+  A team agent that shares no project with you yet gets no planned job (the answer says *skipped* with the reason); the
+  documents of an organisation need its admin.
 - **Instance switch**: *Settings > Organisation > Agents > Agents on the Kalmido server* (the global setting
   `server_agents_off`, `PATCH /api/admin/settings {"server_agents_off": true}`). Off: the kind is not offered (the dialog
   explains why), saving the server settings and the starter pack answer 403 `{"error": "server_agents_off"}`, no run starts.
@@ -356,7 +361,7 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 | `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?}`; creates the settings and sets the agent's provider to `kalmido-server` |
 | `GET /api/agents/<id>/server/models` | `{models: [{id, name}], default, fallback_note?}` live from the provider; 409 `{"error": "no_key"}` without a key |
 | `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state (run / done / failed / aborted), started, ended, steps, tokens_in, tokens_out, error, model}]}` |
-| `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped, id, reason}]}`; the same item twice changes nothing |
+| `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup", "office"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped, id, reason}]}`; the same item twice changes nothing |
 
 Who may: the owner of a personal agent; for a team agent an admin of its organisation or an instance admin (everyone else
 404). An agent is created as
@@ -2296,6 +2301,7 @@ it: an agent never gets more than that person. An agent never manages office rig
 | A quotation draft (`client_id`, `title`, `intro`, `items`, `list_id`, `notify`; 2.144.10: `trial` = a trial quotation) | `POST /api/v1/office/offers` | `create_offer_draft` |
 | Change your own draft (only while it is a draft; 2.88: also `cashflow` auto / yes / no, its share in the cash flow plan once sent; 2.269: `expect_updated_at`, positions with their `id`; 2.270: `items[].id` of each kept position keeps its purchase price, price, unit and flags, `expect_updated_at` answers 409 + `current` when a person changed the draft since) | `PATCH /api/v1/office/offers/{id}` | `update_offer_draft` |
 | An invoice draft from an accepted quotation (2.356: a quotation with a full invoice that is not cancelled answers `409` (`error.code` `invoice_exists`, `error.invoices` = those invoices); ask the person, `force: true` makes a second one) | `POST /api/v1/office/offers/{id}/invoice` | `draft_invoice_from_offer` |
+| 2.568.0: an invoice draft without a quotation (`client_id`; `from_time: true` + `list_id` (the project, you must see it; `task_id` = one task only) + `from` / `to`: the billable, still open time becomes one position per project with the client's hourly rate and is bound to the draft, `409` `no_time` when there is none; or free `items` like a quotation draft, marked for the person; `title`, `intro`, `notify`, `client_ref`). Send raw values only: Kalmido computes sums, VAT and the hours; the number comes only when a person finalises. The answer's `missing` lists what finalising still needs (the person's own check) | `POST /api/v1/office/invoices` | `create_invoice_draft` |
 | A reminder draft over open invoices of one client (2.355: only invoices past their due date, else `409`; the totals carry `interest` / `flat_fee` when the office switched them on) | `POST /api/v1/office/reminders` | `draft_reminder` |
 | Suggest an incoming payment / your suggestions | `POST` / `GET /api/v1/office/payment-suggestions` | `suggest_payment` / `list_payment_suggestions` |
 | 2.94.0: the leads (stage lead, by follow-up day; `due=1` = the day has come) / add a lead (source `agent` by default) | `GET` / `POST /api/v1/office/leads` | `list_office_leads` / `create_office_lead` |
@@ -3829,7 +3835,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
-`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
+`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
 `create_note`, `create_offer_draft`, `create_office_lead`, `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,

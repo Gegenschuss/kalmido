@@ -72,7 +72,10 @@ the Kalmido server* asks for a display name (suggested: *Kalmido AI*), your own 
 first), the model (default `claude-sonnet-5-5`, the list comes live from the provider once the key is saved) and its
 instructions (prefilled: it works only for Kalmido, with the Kalmido tools within its permissions, no web, no terminal, no
 other services). Five ticks add the starter pack (morning briefing, tidy up the basket, sort receipts and documents,
-meeting notes into task proposals, follow up after N days); each only proposes and stays changeable on its own. Nothing of
+meeting notes into task proposals, follow up after N days); each only proposes and stays changeable on its own. 2.568.0: a
+sixth tick, off by default, *Due billing on Mondays at 08:00* reminds of billable time and due invoices and prepares
+invoice drafts only after your Yes; it needs the office rights you give the agent yourself (permission *Office drafts*,
+*May draft office documents*, *Agents may read office data*) and is skipped with the reason until then. Nothing of
 the paths below is needed: no user, no firewall, no Claude Code, no launcher, no `CLAUDE.md` file (the rules of
 `mcp/CLAUDE.template.md` are what the instructions field is for). The key is stored encrypted and shown only as its last
 four characters. Its usage is billed to you by the provider; Kalmido counts it as the agent's usage and its limits pause
