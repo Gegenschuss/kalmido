@@ -194,5 +194,10 @@ ka = A.get(B + O + "/log/chain")
 check(ka.status_code == 200 and ka.json().get("ok") is True and ka.json().get("count") == 0, f"#4497: the organisation's admin checks its (empty) chain {ka.status_code} {ka.text[:160]}")
 check(Bo.get(B + O + "/log/chain").status_code == 403, "#4497: a member gets 403 (like the office log)")
 check(Bo.get(B + O + "/log").status_code == 403, "... the same as the log itself")
+# tenant-matrix: office
+# another person in their own Private office: never the chain of Anna's Private documents (their own empty one, or no office)
+Bo.patch(B + "/api/settings", json={"workspace": "private"})
+kb = Bo.get(B + O + "/log/chain")
+check(kb.status_code in (403, 404) or (kb.status_code == 200 and kb.json().get("count") == 0), f"#4497: another person never sees the chain of someone else's documents {kb.status_code} {kb.text[:160]}")
 
 sys.exit(done("p2531_a_chain_api"))
