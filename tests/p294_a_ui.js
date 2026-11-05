@@ -74,8 +74,10 @@ const day = n => TC.day(n);
       m.querySelector('#lead-company').value = 'Neue Agentur GmbH'; m.querySelector('#lead-email').value = 'neu@example.com'; m.querySelector('#lead-source').value = 'referral';
       m.querySelector('#lead-next').value = 'Send the showreel'; m.querySelector('#lead-fu').value = '${day(2)}'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && ${leadCards}.some(c => /Neue Agentur/.test(c.textContent))`), '#1930: the new lead in its column');
-    check(await ev(`${deals}.then(j => j.items.some(x => x.title === 'Neue Agentur' && x.stage === 'lead' && x.probability === 10 && x.source === 'referral' && x.next_step === 'Send the showreel' && x.follow_up === '${day(2)}' && x.email === 'neu@example.com'))`),
+    // 2.559.0 (#4660): the card shows before the answer (provisional, negative id): wait for the server and the real id
+    check(await ready(ev, `${deals}.then(j => j.items.some(x => x.title === 'Neue Agentur' && x.stage === 'lead' && x.probability === 10 && x.source === 'referral' && x.next_step === 'Send the showreel' && x.follow_up === '${day(2)}' && x.email === 'neu@example.com'))`),
       '#1930: saved as a lead with its fields');
+    await ready(ev, `${leadCards}.some(c => /Neue Agentur/.test(c.textContent) && +c.dataset.id > 0)`);
 
     // convert + undo
     await ev(`(() => { ${leadCards}.find(c => /Neue Agentur/.test(c.textContent)).click(); return 1; })()`);

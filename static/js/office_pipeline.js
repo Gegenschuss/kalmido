@@ -3,7 +3,7 @@
 // stage at a time with a switcher. On top: the open sum, the weighted sum and what is expected to come in per month (next
 // month marked). A deal makes its quotation (the office's own quotation code) and, once won, its project; a quotation set
 // to accepted moves its deal to "Order" on the server. Every change is one undo step. Server: kalmido/office/pipeline.py.
-const PPS = {data: null, err: null, oid: null, stage: 'inquiry', loading: false, drag: null};
+const PPS = {data: null, err: null, oid: null, stage: 'inquiry', loading: false, drag: null, gen: 0};
 // 2.94.0 A (#1930): + the first column "Leads" (office_leads.js: its cards, fields, convert, CSV import)
 const PP_STAGES = [['lead', N_('Leads')], ['inquiry', N_('Enquiry')], ['offer', N_('Quotation sent')], ['won', N_('Order|pipeline')], ['lost', N_('Lost|pipeline')]];
 OFC_TABS.splice(Math.max(0, OFC_TABS.findIndex(t => t[0] === 'cashflow' || t[0] === 'settings')), 0, ['pipeline', 'target', N_('Pipeline'), 1, () => pp_html()]);  // admins only
@@ -12,13 +12,29 @@ const pp_stageName = k => tr(PP_STAGES.find(s => s[0] === k)?.[1] || k);
 const pp_month = ym => { if (!ym) return ''; const [y, m] = ym.split('-').map(Number); return new Date(y, m - 1, 1).toLocaleDateString(LOCALE(), {month: 'short', year: 'numeric'}); };
 async function pp_load() {
   if (PPS.loading) return;
-  PPS.loading = true;
-  try { PPS.data = await api('GET', '/api/office/deals'); PPS.err = null; }
-  catch (x) { PPS.err = x.message || tr('unknown'); }
+  PPS.loading = true; const gen = PPS.gen;
+  let j = null;
+  try { j = await api('GET', '/api/office/deals'); PPS.err = null; }
+  catch (x) { if (!PPS.data) PPS.err = x.message || tr('unknown'); }  // 2.559.0 (#4660): a failed background reload keeps the cards
   PPS.loading = false;
+  if (gen !== PPS.gen) return pp_load();  // 2.559.0 (#4660): an answer from before an own change is fetched again, the cards stay
+  if (j) { PPS.data = j; for (const p of OPT) p.put(); }  // own changes still on the way stay on top of the fresh board
   ofcDraw();
 }
 const pp_reload = () => { PPS.data = null; ofcDraw(); };
+// 2.559.0 (#4660): moving, changing, adding and deleting a deal show at once (optWrite): the board changes locally, the request
+// runs behind it, a refusal puts the old state back (api() says why); the answer's deal replaces the local one, the sums on
+// top (open, weighted, expected) are the server's: the board is fetched again in the background, the cards stay meanwhile.
+// A new deal is a provisional card with a negative id until the answer. Quotation / project from a deal stay waiting.
+const pp_refresh = () => { PPS.gen++; if (PPS.data) pp_load(); };
+const pp_wait = id => { if (!(+id < 0)) return false; toast(tr('Still syncing, try again in a moment')); return true; };  // a provisional card
+const pp_item = id => (PPS.data?.items || []).find(i => i.id === id);
+function pp_itemSet(x, was = x?.id) {  // the server's deal in place of the local one (was: its provisional id)
+  const its = PPS.data?.items; if (!its || !x) return;
+  const {before, ...d} = x, k = its.findIndex(i => i.id === was || i.id === d.id);
+  if (k >= 0) its[k] = {...its[k], ...d}; else its.push(d);
+}
+const pp_local = b => ({...b, value: (+b.value || 0).toFixed(2), ...('client_id' in b ? {client_name: cdn_name(b.client_id, '')} : {})});
 
 function pp_html() {
   if (PPS.oid !== OFC.info?.org_id) Object.assign(PPS, {oid: OFC.info?.org_id, data: null, err: null});  // another office area
@@ -55,21 +71,21 @@ function pp_card(x) {
     ${offer || x.list_id ? `<span class="ppmeta">${offer}${x.list_id ? `<span class="rotag">${ic('brief', 's')}${tr('Project')}</span>` : ''}</span>` : ''}</div></li>`;
 }
 
-async function pp_patch(id, body, msg = tr('Saved'), expect = null) {
-  // 2.560.0 C (#4700): the dialog sends the updated_at it opened with (saved elsewhere meanwhile -> 409 and the bar); the undo
+async function pp_patch(id, body, msg = tr('Saved'), expect = null) {  // 2.559.0 (#4660): at once, see above; throws on a refusal (api() / the caller says why)
+  // 2.560.0 C (#4700): the dialog sends the updated_at it opened with (saved elsewhere meanwhile -> 409); the undo
   // writes back only the keys that really changed, with the version this save left
-  const j = await (expect ? rawFetch : api)('PATCH', `/api/office/deals/${id}`, expect ? {...body, expect_updated_at: expect} : body);
-  pp_reload();
+  const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => (expect ? rawFetch : api)('PATCH', `/api/office/deals/${id}`, expect ? {...body, expect_updated_at: expect} : body), ofcDraw);
+  pp_itemSet(j); pp_refresh();
   const before = Object.fromEntries(Object.entries(j.before || {}).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(j[k] ?? null)));
-  if (Object.keys(before).length) toast(msg, async () => { try { await rawFetch('PATCH', `/api/office/deals/${id}`, {...before, expect_updated_at: j.updated_at}); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } pp_reload(); });
+  if (Object.keys(before).length) toast(msg, async () => { try { pp_itemSet(await rawFetch('PATCH', `/api/office/deals/${id}`, {...before, expect_updated_at: j.updated_at})); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } pp_refresh(); });
   else toast(msg);
   return j;
 }
 async function pp_move(id, stage) {
-  const x = (PPS.data?.items || []).find(i => i.id === id);
-  if (!x || x.stage === stage) return;
-  x.stage = stage; ofcDraw();  // at once; the reload brings the server's values
-  try { await pp_patch(id, {stage}, tr('Moved to {0}', pp_stageName(stage))); } catch (e) { toast(e.message || tr('unknown')); pp_reload(); }
+  const x = pp_item(id);
+  if (!x || x.stage === stage || pp_wait(id)) return;
+  // at once (pp_patch); 2.559.0 (#4660): a refusal puts the card back into its column, api() says why
+  try { await pp_patch(id, {stage}, tr('Moved to {0}', pp_stageName(stage))); } catch { /* back already */ }
 }
 
 function pp_modal(x, stage) {
@@ -108,9 +124,12 @@ function pp_modal(x, stage) {
     if (b.dataset.m === 'close') { close(); return; }
     const err = m => { const el = $('.aerr', md); if (el) el.textContent = m || ''; };
     try {
-      if (b.dataset.m === 'del') {
-        await api('DELETE', `/api/office/deals/${x.id}`); md.remove(); pp_reload();
-        toast(tr('Deleted'), async () => { await api('POST', `/api/office/deals/${x.id}/restore`); pp_reload(); });
+      if (b.dataset.m === 'del') {  // 2.559.0 (#4660): gone at once, a refusal brings it back
+        md.remove();
+        const out = () => { const its = PPS.data?.items, k = its ? its.findIndex(i => i.id === x.id) : -1; if (k < 0) return null; const [o] = its.splice(k, 1); return () => { if (PPS.data && !pp_item(x.id)) PPS.data.items.splice(Math.min(k, PPS.data.items.length), 0, o); }; };
+        try { await optWrite(out, () => api('DELETE', `/api/office/deals/${x.id}`), ofcDraw); } catch { return; }
+        pp_refresh();
+        toast(tr('Deleted'), async () => { pp_itemSet(await api('POST', `/api/office/deals/${x.id}/restore`)); pp_refresh(); });
         return;
       }
       if (b.dataset.m === 'offer') {
@@ -133,20 +152,23 @@ function pp_modal(x, stage) {
         probability: Math.max(0, Math.min(100, Math.round(+v('#pp-prob') || 0))), expected_date: v('#pp-date'), note: v('#pp-note'), lost_reason: v('#pp-lost')};
       if ($('#pp-client', md) && body.stage !== 'lead') body.client_id = v('#pp-client') ? +v('#pp-client') : null;
       if (lf && body.stage === 'lead') Object.assign(body, leadBody(md));  // 2.94.0 A (#1930): the lead's fields
-      if (x) { await pp_patch(x.id, body, tr('Saved'), x.updated_at || null); md.remove(); }
-      else {
-        const j = await api('POST', '/api/office/deals', body); md.remove(); PPS.stage = j.stage; pp_reload();
-        toast(tr('Added'), async () => { await api('DELETE', `/api/office/deals/${j.id}`); pp_reload(); });
-      }
-    } catch (x2) {
-      const el = $('.aerr', md);
-      if (el && x2.status === 409 && x2.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-pp-reload>${tr('Reload')}</button>`;
-        $('[data-pp-reload]', el).addEventListener('click', () => { md.remove(); pp_reload(); pp_modal(x2.data.row); });
+      // 2.559.0 (#4660): the dialog closes at once, the card shows (a new one: provisional); a refusal puts the board back
+      md.remove();
+      if (x) {
+        try { await pp_patch(x.id, body, tr('Saved'), x.updated_at || null); } catch (x2) {
+          // 2.560.0 C (#4700) kept: saved elsewhere meanwhile -> the card is back, the saved state opens (this input is not saved)
+          if (x2.status === 409 && x2.data?.row) { toast(tr('Changed in the meantime')); pp_reload(); pp_modal(x2.data.row); }
+          else if (x.updated_at && x2.message) toast(x2.message);  // rawFetch does not show it itself
+        }
         return;
       }
-      err(x2.message);
-    }
+      const tmp = -Date.now(), was = PPS.stage;
+      const put = () => { if (!PPS.data) return null; if (!pp_item(tmp)) PPS.data.items.push({offer_id: null, list_id: null, ...pp_local(body), id: tmp}); return () => { if (PPS.data) PPS.data.items = PPS.data.items.filter(i => i.id !== tmp); }; };
+      PPS.stage = body.stage;
+      let j; try { j = await optWrite(put, () => api('POST', '/api/office/deals', body), ofcDraw); } catch { if (PPS.stage === body.stage) PPS.stage = was; ofcDraw(); return; }
+      pp_itemSet(j, tmp); pp_refresh();
+      toast(tr('Added'), async () => { await api('DELETE', `/api/office/deals/${j.id}`); pp_refresh(); });
+    } catch (x2) { err(x2.message); }
   });
   setTimeout(() => $('#pp-title', md)?.focus(), 30);
   return md;
@@ -159,7 +181,7 @@ document.addEventListener('click', e => {
   if (a === 'new') pp_modal(null);
   else if (a === 'newlead') pp_modal(null, 'lead');  // 2.94.0 A (#1930)
   else if (a === 'stage') { PPS.stage = b.dataset.v; ofcDraw(); }
-  else if (a === 'open') { const x = (PPS.data?.items || []).find(i => i.id === +b.dataset.id); if (x) pp_modal(x); }
+  else if (a === 'open') { const x = pp_item(+b.dataset.id); if (x && !pp_wait(x.id)) pp_modal(x); }  // 2.559.0 (#4660): not a provisional card
   else return;
   e.preventDefault();
 });

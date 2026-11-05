@@ -65,7 +65,9 @@ const today = TC.today();
     check(await ready(ev, `!!document.querySelector('.modal #pp-title')`), '#1196: the deal dialog');
     await ev(`(() => { const m = document.querySelector('.modal'); m.querySelector('#pp-title').value = 'Messefilm'; m.querySelector('#pp-value').value = '2500'; m.querySelector('[data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && [...document.querySelectorAll('[data-pipcol="inquiry"] .ppcard')].some(c => /Messefilm/.test(c.textContent))`), '#1196: the new inquiry is in its column');
-    check(await ev(`${deals}.then(j => j.items.some(x => x.title === 'Messefilm' && x.stage === 'inquiry' && x.probability === 20))`), '#1196: saved as an inquiry with 20 %');
+    // 2.559.0 (#4660): the card shows before the answer (provisional, negative id): wait for the server and the real id
+    check(await ready(ev, `${deals}.then(j => j.items.some(x => x.title === 'Messefilm' && x.stage === 'inquiry' && x.probability === 20))`), '#1196: saved as an inquiry with 20 %');
+    await ready(ev, `[...document.querySelectorAll('.ppcard')].some(x => /Messefilm/.test(x.textContent) && +x.dataset.id > 0)`);
     // 2.50.1: open + save keeps a value >= 1,000 (the field shows "2,500.00"; ofcNum read it as 2.5)
     check(await ev(`ofcNum(fmtNum(2500, 2)) === 2500 && ofcNum('2,500.00') === 2500 && ofcNum('1.5') === 1.5`), '2.50.1: ofcNum reads the thousands separator');
     await ev(`(() => { [...document.querySelectorAll('.ppcard')].find(x => /Messefilm/.test(x.textContent)).click(); return 1; })()`);
