@@ -135,7 +135,7 @@ function rk_fixedModal(f) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); rk_cfReload();
-        const o = j.item; toast(tr('Deleted'), async () => { await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); rk_cfReload(); });  // 2.91.0 B (#1924): + the subscription fields
+        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trash/undo/fixed_cost/${j.trash_id}`); rk_cfReload(); return; } await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); rk_cfReload(); });  // 2.91.0 B (#1924): + the subscription fields
         return;
       }
       const v = id => $(id, md)?.value ?? '';

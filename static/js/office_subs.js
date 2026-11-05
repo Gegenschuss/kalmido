@@ -107,7 +107,7 @@ function aboModal(f) {
     try {
       if (b.dataset.m === 'del') {
         const j = await api('DELETE', `/api/office/fixed-costs/${f.id}`); md.remove(); aboReload();
-        const o = j.item; toast(tr('Deleted'), async () => { await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); aboReload(); });
+        const o = j.item; toast(tr('Deleted'), async () => { if (j.trash_id) { await api('POST', `/api/office/trash/undo/fixed_cost/${j.trash_id}`); aboReload(); return; } await api('POST', '/api/office/fixed-costs', {label: o.label, amount: o.amount, start: o.start, until: o.until, repeat: o.repeat, category: o.category || '', vat_rate: o.vat_rate || 0, ...aboFields(o)}); aboReload(); });
         return;
       }
       if (b.dataset.m === 'unsub') { md.remove(); await aboPatch(f.id, {sub: 0}, {sub: 1}, tr('No longer a subscription')); return; }

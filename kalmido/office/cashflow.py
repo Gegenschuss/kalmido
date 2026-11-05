@@ -45,6 +45,10 @@ from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .otrash import OTB_UNDO, otb_put  # noqa: E402  2.567.0 (#4707): a deleted fixed cost goes into the office trash
+
+RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash
+OTB_UNDO[RK_FIXED_TRASH] = _ctx  # the toast's undo: the office admin, as deleting it
 
 
 def _j(s):
@@ -228,13 +232,16 @@ def rk_fixed_patch(fid):
 
 @app.delete("/api/office/fixed-costs/<int:fid>")
 def rk_fixed_delete(fid):
-    """Deletes an entry; answers it as it was (the client's undo posts it again)."""
+    """Deletes an entry; answers it as it was and 2.567.0 (#4707) its office trash id (trash_id: the client's undo writes the
+    copy back, POST /api/office/trash/undo/fixed_cost/<id>; restorable from the office trash until its period ends)."""
     c, uid, oid = _ctx()
+    write_lock(c, f"office_fixed_costs-{int(fid)}")
     old = _fixed_public(c, oid, _fixed_row(c, oid, fid))
+    tid = otb_put(c, oid, uid, RK_FIXED_TRASH, "office_fixed_costs", fid, old.get("label") or "")  # 2.567.0 (#4707): a copy first (the label is plain, the amount sealed)
     c.execute("DELETE FROM office_fixed_costs WHERE id=? AND org_id=?", (fid, oid))
     bump(c)
     c.commit()
-    return jsonify(ok=True, item=old)
+    return jsonify(ok=True, item=old, trash_id=tid)
 
 
 # ---------------------------------------------------------------- the cash flow
