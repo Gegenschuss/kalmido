@@ -59,6 +59,18 @@ def ofv_task(c, lid, tid):
     return tid
 
 
+def ofv_client(c, lid, cid):
+    """Review 2.568.0 (N2): project lid of another client than cid -> 400 with that reason (not 409 no_time: the time is
+    there, only under the other client). A project without a client stays 409 no_time (nothing of it can be billed)."""
+    try:
+        cid = int(cid)
+    except (TypeError, ValueError):
+        raise BadInput(tr("Invalid value: {0}", "client_id"))
+    r = c.execute("SELECT client_id FROM lists WHERE id=?", (lid,)).fetchone()
+    if r and r[0] and r[0] != cid:
+        raise BadInput(tr("The project belongs to another client"))
+
+
 def ofv_missing(c, oid, did):
     """What finalising would still miss (the same check as a person's finalising, invoices.inv_missing), translated."""
     r = doc_row(c, oid, did)
@@ -101,6 +113,7 @@ def v1_office_invoice_draft_post():
             if not ofa_agent_on(c, agent_row(c, aid), oid, "time", "view"):
                 raise Denied(403, tr(NO_RIGHT))
         f, t = ofv_period(b, True)
+        ofv_client(c, lid, b["client_id"])
         did, n = inv_from_time(c, oid, uid, {"client_id": b["client_id"], "from": f, "to": t, "project_id": lid, "task_id": tid})
         stat = g.get("tbill_stat")
         if not n:

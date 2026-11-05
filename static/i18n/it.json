@@ -16563,6 +16563,7 @@
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Metti prima l’agente in un gruppo di diritti dell’ufficio con «Preventivi e fatture» (modifica)",
   "You do not work in this agent's office": "Non lavori nell’ufficio di questo agente",
   "task_id needs from_time": "task_id richiede from_time",
+  "The project belongs to another client": "Il progetto appartiene a un altro cliente",
   "Budget entry": "Voce del budget",
   "Budget category": "Categoria del budget",
   "Recurring entry": "Voce ricorrente",

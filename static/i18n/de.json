@@ -16562,6 +16562,7 @@
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Nimm den Agenten zuerst in eine Büro-Rechtegruppe mit „Angebote & Rechnungen“ (bearbeiten) auf",
   "You do not work in this agent's office": "Du arbeitest nicht im Büro dieses Agenten",
   "task_id needs from_time": "task_id braucht from_time",
+  "The project belongs to another client": "Das Projekt gehört zu einem anderen Kunden",
   "Budget entry": "Budget-Eintrag",
   "Budget category": "Budget-Kategorie",
   "Recurring entry": "Dauerposten",
