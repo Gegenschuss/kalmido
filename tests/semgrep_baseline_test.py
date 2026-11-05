@@ -75,6 +75,38 @@ check(rc == 0 and "::notice" in out and "1 stale" in out, f"a stale entry is a n
 rc, out, _ = run([], [ENTRY], "--strict")
 check(rc == 1 and "::error" in out, f"--strict makes a stale entry red: {rc} {out[-300:]}")
 
+# 2.543.0 review: counted, a second occurrence of a known code line in the same file is new
+rc, out, _ = run([KNOWN, moved], [ENTRY])
+check(rc == 1 and "1 new" in out, f"a second occurrence of a known line is new: {rc} {out[-300:]}")
+# a semgrep error, a missing results list, nothing scanned or most known findings gone at once = red, never a clean tree
+tmp_dir = tempfile.mkdtemp()
+def raw(obj, entries):
+    rp, bp = os.path.join(tmp_dir, "r.json"), os.path.join(tmp_dir, "b.json")
+    json.dump(obj, open(rp, "w")); json.dump({"entries": entries}, open(bp, "w"))
+    pr = subprocess.run([sys.executable, TOOL, rp, "--baseline", bp, "--root", ROOT], capture_output=True, text=True)
+    return pr.returncode, pr.stdout
+rc, out = raw({"results": [], "errors": [{"level": "error", "message": "boom"}]}, [ENTRY])
+check(rc == 1, f"a semgrep error is red: {rc} {out[-300:]}")
+rc, out = raw({"errors": []}, [ENTRY])
+check(rc == 1, f"no results list is red: {rc} {out[-300:]}")
+rc, out = raw({"results": [], "errors": [], "paths": {"scanned": []}}, [ENTRY])
+check(rc == 1, f"nothing scanned is red: {rc} {out[-300:]}")
+many = [dict(ENTRY, code=f"x = {i}") for i in range(12)]
+rc, out = raw({"results": [], "errors": []}, many)
+check(rc == 1 and "scan broken" in out, f"most known findings gone at once is red: {rc} {out[-300:]}")
+
+# 2.543.0 review: .zap/rules.tsv ignores plugin 10055 (CSP) as a whole, so ZAP would not see a weaker CSP - the app's
+# CSP is pinned here instead: own scripts only, no eval, no plugins, no framing, no base tag
+import re  # noqa: E402
+_src = open(os.path.join(ROOT, "kalmido", "core", "pages.py"), encoding="utf-8").read()
+_m = re.search(r"^CSP = \((.*?)\)\s*$", _src, re.S | re.M)
+_csp = "".join(re.findall(r'"([^"]*)"', _m.group(1))) if _m else ""
+_dir = {d.split()[0]: d.split()[1:] for d in (x.strip() for x in _csp.split(";")) if d}
+check(_dir.get("script-src") == ["'self'"] and _dir.get("default-src") == ["'self'"], f"CSP script-src / default-src stay 'self': {_dir}")
+check(_dir.get("object-src") == ["'none'"] and _dir.get("frame-ancestors") == ["'none'"] and _dir.get("base-uri") == ["'none'"],
+      f"CSP object-src / frame-ancestors / base-uri stay 'none': {_dir}")
+check("'unsafe-eval'" not in _csp and "*" not in _csp, f"CSP without unsafe-eval or wildcards: {_csp}")
+
 # 5. --accept writes the new finding into the baseline
 rc, out, after = run([KNOWN, new], [ENTRY], "--accept", "a '?' list", "--task", "4625")
 added = [e for e in after["entries"] if e["file"] == "kalmido/b.py"]

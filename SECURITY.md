@@ -62,7 +62,9 @@ exception list in the repository, with its reason and date:
   collapsed), the reason, the date and, when the finding is a real gap that is being fixed, the task number. A finding
   is known when rule, file and code line match - the line number does not count, so edits above a finding do not make it
   new. `tools/semgrep_baseline.py` compares semgrep's JSON output against the list (CI job "semgrep"; an entry whose
-  finding is gone is reported as a notice and should be removed).
+  finding is gone is reported as a notice and should be removed). Matching counts occurrences: a second copy of a known
+  code line in the same file is a new finding. A semgrep error, a scan without a results list or with no scanned file,
+  and most known findings vanishing at once are red too - a broken scan never looks like a clean tree.
 - **ZAP: `.zap/rules.tsv`.** One line per ZAP plugin id (`id`, `IGNORE`, reason with the date). The scan runs without `-I`,
   so every alert that is not ignored there fails the job "OWASP ZAP baseline".
 

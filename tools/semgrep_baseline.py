@@ -18,6 +18,7 @@ fixes it) - for the first run after a rule update, or when a reviewed finding wa
 reason that fits several findings is given once and a finding that needs its own gets its own call.
 Python standard library only; works on the JSON of semgrep 1.x (results[].check_id / path / start.line / extra.lines)."""
 import argparse
+import collections
 import datetime
 import json
 import os
@@ -87,10 +88,21 @@ def save_baseline(path, entries):
 
 def compare(found, entries):
     """(new findings, stale entries, known count)."""
-    known = {key(e) for e in entries}
-    seen = {key(x) for x in found}
-    new = [x for x in found if key(x) not in known]
-    stale = [e for e in entries if key(e) not in seen]
+    # 2.543.0 review: counted, not a set - a second, new occurrence of a known code line in the same file is new
+    left = collections.Counter(key(e) for e in entries)
+    seen = collections.Counter(key(x) for x in found)
+    new = []
+    for x in found:
+        if left[key(x)] > 0:
+            left[key(x)] -= 1
+        else:
+            new.append(x)
+    have = collections.Counter()
+    stale = []
+    for e in entries:
+        have[key(e)] += 1
+        if have[key(e)] > seen[key(e)]:
+            stale.append(e)
     return new, stale, len(found) - len(new)
 
 
@@ -105,6 +117,9 @@ def main(argv=None):
     a = ap.parse_args(argv)
     with open(a.results, encoding="utf-8") as f:
         results = json.load(f)
+    if not isinstance(results, dict) or not isinstance(results.get("results"), list):
+        print("::error title=semgrep baseline::the semgrep output has no results list - scan broken, not green")
+        return 1
     errors = [e for e in results.get("errors") or [] if str(e.get("level") or "") == "error"]
     found = findings(results, a.root)
     entries = load_baseline(a.baseline)
@@ -130,7 +145,16 @@ def main(argv=None):
         print(f"::warning title=semgrep error::{str(e.get('message') or '')[:300]}")
     print(f"semgrep_baseline: {len(found)} findings, {nknown} known, {len(new)} new, {len(stale)} stale entries, "
           f"{len(entries)} entries, {len(errors)} semgrep errors")
-    return 1 if new or (a.strict and stale) else 0
+    # 2.543.0 review: a scan error (a file not parsed) or a scan with no finding at all while the list has some is red:
+    # missing findings must not look like a clean tree
+    if errors:
+        print(f"::error title=semgrep baseline::{len(errors)} semgrep errors - files may be unscanned")
+    scanned = (results.get("paths") or {}).get("scanned") if "paths" in results else True
+    broken = not scanned or (len(entries) >= 10 and len(stale) * 2 > len(entries))
+    if broken:
+        print(f"::error title=semgrep baseline::{len(stale)} of {len(entries)} known findings are gone at once or no file "
+              "was scanned - scan broken? (after a real big clean-up: remove the entries)")
+    return 1 if new or errors or broken or (a.strict and stale) else 0
 
 
 if __name__ == "__main__":
