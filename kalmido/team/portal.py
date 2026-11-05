@@ -766,6 +766,7 @@ def pt_mail_tick(c):
         rows = c.execute(f"""SELECT p.*, t.title, t.status, l.owner_id AS l_owner, l.req_mail_done AS l_done FROM portal_tickets p JOIN tasks t ON t.id=p.task_id
                              JOIN lists l ON l.id=t.list_id JOIN users u ON u.id=l.owner_id
                              WHERE p.notify=1 AND p.email!='' AND t.deleted_at IS NULL AND u.disabled=0 AND {_pt_space_sql()}
+                             AND NOT (COALESCE(p.via, '')='mail' AND COALESCE(p.unverified, 0)=1 AND COALESCE(p.claimed, 0)=0)
                              AND (p.last_mail_at IS NULL OR p.last_mail_at<=?)
                              AND ((t.status=2 AND p.mailed_status!=2) OR (t.status!=2 AND p.mailed_status=2) OR EXISTS(
                                SELECT 1 FROM comments k WHERE k.task_id=p.task_id AND k.portal=1 AND k.user_id IS NOT NULL
@@ -774,7 +775,8 @@ def pt_mail_tick(c):
         for p in rows:
             since = parse_iso(p["last_mail_at"] or p["created_at"])
             new = [a for a in pt_answers(c, p["task_id"]) if not a["customer"] and parse_iso(a["at"]) > since]
-            # 2.553.0 B (#3460): a ticket by e-mail gets the done mail only with the list's switch (default off)
+            # 2.553.0 B (#3460): a ticket by e-mail gets the done mail only with the list's switch (default off); review M1: an
+            # unverified sender (a forged From) gets the team's answers only after opening the status link of the confirmation
             done = p["status"] == 2 and p["mailed_status"] != 2 and (p["via"] != "mail" or bool(p["l_done"]))
             if not new and not done:  # reopened without news: only remember the state
                 c.execute("UPDATE portal_tickets SET mailed_status=? WHERE id=?", (p["status"], p["id"]))

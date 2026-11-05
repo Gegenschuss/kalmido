@@ -144,6 +144,13 @@ def outs(tid):
     return dbx("SELECT msg_id FROM task_mail WHERE task_id=? AND kind='out' ORDER BY id", (tid,))
 
 
+def wdb(q, args=()):
+    c = dbxm.connect(os.path.join(DATA, "tasks.db"))
+    c.execute(q, args)
+    c.commit()
+    c.close()
+
+
 def tick():
     """The mails to the reporters once now (team/portal.py pt_mail_tick, as the watchdog does)."""
     code = "import app\nfrom kalmido.core.db import connect\nfrom kalmido.team.portal import pt_mail_tick\nc = connect()\npt_mail_tick(c)\nc.close()\nprint('ok')\n"
@@ -206,6 +213,19 @@ t2 = poll(lambda: task_of(M2))
 T2 = t2[0] if t2 else 0
 check(bool(t2) and "the sender is not verified" in (t2[2] or "") and dbx("SELECT unverified FROM portal_tickets WHERE task_id=?", (T2,)) == [(1,)],
       f"unverified: still a ticket, marked {t2}")
+
+# 2.553.0 (#3460, review M1): a forged From must not make the server send the team's answers to that address - an unverified
+# sender gets answers only after opening the status link of the confirmation (claimed)
+check(Bo.post(B + f"/api/tasks/{T2}/comments", json={"body": "PUBLIC-TO-DORA answer", "portal": True}).ok, "a public answer to the unverified ticket")
+check(tick() and not [m for m in sent("dora@example.net") if "PUBLIC-TO-DORA" in text_of(m)], "unverified, not confirmed: no answer mail")
+wdb("UPDATE portal_tickets SET claimed=1 WHERE task_id=?", (T2,))
+check(tick() and bool(until(lambda: [m for m in sent("dora@example.net") if "PUBLIC-TO-DORA" in text_of(m)], 30)),
+      "confirmed by the status link: the answer goes out")
+# review N5: a delivery report (a bounce of our own confirmation) never becomes a ticket
+MB = mail("Mail Delivery System <MAILER-DAEMON@example.net>", ADDR, "Undelivered Mail Returned to Sender", "This is the mail system.",
+          "<p2553b-bounce@example.org>", auth=["mx.example.test; spf=pass smtp.mailfrom=example.net"])
+settle()
+check(task_of(MB) is None, "a bounce of the mail system: no ticket")
 
 # ---------------------------------------------------------------- answers: public by mail, internal never
 n_out = len(outs(T1))

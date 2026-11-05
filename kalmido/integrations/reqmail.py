@@ -45,7 +45,6 @@ from ..core.i18n import lang, tr
 from ..core.pg import insert_id
 from ..core.access import Denied, MANAGE_ROLES, need_list, task_visible
 from ..core.pages import save_attachment_bytes
-from ..accounts.login import auth_key
 from ..accounts.session import _token_hash, me
 from ..accounts.bgjobs import bgj_add, bgj_fn
 from ..api.common import hit_limit
@@ -282,6 +281,8 @@ def rq_take(c, r, msg, raw):
         if auto:
             return 0  # an out-of-office answer to an answer never becomes a comment
         return rq_comment(c, msg, mid, p, l, verified)
+    if msg.get_content_type() == "multipart/report" or sender.partition("@")[0] in _AUTO_LOCAL:
+        return 0  # review N5: a delivery report / mailer daemon (a bounce of our own confirmation) is never a ticket
     if hit_limit(f"rqin:{lid}", RQ_IN_HOUR, 3600) or hit_limit(f"rqine:{lid}:{P.pt_email_hash(c, sender)}", RQ_IN_SENDER_HOUR, 3600):
         return 0
     hint = tr("Reply to ticket T{0}, the sender is not its reporter", named, lg=lang(c, l["owner_id"])) if named else ""
