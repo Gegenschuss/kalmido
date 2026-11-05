@@ -384,12 +384,14 @@ function le2eIn(j, url) {
 async function le2eRekeyConflicts(url, body, j, send) {
   const m = /^\/api\/tasks\/(\d+)$/.exec(url || ''), prev = body && typeof body === 'object' ? body._prev : null;
   if (!m || !prev || !Array.isArray(j?.conflicts) || !j.conflicts.length) return j;
-  const lid = j.list_id ?? le2eUrlLid(url); if (!lid || !le2eOn(lid)) return j;
+  // 2.543.0 review: the list from the device, not from the answer, and only a newer generation counts as a key change -
+  // a server cannot make the device compare a cipher of its choice with the text on screen
+  const lid = le2eUrlLid(url) ?? j.list_id; if (!lid || !le2eOn(lid)) return j;
   const real = [], again = {}, base = {};
   for (const c of j.conflicts) {
     const p = c.field, old = prev[p], cur = j._enc?.[p];
     let same = false;
-    if (LE2E_TASK.includes(p) && p in body && le2eIs(old) && le2eIs(cur) && old !== cur) {
+    if (LE2E_TASK.includes(p) && p in body && le2eIs(old) && le2eIs(cur) && old !== cur && (le2eParse(cur)?.g ?? -1) > (le2eParse(old)?.g ?? Infinity)) {
       try { same = await le2eDec(lid, p, old) === await le2eDec(lid, p, cur); } catch { /* does not open here: a real conflict */ }
     }
     if (same) { again[p] = body[p]; base[p] = cur; } else real.push(c);
