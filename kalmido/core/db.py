@@ -1241,6 +1241,8 @@ def init_db(guard=True, load=None):
             gset(c, "cal_secret", secrets.token_hex(32))
         if not gsetting(c, "auth_secret"):  # sign-in: key material for the TOTP secrets and the backup passphrase
             gset(c, "auth_secret", secrets.token_hex(32))
+        from ..notify.channels import chn_hint_migrate
+        chn_hint_migrate(c)  # 2.547.0 (#4516): channel hints without the last characters of the secret (after auth_secret)
         if not gsetting(c, "undo_key"):  # signs the undo payloads handed to the client
             gset(c, "undo_key", secrets.token_hex(32))
         if not gsetting(c, "vapid_private"):  # Web Push: the instance's VAPID key (P-256), generated once

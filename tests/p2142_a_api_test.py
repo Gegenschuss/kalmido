@@ -181,13 +181,14 @@ SECRET_PATH = "/slack/T000/B000/XXXXsecretXXXX1234"
 r = Bo.post(B + "/api/me/channels", json={"kind": "slack", "name": "Team Slack", "url": STUB + SECRET_PATH, "events": ["assign", "comment"]})
 check(r.status_code == 201, f"a Slack channel: {r.status_code} {r.text[:200]}")
 SL = r.json()
-check("url" not in SL and "target" not in SL and SL.get("hint", "").endswith("…1234") and "XXXXsecret" not in r.text,
-      f"the address never comes back, a masked end only: {SL}")
+# 2.547.0 (#4516): the hint is the host only (was the last four characters of the address)
+check("url" not in SL and "target" not in SL and SL.get("hint") == "127.0.0.1" and "XXXXsecret" not in r.text,
+      f"the address never comes back, the host only: {SL}")
 check(SL.get("events") == ["assign", "comment"] and SL.get("enabled") is True, "events + on " + str(SL))
 r = Bo.post(B + "/api/me/channels", json={"kind": "telegram", "token": TG_TOKEN, "chat_id": "-100123456"})
 check(r.status_code == 201, f"a Telegram channel (default events): {r.text[:200]}")
 TG = r.json()
-check(TG.get("events") == ["reminder", "assign", "comment"] and TG.get("hint") == "Telegram …2345", "default events, hint " + str(TG))
+check(TG.get("events") == ["reminder", "assign", "comment"] and TG.get("hint") == "Chat -100123456", "default events, hint " + str(TG))
 r = Bo.post(B + "/api/me/channels", json={"kind": "signal", "url": STUB + "/sig", "number": "+4915100000001", "recipient": "+4915100000002",
                                           "events": ["assign"]})
 check(r.status_code == 201, f"a Signal channel: {r.text[:200]}")
@@ -235,7 +236,8 @@ A.patch(B + f"/api/tasks/{T2}", json={"assignee_id": uid["bob"]})
 check(got("/sig/v2/send", has("Order paper")), "the Signal channel still gets it")
 check(none_after(SECRET_PATH, has("Order paper"), wait=2), "#2145: a switched-off channel gets nothing")
 r = Bo.patch(B + f"/api/me/channels/{SL['id']}", json={"url": STUB + "/slack/new-address-9876", "enabled": True})
-check(r.ok and r.json()["hint"].endswith("…9876"), f"a new address replaces the old one: {r.text[:200]}")
+# 2.547.0 (#4516): the hint shows no part of the new address either
+check(r.ok and r.json()["hint"] == "127.0.0.1" and "new-address" not in r.text, f"a new address replaces the old one: {r.text[:200]}")
 check(Bo.patch(B + f"/api/me/channels/{SL['id']}", json={"events": []}).status_code == 400, "no event: 400")
 
 # ---- failures in a row turn a channel off

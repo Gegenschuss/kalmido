@@ -432,7 +432,7 @@ function whoDraw(root) {
 }
 // 2.142.0 A (#2145, #2146): notification channels (Slack, Matrix, Telegram, Signal) -- a person's own in Settings > Notifications,
 // an organisation's in Settings > Workspaces (its admins) -- and e-mails for single events. The address / token never comes back
-// from the server: a row shows kind, name and a masked end; editing leaves the address empty unless a new one is typed.
+// from the server: a row shows kind, name and a hint (the host / the chat ID, 2.547.0 #4516); editing leaves the address empty unless a new one is typed.
 const CHN_KINDS = {slack: 'Slack', matrix: 'Matrix', telegram: 'Telegram', signal: 'Signal'};
 const CHN_EV = {reminder: N_('Reminders'), assign: N_('Assignments'), comment: N_('Mentions and comments'), digest: N_('Daily digest and briefing'),
   other: N_('Other notifications'), lists: N_('Changes in my own projects'), own: N_('Including my own changes'), newtask: N_('New task'), complete: N_('Task completed')};

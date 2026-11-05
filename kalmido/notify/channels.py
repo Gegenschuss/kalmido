@@ -4,11 +4,12 @@ Channels: a person adds their own (Settings > Notifications > Channels) and pick
 mentions and comments, the daily digest, other notifications, events of their own private lists); an organisation's admins add
 channels of the organisation (Settings > Workspaces) for what happens in its lists that every member sees (new task, completed,
 assigned, comment) -- never a private area, never a list shared only with some, never the words of a list with the lock.
-The address (webhook URL, bot token, numbers) is a secret: sealed with the server key, never sent back (kind, name and a masked
-end only). Messages are plain text for people, not JSON events (that is what the webhooks are for). They are queued and sent by
-a background loop (short timeout, the request never waits); a failed send is tried once more after CH_RETRY_S (2.367.3, #2971),
-CH_FAIL_MAX failed messages in a row turn the channel off (the settings show why, its owner or the organisation's admins get a
-News item and a push). Outbound only to public https addresses, the webhooks' allow-list of an admin
+The address (webhook URL, bot token, numbers) is a secret: sealed with the server key, never sent back (kind, name and a hint
+without a character of the secret: the host, Telegram's chat ID; 2.547.0, #4516: was the last four characters). Messages are
+plain text for people, not JSON events (that is what the webhooks are for). They are queued and sent by a background loop
+(short timeout, the request never waits); a failed send is tried once more after CH_RETRY_S (2.367.3, #2971), CH_FAIL_MAX
+failed messages in a row turn the channel off (the settings show why, its owner or the organisation's admins get a News item
+and a push). Outbound only to public https addresses, the webhooks' allow-list of an admin
 (Settings > Administration > Advanced, KALMIDO_WEBHOOK_ALLOW_HOSTS) for self-hosted targets -- the same guard as the webhooks.
 A person's quiet hours hold back their channel messages (urgent ones excepted). KALMIDO_CHANNELS=0: off.
 
@@ -107,7 +108,8 @@ def chn_target(c, kind, b):
     s = lambda k: str(b.get(k) or "").strip()  # noqa: E731
     if kind in ("slack", "matrix"):
         u = chn_url(c, s("url"))
-        return {"url": u}, f"{urllib.parse.urlsplit(u).hostname} …{u[-4:]}"
+        t = {"url": u}
+        return t, chn_hint(kind, t)
     if kind == "telegram":
         tok, chat = s("token"), s("chat_id")
         if tok.lower().startswith("bot"):
@@ -116,15 +118,38 @@ def chn_target(c, kind, b):
             raise BadInput(tr("Invalid bot token"))
         if not TG_CHAT_RE.fullmatch(chat):
             raise BadInput(tr("Invalid chat ID"))
-        return {"token": tok, "chat_id": chat}, f"Telegram …{tok[-4:]}"
+        t = {"token": tok, "chat_id": chat}
+        return t, chn_hint(kind, t)
     if kind == "signal":
         u, num, to = chn_url(c, s("url")), s("number"), s("recipient")
         if not PHONE_RE.fullmatch(num):
             raise BadInput(tr("Invalid phone number: {0}", tr("Sender")))
         if not (PHONE_RE.fullmatch(to) or SIG_GROUP_RE.fullmatch(to)):
             raise BadInput(tr("Invalid phone number: {0}", tr("Recipient")))
-        return {"url": u.rstrip("/"), "number": num, "recipient": to}, f"{urllib.parse.urlsplit(u).hostname} …{to[-4:]}"
+        t = {"url": u.rstrip("/"), "number": num, "recipient": to}
+        return t, chn_hint(kind, t)
     raise BadInput(tr("Invalid value: {0}", "kind"))
+
+
+def chn_hint(kind, t):
+    """2.547.0 (#4516): the hint of a channel shown in the settings (behind its kind: "Telegram · Chat -100…") -- no character of
+    a secret (the webhook URL's path, the bot token, the numbers): Slack / Matrix / Signal the host, Telegram the chat ID (not
+    secret)."""
+    if kind == "telegram":
+        return f"Chat {t.get('chat_id') or ''}".strip()
+    return urllib.parse.urlsplit(t.get("url") or "").hostname or ""
+
+
+def chn_hint_migrate(c):
+    """2.547.0 (#4516), at every start, a no-op once done: hints from before still end in " …" + the last four characters of the
+    secret. From the sealed address where it opens (chn_hint), else cut back to what came before " …". One-way: the old ends go."""
+    for r in c.execute("SELECT id, kind, target, hint FROM notify_channels WHERE hint LIKE '%…%'").fetchall():
+        from ..accounts.login import unseal
+        try:
+            h = chn_hint(r["kind"], json.loads(unseal(c, f"channel:{r['id']}", r["target"]) or "{}"))
+        except Exception:  # noqa: BLE001 -- an address that does not open (another key, a broken row): the safe part only
+            h = ""
+        c.execute("UPDATE notify_channels SET hint=? WHERE id=?", (h or r["hint"].split(" …")[0].split("…")[0].strip(), r["id"]))
 
 
 def chn_request(kind, t, text):

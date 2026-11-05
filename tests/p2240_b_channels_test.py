@@ -296,5 +296,36 @@ push(FID, "Plain", "Frida words without a reference", click=f"{B}/#workload")
 check(wait_for(FM, "New notification in Kalmido") and not [t for t in texts(FM) if "Frida words without" in t],
       "#2867 B2: a person without an organisation: a push without a reference is neutral too")
 
+# ---- 2.547.0 (#4516): a channel's hint shows no character of its secret (was the last four of URL / token / number)
+TOK4516 = "123456789:AAbbCCddEEffGGhhIIjjKKllMMnnOOpp9xYz"
+H4516 = {}
+for kind, b in (("slack", {"url": STUB + "/b4516/T0/B0/secretTailQ7w"}), ("matrix", {"url": STUB + "/b4516-mx/hookK3vz"}),
+                ("telegram", {"token": TOK4516, "chat_id": "-1007788"}),
+                ("signal", {"url": STUB + "/sig4516", "number": "+4915100004516", "recipient": "+4915100009871"}),
+                ("signal", {"url": STUB + "/sig4516", "number": "+4915100004516", "recipient": "group.QUJDREVGR0hJSktMTU5PUA=="})):
+    r = Ca.post(B + "/api/me/channels", json={"kind": kind, "name": f"h4516 {kind}", "events": ["digest"], **b})
+    check(r.status_code == 201, f"#4516 setup: a {kind} channel {r.text[:200]}")
+    if r.status_code == 201:
+        H4516[r.json()["id"]] = (kind, b, r.json()["hint"])
+want = ["127.0.0.1", "127.0.0.1", "Chat -1007788", "127.0.0.1", "127.0.0.1"]
+check([h for _, _, h in H4516.values()] == want, f"#4516: host / chat ID / kind only {list(H4516.values())}")
+for chid, (kind, b, h) in H4516.items():
+    tails = [str(v)[-4:] for k, v in b.items() if k in ("url", "token", "number", "recipient")]
+    check(not [t for t in tails if t in h], f"#4516: no last four characters of the secret in the {kind} hint {h!r}")
+# the rows from before: the old hint with the end of the secret; one whose address does not open any more
+OLD = {chid: (f"127.0.0.1 …{b['url'][-4:]}" if kind != "telegram" else f"Telegram …{TOK4516[-4:]}") for chid, (kind, b, _) in H4516.items()}
+for chid, h in OLD.items():
+    dbx("UPDATE notify_channels SET hint=? WHERE id=?", (h, chid))
+BROKEN = list(H4516)[1]
+dbx("UPDATE notify_channels SET target='', hint='127.0.0.1 …K3vz' WHERE id=?", (BROKEN,))
+x = in_app("from kalmido.notify.channels import chn_hint_migrate\nwith system_ctx(c):\n    chn_hint_migrate(c)\nc.commit()\nprint('done')")
+check(x == "done", f"#4516 setup: the start's migration ran {x}")
+got4516 = {r[0]: r[1] for r in dbx(f"SELECT id, hint FROM notify_channels WHERE id IN ({','.join(str(int(i)) for i in H4516)})")}
+check([got4516.get(i) for i in H4516] == want, f"#4516: the migration sets the old hints anew {got4516}")
+check(not dbx("SELECT 1 FROM notify_channels WHERE hint LIKE '%…%'"), "#4516: no hint with a masked end is left")
+LH = " ".join(ch["hint"] for ch in Ca.get(B + "/api/me/channels").json()["channels"] if ch["id"] in H4516)
+check(LH and not [t for t in (*(b["url"][-4:] for _, b, _ in H4516.values() if "url" in b), TOK4516[-4:]) if t in LH],
+      f"#4516: the list of channels shows none of the ends either {LH!r}")
+
 print(f"p2240_b_channels: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
