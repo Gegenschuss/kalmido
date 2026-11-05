@@ -216,7 +216,7 @@ check(r.ok, f"the owner restricts the agent to one address {r.status_code} {r.te
 after, _ = chat("From the server FAKE_SLOW")
 check(until(lambda: last_run() and last_run()[1] == "run", 20), "the run under the address rule is running")
 ips = until(lambda: dbx("SELECT allowed_ips FROM api_tokens WHERE user_id=? AND name='Server agent run'", (AID,)), 10)
-check(ips and ips[0][0] == "10.9.9.9", f"the run token keeps the owner's address rule {ips}")
+check(ips and ips[0][0] in ("10.9.9.9", "10.9.9.9/32"), f"the run token keeps the owner's address rule {ips}")
 check(call(Fr, "post", f"/api/agents/{AID}/abort", json={}).ok, "Stop the slow run")
 run = until(lambda: (last_run() if last_run() and last_run()[1] != "run" else None), 15)
 check(run and run[1] == "aborted", f"the run itself passed the rule from the server (else its events call fails) {run}")
