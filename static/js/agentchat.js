@@ -724,16 +724,18 @@ function costLines(c) {
   return [of('day') ? tr('Costs today: {0} of {1}', fmtUsd(c.today), lim) : tr('Costs today: {0}', fmtUsd(c.today)),
     of('month') ? tr('Costs this month: {0} of {1}', fmtUsd(c.month), lim) : tr('Costs this month: {0}', fmtUsd(c.month))];
 }
+// 2.565.0 D (#4674): a server agent's tokens per starter routine this month (a.flows: owner / admins), with the routine's own model
+const flowLines = a => (a.flows || []).map(f => tr('{0}: {1} tokens this month', srv_flowName(f.flow), fmtTok(f.tokens || 0)) + (f.model ? ' · ' + f.model : ''));
 // {ring, lv, p, t, lines}: what the ring and the ⋯ menu show (plan quota first, else the cost limit); null = nothing to show
 function chatUseInfo(a) {
-  const q = a.quota, c = a.cost, cl = costLines(c);
+  const q = a.quota, c = a.cost, cl = costLines(c), fl = flowLines(a);
   if (!q?.windows?.length) {
     if (c?.pct != null) {
       const p = +c.pct;
       return {ring: true, lv: p >= 100 ? 'over' : p >= 75 ? 'warn' : 'ok', p: Math.max(0, Math.min(100, p)), t: tr('Usage: {0}', quotaPct(p)),
-        lines: cl.length ? cl : [c.period === 'day' ? tr('Share of its daily cost limit') : tr('Share of its monthly cost limit')]};
+        lines: [...(cl.length ? cl : [c.period === 'day' ? tr('Share of its daily cost limit') : tr('Share of its monthly cost limit')]), ...fl]};
     }
-    return cl.length ? {ring: false, t: cl[1], lines: cl.slice(0, 1)} : null;
+    return cl.length ? {ring: false, t: cl[1], lines: [cl[0], ...fl]} : fl.length ? {ring: false, t: fl[0], lines: fl.slice(1)} : null;
   }
   const stale = quotaStale(q), lv = stale ? 'stale' : q.level || 'ok', p = Math.max(0, Math.min(100, +q.percent || 0));
   const lbl = w => !w.key ? w.label : tr(QUOTA_KEYS[w.key] || N_('Other quota'));
@@ -741,7 +743,7 @@ function chatUseInfo(a) {
   if (q.limit != null) lines.push(tr('Limit: {0}', quotaPct(q.limit)));
   if (q.paused_until) lines.push(tr('paused until {0}', quotaWhen(q.paused_until)));
   lines.push(stale ? tr('Outdated, last report {0}', quotaWhen(q.at)) : tr('Reported {0}', quotaWhen(q.at)));
-  return {ring: true, lv, p, t: tr('Usage: {0}', quotaPct(q.percent)), lines: [...lines, ...cl]};
+  return {ring: true, lv, p, t: tr('Usage: {0}', quotaPct(q.percent)), lines: [...lines, ...cl, ...fl]};
 }
 function chatRingHtml(a) {
   const u = quotaShowOn() && chatUseInfo(a); if (!u?.ring) return '';

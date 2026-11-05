@@ -72,7 +72,9 @@ the Kalmido server* asks for a display name (suggested: *Kalmido AI*), your own 
 first), the model (default `claude-sonnet-5-5`, the list comes live from the provider once the key is saved) and its
 instructions (prefilled: it works only for Kalmido, with the Kalmido tools within its permissions, no web, no terminal, no
 other services). Five ticks add the starter pack (morning briefing, tidy up the basket, sort receipts and documents,
-meeting notes into task proposals, follow up after N days); each only proposes and stays changeable on its own. 2.568.0: a
+meeting notes into task proposals, follow up after N days); each only proposes and stays changeable on its own. Since
+2.565.0 each of these routines can run with a model of its own (*Model per routine* in the agent's server settings, e.g. a
+cheaper one for the briefing; empty = the agent's model), and its usage shows per routine. 2.568.0: a
 sixth tick, off by default, *Due billing on Mondays at 08:00* reminds of billable time and due invoices and prepares
 invoice drafts only after your Yes; it needs the office rights you give the agent yourself (permission *Office drafts*,
 *May draft office documents* or an office rights group with *Quotations & invoices*, *Agents may read office data*) and

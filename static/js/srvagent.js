@@ -14,6 +14,30 @@ const SRV_ST = [['briefing', N_('Morning briefing at 07:30'), N_('Daily in its c
   ['followup', N_('Follow up on “Waiting on someone”'), N_('A drafted follow-up as a comment, posted only after your Yes.')],
   // 2.568.0 (#4673): off by default; it grants no office rights itself (skipped with the reason until the agent has them)
   ['office', N_('Due billing on Mondays at 08:00'), N_('Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).')]];
+// 2.565.0 D (#4674): the routines that may run with a model of their own (srvstarter.py SRV_FLOWS; '' = the agent's model)
+const SRV_FLOW_KEYS = ['briefing', 'tidy', 'meetings', 'followup'];
+const srv_flowName = k => tr((SRV_ST.find(x => x[0] === k) || [])[1] || k);
+function srv_flowsHtml(j) {
+  const fm = j.flow_models || {};
+  return `<fieldset class="srvflows"><legend>${tr('Model per routine')}</legend>
+    <div class="shint keep">${esc(tr('A routine of the starter pack can use a model of its own, e.g. a cheaper one for the briefing. Empty = the agent’s model.'))}</div>
+    ${SRV_FLOW_KEYS.map(k => `<div class="row"><label for="srv-fm-${k}">${esc(srv_flowName(k))}</label><select id="srv-fm-${k}" data-srv-fm="${k}" data-was="${esc(fm[k] || '')}"><option value="">${esc(tr('Like the agent'))}</option>${fm[k] ? `<option value="${esc(fm[k])}" selected>${esc(fm[k])}</option>` : ''}</select></div>`).join('')}</fieldset>`;
+}
+// the routine choices from the same live model list as the agent's model (srv_modelsFill)
+function srv_flowsFill(md, j) {
+  const ms = j?.models || []; if (!ms.length) return;
+  for (const sel of $$('[data-srv-fm]', md)) {
+    const cur = sel.dataset.was || '';
+    sel.innerHTML = `<option value="">${esc(tr('Like the agent'))}</option>` + (cur && !ms.some(m => m.id === cur) ? `<option value="${esc(cur)}">${esc(cur)}</option>` : '')
+      + ms.map(m => `<option value="${esc(m.id)}" ${m.id === cur ? 'selected' : ''}>${esc(m.name || m.id)}</option>`).join('');
+  }
+}
+// only the routines whose choice changed (an unchanged one is not checked against the list again); null = none changed
+function srv_flowsBody(md) {
+  /** @type {Record<string, string>} */ const out = {};
+  for (const sel of $$('[data-srv-fm]', md)) if (sel.value !== (sel.dataset.was || '')) out[sel.dataset.srvFm] = sel.value;
+  return Object.keys(out).length ? out : null;
+}
 let srv_def = null;
 async function srv_defaults(fresh) {
   if (!srv_def || fresh) srv_def = await api('GET', '/api/agents/server/defaults');
@@ -118,16 +142,16 @@ async function srv_editModal(a, notes) {
   const draw = async () => {
     try { j = await api('GET', `/api/agents/${a.id}/server`); } catch (x) { $('#srv-ed', md).innerHTML = `<div class="muted mhint">${esc(x instanceof Offline ? tr('Only available online.') : x.message)}</div>`; return; }
     if (!md.isConnected) return;
-    $('#srv-ed', md).innerHTML = (j.enabled_instance === false ? srv_offHtml() : '') + srv_fieldsHtml(j, false);
+    $('#srv-ed', md).innerHTML = (j.enabled_instance === false ? srv_offHtml() : '') + srv_fieldsHtml(j, false) + srv_flowsHtml(j);
     $('[data-m="srv-save"]', md).hidden = false;
-    srv_modelsFill(md, a.id, j.model);
+    srv_modelsFill(md, a.id, j.model).then(m => srv_flowsFill(md, m));
   };
   const runs = async () => {
     const box = $('#srv-runs', md);
     let r; try { r = await api('GET', `/api/agents/${a.id}/server/runs?limit=10`); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
     if (!md.isConnected) return;
     box.innerHTML = (r.runs || []).map(x => `<div class="mrow srvrun" role="listitem"><span class="n"><b>${esc(srv_stateTxt(x.state))}</b> <span class="muted">${esc(x.trigger || '')}</span>
-      <small class="muted">${esc([x.started ? fmtStamp(new Date(x.started)) : '', trn('{0} step', '{0} steps', x.steps || 0), tr('{0} tokens', fmtTok((x.tokens_in || 0) + (x.tokens_out || 0)))].filter(Boolean).join(' · '))}</small>
+      <small class="muted">${esc([x.started ? fmtStamp(new Date(x.started)) : '', x.flow ? srv_flowName(x.flow) : '', x.model || '', trn('{0} step', '{0} steps', x.steps || 0), tr('{0} tokens', fmtTok((x.tokens_in || 0) + (x.tokens_out || 0)))].filter(Boolean).join(' · '))}</small>
       ${x.error ? `<small class="srverr">${esc(x.error)}</small>` : ''}</span></div>`).join('') || `<div class="muted mhint">${tr('No runs yet.')}</div>`;
   };
   md.addEventListener('click', async e => {
@@ -148,7 +172,8 @@ async function srv_editModal(a, notes) {
       if (b.dataset.m === 'srv-save') {
         const key = $('#srv-key', md)?.value.trim() || '';
         b.disabled = true; show('');
-        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key} : {})});
+        const fm = srv_flowsBody(md);  // 2.565.0 D (#4674)
+        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key} : {}), ...(fm ? {flow_models: fm} : {})});
         toast(tr('Saved')); await draw();
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }
