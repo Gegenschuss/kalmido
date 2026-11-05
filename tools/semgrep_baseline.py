@@ -35,18 +35,19 @@ def norm(s):
 
 
 def first_line(path, line, lines, root=ROOT):
-    """The first line of the match: from the JSON (extra.lines), else from the file."""
-    txt = str(lines or "")
-    if txt.strip():
-        return norm(txt.split("\n", 1)[0])
+    """The first line of the match: from the file (start.line); the JSON's extra.lines only when the file is not there.
+    2.551.0 (#4625): semgrep without a sign-in (1.183.0) puts the placeholder "requires login" into extra.lines instead of
+    the code - taken as the code it matched no entry and every known finding came back as new; it never counts as code."""
     try:
         with open(os.path.join(root, path), encoding="utf-8", errors="replace") as f:
             for i, s in enumerate(f, 1):
                 if i == line:
                     return norm(s)
+            return ""
     except OSError:
         pass
-    return ""
+    txt = norm(str(lines or "").split("\n", 1)[0])
+    return "" if txt.lower() == "requires login" else txt
 
 
 def findings(results, root=ROOT):

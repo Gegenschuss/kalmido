@@ -31,9 +31,14 @@ def result(path, line, code, rule=RULE):
             "extra": {"lines": code, "severity": "ERROR", "message": "Detected user input used to manually construct a SQL string."}}
 
 
-def run(results, entries, *flags):
-    """(exit code, output) of the tool with a results JSON and a baseline written into a temp folder."""
+def run(results, entries, *flags, files=None):
+    """(exit code, output) of the tool with a results JSON and a baseline written into a temp folder (files: {path: text}
+    of the scanned tree in it)."""
     with tempfile.TemporaryDirectory() as d:
+        for rel, text in (files or {}).items():
+            os.makedirs(os.path.dirname(os.path.join(d, rel)), exist_ok=True)
+            with open(os.path.join(d, rel), "w", encoding="utf-8") as f:
+                f.write(text)
         rj, bj = os.path.join(d, "semgrep.json"), os.path.join(d, "baseline.json")
         with open(rj, "w", encoding="utf-8") as f:
             json.dump({"results": results, "errors": []}, f)
@@ -106,6 +111,21 @@ check(_dir.get("script-src") == ["'self'"] and _dir.get("default-src") == ["'sel
 check(_dir.get("object-src") == ["'none'"] and _dir.get("frame-ancestors") == ["'none'"] and _dir.get("base-uri") == ["'none'"],
       f"CSP object-src / frame-ancestors / base-uri stay 'none': {_dir}")
 check("'unsafe-eval'" not in _csp and "*" not in _csp, f"CSP without unsafe-eval or wildcards: {_csp}")
+
+# 2.551.0 (#4625): semgrep without a sign-in writes "requires login" into extra.lines instead of the code (CI v2.551.0:
+# 65 known findings all new): the code line comes from the file, the placeholder never counts as code
+SRC = "\n" * 9 + KNOWN["extra"]["lines"] + "\n"
+login = {**KNOWN, "extra": {**KNOWN["extra"], "lines": "requires login"}}
+rc, out, _ = run([login], [ENTRY], files={"kalmido/a.py": SRC})
+check(rc == 0 and "1 known, 0 new" in out, f"'requires login' in extra.lines: the line is read from the file, known: {rc} {out[-300:]}")
+moved = {**login, "start": {"line": 12, "col": 5}}
+rc, out, _ = run([moved], [ENTRY], files={"kalmido/a.py": "\n" * 2 + SRC})
+check(rc == 0 and "1 known, 0 new" in out, f"'requires login', the code two lines lower: still known: {rc} {out[-300:]}")
+rc, out, _ = run([{**login, "path": "kalmido/gone.py"}], [ENTRY])
+check(rc == 1 and "1 new" in out, f"'requires login' without the file: no code to match, new (red), never matched by the placeholder: {rc} {out[-300:]}")
+lone = {**ENTRY, "code": "requires login"}
+rc, out, _ = run([{**login, "path": "kalmido/gone.py"}], [{**lone, "file": "kalmido/gone.py"}])
+check(rc == 1, f"an entry with the placeholder as code matches nothing: {rc} {out[-300:]}")
 
 # 5. --accept writes the new finding into the baseline
 rc, out, after = run([KNOWN, new], [ENTRY], "--accept", "a '?' list", "--task", "4625")
