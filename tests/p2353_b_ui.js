@@ -58,11 +58,14 @@ const DESK = {'(hover:hover) and (pointer:fine)': true};
     if (mobile) { w.eval(`document.querySelector('#top .menu')?.click()`); }
     await until(() => d.querySelector('#side .sg-lists'));
     const panel = w.eval('sbb_on()');  // the panel header exists on a computer with sidebar B only; the phone's drawer keeps the group label
-    const shown = [...d.querySelectorAll('#side .sg-lists .sgt > span')].filter(x => !x.classList.contains('sr') && !x.classList.contains('c') && /Projects/.test(x.textContent));
-    const hid = [...d.querySelectorAll('#side .sg-lists .sgt > span.sr')].filter(x => /Projects/.test(x.textContent));
-    check(panel ? shown.length === 0 && hid.length === 1 && /Projects/.test(d.querySelector('#side .sbbpt')?.textContent || '') : shown.length === 1,
-      `${tag}: Projects once on screen (panel header ${panel}, group label shown ${shown.length}, hidden for readers ${hid.length})`);
-    check(!!d.querySelector('#side .sg-lists [data-act="list-new"]') && !!d.querySelector('#side .sg-lists [data-act="side-group"]'), `${tag}: the group keeps its fold button and "New project"`);
+    // 2.556.0 (#4661): the group is called "Lists" and is always visible, folded and unfolded (no more screen-reader-only label, #2777)
+    for (const fold of [false, true]) {
+      if (fold !== !!w.eval(`!sideOpen('lists')`)) { w.eval(`document.querySelector('#side .sg-lists [data-act="side-group"]').click()`); await until(() => !!w.eval(`!sideOpen('lists')`) === fold); }
+      const nm = [...d.querySelectorAll('#side .sg-lists .sgt > span')].filter(x => !x.classList.contains('c') && /^Lists$/.test(x.textContent.trim()));
+      check(nm.length === 1 && !nm[0].classList.contains('sr'), `${tag}: the group name "Lists" is visible ${fold ? 'folded' : 'unfolded'} (${nm.length} found)`);
+    }
+    check(!!d.querySelector('#side .sg-lists [data-act="lists-reorder"][aria-label="Sort lists"]') && !!d.querySelector('#side .sg-lists [data-act="list-new"][aria-label="New list"]'), `${tag}: the group buttons say "Sort lists" / "New list"`);
+    check(!!d.querySelector('#side .sg-lists [data-act="list-new"]') && !!d.querySelector('#side .sg-lists [data-act="side-group"]'), `${tag}: the group keeps its fold button and "New list"`);
     w.close();
   }
 
