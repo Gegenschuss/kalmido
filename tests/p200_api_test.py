@@ -483,7 +483,7 @@ A.patch(B + f"/api/tasks/{T7}", json={"ltags": ["bug"]})
 check(any(a["kind"] == "ltags" and a["data"]["tags"] == ["bug"] for a in A.get(B + f"/api/tasks/{T7}/timeline").json()["activity"]), "change is in the history")
 v7 = cl.get(f"/tasks/{T7}").json()
 check(v7["list_tags"] == ["bug"] and v7["tags"] == [], "v1: list_tags")
-r = cl.patch(f"/tasks/{T7}", json={"list_tags": ["bug", "agent-set"]})
+r = cl.patch(f"/tasks/{T7}", json={"list_tags": ["bug", "agent-set"], "expect_updated_at": v7["updated_at"]})  # 2.564.0 (#4702): the version read
 check(r.ok and r.json()["list_tags"] == ["agent-set", "bug"] or sorted(r.json()["list_tags"]) == ["agent-set", "bug"], "agent sets list tags")
 check({t["id"] for t in cl.get("/tasks", params={"list_id": L, "tag": "bug"}).json()["data"]} == {T7, TPp}, "v1 ?tag= matches list tags")
 check({t["id"] for t in Bo.get(V + "/tasks", headers={"Authorization": "Bearer " + Bo.post(B + "/api/me/tokens", json={"name": "t"}).json()["token"]},
