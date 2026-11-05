@@ -14,6 +14,116 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.544.0] - 2026-11-05
+
+Package 2.528 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Tables: a trash view - "More > Trash" in the tables overview (per workspace, with the days left, restore, delete for good) and "Deleted rows and columns" in a table's menu (#4306).
+### Changed
+- Switching on encryption for knowledge asks first and names how many versions and trashed files there are; they are no longer deleted at once but kept until the trash period ends (only for people who could read the space before) (#4306).
+- An agent's Undo in a table keeps rows, columns and a table a person has typed values into since; the toast says what stayed. The v1 answer carries `kept` (#4306).
+- Online changes of tasks (single and multi-edit), time entries and project properties carry the previous values like the offline queue: a change made on another device in between shows the conflict dialog instead of being overwritten silently (#4305).
+- Office settings save only the changed fields and say so when another person changed the settings in between; the inputs stay in the form (#4305).
+- Accepting an agent's sort or day-plan proposal refuses tasks the person changed since the proposal (409 naming them) (#4305).
+### Fixed
+- "Skip this occurrence" pressed twice (two devices, offline queue) skipped two dates; it now skips one. v1 `POST /tasks/{id}/skip` takes `expect_due` (#4305).
+- Table rows, row order and columns are saved under the table's lock; a row order sorted elsewhere in between is reported instead of lost (#4305).
+- Moving a table or a knowledge page to another workspace stops as a whole when a file cannot be copied, instead of leaving a file with the old key (#4306).
+- Restoring a folder from the file store's trash brings its knowledge pages back too (#4306).
+- Favourites, the custom-fields module switch and the first-run setup no longer overwrite each other's user settings (#4305).
+
+### Fixed
+- main: CI red of 2.541.0 - pg_prepare: the subtask depth limit of the trash cascade count is a bound parameter (no number inside the SQL text); p242_ui: the agent setup guide test counts the 12th step "Control level" (#4179).
+
+Package 2.534 (Bündel: CI: harte Suiten (Büro, Rechnung, Sicherung, Login, Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- CI: the suites of the hard areas (office, invoices, backup, login, security scanners; list in tests/hard_suites.txt) run on their own test shards that start first ("Test suites N/M ... hart"), the other shards follow; tools/shards.py --hard-target-min (#4557).
+- Office, EÜR and VAT figures: approved entertainment receipts count - their own EÜR line "Entertainment (70 % deductible)", the input tax in full in field 66, small businesses 70 % of the gross without input tax; the statement names the non-deductible 30 % and warns when the same bill is also under Receipts; the neutral export has two rows per receipt (#4333).
+### Changed
+- Wide screens: one width system - reading text and chat 46rem, forms 40rem, lists, office and start pages at most 96rem (1536 px) and centred, board, calendar, timeline, matrix, table and mind map use the full width; task lists no longer stretch over the whole monitor. Phones and 1440 px stay as before (#4551).
+### Fixed
+- Sending a quotation or invoice by mail: when the terms could not be joined to the PDF or their file is missing, the mail no longer goes out silently without them - the send dialog says why and offers "send as separate file" / "send without terms" or cancel (#4339).
+- Phone: the sidebar no longer opens on its own when the current page is drawn again after it was closed; only going back still reopens it (#4344).
+
+Package 2.540 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Lesen unter „Alle Arbeitsbereiche“: Übersicht je B).
+### Added
+- Booking pages: the owner can delete confirmed and cancelled bookings (trash icon in the booking list, with a question first; the event, contact and lead stay, the booked person gets no mail) and search all bookings of the page by name or e-mail, also those older than 30 days (#4349).
+### Changed
+- File store under "All workspaces": the top level lists every space (Private, each organisation, Shared with me, Trash) instead of silently showing the last remembered one; a tap opens `#ablage/s/<space>`, the path "All workspaces / <space>" leads back. With one workspace chosen nothing changes (#4575).
+- Reading under "All workspaces" (Read later, Bookmarks, Feeds, Home & life): the same overview of the spaces instead of the space picker; the address carries the open space (#4588).
+- Receipt (document details): the project is chosen with the picker of quotations and invoices - app icons, folders, search from 10 entries, a sheet on a phone, the last chosen projects on top; only the projects of the receipt's area, privately only your own lists, no inbox, archive, health or budget lists (#4471).
+- Toolbars of Documents and the office lists: search, switch, filter, sort and buttons share one height (40 px with a mouse, 44 px on touch); on a phone the documents bar shows symbols only and "To review" only once, office list filters stand in two equal columns, the invoice / quotation sub tabs scroll sideways; receipt filters: ticks on one line, "Day" is now "Date by" (#4472).
+### Fixed
+- Documents: the chosen part of the "All / To review" switch is marked again (#4472).
+- News: the rule hiding another organisation's items compares the organisation number where the item has it, the name only for old items; a retired organisation's name is free again for a new organisation and for moving a personal office (#4383).
+
+Package 2.523 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Rot auf main allein: p).
+### Changed
+- Office > invoices: a payment date typed before the invoice date is refused with a clear message (also for agent payment suggestions); bank reconciliation, cash book and online payments keep their real booking day, so prepayments still work (#4082)
+- Office > final invoice in a foreign currency: the progress invoices are deducted with the net they really billed in their own currency; changing the rate of the draft recomputes the deductions (#4082)
+- Booking archive import: all files of one upload share 200 MB (checked before reading), its undo works for 24 hours like the other imports (#4073)
+- File previews: at most 60 per person and minute and one at a time with text recognition; beyond that the card shows the file symbol (#4073)
+- User docs: corrections where the docs said something the app does not do (import, knowledge pages and agents, project roles, time tracking, dependencies, quiet hours, retention, polls, limits) and short sections for quick notes, delegating and watching, the Chat area, leafing through documents, favourites and saved views, moving a task to another workspace, the software bug inbox, newsletter, receipt fetcher and the practice project (#4176, #4177)
+### Fixed
+- Settings > Company & office > Functions: one press on a switch (e.g. DATEV) is one undo step again and no longer rewrites your personal modules (#4343, #4039)
+- A link into another workspace brings that workspace's own sidebar state (open groups, folders) back; the page stays the link's target (#4189)
+- E-invoice (UBL/Peppol): prices below a cent in a foreign currency keep their quantity (1,000 minutes instead of 1), with a rounding line where needed (#4082)
+- Cash discount: a payment reversed later (reversal dated today after a DATEV export) no longer keeps the invoice "paid" (#4082)
+- Credit card statements and MT940 bank statements: very long lines or files are read in bounded time (#4073)
+
+Package 2.536 (Bündel: Notizen speichern sofort über die Warteschlange (a, Bündel: Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: S).
+### Added
+- Office > Equipment: the depreciation choice is always visible and has a third value "none (no expense)" - a price kept only for the insurance list no longer becomes an expense; the field "new value" says it is no expense (#4335).
+- Equipment dialog and income statement (EÜR) warn when a device is depreciated without a linked receipt, with a link to the equipment (#4335).
+### Changed
+- Notes save at once, online too: every change (text, title, tags, pin, a new note, a quick note) goes into the outbox and shows "Saved" immediately, the server gets it in the background; typing no longer waits for the server on a slow connection. A conflict (409) from the outbox opens the note's own conflict dialog with both versions. Notes in locked (encrypted) lists go to the server directly as before and never wait in plain text (#4567).
+- Deleting a mail in the project mail takes its .eml and attachments into the file trash with it; Undo brings back only what went with the mail, files deleted by hand before stay in the trash; the files of a deleted mail can no longer be opened or restored on their own; a day folder shared with another mail stays, and a mail whose file is a receipt of a locked month cannot be deleted (#4338).
+- Self-hosting docs: the AI examples (Ollama, EU provider) belong in docker-compose.override.yml; the Ollama example names its top-level volume, the EU example no longer mounts /secret a second time read-only (#4345).
+### Fixed
+- Income statement (EÜR) and cash flow count card fees and interest without a receipt ("no receipt needed" on a confirmed card statement) as the DATEV export does: their own EÜR line "Card fees without receipt", a cash flow entry of the kind card; matched positions still count once through their receipt, the bank booking of the statement total is no expense (#4334).
+### Security
+- A support session counts as no session at the OIDC sign-in: /api/auth/oidc/start is refused in a support session and the callback with a support cookie is refused, so a support session can neither link an identity to the customer's account nor swap itself for a session without the support mark; the HTTP Shortcuts download (a new upload token) is refused in a support session, too (#4363).
+
+Package 2.509.0 (Waiting for me opens completed tasks, Office menu without the signature editor, additive migrations checked).
+### Fixed
+- Waiting for me (#4324): a tap on a row whose task was completed long ago opened an empty panel with no way out. Any link to a task that is not in the app's memory now loads and opens it and it stays open through the next reload; a task that does not exist or a device that is offline gets a hint and no panel. A short "Loading…" with Back and Close shows meanwhile. Check on a phone: Waiting for me, a row of an old completed task.
+- Office menu (#4342): every tap on a row of the Office menu also opened the e-mail signature editor. Only Edit in a send dialog opens it now. Check: Office, tap several areas in the menu.
+- Invoices (#4331): a PDF rebuilt for an older finalised invoice without a stored file showed "Already paid / Amount outstanding" of today while its embedded XML has the full amount. The rows are left out of that PDF; the preview on screen keeps them, the stored PDF and the XML do not change.
+### Changed
+- Migrations (#4285): `tools/check_migrations.py` also reads the statements of the fragments: a step adds exactly its own column, nullable or with a DEFAULT; AFTER creates indexes only; SCHEMA only creates; a UNIQUE index on an existing table needs a stated reason. The upgrade test starts on the old database with a row in every table and also compares defaults and constraints; new tests for a step failing in the middle of a start and for two starts at once.
+
+Package 2.538 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Security
+- A support session books nothing in the office and changes no account structure: finalising, unlocking, cancelling by credit note, payments (also the status "paid"), cash book, bank, DATEV, periods, legacy import, master data import, reminder fees, `office/move`, deleting for good (office trash, finished tasks, all times of a project, fixed costs and trips undo, a whole project) and the HTTP Shortcuts download with its upload token answer "Not possible in a support session". Single trips and fixed costs cannot be deleted and number ranges cannot be changed either. Reading stays, editing contents stays (#4365).
+- A support session puts no contents into an organisation that has not opened its own support access: new projects, calendars, address books and clients land privately, an explicit `org_id` / `list_id`, a calendar, address book or project of such an organisation and any write into its office are refused. The HTTP Shortcuts download is hidden in a support session (#4365).
+- Every way a project changes hands (organisation projects list, shared folder, removing a person with `?to=`, leaving) only hands it to a member or admin of the organisation; a guest or read-only member answers 409. When nobody is left, the projects go to an admin, not to a guest (#4371).
+- Locked (end-to-end encrypted) projects keep no time note, status note or description in plain text: the server refuses them, switching the lock on empties existing ones (and the status history and earlier descriptions), the app hides the fields and the notice before switching on names them. Projects locked before this version lose these texts once at the next start (one way). An agent's time proposal brings no note into a locked project, and the lock state never comes from an import file (#4372).
+
+### Changed
+- Public release notes on GitHub show three to five highlights on top, leave out bundle titles and main / CI lines and stay below a fixed length; the rest is a link to the CHANGELOG (#4360).
+- Installer: a busy port prints a command you can run with another port and `PUBLIC_URL` follows the new port while it is still `http://localhost:<port>`; the uninstall text is complete (`down -v`, the images, `sudo rm -rf` of the folder, keep backups and the key first); wording fixed (#4361).
+- New setup card "Import from another app": starts empty and opens Settings > Data after the reload (#4361).
+- Monaco counts as France for VAT (EU, and Monaco - France is domestic). Areas without an own country code (Canary Islands, Ceuta, Melilla, Mount Athos, Heligoland, Büsingen, Livigno, Campione) are not recognised; for clients there pick "not taxable in Germany" by hand (#4368).
+- VAT return and DATEV export work out the reverse charge case from the client's country each time, so older documents move too: since 2.502 a reverse charge invoice to a client outside the EU counts in field 45 / account 8338 instead of 21 / 8336, and since 2.538 one to a client in Monaco counts in field 21 / 8336 instead of 45 / 8338 - a period already filed can show figures that differ from what was filed then (#4368, see docs/OFFICE.md).
+
+### Fixed
+- Finalising a reverse charge invoice without the client's country is refused with a clear message (it counted as domestic §13b before) (#4368).
+- Cash book: without the right to book payments, an entry with an invoice is refused before anything is written with a message that says what to do, and the invoice choice is hidden (#4368).
+- Off-site backup: removing or changing the target keeps its backups as "formerly off-site", so the deletion journal is not cut too early; off-site on without a successful upload shows a hint on the backup page; the note after a restore says "accounts excepted"; if the list of formerly off-site backups cannot be read, removing a target that still holds backups is refused instead of losing their names (#4367).
+- Leaving an organisation clears its unsent changes from the device's offline queue; the leave dialog says how many would be lost (#4369).
+
+Package 2.539 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Security
+- Organisations: when an admin who saw the organisation's recovery key is removed, demoted, leaves, is locked or deleted, the remaining admins get a News item "Renew the recovery key" (nothing is rotated by itself); the export dialog names the risk of an old key (#4373).
+- Hosted instances: the operator's user list shows a client's account reduced (user name, lock, storage, number of organisations; no e-mail, name, 2FA, sign-in methods, organisation ids or photo), the search no longer matches a client's e-mail or name, and a client's photo answers 404. Self-hosted instances are unchanged (#4374).
+- Sign-in (#4375): Settings > Account > Password has a ticked box "End all app passwords and API tokens" (untick to keep them; apps for calendar / contacts and scripts must reconnect otherwise; agent tokens stay; a reset by an admin or by link always ends them). App passwords can only be created from the web session, no longer with an API token. An OIDC account is linked by user name alone only with auto-create on, otherwise via the confirmed e-mail. The new-device mail takes the network into account. An address counts as proved only when the link was sent by mail to that address.
+- Browser encryption (#4376): files of encrypted lists are bound to their task (older files stay readable); the passphrase gets a strength check; "Remember on this device" is bound to the current key generation and dropped on a key reset; before a key is handed to a member for the first time, a short confirmation shows the safety number. A key change (by hand or after removing a member) hands the new key only to confirmed members; the others wait in the list until the owner confirms their safety number once (keys seen before this version count as unconfirmed).
+- Incoming mail (#4381): without `KALMIDO_MAIL_AUTHSERV_ID` no sender counts as confirmed; a reply through a person's signed reply address is stored in their name only with that confirmation, otherwise as "By e-mail from <address>".
+### Fixed
+- Webhooks, notification channels, git and newsletter calls end after 15 s in total; a target that answers drop by drop no longer holds the delivery queue, and a target that timed out is tried once per round (#4379).
+- Tests: p264a_d_ui waits for the drawn "Understood" button before clicking (#4394).
+
 ## [2.541.0] - 2026-11-05
 
 Package 2.530 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -1213,7 +1323,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.541.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.544.0...HEAD
+[2.544.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.544.0
 [2.541.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.541.0
 [2.535.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.535.0
 [2.532.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.532.0
