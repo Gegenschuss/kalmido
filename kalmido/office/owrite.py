@@ -32,9 +32,9 @@ from flask import g, has_request_context, jsonify
 from ..collab.comments import user_names
 
 from ..core.config import app
-from ..core.conflict import Conflict
+from ..core.conflict import Conflict, VersionRequired
 from ..core.db import bump, iso_ms, now_utc
-from ..core.errors import BadInput, Denied
+from ..core.errors import Denied
 from ..core.i18n import tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
 from ..core.pg import table_columns, write_lock
@@ -133,7 +133,7 @@ def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=Non
     agent = obj_is_agent(c, uid) if uid else False
     if version:
         if agent and not b.get("expect_updated_at"):
-            raise BadInput(tr(NEED_VERSION))
+            raise VersionRequired(("expect_updated_at",), tr(NEED_VERSION))  # 2.564.0 (#4702): the agents' one code version_required
         ow_check(b, raw["updated_at"], lambda: public(c, cur) if public else dict(cur), alias)
     vals = clean(c, b, cur) or {}
     changed = {k: (cur.get(k), v) for k, v in vals.items() if not _same(cur.get(k), v)}

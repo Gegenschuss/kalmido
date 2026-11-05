@@ -40,7 +40,7 @@ from datetime import timedelta
 from flask import g, has_request_context, request
 
 from .access import Denied, acx_of, acx_org_ok, need_feat
-from .conflict import ccf_check
+from .conflict import VersionRequired, ccf_check
 from .db import bump, insert_id, iso, iso_ms, now_utc
 from .errors import BadInput, UnknownFields
 from .i18n import N_, tr
@@ -203,7 +203,7 @@ def obj_write(c, uid, kind, rid, b, expect=None):
     exp = expect if expect is not None else b.get("expect_updated_at")
     agent = obj_is_agent(c, uid)
     if agent and not exp:
-        raise BadInput(tr(NEED_VERSION))
+        raise VersionRequired(("expect_updated_at",), tr(NEED_VERSION))  # 2.564.0 (#4702): the agents' one code version_required
     ccf_check({"expect_updated_at": exp}, row["updated_at"], "current", lambda: obj_public(c, uid, kind, row, None))
     vals = _clean(c, reg, b, row)
     changed = {k: (row[k], v) for k, v in vals.items() if not _same(row[k], v)}

@@ -37,8 +37,8 @@ class VersionRequired(Denied):
     silently)."""
     v1_name = "version_required"
 
-    def __init__(self, fields):
-        super().__init__(400, tr("Send the version you read: {0}", " / ".join(fields)))
+    def __init__(self, fields, msg=None):  # msg: an own text (core/writes.py NEED_VERSION)
+        super().__init__(400, msg or tr("Send the version you read: {0}", " / ".join(fields)))
         self.v1_extra = {"fields": list(fields)}
 
 
