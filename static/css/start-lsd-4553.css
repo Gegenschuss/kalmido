@@ -20,5 +20,5 @@
    (its box is placed by rcl_dockSync), without the dark backdrop, so the list stays visible and clickable */
 body.rcldock #view.lsdw > .ofwrap{max-width:160rem}
 body.rcldock #view.lsdw > .ofwrap > .ofbody{padding-right:60%}
-.modal.lsddock{background:none;place-items:stretch;padding:0 0 1rem;pointer-events:none}
-.modal.lsddock > .card{pointer-events:auto;width:100% !important;max-width:none;height:100% !important;max-height:none}  /* !important: a size the dialog grip set by hand is for the dialog in the middle */
+.modal.lsddock{display:block;background:none;padding:0;pointer-events:none}
+.modal.lsddock > .card{pointer-events:auto;position:absolute;inset:0 0 1rem 0;width:auto !important;max-width:none !important;height:auto !important;max-height:none !important}  /* !important: the dialog's own widths (office.css .ofcdlg, a size set with its grip) are for the dialog in the middle */

@@ -127,8 +127,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       await ev(`(() => { const b = document.querySelector('#view [data-rcl="rc"][data-id="${RC[0]}"]'); b.focus(); b.click(); return 1; })()`);
       check(await until(`!!document.querySelector('.modal.bk-sheet #bk-cat')`), `${vw}: the receipt opens`);
       if (wide) {
-        const r = await until(`(() => { const m = document.querySelector('.modal.bk-sheet.lsddock'), c = ${R('.modal.bk-sheet.lsddock > .card')}, row = ${R(`#view [data-rcl="rc"][data-id="${RC[0]}"]`)}; return m && c && row && getComputedStyle(m).backgroundColor === 'rgba(0, 0, 0, 0)' ? {c, row} : null; })()`);
+        const r = await until(`(() => { const m = document.querySelector('.modal.bk-sheet.lsddock'), c = ${R('.modal.bk-sheet.lsddock > .card')}, row = ${R(`#view [data-rcl="rc"][data-id="${RC[0]}"]`)}, wr = ${R('#view > .ofwrap')}; return m && c && row && wr && getComputedStyle(m).backgroundColor === 'rgba(0, 0, 0, 0)' ? {c, row, wr} : null; })()`);
         check(r && r.c.l > r.row.r, `${vw}: the receipt stands right of the list, no backdrop ` + JSON.stringify(r));
+        check(r && Math.abs(r.c.r - r.wr.r) <= 4 && (r.row.r - r.wr.l) / r.wr.w > .33 && (r.row.r - r.wr.l) / r.wr.w < .45, `${vw}: the receipt fills the right part of the pair up to its edge, the list about 40 % ` + JSON.stringify(r));
         check(await ev(`document.querySelector('#view [data-rcl="rc"][data-id="${RC[0]}"]').getAttribute('aria-current') === 'true'`), `${vw}: its row is marked`);
         await shots(`receipt-${vw}`);
         await ev(`(() => { document.querySelector('#view [data-rcl="rc"][data-id="${RC[1]}"]').click(); return 1; })()`);

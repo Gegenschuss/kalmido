@@ -127,9 +127,10 @@ function rcl_dockSync() {
   const md = rcl_docked(); if (!md) return;
   const wrap = $('#view > .ofwrap');
   if (!rclHere() || !lsd_wide() || !wrap) { md.classList.remove('lsddock'); md.style.inset = ''; document.body.classList.remove('rcldock'); RCL.dockId = 0; rcl_mark(); return; }  // narrower again: the dialog in the middle
-  document.body.classList.add('rcldock');  // office.css: the list on the left 40 % of the pair
-  const r = wrap.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
-  md.style.inset = `${Math.round(r.top)}px ${Math.max(0, Math.round(innerWidth - r.right))}px 0 ${Math.round(r.left + r.width * .4 + rem)}px`;
+  document.body.classList.add('rcldock');  // start-lsd-4553.css: the list on the left 40 % of the pair
+  const place = () => { const w = $('#view > .ofwrap'); if (!w || !md.classList.contains('lsddock')) return; const r = w.getBoundingClientRect(), rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
+    md.style.inset = `${Math.round(r.top)}px ${Math.max(0, Math.round(innerWidth - r.right))}px 0 ${Math.round(r.left + r.width * .4 + rem)}px`; };
+  place(); requestAnimationFrame(() => requestAnimationFrame(place));  // again once the wider pair is laid out (measured at once it was still the narrow page)
 }
 window.addEventListener('hashchange', () => setTimeout(rcl_dockSync, 0));  // another page: the receipt goes back into the middle
 function rclSelBar() {
