@@ -20,6 +20,7 @@ from ..core.numtext import server_num
 from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import user_orgs_full, is_write_request  # 2.369.5 (#2517): pulled up from functions
 from ..personal.timetrack import time_report  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.supportgrant import sga_org_foreign
 
 
 # ---------------------------------------------------------------- 2.23.0 (#463): clients
@@ -364,7 +365,6 @@ def client_create():
     f = clean_client(c, uid, body(), new=True)
     if "org_id" not in f:  # 2.148.1 H (#2480): the chosen / only organisation where uid may add, else private (was the first)
         f["org_id"] = ws_chosen_org(c, uid)
-        from ..accounts.supportgrant import sga_org_foreign
         if sga_org_foreign(c, f["org_id"]):  # 2.538.0 (#4365): a support session's new client lands privately
             f["org_id"] = None
     cl_bill_strip(c, uid, f.get("org_id"), f)  # 2.187.1 A (#2735)
