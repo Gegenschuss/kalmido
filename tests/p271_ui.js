@@ -137,7 +137,10 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   // leave the overview: back to the list's own view
   click(w, d.querySelector('#top [data-act="view-timeline"]'));
   await until(() => d.querySelector('#view .tl'));
-  check(!w.eval('isOverview()') && (await call('GET', '/api/state')).lists.find(l => l.id === P).view === 'timeline', 'Timeline: overview off, the list\'s view changes');
+  // 2.555.0: the view goes to the server in the background (outbox) - wait for the saved state, not for the first read
+  let vw = null;
+  for (let i = 0; i < 40 && vw !== 'timeline'; i++) { vw = (await call('GET', '/api/state')).lists.find(l => l.id === P).view; if (vw !== 'timeline') await sleep(100); }
+  check(!w.eval('isOverview()') && vw === 'timeline', 'Timeline: overview off, the list\'s view changes ' + vw);
   // 2.18.0: an open milestone (a task now) is a diamond in its own row, the list row marks only the others
   check(d.querySelectorAll('.tl-grp .tl-ms, .tl-dia').length === 2 && d.querySelectorAll('.tl-msl').length === 2, 'milestones as markers / diamonds in the timeline: ' + d.querySelectorAll('.tl-ms, .tl-dia').length);
   check(d.querySelector('.tl-ms.done') && /Beta/.test(d.querySelector('.tl-ms.done').title), 'a reached milestone looks done');
