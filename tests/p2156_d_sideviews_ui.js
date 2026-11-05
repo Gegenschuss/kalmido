@@ -33,6 +33,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: ALL});
   const HOME = (await call('POST', '/api/lists', {name: 'Home'})).id;
   await call('POST', '/api/lists', {name: 'Work stuff', folder: 'Work'});
+  await call('POST', '/api/lists', {name: 'Work extra', folder: 'Work'});  // 2.547.0 (#4484): two projects in one folder
   await call('POST', '/api/filters', {name: 'Mine', rules: {lists: [HOME]}});
   await call('POST', '/api/tasks', {title: 'Buy bread', list_id: HOME, tags: ['errand']});
   await call('PATCH', '/api/settings', {fav_items: ['v:today']});
@@ -50,6 +51,25 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
   check(dlg && dlg.querySelector('#svd-name') && dlg.querySelectorAll('.svd-ico[role="radio"]').length >= 20 && dlg.querySelector('#svd-start'), 'the dialog: name, icon grid (app icons), start page');
   check(dlg && !/[\u{1F300}-\u{1FAFF}]/u.test(dlg.querySelector('.svd-ic').textContent), 'the icon grid has no emoji');
   check(dlg?.querySelector('[data-svk="v:week"]') && dlg.querySelector('[data-svk="g:filters"]') && dlg.querySelector('[data-svk="folder:Work"]') && dlg.querySelector(`[data-svk="l:${HOME}"]`), 'the dialog lists groups and entries (Plan, filters, folders, lists)');
+  // 2.547.0 (#4484): Projects as folders: closed, one tick per folder (all / none / mixed), a search finds a project in a closed folder
+  if (dlg) {
+    const fireCh = el => el.dispatchEvent(new w.Event('change', {bubbles: true}));
+    const fo = dlg.querySelector('[data-svk="folder:Work"]'), fF = fo.closest('.svd-f'), ids = [...fF.querySelectorAll('[data-svk^="l:"]')];
+    check(ids.length === 2 && fF.classList.contains('svd-c') && dlg.querySelector('.svd-g[data-svg="lists"]').classList.contains('svd-c') && !dlg.querySelector('.svd-g[data-svg="focus"]').classList.contains('svd-c'), 'folders and groups start closed, only Plan is open');
+    check(dlg.querySelector('[data-svk="l:' + HOME + '"]').closest('.svd-f').querySelector('[data-svp]'), 'projects without a folder sit under the pseudo folder "Without folder"');
+    ids[0].checked = false; fireCh(ids[0]);
+    check(fo.indeterminate && fo.checked, 'one project off: the folder tick is indeterminate');
+    fo.checked = false; fireCh(fo);
+    check(ids.every(x => !x.checked) && !fo.indeterminate, 'the folder tick off clears all projects inside');
+    fo.checked = true; fireCh(fo);
+    check(ids.every(x => x.checked), 'the folder tick on sets all projects inside');
+    const q = dlg.querySelector('#svd-q'); q.value = ids[1].closest('label').textContent.trim().toLowerCase(); q.dispatchEvent(new w.Event('input', {bubbles: true}));
+    check(!ids[1].closest('label').hidden && ids[0].closest('label').hidden && fF.classList.contains('svq-open') && dlg.querySelector('.svd-g[data-svg="lists"]').classList.contains('svq-open') && dlg.querySelector('.svd-g[data-svg="filters"]').hidden, 'the search finds a project in a closed folder and unfolds it');
+    q.value = 'zzzz-none'; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+    check(!dlg.querySelector('.svd-none').hidden, 'no hit: a hint');
+    q.value = ''; q.dispatchEvent(new w.Event('input', {bubbles: true}));
+    check(!dlg.querySelector('.svd-g[hidden]') && !fF.classList.contains('svq-open'), 'search cleared: everything back, folded again');
+  }
   if (dlg) {
     dlg.querySelector('#svd-name').value = 'Road';
     click(w, dlg.querySelector('[data-svi="car"]'));

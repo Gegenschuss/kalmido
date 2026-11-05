@@ -40,3 +40,17 @@
 .svset .svr-ic{display:flex;flex:none;color:var(--text2)}
 .svset .svr-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 @media (pointer:coarse){ .svset .svrow .iconbtn{min-height:2.75rem} }
+
+/* 2.547.0 (#4484): groups and project folders start folded, a search above the list */
+.svdlg .svd-qrow{margin:.5rem 0 0}
+.svdlg .svd-q{width:100%;min-width:0;box-sizing:border-box}
+.svdlg .svd-fold{flex:none;padding:0 .375rem;min-height:2rem}
+.svdlg .svd-fold .i{transition:transform .15s}
+.svdlg .svd-fold[aria-expanded="false"] .i{transform:rotate(-90deg)}
+.svdlg .svd-c>.svd-gb,.svdlg .svd-c>.svd-fb{display:none}
+.svdlg .svd-c.svq-open>.svd-gb,.svdlg .svd-c.svq-open>.svd-fb{display:block}
+.svdlg .svd-fh{display:flex;align-items:center;gap:.375rem;padding-left:calc(var(--svd, 0) * 1rem)}
+.svdlg .svd-fl{flex:1;min-width:0;font-weight:500}
+.svdlg .svd-fl span,.svdlg .svd-gl span,.svdlg .svd-i span{min-width:0;overflow-wrap:anywhere}
+.svdlg .svd-g[hidden],.svdlg .svd-f[hidden],.svdlg .svd-i[hidden]{display:none}
+@media (pointer:coarse){ .svdlg .svd-fold{min-height:2.75rem} }

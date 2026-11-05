@@ -184,6 +184,23 @@ function sv_starts(ents) {
   return out;
 }
 
+// the Projects group of the editor as folders: closed, one tick per folder (a tick sets all projects inside), the projects on unfolding.
+// The stored format stays hide = keys of folders and projects; the pseudo folder "Without folder" has no key of its own.
+function sv_folderTree(items, cb) {
+  const parse = (i, dep) => {
+    const out = [];
+    while (i < items.length && items[i].depth >= dep) {
+      const x = items[i++];
+      if (x.key.startsWith('folder:')) { const r = parse(i, dep + 1); i = r.i; out.push({x, kids: r.out}); } else out.push({x});
+    }
+    return {out, i};
+  };
+  const row = (n, dep) => n.kids ? fold(n, dep) : cb(n.x.key, n.x.name, 'svd-i', dep + 1);
+  const fold = (n, dep) => `<div class="svd-f svd-c" data-svf style="--svd:${dep}"><div class="svd-fh"><button type="button" class="btn sm svd-fold" data-svx="f" aria-expanded="false" aria-label="${esc(n.x.name + ': ' + tr('Unfold'))}">${ic('chev', 's')}</button>${cb(n.x.key, n.x.name, 'svd-fl')}</div><div class="svd-fb">${n.kids.map(k => row(k, dep + 1)).join('')}</div></div>`;
+  const all = parse(0, 0).out, loose = all.filter(n => !n.kids), folders = all.filter(n => n.kids);
+  const none = loose.length ? `<div class="svd-f svd-c" data-svf><div class="svd-fh"><button type="button" class="btn sm svd-fold" data-svx="f" aria-expanded="false" aria-label="${esc(tr('Without folder') + ': ' + tr('Unfold'))}">${ic('chev', 's')}</button><label class="svd-fl"><input type="checkbox" data-svp checked><span>${esc(tr('Without folder'))}</span></label></div><div class="svd-fb">${loose.map(n => cb(n.x.key, n.x.name, 'svd-i', 1)).join('')}</div></div>` : '';
+  return folders.map(n => fold(n, 0)).join('') + none;
+}
 // ---- the editor: "Save as view…" (id null: from the sidebar as it is now) and "Edit view…"
 const sv_newId = () => Date.now().toString(36).slice(-6) + Math.random().toString(36).slice(2, 6);
 function sv_edit(id = null) {
@@ -201,15 +218,56 @@ function sv_edit(id = null) {
     <div class="row"><label for="svd-start">${tr('Start page')}</label><select id="svd-start"><option value="">${esc(tr('None (stays where you are)'))}</option>${starts.map(([h, n]) => `<option value="${esc(h)}" ${d.start === h ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>
     <h4>${tr('What the view shows')}</h4>
     <div class="shint">${esc(tr('Unticked entries wait under “Others” in the sidebar. Open = the group is unfolded when you switch to the view.'))}</div>
-    <div class="svd-list">${ents.map(g => `<div class="svd-g" data-svg="${esc(g.g)}"><div class="svd-gh">${cb('g:' + g.g, g.name, 'svd-gl')}<button type="button" class="btn sm svd-open ${open.has(g.g) ? 'on' : ''}" data-svo="${esc(g.g)}" aria-pressed="${open.has(g.g)}" aria-label="${esc(g.name + ': ' + tr('open|fold'))}">${ic('chev', 's')}<span>${esc(open.has(g.g) ? tr('open|fold') : tr('closed|fold'))}</span></button></div>${g.items.map(x => cb(x.key, x.name, 'svd-i', x.depth)).join('')}</div>`).join('')}</div>
+    <div class="row svd-qrow"><input id="svd-q" type="search" class="svd-q" placeholder="${esc(tr('Search entries…'))}" aria-label="${esc(tr('Search entries…'))}" autocomplete="off"></div>
+    <div class="svd-list">${ents.map(g => `<div class="svd-g ${g.g === 'focus' ? '' : 'svd-c'}" data-svg="${esc(g.g)}"><div class="svd-gh"><button type="button" class="btn sm svd-fold" data-svx="g" aria-expanded="${g.g === 'focus'}" aria-label="${esc(g.name + ': ' + tr('Unfold'))}">${ic('chev', 's')}</button>${cb('g:' + g.g, g.name, 'svd-gl')}<button type="button" class="btn sm svd-open ${open.has(g.g) ? 'on' : ''}" data-svo="${esc(g.g)}" aria-pressed="${open.has(g.g)}" aria-label="${esc(g.name + ': ' + tr('open|fold'))}">${ic('chev', 's')}<span>${esc(open.has(g.g) ? tr('open|fold') : tr('closed|fold'))}</span></button></div><div class="svd-gb">${g.g === 'lists' ? sv_folderTree(g.items, cb) : g.items.map(x => cb(x.key, x.name, 'svd-i', x.depth)).join('')}</div></div>`).join('')}<div class="shint svd-none" hidden>${esc(tr('No entries found'))}</div></div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-svd="cancel">${tr('Cancel')}</button><button type="button" class="btn pri" data-svd="save">${tr('Save')}</button></div>`));
   md.classList.add('svdlg'); md.setAttribute('role', 'dialog'); md.setAttribute('aria-labelledby', 'svd-t');
   const groupSync = gEl => { const on = /** @type {HTMLInputElement} */ (gEl.querySelector('.svd-gl input')).checked; gEl.classList.toggle('off', !on); };
   $$('.svd-g', md).forEach(groupSync);
-  md.addEventListener('change', e => { const g = /** @type {any} */ (e.target).closest('.svd-g'); if (g) groupSync(g); });
+  // folder ticks: the state of a folder from its projects (all / none / mixed = indeterminate); a tick on the folder sets all inside
+  const fbox = f => /** @type {HTMLInputElement} */ (f.querySelector(':scope > .svd-fh input'));
+  const leafBoxes = f => /** @type {HTMLInputElement[]} */ ([...f.querySelectorAll('.svd-fb input[data-svk^="l:"]')]);
+  const folderSync = f => { const l = leafBoxes(f), n = l.filter(x => x.checked).length; if (l.length) fbox(f).indeterminate = n > 0 && n < l.length; };
+  $$('.svd-f', md).forEach(folderSync);
+  md.addEventListener('change', e => {
+    const t = /** @type {any} */ (e.target), g = t.closest('.svd-g'), own = t.closest('.svd-fh')?.parentElement;
+    if (own && own.classList.contains('svd-f')) {  // the folder's own tick: all projects and subfolders inside follow
+      own.querySelectorAll('.svd-fb input[type=checkbox]').forEach(x => { x.checked = t.checked; x.indeterminate = false; }); t.indeterminate = false;
+    }
+    if (t.dataset.svk?.startsWith('l:')) for (let q = t.closest('.svd-f'); q; q = q.parentElement?.closest('.svd-f')) {  // a project: its folders follow
+      const b = fbox(q), l = leafBoxes(q), n = l.filter(x => x.checked).length;
+      if (l.length) { b.indeterminate = n > 0 && n < l.length; b.checked = n > 0; }
+    }
+    if (g) groupSync(g);
+  });
+  // search: filters groups, folders and projects; hits unfold their folders
+  const qEl = /** @type {HTMLInputElement} */ ($('#svd-q', md)), norm = x => (x || '').toLocaleLowerCase();
+  const search = () => {
+    const q = norm(qEl.value.trim()); let any = false;
+    $('.svd-list', md).classList.toggle('svq', !!q);
+    const run = (el, force) => {  // true when something inside el is visible
+      let vis = false;
+      for (const k of [...el.children]) {
+        if (k.matches('label.svd-i')) { const m = !q || force || norm(k.textContent).includes(q); k.hidden = !m; vis = vis || m; }
+        else if (k.matches('.svd-f')) {
+          const own = !q || force || norm(k.querySelector('.svd-fl')?.textContent).includes(q), r = run(k.querySelector('.svd-fb'), !!q && own);
+          k.hidden = !(own || r); vis = vis || !k.hidden; k.classList.toggle('svq-open', !!q && !k.hidden);
+        }
+      }
+      return vis;
+    };
+    $$('.svd-g', md).forEach(g => {
+      const own = !q || norm(g.querySelector('.svd-gl')?.textContent).includes(q), r = run(g.querySelector('.svd-gb'), !!q && own), show = own || r;
+      g.hidden = !show; g.classList.toggle('svq-open', !!q && show); any = any || show;
+    });
+    $('.svd-none', md).hidden = !q || any;
+  };
+  qEl.addEventListener('input', search);
   md.addEventListener('click', e => {
     const t = /** @type {any} */ (e.target), ico = t.closest('[data-svi]'), o = t.closest('[data-svo]'), a = t.closest('[data-svd]');
     if (ico) { d.icon = ico.dataset.svi; $$('.svd-ico', md).forEach(b => { b.classList.toggle('on', b === ico); b.setAttribute('aria-checked', String(b === ico)); }); return; }
+    const fx = t.closest('[data-svx]');
+    if (fx) { const box = fx.closest(fx.dataset.svx === 'g' ? '.svd-g' : '.svd-f'), shut = !box.classList.contains('svd-c'); box.classList.toggle('svd-c', shut); fx.setAttribute('aria-expanded', String(!shut)); return; }
     if (o) { const on = !o.classList.contains('on'); o.classList.toggle('on', on); o.setAttribute('aria-pressed', String(on)); o.querySelector('span').textContent = on ? tr('open|fold') : tr('closed|fold'); return; }
     if (!a) return;
     if (a.dataset.svd === 'cancel') { modalClose(md); return; }
