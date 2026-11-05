@@ -34,7 +34,6 @@ from datetime import date
 from flask import Response, jsonify, request
 
 from ..core.access import Denied
-from ..core.conflict import ccf_check  # 2.560.0 D (#4700)
 from ..core.config import MAX_FILE_MB, OFFICE_DIR, app
 from ..core.db import body, bump, iso, local_now, local_stamp, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
@@ -53,6 +52,10 @@ from .model import office_settings, ofx_name1  # 2.369.5 (#2517): pulled up from
 from .packs import office_pack_for, pack_retention  # 2.369.5 (#2517): pulled up from functions
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from .mealpdf import bw_meal_pdf_data, bw_report_pdf  # 2.369.5 (#2517): pulled up from functions
+from .owrite import ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
+
+ow_kind("office_meal", "office_meals")
+ow_kind("office_meal_choice", "office_meal_choices")
 
 BW_KINDS = ("food", "drinks")
 BW_RATES = ("19", "7", "0")  # the usual German rates; another rate (0-100) is kept as it is
@@ -536,7 +539,8 @@ def bw_choice_post():
 
 @app.patch("/api/office/meals/choices/<int:cid>")
 def bw_choice_patch(cid):
-    """{name?, extra?}: the meals keep what they have."""
+    """{name?, extra?}: the meals keep what they have. 2.567.0 D (#4711): through ow_write (version optional, 409 under
+    "current", history); the answer carries updated_at."""
     c, uid, oid = _ctx()
     cur = _choice(c, oid, cid)
     b = body()
@@ -547,11 +551,12 @@ def bw_choice_patch(cid):
     for r in c.execute("SELECT * FROM office_meal_choices WHERE org_id=? AND kind=? AND deleted_at IS NULL AND id<>?", (oid, cur["kind"], cid)).fetchall():
         if oc_dec_fields(c, oid, "office_meal_choices", r)["name"].casefold() == name.casefold():
             raise BadInput(tr("This entry already exists"))
-    row = oc_enc_fields(c, oid, "office_meal_choices", {"name": name, "extra": extra})
-    c.execute("UPDATE office_meal_choices SET name=?, extra=?, updated_at=? WHERE id=? AND org_id=?", (row["name"], row["extra"], iso(now_utc()), cid, oid))
-    bump(c)
+    pub = lambda c, x: {"id": cid, "kind": x["kind"], "name": x["name"], "extra": x.get("extra") or "", "updated_at": x.get("updated_at")}  # noqa: E731
+    row, _ = ow_write(c, uid, "office_meal_choice", cid, b, lambda c, b, x: {k: v for k, v in (("name", name), ("extra", extra)) if (v or None) != (x.get(k) or None)},
+                      where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_meal_choices", r),
+                      enc=lambda c, v: oc_enc_fields(c, oid, "office_meal_choices", v), public=pub)
     c.commit()
-    return jsonify(id=cid, kind=cur["kind"], name=name, extra=extra)
+    return jsonify(pub(c, row))
 
 
 @app.delete("/api/office/meals/choices/<int:cid>")
@@ -611,23 +616,26 @@ def bw_meal_post():
 
 @app.patch("/api/office/meals/<int:mid>")
 def bw_meal_patch(mid):
+    """2.567.0 D (#4711): through office/owrite.py ow_write -- version (409 with the receipt under "current"), only the
+    fields that change, history (amounts and names stay sealed there), updated_by, bump."""
     c, uid, oid = _ctx()
-    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval (2.560.0 D, #4700: also the version check's lock)
+    write_lock(c, f"office_meal_{int(mid)}")  # 2.119.0 (#2288, review): no change slips past a parallel approval
     r = _meal(c, oid, mid)
     _need_draft(r)
     b = body()
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
-    ccf_check(b, r["updated_at"], "row", lambda: _one(c, oid, mid))  # 2.560.0 D (#4700): saved elsewhere meanwhile: 409 with the receipt, never overwritten
-    row = bw_clean(c, oid, uid, b, oc_dec_fields(c, oid, "office_meals", r))
-    if row:
-        from .periodlock import period_need_open
-        period_need_open(c, oid, r["date"], row.get("date"))  # 2.148.0 A (#2471)
-        row["updated_at"] = iso(now_utc())
-        row = oc_enc_fields(c, oid, "office_meals", row)
-        c.execute(f"UPDATE office_meals SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", list(row.values()) + [mid, oid])
-        bump(c)
-        c.commit()
+
+    def clean(c, b, cur):
+        row = bw_clean(c, oid, uid, b, cur)
+        if row:
+            from .periodlock import period_need_open
+            period_need_open(c, oid, cur["date"], row.get("date"))  # 2.148.0 A (#2471)
+        return row
+    ow_write(c, uid, "office_meal", mid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
+             dec=lambda c, x: oc_dec_fields(c, oid, "office_meals", x), enc=lambda c, v: oc_enc_fields(c, oid, "office_meals", v),
+             public=lambda c, cur: _one(c, oid, mid))
+    c.commit()
     return jsonify(_one(c, oid, mid))
 
 
