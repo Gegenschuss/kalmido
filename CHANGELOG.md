@@ -14,6 +14,16 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.563.1] - 2026-11-06
+
+CI-Fix 2.562 (main red: shared core schema, equipment care, travel rights, New for you, at-once reactions).
+### Fixed
+- main: the new tables of the shared core mark their reference columns (no foreign key on purpose) and index the person of a history row (#4709).
+- main: the equipment care rows follow the type scale, their hint says basket instead of inbox in every language (#4591).
+- main: a reaction in the agent chat keeps the keyboard focus on its chip while it shows at once (#4659).
+- main: test containers show only the example file of "New for you", never the one the release writes (#4685).
+- Tests: the suites follow members' own travel expenses (#4592) and the actions that show before the server answers (#4659).
+
 ## [2.563.0] - 2026-11-05
 
 CI-Fix 2.560 (p2172_a_edit_ui, CI limit of the test shards).
@@ -1568,7 +1578,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.563.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.563.1...HEAD
+[2.563.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.1
 [2.563.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.0
 [2.562.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.562.0
 [2.560.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.560.0
