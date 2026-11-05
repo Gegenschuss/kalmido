@@ -74,12 +74,20 @@ def otb_snap(c, table, ids, out=None, depth=0):
     return out
 
 
-def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=()):
-    """Stores the copy of row rid of table (call it BEFORE the DELETE, in the same transaction). -> the trash id"""
-    snap = otb_snap(c, table, [rid])
+def otb_put(c, oid, uid, kind, table, rid, label, sub="", extra_nulls=(), key="id"):
+    """Stores the copy of row rid of table (call it BEFORE the DELETE, in the same transaction). -> the trash id
+    2.567.0 (#4707): rid a list = ONE entry for several rows (an import taken back, a letter's links: one restore brings them
+    all back, ref_id = the first); key = the column naming the row of a table without an id (office_cf_start: org_id; the
+    rows pointing at such a table are not copied - it has none)."""
+    ids = list(rid) if isinstance(rid, (list, tuple)) else [rid]
+    if key == "id":
+        snap = otb_snap(c, table, ids)
+    else:
+        rows = c.execute(f"SELECT * FROM {table} WHERE {key}=?", (ids[0],)).fetchall()
+        snap = {"rows": [[table, [{k: _val(r[k]) for k in r.keys()} for r in rows]]] if rows else [], "nulls": [], "key": key}
     snap["nulls"] += [list(x) for x in extra_nulls]
     tid = insert_id(c, "INSERT INTO office_trash(org_id, kind, sub, ref_id, label, snap, deleted_by, deleted_at) VALUES(?,?,?,?,?,?,?,?)",
-                     (oid, kind, sub or "", rid, (label or "")[:300], json.dumps(snap, default=str), uid, iso_ms(now_utc())))
+                     (oid, kind, sub or "", ids[0], (label or "")[:300], json.dumps(snap, default=str), uid, iso_ms(now_utc())))
     if has_request_context():
         g.otb_id = tid  # the route's answer names it (trash_id: the app's Undo)
     return tid
@@ -100,6 +108,10 @@ def dvb_otb_draft(c, oid, uid, did):
 OTB_CHECK = {}  # 2.552.0 (#4561 B21): kind -> check(c, oid, ref) after a restore from the office trash (409 / 404 rolls it back);
 # set by the module of the kind (office/cardlines.py), which imports this one - no import back
 OTB_OUT = {}  # table -> [(column, referenced table, referenced column)]: its single-column ON DELETE SET NULL references
+OTB_MANY = {}  # 2.567.0 (#4707): kind -> check(c, oid, ids) after a restore, with the ids of every row the entry brought back
+# (an entry of several rows, otb_put with a list); set by the module of the kind like OTB_CHECK
+OTB_UNDO = {}  # 2.567.0 (#4707): kind -> the context of its module () -> (c, uid, oid): the rights of deleting it, for the
+# toast's undo (otb_undo_route); set by the module of the kind (cashflow, cfstart, letterlinks, fixedimport, vmaimport)
 
 
 def otb_dangling(c, table, row):
@@ -131,13 +143,14 @@ def otb_restore(c, oid, tid, notes=None):
     if not r:
         raise Denied(404)
     snap = json.loads(r["snap"] or "{}")
+    key = snap.get("key") or "id"  # 2.567.0 (#4707): a table without an id (otb_put key=)
     for n, (table, rows) in enumerate(snap.get("rows") or []):
         cols = table_columns(c, table)
         for raw in rows:
             row = {k: _unval(v) for k, v in raw.items() if k in cols}
             if n == 0:  # the object itself: it must come back whole
-                if c.execute(f"SELECT 1 FROM {table} WHERE id=?", (row["id"],)).fetchone():
-                    raise Denied(409, tr("Already restored"))
+                if c.execute(f"SELECT 1 FROM {table} WHERE {key}=?", (row[key],)).fetchone():
+                    raise Denied(409, tr("Already restored") if key == "id" else tr("Set again meanwhile: the earlier value was not restored."))
                 if table == "office_docs":
                     if row.get("number") and c.execute("SELECT 1 FROM office_docs WHERE org_id=? AND number=?", (oid, row["number"])).fetchone():
                         if row.get("locked_at"):  # 2.530.0 (#4315, review K1): a finalised document never comes back without its number
@@ -170,6 +183,8 @@ def otb_restore(c, oid, tid, notes=None):
         if col in table_columns(c, table):
             c.execute(f"UPDATE {table} SET {col}=? WHERE id = ANY(CAST(? AS BIGINT[])) AND {col} IS NULL", (value, list(ids)))
     c.execute("DELETE FROM office_trash WHERE id=?", (tid,))
+    if notes is not None and snap.get("rows"):  # 2.567.0 (#4707): every row of the entry (OTB_MANY, the undo's answer)
+        notes["ids"] = [x.get(key) for x in snap["rows"][0][1]]
     return r["kind"], r["ref_id"]
 
 
@@ -220,6 +235,8 @@ def otb_restore_route(tid):
         rk_trash_check(c, oid, kind, ref)
     if kind in OTB_CHECK:  # 2.552.0 (#4561 B21): e.g. a credit card position only into its statement while that is a draft
         OTB_CHECK[kind](c, oid, ref)
+    if kind in OTB_MANY:  # 2.567.0 (#4707): e.g. imported trips only into open months
+        OTB_MANY[kind](c, oid, notes.get("ids") or [ref])
     if kind == "contracts" and t0:  # 2.272.0 F (#3038, review E2-M3): its PDF files that went with it come back too
         since = parse_iso(t0["deleted_at"]) - timedelta(seconds=2)
         for f in c.execute("SELECT id, deleted_at FROM office_contract_files WHERE org_id=? AND contract_id=? AND deleted_at IS NOT NULL",
@@ -252,3 +269,30 @@ def otb_delete_route(tid):
     bump(c)
     c.commit()
     return jsonify(ok=True)
+
+
+@app.post("/api/office/trash/undo/<kind>/<int:tid>")
+def otb_undo_route(kind, tid):
+    """2.567.0 (#4707): the toast's undo of a delete in an office module (fixed costs, the start balance and corrections of the
+    cash flow, a letter's links, an import taken back): the module's own rights (OTB_UNDO), then the person who deleted it or
+    an office admin (like the undo of trips); writes the trash copy back as the restore of the trash does (the same checks).
+    -> {ok, kind, id, ids (every row back), gone?, note?}"""
+    if kind not in OTB_UNDO:
+        raise Denied(404)
+    c, uid, oid = OTB_UNDO[kind]()
+    write_lock(c, f"office_trash_{int(tid)}")
+    t = c.execute("SELECT kind, deleted_by FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
+    if not t or t["kind"] != kind:
+        raise Denied(404)
+    if t["deleted_by"] != uid and office_role(c, uid, oid) != "admin":
+        raise Denied(403, tr("Only an admin of this workspace can do this"))
+    notes = {}
+    kind, ref = otb_restore(c, oid, tid, notes)
+    if kind in OTB_CHECK:
+        OTB_CHECK[kind](c, oid, ref)
+    if kind in OTB_MANY:
+        OTB_MANY[kind](c, oid, notes.get("ids") or [ref])
+    ofx_log(c, oid, "restore", target=kind, detail={"id": ref})
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, kind=kind, id=ref, ids=notes.get("ids") or [ref], **otb_gone_out(notes))
