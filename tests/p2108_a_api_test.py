@@ -180,12 +180,13 @@ check(r.status_code == 201, f"freelancer shares the document with the own agent 
 j = AG.get(B + f"/api/v1/documents/{D1}").json()
 acf = {x["name"]: x for x in j.get("custom_fields") or []}
 check(acf.get("Vertragsnummer", {}).get("value") == "MV-4711-Zebra" and acf.get("Kaution", {}).get("type") == "money", f"agent: sees the fields ({list(acf)})")
-r = AG.patch(B + f"/api/v1/documents/{D1}", json={"custom_fields": {"Vertragsnummer": "MV-4712"}})
+# 2.564.0 (#4702): an agent sends the version it read (updated_at of the document)
+r = AG.patch(B + f"/api/v1/documents/{D1}", json={"custom_fields": {"Vertragsnummer": "MV-4712"}, "expect_updated_at": j.get("updated_at")})
 check(r.ok, f"agent: sets a value by name ({r.status_code} {r.text[:200]})")
 d = Fr.get(B + f"/api/docs/{D1}").json()
 check({x["name"]: x["value"] for x in d["custom_fields"]}.get("Vertragsnummer") == "MV-4712" and d["auto"].get(f"cf{F['Vertragsnummer']}") == "agent",
       f"the value is marked as set by an agent ({d['auto']})")
-check(AG.patch(B + f"/api/v1/documents/{D1}", json={"custom_fields": {"Neues Feld": "x"}}).status_code == 400, "agent: an unknown field 400, no new field")
+check(AG.patch(B + f"/api/v1/documents/{D1}", json={"custom_fields": {"Neues Feld": "x"}, "expect_updated_at": AG.get(B + f"/api/v1/documents/{D1}").json().get("updated_at")}).status_code == 400, "agent: an unknown field 400, no new field")
 check(one("SELECT COUNT(*) FROM doc_fields WHERE ws=?", (f"u{FRIDA}",)) == 7, "agent made no field")
 check(AG.post(B + "/api/docs/fields", json={"ws": "private", "name": "Agent", "type": "text"}).status_code in (401, 403), "agent: no definitions")
 Fr.patch(B + f"/api/docs/{D1}", json={"custom_fields": {str(F["Vertragsnummer"]): "MV-4711-Zebra"}})

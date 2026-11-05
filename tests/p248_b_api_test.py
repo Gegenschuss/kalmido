@@ -375,7 +375,9 @@ check(AGS.patch(B + f"/api/v1/documents/{D1}", json={"sender": "X"}).status_code
 check(dbx("SELECT 1 FROM fs_log WHERE node_id=? AND agent=1", (D1,)), "agent access in the history")
 sid = dbx("SELECT id FROM fs_shares WHERE node_id=? AND agent_id=?", (root, PAG))[0][0]
 check(A.patch(B + f"/api/files/shares/{sid}", json={"role": "edit"}).ok, "share -> edit")
-r = AGS.patch(B + f"/api/v1/documents/{D2}", json={"sender": "Stadtwerke Musterstadt", "type": "Rechnung", "tags": ["Energie"]})
+# 2.564.0 (#4702): an agent sends the version it read (updated_at of the document)
+r = AGS.patch(B + f"/api/v1/documents/{D2}", json={"sender": "Stadtwerke Musterstadt", "type": "Rechnung", "tags": ["Energie"],
+                                                  "expect_updated_at": AGS.get(B + f"/api/v1/documents/{D2}").json().get("updated_at")})
 check(r.ok and r.json()["auto"].get("sender") == "agent" and r.json()["sender"]["name"] == "Stadtwerke Musterstadt", f"agent sets a field ({r.text[:150]})")
 check(r.ok and r.json()["suggest"].get("type", {}).get("by") == "agent" and r.json()["review"], "level agent: the agent's value is a suggestion")
 check(AGS.patch(B + f"/api/v1/documents/{D2}", json={"folder": 1}).status_code == 400, "agents never move documents")
