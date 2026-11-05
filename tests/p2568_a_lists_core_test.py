@@ -300,6 +300,28 @@ r = A.post(B + f"/api/lists/{L9}/shares/{rv[0][0]}/restore")
 check(r.ok and r.json().get("expiry_removed") is True and sees(S["erik"], L9) and role_of(L9, "erik") == "edit" and core_row(L9, uid["erik"])[3] is None,
       f"F3: the expired share comes back without its expiry and the answer says so {core_row(L9, uid['erik'])} " + r.text[:200])
 
+# restore as a list admin (not the owner)
+r = A.delete(B + f"/api/lists/{L9}/members/{uid['gina']}")
+RG = r.json().get("revoked_id") if r.ok else None
+r = S["dora"].post(B + f"/api/lists/{L9}/shares/{RG}/restore")
+check(r.ok and r.json().get("expiry_removed") is False and role_of(L9, "gina") == "view" and sees(S["gina"], L9),
+      "a list admin restores a share " + r.text[:200])
+# restore after the person was shared with again: 409, the stale row is gone for good
+r = A.delete(B + f"/api/lists/{L9}/members/{uid['gina']}")
+RG2 = r.json().get("revoked_id") if r.ok else None
+check(A.put(B + f"/api/lists/{L9}/members", json={"user_id": uid["gina"], "role": "view"}).ok, "gina shared with again by hand")
+r = A.post(B + f"/api/lists/{L9}/shares/{RG2}/restore")
+check(r.status_code == 409 and dbx("SELECT 1 FROM obj_revoked WHERE id=?", (RG2,)) == [] and role_of(L9, "gina") == "view",
+      f"restore of a person shared with again: 409, the taken row is gone ({r.status_code} {r.text[:160]})")
+# restore for a disabled account: refused, nothing changes
+r = A.delete(B + f"/api/lists/{L9}/members/{uid['erik']}")
+RE = r.json().get("revoked_id") if r.ok else None
+dbx("UPDATE users SET disabled=1 WHERE id=?", (uid["erik"],))
+r = A.post(B + f"/api/lists/{L9}/shares/{RE}/restore")
+check(r.status_code in (404, 409) and dbx("SELECT 1 FROM obj_revoked WHERE id=?", (RE,)) == [(1,)] and core_row(L9, uid["erik"]) is None
+      and role_of(L9, "erik") is None, f"restore for a disabled account: refused, the taken row stays ({r.status_code} {r.text[:160]})")
+dbx("UPDATE users SET disabled=0 WHERE id=?", (uid["erik"],))
+
 # F2: a file store row of the node (list_own 0) comes back as that, never as a membership; a group row: 409, never 500
 r = A.post(B + f"/api/files/nodes/{N9}/shares", json={"user_id": uid["fynn"], "role": "view"})
 check(r.status_code == 201, "F2: setup: the file store's share of the node with fynn " + r.text[:160])
@@ -349,5 +371,22 @@ for who, s_ in (("fiona", Fi), ("fred", Fd)):
 nf, nd = Fi.get(B + f"/api/files/nodes/{PN}"), Fd.get(B + f"/api/files/nodes/{PN}")
 check(nf.status_code == nd.status_code and (nf.json().get("role") if nf.ok else None) == (nd.json().get("role") if nd.ok else None),
       f"F6: the same role on the node with and without the core's row ({nf.status_code} / {nd.status_code})")
+
+# an agent's token: the new routes are no API v1 routes, the kind has no core routes, the token's project limit holds
+L10 = new_list(A, "Token board")
+check(A.put(B + f"/api/lists/{L10}/agent", json={"agent_id": AG[1]}).ok, "setup: sortbot on the token board too")
+check(A.patch(B + f"/api/my/agents/{AG[1]}", json={"list_ids": [L5]}).ok, "setup: sortbot's token only for the bot project")
+tok = A.post(B + f"/api/my/agents/{AG[1]}/token").json().get("token", "")
+import requests  # noqa: E402
+TH = {"Authorization": "Bearer " + tok}
+check(requests.get(B + f"/api/v1/lists/{L5}", headers=TH).ok and requests.get(B + f"/api/v1/lists/{L10}", headers=TH).status_code == 404,
+      "the token sees its project, not the other")
+for path in (f"/api/v1/lists/{L10}/history", f"/api/v1/lists/{L5}/history", f"/api/v1/lists/{L5}/shares",
+             f"/api/v1/agent/objects/list/{L5}", f"/api/v1/agent/objects/list/{L10}", "/api/v1/agent/objects/list"):
+    r = requests.get(B + path, headers=TH)
+    check(r.status_code in (403, 404), f"agent token: {path} -> {r.status_code}")
+for path in (f"/api/lists/{L10}/history", f"/api/lists/{L10}/shares", f"/api/lists/{L5}/history"):
+    r = requests.get(B + path, headers=TH)
+    check(not r.ok, f"agent token on the app's route {path}: no access ({r.status_code})")
 
 sys.exit(done("p2568_a_lists_core"))

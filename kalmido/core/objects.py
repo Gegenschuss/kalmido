@@ -682,6 +682,7 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
     mq, ma = _share_match(reg, extra)
     if c.execute(f"SELECT 1 FROM fs_shares WHERE node_id=? AND {key}=?{mq}", (n["id"], int(s[key]), *ma)).fetchone():
         c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
+        c.commit()  # 2.568.0 (#4739): the stale row goes for good (a refusal is not committed; both routes wrote nothing before)
         raise Denied(409, tr("Already shared"))
     sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,expires_at,created_by,created_at,by_role) VALUES(?,?,?,?,?,?,?)",
                     (n["id"], int(s[key]), s.get("role") if s.get("role") in ("view", "edit") else "view", s.get("expires_at"),
