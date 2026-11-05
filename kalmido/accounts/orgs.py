@@ -1123,9 +1123,18 @@ def wsc_clean_color(v):
     return v
 
 
-def _org_patch(c, oid, b):
+def _org_patch(c, oid, b, own_only=None):
     if "name" in b:
-        c.execute("UPDATE orgs SET name=? WHERE id=?", (_clean_name(b["name"]), oid))
+        # 2.551.0 (#4635): the same rule as org_create (a retired organisation's name is free, another spelling of its own
+        # name is no clash). own_only=uid: an organisation admin sees only the companies uid made himself (see org_self_name_taken)
+        nm = _clean_name(b["name"])
+        q, a = "SELECT 1 FROM orgs WHERE id<>? AND lower(name)=lower(?) AND personal_of IS NULL AND retired_at IS NULL", [oid, nm]
+        if own_only is not None:
+            q, a = q + " AND self_made=?", a + [own_only]
+        if c.execute(q, a).fetchone():
+            c.rollback()
+            raise Denied(409, tr("An organisation with this name exists"))
+        c.execute("UPDATE orgs SET name=? WHERE id=?", (nm, oid))
     if "icon" in b:
         v = _clean_icon(b["icon"])
         old = (c.execute("SELECT icon FROM orgs WHERE id=?", (oid,)).fetchone() or [""])[0] or ""
@@ -1382,7 +1391,7 @@ def org_mine_update(oid):
         c.execute("UPDATE orgs SET share_defaults=? WHERE id=?", (sd_clean(b["share_defaults"]), oid))
     if "nav_off" in b:  # 2.418.0 (#3560): menu points switched off for every member (admins only); only the menus change
         c.execute("UPDATE orgs SET nav_off=? WHERE id=?", (nav_clean_org(b["nav_off"]), oid))
-    _org_patch(c, oid, b)
+    _org_patch(c, oid, b, own_only=me())
     bump(c)
     c.commit()
     return jsonify(org_mine_dict(c, c.execute("SELECT * FROM orgs WHERE id=?", (oid,)).fetchone(), me()))
