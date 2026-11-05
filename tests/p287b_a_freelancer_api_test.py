@@ -58,6 +58,7 @@ EXPECT_4XX = {
     "GET /api/life/karakeep/lists": (400, "Karakeep (an outside service) is not connected"),
     "GET /api/newsletter/lists": (404, "no newsletter connection (an outside service)"),
     "GET /api/paperless/preview": (404, "no Paperless connection (an outside service)"),
+    "GET /api/agents/{}/server/team": (400, "the own server agent is a personal one: limits per member exist only for team agents (#4675, the same for every person)"),
     "GET /api/paperless/zip/preview": (404, "no Paperless ZIP uploaded"),
     "GET /api/lists/{}/e2e/todo": (409, "no encryption change is running for the private list"),
     "GET /api/wiki/e2e/todo": (409, "no encryption change is running for the private workspace"),

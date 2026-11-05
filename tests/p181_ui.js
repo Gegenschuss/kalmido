@@ -25,7 +25,8 @@ const START = {'tasks.lastKey': null};  // boot.js seeds "today" for the older s
   const side = [...d.querySelectorAll('#side .sg-focus .srow')].map(r => r.dataset.go);
   // 2.40.0 (#1344): "My tasks" (assigned) sits right under the inbox and is always there
   // 2.364.0 D (#3036): "My tasks" only with collaborators (or while something is assigned)
-  const mine = w.eval('hasPeers()') ? ['assigned'] : [];
+  // 2.569.0 (#4395): "My tasks" is always in the sidebar again, also without collaborators
+  const mine = ['assigned'];
   check(side[0] === 'inbox' && side.slice(1, 1 + mine.length + 4).join() === [...mine, 'today', 'tomorrow', 'week', 'doable'].join(), 'sidebar: Inbox first, My tasks (with collaborators), then Today ... Now doable: ' + side);
   check(d.querySelector('#side .sg-focus .srow[data-go="inbox"]').classList.contains('on'), 'sidebar: Inbox is the open view');
   check(w.eval('SMART_TABS[0]') === 'inbox' && w.eval('Object.keys(SMART)[0]') === 'inbox', 'tab choices + smart list order start with the Inbox');

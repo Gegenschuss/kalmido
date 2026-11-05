@@ -7,7 +7,7 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, write_lock, iso, now_utc
+from ..core.db import body, bump, db, write_lock, iso, iso_ms, now_utc
 from ..core.access import Denied, tvis, vis_sql, list_role
 from ..core.conflict import ccf_check  # 2.569.0 (#4395): versions of the own sections
 from ..accounts.session import me
@@ -165,7 +165,7 @@ def _ms_init(c, uid):
     """Makes the four default sections once (the caller holds the write lock)."""
     if c.execute("SELECT 1 FROM user_mine_sections WHERE user_id=? LIMIT 1", (uid,)).fetchone():
         return False
-    t = iso(now_utc())
+    t = iso_ms(now_utc())  # the version of a section: milliseconds, two devices within one second still differ
     c.executemany("INSERT INTO user_mine_sections(user_id, name, pos, collapsed, kind, created_at, updated_at) VALUES(?,?,?,?,?,?,?)",
                   [(uid, "", n, 0, k, t, t) for n, k in enumerate(MS_DEFAULTS)])
     return True
@@ -228,7 +228,7 @@ def ms_create():
         at = max(0, min(len(rows), rs["pos"] - 1))
     elif isinstance(b.get("after"), int) and b["after"] in rows:
         at = rows.index(b["after"]) + 1
-    t = iso(now_utc())
+    t = iso_ms(now_utc())
     sid = c.execute("INSERT INTO user_mine_sections(user_id, name, pos, collapsed, kind, created_at, updated_at) VALUES(?,?,?,?,?,?,?) "
                     "RETURNING id", (uid, name or "", 0, 1 if rs and rs.get("collapsed") else 0, kind, t, t)).fetchone()[0]
     rows.insert(at, sid)
@@ -256,7 +256,7 @@ def ms_patch(sid):
             c.rollback()
             return jsonify(error=tr("Invalid value: {0}", "name")), 400
         sets += ["name=?", "updated_at=?"]
-        args += [name, iso(now_utc())]
+        args += [name, iso_ms(now_utc())]  # milliseconds (see _ms_init)
     if "collapsed" in b:
         if not isinstance(b["collapsed"], bool):
             c.rollback()
