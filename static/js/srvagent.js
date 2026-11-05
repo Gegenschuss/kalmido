@@ -146,7 +146,7 @@ async function srv_editModal(a, notes) {
   draw(); runs();
   return md;
 }
-const srv_stateTxt = s => tr(({queued: N_('queued|run'), running: N_('running|run'), done: N_('done|run'), error: N_('failed|run'), aborted: N_('stopped|run'), paused: N_('paused|run')})[s] || s || '');
+const srv_stateTxt = s => tr(({queued: N_('queued|run'), run: N_('running|run'), running: N_('running|run'), done: N_('done|run'), failed: N_('failed|run'), error: N_('failed|run'), aborted: N_('stopped|run'), paused: N_('paused|run')})[s] || s || '');  // agent_runs.state (srvagent_run.py)
 // Settings > Agents > Set up: the third way next to "For me" / "For the team" (the in-app guide)
 function srv_guideHtml() {
   return `<div class="shint keep srvguide">${ic('cloud', 's')} <span>${esc(tr('Without a computer: an agent on the Kalmido server (“Kalmido AI”) works with your own API key of a model provider. Kalmido calls the model itself; the agent only uses the Kalmido tools within its permissions.'))}</span>

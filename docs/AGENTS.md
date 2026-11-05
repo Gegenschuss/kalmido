@@ -300,9 +300,16 @@ runs **on the Kalmido server**. You (or an organisation's admin for a team agent
 whenever something comes for the agent (assigned, @mention, a chat message, listening in, a planned job) Kalmido calls the
 model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 
-- **What it may do**: exactly the MCP tools of `mcp/kalmido_mcp.py`, called in-process with the agent's own token, so the same
-  permission, scope and project checks apply as for every other agent (`/api/v1`). No terminal, no files outside Kalmido, no
-  web access. Content from tasks, comments, e-mails and files reaches the model marked as data; the circle limit of
+- **When it runs**: on the events that ask for work: a chat message (and a pressed chat button), an @mention, an assignment,
+  a comment on a task it follows, listening in, a planned job, a proposal request, a follow-up day, a review or letter
+  draft request, a team chat mention (the list: `SRV_TRIGGERS` in `kalmido/agents/srvagent_run.py`). Events made by
+  another agent never start a run, so two server agents cannot keep each other busy. Its answer to a chat or a planned job
+  goes into the chat of the person who asked.
+- **What it may do**: the MCP tools of `mcp/kalmido_mcp.py`, called in-process (the client of the hosted MCP access) with a
+  token of the agent made for this one run (its scopes, projects and lists; deleted at the end of the run), so the same
+  permission, scope and project checks apply as for every other agent (`/api/v1`). The tool packages are those of
+  `KALMIDO_SRVAGENT_TOOLSETS` (default `tickets,chat,calendar,wiki,life,office`: every package except `code` and
+  `integrations`; `chat` always). No terminal, no files outside Kalmido, no web access. Content from tasks, comments, e-mails and files reaches the model marked as data; the circle limit of
   `agents/safety.py` and approvals work as for every other agent. The default instructions say that it works only for
   Kalmido and refuses everything else.
 - **Provider and model**: Anthropic first (the Messages API with tool use), built so that more providers can follow. The
@@ -311,9 +318,15 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   model per agent.
 - **The key**: stored encrypted, never returned, never written to a log. The app shows only its last four characters
   (`…abcd`) with *Replace* and *Delete*.
-- **Runs**: in a queue outside the web process, at most a few at once per server and one per agent, with a time and a
-  step limit per run. *Stop* (Shift+Esc or the menu, `POST /api/agents/<id>/abort`) ends a running one. The tokens of each
-  run count as the agent's usage (the usage ring, *Usage*); its usage limits (day / month) pause it with the reason.
+- **Runs**: in the background queue of the worker, never in the web process; at most `KALMIDO_SRVAGENT_PARALLEL` (default
+  2) at once per server and one per agent; a run ends after `KALMIDO_SRVAGENT_STEPS` model calls (default 25) or
+  `KALMIDO_SRVAGENT_RUN_S` seconds (default 300); one model call may take `KALMIDO_SRVAGENT_CALL_S` seconds (default 120)
+  and answer with `KALMIDO_SRVAGENT_MAX_TOKENS` tokens (default 4096); the model list waits `KALMIDO_SRVAGENT_MODELS_S`
+  seconds (default 15). `KALMIDO_SRVAGENT_ANTHROPIC_URL` is the provider's address (tests point it at a stand-in); a
+  redirect is never followed. *Stop* (Shift+Esc or the menu, `POST /api/agents/<id>/abort`) ends a running one within a
+  second. Usage is counted in tokens only (input and output of every model call, no cost): the usage ring, *Usage*, its
+  usage limits (day / month) and its owner's budget, which pause it with the reason; after the limit allows it, the next
+  event runs. All variables: [ENV.md](ENV.md).
 - **Set up**: *Settings > Agents > Set up > Set up on the Kalmido server* (or *Add agent > Runs on the Kalmido server* in
   the administration): display name (suggested: *Kalmido AI*), username, provider, API key (a password field), model,
   instructions (like a `CLAUDE.md`, prefilled) and the **starter pack**. Its row then carries a cloud button with the same
@@ -339,13 +352,14 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 | Route | What |
 |---|---|
 | `GET /api/agents/server/defaults` | before the agent exists: `{enabled_instance, provider, default_name, default_model, default_instructions, starter, followup_days, followup_max}` (people only) |
-| `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model}`, never the key |
+| `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model, default_instructions, server}`, never the key |
 | `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?}`; creates the settings and sets the agent's provider to `kalmido-server` |
 | `GET /api/agents/<id>/server/models` | `{models: [{id, name}], default, fallback_note?}` live from the provider; 409 `{"error": "no_key"}` without a key |
-| `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state, started, ended, steps, tokens_in, tokens_out, error}]}` |
+| `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state (run / done / failed / aborted), started, ended, steps, tokens_in, tokens_out, error, model}]}` |
 | `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped, id, reason}]}`; the same item twice changes nothing |
 
-Who may: the owner of a personal agent, an instance admin for a team agent (everyone else 404). An agent is created as
+Who may: the owner of a personal agent; for a team agent an admin of its organisation or an instance admin (everyone else
+404). An agent is created as
 before (`POST /api/my/agents` or `POST /api/admin/agents`) with `provider: "kalmido-server"`. Not in this first stage:
 coding agents, building files, own tools.
 

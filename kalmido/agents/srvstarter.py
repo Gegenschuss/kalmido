@@ -17,8 +17,9 @@ A server agent is a normal agent with provider "kalmido-server": Kalmido itself 
      meetings  a standing rule: meeting notes become a proposal "Tasks from notes" (agents/meetprop.py), never tasks directly
      followup  a planned job on weekdays at 09:00: tasks waiting on someone for more than followup_days days get a drafted
                follow-up, posted only after the person's Yes (an approval card)
-   The same item twice changes nothing (state "exists": the same plan title / rule text / levels). Who may: the owner of a
-   personal agent, an instance admin for a team agent (agents/workstyle.py ws_need_editor, everyone else 404). A planned
+   The same item twice changes nothing (state "exists": the same plan title / rule text / levels). Who may: as for the
+   server settings (agents/srvagent.py srv_need): the owner of a personal agent, for a team agent an admin of its
+   organisation or an instance admin; everyone else 404. A planned
    job needs the person to reach the agent (agent_shares: always for the owner of a personal agent; a team agent only
    through a shared project) -- otherwise the item is "skipped" with the reason. The documents of an organisation need its
    admin. Instance switch off -> 403 {error: "server_agents_off"}.
@@ -170,9 +171,9 @@ def srv_defaults():
 @app.post("/api/agents/<int:aid>/server/starter")
 def srv_starter(aid):
     """{items: ["briefing", "tidy", "docs", "meetings", "followup"], followup_days?: 5} -> {items: [{item, state, id, reason}]}."""
-    from ..agents.workstyle import ws_need_editor
+    from ..agents.srvagent import srv_need  # at call time: srvagent.py reads the defaults of this module
     c = db()
-    a = ws_need_editor(c, aid)
+    a = srv_need(c, aid)
     if srv_off(c):
         return err(SRV_OFF_KEY, 403)
     items, days = srv_starter_in(body())

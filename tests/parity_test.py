@@ -469,7 +469,8 @@ APP_ONLY = [
     ("agents are managed by people (admins / owners), not by tokens", ("* /api/my/agents",
                                                                        "PATCH /api/agents/{}/color",  # 2.47.1 (#1721)
                                                                        "* /api/my/mcp-grants",  # 2.488.0 (#3363): the accesses of MCP clients, a person revokes them
-                                                                       "* /api/agents/{}/server")),  # 2.557.0 B (#4670): the server agent's key, model and runs
+                                                                       "* /api/agents/{}/server",  # 2.557.0 B (#4670): the server agent's key, model and runs (C: + its starter pack)
+                                                                       "GET /api/agents/server/defaults")),  # 2.557.0 C (#4670): what the dialog New agent offers before the agent exists
     ("approvals and proposals come only from people (the agent's side: /agent/jobs, POST /agent/jobs/{id}/proposal)", (
         "* /api/agents/jobs", "* /api/proposals", "POST /api/comments/{}/apply", "POST /api/comments/{}/decide",
         "=GET /api/lists/{}/ideas")),  # 2.156.0 A (#1201): the asking person's ideas requests of a list (the mind map)
