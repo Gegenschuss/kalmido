@@ -175,7 +175,7 @@ function tcPatch(bottom) {
   if (S.tc.th) tth_patch();  // 2.139.0 A (#2127): the open thread shows the same messages' changes
   const box = $('#tc-msgs'); if (!box) return;
   const near = bottom || tcNear(box);
-  setHtml(box, tcMsgsHtml());
+  fl_set(box, tcMsgsHtml());  // 2.547.0 (#4500): morphed as msgSecDraw (data-k per message): unchanged messages keep their nodes, no flash
   const added = cf_after(box, 't:' + S.tc.rid);  // 2.46.2 (#1660): new messages fade in; scrolled up -> "New message ↓"
   if (near) { box.scrollTop = box.scrollHeight; cf_pill('tc-new', false); }
   else if (added.length) cf_pill('tc-new', true);
@@ -405,7 +405,7 @@ function tth_msgsHtml(n) {
 function tth_patch(bottom) {
   const box = $('#tth-msgs'); if (!box || !S.tc.th) return;
   const near = bottom || tcNear(box);
-  setHtml(box, tth_msgsHtml());
+  fl_set(box, tth_msgsHtml());  // 2.547.0 (#4500): morphed, as tcPatch
   const added = cf_after(box, 'h:' + S.tc.th.id);  // answers coming in fade in
   if (near) { box.scrollTop = box.scrollHeight; cf_pill('tth-new', false); }
   else if (added.length) cf_pill('tth-new', true);  // 2.521.0 (#4393): scrolled up -> "New message ↓" as in the room

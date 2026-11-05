@@ -951,7 +951,7 @@ const fl_key = n => { if (n.nodeType !== 1) return null; const id = fl_iiId(n) ?
 function fl_iiTidy(root) { for (const b of root.querySelectorAll('button.ib[data-ii]')) if (!document.getElementById(b.dataset.ii) && !root.querySelector(`[id="${b.dataset.ii}"]`)) b.remove(); }
 // what code sets after the render (calFit / chatFit heights, the phone chat's keyboard fix, a drag, the sheet grid's cells)
 // stays on a kept node; the code that set it also takes it away
-const FL_RTC = ['vvfix', 'dragging', 'sb-secfold', 'sgact', 'sgsel'];  // CI of 2.223.1: + sb-secfold (a section folded while it is dragged, #1635)
+const FL_RTC = ['vvfix', 'dragging', 'sb-secfold', 'sgact', 'sgsel', 'cfin'];  // CI of 2.223.1: + sb-secfold (a section folded while it is dragged, #1635); 2.547.0 (#4500): + cfin (a morph right after a new message keeps its fade-in)
 const fl_rtStyle = o => o.id === 'wbody' || o.classList.contains('chview');
 // a <details> the person opened by hand stays open when the view's HTML does not decide it (the views that keep the state
 // themselves write "open" from it); _flSet marks a toggle that came from a morph, not from the person
