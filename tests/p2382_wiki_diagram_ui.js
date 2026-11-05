@@ -1,4 +1,5 @@
 // 2.382.0 (#3153): formulas (KaTeX) and Mermaid diagrams on knowledge pages (Firefox, the app loads its modules itself),
+// 2.554.0 (#4052): the editor part drives the one editor (wkcm.js) instead of the block preview (#3147).
 // computer 1280x800 (alice) and tablet 820x1180 (frida, a person WITHOUT an organisation: freelancer-matrix: knowledge):
 // - a page without such blocks loads neither library nor diagram.js (resource timing); "$5" stays text
 // - a page with "$$" lines, ```math, an inline \( \), a ```mermaid block draws KaTeX / an SVG; a broken diagram keeps its
@@ -62,6 +63,7 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
     const lg = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${run.who}', password: 'password123'})}).then(r => r.status)`);
     check(lg === 200, `${tag}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
+    await ev(`(() => { localStorage.setItem('tasks.wkRo', '"1"'); return 1; })()`);  // 2.554.0 (#4052): the read view = the lock "Read only" (else the editor)
     // a page without formulas / diagrams: nothing of them is loaded
     await nav(B + `#wiki/${run.plain}`);
     const p0 = await until(`(() => { const m = document.querySelector('#wk-md'); return m && m.querySelector('h4') ? m.textContent : null; })()`);
@@ -89,23 +91,23 @@ const K = {Enter: '\uE007', Escape: '\uE00C'};
     const l1 = await ev(loaded);
     check(l1 && ['js/diagram.js', 'vendor/katex/katex.min.js', 'vendor/katex/katex.min.css', 'vendor/mermaid/mermaid.min.js'].every(f => l1.includes(f)), `${tag}: the libraries came from the server itself, only now (${JSON.stringify(l1)})`);
     if (vw > 1000) await shot(`p2382_${vw}_read.png`);
-    // the live preview draws them as well; "/formula" writes a math block
-    await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
-    const e1 = await until(`(() => { const l = document.querySelector('#wk-live'); return l && l.querySelector('.wkdgmm svg') && l.querySelectorAll('.wkdgmath .katex').length === 2 ? 1 : null; })()`, 80);
-    check(e1, `${tag}: the live preview shows the formulas and the diagram drawn`);
-    const lv = await ev(`(() => { const l = document.querySelector('#wk-live'); l.scrollIntoView({block: 'end'}); const r = l.getBoundingClientRect(); return {x: r.left + 20, y: r.bottom - 8}; })()`);
+    // the editor draws them as well; "/formula" writes a math block (2.554.0 #4052: the editor wkcm.js instead of the block preview)
+    await ev(`(() => { LS.del('wkRo'); renderView(); return 1; })()`);
+    const e1 = await until(`(() => { const l = document.querySelector('#wk-cm'); return l && l.querySelector('.cm-content') && l.querySelector('.wkdgmm svg') && l.querySelectorAll('.wkdgmath .katex').length === 2 && l.querySelector('.wkimath .katex') ? 1 : null; })()`, 80);
+    check(e1, `${tag}: the editor shows the formulas and the diagram drawn`);
+    const lv = await ev(`(() => { const l = document.querySelector('#wk-cm .cm-content'); l.scrollIntoView({block: 'end'}); const r = l.getBoundingClientRect(); return {x: r.left + 20, y: r.bottom - 8}; })()`);
     await act([{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(lv.x), y: Math.round(lv.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]);
-    const open = await until(`document.querySelector('#wk-blk')?.value ?? null`);
-    check(open === '`\\(code\\)` stays', `${tag}: a click below the last block opens it (${JSON.stringify(open)})`);
-    await ev(`(() => { const t = document.querySelector('#wk-blk'); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
+    const open = await until(`(() => { const v = WKCM.view, s = v.state; return document.activeElement === v.contentDOM && s.selection.main.head === s.doc.length ? s.doc.lineAt(s.doc.length).text || s.doc.line(s.doc.lines - 1).text : null; })()`);
+    check(open === '`\\(code\\)` stays', `${tag}: a click below the last line puts the cursor at the end (${JSON.stringify(open)})`);
+    await ev(`(() => { const v = WKCM.view; v.dispatch({selection: {anchor: v.state.doc.length}}); return 1; })()`);
     await press('Enter'); await press('Enter'); await type('/formu');
     const m1 = await until(`(() => { const a = document.querySelector('#wk-ac'); return a && !a.classList.contains('hidden') && a.querySelector('button') ? a.querySelector('button').textContent.trim() : null; })()`);
     check(m1 === 'Formula', `${tag}: "/formu" offers the command Formula (${m1})`);
     await press('Enter');
-    const v1 = await ev(`(() => { const t = document.querySelector('#wk-blk'); return t ? {v: t.value, sel: t.value.slice(t.selectionStart, t.selectionEnd)} : null; })()`);
+    const v1 = await ev(`(() => { const s = WKCM.view.state, m = s.selection.main; return {v: s.doc.toString(), sel: s.sliceDoc(m.from, m.to)}; })()`);
     check(v1 && v1.v.endsWith('```math\nE = mc^2\n```') && v1.sel === 'E = mc^2', `${tag}: Enter writes a math block with the example selected (${JSON.stringify(v1)})`);
-    await press('Escape');
-    check(await until(`document.querySelectorAll('#wk-live .wkdgmath .katex').length === 3`, 80), `${tag}: drawn after Esc (three formula blocks)`);
+    await ev(`(() => { WKCM.view.dispatch({selection: {anchor: 0}}); return 1; })()`);  // the cursor elsewhere: the new block is drawn
+    check(await until(`document.querySelectorAll('#wk-cm .wkdgmath .katex').length === 3`, 80), `${tag}: drawn when the cursor left it (three formula blocks)`);
     if (vw > 1000) await shot(`p2382_${vw}_live.png`);
   });
   console.log(`p2382_wiki_diagram_ui: ${ok} ok, ${F.length} failed`);

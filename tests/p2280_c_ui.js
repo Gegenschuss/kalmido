@@ -63,7 +63,7 @@ const bodiesAsked = urls => urls.filter(u => /\/api\/wiki\?/.test(u) && /bodies=
 
   // ================= the start: no texts of the knowledge pages
   const br = browser(await login('frida'));  // the restart below is the same sign-in (2.238.0 B keeps the copy then)
-  const opt = {user: 'frida', shared: br.shared, setup: br.setup, ls: {'tasks.wkSpace': JSON.stringify('private')}};
+  const opt = {user: 'frida', shared: br.shared, setup: br.setup, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}};  // 2.554.0 (#4052): the read view = the lock "Read only"
   let w = await boot(opt), d = w.document;
   check(await until(() => w.eval(`!!S.booted && S.route?.mod !== 'wiki'`) && d.querySelector('#view')?.children.length > 0, 60), 'start: the today view is drawn');
   check(await quiet(br.net, 10000), 'start: the network gets quiet ' + JSON.stringify(br.urls.slice(-8)));

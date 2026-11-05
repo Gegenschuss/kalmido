@@ -158,11 +158,11 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 #wk-res:has(+ .mselbar){padding-bottom:6.5rem}
 /* 2.554.0 (#4052): the one editor (static/js/wkcm.js, CodeMirror 6): Markdown marks only at the cursor, the rest drawn like the
    read view (the box carries .md .wkmd, so pictures, tables and diagrams of the widgets look the same); 2.350.0 B (#3147) is gone */
-.wkcm{position:relative;min-height:12rem}
+.wkcm{position:relative}
 .wkcm .cm-editor{background:none;color:inherit;font:inherit}
 .wkcm .cm-editor.cm-focused{outline:none}
 .wkcm .cm-scroller{font:inherit;line-height:var(--lh);overflow:visible}
-.wkcm .cm-content{min-height:12rem;padding:.25rem 0 2rem;caret-color:var(--text)}
+.wkcm .cm-content{min-height:max(12rem,calc(100dvh - 18rem));padding:.25rem 0 2rem;caret-color:var(--text)}  /* like .ntbody: the free height, a click below the text = at its end */
 .wkcm .cm-line{padding:0}
 .wkcm .cm-cursor,.wkcm .cm-dropCursor{border-left-color:var(--text)}
 .wkcm .cm-selectionBackground,.wkcm .cm-focused>.cm-scroller>.cm-selectionLayer .cm-selectionBackground{background:var(--accent-soft)}
@@ -191,7 +191,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkcm .cm-wkwb{display:block;padding:.125rem 0;border-radius:var(--r-s);cursor:pointer}
 .wkcm .cm-wkwb>:first-child{margin-top:0}
 .wkcm .cm-wkwb>:last-child{margin-bottom:0}
-.wkcm .cm-wktbl{position:relative;margin:.25rem 0;overflow-x:auto}
+.wkcm .cm-wktbl{position:relative;width:fit-content;max-width:100%;margin:.25rem 0;padding-right:2rem;overflow-x:auto}
 .wkcm .cm-wktbl :is(td,th){min-width:3rem;cursor:text}
 .wkcm .cm-wkcell{box-sizing:border-box;width:100%;min-width:4rem;padding:0;border:0;outline:2px solid var(--accent);background:var(--bg);color:inherit;font:inherit}
 .wkcm .cm-wktsrc{position:absolute;top:0;right:0;opacity:0}

@@ -3,6 +3,7 @@
 // kalmido-suite: fresh
 // Firefox, frida (a person WITHOUT an organisation, freelancer-matrix: knowledge), invented texts only.
 // Without the fix the first diagram is drawn with HTML labels (foreignObject) and the second carries the injected colour.
+// 2.554.0 (#4052): the page opens in the editor (wkcm.js): the diagrams are its widgets, drawn by the same diagram.js
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -37,7 +38,7 @@ const BODY = '# Locked\n\n```mermaid\n%%{init: {"htmlLabels": true, "flowchart":
     check(lg === 200, 'login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 800}});
     await nav(B + `#wiki/${pg}`);
-    const r = await until(`(() => { const s = [...document.querySelectorAll('#wk-md .wkdgmm svg')]; if (s.length < 2) return null;
+    const r = await until(`(() => { const s = [...document.querySelectorAll('.wkpage .wkmd .wkdgmm svg')]; if (s.length < 2) return null;
       return s.map(x => ({fo: x.querySelectorAll('foreignObject').length, html: x.querySelectorAll('div, span, iframe').length,
         txt: [...x.querySelectorAll('text, foreignObject')].map(t => t.textContent).join(' ').replace(/\\s+/g, ' ').trim().slice(0, 80), css: [...x.querySelectorAll('style')].map(t => t.textContent).join(' ')})); })()`);
     console.log('svgs', JSON.stringify(r && r.map(x => ({...x, css: x.css.length}))));

@@ -89,11 +89,12 @@ const K = {Enter: '', Escape: ''};
     await nav(B + `#wiki/${run.id}`);
     // #3152: the space's style on the page (alice: Alpha = notepad, frida: private = book)
     const want = run.who === 'alice' ? 'notepad' : 'book';
-    check(await until(`!!document.querySelector('article.wkpage.wkst-${want} #wk-md')`), `${tag}: the page shows the space's style ${want}`);
-    const look = await ev(`(() => { const m = getComputedStyle(document.querySelector('#wk-md')); return {ff: m.fontFamily, bg: m.backgroundImage, lh: m.lineHeight}; })()`);
+    // 2.554.0 (#4052): a page one may write opens in the editor (#wk-cm, also .wkmd): the reading style shows there as well
+    check(await until(`!!document.querySelector('article.wkpage.wkst-${want} #wk-cm .cm-content')`), `${tag}: the page shows the space's style ${want}`);
+    const look = await ev(`(() => { const m = getComputedStyle(document.querySelector('#wk-cm')); return {ff: m.fontFamily, bg: m.backgroundImage, lh: m.lineHeight}; })()`);
     check(want === 'book' ? /Georgia|serif/i.test(look.ff) : /gradient/.test(look.bg), `${tag}: the style is visible ${JSON.stringify(look)}`);
     // light and dark: the paper / the text follow the theme's variables
-    const col = async th => { await ev(`(() => { document.documentElement.dataset.theme = '${th}'; return 1; })()`); await sleep(100); return ev(`(() => { const m = getComputedStyle(document.querySelector('#wk-md')); return {c: m.color, bg: m.backgroundImage}; })()`); };
+    const col = async th => { await ev(`(() => { document.documentElement.dataset.theme = '${th}'; return 1; })()`); await sleep(100); return ev(`(() => { const m = getComputedStyle(document.querySelector('#wk-cm')); return {c: m.color, bg: m.backgroundImage}; })()`); };
     const li = await col('light'), dk = await col('dark');
     check(li.c !== dk.c, `${tag}: light and dark give different text colours ${JSON.stringify([li.c, dk.c])}`);
     if (want === 'notepad') check(li.bg !== dk.bg, `${tag}: the notepad's paper follows light / dark`);
@@ -115,18 +116,15 @@ const K = {Enter: '', Escape: ''};
     await ev(`(() => { LS.del('wkSt'); renderView(); return 1; })()`);
     check(await until(`!!document.querySelector('article.wkpage.wkst-${want}')`), `${tag}: without an own choice the space's style is back`);
 
-    // #3333 in the plain text field (the account setting look.wkEd = text)
-    await ev(`(() => { LS.set('wkEd', 'text'); renderView(); return 1; })()`);
-    await until(`!!document.querySelector('[data-wk="mode"][data-m="edit"]')`);
-    await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
-    await until(`!!document.querySelector('#wk-body')`);
-    await ev(`(() => { const t = document.querySelector('#wk-body'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
+    // #3333 in the editor (2.554.0 #4052: the one editor wkcm.js; before: the plain text field of look.wkEd = text)
+    await until(`!!document.querySelector('#wk-cm .cm-content') && !!WKCM.view`);
+    await ev(`(() => { const v = WKCM.view; v.focus(); v.dispatch({selection: {anchor: v.state.doc.length}}); return 1; })()`);
     await press('Enter'); await type('/task');
     const m1 = await until(acList);
     check(m1 && m1[0] === 'Task (#)', `${tag}: "/task" offers "Task (#)" ${JSON.stringify(m1)}`);
     await press('Enter');
     const m2 = await until(acList);
-    check(await ev(`document.querySelector('#wk-body').value`) === 'Start\n#' && m2 && m2.some(x => x === `#${run.t1} Call the printer ${run.who}`), `${tag}: Enter puts "#" and lists the own tasks ${JSON.stringify(m2)}`);
+    check(await ev(`wk_ta().value`) === 'Start\n#' && m2 && m2.some(x => x === `#${run.t1} Call the printer ${run.who}`), `${tag}: Enter puts "#" and lists the own tasks ${JSON.stringify(m2)}`);
     await type('printer');
     const m3 = await until(`(() => { const l = ${acList}; return l && l.length === 1 ? l : null; })()`);
     check(m3 && m3[0] === `#${run.t1} Call the printer ${run.who}`, `${tag}: a title word filters the loaded tasks ${JSON.stringify(m3)}`);
@@ -148,12 +146,11 @@ const K = {Enter: '', Escape: ''};
     await press('Escape'); await type('a');
     await sleep(600);
     check(!(await ev(acList)), `${tag}: after Esc the task search stays closed`);
-    await ev(`(() => { const t = document.querySelector('#wk-body'), i = t.value.lastIndexOf('\\n'); t.setRangeText('', i, t.value.length, 'end'); t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
+    await ev(`(() => { const t = wk_ta(), i = t.value.lastIndexOf('\\n'); t.setRangeText('', i, t.value.length, 'end'); t.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     check(await saved(w2) === w2, `${tag}: the page is back to the two picks`);
     // a "#" typed by hand opens no task search (a tag stays a tag)
     await type('#abc');
     check(!(await ev(acList)), `${tag}: "#abc" typed by hand opens no list`);
-    await ev(`(() => { LS.del('wkEd'); return 1; })()`);
   });
   console.log(`p2371_3_wiki_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

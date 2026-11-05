@@ -23,7 +23,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'sheets'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   const T1 = (await call('POST', '/api/sheets', {title: 'Budget', space: 'private'})).id;
   const T2 = (await call('POST', '/api/sheets', {title: 'Alone', space: 'private'})).id;
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Plan', body: `See [[tabelle:${T1}]]\n\n- [ ] One\n- [ ] Two\n`})).id;
@@ -43,8 +43,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= #2363 a) suggestions above the keyboard
   w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private')}}); d = w.document;
-  await until(() => d.querySelector('#view [data-wk="mode"][data-m="edit"]') && w.eval('WK.pg?.id') === PG);
-  d.querySelector('#view [data-wk="mode"][data-m="edit"]')?.click();
+  await until(() => w.eval('WK.pg?.id') === PG);  // 2.554.0 (#4052): no Read / Edit switch, a computer writes at once (jsdom: the plain field)
   const ta = await until(() => d.querySelector('#wk-body'));
   const type = async txt => { ta.value = txt; ta.setSelectionRange(txt.length, txt.length); ta.dispatchEvent(new w.Event('input', {bubbles: true})); return until(() => { const b = d.querySelector('#wk-ac'); return b && !b.classList.contains('hidden') && b.textContent.includes('Budget') && b; }); };
   let box = await type('x [[tabelle:bud');

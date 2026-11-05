@@ -36,9 +36,9 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   await call('POST', '/api/users', {username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'files', 'sheets'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   const CB = await login('bob');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats}, CB);  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats}, CB);  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   const ORG = (await call('POST', '/api/admin/orgs', {name: 'Alpha', admin_id: st0.me.id})).id, SP = 'org:' + ORG;
   await call('PUT', `/api/orgs/${ORG}/members`, {email: 'bob@example.com', role: 'member'});
   const TEAM = (await call('POST', '/api/files/folders', {name: 'Team', space: SP})).id;
@@ -53,8 +53,8 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   const PG2 = (await call('POST', '/api/wiki/pages', {space: SP, path: 'Scratch', body: ''})).id;
   check(PG > 0 && PG2 > 0, 'setup: the pages');
 
-  // ================= read mode as the admin
-  let w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP)}}), d = w.document;
+  // ================= read mode as the admin (2.554.0 #4052: the lock "Read only", LS wkRo - a page one may write opens in the editor)
+  let w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP), 'tasks.wkRo': '"1"'}}), d = w.document;
   const img = await until(() => d.querySelector('#wk-md img.wkimg'));
   check(img && img.getAttribute('src') === `/api/files/nodes/${PIC}/content`, '#2103: the picture of the file store shows (its address there, no copy)');
   const tl = await until(() => [...d.querySelectorAll('#wk-md a.wemlink')].find(a => a.getAttribute('href') === '#sheets/' + SH));
@@ -86,14 +86,16 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   // a done task is struck through at its link
   await call('POST', `/api/tasks/${OLD}/complete`, {});
   w.close();
-  w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP)}}); d = w.document;
+  w = await boot({user: 'alice', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP), 'tasks.wkRo': '"1"'}}); d = w.document;
   const done = await until(() => d.querySelector(`#wk-md a.tref[data-tref="${OLD}"]`));
   check(done && done.classList.contains('wemdone'), '#2108: a done task shows struck through at its link ' + (done?.outerHTML || 'no link') + ' ' + JSON.stringify(w.eval(`(() => { const t = taskById(${OLD}); return t ? {s: t.status} : null; })()`)));
 
   // ================= the editor (another page): insert from the file store, suggestions
   w.location.hash = 'wiki/' + PG2;
-  await until(() => d.querySelector('#view [data-wk="mode"][data-m="edit"]') && w.eval('WK.pg?.id') === PG2);
-  d.querySelector('#view [data-wk="mode"][data-m="edit"]')?.click();
+  // 2.554.0 (#4052): no Read / Edit switch: the read view above is the lock "Read only" of this device (LS wkRo); without it
+  // a computer writes at once (jsdom has no layout for CodeMirror: the plain field, the same as "Edit as Markdown")
+  w.eval(`LS.del('wkRo')`);
+  await until(() => w.eval('WK.pg?.id') === PG2 && d.querySelector('#wk-body'));
   const ta = await until(() => d.querySelector('#wk-body'));
   check(d.querySelector('.wkedwrap .wembar [data-wem="ins"]'), '#2103: the editor has "Insert picture or file"');
   ta.value = 'Start\n'; ta.setSelectionRange(6, 6); ta.dispatchEvent(new w.Event('input', {bubbles: true}));
@@ -125,7 +127,7 @@ const PDF = Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj 2 
   w.close();
 
   // ================= a member without access to the closed file
-  w = await boot({user: 'bob', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP)}}); d = w.document;
+  w = await boot({user: 'bob', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify(SP), 'tasks.wkRo': '"1"'}}); d = w.document;
   await until(() => d.querySelector('#wk-md img.wkimg'));
   const na = await until(() => [...d.querySelectorAll('#wk-md .wemna')].find(x => /not available/.test(x.textContent)));
   check(na, '#2103: a file the member may not open: "File not available"');

@@ -36,8 +36,9 @@ function wkcm_load() {
   }
   return WKCM.ld;
 }
-// the editor can be used here (not yet loaded = it is loading; failed = the plain field)
-const wkcm_can = () => !WKCM.fail;
+// the editor can be used here (not yet loaded = it is loading; failed = the plain field). CodeMirror measures text with
+// Range.getClientRects: a browser without it (a document without layout, the jsdom suites) gets the plain field
+const wkcm_can = () => !WKCM.fail && typeof Range === 'function' && typeof Range.prototype.getClientRects === 'function';
 // ---- the stand-in field: what wiki.js / wkembed.js / wklive.js expect of a <textarea>
 function wkcm_ta() {
   const v = WKCM.view; if (!v || !v.dom.isConnected) return null;

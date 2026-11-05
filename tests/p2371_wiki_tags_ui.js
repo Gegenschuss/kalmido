@@ -44,7 +44,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   check(Object.values(id).every(Boolean), 'setup: the pages');
 
   // ================= the tags in the text
-  const w = await boot({user: 'alice', hash: 'wiki/' + id.plan}), d = w.document;
+  const w = await boot({user: 'alice', hash: 'wiki/' + id.plan, ls: {'tasks.wkRo': '"1"'}}), d = w.document;  // 2.554.0 (#4052): the read view = the lock "Read only"
   const md = await until(() => d.querySelector('#view .wkpage #wk-md a.wktag') && d.querySelector('#view .wkpage #wk-md'));
   const links = md ? [...md.querySelectorAll('a.wktag')].map(a => a.textContent + '>' + a.getAttribute('href')) : [];
   check(JSON.stringify(links) === JSON.stringify(['#Projekt>#wiki/t/Projekt', '#kunde/Nord>#wiki/t/kunde%2FNord']), 'the #tags of the text are links to their list, not in code or a link target ' + JSON.stringify(links));
@@ -107,7 +107,7 @@ const rowOf = (d, txt) => [...d.querySelectorAll('#side .sbbt')].find(r => r.que
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
     await nav(B + 'static/icon.svg');
-    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    await ev(`(() => { localStorage.clear(); sessionStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); localStorage.setItem('tasks.wkRo', '"1"'); return 1; })()`);  // 2.554.0 (#4052): the read view
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`);
     await nav(B + '#wiki/' + id.q);
     if (!check(await ready(ev, `document.querySelectorAll('.wkpage .wkq').length === 4 && !!document.querySelector('.wkpage .wkqt')`, 80), 'Firefox: the blocks draw')) console.log(await ev(`(document.querySelector('#view')?.innerHTML || '').slice(0, 1500)`));

@@ -36,7 +36,8 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(PG > 0, 'setup: the page');
   const body = async () => (await call('GET', '/api/wiki/pages/' + PG)).body || '';
 
-  let w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private')}}), d = w.document;
+  // 2.554.0 (#4052): the read view with its boxes = the lock "Read only" (LS wkRo); without it a page one may write opens in the editor
+  let w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}}), d = w.document;
   const boxes = () => [...d.querySelectorAll('#wk-md input[type="checkbox"]')];
   const box = k => d.querySelector(`#wk-md input[data-wkcb="${k}"]`);
   check(await until(() => boxes().length === 3), 'three checkboxes (the code block does not count) ' + boxes().length);
@@ -66,7 +67,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // a task done elsewhere: its line shows ticked, the text stays
   await call('POST', `/api/tasks/${T1}/complete`, {});
   w.close();
-  w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private')}}); d = w.document;
+  w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}}); d = w.document;
   check(await until(() => box(1)?.checked), 'a task done elsewhere: its line shows ticked');
   check((await body()).includes(`- [ ] Beta #${T1}`), '… the text stays as it is');
 
@@ -84,7 +85,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
 
   // ================= right click: "Create as task"
   await call('PATCH', '/api/wiki/pages/' + PG, {body: '- [ ] Order paper\n'});
-  w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private')}}); d = w.document;
+  w = await boot({user: 'frida', hash: 'wiki/' + PG, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}}); d = w.document;
   const li = await until(() => d.querySelector('#wk-md li[data-wkcbl="0"]'));
   check(li, 'the line is there');
   li.dispatchEvent(new w.MouseEvent('contextmenu', {bubbles: true, cancelable: true}));

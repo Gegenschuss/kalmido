@@ -19,7 +19,7 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
   const st0 = await call('GET', '/api/state');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki', 'notes'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   const PG = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Plan', body: 'Hello\n'})).id;
   check(PG, 'setup: a page');
 
@@ -29,11 +29,12 @@ const call = async (method, url, body) => { const r = await fetch(B + url.replac
     check(lg === 200, `${vw}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + `#wiki/${PG}`);
-    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('[data-wk="mode"][data-m="edit"]')`).catch(() => false)); i++) await sleep(300);
-    await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
-    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#wk-body')`).catch(() => false)); i++) await sleep(300);
+    // 2.554.0 (#4052): the one editor (wkcm.js): a computer writes at once, a phone opens it with the pen
+    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#wk-cm .cm-content, [data-wk="pen"]')`).catch(() => false)); i++) await sleep(300);
+    await ev(`(() => { document.querySelector('[data-wk="pen"]')?.click(); return 1; })()`);
+    for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#wk-cm .cm-content')`).catch(() => false)); i++) await sleep(300);
     await sleep(600);
-    const r = await ev(`(() => { const t = document.querySelector('#wk-body').getBoundingClientRect(), f = document.querySelector('.ntfoot').getBoundingClientRect(), tb = document.getElementById('tabs');
+    const r = await ev(`(() => { const t = document.querySelector('#wk-cm').getBoundingClientRect(), f = document.querySelector('.ntfoot').getBoundingClientRect(), tb = document.getElementById('tabs');
       const tt = tb && tb.offsetParent !== null ? tb.getBoundingClientRect().top : innerHeight;
       return {h: t.height, top: t.top, free: Math.min(innerHeight, tt) - t.top, fb: f.bottom, ih: innerHeight, w: t.width, vw: document.documentElement.clientWidth, sw: document.documentElement.scrollWidth}; })()`);
     check(r.h >= 0.7 * r.free, `${vw}: field height ${Math.round(r.h)} >= 70% of the free ${Math.round(r.free)}`);

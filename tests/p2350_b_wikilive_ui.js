@@ -1,10 +1,12 @@
 // 2.350.0 B (#3147, #3149): the knowledge editor with live preview and slash commands (Firefox, real clicks and keys),
-// computer 1280x800 (alice) and tablet 820x1180 (frida, a person WITHOUT an organisation: freelancer-matrix: knowledge):
-// - Edit shows the page drawn (heading, bold, list), no raw field until one clicks; a click into a block shows its Markdown
-// - typing saves the ONE Markdown string of the page (read back over the API), Ctrl+B, arrows move between blocks, Esc
+// computer 1280x800 (alice) and tablet 820x1180 (frida, a person WITHOUT an organisation: freelancer-matrix: knowledge).
+// 2.554.0 (#4052): the block preview (#3147) and the Source / Preview switch (#3128) are replaced by the one editor (wkcm.js,
+// CodeMirror 6); this suite now drives it (the editor's own checks: p2554_c_wikicm_ui):
+// - the page opens drawn (heading, bold, list) with the bar, no raw field; a click into the bold word shows its ** there
+// - typing saves the ONE Markdown string of the page (read back over the API), Ctrl+B
 // - "/" at the start of a line opens the commands, typing filters, Enter on "Checkbox" writes "- [ ] "; Ctrl+K a link,
-//   Ctrl+Shift+7 a numbered list
-// - the page's "…" entry and (2.382.0 #3128) the bar's button "Source" / "Preview" switch to the plain text field (#wk-body, an account setting: look.wkEd) and back; "/" works there too
+//   Ctrl+Shift+7 a numbered list; drawn again when the cursor left: the numbered line and the box
+// - the page's "…" entry "Edit as Markdown" opens the plain text field (#wk-body); "/" works there too; "Back to the editor"
 // Invented texts only. Screenshots: P2350B_SHOTS.
 // kalmido-suite: fresh
 const path = require('path');
@@ -52,94 +54,73 @@ const K = {Enter: '', Escape: '', ArrowUp: '', ArrowDown: '', Contro
       await act([{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(r.x), y: Math.round(r.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]);
       return true;
     };
-    const blk = () => ev(`document.querySelector('#wk-blk')?.value ?? null`);
+    const doc = () => ev(`WKCM.view?.state.doc.toString() ?? null`);
+    const line = t => `[...document.querySelectorAll('#wk-cm .cm-line')].find(l => l.textContent.includes(${JSON.stringify(t)}))`;
+    const put = (a, z = a) => ev(`(() => { const v = WKCM.view; v.focus(); v.dispatch({selection: {anchor: ${a}, head: ${z}}}); return 1; })()`);
     await nav(B + 'static/icon.svg');
     const lg = await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${run.who}', password: 'password123'})}).then(r => r.status)`);
     check(lg === 200, `${tag}: login`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + `#wiki/${run.id}`);
-    await until(`!!document.querySelector('[data-wk="mode"][data-m="edit"]')`);
-    await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
-    // #3147: drawn, no raw field yet
-    const r0 = await until(`(() => { const l = document.querySelector('#wk-live'); if (!l || !l.querySelector('h4')) return null;
-      return {h4: l.querySelector('.wklb h4')?.textContent, b: l.querySelector('.wklb b')?.textContent, li: l.querySelectorAll('.wklb li').length,
-        blk: !!document.querySelector('#wk-blk'), body: !!document.querySelector('#wk-body'), bar: !!document.querySelector('.wkedwrap .wembar')}; })()`);
-    check(r0 && r0.h4 === 'Plan' && r0.b === 'bold' && r0.li === 2 && !r0.blk && !r0.body && r0.bar, `${tag}: edit mode shows the page drawn (heading, bold, list), the bar, no raw field: ${JSON.stringify(r0)}`);
+    // drawn at once, no raw field, no switch
+    const r0 = await until(`(() => { const l = document.querySelector('#wk-cm .cm-content'); if (!l || !l.querySelector('.cm-wkh1')) return null;
+      return {h1: l.querySelector('.cm-wkh1')?.textContent, b: l.querySelector('.cm-wkb')?.textContent, li: l.querySelectorAll('.cm-wkbul').length, raw: l.textContent.includes('**') || l.textContent.includes('# '),
+        body: !!document.querySelector('#wk-body'), mode: !!document.querySelector('[data-wk="mode"], [data-wem="src"]'), bar: !!document.querySelector('.wkedwrap .wembar')}; })()`);
+    check(r0 && r0.h1 === 'Plan' && r0.b === 'bold' && r0.li === 2 && !r0.raw && !r0.body && !r0.mode && r0.bar, `${tag}: the page opens drawn (heading, bold, list), the bar, no raw field, no switch: ${JSON.stringify(r0)}`);
     if (vw > 1000) await shot(`p2350_b_${vw}_drawn.png`);  // at most four pictures
-    // a click into the paragraph opens it as Markdown, near the click
-    await clickAt(`document.querySelector('#wk-live .wklb b')`);
-    await until(`!!document.querySelector('#wk-blk')`);
-    const c1 = await ev(`(() => { const t = document.querySelector('#wk-blk'); return {v: t.value, s: t.selectionStart, f: document.activeElement === t, h4: !!document.querySelector('#wk-live .wklb h4')}; })()`);
-    check(c1.v === 'Intro **bold** text' && c1.f && c1.h4, `${tag}: the clicked block shows its Markdown and has the focus, the rest stays drawn: ${JSON.stringify(c1)}`);
-    check(c1.s >= 6 && c1.s <= 14, `${tag}: the cursor stands near the click (${c1.s})`);
+    // a click into the bold word: its ** show there, the rest stays drawn
+    await clickAt(`document.querySelector('#wk-cm .cm-wkb')`);
+    const c1 = await until(`(() => { const v = WKCM.view; if (document.activeElement !== v.contentDOM) return null; const h = v.state.selection.main.head; return {l: ${line('Intro')}.textContent, h, h1: ${line('Plan')}.textContent}; })()`);
+    check(c1 && c1.l === 'Intro **bold** text' && c1.h1 === 'Plan', `${tag}: the clicked bold word shows its Markdown, the heading stays drawn: ${JSON.stringify(c1)}`);
+    check(c1 && c1.h >= 14 && c1.h <= 22, `${tag}: the cursor stands near the click (${c1 && c1.h})`);
     // typing + autosave: the page's one Markdown string
-    await ev(`(() => { const t = document.querySelector('#wk-blk'); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
+    await put(`WKCM.view.state.doc.line(3).to`);
     await type(' more');
-    await ev(`(() => { const t = document.querySelector('#wk-blk'), i = t.value.indexOf('more'); t.setSelectionRange(i, i + 4); return 1; })()`);
+    await ev(`(() => { const v = WKCM.view, i = v.state.doc.toString().indexOf('more'); v.dispatch({selection: {anchor: i, head: i + 4}}); return 1; })()`);
     await press('b', ['Control']);
-    check(await blk() === 'Intro **bold** text **more**', `${tag}: Ctrl+B makes the selection bold (${await blk()})`);
+    check((await doc()).includes('Intro **bold** text **more**'), `${tag}: Ctrl+B makes the selection bold (${JSON.stringify(await doc())})`);
     const w1 = BODY.replace('text', 'text **more**');
     check(await saved(w1) === w1, `${tag}: autosave writes the whole page as one Markdown string`);
-    // arrows: down skips the blank line into the list, up comes back; Esc draws everything
-    await ev(`(() => { const t = document.querySelector('#wk-blk'); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
-    await press('ArrowDown');
-    check(await until(`document.querySelector('#wk-blk')?.value === '- one\\n- two'`), `${tag}: arrow down at the last line opens the next block (${await blk()})`);
-    check(await ev(`document.querySelector('#wk-live .wklb b:last-of-type')?.textContent === 'more'`), `${tag}: the left paragraph is drawn again with the new bold word`);
-    await ev(`(() => { document.querySelector('#wk-blk').setSelectionRange(0, 0); return 1; })()`);
-    await press('ArrowUp');
-    check(await until(`document.querySelector('#wk-blk')?.value === 'Intro **bold** text **more**'`), `${tag}: arrow up at the first line goes back (${await blk()})`);
-    await press('Escape');
-    check(await until(`!document.querySelector('#wk-blk') && document.querySelectorAll('#wk-live .wklb li').length === 2`), `${tag}: Esc shows everything drawn`);
-    // #3149: below the last block = its end; Enter, "/check" filters the commands, Enter writes the checkbox
-    const lv = await ev(`(() => { const l = document.querySelector('#wk-live'); l.scrollIntoView({block: 'center'}); const r = l.getBoundingClientRect(); return {x: r.left + 20, y: r.bottom - 8}; })()`);
+    // #3149: below the last line = its end; Enter, "/check" filters the commands, Enter writes the checkbox
+    const lv = await ev(`(() => { const l = document.querySelector('#wk-cm .cm-content'); l.scrollIntoView({block: 'end'}); const r = l.getBoundingClientRect(); return {x: r.left + 20, y: Math.min(r.bottom, innerHeight) - 8}; })()`);
     await act([{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: Math.round(lv.x), y: Math.round(lv.y)}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]);
-    check(await until(`document.querySelector('#wk-blk')?.value === 'End'`), `${tag}: a click below the last block opens it (${await blk()})`);
-    await ev(`(() => { const t = document.querySelector('#wk-blk'); t.setSelectionRange(3, 3); return 1; })()`);
+    check(await until(`WKCM.view.state.selection.main.head === WKCM.view.state.doc.length`), `${tag}: a click below the last line puts the cursor at the end`);
     await press('Enter'); await type('/check');
     const m1 = await until(`(() => { const a = document.querySelector('#wk-ac'); return a && !a.classList.contains('hidden') && a.querySelector('button') ? [...a.querySelectorAll('button')].map(b => b.textContent.trim()) : null; })()`);
     check(m1 && m1[0] === 'Checkbox', `${tag}: "/" at the start of a line opens the commands, typing filters them: ${JSON.stringify(m1)}`);
     if (vw > 1000) await shot(`p2350_b_${vw}_slash.png`);
     await press('Enter');
-    check(await blk() === 'End\n- [ ] ', `${tag}: Enter on "Checkbox" writes "- [ ] " (${JSON.stringify(await blk())})`);
+    check((await doc()).endsWith('End\n- [ ] '), `${tag}: Enter on "Checkbox" writes "- [ ] " (${JSON.stringify(await doc())})`);
     await type('Call');
-    await ev(`(() => { const t = document.querySelector('#wk-blk'), i = t.value.indexOf('Call'); t.setSelectionRange(i, i + 4); return 1; })()`);
+    await ev(`(() => { const v = WKCM.view, i = v.state.doc.toString().lastIndexOf('Call'); v.dispatch({selection: {anchor: i, head: i + 4}}); return 1; })()`);
     await press('k', ['Control']);
-    check(await blk() === 'End\n- [ ] [Call](https://)' && !(await ev(`!!document.querySelector('.palette')`)), `${tag}: Ctrl+K in the field makes a link, the command field stays shut (${JSON.stringify(await blk())})`);
-    await ev(`(() => { document.querySelector('#wk-blk').setSelectionRange(1, 1); return 1; })()`);
+    check((await doc()).endsWith('End\n- [ ] [Call](https://)') && !(await ev(`!!document.querySelector('.palette')`)), `${tag}: Ctrl+K in the editor makes a link, the command field stays shut (${JSON.stringify(await doc())})`);
+    await put(`WKCM.view.state.doc.toString().lastIndexOf('End') + 1`);
     await press('7', ['Control', 'Shift']);
-    check(await blk() === '1. End\n- [ ] [Call](https://)', `${tag}: Ctrl+Shift+7 numbers the line (${JSON.stringify(await blk())})`);
-    await press('Escape');
-    check(await until(`!document.querySelector('#wk-blk') && !!document.querySelector('#wk-live ol li') && !!document.querySelector('#wk-live input[type="checkbox"]')`), `${tag}: drawn: numbered line and checkbox`);
+    check((await doc()).endsWith('\n1. End\n- [ ] [Call](https://)'), `${tag}: Ctrl+Shift+7 numbers the line (${JSON.stringify(await doc())})`);
+    await put(0);  // the cursor elsewhere: drawn
+    check(await until(`!!${line('End')} && !!document.querySelector('#wk-cm input[type="checkbox"]') && !${line('Call')}?.textContent.includes('https')`), `${tag}: drawn: numbered line, checkbox, the link without its address`);
     check(await saved(WANT) === WANT, `${tag}: the saved page is the expected Markdown: ${JSON.stringify(await saved(WANT))}`);
     await shot(`p2350_b_${vw}_after.png`);
-    // the plain text field (account setting) and back
-    const menuPick = async () => {
+    // the plain text field (the page's "…": "Edit as Markdown") and back
+    const menuPick = async re => {
       await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); return 1; })()`);
       await until(`!!document.querySelector('#pop:not(.hidden) [role="menuitem"]')`);
-      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => /^\\s*(Source|Preview)\\s*$/.test(x.textContent)); if (!b) return null; const t = b.textContent.trim(); b.click(); return {t}; })()`);
+      return ev(`(() => { const b = [...document.querySelectorAll('#pop [role="menuitem"]')].find(x => ${re}.test(x.textContent.trim())); if (!b) return null; const t = b.textContent.trim(); b.click(); return {t}; })()`);
     };
-    // 2.382.0 (#3128): the entry names what a click shows ("Source" / "Preview", like the bar's button) instead of a ticked "Live preview while writing"
-    check(await ev(`document.querySelector('.wembar [data-wem="src"]')?.textContent.trim()`) === 'Source', `${tag}: the formatting bar has the button "Source"`);
-    const p1 = await menuPick();
-    check(p1 && p1.t === 'Source', `${tag}: the page's "…" has "Source" (${JSON.stringify(p1)})`);
-    check(await until(`document.querySelector('#wk-body')?.value === ${JSON.stringify(WANT)} && !document.querySelector('#wk-live')`), `${tag}: switched off: the plain text field with the whole page`);
-    let look = '';
-    for (let i = 0; i < 40 && !/"wkEd":"text"/.test(look); i++) { await sleep(250); look = (await call(run.ck, 'GET', '/api/state')).settings?.look || ''; }
-    check(/"wkEd":"text"/.test(look), `${tag}: the choice is kept with the account (${look})`);
+    const all = await ev(`(() => { document.querySelector('[data-wk="pmenu"]').click(); const t = [...document.querySelectorAll('#pop [role="menuitem"]')].map(x => x.textContent.trim()); closePop(); return t; })()`);
+    check(all && !all.some(x => /^(Source|Preview)$/.test(x)), `${tag}: no "Source" / "Preview" any more (${JSON.stringify(all)})`);
+    const p1 = await menuPick('/^Edit as Markdown$/');
+    check(p1, `${tag}: the page's "…" has "Edit as Markdown"`);
+    check(await until(`document.querySelector('#wk-body')?.value === ${JSON.stringify(WANT)} && !document.querySelector('#wk-cm')`), `${tag}: the plain text field with the whole page`);
     await ev(`(() => { const t = document.querySelector('#wk-body'); t.focus(); t.setSelectionRange(t.value.length, t.value.length); return 1; })()`);
     await press('Enter'); await type('/head');
     const m2 = await until(`(() => { const a = document.querySelector('#wk-ac'); return a && !a.classList.contains('hidden') && a.querySelector('button') ? a.querySelector('button').textContent.trim() : null; })()`);
     check(m2 === 'Heading', `${tag}: the plain text field has the commands too (${m2})`);
     await press('Enter'); await type('Next');
     check(await saved(WANT + '\n## Next') === WANT + '\n## Next', `${tag}: "/head" + Enter writes a heading, saved`);
-    // 2.382.0 (#3128): back with the bar's button "Preview"
-    const p2 = await ev(`(() => { const b = document.querySelector('.wembar [data-wem="src"]'); if (!b) return null; const t = b.textContent.trim(); b.click(); return t; })()`);
-    check(p2 === 'Preview' && await until(`!!document.querySelector('#wk-live .wklb h5')`), `${tag}: the bar's "Preview" switches on again: drawn (the new heading too) (${p2})`);
-    check(await until(`document.querySelector('.wembar [data-wem="src"]')?.textContent.trim() === 'Source'`), `${tag}: the button names "Source" again`);
-    const p3 = await menuPick(); await until(`!!document.querySelector('#wk-body')`);
-    check(p3 && p3.t === 'Source', `${tag}: the "…" entry switches the same way`);
-    const p4 = await menuPick();
-    check(p4 && p4.t === 'Preview' && await until(`!!document.querySelector('#wk-live')`), `${tag}: and back with "Preview"`);
+    const p2 = await menuPick('/^Back to the editor$/');
+    check(p2 && await until(`!!document.querySelector('#wk-cm .cm-wkh2') && ${line('Next')}?.textContent === 'Next'`), `${tag}: "Back to the editor": drawn, the new heading too`);
   });
   console.log(`p2350_b_wikilive_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);

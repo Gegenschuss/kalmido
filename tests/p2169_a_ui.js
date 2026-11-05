@@ -41,20 +41,21 @@ function browser() {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
   await call('POST', '/api/admin/setup', {lang: 'en', collab_all: true});
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', lang: 'en', tour: 'done'});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', lang: 'en', tour: 'done'});  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   await call('POST', '/api/users', {username: 'frida', display_name: 'Frida', password: 'password123', email: 'frida@example.com', orgs: []});
   CK = await login('frida');
   const st0 = await call('GET', '/api/state');
   check(!(st0.me.workspaces || []).length, 'setup: frida has no organisation');
   const feats = [...new Set([...(st0.settings.features || '').split(',').filter(Boolean), 'wiki'])].join(',');
-  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): these checks drive the plain text editor (#wk-body)
+  await call('PATCH', '/api/settings', {look: '{"wkEd":"text"}', tour: 'done', lang: 'en', features: feats});  // 2.350.0 (#3147): the plain text editor; 2.554.0 (#4052): look.wkEd is ignored now (one editor, wkcm.js)
   const P1 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Start', body: 'Alpha start text'})).id;
   const P2 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Docs/Other', body: 'Beta zebra text'})).id;
   check(P1 && P2, 'setup: two pages');
 
   // ================= the copy: kept on opening, the next sync only for changed texts
   const br = browser();
-  const opt = {user: 'frida', hash: 'wiki', shared: br.shared, setup: br.setup, ls: {'tasks.wkSpace': JSON.stringify('private')}};
+  // 2.554.0 (#4052): the read view of these checks is the lock "Read only" (LS wkRo): a page one may write opens in the editor
+  const opt = {user: 'frida', hash: 'wiki', shared: br.shared, setup: br.setup, ls: {'tasks.wkSpace': JSON.stringify('private'), 'tasks.wkRo': '"1"'}};
   let w = await boot(opt), d = w.document;
   await until(() => typeof w.wk_loadPage === 'function' && w.eval(`(WK.idx.private?.pages || []).length`) === 2, 60);
   const c0 = await until(() => { const r = br.db.get('s:private'); return r && r.pages?.length === 2 ? r : null; }, 40);
@@ -92,7 +93,7 @@ function browser() {
   check(/Offline · as of/.test(d.querySelector('#view .wkpage .ntfoot')?.textContent || ''), 'offline: the page foot says it is the copy');
 
   // ================= offline: a change waits, the tab goes, online again = sent
-  d.querySelector('#view [data-wk="mode"][data-m="edit"]')?.click();
+  w.eval(`LS.del('wkRo'); renderView(); 1`);  // 2.554.0 (#4052): the lock off = the editor (jsdom: the plain field)
   const ta = await until(() => d.querySelector('#wk-body'), 20);
   check(ta, 'offline: the page can be edited');
   ta.value = 'Offline edit one'; ta.dispatchEvent(new w.Event('input', {bubbles: true}));
@@ -118,7 +119,7 @@ function browser() {
   w.__offline = true;
   await w.eval(`wk_loadPage(${P1}, true)`);
   check(w.eval(`!!WK.pg?._off`), 'conflict: the page offline from the copy');
-  w.eval(`WK.edit = true; renderView(); 1`);
+  w.eval(`LS.del('wkRo'); WK.edit = true; renderView(); 1`);  // 2.554.0 (#4052)
   const ta2 = await until(() => d.querySelector('#wk-body'), 20);
   ta2.value = 'Mine offline'; ta2.dispatchEvent(new w.Event('input', {bubbles: true}));
   await w.eval(`wk_flush()`);
@@ -173,7 +174,7 @@ function browser() {
   await until(() => /Gone soon/.test(d.querySelector('#view #wk-md')?.textContent || ''), 40);
   w.__offline = true;
   await w.eval(`wk_loadPage(${P3}, true)`);
-  w.eval(`WK.edit = true; renderView(); 1`);
+  w.eval(`LS.del('wkRo'); WK.edit = true; renderView(); 1`);  // 2.554.0 (#4052)
   const ta3 = await until(() => d.querySelector('#wk-body'), 20);
   check(ta3, 'offline: the page to be deleted can be edited');
   if (ta3) { ta3.value = 'Typed offline'; ta3.dispatchEvent(new w.Event('input', {bubbles: true})); }

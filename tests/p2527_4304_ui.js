@@ -70,7 +70,7 @@ const online = w => { w.__offline = false; w.eval('OUT.retryAt = 0'); w.dispatch
   const W1 = (await call('POST', '/api/wiki/pages', {space: 'private', path: 'Notes/Plan', body: 'Old plan'}, CF)).id;
   const store = wkoStore(), wopt = {user: 'frida', hash: 'wiki/' + W1, shared: {store: {}, wins: []}, setup: x => { x.__wkoStore = store; }, ls: {'tasks.wkSpace': JSON.stringify('private')}};
   const edit = async (ww, text) => {
-    if (!ww.document.querySelector('#wk-body')) ww.document.querySelector('#view [data-wk="mode"][data-m="edit"]')?.click();
+    // 2.554.0 (#4052): a computer writes at once (no Read / Edit switch; jsdom has no layout for CodeMirror: the plain field)
     const ta = await until(() => ww.document.querySelector('#wk-body'));
     ta.value = text; ta.dispatchEvent(new ww.Event('input', {bubbles: true}));
     return ta;

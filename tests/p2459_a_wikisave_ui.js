@@ -1,12 +1,11 @@
 // kalmido-suite: fresh
 // 2.459.0 (#3883): saving a knowledge page never moves the view (Firefox, phone window 412x640 with a touch screen, the
 // keyboard taken as a lower window). frida, a person WITHOUT an organisation. Long page, a tall block in the middle:
-// - live preview: typing in the middle of the tall block and the autosave leave #view.scrollTop, the field and the cursor
-//   as they are (wklv_fit set the field to height auto: the page collapsed, the view landed at its end)
-// - wklv_fit keeps the page's height while it measures (Chrome clamps #view at once, Firefox only after the script: seen here
-//   in the height at the moment of the measurement)
-// - the file answers draw only what changed (wklv_redraw replaced every drawn block, its pictures lost their height)
-// - plain text editor: the same; ntbFit (run by the "Saved" hint) does not grow the field by what is scrolled away
+// - 2.554.0 (#4052): the one editor (wkcm.js, CodeMirror; the phone opens it with the pen): typing in the middle of the long
+//   part and the autosave leave #view.scrollTop, the editor and the cursor as they are (before: the block preview #3147,
+//   whose wklv_fit collapsed the page); the file answers (wkcm_redraw) keep the editor's lines
+// - plain text editor ("Edit as Markdown" in the "…" menu): the same; ntbFit (run by the "Saved" hint) does not grow the
+//   field by what is scrolled away
 // freelancer-matrix: wiki
 // Invented texts only. Screenshots: P2459A_SHOTS.
 const path = require('path');
@@ -20,7 +19,9 @@ if (!process.env.P2459A_NOSTART) execFileSync('bash', [path.join(__dirname, 'sta
 const firefox = require('./ff')({tag: 'p2459_a_wikisave_ui', check, shots: 'P2459A_SHOTS'});
 const call = async (ck, method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return r.json().catch(() => ({})); };
 const BODY = [...Array.from({length: 12}, (_, i) => `Before ${i}\n`), Array.from({length: 90}, (_, i) => `Long line ${i}`).join('\n'), '', 'After one', '', 'After two'].join('\n');
-const STATE = `(() => { const v = document.querySelector('#view'), t = document.activeElement; return {top: Math.round(v.scrollTop), left: Math.round(v.scrollHeight - v.clientHeight - v.scrollTop), id: t?.id, s: t?.selectionStart, e: t?.selectionEnd, fh: Math.round(t?.getBoundingClientRect().height || 0), fy: Math.round(t?.getBoundingClientRect().top || 0), ts: Math.round(t?.scrollTop || 0)}; })()`;
+// 2.554.0 (#4052): the editor's field is CodeMirror's content (its selection in WKCM.view), else the focused <textarea>
+const STATE = `(() => { const v = document.querySelector('#view'), t = document.activeElement, cm = typeof WKCM !== 'undefined' && WKCM.view?.contentDOM === t, m = cm ? WKCM.view.state.selection.main : null;
+  return {top: Math.round(v.scrollTop), left: Math.round(v.scrollHeight - v.clientHeight - v.scrollTop), id: cm ? 'cm' : t?.id, s: cm ? m.from : t?.selectionStart, e: cm ? m.to : t?.selectionEnd, fh: Math.round(t?.getBoundingClientRect().height || 0), fy: Math.round(t?.getBoundingClientRect().top || 0), ts: Math.round(t?.scrollTop || 0)}; })()`;
 
 (async () => {
   await sleep(600);
@@ -64,32 +65,32 @@ const STATE = `(() => { const v = document.querySelector('#view'), t = document.
     await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'frida', password: 'password123'})}).then(r => r.status)`);
     await size(640);
     await nav(B + `#wiki/${id}`);
-    await until(`!!document.querySelector('[data-wk="mode"][data-m="edit"]')`);
-    await ev(`(() => { document.querySelector('[data-wk="mode"][data-m="edit"]').click(); return 1; })()`);
-    await until(`[...document.querySelectorAll('#wk-live .wklb')].some(x => x.textContent.includes('Long line 45'))`);
+    await until(`!!document.querySelector('[data-wk="pen"]')`);  // 2.554.0 (#4052): a phone reads first, the pen opens the editor
+    await ev(`(() => { document.querySelector('[data-wk="pen"]').click(); return 1; })()`);
+    await until(`!!document.querySelector('#wk-cm .cm-content') && !!WKCM.view`);
+    // CodeMirror draws only the lines near the screen: the long part is brought into view first
+    await ev(`(() => { const v = WKCM.view; v.dispatch({effects: CM6.EditorView.scrollIntoView(v.state.doc.toString().indexOf('Long line 45'), {y: 'center'})}); return 1; })()`);
+    await until(`[...document.querySelectorAll('#wk-cm .cm-line')].some(x => x.textContent === 'Long line 45')`);
 
-    // the file answers: an unchanged block keeps its nodes (its pictures keep their height)
-    const redraw = await ev(`(() => { const b = document.querySelector('#wk-live .wklb'), c = b.firstElementChild; wklv_redraw(); return b.firstElementChild === c; })()`);
-    check(redraw, 'live: the answers leave an unchanged block as it is');
+    // the file answers: the editor keeps its lines (its pictures keep their height)
+    const redraw = await ev(`(() => { const l = [...document.querySelectorAll('#wk-cm .cm-line')].find(x => x.textContent.includes('Long line 4')); wkcm_redraw(); return !!l && l.isConnected; })()`);
+    check(redraw, 'live: the answers leave the editor\'s lines as they are');
 
-    // a real click into the middle of the tall block, the keyboard comes, the cursor in the visible part
-    const c = await ev(`(() => { const e = [...document.querySelectorAll('#wk-live .wklb')].find(x => x.textContent.includes('Long line 45')); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: Math.round(r.left + 30), y: Math.round(r.top + r.height / 2)}; })()`);
+    // a real click into the middle of the long part, the keyboard comes, the cursor in the visible part
+    const c = await ev(`(() => { const e = [...document.querySelectorAll('#wk-cm .cm-line')].find(x => x.textContent === 'Long line 45'); e.scrollIntoView({block: 'center'}); const r = e.getBoundingClientRect(); return {x: Math.round(r.left + 30), y: Math.round(r.top + r.height / 2)}; })()`);
     await act([{type: 'pointer', id: 'p1', parameters: {pointerType: 'mouse'}, actions: [{type: 'pointerMove', x: c.x, y: c.y}, {type: 'pointerDown', button: 0}, {type: 'pointerUp', button: 0}]}]);
-    check(await until(`document.activeElement?.id === 'wk-blk' && document.activeElement.value.includes('Long line 89')`), 'live: the tall block is open');
+    check(await until(`document.activeElement === WKCM.view?.contentDOM && WKCM.view.state.doc.lineAt(WKCM.view.state.selection.main.head).text === 'Long line 45'`), 'live: the click puts the cursor into that line');
     await size(380);
-    const put = `(() => { const t = document.querySelector('#wk-blk'), v = document.querySelector('#view'), at = t.value.indexOf('Long line 45'); t.setSelectionRange(at, at); const r = t.getBoundingClientRect(); v.scrollTop += r.top + r.height * at / t.value.length - 130; return 1; })()`;
+    const put = `(() => { const v = WKCM.view, at = v.state.doc.toString().indexOf('Long line 45'), x = document.querySelector('#view'); v.dispatch({selection: {anchor: at}}); const r = v.coordsAtPos(at); x.scrollTop += r.top - 130; return 1; })()`;
     await ev(put); await sleep(100);
-    const fit = await ev(`(() => { const t = document.querySelector('#wk-blk'), v = document.querySelector('#view'), g = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollHeight').get, was = v.scrollHeight; let at = 0;
-      Object.defineProperty(t, 'scrollHeight', {configurable: true, get() { at = v.scrollHeight; return g.call(t); }}); wklv_fit(t); delete t.scrollHeight; return {was, at}; })()`);
-    check(Math.abs(fit.was - fit.at) <= 2, 'live: the page keeps its height while the field is measured ' + JSON.stringify(fit));
     const live = await save('Zed', 'live');
     check(live.b.left > 300, `live: not at the end of the page (${live.b.left} px left)`);
     same(live.a, live.b, 'live', 3);
     await shot('p2459a-live.png');
 
     // the plain text editor, scrolled a little (the keyboard leaves little room), the cursor in the part of the field in view
-    await ev(`(() => { document.querySelector('.wembar [data-wem="src"]').click(); return 1; })()`);
-    check(await until(`!!document.querySelector('#wk-body') && !document.querySelector('#wk-live')`), 'text: the plain text field');
+    await ev(`(() => { wk_modeItems(WK.pg).find(x => x.label === 'Edit as Markdown').fn(); return 1; })()`);  // 2.554.0 (#4052): the "…" entry
+    check(await until(`!!document.querySelector('#wk-body') && !document.querySelector('#wk-cm')`), 'text: the plain text field');
     await sleep(100);  // ntbFit after the redraw
     await ev(`(() => { const t = document.querySelector('#wk-body'), v = document.querySelector('#view'), at = t.value.indexOf('Long line 45'); t.focus({preventScroll: true}); t.setSelectionRange(at, at); v.scrollTop = 120; return v.scrollTop; })()`);
     await sleep(100);
@@ -97,8 +98,8 @@ const STATE = `(() => { const v = document.querySelector('#view'), t = document.
     check(text.a.top > 50, `text: the view is scrolled (${text.a.top})`);
     same(text.a, text.b, 'text', 3);
     await shot('p2459a-text.png');
-    await ev(`(() => { document.querySelector('.wembar [data-wem="src"]').click(); return 1; })()`);  // the account setting back
-    await until(`!!document.querySelector('#wk-live')`);
+    await ev(`(() => { wk_modeItems(WK.pg).find(x => x.label === 'Back to the editor').fn(); return 1; })()`);
+    check(await until(`!!document.querySelector('#wk-cm .cm-content')`), 'text: back in the editor');
   }, true);
   console.log(`p2459_a_wikisave_ui: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
