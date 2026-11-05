@@ -5358,7 +5358,7 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .cchoices.done .cchb:not(.on){opacity:.45}
 .cchb:disabled{cursor:default}
 /* 2.565.0 (#4713): a label of up to 200 characters wraps onto several lines (no ellipsis), the button grows with it; a long one (.cchl) takes the full width on a phone */
-.cchb{max-width:100%;text-align:left;padding-block:.3125rem;line-height:1.3;overflow-wrap:anywhere}
+.cchb{max-width:100%;text-align:left;padding-block:.3125rem;line-height:var(--lh-tight);overflow-wrap:anywhere}
 .cchb>span{min-width:0;white-space:normal}
 .cchw{max-width:100%}
 .cchw>.cchb{flex:1 1 auto;min-width:0}
