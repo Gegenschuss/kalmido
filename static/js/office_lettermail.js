@@ -93,14 +93,26 @@ function ltmBlockEdit(t, after) {
       }
       const v = {name: $('#ltm-bname', md).value, body: $('#ltm-bbody', md).value};
       if (t) {
+        // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar); the undo writes back only
+        // the changed keys, with the version this save left
         const old = {name: t.name, body: t.body};
-        await api('PATCH', `/api/office/letter-blocks/${t.id}`, v); md.remove(); after();
-        toast(tr('Saved'), async () => { await api('PATCH', `/api/office/letter-blocks/${t.id}`, old); after(); });
+        const sv = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/letter-blocks/${t.id}`, t.updated_at ? {...v, expect_updated_at: t.updated_at} : v); md.remove(); after();
+        const back = Object.fromEntries(Object.entries(old).filter(([k, x]) => String(x ?? '') !== String(sv?.[k] ?? '')));
+        if (Object.keys(back).length) toast(tr('Saved'), async () => { try { await rawFetch('PATCH', `/api/office/letter-blocks/${t.id}`, sv?.updated_at ? {...back, expect_updated_at: sv.updated_at} : back); } catch (x) { toast(x.status === 409 ? tr('Changed in the meantime') : x.message || ''); } after(); });
+        else toast(tr('Saved'));
       } else {
         const j = await api('POST', '/api/office/letter-blocks', v); md.remove(); after();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/letter-blocks/${j.id}`); after(); });
       }
-    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
+    } catch (x) {
+      const el = $('.aerr', md); if (!el) return;
+      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
+        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ltm-reload>${tr('Reload')}</button>`;
+        $('[data-ltm-reload]', el).addEventListener('click', () => { md.remove(); after(); ltmBlockEdit(x.data.row, after); });
+        return;
+      }
+      el.textContent = x.message || '';
+    }
   });
 }
 async function ltmStarters(after) {

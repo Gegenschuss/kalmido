@@ -20,6 +20,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import OrgCryptError, oc_dec_fields, oc_enc_fields, oc_is_enc
 from ..core.i18n import N_, tr
 from ..core.db import body, bump
+from ..core.conflict import ccf_check  # 2.560.0 C (#4700)
 from ..core.access import Denied
 from ..personal.timetrack import BadInput
 from ..files.store import fs_purge_files, fs_subtree  # 2.184.0 C (#2582)
@@ -358,7 +359,7 @@ def ltb_row(c, oid, bid):
 
 
 def ltb_public(d):
-    return {"id": d["id"], "name": d["key"], "body": d["text_de"], "archived": d["archived"]}
+    return {"id": d["id"], "name": d["key"], "body": d["text_de"], "archived": d["archived"], "updated_at": d.get("updated_at") or None}  # 2.560.0 C (#4700)
 
 
 def ltb_clean(b):
@@ -409,7 +410,9 @@ def ltb_post():
 @app.patch("/api/office/letter-blocks/<int:bid>")
 def ltb_patch(bid):
     c, uid, oid = ltb_ctx()
+    write_lock(c, f"office_texts-{int(bid)}")  # 2.560.0 C (#4700): the lock of office_update; saved elsewhere meanwhile -> 409 with the block
     cur = ltb_row(c, oid, bid)
+    ccf_check(body(), cur.get("updated_at"), "row", lambda: ltb_public(cur))  # (ltb_clean keeps only name / body, the check is here)
     row = ltb_clean(body())
     if row:
         cur = office_update(c, oid, "texts", cur["id"], row)

@@ -1352,6 +1352,8 @@ def ltx_clean(c, oid, b, cur=None):
 def office_create(c, oid, kind, b):
     if kind == "texts" and b.get("kind") == LTX_KIND:
         row = {**ltx_clean(c, oid, b), "org_id": oid, "kind": LTX_KIND}
+        if "updated_at" in _cols(c, "office_texts"):  # 2.560.0 C (#4700): the version for the check of the next save
+            row["created_at"] = row["updated_at"] = iso(now_utc())
         return office_row(c, oid, kind, insert_id(c, f"INSERT INTO office_texts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values())))
     m = MD[kind]
     cols, vals = ["org_id"], [oid]
@@ -1390,6 +1392,8 @@ def office_update(c, oid, kind, rid, b):
             raise BadInput(tr("Invalid value: {0}", "kind"))
         if letter:
             row = ltx_clean(c, oid, b, r)
+            if row and has_ts:  # 2.560.0 C (#4700): a letter block's save moves its version too
+                row["updated_at"] = iso(now_utc())
             if row:
                 c.execute(f"UPDATE office_texts SET {','.join(k + '=?' for k in row)} WHERE id=? AND org_id=?", [*row.values(), r["id"], oid])
             return office_row(c, oid, kind, rid)
