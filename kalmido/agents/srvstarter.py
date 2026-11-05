@@ -47,6 +47,7 @@ from ..api.scopes import scopes_effective
 from ..api.v1 import SCOPES_AGENT_DEFAULT
 from ..office.agentdocs import ofa_agent_on, ofa_area
 from ..office.model import office_on, office_role, office_settings
+from ..office.rights import office_can, ofr_groups_of
 
 SRV_PROVIDER = "kalmido-server"
 SRV_DEFAULT_MODEL = "claude-sonnet-5-5"   # decision 05.11.2026 13:10: the default; the list itself comes live from the provider
@@ -76,6 +77,9 @@ SRV_OFFICE_WHY = {
     "scope": N_("Give the agent the permission “Office drafts” first (its settings, permissions)"),
     "switch": N_("Switch on “May draft office documents” for the agent first (its settings, Office & finance)"),
     "person": N_("Switch on the office for yourself first (Settings > Features)"),
+    # review 2.568.0 (M2): the person's own right (the route asks it too) and an agent with office groups (the groups decide)
+    "right": N_("Give yourself the right “Quotations & invoices” in the office first"),
+    "groups": N_("Put the agent into an office rights group with “Quotations & invoices” (edit) first"),
     "privacy": N_("Switch on “Agents may read office data” first (office settings, agents)"),
 }
 
@@ -151,8 +155,10 @@ def srv_office_gap(c, a, uid):
     oid = ofa_area(c, a)  # a personal agent: its owner's personal office (none before the office was opened once)
     if not oid or office_role(c, uid, oid) not in ("admin", "member") or not office_on(c, uid):
         return "person"
+    if not office_can(c, uid, oid, "offers", "edit"):  # review 2.568.0 (M2): like the route (_v1ctx)
+        return "right"
     if not ofa_agent_on(c, a, oid, "offers", "edit"):
-        return "switch"
+        return "groups" if ofr_groups_of(c, oid, a["user_id"]) else "switch"
     if not office_settings(c, oid).get("agents_read"):
         return "privacy"
     return None

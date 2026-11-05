@@ -16558,6 +16558,8 @@
   "Due billing on Mondays at 08:00": "Fällige Abrechnungen montags um 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Offene Zeit und fällige Rechnungen als Erinnerung; Rechnungsentwürfe erst nach deinem Ja, nie festgeschrieben oder versendet. Braucht die Büro-Rechte des Agenten („Büro-Entwürfe“, „Darf Büro-Entwürfe anlegen“).",
   "Already set up": "Schon eingerichtet",
+  "Give yourself the right “Quotations & invoices” in the office first": "Gib dir zuerst im Büro das Recht „Angebote & Rechnungen“",
+  "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Nimm den Agenten zuerst in eine Büro-Rechtegruppe mit „Angebote & Rechnungen“ (bearbeiten) auf",
   "Budget entry": "Budget-Eintrag",
   "Budget category": "Budget-Kategorie",
   "Recurring entry": "Dauerposten",

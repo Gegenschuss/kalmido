@@ -255,6 +255,8 @@ FT = {"client_id": CL_ORG, "from_time": True, "list_id": LP_ORG, "from": D9, "to
 FREE = {"client_id": CL_ORG, "items": [{"text": "Cut", "qty": 1, "price": 100}]}
 GV = group("Look only", offers="view", time="view")
 member(BOB, GV)
+x = starter(Bo, GB)  # review 2.568.0 (M2): the starter asks the person's right like the route
+check(x.get("state") == "skipped" and "Give yourself the right" in (x.get("reason") or ""), f"starter: the person without quotations (edit) -> skipped {x}")
 r = requests.post(INV, headers=BH, json=FREE)
 check(r.status_code == 403, f"the person with quotations only to view: 403 ({r.status_code} {r.text[:160]})")
 GS = group("Sales without time", offers="edit", time="none")
@@ -264,6 +266,8 @@ check(r.status_code == 403, f"the person without times to bill: 403 ({r.status_c
 levels(GS, time="view")
 GA = group("Agent look only", offers="view", time="none")
 member(GB, GA)
+x = starter(Bo, GB)  # review 2.568.0 (M2): an agent with office groups: the groups decide, not the switch
+check(x.get("state") == "skipped" and "office rights group" in (x.get("reason") or ""), f"starter: the agent's group without quotations (edit) -> skipped {x}")
 r = requests.post(INV, headers=BH, json=FREE)
 check(r.status_code == 403, f"the agent's group with quotations only to view: 403 ({r.status_code} {r.text[:160]})")
 levels(GA, offers="edit")
@@ -273,5 +277,6 @@ check(not dbx("SELECT 1 FROM office_docs WHERE agent_id=?", (GB,)), "the refusal
 levels(GA, time="view")
 r = requests.post(INV, headers=BH, json=FT)
 check(r.status_code == 201, f"person and agent with both rights: 201 ({r.status_code} {r.text[:200]})")
+check(starter(Bo, GB).get("state") == "created", "starter: with both rights created")
 
 sys.exit(done("p2568_b_ai_office"))
