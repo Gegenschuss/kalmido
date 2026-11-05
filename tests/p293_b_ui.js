@@ -60,7 +60,8 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`/below the start/.test(document.querySelector('.modal #lgb-w').textContent)`), 'the end below the start is shown at once');
     await ev(`(() => { const e = document.querySelector('.modal #lgb-o1'); e.value = '10120'; e.dispatchEvent(new Event('input', {bubbles: true})); document.querySelector('.modal [data-m="save"]').click(); return 1; })()`);
     check(await ready(ev, `!document.querySelector('.modal') && document.querySelectorAll('.lgb-list .lgb-row').length === 1 && /120 km/.test(document.querySelector('.lgb-list .lgb-km').textContent)`), 'the drive is in the list with 120 km');
-    check(await ev(`${api('/api/office/drives?year=' + new Date().getFullYear())}.then(j => j.drives.length === 1 && j.drives[0].odo_end === '10120.0' && j.drives[0].km === '120.0' && j.drives[0].dest === 'Lübeck')`), 'saved with odometer and km');
+    // 2.559.0 (#4660): the row shows before the server stored it -- asked until it has it
+    check(await ready(ev, `${api('/api/office/drives?year=' + new Date().getFullYear())}.then(j => j.drives.length === 1 && j.drives[0].odo_end === '10120.0' && j.drives[0].km === '120.0' && j.drives[0].dest === 'Lübeck')`), 'saved with odometer and km');
     await shot('p293-b-logbook.png');
     // history + take over into the travel expenses
     await ev(`(() => { document.querySelector('.lgb-list .lgb-row').click(); return 1; })()`);

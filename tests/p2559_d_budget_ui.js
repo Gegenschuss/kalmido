@@ -33,7 +33,7 @@ const hold = (w, re) => {
 const unhold = w => { if (w.__f1) w.fetch = w.__f1; };
 // every request of the page in w.__sent (to see that no action fetches the whole state again)
 const watch = w => { w.__sent = []; const f0 = w.fetch; w.fetch = (u, o = {}) => { w.__sent.push(`${o.method || 'GET'} ${u}`); return f0(u, o); }; };
-const stateFetches = w => w.__sent.filter(s => /^GET \/api\/state(\?|$)/.test(s) && !/auto=1/.test(s));
+const stateFetches = w => { let rep = 0; return w.__sent.filter(s => { if (!/^GET \/api\/state(\?|$)/.test(s)) return false; if (/auto=1/.test(s)) { rep = 2; return false; } if (rep) { rep--; return false; } return true; }); };  // the live poll (auto=1) and load()'s up to two repeats when a write crossed it are no reload of the action
 function tinyPdf(text) {  // a one-page PDF with a text layer
   const s = `BT /F1 12 Tf 40 700 Td (${text}) Tj ET`;
   const o = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>', '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
