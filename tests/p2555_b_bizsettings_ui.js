@@ -82,22 +82,27 @@ async function openBiz(who) {
     check([...form.querySelectorAll('[data-ostp="docs"] h4')].some(h => txt(h) === 'Closing texts'), `${who}: the closing texts have their heading`);
     const tri = await until(() => d.getElementById('tri-mode'), 40);
     check(tri && txt(tri.closest('label')) === 'Test mode on' && d.getElementById('tri-h')?.tagName === 'H4', `${who}: the test mode: heading h4, the switch "Test mode on"`);
-    // a part that draws itself again: its h3 becomes h4 (the observer of biz_paint)
-    form.querySelector('[data-ostp="data"]').insertAdjacentHTML('beforeend', '<h3 id="p2555-x">X</h3><h4 id="p2555-y">Y</h4>');
-    check(await until(() => d.getElementById('p2555-x')?.tagName === 'H4' && d.getElementById('p2555-y')?.tagName === 'H5', 20), `${who}: a redrawn part's headings one level lower`);
     // the paper size hint: once, in the letterhead part
     check(!d.getElementById('os-paper-hint') && !!(await until(() => d.getElementById('bp-paper-hint'), 40)), `${who}: one paper size hint place (letterhead)`);
     w.eval(`BPL.st = {...(BPL.st || {}), on: 1, paper: 'a4'}; bp_paperShow('letter')`);
     check([...box.querySelectorAll('.dtp-warn')].filter(x => !x.hidden && /US-Letter/.test(x.textContent)).length === 1, `${who}: a paper size mismatch is said once`);
     // the industry packs: switched on their cards only
     check(!form.querySelector('input[id^="os-ind-"]') && !!form.querySelector('[data-ostp="docs"] .ostind [data-ostgo="pkc"]'), `${who}: no pack boxes in the calculation rules, a link to the packs`);
-    check(await until(() => form.querySelector('#pkc [data-pkc-on="film"]'), 60), `${who}: the film pack's card has its switch`);
+    check(await until(() => d.querySelector('.smodal #ofc-set #pkc [data-pkc-on="film"]'), 60), `${who}: the film pack's card has its switch`);
+    // a part that draws itself again: its h3 becomes h4, its h4 h5 (the observer of biz_paint); the form itself may be drawn
+    // anew meanwhile (then the two are put in again)
+    check(await until(() => {
+      const x = d.getElementById('p2555-x'), y = d.getElementById('p2555-y');
+      if (!x) { d.querySelector('.smodal #ofc-set [data-ostp="data"]')?.insertAdjacentHTML('beforeend', '<h3 id="p2555-x">X</h3><h4 id="p2555-y">Y</h4>'); return false; }
+      return x.tagName === 'H4' && y?.tagName === 'H5' && x.dataset.hl === '1';
+    }, 20), `${who}: a redrawn part's headings one level lower`);
     // travel expenses / entertainment receipts under Bank & taxes
-    const rk = await until(() => form.querySelector('.rkpset'), 40);
+    const lf = () => d.querySelector('.smodal #s-biz #ofc-set');
+    const rk = await until(() => lf()?.querySelector('.rkpset'), 40);
     check(!rk || rk.closest('[data-ostp]')?.dataset.ostp === 'tax', `${who}: travel expenses under Bank & taxes`);
-    const bw = form.querySelector('.bwcset');
+    const bw = lf()?.querySelector('.bwcset');
     check(!bw || bw.closest('[data-ostp]')?.dataset.ostp === 'tax', `${who}: entertainment receipts under Bank & taxes`);
-    check(![...form.querySelectorAll('[data-ostp="packs"]')].some(f => f.querySelector('.rkpset, .bwcset')), `${who}: nothing of travel / entertainment under Packs`);
+    check(![...lf().querySelectorAll('[data-ostp="packs"]')].some(f => f.querySelector('.rkpset, .bwcset')), `${who}: nothing of travel / entertainment under Packs`);
     // labels
     const bad = [...box.querySelectorAll('label[for]')].filter(l => !d.getElementById(l.getAttribute('for'))).map(l => l.getAttribute('for'));
     check(!bad.length, `${who}: every label points to an element ` + bad.join());
