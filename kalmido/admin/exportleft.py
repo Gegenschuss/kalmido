@@ -37,6 +37,7 @@ UMZ_LEFT_TABLES = {
     "comment_trash_text": _DERIVED, "tchat_trash_text": _DERIVED,  # 2.531.0 (#4317 x #4315): the kept text of deleted comments / team chat messages (working data until the trash period ends)
     "hub_mailbox_rules": _LATER, "hub_mailbox_docs": _DERIVED,  # 2.581.0 (#4804): a mailbox's document rules (the mailbox itself is exported), which mails it took (Message-ID hashes)
     "doc_office_moves": _DERIVED,  # 2.547.0 (#4434): the undo of the receipts move into the office (30 days, ids and folders only)
+    "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (until the trash period ends)
     "task_mail": _SERVER,  # 2.393.2 B (#3375): Message-IDs of tasks (the reply addresses are signed with this server's key)
     "budget_meta": _DERIVED, "contact_occ": _DERIVED, "dav_meta": _DERIVED, "dav_sync": _DERIVED, "dav_sync2": _DERIVED, "dl_changes": _DERIVED,
     "doc_models": _DERIVED, "file_text": _DERIVED, "git_closes": _DERIVED, "git_links": _DERIVED, "git_issue_links": _DERIVED,  # 2.394.0 B (#3377)

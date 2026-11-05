@@ -844,13 +844,14 @@ def v1_field_update(fid):
 @app.delete("/api/v1/fields/<int:fid>")
 @v1_view
 def v1_field_delete(fid):
-    """The field goes with every value of it."""
+    """The field goes with every value of it. 2.550.0 (#4528): into the field trash (trash_id): a person restores it in the app
+    within the trash period."""
     v1_args(())
     c = db()
     r = need_field(c, fid)
     need_approval(c, N_("Delete the custom field “{0}” and its values"), (r["name"],), list_id=r["list_id"])
     j = v1_call(field_delete, fid, body={})
-    return jsonify(ok=True, values=j.get("values", 0))
+    return jsonify(ok=True, values=j.get("values", 0), trash_id=j.get("trash_id"))
 
 
 # templates

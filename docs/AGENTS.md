@@ -1574,7 +1574,8 @@ undecided ones per agent and person and 50 per agent (`429`).
 
 Some changes by an agent never happen at once, whatever its permissions:
 
-- deleting a project or a custom field, emptying the trash
+- deleting a project or a custom field, emptying the trash (2.550.0: a deleted field lies in the field trash until the trash
+  period ends; removing a member keeps what ended for them, and adding them again lets the project's owner or admins restore it in the app)
 - batches of 10 or more tasks (`POST /tasks/batch`; an agent's batches within 10 minutes count together; 2.190.0: over projects
   of different people only when one person manages all of them, else `409`: send one batch per project)
 - moving a project it owns into another folder, renaming or removing folders
@@ -4014,7 +4015,8 @@ with the scope it needs). The tools:
   2.43.0, #1328: type `formula` with `formula` = a calculation over number fields, computed by the server and read-only in
   tasks; 2.609.0, #3373: `required` fields - `create_task` in such a project needs their values in `fields`, else `400` naming the
   field (only `create_task`; subtasks, applied proposals and tasks the server makes itself are not checked), read `required` in `get_list` / `list_fields` first; a field with a `key` comes from the organisation's field schema, its
-  name and options are changed there by its admins, `list_tasks` `field_keys` filters by it over every project), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
+  name and options are changed there by its admins, `list_tasks` `field_keys` filters by it over every project; 2.550.0, #4528: `delete_field` puts the field with its values into the field trash, the answer names `trash_id`; a
+  person restores it in the project settings within the trash period, agents cannot restore it), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
 - project tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),

@@ -300,6 +300,10 @@ APP_ONLY = [
      ("=POST /api/obj/{}", "=POST /api/obj/{}/{}/trash", "=POST /api/obj/{}/{}/restore", "=DELETE /api/obj/{}/{}", "=GET /api/obj/{}/{}/history",
       "=POST /api/obj/{}/{}/undo", "=GET /api/obj/{}/{}/shares", "=POST /api/obj/{}/{}/shares", "=DELETE /api/obj/{}/{}/shares/{}",
       "=POST /api/obj/{}/{}/shares/{}/restore")),
+    ("2.550.0 (#4528): the field trash and a removed member's way back are restored by the project's owner / admins in the app -- "
+     "an agent's delete of a field waits for a person's approval already (delete_field), and agents never manage members",
+     ("=GET /api/lists/{}/fields/trash", "=POST /api/fields/trash/{}/restore", "=GET /api/lists/{}/member-memos",
+      "=POST /api/lists/{}/members/{}/restore")),
     ("2.530.0 D (#4316): the numbers of the app's delete dialogs before deleting for good (customer reports, form entries, video "
      "reviews, kept by law, an instance admin's other owners) -- an agent's empty_trash waits for a person's approval with its number",
      ("=GET /api/trash/purge-info",)),

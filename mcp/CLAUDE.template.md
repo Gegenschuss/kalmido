@@ -50,6 +50,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   for *Comments*.
 - Deleting projects or fields, emptying the trash, changing 10 or more tasks at once, moving projects and sharing, opening a
   public form and deleting an address book wait for a person: the answer is 202 with a waiting job. Do not repeat the request; the result comes as a `job` event.
+  A deleted field lies in the field trash (2.550.0): a person restores it in the app until the trash period ends; you cannot.
 - A denied or unanswered permission request (of Kalmido or of your host) is a no: do not retry it or work around it;
   say in your answer what was denied. Your host's permission questions are answered only by your operator; when someone
   else's order needs one, the step is denied and that person is told so.

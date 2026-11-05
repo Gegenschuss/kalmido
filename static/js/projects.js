@@ -765,17 +765,19 @@ function fdDelete(f, done) {
   };
   const pr = optWrite(put, () => api('DELETE', '/api/fields/' + f.id));
   done?.(null, false);
-  pr.then(() => {
+  pr.then(dj => {
     done?.(null, true);
     if (!was) return;
-    let id = f.id;
+    let id = f.id, tid = dj?.trash_id;  // 2.550.0 (#4528): the server keeps it in the field trash
     const e = histAdd({label: tr('Delete field') + ': ' + qn(was.name), lids: [lid],
-      undo: async () => {  // the field again (same name, type, options with their ids), then the values of the tasks loaded here
+      undo: async () => {
+        if (tid) { await api('POST', `/api/fields/trash/${tid}/restore`); tid = null; id = f.id; await load(); return {}; }  // same id, all values
+        // the field again (same name, type, options with their ids), then the values of the tasks loaded here
         id = (await api('POST', `/api/lists/${lid}/fields`, fdBody(was))).id;
         const items = Object.fromEntries(Object.entries(vals).filter(([tid]) => S.tasks.has(+tid)).map(([tid, v]) => [tid, {fields: {[id]: v}}]));
         return Object.keys(items).length ? histBatch('patch_each', Object.keys(items), {items}) : {};
       },
-      redo: async () => { await api('DELETE', '/api/fields/' + id); return {}; }});
+      redo: async () => { tid = (await api('DELETE', '/api/fields/' + id))?.trash_id; return {}; }});
     histToast(tr('“{0}” deleted', was.name), e);
   }, () => done?.(fieldById(f.id), true));
   return pr;
@@ -828,8 +830,8 @@ function fieldModal(lid, f, done, ep) {
         md.remove(); done && done(); return;
       }
       const fc = await api('GET', `/api/fields/${f.id}/count`).catch(() => null), n = fc ? fc.tasks : [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;  // 2.552.0 (#4561 B12): + moved
-      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fdMovedWarn(fc) + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
-      md.remove(); fdDelete(f, done); return;  // 2.554.0 B (#4658): gone at once, the server follows (fdDelete)
+      if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('The field goes into the trash with its values; the project settings can restore it.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fdMovedWarn(fc) + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
+      md.remove(); fdDelete(f, done); return;  // 2.554.0 B (#4658): gone at once, the server follows (fdDelete); 2.550.0 (#4528): into the trash, Undo restores it
     }
     if (a === 'save') {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
@@ -889,6 +891,24 @@ function fieldsBox(lid) {
     <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
     <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +
     `<div class="mrow"><button class="btn sm" data-m="field-add">${ic('plus', 's')} ${tr('Field')}</button>${fs.length ? '' : hintOnce('fields', tr('Own columns for this project: budget, stage, client, …'))}</div>`;
+}
+// 2.550.0 (#4528): a deleted field lies in the field trash with its values; Undo (toast) and "Restore" in the project settings
+// bring it back (owner and project admins, within the trash period)
+async function ftrRestore(tid) {
+  try { await api('POST', `/api/fields/trash/${tid}/restore`); } catch { return false; }
+  await load(); render(); return true;
+}
+function ftrToast(j, after) {
+  if (j?.trash_id) toast(tr('Field deleted'), async () => { if (await ftrRestore(j.trash_id)) after?.(); });
+}
+async function ftrDraw(box, lid) {
+  if (!box) return;
+  let j; try { j = await rawFetch('GET', `/api/lists/${lid}/fields/trash`); } catch { box.hidden = true; return; }
+  if (!box.isConnected) return;
+  box.hidden = !j.fields?.length;
+  box.innerHTML = j.fields?.length ? `<div class="muted mhint">${esc(trn('Deleted fields (kept for {0} day)', 'Deleted fields (kept for {0} days)', j.days))}</div>` +
+    j.fields.map(f => `<div class="mrow" data-ftr="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(f.tasks ? trn('{0} task with a value', '{0} tasks with a value', f.tasks) : ftLabel(f.type))} · ${esc(relTime(f.deleted_at))}</span>` +
+      `<button type="button" class="btn sm" data-ftrest="${f.id}" aria-label="${esc(tr('Restore the field {0}', f.name))}">${ic('undo', 's')} ${tr('Restore')}</button></div>`).join('') : '';
 }
 // filter engine: rules.cf = {field id: {sel: [option ids]} | {chk: ['1', '0']} | {date: [DATE_OPTS]} | {num: {op, v}}}
 const cfRuleOn = r => !!r && (r.sel?.length || r.chk?.length || r.date?.length || (r.num && (r.num.op === 'set' || r.num.op === 'empty' || (r.num.op && r.num.v !== '' && r.num.v != null))));

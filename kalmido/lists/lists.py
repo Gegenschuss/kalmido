@@ -24,6 +24,7 @@ from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
 from ..core.conflict import ccf_check, kern_version_seed, take_version  # 2.657.0 (#5052)
 from ..core.db import iso_ms  # 2.657.0 (#5052)
 from ..core.pg import write_lock  # 2.657.0 (#5052)
+from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
 
 
@@ -1036,7 +1037,11 @@ def member_set(lid):
     pend = [r[0] for r in c.execute("SELECT user_id FROM list_key_pending WHERE list_id=? AND user_id=?", (lid, uid))]  # 2.64.1 (#1817)
     bump(c)
     c.commit()
-    return jsonify(ok=True, **({"by_email": True} if b.get("email") and not b.get("user_id") else {}), **({"e2e_pending": pend} if pend else {}))
+    by_mail = b.get("email") and not b.get("user_id")
+    from ..lists.membermemo import mm_offer
+    offer = None if by_mail or old else mm_offer(c, lid, uid)  # 2.550.0 (#4528): added again -> what their removal ended (never by address)
+    return jsonify(ok=True, **({"by_email": True} if by_mail else {}), **({"e2e_pending": pend} if pend else {}),
+                   **({"restore_offer": offer} if offer else {}))
 
 
 # ---- 2.22.0 (#740): a shared list lands with the other person in a folder of the same name as with its owner (created
@@ -1521,11 +1526,11 @@ def member_remove(lid, uid):
         c.execute("UPDATE list_members SET frole=NULL WHERE list_id=? AND user_id=?", (lid, uid))
     if request.args.get("dry") == "1":  # 2.272.0 E2 (#3038): what goes along, for the question in the app (nothing changes)
         if via_group:
-            return jsonify(assigned=0, values=0, via_group=True)
+            return jsonify(assigned=0, values=0, delegate=0, watch=0, via_group=True)  # 2.550.0 (#4528): + delegate, watch
         # 2.370.4 (#3089 E2-N2): the removal frees the tasks in the trash too, so they count
-        return jsonify(assigned=c.execute("SELECT COUNT(*) FROM tasks WHERE list_id=? AND assignee_id=?", (lid, uid)).fetchone()[0],
-                       values=c.execute("SELECT COUNT(*) FROM task_field_values WHERE value=? AND field_id IN (SELECT id FROM list_fields "
-                                        "WHERE list_id=? AND type='person')", (str(uid), lid)).fetchone()[0])
+        # 2.550.0 (#4528): + delegations and watching; days = how long adding them again can bring it back
+        from ..lists.membermemo import mm_counts
+        return jsonify(**mm_counts(c, lid, uid), days=ret_trash_days())
     from .lmcore import lmc_unshare
     if via_group:  # 2.10.0 (#441): access via a group stays; only the personal share goes
         # 2.64.1 (#1817): not as a participant in a list with the lock (the person leaves it)
@@ -1535,6 +1540,8 @@ def member_remove(lid, uid):
         c.commit()
         return jsonify(ok=True, via_group=True, **({"revoked_id": rev} if rev else {}))
     rev = lmc_unshare(c, me(), lid, uid)  # 2.568.0 (#4739): the core's row goes into obj_revoked (restorable), before the row
+    from ..lists.membermemo import mm_write
+    mm_write(c, lid, uid, me())  # 2.550.0 (#4528): what ends here is kept for adding them again (before the rows change)
     c.execute("DELETE FROM list_members WHERE list_id=? AND user_id=?", (lid, uid))
     c.execute("UPDATE tasks SET assignee_id=NULL WHERE list_id=? AND assignee_id=?", (lid, uid))
     dlg_gone(c, lid, uid)  # 2.473.0 (#3357): delegated tasks and watching of this list end

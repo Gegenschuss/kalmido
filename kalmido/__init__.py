@@ -198,6 +198,7 @@ ORDER = (
     "tasks.snippets",  # 2.35.0 (#1095)
     "tasks.multilist",  # 2.71.0 B (#1459): a task in several lists without a copy (after api.v1)
     "tasks.movememo",  # 2.273.0 B (#3042): what a task move ends, restored by a move back (no routes)
+    "lists.membermemo",  # 2.550.0 (#4528): what removing a member ends, restored on adding them again
     "agents.gates",  # 2.26.0 (#949)
     "agents.watch",  # 2.392.2 (#3366): the watchdog over agent jobs (stalled, stranded branch)
     "agents.taskdec",  # 2.392.0 C (#3370): the yes to a one-way task

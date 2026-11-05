@@ -589,6 +589,19 @@ function shareSummary(l) {
 // Ids of the old headings stay (l-pub-h, sh-own-h, sh-ag-h, sh-grp-h) for links and tests.
 const SH_HID = {grp: 'sh-grp-h', ag: 'sh-ag-h', pub: 'l-pub-h', own: 'sh-own-h', ntf: 'sh-ntf-h'};  // 2.33.0 (#927): + notifications
 const shSec = (k, title, inner, hide = false, open = false) => `<details class="shsec" id="sh-sec-${k}" ${hide ? 'hidden' : ''} ${open ? 'open' : ''}><summary><h4 id="${SH_HID[k]}">${title}</h4><span class="shsecst muted" id="sh-st-${k}"></span>${ic('chev', 's shchev')}</summary>${inner}</details>`;
+// 2.550.0 (#4528): what removing a member ended (lists/membermemo.py): the numbers as text, the memos of a project, the question
+const mmText = d => [d?.assigned && trn('{0} assignment', '{0} assignments', d.assigned), d?.values && trn('{0} person field value', '{0} person field values', d.values),
+  d?.delegate && trn('{0} delegated task', '{0} delegated tasks', d.delegate), d?.watch && trn('{0} watched task', '{0} watched tasks', d.watch)].filter(Boolean).join(', ');
+async function mmLoad(lid) {
+  try { const j = await rawFetch('GET', `/api/lists/${lid}/member-memos`); return Object.fromEntries((j.memos || []).filter(m => m.member).map(m => [m.user_id, m])); } catch { return {}; }
+}
+async function mmAsk(lid, uid, name, offer, after) {
+  if (!await askConfirm(tr('Restore what {0} had in this project?', name), tr('When they were removed, this ended: {0}. Only what nobody has taken over since comes back.', mmText(offer)), {ok: tr('Restore')})) return;
+  let j; try { j = await api('POST', `/api/lists/${lid}/members/${uid}/restore`); } catch { return; }
+  const n = Object.values(j.restored || {}).reduce((a, x) => a + x, 0);
+  toast(tr('Restored: {0}.', mmText(j.restored) || '0') + (j.skipped ? ' ' + trn('{0} item stayed as it is (taken over or gone since).', '{0} items stayed as they are (taken over or gone since).', j.skipped) : ''));
+  if (n) await after?.();
+}
 function shareModal(id, opt = {}) {
   const l0 = listById(id); if (!shareOk(l0)) return;
   const own = isOwner(l0);
@@ -606,12 +619,12 @@ function shareModal(id, opt = {}) {
     ${shSec('own', tr('Owner'), `<div id="sh-ownwrap"><div class="muted mhint" id="sh-owner"></div><div id="l-owner"></div></div>`, false, !collab())}
     <div class="foot"><button class="btn" data-m="list-edit">${ic('edit', 's')} ${tr('Project settings…')}</button><span class="spacer"></span><button class="btn pri" data-m="close">${opt.back ? ic('back', 's') + ' ' + tr('Back') : tr('Done')}</button></div>`);
   md.classList.add('shmodal');
-  let users = null;
+  let users = null, memos = null;  // 2.550.0 (#4528): memos = user id -> what their removal ended (owner and project admins)
   const shSecSet = (k, show, st) => { const sec = $('#sh-sec-' + k, md); if (!sec) return; sec.hidden = !show; const e = $('#sh-st-' + k, md); if (e) e.textContent = st || ''; };
   const roleSel = (attr, cur_, lab) => `<select ${attr} aria-label="${esc(lab || tr('Role'))}">${ROLES.map(([v, n, h]) => `<option value="${v}" title="${esc(tr(h))}" ${v === cur_ ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select>`;
   const isAg = p => !!(p.agent || agentById(p.user_id));
   const row = (cur, p, mng) => `<div class="mrow" data-uid="${p.user_id}">${avBtn(p.user_id, p.name)}<span class="n">${esc(p.name)}${S.me && p.user_id === S.me.id ? ' ' + tr('(me)') : ''}${isAg(p) ? agentBadge(p.user_id) : ''}${p.via_group ? ` <span class="muted">${tr('via a group')}</span>` : ''}${p.via_folder && cur.folder ? ` <span class="muted lfvia">${esc(tr('via the folder {0}', fDisp(cur.folder)))}</span>` : ''/* 2.352.0 E (#2748) */}</span>${mng && p.role !== 'owner' && !(S.me && p.user_id === S.me.id) && !p.via_group
-      ? `${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
+      ? `${memos?.[p.user_id] ? `<button type="button" class="iconbtn" data-mmrest="${p.user_id}" title="${esc(tr('Restore what {0} had in this project', p.name))}" aria-label="${esc(tr('Restore what {0} had in this project', p.name))}">${ic('undo', 's')}</button>` : ''/* 2.550.0 (#4528) */}${roleSel(`data-mrole="${p.user_id}"`, p.role, tr('Role of {0}', p.name))}<button class="iconbtn" data-mrm="${p.user_id}" title="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove from project'))}" aria-label="${esc(isAg(p) ? tr('Stop sharing with {0}', p.name) : tr('Remove {0} from this project', p.name))}">${ic('x', 's')}</button>`
       : `<span class="muted" title="${esc(roleHelp(p.role))}">${esc(roleLabel(p.role))}</span>`}</div>`;
   const draw = () => {
     if (!md.isConnected) return;
@@ -666,9 +679,10 @@ function shareModal(id, opt = {}) {
     });
     // 2.27.0 (#974): opened from "Agent…": scrolled to the Agents part, its choice focused
     const toAgents = () => { if (opt.focus !== 'agents' || !md.isConnected) return; const sec = $('#sh-sec-ag', md); if (sec) sec.open = true; const el = $('#sh-agsel', md) || $('#sh-ag-h', md); el?.scrollIntoView?.({block: 'center'}); $('#sh-agsel', md)?.focus({preventScroll: true}); };
+    if (canManage(l0)) mmLoad(id).then(m => { memos = m; draw(); });  // 2.550.0 (#4528)
     if (canManage(l0)) api('GET', '/api/users').then(j => { users = j.users.filter(u => !u.disabled).map(u => ({id: u.id, display_name: u.display_name, agent: !!u.agent, orgs: u.orgs || [], org_id: u.org_id ?? null})); /* 2.28.0 (#935): + the workspace */ draw(); toAgents(); }).catch(() => { users = []; draw(); });
   }
-  const act = async (fn, msg) => { try { await fn(); await load(); render(); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
+  const act = async (fn, msg) => { try { await fn(); await load(); render(); if (canManage(listById(id) || l0)) memos = await mmLoad(id); draw(); if (msg) toast(msg); } catch { /* api() showed it */ } };
   md.addEventListener('change', e => {
     const r = e.target.closest('[data-mrole]');
     if (r) act(() => api('PUT', `/api/lists/${id}/members`, {user_id: +r.dataset.mrole, role: r.value}));
@@ -689,15 +703,18 @@ function shareModal(id, opt = {}) {
       const [us, rs] = m === 'share' ? ['#l-adduser', '#l-addrole'] : ['#sh-addagent', '#sh-agrole'];
       const u = +$(us, md).value; if (!u) return;
       if (m === 'share-ag' && !await agSafeFirst()) return;  // 2.30.0 (#920)
-      act(() => bridgeTry(ok => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $(rs, md).value, ...(ok ? {bridge_ok: true} : {})})), tr('Shared')); return;  // 2.30.0 (#919)
+      let offer = null;
+      await act(async () => { offer = (await bridgeTry(ok => api('PUT', `/api/lists/${id}/members`, {user_id: u, role: $(rs, md).value, ...(ok ? {bridge_ok: true} : {})})))?.restore_offer; }, tr('Shared'));  // 2.30.0 (#919)
+      if (offer) await mmAsk(id, u, (users || []).find(x => x.id === u)?.display_name || '', offer, () => act(() => null));  // 2.550.0 (#4528)
+      return;
     }
     if (b.dataset.mrm) {
       const p = listPeople(listById(id)).find(x => x.user_id === +b.dataset.mrm), ag = p && isAg(p);
-      let dn = 0; try { const d = await rawFetch('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}?dry=1`); dn = (d.assigned || 0) + (d.values || 0); } catch { /* the question without the number */ }  // 2.272.0 E2 (#3038)
-      const dTxt = dn ? ' ' + trn('{0} assignment or person field value of theirs in this project is removed.', '{0} assignments or person field values of theirs in this project are removed.', dn) : '';
+      let dTxt = ''; try { const d = await rawFetch('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}?dry=1`); const t = mmText(d); if (t) dTxt = ' ' + tr('Of theirs in this project, this ends: {0}.', t) + (d.days ? ' ' + trn('Adding them again within {0} day offers to restore it.', 'Adding them again within {0} days offers to restore it.', d.days) : ''); } catch { /* the question without the number */ }  // 2.272.0 E2 (#3038); 2.550.0 (#4528): + delegations, watching, the way back
       if (!await askConfirm(ag ? tr('Stop sharing with {0}?', p?.name || '') : tr('Remove {0} from this project?', p?.name || ''), (ag ? tr('The agent loses access to this project and its tasks at once.') : tr('They no longer see the project and its tasks; their tasks stay.')) + dTxt, {ok: ag ? tr('Stop sharing') : tr('Remove'), danger: true})) return;
       act(() => api('DELETE', `/api/lists/${id}/members/${b.dataset.mrm}`)); return;
     }
+    if (b.dataset.mmrest) { const uid = +b.dataset.mmrest, mm = memos?.[uid]; if (mm) await mmAsk(id, uid, mm.name, mm, () => act(() => null)); return; }  // 2.550.0 (#4528)
     if (m === 'share-grp') { const g = +$('#l-addgrp', md).value; if (g) act(() => api('PUT', `/api/lists/${id}/groups/${g}`, {role: $('#l-grprole', md).value}), tr('Shared')); return; }
     if (b.dataset.grm) {
       const g = (listById(id)?.groups || []).find(x => x.group_id === +b.dataset.grm);
@@ -979,7 +996,7 @@ function listModal(id, folder = '', o = {}) {
     ${ow_listRow(l, own)}${''/* 2.392.0 C (#3370) */}
     ${id && own && depsOn() ? `<div class="row"><label>${tr('Dependencies')}</label><label class="chkl"><input type="checkbox" id="l-depshift" ${l.dep_shift ? 'checked' : ''}> ${tr('Move dependent tasks along')}</label></div>
     <div class="shint lhint">${tr('Postponing a task moves the tasks it blocks by the same number of days. One undo reverses the whole chain.')}</div>` : ''}
-    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
+    ${id && canManage(l) && fieldsOn() ? `<h4 title="${esc(tr('Own columns for this project: budget, stage, client, …'))}">${tr('Custom fields')}</h4><div class="members" id="l-fields">${fieldsBox(id)}</div><div class="members" id="l-ftrash" hidden></div>` : id && fieldsOf(id).length ? `<h4>${tr('Custom fields')}</h4><div class="muted mhint">${esc(fieldsOf(id).map(f => f.name).join(', '))} · ${tr('only the owner and project admins can change them')}</div>` : ''}
     ${id ? `<div class="lrepo" ${repoShown(l) ? '' : 'hidden'}><div class="shint keep lhint lrepohint" hidden>${ic('git', 's')} ${tr('Connect a repository (optional)')}</div>${repoBoxHtml(l)}</div>` : ''}`, fown, o.open === 'proj' || (!id && (o.kind === 'project' || !!o.ptype)))}
     ${id && !l.is_inbox ? lmSec('props', tr('Properties'), pz_boxHtml(l), fown) : ''}${''/* 2.412.0 (#3552): the properties of the tasks (props.js) */}
     ${lmSec('acts', tr('Actions'), `<div class="row lacts">${id && !l.is_inbox && canManage(l) ? (l.archived ? `<button class="btn" data-m="arch">${ic('undo', 's')} ${tr('Restore project from the archive')}</button><button class="btn danger" data-m="del">${ic('trash', 's')} ${l.e2e ? tr('Delete project permanently…') : tr('Delete project…') /* 2.102.0 (#1988): into the trash */}</button>` : `<button class="btn" data-m="arch" title="${tr('Hidden from your projects; undo or restore any time. Deleting permanently is only possible from the archive.')}">${ic('archive', 's')} ${tr('Archive project')}</button>`) : ''}${id && !own ? `<button class="btn danger" data-m="leave">${ic('logout', 's')} ${tr('Leave project')}</button>` : ''}${id && canEditList(id) /* 2.126.0 D (#1992 A6) */ ? `<button class="btn" data-m="tpl" title="${l.e2e ? esc(tr('Not available in encrypted projects')) : tr('Save the sections and open tasks as a template')}" ${l.e2e ? 'disabled' : ''}>${ic('copy', 's')} ${tr('Save as template')}</button>` : ''}${id && dupOk(l) ? `<button class="btn" data-m="dup" title="${tr('A copy of this project with its sections, tasks and notepads')}">${ic('copy', 's')} ${tr('Duplicate')}</button>` : ''}</div>`, fown, l.archived)}
@@ -1168,8 +1185,9 @@ function listModal(id, folder = '', o = {}) {
     }
     sel?.focus();
   };
-  const drawFields = () => { const box = $('#l-fields', md); if (box) { box.innerHTML = fieldsBox(id); ofs_mount(box, id, drawFields); } };  // 2.609.0 (#3373): + the organisation's fields
+  const drawFields = () => { const box = $('#l-fields', md); if (box) { box.innerHTML = fieldsBox(id); ofs_mount(box, id, drawFields); } ftrDraw($('#l-ftrash', md), id); };  // 2.609.0 (#3373): + the organisation's fields; 2.550.0 (#4528): + the deleted fields
   if (id && $('#l-fields', md)) ofs_mount($('#l-fields', md), id, drawFields);
+  ftrDraw($('#l-ftrash', md), id);
   if (id) rul_mount(md, l);  // 2.71.0 A (#1457)
   if (id) whiMount(md, l);  // 2.115.0 A (#2061)
   md.addEventListener('click', async e => {
@@ -1181,6 +1199,7 @@ function listModal(id, folder = '', o = {}) {
       for (const k of ['fpin', 'fup']) if (+b.dataset[k] < 0) { const r = await fdReal(+b.dataset[k]); if (!r) return; b.dataset[k] = r; }
       await Promise.all(fieldsOf(id).filter(f => f.id < 0).map(f => fdReal(f.id)));
     }
+    if (b.dataset.ftrest) { if (await ftrRestore(+b.dataset.ftrest)) { drawFields(); toast(tr('Field restored')); } return; }  // 2.550.0 (#4528)
     if (b.dataset.fpin) {
       const f = fieldById(+b.dataset.fpin);
       // 2.41.2 (#1501): pinned / order at once (optimistic), no GET /api/state afterwards

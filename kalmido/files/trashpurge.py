@@ -69,6 +69,10 @@ TP_PLAIN = (
     # 2.567.0 A (#4707): the key links of project lists, the copies of deleted sections / planned sprints (lists/parttrash.py)
     ("list_links", "list_links", ""),
     ("list_parts", "list_part_trash", ""),
+    # 2.550.0 (#4528): deleted custom fields with their values (lists/fields.py field_delete) and what removing a member ended
+    # (lists/membermemo.py): rows only, the restore is gone once the period is over
+    ("fields", "field_trash", ""),
+    ("member_memos", "member_memos", ""),
 )
 
 

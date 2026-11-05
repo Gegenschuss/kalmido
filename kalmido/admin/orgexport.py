@@ -506,6 +506,7 @@ OX_LEFT = {
     "list_part_trash": _DERIVED,  # 2.567.0 A (#4707): the copies of deleted sections / sprints until the trash period ends
     "obj_history": _DERIVED, "obj_undo": "undo steps of one day", "obj_revoked": "shares removed (not_included)",  # 2.558.0 (#4709): the core's working data
     "doc_views": "saved views of the documents search (their filters name label and folder ids of this server)",  # 2.579.0 (#4802)
+    "field_trash": _DERIVED, "member_memos": _DERIVED,  # 2.550.0 (#4528): deleted fields / a removed member's ways back (trash period)
     "task_vectors": _DERIVED, "upload_scan": _SERVER, "webhooks": _SECRET, "wiki_shares": _SECRET,
     "wiki_spaces": "the lock of a space (client_encrypted names it)",
     # list column

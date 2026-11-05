@@ -809,6 +809,9 @@ ROUTES = {
     # ---- tasks (192)
     "DELETE /api/attachments/{}": "tasks", "DELETE /api/chat-files/{}": "tasks", "DELETE /api/comments/{}": "tasks",
     "POST /api/comments/{}/restore": "tasks",  # 2.530.0 A (#4315): p4315_a_comment_trash_test.py, freelancer-matrix: tasks
+    # 2.550.0 (#4528): the field trash and a removed member's way back (p4528_b_restore_test.py, freelancer-matrix: lists)
+    "GET /api/lists/{}/fields/trash": "lists", "POST /api/fields/trash/{}/restore": "lists",
+    "GET /api/lists/{}/member-memos": "lists", "POST /api/lists/{}/members/{}/restore": "lists",
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
     "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
@@ -1339,7 +1342,7 @@ DELETE /api/v1/event-calendars/{}
 DELETE /api/v1/event-calendars/{}/members/{}
 DELETE /api/v1/events/{}
 DELETE /api/v1/family/rewards/{}
-DELETE /api/v1/fields/{}
+DELETE /api/v1/filters/{}
 DELETE /api/v1/forms/{}
 DELETE /api/v1/lists/{}
 DELETE /api/v1/lists/{}/files/{}

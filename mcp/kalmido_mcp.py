@@ -1739,7 +1739,8 @@ TOOLS += [
      _obj({"field_id": S_ID, "name": {"type": "string"}, "options": {"type": "object"}, "pinned": {"type": "boolean"}, "sort": {"type": "number"},
            "formula": {"type": "string"}, "required": {"type": "boolean"}}, ["field_id"]),
      lambda api, a: api.call("PATCH", f"/fields/{_id(a, 'field_id')}", body=_without(a, "field_id"))),
-    ("delete_field", "Delete a custom field with all its values." + APPROVAL_NOTE, _obj({"field_id": S_ID}, ["field_id"]),
+    ("delete_field", "Delete a custom field with all its values (2.550.0: into the field trash, a person can restore it in the app "
+     "until the trash period ends; the answer names trash_id)." + APPROVAL_NOTE, _obj({"field_id": S_ID}, ["field_id"]),
      lambda api, a: api.call("DELETE", f"/fields/{_id(a, 'field_id')}")),
     ("get_key_figures", "2.43.0: the key figures of a project shared with you (tiles of its project page set up by people: sum, count, "
                         "average or ratio in % of number / formula fields, maybe only open / done tasks or a choice): [{id, title, agg, "

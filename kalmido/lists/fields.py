@@ -7,7 +7,7 @@ from datetime import date
 from flask import g, has_app_context, jsonify, request
 
 from ..core.config import app
-from ..core.pg import insert_id, like_escape, system_ctx, write_lock
+from ..core.pg import insert_id, like_escape, st_ids, system_ctx, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..core.access import collab_all, Denied, list_people, list_role, need_list, pvis, task_visible, vis_sql
@@ -18,6 +18,7 @@ from ..collab.comments import user_names
 from ..core.errors import BadInput
 from ..core.conflict import Conflict  # 2.564.0 (#4701)
 from ..core.numtext import user_num  # 2.263.0 (#2976)
+from ..core.retention import ret_trash_days  # 2.550.0 (#4528)
 from .formula import fx_check_cycles, fx_compile, fx_display
 
 
@@ -511,14 +512,88 @@ def fx_used_by(c, fid):
 
 @app.delete("/api/fields/<int:fid>")
 def field_delete(fid):
+    """2.550.0 (#4528): the field goes into the field trash (field_trash: its definition and every value, also of tasks in the
+    trash); Undo / restore within the trash period (POST /api/fields/trash/<id>/restore). Answer: values, trash_id."""
     c = db()
-    need_field(c, fid)
+    r = need_field(c, fid)
+    vals = [[v[0], v[1]] for v in c.execute("SELECT task_id, value FROM task_field_values WHERE field_id=? ORDER BY task_id", (fid,))]
+    grouped = c.execute("SELECT 1 FROM lists WHERE id=? AND group_field=?", (r["list_id"], f"cf:{fid}")).fetchone()
+    tid = insert_id(c, "INSERT INTO field_trash(list_id,field_id,name,type,def,vals,n,grouped,deleted_by,deleted_at) VALUES(?,?,?,?,?,?,?,?,?,?)",
+                    (r["list_id"], fid, r["name"], r["type"], json.dumps({k: r[k] for k in ("options", "pinned", "sort", "created_at")}),
+                     json.dumps(vals, ensure_ascii=False), len({v[0] for v in vals}), 1 if grouped else 0, fd_uid(), iso(now_utc())))
     n = c.execute("DELETE FROM task_field_values WHERE field_id=?", (fid,)).rowcount
     c.execute("DELETE FROM list_fields WHERE id=?", (fid,))
     c.execute("UPDATE lists SET group_field='' WHERE group_field=?", (f"cf:{fid}",))  # 2.144.0 A2 (#2414): no grouping by a gone field
     bump(c)
     c.commit()
-    return jsonify(ok=True, values=n)
+    return jsonify(ok=True, values=n, trash_id=tid)
+
+
+def ftr_person():
+    """2.550.0 (#4528): the field trash is the app's (people's) way back: an agent's delete waits for a person's approval already."""
+    u = getattr(g, "user", None)
+    if u is not None and (u["kind"] if "kind" in u.keys() else "user") == "agent":
+        raise Denied(403, tr("Not available for agent accounts"))
+
+
+def ftr_row(c, tid):
+    """2.550.0 (#4528): a row of the field trash for its project's owner and admins (404 for everyone else, agents 403)."""
+    ftr_person()
+    r = c.execute("SELECT * FROM field_trash WHERE id=?", (tid,)).fetchone()
+    if not r:
+        raise Denied(404)
+    need_list(c, r["list_id"], manage=True)
+    return r
+
+
+@app.get("/api/lists/<int:lid>/fields/trash")
+def field_trash_list(lid):
+    """2.550.0 (#4528): the deleted fields of a project (newest first) for its owner and admins: {fields: [{id, name, type,
+    tasks, deleted_at, deleted_by}], days}."""
+    ftr_person()
+    c = db()
+    need_list(c, lid, manage=True)
+    rows = c.execute("SELECT id, name, type, n, deleted_by, deleted_at FROM field_trash WHERE list_id=? ORDER BY deleted_at DESC, id DESC "
+                     "LIMIT 100", (lid,)).fetchall()
+    names = user_names(c, list({r["deleted_by"] for r in rows if r["deleted_by"]}))
+    return jsonify(fields=[{"id": r["id"], "name": r["name"], "type": r["type"], "tasks": r["n"], "deleted_at": r["deleted_at"],
+                            "deleted_by": names.get(r["deleted_by"], "")} for r in rows], days=ret_trash_days())
+
+
+@app.post("/api/fields/trash/<int:tid>/restore")
+def field_trash_restore(tid):
+    """2.550.0 (#4528): a deleted field back with its id and its values -- of the tasks that are still in the project (person
+    values only of people who still reach it); the grouping by it when the project has no other one. The row leaves the trash."""
+    c = db()
+    r = ftr_row(c, tid)
+    lid, fid = r["list_id"], r["field_id"]
+    if c.execute("SELECT 1 FROM list_fields WHERE id=?", (fid,)).fetchone():
+        raise Denied(409, tr("This field exists already"))
+    if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
+        return err(tr("At most {0} fields per project", FIELD_MAX))
+    d = json.loads(r["def"] or "{}")
+    pinned = 1 if d.get("pinned") and fields_pinned_ok(c, lid) else 0
+    c.execute("INSERT INTO list_fields(id,list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?,?)",
+              (fid, lid, r["name"], r["type"], d.get("options") or "{}", pinned, float(d.get("sort") or 0), d.get("created_at") or iso(now_utc())))
+    vals = json.loads(r["vals"] or "[]")
+    live = {x[0] for x in c.execute("SELECT id FROM tasks WHERE list_id=? AND id = ANY(CAST(? AS BIGINT[]))",
+                                    (lid, st_ids([v[0] for v in vals])))} if vals else set()
+    people = {str(x) for x in list_people(c, lid)} if r["type"] == "person" else None
+    n = 0
+    for t, v in vals:
+        if t in live and (people is None or v in people):
+            n += c.execute("INSERT INTO task_field_values(task_id,field_id,value) VALUES(?,?,?) ON CONFLICT DO NOTHING", (t, fid, v)).rowcount
+    if r["grouped"]:
+        c.execute("UPDATE lists SET group_field=? WHERE id=? AND COALESCE(group_field,'')=''", (f"cf:{fid}", lid))
+    cc = c.execute("SELECT col_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    if cc and f"f:{fid}" not in cc:  # like field_create: a list with its own columns shows it again as its last column
+        cols = columns_out(cc, {x[0] for x in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
+        if cols is not None and f"f:{fid}" not in cols and len(cols) < COL_MAX:
+            c.execute("UPDATE lists SET col_cfg=? WHERE id=?", (json.dumps([*cols, f"f:{fid}"]), lid))
+    c.execute("DELETE FROM field_trash WHERE id=?", (tid,))
+    bump(c)
+    c.commit()
+    return jsonify(ok=True, field=field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c), values=n)
 
 
 def search_field_ids(c, uid, q):
