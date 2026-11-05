@@ -26,7 +26,7 @@ const FV2_MODS = {cal: ['cal', N_('Calendar')], timeline: ['timeline', N_('Timel
   life: ['home', N_('Home & life')], workload: ['chart', N_('Workload & absences')], office: ['receipt', N_('Office & finance')], wiki: ['book', N_('Knowledge pages')], sheets: ['sheet', N_('Tables')],
   review: ['journal', N_('Review & journal')], family: ['family', N_('Family')], overview: ['pulse', N_('Project status')], agents: ['bot', N_('Agents')],
   notes: ['note', N_('Notes')], news: ['bell', N_('News')], team: ['comment', N_('Team chat')]};  // 2.364.0 B (#3040): one name for the team chat
-const FV2 = {drag: null, add: '', held: 0, lp: null, res: {}, gone: [], at: 0, busy: false, again: false, last: new Map(), over: []};
+const FV2 = {drag: null, out: null, add: '', held: 0, lp: null, res: {}, gone: [], at: 0, busy: false, again: false, last: new Map(), over: []};
 // 2.441.0 (#3592): the symbol and the module of the objects the server knows; the symbols a person can give a favourite
 const FV2_REF = {office_doc: ['receipt', 'office'], office_letter: ['file', 'office'], office_gendoc: ['file', 'office'], office_receipt: ['receipt', 'office'],
   wiki: ['book', 'wiki'], sheet: ['sheet', 'sheets'], contact: ['user', 'contacts'], address_book: ['book', 'contacts']};
@@ -346,10 +346,36 @@ function fv2_target(x, y) {
   for (const b of $$('.fv2bar [data-fv2]:not([hidden])')) { const r = b.getBoundingClientRect(), d = Math.hypot(r.left + r.width / 2 - x, r.top + r.height / 2 - y); if (d < bd) { bd = d; best = b; } }
   return best;
 }
-function fv2_drop(t, x) {
-  const key = FV2.drag; FV2.drag = null;
+function fv2_drop(t, x, rel) {
+  const key = FV2.drag, out = !!rel && !!FV2.out; FV2.drag = null; fv2_outSet(null, false);  // 2.551.0 (#4615): rel = really let go (not Esc / cancelled)
   $$('.fv2bar .fv2-before, .fv2bar .fv2-after, .fv2bar .dragging').forEach(b => b.classList.remove('fv2-before', 'fv2-after', 'dragging'));
+  if (out && key) { fv2_dragOut(key); return; }
   if (key && t && t.dataset.fv2 !== key) fv2_move(key, t.dataset.fv2, fv2_after(t, x));
+}
+// 2.551.0 (#4615): a tile dragged well below the bar (about 1.5 tile heights under it) is out: the tile shows a crossed symbol,
+// the bar "Release to remove"; let go there = removed (Undo in the hint), back into the bar = moving again. Touch and mouse alike.
+const fv2_dragTile = () => FV2.drag ? $$('.fv2bar [data-fv2]').find(x => x.dataset.fv2 === FV2.drag) || null : null;
+function fv2_isOut(t, y) {
+  const bar = t?.closest?.('.fv2bar'); if (!bar || bar.classList.contains('fv2-page')) return false;
+  const r = bar.getBoundingClientRect(), h = t.getBoundingClientRect().height || t.offsetHeight || 30;
+  return y > r.bottom + 1.5 * h;
+}
+function fv2_outSet(t, on) {
+  if (on ? FV2.out === t : !FV2.out) return;
+  FV2.out = on ? t : null;
+  $$('.fv2bar .fv2-out').forEach(x => x.classList.remove('fv2-out'));
+  $$('.fv2bar.fv2-outing').forEach(b => { b.classList.remove('fv2-outing'); b.removeAttribute('data-out'); });
+  if (!on || !t) return;
+  const bar = t.closest('.fv2bar'); t.classList.add('fv2-out'); fv2_mark(null, 0);
+  if (bar) { bar.classList.add('fv2-outing'); bar.dataset.out = tr('Release to remove'); }
+  announce(tr('Release to remove'));
+}
+// removed by dragging it out: the hint with Undo (a list's star too, which favSet keeps without one); Undo puts it back in its place
+function fv2_dragOut(key) {
+  const ks = fv2_keys(), nx = ks[ks.indexOf(key) + 1];
+  if (!key.startsWith('l:')) { fv2_set(key, false); return; }  // fv2_change offers the Undo
+  favSet(+key.slice(2), false);
+  toast(tr('Removed from favourites'), () => fv2_set(key, true, nx, false));
 }
 // 2.441.0 (#3592): anything with an address dragged into the row becomes a favourite (a sidebar row, a link)
 function fv2_dragKey(e) {
@@ -362,7 +388,7 @@ function fv2_addEnd() { FV2.add = ''; $$('.fv2bar.fv2-drop').forEach(b => b.clas
 document.addEventListener('dragstart', e => {
   const t = e.target.closest?.('.fv2bar [data-fv2][draggable="true"]');
   if (!t) { FV2.add = fv2_dragKey(e); if (FV2.add) $$('.fv2bar').forEach(b => b.classList.add('fv2-drop')); return; }
-  FV2.drag = t.dataset.fv2; e.dataTransfer.effectAllowed = 'move';
+  FV2.drag = t.dataset.fv2; FV2.out = null; e.dataTransfer.effectAllowed = 'move';
   try { e.dataTransfer.setData('text/plain', 'fav:' + FV2.drag); } catch { /* old browsers */ }
   requestAnimationFrame(() => t.classList.add('dragging'));
 });
@@ -373,6 +399,8 @@ window.addEventListener('dragover', e => {
 }, true);
 document.addEventListener('dragover', e => {
   if (!FV2.drag) return;
+  const d = fv2_dragTile(), out = fv2_isOut(d, e.clientY); fv2_outSet(d, out);  // 2.551.0 (#4615)
+  if (out) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; return; }
   const t = fv2_target(e.clientX, e.clientY); fv2_mark(t, e.clientX);
   if (t) e.preventDefault();
 });
@@ -385,7 +413,7 @@ window.addEventListener('drop', e => {
 document.addEventListener('drop', e => {
   if (!FV2.drag) return;
   e.preventDefault(); e.stopImmediatePropagation();
-  fv2_drop(fv2_target(e.clientX, e.clientY), e.clientX);
+  fv2_drop(FV2.out ? null : fv2_target(e.clientX, e.clientY), e.clientX, true);
 }, true);
 document.addEventListener('dragend', () => { if (FV2.drag) fv2_drop(null, 0); if (FV2.add) fv2_addEnd(); });
 // the star of a page, a favourite that opens through its workspace, "+N"
@@ -419,14 +447,15 @@ document.addEventListener('touchmove', e => {
   if (!lp.active) { if (Math.hypot(p.clientX - lp.x, p.clientY - lp.y) > 8) { clearTimeout(lp.timer); FV2.lp = null; } return; }  // scrolling
   e.preventDefault();
   lp.moved = true; lp.lx = p.clientX; lp.ly = p.clientY;
-  fv2_mark(fv2_target(p.clientX, p.clientY), p.clientX);
+  const out = !!FV2.drag && fv2_isOut(lp.el, p.clientY); fv2_outSet(lp.el, out);  // 2.551.0 (#4615)
+  if (!out) fv2_mark(fv2_target(p.clientX, p.clientY), p.clientX);
 }, {passive: false});
 function fv2_touchEnd(e) {
   const lp = FV2.lp; FV2.lp = null; if (!lp) return;
   clearTimeout(lp.timer); if (!lp.active) return;  // a tap: the tile's own click
   if (e && e.cancelable) e.preventDefault();
   FV2.held = Date.now();
-  if (lp.moved) { fv2_drop(fv2_target(lp.lx, lp.ly), lp.lx); return; }
+  if (lp.moved) { fv2_drop(FV2.out ? null : fv2_target(lp.lx, lp.ly), lp.lx, true); return; }
   FV2.drag = null; lp.el.classList.remove('dragging');
   fv2_tileMenu(lp.el);
 }

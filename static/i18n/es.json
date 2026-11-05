@@ -16287,6 +16287,7 @@
   "{0} created the task from a quotation": "{0} creó la tarea a partir de un presupuesto",
   "{0}: the position is no longer in the quotation (the task stays)": "{0}: la posición ya no está en el presupuesto (la tarea se queda)",
   "{0}: the position is in the quotation again": "{0}: la posición vuelve a estar en el presupuesto",
+  "Release to remove": "Suelta para quitar",
   "This topic is not available. Use another one with at least 16 characters (the dice button makes one).": "Este tema no está disponible. Usa otro con al menos 16 caracteres (el botón del dado crea uno).",
   "This ntfy topic is not available. Choose another one.": "Este tema de ntfy no está disponible. Elige otro.",
   "Without a place": "Sin ubicación",
