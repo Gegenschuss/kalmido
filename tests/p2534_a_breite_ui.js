@@ -6,6 +6,7 @@
 //   at 3840 the limit holds (narrower than the content area: before, the list was as wide as the area, Start / office 72rem)
 // - the board of a project (.kanban) uses the full width (--w-voll)
 // - the team chat: the messages (own ones right, the other's left) stay inside a reading column of --w-lesen in the middle
+// - 2.552.0 (#4552): from 1920 more than one column of tiles on Start / Projects start, board columns 18 to 28rem, 390 px one column
 // - 1440 x 900 and 390 x 844: the pages fill the content area as before (the widths are only upper limits), no sideways overflow
 // Screenshots (P2534A_SHOTS) at 1440, 1920, 2560 and 3840, light and dark.
 // freelancer-matrix: Breiten (alice has no organisation; the widths do not depend on the workspace)
@@ -84,6 +85,19 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
           await shot(`p2534a-${name}-${vw}-${theme}.png`);
         }
       }
+      // 2.552.0 (#4552): tiles in a grid by the space (auto-fill, 22rem), board columns grow up to 28rem
+      const COLS = sel => `(() => { const e = [...document.querySelectorAll(${JSON.stringify(sel)})].filter(x => x.offsetWidth); if (e.length < 2) return null; return new Set(e.map(x => Math.round(x.getBoundingClientRect().left))).size; })()`;
+      for (const [name, hash, sel] of [['start', '#home', '#view .dash .dcard'], ['projects start', '#projects', '#view .pstart .psg']]) {
+        await nav(B + '?w=' + vw + hash);
+        const n = await until(`!!S.booted && (${COLS(sel)})`).catch(() => null);
+        if (!n) { if (name === 'start') check(false, `${vw}px ${name}: tiles show`); continue; }  // the projects start may hold a single group
+        if (vw >= 1920) check(n > 1, `${vw}px ${name}: more than one column (${n})`);
+        if (vw < 768) check(n === 1, `${vw}px ${name}: one column (${n})`);
+      }
+      await nav(B + '?w=' + vw + '#l/' + K);
+      const kc = await until(`!!S.booted && (() => { const c = [...document.querySelectorAll('#view .kcol')].filter(x => x.offsetWidth); return c.length ? c.map(x => x.getBoundingClientRect().width).concat([parseFloat(getComputedStyle(document.documentElement).fontSize)]) : null; })()`);
+      if (kc) { const rem = kc.pop(); check(Math.max(...kc) <= 28 * rem + 1 && Math.min(...kc) >= 18 * rem - 1, `${vw}px board: columns between 18rem and 28rem ` + JSON.stringify(kc)); }
+      else check(false, `${vw}px board: columns show`);
       // the team chat: the messages of both sides inside the reading column in the middle of the room
       await nav(B + '?w=' + vw + '#team/' + RID);
       const c = await until(`(() => { const box = document.querySelector('#view .tcmsgs'), ms = [...document.querySelectorAll('#view .tcmsgs .cmsg')].filter(x => x.offsetWidth); if (!box || ms.length < 8) return null;

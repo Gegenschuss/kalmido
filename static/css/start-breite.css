@@ -23,3 +23,23 @@
 
 /* --w-voll: named so a later rule cannot limit them by accident */
 .kanban,.matrix,.shvwrap,.mmwrap,.lcal,.tl{max-width:var(--w-voll)}
+
+/* 2.552.0 (#4552): wide screens B -- tiles in a grid by the space (repeat(auto-fill, minmax(22rem, 1fr)): the number of columns
+   follows the width of the page, no fixed count). Only from 1700 px of screen: 1440 x 900 and smaller stay as they were.
+   Board columns (.kcol, app.css) grow from 18rem up to 28rem. */
+@media (min-width:1700px){
+  .dgrid:not(.lysix),.agcards{grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr))}   /* Home / Life / family / clients cards, agent cards */
+  .lygrid:not(.lysix){grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr))}           /* statistics charts, agents blocks, overview */
+  .lygrid:not(.lysix) > .ly-full{grid-column:1/-1}
+  /* start page: the two columns (main, side) dissolve into one grid of tiles; the wide blocks take two */
+  .dgrid.lysix.hpcols{grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr))}
+  .lysix.hpcols > .hpcol{display:contents}
+  .lysix.hpcols > .hpcol > .lyb{grid-column:auto}
+  .lysix.hpcols > .hpcol > .lw4,.lysix.hpcols > .hpcol > .lw6{grid-column:span 2}
+  .lysix.hpcols > .hpcol > .lyb > .dcard{height:100%}
+  /* projects start: the groups (plan, projects, folders, filters) side by side */
+  .pstart{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));gap:1.25rem;align-items:start}
+  .pstart > :not(.psg){grid-column:1/-1}
+  /* schedule: my bookings in columns */
+  .dpminel{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr));column-gap:1rem}
+}
