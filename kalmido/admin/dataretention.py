@@ -20,6 +20,7 @@ from ..core.retention import ret_days, ret_on, ret_report
 from ..core.serializers import unlink_files
 from ..team.portal import _PT_EDITS
 from .backup import BK_DIR, BK_KEEP_WEEKLY_CAP, bk_parse_name  # 2.312.0 B (#3264)
+from .hosting import hosted  # 2.552.0 (#4596, review)
 from ..core.config import ATT_DIR  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import FS_VERSIONS_KEEP  # 2.369.5 (#2517): pulled up from functions
 
@@ -104,7 +105,9 @@ def lgc_journal_cut(now, c=None):
             raw = gsetting(c, "bko_remote")
             remote = json.loads(raw or "[]")
             conf = json.loads(gsetting(c, "bko_conf") or "{}")
-            if not isinstance(remote, list) or (not raw and isinstance(conf, dict) and conf.get("on") is True):
+            # 2.552.0 (#4596, review): on a hosted instance no off-site target is used (offsite.bko_no_hosted): a target saved
+            # before and never uploaded to holds nothing that could come back, so it does not stop the clean-up for good
+            if not isinstance(remote, list) or (not raw and isinstance(conf, dict) and conf.get("on") is True and not hosted()):
                 return None
             # 2.538.0 (#4367): the backups of a removed / replaced target ("formerly off-site", offsite.bko_retire) still
             # lie there and can be restored: they count as well

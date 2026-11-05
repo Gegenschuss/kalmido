@@ -136,6 +136,9 @@ check("cut None" in py(CUT), "off-site: an unreadable list: nothing goes")
 setting("bko_remote", None)
 setting("bko_conf", json.dumps({"on": True, "type": "s3"}))
 check("cut None" in py(CUT), "off-site: a target switched on without a list: nothing goes")
+# 2.552.0 (#4596, review): on a hosted instance the saved target is never used (403 / no upload) - it no longer holds the list back
+check("cut None" not in py("import kalmido.admin.hosting as hz\nhz.HOSTED = True\n" + CUT),
+      "off-site: hosted, a target switched on without a list does not stop the clean-up for good")
 setting("bko_conf", None)
 check("cut None" not in py(CUT) and "cut 2020" not in py(CUT), "no off-site target ever: the local rule")
 # 2.538.0 (#4367): removing the target keeps its backups' names as "formerly off-site" (they still lie there and can be
