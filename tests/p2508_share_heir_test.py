@@ -3,8 +3,9 @@
 """2.508.0 (#4301): deleting an account no longer takes what it shares privately with it. A private calendar, address book,
 table (with its files) and the knowledge pages somebody may write pass to the longest-standing person with the right to
 write, with what the others wrote; shares through a folder count like shares of the object. Nobody to take over: the object
-goes and the delete dialog says so. People without an organisation throughout (freelancer-matrix: pim  freelancer-matrix: sheets
-freelancer-matrix: wiki); the organisation admin's dialog names nobody. Invented names only, sealed with a server key.
+goes and the delete dialog says so. 2.537.0 (#4347): shared folders and files of the private file store too (a branch with
+its files, versions, recognised text and the contributions of others, sealed again for the heir). People without an
+organisation throughout (freelancer-matrix: pim  freelancer-matrix: sheets  freelancer-matrix: wiki  freelancer-matrix: files); the organisation admin's dialog names nobody. Invented names only, sealed with a server key.
 usage: p2508_share_heir_test.py <datadir>"""
 import base64
 import os
@@ -13,7 +14,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dbx as dbxm  # noqa: E402
 import kt  # noqa: E402
-from kt import B, check, dbx, sess  # noqa: E402
+from kt import B, check, dbx, sess, until  # noqa: E402
 
 kt.fresh({"KALMIDO_ORGCRYPT_DELAY": "0", "KALMIDO_SECRET_KEY": base64.b64encode(os.urandom(32)).decode()})
 A = kt.setup()
@@ -221,6 +222,185 @@ r = dbx("SELECT body FROM wiki_pages WHERE id=?", (P2,))[0][0]
 check(r.startswith("kenc1:"), "the text is sealed for its new owner, not lying open")
 check(not dbx("SELECT 1 FROM wiki_versions WHERE page_id=? AND body LIKE 'kenc1:AAAA%'", (P1,)), "the unreadable old state went")
 check(not dbx("SELECT 1 FROM users WHERE id=?", (ANNA,)), "and the account is gone")
+
+# ---------------------------------------------------------------- 2.537.0 (#4347): shared branches of the file store
+def folder(s, name, parent=None):
+    r = s.post(B + "/api/files/folders", json={"name": name, **({"parent_id": parent} if parent else {"space": "private"})})
+    assert r.status_code == 201, r.text
+    return r.json()["id"]
+
+
+def upload(s, name, data, parent):
+    r = s.post(B + "/api/files/upload", data={"parent_id": str(parent)}, files={"file": (name, data)})
+    assert r.status_code == 201, r.text
+    return r.json()["items"][0]["id"]
+
+
+def text_pdf(line):
+    """A one-page PDF with a text layer (hand-written, as in p296_e_api_test.py)."""
+    stream = f"BT /F1 12 Tf 60 740 Td ({line}) Tj ET".encode("latin-1")
+    objs = [b"<< /Type /Catalog /Pages 2 0 R >>", b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+            b"<< /Length %d >>\nstream\n" % len(stream) + stream + b"\nendstream",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"]
+    out, offs = b"%PDF-1.4\n", []
+    for i, o in enumerate(objs, 1):
+        offs.append(len(out))
+        out += b"%d 0 obj\n" % i + o + b"\nendobj\n"
+    x = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objs) + 1) + b"".join(b"%010d 00000 n \n" % o for o in offs)
+    return out + b"trailer\n<< /Size %d /Root 1 0 R >>\nstartxref\n%d\n%%%%EOF\n" % (len(objs) + 1, x)
+
+
+def node(nid):
+    r = dbx("SELECT owner_id, parent_id, name FROM fs_nodes WHERE id=?", (nid,))
+    return tuple(r[0]) if r else None
+
+
+def share_of(nid, u):
+    r = dbx("SELECT role FROM fs_shares WHERE node_id=? AND user_id=?", (nid, u))
+    return r[0][0] if r else None
+
+
+def stored(nid):
+    return [x[0] for x in dbx("SELECT path FROM fs_versions WHERE node_id=? ORDER BY no", (nid,))]
+
+
+def settled(nid):
+    """The recognition of file nid is over (a running one would make the deletion answer 409)."""
+    return until(lambda: not dbx("SELECT 1 FROM file_text WHERE kind='fs' AND node_id=? AND state IN ('wait', 'run')", (nid,))
+                 and not dbx("SELECT 1 FROM doc_meta WHERE node_id=? AND state IN ('wait', 'run')", (nid,)), 120)
+
+
+def recognised(nid, uid):
+    """2.537.0 (#4347, review 1): mark file nid as a recognised document with values (doc_meta.extracted), as every recognition
+    with a date and an amount does."""
+    check(settled(nid), f"the recognition of {nid} is over")
+    write("INSERT INTO doc_meta(node_id, ws, state, extracted, doc_date, created_at, updated_at) VALUES(?,?,'done',?,?,?,?) "
+          "ON CONFLICT(node_id) DO UPDATE SET state='done', extracted=excluded.extracted, doc_date=excluded.doc_date",
+          (nid, f"u{uid}", '{"gross": "11.90", "currency": "EUR"}', "2026-02-01", "2026-02-01T00:00:00Z", "2026-02-01T00:00:00Z"))
+
+
+def group_share(nid, g):
+    r = dbx("SELECT role FROM fs_shares WHERE node_id=? AND group_id=?", (nid, g))
+    return r[0][0] if r else None
+
+
+OLGA, Ol = person("olga")
+PIA, Pi = person("pia")
+QUIN, Qu = person("quin")
+RUTH, Ru = person("ruth")
+SAM, Sa = person("sam")
+folder(Pi, "Garden plans")  # the heir's own folder of that name: the branch gets " (2)"
+GP = folder(Ol, "Garden plans")
+DR = folder(Ol, "Drawings", GP)
+V1, V2 = text_pdf("Rhubarbfield first layout"), text_pdf("Rhubarbfield second layout")
+PLAN = upload(Ol, "plan.pdf", V1, DR)
+check(Ol.post(B + f"/api/files/nodes/{PLAN}/versions", files={"file": ("plan.pdf", V2, "application/pdf")}).status_code == 201, "a second version")
+for nid, who, role in ((GP, QUIN, "edit"), (GP, PIA, "edit"), (GP, RUTH, "view"), (DR, SAM, "view"), (DR, PIA, "view")):
+    check(Ol.post(B + f"/api/files/nodes/{nid}/shares", json={"user_id": who, "role": role}).status_code == 201, f"share {nid} with {who}")
+write("UPDATE fs_shares SET created_at='2020-01-01T00:00:00Z' WHERE node_id=? AND user_id=?", (GP, PIA))  # pia's edit share is the older one
+QNOTE = b"Quin's notes on the beds"
+QF = upload(Qu, "quin.txt", QNOTE, GP)  # a contribution of another person
+check(node(QF)[0] == OLGA, "a file added to the shared folder is the folder owner's node")
+ft = until(lambda: (lambda r: r and r[0][0] in ("found", "none", "skip", "error") and r[0][0])(
+    dbx("SELECT state FROM file_text WHERE kind='fs' AND node_id=?", (PLAN,))), 120)
+check(ft == "found", f"the text of the file is recognised ({ft})")
+BEFORE = stored(PLAN)
+# read only on top, an edit share on a folder inside it: that folder goes on its own, the read share lives on on it
+RO = folder(Ol, "Read only")
+ROF = upload(Ol, "ro.txt", b"only read", RO)
+INNER = folder(Ol, "Inner", RO)
+INF = upload(Ol, "inner.txt", b"inner text", INNER)
+check(Ol.post(B + f"/api/files/nodes/{RO}/shares", json={"user_id": RUTH, "role": "view"}).status_code == 201, "read share")
+check(Ol.post(B + f"/api/files/nodes/{INNER}/shares", json={"user_id": SAM, "role": "edit"}).status_code == 201, "edit share inside")
+LONE = folder(Ol, "Viewed")
+check(Ol.post(B + f"/api/files/nodes/{LONE}/shares", json={"user_id": SAM, "role": "view"}).status_code == 201, "a read-only folder")
+# review #4347 (1): recognised documents in a branch, and a recognised file shared on its own, are handed on (not left to go)
+BILL = upload(Ol, "bill.pdf", text_pdf("Rhubarbfield bill"), DR)
+recognised(BILL, OLGA)
+LOOSE = folder(Ol, "Loose")
+DEED = upload(Ol, "deed.pdf", text_pdf("Rhubarbfield deed"), LOOSE)
+recognised(DEED, OLGA)
+check(Ol.post(B + f"/api/files/nodes/{DEED}/shares", json={"user_id": SAM, "role": "edit"}).status_code == 201, "a file shared on its own")
+# review #4347 (2, 3): a group's share of the folder above stays the group's; an expired row of somebody who keeps a role is replaced
+TEAM = A.post(B + "/api/admin/groups", json={"name": "Crew", "members": [QUIN, SAM]}).json()["id"]
+PRJ = folder(Ol, "Projects")
+PL = folder(Ol, "Plans", PRJ)
+PLF = upload(Ol, "plans.txt", b"the plans", PL)
+write("INSERT INTO fs_shares(node_id, group_id, role, created_by, created_at) VALUES(?,?,'view',?,?)",  # a group of the instance (the
+      (PRJ, TEAM, OLGA, "2026-02-01T00:00:00Z"))  # share dialog offers people without an organisation none)
+check(Qu.get(B + f"/api/files/nodes/{PLF}/content").ok, "a group's read share: quin reads the plans")
+check(Ol.post(B + f"/api/files/nodes/{PRJ}/shares", json={"user_id": RUTH, "role": "view"}).status_code == 201, "a person's read share")
+for who, role in ((PIA, "edit"), (RUTH, "view")):
+    check(Ol.post(B + f"/api/files/nodes/{PL}/shares", json={"user_id": who, "role": role}).status_code == 201, f"share of plans with {who}")
+write("UPDATE fs_shares SET expires_at='2020-01-01T00:00:00Z' WHERE node_id=? AND user_id=?", (PL, RUTH))  # ruth's own row there ran out
+# review #4347 (4): a public link and a file request somebody else set on the branch end with it
+write("INSERT INTO fs_ext_links(node_id, created_by, token_hash, token, created_at) VALUES(?,?,?,?,?)",
+      (PLAN, QUIN, "p4347-hash", "p4347-token", "2026-02-01T00:00:00Z"))
+write("""INSERT INTO fs_upload_requests(node_id, created_by, token, token_hash, title, expires_at, created_at)
+         VALUES(?,?,?,?,?,?,?)""", (GP, QUIN, "p4347-req", "p4347-req-hash", "For the beds", "2099-01-01T00:00:00Z", "2026-02-01T00:00:00Z"))
+for n in (PLAN, BILL, DEED, PLF, QF):
+    check(settled(n), f"nothing is being recognised in {n}")
+
+sh = A.get(B + f"/api/users/{OLGA}/delete-info").json()["purge"]["shared"]
+# 2.537.0 (#4347, review): the recognised file on its own and the plans count as handed on, the projects (read only) as gone
+check(sh["to"] == {"folders": 4} and sh["gone"] == {"folders": 3}, f"the dialog counts the branches handed on and those that go: {sh}")
+check(set(sh["names"]) == {"Pia", "Sam"}, f"and names who takes them over: {sh['names']}")
+r = A.delete(B + f"/api/users/{OLGA}")
+check(r.ok, "olga's account goes " + r.text[:200])
+
+check(node(GP) == (PIA, None, "Garden plans (2)"), f"the branch: to the oldest edit share, at the top of her tree ({node(GP)})")
+check(node(DR)[0] == PIA and node(PLAN)[0] == PIA and node(QF)[0] == PIA, "with everything in it, the contribution of another included")
+r = Pi.get(B + f"/api/files/nodes/{PLAN}/content")
+check(r.ok and r.content == V2, f"the file sealed for pia reads as before ({r.status_code})")
+r = Pi.get(B + f"/api/files/nodes/{PLAN}/content", params={"v": 1})
+check(r.ok and r.content == V1, f"its first version too ({r.status_code})")
+AFTER = stored(PLAN)
+check(len(AFTER) == 2 and not set(AFTER) & set(BEFORE), f"into new stored files: {BEFORE} -> {AFTER}")
+check(until(lambda: not [p for p in BEFORE if os.path.exists(os.path.join(kt.DATA, "attachments", p))], 10), "the old ones are removed")
+check(dbx("SELECT ws FROM file_text WHERE kind='fs' AND node_id=?", (PLAN,))[0][0] == f"u{PIA}", "the recognised text belongs to pia's workspace")
+r = Pi.get(B + "/api/files/search", params={"q": "rhubarbfield"})
+check(r.ok and PLAN in [x["id"] for x in r.json()["items"]], "and pia finds the file by its text " + r.text[:160])
+r = Qu.get(B + f"/api/files/nodes/{QF}/content")
+check(r.ok and r.content == QNOTE, f"quin still reads his file ({r.status_code})")
+check(share_of(GP, QUIN) == "edit" and share_of(GP, RUTH) == "view", "the shares of the others stay")
+check(share_of(DR, SAM) == "view", "a share inside the branch stays too")
+check(share_of(GP, PIA) is None and share_of(DR, PIA) is None, "pia's own share rows are gone")
+check(Ru.get(B + f"/api/files/nodes/{PLAN}/content").ok, "ruth reads through the folder as before")
+r = Qu.post(B + "/api/files/upload", data={"parent_id": str(GP)}, files={"file": ("more.txt", b"more")})
+check(r.status_code == 201, "quin still adds files " + r.text[:120])
+check(Ru.post(B + "/api/files/upload", data={"parent_id": str(GP)}, files={"file": ("no.txt", b"no")}).status_code in (403, 404), "ruth does not")
+
+check(node(INNER) == (SAM, None, "Inner"), f"the inner folder with the edit share: to sam ({node(INNER)})")
+r = Sa.get(B + f"/api/files/nodes/{INF}/content")
+check(r.ok and r.content == b"inner text", "sam reads its file")
+check(share_of(INNER, RUTH) == "view", "the read share of the folder above lives on as a share of it")
+check(node(RO) is None and node(ROF) is None and node(LONE) is None, "what only others read goes with the account")
+
+# review #4347 (1, 8): the recognised documents went along, their data sealed for the heir
+check(node(BILL) == (PIA, DR, "bill.pdf"), f"the recognised document in the branch: pia's ({node(BILL)})")
+r = Pi.get(B + f"/api/files/nodes/{BILL}/content")
+check(r.ok and r.content.startswith(b"%PDF"), f"pia reads it ({r.status_code})")
+m = dbx("SELECT ws, extracted FROM doc_meta WHERE node_id=?", (BILL,))
+check(m and m[0][0] == f"u{PIA}" and m[0][1], f"its document data belong to pia's workspace ({m and m[0][0]})")
+check(node(DEED) == (SAM, None, "deed.pdf"), f"the recognised file shared on its own: to sam ({node(DEED)})")
+check(Sa.get(B + f"/api/files/nodes/{DEED}/content").ok, "sam reads it")
+check(node(PRJ) is None, "the projects folder (read only) goes")
+# review #4347 (2): the group keeps its role as the group's share, no row per member
+check(node(PL) == (PIA, None, "Plans"), f"the plans: to pia ({node(PL)})")
+check(group_share(PL, TEAM) == "view", "the group's share of the folder above became the group's share of the branch")
+check(share_of(PL, QUIN) is None and share_of(PL, SAM) is None, "no share row per member of the group")
+check(Qu.get(B + f"/api/files/nodes/{PLF}/content").ok, "quin reads through the group")
+check(A.patch(B + f"/api/admin/groups/{TEAM}", json={"members": [SAM]}).ok, "quin leaves the group")
+check(Qu.get(B + f"/api/files/nodes/{PLF}/content").status_code in (403, 404), "and no longer reads it")
+# review #4347 (3): ruth's expired row was replaced by a live one
+r = dbx("SELECT role, expires_at FROM fs_shares WHERE node_id=? AND user_id=?", (PL, RUTH))
+check(r == [("view", None)], f"ruth's expired row is replaced by a live one ({r})")
+check(Ru.get(B + f"/api/files/nodes/{PLF}/content").ok, "ruth reads the plans as before")
+# review #4347 (4): another person's public link and file request on the branch end
+check(not dbx("SELECT 1 FROM fs_ext_links WHERE node_id=?", (PLAN,)), "quin's public link on the file ended")
+check(dbx("SELECT revoked_at FROM fs_upload_requests WHERE token_hash='p4347-req-hash'")[0][0], "quin's file request ended")
 
 # ---------------------------------------------------------------- never into a knowledge space with the lock (review)
 JANA, Ja = person("jana")

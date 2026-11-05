@@ -5,7 +5,8 @@ POST /api/office/docs/<did>/project picks a project ({list_id}), takes it off ({
 document's client). It is an internal mark only: also on a finalised / sent document, which stays as it is (no new totals,
 no rendering). A quotation of a deal without a project gives a new project to the deal too.
 GET /api/lists/<lid>/office-docs: the project's documents for its overview -- only for people with office rights in the
-project's own area; everybody else gets {office: false} and no hint that there are any."""
+project's own area; everybody else gets {office: false} and no hint that there are any. 2.537.0 C (#3433): + budget (hours
+and the net of the quotation the project's tasks came from, office/offertasks.py) or null."""
 from flask import g, jsonify
 
 from ..accounts.orgroles import office_allowed
@@ -113,4 +114,5 @@ def dpj_list_docs(lid):
                      "ORDER BY date DESC, id DESC LIMIT ?", (oid, lid, DPJ_MAX)).fetchall()
     pm = inv_paid_map(c, oid, [r["id"] for r in rows if r["kind"] != "offer"]) if rows else {}
     keep = ("id", "kind", "number", "status", "state", "status_text", "date", "gross_text", "project_title", "trial")
-    return jsonify(office=True, docs=[{k: v for k, v in doc_brief(r, pm).items() if k in keep} for r in rows])
+    from .offertasks import otk_project_budget  # 2.537.0 C (#3433): the budget the project's tasks got from its quotation
+    return jsonify(office=True, docs=[{k: v for k, v in doc_brief(r, pm).items() if k in keep} for r in rows], budget=otk_project_budget(c, oid, lid))

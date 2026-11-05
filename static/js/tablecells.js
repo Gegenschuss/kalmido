@@ -84,7 +84,7 @@ async function tcSave(tid, fid, v) {
   const before = snapTask(t), put = x => { const y = taskById(tid); if (!y) return; y.fields = {...(y.fields || {})}; if (x == null) delete y.fields[fid]; else y.fields[fid] = x; };
   put(v); render();  // at once on screen; the server's answer (or the error) settles it
   try {
-    const r = await api('PATCH', '/api/tasks/' + tid, {fields: {[fid]: v}});
+    const r = await api('PATCH', '/api/tasks/' + tid, {fields: {[fid]: v}, _prev: {fields: {[fid]: old}}});  // 2.537.0 (#4568): the base it saw (put() shows the new value already, the outbox would take that as the base)
     putTask(r); render(); if (S.sel === tid) renderDetail();
     const after = S.tasks.get(tid) || r;
     if (before) histFields(histLabel(before, after), [[before, snapTask(after)]], {res: r});

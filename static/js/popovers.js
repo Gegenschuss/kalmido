@@ -215,7 +215,7 @@ function datePop(anchor, id) {
     ...(st.due ? {deadline: st.deadline, nag: st.nag} : {deadline: 0, nag: ''}), remind_at: st.remind_at || null});
   const msgOf = () => st.due ? tr('Date: {0}', dayLabel(st.due)) : tr('Date removed');
   // instant mode: what was sent last, the running request chain, the dependent tasks the server moved along (first prev)
-  const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null};
+  const I = {sig: JSON.stringify(body()), timer: null, chain: Promise.resolve(), saved: false, shifted: new Map(), done: false, last: null, later: Promise.resolve()};  // 2.537.0 (#4568): later = the outbox's answers still to come
   const send = () => {
     clearTimeout(I.timer); I.timer = null;
     const b = body(), sig = JSON.stringify(b);
@@ -224,7 +224,9 @@ function datePop(anchor, id) {
     I.chain = I.chain.then(async () => {
       const r = await patchTask(id, b, true);
       I.saved = true; I.last = r;
-      for (const x of r?.shifted || []) { const o = I.shifted.get(x.id); I.shifted.set(x.id, o ? {...x, prev_start: o.prev_start, prev_due: o.prev_due} : x); }
+      const shAdd = sh => { for (const x of sh || []) { const o = I.shifted.get(x.id); I.shifted.set(x.id, o ? {...x, prev_start: o.prev_start, prev_due: o.prev_due} : x); } };
+      shAdd(r?.shifted);
+      if (r?._q) I.later = Promise.all([I.later, outLater(r._q).then(j => { shAdd(j?.shifted); if (j?.chain) I.lastChain = j.chain; })]);  // 2.537.0 (#4568): in the outbox, its answer follows
       const f = $('#pop .psaved'); if (f && !I.done) { f.innerHTML = `${ic('check', 's')}<span>${tr('Saved')}</span>`; f.classList.add('on'); }
       const u = $('#pop [data-q="revert"]'); if (u && !I.done) u.hidden = false;
     }).catch(() => { /* api() showed the error; the popover shows the state it has */ });
@@ -236,12 +238,14 @@ function datePop(anchor, id) {
     if (I.done) return; I.done = true;
     await send();
     if (!I.saved) return;
-    const cur = S.tasks.get(id) || I.last;
-    shiftUndo(before, cur ? {...cur, id, shifted: [...I.shifted.values()]} : null, msgOf());
+    const cur = S.tasks.get(id) || I.last, known = new Set(I.shifted.keys());
+    // 2.537.0 (#4568): the dependent tasks the outbox's answers move along join the step afterwards
+    const later = I.later.then(() => ({id, shifted: [...I.shifted.values()].filter(x => !known.has(x.id)), chain: I.lastChain}));
+    shiftUndo(before, cur ? {...cur, id, shifted: [...I.shifted.values()]} : null, msgOf(), later);
   };
   const revert = async () => {
     I.done = true; clearTimeout(I.timer);
-    await I.chain;
+    await I.chain; await I.later;  // 2.537.0 (#4568): + the answers of the outbox (the dependent tasks to put back)
     if (!I.saved) return;
     const back = {}; for (const k of ['due', 'due_time', 'reminders', 'repeat', 'repeat_from', 'start', 'duration', 'deadline', 'nag', 'remind_at']) back[k] = before[k] ?? (k === 'reminders' || k === 'repeat' || k === 'nag' ? '' : k === 'deadline' ? 0 : null);
     try { await patchTask(id, back, true); } catch { return; }

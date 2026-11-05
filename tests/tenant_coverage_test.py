@@ -1301,6 +1301,8 @@ ROUTES = {
     # 2.168.0 A (#2665): a document's project (only projects one sees, of the office's workspace), a project's documents only
     # with office rights in its area (p2168_a_docproject_test.py)
     "POST /api/office/docs/{}/project": "office", "GET /api/lists/{}/office-docs": "office",
+    # 2.537.0 C (#3433): tasks with a time budget from a quotation: the office's document, the project only when seen (p3433_c_offer_tasks_test.py)
+    "GET /api/office/docs/{}/tasks": "office", "POST /api/office/docs/{}/tasks": "office",
     # 2.299.0 D (#3193): hide / show the hints of the receipt check (people with edit on the document; p2299_d_api_test.py)
     "POST /api/docs/{}/checks": "document",
     # 2.299.0 C (#3192): bank bookings without a receipt, their counter and the reminder (p2299_c_norc_test.py)

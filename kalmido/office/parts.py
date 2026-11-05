@@ -516,10 +516,10 @@ def tp_duplicate(c, oid, did, nid):
     pmap = {}
     for p in c.execute("SELECT * FROM office_doc_parts WHERE doc_id=? AND org_id=? ORDER BY sort, id", (did, oid)).fetchall():
         row = {k: p[k] for k in p.keys() if k not in ("id", "doc_id", "created_at", "updated_at")}
-        row.update(doc_id=nid, created_at=ts, updated_at=ts)
+        row.update(doc_id=nid, created_at=ts, updated_at=ts, origin_id=p["origin_id"] or p["id"])  # 2.537.0 C (#3433): origin_id
         pmap[p["id"]] = insert_id(c, f"INSERT INTO office_doc_parts({','.join(row)}) VALUES({','.join('?' * len(row))})", list(row.values()))
         for it in _part_items(c, oid, did, p["id"]):
-            it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP}
+            it = {k: v for k, v in it.items() if k not in DUP_ITEM_SKIP} | {"origin_id": it.get("origin_id") or it["id"]}  # 2.537.0 C (#3433)
             it.update(doc_id=nid, org_id=oid, part_id=pmap[p["id"]])
             it = oc_item_store(c, oid, it)
             c.execute(f"INSERT INTO office_doc_items({','.join(it)}) VALUES({','.join('?' * len(it))})", list(it.values()))

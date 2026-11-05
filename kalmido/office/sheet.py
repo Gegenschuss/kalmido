@@ -668,6 +668,22 @@ def dk_sheet_calc(sheet, pack=None, lang="de", currency="EUR", fx=1, home="EUR")
             "labels": labels, "head_print": head_print, "lang": lg, "currency": cur}
 
 
+def dk_staff_days(sheet, lang="de"):
+    """2.537.0 C (#3433): the crew rows of a shoot sheet as [{uid, name, people, days}] for the tasks made from a quotation:
+    days = the working days of one person (shoot days + travel days, + prep days when the row has prep), the calendar days
+    without the price shares and weekend surcharges of dk_sheet_calc; the name in the document's language like the print."""
+    h = (sheet or {}).get("head") or {}
+    H = {k: dec(h.get(k), "0") for k in DK_HEAD}
+    out = []
+    for r in (sheet or {}).get("staff") or []:
+        if not isinstance(r, dict):
+            continue
+        nm = r.get("name") or "" if calc_lang(lang) == "de" else (r.get("name_tr") or {}).get(lang) or r.get("name_en") or r.get("name") or ""
+        days = H["shoot_days"] + H["travel_days"] + (H["prep_days"] if r.get("prep") else 0)
+        out.append({"uid": str(r.get("uid") or ""), "name": str(nm), "people": dec(r.get("qty"), "1"), "days": days})
+    return out
+
+
 def dk_calc_public(calc, admin):
     """The calculation for the client: members get no purchase (costs, margin, cost per row) and no markup."""
     if admin or not isinstance(calc, dict):

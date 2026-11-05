@@ -44,7 +44,7 @@ const addD = (s, n) => { const [y, m, d] = s.split('-').map(Number); const x = n
 
   // ================= several steps across action types, back and forth
   await w.eval(`toggleTask(${t1})`); await sleep(200);                        // 1 complete
-  await w.eval(`patchTask(${t2}, {priority: 5})`); await sleep(100);          // 2 field edit
+  await w.eval(`patchTask(${t2}, {priority: 5})`); await until(() => w.eval('OUT.q.length') === 0 && !w.eval('OUT.flushing'));  // 2 field edit; 2.537.0 (#4568): it goes through the outbox online too, the next writes (the create) would queue behind it (a temporary id)
   await w.eval(`patchUndoable(${t3}, {list_id: ${HOME}}, 'moved')`);         // 3 move
   const created = await w.eval(`createTask({title: 'Fresh idea', list_id: ${WORK}})`); const tn = created.id;  // 4 create
   await w.eval(`sectionCreate(${WORK}, 'Later')`);                             // 5 section

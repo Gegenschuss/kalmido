@@ -617,6 +617,7 @@ document.addEventListener('click', async e => {
     } break; }  // 2.31.0 (#1054): replaces the Details | Comments tabs; 2.31.1: the heading stays below the sticky panel header
     case 'sec-add': e.stopPropagation(); secAddOpen(+a.dataset.sec || 0); break;
     case 'c-send': sendComment(); break;
+    case 'c-resend': case 'c-pdrop': cmtPendBtn(a); break;  // 2.537.0 (#4569): a comment that was not sent
     case 'c-file-rm': { const arr = S.cfiles[S.sel] || []; arr.splice(+a.dataset.i, 1); $('#c-files').innerHTML = composerFiles(S.sel); break; }
     case 'mention-pick': mentionPick(+a.dataset.i); break;
     case 'c-edit': S.cedit = +a.dataset.cid; drawTimeline(); setTimeout(() => { const i = $(`.c-edit-input[data-cid="${a.dataset.cid}"]`); if (i) { autosize(i); i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); break;

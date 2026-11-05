@@ -183,8 +183,8 @@ S.te = {tid: null, items: null, v: -1, all: false, err: null};
 async function loadTaskTime(id) {
   if (!tFor(taskById(id)) || !(id > 0) || taskById(id)?.context) return;
   const v = S.v;
-  if (S.te.tid !== id) S.te = {tid: id, items: null, v: -1, all: false, err: null};
-  try { const j = await rawFetch('GET', `/api/time/entries?task_id=${id}`); if (S.te.tid === id) Object.assign(S.te, {items: j.entries, v, err: null}); }
+  if (S.te.tid !== id) S.te = {tid: id, items: null, budget: null, v: -1, all: false, err: null};
+  try { const j = await rawFetch('GET', `/api/time/entries?task_id=${id}`); if (S.te.tid === id) Object.assign(S.te, {items: j.entries, budget: j.budget || null, v, err: null}); }
   catch (e) { if (S.te.tid === id) Object.assign(S.te, {v, err: e instanceof Offline ? 'offline' : e.message}); }
   drawTaskTime();
 }
@@ -194,10 +194,22 @@ function taskTimeHtml(t) {
   const items = S.te.tid === t.id ? S.te.items : null;
   let h = `<h5>${tr('Time|tracked')}${all >= 60 ? ` <span class="muted h5note">${all - mine >= 60 ? tr('{0} in total, {1} by you', fmtDur(all), fmtDur(mine)) : fmtDur(all)}</span>` : ''}</h5>
     <div class="tebtns"><button class="btn sm ${run ? 'recon' : ''}" data-act="timer-toggle" data-id="${t.id}">${run ? `${ic('stop', 's')} ${tr('Stop')} <span data-timer-live>${fmtT(timerElapsed())}</span>` : `${ic('play', 's')} ${tr('Start timer')}`}</button><button class="btn sm" data-act="te-add" data-id="${t.id}">${ic('plus', 's')} ${tr('Add time')}</button></div>`;
+  h += te_budgetHtml(t);
   if (items === null) return h + (S.te.err === 'offline' ? `<div class="muted mhint">${tr('Time entries are only available online.')}</div>` : '');
   const shown = S.te.all ? items : items.slice(0, 8);
   return h + `<div class="telist">${shown.map(e => teRow(e, {task: false})).join('')}</div>` +
     (items.length > shown.length ? `<button class="btn sm telink" data-act="te-more">${tr('Show all ({0})', items.length)}</button>` : '');
+}
+// 2.537.0 (#3433): "tracked X of Y h" of the task with a "Budget h" (its subtasks count along, once per branch); the server sends
+// it with the entries (task_budget: rights like the project head bar), the bar and colours like the client's budget (80 / 100 %);
+// my running timer on the task or a subtask counts along. Hours only, never prices.
+function te_budgetHtml(t) {
+  const b = S.te.tid === t.id ? S.te.budget : null;
+  if (!b || !(b.h > 0)) return '';
+  const sub = id => [id, ...children(id).flatMap(k => sub(k.id))], run = S.timer?.task_id && sub(t.id).includes(S.timer.task_id) ? timerElapsed() : 0;
+  const hrs = (b.s + run) / 3600, pc = Math.round(hrs / b.h * 100), lv = pc >= 100 ? 'over' : pc >= 80 ? 'warn' : 'ok';
+  return `<div class="clbud tebud lv-${lv}" data-tebud="${t.id}"><div class="clbar" role="meter" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.min(100, pc)}" aria-label="${esc(tr('Budget used'))}"><i style="width:${Math.min(100, pc)}%"></i></div>`
+    + `<span class="clbt">${esc(tr('Tracked'))} <b>${esc(tr('{0} of {1} h', fmtNum(hrs, 1), fmtNum(b.h, 1)))}</b> · ${pc} % · ${esc(tr(BUDGET_TXT[lv]))}${b.own ? ` · ${esc(tr('Your time only'))}` : ''}</span></div>`;
 }
 function teRow(e, {task = true, day = true} = {}) {
   const s = new Date(e.start), en = e.end ? new Date(e.end) : null;

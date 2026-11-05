@@ -7681,6 +7681,9 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 /* 2.62.0 A (#1530) a message on its way: the bubble waits a little lighter until the server answered */
 .cmsg.csdpend .cbub{opacity:.6}
 .cmsg.csdpend .cmeta{opacity:.8}
+.cm.cmpend:not(.cmfail) .cbody{opacity:.6}
+.cm.cmfail .cpfail{color:var(--danger);font-size:.85em}
+.cm.cmfail .chead .btn{margin-left:.4em}
 
 /* 2.62.0 A (#1848) pinned chat messages: one quiet bar above the messages (the newest pin, an arrow through the others) */
 .cpnbar{display:flex;align-items:flex-start;gap:.375rem;padding:.125rem .5rem .125rem .75rem;border-bottom:.0625rem solid var(--line);background:color-mix(in srgb,var(--accent) 6%,var(--bg2));color:var(--accent);flex:0 0 auto}

@@ -633,6 +633,7 @@ async function api(method, url, body) {
   }
   url = tu;
   if (queueable(method, url) && !(body instanceof FormData) && OUT.q.length) return enqueue(method, url, body);
+  if (outNow(method, url, body)) { const r = enqueue(method, url, body); if (OUT.online && S.sel && url === '/api/tasks/' + S.sel) savedPing(); return r; }  // 2.537.0 (#4568)
   const ox = oxbPrev(method, url, body); body = ox.body;  // 2.528.0 B (#4305)
   try { const j = await rawFetch(method, url, body, oxaKey(body)); if (ox.on && j?.conflicts?.length) addConflicts(j.id || +url.split('/').pop(), j.conflicts, j.title); if (method !== 'GET' && S.sel && new RegExp(`^/api/tasks/${S.sel}(/|$)`).test(url)) savedPing(); return method === 'GET' ? mvResp(url, j) : j; }  // 2.436.0 (#3620)
   catch (e) {
@@ -795,6 +796,49 @@ async function fdWriteFlush() {
   } finally { fdWriteFlush.busy = false; }
 }
 window.addEventListener('online', () => setTimeout(fdWriteFlush, 500));
+// 2.537.0 (#4568): a change of one task (title, description, dates, tags, fields, priority, assignees ...) goes into the outbox
+// online too: shown and kept here at once, the server gets it in the background and its answer follows (outLater). Not: a
+// locked list (only ciphers leave, straight to the server as before), a move to another list / organisation, a task this page
+// does not hold, steps the server works out itself (_act, le2e_move, snippets). Deleting is no PATCH.
+function outNow(method, url, body) {
+  const m = method === 'PATCH' && /^\/api\/tasks\/(\d+)$/.exec(url);
+  if (!m || !body || typeof body !== 'object' || body instanceof FormData) return false;
+  const t = S.tasks.get(+m[1]); if (!t || t._enc) return false;
+  if ((typeof LE2E === 'object' && LE2E.on.has(t.list_id)) || (typeof listById === 'function' && listById(t.list_id)?.e2e)) return false;
+  if ((body.list_id != null && body.list_id !== t.list_id) || 'org_id' in body) return false;
+  return !['_act', 'le2e_move', 'snippets'].some(k => k in body);
+}
+// 2.537.0 (#4568): the server's answer to an outbox entry, for the one who wrote it (the dependent tasks a date moved along,
+// shifted / chain): a Promise of the answer, null when the change was refused (it waits in the conflicts dialog) or this page
+// went away first (the entry lives on, its waiter not)
+const OUT_LATER = new Map();
+function outLater(e) {
+  if (!e?.k) return Promise.resolve(null);
+  if (e.done) return Promise.resolve(e.res || null);
+  let w = OUT_LATER.get(e.k);
+  if (!w) { let res; const p = new Promise(r => { res = r; }); w = {p, res}; OUT_LATER.set(e.k, w); }
+  return w.p;
+}
+// an entry's answer came (j) or it was refused (null): its waiter gets it; a task's own answer is put in place (the server's
+// computed fields), when no newer change of the same task waits behind it. true = settled, no whole new state needed.
+function outAnswer(e, j) {
+  const w = OUT_LATER.get(e.k); if (w) { OUT_LATER.delete(e.k); w.res(j); }
+  const m = j && e.method === 'PATCH' && /^\/api\/tasks\/(\d+)$/.exec(e.url);
+  if (!m || j.id !== +m[1] || j.shifted?.length || j.chain?.skipped?.length) return false;
+  if (j.conflicts?.length) {  // the calm bar under the field the detail shows (as a save straight from the detail did)
+    const keep = {...j};
+    for (const c of j.conflicts) {
+      const el = (c.field === 'title' || c.field === 'content') && S.sel === j.id && $(c.field === 'title' ? '#d-title' : '#d-content');
+      if (!el) continue;
+      if (document.activeElement === el) keep[c.field] = el.value;  // the draft stays where it is typed
+      setTimeout(() => cfInline(j.id, c.field, c, el.value), 0);
+    }
+    if (!OUT.q.some(x => x.url === e.url)) putTask(keep);
+    return false;
+  }
+  if (!OUT.q.some(x => x.url === e.url)) putTask(j);
+  return true;
+}
 function enqueue(method, url, body) {
   body = outPrev(method, url, body);
   const pm = method === 'PATCH' && url.match(/^\/api\/tasks\/(-?\d+)$/);
@@ -880,6 +924,7 @@ async function outFlush() {
   const idmap = LS.get('idmap', {});
   let dropped = 0, wdropped = 0, skipped = 0, sent = 0, sentNt = 0;
   const ntU = u => typeof NT_URL === 'object' && NT_URL.test(u);  // 2.536.0 (#4567): a note's address (chat.js, not on every page)
+  let sentTk = 0;  // 2.537.0 (#4568): changes of a task whose answer settled it (outAnswer): no whole new state for them
   try {
     while (outSync().length) {
       const e = OUT.q[0];
@@ -899,7 +944,7 @@ async function outFlush() {
       // 2.359.0 A (#3023): a temporary id still in the entry: its create failed (a create always waits ahead of its changes) ->
       // not sent (no PATCH /api/tasks/-123), the change waits in the conflicts dialog
       const tmpLeft = /\/-\d+(?=[/?]|$)/.test(url) || [body?.parent_id, body?.task_id, ...(body?.ids || []), ...(body?.items || []).map(it => it?.id)].some(v => typeof v === 'number' && v < 0);
-      if (tmpLeft) { console.warn('outbox: its new task was not created', e); dropped++; outReject(e, new Error(tr('The new task could not be created'))); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; continue; }
+      if (tmpLeft) { console.warn('outbox: its new task was not created', e); dropped++; outReject(e, new Error(tr('The new task could not be created'))); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; outAnswer(e, null); continue; }
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
       try {
@@ -921,6 +966,7 @@ async function outFlush() {
         if (j?.order_kept) toast(tr(MO_KEPT));  // 2.363.3 (#3133)
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
         e.res = j;
+        if (outAnswer(e, j)) sentTk++;  // 2.537.0 (#4568): the answer for the one who wrote it
       } catch (err) {
         if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
         // 2.359.0 A (#3023): a server error (5xx, the maintenance / restore 503, too many requests 429, a timeout 408) is no
@@ -934,13 +980,14 @@ async function outFlush() {
         }
         if (err.data?.code === 'skip_stale') {  // 2.528.0 (#4305 B1): skipped elsewhere already = not skipped twice, the current date
           if (err.data.task && typeof putTask === 'function') putTask(err.data.task);
-          setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; continue;
+          setTimeout(() => toast(err.message), 400); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; outAnswer(e, null); continue;  // 2.537.0 (#4568): its waiter hears it
         }
         console.warn('outbox: dropped', e, err);  // e.g. 404: deleted on another device
         if (typeof ntReject === 'function' && ntU(e.url) && ntReject(e, err)) { /* 2.536.0 (#4567): 409 = the note's own dialog (chat.js) */ }
         else if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
         e.res = null;
+        outAnswer(e, null);  // 2.537.0 (#4568): refused: its waiter hears it (the change waits in the conflicts dialog)
       }
       e.done = true;
     }
@@ -950,13 +997,14 @@ async function outFlush() {
     OUT.flushing = false;
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
-    if (sent && sent > sentNt && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself
+    if (sent && sent > sentNt + sentTk && !OUT.q.length && !dropped && !wdropped && !skipped) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself; 2.537.0 (#4568): a task's change said "Saved" already
     if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
     else if (wdropped) setTimeout(() => toast(trn('{0} offline change of a knowledge page not applied (page deleted or no right)', '{0} offline changes of knowledge pages not applied (page deleted or no right)', wdropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
   }
-  // 2.536.0 (#4567): only notes went out (every few seconds while typing): no whole new state, the notes are drawn already
-  if (!(sent && sent === sentNt && !dropped && !wdropped)) await load();
+  // 2.536.0 (#4567): only notes went out (every few seconds while typing): no whole new state, the notes are drawn already;
+  // 2.537.0 (#4568): the same for task changes the answers settled
+  if (!(sent && sent === sentNt + sentTk && !dropped && !wdropped)) await load();
   render();
   if (typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline (attachments.js)
 }
@@ -1088,7 +1136,9 @@ function conflictModal() {
       if (b.dataset.cf === 'dl') { if (typeof qfDownload === 'function') await qfDownload(c.qf); return; }  // 2.380 H (#3387)
       if (c.qf && typeof qfForget === 'function') qfForget([c.qf]);
       if (b.dataset.cf === 'mine') {
-        try { const t = await api('PATCH', '/api/tasks/' + c.tid, c.field.startsWith('field:') ? {fields: {[c.field.slice(6)]: c.mine}} : {[c.field]: c.mine}); putTask(t); } catch { return; }
+        // 2.537.0 (#4568): the base = the other version shown here (the change goes through the outbox, which would take the page's)
+        const fk = c.field.startsWith('field:') && c.field.slice(6);
+        try { const t = await api('PATCH', '/api/tasks/' + c.tid, fk ? {fields: {[fk]: c.mine}, _prev: {fields: {[fk]: c.server}}} : {[c.field]: c.mine, _prev: {[c.field]: c.server}}); putTask(t); } catch { return; }
       }
       S.conflicts.splice(+b.dataset.i, 1);
     }

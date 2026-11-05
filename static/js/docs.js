@@ -614,7 +614,7 @@ async function dc_mdClick(e) {
     if (d.einvoice?.source === 'xml') { window.open(`/api/docs/${d.id}/einvoice`, '_blank', 'noopener'); return; }  // 2.146.0 A (#2451)
     if (typeof dcr_full === 'function' && dcr_full(d)) return;  // 2.521.0 (#4476): the full screen leafs through the list
     if (dc_isPdf(d) && typeof pdfView === 'function') pdfView({url: dc_fileUrl(d), name: d.name, size: d.size, dlUrl: dc_fileUrl(d, true)});
-    else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') window.open(dc_fileUrl(d), '_blank', 'noopener');
+    else if (/^image\//.test(d.mime) && typeof attLightbox === 'function') attLightbox('d', [{id: 'd', name: d.name, size: d.size}], (a, dl) => dc_fileUrl(d, dl));  // 2.537.0 (#4574)
     else window.open(dc_fileUrl(d), '_blank', 'noopener');
     return;
   }
