@@ -14,7 +14,7 @@ if (process.env.P2556AB_NOSTART !== '1') execFileSync('bash', [path.join(__dirna
 
 (async () => {
   await sleep(600);
-  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
+  const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
   await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CA}, body: JSON.stringify({lang: 'en', tour: 'done', features: 'cal,comments,collab,agents'})});
