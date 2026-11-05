@@ -545,7 +545,7 @@ async function rawFetch0(method, url, body, key) {
   const opt = {method, headers: {'X-Requested-With': 'kalmido'}, redirect: 'manual'};
   if (key) opt.headers['Idempotency-Key'] = key;  // 2.270.0 C (#3022): a replay the server already applied comes back as its first answer
   const dev = wpDevHeader(url); if (dev) opt.headers['X-Kalmido-Device'] = dev;
-  const un = typeof oun_hdr === 'function' ? oun_hdr(method, url) : ''; if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js
+  const un = (typeof oun_hdr === 'function' ? oun_hdr(method, url) : '') || (typeof obj_hdr === 'function' ? obj_hdr(method, url) : ''); if (un) opt.headers['X-Kalmido-Undo'] = un;  // 2.111.0 A (#2233): office_undo.js; 2.558.0 (#4709): objsave.js
   if (body instanceof FormData) opt.body = body;
   else if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
   let r;
