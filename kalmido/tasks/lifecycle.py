@@ -37,6 +37,20 @@ def _norm(v):
     return None if v in ("", None) else str(v)
 
 
+def people_merge(c, tid, old, mine):
+    """2.564.0 (#4701): tasks.people sent as a whole list with _prev.people = the list the client saw: the stored list with the
+    ones this client added / removed (a person another device added meanwhile stays). Invalid input goes on as sent
+    (people_set refuses it)."""
+    ok = lambda v: isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v)  # noqa: E731
+    if not ok(old) or not ok(mine):
+        return mine
+    have = [r[0] for r in c.execute("SELECT user_id FROM task_people WHERE task_id=? ORDER BY user_id", (tid,))]
+    if set(have) == set(old):
+        return mine
+    off, on = set(old) - set(mine), [x for x in mine if x not in old]
+    return list(dict.fromkeys([x for x in have if x not in off] + on))
+
+
 def apply_update(c, tid, b, conflicts=None, lock=False):
     """b may carry `_prev` = the values the client saw before its edit (offline replay, detail typing).
     A field whose server value differs from `_prev` was changed elsewhere meanwhile: it is NOT
@@ -72,6 +86,9 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
                             conflicts.append({"field": f"field:{int(fk)}", "server": cur, "mine": fv[fk]})
                         del fv[fk]
                 b["fields"] = fv
+                continue
+            if k == "people":  # 2.564.0 (#4701): who comes along, merged: only the ones added / removed against _prev apply
+                b["people"] = people_merge(c, tid, old, b["people"])
                 continue
             if k == "tags":
                 cur = my_tags(c, tid)
