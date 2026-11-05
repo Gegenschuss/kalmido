@@ -110,7 +110,7 @@ check(r.ok and any(x["data"].get("by_name") == "Erin Person" for x in renew(A)),
 assert A.patch(B + f"/api/users/{uid['erin']}", json={"disabled": False}).ok
 # a person without an organisation: her own office, no News
 r = Fr.post(B + "/api/orgs/0/encryption/recovery", json={"password": "password123"})
-check(r.status_code in (200, 404) and not renew(Fr), f"freelancer: the own office's recovery key as before, no News {r.status_code}")
+check(r.status_code == 404 and not renew(Fr), f"freelancer without a personal office yet: 404 as before (p2138_c), no News {r.status_code}")
 
 # ================================================================ #4374 self-hosted: unchanged
 CARL_AV = photo(S["carl"])
