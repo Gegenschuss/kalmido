@@ -58,7 +58,9 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
 - An old area that keeps its own role table and reference kind (stage 6, the projects, `kalmido/lists/lmcore.py`):
   `fsref=False` (the area's registration in files/fsref.py stays; the shares of its node are already in its base role, so
   `obj_role` does not read them again), `share_cols` (its own columns on `fs_shares`, e.g. `list_role` / `list_own`, put back
-  by `obj_share_restore`), `on_restore` (the area puts its role table right under its own rules after a restore, or refuses),
+  by `obj_share_restore`), `on_restore` (the area puts its role table right under its own rules after a restore, or refuses;
+  only for the area's own rows of a person / an agent, `list_own = 1` -- any other row of the node takes the core's way, a
+  group's own row is refused with 409), the reason `expired` in `obj_revoked` for an own row that ran out,
   `on_revoke` (its part of `obj_revoke_person`) and `list_col` (the column a token's project limit is checked against). Its
   routes call `obj_share(..., extra=..., checked=True)` / `obj_unshare(..., checked=True)` after checking the right and the
   target themselves.

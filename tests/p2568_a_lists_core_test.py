@@ -300,4 +300,25 @@ r = A.post(B + f"/api/lists/{L9}/shares/{rv[0][0]}/restore")
 check(r.ok and r.json().get("expiry_removed") is True and sees(S["erik"], L9) and role_of(L9, "erik") == "edit" and core_row(L9, uid["erik"])[3] is None,
       f"F3: the expired share comes back without its expiry and the answer says so {core_row(L9, uid['erik'])} " + r.text[:200])
 
+# F2: a file store row of the node (list_own 0) comes back as that, never as a membership; a group row: 409, never 500
+r = A.post(B + f"/api/files/nodes/{N9}/shares", json={"user_id": uid["fynn"], "role": "view"})
+check(r.status_code == 201, "F2: setup: the file store's share of the node with fynn " + r.text[:160])
+FS = dbx("SELECT id FROM fs_shares WHERE node_id=? AND user_id=? AND COALESCE(list_own,0)=0", (N9, uid["fynn"]))[0][0]
+rowj = {"id": FS, "node_id": N9, "user_id": uid["fynn"], "group_id": None, "agent_id": None, "role": "view", "expires_at": None,
+        "created_by": ALICE, "created_at": "2026-11-01T08:00:00Z", "by_role": "admin", "list_role": None, "list_own": 0}
+dbx("DELETE FROM fs_shares WHERE id=?", (FS,))
+RF2 = dbx("INSERT INTO obj_revoked(src,org_id,user_id,kind,ref_id,row_json,reason,by_id,created_at) VALUES('fs_shares',?,?,'list',?,?,'leave',?,?) RETURNING id",
+          (ORG, uid["fynn"], L9, json.dumps(rowj), ALICE, "2026-11-05T08:00:00Z"))[0][0]
+r = A.post(B + f"/api/lists/{L9}/shares/{RF2}/restore")
+own = dbx("SELECT own_role, frole FROM list_members WHERE list_id=? AND user_id=?", (L9, uid["fynn"]))
+check(r.ok and core_row(L9, uid["fynn"]) is None and own == [(None, "view")]
+      and dbx("SELECT COALESCE(list_own,0) FROM fs_shares WHERE node_id=? AND user_id=?", (N9, uid["fynn"])) == [(0,)],
+      f"F2: the file store's row comes back as a file store share (a role through the node), no own membership {own} ({r.status_code} {r.text[:160]})")
+rowg = dict(rowj, user_id=None, group_id=G, list_role="view", list_own=1)
+RG3 = dbx("INSERT INTO obj_revoked(src,org_id,user_id,kind,ref_id,row_json,reason,by_id,created_at) VALUES('fs_shares',?,NULL,'list',?,?,'retire',?,?) RETURNING id",
+          (ORG, L9, json.dumps(rowg), ALICE, "2026-11-05T08:00:00Z"))[0][0]
+r = A.post(B + f"/api/lists/{L9}/shares/{RG3}/restore")
+check(r.status_code == 409 and dbx("SELECT 1 FROM fs_shares WHERE node_id=? AND group_id=?", (N9, G)) == [],
+      f"F2: a group's own row: 409 (not 500), nothing written ({r.status_code} {r.text[:160]})")
+
 sys.exit(done("p2568_a_lists_core"))

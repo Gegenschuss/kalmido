@@ -670,8 +670,13 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
     n = obj_node(c, uid, kind, rid, make=True)
     if n is None:
         raise Denied(404)  # #4739: an area that places its nodes itself has none for it
-    # 2.568.0 (#4739): with an on_restore hook the area checks the target under its own rules (below)
-    if not key or (reg["on_restore"] is None and not _pool_ok(c, n, key, int(s[key]), uid)):
+    # 2.568.0 (#4739): with an on_restore hook the area checks the target under its own rules (below); review F2: only for
+    # the area's own rows of a person / an agent (lists: list_own) -- any other row (the file store's share on the node, a
+    # group) takes the core's way
+    own = reg["on_restore"] is not None and ("list_own" not in reg["share_cols"] or bool(s.get("list_own")))
+    if own and key == "group_id":
+        raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
+    if not key or (not own and not _pool_ok(c, n, key, int(s[key]), uid)):
         raise Denied(409, tr("Only people, groups and agents of the same workspace can get a share"))
     extra = {k: s.get(k) for k in reg["share_cols"] if k in s}
     mq, ma = _share_match(reg, extra)
@@ -685,7 +690,7 @@ def obj_share_restore(c, uid, kind, rid, revoked_id):
         c.execute(f"UPDATE fs_shares SET {k}=? WHERE id=?", (v, sid))
     c.execute("DELETE FROM obj_revoked WHERE id=?", (r["id"],))
     obj_forget()
-    if reg["on_restore"]:
+    if own:
         s2 = dict(s, id=sid)
         reg["on_restore"](c, uid, int(rid), s2)
     return sid
