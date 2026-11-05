@@ -36,7 +36,7 @@ async function wem_ask(p) {
   } catch { /* offline / no access: everything stays a placeholder */ }
   files.forEach(id => w.got.add('f' + id)); links.forEach(x => w.got.add('l' + x.toLowerCase()));
   if (S.route.mod === 'wiki' && (WK.pg === p || p._emb) && !WK.edit) viewSafeRender();  // 2.371.2 (#3151): + an embedded page
-  else if ((WK.pg === p || p._emb) && WK.edit && typeof wklv_redraw === 'function') wklv_redraw();  // 2.350.0 B (#3147): the live preview's blocks
+  else if ((WK.pg === p || p._emb) && WK.edit && typeof wkcm_redraw === 'function') wkcm_redraw();  // 2.554.0 (#4052): the editor's widgets
 }
 // ---- rendering (wiki.js wk_render: wem_cut before the Markdown, wem_put after it, wem_link for [[datei:…]] / [[tabelle:…]])
 const wem_cut = (src, out) => src.replace(WEM_EMBED_RE, (_, bang, label, id) => { out.push({img: !!bang, label, id}); return `⁣WEM${out.length - 1}⁣`; });
@@ -216,7 +216,7 @@ async function wem_swap(p, pairs, fwd) {
 }
 // ---- the editor: insert a picture / file (upload or from the file store), paste / drop files
 function wem_bar(p) {
-  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button>${typeof wklv_srcBtn === 'function' ? wklv_srcBtn() : ''}<span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
+  return `<div class="wembar" role="toolbar" aria-label="${esc(tr('Formatting'))}">${wem_fmtBtns()}<button type="button" class="btn sm" data-wem="ins" aria-haspopup="menu">${ic('picture', 's')}<span class="wemlbl">${esc(tr('Insert picture or file'))}</span></button><span class="shint">${esc(tr('Markdown: # heading, - list, [[Page]] links a page, #123 a task'))}</span></div>`;  // 2.298.0 C (#3187): the syntax behind (i)
 }
 // 2.276.0 B (#3043): the formatting bar -- writes the same Markdown one would type (heading, bold, italic, list, checkbox, link);
 // a click wraps the selection or prefixes the selected lines, a second click takes it away again. Edits go through insertText,
@@ -231,6 +231,7 @@ function wem_fmtBtns() {
 }
 // one replacement of [a, b) as ONE undo step, then select [s0, s1]
 function wem_rep(ta, a, b, txt, s0, s1) {
+  if (ta.cmRep) { ta.cmRep(a, b, txt, s0, s1); return; }  // 2.554.0 (#4052): the editor (wkcm.js): one transaction
   const v = ta.value;
   ta.focus(); ta.setSelectionRange(a, b);
   let ok = false; try { ok = document.execCommand('insertText', false, txt); } catch { /* not supported */ }
@@ -403,7 +404,6 @@ document.addEventListener('click', e => {
   if (k === 'ins') wem_insMenu(a, p);
   else if (k === 'cb') { e.preventDefault(); wem_cbDlg(p, [+a.dataset.k]); }
   else if (k === 'cbs') wem_cbDlg(p, wem_cbLines(p.body).map((_, i) => i));
-  else if (k === 'src' && typeof wklv_toggle === 'function') wklv_toggle();  // 2.382.0 (#3128)
 });
 // 2.276.0 B (#3043): the bar keeps the field's focus and selection (no blur = no save, the phone's keyboard stays)
 document.addEventListener('mousedown', e => { if (/** @type {any} */ (e.target).closest?.('[data-wemf]')) e.preventDefault(); });
@@ -447,7 +447,7 @@ function wem_pgLoad(id) {
     } catch (e) { x.p = null; x.err = e instanceof Offline ? tr('Knowledge pages are only available online.') : tr('Page not available'); }
     finally { x.v = S.v; x.busy = false; }
     if (S.route.mod !== 'wiki') return;
-    if (!WK.edit) viewSafeRender(); else if (typeof wklv_redraw === 'function') wklv_redraw();
+    if (!WK.edit) viewSafeRender(); else if (typeof wkcm_redraw === 'function') wkcm_redraw();  // 2.554.0 (#4052)
   })();
   return x;
 }

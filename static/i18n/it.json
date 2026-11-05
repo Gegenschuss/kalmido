@@ -16359,5 +16359,16 @@
   "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} documento finalizzato non è ancora concatenato (viene aggiunto alla prossima finalizzazione).", "{0} documenti finalizzati non sono ancora concatenati (vengono aggiunti alla prossima finalizzazione)."],
   "Chain broken: document {0} differs from what was finalised.": "Catena interrotta: il documento {0} differisce da quanto finalizzato.",
   "Chain broken: a document before {0} is missing.": "Catena interrotta: manca un documento prima di {0}.",
+  "Edit as Markdown": "Modifica come Markdown",
+  "Back to the editor": "Torna all'editor",
+  "Edit the table as text": "Modifica la tabella come testo",
+  "Cell {0}, {1}": "Cella {0}, {1}",
+  "Find": "Trova",
+  "Next match": "Risultato successivo",
+  "Previous match": "Risultato precedente",
+  "Match case": "Maiuscole/minuscole",
+  "Whole word": "Parola intera",
+  "Regular expression": "Espressione regolare",
+  "Replace all": "Sostituisci tutto",
   "Task…": "Attività…"
 }

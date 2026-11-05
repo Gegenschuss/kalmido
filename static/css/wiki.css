@@ -156,21 +156,52 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkselrow>.absel{min-height:2.5rem}
 /* 2.428.0 A (#3581): the shared floating bar (.mselbar): room below the list so the last row stays reachable */
 #wk-res:has(+ .mselbar){padding-bottom:6.5rem}
-/* 2.350.0 B (#3147): the live preview: drawn blocks, the open block is a growing field with its Markdown */
-.wklive{position:relative;min-height:12rem;padding:.25rem 0 2rem;cursor:text}
-.wklive .wklb{border-radius:var(--r-s);min-height:.25rem}
-.wklive .wklb>:first-child{margin-top:0}
-.wklive .wklb>:last-child{margin-bottom:0}
-.wklive .wklb+.wklb,.wklive .wklb+.wkblk,.wklive .wkblk+.wklb{margin-top:.25rem}
-.wklive .wkgap1{min-height:0;height:0}
-.wklive .wkgap2{height:1.5em}
-.wklive .wkgap3{height:3em}
-.wklive .wkgap4{height:4.5em}
-@media (hover:hover){.wklive .wklb:not(.wkgap1):hover{background:var(--bg2)}}
-.wklive .wklvfm{margin:0;color:var(--muted);font-size:var(--fs-s);white-space:pre-wrap}
-.wkblk{display:block;box-sizing:border-box;width:100%;min-height:1.75rem;margin:0;padding:.25rem .375rem;border:0;border-radius:var(--r-s);outline:1px solid var(--line2);background:var(--bg2);color:var(--text);font:inherit;line-height:var(--lh);resize:none;overflow:hidden}
-.wkblk:focus{outline:2px solid var(--accent)}
-.wkedwrap:has(#wk-live) .wkac{bottom:auto}
+/* 2.554.0 (#4052): the one editor (static/js/wkcm.js, CodeMirror 6): Markdown marks only at the cursor, the rest drawn like the
+   read view (the box carries .md .wkmd, so pictures, tables and diagrams of the widgets look the same); 2.350.0 B (#3147) is gone */
+.wkcm{position:relative;min-height:12rem}
+.wkcm .cm-editor{background:none;color:inherit;font:inherit}
+.wkcm .cm-editor.cm-focused{outline:none}
+.wkcm .cm-scroller{font:inherit;line-height:var(--lh);overflow:visible}
+.wkcm .cm-content{min-height:12rem;padding:.25rem 0 2rem;caret-color:var(--text)}
+.wkcm .cm-line{padding:0}
+.wkcm .cm-cursor,.wkcm .cm-dropCursor{border-left-color:var(--text)}
+.wkcm .cm-selectionBackground,.wkcm .cm-focused>.cm-scroller>.cm-selectionLayer .cm-selectionBackground{background:var(--accent-soft)}
+.wkcm .cm-placeholder{color:var(--muted)}
+.wkcm .cm-wkh{font-weight:650;line-height:var(--lh-tight)}
+.wkcm .cm-wkh1{padding-top:.5em;font-size:1.6em}
+.wkcm .cm-wkh2{padding-top:.4em;font-size:1.35em}
+.wkcm .cm-wkh3{padding-top:.3em;font-size:1.15em}
+.wkcm .cm-wkh4,.wkcm .cm-wkh5,.wkcm .cm-wkh6{padding-top:.2em;font-size:1.05em}
+.wkcm .cm-wkb{font-weight:700}
+.wkcm .cm-wki{font-style:italic}
+.wkcm .cm-wks,.wkcm .cm-wkdone{text-decoration:line-through}
+.wkcm .cm-wkdone{color:var(--muted)}
+.wkcm .cm-wkc{padding:0 .2em;border-radius:.25rem;background:var(--bg3);font-family:var(--mono);font-size:.9em}
+.wkcm .cm-wkcode{background:var(--bg2);font-family:var(--mono);font-size:.9em}
+.wkcm .cm-wkl{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
+.wkcm .cm-wkmiss{text-decoration-style:dashed}
+.wkcm [data-wkgo],.wkcm [data-wknew]{cursor:pointer}
+.wkcm .cm-wkq{padding-left:.75rem;border-left:3px solid var(--line2);color:var(--muted)}
+.wkcm .cm-wkfm,.wkcm .cm-wksrc{color:var(--muted);font-family:var(--mono);font-size:.9em}
+.wkcm .cm-wkbul{color:var(--muted)}
+.wkcm .cm-wkcb input{margin:0 .4em 0 0;vertical-align:-.15em;cursor:pointer}
+.wkcm .cm-wkhr{display:block}
+.wkcm .cm-wkhr hr{margin:.5em 0}
+.wkcm .cm-wkw img{max-width:100%}
+.wkcm .cm-wkwb{display:block;padding:.125rem 0;border-radius:var(--r-s);cursor:pointer}
+.wkcm .cm-wkwb>:first-child{margin-top:0}
+.wkcm .cm-wkwb>:last-child{margin-bottom:0}
+.wkcm .cm-wktbl{position:relative;margin:.25rem 0;overflow-x:auto}
+.wkcm .cm-wktbl :is(td,th){min-width:3rem;cursor:text}
+.wkcm .cm-wkcell{box-sizing:border-box;width:100%;min-width:4rem;padding:0;border:0;outline:2px solid var(--accent);background:var(--bg);color:inherit;font:inherit}
+.wkcm .cm-wktsrc{position:absolute;top:0;right:0;opacity:0}
+.wkcm .cm-wktbl:is(:hover,:focus-within) .cm-wktsrc,.wkcm .cm-wktsrc:focus{opacity:1}
+.wkcm .cm-panels{border-color:var(--line2);background:var(--bg2);color:var(--text)}
+.wkcm .cm-panels input,.wkcm .cm-panels button{font:inherit;font-size:var(--fs-s)}
+.wkcmwait{opacity:.75}
+@media (hover:hover){.wkcm .cm-wkwb:hover{background:var(--bg2)}}
+@media (hover:none){.wkcm .cm-wktsrc{opacity:1}}
+.wkedwrap:has(#wk-cm) .wkac{bottom:auto}
 /* 2.350.0 C (#2744): a running import - the note on top of the knowledge pages and at Knowledge in the bar (a click opens its window) */
 .wki-st{display:flex;align-items:center;gap:.5rem;width:100%;margin:0 0 .5rem;padding:.375rem .75rem;border:1px solid var(--line);border-radius:.5rem;background:var(--bg2);color:var(--text);font:inherit;font-size:var(--fs-m);text-align:left;cursor:pointer}
 .wki-st:hover{background:var(--bg3)}

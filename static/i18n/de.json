@@ -16358,5 +16358,16 @@
   "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} festgeschriebenes Dokument ist noch nicht verkettet (es kommt beim nächsten Festschreiben dazu).", "{0} festgeschriebene Dokumente sind noch nicht verkettet (sie kommen beim nächsten Festschreiben dazu)."],
   "Chain broken: document {0} differs from what was finalised.": "Kette unterbrochen: Dokument {0} weicht vom festgeschriebenen Stand ab.",
   "Chain broken: a document before {0} is missing.": "Kette unterbrochen: Ein Dokument vor {0} fehlt.",
+  "Edit as Markdown": "Als Markdown bearbeiten",
+  "Back to the editor": "Zurück zum Editor",
+  "Edit the table as text": "Tabelle als Text bearbeiten",
+  "Cell {0}, {1}": "Zelle {0}, {1}",
+  "Find": "Suchen",
+  "Next match": "Nächster Treffer",
+  "Previous match": "Vorheriger Treffer",
+  "Match case": "Groß-/Kleinschreibung beachten",
+  "Whole word": "Ganzes Wort",
+  "Regular expression": "Regulärer Ausdruck",
+  "Replace all": "Alle ersetzen",
   "Task…": "Aufgabe…"
 }

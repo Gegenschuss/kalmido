@@ -79,7 +79,7 @@ async function wk_load(sp, force) {
   if (typeof sbb_sync === 'function') sbb_sync('wiki');  // 2.152.3 B (#2620): the panel's folders
 }
 async function wk_loadPage(id, force) {
-  if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || WK.edit))) return;
+  if (WK.busy['p' + id] || (!force && WK.pg && WK.pg.id === id && (WK.pg._v === S.v || WK.dirty || (WK.edit && wk_typing())))) return;  // 2.554.0 (#4052): the editor is open on every page one may write: only while one writes in it
   WK.busy['p' + id] = true;
   const v0 = S.v, mk0 = WK.pgMk;  // 2.519.0 (#3715): as wk_load - a page marked while it loads stays marked
   try {
@@ -161,6 +161,7 @@ function wk_scrollAfter(id, ready) {
 const wk_moreHtml = d => d?.more ? `<div class="muted mhint wkcapped" role="status">${ic('info', 's')}${esc(tr('Only the first {0} pages of this workspace are shown here.', 5000))}</div>` : '';
 // ---- the view
 function viewWiki() {
+  if (typeof wkcm_gone === 'function') wkcm_gone();  // 2.554.0 (#4052): the editor of a page that went (another page, a space locked) lets go of its text
   const all = wk_all(), op = wk_open(), sp = op || wk_cur(), d = WK.idx[sp];
   if (!d || d.v !== S.v) wk_load(sp);
   if (all && op && S.route.wsp === op && WK.space !== op) { WK.space = op; LS.set('wkSpace', op); }  // 2.198.0 A (#2743): the space used last (New page, older links)
@@ -490,16 +491,22 @@ function wk_attrsHtml(a, sp) {
   const tagv = (k, v) => /^tags?$/i.test(k) && typeof wkt_attrHtml === 'function' && wkt_attrHtml(v, sp);  // 2.371 (#3150): the tags as links
   return `<dl class="wkattrs">${ks.map(k => `<div><dt>${esc(k)}</dt><dd>${tagv(k, a[k]) || esc(Array.isArray(a[k]) ? a[k].join(', ') : String(a[k]))}</dd></div>`).join('')}</dl>`;
 }
+// 2.554.0 (#4052): one editor (wkcm.js, CodeMirror): a page one may write opens ready to type on a computer; a phone shows it
+// read first and its pen opens the same editor. "Read only" (LS wkRo, this device) and "Edit as Markdown" (the plain field,
+// WK.mdFor) are in the page's "…" menu; without the right to write the page is only read. LS wkEd (the former choice) is ignored.
+const wk_ro = () => !!LS.get('wkRo', '');
+const wk_typing = () => !!document.activeElement?.closest?.('#wk-cm, #wk-body');
 function wk_pageHtml(p) {
-  const may = WK.idx[p.space]?.mayWrite !== false, edit = WK.edit && may, mob = isMobile();
+  const may = WK.idx[p.space]?.mayWrite !== false, mob = isMobile(), asMd = WK.mdFor === p.id, cm = typeof wkcm_html === 'function' && wkcm_can();
+  const edit = WK.edit = may && (asMd || (!wk_ro() && (WK.edit || !mob)));
   return `<div class="nthead">${mob ? `<button type="button" class="iconbtn" data-wk="close" aria-label="${esc(tr('Back'))}">${ic('back')}</button>` : ''}
     <div class="wktitle">${wk_crumbs(p)}<h2>${esc(wk_base(p.path))}${typeof wsh_markHtml === 'function' ? wsh_markHtml(p.shares) : ''}</h2></div>
+    ${mob && may && !wk_ro() && !asMd ? `<button type="button" class="iconbtn wkpen" data-wk="pen" aria-pressed="${edit}" title="${esc(edit ? tr('Done') : tr('Edit'))}" aria-label="${esc(edit ? tr('Done') : tr('Edit'))}">${ic(edit ? 'check' : 'edit')}</button>` : ''}
     ${may && typeof wsh_btnHtml === 'function' ? wsh_btnHtml(p) : ''}
     ${may ? `<button type="button" class="iconbtn" data-wk="pmenu" aria-haspopup="menu" title="${esc(tr('More'))}" aria-label="${esc(tr('More'))}">${ic('dots')}</button>` : ''}
     ${mob ? '' : `<button type="button" class="iconbtn" data-wk="close" title="${esc(tr('Close'))}" aria-label="${esc(tr('Close'))}">${ic('x')}</button>`}</div>${wk_dayBar(p)}
-    ${may ? `<div class="seg ntmode" role="group" aria-label="${esc(tr('Mode'))}"><button type="button" data-wk="mode" data-m="read" class="${edit ? '' : 'on'}" aria-pressed="${!edit}">${tr('Read')}</button><button type="button" data-wk="mode" data-m="edit" class="${edit ? 'on' : ''}" aria-pressed="${edit}">${tr('Edit')}</button></div>` : ''}
-    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${typeof wklv_on === 'function' && wklv_on() ? wklv_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], #123)'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
-      : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${may ? tr('Empty page. Switch to Edit to write.') : tr('Empty page.')}</p>`}</div>`}
+    ${edit ? `<div class="wkedwrap">${typeof wem_bar === 'function' ? wem_bar(p) : ''}${!asMd && cm ? wkcm_html(p) : `<textarea id="wk-body" class="ntbody" aria-label="${esc(tr('Text'))}" placeholder="${esc(tr('Write … ([[Page]], #123)'))}">${esc(p.body)}</textarea>`}<div id="wk-ac" class="wkac hidden" role="listbox" aria-label="${esc(tr('Pages'))}"></div></div>`
+      : `${wk_attrsHtml(p.attrs, p.space)}<div class="md ntmd wkmd" id="wk-md">${wk_bodyStrip(p.body).trim() ? wk_render(p) : `<p class="muted">${tr('Empty page.')}</p>`}</div>`}
     ${wka_html(p, may)}${wko_cfHtml(p)}
     ${p.backlinks?.length ? `<section class="wkback" aria-label="${esc(tr('Linked from'))}"><h4>${ic('link', 's')}${tr('Linked from')}</h4><ul>${p.backlinks.map(b => `<li><a href="#wiki/${b.id}">${esc(b.path)}</a></li>`).join('')}</ul></section>` : ''}
     <div class="ntfoot muted"><span id="wk-saved" role="status" aria-live="polite"></span><span class="spacer"></span>${p._off ? `<span class="wkoff">${esc(tr('Offline · as of {0}', fmtWhen(p._off)))}</span> · ` : ''}<span>${esc(tr('Changed {0}', fmtWhen(p.updated_at)))}${p.updated_by_name ? ' · ' + esc(p.updated_by_name) : ''}</span></div>${wk_smvLine(p.moved)}`;
@@ -659,15 +666,15 @@ document.addEventListener('click', e => {
   else if (a.dataset.wka === 'del' && f) wka_del(p, f);
 });
 // ---- saving (like notes: debounced, a change by someone else in between asks)
-// 2.350.0 B (#3147): the field one writes in: the plain text editor or the open block of the live preview (wklive.js)
-const wk_ta = () => /** @type {any} */ ($('#wk-body') || $('#wk-blk'));
-const wk_isTa = t => t?.id === 'wk-body' || t?.id === 'wk-blk';
+// 2.350.0 B (#3147): the field one writes in; 2.554.0 (#4052): the plain field (Edit as Markdown) or the editor's stand-in (wkcm.js wkcm_ta)
+const wk_ta = () => /** @type {any} */ ($('#wk-body') || (typeof wkcm_ta === 'function' ? wkcm_ta() : null));
+const wk_isTa = t => t?.id === 'wk-body' || (typeof wkcm_isEl === 'function' && wkcm_isEl(t));
 function wk_queue() { WK.dirty = true; WK.seq = (WK.seq || 0) + 1; clearTimeout(WK.saveT); WK.saveT = setTimeout(wk_flush, 1000); wk_preseal(); }
 // 2.527.0 (#4304 A2): the page goes away (tab closed, reload): what was typed and not saved yet goes into the queue at once
 // (synchronously, outStash) and out with keepalive under the same key (core.js keepSend; the server applies it once). An
 // encrypted space never stores or sends its text in clear: its cipher is made while typing (wk_preseal, after every seal kept
 // in WK.seal), the pagehide takes the newest one - sealing only at the pagehide would come too late (async, the page is gone).
-const wk_src = p => $('#wk-body') || (typeof wklv_src === 'function' ? wklv_src(p) : null);
+const wk_src = p => $('#wk-body') || (typeof wkcm_src === 'function' ? wkcm_src(p) : null);  // 2.554.0 (#4052)
 function wk_preseal() {
   const p = WK.pg; if (!p || !wk_e2e(p.space) || typeof wkeReady !== 'function' || !wkeReady(p.space)) return;
   clearTimeout(WK.sealT);
@@ -787,10 +794,10 @@ async function wk_mk(sp, path, tpl) {  // makes the page (tpl = a template's id,
   WK.caretNext = f.at >= 0 ? {id: r.id, at: f.at} : null;
   return r;
 }
-function wk_caretAt(at) {  // writing starts there: the plain text field, else the live preview's block with that place
+function wk_caretAt(at) {  // writing starts there: the plain text field, else the editor (2.554.0 #4052, wkcm.js)
   const ta = /** @type {any} */ ($('#wk-body'));
   if (ta) { ta.focus(); ta.setSelectionRange(at, at); return; }
-  if ($('#wk-live') && typeof wklv_open === 'function') wklv_open(at);
+  if (typeof wkcm_caret === 'function') wkcm_caret(at);
 }
 // 2.371.2 (#3151): daily notes -- "Today" opens journal/YYYY-MM-DD of the space, made from the template Templates/Tagesnotiz
 // (or Templates/Daily note, Vorlagen/…) when there is one, else empty. A daily note shows the nearest earlier / later day
@@ -940,7 +947,7 @@ function wk_acDraw(box) {
   box.innerHTML = WK.ac.hits.map((p, i) => `<button type="button" role="option" class="${i === WK.ac.i ? 'on' : ''}" aria-selected="${i === WK.ac.i}" data-wk="ac" data-i="${i}">${typeof wem_fi === 'function' ? wem_fi(p._ic || 'note') : ic(p._ic || 'note', 's')}<span>${esc(p._label || p.path)}</span></button>`).join('');
   box.classList.remove('hidden');
   if (typeof wem_acPlace === 'function') wem_acPlace(box);  // 2.126.2 A (#2363): stay above the on-screen keyboard
-  if (typeof wklv_acPlace === 'function') wklv_acPlace(box);  // 2.350.0 B (#3147): below the live preview's open block
+  if (typeof wkcm_acPlace === 'function') wkcm_acPlace(box);  // 2.554.0 (#4052): below the editor's caret
 }
 function wk_acPick(i) {
   const ta = wk_ta(), a = WK.ac; if (!ta || !a) return;
@@ -969,7 +976,7 @@ document.addEventListener('click', async e => {
   else if (k === 'create') { e.preventDefault(); if (WK.idx[p?.space || wk_cur()]?.mayWrite !== false) wk_new(a.dataset.path); }
   else if (k === 'close' || k === 'home') { e.preventDefault(); await wk_flush(); WK.edit = false; go(k === 'close' && p && wk_dirOf(p.path) && typeof sbb_on === 'function' && sbb_on() ? wk_dirGo(wk_dirOf(p.path), p.space) : p ? wk_home(p.space) : 'wiki'); }  // 2.198.0 A (#2743): under "All" into the page's space  // 2.152.3 B (#2620): a computer: back to the page's folder
   else if (k === 'amenu') menu(a, w299_areaItems());  // 2.152.3 B (#2620): the space's menu in the bar
-  else if (k === 'mode') { if (a.dataset.m === 'read') await wk_flush(); WK.edit = a.dataset.m === 'edit'; renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); }
+  else if (k === 'pen') { if (WK.edit) await wk_flush(); WK.edit = !WK.edit; if (WK.edit && typeof WKCM !== 'undefined') WKCM.focusNext = true; renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); }  // 2.554.0 (#4052): the phone's pen (Read / Edit is gone)
   else if (k === 'ac') { e.preventDefault(); wk_acPick(+a.dataset.i); }
   else if (k === 'cfshow' && p) wko_cfShow(p);  // 2.169.0 (#2671)
   else if (k === 'pmenu' && p) menu(a, [{label: tr('Rename…'), icon: 'edit', fn: () => wk_rename(p)},
@@ -979,7 +986,7 @@ document.addEventListener('click', async e => {
     ...(typeof wkh_items === 'function' ? wkh_items(p) : []),  // 2.123.0 A (#2102): the page history (wkhist.js)
     {label: tr('Copy link'), icon: 'link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#wiki/${p.id}`).then(() => toast(tr('Link copied'))); }},
     {label: tr('Copy as [[link]]'), icon: 'copy', fn: () => { navigator.clipboard?.writeText(`[[${p.path}]]`).then(() => toast(tr('Link copied'))); }},
-    ...(typeof wklv_menuItem === 'function' ? [wklv_menuItem()] : []),  // 2.350.0 B (#3147): live preview <-> plain text
+    ...wk_modeItems(p),  // 2.554.0 (#4052): Edit as Markdown (the way out) / Read only
     ...(typeof wkst_items === 'function' ? wkst_items(p) : []),  // 2.371.3 (#3152): reading style (mine / the space's)
     '-', {label: tr('Delete'), icon: 'trash', cls: 'flag-5', fn: () => wk_delete(p)}]);
 });
@@ -987,8 +994,14 @@ document.addEventListener('change', e => {
   if (e.target.matches?.('[data-wk-tpl]')) WK.tplPick = +e.target.value;
   if (e.target.matches?.('[data-wk-sp]')) { WK.spPick = e.target.value; const t = e.target.closest('.cdlg-b')?.querySelector('[data-wk-tpl]'); if (t) { t.innerHTML = wk_tplOpts(WK.spPick); t.closest('.wktpl')?.classList.toggle('hidden', !wk_pages(WK.spPick).some(x => wk_isTpl(x.path))); WK.tplPick = 0; } }  // 2.198.0 A (#2743): New page without an open space: its templates follow the space
 });
+// 2.554.0 (#4052): the page's "…" entries of the editor: the plain Markdown field as the way out, and the lock "Read only"
+function wk_modeItems(p) {
+  const asMd = WK.mdFor === p.id, ro = wk_ro(), sw = fn => async () => { await wk_flush(); fn(); renderView(); if (WK.edit) setTimeout(() => wk_ta()?.focus(), 30); };
+  return [...(ro ? [] : [asMd ? {label: tr('Back to the editor'), icon: 'edit', fn: sw(() => { WK.mdFor = 0; })} : {label: tr('Edit as Markdown'), icon: 'code', fn: sw(() => { WK.mdFor = p.id; WK.edit = true; })}]),
+    {label: tr('Read only'), icon: 'lock', on: ro, fn: sw(() => { if (ro) LS.del('wkRo'); else { LS.set('wkRo', '1'); WK.mdFor = 0; } WK.edit = false; })}];
+}
 document.addEventListener('input', async e => {
-  if (wk_isTa(e.target)) { wk_queue(); wk_acUpdate(e.target); }  // 2.350.0 B (#3147): + the live preview's block
+  if (wk_isTa(e.target) && e.target.id === 'wk-body') { wk_queue(); wk_acUpdate(e.target); }  // 2.554.0 (#4052): the editor saves through its own listener (wkcm.js wkcm_upd)
   else if (e.target.id === 'wk-q') { WK.q = e.target.value; const r = $('#wk-res'); if ($('#view .wkdesk')) { if (WK.dirty) await wk_flush(); renderView(); return; }  /* 2.152.3: save a page being edited before the hits replace it */ if (r) {  /* 2.152.3 B (#2620): the bar of a computer: hits replace the page / folder */ const v = document.createElement('div'); v.innerHTML = viewWiki(); const n = $('#wk-res', v); if (n) r.innerHTML = n.innerHTML; } }
 });
 document.addEventListener('keydown', e => {
