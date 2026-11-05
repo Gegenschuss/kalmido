@@ -20,7 +20,7 @@ import mimetypes
 import os
 import time
 import uuid
-from flask import g, jsonify, request, Response
+from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, ATT_DIR, MAX_FILE_MB
 from ..core.pg import insert_id, system_ctx, write_lock
@@ -36,12 +36,13 @@ from ..core.errors import BadInput, reject_unknown
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
-from ..accounts.orgroles import user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import FULL_READ, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions; 2.565.0 (#4719): FULL_READ
 from .teamchat import tchat_coworkers, need_tchat, need_room  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name, unexec_name, send_stored  # 2.369.5 (#2517): pulled up from functions
 from ..notify.alerts import aa_count, aa_oserr  # 2.369.5 (#2517): pulled up from functions
 from ..core.errors import UnknownFields  # 2.369.5 (#2517): pulled up from functions
+from ..lists.groups import need_group  # 2.565.0 (#4719): a channel shared with a group
 
 TCX_KINDS = ("channel", "group")
 TCX_NAME_MAX, TCX_MEMBERS_MAX, TCX_FILES_MAX = 80, 200, 10
@@ -60,7 +61,10 @@ def tcx_agent_org(c, aid):
 
 
 def tcx_member_ids(c, rid):
-    return {r[0] for r in c.execute("SELECT user_id FROM tchat_members WHERE room_id=?", (rid,))}
+    """The member rows of room rid: the fallback rows and the core's personal shares (2.565.0, #4719; no group's members)."""
+    from .tcxcore import tcx_core_members_sql
+    return {r[0] for r in c.execute(f"SELECT user_id FROM tchat_members WHERE room_id=? UNION SELECT user_id FROM {tcx_core_members_sql()} cm "
+                                    "WHERE cm.room_id=? AND cm.via=0", (rid, rid))}
 
 
 def tcx_members(c, r):
@@ -75,16 +79,25 @@ def tcx_members_of(c, rooms):
     out = {r["id"]: set() for r in rooms}
     if not out:
         return out
-    rows = c.execute("""SELECT m.room_id, m.user_id, u.disabled, u.kind FROM tchat_members m JOIN users u ON u.id=m.user_id
-                        WHERE m.room_id = ANY(CAST(? AS BIGINT[]))""", (sorted(out),)).fetchall()
+    # 2.565.0 (#4719): the members are the core's shares of the room (a person, an agent, a group's members: via = the group)
+    # and the fallback rows of tchat_members (kept in step, tcxcore.py); a group gives a channel only its enabled people who
+    # are full members of the channel's organisation (no guests / accounting, the rule of the open channels)
+    from .tcxcore import tcx_core_members_sql
+    rows = c.execute(f"""SELECT m.room_id, m.user_id, MIN(m.via) AS via, u.disabled, u.kind
+                         FROM (SELECT room_id, user_id, 0 AS via FROM tchat_members WHERE room_id = ANY(CAST(? AS BIGINT[]))
+                               UNION SELECT room_id, user_id, via FROM {tcx_core_members_sql()} cm WHERE cm.room_id = ANY(CAST(? AS BIGINT[]))) m
+                         JOIN users u ON u.id=m.user_id GROUP BY m.room_id, m.user_id, u.disabled, u.kind""",
+                     (sorted(out), sorted(out))).fetchall()
     ppl = sorted({x["user_id"] for x in rows if (x["kind"] or "") != "agent"})
     ags = sorted({x["user_id"] for x in rows if (x["kind"] or "") == "agent"})
-    orgs = {}
+    orgs, full = {}, {}
     if ppl and any(r["org_id"] for r in rooms):
         if instance_mode(c) != "shared":  # user_orgs of every person at once
             with system_ctx(c):
-                for x in c.execute("SELECT user_id, org_id FROM org_members WHERE user_id = ANY(CAST(? AS BIGINT[]))", (ppl,)):
+                for x in c.execute("SELECT user_id, org_id, role FROM org_members WHERE user_id = ANY(CAST(? AS BIGINT[]))", (ppl,)):
                     orgs.setdefault(x[0], set()).add(x[1])
+                    if x[2] in FULL_READ:
+                        full.setdefault(x[0], set()).add(x[1])
     aorg = {}
     if ags:
         with system_ctx(c):  # tcx_agent_org of every agent at once
@@ -93,11 +106,12 @@ def tcx_members_of(c, rooms):
     by = {r["id"]: r for r in rooms}
     for x in rows:  # the people first (a personal agent follows its owner out)
         r = by[x["room_id"]]
-        if (x["kind"] or "") != "agent" and not x["disabled"] and (not r["org_id"] or r["org_id"] in orgs.get(x["user_id"], ())):
+        if (x["kind"] or "") != "agent" and not x["disabled"] and (not r["org_id"] or r["org_id"] in orgs.get(x["user_id"], ())) \
+                and (not x["via"] or (r["kind"] == "channel" and (not r["org_id"] or r["org_id"] in full.get(x["user_id"], ())))):
             out[r["id"]].add(x["user_id"])
     for x in rows:
         r, a = by[x["room_id"]], aorg.get(x["user_id"])
-        if (x["kind"] or "") == "agent" and r["kind"] == "channel" and a and not a["disabled"] \
+        if (x["kind"] or "") == "agent" and not x["via"] and r["kind"] == "channel" and a and not a["disabled"] \
                 and (a["org_id"] or None) == (r["org_id"] or None) and (a["owner_id"] is None or a["owner_id"] in out[r["id"]]):
             out[r["id"]].add(x["user_id"])
     return out
@@ -151,8 +165,12 @@ def tcx_can_manage(c, r, uid, mem=None):
 def tcx_rooms_of(c, uid, mems=None):
     """The channels / groups uid is a member of (not archived) -- for tchat_rooms (teamchat.py). 2.281.0 B (#3110): mems =
     a dict that gets {room id: tcx_members} of these rooms."""
-    rows = c.execute("""SELECT r.* FROM tchat_rooms r JOIN tchat_members m ON m.room_id=r.id
-                        WHERE m.user_id=? AND r.kind IN ('channel','group') AND r.archived_at IS NULL""", (uid,)).fetchall()
+    from .tcxcore import tcx_core_rooms_sql
+    from ..core.objects import obj_token_lists
+    if obj_token_lists(uid) is not None:
+        return []  # 2.565.0 (#4719): the core's floor (obj_role): a token limited to lists reaches no channel / group
+    rows = c.execute(f"""SELECT r.* FROM tchat_rooms r WHERE r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})
+                         AND r.kind IN ('channel','group') AND r.archived_at IS NULL""", (uid,)).fetchall()
     mm = tcx_members_of(c, rows)
     if mems is not None:
         mems.update(mm)
@@ -178,6 +196,9 @@ def tcx_room_brief(c, r, uid, mem=None):
     if r["kind"] == "group":
         d["member_ids"] = sorted(mem)
         d["custom_name"] = r["name"] or ""
+    elif d["manage"]:  # 2.565.0 (#4719): the groups shared with the channel (their people are members while they qualify)
+        from .tcxcore import tcx_core_groups
+        d["groups"] = tcx_core_groups(c, [r["id"]])[r["id"]]
     return d
 
 
@@ -193,9 +214,12 @@ def tcx_sig(c, uid):
 
 def tcx_sig_q(uid):
     """2.149.0 C (#2507): the query of tcx_sig (one row, 5 columns; tchat_sig runs it inside its one statement)."""
-    return ("""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
-                     COALESCE(SUM((SELECT COUNT(*) FROM tchat_members x WHERE x.room_id=r.id)),0)
-                     FROM tchat_members m JOIN tchat_rooms r ON r.id=m.room_id WHERE m.user_id=?""", (uid,))
+    from .tcxcore import tcx_core_members_sql, tcx_core_rooms_sql
+    # 2.565.0 (#4719): + the rooms and members through the core's shares (a group shared with a channel)
+    return (f"""SELECT COUNT(*), COALESCE(SUM(length(r.name)),0), COUNT(r.archived_at), COALESCE(SUM(r.is_open),0),
+                      COALESCE(SUM((SELECT COUNT(*) FROM (SELECT user_id FROM tchat_members x WHERE x.room_id=r.id
+                                    UNION SELECT user_id FROM {tcx_core_members_sql()} cm WHERE cm.room_id=r.id) xs)),0)
+                      FROM tchat_rooms r WHERE r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})""", (uid,))
 
 
 def tcx_sig_fmt(r):
@@ -268,8 +292,9 @@ def tcx_may_add(c, r, actor, uid):
 
 
 def tcx_add(c, rid, uid, actor):
-    c.execute("INSERT INTO tchat_members(room_id,user_id,added_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
-              (rid, uid, actor, iso(now_utc())))
+    """2.565.0 (#4719): through the core -- the share of the room's node and the fallback row (collab/tcxcore.py)."""
+    from .tcxcore import tcx_core_add
+    tcx_core_add(c, rid, uid, actor)
 
 
 def tcx_clean_name(v, required):
@@ -324,7 +349,8 @@ def tcx_channels():
     need_tchat(c)
     uid = me()
     orgs = _orgs_full(c, uid)  # 2.143.0 A (#2151)
-    rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=?)
+    from .tcxcore import tcx_core_rooms_sql
+    rows = c.execute(f"""SELECT * FROM tchat_rooms WHERE kind='channel' AND (id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)})
                          OR created_by=? {('OR org_id IN (' + ','.join('?' * len(orgs)) + ')') if orgs else ''}) ORDER BY lower(name), id""",
                      (uid, uid, *orgs)).fetchall()
     mm = tcx_members_of(c, rows)  # 2.281.0 B (#3110): the members of every channel at once
@@ -441,12 +467,16 @@ def tcx_room_patch(rid):
 
 @app.post("/api/team/rooms/<int:rid>/members")
 def tcx_member_add(rid):
-    """{user_id} -- add someone (channel: its managers; group: every member) or join an open channel myself."""
+    """{user_id} -- add someone (channel: its managers; group: every member) or join an open channel myself.
+    2.565.0 (#4719): {group_id} -- share a channel with a group (its managers, members of the channel): every person of the
+    group is a member while they qualify (tcx_members_of); a group conversation takes no group."""
     c = db()
     need_person(c)
     r = need_xroom(c, rid)
     b = body()
-    reject_unknown(b, ("user_id",))
+    reject_unknown(b, ("user_id", "group_id"))
+    if "group_id" in b:
+        return tcx_group_add(c, r, b)
     uid, u = me(), b.get("user_id")
     if isinstance(u, bool) or not isinstance(u, int):
         return err(tr("Invalid value: {0}", "user_id"))
@@ -481,7 +511,8 @@ def tcx_member_del(rid, uid):
             raise Denied(403)
     if uid not in tcx_member_ids(c, rid):
         raise Denied(404)
-    c.execute("DELETE FROM tchat_members WHERE room_id=? AND user_id=?", (rid, uid))
+    from .tcxcore import tcx_core_take
+    tcx_core_take(c, rid, [uid], me())  # 2.565.0 (#4719): through the core (restorable), the fallback row with it
     c.execute("DELETE FROM tchat_reads WHERE room_id=? AND user_id=?", (rid, uid))  # 2.223.2 A (#2869): tchat_sig_q counts read rooms
     tcx_agents_out(c, rid, uid)
     c.commit()
@@ -494,7 +525,46 @@ def tcx_agents_out(c, rid, uid):
     with system_ctx(c):  # the owner of an agent is structure (the person's own agents)
         own = [x[0] for x in c.execute("SELECT user_id FROM agents WHERE owner_id=?", (uid,))]
     if own:
-        c.execute(f"DELETE FROM tchat_members WHERE room_id=? AND user_id IN ({','.join('?' * len(own))})", (rid, *own))
+        from .tcxcore import tcx_core_take
+        tcx_core_take(c, rid, own, me() if has_request_context() else None)  # 2.565.0 (#4719): through the core
+
+
+def tcx_group_add(c, r, b):
+    """2.565.0 (#4719): POST .../members {group_id} -- the channel's managers who are members of it share it with a group they
+    may see (lists/groups.py need_group)."""
+    from .tcxcore import tcx_core_group_put
+    gid, uid = b.get("group_id"), me()
+    if isinstance(gid, bool) or not isinstance(gid, int) or "user_id" in b:
+        return err(tr("Invalid value: {0}", "group_id"))
+    if r["kind"] != "channel":
+        return err(tr("Only channels can be shared with a group"))
+    if r["archived_at"]:
+        return err(tr("This channel is archived"), 409)
+    if not tcx_can_manage(c, r, uid):
+        raise Denied(403, tr("Only the creator of the channel or an admin of the organisation can change it"))
+    if not tcx_insider(c, r, uid):
+        raise Denied(403, tr(TCX_MEMBERS_ONLY))
+    need_group(c, gid)
+    tcx_core_group_put(c, r["id"], gid, uid)
+    c.commit()
+    return jsonify(tcx_out(c, r, uid))
+
+
+@app.delete("/api/team/rooms/<int:rid>/groups/<int:gid>")
+def tcx_group_del(rid, gid):
+    """2.565.0 (#4719): the channel is no longer shared with group gid (its managers); its people who are members only
+    through it leave it (the share goes into the core's obj_revoked)."""
+    from .tcxcore import tcx_core_group_take
+    c = db()
+    need_person(c)
+    r = need_xroom(c, rid)
+    if r["kind"] != "channel" or not tcx_can_manage(c, r, me()):
+        raise Denied(403, tr("Only the creator of the channel or an admin of the organisation can change it"))
+    if not tcx_core_group_take(c, rid, gid, me()):
+        raise Denied(404)
+    c.commit()
+    r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
+    return jsonify(tcx_out(c, r) if tcx_room_ok(c, r, me()) or tcx_can_manage(c, r, me()) else {"id": rid, "kind": r["kind"], "left": True})
 
 
 # ---------------------------------------------------------------- files
@@ -802,8 +872,17 @@ def v1_tcx_room_patch(rid):
 def v1_tcx_member_add(rid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("user_id",))
+    reject_unknown(b, ("user_id", "group_id"))  # 2.565.0 (#4719): + group_id (people only)
     return jsonify(v1_call(tcx_member_add, rid, body=b))
+
+
+@app.delete("/api/v1/team/rooms/<int:rid>/groups/<int:gid>")
+@v1_view
+def v1_tcx_group_del(rid, gid):
+    """2.565.0 (#4719): the channel is no longer shared with the group (people only)."""
+    v1_args(())
+    v1_call(tcx_group_del, rid, gid, body={})
+    return Response(status=204)
 
 
 # 2.139.1 (#2059): the second id as <uid> like the other v1 member routes, so the route matches its documented path
@@ -832,7 +911,8 @@ def tcx_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
         "members": {"type": "integer"}, "org_id": nul("integer", description="null = a channel of your own space"),
         "open": {"type": "boolean", "description": "every person of the organisation sees it and may join"},
         "archived": {"type": "boolean"}, "joined": {"type": "boolean"}, "manage": {"type": "boolean", "description": "you may rename / archive it and manage members"},
-        "member_ids": {"type": "array", "items": {"type": "integer"}, "description": "group: its members"}}}
+        "member_ids": {"type": "array", "items": {"type": "integer"}, "description": "group: its members"},
+        "groups": {"type": "array", "items": {"type": "integer"}, "description": "2.565.0 (#4719): a channel you manage: the groups shared with it"}}}
     schemas["TeamChannelPage"] = page("TeamChannel")
     rp = pid(desc="Conversation (room) id")
     paths["/team/channels"] = {
@@ -853,10 +933,15 @@ def tcx_spec(paths, schemas, op, ok, errs, ref, pid, nul, page):
                                              ok(ref("TeamChannel")) | errs("400", "403", "404"), [rp],
                                              body={"type": "object", "properties": {"name": {"type": "string"}, "open": {"type": "boolean"},
                                                                                     "archived": {"type": "boolean"}}}, scope="comments")}
-    paths["/team/rooms/{id}/members"] = {"post": op("2.113.1 (#2059): add someone to a channel / group, or join an open channel (your own id)", TC,
+    paths["/team/rooms/{id}/members"] = {"post": op("2.113.1 (#2059): add someone to a channel / group, or join an open channel (your own id); "
+                                                    "2.565.0 (#4719): or share a channel with a group (group_id, people only: its full members "
+                                                    "of the channel's organisation are members)", TC,
                                                     ok(ref("TeamChannel")) | errs("400", "403", "404", "409"), [rp],
-                                                    body={"type": "object", "properties": {"user_id": {"type": "integer"}}, "required": ["user_id"]},
+                                                    body={"type": "object", "properties": {"user_id": {"type": "integer"}, "group_id": {"type": "integer"}}},
                                                     scope="comments")}
+    paths["/team/rooms/{id}/groups/{gid}"] = {"delete": op("2.565.0 (#4719): a channel you manage is no longer shared with the group (people only)",
+                                                           TC, {"204": {"description": "Removed"}} | errs("403", "404"),
+                                                           [rp, pid("gid", "Group id")], scope="comments")}
     paths["/team/rooms/{id}/members/{uid}"] = {"delete": op("2.113.1 (#2059): leave a channel / group (your own id) or remove someone from a channel you manage",
                                                             TC, {"204": {"description": "Removed"}} | errs("403", "404"),
                                                             [rp, pid("uid", "User id")], scope="comments")}

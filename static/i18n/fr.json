@@ -16563,6 +16563,8 @@
   "Calibration: {0}": "Étalonnage : {0}",
   "Maintenance: {0}": "Maintenance : {0}",
   "The agent's data lock leaves this area out": "Le verrouillage des données de l'agent exclut ce domaine",
+  "This cannot be filed in a folder": "Cet élément ne peut pas être classé dans un dossier",
+  "Only channels can be shared with a group": "Seuls les canaux peuvent être partagés avec un groupe",
   "Send the version you read: {0}": "Indique la version que tu as lue : {0}",
   "{0} changed the task although it is locked (agents are not bound by the lock)": "{0} a modifié la tâche bien qu’elle soit verrouillée (le verrou ne s’applique pas aux agents)",
   "No billable, still open time of this project in this period": "Aucun temps facturable encore ouvert dans ce projet pour cette période",

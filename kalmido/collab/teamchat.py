@@ -189,6 +189,10 @@ def need_dm_open(c, r):
 
 def need_room(c, rid):
     r = c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()
+    if r is not None and r["kind"] in TCX_KINDS:  # 2.565.0 (#4719): a channel / group is an object of the shared core
+        from ..core.objects import obj_need
+        obj_need(c, me(), "tchat_room", rid)  # its floor + the team chat's rule (collab/tcxcore.py); 404 without a role
+        return r
     if not tchat_room_ok(c, r, me()):
         raise Denied(404)
     return r
@@ -315,6 +319,7 @@ def tchat_sig_q(uid):
     """2.149.0 C (#2507): the parts of tchat_sig as ONE statement (one row, 16 columns; was five queries, the messages of
     the list / DM conversations were read twice). /api/version runs it inside its own one statement."""
     from .teamchan import tcx_sig_q
+    from .tcxcore import tcx_core_rooms_sql
     # the list / DM conversations: newest id, count, pins, newest pin, newest edit (2.62.0 #1848: + the pins)
     m = ("""SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COUNT(m.pinned_at), COALESCE(MAX(m.pinned_at),''), COALESCE(MAX(m.edited_at),'')
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
@@ -326,7 +331,7 @@ def tchat_sig_q(uid):
                     WHERE room_id IN (SELECT room_id FROM tchat_reads WHERE user_id=?))"""
     # 2.113.1 (#2059): + the messages of my channels / groups and their names, states, members
     x = """SELECT COALESCE(MAX(m.id),0), COUNT(m.id), COALESCE(MAX(m.edited_at),''), COUNT(m.pinned_at) FROM tchat_msgs m
-           WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=?)"""
+           WHERE m.room_id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION """ + tcx_core_rooms_sql(uid) + ")"  # 2.565.0 (#4719)
     tq, ta = tcx_sig_q(uid)
     return (f"SELECT * FROM ({m}) s1 CROSS JOIN ({rd}) s2 CROSS JOIN ({x}) s3 CROSS JOIN ({tq}) s4",
             (uid, uid, uid, uid, uid, uid, uid, *ta))

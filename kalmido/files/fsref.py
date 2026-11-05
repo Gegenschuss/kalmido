@@ -81,12 +81,16 @@ fs_protect_hooks = []
 
 
 def fs_ref_register(kind, *, label, open_url, base_role, space, protect=None, hidden=None, on_trash=None, title=None, content=None,
-                    content_gate=None, cap=None):
-    """Register a kind of reference node (module docstring). Registering the same kind again replaces it (a module reload)."""
+                    content_gate=None, cap=None, listed=True):
+    """Register a kind of reference node (module docstring). Registering the same kind again replaces it (a module reload).
+    2.565.0 (#4719): listed=False = the node only carries the object's shares (the team chat's rooms): it lies in no folder,
+    no listing, search or route of the file store shows it (fs_ref_rows, fs_ref_hidden_sql, need_node) and it is never filed
+    (fs_ref_place 409)."""
     if not re.fullmatch(r"[a-z][a-z0-9_]{0,19}", kind or "") or kind in FSR_RESERVED:
         raise ValueError(f"fs_ref_register: invalid kind {kind!r}")
     FSR[kind] = {"label": label, "open_url": open_url, "base_role": base_role, "space": space, "protect": protect,
-                 "hidden": hidden, "on_trash": on_trash, "title": title, "content": content, "content_gate": content_gate, "cap": cap}
+                 "hidden": hidden, "on_trash": on_trash, "title": title, "content": content, "content_gate": content_gate, "cap": cap,
+                 "listed": bool(listed)}
 
 
 def fs_ref_token_lacks(uid, scope):
@@ -252,6 +256,8 @@ def fs_ref_place(c, uid, ref_kind, ref_id, parent_id, name=None):
     """File the object into folder parent_id (None: into no folder) -- module docstring. Returns the node id or None."""
     reg = _reg(ref_kind)
     ref_id = int(ref_id)
+    if not reg.get("listed", True):
+        raise Denied(409, tr("This cannot be filed in a folder"))  # 2.565.0 (#4719): a node that only carries shares
     if not fs_ref_role(c, uid, ref_kind, ref_id):
         raise Denied(404)
     if not fs_ref_may_file(c, uid, ref_kind, ref_id):
@@ -485,13 +491,17 @@ def fs_ref_rows(c, uid, rows):
     moved to another workspace): their titles stay unseen too."""
     if not any(r["kind"] == "ref" for r in rows):
         return rows
-    return [r for r in rows if r["kind"] != "ref" or fs_ref_role(c, uid, r["ref_kind"], r["ref_id"])]
+    return [r for r in rows if r["kind"] != "ref" or (FSR.get(r["ref_kind"] or "", {}).get("listed", True)  # 2.565.0 (#4719)
+                                                      and fs_ref_role(c, uid, r["ref_kind"], r["ref_id"]))]
 
 
 def fs_ref_hidden_sql(c, uid):
     """The clause for fs_visible_sql: leaves out the reference nodes of objects a folder must not open to uid ('' none)."""
     parts = []
     for kind, reg in FSR.items():
+        if not reg.get("listed", True):  # 2.565.0 (#4719): a node that only carries shares is in no listing
+            parts.append(f"ref_kind = '{kind}'")
+            continue
         sql = reg["hidden"](c, uid) if reg["hidden"] else ""
         if sql:
             parts.append(f"(ref_kind = '{kind}' AND ref_id IN {sql})")

@@ -4088,6 +4088,9 @@ group conversations of people (`kind` `group`). An agent is never in a group; it
 In a channel you get `team_message` when someone @mentions you, like in a project's channel. Messages carry `attachments`
 `[{id, name, mime, size, url}]`; `post_team_message` sends `files` `[{name, base64, mime?}]` (not in end-to-end encrypted
 conversations). Opening channels or groups, renaming, archiving and managing members stay with people (`403` for agents).
+2.565.0 (#4719): a person may share a channel with a group of people (`groups` in the channel for its managers); the group's
+people are members, an agent never joins through a group - only when a person adds it. Leaving the organisation or a role
+going down to guest / accounting ends the membership, as before.
 
 2.139.0 (#2128): **voice messages**. People record them in the app (the microphone in the composer); a voice message is
 an audio attachment with `voice: true` and `duration_ms` (the length the browser measured, `null` = unknown); every

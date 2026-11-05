@@ -1153,6 +1153,13 @@ def init_db(guard=True, load=None):
             gset(c, "migr_lf2352", "1")
             if any(n.values()):
                 print("list folders into the projects trees (#2748):", n, flush=True)
+        # 2.565.0 (#4719), every start: the team chat's members as shares of the shared core, kept in step with tchat_members
+        # (copy forward; what an older version added / removed after a rollback)
+        from ..collab.tcxcore import tcx_core_sync
+        n = tcx_core_sync(c)
+        clk("tcx_core_sync")
+        if any(n.values()):
+            print("team chat members on the shared core (#4719):", n, flush=True)
         # 2.33.0 (#927), once: lists / folders shared so far keep every notification ("all", written explicitly; new shares
         # start with "read"), their owners are asked once in the app
         if gsetting(c, "migr_notiftpl2330") != "1":

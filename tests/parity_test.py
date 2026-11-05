@@ -186,7 +186,8 @@ APP_TO_API = {
     # 2.113.1 (#2059): channels, groups, files
     "GET /api/team/channels": ["GET /team/channels"], "POST /api/team/channels": ["POST /team/channels"], "POST /api/team/groups": ["POST /team/groups"],
     "PATCH /api/team/rooms/{}": ["PATCH /team/rooms/{}"], "POST /api/team/rooms/{}/members": ["POST /team/rooms/{}/members"],
-    "DELETE /api/team/rooms/{}/members/{}": ["DELETE /team/rooms/{}/members/{}"], "GET /api/team/files/{}": ["GET /team/files/{}"],
+    "DELETE /api/team/rooms/{}/members/{}": ["DELETE /team/rooms/{}/members/{}"], "DELETE /api/team/rooms/{}/groups/{}": ["DELETE /team/rooms/{}/groups/{}"],  # 2.565.0 (#4719)
+    "GET /api/team/files/{}": ["GET /team/files/{}"],
     "GET /api/team/rooms/{}/messages": ["GET /team/rooms/{}/messages"], "POST /api/team/rooms/{}/messages": ["POST /team/rooms/{}/messages"],
     "POST /api/team/rooms/{}/read": ["POST /team/rooms/{}/read"], "PATCH /api/team/messages/{}": ["PATCH /team/messages/{}"],
     "DELETE /api/team/messages/{}": ["DELETE /team/messages/{}"], "POST /api/team/messages/{}/reactions": ["POST /team/messages/{}/reactions"],

@@ -196,11 +196,12 @@ def search_messages(c, uid, q, arts=None, sender=None, room=None, agent=None, ta
             hits.append({"art": "c", "chat_type": "task", "id": r["id"], "task_id": r["task_id"], "list_id": r["list_id"],
                          "chat_name": r["title"], "sender_id": r["user_id"], "created_at": r["created_at"], "_body": r["body"]})
     if "t" in arts and (collab_all() if agent_me else tchat_on(c, uid)):
+        from .tcxcore import tcx_core_rooms_sql  # 2.565.0 (#4719): + the channels shared with a group of uid
         rows = c.execute(f"""SELECT m.id, m.room_id, m.user_id, m.body, m.created_at, r.kind, r.list_id, r.a, r.b
             FROM tchat_msgs m JOIN tchat_rooms r ON r.id=m.room_id
             WHERE {mcond} AND m.deleted_at IS NULL AND m.enc IS NULL AND ((r.kind='dm' AND (r.a=? OR r.b=?)) OR (r.kind='list' AND r.list_id IN {vis_sql()}
               AND r.list_id NOT IN (SELECT id FROM lists WHERE e2e IS NOT NULL))
-              OR (r.kind IN ('channel','group') AND r.id IN (SELECT room_id FROM tchat_members WHERE user_id=?))){snd}
+              OR (r.kind IN ('channel','group') AND r.id IN (SELECT room_id FROM tchat_members WHERE user_id=? UNION {tcx_core_rooms_sql(uid)}))){snd}
             {' AND m.room_id=?' if room is not None else ''} ORDER BY m.id DESC LIMIT {MSG_CAND}""",
                          match + [uid, uid, uid, uid, uid] + ([sender] if sender is not None else []) + ([room] if room is not None else [])).fetchall()
         ok, lnames, rrows = {}, {}, {}

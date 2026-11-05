@@ -909,6 +909,8 @@ ROUTES = {
     "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
     "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
     "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
+    # 2.565.0 (#4719): a channel shared with a group (p2565_c_kern_teamchat_test.py, a private channel of a freelancer on the core)
+    "DELETE /api/team/rooms/{}/groups/{}": "team", "DELETE /api/v1/team/rooms/{}/groups/{}": "team",
     # ---- time (28)
     "DELETE /api/habits/{}": "time", "POST /api/habits/{}/restore": "time", "DELETE /api/time/entries/{}": "time", "DELETE /api/v1/habits/{}": "time",  # 2.530.0 B (#4315): restore
     "DELETE /api/v1/time/entries/{}": "time", "DELETE /api/v1/time/timer": "time", "GET /api/time/entries": "time",

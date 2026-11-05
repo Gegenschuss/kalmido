@@ -68,6 +68,14 @@ obj_register("meeting", "meetings", label=N_("Meeting"), area="calendar",
 The kind is registered with the file store's reference nodes at the same time (files/fsref.py): the object can lie in
 folders, and a folder share opens it.
 
+`listed=False` (2.565.0, #4719, the team chat's rooms): the reference node only carries the object's shares. It lies in no
+folder, the file store never lists, searches or opens it (fs_ref_rows, fs_ref_hidden_sql, need_node) and it is never filed
+(409). The area writes its members with `obj_member_put(c, by, kind, id, key, target, role)` / `obj_member_take(c, by, kind,
+id, key, targets, reason)` after its own rule decided (no pool check of the file store: a group conversation spans
+workspaces); taken shares land in `obj_revoked`. `obj_share_rows_sql(kind)` reads the live shares in bulk, `obj_gate(c, uid,
+kind, row)` is the core's floor for a row the area listed itself (`obj_token_lists(uid)` its token part). With a `cap` hook that gives nothing, the area's base role
+is the only role and reads the shares itself (collab/tcxcore.py).
+
 ## 3. Who may do what
 
 `obj_role(c, uid, kind, id)` is the one role: `None` < `view` < `edit` < `manage`.
@@ -160,6 +168,9 @@ organisations + a private person, read-only, guest, a group, an agent, an expire
 - Agents' changes as a proposal a person accepts (proposal kind `obj_patch`): the first area that needs it adds it
   (agents/proposals.py); stage 1 has the direct write with the version.
 - Old areas: nothing moves yet (stage 2: office and clients #4711, stage 3: calendars and contacts #4712).
+- Stage 5 (#4719, 2.565.0): team chat channels and group conversations are the kind `tchat_room` (collab/tcxcore.py,
+  listed=False); members are shares (person, agent, group), tchat_members stays the reader fallback (kept in step at every
+  start, tcx_core_sync) until stage 7. The materialisation of group shares into list_members.grole stays until stage 6 (#4739).
 - Stage 6 (2.568.0, #4739): the projects' shares (members, the project's agent) are share rows of the core on the project's
   node (expiry, created_by, taken back into `obj_revoked`, restorable: `GET /api/lists/<id>/shares`,
   `POST /api/lists/<id>/shares/<rid>/restore`); `list_members` stays the role table every reader uses. A group's share gives

@@ -66,6 +66,12 @@ Interface (signatures fixed; stages 2 / 3 and the first areas #1958 #1957 #4675 
       back; checked=True: the area checked the right itself, e.g. a member leaving a list)
   obj_share_restore(c, uid, kind, id, rid) -> share id
   obj_shares(c, uid, kind, id) -> {shares, inherited, revoked}
+  obj_gate(c, uid, kind, row) -> bool   steps 1 + 2 of obj_role for a row the area listed itself (2.565.0, #4719)
+  obj_token_lists(uid) -> set | None    the list limit of uid's own API token in this request (step 2)
+  obj_share_rows_sql(kind) -> "(SELECT ref_id, user_id, group_id, agent_id, role, created_by ...)" the live shares of the kind
+  obj_member_put(c, by, kind, id, key, target, role="edit") / obj_member_take(c, by, kind, id, key, targets, reason="unshare")
+      a kind registered with listed=False (the team chat's rooms): the area's own rule decided, the core writes / takes back
+      the share row (taken = obj_revoked, restorable)
   obj_revoke_person(c, uid, org, reason, heir=None, role=None) -> {table: rows} -- reason 'leave' (uid leaves org: its shares
       and its agents' on the organisation's nodes, its team chat memberships of the organisation's rooms; its core objects
       to heir), 'role' (uid's role in org is now role: guest / accounting leave the open channels they joined themselves),
@@ -166,8 +172,10 @@ def f_date(null=True):
 def obj_register(kind, table, *, label, fields, open_url=None, space=None, title=None, base_role=None, visible=None, cap=None,
                  hidden=None, org_access="edit", area="other", scopes=("read", "tasks:write"), dl_area=None, feat=None,
                  protect=None, on_trash=None, content=None, undo_scope=None, public=None, routes=True, trash_role="manage",
-                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id"):
-    """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload)."""
+                 fsref=True, share_cols=(), on_restore=None, on_revoke=None, list_col="list_id", listed=True):
+    """Register a kind of core object (module docstring). Registering the same kind again replaces it (a module reload).
+    2.565.0 (#4719): listed=False = the object's reference node only carries its shares (files/fsref.py): it lies in no
+    folder and the file store never shows it; the area writes the shares with obj_member_put / obj_member_take."""
     if not _NAME.fullmatch(kind or "") or not _TABLE.fullmatch(table or ""):
         raise ValueError(f"obj_register: invalid kind / table {kind!r} {table!r}")
     if base_role is not None and visible is None:
@@ -179,7 +187,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
     reg = {"kind": kind, "table": table, "label": label, "fields": dict(fields), "space": space, "title": title, "base_role": base_role,
            "visible": visible, "cap": cap, "hidden": hidden, "org_access": org_access, "area": area, "scopes": tuple(scopes),
            "dl_area": dl_area, "feat": feat, "undo_scope": undo_scope, "public": public, "routes": bool(routes), "trash_role": trash_role,
-           "open_url": open_url or (lambda rid: f"obj/{kind}/{int(rid)}"),
+           "listed": bool(listed), "open_url": open_url or (lambda rid: f"obj/{kind}/{int(rid)}"),
            # 2.568.0 (#4739): an old area with its own reference kind and role table (module docstring)
            "fsref": bool(fsref), "share_cols": tuple(x for x in share_cols if _TABLE.fullmatch(x)), "on_restore": on_restore,
            "on_revoke": on_revoke, "list_col": list_col if _TABLE.fullmatch(list_col or "") else "list_id"}
@@ -211,7 +219,7 @@ def obj_register(kind, table, *, label, fields, open_url=None, space=None, title
 
     fs_ref_register(kind, label=label, open_url=reg["open_url"], base_role=fsr_base, space=lambda c, rid: obj_space(c, kind, rid),
                     protect=protect, hidden=hidden, on_trash=fsr_on_trash, title=lambda c, rid: obj_title(c, kind, rid),
-                    content=content, cap=cap)
+                    content=content, cap=cap, listed=listed)
     return reg
 
 
@@ -419,6 +427,10 @@ def _share_sql(c, uid, reg, agent):
     sql = reg["hidden"](c, uid) if reg["hidden"] else ""
     if sql:
         hid = f" AND n.ref_id NOT IN {sql}"
+    if not reg.get("listed", True):  # 2.565.0 (#4719): the node lies in no folder and in no listing of the file store
+        return (f"(SELECT n.ref_id FROM fs_nodes n JOIN {t} o ON o.id = n.ref_id WHERE n.kind = 'ref' AND n.ref_kind = '{kind}' "
+                f"AND n.deleted_at IS NULL AND n.id IN (SELECT node_id FROM fs_shares WHERE {who} AND (expires_at IS NULL OR expires_at > '{now}')) "
+                f"AND (CASE WHEN o.org_id IS NULL THEN n.org_id IS NULL ELSE n.org_id = o.org_id END){hid})")
     return (f"(WITH RECURSIVE os(id) AS (SELECT node_id FROM fs_shares WHERE {who} AND (expires_at IS NULL OR expires_at > '{now}') "
             f"UNION SELECT n.id FROM fs_nodes n JOIN os ON n.parent_id = os.id) "
             f"SELECT n.ref_id FROM fs_nodes n JOIN {t} o ON o.id = n.ref_id WHERE n.kind = 'ref' AND n.ref_kind = '{kind}' "
@@ -714,6 +726,82 @@ def obj_shares(c, uid, kind, rid):
     return {"shares": own, "inherited": inh, "revoked": rev}
 
 
+# ---------------------------------------------------------------- 2.565.0 (#4719): shares an area keeps itself (listed=False)
+def obj_gate(c, uid, kind, row):
+    """Steps 1 + 2 of obj_role for a row the area read itself (its listing): the organisation floor, an agent of another
+    workspace, hidden, the data lock, a token's list limit. False = no role at all, whatever the area's own rule says."""
+    reg = OBJ.get(kind or "")
+    return bool(reg and uid and row is not None and _gate(c, uid, reg, row))
+
+
+def obj_token_lists(uid):
+    """The list limit of the request's own API token when uid asks through it (None: no limit / not uid's request) -- step 2
+    of obj_role for an area that lists its objects itself: an object without a list_id is out then."""
+    return _req_token_lists(uid)
+
+
+def obj_share_rows_sql(kind):
+    """The live shares of the reference nodes of kind as an SQL subquery (no ? parameters) with the columns ref_id, user_id,
+    group_id, agent_id, role, created_by -- for an area that reads its members in bulk (team chat: collab/teamchan.py
+    tcx_members_of). Not in the trash, not expired; the area applies its own rules to the people it names."""
+    reg = obj_reg(kind)
+    now = now_iso().replace("'", "")
+    return (f"(SELECT n.ref_id, s.user_id, s.group_id, s.agent_id, s.role, s.created_by FROM fs_shares s JOIN fs_nodes n ON n.id = s.node_id "
+            f"WHERE n.kind = 'ref' AND n.ref_kind = '{reg['kind']}' AND n.deleted_at IS NULL "
+            f"AND (s.expires_at IS NULL OR s.expires_at > '{now}'))")
+
+
+def _unlisted(kind):
+    reg = obj_reg(kind)
+    if reg.get("listed", True):
+        raise ValueError(f"obj_member_put / obj_member_take {kind}: only for kinds registered with listed=False")
+    return reg
+
+
+def obj_member_put(c, by, kind, rid, key, target, role="edit"):
+    """The area decided by its OWN rule (team chat: tcx_may_add, who may manage the room) that target joins the object: the
+    share row on its reference node (made at the top of its workspace when missing); the same target again changes the role.
+    No pool check of the file store (a group conversation spans workspaces) -- hence only for kinds with listed=False, whose
+    node lies in no folder. key user_id | group_id | agent_id. Returns the share id. The caller commits."""
+    _unlisted(kind)
+    if key not in ("user_id", "group_id", "agent_id") or role not in ("view", "edit"):
+        raise BadInput(tr("Invalid data"))
+    with system_ctx(c):  # the node of a room of an organisation / of another person's space is structure (the area checked)
+        n = obj_node(c, by, kind, rid, make=True)
+        old = c.execute(f"SELECT id, role FROM fs_shares WHERE node_id=? AND {key}=?", (n["id"], int(target))).fetchone()
+        if old:
+            if old["role"] != role:
+                c.execute("UPDATE fs_shares SET role=? WHERE id=?", (role, old["id"]))
+            sid = old["id"]
+        else:
+            if c.execute("SELECT COUNT(*) FROM fs_shares WHERE node_id=?", (n["id"],)).fetchone()[0] >= OBJ_SHARE_MAX:
+                raise Denied(409, tr("Too many shares"))
+            sid = insert_id(c, f"INSERT INTO fs_shares(node_id,{key},role,created_by,created_at,by_role) VALUES(?,?,?,?,?,?)",
+                            (n["id"], int(target), role, by, iso(now_utc()), _by_role(c, by, n["org_id"]) if by else None))
+    obj_forget()
+    return sid
+
+
+def obj_member_take(c, by, kind, rid, key, targets, reason="unshare"):
+    """The shares of targets (ids of key user_id | group_id | agent_id) on the object's node go into obj_revoked (restorable
+    for OBJ_REVOKED_DAYS, obj_share_restore). Returns their number. The caller commits."""
+    _unlisted(kind)
+    if key not in ("user_id", "group_id", "agent_id") or reason not in OBJ_REASONS:
+        raise ValueError("obj_member_take: invalid key / reason")
+    ids = sorted({int(x) for x in targets or ()})
+    if not ids:
+        return 0
+    with system_ctx(c):  # the area checked who may take whom out
+        n = fs_ref_node(c, kind, rid)
+        if n is None:
+            return 0
+        _revoked_prune(c)
+        q = ",".join("?" * len(ids))
+        out = _take(c, "fs_shares", f"node_id=? AND {key} IN ({q})", (n["id"], *ids), reason, by, n["org_id"] or None, "user_id", kind=kind)
+    obj_forget()
+    return out
+
+
 # ---------------------------------------------------------------- revocation in one place
 def _take(c, src, sql, args, reason, by, org, who_col, kind=None):
     """Moves the rows of src matching sql into obj_revoked and deletes them. Returns their number."""
@@ -763,10 +851,17 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                     if reg["base_role"] is None:  # the default rules: the organisation's object stays with it, the heir owns it
                         c.execute(f"UPDATE {reg['table']} SET owner_id=? WHERE org_id=? AND owner_id=?", (int(heir), int(org), int(uid)))
         elif reason == "role" and uid and org:
-            if role in ("guest", "accounting"):  # F5 (#2822): the open channels they joined themselves (added_by = themselves / unknown)
-                out["tchat_members"] = _take(c, "tchat_members", "user_id=? AND (added_by=? OR added_by IS NULL) AND room_id IN "
-                                             "(SELECT id FROM tchat_rooms WHERE org_id=? AND kind='channel' AND is_open=1)",
-                                             (int(uid), int(uid), int(org)), reason, by, int(org), "user_id")
+            if role in ("guest", "accounting"):  # F5 (#2822): the open channels they had joined
+                # 2.565.0 (#4719): like #4698 b (accounts/orgs.py org_open_chan_off) every row of them and their personal agents,
+                # and their shares on those rooms' nodes too (the core's members) -- restorable, nothing stays to reopen the room
+                ppl = [int(uid), *_agents_of(c, uid)]
+                q = ",".join("?" * len(ppl))
+                rooms = "SELECT id FROM tchat_rooms WHERE org_id=? AND kind='channel' AND is_open=1"
+                out["tchat_members"] = _take(c, "tchat_members", f"user_id IN ({q}) AND room_id IN ({rooms})",
+                                             (*ppl, int(org)), reason, by, int(org), "user_id")
+                out["fs_shares"] = _take(c, "fs_shares", f"(user_id IN ({q}) OR agent_id IN ({q})) AND node_id IN (SELECT id FROM fs_nodes "
+                                         f"WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id IN ({rooms}))",
+                                         (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
         elif reason == "retire" and org:
             out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (int(org),), reason, by, int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", "room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)", (int(org),),
@@ -781,6 +876,13 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                         if h:
                             out[reg["kind"]] += c.execute(f"UPDATE {reg['table']} SET owner_id=? WHERE org_id=? AND owner_id=?",
                                                           (int(h), int(o), int(uid))).rowcount
+            for reg in OBJ.values():  # 2.565.0 (#4719): a node that only carries shares (a room) stays with the next person in it
+                if not reg.get("listed", True):
+                    for n in c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND owner_id=?", (reg["kind"], int(uid))).fetchall():
+                        nxt = c.execute("SELECT MIN(s.user_id) FROM fs_shares s JOIN users u ON u.id=s.user_id WHERE s.node_id=? AND s.user_id!=? "
+                                        "AND COALESCE(u.kind,'')!='agent'", (n["id"], int(uid))).fetchone()[0]
+                        if nxt:
+                            c.execute("UPDATE fs_nodes SET owner_id=? WHERE id=?", (int(nxt), n["id"]))
             c.execute("DELETE FROM obj_undo WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_history SET user_id=NULL WHERE user_id=?", (int(uid),))
             c.execute("UPDATE obj_revoked SET by_id=NULL WHERE by_id=?", (int(uid),))

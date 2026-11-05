@@ -16563,6 +16563,8 @@
   "Calibration: {0}": "Kalibrierung: {0}",
   "Maintenance: {0}": "Wartung: {0}",
   "The agent's data lock leaves this area out": "Die Datensperre des Agenten lässt diesen Bereich aus",
+  "This cannot be filed in a folder": "Das lässt sich nicht in einem Ordner ablegen",
+  "Only channels can be shared with a group": "Nur Kanäle lassen sich mit einer Gruppe teilen",
   "Send the version you read: {0}": "Gib die gelesene Version mit: {0}",
   "{0} changed the task although it is locked (agents are not bound by the lock)": "{0} hat die Aufgabe geändert, obwohl sie gesperrt ist (Agenten bindet die Sperre nicht)",
   "No billable, still open time of this project in this period": "Keine abrechenbare, noch offene Zeit in diesem Projekt und Zeitraum",

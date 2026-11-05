@@ -947,6 +947,8 @@ ROUTES = {
     "GET /api/team/files/{}": "team", "GET /api/v1/team/channels": "team", "POST /api/v1/team/channels": "team",
     "POST /api/v1/team/groups": "team", "PATCH /api/v1/team/rooms/{}": "team", "POST /api/v1/team/rooms/{}/members": "team",
     "DELETE /api/v1/team/rooms/{}/members/{}": "team", "GET /api/v1/team/files/{}": "team",
+    # 2.565.0 (#4719): a channel shared with a group (p2565_c_kern_teamchat_test.py: another organisation's person / agent 404)
+    "DELETE /api/team/rooms/{}/groups/{}": "team", "DELETE /api/v1/team/rooms/{}/groups/{}": "team",
     # ---- template (12)
     "GET /api/v1/templates": "template", "POST /api/v1/templates": "template", "PATCH /api/v1/templates/{}": "template",
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
