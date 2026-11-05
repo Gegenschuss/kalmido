@@ -9,7 +9,7 @@ companies, people and figures only.
  - #2291 ?person=u<id>|n:<name> on the evaluation (only that person's trips, each receipt with the person's share; CSV
    named after the person), an invalid key = 400
  - #2287 a trip posted again with the same data (the client's "Duplicate") comes without receipts
- - rights: a member gets 403, another organisation sees none of the purposes and gets 404 on them; a person without an
+ - rights: a member reads the list (own trips, #4592) and gets 403 on the set-up, another organisation sees none of the purposes and gets 404 on them; a person without an
    organisation (the personal office, its own admin) has an own list -- freelancer-matrix: office -- tenant-matrix: office
 usage: p2117_a_api_test.py <datadir>      (P2117A_NOSTART=1: use a running server)"""
 import base64
@@ -151,7 +151,9 @@ check(d["dest"] == "Hannover" and d["purpose"] == "Messe" and d["items"] == [] a
 check(A.delete(B + f"{T}/{d['id']}").ok, "the undo of the copy deletes it")
 
 # ---------------------------------------------------------------- rights
-for m, u, kw in (("get", P, {}), ("post", P, {"json": {"name": "Bob"}}), ("patch", f"{P}/{MESSE}", {"json": {"name": "Bob"}}), ("delete", f"{P}/{MESSE}", {})):
+# 2.545.0 (#4592): a member enters own trips (level "own"), so reads the purposes for the trip form; setting them up stays the admins'
+check(Bo.get(B + P).ok, f"a member reads the purposes (the trip form, #4592): get {P}")
+for m, u, kw in (("post", P, {"json": {"name": "Bob"}}), ("patch", f"{P}/{MESSE}", {"json": {"name": "Bob"}}), ("delete", f"{P}/{MESSE}", {})):
     check(getattr(Bo, m)(B + u, **kw).status_code == 403, f"a member gets 403: {m} {u}")
 check(Ca.get(B + P).json()["purposes"] == [], "another organisation sees none of the purposes")
 check(Ca.patch(B + f"{P}/{MESSE}", json={"name": "Fremd"}).status_code == 404 and Ca.delete(B + f"{P}/{MESSE}").status_code == 404,

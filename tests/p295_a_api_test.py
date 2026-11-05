@@ -10,7 +10,7 @@ tables in kalmido/office/vma.py (Germany 28 / 14, Greece outside Athens 2025 36 
  - GET /api/office/trips/vma-rates: countries and cities of a year, 2027 = the 2026 table + hint "older", 2024 = none + hint
  - GET /api/office/trips/vma: the sums per person (one entry per participant, "No person" for a trip without), open trips
    listed but not summed, "no per diem" left out, ?person= filters; vma.pdf / vma.xlsx (one sheet per person) / vma.csv
- - rights: a member gets 403, another organisation sees none of the trips and gets 404 on them; a person without an
+ - rights: a member sees the own per diem only (#4592) and gets 403 on rates and files, another organisation sees none of the trips and gets 404 on them; a person without an
    organisation (the personal office, its own admin) gets 200 everywhere -- freelancer-matrix: office -- tenant-matrix: office
 usage: p295_a_api_test.py <datadir>      (P295A_NOSTART=1: use a running server)"""
 import base64
@@ -181,7 +181,11 @@ log = A.get(B + "/api/office/log?limit=10").json().get("log", [])
 check(any(x["action"] == "export" and x["target"] == "travel" for x in log), "the export is in the office log")
 
 # ---------------------------------------------------------------- rights
-for p in ("/vma?year=2025", "/vma-rates?year=2025", "/vma.pdf?year=2025", "/vma.xlsx?year=2025", "/vma.csv?year=2025"):
+# 2.545.0 (#4592): a member works on the level "own" in the travel expenses: the own per diem report (no trip of others,
+# e.g. the one without participants), the rate table and the files stay the admins'
+r = Bo.get(B + T + "/vma?year=2025")
+check(r.ok and "No person" not in [g["label"] for g in r.json().get("people", [])], f"a member sees the own per diem only (#4592): {r.text[:200]}")
+for p in ("/vma-rates?year=2025", "/vma.pdf?year=2025", "/vma.xlsx?year=2025", "/vma.csv?year=2025"):
     check(Bo.get(B + T + p).status_code == 403, f"a member gets 403: {p}")
 j = Ca.get(B + T + "/vma?year=2025").json()
 check(j["people"] == [] and j["total"] == "0.00", "another organisation sees none of the trips")
