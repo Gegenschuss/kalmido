@@ -1337,7 +1337,6 @@ POST /api/family/rewards/{}/request
 POST /api/favorites/suggestion
 POST /api/filters
 POST /api/folders/delete
-POST /api/folders/owner
 POST /api/folders/playbook/restore
 POST /api/folders/rename
 POST /api/folders/repos
