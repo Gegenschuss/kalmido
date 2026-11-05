@@ -67,6 +67,7 @@ CTL_BODY_MAX = 32000  # 2.235.0 A2 (#2891): the bound body of an approval card (
 
 # (methods, path with {} for the route variables, class). First match wins; DELETE not listed = one_way, the rest = change.
 CTL_ROUTES = (
+    (("PATCH",), r"^/agent/objects/\{\}/\{\}$", "change"),  # 2.558.0 (#4709): an object of the shared core (an area's data, not the agent's channel)
     (CTL_WRITE, r"^/agent(/|$)", "meta"),  # the agent's own channel: status, typing, chat + approval cards, jobs, proposals, queue
     (("POST",), r"^/tasks/\{\}/typing$", "meta"),
     (CTL_WRITE, r"^/tasks/\{\}/working$", "meta"),  # 2.407.0 (#3513): "agent is working" mark, its own status like typing

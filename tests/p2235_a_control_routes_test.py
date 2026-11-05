@@ -69,6 +69,7 @@ ROUTES = {
     "POST /api/v1/folders/delete": "one_way", "POST /api/v1/imports/{}/undo": "one_way",
     # ---- change
     "DELETE /api/v1/tasks/{}/waiting": "change", "DELETE /api/v1/time/timer": "change",
+    "PATCH /api/v1/agent/objects/{}/{}": "change",  # 2.558.0 (#4709): writing an object of the shared core
     "PATCH /api/v1/address-books/{}": "change", "PATCH /api/v1/clients/{}": "change", "PATCH /api/v1/comments/{}": "change",
     "PATCH /api/v1/contacts/{}": "change", "PATCH /api/v1/documents/{}": "change", "PATCH /api/v1/event-calendars/{}": "change",
     "PATCH /api/v1/events/{}": "change", "PATCH /api/v1/family/rewards/{}": "change", "PATCH /api/v1/fields/{}": "change",
