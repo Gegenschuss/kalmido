@@ -38,7 +38,7 @@ function wkcm_load() {
 }
 // the editor can be used here (not yet loaded = it is loading; failed = the plain field). CodeMirror measures text with
 // Range.getClientRects: a browser without it (a document without layout, the jsdom suites) gets the plain field
-const wkcm_can = () => !WKCM.fail && typeof Range === 'function' && typeof Range.prototype.getClientRects === 'function';
+const wkcm_can = () => !WKCM.fail && typeof window.Range === 'function' && typeof window.Range.prototype.getClientRects === 'function';
 // ---- the stand-in field: what wiki.js / wkembed.js / wklive.js expect of a <textarea>
 function wkcm_ta() {
   const v = WKCM.view; if (!v || !v.dom.isConnected) return null;
@@ -233,7 +233,7 @@ function wkcm_defs() {
   class Table extends C.WidgetType {
     constructor(t) { super(); this.t = t; }  // t = {from, rows: [{cells: [{a, b, raw}]}], al: [...], h: the cells' drawn html}
     eq(o) { return o.t.key === this.t.key; }
-    toDOM(view) { const d = document.createElement('div'); d.className = 'cm-wktbl'; d._wk = this; wkcm_tblDraw(view, d, this.t); return d; }
+    toDOM(view) { const d = /** @type {any} */ (document.createElement('div')); d.className = 'cm-wktbl'; d._wk = this; wkcm_tblDraw(view, d, this.t); return d; }
     updateDOM(d, view) { return wkcm_tblUpdate(view, d, this); }
     ignoreEvent() { return true; }
     get estimatedHeight() { return 32 * this.t.rows.length; }

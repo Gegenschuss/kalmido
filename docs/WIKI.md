@@ -61,9 +61,9 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   open them. Deleting a file or its page can be undone. An encrypted space (see below) takes no files yet.
 - **Formatting bar (2.276.0, #3043).** A page is edited in the normal font (notes keep theirs). The bar above the text
   writes the Markdown for you: heading (`## `), bold, italic, list, checkbox (`- [ ] `) and link wrap the selection or
-  prefix the selected lines, a second press removes it; Ctrl/Cmd+B and +I work and the browser's undo takes one step back.
+  prefix the selected lines, a second press removes it; Ctrl/Cmd+B and +I work and undo takes one step back.
   The bar stays one row on phones and tablets and scrolls sideways. The text itself stays Markdown (links, `[[Page]]`,
-  `#123` and embeds are never rewritten); a formatted editing mode is not part of it yet.
+  `#123` and embeds are never rewritten); since 2.554.0 it works on the editor's selection (see *One editor*).
 - **Pictures and files in the editor (2.123.0).** *Insert picture or file* above the text uploads files to the page (also
   pasting a picture or dropping files into the text) or picks a file of the **file store** of the same space
   (*From the file store…*: browse its folders or search). A file of the file store is referenced, not copied:
@@ -113,8 +113,19 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
   loaded only when a page has such a block; without a connection, or when a block has an error, its source stays visible
   as a code block with a short hint. The editor's "/" commands *Formula* and *Diagram* insert an example. Pages shared
   through a public link show the source as code.
-- **Source / Preview** (2.382.0). The formatting bar of the editor has a button that switches between the live preview
-  (the page drawn while writing) and the plain Markdown source; the page's "…" menu has the same entry.
+- **One editor (2.554.0, #4052).** A page you may change opens ready to type, there is no Read / Edit switch and no
+  Source / Preview button any more. The editor (CodeMirror 6, shipped with Kalmido in `static/vendor/codemirror`, loaded
+  only when a page is edited) shows the page formatted and the Markdown marks (`**`, `_`, `#`, `` ` ``, the parts of
+  `[text](address)` and `[[Page]]`) only where the cursor is. A check box ticks with the first click, links, `[[Page]]`
+  and `#123` open with the first click. A table stays a table: a click edits only that cell, Tab goes to the next one
+  (after the last a new row), the button next to it shows the table as text. Pictures, formulas, diagrams, mind maps,
+  embedded pages and tables are drawn in place; a click into one shows its Markdown. The "/" commands, the `[[`
+  suggestions, Ctrl/Cmd+K and Ctrl/Cmd+Shift+7 / 8 / 9 and the formatting bar work as before, undo / redo is the
+  editor's. On a phone a page opens read first; the pen opens the editor, the tick goes back to reading. The page's "…"
+  menu has *Edit as Markdown* (the plain text field, the way out, e.g. for a very long page) and *Read only* (a lock on
+  this device). The page stays one Markdown string: saving, conflicts, the offline outbox, the history and encrypted
+  spaces are unchanged, and a page opened without typing is saved back byte for byte. Without a connection before the
+  editor was ever loaded the plain text field is used.
 
 - **Tags (2.371).** `#word` in the text (starting with a letter: `#project`, `#customer/north`; `#123` stays a task) or
   `tags: [a, b]` in the frontmatter tag a page. A tag in the text is a link to its list; the panel has the group *Tags*
