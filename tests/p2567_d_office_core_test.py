@@ -92,6 +92,7 @@ def two(S, who, uid, what, kind, table, rid, url, first, second, ver, method="PA
         check(ver(cur) == v1, p + f"'current' is the stored version {ver(cur)!r} == {v1!r}")
         if same:
             check(same(cur), p + f"'current' shows writer 1's change {cur}")
+        check(r.json().get("row") == cur, p + "the older key 'row' carries the same state (old clients)")
     check(row(table, rid) == after, p + "the 409 wrote nothing")
     # without expect_updated_at: as before
     r = S.request(method, B + url, json=second)

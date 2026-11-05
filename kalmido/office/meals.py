@@ -554,7 +554,7 @@ def bw_choice_patch(cid):
     pub = lambda c, x: {"id": cid, "kind": x["kind"], "name": x["name"], "extra": x.get("extra") or "", "updated_at": x.get("updated_at")}  # noqa: E731
     row, _ = ow_write(c, uid, "office_meal_choice", cid, b, lambda c, b, x: {k: v for k, v in (("name", name), ("extra", extra)) if (v or None) != (x.get(k) or None)},
                       where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_meal_choices", r),
-                      enc=lambda c, v: oc_enc_fields(c, oid, "office_meal_choices", v), public=pub)
+                      enc=lambda c, v: oc_enc_fields(c, oid, "office_meal_choices", v), alias="row", public=pub)
     c.commit()
     return jsonify(pub(c, row))
 
@@ -634,7 +634,7 @@ def bw_meal_patch(mid):
         return row
     ow_write(c, uid, "office_meal", mid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
              dec=lambda c, x: oc_dec_fields(c, oid, "office_meals", x), enc=lambda c, v: oc_enc_fields(c, oid, "office_meals", v),
-             public=lambda c, cur: _one(c, oid, mid))
+             alias="row", public=lambda c, cur: _one(c, oid, mid))
     c.commit()
     return jsonify(_one(c, oid, mid))
 

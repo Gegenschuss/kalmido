@@ -195,7 +195,7 @@ def cc_patch(cid):
         return {k: x for k, x in v.items() if (x or None) != (cur.get(k) or None)}
     _, changed = ow_write(c, uid, "office_cc_card", cid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
                           dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_cards", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_cards", v),
-                          public=lambda c, cur: _card_public(c, oid, cur))
+                          alias="row", public=lambda c, cur: _card_public(c, oid, cur))
     if changed:
         ofx_log(c, oid, "update", target="cards", detail={"card": cid})
     c.commit()
