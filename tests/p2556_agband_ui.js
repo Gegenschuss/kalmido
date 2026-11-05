@@ -17,7 +17,7 @@ if (process.env.P2556AB_NOSTART !== '1') execFileSync('bash', [path.join(__dirna
   const r = await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123', wizard: true, lang: 'en'})});
   check(r.ok, 'setup');
   const CA = await login('alice');
-  await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CA}, body: JSON.stringify({lang: 'en', tour: 'done'})});
+  await fetch(B + 'api/settings', {method: 'PATCH', headers: {...H, Cookie: CA}, body: JSON.stringify({lang: 'en', tour: 'done', features: 'cal,comments,collab,agents'})});
   const ready = async (ev, expr, n = 40) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(250); } return false; };
   const signIn = (ev, u) => ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: '${u}', password: 'password123'})}).then(r => r.ok)`);
   await firefox(async ({cmd, ev, ctx, nav, shot}) => {
