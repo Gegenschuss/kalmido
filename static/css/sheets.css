@@ -273,5 +273,5 @@ input.shvmx{color:transparent!important;caret-color:var(--text);background:trans
 .shvach{display:none}
 @media (hover: none){
   .shvac button{flex-wrap:wrap;min-height:2.75rem;padding:.375rem .625rem;row-gap:.125rem}
-  .shvach{display:block;flex-basis:100%;font-size:var(--fs-xs);color:var(--muted);white-space:normal;line-height:1.3}
+  .shvach{display:block;flex-basis:100%;font-size:var(--fs-xs);color:var(--muted);white-space:normal;line-height:var(--lh-tight)}  /* 2.556 (#4662): token, not 1.3 (p2419_scale) */
 }
