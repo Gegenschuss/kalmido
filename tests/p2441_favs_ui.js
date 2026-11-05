@@ -201,7 +201,8 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     check(await ready(ev, `[...document.querySelectorAll('.menu-list [role="menuitem"]')].some(x => /Only favourites/.test(x.textContent))`), 'phone: "Only favourites" is in the menu of a tile');
     await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})); return 1; })()`);
     await ev(`(() => { document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]').click(); return 1; })()`);
-    check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target');
+    // CI red of 2.560 / 2.562 only (green on the Mac): the message says where the app stood, to find the cause
+    check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target ' + await ev(`JSON.stringify({route: S.route?.key, hash: location.hash, menu: !!document.querySelector('.menu-list'), side: !!document.querySelector('#side.open'), tile: !!document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]'), attrs: document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]')?.outerHTML.replace(/<svg.*?<\\/svg>/g, '').slice(0, 200)})`).catch(e => String(e)));
     // turning: wide = the row in the head bar, #favrow empty; narrow again = the row under the header
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 760}});
     check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#favrow .fv2-tile')`), 'wide: the row in the head bar, #favrow empty');

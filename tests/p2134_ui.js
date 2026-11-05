@@ -189,8 +189,9 @@ const ALL = 'cal,timeline,matrix,habits,pomo,kanban,collab,stats,time,progress,d
       await touch([[p.x, p.y], [p.x, (p.y + mv.y) / 2], [mv.x, mv.y]], {endHold: 300}); await sleep(600);
       check(await ev(`!!document.querySelector('.palette') && PAL.mode === 'move'`), `${tag}: dropped on "Move to list": the list picker opens`);
       await shot(`p2134-${tag}-move.png`);
-      await ev(`(() => { const it = PAL.items.find(x => x.label === 'Elsewhere'); it && it.fn(); closePalette(); return 1; })()`); await sleep(800);
-      check((await call('GET', '/api/state')).tasks.find(t => t.id === MT).list_id === L2, `${tag}: the task moved to the other list`);
+      const picked = await ev(`(() => { const it = PAL.items.find(x => x.label === 'Elsewhere'); it && it.fn(); closePalette(); return it ? 'picked' : 'no item: ' + PAL.items.map(x => x.label).join('|') + ' for ' + JSON.stringify({kf: S.kf, cur: curTask()?.id, list: curTask()?.list_id, parent: curTask()?.parent_id, mt: ${MT}, mtParent: S.tasks.get(${MT})?.parent_id, ws: mv_scope([curTask()?.id]), l2: (S.lists.find(l => l.id === ${L2}) || {}).ws_id}); })()`);
+      const moved = await until(async () => (await call('GET', '/api/state')).tasks.find(t => t.id === MT)?.list_id === L2, 40);
+      check(moved, `${tag}: the task moved to the other list (${picked}; toast ${await ev(`document.querySelector('#toast')?.textContent || '-'`)}; dialog ${await ev(`document.querySelector('.modal, dialog[open]')?.textContent?.slice(0, 120) || '-'`)}; client list ${await ev(`S.tasks.get(${MT})?.list_id`)} / L2 ${L2})`);
       await release();
     }
     // 5) the section "+" with a keyboard: the sheet's box is above the keyboard
