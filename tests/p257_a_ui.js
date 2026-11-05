@@ -166,7 +166,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    const TILE = touch ? '#side .fv2side .fv2-row' : '.fv2bar .fv2-tile';  // 2.489.0 (#4014): a phone shows the favourites as entries of the sidebar
+    const TILE = '.fv2bar .fv2-tile';  // 2.552.0 (#4618): the head bar's row, on a phone #favrow under the header (it is a .fv2bar too; #4014 had put them into the sidebar)
     for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('${TILE}') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
@@ -179,8 +179,7 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
       check(m.scroll > 100, tag + ': the sidebar scrolls ' + JSON.stringify({...m, extra}));
       if (m.flow) check(Math.abs(m.top1 - (m.top0 - m.scroll)) < 2, tag + ': sidebar B: the head scrolls along (#3303) ' + JSON.stringify(m));  // 2.331.0 A (#3303): in sidebar B the head is no longer fixed
       else check(Math.abs(m.top1 - m.top0) < 2 && m.top1 >= -1 && m.front, tag + ': the head stays in place while the sidebar scrolls ' + JSON.stringify(m));
-      if (touch) check(m.th >= 1.75 * m.rem - 1 && m.w > m.th * 3, tag + ': a favourite is a full row of the sidebar ' + JSON.stringify(m));  // 2.489.0 (#4014)
-      else check(Math.abs(m.w - m.th) < 2 && m.w >= 1.875 * m.rem - 1, tag + ': tiles square, at least 1.875 rem '  /* 2.441.0 (#3592): the row of the head bar */ + JSON.stringify(m));
+      check(Math.abs(m.w - m.th) < 2 && m.w >= 1.875 * m.rem - 1, tag + ': tiles square, at least 1.875 rem '  /* 2.441.0 (#3592): the row of the head bar */ + JSON.stringify(m));
       check(m.h < m.vh * 0.6, tag + ': the head stays below 60 % of the height ' + JSON.stringify(m));
     }
     await ev(`(() => { document.querySelector('#side').scrollTop = 0; return 1; })()`);

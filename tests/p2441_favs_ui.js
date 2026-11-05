@@ -185,28 +185,32 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     const {ev, cmd, ctx, shot} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
     await signIn(o, 'frida', '#today');
-    const SIDE = `[...document.querySelectorAll('#side .sg-favs .fv2side .fv2-row')]`;
-    check(await ready(ev, `${SIDE}.length === 4`), 'phone: four entries under "Favourites" in the sidebar ' + await ev(`${SIDE}.map(x => x.dataset.fv2).join()`));
-    check(!(await ev(`!!document.querySelector('#favrow, .fv2bar:not(.fv2-page) .fv2-tile')`)), 'phone: no row of tiles over the page');
-    const e = JSON.parse(await ev(`(() => { const r = k => document.querySelector('#side .fv2side .fv2-row[data-fv2="' + k + '"]'); return JSON.stringify({names: ${SIDE}.map(x => x.querySelector('.n')?.textContent).join('|'), icon: !!r('v:today')?.querySelector('.fv2-ri svg'), n: r('l:${FL}')?.querySelector('.c')?.textContent, on: r('v:today')?.classList.contains('on')}); })()`));
-    check(/Today/.test(e.names) && /Image film|Quotation/.test(e.names) && /Shoot prep/.test(e.names) && e.icon, 'phone: symbol and name ' + JSON.stringify(e));
-    check(e.n === '2', 'phone: the list counts its open tasks ' + JSON.stringify(e));
-    check(e.on, 'phone: the open view is marked');
-    check(/nunread[^>]*>2</.test(await ev(`(() => { const a = S.agents; S.agents = [{id: 991, waiting: 1, chat_unread: 1}]; const h = fv2_sideN('a:991'); S.agents = a; return h; })()`)), 'phone: what is unread keeps its marked number');
+    // 2.552.0 (#4618): takes back #4014 -- no section "Favourites" in the phone's sidebar (no heading, no entries); the row under the header
+    const NOSIDE = `!document.querySelector('#side .sg-favs .sgh, #side .fv2side, #side .fv2-row')`;
+    check(await ready(ev, `document.querySelectorAll('#favrow .fv2-tile').length === 4 && !document.querySelector('#favrow').classList.contains('hidden')`), 'phone: the row under the header, four tiles');
+    const p = JSON.parse(await ev(`(() => { const r = document.querySelector('#favrow').getBoundingClientRect(), t = document.querySelector('#top').getBoundingClientRect(), a = document.querySelector('#favrow .fv2-tile').getBoundingClientRect(); return JSON.stringify({under: r.top >= t.bottom - 1, h: a.height}); })()`));
+    check(p.under && p.h >= 44, 'phone: below the header, a big enough target ' + JSON.stringify(p));
+    check(await ev(NOSIDE), 'phone: the sidebar has no section Favourites (no heading, no entries)');
     await ev(`(() => { sideOpenDrawer(); return 1; })()`);
     await ready(ev, `!!document.querySelector('#side.open')`);
+    check(await ev(NOSIDE), 'phone: the opened drawer has no section Favourites either');
     await shot('p2441-phone.png');
-    await ev(`(() => { document.querySelector('#side .fv2side .fv2-row[data-fv2="l:${FL}"]').click(); return 1; })()`);
-    check(await ready(ev, `S.route.key === 'l:${FL}' && !document.querySelector('#side.open')`), 'phone: an entry opens its target and closes the drawer');
-    // turning: wide = the row in the head bar, no entries; narrow again = the entries
+    await ev(`(() => { closeSide(); return 1; })()`);
+    // "Only favourites" is reachable without the heading: in the menu of a tile
+    await ev(`(() => { fv2_tileMenu(document.querySelector('#favrow .fv2-tile')); return 1; })()`);
+    check(await ready(ev, `[...document.querySelectorAll('.menu-list [role="menuitem"]')].some(x => /Only favourites/.test(x.textContent))`), 'phone: "Only favourites" is in the menu of a tile');
+    await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})); return 1; })()`);
+    await ev(`(() => { document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]').click(); return 1; })()`);
+    check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target');
+    // turning: wide = the row in the head bar, #favrow empty; narrow again = the row under the header
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 760}});
-    check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#side .fv2side')`), 'wide: the row in the head bar, no entries in the sidebar');
+    check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#favrow .fv2-tile')`), 'wide: the row in the head bar, #favrow empty');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
-    check(await ready(ev, `${SIDE}.length === 4 && !document.querySelector('#kbar .fv2bar .fv2-tile')`), 'narrow again: the entries are back');
+    check(await ready(ev, `document.querySelectorAll('#favrow .fv2-tile').length === 4 && !document.querySelector('#kbar .fv2bar .fv2-tile')`), 'narrow again: the row under the header is back');
     check(await ev(`topMoreItems().some(x => /favourites/.test(x.label || ''))`), 'phone: the star of a page is in "…"');
-    await shot('p2441-phone.png');
     await ev(`(() => { nav_pref('tabbar').order.push('favs'); S.settings.nav_menus = S.settings.nav_menus || '{}'; LS.set('tabbar', [...tabIds(), 'favs']); render(); go('favorites'); return 1; })()`);
     check(await ready(ev, `S.route.key === 'favorites' && document.querySelectorAll('#view .fv2-page .fv2-tile').length === 4`), 'phone: the page lists them');
+    check(await ready(ev, `!document.querySelector('#favrow .fv2-tile')`), '2.552.0 (#4618): tab pinned = no row over the page');
     check(/Image film|Quotation/.test(await ev(`document.querySelector('#view .fv2-page').textContent`)), 'phone: names on the page');
     await shot('p2441-page.png');
   }, true);

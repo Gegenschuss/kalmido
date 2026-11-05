@@ -11,8 +11,8 @@
    - 2.441.0 (#3592): everything with an address of its own (a quotation, a page, a table, a contact, a file, a saved view):
      fv2_hashKey turns an address into a key, GET /api/favorites/targets checks those on the server each time (names, routes,
      workspaces of what the person may read). ONE row for all workspaces, a dot shows the workspace; a computer: in the free
-     room of the head bar (#kbar), what does not fit under "+N"; without a head bar (a phone, 2.489.0 #4014) entries in the sidebar's
-     section "Favourites" or, with the tab "Favourites" pinned, a page (#favorites). Dividers are keys too (sep:), the own look is the setting fav_meta. */
+     room of the head bar (#kbar), what does not fit under "+N"; a phone (2.552.0 #4618, no sidebar section any more): a row to swipe under the header (#favrow) or, with the tab
+     "Favourites" pinned, a page (#favorites). Dividers are keys too (sep:), the own look is the setting fav_meta. */
 'use strict';
 
 // [icon, name] of the Plan views and the rows of "More"
@@ -136,17 +136,23 @@ function fv2_tileHtml(t, page) {
   const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
   return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c ? ` style="--fvc:${esc(m.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;
 }
-// the row: in the head bar (left empty by sbb_barHtml); 2.489.0 (#4014): without one the sidebar shows them (fv2_sideHtml)
+// the row: a computer in the head bar (left empty by sbb_barHtml), else under the header (#favrow, a phone: swipe it); hidden while the page is pinned
+// 2.552.0 (#4618): takes back #4014 -- the phone's sidebar shows no section "Favourites" (fv2_sideHtml), only this row or the tab
 const fv2_pagePinned = () => { try { return isMobile() && tabIds().includes('favs'); } catch { return false; } };
 function fv2_barDraw() {
-  const on = $('#kbar .fv2bar'); if (!on) return;
+  const kb = $('#kbar .fv2bar'), row = $('#favrow'), mini = document.documentElement.classList.contains('mini') || document.documentElement.classList.contains('mini-task');
+  const on = kb || (row && !mini && !fv2_pagePinned() ? row : null);
+  if (row && row !== on && row.firstChild) { row.innerHTML = ''; row.classList.add('hidden'); FV2.last.delete(row); }
+  if (!on) return;
   fv2_fetch();
-  const html = `${fv2_tiles().map(t => fv2_tileHtml(t)).join('')}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>`;
-  if (FV2.last.get(on) === html && on.firstChild) { fv2_fit(); return; }
+  const ts = fv2_tiles(), body = ts.map(t => fv2_tileHtml(t)).join('');
+  const html = on === kb ? `${body}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>` : body;
+  if (on === row) row.classList.toggle('hidden', !ts.length);
+  if (FV2.last.get(on) === html && on.firstChild) { if (on === kb) fv2_fit(); return; }
   FV2.last.set(on, html);
   on.setAttribute('aria-label', tr('Favourites'));
   keepFocus(on, () => { on.innerHTML = html; });
-  fv2_fit();
+  if (on === kb) fv2_fit();
 }
 // "+N": what does not fit stays hidden in the row and is offered by the button at its end; the bar never takes room from the others
 function fv2_fit() {
@@ -185,7 +191,6 @@ async function fv2_fetch(force) {
   FV2.busy = false;
   if (FV2.again) { FV2.again = false; fv2_fetch(true); return; }
   fv2_barDraw();
-  if (fv2_sideOn()) renderSide();  // 2.489.0 (#4014)
   if (S.route.key === 'favorites') render();
 }
 // 2.441.0 (#3592): the favourites that show nothing now: the target is gone or the access is (Settings); they stay stored
@@ -199,37 +204,12 @@ async function fv2_open(b) {
   if (ws && wsOn() && ws !== cur && wsOptions().includes(ws) && (cur !== 'all' || b.dataset.fv2.startsWith('r:office'))) await wsSet(ws);
   go(b.dataset.fv2Go);
 }
-// the section "Favourites" (renderSide via favSideHtml): the heading with "Only favourites" (lists only), the entries below
-// 2.489.0 (#4014): with a head bar (a computer, a tablet held across) the favourites are its row; without one (the phone's narrow
-// layout) they stand here again as entries (symbol, name, number / unread) instead of a row of their own over the page's header
-function fv2_sideHtml(lists, head) {
-  const side = fv2_sideOn(), sv = sv_tilesHtml(), ts = side ? fv2_tiles().filter(t => !t.sep) : [];
-  if (side) fv2_fetch();  // the names of the objects (quotations, pages, files) come from the server
-  if (sbb_on() || (!favAny() && !ts.length)) return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186): + the view tiles
-  const only = favOnly(), lab = tr('Only favourites');  // 2.441.0 (#3592): the tiles moved into the head bar
-  const acts = favAny() ? `<button type="button" data-fav-only class="${only ? 'on' : ''}" aria-pressed="${only}" title="${esc(lab)}" aria-label="${esc(lab)}">${ic('filter', 's')}</button>` : '';
-  const rows = ts.length && sideOpen('favs') ? `<div class="fv2side" role="group" aria-label="${esc(tr('Favourites'))}">${ts.map(fv2_rowHtml).join('')}</div>` : '';
-  return `<div class="sgroup sg-favs">${head('favs', tr('Favourites'), acts)}${sv}${rows}</div>`;
-}
-// 2.489.0 (#4014): no head bar = the favourites are entries of the sidebar (the page "Favourites" pinned as a tab keeps them there)
-const fv2_sideOn = () => { try { return !sbb_on() && !S.me?.kid && !fv2_pagePinned(); } catch { return false; } };
-// the number of an entry: open tasks as the sidebar's rows count them, what is unread as a marked number
-function fv2_sideN(key) {
-  const i = key.indexOf(':'), p = key.slice(0, i), v = key.slice(i + 1), c = counts();
-  const plain = n => n && rsy_sideCnt() ? `<span class="c">${n}</span>` : '', unread = n => n ? `<span class="c nunread">${n > 99 ? '99+' : n}</span>` : '';
-  if (p === 'l') return plain(c.lists[v]);
-  if (p === 'v') return v === 'today' && c.over ? `<span class="c over">${c.today || ''}</span>` : plain(typeof c[v] === 'number' ? c[v] : 0);
-  if (p === 'f') return plain(c.filters[v]);
-  if (p === 'tag') return plain(c.tags[v]);
-  if (p === 'a') { const a = (S.agents || []).find(x => x.id === +v); return unread(a ? (a.waiting || 0) + (a.chat_unread || 0) : 0); }
-  if (key === 'm:news') return unread(S.news?.unread ? bellCount() : 0);
-  if (key === 'm:team') return unread(S.team?.unread || 0);
-  if (key === 'm:agents') return unread((S.agents || []).reduce((n, x) => n + (x.waiting || 0) + (x.chat_unread || 0) + (x.approvals_open || 0), 0));
-  return '';
-}
-function fv2_rowHtml(t) {
-  const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
-  return `<button type="button" class="srow fv2-row ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c ? ` style="--fvc:${esc(m.c)}"` : ''}><span class="fv2-ri" aria-hidden="true">${m.i ? ic(m.i) : t.icon}</span><span class="n">${esc(t.name)}</span>${dot}${fv2_sideN(t.key)}</button>`;
+// the sidebar (renderSide via favSideHtml): no section "Favourites" in any layout -- a computer has them in the head bar, a phone in the row
+// under the header (#favrow) or on the tab (2.552.0 #4618, takes back #4014); "Only favourites" is in the menu of a tile (fv2_onlyItem)
+// what stays: the view tiles ("Everything" + one per view, sideviews.js)
+function fv2_sideHtml() {
+  const sv = sv_tilesHtml();
+  return sv ? `<div class="sgroup sg-favs sg-svonly">${sv}</div>` : '';  // 2.156.0 D (#2186)
 }
 
 // ---- saving: one PATCH per change, shown at once; a failure loads the server's state again
