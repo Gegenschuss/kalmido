@@ -792,7 +792,7 @@ def v1_tcx_group_new():
 def v1_tcx_room_patch(rid):
     v1_args(())
     b = v1_json()
-    reject_unknown(b, ("name", "open", "archived", "expect_updated_at"))
+    reject_unknown(b, ("name", "open", "archived"))
     return jsonify(v1_call(tcx_room_patch, rid, body=b))
 
 
