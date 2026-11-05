@@ -288,12 +288,13 @@ async function amv_open() {
     ${j.more ? `<p class="muted">${esc(trn('{0} more receipt follows after this move', '{0} more receipts follow after this move', j.more))}</p>` : ''}
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Cancel')}</button><button type="button" class="btn pri" data-m="go">${ic('check', 's')} <span class="amv-go"></span></button></div>`);
   md.classList.add('amvmd');
-  const ids = () => $$('select[data-amv-id]', md).filter(s => !s.disabled && s.value === 'move').map(s => +s.dataset.amvId);
-  const sync = () => { const n = ids().length; $('.amv-go', md).textContent = trn('Move {0} receipt', 'Move {0} receipts', n); $('[data-m="go"]', md).disabled = !n; };
+  const mdq = /** @type {any} */ (md);  // the modal as the root of $ / $$
+  const ids = () => $$('select[data-amv-id]', mdq).filter(s => !s.disabled && s.value === 'move').map(s => +s.dataset.amvId);
+  const sync = () => { const n = ids().length; $('.amv-go', mdq).textContent = trn('Move {0} receipt', 'Move {0} receipts', n); $('[data-m="go"]', mdq).disabled = !n; };
   sync();
   md.addEventListener('change', sync);
   md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
+    const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { md.remove(); return; }
     b.disabled = true;
     let r; try { r = await api('POST', '/api/docs/office-move', {ids: ids()}); } catch { b.disabled = false; return; }
@@ -303,7 +304,7 @@ async function amv_open() {
   });
 }
 document.addEventListener('click', async e => {
-  const b = e.target.closest?.('[data-amv]'); if (!b) return;
+  const b = /** @type {any} */ (e.target).closest?.('[data-amv]'); if (!b) return;
   const k = b.dataset.amv, u = AMV.info?.undo;
   if (k === 'open') { amv_open(); return; }
   if (k === 'seen' && u) { try { localStorage.setItem(amv_undoKey(u.id), '1'); } catch { /* private mode */ } ofcDraw(); return; }
