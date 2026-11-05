@@ -51,7 +51,7 @@ const today = new Date().toISOString().slice(0, 10);
   const ED = `(() => { const ed = document.querySelector('.ofdeditor'); if (!ed) return 'null'; const r = e => e.getBoundingClientRect();
     const head = ed.querySelector('[data-sec="head"]'), pos = [...ed.querySelectorAll('section.ofdsec')][0];
     const h = r(head), p = r(pos);
-    return JSON.stringify({h: [Math.round(h.left), Math.round(h.right), Math.round(h.top)], p: [Math.round(p.left), Math.round(p.right), Math.round(p.top)], hw: Math.round(h.width),
+    return JSON.stringify({h: [Math.round(h.left), Math.round(h.right), Math.round(h.top)], p: [Math.round(p.left), Math.round(p.right), Math.round(p.top)], hw: Math.round(h.width), cw: Math.round((ed.closest('.lsdr') || ed.parentElement).clientWidth),
       side: document.documentElement.scrollWidth > document.documentElement.clientWidth || ed.scrollWidth > ed.clientWidth + 1,
       tab: head.compareDocumentPosition(pos) & Node.DOCUMENT_POSITION_FOLLOWING ? 1 : 0}); })()`;
   // the dialog is there, its area drawn and its width settled (two looks in a row agree; the module's styles load with it)
@@ -90,7 +90,8 @@ const today = new Date().toISOString().slice(0, 10);
           check(await ready(ev, `!!document.querySelector('.ofdeditor [data-sec="head"]') && !!document.querySelector('.ofdeditor section.ofdsec .ofdit')`), `${theme} ${W}: the ${tab} editor opens`);
           const e = JSON.parse(await ev(ED));
           check(!e.side && e.tab === 1, `${theme} ${W} ${tab}: no sideways scrolling, the head before the positions in the DOM ` + JSON.stringify(e));
-          if (W >= 1920) check(e.p[0] >= e.h[1] && Math.abs(e.p[2] - e.h[2]) <= 2, `${theme} ${W} ${tab}: head and positions side by side ` + JSON.stringify(e));
+          // 2.555.0: since #4553 the document may stand beside its list; side by side counts by the document's own width (80rem)
+          if (e.cw >= 1280) check(e.p[0] >= e.h[1] && Math.abs(e.p[2] - e.h[2]) <= 2, `${theme} ${W} ${tab}: head and positions side by side ` + JSON.stringify(e));
           else check(e.p[2] > e.h[2] && Math.abs(e.p[0] - e.h[0]) <= 1, `${theme} ${W} ${tab}: head above the positions as before ` + JSON.stringify(e));
           if (tab === 'invoices') { await ready(ev, theme_(theme)); await shot(`p2555-a-invoice-${W}-${theme}.png`); }
         }

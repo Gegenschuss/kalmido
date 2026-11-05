@@ -1212,7 +1212,7 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
    --w-form) with the project row below it on the left, the positions with texts and own fields beside it on the right; everything
    after (fees, payments, history) below at the full width. The order stays the DOM order (no order:), so the tab order is
    head, project, positions. Below 80rem of the page (1440 px with the sidebar, tablets, phones) it stays one column. */
-.ofcbody:has(>.ofdeditor),.pboffers:has(>.ofdeditor){container:ofded / inline-size}
+.ofcbody:has(>.ofdeditor),.pboffers:has(>.ofdeditor),.lsdr:has(>.ofdeditor){container:ofded / inline-size}  /* .lsdr: the document beside its list (#4553); there it is the document's own width that counts */
 @container ofded (min-width:80rem){
   .ofdeditor{display:grid;grid-template-columns:minmax(0,var(--w-form)) minmax(0,1fr);grid-template-rows:auto 1fr;gap:.75rem 1.5rem;align-items:start}  /* the second row takes what the long positions add, so the project row stays right under the head */
   .ofdeditor>*{grid-column:1 / -1}
