@@ -311,6 +311,9 @@ APP_ONLY = [
      ("=POST /api/videos", "=PATCH /api/videos/{}", "=DELETE /api/videos/{}", "=POST /api/videos/{}/restore", "* /api/videos/{}/versions",
       "=DELETE /api/videos/{}/comments/{}", "=POST /api/videos/{}/comments/{}/restore", "=POST /api/videos/{}/signoff",
       "=POST /api/videos/{}/signoffs/{}/revoke", "=POST /api/videos/{}/move-space")),
+    # 2.549.0 (#4536): the video trash list belongs to trash / restore above (people only, agents 404)
+    ("2.549.0 (#4536): the video trash of the trash view stays with people, like the restore it lists for (agents 404)",
+     ("=GET /api/videos/trash",)),
     ("2.96.0 (#1941): moving data between the private workspace and an organisation stays with people in the app -- an agent belongs "
      "to ONE workspace and never moves data across its boundary (the routes answer 403 to agents)",
      ("=POST /api/files/move-space", "=POST /api/sheets/{}/move-space", "=POST /api/wiki/move-space",

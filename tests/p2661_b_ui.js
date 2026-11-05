@@ -57,6 +57,7 @@ const WS_VIEWS = {
   'static/js/polls.js': 'helper',            // 2.98.1: the default workspace of a new poll (the dialog shows all polls, with their workspace)
   'static/js/palette.js': 'draw',
   'static/js/areas.js': 'draw',               // 2.87.0: private areas hidden in an organisation's view (o3a_hid while drawing, #1845)
+  'static/js/trashui.js': 'draw',             // 2.549.0 (#4536): the trash's video sign-offs of the shown workspace (wsObjIn while drawing)
   'static/js/notesall.js': 'draw',            // 2.398.0 (#3405): the notes of the shown workspace's projects + the private list Notes (nt_inWs while drawing)
   'static/js/stats.js': 'draw',               // 2.398.0 (#3406): the statistics of the shown workspace (?space=), loads again when it changed (S.st.sp)
   'static/js/tagsview.js': 'draw',
