@@ -63,6 +63,7 @@ KINDS = {
                "organisation: create, comments, versions, customer link, export, delete + restore; p2991_c_api_test.py: the own agent "
                "of such a person reads and comments them through the API v1; p2549_c_vtrash_test.py (2.549.0): her video trash, a review "
                "without a place restored into her project"),
+    "obj": ("matrix", "obj_core_test.py, obj_write_test.py: core objects (2.558.0) in the private workspace of a person without an organisation: create, change with the version, history, undo, trash, restore, delete, shares with her own agent, her agent reads and writes"),
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private workspace of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
@@ -836,6 +837,12 @@ ROUTES = {
     "PATCH /api/v1/videos/{}/comments/{}": "videos",
     "DELETE /api/sheets/{}": "sheets", "DELETE /api/sheets/{}/columns/{}": "sheets",
     "DELETE /api/sheets/{}/rows/{}": "sheets", "GET /api/sheets": "sheets", "GET /api/sheets/{}": "sheets",
+    # 2.558.0 (#4709): the core objects (core/objweb.py)
+    "GET /api/obj/{}": "obj", "POST /api/obj/{}": "obj", "GET /api/obj/{}/{}": "obj", "PATCH /api/obj/{}/{}": "obj",
+    "POST /api/obj/{}/{}/trash": "obj", "POST /api/obj/{}/{}/restore": "obj", "DELETE /api/obj/{}/{}": "obj",
+    "GET /api/obj/{}/{}/history": "obj", "POST /api/obj/{}/{}/undo": "obj", "GET /api/obj/{}/{}/shares": "obj",
+    "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
+    "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     "GET /api/sheets/{}/export.csv": "sheets", "GET /api/sheets/{}/export.xlsx": "sheets",
     "GET /api/sheets/{}/links": "sheets", "GET /api/sheets/{}/vars": "sheets", "GET /api/v1/sheets": "sheets",
     "GET /api/v1/sheets/{}": "sheets", "GET /api/v1/sheets/{}/vars": "sheets", "PATCH /api/sheets/{}": "sheets",

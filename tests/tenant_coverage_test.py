@@ -114,6 +114,7 @@ KINDS = {
                        "p2177_a_api_test.py: the large ZIP import (another organisation's space 404, another person's upload 404)"),
     # 2.89.0 (#1916): tables belong to one organisation (every member) or one person (org_id NULL, owner_id); attached to a list
     # the list decides; Kalmido variables in formulas are evaluated per viewer (a source they may not see: "denied", no name / value)
+    "obj": ("matrix", "obj_core_test.py, obj_write_test.py: a core object (2.558.0, core/objects.py) of another organisation / person: 404 for the person and her agent (read, list, change, trash, restore, delete, history, undo, shares); shares only to the same workspace"),
     "sheet": ("matrix", "p2528_c_sheets_test.py (the trash of tables), p289_a_api_test.py: a table of another organisation / person / list: 404 (read, change, cells, columns, rows, "
                         "trash, presence, completion); a formula's source of another workspace cannot be chosen and shows no value"),
     # 2.124.0 C (#2113): one table shared with single people / agents (sheets/shshare.py): only people / agents of the table's
@@ -1064,6 +1065,12 @@ ROUTES = {
     "POST /api/wiki/e2e/keys": "wiki", "POST /api/wiki/e2e/rotate": "wiki",
     # 2.89.0 (#1916): tables (sheets/web.py; p289_a_api_test.py)
     "GET /api/sheets": "sheet", "POST /api/sheets": "sheet", "GET /api/sheets/{}": "sheet", "PATCH /api/sheets/{}": "sheet",
+    # 2.558.0 (#4709): the core objects' generic routes (core/objweb.py; obj_core_test.py, obj_write_test.py)
+    "GET /api/obj/{}": "obj", "POST /api/obj/{}": "obj", "GET /api/obj/{}/{}": "obj", "PATCH /api/obj/{}/{}": "obj",
+    "POST /api/obj/{}/{}/trash": "obj", "POST /api/obj/{}/{}/restore": "obj", "DELETE /api/obj/{}/{}": "obj",
+    "GET /api/obj/{}/{}/history": "obj", "POST /api/obj/{}/{}/undo": "obj", "GET /api/obj/{}/{}/shares": "obj",
+    "POST /api/obj/{}/{}/shares": "obj", "DELETE /api/obj/{}/{}/shares/{}": "obj", "POST /api/obj/{}/{}/shares/{}/restore": "obj",
+    "GET /api/v1/agent/objects/{}": "obj", "GET /api/v1/agent/objects/{}/{}": "obj", "PATCH /api/v1/agent/objects/{}/{}": "obj",
     # 2.96.0 B (#1941): a table to the other workspace (p296_b_api_test.py)
     "POST /api/sheets/{}/move-space": "sheet",
     # 2.401.0 (#2924): the dry run of a project's workspace change (p2401_a_api_test.py)

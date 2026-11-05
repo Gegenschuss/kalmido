@@ -174,6 +174,8 @@ APP_TO_API = {
     "DELETE /api/chat-files/{}": ["DELETE /chat-attachments/{}"],
     "POST /api/agents/{}/chat/{}/reactions": ["POST /agents/{}/chat/{}/reactions"],
     "GET /api/agents": ["GET /agents"],
+    # 2.558.0 (#4709): the core objects -- agents read and change them (only what is shared with them, with the version)
+    "GET /api/obj/{}": ["GET /agent/objects/{}"], "GET /api/obj/{}/{}": ["GET /agent/objects/{}/{}"], "PATCH /api/obj/{}/{}": ["PATCH /agent/objects/{}/{}"],
     # 2.17.0 (#442): notes
     "GET /api/lists/{}/notes": ["GET /lists/{}/notes"], "POST /api/lists/{}/notes": ["POST /lists/{}/notes"],
     "GET /api/notes": ["GET /notes"], "GET /api/notes/{}": ["GET /notes/{}"], "PATCH /api/notes/{}": ["PATCH /notes/{}"],
@@ -267,6 +269,10 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.558.0 (#4709): the core objects' own management stays with people -- creating, the trash, deleting, the editor's undo session and who it is shared with (an agent changes what is shared with it, never its shares or its existence)",
+     ("=POST /api/obj/{}", "=POST /api/obj/{}/{}/trash", "=POST /api/obj/{}/{}/restore", "=DELETE /api/obj/{}/{}", "=GET /api/obj/{}/{}/history",
+      "=POST /api/obj/{}/{}/undo", "=GET /api/obj/{}/{}/shares", "=POST /api/obj/{}/{}/shares", "=DELETE /api/obj/{}/{}/shares/{}",
+      "=POST /api/obj/{}/{}/shares/{}/restore")),
     ("2.530.0 D (#4316): the numbers of the app's delete dialogs before deleting for good (customer reports, form entries, video "
      "reviews, kept by law, an instance admin's other owners) -- an agent's empty_trash waits for a person's approval with its number",
      ("=GET /api/trash/purge-info",)),
