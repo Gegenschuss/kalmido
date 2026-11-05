@@ -144,7 +144,7 @@ def chn_hint_migrate(c):
     """2.547.0 (#4516), at every start, a no-op once done: hints from before still end in " …" + the last four characters of the
     secret. From the sealed address where it opens (chn_hint), else cut back to what came before " …". One-way: the old ends go.
     Called once when the delivery loop starts (chn_loop), not from core/db.py init_db (no upward import from the core)."""
-    for r in c.execute("SELECT id, kind, target, hint FROM notify_channels WHERE hint LIKE '%…%'").fetchall():
+    for r in c.execute("SELECT id, kind, target, hint FROM notify_channels WHERE hint ILIKE '%…%'").fetchall():
         try:
             h = chn_hint(r["kind"], json.loads(unseal(c, f"channel:{r['id']}", r["target"]) or "{}"))
         except Exception:  # noqa: BLE001 -- an address that does not open (another key, a broken row): the safe part only

@@ -60,7 +60,7 @@ const SLACK = 'https://hooks.slack.com/services/T000/B000/abcdefgh1234';
   click(w, dlg().querySelector('[data-m="ok"]'));
   await until(() => box()?.querySelector('.chnrow'), 60);
   const row = box()?.querySelector('.chnrow');
-  check(/Team Slack/.test(row?.textContent || '') && /hooks\.slack\.com …1234/.test(row?.textContent || ''), '#2145: the row: name, service, masked end: ' + (row?.textContent || '').trim().slice(0, 120));
+  check(/Team Slack/.test(row?.textContent || '') && /hooks\.slack\.com/.test(row?.textContent || '') && !/…1234/.test(row?.textContent || ''), '#2145: the row: name, service, host (2.547.0 (#4516): no masked end of the secret): ' + (row?.textContent || '').trim().slice(0, 120));
   check(!box().innerHTML.includes('abcdefgh1234') && !box().innerHTML.includes('/services/'), '#2145: the address never shows');
   const list = (await call('GET', '/api/me/channels')).channels || [];
   check(list.length === 1 && list[0].kind === 'slack' && !JSON.stringify(list).includes('abcdefgh'), '#2145: saved on the server, no address in GET');
