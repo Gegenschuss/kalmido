@@ -188,6 +188,7 @@ def admin_settings():
     need_admin()
     b, c = body(), db()
     old = {k: gsetting(c, k) not in ("0", "") for k in ("collab_all", "time_all", "update_check") + AUTH_SWITCHES}
+    srv_was = gsetting(c, "server_agents_off") == "1"  # 2.557.0 (#4670): its alert below ("1" = off, the other way round)
     # 2.306.0 Fix-1 (#2875 review): auto-created accounts by the admin rule ask for the account password. 2.360.0 A (#2496):
     # every switch that opens the server (from its value in effect), so a stolen admin session alone cannot (an account
     # without a password: its session)
@@ -264,6 +265,8 @@ def admin_settings():
     for k, was in old.items():
         if k in b and b[k] != was:
             aa_switch(c, g.user, k, b[k])
+    if isinstance(b.get("server_agents_off"), bool) and b["server_agents_off"] != srv_was:
+        aa_switch(c, g.user, "server_agents", not b["server_agents_off"])  # 2.557.0 (#4670): a security alert like the other switches
     if pub_new is not None:  # 2.489.0 C (#2656): one security alert per kind switched
         for k in sorted(pub_off ^ pub_new):
             aa_now("security", f"publinks:{k}:{int(k not in pub_new)}:{int(time.time())}", N_("{0} set public links for “{1}” to {2}."),

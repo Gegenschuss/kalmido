@@ -16423,6 +16423,7 @@
   "Follow up": "Navragen",
   "Look at my tasks that have been waiting on someone for more than {0} days. Draft a short, friendly follow-up for each as a comment and ask me with an approval card; post or send nothing before my Yes.": "Bekijk mijn taken die al meer dan {0} dagen op iemand wachten. Stel voor elk een korte, vriendelijke herinnering op als opmerking en vraag het me met een goedkeuringskaart; plaats of verstuur niets vóór mijn Ja.",
   "Share a project with the agent first": "Deel eerst een project met de agent",
+  "Server agents (run on this server with their own API key)": "Serveragents (draaien op deze server met een eigen API-sleutel)",
   "The provider is not reachable": "De aanbieder is niet bereikbaar",
   "The provider refused the key": "De aanbieder heeft de sleutel geweigerd",
   "The model is not offered by the provider": "De aanbieder biedt dit model niet aan",

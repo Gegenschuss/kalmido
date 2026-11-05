@@ -16424,6 +16424,7 @@
   "Follow up": "Sollecitare",
   "Look at my tasks that have been waiting on someone for more than {0} days. Draft a short, friendly follow-up for each as a comment and ask me with an approval card; post or send nothing before my Yes.": "Guarda le mie attività in attesa di qualcuno da più di {0} giorni. Scrivi per ciascuna un breve e cordiale sollecito come commento e chiedimelo con una scheda di approvazione; non pubblicare né inviare nulla prima del mio Sì.",
   "Share a project with the agent first": "Condividi prima un progetto con l'agente",
+  "Server agents (run on this server with their own API key)": "Agenti server (girano su questo server con la propria chiave API)",
   "The provider is not reachable": "Il fornitore non è raggiungibile",
   "The provider refused the key": "Il fornitore ha rifiutato la chiave",
   "The model is not offered by the provider": "Il fornitore non offre questo modello",

@@ -238,7 +238,7 @@ def srv_dict(c, a, row=None):
     return {"provider": (row["provider"] if row else "") or "anthropic", "model": (row["model"] if row else "") or dm,
             "instructions": row["instructions"] if row else "", "has_key": bool(row and row["key_sealed"]),
             "key_hint": ("…" + row["key_hint"]) if row and row["key_sealed"] and row["key_hint"] else "",
-            "enabled_instance": not srv_off(c), "default_model": dm, "default_instructions": di,
+            "enabled_instance": not srv_off(c), "default_model": dm, "default_instructions": tr(di),  # 2.557.0: in the person's language
             "server": bool(row) and (a["provider"] or "") == SRV_PROVIDER}
 
 

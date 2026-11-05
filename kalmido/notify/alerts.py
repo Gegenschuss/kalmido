@@ -66,7 +66,8 @@ AA_SWITCH_LABEL = {"collab_all": N_("Collaboration for everyone"), "time_all": N
                    "passkey_login": N_("Allow signing in with a passkey without the password"),
                    "oidc_autocreate": N_("Create accounts on the first OIDC sign-in"), "bk_on": N_("Automatic backups"),
                    "public_links": N_("Public links to projects"),
-                   "mcp_remote": N_("Hosted MCP access")}  # 2.488.0 (#3363)
+                   "mcp_remote": N_("Hosted MCP access"),  # 2.488.0 (#3363)
+                   "server_agents": N_("Server agents (run on this server with their own API key)")}  # 2.557.0 (#4670)
 _AA_LOCK = threading.Lock()
 _AA = {"q": [], "b": {}, "int": {}, "disk_at": 0.0, "qc_at": 0.0, "storage": {}, "qc": {}}
 

@@ -16423,6 +16423,7 @@
   "Follow up": "Relancer",
   "Look at my tasks that have been waiting on someone for more than {0} days. Draft a short, friendly follow-up for each as a comment and ask me with an approval card; post or send nothing before my Yes.": "Regarde mes tâches qui attendent quelqu'un depuis plus de {0} jours. Rédige pour chacune une relance courte et aimable en commentaire et demande-moi avec une carte d'approbation ; ne publie ni n'envoie rien avant mon Oui.",
   "Share a project with the agent first": "Partage d'abord un projet avec l'agent",
+  "Server agents (run on this server with their own API key)": "Agents serveur (s'exécutent sur ce serveur avec leur propre clé API)",
   "The provider is not reachable": "Le fournisseur est injoignable",
   "The provider refused the key": "Le fournisseur a refusé la clé",
   "The model is not offered by the provider": "Le fournisseur ne propose pas ce modèle",
