@@ -7,7 +7,7 @@ be switched off again at any time; both steps go into the office log. Office adm
 from flask import jsonify
 
 from ..core.config import app
-from ..core.db import body, iso, now_utc
+from ..core.db import body, bump, iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.pg import system_ctx
@@ -48,5 +48,6 @@ def rth_put():
             n = c.execute("UPDATE orgs SET ret_hold_at=NULL, ret_hold_by=NULL WHERE id=? AND ret_hold_at IS NOT NULL", (oid,)).rowcount
     if n:
         ofx_log(c, oid, "retention_hold", target="settings", detail={"on": on})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(rth_state(c, oid))

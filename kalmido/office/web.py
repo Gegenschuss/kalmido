@@ -209,6 +209,7 @@ def office_settings_put():
     diff = ofx_diff(cur, new)
     if diff["after"]:
         ofx_log(c, oid, "update", target="settings", detail=diff)
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     s2 = office_settings(c, oid)
     return jsonify(settings={**s2, "updated_at": oxa_settings_at(c, oid)},  # 2.528.0 (#4305 A3): + the new version
@@ -335,6 +336,7 @@ def office_row_post(kind):
     _ltx_need(c, uid, oid, b if kind == "texts" else {})
     r = office_create(c, oid, kind, b)
     ofx_log(c, oid, "create", target=kind, detail={"id": r["id"], "after": _ltx_log(r)})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(r), 201
 
@@ -372,6 +374,7 @@ def office_row_patch(kind, rid):
     if diff["after"]:
         ofx_log(c, oid, "update", target=kind, detail={"id": r["id"], **diff})
     oun_post(c)
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(r)
 
@@ -385,6 +388,7 @@ def office_row_delete(kind, rid):
     _ltx_need(c, uid, oid, old)
     res = office_delete(c, oid, kind, rid)
     ofx_log(c, oid, "delete" if res == "deleted" else "archive", target=kind, detail={"id": old["id"], "before": _ltx_log(old)})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True, result=res, **({"trash_id": g.otb_id} if res == "deleted" and g.get("otb_id") else {}))  # 2.272.0 E2 (#3038)
 
@@ -425,6 +429,7 @@ def office_import_post():
     overwrite = (request.args.get("overwrite") or (d.get("overwrite") if isinstance(d.get("overwrite"), (bool, int, str)) else "")) in (1, True, "1", "true")
     counts = office_import(c, oid, d, overwrite=overwrite)
     ofx_log(c, oid, "import", target="master_data", detail={"overwrite": bool(overwrite), "counts": counts})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True, counts=counts)
 

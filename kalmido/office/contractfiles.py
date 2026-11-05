@@ -27,7 +27,7 @@ from flask import Response, jsonify, request
 
 from ..core.config import app, MAX_FILE_MB, OFFICE_DIR
 from ..core.access import Denied
-from ..core.db import body, db, iso, local_now, now_utc
+from ..core.db import body, bump, db, iso, local_now, now_utc
 from ..core.retention import ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_read_file, oc_write_file
@@ -217,6 +217,7 @@ def dma_files_post(cid):
         if old is not None:
             c.execute("UPDATE office_contract_files SET deleted_at=? WHERE id=? AND org_id=?", (ts, old["id"], oid))
         ofx_log(c, oid, "update", target="contracts", detail={"id": ct["id"], "file_added": name, "file_replaced": old["name"] if old else None})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     except Exception:
         c.rollback()
@@ -256,6 +257,7 @@ def dma_file_patch(cid, fid):
         raise BadInput(tr("Invalid data"))
     day = _date_in(b.get("date"))
     c.execute("UPDATE office_contract_files SET date=? WHERE id=? AND org_id=?", (day, r["id"], oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(dma_public(dma_file(c, oid, cid, fid)))
 
@@ -267,6 +269,7 @@ def dma_file_delete(cid, fid):
     r = dma_file(c, oid, cid, fid)
     c.execute("UPDATE office_contract_files SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), r["id"], oid))
     ofx_log(c, oid, "update", target="contracts", detail={"id": ct["id"], "file_removed": r["name"]})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True)
 
@@ -277,5 +280,6 @@ def dma_file_restore(cid, fid):
     dma_contract(c, oid, cid)
     r = dma_file(c, oid, cid, fid, deleted=True)
     c.execute("UPDATE office_contract_files SET deleted_at=NULL WHERE id=? AND org_id=?", (r["id"], oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(dma_public(dma_file(c, oid, cid, fid)))

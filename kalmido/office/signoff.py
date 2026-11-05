@@ -22,7 +22,7 @@ from flask import g, jsonify, redirect, request
 from ..core.config import app, APP_NAME, PUBLIC_URL, TZ
 from ..collab.comments import lang_of, push_later  # 2.367.5 (#2980); 2.370.3 (#2760): push_later
 from ..core.i18n import browser_lang, lang, LANGS, N_, tr
-from ..core.db import body, db, err, iso, local_now, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, iso, local_now, now_utc, parse_iso, usettings
 from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.access import acx_anon_bind, Denied, FULL_ROLES, list_role, need_list
 from ..core.orgcrypt import OrgCryptError, oc_dec, oc_dec_fields, oc_enc, oc_enc_fields, oc_is_enc, oc_log_detail
@@ -332,6 +332,7 @@ def sig_offer_new(did):
     title = " ".join(x for x in (m.get("title") or "", r["number"] or "", " ".join((r["project_title"] or "").split())) if x)  # 2.431.0 B (#3594): the subject on one line
     row, tok = sig_create(c, oid, "offer", title, h, uid, exp, doc_id=did)
     ofx_log(c, oid, "signoff_link", doc_id=did, detail={"signoff": row["id"], "expires_at": exp, "doc_hash": h})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(sig_public(c, row, office_role(c, uid, oid) == "admin"))
 
@@ -362,6 +363,7 @@ def sig_offer_revoke(sid):
         c.execute("UPDATE office_signoffs SET revoked_at=? WHERE id=?", (iso(now_utc()), sid))
         ofx_log(c, oid, "signoff_revoke", target="gen_doc" if r["gen_doc_id"] else "doc", doc_id=r["doc_id"],
                 detail={"signoff": sid, **({"gen_doc": r["gen_doc_id"]} if r["gen_doc_id"] else {})})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     return jsonify(sig_public(c, c.execute("SELECT * FROM office_signoffs WHERE id=?", (sid,)).fetchone(), office_role(c, uid, oid) == "admin"))
 

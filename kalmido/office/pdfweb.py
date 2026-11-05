@@ -27,7 +27,7 @@ from flask import g, jsonify, request, Response, send_file
 
 from ..core.config import app, APP_VERSION, OFFICE_DIR
 from ..core.i18n import tr
-from ..core.db import connect, db, err
+from ..core.db import bump, connect, db, err
 from ..core.access import Denied
 from .model import office_feature, office_gate, office_logo_set, office_need_feature, office_org, office_settings
 from ..core.orgcrypt import oc_read_file, oc_write_file
@@ -442,6 +442,7 @@ def opdf_logo_upload():
     office_logo_set(c, oid, LOGO_FILE)
     from .ledger import ofx_log
     ofx_log(c, oid, "upload", target="logo", detail={"bytes": len(png), "width": w, "height": h})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(logo=LOGO_FILE, width=w, height=h, bytes=len(png))
 
@@ -457,5 +458,6 @@ def opdf_logo_delete():
     office_logo_set(c, oid, "")
     from .ledger import ofx_log
     ofx_log(c, oid, "delete", target="logo")
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(logo="")

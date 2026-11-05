@@ -262,7 +262,9 @@ r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "LU", "ver
 check(r.ok and r.json()["installed"]["badge"] == "community", f"community with confirmation: installed ({r.status_code} {r.text[:200]})")
 
 # ---- install AT, choose it, finalise a quotation
+OV0 = A.get(B + "/api/version").json()["a"].get("office", 0)  # 2.566.0 (#4706): the install ticks the office area
 r = A.post(B + O + "/packs/install", json={"kind": "country", "code": "AT", "version": 1})
+check(A.get(B + "/api/version").json()["a"].get("office", 0) > OV0, "#4706 the install moves the office area counter (other devices reload)")
 check(r.ok and r.json()["installed"]["version"] == 1 and r.json()["installed"]["badge"] == "verified"
       and r.json()["installed"]["installed_by_name"] == "Alice Admin" and r.json()["item"]["installed"], f"AT v1 installed ({r.status_code} {r.text[:300]})")
 check(any(x.get("action") == "pack_install" for x in A.get(B + O + "/log?limit=20").json().get("log") or []), "office log: pack_install")

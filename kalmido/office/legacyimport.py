@@ -2376,6 +2376,7 @@ def fi_archive_run_post():
     c, uid, oid = _ctx()
     rid = _run_new(c, oid, uid, "archive")
     c.execute("UPDATE office_import_runs SET counts=? WHERE id=? AND org_id=?", (json.dumps({"archive": 0}), rid, oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(run_id=rid), 201
 
@@ -2390,6 +2391,7 @@ def fi_archive_post():
     try:
         from .ledger import ofx_log
         ofx_log(c, oid, "upload", target="archive", detail={"archive_id": aid, "bytes": len(raw)})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     except BaseException:
         fk_archive_done(p, False)
@@ -2425,6 +2427,7 @@ def fi_archive_patch(aid):
     f = r81b_archive_patch(c, oid, uid, aid, b if isinstance(b, dict) else {})
     if f:
         ofx_log(c, oid, "update", target="archive", detail={"archive_id": aid, "fields": sorted(f)})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(_archive_public(c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()))
 
@@ -2478,6 +2481,7 @@ def fi_counter_post():
     c.execute("INSERT INTO office_numbers(org_id, kind, period, last) VALUES(?,?,?,?) ON CONFLICT(org_id, kind, period) DO UPDATE SET last=excluded.last",
               (oid, kind, cur["period"], last))
     ofx_log(c, oid, "number", target="legacy", detail={"kind": kind, "from": cur["last"], "to": last, **({"reason": reason} if reason else {})})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(fi_counter(c, oid, kind))
 

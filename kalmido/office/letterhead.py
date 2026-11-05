@@ -33,7 +33,7 @@ from flask import jsonify, request
 from ..core.config import app, OFFICE_DIR
 from ..core.i18n import N_, tr
 from .doclang import doc_lg
-from ..core.db import body, db, err
+from ..core.db import body, bump, db, err
 from ..core.access import Denied
 from ..core.orgcrypt import OrgCryptError, oc_read_file, oc_write_file
 from .model import office_gate, office_org, office_settings, office_settings_lock, office_settings_save
@@ -340,6 +340,7 @@ def bp_upload():
     lh.update(file=name, sha256=sha, name=fname, bytes=len(raw), pages=pages, prev=prev, pdfa=[], fmt=bp_fmt(sizes))  # 2.469.0 (#3352)
     _save(c, oid, lh)
     ofx_log(c, oid, "upload", target="letterhead", detail={"bytes": len(raw), "pages": pages, "sha256": sha})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     bp_purge(oid, {name, prev})  # 2.533.0 A2 (#4318 B21): files go only after the commit (a failed save keeps the old one)
     return jsonify(letterhead=bp_public(lh, c, oid))
@@ -368,6 +369,7 @@ def bp_put():
     if after != before:
         _save(c, oid, lh)
         ofx_log(c, oid, "update", target="letterhead", detail={"before": before, "after": after})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     return jsonify(letterhead=bp_public(lh, c, oid))
 
@@ -383,6 +385,7 @@ def bp_delete():
         lh.update(sha256="", bytes=0, pages=0, fmt="")
         _save(c, oid, lh)
         ofx_log(c, oid, "delete", target="letterhead")
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
         bp_purge(oid, {lh["prev"]})  # 2.533.0 A2 (#4318 B21): after the commit
     return jsonify(letterhead=bp_public(lh, c, oid))
@@ -413,6 +416,7 @@ def bp_restore():
         lh.update(sha256=hashlib.sha256(data).hexdigest(), bytes=len(data), pages=pages, pdfa=None, fmt=bp_fmt(sizes))  # 2.469.0 (#3352)  # 2.296.0 C (#3177): read again (bp_pdfa_of)
     _save(c, oid, lh)
     ofx_log(c, oid, "update", target="letterhead", detail={"restored": want})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(letterhead=bp_public(lh, c, oid))
 

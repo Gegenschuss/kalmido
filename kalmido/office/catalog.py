@@ -27,7 +27,7 @@ from contextvars import ContextVar
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import APP_VERSION, app
-from ..core.db import body, db, err, iso, now_utc
+from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import N_, lg_base, tr
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied
@@ -623,6 +623,7 @@ def pkc_install():
               (oid, kind, code, ver, sha, json.dumps(d, ensure_ascii=False), json.dumps(meta, ensure_ascii=False), badge, source, ts, uid))
     from .ledger import ofx_log
     ofx_log(c, oid, "pack_install", target="pack", detail={"kind": kind, "code": code, "version": ver, "sha256": sha, "badge": badge, "source": source})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     _forget(oid)
     rows = pkc_rows(c, oid)
@@ -654,6 +655,7 @@ def pkc_uninstall(kind, code):
     c.execute("UPDATE office_pack_installs SET removed_at=? WHERE id=? AND org_id=?", (iso(now_utc()), r["id"], oid))
     from .ledger import ofx_log
     ofx_log(c, oid, "pack_remove", target="pack", detail={"kind": kind, "code": code, "version": r["version"], "sha256": r["sha256"]})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     _forget(oid)
     return jsonify(ok=True)
@@ -676,6 +678,7 @@ def pkc_restore(kind, code):
     from .ledger import ofx_log
     ofx_log(c, oid, "pack_install", target="pack", detail={"kind": kind, "code": code, "version": r["version"], "sha256": r["sha256"],
                                                           "badge": r["badge"], "source": r["source"], "restore": True})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     _forget(oid)
     r = c.execute("SELECT * FROM office_pack_installs WHERE id=?", (r["id"],)).fetchone()

@@ -714,6 +714,7 @@ def di_supplier_put(sid):
         raise BadInput(tr(R_NO_NAME))
     enc = oc_enc_fields(c, oid, "office_suppliers", {"name": name})
     c.execute("UPDATE office_suppliers SET name=?, updated_at=? WHERE id=? AND org_id=?", (enc["name"], iso(now_utc()), sid, oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(_sup_public(oc_dec_fields(c, oid, "office_suppliers", _sup_row(c, oid, sid))))
 
@@ -725,6 +726,7 @@ def di_supplier_delete(sid):
     _purge(c, oid)
     _sup_row(c, oid, sid)
     c.execute("UPDATE office_suppliers SET deleted_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True)
 
@@ -737,6 +739,7 @@ def di_supplier_restore(sid):
     c.commit()
     _sup_row(c, oid, sid, deleted=True)
     c.execute("UPDATE office_suppliers SET deleted_at=NULL, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), sid, oid))
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return jsonify(ok=True)
 

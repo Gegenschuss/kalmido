@@ -19,7 +19,7 @@ from flask import jsonify, request
 
 from ..core.access import Denied
 from ..core.config import app
-from ..core.db import body, err, iso, now_utc
+from ..core.db import body, bump, err, iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import N_, tr
 from ..core.orgcrypt import oc_dec_fields, oc_enc_fields
@@ -190,6 +190,7 @@ def bka_new():
     if first or b.get("default") is True:
         _set_default(c, oid, rid)
     ofx_log(c, oid, "create", target="bank_account", detail={"id": rid, "after": _brief(d)})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return _answer(c, oid, rid), 201
 
@@ -205,6 +206,7 @@ def bka_edit(rid):
     _set_bank(c, oid, rid, d)
     c.execute(f"UPDATE {BKA_TABLE} SET label=?, datev_account=? WHERE id=? AND org_id=?", (d["label"], d["datev_account"], rid, oid))
     ofx_log(c, oid, "update", target="bank_account", detail={"id": rid, "before": _brief(cur), "after": _brief(d)})
+    bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     return _answer(c, oid, rid)
 
@@ -219,6 +221,7 @@ def bka_make_default(rid):
     if not r["is_default"]:
         _set_default(c, oid, rid)
         ofx_log(c, oid, "update", target="bank_account", detail={"id": rid, "default": True, "after": _brief(r)})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     return _answer(c, oid, rid)
 
@@ -239,6 +242,7 @@ def bka_archive(rid):
             _set_default(c, oid, rest[0])
         c.execute(f"UPDATE {BKA_TABLE} SET archived=1, is_default=0, updated_at=? WHERE id=? AND org_id=?", (iso(now_utc()), rid, oid))
         ofx_log(c, oid, "archive", target="bank_account", detail={"id": rid, "before": _brief(r)})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     d = bka_default(c, oid)
     return _answer(c, oid, rid, default_id=d["id"] if d else None, was_default=was)
@@ -254,5 +258,6 @@ def bka_restore(rid):
         if bka_default(c, oid) is None:
             _set_default(c, oid, rid)
         ofx_log(c, oid, "restore", target="bank_account", detail={"id": rid, "after": _brief(r)})
+        bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
         c.commit()
     return _answer(c, oid, rid)
