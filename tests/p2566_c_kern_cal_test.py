@@ -19,6 +19,8 @@ names only.  tenant-matrix: calendar, book   freelancer-matrix: pim
  - review F4: member rows written while there was no node are all mirrored when the node comes; review F3: a node in the
    file store's trash is still the node (a share taken back stays taken back), it does not go there alone while it carries
    shares, and removed for good it writes its shares back into the member rows
+ - review F1: the owner leaves the organisation without an heir: the calendar's node follows into the private tree, a share
+   taken back in the core stays taken back, one only in the core stays
  - the start's one-shot (migr_kern4712, a restart on the same data): members without a node get it and their core shares
 usage: p2566_c_kern_cal_test.py <datadir>"""
 import os
@@ -299,6 +301,27 @@ check(B5 not in ids(Gi.get(B + "/api/books")), "review F3: the book's node in th
 sql("DELETE FROM fs_nodes WHERE id=?", (N6,), write=True)
 check(B5 not in ids(Gi.get(B + "/api/books")) and B5 in ids(Bo.get(B + "/api/books")),
       "review F3: the book's node removed for good: gina stays out, bob's core-only share lives on as his row")
+
+# ================================================================== review F1: the owner leaves the organisation without an heir
+r = A.post(B + "/api/users", json={"username": "ivy", "display_name": "Ivy", "password": "password123", "email": "ivy@example.com", "orgs": []})
+assert r.ok, r.text
+IVY = r.json()["id"]
+Iv = sess("ivy")
+Iv.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done"})
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"email": "ivy@example.com", "role": "member"}).ok, "F1: ivy joins the organisation")
+K6 = A.post(B + "/api/evcals", json={"name": "Team rota", "org_id": ORG}).json()["id"]
+check(A.put(B + f"/api/evcals/{K6}/members", json={"user_id": BOB, "role": "edit"}).ok, "F1: the organisation's calendar shared with bob")
+N7 = node("evcal", K6)
+sql("DELETE FROM fs_shares WHERE node_id=? AND user_id=?", (N7, BOB), write=True)  # taken back in the core, his old row stays
+sql("INSERT INTO fs_shares(node_id,user_id,role,created_at) VALUES(?,?,'view','2026-11-05T00:00:00+00:00')", (N7, IVY), write=True)  # only in the core
+check(K6 not in ids(Bo.get(B + "/api/evcals")) and K6 in ids(Iv.get(B + "/api/evcals")), "F1: bob taken back, ivy shared in the core only")
+r = A.patch(B + f"/api/users/{ALICE}", json={"orgs": []})  # the only admin takes herself out: no heir, the calendar becomes private
+check(r.ok and not sql("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (ORG, ALICE)), f"F1: alice left the organisation {r.status_code} {r.text[:160]}")
+check(sql("SELECT org_id FROM ev_cals WHERE id=?", (K6,)) == [(None,)], "F1: her calendar is private now")
+check(node("evcal", K6) == N7 and sql("SELECT org_id FROM fs_nodes WHERE id=?", (N7,)) == [(None,)],
+      "review F1: its node followed into her private tree (not deleted)")
+check(K6 not in ids(Bo.get(B + "/api/evcals")), "review F1: bob, taken back in the core, does not get her now private calendar back")
+check(K6 in ids(Iv.get(B + "/api/evcals")) and share("evcal", K6, IVY) == "view", "review F1: ivy's core-only share stays with the node")
 
 # ================================================================== the one-shot copy at the start (migr_kern4712)
 K3 = A.post(B + "/api/evcals", json={"name": "Before the update"}).json()["id"]

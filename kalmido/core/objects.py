@@ -100,7 +100,7 @@ from .dlock import dl_of
 from ..files.fslock import fl_is_locked, fsl_denied
 from ..accounts.orgretain import upg_heir
 
-from .objhooks import OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
+from .objhooks import FOLLOW, OBJ, REVOKE  # kind -> the registered hooks; what a person loses (core/objhooks.py: accounts reads them)
 OBJ_RANK = {None: 0, "view": 1, "edit": 2, "manage": 3}
 OBJ_ROLES = ("view", "edit", "manage")
 OBJ_REVOKED_DAYS = 30  # rows taken away stay restorable this long (obj_revoked)
@@ -937,7 +937,13 @@ def obj_revoke_person(c, uid, org, reason, heir=None, role=None):
                                          f"WHERE kind='ref' AND ref_kind='tchat_room' AND ref_id IN ({rooms}))",
                                          (*ppl, *ppl, int(org)), reason, by, int(org), "user_id")
         elif reason == "retire" and org:
-            out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)", (int(org),), reason, by, int(org), "user_id")
+            # 2.566.0 (#4712, review F1): the shares of the owner's own agents on a calendar's / book's node stay (their delegates,
+            # as their member rows below): the node follows the object into the owner's private tree (orgretain.obj_nodes_follow)
+            keep = "".join(f" AND NOT EXISTS (SELECT 1 FROM fs_nodes n JOIN {r['table']} k ON k.id=n.ref_id JOIN agents a ON "
+                           f"a.user_id=fs_shares.agent_id AND a.owner_id=k.owner_id WHERE n.id=fs_shares.node_id AND n.kind='ref' "
+                           f"AND n.ref_kind='{r['kind']}')" for r in OBJ.values() if r["members"])
+            out["fs_shares"] = _take(c, "fs_shares", "node_id IN (SELECT id FROM fs_nodes WHERE org_id=?)" + keep, (int(org),), reason, by,
+                                     int(org), "user_id")
             out["tchat_members"] = _take(c, "tchat_members", "room_id IN (SELECT id FROM tchat_rooms WHERE org_id=?)", (int(org),),
                                          reason, by, int(org), "user_id")
             for reg in OBJ.values():  # 2.566.0 (#4712, #4697): everyone but the owner and the owner's own agents (their delegates)
@@ -990,6 +996,7 @@ def obj_public(c, uid, kind, row, role=None):
 
 
 REVOKE.append(obj_revoke_person)  # core/objhooks.person_revoked (accounts calls it without importing the domain layer)
+FOLLOW.append(obj_node_follow)  # 2.566.0 (#4712, review F1): accounts/orgretain.py obj_nodes_follow
 
 
 def _probe_register():

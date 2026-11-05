@@ -311,16 +311,20 @@ def odl_public_off(c, oid):
     c.execute("UPDATE appt_pages SET enabled=0 WHERE office_org_id=? OR cal_id IN (SELECT id FROM ev_cals WHERE org_id=?)", (oid, oid))
 
 
-def obj_nodes_off(c, where, args, table=None):
-    """2.566.0 (#4712): the reference nodes of the calendars / address books (the kinds of the shared core with an old
-    member table, core/objhooks.OBJ members=) whose rows match where (on their table) are removed: such an object leaves
-    the organisation's tree (it becomes private), its node and the shares on it go with it, and its old member rows are
-    read again (events/model.py ev_role, contacts/model.py book_role: without a node). table: only that kind's table (where
-    names its rows); None: every such kind. The caller is in system_ctx."""
+def obj_nodes_follow(c, oid):
+    """2.566.0 (#4712, review F1): the reference nodes of the calendars / address books (the kinds of the shared core with an
+    old member table, core/objhooks.OBJ members=) that still lie in organisation oid's tree while their object left it (it
+    became private: org_leave without an heir, odl_retire, odl_dismantle) follow it into its owner's private tree with their
+    shares (core/objects.obj_node_follow). The node stays the object's truth: a share taken back in the core stays taken
+    back (its old member row is not read again), a share that lives only in the core stays (was: the node was deleted).
+    Call after the object's org_id changed; the caller is in system_ctx."""
+    from ..core.objhooks import FOLLOW
     for reg in OBJ.values():
-        if reg.get("members") and table in (None, reg["table"]):
-            c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id IN (SELECT id FROM {reg['table']} WHERE {where})",
-                      (reg["kind"], *args))
+        if reg.get("members"):
+            for (rid,) in c.execute(f"SELECT n.ref_id FROM fs_nodes n JOIN {reg['table']} o ON o.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=? "
+                                    "AND n.org_id=? AND o.org_id IS DISTINCT FROM n.org_id ORDER BY n.ref_id", (reg["kind"], int(oid))).fetchall():
+                for f in FOLLOW:
+                    f(c, reg["kind"], rid)
 
 
 def odl_members_off(c, oid):
@@ -330,9 +334,8 @@ def odl_members_off(c, oid):
     owner keeps the object; their own personal agents stay with it (the owner's delegates). The caller is in system_ctx.
     2.566.0 (#4712): the member rows and the shares of the calendars' / books' nodes are the shared core's revocation
     (person_revoked 'retire', core/objects.py obj_revoke_person: members= of the kinds, restorable rows), which both callers
-    run first; only the invitations stay here (they are the events' own data, not a share). Their reference nodes in the
-    organisation's tree go as well (obj_nodes_off): the objects become private, the owner's own agents' rows count again."""
-    obj_nodes_off(c, "org_id=?", (oid,))
+    run first; only the invitations stay here (they are the events' own data, not a share). Their reference nodes follow the
+    objects into their owners' private trees once they are private (obj_nodes_follow, review F1)."""
     c.execute("DELETE FROM event_attendees WHERE user_id IS NOT NULL AND event_id IN (SELECT e.id FROM events e JOIN ev_cals k ON k.id=e.cal_id "
               "WHERE k.org_id=? AND k.owner_id!=event_attendees.user_id AND NOT EXISTS (SELECT 1 FROM agents a WHERE "
               "a.user_id=event_attendees.user_id AND a.owner_id=k.owner_id))", (oid,))
@@ -355,6 +358,7 @@ def odl_retire(c, oid, until, gone=None):
         odl_members_off(c, oid)  # 2.560.0 (#4697): before org_id=NULL (then the organisation's boundary no longer holds)
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))
+        obj_nodes_follow(c, oid)  # 2.566.0 (#4712, review F1): their nodes follow them into the owners' private trees
         c.execute("DELETE FROM org_members WHERE org_id=?", (oid,))
         c.execute("DELETE FROM org_joins WHERE org_id=?", (oid,))  # 2.223.2 A (#2859): no way back in by an open invitation
         c.execute("DELETE FROM org_invites WHERE org_id=?", (oid,))
@@ -400,6 +404,7 @@ def odl_dismantle(c, oid):
         odl_members_off(c, oid)  # 2.560.0 (#4697): as odl_retire
         c.execute("UPDATE ev_cals SET org_id=NULL WHERE org_id=?", (oid,))  # 2.30.0 (#1036): they stay with their owners, private
         c.execute("UPDATE books SET org_id=NULL, owner_org_id=NULL WHERE org_id=?", (oid,))  # 2.52.0 C (#1438)
+        obj_nodes_follow(c, oid)  # 2.566.0 (#4712, review F1): as odl_retire (fs_org_purge removed the top nodes already)
         # 2.42.0 (#828): files of lists that left the organisation are sealed with their new organisation's key (or plain),
         # then the organisation's key is destroyed and its office folder (stored invoices, archive) removed
         if before_org_delete(c, oid)[1]:  # 2.64.0 (#1864): a file that lives on could not be resealed: keep the key

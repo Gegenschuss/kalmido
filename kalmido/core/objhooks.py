@@ -7,11 +7,14 @@ as core/instance.UPDATE_KICK).
   START   2.565.0 (#4717 #4719): (key, once, f(c)) that core/db.init_db runs at every start (once: only until gsetting key is "1") -
           the areas' forward copies onto the shared core, without core/db importing the areas
   REVOKE  the functions f(c, uid, org, reason, heir=None, role=None) of what a person loses (core/objects.obj_revoke_person)
+  FOLLOW  f(c, kind, rid): the object's reference node follows it into its new workspace (core/objects.obj_node_follow,
+          2.566.0 #4712 review F1: accounts/orgretain.py obj_nodes_follow)
 """
 OBJ = {}
 START = []
 REVOKE = []
 SETTLE = []  # 2.568.0 (#4739): f(c, kind, rid) -- an area's own core rows follow its member table again (lists/lmcore.py)
+FOLLOW = []
 
 
 def person_revoked(c, uid, org, reason, heir=None, role=None):
