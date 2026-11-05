@@ -538,7 +538,7 @@ def obj_share(c, uid, kind, rid, key, target, role="view", expires_at=None):
 
 
 def _revoked_add(c, src, row, reason, by, org=None, uid=None, kind=None, ref_id=None):
-    d = {k: (v if not isinstance(v, (bytes, bytearray, memoryview)) else None) for k, v in dict(row).items()}
+    d = {k: (row[k] if not isinstance(row[k], (bytes, bytearray, memoryview)) else None) for k in row.keys()}
     return insert_id(c, "INSERT INTO obj_revoked(src,org_id,user_id,kind,ref_id,row_json,reason,by_id,created_at) VALUES(?,?,?,?,?,?,?,?,?)",
                      (src, org, uid, kind, ref_id, json.dumps(d, default=str), reason, by, iso(now_utc())))
 

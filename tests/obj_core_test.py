@@ -154,7 +154,9 @@ check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['gina']}").ok, "gina leaves th
 check(dbx("SELECT COUNT(*) FROM fs_shares s JOIN fs_nodes n ON n.id=s.node_id WHERE s.user_id=? AND n.org_id=?", (uid["gina"], ORG))[0][0] == 0
       and dbx("SELECT COUNT(*) FROM tchat_members WHERE user_id=? AND room_id=?", (uid["gina"], CL))[0][0] == 0, "her shares and channel rows are gone")
 check(dbx("SELECT COUNT(*) FROM obj_revoked WHERE user_id=? AND reason='leave'", (uid["gina"],))[0][0] >= 2, "... into obj_revoked (restorable)")
-check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": uid["gina"], "role": "guest"}).ok, "gina comes back as a guest")
+r = A.put(B + f"/api/orgs/{ORG}/members", json={"email": "gina@example.com", "role": "guest"})
+back = dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (ORG, uid["gina"]))
+check(r.ok and len(back) == 1 and back[0][0] == "guest", f"gina comes back as a guest ({r.status_code} {r.text[:160]})")
 Gi = sess("gina")
 check(role(Gi, O2) == 404 and O2 not in ids(Gi), "coming back revives no old share")
 check(A.delete(B + f"/api/orgs/{ORG}/members/{uid['bob']}").ok, "bob (the owner of O1) leaves")
