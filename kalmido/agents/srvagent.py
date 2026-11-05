@@ -371,11 +371,12 @@ def srv_runs_get(aid):
 
 # ---------------------------------------------------------------- the hook in agents/core.py agent_emit
 
-def srv_event(c, a, event):
+def srv_event(c, a, event, actor=None):
     """agent_emit recorded an event for server agent a (the caller commits): Stop marks its running run, an event that asks for
-    work queues a run (agents/srvagent_run.py)."""
+    work queues a run (agents/srvagent_run.py). An event made by another agent never starts a run (two server agents must not
+    keep each other busy: an agent gives no orders to another one, #928); the next run reads it as data."""
     from .srvagent_run import srv_abort, srv_kick, SRV_TRIGGERS
     if event == "abort":
         srv_abort(c, a["user_id"])
-    elif event in SRV_TRIGGERS:
+    elif event in SRV_TRIGGERS and not (isinstance(actor, dict) and actor.get("kind") == "agent"):
         srv_kick(a["user_id"])

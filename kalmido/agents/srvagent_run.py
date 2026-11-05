@@ -137,9 +137,10 @@ def srv_run_job(aid):
 
 
 def _pending(c, aid, cursor):
-    """The first event after cursor that asks for work, or None."""
-    return c.execute(f"SELECT id, event FROM agent_events WHERE agent_id=? AND id>? AND event IN ({','.join('?' * len(SRV_TRIGGERS))}) "
-                     "ORDER BY id LIMIT 1", (aid, cursor, *SRV_TRIGGERS)).fetchone()
+    """The first event after cursor that asks for work (not made by another agent: srvagent.srv_event), or None."""
+    return c.execute(f"""SELECT id, event FROM agent_events WHERE agent_id=? AND id>? AND event IN ({','.join('?' * len(SRV_TRIGGERS))})
+                         AND COALESCE(payload::jsonb->'actor'->>'kind', '')<>'agent' ORDER BY id LIMIT 1""",
+                     (aid, cursor, *SRV_TRIGGERS)).fetchone()
 
 
 def _claim(c, aid, probe=False):
@@ -251,7 +252,7 @@ def _run(aid, rid):
         new_cursor = int(evs.get("cursor") or cursor)
         # the events are taken: a failed run never works the same events off again (no loop of costs)
         _db(lambda c: c.execute("UPDATE agent_server SET cursor=GREATEST(cursor, ?) WHERE agent_id=?", (new_cursor, aid)))
-        work = [e for e in data if isinstance(e, dict) and e.get("event") in SRV_TRIGGERS]
+        work = [e for e in data if isinstance(e, dict) and e.get("event") in SRV_TRIGGERS and (e.get("actor") or {}).get("kind") != "agent"]
         if not work:
             return
         asker = _asker(work)
