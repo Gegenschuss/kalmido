@@ -16357,5 +16357,6 @@
   "Chain intact: {0} finalised document checked.": ["Keten intact: {0} definitief document gecontroleerd.", "Keten intact: {0} definitieve documenten gecontroleerd."],
   "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} definitief document is nog niet geketend (het wordt bij de volgende vastlegging toegevoegd).", "{0} definitieve documenten zijn nog niet geketend (ze worden bij de volgende vastlegging toegevoegd)."],
   "Chain broken: document {0} differs from what was finalised.": "Keten verbroken: document {0} wijkt af van wat definitief werd vastgelegd.",
-  "Chain broken: a document before {0} is missing.": "Keten verbroken: een document vóór {0} ontbreekt."
+  "Chain broken: a document before {0} is missing.": "Keten verbroken: een document vóór {0} ontbreekt.",
+  "Task…": "Taak…"
 }

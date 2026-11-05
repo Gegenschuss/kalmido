@@ -98,8 +98,11 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ready(ev, `${ids}.then(a => a.includes(${SID}) && a.length === 2)`, 80), 'undo: the stack is back, the parts went');
     // link the letter with the task
     await nav(B + `#docs/${ONE}`);
-    check(await ready(ev, `!!document.querySelector('.dc-md [data-dsp="link"]')`, 80), 'the sheet offers "Link with a task…"');
-    await ev(`(() => { document.querySelector('.dc-md [data-dsp="link"]').click(); return 1; })()`);
+    // 2.554.0 (#4469): one button "Task…" with a menu (New task / Link with a task…)
+    check(await ready(ev, `!!document.querySelector('.dc-md [data-dsp="taskmenu"]')`, 80), 'the sheet offers "Task…"');
+    await ev(`(() => { document.querySelector('.dc-md [data-dsp="taskmenu"]').click(); return 1; })()`);
+    check(await ready(ev, `[...document.querySelectorAll('#pop [role="menuitem"]')].some(b => /Link with a task/.test(b.textContent))`, 20), 'the menu offers "Link with a task…"');
+    await ev(`(() => { [...document.querySelectorAll('#pop [role="menuitem"]')].find(b => /Link with a task/.test(b.textContent)).click(); return 1; })()`);
     check(await ready(ev, `!!document.querySelector('.dsp-pick [data-pick="${TID}"]')`, 40), 'the task picker lists the task');
     await shot('p2154-a-pick.png');
     await ev(`(() => { document.querySelector('.dsp-pick [data-pick="${TID}"]').click(); return 1; })()`);

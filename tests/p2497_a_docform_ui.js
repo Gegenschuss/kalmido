@@ -98,7 +98,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     const [wn, wa] = JSON.parse(widths);
     check(Math.abs(wn - wa) <= 2, 'the archive number row is as wide as the title ' + widths);
     // the actions
-    const acts = `(() => { const r = e => e.getBoundingClientRect(), a = [...document.querySelectorAll('.dc-acts .btn')].filter(e => e.getClientRects().length); const del = a[a.length - 1], prev = a[a.length - 2];
+    const acts = `(() => { const r = e => e.getBoundingClientRect(), a = [...document.querySelectorAll('.dc-acts .btn, .dc-acts .iconbtn')]  /* 2.554.0 (#4469): Delete is an icon button */.filter(e => e.getClientRects().length); const del = a[a.length - 1], prev = a[a.length - 2];
       return JSON.stringify({n: a.length, last: del.dataset.dc, cl: del.classList.contains('dc-adel'), lines: new Set(a.map(e => Math.round(r(e).top))).size, apart: (r(del).top > r(prev).bottom || r(del).left - r(prev).right >= 16) && Math.abs(r(del).right - r(del.parentElement).right) <= 1}); })()`;
     let g = JSON.parse(await ev(acts));
     check(g.last === 'del' && g.cl, 'Delete is the last action ' + JSON.stringify(g));
@@ -156,7 +156,7 @@ function textPdf(lines) {  // a one-page PDF with a text layer, written by hand
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
     const sm = await ev(noSide); check(flat(sm), 'phone 320 px, More open: no sideways scrolling ' + sm);
     await ev(`document.querySelector('[data-dc="actsmore"]')?.click()`);
-    check(await ev(`[...document.querySelectorAll('.dc-acts .btn')].pop().dataset.dc === 'del'`), 'phone: Delete is the last action');
+    check(await ev(`[...document.querySelectorAll('.dc-acts .btn, .dc-acts .iconbtn')].pop().dataset.dc === 'del'`), 'phone: Delete is the last action');
     await ev(`document.querySelector('.dc-acts').scrollIntoView()`);
     await shot('p2497-a-letter-phone.png');
   }, false);

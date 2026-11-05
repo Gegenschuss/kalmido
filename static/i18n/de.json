@@ -16357,5 +16357,6 @@
   "Chain intact: {0} finalised document checked.": ["Kette intakt: {0} festgeschriebenes Dokument geprüft.", "Kette intakt: {0} festgeschriebene Dokumente geprüft."],
   "{0} finalised document is not chained yet (it is added at the next finalising).": ["{0} festgeschriebenes Dokument ist noch nicht verkettet (es kommt beim nächsten Festschreiben dazu).", "{0} festgeschriebene Dokumente sind noch nicht verkettet (sie kommen beim nächsten Festschreiben dazu)."],
   "Chain broken: document {0} differs from what was finalised.": "Kette unterbrochen: Dokument {0} weicht vom festgeschriebenen Stand ab.",
-  "Chain broken: a document before {0} is missing.": "Kette unterbrochen: Ein Dokument vor {0} fehlt."
+  "Chain broken: a document before {0} is missing.": "Kette unterbrochen: Ein Dokument vor {0} fehlt.",
+  "Task…": "Aufgabe…"
 }

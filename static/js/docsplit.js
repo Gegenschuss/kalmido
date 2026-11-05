@@ -11,17 +11,21 @@
 const DSP = {d: null, j: null, cuts: new Set(), over: new Map(), blank: false, thumbs: {}};
 
 // ---- the lines in the document sheet (docs.js dc_mdDraw: in place of the due-date line)
+// 2.554.0 A (#4469): the stack question's buttons (also inside the review box of docs.js)
+const dsp_stackBtns = () => `<button type="button" class="btn sm" data-dsp="dismiss">${tr('No stack')}</button><button type="button" class="btn sm pri" data-dsp="open">${tr('Split stack…')}</button>`;
 function dsp_sheetHtml(d, w) {
   const out = [];
-  if (d.split?.stack && w) out.push(`<div class="dc-due dsp-hint" role="group" aria-label="${esc(tr('Stack - split?'))}">${ic('scissors', 's')} <span>${esc(tr('Stack - split? Several archive numbers were found on its pages.'))}</span>
-    <button type="button" class="btn sm" data-dsp="dismiss">${tr('No stack')}</button><button type="button" class="btn sm pri" data-dsp="open">${tr('Split stack…')}</button></div>`);
-  if (d.split?.no_asn) out.push(`<div class="dc-due muted dsp-noasn">${ic('info', 's')} <span>${esc(tr('Without an archive number: the pages before the first code of a stack.'))}</span></div>`);
+  // in the box "To review" the stack question is part of the box (docs.js sugHtml); here only without a review
+  if (d.split?.stack && w && !d.review) out.push(`<div class="dc-due dsp-hint" role="group" aria-label="${esc(tr('Stack - split?'))}"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Stack - split? Several archive numbers were found on its pages.'))}</span></span>
+    ${dsp_stackBtns()}</div>`);
+  if (d.split?.no_asn) out.push(`<div class="dc-due muted dsp-noasn"><span class="dc-ht">${ic('info', 's')} <span>${esc(tr('Without an archive number: the pages before the first code of a stack.'))}</span></span></div>`);
   if (d.task) {
-    out.push(`<div class="dc-due dsp-task">${ic(d.task.done ? 'done' : 'check', 's')} <span>${tr('Task')}: <a href="#t/${+d.task.id}">${esc(d.task.title)}</a></span>${w ? `<button type="button" class="btn sm" data-dsp="unlink">${tr('Unlink')}</button>` : ''}</div>`);
+    out.push(`<div class="dc-due dsp-task"><span class="dc-ht">${ic(d.task.done ? 'done' : 'check', 's')} <span>${tr('Task')}: <a href="#t/${+d.task.id}">${esc(d.task.title)}</a></span></span>${w ? `<button type="button" class="btn sm" data-dsp="unlink">${tr('Unlink')}</button>` : ''}</div>`);
   } else if (w && !d.task_id) {
-    const link = `<button type="button" class="btn sm" data-dsp="link">${ic('link', 's')} ${tr('Link with a task…')}</button>`;
-    out.push(d.due ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button>${link}</div>`
-      : `<div class="dc-due dsp-link">${link}</div>`);
+    // one button "Task…" with a menu (New task / Link with a task…); a due date stands as text on the left
+    const btn = `<button type="button" class="btn sm" data-dsp="taskmenu" aria-haspopup="menu">${ic('check', 's')} ${tr('Task…')}</button>`;
+    out.push(d.due ? `<div class="dc-due"><span class="dc-ht">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span></span>${btn}</div>`
+      : `<div class="dc-due dsp-link">${btn}</div>`);
   }
   return out.join('');
 }
@@ -41,6 +45,10 @@ document.addEventListener('click', async e => {
   const d = DC.doc, act = b.dataset.dsp;
   if (act === 'open') { dsp_open(d); return; }
   if (act === 'link') { dsp_pick(d); return; }
+  if (act === 'taskmenu') {  // 2.554.0 A (#4469)
+    menu(b, [{label: tr('New task'), icon: 'plus', fn: () => dc_newTask(d, b.closest('.dc-md'))}, {label: tr('Link with a task…'), icon: 'link', fn: () => dsp_pick(d)}]);
+    return;
+  }
   b.disabled = true;
   if (act === 'dismiss') {
     const go = undo => async () => { await api('POST', `/api/docs/${d.id}/split/dismiss`, undo ? {undo: true} : {}); await dsp_redraw(d.id); dc_load(); return {}; };

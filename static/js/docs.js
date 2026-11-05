@@ -449,7 +449,7 @@ function dc_actsHtml(d, w) {
     w && smv_can(d.org_id) ? `<button type="button" class="btn sm" data-dc="space">${ic('building', 's')} ${tr('Move to another workspace…')}</button>` : ''].filter(Boolean);
   const open = DC.actsMore === d.id;
   const rest = more.length > 1 ? `<button type="button" class="btn sm" data-dc="actsmore" aria-expanded="${open}" aria-controls="dc-amore">${tr('More…')}${ic('chev', 's dc-chev')}</button><div class="dc-ag dc-amore" id="dc-amore" ${open ? '' : 'hidden'}>${more.join('')}</div>` : more.join('');
-  return `${look}${rest}${w ? `<button type="button" class="btn sm danger dc-adel" data-dc="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}`;
+  return `${look}${rest}${w ? `<button type="button" class="iconbtn danger dc-adel" data-dc="del" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>` : ''}`;  // 2.554.0 A (#4469): a red icon button
 }
 function dc_mdDraw(md) {
   const d = DC.doc; if (!d || !md) return;
@@ -463,14 +463,16 @@ function dc_mdDraw(md) {
   const opt = (f, label, input, empty) => empty && !shown(f) ? (ro ? '' : `<div class="row dc-f dc-opt" data-opt="${f}" hidden><label for="dc-${f}">${label}</label>${input}</div>`) : field(f, label, input);
   const noDue = !d.due && !shown('due'), noAmt = !d.amount && !shown('amount');
   const sug = Object.entries(d.suggest || {});
-  const sugHtml = d.review ? `<div class="dc-rev" role="group" aria-label="${esc(tr('To review'))}">
-    <b>${tr('To review')}</b>
+  // 2.554.0 A (#4469): a compact line: the text left, the buttons right (phone: below, full width); with a stack the stack question
+  // is part of the box ("No stack" / "Split stack…") and "Checked" only comes after that decision
+  const stackQ = w && d.split?.stack && typeof dsp_stackBtns === 'function';
+  const sugHtml = d.review ? `<div class="dc-rev${stackQ ? ' dsp-hint' : ''}" role="group" aria-label="${esc(tr('To review'))}">
+    <span class="dc-revt"><b>${tr('To review')}</b> ${stackQ ? `<span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Stack - split? Several archive numbers were found on its pages.'))}</span></span>` : sug.length ? '' : `<span class="muted">${tr('Check sender and type, then mark the document as checked.')}</span>`}</span>
     ${sug.map(([f, s]) => `<div class="dc-sug"><span>${esc(tr(DC_FEATS.find(x => x[0] === f)?.[1] || f))}: <b>${esc(s.label)}</b>${s.by === 'agent' ? ` <span class="muted">(${tr('from the agent')})</span>` : ''}</span>${w ? `<button type="button" class="btn sm" data-dc="take:${esc(f)}">${tr('Accept|suggestion')}</button>` : ''}</div>`).join('')}
-    ${sug.length ? '' : `<p class="muted">${tr('Check sender and type, then mark the document as checked.')}</p>`}
-    ${w ? `<div class="dc-revact">${sug.length > 1 ? `<button type="button" class="btn sm" data-dc="takeall">${tr('Accept all')}</button>` : ''}<button type="button" class="btn sm pri" data-dc="checked">${ic('check', 's')} ${tr('Checked')}</button></div>` : ''}</div>` : '';
+    ${w ? `<div class="dc-revact">${sug.length > 1 ? `<button type="button" class="btn sm" data-dc="takeall">${tr('Accept all')}</button>` : ''}${stackQ ? dsp_stackBtns() : `<button type="button" class="btn sm pri" data-dc="checked">${ic('check', 's')} ${tr('Checked')}</button>`}</div>` : ''}</div>` : '';
   // 2.154.0 A (#1111): docsplit.js draws the due date / task line (+ link with an existing task) and the stack hint; right
   // after "Create task" (no task title from the server yet) the line below
-  const due = typeof dsp_sheetHtml === 'function' && (d.task !== undefined || !d.task_id) ? dsp_sheetHtml(d, w) : d.due && !d.task_id && w ? `<div class="dc-due">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
+  const due = typeof dsp_sheetHtml === 'function' && (d.task !== undefined || !d.task_id) ? dsp_sheetHtml(d, w) : d.due && !d.task_id && w ? `<div class="dc-due"><span class="dc-ht">${ic('alarm', 's')} <span>${esc(tr('Due on {0}', dc_day(d.due)))}</span></span><button type="button" class="btn sm" data-dc="task">${tr('Create task')}</button></div>`
     : d.task_id ? `<div class="dc-due muted">${ic('done', 's')} <a href="#t/${d.task_id}">${tr('Task created')}</a></div>` : '';
   const ro = w ? '' : 'disabled';
   // 2.430.0 (#3582): the preview on top (filled by dc_pvDraw, kept through redraws), the fields below; the same document is
@@ -601,6 +603,15 @@ async function dc_mdChange(e) {
 async function dc_c168Refresh(id) {  // 2.210 C (#2761): re-read the open document and the list ("shared" mark)
   try { const d = await api('GET', `/api/docs/${id}`); if (DC.doc?.id === id) { DC.doc = d; dc_mdDraw($('.dc-md')); } const i = DC.docs.findIndex(x => x.id === id); if (i >= 0) { DC.docs[i].shared = d.shared; if (typeof dc_draw === 'function') dc_draw(); } } catch { /* shown */ }
 }
+// 2.554.0 A (#4469): "New task" from the button "Task…" (docsplit.js menu) and the plain button
+async function dc_newTask(d, md) {
+  const x = await api('POST', `/api/docs/${d.id}/task`).catch(() => null); if (!x) return;
+  DC.doc = {...d, task_id: x.task_id}; dc_mdDraw(md);
+  if (typeof load === 'function') load();
+  histToast(tr('Task created: {0}', x.title), histAdd({label: tr('Task created: {0}', x.title),
+    undo: async () => { await api('DELETE', `/api/tasks/${x.task_id}`); await api('DELETE', `/api/docs/${d.id}/task`); if (DC.doc?.id === d.id) { DC.doc.task_id = null; dc_mdDraw($('.dc-md')); } return {}; },
+    redo: async () => { const y = await api('POST', `/api/docs/${d.id}/task`); x.task_id = y.task_id; return {}; }}));
+}
 async function dc_mdClick(e) {
   const b = e.target.closest('[data-dc]'); if (!b || !DC.doc) return;
   const d = DC.doc, a = b.dataset.dc, md = b.closest('.dc-md');
@@ -677,15 +688,7 @@ async function dc_mdClick(e) {
     if (DC.f.review) { if (nx && S.route.mod === 'docs') dc_goTo(nx.id, nxDir); else md.remove(); }
     return;
   }
-  if (a === 'task') {
-    const x = await api('POST', `/api/docs/${d.id}/task`).catch(() => null); if (!x) return;
-    DC.doc = {...d, task_id: x.task_id}; dc_mdDraw(md);
-    if (typeof load === 'function') load();
-    histToast(tr('Task created: {0}', x.title), histAdd({label: tr('Task created: {0}', x.title),
-      undo: async () => { await api('DELETE', `/api/tasks/${x.task_id}`); await api('DELETE', `/api/docs/${d.id}/task`); if (DC.doc?.id === d.id) { DC.doc.task_id = null; dc_mdDraw($('.dc-md')); } return {}; },
-      redo: async () => { const y = await api('POST', `/api/docs/${d.id}/task`); x.task_id = y.task_id; return {}; }}));
-    return;
-  }
+  if (a === 'task') { await dc_newTask(d, md); return; }
   if (a === 'del') {
     try { await api('DELETE', `/api/files/nodes/${d.id}`); } catch { return; }
     md.remove(); dc_load();

@@ -85,21 +85,30 @@
   .dc-paneon>.dc-view{display:none}
   .dc-pane{position:static;max-height:none;margin:0;padding:.5rem 0;border:0;background:none}
 }
-.dc-acts{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem}
+.dc-acts{display:flex;flex-wrap:wrap;align-items:stretch;gap:.375rem}
 /* 2.497.0 A (#4046): the row of actions; the rarer ones fold out on a line of their own, Delete apart at the end */
 .dc-ag{display:flex;flex-wrap:wrap;gap:.375rem}
 .dc-amore{flex-basis:100%}
-.dc-adel{margin-left:auto}
+.dc-adel{margin-left:auto;color:var(--danger)}
+.dc-acts .iconbtn{width:2.5rem;height:2.5rem;padding:0}
 .dc-acts [data-dc="actsmore"] .dc-chev{transition:transform .15s}
 .dc-acts [data-dc="actsmore"][aria-expanded="true"] .dc-chev{transform:rotate(180deg)}
 .dc-acts .btn{min-height:2.5rem}
 .dc-state{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;margin:.25rem 0;color:var(--muted);font-size:var(--fs-s)}
 .dc-state.failed{color:var(--danger)}
-.dc-rev{display:flex;flex-direction:column;gap:.375rem;margin:.5rem 0;padding:.625rem .75rem;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-soft)}
-.dc-sug{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap}
-.dc-revact{display:flex;justify-content:flex-end;gap:.5rem;flex-wrap:wrap}
+.dc-rev{display:flex;flex-wrap:wrap;align-items:center;gap:.375rem .5rem;margin:.5rem 0;padding:.5rem .75rem;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-soft)}
+/* 2.554.0 A (#4469): a compact line: the text left, the buttons right; under 600 px the buttons below, full width */
+.dc-revt{flex:1 1 7rem;min-width:0}
+.dc-sug{display:flex;align-items:center;justify-content:space-between;gap:.5rem;flex-wrap:wrap;flex-basis:100%}
+.dc-revact{display:flex;justify-content:flex-end;gap:.5rem;flex-wrap:wrap;margin-left:auto}
 .dc-rev .btn,.dc-due .btn{min-height:2.5rem}
 .dc-due{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:.5rem 0}
+.dc-ht{display:inline-flex;align-items:flex-start;gap:.375rem;flex:1 1 12rem;min-width:0}
+.dc-ht>svg,.dc-revt svg{flex:none}
+@media (max-width:600px){
+  .dc-revact{flex:1 1 100%}
+  .dc-revact .btn{flex:1 1 auto}
+}
 .dc-f{position:relative}
 .dc-f input,.dc-f select{min-height:2.5rem}
 /* 2.497.0 A (#4046): one fixed grid for all fields of the document (receipt, document): label column, field, "automatic" */
