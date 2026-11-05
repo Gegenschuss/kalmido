@@ -164,7 +164,9 @@ def agent_chain(s, hd, uid, client, tag):
     q = r.json()["doc"]["id"]
     lg = log_of(s, q)
     check(any(x["action"] == "create" and x["user_id"] == uid for x in lg), f"{tag}: the quotation draft has its office log line 'create' {[x['action'] for x in lg]}")
-    r = ag("PATCH", f"/offers/{q}", hd, json={"title": f"Imagefilm {tag} lang", "items": [{"text": "Kamera", "qty": 2, "unit": "day", "price": 800}]})
+    # 2.564.0 (#4702): an agent sends the version it read (expect_updated_at)
+    r = ag("PATCH", f"/offers/{q}", hd, json={"title": f"Imagefilm {tag} lang", "items": [{"text": "Kamera", "qty": 2, "unit": "day", "price": 800}],
+                                              "expect_updated_at": ag("GET", f"/docs/{q}", hd).json()["updated_at"]})
     check(r.ok, f"{tag}: the agent changes its draft " + r.text[:200])
     lg = log_of(s, q)
     up = [x for x in lg if x["action"] == "update"]

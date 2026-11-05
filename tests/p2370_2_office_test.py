@@ -124,9 +124,10 @@ def agent_case(s, who, hd, tid, cl):
     # kept positions, over the API
     r = requests.post(V + "/office/offers", headers=hd, json={"client_id": cl, "title": "Film 2", "items": [{"text": "Licht", "qty": 1, "unit": "day", "price": 50}]})
     q2 = r.json()["doc"]["id"]
-    r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"items": [{"text": "Ton", "qty": 1, "unit": "day", "price": 50}]})
+    uv = lambda: requests.get(V + f"/office/docs/{q2}", headers=hd).json()["updated_at"]  # 2.564.0 (#4702): an agent sends the version it read
+    r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"items": [{"text": "Ton", "qty": 1, "unit": "day", "price": 50}], "expect_updated_at": uv()})
     check(r.ok and r.json().get("kept_ids") == [], f"{who}: the agent's save names what stayed (nothing here) {r.status_code} {r.text[:160]}")
-    r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"title": "Film 3"})
+    r = requests.patch(V + f"/office/offers/{q2}", headers=hd, json={"title": "Film 3", "expect_updated_at": uv()})
     check(r.ok and "kept_ids" not in r.json(), f"{who}: a save without positions works and names nothing {r.status_code} {r.text[:160]}")
 
 

@@ -151,7 +151,8 @@ for m, path in (("POST", f"/docs/{QID}/status"), ("DELETE", f"/offers/{QID}"), (
     check(r.status_code in (403, 404, 405), f"#1348: no v1 route {m} {path} ({r.status_code})")
 
 # changing: own drafts only, only drafts; the marks
-r = ag("PATCH", f"/offers/{QID}", json={"title": "Imagefilm 2027 (lang)"})
+# 2.564.0 (#4702): an agent sends the version it read (expect_updated_at)
+r = ag("PATCH", f"/offers/{QID}", json={"title": "Imagefilm 2027 (lang)", "expect_updated_at": ag("GET", f"/docs/{QID}").json()["updated_at"]})
 check(r.ok and r.json()["doc"]["project_title"] == "Imagefilm 2027 (lang)" and r.json()["doc"]["number"] == "", "#1348: the agent changes its draft")
 check(ag("PATCH", f"/offers/{FQ}", json={"title": "x"}).status_code == 404, "#1348: another organisation's quotation: 404")
 HQ = A.post(B + D, json={"client_id": CL, "project_title": "Von Hand"}).json()["id"]

@@ -237,15 +237,19 @@ x = items_now()
 check(len(x) == 2 and float(x[0]["qty"]) == 3 and float(x[0]["rate"]) == 550 and float(x[0].get("cost") or 0) == 300,
       f"#3028: purchase price and the person's price stay {[(i.get('qty'), i.get('rate'), i.get('cost')) for i in x]}")
 check(float(x[1]["rate"]) == 120, f"#3028: a free position keeps its price when the agent sends none {x[1].get('rate')}")
-r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"service_id": SV, "qty": 4}]})
+def uv():  # 2.564.0 (#4702): an agent sends the version it read; the draft's updated_at now
+    return requests.get(V + f"/office/docs/{DID}", headers=FH).json()["updated_at"]
+
+
+r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"service_id": SV, "qty": 4}], "expect_updated_at": uv()})
 x = items_now()
 check(r.ok and len(x) == 1 and float(x[0].get("cost") or 0) == 300 and float(x[0]["rate"]) == 550,
       f"#3028: without id the same service keeps purchase and price {[(i.get('qty'), i.get('rate'), i.get('cost')) for i in x]}")
 Fr.put(B + f"{O}/docs/{DID}/items", json={"items": x})  # saved again by the person: the agent's ids are gone
-r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"id": P1, "service_id": SV, "qty": 5}]})
+r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"id": P1, "service_id": SV, "qty": 5}], "expect_updated_at": uv()})
 x = items_now()
 check(r.ok and float(x[0]["qty"]) == 5 and float(x[0].get("cost") or 0) == 300, f"#3028: an id gone since = found by its service {r.status_code} {x}")
-r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"id": "x", "service_id": SV, "qty": 1}]})
+r = requests.patch(V + f"/office/offers/{DID}", headers=FH, json={"items": [{"id": "x", "service_id": SV, "qty": 1}], "expect_updated_at": uv()})
 check(r.status_code == 400, f"#3028: a position id must be a number {r.status_code}")
 
 print(f"p2270_d_agent_conflict: {OKS[0]} ok, {len(FAILS)} failed", flush=True)

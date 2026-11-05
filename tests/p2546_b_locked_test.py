@@ -286,7 +286,9 @@ for who, S in (("org admin", A), ("freelancer", F)):
     check(r.status_code == 201, f"{who}: the agent's quotation draft " + r.text[:160])
     Q = (r.json().get("doc") or {}).get("id") if r.status_code == 201 else None
     if Q:
-        r = requests.patch(B + f"/api/v1/office/offers/{Q}", headers=AH, json={"title": "Noch ein Entwurf"})
+        # 2.564.0 (#4702): an agent sends the version it read (expect_updated_at)
+        r = requests.patch(B + f"/api/v1/office/offers/{Q}", headers=AH, json={
+            "title": "Noch ein Entwurf", "expect_updated_at": requests.get(B + f"/api/v1/office/docs/{Q}", headers=AH).json().get("updated_at")})
         check(r.ok, f"{who}: the agent changes its draft (control) {r.status_code}")
         check(S.post(B + f"{D}/{Q}/finalize").ok, f"{who}: the person finalises the agent's quotation")
         for st_ in ("sent", "accepted"):  # so that an invoice may be made from it

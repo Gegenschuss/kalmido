@@ -144,7 +144,9 @@ if r.status_code == 201:
     pt = F.get(B + f"{D}/{did}").json().get("project_title") if did else None
     check(pt == "Zeile eins\nZeile zwei\nZeile drei", f"#3594: the agent's subject keeps its breaks as LF {pt!r}")
     if did:
-        r = requests.patch(B + f"/api/v1/office/offers/{did}", headers=FH, json={"title": "Neu eins\r\nNeu zwei"})
+        # 2.564.0 (#4702): an agent sends the version it read (expect_updated_at)
+        r = requests.patch(B + f"/api/v1/office/offers/{did}", headers=FH, json={
+            "title": "Neu eins\r\nNeu zwei", "expect_updated_at": requests.get(B + f"/api/v1/office/docs/{did}", headers=FH).json().get("updated_at")})
         pt = F.get(B + f"{D}/{did}").json().get("project_title")
         check(r.ok and pt == "Neu eins\nNeu zwei", f"#3594: the agent's change of the subject too {r.status_code} {pt!r}")
 

@@ -31,6 +31,7 @@ from ..core.pg import insert_id, system_ctx, write_lock
 from ..core.orgcrypt import oc_log_detail
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
+from ..core.conflict import take_version
 from ..core.errors import BadInput
 from ..api.v1 import UnknownFields
 from ..api.common import v1_args, v1_err, v1_json, v1_view
@@ -734,6 +735,7 @@ def v1_office_offer_patch(did):
         raise Denied(403, tr("An agent changes only its own drafts"))
     if ofx_locked(r) or r["status"] != "draft":
         raise Denied(409, tr("Only a draft can be changed"))
+    take_version(b)  # 2.564.0 (#4702): expect_updated_at (or If-Match) required for agents: 400 version_required
     exp = b.get("expect_updated_at")
     if exp and exp != r["updated_at"]:  # 2.269.0 A (#3012) / 2.270.0 D (#3028): a person (or another run) saved since the agent read it
         cur = _doc_v1(c, oid, r)
@@ -1059,7 +1061,7 @@ def ofa_spec(paths, schemas, op, ok, errs, ref, pid, q):
     # 2.88.0 (#1915): a change may also set the draft's share in the cash flow plan
     schemas["OfficeDraftPatch"] = {"type": "object", "properties": {**draft["properties"], "cashflow": {
         "type": "string", "enum": ["auto", "yes", "no"], "description": "In the cash flow plan once sent: auto (the newest version of the chain), yes, no"},
-        "expect_updated_at": {"type": "string", "description": "2.270.0: the draft's updated_at as read; changed since = 409 {error, current} (recommended)"}}}
+        "expect_updated_at": {"type": "string", "description": "2.270.0: the draft's updated_at as read; changed since = 409 {error, current}. 2.564.0: required (or the header If-Match): without it 400 version_required"}}}
     rules = ("Both switches must be on: the agent's \"May draft office documents\" and the area's privacy switch \"Agents may read "
              "office data\". Drafts only: never a number, status, finalising, sending, deleting or booking. Every request is in the "
              "office log.")

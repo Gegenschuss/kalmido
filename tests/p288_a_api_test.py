@@ -197,7 +197,7 @@ check(r.ok and r.json()["version_of"] == Q1 and r.json()["cashflow"] == "auto" a
 r = requests.post(V + "/offers", headers=AH, json={"client_id": CL, "title": "Agentenentwurf", "items": [{"text": "Schnitt", "qty": 1, "unit": "flat", "price": 300}]})
 check(r.status_code == 201, "setup: an agent's draft " + r.text[:200])
 AQ = r.json()["doc"]["id"]
-r = requests.patch(V + f"/offers/{AQ}", headers=AH, json={"cashflow": "no"})
+r = requests.patch(V + f"/offers/{AQ}", headers=AH, json={"cashflow": "no", "expect_updated_at": r.json()["doc"]["updated_at"]})  # 2.564.0 (#4702): the version read
 check(r.ok and r.json()["doc"]["cashflow"] == "no", "#1915: the agent sets cashflow of its own draft " + r.text[:200])
 check(requests.patch(V + f"/offers/{AQ}", headers=AH, json={"cashflow": "always"}).status_code == 400, "#1915: agent: a bad value 400")
 check(requests.patch(V + f"/offers/{Q3}", headers=AH, json={"cashflow": "no"}).status_code in (403, 409), "#1915: agent: not a person's quotation")
