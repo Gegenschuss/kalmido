@@ -270,7 +270,9 @@ UA8_AREAS = (
     (N_("basket"), "SELECT 1 FROM tasks t JOIN lists l ON l.id=t.list_id WHERE l.owner_id=? AND l.is_inbox=1 LIMIT 1"),
     (N_("calendars"), "SELECT 1 FROM ev_cals k JOIN events e ON e.cal_id=k.id WHERE k.owner_id=? AND k.org_id IS NULL LIMIT 1"),
     (N_("address books"), "SELECT 1 FROM books b JOIN contacts x ON x.book_id=b.id WHERE b.owner_id=? AND b.org_id IS NULL LIMIT 1"),
-    (N_("files"), "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' LIMIT 1"),
+    # 2.566.0 (#4712): not the reference node of a calendar / address book on the shared core (counted by its own line above)
+    (N_("files"), "SELECT 1 FROM fs_nodes WHERE owner_id=? AND org_id IS NULL AND kind!='folder' "
+        "AND NOT (kind='ref' AND ref_kind IN ('evcal', 'address_book')) LIMIT 1"),
     (N_("knowledge"), "SELECT 1 FROM wiki_pages WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
     (N_("tables"), "SELECT 1 FROM sheets WHERE owner_id=? AND org_id IS NULL LIMIT 1"),  # 2.89.0 (#1916): private tables
     (N_("filed e-mails"), "SELECT 1 FROM hub_mails WHERE owner_id=? AND org_id IS NULL LIMIT 1"),
