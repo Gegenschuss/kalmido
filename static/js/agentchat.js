@@ -616,7 +616,8 @@ function chatRxHtml(m, a) {
 }
 async function chatReact(mid, emoji) {
   const aid = S.chat.aid, m = S.chat.msgs.find(x => x.id === mid); if (!aid || !m) return;
-  try { const r = await api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji}); for (const x of [m, S.chat.msgs.find(y => y.id === mid)]) if (x) x.reactions = r.reactions; S.chat.mutAt = (S.chat.seq || 0) + 1; if (r.approval === 'approved') toast(tr('Approved')); else if (r.approval === 'rejected') toast(tr('Rejected')); if (r.approval && chatPerm(m)) chatLoad(); }
+  const on = !rxHas(m.reactions, emoji), get = () => S.chat.msgs.find(y => y.id === mid);  // 2.559.0 (#4659): shown at once (agents.js rxMine), a refusal puts it back
+  try { const r = await optWrite(optSet(get, {reactions: rxMine(m.reactions, emoji, on)}), () => api('POST', `/api/agents/${aid}/chat/${mid}/reactions`, {emoji, on}), chatDraw); for (const x of [m, get()]) if (x) x.reactions = r.reactions; S.chat.mutAt = (S.chat.seq || 0) + 1; if (r.approval === 'approved') toast(tr('Approved')); else if (r.approval === 'rejected') toast(tr('Rejected')); if (r.approval && chatPerm(m)) chatLoad(); }
   catch { return; }
   chatDraw(); rxRefocus('#chat-msgs', mid, emoji);
 }

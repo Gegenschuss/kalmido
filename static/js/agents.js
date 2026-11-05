@@ -294,11 +294,25 @@ function sugHtml(c, ro) {
     ${s.state === 'open' && !ro && S.tl.can_write ? `<div class="sugb"><button class="btn sm pri" data-act="c-apply" data-cid="${c.id}">${ic('check', 's')} ${tr('Apply')}</button><span class="muted">${tr('or react with 👍 · the original text stays at the top of the notes')}</span></div>` : ''}</div>`;
 }
 function tlComment(cid) { return (S.tl.comments || []).find(x => x.id === cid); }
+// 2.559.0 (#4659): my reaction e on (on) / off a reaction row [{emoji, count, users}], here at once (the answer replaces it)
+const rxHas = (rs, e) => (rs || []).some(r => r.emoji === e && (r.users || []).some(u => S.me && u.id === S.me.id));
+function rxMine(rs, e, on) {
+  const me = {id: S.me?.id, name: S.me?.display_name || S.me?.username || ''};
+  const out = (rs || []).map(r => ({...r, users: [...(r.users || [])]}));
+  let r = out.find(x => x.emoji === e);
+  if (on) { if (!r) out.push(r = {emoji: e, count: 0, users: []}); if (!r.users.some(u => u.id === me.id)) { r.users.push(me); r.count = (r.count ?? r.users.length - 1) + 1; } return out; }
+  if (r && r.users.some(u => u.id === me.id)) { r.users = r.users.filter(u => u.id !== me.id); r.count = Math.max(0, (r.count ?? r.users.length + 1) - 1); }
+  return out.filter(x => x.users.length);
+}
+// 2.559.0 (#4659): the reaction shows at once, the request behind it (on: what was tapped, so a second tap meanwhile is no
+// toggle of a different state); a refusal puts the row back
 async function commentReact(cid, e) {
   const c = tlComment(cid); if (!c) return;
+  const on = !rxHas(c.reactions, e);
   let j;
-  try { j = await capi('POST', `/api/comments/${cid}/reactions`, {emoji: e}); } catch { return; }
-  c.reactions = j.reactions; if (j.suggestion !== undefined) c.suggestion = j.suggestion;
+  try { j = await optWrite(optSet(() => tlComment(cid), {reactions: rxMine(c.reactions, e, on)}), () => capi('POST', `/api/comments/${cid}/reactions`, {emoji: e, on}), drawTimeline); } catch { return; }
+  const x = tlComment(cid) || c;
+  x.reactions = j.reactions; if (j.suggestion !== undefined) x.suggestion = j.suggestion;
   drawTimeline();
   if (j.applied) { toast(tr('Suggestion applied')); await load(); render(); }
   else if (j.approval) { toast(j.approval === 'approved' ? tr('Approved') : tr('Rejected')); if (S.sel) loadTimeline(S.sel); }
