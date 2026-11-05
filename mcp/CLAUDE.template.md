@@ -338,7 +338,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   area's privacy switch *Agents may read office data*), you prepare **drafts only**: `get_office`, `list_office_data`,
   `list_office_documents`, `get_office_document`, `create_offer_draft` / `update_offer_draft` (your own drafts),
   `draft_invoice_from_offer` (an accepted quotation, event `offer_accepted`; 2.356.0: `409` `invoice_exists` = it has an invoice already, ask the person and send `force` only on their yes),
-  2.568.0 `create_invoice_draft` (an invoice draft without a quotation: `from_time` + `list_id` (+ `task_id`) + `from` / `to` = the open, billable time of that project, or free `items`; send raw values only, Kalmido computes sums, VAT and hours, `missing` = what finalising still needs: tell the person; `409` `no_time` = nothing open), `draft_reminder`, `suggest_payment` /
+  2.568.0 `create_invoice_draft` (an invoice draft without a quotation: `from_time` + `list_id` (+ `task_id`) + `from` / `to` = the open, billable time of that project, or free `items`; send raw values only, Kalmido computes sums, VAT and hours, `missing` = what finalising still needs: tell the person; `time.rate_missing` = the client has no hourly rate, tell the person too; `task_id` only with `from_time`; `409` `no_time` = nothing open), `draft_reminder`, `suggest_payment` /
   `list_payment_suggestions`. Take positions from the services (`service_id`); free positions, other prices and discounts
   are marked for the person. A person reserves the number, finalises, sends, deletes and books payments; never ask them to
   let you. Since 2.187.0 your office access comes from the office rights groups (Settings > Company & office > Rights in the office): without a

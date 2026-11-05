@@ -2293,7 +2293,8 @@ TOOLS += [
                              "billable, still open time becomes one position per project with the client's hourly rate, bound to the draft so "
                              "it is never billed twice; 409 no_time when there is none) or free positions in items like create_offer_draft. "
                              "Send raw values only: Kalmido computes sums, VAT and the number (only when a person finalises). missing = what "
-                             "finalising still needs: tell the person. A person finalises and sends it.",
+                             "finalising still needs: tell the person; time.rate_missing = the client has no hourly rate (the hours stand at 0): tell the "
+                             "person too. task_id only with from_time. A person finalises and sends it.",
      _obj({"client_id": S_ID, "title": {"type": "string"}, "intro": {"type": "string"}, "list_id": {**S_ID, "description": "The project"},
            "task_id": {**S_ID, "description": "Only the time of this task (from_time)"}, "from_time": {"type": "boolean"}, "from": D, "to": D,
            "items": {"type": "array", "items": _OITEM}, "notify": {"type": "boolean"}, **_RB, **_CREF}, ["client_id"]),

@@ -94,6 +94,9 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     entry(uid, LP, T1, D1, 7200)   # 2 h on the task
     entry(uid, LP, None, D2, 3600)  # 1 h on the project
     entry(uid, LH, None, D2, 3600)  # 1 h in a project the agent does not see
+    LZ = S.post(B + "/api/lists", json={"name": "Rateless project", "org_id": ORG if S is A else None}).json()["id"]
+    S.patch(B + f"/api/lists/{LZ}", json={"client_id": CL2})
+    entry(uid, LZ, None, D2, 3600)  # 1 h for the client without an hourly rate
 
     # ---- the starter item office: skipped with its reason until every right is there
     G0, H0 = agent(S, f"ki0{len(who)}", ["read"])
@@ -167,6 +170,7 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     tot = d.get("totals") or {}
     check(float(tot.get("net") or 0) == 160.0 and float(tot.get("gross") or 0) == 190.4, f"{who}: net and gross computed by Kalmido (19 % VAT) {tot.get('net')} {tot.get('gross')}")
     check(j.get("missing") == [], f"{who}: nothing missing before finalising {j.get('missing')}")
+    check((j.get("time") or {}).get("rate_missing") is False, f"{who}: the client has an hourly rate {j.get('time')}")
     check(head(I1)["number"] == "", f"{who}: no number in the database")
     r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "task_id": T1, "from": D9, "to": TODAY,
                                                          "client_ref": f"ref-{who}"})
@@ -178,6 +182,12 @@ for who, S, uid in (("org admin", A, ALICE), ("freelancer", F, FID)):
     check(len(its) == 1 and float(its[0]["qty"]) == 1.0, f"{who}: only the 1 h left, the task's 2 h are on the first draft {its}")
     r = requests.post(INV, headers=AH, json={"client_id": CL, "from_time": True, "list_id": LP, "from": D9, "to": TODAY})
     check(r.status_code == 409 and r.json()["error"]["code"] == "no_time", f"{who}: nothing open any more: 409 no_time ({r.status_code} {r.text[:160]})")
+
+    # review 2.568.0 (N3): a client without an hourly rate: the answer says so (the hours stand at 0)
+    check(S.put(B + f"/api/lists/{LZ}/members", json={"user_id": G, "role": "edit"}).ok, f"{who}: the rateless project shared with the agent")
+    r = requests.post(INV, headers=AH, json={"client_id": CL2, "from_time": True, "list_id": LZ, "from": D9, "to": TODAY})
+    check(r.status_code == 201 and (r.json().get("time") or {}).get("rate_missing") is True,
+          f"{who}: no hourly rate: time.rate_missing ({r.status_code} {r.text[:200]})")
 
     # ---- free positions
     r = requests.post(INV, headers=AH, json={"client_id": CL2, "title": "Workshop", "from": D9, "to": TODAY, "notify": True,

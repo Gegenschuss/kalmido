@@ -119,6 +119,9 @@ def v1_office_invoice_draft_post():
         if not n:
             c.rollback()
             return v1_err(409, tr(OFV_NO_TIME), name="no_time", time=stat)
+        # review 2.568.0 (N3): the client has no hourly rate -> the positions stand at 0: the agent tells the person
+        rate = c.execute("SELECT rate FROM clients WHERE id=?", (int(b["client_id"]),)).fetchone()
+        stat = {**(stat or {}), "rate_missing": not (rate and rate[0])}
         head = {}
         if b.get("title") not in (None, ""):
             head["project_title"] = pt_text(b["title"], "title")
@@ -175,4 +178,5 @@ def ofv_spec(paths, schemas, op, ok, errs, ref, pid, q):
             "client_ref": {"type": "string", "maxLength": 64, "description": "Your own id of this request; sent again = 200 the draft made the first time"}}},
         scope="office",
         desc="Kalmido computes sums, VAT and the hours; the number comes only when a person finalises. missing = what finalising "
-             "still needs (recipient address, VAT ID ...). 409 no_time: no open, billable time in the period.")}
+             "still needs (recipient address, VAT ID ...). time.rate_missing = the client has no hourly rate, the hours stand at 0: tell "
+             "the person. 409 no_time: no open, billable time in the period. 400: task_id without from_time, a project of another client.")}
