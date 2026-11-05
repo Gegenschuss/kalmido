@@ -5,5 +5,5 @@
 }
 /* 2.537 (#4569) a comment on its way stands in the list lighter; a failed one shows Not sent with Send again / Discard */
 .cm.cmpend:not(.cmfail) .cbody{opacity:.6}
-.cm.cmfail .cpfail{color:var(--danger);font-size:.85em}
+.cm.cmfail .cpfail{color:var(--danger);font-size:var(--fs-xs)}  /* 2.556 (#4662): token of the scale, not .85em (p2419_scale) */
 .cm.cmfail .chead .btn{margin-left:.4em}
