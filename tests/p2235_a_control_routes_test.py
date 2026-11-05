@@ -107,7 +107,8 @@ ROUTES = {
     "POST /api/v1/lists/{}/tags": "change", "POST /api/v1/me/app-passwords": "change", "POST /api/v1/me/purpose": "change",
     "POST /api/v1/notes/{}/restore": "change", "POST /api/v1/office/leads": "change", "POST /api/v1/office/letters": "change",
     "POST /api/v1/office/letters/{}/links": "change", "POST /api/v1/office/offers": "change",
-    "POST /api/v1/office/offers/{}/invoice": "change", "POST /api/v1/office/reminders": "change", "POST /api/v1/sheets": "change",
+    "POST /api/v1/office/offers/{}/invoice": "change", "POST /api/v1/office/invoices": "change",  # 2.568.0 (#4673): an invoice draft, like the quotation's
+    "POST /api/v1/office/reminders": "change", "POST /api/v1/sheets": "change",
     "POST /api/v1/sheets/{}/batches/{}/undo": "change", "POST /api/v1/sheets/{}/columns": "change",
     "POST /api/v1/sheets/{}/rows": "change", "POST /api/v1/sheets/{}/tabs": "change", "POST /api/v1/tasks/batch": "change",
     "POST /api/v1/tasks/{}/approval": "change", "POST /api/v1/tasks/{}/attachments": "change",
