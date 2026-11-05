@@ -19,7 +19,7 @@ from kt import FAILS, OKS, check  # tests/kt.py
 
 FILES = [os.path.join(ROOT, "static", "app.css")] + sorted(glob.glob(os.path.join(ROOT, "static", "css", "*.css")))
 RULE = re.compile(r"([^{}]*)\{([^{}]*)\}")
-EM_OK = ("code", ".tref", ".rfcard", "::after", ".wkst-")
+EM_OK = ("code", ".tref", ".rfcard", "::after", ".wkst-", ".wkcm .cm-wk")  # 2.556.0 (#4662): + the wiki editor's marks (#4052): its headings / code scale with the editor text like the reading styles
 MICRO_OK = (".tthav .avatar",)  # initials in a 20 px dot: 8 px, below the scale on purpose
 LOGO = re.compile(r"svg\.(logo|kword|bot)|#boot|#fab|\.empty|\.alogo")
 

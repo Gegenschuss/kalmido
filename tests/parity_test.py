@@ -768,6 +768,9 @@ APP_ONLY = [
     ("2.270.0 A (#3019): the history of a project description (earlier texts, who replaced them) is a person's view in the "
      "web app; agents read and change the current description through GET / PATCH /lists/{id}/overview",
      ("=GET /api/lists/{}/overview/history",)),
+    ("2.556.0 B (#4685): New for you is the web app's dialog after an update (the seen version per person); agents have no "
+     "dialog and read the change log themselves",
+     ("=GET /api/whatsnew", "=POST /api/whatsnew/seen")),
 ]
 
 

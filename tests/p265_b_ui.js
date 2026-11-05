@@ -43,7 +43,8 @@ const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 
   check(['chatbase', 'calendar', 'templates', 'calevents', 'lazyload'].every(f => tags.includes(f)) && tags.indexOf('lazyload') === tags.indexOf('core') + 1, 'start parts load at start (chatbase.js, calendar.js, templates.js, calevents.js)');
   check(LAZY_CSS.length >= 10 && JSON.stringify(LAZY_CSS) === JSON.stringify(ldCss), 'sw.js LAZY_CSS = the stylesheets of LD_CSS: ' + LAZY_CSS.join(' '));
   const sheets = await Promise.all(LAZY_CSS.map(async f => { const r = await fetch(B + 'static/css/' + f + '.css'); return {f, ok: r.ok, n: (await r.text()).length}; }));
-  check(sheets.every(s => s.ok && s.n > 500), 'every module stylesheet is served: ' + sheets.map(s => `${s.f} ${s.n}`).join(', '));
+  // 2.556.0 (#4685): > 300, not 500 - whatsnew.css (the small New for you dialog) has about 400 bytes; the check means served, not empty
+  check(sheets.every(s => s.ok && s.n > 300), 'every module stylesheet is served: ' + sheets.map(s => `${s.f} ${s.n}`).join(', '));
   const appCss = await get('static/app.css');
   check(!/^\.dc-view\{/m.test(appCss) && !/^\.wktree\{/m.test(appCss) && /^\.dc-view\{/m.test(await get('static/css/docs.css')), 'area rules moved out of app.css (documents, knowledge pages)');
   // the start: scripts with a tag + app.css + i18n.js (the budget of tools/perf_budget.py measures the same)
