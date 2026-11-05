@@ -181,7 +181,7 @@ a.wemlink{display:inline-flex;align-items:center;gap:.25rem}
 .wkcm .cm-wkl{color:var(--accent);text-decoration:underline;text-underline-offset:2px}
 .wkcm .cm-wkmiss{text-decoration-style:dashed}
 .wkcm [data-wkgo],.wkcm [data-wknew]{cursor:pointer}
-.wkcm .cm-wkq{padding-left:.75rem;border-left:3px solid var(--line2);color:var(--muted)}
+.wkcm .cm-wkq{padding-left:.75rem;border-left:.1875rem solid var(--line2);color:var(--muted)}
 .wkcm .cm-wkfm,.wkcm .cm-wksrc{color:var(--muted);font-family:var(--mono);font-size:.9em}
 .wkcm .cm-wkbul{color:var(--muted)}
 .wkcm .cm-wkcb input{margin:0 .4em 0 0;vertical-align:-.15em;cursor:pointer}
