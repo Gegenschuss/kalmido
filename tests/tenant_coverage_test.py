@@ -787,6 +787,8 @@ ROUTES = {
    
     "POST /api/lists/{}/repos": "list", "PATCH /api/repos/{}": "list", "DELETE /api/repos/{}": "list",
     "POST /api/repos/{}/refresh": "list", "POST /api/repos/{}/issues/import": "list", "POST /api/lists/{}/fields": "list", "PATCH /api/fields/{}": "list",  # 2.394.0 (#3377): issues/import
+    # 2.550.0 (#4528): the field trash and the member memo, owner and project admins only (p4528_b_restore_test.py: member 403, outsider 404)
+    "GET /api/lists/{}/fields/trash": "list", "POST /api/fields/trash/{}/restore": "list", "GET /api/lists/{}/member-memos": "list", "POST /api/lists/{}/members/{}/restore": "list",  # p4528_b_restore_test.py
     "DELETE /api/fields/{}": "list", "GET /api/fields/{}/count": "list", "POST /api/lists/{}/folder-reset": "list", "GET /api/lists/{}/folder-preview": "list", "GET /api/lists/{}/groups": "list",
     "PUT /api/lists/{}/groups/{}": "list", "DELETE /api/lists/{}/groups/{}": "list", "POST /api/lists": "list",
     "PATCH /api/lists/{}": "list", "POST /api/lists/reorder": "list", "DELETE /api/lists/{}": "list",
