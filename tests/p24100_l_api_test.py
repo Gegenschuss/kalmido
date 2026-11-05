@@ -33,6 +33,7 @@ for s in (A, Bo, Ca):
 def budget_case(S, tag):
     """The project of the task: top level 3 (no subtasks), then four tasks with own values AND valued subtasks."""
     P = S.post(B + "/api/lists", json={"name": f"Budget {tag}", "ptype": "agency", "time_tracking": True}).json()["id"]
+    S.post(B + f"/api/lists/{P}/fields", json={"name": "Budget h", "type": "number"})  # 2.551.0 (#3906): the agency type has no such field any more
     fb = next(f for f in S.get(B + "/api/state").json()["fields"] if f["list_id"] == P and f["name"] == "Budget h")
 
     def task(title, v, parent=None):

@@ -100,7 +100,7 @@ def fields(s, lid):
 
 for s, who in ((A, "alice"), (Fr, "frida (no organisation)")):
     lid = s.post(B + "/api/lists", json={"name": f"Agency {who[:5]}", "ptype": "agency"}).json()["id"]
-    check(fields(s, lid) == [("Budget h", "number")], f"{who}: #3438 a new agency project has only Budget h {fields(s, lid)}")
+    check(fields(s, lid) == [], f"{who}: #3438 a new agency project has no Client field (2.551.0, #3906: nor Budget h) {fields(s, lid)}")
 # the state of before: agency projects with "Client" (empty / with a value) and "Kunde" (empty), a plain list with an empty "Client"
 TS = "2026-10-01T00:00:00Z"
 L_EMPTY = A.post(B + "/api/lists", json={"name": "Old agency", "ptype": "agency"}).json()["id"]
@@ -121,7 +121,7 @@ left = {r[0] for r in dbw("SELECT id FROM list_fields WHERE id IN (?,?,?,?)", tu
 check(ids[L_EMPTY] not in left and ids[L_DE] not in left, f"#3438: the empty Client / Kunde fields of agency projects are gone {left}")
 check(ids[L_VAL] in left, "#3438: a Client field with a value stays")
 check(ids[L_PLAIN] in left, "#3438: an empty Client field of a list without the type stays")
-check(("Budget h", "number") in fields(A, L_EMPTY) and dbw("SELECT value FROM task_field_values WHERE task_id=?", (T_VAL,)) == [("Example Ltd",)],
+check(not fields(A, L_EMPTY) and dbw("SELECT value FROM task_field_values WHERE task_id=?", (T_VAL,)) == [("Example Ltd",)],
       "#3438: Budget h and the value kept")
 check([r[0] for r in dbw("SELECT value FROM settings WHERE key='migr_agcl2380'")] == ["1"], "#3438: the one-shot is marked done")
 

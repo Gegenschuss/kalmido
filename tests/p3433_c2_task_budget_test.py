@@ -41,6 +41,7 @@ def budget(S, tid):
 
 def case(S, tag):
     P = S.post(B + "/api/lists", json={"name": f"Film {tag}", "ptype": "agency", "time_tracking": True}).json()["id"]
+    S.post(B + f"/api/lists/{P}/fields", json={"name": "Budget h", "type": "number"})  # 2.551.0 (#3906): the agency type has no such field any more
     fb = next(f for f in S.get(B + "/api/state").json()["fields"] if f["list_id"] == P and f["name"] == "Budget h")
 
     def task(title, v=None, parent=None, lid=P):
@@ -83,6 +84,7 @@ def case(S, tag):
     check(budget(S, task("No budget")) is None, f"{tag}: a task without a value: no budget")
     # a project without time tracking: none
     Q = S.post(B + "/api/lists", json={"name": f"Notes {tag}", "ptype": "agency", "time_tracking": False}).json()["id"]
+    S.post(B + f"/api/lists/{Q}/fields", json={"name": "Budget h", "type": "number"})  # 2.551.0 (#3906)
     fq = next(f for f in S.get(B + "/api/state").json()["fields"] if f["list_id"] == Q and f["name"] == "Budget h")
     r = S.post(B + "/api/tasks", json={"title": "Draft", "list_id": Q, "fields": {str(fq["id"]): "5"}})
     check(budget(S, r.json()["id"]) is None, f"{tag}: a project without time tracking: no budget")

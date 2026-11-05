@@ -258,6 +258,7 @@ check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": 10}).ok and next(x for 
 check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": 0}).status_code == 400 and Bo.patch(B + f"/api/lists/{P}", json={"day_hours": "x"}).status_code == 400, "day_hours invalid 400")
 check(Bo.patch(B + f"/api/lists/{P}", json={"day_hours": ""}).ok and next(x for x in Bo.get(B + "/api/state").json()["lists"] if x["id"] == P)["day_hours"] is None, "day_hours '' -> the server's value")
 Bo.patch(B + f"/api/lists/{P}", json={"day_hours": 10})
+Bo.post(B + f"/api/lists/{P}/fields", json={"name": "Budget h", "type": "number"})  # 2.551.0 (#3906): the agency type has no such field any more
 fields = [f for f in Bo.get(B + "/api/state").json()["fields"] if f["list_id"] == P]
 fb = next((f for f in fields if f["name"] == "Budget h"), None)
 check(fb and fb["type"] == "number", f"agency project: number field Budget h: {[f['name'] for f in fields]}")

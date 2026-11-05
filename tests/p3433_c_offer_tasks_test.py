@@ -102,7 +102,7 @@ def scenario(S, who, shoot=False, member=None):
     check(r.status_code == 201 and r.json().get("made_project") is True and r.json().get("created") == len(pick), f"{who}: tasks created {r.text[:200]}")
     L = r.json().get("list_id")
     row = sql("SELECT ptype, client_id FROM lists WHERE id=?", (L,))
-    check(row and row[0][0] == "agency" and row[0][1] == cl and r.json().get("field_made") is False, f"{who}: an agency project with the client, its own field {row}")
+    check(row and row[0][0] == "agency" and row[0][1] == cl and r.json().get("field_made") is True, f"{who}: an agency project with the client, the field made (2.551.0, #3906: not in the type any more) {row}")
     doc = S.get(B + f"{D}/{Q}").json()
     check(doc.get("list_id") == L and doc.get("offer_tasks") == len(pick), f"{who}: the quotation is in the project, offer_tasks {doc.get('offer_tasks')}")
     ts = tasks_of(L)

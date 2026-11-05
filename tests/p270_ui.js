@@ -63,6 +63,7 @@ const SMALL = sel => `(() => [...document.querySelectorAll('${sel}')].filter(e =
   const D2 = (await call('POST', '/api/tasks', {title: 'Renew passport', list_id: L, due: day(30), reminders: '1440', deadline: 1})).id;
   const D3 = (await call('POST', '/api/tasks', {title: 'Water plants', list_id: L, due: day(3)})).id;
   const P = (await call('POST', '/api/lists', {name: 'Client X', ptype: 'agency', folder: 'Clients', time_tracking: true})).id; // 2.41.0 (#1471): time tracking is a switch of the list
+  await call('POST', `/api/lists/${P}/fields`, {name: 'Budget h', type: 'number'}); // 2.551.0 (#3906): the agency type has no such field any more
   const st0 = await call('GET', '/api/state');
   const fb = st0.fields.find(f => f.list_id === P && f.name === 'Budget h');
   const PT = (await call('POST', '/api/tasks', {title: 'Concept', list_id: P, fields: {[fb.id]: '20'}, due: day(2)})).id;

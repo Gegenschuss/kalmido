@@ -21,7 +21,7 @@ can start from a type:
 
 | Type | Standard sections (2.27.0: only when ticked) | Also |
 |---|---|---|
-| Agency | Request · Concept · Production · Approval · Billing | fields *Client* (text) and *Budget h* (number), time tracking |
+| Agency | Request · Concept · Production · Approval · Billing | no fields of its own (the client is the project's; a task has its own budget), time tracking |
 | Software / AI dev | Backlog · Next · In progress · Review · Done | Kanban view, ticket types, dependencies, *Move dependent tasks along*; a next-steps dialog to connect a repository and, optionally, share the project with a coding agent |
 | Personal | Ideas · Planning · To do | no fields |
 

@@ -114,7 +114,7 @@ Every single feature of Kalmido, area by area. The [README](../README.md) has th
 - **Time sum in the project header** (2.7.0): a project with time tracking (and a folder of them) shows its tracked time in hours and in
   working days, e.g. *12.5 h · 1.6 days*. The length of a day / shift is one value for the whole server
   (*Settings > Server > Server > Time sums*, 8 h by default) that a project can override in its dialog, the same for everyone in it. A
-  number field *Budget h* (the agency project type has one) adds a budget bar: tracked against the sum of the budgets
+  number field *Budget h* (add it in the project's fields; a quotation turned into tasks makes it when missing) adds a budget bar: tracked against the sum of the budgets
 
 **Together**
 - Several users, each with their own basket, habits, filters, tags, settings and notifications
