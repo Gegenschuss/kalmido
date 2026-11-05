@@ -16559,6 +16559,7 @@
   "Due billing on Mondays at 08:00": "Fatturazioni in scadenza il lunedì alle 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Tempo aperto e fatture in scadenza come promemoria; bozze di fattura solo dopo il tuo Sì, mai finalizzate o inviate. Servono i permessi d’ufficio dell’agente («Bozze dell’ufficio», «Può redigere documenti dell’ufficio»).",
   "Already set up": "Già configurato",
+  "Participants do not see the project's settings history": "I partecipanti non vedono la cronologia delle impostazioni del progetto",
   "Give yourself the right “Quotations & invoices” in the office first": "Assegnati prima il diritto «Preventivi e fatture» nell’ufficio",
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Metti prima l’agente in un gruppo di diritti dell’ufficio con «Preventivi e fatture» (modifica)",
   "You do not work in this agent's office": "Non lavori nell’ufficio di questo agente",

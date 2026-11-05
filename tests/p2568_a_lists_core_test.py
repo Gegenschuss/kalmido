@@ -321,4 +321,11 @@ r = A.post(B + f"/api/lists/{L9}/shares/{RG3}/restore")
 check(r.status_code == 409 and dbx("SELECT 1 FROM fs_shares WHERE node_id=? AND group_id=?", (N9, G)) == [],
       f"F2: a group's own row: 409 (not 500), nothing written ({r.status_code} {r.text[:160]})")
 
+# F5: a participant sees the project, not its settings' history (403 with a reason); a viewer does
+check(A.put(B + f"/api/lists/{L9}/members", json={"user_id": uid["erik"], "role": "participant"}).ok and role_of(L9, "erik") == "participant",
+      "erik a participant")
+r = S["erik"].get(B + f"/api/lists/{L9}/history")
+check(r.status_code == 403 and r.json().get("error"), f"F5: a participant: 403 with a reason ({r.status_code} {r.text[:160]})")
+check(S["gina"].get(B + f"/api/lists/{L9}/history").ok, "a viewer with a personal share reads the history")
+
 sys.exit(done("p2568_a_lists_core"))

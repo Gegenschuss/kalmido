@@ -16558,6 +16558,7 @@
   "Due billing on Mondays at 08:00": "Facturations à faire le lundi à 08:00",
   "Open time and due invoices as a reminder; invoice drafts only after your Yes, never finalised or sent. Needs the agent’s office rights (“Office drafts”, “May draft office documents”).": "Temps ouvert et factures échues en rappel ; brouillons de facture seulement après ton Oui, jamais finalisés ni envoyés. Nécessite les droits bureau de l’agent (« Brouillons du bureau », « Peut rédiger des documents du bureau »).",
   "Already set up": "Déjà configuré",
+  "Participants do not see the project's settings history": "Les participants ne voient pas l’historique des réglages du projet",
   "Give yourself the right “Quotations & invoices” in the office first": "Donne-toi d’abord le droit « Devis et factures » dans le bureau",
   "Put the agent into an office rights group with “Quotations & invoices” (edit) first": "Place d’abord l’agent dans un groupe de droits du bureau avec « Devis et factures » (modifier)",
   "You do not work in this agent's office": "Tu ne travailles pas dans le bureau de cet agent",

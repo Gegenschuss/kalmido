@@ -217,4 +217,6 @@ def lmc_history_route(lid):
     """The history of the project's settings (columns, sums, key figures, properties, ticket template, agent members)."""
     c = db()
     need_list(c, lid, write=False)
+    if _list_role(c, int(lid), me()) == "participant":  # review F5: they see the project (need_list), not its settings' history
+        return err(tr("Participants do not see the project's settings history"), 403)
     return jsonify(history=obj_history(c, me(), LMC_KIND, lid))
