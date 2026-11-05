@@ -433,7 +433,8 @@ def tcx_room_patch(rid):
         if not isinstance(b["archived"], bool):
             return err(tr("Invalid value: {0}", "archived"))
         c.execute("UPDATE tchat_rooms SET archived_at=? WHERE id=?", (iso(now_utc()) if b["archived"] else None, rid))
-    c.execute("UPDATE tchat_rooms SET updated_at=? WHERE id=?", (iso_ms(now_utc()), rid))
+    if {"name", "open", "archived"} & set(b):  # review 2.564.0: a body with only the version is no new version
+        c.execute("UPDATE tchat_rooms SET updated_at=? WHERE id=?", (iso_ms(now_utc()), rid))
     c.commit()
     return jsonify(tcx_out(c, c.execute("SELECT * FROM tchat_rooms WHERE id=?", (rid,)).fetchone()))
 

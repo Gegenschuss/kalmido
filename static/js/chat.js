@@ -712,11 +712,14 @@ async function tcx_settings() {
   md.addEventListener('submit', async e => {
     e.preventDefault(); const was = room.kind === 'group' ? S.tc.room.custom_name || '' : S.tc.room.name, v = $('#tcx-name', md).value.trim();
     if (v === was || (ch && !v)) return;
-    if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {name: v, ...(ver ? {expect_updated_at: ver} : {})})) { after(); return; }
+    const rn = await tcx_req('PATCH', `/api/team/rooms/${rid}`, {name: v, ...(ver ? {expect_updated_at: ver} : {})});
+    if (!rn) { after(); return; }
+    if (rn.updated_at) ver = rn.updated_at;  // review 2.564.0: the next save in the same dialog sends the new version at once
     step(tr('Renamed to “{0}”', v || tr('the members')), () => patch({name: was}), () => patch({name: v})); after();
   });
   md.addEventListener('change', async e => {
-    if (e.target.id === 'tcx-open') { const on = e.target.checked; if (!await tcx_req('PATCH', `/api/team/rooms/${rid}`, {open: on, ...(ver ? {expect_updated_at: ver} : {})})) { e.target.checked = !on; after(); return; }
+    if (e.target.id === 'tcx-open') { const on = e.target.checked; const ro = await tcx_req('PATCH', `/api/team/rooms/${rid}`, {open: on, ...(ver ? {expect_updated_at: ver} : {})}); if (!ro) { e.target.checked = !on; after(); return; }
+      if (ro.updated_at) ver = ro.updated_at;
       step(on ? tr('Open to the whole organisation') : tr('Invited people only'), () => patch({open: !on}), () => patch({open: on})); after(); }
     else if (e.target.id === 'tcx-add' && e.target.value) { const uid = +e.target.value;
       if (!await tcx_req('POST', `/api/team/rooms/${rid}/members`, {user_id: uid})) { e.target.value = ''; return; }
