@@ -64,6 +64,14 @@ with tempfile.TemporaryDirectory() as d:
                 "On the iPhone: Settings > Apps > Calendar. Mac: System Settings > Internet Accounts. Office > Settings > Packs.\n")
     r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_menupaths.py"), good], capture_output=True, text=True)
     check(r.returncode == 0, f"check_menupaths.py passes today's menu and other apps' paths: {r.stdout[-300:]}")
+# 2.545.0 (#4384): README.md (and examples/README.md) are part of the repository check again, CHANGELOG.md stays out
+spec_m = importlib.util.spec_from_file_location("kalmido_menupaths_4384", os.path.join(ROOT, "tools", "check_menupaths.py"))
+menu_m = importlib.util.module_from_spec(spec_m)
+spec_m.loader.exec_module(menu_m)
+menu_docs = {os.path.relpath(p, ROOT) for p in menu_m.files()[0]}
+for name in ("README.md", os.path.join("examples", "README.md")):
+    check(name in menu_docs, f"check_menupaths.py reads {name}")
+check("CHANGELOG.md" not in menu_docs, "check_menupaths.py leaves CHANGELOG.md (history) out")
 
 # the MCP server reports the app's version, not a fixed 2.21.0
 spec = importlib.util.spec_from_file_location("kalmido_mcp_f", os.path.join(ROOT, "mcp", "kalmido_mcp.py"))

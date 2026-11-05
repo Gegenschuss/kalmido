@@ -19,8 +19,8 @@ import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-# README.md is written by the release train only: its menu paths come with the notes of package 2.512, then it joins the check
-SKIP = {"CHANGELOG.md", "README.md"}
+# README.md joins the check since 2.545.0 (#4384): package 2.512 brought its menu paths in; CHANGELOG.md keeps the old names as history
+SKIP = {"CHANGELOG.md"}
 SEP = r"\s*(?:>|›|→|->)\s*"
 DECOR = r"[*_`\"“”„]*"
 PATH = re.compile(r"\bSettings" + DECOR + SEP + DECOR + r"(?=(?P<tail>[^\n]*(?:\n[^\n]*)?))")

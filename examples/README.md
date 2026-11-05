@@ -41,7 +41,7 @@ It depends on where the proxy runs. Put what the command prints behind the defau
 The network `kalmido_default` is named after the folder that holds `docker-compose.yml`; `docker network ls` lists the
 networks. It can come back with another address after `docker compose down`: check again then.
 
-**Check it:** open Kalmido through the proxy from outside your network and look at *Administration > Server > Your IP*.
+**Check it:** open Kalmido through the proxy from outside your network and look at *Settings > Server > Server > Your IP*.
 
 - Right: *As the server sees it* shows your public address, *Via proxy* shows the address from the table and says *trusted*.
 - Wrong: a private address like `172.18.0.1`, or *not trusted*. Then the address in `.env` does not match: take the private
