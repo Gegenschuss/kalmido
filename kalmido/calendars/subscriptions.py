@@ -27,13 +27,14 @@ from dateutil.rrule import rrulestr
 from flask import jsonify, request
 
 from ..core.config import _origin, app, APP_NAME, APP_VERSION, TZ
-from ..core.pg import insert_id
+from ..core.pg import insert_id, write_lock
 from ..core.i18n import lang, N_, tr
 from ..core.db import ALLOW_PURPOSES, body, connect, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso
 from ..accounts.session import FAIL_WINDOW, GATE, me
 from ..core.access import Denied
 from ..tasks.validation import RR_FREQS, RR_PROBE_DAYS
 from ..core.errors import BadInput
+from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..calendars.caldav import _DtdRefused, xml_no_dtd
 from ..notify.push import _b64u, _b64u_dec
 from ..notify.alerts import _env_int, aa_count, aa_now
@@ -1022,7 +1023,13 @@ def cal_public(r):
             "password_saved": bool(r["password"]), "status": r["status"],
             "error": r["error"], "error_text": cal_err_text(r["error"]) if r["error"] else "",
             "synced_at": r["synced_at"], "tried_at": r["tried_at"], "events": r["events"], "truncated": bool(r["truncated"]),
-            "fails": r["fails"], "write": bool(r["dav_write"]), "can_write": bool(r["dav_can_write"])}  # 2.52.0 B (#1128)
+            "fails": r["fails"], "write": bool(r["dav_write"]), "can_write": bool(r["dav_can_write"]),  # 2.52.0 B (#1128)
+            "updated_at": cal_ver(r)}  # 2.564.0 D (#4701): the version the edit dialog sends back
+
+
+def cal_ver(r):
+    """2.564.0 D (#4701): the version of a subscription's settings (updated_at, else created_at for one never edited)."""
+    return (r["updated_at"] if "updated_at" in r.keys() else None) or r["created_at"]
 
 
 def cal_list(c, uid):
@@ -1176,6 +1183,9 @@ def cal_update(sid):
     """name / color / visible / interval; a new ICS link, or new CalDAV username / password (then fetched again)."""
     c, b = db(), body()
     r = need_calsub(c, sid)
+    write_lock(c, f"cal_subs-{sid}")  # 2.564.0 D (#4701): saved meantime on another device -> 409 + the subscription
+    r = need_calsub(c, sid)
+    ccf_check(b, cal_ver(r), "calendar", lambda: cal_public(r))
     upd = _cal_fields(b, r)
     resync = False
     if "url" in b and r["kind"] == "ics" and b["url"] not in ("", None):
@@ -1196,7 +1206,7 @@ def cal_update(sid):
             upd.update(password=cal_seal(c, r["user_id"], b["password"]), ctag="")
             resync = True
     if upd:
-        upd["changed_at"] = iso_ms(now_utc())
+        upd["changed_at"] = upd["updated_at"] = iso_ms(now_utc())
         c.execute(f"UPDATE cal_subs SET {', '.join(k + '=?' for k in upd)} WHERE id=? AND user_id=?", (*upd.values(), sid, me()))
         c.commit()
     if resync and CAL_ON:

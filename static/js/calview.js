@@ -170,7 +170,9 @@ function calEditModal(x, colors, done) {
     if (x.kind === 'caldav' && body.username === x.username) delete body.username;
     b.disabled = true;
     try {
-      const r = await calReq('PATCH', `/api/calendars/${x.id}`, body);
+      // 2.564.0 D (#4701): against the version the dialog opened with; 409 = saved meantime elsewhere: the reason, the current state opens
+      let r; try { r = await rawFetch('PATCH', `/api/calendars/${x.id}`, x.updated_at ? {...body, expect_updated_at: x.updated_at} : body); }
+      catch (e2) { if (e2.status === 409 && e2.data?.calendar) { md.remove(); toast(e2.message); done && done(); calEditModal(e2.data.calendar, colors, done); return; } throw new Error(e2 instanceof Offline ? tr('Offline: only works again with a connection') : e2.message); }
       if (r.status === 'error' && (body.url || body.password || body.username)) { $('#ce-err', md).textContent = r.error_text; $('#ce-err', md).hidden = false; done && done(); return; }
       md.remove(); toast(tr('Saved')); done && done();
     } catch (err) { $('#ce-err', md).textContent = err.message; $('#ce-err', md).hidden = false; } finally { b.disabled = false; }
