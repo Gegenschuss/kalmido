@@ -174,6 +174,11 @@ def openapi_spec():
                      "id stays that snippet; [] removes all); POST /tasks/{id}/snippets appends one. Task events carry at most 10, "
                      "code cut to 4000 characters (truncated: true) and snippets_total; get_task has the full code"},
         "snippets_n": {"type": "integer", "description": "2.35.0: the number of code snippets (also in lists)"},
+        # 2.556.0 C (#4583): the completed copy of a recurring task
+        "sub_snapshot": {"type": "object", "description": "2.556.0: only on the completed copy a recurring task leaves when it is "
+                         "ticked (read only, never changes): its subtasks at that moment -- done, total and items [{title, status "
+                         "(2 done, 0 open, -1 won't do), depth (1 = direct subtask)}], at most 100 items. The copy has no subtasks "
+                         "of its own; the original's subtasks are open again for the next round. Absent on every other task"},
         # 2.36.0 (#1118): the lock
         "locked": {"type": "boolean", "description": "2.36.0: locked in the app: title, notes, dates, priority, project, tags, repeat "
                    "and assignee are read-only there until a person with write access unlocks it (comments, checkboxes in the "

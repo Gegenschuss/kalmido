@@ -1,4 +1,5 @@
 """JSON shapes of database rows (tasks, lists, users ...) as the web client and the API see them."""
+import json
 import os
 import re
 from datetime import timedelta
@@ -14,6 +15,15 @@ from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
 
 # ---------------------------------------------------------------- serializers
+
+def rsn_out(v):
+    """2.556.0 C (#4583): tasks.sub_snapshot (JSON text, lifecycle.rsn_take) -> {done, total, items} or None (none / damaged)."""
+    try:
+        ss = json.loads(v or "null")
+    except (TypeError, ValueError):
+        return None
+    return ss if isinstance(ss, dict) and isinstance(ss.get("items"), list) else None
+
 
 def task_dict(r, tags, full_snips=False):
     from ..family.family import fam_task_out
@@ -40,6 +50,10 @@ def task_dict(r, tags, full_snips=False):
     if not d.get("approval"):  # 2.23.0 (#463): only on tasks that wait for / had an approval
         d.pop("approval", None)
         d.pop("approver_id", None)
+    if "sub_snapshot" in d:  # 2.556.0 C (#4583): a completed copy of a recurring task: its subtasks then (read only), only when set
+        ss = rsn_out(d.pop("sub_snapshot"))
+        if ss:
+            d["sub_snapshot"] = ss
     fam_task_out(d)  # 2.19.0 (#653): fam / rotation as objects, only when set
     from ..collab.liste2e import le2a_snip_cipher
     if "snippets" in d and le2a_snip_cipher(d["snippets"]):  # 2.64.1 (#1817): a list with the lock: the ciphertext (the browser decrypts)

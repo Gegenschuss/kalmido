@@ -406,6 +406,37 @@ def complete_stale(c, tid, due, status=0):
     return t is None or t["status"] != status or _norm(t["due"]) != _norm(due)
 
 
+RSN_MAX = 100  # items kept in a snapshot (done / total count all of them)
+
+
+def rsn_take(c, tid):
+    """2.556.0 C (#4583): the subtasks of tid (all levels, in their order, not in the trash) as they are now -> the JSON of
+    tasks.sub_snapshot ({"done", "total", "items": [{"title", "status", "depth"}]}) or '' without subtasks. A title of a list
+    with the lock stays its ciphertext (same list and field: the browser opens it like the copy's own title)."""
+    ids = descendants(c, tid)
+    if not ids:
+        return ""
+    rows = c.execute(f"SELECT id, parent_id, title, status, sort FROM tasks WHERE id IN ({','.join('?' * len(ids))}) "
+                     "AND deleted_at IS NULL ORDER BY sort, id", ids).fetchall()
+    kids = {}
+    for r in rows:
+        kids.setdefault(r["parent_id"], []).append(r)
+    out, seen = [], set()
+
+    def walk(pid, lvl):
+        for r in kids.get(pid, []):
+            if r["id"] not in seen:
+                seen.add(r["id"])
+                out.append({"title": r["title"], "status": int(r["status"]), "depth": lvl})
+                walk(r["id"], lvl + 1)
+    walk(tid, 1)
+    items = out
+    if not items:
+        return ""
+    return json.dumps({"done": sum(1 for i in items if i["status"] == 2), "total": len(items), "items": items[:RSN_MAX]},
+                      ensure_ascii=False)
+
+
 def do_complete(c, tid, status=2, undo=None):
     """undo (dict, filled in): what POST /api/tasks/<id>/undo needs to take this completion back."""
     from ..collab.comments import assignment_events
@@ -443,6 +474,8 @@ def do_complete(c, tid, status=2, undo=None):
         cols = [k for k in t.keys() if k not in ("id", "tt_id", "client_ref", "ticket_no")]  # 2.126.0 D (#1990): client_ref
         vals = {k: t[k] for k in cols}
         vals.update(status=2, repeat="", completed_at=ts, updated_at=ts, reminded="[]", completed_by=who, rotation="")
+        if "sub_snapshot" in vals:  # 2.556.0 C (#4583): the round's subtasks, read before they are reset below (a birthday's keep their ticks)
+            vals["sub_snapshot"] = "" if (_jparse(t["fam"]) or {}).get("kind") in FAM_OCC else rsn_take(c, tid)
         cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                         [vals[k] for k in cols])
         for r in c.execute("SELECT user_id, tag FROM task_tags WHERE task_id=?", (tid,)).fetchall():

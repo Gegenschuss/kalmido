@@ -662,7 +662,7 @@ function renderDetail0() {
   const msTog = !t.context && (msT || (isProject(t.list_id) && !t.parent_id && !kids.length && t.id > 0));
   // 2.0.6 (#316 / #322): the order of the sections below the description, in one place
   const SEC = {
-    subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${isOcc(t) && famOn() ? tr('Gift ideas') : tr('Subtasks')}</h5><div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
+    subtasks: ck || msT ? '' : `<div class="dsec subsec"><h5>${isOcc(t) && famOn() ? tr('Gift ideas') : tr('Subtasks')}</h5>${rsnHtml(t)}<div class="subs">${kids.map(k => taskRow(k, {compact: true, subRow: true})).join('')}
         ${ro ? '' : depthOf(t) < maxDepth() - 1 ? `<div class="subadd">${ic('plus', 's')}<input id="d-sub" placeholder="${isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask')}" aria-label="${esc(isOcc(t) && famOn() ? tr('Add a gift idea') : tr('Add subtask'))}" enterkeyhint="done"></div>` : `<div class="muted" style="font-size:var(--fs-s);padding:.25rem">${tr('At most {0} levels', maxDepth())}</div>`}</div></div>`,
     comments: cm === 'full' ? `<div class="dsec cmsec ${cmtNew() ? 'cmnew' : ''}" id="d-tl">${timelineHtml(t)}</div>` : '',
     history: hist ? `<details class="dsec cmsec cmro" id="d-hist"><summary><span>${tr('History')}</span></summary><div class="cms" id="d-hist-items">${S.tl.id === t.id ? histItems() : `<div class="muted cmempty">${tr('Loading…')}</div>`}</div></details>` : '',
@@ -766,6 +766,14 @@ function renderDetail0() {
   $('#detail').classList.toggle('dsplit', split); if (split) dsApply(); else $('#detail').classList.remove('dsfold');
   autosize($('#d-title')); autosize($('#d-content')); autosize($('#c-input'));
   if (isMobile() && $('#stale')) staleDraw();
+}
+// 2.556.0 C (#4583): the completed copy of a recurring task: its subtasks when it was completed (server: tasks/lifecycle.rsn_take),
+// read only; a title of a list with the lock is opened by liste2e.js like any other ("" until then)
+function rsnHtml(t) {
+  const ss = t.sub_snapshot, it = Array.isArray(ss?.items) ? ss.items : [];
+  if (!it.length) return '';
+  return `<div class="rsnap muted" style="font-size:var(--fs-s);padding:.25rem"><div>${esc(tr('{0} of {1} subtasks done', +ss.done || 0, +ss.total || it.length))}</div>
+    <ul style="list-style:none;margin:.25rem 0;padding:0">${it.map(s => `<li class="${+s.status === 2 ? 'done' : +s.status === -1 ? 'wont' : 'open'}" style="padding-inline-start:${Math.min(Math.max(+s.depth || 1, 1), 8) - 1}rem">${ic(+s.status === 2 ? 'check' : 'sub', 's')} <span>${esc(mdPlain(s.title || '') || '…')}</span>${+s.status === -1 ? ` <span class="muted">(${esc(tr('Won’t do'))})</span>` : ''}</li>`).join('')}</ul></div>`;
 }
 // U17: the open "- [ ]" lines of a description become real subtasks (one undo step); ticked lines stay in the text
 async function mdToSubtasks() {
