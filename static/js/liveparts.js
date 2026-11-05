@@ -83,7 +83,7 @@ async function lpFollow() {
   if (!ok) {  // the server answered full: as before
     S.lpN.state++;
     const ts = lpTaskSig();
-    let r; try { r = await load(true); } catch { return; }
+    let r; try { r = await load(true, S.v); } catch { return; }  // 2.545.0 (#4483): a load() on its way: wait for it, fetch again only when it predates the known version
     if (r === 'brake') { for (const k of areas) lpAreas.add(k); if (!lpT) lpT = setTimeout(lpFollow, 4000); return; }  // 2.280.0 F (#3109): held back: again later
     // 2.351.0 D (#2785): the whole state may bring more than the light counters (a task deleted on another device meanwhile):
     // it took S.v, so the poll sees nothing new any more -> drawn bundled like the poll's full way (lpDraw checks only counters);
