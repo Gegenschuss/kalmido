@@ -5,10 +5,16 @@ Source:   https://registry.npmjs.org/mermaid/-/mermaid-12.2.0.tgz
 Tarball:  sha512-w7nr/SFrLO7BaVTs3dQTvYSV6nYSBj0Yy9DjBhsIJtAcHqRzXSq4Pg32ujHZ/AdWsAMNEvvhbm5dt9E2tOiHzw==
           (the npm registry's "integrity" value, checked on download)
 Files:    dist/mermaid.min.js (one file, sets the global "mermaid"), LICENSE -- unchanged copies. The bundle includes its
-          own dependencies (d3, dagre, DOMPurify and others, all MIT / ISC / Apache-2.0 / BSD; their notices are kept
-          inside the file).
+          own dependencies (d3, dagre, DOMPurify, langium, chevrotain and others, all MIT / ISC / Apache-2.0 / BSD).
+          The notice block at the end of the file names only some of them; THIRD_PARTY lists all packages in mermaid's
+          dependency tree (name, version, license) with their license texts (#4171). It is generated from the npm packages
+          (versions resolved by npm at generation time, so it may name more packages than the minified file uses) and
+          is not a copy from the tarball.
 Loaded:   only when a page has a ```mermaid block; not in the service worker's precache. Runs with securityLevel
           "strict", no HTML labels.
 Update:   download the new tarball, compare its sha512 with the registry's "integrity", copy the same files,
+          regenerate THIRD_PARTY (mkdir /tmp/lic; cd /tmp/lic; npm install mermaid@<new version> --ignore-scripts
+          --no-audit --no-fund; then, from the repository root,
+          python3 -I tools/vendor_notices.py /tmp/lic/node_modules mermaid > static/vendor/mermaid/THIRD_PARTY),
           update this README and THIRD_PARTY_NOTICES.md.
           sha256 a8a6a6f805b074a8261a2825c86f99c8054acb3b35f50bb7e24a4f9f2c3c3b9f  mermaid.min.js
