@@ -106,7 +106,10 @@ def _items(c, rows, parent_role=None, above=None, can=False):
         if role != "owner":
             role = fs_role(c, r["id"], uid) or role
         x = fs_node_json(c, r, role, names, r["id"] in sh or bool(r["org_access"]), up, lk)
-        if above is not None and (role == "owner" or can):
+        row_can = can
+        if can and role != "owner" and r["kind"] == "ref":  # 2.558.0 D (#4693, review F3): a referenced object has its own say
+            row_can = fs_area_share(c, uid, r)  # (a page encrypted in the browser is never shared, wiki/wkfolder.py _share)
+        if above is not None and (role == "owner" or row_can):
             sw_ids.append(r["id"])
         if r["id"] in xl and role == "owner":
             x["xl"] = True

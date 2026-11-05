@@ -9,6 +9,8 @@
    shares; it still has the owner's name for "Shared by <name>"
  - the scan's answer (POST /api/files/scan) carries share_with of the new file for its owner
  - the names come in ONE bundled read per listing (fs_share_with), not one query per row (the code path, not timed)
+ - 2.558.0 D (#4693, review F4): in an organisation the org admin (not the folder's maker) gets the names; a member, a
+   read-only person, a guest with a share and an agent with a share get none
  - a person without an organisation gets the same (freelancer-matrix: files)
 usage: p2558_4693_share_names_test.py <datadir>"""
 import io
@@ -16,6 +18,8 @@ import os
 import struct
 import sys
 import zlib
+
+import requests
 
 import kt
 from kt import B, check, sess
@@ -123,6 +127,43 @@ src = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "kalmi
 body = src[src.index("def _items("):src.index("def fs_sort_key(")]
 loop = body[body.index("for r in rows:"):body.index("if sw_ids:")]
 check("fs_share_with" not in loop and body.count("fs_share_with(") == 1, "the names are read once per listing, not per row")
+
+# ---- 2.558.0 D (#4693, review F4): in an organisation only who manages the shares sees the names: the org admin (not the
+# folder's maker) yes; a member, read-only, a guest with a share and an agent with a share never
+ORG = A.post(B + "/api/admin/orgs", json={"name": "Team Example", "admin_id": A.get(B + "/api/state").json()["me"]["id"]}).json()["id"]
+oids = {}
+for u, nm, rk in (("olga", "Olga Admin", "admin"), ("mia", "Mia Maker", "member"), ("nora", "Nora Member", "member"),
+                  ("rita", "Rita Readonly", "readonly"), ("gina", "Gina Guest", "guest")):
+    r = A.post(B + "/api/users", json={"username": u, "display_name": nm, "password": kt.PASSWORD, "orgs": [{"id": ORG, "role": rk}]})
+    assert r.ok, r.text
+    oids[u] = r.json()["id"]
+S = {u: sess(u) for u in oids}
+for x in S.values():
+    x.patch(B + "/api/settings", json={"lang": "en", "tour": "done"})
+r = A.post(B + "/api/admin/agents", json={"username": "teambot", "display_name": "Team bot", "org_id": ORG})
+assert r.ok, r.text
+TAG_ID, AGS = r.json()["id"], requests.Session()
+AGS.headers.update({**kt.H, "Authorization": "Bearer " + r.json()["token"]})
+r = S["mia"].post(B + "/api/files/folders", json={"name": "Team files", "space": f"org:{ORG}"})
+assert r.ok, r.text
+TEAM = r.json()["id"]
+TFILE = up(S["mia"], "team.txt", TEAM)
+check(S["mia"].patch(B + f"/api/files/nodes/{TEAM}", json={"org_access": "view"}).ok, "org: the folder opened to the members")
+share(S["mia"], TEAM, user_id=oids["gina"])
+share(S["mia"], TEAM, agent_id=TAG_ID)
+want = {("u", "Gina Guest"), ("a", "Team bot")}
+jo = lst(S["olga"], parent=TEAM)
+check(want <= set(names(jo["node"].get("share_with"))) and want <= set(names((row(jo, TFILE) or {}).get("share_with"))),
+      f"org admin (not the maker): the names on the head and the rows {jo['node'].get('share_with')} {row(jo, TFILE)}")
+for who in ("nora", "rita", "gina"):
+    r = S[who].get(B + "/api/files", params={"parent": TEAM})
+    j = r.json() if r.ok else {"node": {}, "items": []}
+    check(r.ok and "share_with" not in str(j) and "Team bot" not in str(j) and (who == "gina" or "Gina Guest" not in str(j)),
+          f"org {who}: no names of the shares {r.status_code} {str(j)[:300]}")
+r = AGS.get(B + "/api/files", params={"parent": TEAM})
+j = r.json() if r.ok else {}
+check(r.status_code in (200, 401, 403, 404) and "share_with" not in str(j) and "Gina Guest" not in str(j),
+      f"org agent with a share: no names {r.status_code} {str(j)[:300]}")
 
 # ---- a person without an organisation (freelancer-matrix: files)
 FID, Fr = freelancer(B, A)
