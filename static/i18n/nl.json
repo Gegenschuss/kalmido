@@ -16309,6 +16309,7 @@
   "{0} created the task from a quotation": "{0} heeft de taak uit een offerte aangemaakt",
   "{0}: the position is no longer in the quotation (the task stays)": "{0}: de positie staat niet meer in de offerte (de taak blijft)",
   "{0}: the position is in the quotation again": "{0}: de positie staat weer in de offerte",
+  "Credit card position": "Creditcardpost",
   "The off-site backup is set up by the operator.": "De externe back-up wordt door de beheerder ingericht.",
   "On a hosted instance the operator sets up the off-site backup": "Op een gehoste instantie richt de beheerder de externe back-up in",
   "Release to remove": "Loslaten om te verwijderen",

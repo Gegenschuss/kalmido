@@ -195,8 +195,9 @@ document.addEventListener('click', async e => {
   else if (a === 'editline') ccLineDlg(ccLineOf(id));
   else if (a === 'delline') {
     const x = ccLineOf(id), req = {day: x.day, merchant: x.merchant, amount: x.amount, orig_amount: x.orig_amount, orig_currency: x.orig_currency, kind: x.kind};
-    let cur = id;
-    ccDo(tr('Position removed'), () => api('DELETE', `/api/office/cards/lines/${cur}`), async () => { cur = (await api('POST', `/api/office/cards/statements/${sid}/lines`, req)).line.id; });
+    let cur = id, tid = null;  // 2.552.0 (#4561 B21): the undo writes the office trash copy back (same id), else types it in again
+    ccDo(tr('Position removed'), async () => { tid = (await api('DELETE', `/api/office/cards/lines/${cur}`)).trash_id || null; },
+      async () => { cur = (await (tid ? api('POST', `/api/office/cards/trash/${tid}/restore`) : api('POST', `/api/office/cards/statements/${sid}/lines`, req))).line.id; });
   } else if (a === 'mark') {
     const was = ccLineOf(id)?.state || 'open', v = b.dataset.v;
     ccDo(tr('Saved'), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: v}), () => api('PATCH', `/api/office/cards/lines/${id}`, {state: was}));

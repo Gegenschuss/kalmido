@@ -108,6 +108,8 @@ ROUTES = {
     "POST /api/repos/{}/issues/import": "tasks",
     # 2.530.0 C (#4315): the undo of deleting a trip / a travel receipt from the office trash (p2530_c_office_trash_test.py)
     "POST /api/office/trips/trash/{}/restore": "office",
+    # 2.552.0 (#4561 B21): the undo of deleting a credit card position from the office trash (p2552_b_dataloss_test.py as the freelancer)
+    "POST /api/office/cards/trash/{}/restore": "office",
     # 2.488.0 (#3363): the hosted MCP access (p2488_mcp_oauth_test.py: the person without an organisation connects her own agent)
     "GET /.well-known/oauth-protected-resource": "public", "GET /.well-known/oauth-protected-resource/mcp": "public",
     "GET /.well-known/oauth-authorization-server": "public", "GET /.well-known/oauth-authorization-server/mcp": "public",

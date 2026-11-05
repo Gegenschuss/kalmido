@@ -24,8 +24,9 @@ from ..files.store import fs_chain, fs_deleted, fs_log_add, fs_role
 from .bank import _clean, _name_hit, _norm
 from .books import bk_receipt_set_paid, bk_to_home, bk_ws
 from .calc import dec, dstr, money
-from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_writable, cl_day)
+from .cards import (CC_CONFIRMED, CC_DRAFT_ONLY, CC_KINDS, CC_NAME_MAX, _line_insert, _money, cc_ctx, cc_stmt, cc_stmt_row, cc_writable, cl_day)
 from .model import office_settings
+from .otrash import otb_put, otb_restore
 from .rcsubmit import rsb_ingest
 from .bank import _rc_paid_amount  # 2.369.5 (#2517): pulled up from functions
 
@@ -33,6 +34,7 @@ CL_DAYS = 10  # +- days around a position that count as "date close"
 CL_SCAN = 5000  # newest documents looked at
 CL_SHOW = 30  # candidates of one position
 CL_MIN = 3  # a suggestion needs at least the amount or the name
+CL_TRASH = "cc_line"  # 2.552.0 (#4561 B21): kind of a deleted position in the office trash
 
 
 def cl_docs(c, oid):
@@ -232,10 +234,42 @@ def cl_del(lid):
     x, s = cl_row(c, oid, lid, uid, every)
     cc_writable(c, oid, s, x["day"])
     _draft(s)
+    tid = otb_put(c, oid, uid, CL_TRASH, "office_cc_lines", lid, x["day"] or "")  # 2.552.0 (#4561 B21): a copy into the office trash first (label: the day only, merchant / amount are sealed)
     c.execute("DELETE FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid))
     bump(c)
     c.commit()
-    return jsonify(ok=True, line=_public(c, x))
+    return jsonify(ok=True, line=_public(c, x), trash_id=tid)
+
+
+def cl_trash_check(c, oid, lid, uid=None, every=True):
+    """2.552.0 (#4561 B21): after otb_restore of a position (same transaction): its statement is still there, a draft and its
+    month open (as deleting it), else 409 / 404 and the caller's transaction is rolled back. -> the statement id"""
+    r = c.execute("SELECT statement_id, day FROM office_cc_lines WHERE id=? AND org_id=?", (lid, oid)).fetchone()
+    if not r:
+        raise Denied(404)
+    s = cc_stmt(c, oid, r["statement_id"], uid, every) if uid is not None else cc_stmt_row(c, oid, r["statement_id"])
+    _draft(s)
+    cc_writable(c, oid, s, r["day"])
+    return r["statement_id"]
+
+
+@app.post("/api/office/cards/trash/<int:tid>/restore")
+def cl_trash_restore(tid):
+    """2.552.0 (#4561 B21): the undo of deleting a position: writes its office trash copy back (the person who deleted it or
+    whoever sees all cards; the office trash itself lists it for the admins) -> {ok, line}."""
+    c, uid, oid, every = cc_ctx()
+    write_lock(c, f"office_cc_{oid}")
+    write_lock(c, f"office_trash_{int(tid)}")
+    t = c.execute("SELECT kind, deleted_by FROM office_trash WHERE id=? AND org_id=?", (tid, oid)).fetchone()
+    if not t or t["kind"] != CL_TRASH:
+        raise Denied(404)
+    if t["deleted_by"] != uid and not every:
+        raise Denied(404)
+    _, lid = otb_restore(c, oid, tid)
+    cl_trash_check(c, oid, lid, uid, every)
+    bump(c)
+    c.commit()
+    return _answer(c, oid, uid, lid, every)
 
 
 @app.get("/api/office/cards/lines/<int:lid>/candidates")

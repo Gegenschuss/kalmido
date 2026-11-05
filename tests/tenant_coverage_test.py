@@ -424,6 +424,7 @@ ROUTES = {
     "GET /api/office/trips": "office", "POST /api/office/trips": "office", "PATCH /api/office/trips/{}": "office", "DELETE /api/office/trips/{}": "office",
     "POST /api/office/trips/{}/items": "office", "PATCH /api/office/trips/{}/items/{}": "office", "DELETE /api/office/trips/{}/items/{}": "office",
     "POST /api/office/trips/trash/{}/restore": "office",  # 2.530.0 C (#4315): p2530_c_office_trash_test.py (other org 404, member 403)
+    "POST /api/office/cards/trash/{}/restore": "office",  # 2.552.0 (#4561 B21): p2552_b_dataloss_test.py (other org 404)
     "GET /api/office/trips/report": "office", "GET /api/office/trips/bill-docs": "office", "POST /api/office/trips/bill": "office", "GET /api/office/receipts/billed": "office", "POST /api/office/receipts/bill": "office",
     "POST /api/office/receipts/unbill": "office",
     "POST /api/office/trips/unbill": "office", "GET /api/office/cashflow": "office", "GET /api/office/fixed-costs": "office",
