@@ -141,6 +141,20 @@ def scenario(S, who, ws, other, member=None):
     r = S.post(B + f"{O}/trash/{ti}/restore")
     check(r.ok and r.json().get("kind") == "trip_item", f"{who}: the office trash restores the receipt {r.text[:200]}")
     check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=?", (trip,))) == items, f"{who}: both receipts again (same ids)")
+    # 2.603.0 A (#4555): a trip in an open month with a receipt paid ahead in the month that gets locked
+    t0 = TODAY.isoformat()
+    r = S.post(B + T, json={"date_from": t0, "date_to": t0, "dest": f"Bremen {who}", "overnight": False,
+                            "items": [{"date": PM1, "category": "train", "amount": "39.90", "currency": "EUR"},
+                                      {"date": t0, "category": "taxi", "amount": "18.50", "currency": "EUR"}]})
+    check(r.status_code == 201 and len(r.json().get("items") or []) == 2, f"{who}: setup trip with a receipt ahead {r.text[:200]}")
+    trip2 = r.json()["id"]
+    early, late = (next(x["id"] for x in r.json()["items"] if x["date"] == d) for d in (PM1, t0))
+    r = S.post(B + T, json={"date_from": t0, "date_to": t0, "dest": f"Kiel {who}", "overnight": False,
+                            "items": [{"date": PM1, "category": "train", "amount": "29.90", "currency": "EUR"}]})
+    trip3 = r.json()["id"] if r.status_code == 201 else None
+    r = S.delete(B + f"{T}/{trip3}")
+    t3 = r.json().get("trash_id") if r.ok else None
+    check(trip3 and t3, f"{who}: setup a whole trip with a receipt ahead in the trash {r.text[:200]}")
     # a month locked since the delete: nothing comes back
     r = S.delete(B + f"{T}/{trip}")
     tt = r.json().get("trash_id")
@@ -152,6 +166,21 @@ def scenario(S, who, ws, other, member=None):
           f"{who}: a month locked since: the undo 409, the copy stays {r.text[:200]}")
     r = S.post(B + f"{O}/trash/{tt}/restore")
     check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip,)), f"{who}: the office trash 409 as well {r.text[:200]}")
+    # 2.603.0 A (#4555): a single receipt in an open month comes back although another receipt of its trip lies in the
+    # locked month - over both routes; the whole trip with that receipt stays 409
+    for how, route in (("the undo", "/api/office/trips/trash/{}/restore"), ("the office trash", O + "/trash/{}/restore")):
+        r = S.delete(B + f"{T}/{trip2}/items/{late}")
+        tl = r.json().get("trash_id") if r.ok else None
+        check(r.ok and tl, f"{who} #4555: the open receipt goes to the trash {r.text[:200]}")
+        r = S.post(B + route.format(tl))
+        check(r.ok and sql("SELECT 1 FROM office_trip_items WHERE id=?", (late,)),
+              f"{who} #4555: {how} brings the open receipt back next to a locked one {r.status_code} {r.text[:200]}")
+    check(sorted(x[0] for x in sql("SELECT id FROM office_trip_items WHERE trip_id=?", (trip2,))) == sorted((early, late)),
+          f"{who} #4555: both receipts of the trip there")
+    for how, route in (("the undo", "/api/office/trips/trash/{}/restore"), ("the office trash", O + "/trash/{}/restore")):
+        r = S.post(B + route.format(t3))
+        check(r.status_code == 409 and not sql("SELECT 1 FROM office_trips WHERE id=?", (trip3,)),
+              f"{who} #4555: {how} of a whole trip with a receipt in the locked month stays 409 {r.status_code} {r.text[:200]}")
 
     # ------------------------------------------------------------ #4316 B14: "no receipt" keeps the lock from its arrival
     n1 = upload(S, ws, f"beleg-{who}.pdf")

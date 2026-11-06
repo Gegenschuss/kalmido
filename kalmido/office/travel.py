@@ -662,10 +662,12 @@ def rk_trash_check(c, oid, kind, ref):
     "own" sees only the person's own trips (else 404 and the caller's transaction is rolled back)."""
     tid = ref
     if kind == "trip_item":
-        r = c.execute("SELECT trip_id FROM office_trip_items WHERE id=? AND org_id=?", (ref, oid)).fetchone()
+        r = c.execute("SELECT trip_id, date FROM office_trip_items WHERE id=? AND org_id=?", (ref, oid)).fetchone()
         if not r:
             raise Denied(404)
-        tid = r["trip_id"]
+        # 2.603.0 A (#4555): a single receipt checks the trip's days and its own date only, not the trip's other receipts
+        _trip_need_open(c, oid, _trip(c, oid, r["trip_id"]), r["date"], items=False)
+        return r["trip_id"]
     _trip_need_open(c, oid, _trip(c, oid, tid))
     return tid
 
