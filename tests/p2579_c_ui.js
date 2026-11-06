@@ -32,9 +32,10 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   await sleep(600);
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});
   CK = await login('alice');
-  await call('POST', '/api/admin/setup', {org_name: 'Example Studio', lang: 'en', collab_all: true});
+  await call('POST', '/api/admin/setup', {org_name: 'Example Studio', lang: 'en', collab_all: true, modules: ['cal', 'comments', 'collab']});
   await call('PATCH', '/api/settings', {tour: 'done', lang: 'en', features: 'files,docs,collab,comments', workspace: 'private'});
-  const ORG = (await call('GET', '/api/state')).me.workspaces[0].id;
+  const ORG = (await call('GET', '/api/state')).me.workspaces?.[0]?.id;
+  check(ORG, 'setup: the organisation');
   const bob = await call('POST', '/api/users', {orgs: [{id: ORG, role: 'member'}], username: 'bob', display_name: 'Bob', password: 'password123', email: 'bob@example.com'});
   const D1 = await docNew('koala-1.txt', 'Rechnung Koala Eukalyptus');
   await docNew('emu-1.txt', 'Brief Emu Steppe');
