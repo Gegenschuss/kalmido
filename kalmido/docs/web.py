@@ -160,6 +160,10 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
             d["duplicate_of"] = dv
     if sp:
         d["split"] = sp
+        from flask import has_request_context as _hrc
+        if full and sp.get("auto") and _hrc() and getattr(g, "user", None):  # 2.580.0 (#4401, review C 7b): the undo while it can be done
+            from .split import sp_undo_ok
+            sp["undo"] = sp_undo_ok(c, sp, me())
     if role:
         d["role"] = role
     if full:

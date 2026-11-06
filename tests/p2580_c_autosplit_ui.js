@@ -81,6 +81,19 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
     check(await ev(`!document.querySelector('.dc-md')`), 'the part\'s sheet closed');
     await undoToast(ev, /Stack restored/);
     check(await ready(ev, `${ids}.then(a => !a.includes(${SID}) && a.length === 2)`, 80), 'the toast\'s undo splits it again');
+
+    // review 2.580 C (7a): the undo went through but reading the stack's cuts fails -- the sheet closes anyway, the list is fresh
+    const before = await ev(ids);
+    const S2 = await up(CF, 's2.pdf', stackPdf(['qr:ASN00203\nBrief Drei\nBeispiel Verein e.V.', 'qr:ASN00204\nBrief Vier\nBeispiel Bank AG']));
+    check(await ready(ev, `${ids}.then(a => !a.includes(${S2}) && a.length === 4)`, 360), 'a second clear stack split without a click');
+    const P2 = (await ev(ids)).filter(x => !before.includes(x)).sort((x, y) => x - y);
+    await nav(B + `#docs/${Math.max(...P2)}`);
+    check(await ready(ev, `!!document.querySelector('.dc-md .dsp-auto [data-dsp="unsplit"]')`, 80), 'the second stack\'s part: "Undo"');
+    await ev(`(() => { const f0 = window.fetch; window.fetch = (u, o) => /\\/split$/.test(String(u)) && !(o && o.method && o.method !== 'GET') ? Promise.resolve(new Response('{"error":"down"}', {status: 500, headers: {'Content-Type': 'application/json'}})) : f0(u, o); return 1; })()`);
+    await ev(`(() => { document.querySelector('.dc-md .dsp-auto [data-dsp="unsplit"]').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('.dc-md')`, 40), 'reading the cuts failed: the part\'s sheet closed all the same');
+    check(await ready(ev, `${ids}.then(a => a.includes(${S2}) && ${JSON.stringify(P2)}.every(x => !a.includes(x)))`, 40), 'the undo went through');
+    check(await ready(ev, `!!DC.docs && DC.docs.some(x => x.id === ${S2}) && !DC.docs.some(x => x.id === ${Math.max(...P2)})`, 40), 'the list was loaded again (the stack, not the part) ' + await ev(`JSON.stringify((DC.docs || []).map(x => x.id))`));
   }, false);
 
   console.log(`p2580_c_autosplit_ui: ${ok} ok, ${F.length} failed`);

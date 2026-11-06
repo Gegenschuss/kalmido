@@ -16,9 +16,10 @@ number). Agents never reach these routes; the workspace boundary stays (the fold
 2.580.0 (#4401): a clear stack (sp_clear: every document starts with an archive number code, no pages before the first code,
 no number twice in the stack nor already taken in the workspace, at most SP_PAGES pages) is split without a person: the
 recognition marks it "auto", the queue (docs/ingest.py, sp_auto_queued) splits it as its owner with the proposed cuts
-(separator sheets and blank pages left out) through the same core as the route (_sp_do); its parts carry "auto" (the hint
-"Split automatically from a stack - Undo"). Anything else (or a failure of the automatic split) stays "open" as before; the
-undo of an automatic split marks the stack "hand" (never split automatically again).
+(separator sheets and surely blank pages left out; a page only maybe blank makes it unclear) through the same core as the
+route (_sp_do); its parts carry "auto" (the hint "Split automatically from a stack - Undo", the undo while the stack is in
+the trash). Anything else (or a failure of the automatic split) stays "open" as before; every undo marks the stack "hand"
+(never split automatically again).
 
 doc_meta.split_scan: JSON (no content of the document, only numbers): {v, n (pages), pages: [{asn, sep, ink, blank}],
 state: open | auto | none | single | long | done, parts? (ids after a split), asn? (the stack's own number before it), from?
@@ -39,7 +40,7 @@ import threading
 from flask import Response, g, jsonify, request
 
 from ..core.config import app
-from ..core.db import body, bump, db, err, iso, now_utc
+from ..core.db import OperationalError, body, bump, db, err, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
@@ -274,11 +275,22 @@ def sp_plan(pages):
     return starts, drop, codes >= 2 or (bool(drop) and len(starts) >= 2)
 
 
+def sp_sure_blank(p):
+    """2.580.0 (#4401, review C finding 1): a scanned page that is surely blank -- found blank AND nearly white (ink below
+    SP_INK_SURE, the bar without text recognition); a page without its ink value is never sure."""
+    try:
+        return bool(p.get("blank")) and float(p.get("ink", 1)) < SP_INK_SURE
+    except (TypeError, ValueError):
+        return False
+
+
 def sp_clear(c, ws, nid, pages):
     """2.580.0 (#4401): the parts ([[1-based page, ...], ...]) of a stack clear enough to split without a person, else None.
     Clear: two documents or more, each starting with an archive number code (no pages without one before the first code,
     no separator sheet followed by a page without a code), no number twice in the stack, none already taken by another
-    document of workspace ws, at most SP_PAGES pages. Separator sheets and blank pages are left out (as in the preview)."""
+    document of workspace ws, at most SP_PAGES pages. Separator sheets and surely blank pages (sp_sure_blank) are left out;
+    a page that is only maybe blank (blank, but more ink than SP_INK_SURE: a pale receipt, a pencil note) makes the stack
+    unclear -- a person decides in the preview (review 2.580 C, finding 1)."""
     if not isinstance(pages, list) or not 2 <= len(pages) <= SP_PAGES:
         return None
     starts, drop, stack = sp_plan(pages)
@@ -287,12 +299,14 @@ def sp_clear(c, ws, nid, pages):
     asns = [pages[i].get("asn") for i in starts]
     if any(a is None for a in asns) or len(set(asns)) != len(asns):
         return None
+    if any(p.get("blank") and not sp_sure_blank(p) for p in pages):
+        return None
     if any(S.asn_taken(c, ws, a, nid) for a in asns):
         return None
     parts = []
     for k, s in enumerate(starts):
         end = starts[k + 1] if k + 1 < len(starts) else len(pages)
-        ps = [i + 1 for i in range(s, end) if i not in drop and not pages[i].get("blank")]
+        ps = [i + 1 for i in range(s, end) if i not in drop and not sp_sure_blank(pages[i])]
         if not ps:
             return None
         parts.append(ps)
@@ -403,6 +417,20 @@ def _sp_trash_need(c, uid, n):
     if c.execute("SELECT 1 FROM office_cash_entries WHERE node_id=? UNION ALL SELECT 1 FROM office_equipment WHERE receipt_node_id=? LIMIT 1",
                  (n["id"], n["id"])).fetchone():
         raise Denied(409, tr(FSM_RECEIPT_STAYS))
+
+
+def sp_undo_ok(c, sp, uid):
+    """2.580.0 (#4401, review C finding 7b): the part view sp (sp_view) of an automatic split -- may person uid undo it from
+    the part now? Only while the stack still lies in the trash, split, with the rights docs_unsplit asks (write + trash)."""
+    try:
+        sid = int(sp.get("from") or 0)
+        if not sid or not uid:
+            return False
+        sm = S.meta_row(c, sid)
+        sn = need_node(c, sid, write=True, trash=True) if sm and _get(sm).get("state") == "done" else None
+        return bool(sn and sn["deleted_at"] and (sn["role"] == "owner" or sn["deleted_by"] == uid or _get(sm).get("auto")))
+    except Denied:
+        return False
 
 
 @app.get("/api/docs/<int:nid>/split")
@@ -539,6 +567,9 @@ def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
     own_asn = m["asn"]
     stem = re.sub(r"\.pdf$", "", n["name"], flags=re.I)[:110] or "document"
     ids, have_code = [], False
+    # review 2.580 C (finding 3): the parts keep the stack's area (office / private); a stack of the general input (own
+    # space, docs/area.py) -> its parts are sorted again after their own recognition (ar_sort_queued)
+    area, sort = m["area"] or "", "pending" if m["area_sort"] in ("pending", "sorting", "auto") and not n["org_id"] else ""
     with c.savepoint():
         c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part (2.154.0 E: undone on a failure)
         for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
@@ -546,11 +577,16 @@ def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
             fs_log_add(c, pid, "upload", "split")
             c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
                       "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
+            c.execute("UPDATE doc_meta SET area=?, area_sort=? WHERE node_id=?", (area, sort, pid))
             ids.append(pid)
         S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): only around the numbers, after the parts are stored: a save with "next" waits
         for ps, pid in zip(parts, ids):
             a = asn_of(ps)
             extra = {"from": nid, **({"auto": 1} if auto else {})}
+            if auto and (a is None or S.asn_taken(c, m["ws"], a, pid)):
+                # review 2.580 C (finding 5): a number taken between sp_clear and the lock -- no longer clear, the savepoint
+                # rolls back, the stack stays "open" for a person
+                raise _SpCut("asn_taken")
             if a is not None and not S.asn_taken(c, m["ws"], a, pid):
                 c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (a, json.dumps({"asn": "code"}), pid))
                 have_code = True
@@ -622,17 +658,17 @@ def sp_auto_queued(c):
         return 0
     nid = r[0]
     write_lock(c, f"docs_split_{int(nid)}")  # with a person's click on "Split" at the same time: one of them splits
-    m = S.meta_row(c, nid)
-    v = _get(m) if m else {}
-    if not m or v.get("state") != "auto":
-        c.commit()
-        return 1
-    n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
-    uid = n["owner_id"] if n and not n["deleted_at"] and n["kind"] == "file" else None
-    parts = sp_clear(c, m["ws"], nid, v.get("pages")) if uid and m["state"] == "done" else None
     why = "unclear"
-    if parts and fs_role(c, nid, uid) in ("owner", "edit"):
-        try:
+    try:  # review 2.580 C (finding 4): whatever fails after the lock leaves this stack "open" -- never the same stack each tick
+        m = S.meta_row(c, nid)
+        v = _get(m) if m else {}
+        if not m or v.get("state") != "auto":
+            c.commit()
+            return 1
+        n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+        uid = n["owner_id"] if n and not n["deleted_at"] and n["kind"] == "file" else None
+        parts = sp_clear(c, m["ws"], nid, v.get("pages")) if uid and m["state"] == "done" else None
+        if parts and fs_role(c, nid, uid) in ("owner", "edit"):
             _sp_trash_need(c, uid, n)
             data = _pdf_of(c, nid, m, n)
             if data is None:
@@ -641,15 +677,17 @@ def sp_auto_queued(c):
             c.commit()
             docs_kick()
             return 1
-        except Exception as e:  # noqa: BLE001 -- _SpCut, Denied (locked month, receipt, rights), quota, a broken file: a person decides
-            why = type(e).__name__
-            c.rollback()
-            write_lock(c, f"docs_split_{int(nid)}")
-            m = S.meta_row(c, nid)
-            v = _get(m) if m else {}
-            if not m or v.get("state") != "auto":
-                c.commit()
-                return 1
+    except OperationalError:
+        raise  # the database away for a moment: the queue's own handler, the stack stays "auto" for the next tick
+    except Exception as e:  # noqa: BLE001 -- _SpCut, Denied (locked month, receipt, rights), quota, a broken file / scan: a person decides
+        why = type(e).__name__
+        c.rollback()
+        write_lock(c, f"docs_split_{int(nid)}")
+        m = S.meta_row(c, nid)
+        v = _get(m) if m else {}
+        if not m or v.get("state") != "auto":
+            c.commit()
+            return 1
     print("docs: automatic split left to a person", nid, why, flush=True)
     _put(c, nid, {**v, "state": "open"})
     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
@@ -669,8 +707,8 @@ def docs_unsplit(nid):
     v = _get(m) if m else {}
     if not m or v.get("state") != "done":
         return err(tr("This stack was not split"), 409)
-    if n["role"] != "owner" and n["deleted_by"] != uid:
-        raise Denied(403)
+    if n["role"] != "owner" and n["deleted_by"] != uid and not v.get("auto"):
+        raise Denied(403)  # review 2.580 C (finding 2): an automatic split (moved by its owner) -- anyone with write + trash rights on the stack
     ts = _now()
     pl_tree_need_open(c, nid)  # 2.237.0 B (#2864): the stack comes back like a single restore
     parts = []
@@ -698,8 +736,7 @@ def docs_unsplit(nid):
         if not S.asn_taken(c, m["ws"], a, nid):
             c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (a, nid))
     rest = {k: x for k, x in v.items() if k not in ("parts", "asn", "auto")}
-    if v.get("auto"):
-        rest["hand"] = 1  # 2.580.0 (#4401): an automatic split undone -- the stack waits for a person, never split automatically again
+    rest["hand"] = 1  # 2.580.0 (#4401, review C finding 6): every undo -- the stack waits for a person, never split automatically again
     _put(c, nid, {**rest, "state": "open"})
     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
     bump(c)

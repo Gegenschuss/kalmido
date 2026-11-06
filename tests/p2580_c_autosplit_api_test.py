@@ -13,6 +13,11 @@ freelancer-matrix: files
  - an agent's upload into its own folder: split there (never into another folder), as the folder's owner
  - all of it as a person without organisation, the clear case also in an organisation
 Red without the fix: the clear stacks stay "open" (no part, no trash).
+Review 2.580 C (fixes, each red without its fix): a page only maybe blank (pale, no text) is never left out without a person
+(the stack stays open; without text recognition it is no blank page and stays in its part); a surely blank page is left
+out; the parts keep the stack's area (office upload -> office; the general input -> sorted again); a member with write
+rights undoes an automatic split moved by the folder's owner; a broken scan in state "auto" goes "open" and no longer
+blocks the next stack; every undo marks "hand"; a part offers its undo only while the stack lies in the trash.
 usage: p2580_c_autosplit_api_test.py <datadir>   (P2580C_NOSTART=1: the container runs already)"""
 import base64
 import json
@@ -43,6 +48,9 @@ for spec in json.loads(sys.argv[1]):
     im = Image.new('L', (1654, 2339), 255)
     d = ImageDraw.Draw(im)
     lines = spec.split('\n') if spec else []
+    if lines and lines[0] == 'box':  # a pale page: a small grey square, no text (ink between the two blank bars)
+        lines.pop(0)
+        d.rectangle((800, 1100, 877, 1177), fill=100)
     if lines and lines[0].startswith('qr:'):
         q = segno.make(lines.pop(0)[3:], micro=False)
         b = io.BytesIO()
@@ -62,8 +70,8 @@ def stack_pdf(pages):
     return base64.b64decode(out.stdout)
 
 
-def up(s, name, data, ws="private"):
-    r = s.post(B + "/api/docs", data={"ws": ws}, files=[("files", (name, data, "application/pdf"))])
+def up(s, name, data, ws="private", **form):
+    r = s.post(B + "/api/docs", data={"ws": ws, **form}, files=[("files", (name, data, "application/pdf"))])
     assert r.status_code == 201, r.text
     return r.json()["ids"][0]
 
@@ -119,6 +127,47 @@ check(all(d and (d.get("split") or {}).get("auto") is True and (d.get("split") o
 check(all(d and not (d.get("split") or {}).get("stack") and not (d.get("split") or {}).get("no_asn") for d in ds), "parts: no stack mark, no 'before the first code'")
 check([d and d["pages"] for d in ds] == [2, 1, 1], f"parts: the separator sheet left out ({[d and d['pages'] for d in ds]})")
 check(all(node(p)[0] == st[0] for p in P), "parts: in the stack's folder")
+# 2.580.0 (#4401, review C 7b): the undo is offered while the stack lies in the trash, not once it is back
+check(all(d and (d.get("split") or {}).get("undo") is True for d in ds), f"parts: the undo offered ({[d and d.get('split') for d in ds]})")
+kt.dbx("UPDATE fs_nodes SET deleted_at=NULL WHERE id=?", (SID,))
+check((doc(Fr, P[0]).get("split") or {}).get("undo") is False, "a part: no undo while the stack is out of the trash")
+kt.dbx("UPDATE fs_nodes SET deleted_at=? WHERE id=?", (st[2], SID))
+
+# ================================================================ review C 1: blank pages
+B1 = up(Fr, "stapel-leer.pdf", stack_pdf(["qr:ASN00521\nRechnung Leer", "", "qr:ASN00522\nVertrag Leer"]))
+PB = split_done(B1)
+check(PB and [(done(Fr, p) or {}).get("pages") for p in PB] == [1, 1], f"a surely blank page: left out ({PB and [doc(Fr, p)['pages'] for p in PB]})")
+B2 = up(Fr, "stapel-blass.pdf", stack_pdf(["qr:ASN00531\nRechnung Blass", "box", "qr:ASN00532\nVertrag Blass"]))
+done(Fr, B2)
+queue_passed(Fr, "nach-blass")
+pale = (scan(B2).get("pages") or [{}, {}])[1] if scan(B2).get("state") != "done" else None
+if scan(B2).get("state") == "done":  # the parts: the pale page must still be there
+    PP = scan(B2).get("parts") or []
+    check(PP and (done(Fr, PP[0]) or {}).get("pages") == 2, f"a pale page: never left out without a person ({[doc(Fr, p)['pages'] for p in PP]})")
+else:
+    print("NOTE: pale page", pale, flush=True)
+    check(pale.get("blank") and 0.0008 <= pale.get("ink", 0) < 0.004 and scan(B2).get("state") == "open" and node(B2)[2] is None,
+          f"a pale page found blank (not surely): the stack stays 'Stack - split?' ({scan(B2).get('state')} {pale})")
+
+# ================================================================ review C 3: the parts keep the stack's area
+FO = up(Fr, "stapel-buero.pdf", stack_pdf(["qr:ASN00541\nRechnung Buero", "qr:ASN00542\nQuittung Buero"]), area="office")
+PF = split_done(FO)
+check(PF and [kt.dbx("SELECT area FROM doc_meta WHERE node_id=?", (p,))[0][0] for p in PF] == ["office", "office"],
+      f"office upload: the parts stay in the office ({PF and [kt.dbx('SELECT area FROM doc_meta WHERE node_id=?', (p,))[0][0] for p in PF]})")
+GS = up(Fr, "stapel-eingang.pdf", stack_pdf(["qr:ASN00551\nBrief Eingang", "qr:ASN00552\nNoch ein Brief"]), sort="1")
+PG = split_done(GS)
+sorted_ = lambda p: kt.dbx("SELECT area_sort FROM doc_meta WHERE node_id=?", (p,))[0][0]  # noqa: E731
+check(PG and until(lambda: all(sorted_(p) == "auto" for p in PG), 120),
+      f"general input: the parts sorted after their own recognition ({PG and [sorted_(p) for p in PG]})")
+
+# ================================================================ review C 4: a broken scan in state "auto" does not block the queue
+BR = up(Fr, "kaputt.pdf", stack_pdf(["Ein Brief kaputt"]))
+done(Fr, BR)
+kt.dbx("UPDATE doc_meta SET split_scan=? WHERE node_id=?", (json.dumps({"v": 1, "n": 3, "pages": [1, 2, 3], "state": "auto"}, separators=(",", ":")), BR))
+NX = up(Fr, "stapel-danach.pdf", stack_pdf(["qr:ASN00561\nRechnung Danach", "qr:ASN00562\nVertrag Danach"]))
+PN = split_done(NX)
+check(scan(BR).get("state") == "open" and doc(Fr, BR)["review"], f"a broken scan: 'open' + To review ({scan(BR).get('state')})")
+check(PN and len(PN) == 2, f"the next clear stack is still split ({scan(NX).get('state')})")
 
 # ================================================================ not clear: stays "Stack - split?"
 OTHER = up(Fr, "vergeben.pdf", stack_pdf(["Ein Brief mit Nummer"]))
@@ -157,6 +206,11 @@ check(r.status_code == 201 and len(r.json().get("ids") or []) == 3, f"redo: spli
 P2 = (r.json().get("ids") or []) if r.ok else []
 check(P2 and not any((doc(Fr, p).get("split") or {}).get("auto") for p in P2), "a split by hand: no 'automatically' hint")
 check(Fr.post(B + f"/api/docs/{SID}/unsplit").ok, "undo of the split by hand")
+# review C 6: every undo marks "hand" -- a stack split by hand and undone is never split automatically later
+HS = U["a page before the first code"]
+r = Fr.post(B + f"/api/docs/{HS}/split", json={"parts": [[1, 2], [3]]})
+check(r.status_code == 201, f"a stack split by hand ({r.status_code} {r.text[:120]})")
+check(Fr.post(B + f"/api/docs/{HS}/unsplit").ok and scan(HS).get("hand") == 1, f"its undo: marked 'hand' ({scan(HS)})")
 
 # ================================================================ an agent's upload: split in its own folder, never another
 r = A.post(B + "/api/admin/agents", json={"username": "fridabot", "display_name": "Fridabot"})
@@ -185,5 +239,23 @@ PO = split_done(OS)
 check(PO and len(PO) == 2 and asns(PO) == [901, 902], f"organisation: a clear stack split by the queue ({scan(OS).get('state')} {PO and asns(PO)})")
 check(Fr.post(B + f"/api/docs/{OS}/unsplit").status_code == 404, "another person: no undo of the organisation's stack (404)")
 check(A.post(B + f"/api/docs/{OS}/unsplit").ok, "organisation: the undo works")
+# review C 2: a member uploads, the folder's owner splits -- the member undoes it (write + trash rights on the stack)
+r = A.post(B + "/api/users", json={"orgs": [{"id": ORG, "role": "member"}], "username": "bea", "display_name": "Bea",
+                                    "password": "password123", "email": "bea@example.com"})
+check(r.status_code < 300, f"a member ({r.status_code} {r.text[:120]})")
+Be = kt.sess("bea")
+Be.patch(B + "/api/settings", json={"lang": "en", "features": FEAT, "tour": "done", "workspace": f"org:{ORG}"})
+MS = up(Be, "mitglied-stapel.pdf", stack_pdf(["qr:ASN00911\nRechnung Bea", "qr:ASN00912\nVertrag Bea"]), f"org:{ORG}")
+PM = split_done(MS)
+check(PM and len(PM) == 2, f"a member's clear stack: split ({scan(MS).get('state')})")
+if PM:
+    # as when the stack lay in a folder of Alice's that Bea may edit: owned by Alice, split (moved to the trash) as Alice
+    BEA = kt.dbx("SELECT id FROM users WHERE username='bea'")[0][0]
+    kt.dbx("UPDATE fs_nodes SET owner_id=?, deleted_by=? WHERE id=?", (ALICE, ALICE, MS))
+    kt.dbx("INSERT INTO fs_shares(node_id, user_id, role, created_by, created_at) VALUES(?,?,?,?,?)", (MS, BEA, "edit", ALICE, "2026-11-06T10:00:00+00:00"))
+    dm = done(Be, PM[0])
+    check(dm and (dm.get("split") or {}).get("undo") is True, f"the member: the undo offered ({dm and dm.get('split')})")
+    r = Be.post(B + f"/api/docs/{MS}/unsplit")
+    check(r.ok, f"the member undoes the automatic split ({r.status_code} {r.text[:120]})")
 
 sys.exit(kt.done("p2580_c_autosplit_api"))
