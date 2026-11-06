@@ -144,7 +144,8 @@ const srv = http.createServer((req, res) => {
   const nn = JSON.parse(await w.eval(`api('POST', '/api/lists/${lid0}/notes', {title: 'Demo-Notiz', body: '# Hallo'}).then(j => api('GET', '/api/lists/${lid0}/notes')).then(j => JSON.stringify(j))`));
   check(nn.notes?.length === 1 && nn.notes[0].title === 'Demo-Notiz' && nn.may_write, 'notes: create + list ' + JSON.stringify(nn).slice(0, 120));
   w.eval(`go('notes/${lid0}')`); await sleep(500);
-  check(/Demo-Notiz/.test(d.querySelector('#view')?.textContent || ''), 'notes: the view shows the note');
+  // 2.602.0 (#4817): on a computer the list of notes sits in the panel #side, the page shows the open note alone
+  check(/Demo-Notiz/.test((d.querySelector('#view')?.textContent || '') + (d.querySelector('#side')?.textContent || '')), 'notes: the view shows the note');
   w.close();
 
   // 6. reload: the task is still there (same browser storage)
