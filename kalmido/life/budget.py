@@ -152,13 +152,15 @@ def bud_dkey(c, lid, sid, day, amount, kind, title):
     return hmac.new(key, msg, hashlib.sha256).hexdigest()[:40]
 
 
-def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True):
+def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=True, again=0):
     """Every budget row encrypted for the space of its list now. plain(sid) -> True: decrypt that row (the way back:
     decrypt-all / decrypt-private); force_from = a space whose key is about to go (an account / organisation is
     deleted): its rows are moved to the space they lie in now even when that one is switched off. Rows of a space that is
     not active stay as they are (like files_settle). Commits per list (commit=False: inside the caller's transaction).
+    again (2.611.0, #4865): how often these lists were queued again already (admin/orgcrypt_cli.py oc_settle_again).
     -> number of rows changed."""
     n = 0
+    left = []  # 2.611.0 (#4865): lists the background pass could not finish (busy, or a row changed meanwhile): queued again
     with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
         q, args = "SELECT id, org_id, owner_id FROM lists WHERE life='budget'", []
         if list_ids is not None:
@@ -177,11 +179,13 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
             # read above can be older than a deletion that handed the list on and resealed its rows meanwhile (then the
             # rows came back sealed for the space read before -- a key that went with the deletion -- or plain). A list
             # that a running transaction changes (moved, handed on, deleted) is left to that one (SKIP LOCKED)
+            # 2.611.0 (#4865): the way back (plain) waits for that transaction instead -- a queued pass would not open the rows
             with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
-                lr = c.execute("SELECT id, org_id, owner_id FROM lists WHERE id=? FOR SHARE SKIP LOCKED", (lid,)).fetchone()
+                lr = c.execute("SELECT id, org_id, owner_id FROM lists WHERE id=? FOR SHARE" + ("" if plain else " SKIP LOCKED"), (lid,)).fetchone()
             if lr is None:
-                print("[orgcrypt] budget list left to a running transaction:", lid, flush=True)  # 2.585.0 (#4836, review 2): visible, the next pass takes it
+                print("[orgcrypt] budget list left to a running transaction:", lid, flush=True)  # 2.585.0 (#4836, review 2): visible
                 c.commit()
+                left.append(lid)  # 2.611.0 (#4865): and queued again (was: only at the next full pass)
                 continue
         space = int(lr["org_id"]) if lr["org_id"] else (oc.oc_user_space(lr["owner_id"]) or 0)
         active = bool(space) and oc.oc_active_for(c, space)
@@ -212,13 +216,21 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
                     if table == "budget_entries":
                         sets["dkey"] = bud_dkey(c, lid, used, d["day"], d["amount"], d["kind"], d["title"])
                     cols = list(sets)
-                    # 2.585.0 (#4836): only the row as it was read (a deletion's resealing that committed meanwhile stays)
-                    upd = c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND sid IS NOT DISTINCT FROM ?",
-                                    [sets[k] for k in cols] + [r["id"], r["sid"]])
+                    # 2.585.0 (#4836): only the row as it was read (a deletion's resealing that committed meanwhile stays);
+                    # 2.611.0 (#4865): also its content -- an edit between the read and this write stays (it was overwritten
+                    # with the values read before); day / kind with the entries, they make the duplicate key
+                    same = ["sid"] + list(oc.FIELDS[table]) + (["day", "kind"] if table == "budget_entries" else [])
+                    upd = c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND "
+                                    + " AND ".join(f"{k} IS NOT DISTINCT FROM ?" for k in same), [sets[k] for k in cols] + [r["id"]] + [r[k] for k in same])
                     changed += 1 if upd.rowcount else 0
+                    if not upd.rowcount and commit and not plain and force_from is None and lid not in left:
+                        left.append(lid)  # 2.611.0 (#4865): changed meanwhile -- a later pass looks at the row again
         if commit:
             c.commit()  # 2.585.0 (#4836): also when nothing changed -- ends the list's FOR SHARE
             n += changed
+    if left and commit and not plain and force_from is None:
+        from ..admin.orgcrypt_cli import oc_settle_again  # (late: that module imports this one)
+        oc_settle_again(left, again)
     return n
 
 

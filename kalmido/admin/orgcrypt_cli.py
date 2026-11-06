@@ -334,6 +334,26 @@ def _head(path):
         return None
 
 
+def _still(p):
+    """2.611.0 (#4865): check() for oc_reseal_file -- the file is still the one read before (like rot_files' same()). The
+    passes read a file and write it back sealed / opened; a deletion in between (the row and the file gone, or replaced by an
+    upload) got it back on the disk from os.replace, the deleted content included. -> a function, False once it changed."""
+    def mark():
+        s = os.stat(p)
+        return (s.st_ino, s.st_mtime_ns, s.st_size)
+    try:
+        was = mark()
+    except OSError:
+        return lambda: False
+
+    def same():
+        try:
+            return mark() == was
+        except OSError:
+            return False
+    return same
+
+
 def files_encrypt(c, oid, key, paths, stop=None):
     """Seal the plain files among paths with organisation oid's key. -> (sealed, failed)."""
     n = bad = 0
@@ -344,11 +364,13 @@ def files_encrypt(c, oid, key, paths, stop=None):
         if h is None or h[:len(oc.MAGIC)] == oc.MAGIC:
             continue
         try:
+            same = _still(p)  # 2.611.0 (#4865)
             with open(p, "rb") as f:
                 data = f.read()
             if not data:
                 continue
-            oc.oc_reseal_file(p, oc.oc_seal_k(key, oid, data))
+            if not oc.oc_reseal_file(p, oc.oc_seal_k(key, oid, data), check=same):
+                continue
             n += 1
         except OSError as e:
             bad += 1
@@ -376,6 +398,7 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
                 keys[hid] = oc.oc_key(c, hid, create=False)
             if keys[hid] is None:
                 raise oc.OrgCryptError(f"org {hid}: no key")
+            same = _still(p)  # 2.611.0 (#4865)
             with open(p, "rb") as f:
                 data = oc.oc_open_k(keys[hid], f.read())
             tgt = reseal(p) if reseal else None
@@ -389,7 +412,8 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
                 if stats is not None:
                     stats["kept"] = stats.get("kept", 0) + 1
                 continue
-            oc.oc_reseal_file(p, data)
+            if not oc.oc_reseal_file(p, data, check=same):
+                continue
             n += 1
         except (OSError, oc.OrgCryptError) as e:
             bad += 1
@@ -785,13 +809,15 @@ def _files_settle_parts(c, parts, stop, out, key, active):
             try:
                 if sealed and k_old is None:
                     raise oc.OrgCryptError(f"{oc._label(hid)}: no key")
+                same = _still(p)  # 2.611.0 (#4865)
                 with open(p, "rb") as f:
                     data = f.read()
                 if not data:
                     continue
                 if sealed:
                     data = oc.oc_open_k(k_old, data)
-                oc.oc_reseal_file(p, oc.oc_seal_raw(k, sid, data))
+                if not oc.oc_reseal_file(p, oc.oc_seal_raw(k, sid, data), check=same):
+                    continue  # deleted or written anew meanwhile: that stays (the next pass looks again)
                 out["resealed" if sealed else "sealed"] += 1
             except (OSError, oc.OrgCryptError) as e:
                 out["failed"] += 1
@@ -1080,14 +1106,15 @@ def oc_migrate_kick():
 
 
 @bgj_fn("orgcrypt:settle")  # 2.193.0 D (#2220): oc_settle_kick through the queue
-def oc_settle_lists(list_ids):
+def oc_settle_lists(list_ids, again=0):
     """2.64.0 (#1864): one pass over the files of these lists (tasks moved between spaces, a list moved into / out of an
-    organisation or handed to another owner): each sealed for its space now. Never raises."""
+    organisation or handed to another owner): each sealed for its space now. Never raises. again (2.611.0, #4865): the
+    how-manieth time these lists come back from oc_settle_again (rows queued before 2.611 have none: 0)."""
     c = None
     try:
         c = connect()
         files_settle(c, list_ids=list_ids, pause=_pause())
-        _bud().bud_settle(c, list_ids=list_ids)  # 2.72.0 (#1333): a moved budget list's rows for its new space
+        _bud().bud_settle(c, list_ids=list_ids, again=int(again or 0))  # 2.72.0 (#1333): a moved budget list's rows for its new space
     except Exception as e:  # noqa: BLE001 -- a background thread never takes the server down
         print(TAG, "resealing moved files failed:", type(e).__name__, flush=True)
     finally:
@@ -1097,6 +1124,25 @@ def oc_settle_lists(list_ids):
             except Exception:  # noqa: BLE001
                 pass
             c.close()
+
+
+# 2.611.0 (#4865): a budget list the background pass had to leave (a running transaction held it, or a row changed between
+# the read and the write) is queued again: OC_SETTLE_AGAIN times at most, waiting 30 s, 1, 2, 4 min -- a request's
+# transaction is long over by then; a list still busy after that is left to the next full pass (start-up, a move's kick)
+# instead of a queue row that comes back for ever
+OC_SETTLE_AGAIN = 4
+
+
+def oc_settle_again(list_ids, again=0):
+    """2.611.0 (#4865): bud_settle's lists left behind -> one more oc_settle_lists over them later (see OC_SETTLE_AGAIN)."""
+    ids = sorted({int(x) for x in list_ids or () if x})
+    if not ids or not oc.oc_enabled() or not env_bool("TASKS_WATCHDOG", True):
+        return
+    if int(again) >= OC_SETTLE_AGAIN:
+        print(TAG, "budget lists still busy, left to the next full pass:", ids, flush=True)
+        return
+    delay = max(float(os.environ.get("KALMIDO_ORGCRYPT_DELAY", 0) or 0), 30.0 * 2 ** int(again))
+    bgj_add("orgcrypt:settle", ids, int(again) + 1, delay=delay)
 
 
 def oc_settle_kick(list_ids, delay=3.0):

@@ -413,7 +413,10 @@ def wkh_settle(c, plain=None, stop=None):
                         if locked[sid] or not on[sid] or key(sid) is None:
                             continue
                         new = _seal(key(sid), sid, ctx, v)
-                    out["changed"] += c.execute(f"UPDATE {table} SET body=? WHERE id=? AND body=?", (new, r["id"], v)).rowcount
+                    # 2.611.0 (#4865): and still in the space it was read in -- a page moved meanwhile with its text unchanged
+                    # (a target that seals nothing) was sealed with the old space's key, unreadable in the new one
+                    out["changed"] += c.execute(f"UPDATE {table} SET body=? WHERE id=? AND body=? AND org_id IS NOT DISTINCT FROM ? "
+                                                "AND owner_id IS NOT DISTINCT FROM ?", (new, r["id"], v, r["org_id"], r["owner_id"])).rowcount
             c.commit()
             if len(rows) < WKH_BATCH:
                 break
