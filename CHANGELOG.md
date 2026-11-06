@@ -14,6 +14,94 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.570.0] - 2026-11-06
+
+Package 2.567 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Trash: deleted budget entries, categories and recurring items, list templates, key links of projects, sections and planned sprints now go into the trash for 30 days instead of being gone at once. The trash view has a new group "Other deleted items" with Restore; the toast's Undo restores from the server, so it works from another device too. Budget receipts stay until the entry is deleted for good (#4707).
+- Office: every save of letters, letter blocks, clients, business contracts, document templates and generated documents, deals and leads, the logbook, travel costs, fixed costs and subscriptions, cash flow corrections, credit cards and their positions, bank rules, invoice series and entertainment receipts goes through one write layer (office/owrite.py on the shared core): row lock, version check (409 with the current state under `current`, the old key kept), only the fields sent, a history entry with the agent marked, `updated_by`, the change counter. Letters get the session undo of the office (#4711).
+### Changed
+- Office undo runs on the shared core's undo (obj_undo); route and header stay the same (#4711).
+- Agents: `PATCH /api/v1/office/letters/{id}`, `PATCH /api/v1/office/leads/{id}` and the MCP tools `update_letter_draft` / `update_office_lead` need `expect_updated_at` (400 without) (#4711).
+### Fixed
+- Office: deleting a fixed cost or subscription, the start balance, a cash flow correction, letter links, and taking back an import of fixed costs or trips no longer deletes for good: a copy goes into the office trash and Undo writes it back (#4707).
+- Office: letter blocks checked the version after the field filter had removed it, so two devices overwrote each other silently (#4711).
+
+### Fixed
+- main: CI red of 2.563.0 - five test suites follow the app again (own Budget h field, the contact save that answers later, a Firefox navigate the page aborted, two share-name checks that could not fail, the release's whatsnew file)
+
+Package 2.568 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Kalmido AI and connected agents can prepare an invoice draft without a quotation: from a project's tracked time or with free positions (`POST /api/v1/office/invoices`, MCP tool `create_invoice_draft`). Kalmido computes totals, tax and the required e-invoice fields; numbering, finalising, sending and cancelling stay with the person (#4673).
+- New starter item "Due billing" in the dialog "New agent on the Kalmido server" (off by default): a weekly reminder on Mondays at 08:00 about unbilled time and a standing rule "quotations and invoices only as drafts"; skipped with the reason while the agent lacks the office rights; can be set up later in the agent's server settings; the reason names the missing right or office group (#4673).
+- Projects as a kind of the shared core: adding, removing and expiring a member writes a core share row; a removed member can be restored (`GET /api/lists/<id>/shares`, `POST /api/lists/<id>/shares/<rid>/restore`); `PUT members` takes an optional `expires_at` (#4739).
+- Project settings history: changes of columns, sums, key figures, properties, ticket template and agent members are kept with before/after (`GET /api/lists/<id>/history`) (#4739).
+### Changed
+- Leaving, changing the role in or retiring an organisation takes back project shares through the shared core's central revocation (#4739).
+### Fixed
+- Restoring an expired project share brings it back without the expiry (`expiry_removed`); a participant gets 403 with a reason on the settings history; a project's own member rows add nothing to the file store's "Shared with me" (#4739).
+- A group share no longer gives a guest or accounting person a project role in an organisation's project, also after rejoining as a guest (audit A-F10, #4739).
+
+Package 2.564 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Changed
+- #4702: agent accounts must send the version they read when they change content through API v1 / MCP (tasks, batch, knowledge pages, table cells and titles, file versions, documents, notes, events, contacts, quotation and letter drafts, leads): without it `400 version_required` (with the fields that would do), with an old one `409` and the current state; state steps (move, complete, pin, lock) and people's tokens stay as they were. MCP schemas and docs (AGENTS.md "Version required", AGENT-SETUP, CLAUDE template, in-app rules) updated.
+- #4702: an agent changing a locked task's field is marked `locked_bypass` in the task's history.
+### Fixed
+- #4701: saving a whole form or set no longer overwrites a change made meanwhile on another device: field options (409 when another admin changed them, values of options added meanwhile stay), task people and file tags (merged against what was seen), waiting-on (only the sent fields), templates (lock), table title / sheet name / chart / cell name / freeze (sheet lock and table history), comments, team chat messages and rooms, polls, habits, the document sheet, calendar subscriptions, sprints and sprint settings, the booking page and appointment types, agent rule texts (409 with the current state; the dialog shows the reason and the current values).
+- #4709: the generic ref_id / by_id columns of the shared core tables carry their "no FK" marker (schema rule).
+
+Package 2.555 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: CI rot in 2.544.0: p2190_a_sessions erwartet noch,, Bündel: Einreihen-Prüfung).
+### Added
+- Budget warning per task and project (#4570): at 80 % of "Budget h" the tracked time turns into a warning, at 100 % it shows "over budget" (project page head and "Tracked time", the task's time area); the project owner and the project admins get one notice per threshold (News + push, own switchable row "Budget warnings" in Settings > Notifications). Display only, nothing is blocked. The project overview of the API returns `time.budget_level` and `time.budget_pct`.
+- Wide monitors (#4554): from 1800 px the settings dialog grows and shows its sections in two columns; invoice, quotation, credit note, delivery note and reminder show the head beside the positions from an editor width of 80rem. Tab order unchanged.
+### Changed
+- Field forms of documents and receipts (#4470): narrower than 36rem (sidebar, sheet, phone) the label stands above the field and every field takes the full width; "automatic" sits at the right of the label line; date fields look like the other inputs. Ruled by a container query on the form.
+- Settings > Company & office (#4664): no "Applies to" menu with "All workspaces" any more, the workspace is named once as text; one heading per thing (groups h3, parts h4: no double "Company", "Documents & numbers", "Functions", "Country pack"); "Industry packs" switched only under Packs (the calculation rules link there); travel costs and meals under "Bank & taxes"; one paper format note; "Closing texts" heading; "Choose country" stays in the settings.
+- Settings, other areas (#4664): one switch for "people may create their own agents"; no repeated headings under sub-tabs (Assistant, Sign-in = "Two-factor and passkeys", Account = "Profile", Export, Admin alerts); tab "Log & errors" is now "Admin alerts"; one device test plus "Test all channels"; push and quiet-hours texts point to the right place; Karakeep fields save on change; "Report to" shows "(Project of another admin)"; the Server tab keeps updates and the assistant after publishing a notice.
+### Fixed
+- Budget warning: pushes only go out once the notice is stored; "delete all times" and its Undo update the budget marks (#4570, review).
+
+Package 2.542 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+### Added
+- Office: a database trigger holds finalised documents - changing their content, number, date, totals, snapshots, lock or PDF hash, or deleting them, is refused by the database itself; payment, reminder, sending and project fields stay free (#4598).
+- Tasks: ticking a task with open subtasks asks first ("N open subtasks left. Tick them all?"), on every way (tick, swipe, key x, multi-select, Start); recurring tasks get their own text (#4579).
+### Changed
+- Tasks: a locked task (padlock) cannot be completed or reopened on any way - app, API token, agents, MCP, CalDAV, multi-select, undo, agent cleanup proposals; the app shows a hint with an Unlock button, agents get the reason and how to unlock (locked: false) (#4609).
+- Agent chat: the agent's own colour wins - head stripe, send button, input border and its bubbles; the workspace shows as a dot with its name in the head; without an own colour it stays the workspace accent (#4604).
+- Sidebar: the "Show the panel" button is gone (the icons no longer jump); switching to another area opens the panel again, a tap on the open area's icon brings it back (#4610).
+- Wording: the own workspace is called "Private" everywhere - Files ("My files" before), Office ("private office"), Contacts ("Move to Private"), the agent chat head (#4605).
+### Fixed
+- Start: tapping a task opens its detail next to Start instead of an empty project; Start rows show the subtask counter (#4579).
+- Chat: swiping right to reply works again in the agent chat and in comments while messages update (#4614).
+- Office: trial documents (with the sample watermark) can no longer be sent by e-mail - send button off, the server answers 409 (#4594).
+
+Package 2.565 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI v2.551.0 rot ohne erkennb).
+### Added
+- Kalmido AI: each starter routine (briefing, follow-up, inbox triage, meeting notes) can run with a model of its own, chosen in the server agent dialog from the live model list; empty means the agent's model. The usage ring and the agent menu show the tokens per routine (#4674).
+- Team chat: a channel can be shared with a group (API: `POST /api/team/rooms/<id>/members {group_id}`, `DELETE /api/team/rooms/<id>/groups/<gid>`, also in API v1); only active full members of the channel's organisation get in, never agents (#4719).
+### Changed
+- Agent chat: answer buttons hold up to 200 characters (was 80) and wrap onto several lines instead of ending in "…"; long buttons take the full width on the phone (#4713).
+- Shared core stage 4: shares of tables and knowledge pages with people and agents are core shares on the reference node of the table, page or folder; a share of a knowledge folder follows renames, moves and a restore as "Name (2)" (#4717, also fixes #4668). The old share rows stay as cards and as a reader fallback for one release.
+- Shared core stage 5: team chat channels and group conversations are a kind of the shared core; members are core shares, leaving, removal, role changes and leaving the organisation revoke through the core (restorable). `tchat_members` stays the reader fallback (#4719).
+### Fixed
+- Calendar: moving or deleting single dates of a series on two devices at the same time no longer drops one of the changes; every edit and delete runs under the event's lock, CalDAV PUT/DELETE included, and dragging, undo, redo and agent drafts send the version (#4703).
+- Contacts and events: a save conflict (409) no longer leaves a dead dialog - the dialog comes back with the current state, your own changes on top and the fields changed elsewhere marked; an open dialog shows a bar when the entry was changed elsewhere, with "Take over" (#4705).
+
+CI fix of 2.563.1 (main red: p2134_ui, p2276_a_ui, p2441_favs_ui, p276_b_ui).
+### Fixed
+- main: on a phone, a tile tapped right after its menu closed opens its page again; before, the Back that tidies the closed menu landed after it and took the app back to the old page (#3506).
+- main: a task dragged onto another task becomes its subtask in the parent's list and section at once, as the server stores it; before, the move picker left out the list it came from until the next reload (#4659).
+- main: hiding and showing a menu point quickly in the menu editor no longer leaves it hidden after the next sign-in; the saves go one after the other (#3560).
+
+Package 2.570 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Office: the history of an office record (who changed which field when) is readable for every kind saved through the office write path, with the role and level its save route needs; read-only and accounting roles get no history (#4783).
+
+### Fixed
+- Office > Devices > New device opens the editor again instead of doing nothing (#4750).
+- Turning encryption on or off for the whole instance (encrypt-all, decrypt-all) now also seals or opens the copies in the office trash, so a restored item is stored the same way as everything else; the trash is not emptied, and copies that cannot be opened are counted as failed and kept (#4716).
+
 ## [2.563.1] - 2026-11-06
 
 CI-Fix 2.562 (main red: shared core schema, equipment care, travel rights, New for you, at-once reactions).
@@ -1578,7 +1666,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.563.1...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.570.0...HEAD
+[2.570.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.570.0
 [2.563.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.1
 [2.563.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.0
 [2.562.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.562.0
