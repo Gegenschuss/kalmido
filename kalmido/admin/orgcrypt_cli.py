@@ -360,11 +360,11 @@ def files_encrypt(c, oid, key, paths, stop=None):
     for p in paths:
         if stop and stop():
             break
+        same = _still(p)  # 2.611.0 (#4865)  # review 2.611: marked before the header is read, a file replaced after it is noticed
         h = _head(p)
         if h is None or h[:len(oc.MAGIC)] == oc.MAGIC:
             continue
         try:
-            same = _still(p)  # 2.611.0 (#4865)
             with open(p, "rb") as f:
                 data = f.read()
             if not data:
@@ -385,6 +385,7 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
     n = bad = 0
     keys = {}
     for p in paths:
+        same = _still(p)  # 2.611.0 (#4865)  # review 2.611: marked before the header is read, a file replaced after it is noticed
         h = _head(p)
         if h is None or h[:len(oc.MAGIC)] != oc.MAGIC:
             continue
@@ -398,7 +399,6 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
                 keys[hid] = oc.oc_key(c, hid, create=False)
             if keys[hid] is None:
                 raise oc.OrgCryptError(f"org {hid}: no key")
-            same = _still(p)  # 2.611.0 (#4865)
             with open(p, "rb") as f:
                 data = oc.oc_open_k(keys[hid], f.read())
             tgt = reseal(p) if reseal else None
@@ -794,6 +794,7 @@ def _files_settle_parts(c, parts, stop, out, key, active):
                 active[sid] = oc.oc_active_for(c, sid)
             if not active[sid]:
                 continue
+            same = _still(p)  # 2.611.0 (#4865)  # review 2.611: marked before the header is read, a file replaced after it is noticed
             h = _head(p)
             if h is None:
                 continue
@@ -809,7 +810,6 @@ def _files_settle_parts(c, parts, stop, out, key, active):
             try:
                 if sealed and k_old is None:
                     raise oc.OrgCryptError(f"{oc._label(hid)}: no key")
-                same = _still(p)  # 2.611.0 (#4865)
                 with open(p, "rb") as f:
                     data = f.read()
                 if not data:
