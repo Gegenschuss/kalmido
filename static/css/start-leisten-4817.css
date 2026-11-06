@@ -1,0 +1,10 @@
+/* 2.602.0 (#4817): the note list in the panel of sidebar B (chat.js nt_panelHtml): the bar wraps (search on a line of its own),
+   the page beside it shows the open note alone or the hint (nt_pageHtml). A start file: notes have no module of their own and
+   app.css takes no new rules. */
+#side .ntpan{padding:0 .5rem .5rem}
+#side .ntpan .ntbar{flex-wrap:wrap}
+#side .ntpan .ntbar .ssearch{flex:1 1 100%}
+#side .ntpan .sbnbar .sbnsel{flex:1 1 auto}
+.ntview.ntsolo,.ntview.ntsolo.open{grid-template-columns:minmax(0,1fr)}
+.ntpick{justify-items:center;padding-top:2rem}
+.ntpickb{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}

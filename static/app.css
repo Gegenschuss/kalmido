@@ -36,8 +36,7 @@
   --tabs-h:0px;--ui:1;
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
-  /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;
-  /* 2.602.0 (#4817): ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts, clients, notes without the panel): as the panel (--sideW 15rem, at least 14rem) */ --w-leiste:15rem;--w-leiste-min:14rem;
+  /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;--w-leiste:15rem;--w-leiste-min:14rem;  /* 2.602.0 (#4817): --w-leiste = ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts / clients, notes without the panel), as the panel (--sideW 15rem, at least 14rem) */
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}
@@ -4180,15 +4179,6 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 /* #442 notes */
 .ntview{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
 .ntview.open{grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr)}  /* 2.602.0 (#4817): --w-leiste (was 14-22rem) */
-/* 2.602.0 (#4817): the note list in the panel of sidebar B (chat.js nt_panelHtml): the bar wraps (search on a line of its own),
-   the page beside it shows the open note alone or the hint (nt_pageHtml) */
-#side .ntpan{padding:0 .5rem .5rem}
-#side .ntpan .ntbar{flex-wrap:wrap}
-#side .ntpan .ntbar .ssearch{flex:1 1 100%}
-#side .ntpan .sbnbar .sbnsel{flex:1 1 auto}
-.ntview.ntsolo,.ntview.ntsolo.open{grid-template-columns:minmax(0,1fr)}
-.ntpick{justify-items:center;padding-top:2rem}
-.ntpickb{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
 .ntbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
 .ntbar .ssearch,.ntbar .ctsearch{flex:1 1 auto}
 .ntcards{list-style:none;margin:0;padding:0;display:grid;gap:.375rem}
