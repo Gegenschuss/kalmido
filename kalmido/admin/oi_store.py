@@ -303,6 +303,13 @@ def _rule(c, run, src, d, ctx):
         r = None
     if not r:
         return None
+    to = (r.get("task") or {}).get("to")
+    if to:  # 2.581.0 (#4803 review): the person of a flow's task is an id of the source server -> the person chosen here, else the author
+        new = ctx.who(int(to))
+        if new and _not_agent(c, new):
+            r["task"]["to"] = int(new)
+        else:
+            r["task"].pop("to", None)
     d["ws"], d["data"] = ws, S._jseal(c, ws, "doc_rules.data", r)
     return d
 
