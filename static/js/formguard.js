@@ -6,6 +6,7 @@
 // being typed in is kept, until its change event. Closing or reloading the page with a draft asks first (beforeunload).
 // Dialogs use fgModal(md): Cancel / Esc / the backdrop ask "Discard changes?" when something was changed (modalGuard).
 const FG = {d: {}, watch: [], pend: []};
+const FDF_DAYS = 3;  // 2.577.0 (#4708 8): a dialog's kept input is dropped at the start after so many days
 const fgField = el => /^(INPUT|SELECT|TEXTAREA)$/.test(el?.tagName) && el.type !== 'file' && el.type !== 'button' && el.type !== 'submit' && !el.closest('[data-fg-skip]');
 // a field's name across redraws: its id, else its name, else its data-* attributes (positions: data-i + data-k)
 const fgKey = el => el.id || el.name || [...el.attributes].filter(a => a.name.startsWith('data-')).map(a => a.name + '=' + a.value).join('&');
@@ -90,9 +91,24 @@ function fgKeep(el) {
 }
 
 // a dialog: asks before its unsaved input is thrown away; returns the close function for its Cancel button
-function fgModal(md) {
+// 2.577.0 (#4708 8): and its input survives an ended session / a reload / a closed tab (fdDialog) in every such dialog: the
+// key is the dialog's title + its fields + their values when it opened (fgAutoKey), so a draft only comes back into the same
+// dialog of the same record in the same state (saved elsewhere since: other values, other key). A dialog that calls
+// fdDialog itself (own key, base) keeps that; fd = false or data-fd-skip on the dialog: nothing kept.
+function fgModal(md, fd) {
   const snap = () => JSON.stringify(fgFields(md).map(fgVal)), start = snap();
-  return modalGuard(md, () => snap() !== start);
+  const close = modalGuard(md, () => snap() !== start);
+  if (fd !== false && typeof fdDialog === 'function' && !md.matches?.('[data-fd-skip]') && !md.querySelector?.('[data-fd-skip]')) {
+    const fs = fgFields(md), key = fgAutoKey(md, fs, start);
+    if (fs.length) setTimeout(() => { if (!md._fdOn && md.isConnected) fdDialog(md, key); }, 0);  // after the caller's own setup
+  }
+  return close;
+}
+function fgAutoKey(md, fs, start) {
+  const s = (md.querySelector('h1,h2,h3,h4')?.textContent || '').trim() + '|' + fs.map(fgKey).join(',') + '|' + start;
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return 'auto.' + h.toString(36) + '.' + s.length.toString(36);
 }
 
 // 2.527.0 (#4304 A5): a dialog's input survives the end of the session (401 -> sign-in -> reload), a closed tab or a crash:
@@ -102,6 +118,7 @@ function fgModal(md) {
 // 2.552.0 (#4547): x = {get, put} for what is no plain field (rows drawn by the dialog, a picker): get() = its value while
 // changed (undefined = nothing to keep), put(v) puts it back; a change there fires "change" on the dialog
 function fdDialog(md, key, base = '', x) {
+  md._fdOn = true;  // 2.577.0 (#4708 8): fgModal's automatic key steps back
   const k = fdTake('fdf', key, undefined, base);
   if (k && typeof k === 'object') {
     let n = 0;

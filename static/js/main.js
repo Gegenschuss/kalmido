@@ -30,6 +30,7 @@ function bootDone() {
   await i18nBoot; await i18nLoad(uiLang()); S.booted = true;
   // 2.527.0 (#4304 A5 + A6): writes kept from before the sign-in go now; a dialog's kept input waits for the dialog
   setTimeout(fdWriteFlush, 0);
+  for (const r of fdList('fdf')) if (Date.now() - (r.at || 0) > FDF_DAYS * 864e5) fdDrop('fdf', r.id);  // 2.577.0 (#4708 8): a dialog never opened again
   if (fdList('fdf').length) setTimeout(() => toast(tr('Unsaved input of a dialog was kept: open the dialog again to finish it')), 1500);
   // 2.145.0 B (#2424): an own window (miniwin.js) shows one list / task / chat: no other servers, no suggestions, no push housekeeping
   if (!MW_ON) setTimeout(msvvBoot, 0);  // 2.73.0 C (#661): the other servers (msvview.js), after the own state
