@@ -2051,10 +2051,18 @@ def umz_office_oi(data, me_old):
         if not _oid(r.get("id") if isinstance(r, dict) else None) or not isinstance(m, str) or not UMZ_MONTH_RE.match(m) or m in seen:
             continue
         seen.add(m)
-        ts.append({**r, "user_id": me_old, "decided_by": None})
+        # 2.584.0 (#3965, fable F2): only the known fields of a month; the history (log) is never taken from a file (its "by"
+        # ids would be shown as names of this server's accounts), the state only one of the app's own
+        ts.append({**{k: r[k] for k in UMZ_SHEET_KEEP if isinstance(r.get(k), str)}, "id": r["id"], "month": m,
+                   "state": r.get("state") if r.get("state") in UMZ_SHEET_STATES else "open", "log": "[]",
+                   "user_id": me_old, "decided_by": None})
     if ts:
         out["time_sheets.json"] = ts
     return out
+
+
+UMZ_SHEET_STATES = ("open", "closed", "approved")  # 2.584.0 (#3965, fable F2): time_sheets.state (personal/timesheet.py)
+UMZ_SHEET_KEEP = ("closed_at", "decided_at", "note", "created_at", "updated_at")
 
 
 def umz_sheets_here(c, uid, data):

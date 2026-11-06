@@ -116,7 +116,10 @@ FILE = mkzip({
                  {"id": 63, "kind": "vacation", "start_date": "2026-11-10", "end_date": "2026-11-01", "note": "rueckwaerts", "created_at": TS}],
     "timesheets": [{"id": 71, "org_id": 77, "month": "2026-08", "state": "closed", "note": "alt", "created_at": TS, "updated_at": TS},
                    {"id": 72, "org_id": 77, "month": "2026-09", "state": "approved", "note": "Umzug Monat", "decided_at": TS,
-                    "user_id": OID, "decided_by": OID, "created_at": TS, "updated_at": TS}],
+                    "user_id": OID, "decided_by": OID, "created_at": TS, "updated_at": TS,
+                    # fable F2: a forged history whose "by" ids would be shown as names of this server's accounts
+                    "log": json.dumps([{"by": OID, "do": "approve", "at": TS}, {"by": 1, "do": "close", "at": TS}])},
+                   {"id": 73, "month": "2026-07", "state": "hacked", "log": "[{\"by\": 1}]", "extra": "x", "created_at": TS, "updated_at": TS}],
     "playbooks": [{"id": 81, "list_id": None, "owner_id": ME, "folder": "Kunden", "version": 1, "body": "Ordner v1", "author_id": ME,
                    "source": "edit", "created_at": TS},
                   {"id": 82, "list_id": None, "owner_id": ME, "folder": "Kunden", "version": 2, "body": "Ordner v2", "author_id": 2000,
@@ -159,9 +162,14 @@ check(sorted((x.get("kind"), x.get("note")) for x in items) == [("sick", "krank"
 
 # timesheets
 ts = kt.dbx("SELECT month, state, org_id, decided_by, note FROM time_sheets WHERE user_id=? ORDER BY month", (GID,))
-check([(t[0], t[1]) for t in ts] == [("2026-08", "open"), ("2026-09", "approved")] and ts[1][2] is None and ts[1][3] is None,
+# 2.584.0 (#3965, fable F2): a third month with a state the app does not know arrives as open
+check([(t[0], t[1]) for t in ts] == [("2026-07", "open"), ("2026-08", "open"), ("2026-09", "approved")] and ts[2][2] is None and ts[2][3] is None,
       f"#3965 the month gina had stays hers, the other one arrives (private, no decider) {ts}")
 check(one("SELECT COUNT(*) FROM time_sheets WHERE user_id=?", (OID,)) == 0, "#3965 no timesheet lands with otto")
+logs = kt.dbx("SELECT month, log FROM time_sheets WHERE user_id=? AND month IN ('2026-07', '2026-09') ORDER BY month", (GID,))
+check([x[1] for x in logs] == ["[]", "[]"], f"fable F2: the history of an imported month never comes from the file {logs}")
+r = Gi.get(B + "/api/time/sheets", params={"month": "2026-09"})
+check(r.ok and "Otto" not in r.text and "Alice" not in r.text, f"fable F2: no name of another account through the imported month {r.status_code} {r.text[:200]}")
 
 # budgets
 BL = one("SELECT id FROM lists WHERE owner_id=? AND name='Haushalt Umzug' AND life='budget' AND deleted_at IS NULL", (GID,))

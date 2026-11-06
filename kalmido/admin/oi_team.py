@@ -587,6 +587,15 @@ def _act_data(run, who, kind, v):
     return v
 
 
+def _ts_month(c, run, src, d, ctx):
+    """2.584.0 (#3965, fable F2): a month's history (log, with the "by" ids of the old server) never comes from a file - this
+    server would show them as names of its own accounts; the state only one of the app's own (personal/timesheet.py)."""
+    d["log"] = "[]"
+    if d.get("state") not in ("open", "closed", "approved"):
+        d["state"] = "open"
+    return d
+
+
 def _activity(c, run, src, d, ctx):
     v = src.get("data")
     if isinstance(v, str):
@@ -755,7 +764,7 @@ SPECS = [
     OiT("time_entries.json", "time_entries", refs={"task_id": "tasks", "list_id": "lists", "billed_doc_id": "office_docs"}, people={"user_id": "null"},
         space=(), label=N_("Time entries"), prep=_chain(_time, _time_person, _billed)),
     OiT("time_sheets.json", "time_sheets", people={"user_id": "null", "decided_by": "null"}, label=N_("Time entries"),
-        prep=_person("user_id")),
+        prep=_chain(_person("user_id"), _ts_month)),
     OiT("comments/reactions.json", "comment_reactions", refs={"comment_id": "comments"}, need=("comment_id",),
         people={"user_id": "need"}, space=(), rid=False, label=N_("Reactions")),
     # chat
