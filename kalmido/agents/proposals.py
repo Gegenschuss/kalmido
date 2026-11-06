@@ -12,7 +12,7 @@ from ..core.db import body, bump, db, err, iso, now_utc, iso_ms
 from ..accounts.session import me
 from ..accounts.pictures import avatar_url
 from ..core.access import (
-    collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_collab, need_list, need_task, reading_ids, WRITE_ROLES,
+    collab_all, Denied, list_people, list_role, my_inbox, my_max_sort, need_collab, need_list, need_task, reading_ids, task_visible, WRITE_ROLES,
 )
 from ..core.state import visible_lists, visible_sections
 from ..lists.lists import list_created, clean_folder, FOLDER_MAX
@@ -586,20 +586,25 @@ def need_prop(c, jid, lock=False, team=False):
     return j
 
 
-def prop_view_input(j, uid):
+def prop_view_input(c, j, uid):
     """2.611.0 D (#4784): the input as person uid may see it. Another person with write rights (a team proposal, need_prop
     team=True) gets for extract only what the card needs (the list with its sections, its members): never the free text nor
-    the image references of the one who asked."""
+    the image references of the one who asked. Review 2.611: of subtasks the others get the task's notes (a copy from the
+    time of the request) only while they may see the task itself in full now (moved into a private list = gone, as job_dict)."""
     inp = json.loads(j["input"] or "{}")
     if j["kind"] == "extract" and j["user_id"] != uid:
         inp = {k: inp[k] for k in ("list", "members") if k in inp}
+    if j["kind"] == "subtasks" and j["user_id"] != uid and isinstance(inp.get("task"), dict) \
+            and not task_visible(c, j["task_id"], uid, full=True):
+        inp["task"] = {k: v for k, v in inp["task"].items() if k != "notes"}
+        inp.pop("hint", None)
     return inp
 
 
 def prop_view(c, j):
     rec = json.loads(j["applied"] or "null")
     out = {"job": job_dict(c, j), "kind": j["kind"], "state": j["prop_state"] or "requested",
-            "input": prop_view_input(j, me()), "proposal": json.loads(j["proposal"] or "null"),
+            "input": prop_view_input(c, j, me()), "proposal": json.loads(j["proposal"] or "null"),
             "agent": {"id": j["agent_id"], "name": user_names(c, [j["agent_id"]]).get(j["agent_id"], "")},
             "applied": {"undone": bool(rec.get("undone")), "list_id": rec.get("list"), "at": rec.get("at")} if rec else None,
             "limits": PROP_LIMITS}

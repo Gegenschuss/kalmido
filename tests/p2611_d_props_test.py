@@ -122,6 +122,19 @@ r = Do.post(B + f"/api/proposals/{J2}/apply", json={"select": ["0"]})
 check(r.ok and r.json().get("created") == 1, f"dora applies the extract {r.status_code} {r.text[:160]}")
 check(dbx("SELECT COUNT(*) FROM tasks WHERE list_id=? AND title='Order chairs' AND deleted_at IS NULL", (P,)) == [(1,)], "the task is there")
 
+# ---------------------------------------------------------------- review 2.611: the notes of a subtasks request follow the task
+CP = Ca.post(B + "/api/lists", json={"name": "Carl private"}).json()["id"]
+T4 = Ca.post(B + "/api/tasks", json={"title": "Noted owl task", "list_id": P, "content": "CARL-TASK-NOTE keep it short"}).json()["id"]
+J3 = ask(Ca, {"kind": "subtasks", "task_id": T4}, len(runs()))
+propose(J3, {"kind": "subtasks", "items": [{"title": "Noted step"}]})
+r = Do.get(B + f"/api/proposals/{J3}")
+check(r.ok and "CARL-TASK-NOTE" in r.text, f"dora sees the notes of the task while she sees the task {r.status_code}")
+check(Ca.patch(B + f"/api/tasks/{T4}", json={"list_id": CP}).ok, "carl moves the task into his private list")
+r = Do.get(B + f"/api/proposals/{J3}")
+check("CARL-TASK-NOTE" not in r.text, f"... then dora no longer gets its notes from the request {r.status_code}")
+r = Ca.get(B + f"/api/proposals/{J3}")
+check(r.ok and "CARL-TASK-NOTE" in r.text, f"... carl (who asked) still does {r.status_code}")
+
 # ---------------------------------------------------------------- freelancer: her own agent in her own project
 FAG = Fr.post(B + "/api/my/agents", json={"username": "frida-bot", "display_name": "Frida Bot"}).json()["id"]
 FL = Fr.post(B + "/api/lists", json={"name": "Frida's project"}).json()["id"]
