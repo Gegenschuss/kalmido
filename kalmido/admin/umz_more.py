@@ -271,7 +271,7 @@ def _budgets(c, run, uid, data):
                 run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
             continue
         try:
-            made, bad = bud_import(c, uid, lid, b, lambda t: run.m("tasks", t))
+            made, bad = bud_import(c, uid, lid, b, lambda t: run.m("tasks", t), run.step)  # 2.584.0 (fable F6): + step
         except Denied:  # not a budget list of mine (the file's list is no budget, or it did not come along as mine)
             run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
             continue

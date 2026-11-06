@@ -725,7 +725,10 @@ def umz_left(data, unread=None):
                     # 2.363.4 (#3127): what hangs on a project that is not mine (or encrypted); 2.584.0 (#3965): a folder's playbook comes along
                     (N_("Notepads"), sum(1 for r in data.get("list_notepads", []) if _oid(r.get("list_id")) not in mine)),
                     (N_("Playbooks"), sum(1 for r in data.get("playbooks", []) if isinstance(r, dict) and r.get("list_id") is not None
-                                          and _oid(r.get("list_id")) not in mine))):
+                                          and _oid(r.get("list_id")) not in mine)),
+                    # 2.584.0 (#3965, fable F6): the budget's entries come along, their receipts (names only in the file) do not
+                    (N_("Receipts in the household budget"), sum(len(b["files"]) for b in data.get("budgets", [])
+                                                                 if isinstance(b, dict) and isinstance(b.get("files"), list)))):
         if k:
             out[what] = out.get(what, 0) + k
     return [{"what": w, "count": k} for w, k in out.items()]

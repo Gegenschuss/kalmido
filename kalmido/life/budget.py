@@ -1504,7 +1504,8 @@ def bud_export(c, uid):
         lid = l["id"]
         out.append({"list_id": lid, "name": l["name"], "categories": [cat_out(d) for d in _cats(c, lid)],
                     "recurring": [rec_out(d) for d in _rec_rows(c, lid)],
-                    "entries": [entry_out(bud_dec(c, "budget_entries", r)) for r in
+                    # 2.584.0 (#3965, fable F6): + rmonth, the month a template's entry was booked for (bud_import takes it)
+                    "entries": [{**entry_out(bud_dec(c, "budget_entries", r)), "rmonth": r["rmonth"]} for r in
                                 c.execute("SELECT * FROM budget_entries WHERE list_id=? AND deleted_at IS NULL ORDER BY day, id", (lid,))],
                     "files": [dict(r) for r in c.execute("SELECT id, entry_id, name, mime, size, created_at FROM budget_files WHERE list_id=? AND entry_id IN (SELECT id FROM budget_entries WHERE deleted_at IS NULL)",
                                                          (lid,))]})
@@ -1512,12 +1513,14 @@ def bud_export(c, uid):
 
 
 
-def bud_import(c, uid, lid, b, task_of=None):
+def bud_import(c, uid, lid, b, task_of=None, step=None):
     """2.584.0 (#3965): the counterpart of bud_export -- one exported budget b ({categories, recurring, entries}) into the budget
     list lid of uid (the caller made or mapped it; nothing here trusts an id of the file: categories and templates get new ids,
     an entry / template points only at one of THIS import, a contract only at a task task_of(old id) maps). Every value is
     checked like an entry made by hand (_entry_vals / _rec_vals), encrypted for the list's space (bud_enc), the limits of the
     app apply (BUD_CATS_MAX, BUD_REC_MAX). Inside the caller's transaction, each row in its own savepoint.
+    fable F6: at most BUD_ROWS_MAX entries (like one bank import; more = rows left out), step() per row (the run's progress), the
+    booked month of a template's entry from the file when it is one (else its day's).
     -> ([(table, new id)], rows left out)."""
     if not c.execute("SELECT 1 FROM lists WHERE id=? AND owner_id=? AND life='budget' AND deleted_at IS NULL", (lid, uid)).fetchone():
         raise Denied(404)
@@ -1529,7 +1532,9 @@ def bud_import(c, uid, lid, b, task_of=None):
     def old(v):
         return v if isinstance(v, int) and not isinstance(v, bool) else None
     sort = c.execute("SELECT COALESCE(MAX(sort),-1)+1 FROM budget_cats WHERE list_id=?", (lid,)).fetchone()[0]
+    step = step or (lambda: None)
     for r in rows("categories"):
+        step()
         try:
             if c.execute("SELECT COUNT(*) FROM budget_cats WHERE list_id=? AND deleted_at IS NULL", (lid,)).fetchone()[0] >= BUD_CATS_MAX:
                 raise BadInput(tr("Too many categories"))
@@ -1546,6 +1551,7 @@ def bud_import(c, uid, lid, b, task_of=None):
             cats[r["id"]] = cid
         made.append(("budget_cats", cid))
     for r in rows("recurring"):
+        step()
         try:
             v = _rec_vals(c, lid, {**r, "cat_id": cats.get(old(r.get("cat_id")))})
             ct = task_of(r.get("contract_task_id")) if task_of and r.get("contract_task_id") is not None else None
@@ -1557,9 +1563,15 @@ def bud_import(c, uid, lid, b, task_of=None):
         if old(r.get("id")):
             recs[r["id"]] = rid
         made.append(("budget_recurring", rid))
-    for r in rows("entries"):
+    ents = rows("entries")
+    bad += max(0, len(ents) - BUD_ROWS_MAX)
+    for r in ents[:BUD_ROWS_MAX]:
+        step()
         try:
             v = _entry_vals(c, lid, {**r, "cat_id": cats.get(old(r.get("cat_id"))), "recurring_id": recs.get(old(r.get("recurring_id")))})
+            rm = r.get("rmonth")
+            if v["recurring_id"] and isinstance(rm, str) and BUD_MONTH_RE.fullmatch(rm):  # fable F6: the month it was booked for
+                v["rmonth"] = r["rmonth"]
             eid = entry_insert(c, uid, lid, v, r.get("source") if r.get("source") in BUD_SOURCES else "manual")
         except (BadInput, Denied):
             bad += 1

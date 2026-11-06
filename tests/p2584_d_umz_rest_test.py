@@ -103,8 +103,10 @@ FILE = mkzip({
                  "entries": [{"id": 53, "list_id": 5, "day": "2026-10-03", "amount": 45.5, "kind": "out", "title": "Einkauf", "note": "Markt",
                               "counterpart": "Laden", "cat_id": 51, "recurring_id": None, "source": "manual"},
                              {"id": 54, "list_id": 5, "day": "2026-10-01", "amount": 800, "kind": "out", "title": "Miete", "note": "",
-                              "counterpart": "", "cat_id": 51, "recurring_id": 52, "source": "recurring"},
-                             {"id": 55, "list_id": 5, "day": "kein Tag", "amount": 1, "kind": "out", "title": "Kaputt"}]},
+                              "counterpart": "", "cat_id": 51, "recurring_id": 52, "source": "recurring", "rmonth": "2026-09"},
+                             {"id": 55, "list_id": 5, "day": "kein Tag", "amount": 1, "kind": "out", "title": "Kaputt"}],
+                 # fable F6: the receipts' names only (bud_export): they stay behind and the preview says so
+                 "files": [{"id": 59, "entry_id": 53, "name": "beleg.pdf", "mime": "application/pdf", "size": 10, "created_at": TS}]},
                 # a budget on a project that is no budget list, and one naming otto's list (an id of this server)
                 {"list_id": 1, "name": "Kein Budget", "entries": [{"id": 56, "day": "2026-10-04", "amount": 5, "kind": "out", "title": "Falsch"}]},
                 {"list_id": OLIST, "name": "Fremd", "categories": [{"id": 57, "name": "Fremdkat", "kind": "out"}],
@@ -133,6 +135,7 @@ nt = {x.get("what"): x.get("count") for x in (j.get("preview") or {}).get("not_t
 gone = {"Household budget", "Absences", "Timesheets", "Playbooks"} & set(nt)
 check(not gone, f"#3965 the preview no longer names them as staying behind {gone} {nt}")
 check(nt.get("Timesheets of months you have here already") == 1, f"#3965 ... but the month gina has here already {nt}")
+check(nt.get("Receipts in the household budget") == 1, f"fable F6: the preview names the receipts that stay behind {nt}")
 r = Gi.post(B + f"/api/account/import/{iid}/run", json={"target": "private", "people": {}})
 check(r.status_code == 202, f"the run starts {r.status_code} {r.text[:200]}")
 j = until(lambda: state_of(Gi, iid), 180) or {}
@@ -185,8 +188,9 @@ check(ents == [("Einkauf", 45.5, "Markt", True), ("Miete", 800.0, "", True)], f"
 rec = (Gi.get(B + f"/api/budget/{BL or 0}/recurring").json() or {}).get("items") or []
 RID = rec[0].get("id") if rec else None
 check(len(rec) == 1 and rec[0].get("title") == "Miete" and rec[0].get("amount") == 800, f"#3965 the template arrives {rec}")
-check(one("SELECT recurring_id FROM budget_entries WHERE list_id=? AND rmonth='2026-10'", (BL or 0,)) == RID and RID,
-      "#3965 the booked month points at the new template")
+# 2.584.0 (#3965, fable F6): the booked month comes from the file (2026-09, booked on 1 October), not from the day
+check(one("SELECT recurring_id FROM budget_entries WHERE list_id=? AND rmonth='2026-09'", (BL or 0,)) == RID and RID,
+      "#3965 the booked month points at the new template, fable F6: the month of the file")
 sids = kt.dbx("SELECT sid, title FROM budget_entries WHERE list_id=?", (BL or 0,))
 check(all(x[0] in (0, -GID) and (x[0] == 0 or x[1] not in ("Einkauf", "Miete")) for x in sids),
       f"#3965 the entries are sealed like one made by hand (the owner's account key while private encryption is on) {sids}")
