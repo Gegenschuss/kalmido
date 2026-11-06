@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.614.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "In der EÜR siehst du jetzt den Vergleich mit dem Vorjahr, ältere Jahre aus dem DATEV-Archiv.",
+     "en": "The income statement now shows a comparison with the year before, older years from the DATEV archive."
+    },
+    {
+     "de": "Du kannst je Jahr wählen, ob die EÜR nach Belegen oder streng nach Bank und Kasse rechnet.",
+     "en": "You can choose per year whether the income statement counts by receipts or strictly by bank and cash."
+    },
+    {
+     "de": "Am Rechner steht die Notizen-Liste jetzt in der Seitenleiste, die sich ausblenden und breiter ziehen lässt.",
+     "en": "On a computer the note list now sits in the sidebar, which you can hide and drag wider."
+    },
+    {
+     "de": "Karten, Hinweise und der Monatskalender haben einheitliche Ecken und Ränder.",
+     "en": "Cards, hints and the month calendar have consistent corners and borders."
+    }
+   ]
+  },
+  {
    "version": "2.605.0",
    "date": "2026-11-06",
    "items": [

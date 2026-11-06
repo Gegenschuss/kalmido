@@ -15,6 +15,40 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.614.0] - 2026-11-06
+
+### Fixed - main: test p4286_restore runs its hard stops alone on the database (server beside it frozen without an open transaction, like behind the maintenance gate) and names a failed pg_restore of the backup (CI red of 2.601.0)
+
+Package 2.603 (Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sa).
+
+### Added
+- Office > Bookkeeping > income statement (EUeR): a section "Comparison with the year before" with this year, the year before, deviation and percent per line, totals, profit and a VAT liability line. Years before Kalmido come from the DATEV booking archive, marked "Source: DATEV archive", display only - never booked or added (#4921).
+- Office settings > Company & office > Bank & taxes: new setting "Basis of the income statement" per year - "Receipts" (as before, default) or "Bank and cash (strict)": receipts count only through their bank, cash or card line on its day, bank lines without a receipt count with the warning "Receipt missing", income only through bank/cash, card totals are transfers and the card positions the expenses, cash withdrawals are transfers to the cash book, private lines do not count. Also offered on the country card of a new office; a year with a locked month keeps its basis. EUeR, VAT figures, tax reserve, cash flow and the DATEV export follow it (#4927).
+- Entertainment receipt: "Paid with" links it to its bank, cash or card line; with the strict basis it counts through that line with the 70/30 split, never twice (#4927).
+
+### Fixed
+- Travel costs: restoring a single deleted receipt from the office trash no longer fails because another receipt of the same trip lies in a locked month (#4555).
+- Documents on the phone: the document sheet could open without its receipt hints when the app redrew while the documents module was still loading (#4912).
+
+Package 2.602 (Bündel: Bündel: CI-only rot: p2141_a_api, CI-only rot: p2172_a_edit_ui, CI-only rot: p2273_c_ui u. 7 weitere, Sammelpaket: Aufgaben ohne Pak).
+
+### Changed
+- On a computer the note list sits in the shared sidebar like Knowledge: search, bin, "New note" and the cards are in the sidebar, which can be hidden and dragged wider; the page shows the open note. On a phone list and note still come one after the other (#4817).
+- Lists that stay inside the page (file store spaces, team chat, contacts / customers, notes without sidebar) share one width token --w-leiste (15rem, at least 14rem) (#4817).
+- Cards and surfaces use the radius, border and shadow tokens only: cards var(--r-l) with border var(--line2), hints / fields / chips var(--radius) or var(--r-s); the undefined --r / --r-m / --hover are gone; the month calendar has the same frame as the week (#4816).
+- Fewer database queries: the participant lists are worked out once per request, v1 tags of all lists, the approval hint's list names / roles and the tag copy of a repeated task each run as one query (#4507, #4508).
+
+### Fixed
+- A cold start on a document address (#docs/<id>) showed the document without the reading view and folded properties; the pane is drawn anew once the reading layout is ready (#4913).
+- The sweep of p287b_a_freelancer_api makes its own sprint, field and saved documents view instead of skipping their routes (#4935).
+- The second /api/state switched the database context 14 times (10 without an organisation) instead of at most 4: the account kind, the receipts' structure and the own organisation are no longer read in the system context each time (#4729).
+
+Package 2.570 (part B: undo with a version check).
+
+### Fixed
+- Undo and redo no longer silently overwrite a change made in another session: a bookmark, a document, an office archive correction and "Make this the default" for the dashboard and project page arrangements now check the version, keep the other change and say "Changed elsewhere, not undone" (#4770).
+- A bookmark preview fetch and a document recognition run no longer move the item's version, so undo after them works as before; documents carry their own edited_at, office archive entries an updated_at and the standard arrangements a version (#4770).
+
 ## [2.605.0] - 2026-11-06
 
 Package 2.586 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2191_c_perf, CI-only rot: p2290_c_fold_ui u. 1 weitere).
@@ -55,6 +89,7 @@ Package 2.582 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher),
 
 Not released (the CI of this version was red); its changes are listed under 2.605.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.605.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.614.0...HEAD
+[2.614.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.614.0
 [2.605.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.605.0
 [2.601.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.601.0
