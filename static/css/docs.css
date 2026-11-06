@@ -355,7 +355,7 @@
   /* a wide pane: the properties as a column beside the preview, each part scrolls on its own */
   @container dcpane (min-width:52rem){
     .dc-main.dc-rd{display:flex;gap:1rem;overflow:hidden}
-    .dc-rd .dc-top{flex:1 1 0;min-width:20rem;height:auto;margin:0}
+    .dc-rd .dc-top{flex:1 1 0;min-width:12rem;height:auto;margin:0}  /* 2.582.0 (#4830): DCR_PV_MIN, the props grip goes up to it */
     .dc-rd>.dc-grip{display:block;margin:0 -.875rem}
     .dc-rd>.dc-props{flex:0 0 var(--dc-ew,24rem);min-width:0;overflow-y:auto;overscroll-behavior:contain;padding-right:.25rem}
   }

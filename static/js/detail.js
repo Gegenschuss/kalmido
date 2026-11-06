@@ -146,8 +146,11 @@ window.addEventListener('resize', () => { clearTimeout(fitT); fitT = setTimeout(
 // 2.350.0 D (#2750): chat and sidebar have no upper limit any more (1000 rem = never reached); the list keeps LIST_FLOOR_PX
 // 2.406.0 A (#3504): usable minimums: the sidebar at least 14 rem, the list at least 18 rem (288 px); stored narrower widths
 // are lifted on load (panelRem), a window too narrow for both folds the sidebar into the drawer (lay2209)
-const PW = {det: [25.5, 20, 48], chat: [26, 20, 1000], side: [15, 14, 1000]};  // rem: standard, min, max
-const LIST_FLOOR_PX = 288, OLD_MAX = {chat: 44, side: 26};  // 18 rem; the former maximums
+// 2.582.0 (#4830): the task panel has no upper limit either (owner decision 06.11.2026: every grip goes as far as the
+// neighbours' minimum widths allow); panelMax keeps the list at LIST_MIN_PX (LIST_SQUEEZE_PX while shrinking). Stored
+// widths stay valid; DET_STD_MAX is only the cap of the growing default (pw_std), the former maximum.
+const PW = {det: [25.5, 20, 1000], chat: [26, 20, 1000], side: [15, 14, 1000]};  // rem: standard, min, max
+const LIST_FLOOR_PX = 288, OLD_MAX = {chat: 44, side: 26}, DET_STD_MAX = 48;  // 18 rem; the former maximums
 // 2.350.0 D (#2750): a chat / sidebar wider than the former maximum may squeeze the list down to 18 rem (else 320 px as before)
 const listFloor = () => (document.body.classList.contains('chat-open') && panelRem('chat') > OLD_MAX.chat) || panelRem('side') > OLD_MAX.side ? LIST_FLOOR_PX : LIST_SQUEEZE_PX;
 // 2.319.0 B (#3288): the app bar's width in rem (app.css --srW: narrower without its labels)
@@ -160,7 +163,7 @@ function pw_std(k) {
   const rem = parseFloat(getComputedStyle(document.documentElement).fontSize) || 16, app = $('#app'), b = document.body;
   const side = !app || app.classList.contains('side-rail') ? 0 : (app.classList.contains('sb-b') ? srW() * rem : 0) + (app.classList.contains('sbb-nopan') ? 0 : panelRem('side') * rem);
   const chat = b?.classList.contains('chat-open') && innerWidth >= 1000 ? panelRem('chat') * rem : 0;
-  return Math.max(PW.det[0], Math.min(PW.det[2], Math.floor((innerWidth - side - chat) * .3 / rem * 4) / 4));
+  return Math.max(PW.det[0], Math.min(DET_STD_MAX, Math.floor((innerWidth - side - chat) * .3 / rem * 4) / 4));
 }
 const panelRem = k => { const v = +LS.get('pw.' + k, 0); return v ? Math.max(PW[k][1], Math.min(PW[k][2], v)) : pw_std(k); };
 // 2.209.0 A (#2772): the widths in use when fitLayout had to shrink a panel (rem, null = the stored width)

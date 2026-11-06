@@ -14,7 +14,10 @@
 const DCR = {rz: 1, pdf: null, ro: null, drag: null};
 const DCR_ZMIN = 0.5, DCR_ZMAX = 4;
 // the grips: their device key, the CSS variable on .dc-wrap, the room the others keep (rem)
-const DCR_GRIPS = {pane: {k: 'dc.paneW', v: '--dc-pw', min: 20, keep: 18}, list: {k: 'dc.readW', v: '--dc-rl', min: 14, keep: 30}, props: {k: 'dc.propW', v: '--dc-ew', min: 16, keep: 20}};
+// 2.582.0 (#4830): no fixed limits, only the neighbour's minimum: the properties beside the preview keep the preview a small
+// rest (DCR_PV_MIN, docs.css .dc-rd .dc-top) plus the gap, no longer 20rem
+const DCR_PV_MIN = 12;
+const DCR_GRIPS = {pane: {k: 'dc.paneW', v: '--dc-pw', min: 20, keep: 18}, list: {k: 'dc.readW', v: '--dc-rl', min: 14, keep: 30}, props: {k: 'dc.propW', v: '--dc-ew', min: 16, keep: DCR_PV_MIN + 1}};
 const dcr_rem = () => parseFloat(getComputedStyle(document.documentElement).fontSize) || 16;
 const dcr_wide = () => !isMobile() && matchMedia('(min-width:64rem)').matches;
 const dcr_want = () => !!LS.get('dc.read', false);
