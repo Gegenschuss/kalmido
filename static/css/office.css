@@ -1230,3 +1230,4 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
   .ofdeditor>.ofdfs:first-child+.dpjrow{grid-column:1;grid-row:2}
   .ofdeditor>.ofdfs:first-child~.ofdfs{grid-column:2;grid-row:1 / span 2}
 }
+.fcicat .fcicatren{margin-inline-start:.25rem;vertical-align:middle;text-transform:none}  /* 2.581.0 (#4820): the pencil of a fixed cost category */

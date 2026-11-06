@@ -182,12 +182,12 @@ def fci_preview(c, oid, raw, name=""):
         if all(not str(x).strip() or fci_num(x) == 0 for x in r):
             continue  # 2.122.2 (#2323): a row with only "0" (a month cell of an empty row) is empty too
         label, amt_s, mon_s = _clean_text(cell(r, "label"), 200), cell(r, "amount"), cell(r, "month")
-        cat = _clean_text(cell(r, "category"), 100)
+        cat = _clean_text(cell(r, "category"), 100).rstrip(" :")  # 2.581.0 (#4820): "Digital Abos:" -> "Digital Abos"
         base = {"row": no, "label": label, "amount": "", "gross": "", "repeat": "", "start": "", "month": mon_s[:10],
                 "category": cat or group, "vat_rate": 0, "status": "error", "reason": "", "sel": False, "part": "",
                 "sub": 1 if FCI_YES_RE.match(cell(r, "sub")) else 0, "notice_days": 0}  # 2.91.0 B (#1924)
         if label and not amt_s and not mon_s:
-            group = cat or label  # a group row: the category of the rows below
+            group = (cat or label)[:100].rstrip(" :")  # a group row: the category of the rows below; 2.581.0 (#4820): no colon at the end
             continue
         if not label:
             out.append({**base, "reason": tr(FCI_REASONS["name"])})

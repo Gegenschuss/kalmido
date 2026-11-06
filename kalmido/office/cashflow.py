@@ -114,7 +114,7 @@ def rk_fixed_clean(b, cur=None, c=None, oid=None):
     # 2.67.0 (#1838): a free category (the list groups by it) and the VAT rate of the net amount (0 / 7 / 19; 0 before)
     if "category" in b or not cur:
         v = b.get("category")
-        out["category"] = re.sub(r"[\x00-\x1f\x7f]", "", v).strip()[:100] if isinstance(v, str) else ""
+        out["category"] = rk_cat_clean(v)  # 2.581.0 (#4820): + no colon at the end
     if "vat_rate" in b or not cur:
         v = b.get("vat_rate", 0)
         if isinstance(v, bool) or v in (None, ""):
@@ -132,6 +132,12 @@ def rk_fixed_clean(b, cur=None, c=None, oid=None):
     from .subs import abo_clean
     out.update(abo_clean(c, oid, b, cur))  # 2.91.0 B (#1924): the subscription fields (sub, notice_days, seats, ...)
     return out
+
+
+def rk_cat_clean(v):
+    """2.581.0 (#4820): a fixed cost's category as stored: no control characters, at most 100, no spaces / colons at the end
+    ("Digital Abos:" -> "Digital Abos", the same rule as a group row of the import, office/fixedimport.py)."""
+    return re.sub(r"[\x00-\x1f\x7f]", "", v).strip()[:100].rstrip(" :") if isinstance(v, str) else ""
 
 
 def _fixed_public(c, oid, r):
@@ -250,6 +256,41 @@ def rk_fixed_delete(fid):
     bump(c)
     c.commit()
     return jsonify(ok=True, item=old, trash_id=tid)
+
+
+@app.post("/api/office/fixed-costs/category-rename")
+def rk_fixed_cat_rename():
+    """2.581.0 (#4820): {from, to, ids?} -> {count, ids, old, to, merged}: every fixed cost of category `from` (exactly as
+    stored) gets category `to` (rk_cat_clean; empty = without a category) in ONE transaction; a `to` that is there already
+    merges both groups (merged). ids = only these entries (the toast's undo renames back exactly the moved ones). The
+    rights of saving a fixed cost (office_gate + the office admin, _ctx); every row is read (decrypted: the match must not
+    depend on what core/orgcrypt.py seals -- today only the amount) and written again through ow_write (lock, history per
+    entry, bump), not one SQL UPDATE."""
+    c, uid, oid = _ctx()
+    b = body()
+    if not isinstance(b, dict) or not isinstance(b.get("from"), str) or not isinstance(b.get("to", ""), str):
+        raise BadInput(tr("Invalid data"))
+    old, to, ids = b["from"], rk_cat_clean(b.get("to", "")), b.get("ids")
+    if ids is not None:
+        if not isinstance(ids, list) or len(ids) > MAX_FIXED or any(isinstance(x, bool) or not isinstance(x, int) for x in ids):
+            raise BadInput(tr("Invalid value: {0}", "ids"))
+        ids = set(ids)
+    elif not old:
+        raise BadInput(tr("Invalid value: {0}", "from"))  # "Without category" as a whole is not renamed (no pencil there)
+    write_lock(c, f"office_fixed_costs-cat-{int(oid)}")
+    rows = [oc_dec_fields(c, oid, "office_fixed_costs", r) for r in
+            c.execute("SELECT * FROM office_fixed_costs WHERE org_id=? ORDER BY id", (oid,)).fetchall()]
+    hit = [r["id"] for r in rows if (r.get("category") or "") == old and (ids is None or r["id"] in ids)]
+    if not hit:
+        raise Denied(404)
+    merged = any((r.get("category") or "") == to and r["id"] not in hit for r in rows) if to else False
+    if to != old:
+        dec_, enc_ = (lambda c, r: oc_dec_fields(c, oid, "office_fixed_costs", r)), (lambda c, v: oc_enc_fields(c, oid, "office_fixed_costs", v))
+        for fid in hit:
+            ow_write(c, uid, "office_fixed_cost", fid, {"category": to}, lambda c, b, cur: {"category": to}, oid=oid,
+                     dec=dec_, enc=enc_, version=False, lock=f"office_fixed_costs-{int(fid)}")
+    c.commit()
+    return jsonify(count=len(hit) if to != old else 0, ids=hit, old=old, to=to, merged=merged)
 
 
 # ---------------------------------------------------------------- the cash flow

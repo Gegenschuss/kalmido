@@ -579,6 +579,7 @@ ROUTES = {
     "POST /api/office/docs/{}/payments": "office", "POST /api/office/docs/{}/send": "office",
     "POST /api/office/docs/{}/signoff": "office", "POST /api/office/docs/{}/status": "office",
     "POST /api/office/fixed-costs": "office", "POST /api/office/fixed-costs/delete": "office",
+    "POST /api/office/fixed-costs/category-rename": "office",  # 2.581.0 (#4820)
     "POST /api/office/fixed-costs/import": "office", "POST /api/office/fixed-costs/import/preview": "office",
     "POST /api/office/import": "office", "POST /api/office/legacy/archive": "office",
     "POST /api/office/legacy/archive/address": "office", "POST /api/office/legacy/archive/parse": "office",

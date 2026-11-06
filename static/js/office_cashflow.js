@@ -101,8 +101,22 @@ function rk_fixedHtml() {
   const cats = [...new Set(fx.map(f => f.category || ''))].sort((a, b) => !a - !b || a.localeCompare(b, undefined, {sensitivity: 'base'}));
   const row = f => `<li><button type="button" class="ofcrow" data-rkf="fixed" data-id="${f.id}"><span class="ofcn"><b>${esc(f.label)}${f.sub ? ` <span class="abo-tag">${tr('Subscription')}</span>` : ''}</b><small class="muted">${esc([rp(f.repeat), tr('from {0}', fmtDateLoc(f.start)), f.until ? tr('until {0}', fmtDateLoc(f.until)) : '', +f.vat_rate ? tr('VAT {0} %', f.vat_rate) : tr('without VAT')].filter(Boolean).join(' · '))}</small></span>${rk_fixedSum(f)}${ic('chev', 's')}</button></li>`;
   return `<div class="ofcbar fcibar"><h3 class="ofcgrp">${tr('Fixed costs')}</h3><span class="spacer"></span>${fx.some(f => f.sub) ? `<a class="btn sm ghost" href="#office/subs" data-abo="go">${ic('repeat', 's')}<span>${tr('Subscriptions & tools')}</span></a>` : ''}<button class="btn sm pri" data-rkf="fnew">${ic('plus', 's')}<span>${tr('New fixed cost')}</span></button></div>`
-    + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
+    + (fx.length ? cats.map(k => `${cats.length > 1 || k ? `<h4 class="fcicat">${esc(k || tr('Without category'))}${k ? `<button type="button" class="iconbtn fcicatren" data-rkf="fcat" data-k="${esc(k)}" title="${esc(tr('Rename category'))}" aria-label="${esc(tr('Rename category {0}', k))}">${ic('edit', 's')}</button>` : ''}</h4>` : ''}<ul class="ofclist" role="list">${fx.filter(f => (f.category || '') === k).map(row).join('')}</ul>`).join('')
       : `<p class="muted lempty">${tr('No fixed costs yet, e.g. rent or software subscriptions.')}</p>`) + oim_link('fixed', !fx.length) + rk_agrFixedHtml();
+}
+// 2.581.0 (#4820): rename a category for all its fixed costs in one step (server: office/cashflow.py rk_fixed_cat_rename);
+// a name that is there already merges both groups (asked first), empty = without a category; one undo for the whole step
+async function rk_fixedCatRename(k) {
+  const cats = new Set((RKF.fixed || []).map(f => f.category || '').filter(Boolean));
+  const v = await askPrompt(tr('Rename category'), k, {body: tr('Empty = without category'), ok: tr('Save'), input: {max: 100, placeholder: tr('Without category')}});
+  if (v == null) return;
+  const to = v.trim().slice(0, 100).replace(/[\s:]+$/, '');
+  if (to === k) return;
+  if (to && cats.has(to) && !await askConfirm(tr('Merge categories?'), tr('“{0}” will be merged with “{1}”.', k, to), {ok: tr('Merge')})) return;
+  let j;
+  try { j = await api('POST', '/api/office/fixed-costs/category-rename', {from: k, to}); } catch (x) { toast(x.message || tr('unknown')); return; }
+  rk_cfReload();
+  toast(j.merged ? tr('Merged') : tr('Renamed'), async () => { await api('POST', '/api/office/fixed-costs/category-rename', {from: j.to, to: j.old, ids: j.ids}).catch(x => toast(x.message || tr('unknown'))); rk_cfReload(); });
 }
 // 2.122.3 A (#2333): without VAT net and gross are the same, so one amount without "net"/"gross" (like the contracts row)
 function rk_fixedSum(f) {
@@ -254,6 +268,7 @@ document.addEventListener('click', e => {
   else if (a === 'fimp') fci_pick();
   else if (a === 'open') { RKF.open = RKF.open === b.dataset.k ? null : b.dataset.k; ofcDraw(); }
   else if (a === 'fnew') rk_fixedModal(null);
+  else if (a === 'fcat') rk_fixedCatRename(b.dataset.k);  // 2.581.0 (#4820)
   else if (a === 'fixed') { const f = (RKF.fixed || []).find(x => x.id === +b.dataset.id); if (f) rk_fixedModal(f); }
   else if (a === 'trip') { if (typeof RK === 'object') { RK.open = +b.dataset.id; RK.view = 'trips'; RK.year = ''; RK.data = null; } return; }  // the link itself opens the tab
   else return;
