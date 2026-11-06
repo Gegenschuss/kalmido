@@ -111,6 +111,10 @@ const RO = /read-only/, GU = /does not include this/;
   check(r.http === 403 && RO.test(r.error || ''), `read-only: no answer to the buttons ${r.http} ${r.error}`);
   r = await call('POST', `/api/comments/${QC}/choice`, {choice_ids: ['Short']}, Gi);
   check(r.http === 403, `guest: no answer to the buttons ${r.http}`);
+  r = await v1('POST', `comments/${QC}/choice`, {choice_ids: ['Long']}, await (async () => (await call('POST', '/api/me/tokens', {name: 'r', scopes: ['read', 'write', 'comments']}, Ri)).token)());
+  check(r.http === 403, `v1 read-only: no answer to the buttons ${r.http}`);
+  r = await call('POST', `/api/comments/${QC}/choice`, {choice_ids: ['Short']}, A);  // (bob may not address the admin's agent; while it is the newest question)
+  check(r.http === 200, `the project's owner answers the buttons ${r.http} ${r.error || ''}`);
 
   // ================= API v1 (people's own tokens)
   const tok = async c => (await call('POST', '/api/me/tokens', {name: 't', scopes: ['read', 'write', 'comments']}, c)).token;
@@ -122,14 +126,10 @@ const RO = /read-only/, GU = /does not include this/;
   check(r.http === 403, `v1 guest: no comment ${r.http}`);
   r = await v1('POST', `comments/${C0}/reactions`, {emoji: 'heart'}, VR);
   check(r.http === 403, `v1 read-only: no reaction ${r.http}`);
-  r = await v1('POST', `comments/${QC}/choice`, {choice_ids: ['Long']}, VR);
-  check(r.http === 403, `v1 read-only: no answer to the buttons ${r.http}`);
   r = await v1('POST', `tasks/${T2}/comments`, {body: 'Via the API'}, VB);
   check(r.http === 201, `v1 member: comments ${r.http} ${r.text.slice(0, 150)}`);
   r = await v1('PATCH', `comments/${CB}`, {body: 'Looks good!'}, VB);
   check(r.http === 200, `v1 member: edits the own comment ${r.http}`);
-  r = await call('POST', `/api/comments/${QC}/choice`, {choice_ids: ['Short']}, A);  // (bob may not address the admin's agent)
-  check(r.http === 200, `the project's owner answers the buttons ${r.http} ${r.error || ''}`);
 
   // ================= a video sign-off of the organisation
   const VID = (await call('POST', '/api/videos', {title: 'First cut', url: 'https://vimeo.com/123456789', list_id: L2}, A)).id;
