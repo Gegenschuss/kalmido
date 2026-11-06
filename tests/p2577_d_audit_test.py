@@ -208,6 +208,7 @@ check(r.status_code == 201 and r.json().get("updated_by") == FID, f"(4) a new ev
 # the wiki history marks a version an agent account wrote
 ag = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "spurhelfer", "display_name": "Spur Helfer"}).json()
 pv = Fr.post(B + "/api/wiki/pages", json={"path": "Spurseite", "body": "eins"}).json()["id"]
+Fr.patch(B + f"/api/wiki/pages/{pv}", json={"body": "zwei"})  # the history begins with a save
 vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
 check(vs and vs[0].get("agent") is False, f"(4) a person's version is not marked as an agent's {vs[:1]}")
 kt.dbx("UPDATE wiki_versions SET created_by=? WHERE page_id=?", (ag.get("id"), pv))
