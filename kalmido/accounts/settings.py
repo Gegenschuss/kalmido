@@ -943,7 +943,7 @@ FV2_VIEWS = ("inbox", "assigned", "today", "tomorrow", "week", "doable", "pinned
 # 2.441.0 (#3592): anything with an address of its own: r:<reference kind>:<id> (lists/favorites.py FV2_REF_KINDS), file: (a file
 # or folder of the file store), doc: (a document), sv: (a saved view of the sidebar), sep: (a divider between the favourites)
 FV2_KEY_RE = re.compile(r"(?:[lafpg]:\d{1,11}|m:[a-z]{2,16}|v:[a-z_]{2,12}|(?:file|doc|sep):\d{1,11}|sv:[a-z0-9]{1,16}"
-                        r"|r:(?:office_doc|office_letter|office_gendoc|office_receipt|wiki|sheet|contact|address_book):\d{1,11})")
+                        r"|r:(?:office_doc|office_letter|office_gendoc|office_receipt|wiki|sheet|contact|address_book|docview):\d{1,11})")  # 2.579.0 (#4802): + docview
 FV2_META_MAX = 200
 FV2_META_RE = re.compile(r"(?:#[0-9a-fA-F]{6})?")
 FV2_ICON_RE = re.compile(r"[a-z0-9]{0,16}")
