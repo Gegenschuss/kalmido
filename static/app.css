@@ -2633,13 +2633,6 @@ a.gitrow:hover{background:var(--bg3)}
 .ptcard small{font-size:var(--fs-s);line-height:var(--lh-tight)}
 .ptcard .i{color:var(--accent)}
 .ptcard.on{border-color:var(--accent);box-shadow:0 0 0 .0625rem var(--accent) inset}
-/* 2.575.0 (#3778): own module cards (settings.js mc_*) */
-.mcards .mcgrp{margin:.5rem 0 .75rem}.mcards h5{margin:.5rem 0 .25rem;font-size:var(--fs-m)}
-.mcwrap{position:relative;display:flex;min-width:0}.mcwrap>.ptcard{flex:1;padding-right:2.25rem}
-.mcwrap .mcedit{position:absolute;top:.25rem;right:.25rem}.mcadd{justify-content:center;border-style:dashed}
-.mcnew{color:var(--accent)}.mcedmods{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.5rem}
-.mcedg{border:.0625rem solid var(--line);border-radius:var(--radius);padding:.375rem .5rem;margin:0;min-width:0}.mcedg legend{font-weight:600;padding:0 .25rem}
-.mcedppl{display:flex;flex-wrap:wrap;gap:.25rem 1rem}
 .ptdates{margin-top:.5rem}
 .nsteps{display:flex;flex-direction:column;gap:.75rem;margin:.5rem 0}
 .nstep{display:flex;flex-direction:column;gap:.25rem;padding:.625rem .75rem;border-radius:var(--radius);background:var(--bg3)}

@@ -26,13 +26,22 @@ from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, write_lock
 from ..core.schema import USER_DEFAULTS
-from ..family.family import PM_FULL
 from .orgs import is_org_admin, user_orgs
 from .session import me
 from .wsareas import WSA_KEY_RE, _req_org
 
-# the modules a card can hold: every module of Settings > Modules (family.py PM_FULL = the client's FEATS) + the documents
-MC_MODS = PM_FULL + tuple(x for x in ("docs",) if x not in PM_FULL)
+# the modules a card can hold: every module of Settings > Modules (family/family.py PM_FULL = the client's FEATS, in that
+# order) + the documents. A copy: accounts is a layer below the areas (tools/check_layers.py); tests/p2575_a_api_test.py
+# fails when PM_FULL gains a module that is missing here
+_MC_MODS = ("cal", "timeline", "matrix", "habits", "pomo", "kanban", "collab", "stats", "time", "progress", "deps", "fields",
+            "agents", "comments", "family", "events", "contacts", "contracts", "home", "care", "health", "review", "travel",
+            "reading", "budget", "feeds", "clients", "workload", "forms", "office", "wiki", "files", "dispo", "sheets", "docs")
+
+
+def mc_mods():
+    return _MC_MODS
+
+
 MC_NAME_MAX = 60
 MC_MAX = 50  # cards per workspace (private: per person)
 MC_PEOPLE_MAX = 2000
@@ -61,14 +70,14 @@ def _csv(v):
 
 
 def mc_clean_mods(v):
-    """[module, ...] (or csv) -> the stored csv in the order of MC_MODS; an unknown module is a 400."""
+    """[module, ...] (or csv) -> the stored csv in the order of mc_mods(); an unknown module is a 400."""
     xs = v.split(",") if isinstance(v, str) else v
-    if not isinstance(xs, list) or len(xs) > len(MC_MODS) or not all(isinstance(x, str) for x in xs):
+    if not isinstance(xs, list) or len(xs) > len(mc_mods()) or not all(isinstance(x, str) for x in xs):
         raise BadInput(tr("Invalid value: {0}", "mods"))
     xs = {x.strip() for x in xs if x.strip()}
-    if any(x not in MC_MODS for x in xs):
+    if any(x not in mc_mods() for x in xs):
         raise BadInput(tr("Invalid value: {0}", "mods"))
-    return ",".join(x for x in MC_MODS if x in xs)
+    return ",".join(x for x in mc_mods() if x in xs)
 
 
 def mc_clean_own(v):
@@ -82,12 +91,12 @@ def mc_clean_own(v):
         raise bad
     out = {}
     for k, xs in o.items():
-        if not isinstance(k, str) or not WSA_KEY_RE.fullmatch(k) or not isinstance(xs, list) or len(xs) > len(MC_MODS):
+        if not isinstance(k, str) or not WSA_KEY_RE.fullmatch(k) or not isinstance(xs, list) or len(xs) > len(mc_mods()):
             raise bad
-        if any(not isinstance(x, str) or x not in MC_MODS for x in xs):
+        if any(not isinstance(x, str) or x not in mc_mods() for x in xs):
             raise bad
         if xs:
-            out[k] = [x for x in MC_MODS if x in xs]
+            out[k] = [x for x in mc_mods() if x in xs]
     return json.dumps(out, separators=(",", ":"))
 
 
@@ -129,15 +138,15 @@ def mc_drop():
 
 
 def mc_cap_list(c, uid, oid):
-    """mc_cap as a list in the order of MC_MODS (None = no cap): what /api/me's workspaces carry (orgs.py workspaces_for)."""
+    """mc_cap as a list in the order of mc_mods() (None = no cap): what /api/me's workspaces carry (orgs.py workspaces_for)."""
     cap = mc_cap(c, uid, oid)
-    return None if cap is None else [m for m in MC_MODS if m in cap]
+    return None if cap is None else [m for m in mc_mods() if m in cap]
 
 
 def mc_check(c, uid, oid, mod):
     """403 when module mod is outside uid's cap in organisation oid."""
     cap = mc_cap(c, uid, oid)
-    if cap is not None and mod in MC_MODS and mod not in cap:
+    if cap is not None and mod in mc_mods() and mod not in cap:
         raise Denied(403, tr(MC_OFF_TEXT))
 
 
@@ -223,7 +232,7 @@ def mc_json(r, people=None):
     known = set(_csv(r["known"]))
     d = {"id": r["id"], "space": f"org:{r['org_id']}" if r["org_id"] else "private", "name": r["name"], "icon": r["icon"],
          "mods": _csv(r["mods"]), "dflt": bool(r["dflt"]), "updated_at": r["updated_at"],
-         "new_mods": [m for m in MC_MODS if m not in known]}  # added by an update after the card was saved: off on it
+         "new_mods": [m for m in mc_mods() if m not in known]}  # added by an update after the card was saved: off on it
     if people is not None:
         d["people"] = people
     return d
@@ -297,11 +306,11 @@ def modcards_list():
     oid = _space(c, uid, request.args.get("space") or "private")
     if oid is None:
         rows = c.execute("SELECT * FROM module_cards WHERE org_id IS NULL AND user_id=? ORDER BY id", (uid,)).fetchall()
-        return jsonify(space="private", mods=list(MC_MODS), admin=True, cap=None, cards=[mc_json(r) for r in rows])
+        return jsonify(space="private", mods=list(mc_mods()), admin=True, cap=None, cards=[mc_json(r) for r in rows])
     adm = is_org_admin(c, uid, oid)
     rows = c.execute("SELECT * FROM module_cards WHERE org_id=? ORDER BY id", (oid,)).fetchall()
     ppl = _people_of(c, [r["id"] for r in rows])
-    out = dict(space=f"org:{oid}", mods=list(MC_MODS), admin=adm, cap=mc_cap_list(c, uid, oid))
+    out = dict(space=f"org:{oid}", mods=list(mc_mods()), admin=adm, cap=mc_cap_list(c, uid, oid))
     if adm:
         out["cards"] = [mc_json(r, ppl[r["id"]]) for r in rows]
         out["members"] = _org_members(c, oid)
@@ -334,7 +343,7 @@ def modcards_new():
         c.execute("UPDATE module_cards SET dflt=0 WHERE org_id=?", (oid,))
     cid = insert_id(c, "INSERT INTO module_cards(org_id,user_id,name,icon,mods,known,dflt,created_by,created_at,updated_at) "
                        "VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (oid, None if oid else uid, f["name"], f["icon"], f["mods"], ",".join(MC_MODS), f.get("dflt", 0), uid, ts, ts))
+                    (oid, None if oid else uid, f["name"], f["icon"], f["mods"], ",".join(mc_mods()), f.get("dflt", 0), uid, ts, ts))
     if oid is not None:
         _set_people(c, cid, people)
     bump(c)
@@ -358,7 +367,7 @@ def modcards_edit(cid):
     if oid is None and (f.get("dflt") or "people" in b):
         raise BadInput(tr("Invalid value: {0}", "dflt" if f.get("dflt") else "people"))
     people = _clean_people(c, oid, b["people"]) if oid is not None and "people" in b else None
-    f["known"] = ",".join(MC_MODS)
+    f["known"] = ",".join(mc_mods())
     f["updated_at"] = iso_ms(now_utc())
     if f.get("dflt"):
         c.execute("UPDATE module_cards SET dflt=0 WHERE org_id=? AND id!=?", (oid, cid))

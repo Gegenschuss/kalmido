@@ -14,7 +14,9 @@ freelancer-matrix: modcards
  - a person without an organisation: own cards in Private (make, change, apply through the settings, delete); no default,
    no people, no organisation space
 usage: p2575_a_api_test.py <datadir>"""
+import ast
 import os
+import re
 import sys
 
 N = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +29,10 @@ from kt import B, DATA, FAILS, OKS, check, sess  # noqa: E402,F401
 FEAT = "cal,events,contacts,comments,collab,files,docs,wiki,sheets,time,pomo,habits"
 
 kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2575A")
+
+# the modules a card can hold = every module of Settings > Modules (family.py PM_FULL) + the documents (modcards.py keeps a copy)
+_src = open(os.path.join(N, "..", "kalmido", "family", "family.py"), encoding="utf-8").read()
+PM_FULL = ast.literal_eval(re.search(r"^PM_FULL = (\(.*?\))\n", _src, re.S | re.M).group(1))
 
 
 def sql(q, args=(), write=False):
@@ -70,6 +76,7 @@ check(r.status_code == 201, "an organisation's knowledge page " + r.text[:160])
 PG = r.json().get("id") if r.status_code == 201 else 0
 check(Bo.get(B + f"/api/wiki/pages/{PG}").status_code == 200, "no card yet: Bob opens the organisation's page")
 check(Bo.get(B + f"/api/modcards?space={WS}").json().get("cap") is None, "no card yet: no cap")
+check(Bo.get(B + f"/api/modcards?space={WS}").json().get("mods") == list(PM_FULL) + ["docs"], "a card holds every module of Settings > Modules")
 
 # ================================================================== the admin's cards
 r = A.post(B + "/api/modcards", json={"space": WS, "name": "Basics", "icon": "users", "mods": ["wiki", "time"], "dflt": True})
