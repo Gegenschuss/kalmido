@@ -101,7 +101,8 @@ def can(s, sid):
 
 
 def cell(s, sid, raw="1", base=V, path="/cells"):
-    return s.put(base + f"/sheets/{sid}{path}", json={"cells": [{"cell": "A1", "raw": raw}]}).status_code
+    # 2.571.0 (#4766): an agent's cell write says what it read (2.564.0 #4702: "prev", else 400 version_required); A1 is empty here
+    return s.put(base + f"/sheets/{sid}{path}", json={"cells": [{"cell": "A1", "raw": raw, "prev": ""}]}).status_code
 
 
 def wcell(s, sid, raw="1"):
