@@ -1,0 +1,11 @@
+/* 2.580.0 (#4821): where a task of a mixed view under "All workspaces" comes from (workspace.js ws_originHtml): the workspace's dot +
+   "Workspace · Project"; phones (<= 480 px) only the dot + the workspace's short letters, the full origin in the title */
+.wso .wsov{display:inline-flex;align-items:center;gap:.25rem;min-width:0;max-width:100%;vertical-align:bottom}
+.wso .wsp-dot{width:.5rem;height:.5rem}
+.wso .wsows,.wso .wsol{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wso .wsows{flex:0 1 auto;max-width:55%}
+.wso .wsosep{color:var(--muted)}
+.wso .wsoab{display:none;font-weight:600}
+.meta .lst.wso{max-width:16rem}
+.tcols .c-list.wso{width:11rem}
+@media (max-width:30rem){ .wso .wsows,.wso .wsosep,.wso .wsol,.wso .lic{display:none} .wso .wsoab{display:inline} .meta .lst.wso{max-width:none} }

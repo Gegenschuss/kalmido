@@ -228,6 +228,18 @@ function wsDefaultOrg(folder = '', proj = false) {
 }
 // 2.364.0 D (#3033): under "All workspaces" a private project carries a small house in the sidebar
 const ws_prvMark = l => wsOn() && wsCur() === 'all' && !l.org_id && !l.is_inbox ? `<span class="shr wsprv" role="img" title="${esc(wsName('private'))}" aria-label="${esc(wsName('private'))}">${ic('home', 's')}</span>` : '';
+// 2.580.0 (#4821): a task row of a mixed view (Today, Upcoming, filters, search, tags) under "All workspaces" names where the
+// task comes from: the workspace's dot + "Workspace · Project" (phones <= 480 px: dot + the workspace's short letters, the rest in
+// the title and for screen readers). Not inside an open list (no showList there), not with only one workspace (wsOn), not the inbox
+// (it belongs to no workspace). For a private project this is the row's sign of Private: ws_prvMark stays the sidebar's only.
+const ws_isOrigin = l => !!l && !l.is_inbox && wsOn() && wsCur() === 'all';
+const ws_abbr = ws => { const w = wsName(ws).trim().split(/\s+/).filter(Boolean).map(x => Array.from(x));
+  return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || []).slice(0, 2).join('')).toUpperCase(); };
+function ws_originHtml(l, lst, cls) {
+  const ws = wsOf(l), nm = wsName(ws);
+  return `<span class="${cls} wso" title="${esc(nm + ' · ' + lst)}"><span class="sr">${esc(tr('Workspace: {0}', nm) + ', ' + tr('Project') + ': ' + lst)}</span>`
+    + `<span class="wsov" aria-hidden="true">${wsp_dot(ws)}<span class="wsows">${esc(nm)}</span><span class="wsoab">${esc(ws_abbr(ws))}</span><span class="wsosep">·</span>${licMark(l, 'lsm')}<span class="wsol">${esc(lst)}</span></span></span>`;
+}
 // the <select> of a list's workspace (list dialog); only when the person has an organisation
 function wsSelectHtml(id, cur, dis = '') {
   if (!wsOn()) return '';
