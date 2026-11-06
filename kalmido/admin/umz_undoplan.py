@@ -70,8 +70,13 @@ def _work_cols(c, table):
     return [k for k in umz_cols(c, table)[0] if k.endswith("_at") and k not in _NOT_WORK]
 
 
+# fingerprinted although they have an edited column: bookmarks (the preview fetch writes updated_at), habits (updated_at of 2.564
+# #4701 is only the version of the settings, a day logged since is a change of the habit too: its log is in the fingerprint)
+_PRINT_ALWAYS = frozenset(("bookmarks", "habits"))
+
+
 def _printed(c, table):
-    return table == "bookmarks" or (table not in _NO_PRINT and not any(k in umz_cols(c, table)[0] for k in _EDITED))
+    return table in _PRINT_ALWAYS or (table not in _NO_PRINT and not any(k in umz_cols(c, table)[0] for k in _EDITED))
 
 
 def undo_print(row, skip=()):
