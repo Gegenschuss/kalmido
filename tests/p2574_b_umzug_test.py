@@ -6,6 +6,9 @@ by hanna:
  - otto gets the request as News like discover.conn_request tells one (kind connreq, from hanna, with her name)
  - quinn blocked hanna: the request is hidden and nothing reaches quinn (no News)
  - at most UMZ_CONN_MAX (50) new requests in one run: the rest is not asked and named in its own warning
+ - review B1: rita is visible but never made herself findable: no request, no News, named in its own warning (ask by hand)
+ - review B2: the undo withdraws the requests (wd_open / wd_hidden, as by hand); the same file imported again brings them back
+   without a second News
 Starts its OWN container (start.sh) with KALMIDO_SECRET_KEY (P2574B_NOSTART=1 = the server already runs like that).
 freelancer-matrix: own
 usage: p2574_b_umzug_test.py <datadir>"""
@@ -47,6 +50,10 @@ def upload(s, data):
     return iid, until(lambda: state_of(s, iid), 180) or {}
 
 
+def findable(uid):  # review B1: a confirmed profile of the connection search (discover.disc_findable)
+    kt.dbx("INSERT INTO disc_profiles(user_id, email, confirmed_at, created_at) SELECT id, lower(email), ?, ? FROM users WHERE id=?", (TS, TS, uid))
+
+
 def link(x, y):
     lo, hi = sorted((x, y))
     kt.dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?,?,?)", (lo, hi, TS))
@@ -67,8 +74,12 @@ for n in range(1, CAP + 1):  # 50 more: with otto and quinn 52 connections, the 
     assert r.ok, r.text
     PALS.append(r.json()["id"])
     link(GID, PALS[-1])
+RID, _ = freelancer(B, A, "rita")  # review B1: visible to hanna, not findable
+link(GID, RID)
+for x in [OID, QID] + PALS:
+    findable(x)
 kt.dbx("INSERT INTO conn_blocks(user_id, blocked_id, created_at) VALUES(?,?,?)", (QID, HID, TS))
-check(one("SELECT count(*) FROM conn_links WHERE ? IN (a_id, b_id)", (GID,)) == CAP + 2, "setup: gina has 52 connections")
+check(one("SELECT count(*) FROM conn_links WHERE ? IN (a_id, b_id)", (GID,)) == CAP + 3, "setup: gina has 53 connections")
 
 # ---- the export of gina, imported by hanna
 check(G.post(B + "/api/account/export").status_code == 202, "the export starts")
@@ -104,6 +115,31 @@ over = next((w for w in W if w.startswith("Connections not asked again, more tha
 check(f"more than {CAP}" in over and "Pal49" in over and "Pal50" in over and "Pal48" not in over, f"the rest is named in its own warning: {W}")
 check(any(w.startswith("Connections asked again") and "Otto" in w for w in W), f"the asked ones are named as before: {W}")
 check(not one("SELECT 1 FROM conn_links WHERE ? IN (a_id, b_id)", (HID,)), "never a connection without the other person")
+
+# ---- review B1: rita never made herself findable
+check(not one("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=?", (HID, RID)), "rita: no request")
+check(not one("SELECT count(*) FROM notifications WHERE user_id=? AND kind='connreq'", (RID,)), "rita: no News")
+nf = next((w for w in W if w.startswith("Connections not asked again, the other person cannot be found")), "")
+check("Rita" in nf and "Otto" not in nf, f"rita: named in her own warning (ask by hand): {W}")
+
+# ---- review B2: undo, then the same file again: the requests come back, no second News
+IMP = (j.get("result") or {}).get("import_id")
+check(IMP and H.post(B + f"/api/imports/{IMP}/undo", json={}).ok, "the undo")
+check(until(lambda: one("SELECT status FROM conn_requests WHERE from_id=? AND to_id=?", (HID, OID)) == "wd_open", 30),
+      f"otto: the undo withdraws the request ({one('SELECT status FROM conn_requests WHERE from_id=? AND to_id=?', (HID, OID))})")
+check(one("SELECT status FROM conn_requests WHERE from_id=? AND to_id=?", (HID, QID)) == "wd_hidden", "quinn: withdrawn as hidden")
+iid, j = upload(H, ZIP)
+check(j.get("state") == "preview", f"again: preview {j.get('state')} {j.get('error')}")
+r = H.post(B + f"/api/account/import/{iid}/run", json={"target": "private", "people": {}})
+check(r.status_code == 202, f"again: the run starts {r.status_code} {r.text[:200]}")
+j = until(lambda: state_of(H, iid), 180) or {}
+check(j.get("state") == "done", f"again: the import is done {j.get('state')} {j.get('error')}")
+check(one("SELECT status FROM conn_requests WHERE from_id=? AND to_id=?", (HID, OID)) == "open", "otto: the request is open again")
+check(one("SELECT status FROM conn_requests WHERE from_id=? AND to_id=?", (HID, QID)) == "hidden", "quinn: hidden again")
+check(one("SELECT count(*) FROM conn_requests WHERE from_id=? AND to_id=?", (HID, OID)) == 1, "otto: still one request row")
+check(one("SELECT count(*) FROM notifications WHERE user_id=? AND kind='connreq'", (OID,)) == 1, "otto: no second News")
+W2 = [x.get("text", "") for x in (j.get("result") or {}).get("warnings") or []]
+check(any(w.startswith("Connections asked again") and "Otto" in w for w in W2), f"again: otto named as asked: {W2}")
 
 print(f"p2574_b_umzug: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

@@ -16592,6 +16592,7 @@
   "Only useful with members: the second 👍 must come from another person who may approve (project owner, project admin or an admin). Share the project first.": "Solo tiene sentido con miembros: el segundo 👍 debe venir de otra persona que pueda aprobar (propietario, administrador del proyecto o un administrador). Comparte primero el proyecto.",
   "{0} approved the comment of {1} (one of two approvals)": "{0} aprobó el comentario de {1} (una de dos aprobaciones)",
   "Connections not asked again, more than {0} in one import (ask them by hand): {1}": "Conexiones no solicitadas de nuevo, más de {0} en una importación (solicítalas a mano): {1}",
+  "Connections not asked again, the other person cannot be found in the connection search (ask them by hand): {0}": "Conexiones no solicitadas de nuevo, la otra persona no aparece en la búsqueda de conexiones (solicítalas a mano): {0}",
   "This module is not on your module card in this organisation.": "Este módulo no está en tu tarjeta de módulos en esta organización.",
   "At most {0} module cards": "Como máximo {0} tarjetas de módulos",
   "Module cards": "Tarjetas de módulos",

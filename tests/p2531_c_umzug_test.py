@@ -62,6 +62,8 @@ lo, hi = sorted((GID, OID))
 kt.dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?,?,?)", (lo, hi, TS))
 lo, hi = sorted((GID, PID))
 kt.dbx("INSERT INTO conn_links(a_id, b_id, created_at) VALUES(?,?,?)", (lo, hi, TS))
+# 2.574.0 (#4556): the import asks only someone findable in the connection search (review B1), like a request by hand
+kt.dbx("INSERT INTO disc_profiles(user_id, email, confirmed_at, created_at) SELECT id, lower(email), ?, ? FROM users WHERE id=?", (TS, TS, OID))
 kt.dbx("UPDATE users SET kid=1 WHERE id=?", (KID,))
 kt.dbx("INSERT INTO kid_parents(kid_id, parent_id) VALUES(?,?)", (KID, GID))
 
@@ -128,7 +130,8 @@ check(not one("SELECT 1 FROM kid_parents WHERE ? IN (kid_id, parent_id)", (HID,)
 # ---- the undo takes the request back
 IMP = RES.get("import_id")
 check(IMP and H.post(B + f"/api/imports/{IMP}/undo", json={}).ok, "the undo")
-check(until(lambda: not one("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=?", (HID, OID)), 30),
+# 2.574.0 (#4556): withdrawn (wd_open) as by hand instead of deleted (review B2)
+check(until(lambda: one("SELECT status FROM conn_requests WHERE from_id=? AND to_id=?", (HID, OID)) == "wd_open", 30),
       "F12 the undo takes the request that still waits back")
 
 print(f"p2531_c_umzug: {OKS[0]} ok, {len(FAILS)} failed")

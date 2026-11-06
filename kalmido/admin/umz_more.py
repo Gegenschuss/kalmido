@@ -17,6 +17,7 @@ from ..core.i18n import N_
 from ..accounts.layouts import clean_layout
 from ..accounts.layoutsets import lyv_key_ok, lyv_save
 from ..accounts.discover import _push as conn_push  # 2.574.0 (#4556): a request asked again is told like one asked by hand
+from ..accounts.discover import disc_findable  # 2.574.0 (#4556, review B1)
 from ..collab.comments import send_pushes
 from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_STATES, BM_TITLE_MAX, bm_key, bm_norm_url, bm_site, bm_tags
 from ..notify.taskbell import TBL_LEVELS
@@ -170,7 +171,9 @@ def _family(c, run, uid, data, ts, salt):
     the other person confirms (never a connection without them); one that cannot be asked is named.
     2.574.0 (#4556): an open request is told to the other person the way discover.conn_request tells one (News + push, row
     "share" of their notification settings); a hidden one (they blocked the person) stays silent. At most UMZ_CONN_MAX new
-    requests per run, the rest is not asked and named in its own warning."""
+    requests per run, the rest is not asked and named in its own warning. Review B1: only someone the person could ask by hand
+    (findable, or a request row between them, discover.disc_findable); the others are named (ask by hand). Review B2: a request the
+    undo withdrew (wd_<state>) gets its state back without a new message, like asking again by hand."""
     fam = [r for r in data.get("kid_parents") or [] if isinstance(r, dict)]
     if fam:
         run.warning(N_("Family links do not move along, an admin of this server sets them up again: {0}"), _names(fam))
@@ -179,7 +182,7 @@ def _family(c, run, uid, data, ts, salt):
         return
     me_ = c.execute("SELECT kid, COALESCE(kind,'user') AS kind, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     seen = umz_seen(c, uid, salt) if me_ and not me_["kid"] and me_["kind"] == "user" else {}
-    asked, gone, over, tell = [], [], [], []
+    asked, gone, over, tell, hidden_ = [], [], [], [], []
     for r in links:
         run.step()
         hit = umz_find(c, uid, r.get("email_hash") if isinstance(r.get("email_hash"), str) else "", seen)
@@ -188,14 +191,24 @@ def _family(c, run, uid, data, ts, salt):
             gone.append(r)
             continue
         a, b = sorted((uid, o["id"]))
+        old = c.execute("SELECT id, status FROM conn_requests WHERE from_id=? AND to_id=?", (uid, o["id"])).fetchone()
         if c.execute("SELECT 1 FROM conn_links WHERE a_id=? AND b_id=? AND deleted_at IS NULL", (a, b)).fetchone() or \
-                c.execute("SELECT 1 FROM conn_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=? AND status='open')",
-                          (uid, o["id"], o["id"], uid)).fetchone():
+                (old and not old["status"].startswith("wd_")) or \
+                c.execute("SELECT 1 FROM conn_requests WHERE from_id=? AND to_id=? AND status='open'", (o["id"], uid)).fetchone():
             continue  # connected or asked already (a request of mine keeps its state, as when asking again by hand)
+        if not old and not disc_findable(c, uid, o["id"]):  # review B1: not findable for a request by hand either
+            hidden_.append(r)
+            continue
         if len(asked) >= UMZ_CONN_MAX:  # 2.574.0 (#4556): a hidden one counts too (the limit tells nothing about a block)
             over.append(r)
             continue
         blocked = c.execute("SELECT 1 FROM conn_blocks WHERE user_id=? AND blocked_id=?", (o["id"], uid)).fetchone()
+        if old:  # review B2: withdrawn by an undo -> the old state back, no new message (discover.conn_request, 2.49.0 S1)
+            st0 = old["status"][3:]
+            c.execute("UPDATE conn_requests SET status=? WHERE id=?", ("hidden" if blocked and st0 == "open" else st0, old["id"]))
+            _more(run, "conn_requests", old["id"])
+            asked.append(r)
+            continue
         rid = umz_insert(c, "conn_requests", {"from_id": uid, "to_id": o["id"], "status": "hidden" if blocked else "open", "created_at": ts})
         if rid:
             _more(run, "conn_requests", rid)
@@ -212,6 +225,9 @@ def _family(c, run, uid, data, ts, salt):
         run.warning(N_("Connections that do not move along (no account here you may see): {0}"), _names(gone))
     if over:
         run.warning(N_("Connections not asked again, more than {0} in one import (ask them by hand): {1}"), UMZ_CONN_MAX, _names(over), must=True)
+    if hidden_:  # review B1
+        run.warning(N_("Connections not asked again, the other person cannot be found in the connection search (ask them by hand): {0}"),
+                    _names(hidden_))
 
 
 def _conn_tell(c, uid, to_ids):
@@ -265,7 +281,9 @@ def umz_more_undo(c, uid, cr, since, plan):
         if not isinstance(v, int):
             continue
         if table == "conn_requests":  # 2.531.0 (#4317 F12): a request still waiting goes, one the other person answered stays
-            if c.execute("DELETE FROM conn_requests WHERE id=? AND from_id=? AND status IN ('open','hidden')", (v, uid)).rowcount == 0:
+            # 2.574.0 (#4556, review B2): withdrawn (wd_<state>) as by hand, not deleted: a second import brings it back without a new message
+            if c.execute("UPDATE conn_requests SET status='wd_' || status WHERE id=? AND from_id=? AND status IN ('open','hidden')",
+                         (v, uid)).rowcount == 0:
                 kept += 1 if c.execute("SELECT 1 FROM conn_requests WHERE id=? AND from_id=?", (v, uid)).fetchone() else 0
             continue
         if table == "bookmarks":

@@ -426,6 +426,17 @@ def _ref_target(c, uid, ref):
     return 0
 
 
+def disc_findable(c, uid, other):
+    """2.574.0 (#4556, review B1): may uid ask other by hand - other made themselves findable (a confirmed profile with their current
+    address) or a request row between the two exists (either way, any state)? The bar of _ref_target, for the account import."""
+    if c.execute("SELECT 1 FROM conn_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=?)", (uid, other, other, uid)).fetchone():
+        return True
+    with system_ctx(c):
+        r = c.execute("""SELECT u.email, p.email AS pe FROM users u JOIN disc_profiles p ON p.user_id=u.id WHERE u.id=? AND u.disabled=0
+                         AND u.kind='user' AND u.kid=0 AND u.signup='' AND p.confirmed_at IS NOT NULL""", (other,)).fetchone()
+    return bool(r and r["pe"] == disc_norm(r["email"] or ""))
+
+
 @app.post("/api/disc/requests/<int:rid>/<action>")
 def conn_answer(rid, action):
     """The person asked: accept | decline | reopen (undo of decline / accept, back to open)."""
