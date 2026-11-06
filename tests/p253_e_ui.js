@@ -35,7 +35,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
   check(/class="abadge[ "]/.test(html[0]), 'the agent badge stays');  // 2.482.0 (#3530): an AI agent's badge has the class abai too
   const css = await require('./boot').allCss(); // 2.65.0 (#1824): + the module stylesheets
   const blk = css.slice(css.indexOf('/* 2.53.0 E'));
-  check(!/\.agc[^{]*\{[^}]*var\(--accent\)[^}]*\}/.test(blk.replace(/\.cm\.agc\.new,\.nitem\.agc\.unread\{[^}]*\}/, '')), 'agent tone never uses --accent (except the unread strip)');
+  // #4604: .agcol (the agent chat's own fitted accent, 2.542.0) is another class, not the agent tone .agc
+  check(!/\.agc(?![\w-])[^{]*\{[^}]*var\(--accent\)[^}]*\}/.test(blk.replace(/\.cm\.agc\.new,\.nitem\.agc\.unread\{[^}]*\}/, '')), 'agent tone never uses --accent (except the unread strip)');
   check(/--agent-bg/.test(blk) && /--agent-ink/.test(blk), 'own variables');
   w.close();
 
