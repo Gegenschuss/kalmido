@@ -4313,6 +4313,8 @@ its formulas, a sheet in the trash gives `ref`. Taking back the call that added 
 color / fill: a | a2 | g1 | g2 | g3 (accent, light accent, dark / middle / light grey - no other colours), align: left |
 center | right, merge: [rows, columns]}` on top of its column's kind. Change it with `sheet_set_cells`: `fmt_patch:
 {"bold": true}` changes only these keys (`null` removes one), `fmt` sets the whole format; without `raw` the input stays.
+A new `merge` ends the merged blocks lying inside it; one reaching into it from outside is refused (400). An entry whose
+`prev` no longer fits is skipped as a whole (its format too).
 Send `prev_fmt` (the format you read) so a person's newer format is kept (`conflicts` with `what: "fmt"`). The table's
 `rules` colour cells by their value (`gt`, `lt`, `eq`, `between`, `contains`, `empty`, `overdue`); `sheet_set_rules` replaces
 the whole list and needs `expect_rev`. Your format changes are part of your call: taking it back removes them.

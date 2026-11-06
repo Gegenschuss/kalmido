@@ -1891,7 +1891,8 @@ another sheet with `Name!A1` / `'Sheet name'!A1:B5`; the .xlsx export / import c
 2.578.0: cell format and colour rules. A cell answer has `fmt` (`null` = none): `{bold, italic, wrap: true, color / fill:
 a | a2 | g1 | g2 | g3, align: left | center | right, merge: [rows, columns]}` - the colours are keys of the app's palette
 (accent, light accent, dark / middle / light grey; no other colours), `merge` sits on the top left cell of a merged block
-(the covered cells keep their input). It comes on top of the column's kind. `PUT /api/v1/sheets/{id}/cells` (and the app's
+(the covered cells keep their input; a new block ends the blocks lying inside it, one that reaches into it from outside = 400;
+a format on a missing cell counts as a new cell against the table's cap). It comes on top of the column's kind. `PUT /api/v1/sheets/{id}/cells` (and the app's
 route) takes per cell `fmt` (the whole format, `null` = none) or `fmt_patch` (only these keys, `null` removes one), without
 `raw` only the format changes; `prev_fmt` = the format you read (formatted otherwise since: not changed, in `conflicts`
 with `what: "fmt"`). An agent's format change belongs to its batch (taken back with it). The table answer has `rules`, the
