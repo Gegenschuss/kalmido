@@ -99,6 +99,8 @@ const WS_VIEWS = {
                                               // like office_where (no view keeping data; p2250_a_officesearch checks Private)
   'kalmido/docs/area.py': 'helper',            // 2.522.0 (#4433): ar_office - the office a person works in (the saved setting, per request or
                                               // queue run; no view keeping data)
+  'kalmido/accounts/onboarding.py': 'helper',  // 2.578.0 (#4573): ind_area - which area the app's industry belongs to (the saved setting,
+                                              // per request like office_where; no view keeping data)
   'kalmido/accounts/wsareas.py': 'helper',    // 2.409.0 (#3490): _req_org - which organisation an area lock applies to when a
                                               // request names no space (the saved setting, per request; no view keeping data)
 };
