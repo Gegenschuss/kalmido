@@ -4260,6 +4260,8 @@ curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
 `incident`); people manage them in the app (Settings > Data > Ticket types), agents read them: `list_ticket_types`
 (`GET /api/v1/ticket-types`; with `list_id`: `GET /api/v1/lists/{id}/ticket-types`, the keys that project offers). Set a
 task's `type` only to a key its project offers (else 400). An epic's subtasks are its parts; the app shows their progress.
+With a limited role in an organisation (guest, accounting) the list shows only key, name, icon and colour of the types the
+projects shared with you offer, and `space=org:<id>` answers 404. Deleting a type (people's tokens) needs the scope `delete`.
 
 ## Sprints
 

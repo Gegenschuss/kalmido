@@ -12,6 +12,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F5 the trash lists an organisation's deleted template for its admins (also when another admin made it), not for a member
  - F6 a guest gets no workspace view of the organisation's ticket types (404) and in the plain list only key, name, icon,
    colour of the types its shared project offers; the task counts only for the types' managers
+ - F8 deleting a ticket type changes its tasks' updated_at; the API needs the scope delete for it
 freelancer-matrix: orgschema. A person without an organisation: her template's trash, her ticket types as before
 usage: p2609_c_review_api_test.py <datadir>"""
 import os
@@ -229,6 +230,19 @@ check(j["types"] and all("tasks" not in x for x in j["types"]), f"F6: a member r
 j = A.get(B + "/api/ticket-types", params={"space": f"org:{ORG}"}).json()
 check(next(x for x in j["types"] if x["id"] == INC).get("tasks") == 1, f"F6: the admin sees the count {j['types']}")
 check(any(x["key"] == "incident" and "template" in x for x in Bo.get(B + "/api/ticket-types").json()["types"]), "F6: a member still meets the full type")
+
+# ================================================================== F8 deleting a type: updated_at, the scope delete
+dbw("UPDATE tasks SET updated_at='2026-01-01T00:00:00Z' WHERE id=?", (TI,))
+r = requests.delete(V + f"/ticket-types/{INC}", headers=tok(A, ("read", "structure")), params={"confirm": "1"})
+check(r.status_code == 403, f"F8: the scope structure no longer deletes a type {r.status_code} {r.text[:120]}")
+r = requests.delete(V + f"/ticket-types/{INC}", headers=tok(A, ("read", "delete")), params={"confirm": "1"})
+check(r.ok and r.json().get("tasks") == 1, f"F8: the scope delete does {r.status_code} {r.text[:120]}")
+check(dbx("SELECT ttype, updated_at FROM tasks WHERE id=?", (TI,))[0][1] != "2026-01-01T00:00:00Z", "F8: the task's updated_at changed")
+r = requests.get(V + "/tasks", headers=tok(A, ("read",)), params={"updated_since": "2026-06-01T00:00:00Z", "list_id": L1})
+check(r.ok and TI in [x["id"] for x in r.json()["data"]], f"F8: updated_since finds the task {r.status_code}")
+spec = requests.get(V + "/openapi.json").json()
+check(spec["paths"]["/ticket-types/{id}"]["delete"].get("x-kalmido-scope") == "delete", "F8: OpenAPI names the scope delete")
+assert A.delete(B + f"/api/ticket-types/{HID}").ok
 
 # ================================================================== freelancer-matrix: orgschema
 FL = mklist(Fr, "My work", None)

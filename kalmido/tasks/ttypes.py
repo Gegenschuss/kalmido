@@ -279,7 +279,8 @@ def tt_delete(c, uid, tid, confirm):
         e.v1_name, e.v1_extra = "has_tasks", {"tasks": n}
         raise e
     q = "org_id=?" if oid else "org_id IS NULL AND owner_id=?"
-    c.execute(f"UPDATE tasks SET ttype='' WHERE ttype=? AND list_id IN (SELECT id FROM lists WHERE {q})", (key, oid or owner))
+    # review F8: the tasks changed (API clients with updated_since, the sync see it)
+    c.execute(f"UPDATE tasks SET ttype='', updated_at=? WHERE ttype=? AND list_id IN (SELECT id FROM lists WHERE {q})", (iso(now_utc()), key, oid or owner))
     c.execute(f"UPDATE lists SET def_ttype='' WHERE def_ttype=? AND {q}", (key, oid or owner))
     for lr in c.execute(f"SELECT id, ttypes FROM lists WHERE {q} AND ttypes ILIKE ?", (oid or owner, f'%"{key}"%')).fetchall():
         try:
@@ -410,7 +411,7 @@ def tt_spec(paths, schemas, op, ok, errs, ref, pid, q):
                     [pid("id", "Ticket type id")], body=tt_body, scope="write"),
         "delete": op("Delete an own ticket type. Tasks of this type: 409 has_tasks with their count, then again with confirm=1: they "
                      "get no type", T, ok({"type": "object"}) | errs("403", "404", "409"),
-                     [pid("id", "Ticket type id"), q("confirm", "1 = also when tasks have this type", {"type": "string"})], scope="write")}
+                     [pid("id", "Ticket type id"), q("confirm", "1 = also when tasks have this type", {"type": "string"})], scope="delete")}  # review F8: as deleting a field
     paths["/lists/{id}/ticket-types"] = {"get": op(
         "The ticket type keys a project offers (built-in and own, in order)", T,
         ok({"type": "object", "properties": {"keys": {"type": "array", "items": {"type": "string"}}}}) | errs("404"), [pid("id", "List id")])}

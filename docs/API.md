@@ -505,8 +505,12 @@ until someone switches them on.
   `?space=private|org:<id>` = the ones of that workspace with their task counts (`tasks`), `can_edit` and the suggestions.
 - `POST /ticket-types` `{space?, name, key?, icon?, color?, template?, enabled?}` (or only `{space?, key: "epic"}` for a
   suggestion), `PATCH /ticket-types/{id}`, `DELETE /ticket-types/{id}`: tasks of the type answer `409` (`has_tasks`, with
-  their number in `tasks`); again with `?confirm=1` they get no type and the projects forget it as their default / pick.
-  Agents only read (403).
+  their number in `tasks`); again with `?confirm=1` they get no type (their `updated_at` changes) and the projects forget it
+  as their default / pick. Creating and changing need the scope `structure`, deleting the scope `delete` (as a custom
+  field). Agents only read (403).
+- Who sees what: the workspace view (`?space=org:<id>`) only for members of the organisation with the full view (else
+  `404`), the task counts only for the type's managers. A guest or accounting person gets, without `space`, only key, name,
+  icon and colour of the types the projects shared with them offer.
 - A project offers all enabled types of its workspace or the ones it picked (`ttypes` of the list, `PATCH /lists/{id}`
   in the app): `GET /lists/{id}/ticket-types` -> `{keys}`. A task gets an own type only where its project offers it (else
   400); a built-in type is always taken. `GET /tasks?type=<key>` filters by an own type too.
