@@ -289,7 +289,21 @@ def org_files(c, oid):
                          "UNION ALL SELECT f.path FROM tchat_files f JOIN tchat_rooms r ON r.id=f.room_id JOIN lists l ON l.id=r.list_id "
                          "WHERE r.kind='list' AND l.org_id=?",  # and those of its lists' channels
                          (oid, oid, oid, oid, oid, oid, oid)).fetchall()
+        for col in _thumb_cols(c):  # 2.611.0 (#4884): the previews of its documents (the space of their node)
+            rows += c.execute(f"SELECT d.{col} FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE n.org_id=? AND d.{col}<>''", (oid,)).fetchall()
     return [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + _office_files(oid) + list(f8f_icon_files(c, oid))
+
+
+def _thumb_cols(c):
+    """2.611.0 (#4884): the columns of doc_meta that hold a preview image's path below ATT_DIR (docs/store.py THUMB_DIR): thumb,
+    and thumb_l (the sharp one, 2.583.0 #4812) once this database has it -- the version that brings the column may come later."""
+    return ("thumb", "thumb_l") if _has_col(c, "doc_meta", "thumb_l") else ("thumb",)
+
+
+def _has_col(c, table, col):
+    with system_ctx(c):  # orgcrypt: the database's own catalogue, no content
+        return c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema=current_schema() AND table_name=? AND column_name=?",
+                         (table, col)).fetchone() is not None
 
 
 def all_files(c):
@@ -302,6 +316,8 @@ def all_files(c):
                          "UNION ALL SELECT path FROM sheet_files "  # 2.124.0 B (#2110)
                          "UNION ALL SELECT path FROM template_files "  # 2.363.3 (#3134)
                          "UNION ALL SELECT path FROM tchat_files").fetchall()  # 2.113.1 (#2059): team chat files
+        for col in _thumb_cols(c):  # 2.611.0 (#4884): the documents' preview images (a private one of header 0: docs_thumbs_open)
+            rows += c.execute(f"SELECT {col} FROM doc_meta WHERE {col}<>''").fetchall()
     out = [os.path.join(ATT_DIR, r[0]) for r in rows if r[0]] + list(f8f_icon_files(c))  # 2.58.0 (#1805)
     if os.path.isdir(OFFICE_DIR):
         for name in sorted(os.listdir(OFFICE_DIR)):
@@ -352,6 +368,8 @@ def files_decrypt(c, paths, only_org=None, reseal=None, only=None, stats=None):
             continue
         hid = oc.oc_file_org(h)
         if (only_org is not None and hid != only_org) or (only is not None and not only(hid)):
+            continue
+        if not hid:  # 2.611.0 (#4884): header 0 = a private document preview (docs/store.py thumb_seal), no key row: docs_thumbs_open
             continue
         try:
             if hid not in keys:
@@ -406,6 +424,14 @@ SPACE_SQL = (
     # 2.83.0 (#1427): the lists' own header pictures (lists/listhead.py o3c_head_rel) move with their list
     ("lists", "l.id", "SELECT l.id AS rid, 'listheads/l' || l.id || '-' || l.header_file || '.jpg' AS path, l.org_id, l.owner_id "
                       "FROM lists l WHERE l.header_file<>''", "l.id"),
+    # 2.611.0 (#4884): the documents' preview images (docs/store.py _thumb_write, below attachments/docthumbs) in the space of
+    # their node, so encrypting, the way back and a key's deletion take them along (before only the key change, rot_files,
+    # knew them). A private one sealed with the space's derived key (header 0, docs/store.py thumb_seal) is left to its own
+    # way here (files_settle / files_decrypt skip header 0; decrypt-all opens it in docs_thumbs_open). thumb_l: _thumb_cols
+    ("doc_meta", "d.node_id", "SELECT d.node_id AS rid, d.thumb AS path, n.org_id, n.owner_id FROM doc_meta d "
+                              "JOIN fs_nodes n ON n.id=d.node_id WHERE d.thumb<>''", None),
+    ("doc_meta.thumb_l", "d.node_id", "SELECT d.node_id AS rid, d.thumb_l AS path, n.org_id, n.owner_id FROM doc_meta d "
+                                      "JOIN fs_nodes n ON n.id=d.node_id WHERE d.thumb_l<>''", None),
 )
 
 
@@ -480,6 +506,8 @@ def space_rows(c, list_ids=None, commit=False, held=False, pause=0.0):
     between two portions, outside the lock (was files_settle's)."""
     for table, idc, sql, lcol in SPACE_SQL:
         if list_ids is not None and lcol is None:
+            continue
+        if table == "doc_meta.thumb_l" and "thumb_l" not in _thumb_cols(c):  # 2.611.0 (#4884): a database without the column yet
             continue
         last = 0
         while True:
@@ -829,6 +857,30 @@ def before_user_delete(c, uid):
     return files_decrypt(c, list(where), only_org=me_sid, reseal=target)
 
 
+def docs_thumbs_open(c):
+    """2.611.0 (#4884): decrypt-all's part for the previews of private documents sealed with the space's derived key (header 0,
+    docs/store.py thumb_seal; no key row, files_decrypt skips them): plain again, so they still open after the server key
+    is gone (else 404 and the preview catch-up never makes them again). -> (changed, failed)."""
+    S = _ds()
+    n = bad = 0
+    for col in _thumb_cols(c):
+        with system_ctx(c):  # orgcrypt: server-side bulk work over the private documents' previews
+            rows = c.execute(f"SELECT ws, {col} AS rel FROM doc_meta WHERE ws LIKE 'u%' AND {col}<>''").fetchall()  # pg-ok: ws prefix u is case-exact
+        for r in rows:
+            p = os.path.join(ATT_DIR, r["rel"])
+            h = _head(p)
+            if not h or h[:len(oc.MAGIC)] != oc.MAGIC or oc.oc_file_org(h) != 0:
+                continue
+            try:
+                oc.oc_reseal_file(p, S.thumb_read(c, r["ws"], p))
+                n += 1
+            except OSError as e:
+                bad += 1
+                print(TAG, "cannot open a document preview:", type(e).__name__, flush=True)
+    c.commit()
+    return n, bad
+
+
 def files_count(c, oid):
     out = {"enc": 0, "plain": 0}
     for p in org_files(c, oid):
@@ -913,6 +965,8 @@ def decrypt_all(c):
     c.commit()
     st = {}
     n, bad = files_decrypt(c, all_files(c), stats=st)
+    tn, tb = docs_thumbs_open(c)  # 2.611.0 (#4884): the private documents' previews of header 0 plain too
+    n, bad = n + tn, bad + tb
     tot["files"], tot["kept"] = n, st.get("kept", 0)
     tot["failed"] += bad  # 2.570.0 D (#4716): added, no longer replaced (the trash copies' and documents' values that did not open)
     return tot
