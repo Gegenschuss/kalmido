@@ -1,0 +1,3 @@
+/* 2.569.0 (#4395): My tasks, own sections: "New section" under the last one (a start file: app.css does not grow) */
+#view .msenew{display:flex;align-items:center;gap:.375rem;margin:.5rem 0 .25rem;padding:.5rem;min-height:2.75rem;color:var(--muted)}
+#view .msenew:hover{color:var(--text)}
