@@ -183,6 +183,7 @@ const contrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y
   await call('POST', `/api/sheets/${SID}/presence`, {cell_id: a1.id}, CB);
   await w.eval(`shvLoad(${SID}, true)`);
   check(await until(() => /Bob is editing A1/.test(d.querySelector('.shvpres')?.textContent || '') && td(R[0], C[0]).classList.contains('shvpc')), 'presence: "Bob is editing A1", the cell marked');  // 2.308.0 (#3260): wait for the presence instead of a fixed time
+  w.eval(`document.activeElement?.blur()`);  // 2.578.0 (#3462): the side panel redraws only while the focus is outside it (shvSideSync); the freeze button may still hold it
   w.eval(`SHV.sh.batches = [{batch: 'b1', agent_id: 1, agent_name: 'Helper', created_at: new Date().toISOString(), count: 2, undone: 0}]; shvSideSync()`);
   check(/Changes by agents/.test(d.getElementById('shv-side').textContent) && d.querySelector('#shv-side [data-shv="bundo"][data-b="b1"]'), 'panel: an agent call with "Take back"');
   w.close();
