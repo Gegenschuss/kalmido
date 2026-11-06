@@ -1030,7 +1030,7 @@ ROUTES = {
     "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
     "PUT /api/office/books/taxform/vat": "office",
     "GET /api/office/books/basis": "office", "PUT /api/office/books/basis": "office",  # 2.603.0 (#4927): p2603_c_euer_basis_test.py
-    "GET /api/office/meals/{}/payment": "office", "PUT /api/office/meals/{}/payment": "office",  # 2.603.0 (#4927)
+    "GET /api/office/meals/{}/payment": "office", "PUT /api/office/meals/{}/payment": "office",  # 2.603.0 (#4927): p2603_c_euer_basis_test.py
     "GET /api/office/books/taxcheck": "office",  # 2.589.0 (#3458): the tax check (p2589_c_taxcheck_test.py)
     "GET /api/office/books/receipts": "office", "GET /api/office/books/receipts.csv": "office", "GET /api/office/books/receipts.zip": "office",  # 2.153.0 (#2055)
     "POST /api/office/books/receipts/checked": "office",  # 2.420.0 C (#3448): p24200_c_api_test.py

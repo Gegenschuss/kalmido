@@ -136,9 +136,9 @@ def office(s, who, ws, me):
                                            "company_fields": {"name": f"{who} Beispiel GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
                                                               "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}}).ok,
           f"{who}: office settings")
-    b = s.get(B + O + f"/books/basis?year={Y}").json()
+    b = s.get(B + f"/api/office/books/basis?year={Y}").json()
     check(b.get("basis") == "receipts" and b.get("years") == {} and b.get("locked") is False, f"{who}: the default is receipts {b}")
-    check(s.put(B + O + "/books/basis", json={"year": Y, "basis": "nonsense"}).status_code == 400, f"{who}: a wrong basis 400")
+    check(s.put(B + "/api/office/books/basis", json={"year": Y, "basis": "nonsense"}).status_code == 400, f"{who}: a wrong basis 400")
     # ---- the data
     r1 = doc(s, ws, "r1-material.pdf", "119.00", f"{Y}-03-10", "19")
     r2 = doc(s, ws, "r2-ohne-bank.pdf", "59.50", f"{Y}-04-01", "19")
@@ -175,15 +175,15 @@ def office(s, who, ws, me):
     check(r.status_code == 201, f"{who}: a meal {r.text[:200]}")
     mid = r.json()["id"]
     check(s.post(B + O + f"/meals/{mid}/approve").ok, f"{who}: meal approved")
-    p = s.get(B + O + f"/meals/{mid}/payment").json()
+    p = s.get(B + f"/api/office/meals/{mid}/payment").json()
     check(p["current"] is None and p["candidates"] and p["candidates"][0]["kind"] == "bank" and p["candidates"][0]["id"] == tx["MEAL"],
           f"{who}: the bank line of the same amount is offered first {p}")
-    r = s.put(B + O + f"/meals/{mid}/payment", json={"kind": "bank", "id": tx["MEAL"]})
+    r = s.put(B + f"/api/office/meals/{mid}/payment", json={"kind": "bank", "id": tx["MEAL"]})
     check(r.ok and r.json()["current"]["amount"] == "150.40", f"{who}: an approved meal takes its line {r.text[:200]}")
     r = s.post(B + O + "/meals", json=meal(me, f"{Y}-09-09"))
     mid2 = r.json()["id"]
-    check(s.put(B + O + f"/meals/{mid2}/payment", json={"kind": "bank", "id": tx["MEAL"]}).status_code == 409, f"{who}: one meal per line")
-    check(s.put(B + O + f"/meals/{mid2}/payment", json={"kind": "bank", "id": 99999999}).status_code == 404, f"{who}: a line of nobody 404")
+    check(s.put(B + f"/api/office/meals/{mid2}/payment", json={"kind": "bank", "id": tx["MEAL"]}).status_code == 409, f"{who}: one meal per line")
+    check(s.put(B + f"/api/office/meals/{mid2}/payment", json={"kind": "bank", "id": 99999999}).status_code == 404, f"{who}: a line of nobody 404")
     check(s.delete(B + O + f"/meals/{mid2}").ok, f"{who}: the draft goes")
     # the card: a statement of October, the cafe with its receipt, 20.00 open, the bank total 33.00 differs
     r = s.post(B + K, json={"holder_id": me, "last4": "4711", "account": "DE02120300000000202051"})
@@ -213,10 +213,10 @@ def office(s, who, ws, me):
     check(inc(ei, "vat19") and inc(ei, "vat19")["net"] == "1500.00" and inc(ei, "bank") is None, f"{who}: receipts: both invoices count {ei['income']}")
 
     # ---- basis bank and cash (from Y on: this year inherits)
-    r = s.put(B + O + "/books/basis", json={"year": Y, "basis": "bank"})
+    r = s.put(B + "/api/office/books/basis", json={"year": Y, "basis": "bank"})
     check(r.ok and r.json()["basis"] == "bank" and r.json()["years"] == {str(Y): "bank"}, f"{who}: bank and cash from {Y} {r.text[:200]}")
-    check(s.get(B + O + f"/books/basis?year={TODAY.year}").json()["basis"] == "bank", f"{who}: the next year inherits")
-    check(s.get(B + O + f"/books/basis?year={Y - 1}").json()["basis"] == "receipts", f"{who}: the year before stays")
+    check(s.get(B + f"/api/office/books/basis?year={TODAY.year}").json()["basis"] == "bank", f"{who}: the next year inherits")
+    check(s.get(B + f"/api/office/books/basis?year={Y - 1}").json()["basis"] == "receipts", f"{who}: the year before stays")
     eu = s.get(B + O + f"/books/euer?year={Y}").json()
     w = eu.get("warnings") or {}
     check(eu.get("basis") == "bank", f"{who}: strict: the basis named {eu.get('basis')}")
@@ -246,18 +246,18 @@ def office(s, who, ws, me):
     cf = s.get(B + O + f"/cashflow?from={Y}-05&months=1").json()
     check(any(e["kind"] == "norc" and e["amount"] == "30.00" for e in cf.get("entries", [])), f"{who}: strict: the cash flow has the booking without receipt")
     # taking the meal's line off: the line is a booking without receipt again, the meal does not count
-    check(s.put(B + O + f"/meals/{mid}/payment", json={"kind": None}).ok, f"{who}: the link taken off")
+    check(s.put(B + f"/api/office/meals/{mid}/payment", json={"kind": None}).ok, f"{who}: the link taken off")
     eu2 = s.get(B + O + f"/books/euer?year={Y}").json()
     check(line(eu2, "m:") is None and line(eu2, "b:")["net"] == "210.40", f"{who}: strict: no line, no meal; the line counts without receipt {line(eu2, 'b:')}")
-    check(s.put(B + O + f"/meals/{mid}/payment", json={"kind": "bank", "id": tx["MEAL"]}).ok, f"{who}: linked again")
+    check(s.put(B + f"/api/office/meals/{mid}/payment", json={"kind": "bank", "id": tx["MEAL"]}).ok, f"{who}: linked again")
     # ---- a locked month keeps the basis of its year
     r = s.post(B + O + "/periods/lock", json={"through": f"{Y}-01", "confirm": f"01/{Y}"})
     check(r.ok, f"{who}: January of {Y} locked {r.text[:200]}")
-    r = s.put(B + O + "/books/basis", json={"year": Y, "basis": "receipts"})
+    r = s.put(B + "/api/office/books/basis", json={"year": Y, "basis": "receipts"})
     check(r.status_code == 409 and str(Y) in r.text, f"{who}: a year with a locked month keeps its basis {r.status_code} {r.text[:200]}")
-    check(s.get(B + O + f"/books/basis?year={Y}").json()["locked"] is True, f"{who}: the year shows as locked")
-    check(s.put(B + O + "/books/basis", json={"year": Y, "basis": "bank"}).ok, f"{who}: the same basis again is fine")
-    check(s.put(B + O + "/books/basis", json={"year": TODAY.year, "basis": "receipts"}).ok, f"{who}: the open year may change")
+    check(s.get(B + f"/api/office/books/basis?year={Y}").json()["locked"] is True, f"{who}: the year shows as locked")
+    check(s.put(B + "/api/office/books/basis", json={"year": Y, "basis": "bank"}).ok, f"{who}: the same basis again is fine")
+    check(s.put(B + "/api/office/books/basis", json={"year": TODAY.year, "basis": "receipts"}).ok, f"{who}: the open year may change")
     ei = s.get(B + O + f"/books/euer?year={TODAY.year}").json()
     check(inc(ei, "vat19")["net"] == "1500.00" and ei.get("basis") == "receipts", f"{who}: this year by receipts again")
     check(s.get(B + O + f"/books/euer?year={Y}").json().get("basis") == "bank", f"{who}: {Y} stays bank and cash")
@@ -271,10 +271,10 @@ FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
 office(Fr, "freelancer", "private", FID)
 # tenant-matrix: office -- the meal of another office area: 404, never its line
-check(Fr.get(B + O + f"/meals/{MID}/payment").status_code == 404, "another office's meal: 404")
-check(Fr.put(B + O + f"/meals/{MID}/payment", json={"kind": None}).status_code == 404, "another office's meal cannot be unlinked: 404")
-check(A.get(B + O + f"/meals/{MID}/payment").json()["current"]["kind"] == "bank", "the organisation's link stays")
-check(A.get(B + O + f"/books/basis?year={Y}").json()["years"] == {str(Y): "bank", str(TODAY.year): "receipts"}, "the organisation keeps its own setting")
+check(Fr.get(B + f"/api/office/meals/{MID}/payment").status_code == 404, "another office's meal: 404")
+check(Fr.put(B + f"/api/office/meals/{MID}/payment", json={"kind": None}).status_code == 404, "another office's meal cannot be unlinked: 404")
+check(A.get(B + f"/api/office/meals/{MID}/payment").json()["current"]["kind"] == "bank", "the organisation's link stays")
+check(A.get(B + f"/api/office/books/basis?year={Y}").json()["years"] == {str(Y): "bank", str(TODAY.year): "receipts"}, "the organisation keeps its own setting")
 
 print(f"p2603_c_euer_basis: {OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
