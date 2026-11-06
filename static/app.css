@@ -8576,6 +8576,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .srb.sbacct{padding:.25rem}
 .srb.sbacct .avatar{width:1.75rem;height:1.75rem;font-size:var(--fs-xs)}
 #srail .srb:focus-visible{outline-offset:-2px}
+#srail .srb.srbdbef{box-shadow:inset 0 2px 0 var(--accent)}#srail .srb.srbdaft{box-shadow:inset 0 -2px 0 var(--accent)}#srail .srb.dragging{opacity:.5}  /* 2.575.0 D (#4051): the place an icon is dragged to */
 #side .sbbtop{margin:0 0 .25rem}
 #side .sbbtop .scmd{margin:0;height:2.25rem}
 #side .sbbpt{margin:.75rem .5rem .25rem;font-size:var(--fs-b);font-weight:600;color:var(--text)}

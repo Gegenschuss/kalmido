@@ -146,7 +146,7 @@ function tabBtn(t, on, cls = '') {
 // 2.364.0 B (#3040): "More" = the drawer's list of areas, the same entries in the same order (sbb_btnHtml decides: switched on,
 // not hidden in the sidebar settings, not private in an organisation's view; pinned ones too), then the conversations not
 // pinned, Search and Settings last. Overflowing pinned tabs stay on top. rest = those, for the groups of tabsMore
-const tabAreaItems = () => { const cur = sbb_area(); return SBB_RAIL.map(r => r[0]).filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, rail: 1, ...(a ? {area: id} : {})}; }); };  // 2.479.0 (#2814): rail = an area (Chat is one now)
+const tabAreaItems = () => { const cur = sbb_area(); return sbb_ids().filter(id => sbb_btnHtml(id, cur, sideHidden, 0)).map(id => { const d = sbb_def(id), a = !!mg_area(id); return {id: a ? 'a:' + id : id, go: sbb_target(id), icon: ic(d[1], 'l'), ico: d[1], label: tr(d[2]), mod: id, rail: 1, ...(a ? {area: id} : {})}; }); };  // 2.479.0 (#2814): rail = an area (Chat is one now)
 function tabOverflow() {
   const items = tabItems(), mx = tabMax(), shown = items.length > mx ? items.slice(0, mx - 1) : items;  // 2.477.0 (#3938)
   const rest = items.slice(shown.length), pinned = k => items.some(t => t.id === k);

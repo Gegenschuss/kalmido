@@ -31,6 +31,8 @@ SETTINGS_SERVER_ONLY = ("digest_sent", "digest_mail_sent", "digest_mail_try", "r
                         "fav_asked",  # 2.46.1 (#1361): lists already offered as a favourite
                         "evmail_at", "evmail_day")  # 2.142.0 A (#2146): the bundled event mails sent
 SIDE_GROUPS = ("focus", "clients", "lists", "filters", "tags", "views", "areas", "team")  # 2.25.0 (UX-03); 2.39.1 (#1185): areas
+# 2.575.0 D (#4051): start_page "a:<area>" = the app opens on that area (the ids of SBB_RAIL in static/js/areas.js; home stays "home")
+START_AREA_RE = re.compile(r"a:(tasks|cal|notes|office|time|review|life|reading|ablage|wiki|sheets|habits|team|agents)")
 PUSH_TEST_LIMIT = 40  # 2.367.5 (#2980): test pushes (ntfy and device) per person and hour
 SIDE_PEOPLE_MAX = 5  # 2.99.0 E (#2187): people pinned to the sidebar (static/js/sbnav.js SB_PINS)
 DASH_WIDGETS = ("wait", "today", "news", "chat", "projects", "pinned", "notes", "agents", "stats", "search", "family", "kpi")  # 2.17.0 (#475), 2.19.0; 2.55.1: kpi (2.50.0 #1197, office admins)
@@ -351,7 +353,7 @@ def clean_setting(k, v):
     if k in CAL_LIST_KEYS:  # 2.36.1 (#1127, #956): json lists (list ids / calendar keys "e:<id>" | "s:<id>")
         return clean_cal_list(k, v)
     if k == "start_page":  # 2.364.0 B (#3031)
-        if sv not in ("home", "inbox", "today", "last"):
+        if sv not in ("home", "inbox", "today", "last") and not START_AREA_RE.fullmatch(sv):  # 2.575.0 D (#4051): + "a:<area>"
             raise bad
         return sv
     if k == "side_icons":  # 2.36.0 (#1117)

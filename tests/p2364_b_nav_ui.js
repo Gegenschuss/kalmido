@@ -99,7 +99,9 @@ const feats = async ck => ((await call('GET', '/api/state', null, ck)).settings 
     // Settings > General: open the app on the basket
     w.eval(`settingsModal('general')`);
     const sel = await until(() => d.querySelector('.smodal #s-startpg'));
-    check(sel && [...sel.options].map(o => o.value).join() === 'home,inbox,today,last' && sel.value === 'home', '#3031 fiona: Settings > General "Open the app on", Start by default');
+    // 2.575.0 (#4051): after the four pages the areas follow as start areas ("a:<area>", the menu of an area icon sets them too)
+    const opv = sel ? [...sel.options].map(o => o.value) : [];
+    check(sel && opv.slice(0, 4).join() === 'home,inbox,today,last' && opv.slice(4).every(v => /^a:[a-z]+$/.test(v)) && opv.includes('a:notes') && sel.value === 'home', '#3031 fiona: Settings > General "Open the app on", Start by default ' + opv.join());
     if (sel) { sel.value = 'inbox'; sel.dispatchEvent(new w.Event('change', {bubbles: true})); }
     check(await until(async () => ((await call('GET', '/api/state', null, FCK)).settings || {}).start_page === 'inbox'), '#3031 fiona: the choice is saved to the account');
     w.close();

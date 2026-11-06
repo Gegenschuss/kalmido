@@ -120,6 +120,9 @@ function setVal(el, kind) {  // the value a control stands for; undefined = not 
   return v;
 }
 // apply + remember a change of server settings; label = what the history shows
+// 2.575.0 D (#4051): the areas as start pages ("a:<area>", set from an area icon's menu too, areas.js sbb_railMenu): the shown
+// ones in the bar's order; the one chosen stays listed while it is hidden or off (the app then opens on Start)
+const st_areaOpts = cur => { const ids = sbb_ids().filter(id => id !== 'home' && sbb_def(id) && (sbb_shown(id) || sbb_startKey(id) === cur)); return ids.length ? `<optgroup label="${esc(tr('Areas|nav'))}">${ids.map(id => `<option value="${sbb_startKey(id)}" ${cur === sbb_startKey(id) ? 'selected' : ''}>${esc(tr(sbb_def(id)[2]))}</option>`).join('')}</optgroup>` : ''; };
 async function setApply(patch, label, o = {}) {
   const before = {};
   for (const k in patch) before[k] = S.settings[k] ?? '';
@@ -732,7 +735,7 @@ function settingsModal(focus) {
       <div class="row"><div class="seg" id="s-lang" role="group" aria-labelledby="s-lang-h">${(S.languages || []).map(L => `<button data-lang-set="${esc(L.code)}" class="${(s.lang || 'en') === L.code ? 'on' : ''}" lang="${esc(L.code)}">${langName(L)}</button>`).join('')}</div></div>
       ${hint(tr('Quick add understands English, German and the language chosen here.'))}
       <h4 id="s-startpg-h">${tr('Start page')}</h4>
-      <div class="row"><label for="s-startpg">${tr('Open the app on')}</label><select id="s-startpg">${START_PAGES.map(([v, n]) => `<option value="${v}" ${(s.start_page || 'home') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}</select></div>
+      <div class="row"><label for="s-startpg">${tr('Open the app on')}</label><select id="s-startpg">${START_PAGES.map(([v, n]) => `<option value="${v}" ${(s.start_page || 'home') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}${st_areaOpts(s.start_page) /* 2.575.0 D (#4051) */}</select></div>
       ${fmtSetHtml(s, hint) /* 2.368.0 B (#2982) */}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>

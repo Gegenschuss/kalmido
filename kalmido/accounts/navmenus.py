@@ -14,7 +14,7 @@ from ..core.errors import BadInput
 from ..core.i18n import tr
 
 # the menus that can be arranged (the ids of MG_AREAS in areas.js, and the phone's tab bar)
-NAV_AREAS = ("office", "time", "review", "life", "reading", "ablage", "tabbar")
+NAV_AREAS = ("office", "time", "review", "life", "reading", "ablage", "tabbar", "rail")  # 2.575.0 D (#4051): + rail = the order of the area icons
 NAV_LISTS = ("order", "hidden", "shown")
 NAV_MAX = 80  # entries per list (the office has about 25 points, the tab bar a handful)
 # a point: a route word of the office / an area ("cashflow", "family"); the tab bar also pins views, lists and filters

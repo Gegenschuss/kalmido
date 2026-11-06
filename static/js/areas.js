@@ -494,7 +494,7 @@ function sbb_btnHtml(id, cur, hid, aw) {
   if (!sbb_shown(id) || (!on && id !== 'tasks' && (a => a ? mg_sideHidden(id, hid) : hid('e:' + id))(mg_area(id)))) return '';  // Settings > Appearance > Sidebar per part
   const req = id === 'life' && famOn() ? (S.kids || []).reduce((n, k) => n + (k.requests || 0), 0) : 0, n = id === 'agents' ? aw : id === 'team' ? S.team?.unread || 0 : req;  // 2.479.0 (#2814)
   const dot = id === 'time' && (S.timer || S.pomo) ? '<span class="srbd recdot"></span>' : n ? `<span class="srbd nunread">${n}</span>` : id === 'wiki' && typeof wki_dotHtml === 'function' ? wki_dotHtml() : '';  // 2.350.0 C (#2744): a running import
-  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
+  return `<button type="button" class="srb ${on ? 'on' : ''}" data-go="${esc(on ? sbb_home(id) : sbb_target(id))}" data-sbb="${id}"${on ? ' aria-current="page"' : ''}${sbb_on() && !S.me?.kid ? ' draggable="true"' : '' /* 2.575.0 D (#4051) */}${sbb_nameAttr(tr(d[2]))}>${ic(d[1])}<span class="srbn">${esc(tr(d[2]))}</span>${dot}</button>`;
 }
 const sbb_aw = () => (S.agents || []).reduce((n, x) => n + x.waiting + x.chat_unread + (x.approvals_open || 0), 0);
 function sbb_railHtml(hid) {
@@ -503,8 +503,95 @@ function sbb_railHtml(hid) {
   // 2.152.3 A (#2619): the account moved up into the head bar (sbb_barHtml). 2.542.0 (#4610): the button "Show the panel" on top
   // of the bar is gone (its place came and went, the icons below moved): a tap on the open area's icon brings the panel back,
   // and a change of the area opens it again (sbb_unfoldOnSwitch)
-  return `<div class="srbs">${SBB_RAIL.map(r => btn(r[0])).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu)
+  return `<div class="srbs">${sbb_ids().map(btn).join('')}</div>`;  // 2.380.2 (#3400): Settings moved into the Kalmido menu of the head bar (sbb_wsMenu); 2.575.0 D (#4051): the person's order
 }
+// ---- 2.575.0 D (#4051): a right click (computer) or a long press (phone) on an area's icon (the computer's bar, the phone's
+// row in the drawer) opens the area's menu: Move up / down (the computer also drags), Hide from the bar (Settings > Appearance >
+// Sidebar, the same setting "sidebar"; Projects stays), Customise menu (nav_edit, only areas with an editor), Set as start area
+// (setting start_page "a:<id>", core.js st_landing), and for an organisation's admins, apart at the end, Switch off in this
+// organisation (orgs.areas_off, the same switch as Settings > Workspaces; the server checks the role). No renaming, no icons.
+// The order is the person's (setting nav_menus "rail", one setting the same on every device); an area not named yet keeps its
+// usual place after the named ones (nav_sort)
+const sbb_ids = () => nav_sort('rail', SBB_RAIL.map(r => r[0]), x => x);
+// the keys of an area in the setting "sidebar" ('e:<key>'): only what Settings > Appearance > Sidebar can bring back
+const sbb_hideKeys = id => id === 'tasks' || id === 'home' ? null : mg_area(id) ? mg_sideKeys(id) : SIDE_AREA_KEYS.includes(id) || SIDE_VIEW_KEYS.includes(id) ? [id] : null;
+const sbb_startKey = id => id === 'home' ? 'home' : 'a:' + id;
+// the page an area set as the start opens on (like a click on its icon); an area not shown (off, hidden): Start
+const sbb_startHash = id => sbb_def(id) && sbb_shown(id) ? sbb_target(id) : 'home';
+// one setting with Undo in the toast; written at once, put back on an error
+function sbb_setUndo(k, v, label) {
+  const from = S.settings[k] ?? '';
+  if (String(from) === String(v)) return Promise.resolve();
+  const put = x => async () => { S.settings[k] = x; render(); await api('PATCH', '/api/settings', {[k]: x}); return {}; };
+  return put(v)().then(() => offerUndo(label, histAdd({label, undo: put(from), redo: put(v)})), () => { S.settings[k] = from; render(); });
+}
+// move an area before / after another (to: an area id); the whole order is stored
+function sbb_move(id, to, where, name) {
+  const o = sbb_ids().filter(x => x !== id), i = o.indexOf(to); if (i < 0 || id === to) return Promise.resolve();
+  o.splice(where === 'after' ? i + 1 : i, 0, id);
+  nav_pref('rail'); const m = {...NAV.o, rail: {...(NAV.o.rail || {}), order: o}};
+  return sbb_setUndo('nav_menus', JSON.stringify(m), tr('{0} moved', name));
+}
+function sbb_hide(id, name) {
+  const keys = sbb_hideKeys(id); if (!keys) return Promise.resolve();
+  const p = sidePref(), h = new Set(p.hidden); for (const k of keys) h.add('e:' + k);
+  return sbb_setUndo('sidebar', JSON.stringify({order: p.order, hidden: [...h]}), tr('{0} hidden from the bar. Bring it back under Settings > Appearance > Sidebar.', name));
+}
+// Customise: the area opens first (the editor is drawn in its panel / menu)
+function sbb_custom(id) {
+  if (sbb_area() !== id) go(sbb_target(id));
+  nav_edit(id);
+}
+// the organisation of the shown workspace whose admin I am (or null): its areas_off is the switch of point 5
+const sbb_admOrg = () => { const w = typeof wsCur === 'function' ? wsCur() : ''; const o = w.startsWith('org:') ? wsOrg(w.slice(4)) : null; return o && o.role === 'admin' && Array.isArray(o.areas_off) ? o : null; };
+function sbb_orgOff(id, name) {
+  const o = sbb_admOrg(); if (!o || !WSA_ORG.includes(id)) return Promise.resolve();
+  const put = off => async () => { const j = await api('PATCH', `/api/orgs/${o.id}`, {areas_off: WSA_ORG.filter(x => off.has(x))}); o.areas_off = j?.areas_off || WSA_ORG.filter(x => off.has(x)); WSA.ws = null; render(); return {}; };
+  const was = new Set(o.areas_off), now = new Set([...was, id]), label = `${name} · ${o.name}`;
+  return put(now)().then(() => offerUndo(tr('{0} off', label), histAdd({label, undo: put(was), redo: put(now)})), () => {});
+}
+function sbb_railMenu(b) {
+  const id = b.dataset.sbb, d = sbb_def(id); if (!d || S.me?.kid) return;
+  const name = tr(d[2]), sib = [...b.parentElement.querySelectorAll('.srb[data-sbb]')], i = sib.indexOf(b);
+  const up = i > 0 ? sib[i - 1].dataset.sbb : null, down = i >= 0 && i < sib.length - 1 ? sib[i + 1].dataset.sbb : null;
+  const start = (S.settings?.start_page || 'home') === sbb_startKey(id), org = WSA_ORG.includes(id) && sbb_admOrg();
+  menu(b, [
+    up ? {label: tr('Move up'), icon: 'up', act: 'sbb-up', fn: () => sbb_move(id, up, 'before', name)} : null,
+    down ? {label: tr('Move down'), icon: 'down', act: 'sbb-down', fn: () => sbb_move(id, down, 'after', name)} : null,
+    sbb_hideKeys(id) ? {label: tr('Hide from the bar'), icon: 'eyeoff', act: 'sbb-hide', fn: () => sbb_hide(id, name)} : null,
+    nav_canEdit(id) ? {label: tr('Customise menu …'), icon: 'edit', act: 'sbb-custom', fn: () => sbb_custom(id)} : null,
+    {label: tr('Set as start area'), icon: 'start', act: 'sbb-start', on: start, dis: start, title: start ? tr('The app opens on this area') : '', fn: () => sbb_setUndo('start_page', sbb_startKey(id), tr('The app opens on {0}', name))},
+    org ? '-' : null,
+    org ? {label: tr('Switch off in this organisation'), icon: 'ban', cls: 'danger', act: 'sbb-orgoff', fn: () => sbb_orgOff(id, name)} : null,
+  ].filter(Boolean), null, null, name);
+}
+const SBB_RMENU = '#srail .srb[data-sbb], #side .sbmr .srb[data-sbb]';
+ms_rowMenu(SBB_RMENU, sbb_railMenu);  // touch: a long press (the click ending it opens nothing)
+document.addEventListener('contextmenu', e => {
+  const b = e.target.closest?.(SBB_RMENU); if (!b || S.me?.kid) return;
+  e.preventDefault(); if (e.pointerType === 'touch' || isTouch()) return;  // touch: the long press above
+  sbb_railMenu(b);
+});
+// the computer drags an icon before / after another (a line marks the place)
+let SBB_RDRAG = null;
+const sbb_rzone = (t, y) => { const r = t.getBoundingClientRect(); return y < r.top + r.height / 2 ? 'before' : 'after'; };
+const sbb_rmark = (t, z) => { for (const x of $$('#srail .srb.srbdbef, #srail .srb.srbdaft')) x.classList.remove('srbdbef', 'srbdaft'); t?.classList.add(z === 'after' ? 'srbdaft' : 'srbdbef'); };
+document.addEventListener('dragstart', e => {
+  const b = e.target.closest?.('#srail .srb[data-sbb][draggable="true"]'); if (!b) return;
+  SBB_RDRAG = b.dataset.sbb; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', b.textContent.trim()); b.classList.add('dragging');
+});
+document.addEventListener('dragover', e => {
+  if (!SBB_RDRAG) return;
+  const t = e.target.closest?.('#srail .srb[data-sbb]'); if (!t || t.dataset.sbb === SBB_RDRAG) { sbb_rmark(null); return; }
+  e.preventDefault(); e.dataTransfer.dropEffect = 'move'; sbb_rmark(t, sbb_rzone(t, e.clientY));
+});
+document.addEventListener('drop', e => {
+  if (!SBB_RDRAG) return;
+  const id = SBB_RDRAG, t = e.target.closest?.('#srail .srb[data-sbb]'); SBB_RDRAG = null; sbb_rmark(null);
+  if (!t || t.dataset.sbb === id) return;
+  e.preventDefault(); sbb_move(id, t.dataset.sbb, sbb_rzone(t, e.clientY), tr(sbb_def(id)?.[2] || id));
+});
+document.addEventListener('dragend', () => { if (!SBB_RDRAG && !$('#srail .srb.dragging')) return; SBB_RDRAG = null; sbb_rmark(null); $$('#srail .srb.dragging').forEach(x => x.classList.remove('dragging')); });
 // 2.542.0 (#4610): another area than the one drawn last opens the panel again (LS sideFold back to false, the layout follows
 // at once; no extra render). The first drawing after a load keeps the hidden panel; folded for room (#3163) and areas
 // without a panel (SBB_NOPANEL) stay as they are
@@ -568,7 +655,7 @@ document.fonts?.addEventListener('loadingdone', sbb_fit);
 const SBM = {keep: false, focus: ''};
 // the row is one tab stop of its own (a scrolling region reachable by keyboard; its icons rove with the sidebar)
 // 2.442.0 (#3739): --sbmc = columns: never more than two rows (with up to 5 areas one row of the usual width)
-const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = SBB_RAIL.map(r => sbb_btnHtml(r[0], cur, hid, aw)).filter(Boolean); return `<div class="sbmr" style="--sbmc:${Math.max(Math.ceil(bs.length / 2), Math.min(bs.length, 5))}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
+const sbm_rowHtml = hid => { const cur = sbb_area(), aw = sbb_aw(), bs = sbb_ids().map(id => sbb_btnHtml(id, cur, hid, aw)).filter(Boolean);  /* 2.575.0 D (#4051): the person's order */ return `<div class="sbmr" style="--sbmc:${Math.max(Math.ceil(bs.length / 2), Math.min(bs.length, 5))}" role="group" tabindex="0" aria-label="${esc(tr('Areas|nav'))}">${bs.join('')}</div>`; };
 // route() asks once whether this route came from the row (the drawer stays open)
 const sbm_hold = () => { const k = SBM.keep; SBM.keep = false; return k && !!$('#side.open'); };
 function sbm_go(b) {

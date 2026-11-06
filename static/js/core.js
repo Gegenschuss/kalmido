@@ -1609,8 +1609,10 @@ const START_PAGES = [['home', N_('Start|home')], ['inbox', N_('Basket')], ['toda
 // #2821), so Start comes from the next opening on
 function st_landing() {
   const p = S.settings?.start_page || 'home';
-  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !START_PAGES.some(x => x[0] === p) || S.settings?.tour === 'pending') return;
-  history.replaceState(history.state, '', location.pathname + location.search + '#' + p);
+  // 2.575.0 D (#4051): "a:<area>" = an area set as the start (its icon's menu): the page its icon opens, Start while it is not shown
+  const h = p.startsWith('a:') ? (typeof sbb_startHash === 'function' ? sbb_startHash(p.slice(2)) : 'home') : START_PAGES.some(x => x[0] === p) ? p : '';
+  if (location.hash.length > 1 || S.me?.kid || p === 'last' || !h || S.settings?.tour === 'pending') return;
+  history.replaceState(history.state, '', location.pathname + location.search + '#' + h);
 }
 const SMART = {
   inbox: {name: N_('Basket'), icon: 'inbox'},
