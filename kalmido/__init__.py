@@ -524,6 +524,7 @@ ORDER = (
     "office.numranges",  # 2.138.0 D (#2256): the next running number of every number series (office admin)
     "office.timebill",  # 2.144.6 A (#2053): time entries billable / billed by an invoice, never twice
     "office.docproject",  # 2.168.0 A (#2665): quotations / invoices bound to a project, the project's documents
+    "office.offerdispo",  # 2.589.0 (#4571): shoot days of a quotation as pencilled-in bookings of the disposition (no routes)
     "office.offertasks",  # 2.537.0 C (#3433): tasks with a time budget from a quotation
     "office.search",  # 2.250.0 A (#2992): office hits of the web search /api/search (no routes; used by tasks.ftsearch)
     "agents.importprop",  # 2.68.0 A (#1839): agents propose old data for the office (fixed costs), the person takes it over
