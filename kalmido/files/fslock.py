@@ -34,7 +34,7 @@ from ..collab.liste2e import LE2EDenied, le2e_is_cipher, le2e_parse, le2e_writer
 from .store import (fs_chain, fs_deleted, fs_log_add, fs_read, fs_role, fs_space, fs_subtree, fs_version_row, need_node, safe_fs_name,
                     _free_name, _mime_of, _store_version, _now, DEPTH_MAX)
 from .fsroots import fs_area_of
-from .web import _items, _move, fs_node_json
+from .web import _items, _move, fs_node_json, fs_web_expect
 
 FSL_MAGIC = b"KENC\x02"
 FSL_HEAD = len(FSL_MAGIC) + 4
@@ -797,8 +797,7 @@ def fsl_version(fid):
     except ValueError as e:
         return err(str(e))
     quota_guard(c, uid, len(data))
-    from .web import fs_web_expect  # 2.577.0 (#4708 3): an older version read -> 409, as the plain file routes
-    fs_web_expect(c, fid, request.form.get("expect_version"))
+    fs_web_expect(c, fid, request.form.get("expect_version"))  # 2.577.0 (#4708 3): an older version read -> 409, as the plain file routes
     no = _store_version(c, fid, fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
     if (n["e2e_gen"] or 0) != gen:
         c.execute("UPDATE fs_nodes SET e2e_gen=? WHERE id=?", (gen, fid))  # the name stays of its generation (still readable)

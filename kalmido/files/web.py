@@ -28,7 +28,8 @@ from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
-from ..core.pg import system_ctx  # 2.149.0 G (#2517): pulled up from functions
+from ..core.conflict import Conflict, need_version  # 2.577.0 (#4708 3)
+from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
 from ..core.retention import ret_days, ret_on  # 2.369.5 (#2517): pulled up from functions
@@ -502,8 +503,6 @@ def fs_web_expect(c, nid, v):
     """2.577.0 (#4708 3): the version check of the app's file routes, as the API's (v1.py fs_version_check): v = the version
     number the client read (form / body field expect_version, or the header If-Match); another version came meanwhile ->
     409 with the file as it is now under "current", nothing stored. Optional for people (old clients), required for agents."""
-    from ..core.conflict import Conflict, need_version
-    from ..core.pg import write_lock
     need_version({"expect_version": v}, "expect_version")
     if v in (None, "") and (request.headers.get("If-Match") or "").strip():
         v = request.headers["If-Match"].strip().removeprefix("W/").strip('"')
