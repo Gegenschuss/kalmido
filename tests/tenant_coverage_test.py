@@ -853,7 +853,7 @@ ROUTES = {
     "DELETE /api/filters/{}": "own", "POST /api/habits": "own", "PATCH /api/habits/{}": "own",
     "DELETE /api/habits/{}": "own", "POST /api/habits/{}/restore": "own", "POST /api/habits/{}/log": "own", "POST /api/pomo/start": "own",  # 2.530.0 B (#4315): restore
     "POST /api/pomo/{}/{}": "own", "POST /api/time/start": "own", "POST /api/time/stop": "own",
-    "POST /api/time/entries": "own", "PATCH /api/time/entries/{}": "own", "DELETE /api/time/entries/{}": "own",
+    "POST /api/time/entries": "own", "GET /api/time/entries/{}": "own", "PATCH /api/time/entries/{}": "own", "DELETE /api/time/entries/{}": "own",
     "GET /api/time/entries": "own", "GET /api/time/report": "own", "GET /api/time/export.csv": "own", "GET /api/time/export.xlsx": "own",
     "GET /api/family/contacts": "own", "POST /api/family/contacts": "own", "PATCH /api/family/contacts/{}": "own",
     "DELETE /api/family/contacts/{}": "own", "POST /api/family/contacts/{}/sync": "own",
@@ -1244,7 +1244,8 @@ ROUTES = {
     "GET /api/life/devices/{}/link": "devlink", "POST /api/life/devices/{}/to-office": "devlink", "POST /api/life/device-links/{}/pull": "devlink",
     "DELETE /api/life/device-links/{}": "devlink", "GET /api/office/equipment/{}/link": "devlink", "POST /api/office/equipment/{}/to-device": "devlink",
     "POST /api/budget/{}/cats": "budget", "PATCH /api/budget/cats/{}": "budget", "DELETE /api/budget/cats/{}": "budget",
-    "POST /api/budget/{}/entries": "budget", "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
+    "POST /api/budget/{}/entries": "budget", "GET /api/budget/entries/{}": "budget", "GET /api/budget/recurring/{}": "budget",  # 2.576.0 (#4764)
+    "PATCH /api/budget/entries/{}": "budget", "DELETE /api/budget/entries/{}": "budget",
     "GET /api/budget/{}/recurring": "budget", "POST /api/budget/{}/recurring": "budget", "PATCH /api/budget/recurring/{}": "budget",
     "DELETE /api/budget/recurring/{}": "budget", "POST /api/budget/recurring/{}/book": "budget",
     # 2.567.0 A (#4707): the budget's trash (p2567_a_trash_test.py: a stranger 404, read-only 403)

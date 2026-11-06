@@ -651,7 +651,8 @@ ROUTES = {
     "DELETE /api/family/rewards/{}": "personal", "DELETE /api/feeds/{}": "reading", "DELETE /api/life/karakeep": "personal",
     "DELETE /api/servers/{}": "personal", "DELETE /api/servers/{}/tasks/{}": "personal",
     "DELETE /api/supporter/{}": "personal", "DELETE /api/v1/family/rewards/{}": "personal", "GET /api/budget": "personal",
-    "GET /api/budget/files/{}": "personal", "GET /api/budget/{}": "personal", "GET /api/budget/{}/contracts": "personal",
+    "GET /api/budget/files/{}": "personal", "GET /api/budget/entries/{}": "personal", "GET /api/budget/recurring/{}": "personal",  # 2.576.0 (#4764)
+    "GET /api/budget/{}": "personal", "GET /api/budget/{}/contracts": "personal",
     "GET /api/budget/{}/recurring": "personal", "GET /api/family": "personal", "GET /api/family/contacts": "personal",
     "GET /api/family/deadline-types": "personal", "GET /api/family/kids": "personal", "GET /api/family/packing": "personal",
     "GET /api/feeds": "reading", "GET /api/feeds/items": "reading", "GET /api/feeds/opml": "reading",
@@ -933,7 +934,8 @@ ROUTES = {
     "POST /api/v1/focus/{}/resume": "time",
     "GET /api/v1/habits": "time", "GET /api/v1/time/check": "time", "GET /api/v1/time/entries": "time",
     "GET /api/v1/time/from-events": "time", "GET /api/v1/time/gaps": "time", "GET /api/v1/time/timer": "time",
-    "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "PATCH /api/v1/habits/{}": "time",
+    "PATCH /api/habits/{}": "time", "PATCH /api/time/entries/{}": "time", "GET /api/time/entries/{}": "time",  # 2.576.0 (#4764)
+    "PATCH /api/v1/habits/{}": "time",
     "PATCH /api/v1/time/entries/{}": "time", "POST /api/habits": "time", "POST /api/habits/{}/log": "time",
     "POST /api/time/entries": "time", "POST /api/time/start": "time", "POST /api/time/stop": "time",
     "POST /api/v1/habits": "time", "POST /api/v1/habits/{}/checkin": "time", "POST /api/v1/time/entries": "time",

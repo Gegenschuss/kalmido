@@ -15,6 +15,7 @@ from ..life.budget import (
     bud_list_create, bud_month,
     bud_month_view, bud_need_on, bud_obj, bud_overview, bud_this_month, cat_create, cat_delete, cat_update, entry_create,
     entry_delete, entry_update, rec_book, rec_create, rec_delete, rec_list, rec_update,
+    entry_get, rec_get,  # 2.576.0 (#4764): one entry / template for the dialog's version watch
     cat_restore, entry_restore, rec_restore,  # 2.567.0 A (#4707): the trash
 )
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
@@ -96,6 +97,14 @@ def budget_entry_new(lid):
     return _done(c, entry_create(c, uid, lid, body()), 201)
 
 
+@app.get("/api/budget/entries/<int:eid>")
+def budget_entry_get(eid):
+    """2.576.0 (#4764): one entry (read right on its list) -- the open dialog sees a save elsewhere (objsave.js dlgStale)."""
+    c, uid = db(), me()
+    bud_need_on(c, uid)
+    return jsonify(entry_get(c, bud_obj(c, uid, "budget_entries", eid, write=False)["id"]))
+
+
 @app.patch("/api/budget/entries/<int:eid>")
 def budget_entry_patch(eid):
     c, uid = db(), me()
@@ -129,6 +138,14 @@ def budget_rec_new(lid):
     """{title, amount, kind, cat_id?, per: month|quarter|year, start: YYYY-MM, until?} -> the template."""
     c, uid = db(), me()
     return _done(c, rec_create(c, uid, lid, body()), 201)
+
+
+@app.get("/api/budget/recurring/<int:rid>")
+def budget_rec_get(rid):
+    """2.576.0 (#4764): one template (read right on its list) -- for the version watch of its form (objsave.js dlgStale)."""
+    c, uid = db(), me()
+    bud_need_on(c, uid)
+    return jsonify(rec_get(c, uid, bud_obj(c, uid, "budget_recurring", rid, write=False)["id"]))
 
 
 @app.patch("/api/budget/recurring/<int:rid>")

@@ -198,6 +198,7 @@ def entry_out(r, uid, vis, ref, rm):
             "title": title or "", "start": r["start"], "end": r["end"], "seconds": sec, "rounded": rnd_up(sec, rm),
             "note": "" if hid else r["note"], "source": r["source"], "running": r["end"] is None, "mine": r["user_id"] == uid,
             "auto_stopped": bool(r["auto_stopped"]), "client_id": r["client_id"] if r["user_id"] == uid else None,
+            "updated_at": r["updated_at"],  # 2.576.0 (#4764): the version the edit dialog watches (objsave.js dlgStale)
             **tbill_out(r, uid)}  # 2.144.6 A (#2053): billable / billed
 
 
@@ -598,6 +599,17 @@ def oxb_time_prev(c, eid, r, b):
         if now != _oxb_tnorm(k, old) and now != mine:
             raise Conflict("entry", cur)
     return r
+
+
+@app.get("/api/time/entries/<int:eid>")
+def time_get(eid):
+    """2.576.0 (#4764): my entry as the edit dialog shows it -- its version watch sees a change elsewhere (objsave.js dlgStale)."""
+    need_time()
+    c = db()
+    r = need_entry(c, eid)
+    if not isinstance(r, Row):
+        return r
+    return jsonify(one_entry(c, eid))
 
 
 @app.patch("/api/time/entries/<int:eid>")

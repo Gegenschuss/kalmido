@@ -149,6 +149,7 @@ APP_TO_API = {
     "POST /api/time/stop": ["DELETE /time/timer"],
     "GET /api/time/entries": ["GET /time/entries"],
     "POST /api/time/entries": ["POST /time/entries"],
+    "GET /api/time/entries/{}": ["GET /time/entries"],  # 2.576.0 (#4764): the dialog's version watch; the API lists them
     "PATCH /api/time/entries/{}": ["PATCH /time/entries/{}"],
     "DELETE /api/time/entries/{}": ["DELETE /time/entries/{}"],
     "GET /api/time/report": ["GET /time/entries"],
