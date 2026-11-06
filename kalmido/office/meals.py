@@ -219,12 +219,13 @@ def ofc_bw_booked(c, oid, frm, to):
     (books.bk_euer / bk_ustva, bkexport.bx_rows): [{id, date, title, currency, calc (bw_calc)}], the whole office (no "own"
     filter: the bookkeeping is the office admin's). Drafts never count."""
     out = []
-    for r in c.execute("SELECT id, date, place_name, occasion, amounts, tip, currency FROM office_meals WHERE org_id=? AND status='approved' "
+    for r in c.execute("SELECT id, date, place_name, occasion, amounts, tip, currency, pay_kind, pay_id FROM office_meals WHERE org_id=? AND status='approved' "
                        "AND deleted_at IS NULL AND date>=? AND date<=? ORDER BY date, id", (oid, frm, to)).fetchall():
         d = oc_dec_fields(c, oid, "office_meals", r)
         title = " - ".join(x for x in (d.get("place_name") or "", d.get("occasion") or "") if x)
         out.append({"id": d["id"], "date": d["date"], "title": title, "currency": d["currency"] or "",
-                    "calc": bw_calc(_j(d.get("amounts"), []), d.get("tip"))})
+                    "calc": bw_calc(_j(d.get("amounts"), []), d.get("tip")),
+                    "pay": (r["pay_kind"], r["pay_id"]) if r["pay_kind"] and r["pay_id"] else None})  # 2.603.0 (#4927): its line
     return out
 
 
@@ -289,7 +290,8 @@ def bw_public(c, oid, r, logs=None, files=None, years=None):
             "approved_name": d.get("approved_name") or "", "sign_image": int(d.get("sign_image") or 0), "calc": bw_calc(lines, d["tip"]), "log": lg,
             "files": (files or {}).get(d["id"], []), "kept_until": bw_kept_from(d["date"], [x["at"] for x in lg if x["action"] == "approve"],
                                                                                     years if years is not None else bw_years(c, oid)),
-            "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"]}
+            "deleted": 1 if d.get("deleted_at") else 0, "created_at": d["created_at"], "updated_at": d["updated_at"],
+            "pay": {"kind": d["pay_kind"], "id": d["pay_id"]} if d.get("pay_kind") and d.get("pay_id") else None}  # 2.603.0 (#4927)
 
 
 _BW_COLS = []

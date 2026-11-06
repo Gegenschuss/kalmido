@@ -242,6 +242,7 @@ function bw_modal(m0) {
     <div class="row"><label for="bw-note">${tr('Note')}</label><textarea id="bw-note" rows="2" maxlength="2000">${esc(m?.note || '')}</textarea></div>
     </fieldset>
     <div class="row"><span class="rklab">${tr('Restaurant bill')}</span><div class="bwfilebox">${m ? bw_fileHtml(m) : `<button type="button" class="btn sm" data-bwm="file">${ic('upload', 's')}<span>${tr('Attach the restaurant bill')}</span></button><span class="muted bwpend"></span>`}</div></div>
+    ${m?.id && OFC.info?.role === 'admin' ? `<div class="row bwpay" data-fg-skip><label for="bw-pay">${tr('Paid with')}</label><span class="bwpaybox muted">${tr('Loading…')}</span></div>` : ''}${''/* 2.603.0 (#4927): the proof of its bank / cash / card line */}
     ${(m?.log || []).length ? `<div class="bwlogbox"><b>${tr('Approval log')}</b><ul class="bwlog" role="list">${m.log.map(e => `<li>${esc(bw_actLabel(e))}</li>`).join('')}</ul></div>` : ''}
     ${hostOk || (!ro && m?.own_host !== 0) ? bw_sigHtml() : ''}
     <div class="aerr" role="alert"></div>
@@ -249,6 +250,7 @@ function bw_modal(m0) {
       <span class="spacer"></span>${m ? `<button class="btn" data-bwm="pdf">${ic('pdf', 's')}<span>PDF</span></button>` : ''}
       <button class="btn" data-bwm="close">${ro ? tr('Close') : tr('Cancel')}</button>${hostOk ? `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>` : ro ? '' : `<button class="btn" data-bwm="save">${tr('Save draft')}</button>${m?.own_host === 0 ? '' : `<button class="btn pri" data-bwm="approve">${ic('check', 's')}<span>${tr('Approve')}</span></button>`}`}</div>`));  // 2.187.1 (#2735, review): own level, not the host: no approve
   md.classList.add('ofcdlg', 'bwdlg');
+  if (m?.id && $('.bwpay', md)) bw_payLoad(md, m.id);  // 2.603.0 (#4927)
   const close = ro ? () => md.remove() : fgModal(md);
   const err = msg => { const el = $('.aerr', md); if (el) el.textContent = msg || ''; };
   const val = id => /** @type {any} */ ($(id, md))?.value ?? '';
@@ -347,6 +349,22 @@ function bw_modal(m0) {
   });
   place(); host(); sum();
   return md;
+}
+// 2.603.0 (#4927): "Paid with" - the bank booking, cash entry or card position the meal is the proof of (server: office/mealpay.py);
+// with the basis "bank and cash" the meal counts only through it
+const BW_PAYK = {bank: N_('Bank'), cash: N_('Cash book'), card: N_('Credit card')};
+const bw_payLabel = x => x.gone ? tr('Booking gone') : [tr(BW_PAYK[x.kind] || x.kind), fmtDateLoc(x.day), ofcMoney(x.amount), x.text].filter(Boolean).join(' · ');
+async function bw_payLoad(md, id) {
+  const box = $('.bwpaybox', md); if (!box) return;
+  let j; try { j = await api('GET', `${BW_U}/${id}/payment`); } catch (x) { box.textContent = x.message || tr('unknown'); return; }
+  const opts = [['', tr('Not linked')], ...(j.current ? [[`${j.current.kind}:${j.current.id}`, bw_payLabel(j.current)]] : []), ...j.candidates.map(x => [`${x.kind}:${x.id}`, bw_payLabel(x)])];
+  box.classList.remove('muted');
+  box.innerHTML = ofcSel('bw-pay', j.current ? `${j.current.kind}:${j.current.id}` : '', opts, null, tr('Paid with'));
+  $('#bw-pay', box).addEventListener('change', async e => {
+    e.stopPropagation();
+    const v = /** @type {any} */ (e.target).value, [kind, lid] = v ? v.split(':') : [null, null];
+    try { await api('PUT', `${BW_U}/${id}/payment`, kind ? {kind, id: +lid} : {kind: null}); toast(tr('Saved')); } catch (x) { toast(x.message || tr('unknown')); bw_payLoad(md, id); }
+  });
 }
 function bw_fd(f) { const fd = new FormData(); fd.append('file', f, f.name || 'bill.pdf'); return fd; }
 function bw_pick(done) {

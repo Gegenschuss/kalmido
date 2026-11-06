@@ -20,7 +20,7 @@ Sources (nothing is booked twice):
 import csv
 import io
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import ROUND_DOWN, Decimal
 
 from flask import Response, g, has_request_context, jsonify, request
@@ -376,7 +376,8 @@ def ofc_meals_home(c, oid, frm, to, s):
         k = m["calc"]
         net, ded = f(k["net"]), f(k["deductible"])
         out.append({"id": m["id"], "date": m["date"], "title": m["title"], "gross": f(k["gross"]), "vat": f(k["vat"]), "net": net,
-                    "deductible": ded, "not_deductible": net - ded, "unrated": cur if rate is None else None})
+                    "deductible": ded, "not_deductible": net - ded, "unrated": cur if rate is None else None,
+                    "pay": m.get("pay")})  # 2.603.0 (#4927): (kind, id) of its bank / cash / card line or None
     return out
 
 
@@ -422,6 +423,8 @@ def bk_euer(c, oid, year):
     flows = eb_flows(c, oid, y0, y1) if strict else None
     inc_ids = eb_income_payment_ids(c, oid) if strict else None
     pay_outside = 0
+    # 2.534.0 (#4333): the approved entertainment receipts (office/meals.py); 2.603.0 (#4927): strict = through their line only
+    meals = bk_meals_strict(c, oid, flows, y0, y1, s) if strict else ofc_meals_home(c, oid, y0, y1, s)
     for p, r in bk_payments(c, oid, y0, y1, home):
         if strict and p["id"] not in inc_ids:
             pay_outside += 1  # (6) a payment typed by hand without its bank / cash booking does not count
@@ -489,9 +492,6 @@ def bk_euer(c, oid, year):
     if km["count"]:
         exp["km"] = {"label": tr("Mileage allowance"), "v": [km["amount"], Decimal(0), km["amount"]], "count": km["count"]}
     # 2.534.0 (#4333): the approved entertainment receipts (office/meals.py): 70 % as an expense, the input tax in full
-    meals = ofc_meals_home(c, oid, y0, y1, s)
-    if strict:  # 2.603.0 (#4927): (5) a meal counts only through its bank / cash / card line
-        meals = bk_meals_strict(c, oid, meals, flows, exp)
     meal_sum, meal_notes = None, []
     if meals:
         v, meal_sum = ofc_meals_euer(meals, small)
@@ -535,11 +535,30 @@ OFC_MEAL_STRICT = N_("Entertainment receipts count only through their bank, cash
 BK_WARN_MAX = 200
 
 
-def bk_meals_strict(c, oid, meals, flows, exp):
-    """2.603.0 (#4927) point 5, the strict basis: the meals that hang on a bank / cash / card line of the period
-    (office_meals.pay_kind / pay_id); that line leaves the other expenses (its receipt or "without receipt"), the meal gives
-    its 70 / 30 split instead. A meal without a line does not count. -> the meals that count."""
-    return [m for m in meals if m.get("pay")]  # no link yet (step 4 of #4927)
+BK_MEAL_WINDOW = 62  # days: a meal may be paid up to two months before / after its date (the line's day counts)
+
+
+def bk_meals_strict(c, oid, flows, frm, to, s):
+    """2.603.0 (#4927) point 5, the strict basis: the approved meals that hang on a bank / cash / card line of the flows of
+    [frm, to] (office_meals.pay_kind / pay_id, office/mealpay.py), on the line's day. That line leaves the flows (its receipt
+    or "without receipt"): the meal gives its 70 / 30 split instead, no second expense. A meal without a line does not count.
+    Changes flows in place -> the meals that count (ofc_meals_home rows)."""
+    lines = {(x["src"], x["ref"]): ("paid", nid) for nid, x in flows["paid"].items()}
+    lines.update({(x["src"], x["ref"]): ("norc", i) for i, x in enumerate(flows["norc"])})
+    d0 = (date.fromisoformat(frm) - timedelta(days=BK_MEAL_WINDOW)).isoformat()
+    d1 = (date.fromisoformat(to) + timedelta(days=BK_MEAL_WINDOW)).isoformat()
+    out, nodes, norc = [], set(), set()
+    for m in ofc_meals_home(c, oid, d0, d1, s):
+        w = lines.get(tuple(m["pay"])) if m.get("pay") else None
+        if w is None or (w[0] == "norc" and w[1] in norc) or (w[0] == "paid" and w[1] in nodes):
+            continue
+        day = flows["paid"][w[1]]["day"] if w[0] == "paid" else flows["norc"][w[1]]["day"]
+        out.append(dict(m, date=day))
+        (nodes if w[0] == "paid" else norc).add(w[1])
+    for nid in nodes:
+        flows["paid"].pop(nid, None)
+    flows["norc"][:] = [x for i, x in enumerate(flows["norc"]) if i not in norc]
+    return out
 
 
 def bk_strict_warnings(c, oid, frm, to, flows, pay_outside):
@@ -599,6 +618,7 @@ def bk_ustva(c, oid, year, period):
         return dict(head, small_business=True)
     flows = eb_flows(c, oid, frm, to) if strict else None
     inc_ids = eb_income_payment_ids(c, oid) if strict and basis == "ist" else None
+    meals = bk_meals_strict(c, oid, flows, frm, to, s) if strict else ofc_meals_home(c, oid, frm, to, s)  # 2.603.0 (#4927): before the receipts
     sums, items = {}, []
 
     memo = {}
@@ -663,9 +683,6 @@ def bk_ustva(c, oid, year, period):
             items.append({"kind": "travel", "trip_id": t["id"], "title": it.get("text") or rk_cat_label(it["category"] or "other"), "date": day,
                           "gross": dstr(gross), "vat": dstr(vat), "vat_pct": it["vat_pct"]})
     # 2.534.0 (#4333): the input tax of the approved entertainment receipts counts in full (by the day of the meal)
-    meals = ofc_meals_home(c, oid, frm, to, s)
-    if strict:
-        meals = bk_meals_strict(c, oid, meals, flows, {})
     for m in meals:
         kz66 += m["vat"]
         items.append({"kind": "meal", "meal_id": m["id"], "title": m["title"], "date": m["date"], "gross": dstr(m["gross"]),

@@ -372,6 +372,7 @@ ORDER = (
     "office.vmaimport",  # 2.95.0 B (#1932): the import of a per diem spreadsheet (preview, import, undo)
     "office.mealpdf",  # 2.119.0 A (#2288): the PDFs of the entertainment receipts (no routes)
     "office.meals",  # 2.119.0 A (#2288): entertainment receipts (Bewirtungsbelege): meals, approval + log, choices, evaluation
+    "office.mealpay",  # 2.603.0 (#4927): an entertainment receipt as the proof of its bank / cash / card line
     "office.cashflow",  # 2.47.3 (#1652, part B): cash flow per month + fixed costs
     "office.cfstart",  # 2.123.0 D (#2341): start balance, corrections by hand and real balances of the cash flow
     "office.cfbank",  # 2.124.0 D (#2342): the balances of the bank statements in the cash flow (no routes)
