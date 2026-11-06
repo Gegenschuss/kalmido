@@ -307,20 +307,34 @@ def srvweb_state(c, aid):
 
 
 def srvweb_mark(text, srcs, lg, mx):
-    """text with the block "From the web:" of the sources not named in it yet (cut to mx characters; text stays whole)."""
+    """text with the block "From the web:" of the sources not named in it yet, at most mx characters. Review F4: the block is
+    never dropped - the text is cut (with "…") so the sources fit; the block itself takes at most half of mx."""
     text = text or ""
-    lines = [f"- {s['label'] + ': ' if s['label'] else ''}{s['url']}" for s in srcs if s["url"] not in text or s["label"]]
+
+    def lines_of(t):
+        return [f"- {s['label'] + ': ' if s['label'] else ''}{s['url']}" for s in srcs if s["url"] not in t or s["label"]]
+
+    lines = lines_of(text)
     if not lines:
         return text
-    head = ("\n\n" if text.strip() else "") + tr("From the web (foreign sources, please check):", lg=lg) + "\n"
-    room = mx - len(text) - len(head)
-    keep = []
-    for ln in lines:
-        if room - len(ln) - 1 < 0:
-            break
-        keep.append(ln)
-        room -= len(ln) + 1
-    return text + head + "\n".join(keep) if keep else text
+    head = tr("From the web (foreign sources, please check):", lg=lg) + "\n"
+
+    def block(ls):
+        room, keep = mx // 2 - len(head) - 2, []
+        for ln in ls:
+            if len(ln) + 1 > room:
+                break
+            keep.append(ln)
+            room -= len(ln) + 1
+        return head + "\n".join(keep or [ls[0][:max(0, mx // 2 - len(head) - 2)]])
+
+    blk = block(lines)
+    sep = "\n\n" if text.strip() else ""
+    if len(text) + len(sep) + len(blk) <= mx:
+        return text + sep + blk
+    blk = block(lines_of(""))  # the text is cut: a source it named may be in the part cut off
+    text = text[:max(0, mx - len(blk) - 3)].rstrip() + "…"
+    return text + "\n\n" + blk
 
 
 # ---------------------------------------------------------------- the gate (agents/control.py ctl_gate)

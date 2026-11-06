@@ -9,6 +9,7 @@
 #     FAKEWEB_SLOW <task>  (review F1) step 1: a fetched page + check_vat_id DE555555555 (a slow tool: the VIES time limit);
 #                       step 2 waits until /data/slow-go exists (the test took the run for lost meanwhile), then add_comment
 #                       on <task>; step 3: "ok"
+#     FAKEWEB_LONG      (review F4) a fetched page + a final text that fills the chat message ("FAKEWEB long " + 7990 x "L")
 #     FAKEWEB_PAUSE     step 1: pause_turn after a web search; step 2 (the answer sent back): "FAKEWEB resumed"
 #     FAKEVIES <vat> END  step 1: check_vat_id <vat>; step 2: "FAKEVIES result: " + the tool result
 #     otherwise         "FAKEWEB answer"
@@ -139,6 +140,13 @@ class H(BaseHTTPRequestHandler):
                 return answer('tool_use', [{'type': 'tool_use', 'id': 'toolu_s2', 'name': 'add_comment',
                                             'input': {'task_id': int(m.group(1)), 'body': 'INJECTED slow'}}])
             return answer('end_turn', [{'type': 'text', 'text': 'FAKEWEB slow ok'}])
+        if 'FAKEWEB_LONG' in first:
+            return answer('end_turn', [
+                {'type': 'server_tool_use', 'id': 'srvtoolu_f8', 'name': 'web_fetch', 'input': {'url': PAGE}},
+                {'type': 'web_fetch_tool_result', 'tool_use_id': 'srvtoolu_f8', 'content': {
+                    'type': 'web_fetch_result', 'url': PAGE, 'retrieved_at': '2026-11-06T10:00:00Z',
+                    'content': {'type': 'document', 'source': {'type': 'text', 'media_type': 'text/plain', 'data': 'Pelican'}, 'title': 'Offer'}}},
+                {'type': 'text', 'text': 'FAKEWEB long ' + 'L' * 7990}], {'web_fetch_requests': 1})
         if 'FAKEWEB_PAUSE' in first:
             if k == 1:
                 return answer('pause_turn', [{'type': 'server_tool_use', 'id': 'srvtoolu_p1', 'name': 'web_search', 'input': {'query': 'x'}}],

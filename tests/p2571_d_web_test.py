@@ -169,6 +169,13 @@ check(agent_says(after, "FAKEWEB resumed"), "the paused turn was resumed")
 calls = [x for x in plog()[n0:] if x["path"] == "/v1/messages"]
 check(len(calls) == 2 and calls[1]["roles"] == ["user", "assistant"], f"resumed by sending the answer back, no extra message {[c['roles'] for c in calls]}")
 
+# ---------------------------------------------------------------- review F4: a full message keeps its sources (the text is cut)
+after, rid = chat("FAKEWEB_LONG")
+m = agent_says(after, "FAKEWEB long")
+b4 = (m or {}).get("body") or ""
+check(m and len(b4) <= 8000 and "From the web" in b4 and "https://example.org/offer" in b4 and "L…" in b4,
+      f"the long answer is cut so the web source fits {len(b4)} {b4[-200:]}")
+
 # ---------------------------------------------------------------- VIES
 v0 = len(plog("vies.log"))
 after, rid = chat("FAKEVIES DE 123 456 789 END")
