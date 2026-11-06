@@ -121,7 +121,8 @@ async function round(who, ck) {
   check(pg.http === 200 && pg.page?.updated_at, `${who}: the booking page with updated_at ${pg.http}`);
   if (pg.page?.updated_at) {
     const x = await call(ck, 'PUT', '/api/appt/page', {title: 'Old', expect_updated_at: OLD});
-    check(x.http === 409 && x.page?.page?.title === 'Book me', `${who}: booking page with an old version: 409 with the page ${x.http}`);
+    // 2.566.0 (#4704): the page's 409 carries it under "current" (#4701 on main, the same check)
+    check(x.http === 409 && x.current?.page?.title === 'Book me', `${who}: booking page with an old version: 409 with the page ${x.http}`);
     const y = await call(ck, 'PUT', '/api/appt/page', {title: 'Book me 2', expect_updated_at: pg.page.updated_at});
     check(y.http === 200 && y.page?.title === 'Book me 2', `${who}: booking page with the current version saves ${y.http}`);
   }
