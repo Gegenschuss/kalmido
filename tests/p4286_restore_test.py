@@ -461,17 +461,45 @@ r = restore(A, name=GOOD)
 check(r.ok, f"4 way back fails: the next restore goes through {r.status_code} {r.text[:240]}")
 same(snap(people()), GOOD_SEEN, "4 way back fails: ... with the content of its backup")
 
+def alone(script, *args):
+    """#3506 (CI red of 2.601.0): a hard stop runs bk_restore in a process of its own, so the maintenance gate it closes is
+    its own only - the server beside it (backup tick every second, queue, pushes) keeps writing, which a restore inside the
+    server never meets (every background tick goes through GATE). The server is frozen first (SIGSTOP to its pid 1, the
+    one process of the role "all") at a moment none of its connections is inside a transaction: then it holds no lock, and
+    the restore is alone on the database like behind the gate. The next start() replaces the frozen container."""
+    for _ in range(50):
+        subprocess.run(["docker", "kill", "-s", "STOP", CT], check=True, capture_output=True, timeout=30)
+        busy = kt.dbx("SELECT count(*) FROM pg_stat_activity WHERE backend_type='client backend' AND pid<>pg_backend_pid()"
+                      " AND datname=current_database() AND xact_start IS NOT NULL")[0][0]
+        if not busy:
+            break
+        subprocess.run(["docker", "kill", "-s", "CONT", CT], check=True, capture_output=True, timeout=30)
+        time.sleep(0.2)
+    else:
+        check(False, "4 hard stop: the server leaves its transactions within 10 s")
+    return subprocess.run(["docker", "exec", "-i", CT, "python", "-c", script, *args], capture_output=True, text=True, timeout=300)
+
+
 # ---- a hard stop between pg_restore and init_db
 A = sess("alice")
 assert A.post(B + "/api/tasks", json={"title": "vor dem harten Halt", "list_id": S.list}).ok
 STOP = """
 import os, sys
 from kalmido.admin import backup as bk
+real = bk._pg_restore
+def first(dump):  # 8 = the backup's pg_restore itself failed (the way back would run and end at ITS init_db with 9 as well)
+    try:
+        real(dump)
+    except Exception as e:
+        print("pg_restore of the backup failed:", type(e).__name__, e, (getattr(e, "raw", b"") or b"").decode(errors="replace")[-600:], file=sys.stderr, flush=True)
+        os._exit(8)
+    bk._pg_restore = real
+bk._pg_restore = first
 bk.init_db = lambda **k: os._exit(9)   # the process ends where init_db would start
 bk.bk_restore(os.path.join(bk.BK_DIR, sys.argv[1]), "", "alice", "session")
 """
-r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", STOP, GOOD], capture_output=True, text=True, timeout=300)
-check(r.returncode == 9, f"4 hard stop: the process ended between pg_restore and init_db {r.returncode} {r.stderr[-400:]}")
+r = alone(STOP, GOOD)
+check(r.returncode == 9, f"4 hard stop: the process ended between pg_restore and init_db {r.returncode} {r.stderr[-800:]}")
 work = [p for p in glob.glob(os.path.join(BK, ".restore-*")) if glob.glob(os.path.join(p, "*.dump"))]
 check(work, "4 hard stop: the work folder of the restore lies in the backup folder with its plain dump")
 start(K1, keep=True)
@@ -503,7 +531,7 @@ real = subprocess.run
 bk.subprocess.run = lambda a, *k, **kw: os._exit(9) if "pg_restore" in a[0] and "-d" in a else real(a, *k, **kw)
 bk.bk_restore(os.path.join(bk.BK_DIR, sys.argv[1]), "", "alice", "session")
 """
-r = subprocess.run(["docker", "exec", "-i", CT, "python", "-c", STOP, GOOD], capture_output=True, text=True, timeout=300)
+r = alone(STOP, GOOD)
 check(r.returncode == 9 and not hasfk() and os.path.exists(NOTE), f"4 keys: a hard stop just before pg_restore: the key is gone, the list knows it {r.returncode} {hasfk()} {r.stderr[-300:]}")
 start(K1, keep=True)
 check(hasfk() and not os.path.exists(NOTE), f"4 keys: the next start brings it back {hasfk()}")
