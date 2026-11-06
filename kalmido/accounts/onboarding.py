@@ -505,9 +505,12 @@ def ind_state(c, uid):
     return {"code": ind_of_area(c, oid, d), "can_set": bool(may), "choices": ind_choices(lang(c, uid)), "updated_at": at}
 
 
-def ind_set(c, uid, code, b=None):
+def ind_set(c, uid, code, b=None, commit=True):
     """Sets uid's industry ("" = none; caller commits). Only the built-in packs change in industry_packs, own packs stay.
-    b: the request body (expect_updated_at = the version read, 409 when the settings moved on). -> True when it changed."""
+    b: the request body (expect_updated_at = the version read, 409 when the settings moved on). commit=False (the first-run
+    setup, review 2.578 F4): the new personal area is not committed early, so a later error of the setup leaves nothing
+    half applied; its statements see the area all the same (the access context is applied per statement, as for the
+    organisation om_setup_org makes in the same transaction). -> True when it changed."""
     code = (code or "").strip().lower() if isinstance(code, str) else code
     if code not in ("",) + ind_codes():
         raise BadInput(tr("Invalid value: {0}", "industry"))
@@ -519,7 +522,8 @@ def ind_set(c, uid, code, b=None):
             c.execute("INSERT INTO orgs(name,icon,created_at,personal_of) VALUES(?,?,?,?) ON CONFLICT (personal_of) WHERE personal_of IS NOT NULL DO NOTHING",
                       (f"private-{int(uid)}", "", iso(now_utc()), uid))
             oid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()[0]
-        c.commit()  # the area exists before anything is written into it
+        if commit:
+            c.commit()  # the area exists before anything is written into it
         acx_drop()
     write_lock(c, f"office_packs_{int(oid)}")  # the locks of PUT /api/office/settings, in its order
     write_lock(c, f"office_settings_{int(oid)}")
