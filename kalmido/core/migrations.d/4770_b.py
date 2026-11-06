@@ -1,7 +1,8 @@
-"""2.570.0 (#4770): doc_meta.run_at = when the recognition queue last took the document (docs/ingest.py): the heartbeat its
-stale check reads. Before, the queue stamped updated_at for that, so a run that finished moved the version a person's undo
-is checked against (expect_updated_at) and the undo was refused for nothing; updated_at is now the version of the changes
-of people and agents only. Nullable: older rows and older versions fall back to updated_at."""
+"""2.570.0 (#4770): doc_meta.edited_at = the version of a document's changes by people (docs/web.py docs_patch, accept):
+PATCH /api/docs/<id> checks expect_updated_at against it (409 with the document: an undo never overwrites another
+session's change). updated_at stays what the background stamps (the recognition queue's heartbeat, the thumbnail's cache
+key), so a recognition run that finished no longer turns an undo into a conflict. NULL = not edited since: the row's
+created_at stands for it (web.doc_ver); older versions ignore the column."""
 MIGRATIONS = [
-    ("doc_meta", "run_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS run_at TEXT"),
+    ("doc_meta", "edited_at", "ALTER TABLE doc_meta ADD COLUMN IF NOT EXISTS edited_at TEXT"),
 ]

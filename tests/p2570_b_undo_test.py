@@ -6,8 +6,8 @@ changes, A writes back with the old version -> 409 with the current state, B's c
 old behaviour. Guarded:
  - a bookmark's preview fetch (background) no longer moves updated_at: an undo against the version of the own save still
    goes through after it (before: refused for nothing), the fetch stamps fetched_at
- - a document's recognition run (background) no longer moves updated_at (its own run_at); a name change of another session
-   is a new version too
+ - a document's version is edited_at (people's changes; updated_at stays the background's stamp, the thumbnail's key):
+   a recognition run after the own save leaves it, a name change of another session is a new version
  - the office archive's correction: a version (never corrected = created_at), 409 against it
  - the instance standard of a view and a project page's standard carry a version (versions / std_at / mine_at)
  - bookmarks, documents and the archive as a person without an organisation (freelancer-matrix: reading, files, office)
@@ -121,16 +121,17 @@ def docs(s1, s2, who):
     check(d, f"{who}: the first recognition run is over")
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": "2027-01-15"})
     check(r.ok, f"{who}: A sets the due date " + r.text[:160])
-    u1 = r.json()["updated_at"]
-    run_sql("UPDATE doc_meta SET state='wait' WHERE node_id=?", (nid,))  # the queue takes it again (background)
-    d = fin()
-    check(d and d["updated_at"] == u1 and one("SELECT run_at FROM doc_meta WHERE node_id=?", (nid,)),
-          f"{who}: the recognition ran again, updated_at stays, run_at set {d and d['updated_at']} / {u1}")
+    u1, t1 = r.json()["edited_at"], r.json()["updated_at"]
+    check(u1 and u1 == one("SELECT edited_at FROM doc_meta WHERE node_id=?", (nid,)), f"{who}: the save answers its version {u1}")
+    n0 = one("SELECT tries FROM doc_meta WHERE node_id=?", (nid,))
+    run_sql("UPDATE doc_meta SET state='wait', tries=0 WHERE node_id=?", (nid,))  # the queue takes it again (background)
+    d = until(lambda: (lambda j: j if j["state"] in ("done", "failed") and one("SELECT tries FROM doc_meta WHERE node_id=?", (nid,)) == 1 else None)(s1.get(B + f"/api/docs/{nid}").json()), 90)
+    check(d and d["edited_at"] == u1, f"{who}: the recognition ran again (tries {n0} -> 1, updated_at {t1} -> {d and d['updated_at']}), the version stays {d and d['edited_at']} / {u1}")
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": None, "expect_updated_at": u1})
     check(r.ok and not r.json()["due"], f"{who}: A's undo after the run goes through (before: 409 for nothing) " + r.text[:160])
-    u2 = r.json()["updated_at"]
+    u2 = r.json()["edited_at"]
     r = s2.patch(B + f"/api/docs/{nid}", json={"name": f"umbenannt-{who}.txt"})
-    check(r.ok and r.json()["updated_at"] != u2, f"{who}: B renames - a new version " + r.text[:160])
+    check(r.ok and r.json()["edited_at"] != u2, f"{who}: B renames - a new version " + r.text[:160])
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": "2027-01-15", "expect_updated_at": u2})
     check(r.status_code == 409 and (r.json().get("current") or {}).get("name") == f"umbenannt-{who}.txt",
           f"{who}: A's redo with the old version: 409 with the current document " + r.text[:200])

@@ -97,6 +97,12 @@ def _agent_folder(c, aid, node, r):
 
 
 # ---- serializing ------------------------------------------------------------------------------------------------------
+def doc_ver(m):
+    """2.570.0 (#4770): the version a document's PATCH checks (fragment 4770_b): the last change of a person, never edited =
+    created_at. Not updated_at: the background moves that (recognition, thumbnails) without anybody changing a value."""
+    return str((m["edited_at"] if "edited_at" in m.keys() else "") or m["created_at"] or "")
+
+
 def doc_json(c, m, node, full=False, role=None, pre=None):
     """The document view of doc_meta row m and its node. 2.525.0 (#4195): pre = doc_prefetch of the list's rows (tags and the
     shared flag of every row read once, not per row)."""
@@ -137,7 +143,8 @@ def doc_json(c, m, node, full=False, role=None, pre=None):
          "type": {"id": m["type_id"], "name": S.label_name(c, ws, "type", m["type_id"])} if m["type_id"] else None,
          "tags": pre["tags"].get(m["node_id"], []) if pre else S.node_tags(c, m["node_id"]), "folder": folder, "auto": auto, "suggest": out_sug, "review": bool(m["review"]),
          "thumb": bool(m["thumb"]), "task_id": m["task_id"], "asn": m["asn"], "source": m["source"], "created_at": node["created_at"],
-         "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand}
+         "updated_at": m["updated_at"], "parent_id": node["parent_id"], "hand": hand,
+         "edited_at": doc_ver(m)}  # 2.570.0 (#4770): the version of people's changes (expect_updated_at of PATCH)
     # 2.210 C (#2761): only a flag whether the document is shared (no names)
     d["shared"] = bool(node["org_access"]) or (m["node_id"] in pre["shared"] if pre else
                                                 bool(c.execute("SELECT 1 FROM fs_shares WHERE node_id=? LIMIT 1", (m["node_id"],)).fetchone()))
@@ -605,22 +612,22 @@ def _reindex(c, nid):
 def docs_patch(nid):
     """{name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | ""),
     custom_fields? {field id: value | null} (2.153.0), expect_updated_at?}
-    2.570.0 (#4770): expect_updated_at set and the document changed since -> 409 with it under "doc" (2.564.0 D #4701; an undo never
-    overwrites another session's change; the recognition queue no longer moves updated_at); missing -> the old behaviour.
-    Every change of a person stamps updated_at (also name, tags, folder, custom fields), so the version names them all."""
+    2.570.0 (#4770): expect_updated_at = the document's edited_at; set and changed since -> 409 with it under "doc" (2.564.0 D
+    #4701; an undo never overwrites another session's change; a recognition run in the background is no change); missing
+    -> the old behaviour. Every change of a person stamps edited_at (also name, tags, folder, custom fields)."""
     c = db()
     _no_agent()
     write_lock(c, f"doc_meta-{int(nid)}")
     m, n = _doc(c, nid, write=True)
     d = body()
     if isinstance(d, dict) and "expect_updated_at" in d:
-        ccf_check(d, m["updated_at"], "doc", lambda: doc_json(c, m, n, full=True, role=n["role"]))
+        ccf_check(d, doc_ver(m), "doc", lambda: doc_json(c, m, n, full=True, role=n["role"]))
         d = {k: v for k, v in d.items() if k != "expect_updated_at"}
     e = doc_update(c, nid, d, me())
     if e:
         return e
     if isinstance(d, dict) and d:
-        c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
+        c.execute("UPDATE doc_meta SET edited_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
@@ -647,6 +654,8 @@ def docs_accept(nid):
     e = doc_update(c, nid, vals, me()) if vals else None
     if e:
         return e
+    if vals:  # 2.570.0 (#4770): taken suggestions are a change of the person (the version)
+        c.execute("UPDATE doc_meta SET edited_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     m = S.meta_row(c, nid)
     left = {k: v for k, v in S.meta_json(c, m, "suggest", {}).items() if k != "_given"}
     if not left:

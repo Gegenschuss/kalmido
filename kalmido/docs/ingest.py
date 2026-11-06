@@ -189,10 +189,9 @@ def docs_run_once():
             r = None
             # 2.149.0 C (#2516): the three writes below only touch waiting / running rows: none (the usual idle tick) -> no writes
             if c.execute("SELECT 1 FROM doc_meta WHERE state IN ('wait', 'run') LIMIT 1").fetchone():
-                # 2.570.0 (#4770): the queue's own stamp run_at (older rows: updated_at); updated_at stays the version of people's changes
-                c.execute("UPDATE doc_meta SET state='wait' WHERE state='run' AND COALESCE(run_at, updated_at) < ?", (stale,))
+                c.execute("UPDATE doc_meta SET state='wait' WHERE state='run' AND updated_at < ?", (stale,))
                 c.execute("UPDATE doc_meta SET state='failed', error='failed' WHERE state='wait' AND tries >= ?", (TRIES,))
-                r = c.execute(f"UPDATE doc_meta SET state='run', tries=tries+1, run_at=? WHERE node_id=({DOCS_NEXT} FOR UPDATE OF d SKIP LOCKED) "
+                r = c.execute(f"UPDATE doc_meta SET state='run', tries=tries+1, updated_at=? WHERE node_id=({DOCS_NEXT} FOR UPDATE OF d SKIP LOCKED) "
                               "RETURNING node_id, ws", (_now(), "{" + ",".join(_Q["recent"]) + "}")).fetchone()
                 if r:
                     _Q["recent"] = [w for w in _Q["recent"] if w != r[1]][-63:] + [r[1]]
@@ -240,7 +239,7 @@ def docs_run_once():
             _Q["lost"] = nid  # 2.521.0 E (#4475): the database may be gone (OOM restart): the next step resets the row
             c.rollback()
             with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
-                c.execute("UPDATE doc_meta SET state=CASE WHEN tries >= ? THEN 'failed' ELSE 'wait' END, error='failed', run_at=? "
+                c.execute("UPDATE doc_meta SET state=CASE WHEN tries >= ? THEN 'failed' ELSE 'wait' END, error='failed', updated_at=? "
                           "WHERE node_id=?", (TRIES, _now(), nid))
             c.commit()
             _Q["lost"] = None
@@ -268,9 +267,9 @@ def docs_take_up(c):
         return
     with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
         if every:
-            c.execute("UPDATE doc_meta SET state='wait', run_at=? WHERE state='run'", (_now(),))
+            c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE state='run'", (_now(),))
         else:
-            c.execute("UPDATE doc_meta SET state='wait', run_at=? WHERE node_id=? AND state='run'", (_now(), lost))
+            c.execute("UPDATE doc_meta SET state='wait', updated_at=? WHERE node_id=? AND state='run'", (_now(), lost))
     c.commit()
     _Q["first"], _Q["lost"] = False, None
 
