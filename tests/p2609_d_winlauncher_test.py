@@ -8,8 +8,8 @@ and Windows PowerShell 5.1; the normal suites run it on Linux / macOS with pwsh 
  1. launcher_gone / win_pid_gone without Windows: a stand-in kernel32 (alive, ended, no such process, refused) and the
     nt branch of launcher_gone (pure Python, everywhere)
  2. on Windows: win_pid_gone with the real kernel32 (this process alive, an ended one gone)
- 3. the launcher: it starts (PUT /api/v1/agent/status with the host), an event is worked off (the answer is posted), a
-    pause in Kalmido ends the whole tree (event runner, the command, what the command started), the event waits in the
+ 3. the launcher: it starts (PUT /api/v1/agent/status with the host), an event is worked off (the answer is posted), the
+    time limit of a run ends the command with its child (taskkill /T on Windows), a pause in Kalmido ends the whole tree (event runner, the command, what the command started), the event waits in the
     runner's queue and runs after the resume, and a launcher killed hard leaves no runner behind (launcher_gone)
 Waits are on states (until), never fixed sleeps. Standard library only; tests/kt.py needs time zone data (pip tzdata on Windows)."""
 import importlib.util
@@ -265,12 +265,14 @@ fake = os.path.join(tmp, "fake_claude.py")
 with open(fake, "w") as f:
     f.write(r'''import json, os, subprocess, sys, time
 args, prompt = sys.argv[1:], sys.stdin.read()
-rec = {"pid": os.getpid(), "ppid": os.getppid(), "hang": "please hang" in prompt}
-if rec["hang"] and os.path.exists(os.environ["FAKE_HANG"]):
+rec = {"pid": os.getpid(), "ppid": os.getppid(), "hang": "please hang" in prompt, "stall": "please stall" in prompt}
+if (rec["hang"] and os.path.exists(os.environ["FAKE_HANG"])) or rec["stall"]:
     c = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(600)"])
     rec["child"] = c.pid
 with open(os.environ["FAKE_RUNS"], "a") as f:
     f.write(json.dumps(rec) + "\n")
+if rec["stall"]:  # until the runner's time limit ends it with its child
+    time.sleep(600)
 while rec.get("child") and os.path.exists(os.environ["FAKE_HANG"]):
     time.sleep(0.2)
 word = "please hang" if rec["hang"] else ("hello one" if "hello one" in prompt else "?")
@@ -283,7 +285,7 @@ print(json.dumps({"type": "result", "subtype": "success", "is_error": False, "re
 envf = os.path.join(tmp, "agent.env")
 state = os.path.join(tmp, "state")
 with open(envf, "w") as f:
-    f.write(f"KALMIDO_URL={URL}\nKALMIDO_TOKEN={TOKEN}\nKALMIDO_POLL=1\nKALMIDO_RESTART_DELAY=1\nKALMIDO_HOST=winci\n"
+    f.write(f"KALMIDO_URL={URL}\nKALMIDO_TOKEN={TOKEN}\nKALMIDO_POLL=1\nKALMIDO_RESTART_DELAY=1\nKALMIDO_HOST=winci\nKALMIDO_RUN_TIMEOUT=60\n"
             f"KALMIDO_STATE_DIR={state}\nKALMIDO_PYTHON={sys.executable}\nKALMIDO_AGENT_PROFILE=claude\n"
             f"KALMIDO_RUN_LOG={os.path.join(tmp, 'agent_run.log')}\nFAKE_RUNS={runs}\nFAKE_HANG={hang}\n")
 logf = open(os.path.join(tmp, "launcher.log"), "w")
@@ -332,10 +334,22 @@ try:
     runner_pid = r1[0]["ppid"] if r1 else None
     check(pid_alive(runner_pid), f"the event runner is alive after the run ({runner_pid})")
 
+    # the time limit of a run (KALMIDO_RUN_TIMEOUT, 60 s: above the up to ~32 s a pause needs on Windows, see below) ends
+    # the command with its child (taskkill /T /F on Windows) and says so in the chat; the runner goes on
+    with ST["lock"]:
+        ST["events"].append(chat_event(2, "please stall"))
+    check(until(lambda: any(r.get("stall") for r in records()), 120), f"the stalling run is there\n{logs()}")
+    sr = [r for r in records() if r.get("stall")][0]
+    left += [sr["pid"], sr["child"]]
+    check(until(lambda: not pid_alive(sr["pid"]) and not pid_alive(sr["child"]), 150),
+          f"the time limit ends the command and its child: {[(p, pid_alive(p)) for p in (sr['pid'], sr['child'])]}\n{logs()}")
+    check(until(lambda: [p for p in ST["posts"] if "time limit" in p["body"]], 60), f"the chat hears of the time limit: {ST['posts'][-3:]}")
+    check(pid_alive(runner_pid), "the runner itself goes on after a time limit")
+
     # a pause in Kalmido during a run ends the tree: the runner, the command, the command's child
     open(hang, "w").close()
     with ST["lock"]:
-        ST["events"].append(chat_event(2, "please hang"))
+        ST["events"].append(chat_event(3, "please hang"))
     check(until(lambda: any(r.get("child") for r in records()), 120), f"the hanging run is there\n{logs()}")
     hr = [r for r in records() if r.get("child")][0]
     left += [hr["pid"], hr["child"], hr["ppid"]]
