@@ -14,10 +14,14 @@ freelancer-matrix: files
  - a person without an office: sort=1 changes nothing (no area, the file store unfiltered)
  - a person whose office is an organisation's: the sorted invoice moves into the organisation's documents, the notice stays
    private; "Wrong area" moves it back into the private space, the undo into the organisation again
-usage: p4433_a_area_test.py <datadir>      (a fresh container; P4433A_NOSTART=1 / KMT_NOSTART=1: it runs already)"""
+ - 2.576.0 (#4487): a mail to the person's own document address is the general input too: its e-invoice lands in the office,
+   a mail with a tax notice stays private (the IMAP stub of the container, tests/stub_mail.py)
+usage: p4433_a_area_test.py <datadir>      (a fresh container with the stub mailbox; P4433A_NOSTART=1 / KMT_NOSTART=1: it runs already)"""
 import base64
+import email.message
 import json
 import os
+import subprocess
 import sys
 
 import requests
@@ -28,7 +32,16 @@ from kt import B, FAILS, OKS, check, until  # noqa: E402
 from freelancer_fixture import freelancer  # noqa: E402
 
 V = B + "/api/v1"
-kt.fresh(prefix="P4433A")
+# 2.576.0 (#4487): the stub mailbox (IMAP 127.0.0.1:1143 inside the container) for the mail to the own document address
+MAILENV = {"KALMIDO_MAIL_ADDRESS": "tasks@example.test", "KALMIDO_IMAP_HOST": "127.0.0.1", "KALMIDO_IMAP_PORT": "1143", "KALMIDO_IMAP_SSL": "0",
+           "KALMIDO_IMAP_USER": "kalmido", "KALMIDO_IMAP_PASSWORD": "secret", "KALMIDO_IMAP_INTERVAL": "600"}
+if not kt.nostart("P4433A"):
+    subprocess.run(["rm", "-rf", kt.DATA])
+    os.makedirs(os.path.join(kt.DATA, "mail", "in"), exist_ok=True)
+    subprocess.run(["cp", os.path.join(kt.N, "stub_mail.py"), kt.DATA])
+    kt.fresh(env=MAILENV, prefix="P4433A", keep=True)
+    subprocess.run(["docker", "exec", "-d", kt.CT, "python", "/data/stub_mail.py"])
+os.makedirs(os.path.join(kt.DATA, "mail", "in"), exist_ok=True)
 A = kt.setup()
 ALICE = A.get(B + "/api/state").json()["me"]["id"]
 
@@ -163,6 +176,38 @@ r = requests.post(V + "/documents", headers={"Authorization": "Bearer " + KEY},
 check(r.status_code == 201, f"scan inbox upload {r.status_code} {r.text[:160]}")
 scan = r.json().get("id")
 check(settled(Fr, scan) and row(scan)[1] == "", f"#4433: a bound scan inbox lands as sent, never sorted {row(scan)}")
+
+# ---- 2.576.0 (#4487): a mail to her own document address is the general input: sorted like the upload
+r = Fr.post(B + "/api/docs/mail", json={"ws": "private"})
+check(r.ok and r.json().get("address"), "her document address " + r.text[:160])
+MAILNO = [0]
+
+
+def mail_in(addr, name, data, mt, st):
+    """One mail with one attachment to addr through the stub mailbox -> the new document's node id (None: none came)."""
+    MAILNO[0] += 1
+    m = email.message.EmailMessage()
+    m["From"], m["To"], m["Subject"], m["Message-ID"] = "post@example.com", addr, "Fwd: Post", f"<p4433-mail-{MAILNO[0]}@example.com>"
+    m.set_content("siehe Anhang")
+    m.add_attachment(data, maintype=mt, subtype=st, filename=name)
+    open(os.path.join(kt.DATA, "mail", "in", f"{MAILNO[0]}.eml"), "wb").write(bytes(m))
+
+    def got():
+        A.post(B + "/api/admin/mail/poll")
+        x = kt.dbx("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.source='mail' AND n.name=?", (name,))
+        return x[0][0] if x else None
+    return until(got, 40)
+
+
+if r.ok and r.json().get("address"):
+    ADDR = r.json()["address"]
+    m1 = mail_in(ADDR, "mail-rechnung.xml", ubl("ER-2026-91", "Beispiel Post GmbH", "DE456789123"), "application", "xml")
+    d = m1 and settled(Fr, m1)
+    check(d and row(m1)[:2] == ("office", "auto") and m1 in ids(Fr, area="office") and m1 not in ids(Fr, area="private"),
+          f"#4487: the e-invoice of a mail to her own address is sorted into the office {m1 and row(m1)}")
+    m2 = mail_in(ADDR, "mail-bescheid.txt", NOTICE.replace(b"2026", b"2027"), "text", "plain")
+    check(m2 and settled(Fr, m2) and row(m2)[:2] == ("private", "auto") and m2 in ids(Fr, area="private"),
+          f"#4487: a tax notice by mail stays private {m2 and row(m2)}")
 
 # ---- the tenant boundary
 G = freelancer(B, A, "gina")[1]

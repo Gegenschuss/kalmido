@@ -121,8 +121,19 @@ def _docs_receipts(c, uid, oid, ids, neg, limit):
     rows = c.execute(f"SELECT r.node_id, n.name, n.created_at FROM rc_receipts r JOIN fs_nodes n ON n.id=r.node_id WHERE r.ws=? "
                      f"AND n.kind='file' AND n.deleted_at IS NULL AND n.id IN {fs_visible_sql(uid, c)} AND {_in('r.node_id', ids, neg)} "
                      f"ORDER BY r.node_id DESC LIMIT {int(limit)}", (bk_ws(c, oid),)).fetchall()
-    return [{"id": r["node_id"], "kind": "receipt", "title": r["name"], "sub": "", "date": (r["created_at"] or "")[:10], "locked": False,
-             "open": f"docs/{r['node_id']}"} for r in rows if not fs_deleted(fs_chain(c, r["node_id"]))]
+    out = [{"id": r["node_id"], "kind": "receipt", "title": r["name"], "sub": "", "date": (r["created_at"] or "")[:10], "locked": False,
+            "open": f"docs/{r['node_id']}"} for r in rows if not fs_deleted(fs_chain(c, r["node_id"]))]
+    if neg:  # 2.576.0 (#4487): Office > Receipts is the office's own document list -- + its documents not recorded yet ("New in
+        # the office", docs/area.py area 'office'), the same visibility (fs_visible_sql); filed ones come through their reference
+        new = c.execute(f"SELECT d.node_id, n.name, n.created_at FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.ws=? AND d.area='office' "
+                        f"AND NOT EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id) AND n.kind='file' AND n.deleted_at IS NULL "
+                        f"AND n.id IN {fs_visible_sql(uid, c)} AND {_in('d.node_id', ids, True)} ORDER BY d.node_id DESC LIMIT {int(limit)}",
+                        (bk_ws(c, oid),)).fetchall()
+        lg = lang(c, uid)
+        out += [{"id": r["node_id"], "kind": "doc", "title": r["name"], "sub": tr("New in the office", lg=lg), "date": (r["created_at"] or "")[:10],
+                 "locked": False, "open": f"docs/{r['node_id']}"} for r in new if not fs_deleted(fs_chain(c, r["node_id"]))]
+        out.sort(key=lambda x: -x["id"])
+    return out[:int(limit)]
 
 
 OFT_DOCS = {"offers": _docs_sec("offers"), "invoices": _docs_sec("invoices"), "gendocs": _docs_gendocs, "letters": _docs_letters, "receipts": _docs_receipts}

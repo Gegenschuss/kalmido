@@ -87,7 +87,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
     c.execute("UPDATE doc_meta SET raw_sha=? WHERE node_id=?", (sha, nid))  # 2.146.0 B (#2452)
     if area == "sort" and not org_id and not parent_id:  # 2.522.0 (#4433): only the general input is sorted
         c.execute("UPDATE doc_meta SET area_sort='pending' WHERE node_id=?", (nid,))
-    elif area == "office" and not org_id:
+    elif area == "office":  # 2.576.0 (#4487): an organisation's office upload too (the file store hides only office documents)
         c.execute("UPDATE doc_meta SET area='office' WHERE node_id=?", (nid,))
     return nid
 

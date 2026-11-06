@@ -4,7 +4,7 @@ const RC = {id: null, d: null, seq: 0};
 
 function rc_slot(doc) {
   if (RC.id !== doc.id) { RC.id = doc.id; RC.d = null; RC.cb = null; rc_load(); }
-  return `<div class="rc-slot">${rc_html()}</div><p class="rc-cb muted" ${RC.cb?.length ? '' : 'hidden'}>${esc(rc_cbText())}</p>`;  // 2.121.0 B (#2095): + the cash book hint
+  return `${rc_alsoHtml(doc)}<div class="rc-slot">${rc_html()}</div><p class="rc-cb muted" ${RC.cb?.length ? '' : 'hidden'}>${esc(rc_cbText())}</p>`;  // 2.121.0 B (#2095): + the cash book hint
 }
 async function rc_load() {
   const id = RC.id, seq = ++RC.seq;
@@ -89,6 +89,16 @@ function rc_isReceipt(d) {
 }
 // 2.522.0 (#4433): the area of the open document (docs/area.py ar_view: null = no office, everything as before)
 const rc_area = () => (typeof DC !== 'undefined' && DC.doc?.id === RC.id ? DC.doc.area : null) || null;
+// 2.576.0 (#4487, decision 04.11.2026): Office > Receipts and the file store apart, a document in both points to the other
+// place instead of a copy: an office document (docs/area.py ar_view area 'office') lies in a folder of the file store as well
+// -> "Also in: Office > Receipts" (outside the office) and "Also in: File store" (its folder); nothing for the private ones
+function rc_alsoHtml(doc) {
+  const ar = doc?.area; if (!ar || ar.area !== 'office') return '';
+  const b = (go, name) => `<button type="button" class="linkbtn" data-rcgo="${esc(go)}">${esc(name)}</button>`;
+  const ls = [S.route.mod !== 'office' && officeOn() ? b('office/receipts', tr('Office') + ' › ' + tr('Receipts')) : '',
+    doc.parent_id && S.route.mod !== 'ablage' && ab_on() ? b('ablage/' + doc.parent_id, tr('File store')) : ''].filter(Boolean);
+  return ls.length ? `<p class="muted rc-also">${ic('link', 's')} ${tr('Also in {0}', ls.join(' · '))}</p>` : '';
+}
 // "Wrong area" of a document the general input sorted (in the office: back to the private space, and the other way round)
 const rc_wrongHtml = ar => ar?.wrong && ar.can_move ? `<div class="rc-sug rc-area" role="group"><span class="muted">${esc(ar.area === 'office' ? tr('Sorted into the office.') : tr('Sorted into your own documents.'))}</span><button type="button" class="btn sm" data-rc="area:${ar.area === 'office' ? 'private' : 'office'}">${ic('undo', 's')} ${tr('Wrong area')}</button></div>` : '';
 // one click, one undo step: POST /api/docs/<id>/area, then the sheet and the list anew (the document may be in another workspace now)
@@ -98,7 +108,7 @@ async function rc_areaMove(id, to, b) {
     await api('POST', `/api/docs/${id}/area`, undo ? {to: t, undo: true} : {to: t});
     if (typeof dc_c168Refresh === 'function') await dc_c168Refresh(id);
     if (typeof dc_load === 'function' && typeof DC !== 'undefined' && DC.docs) dc_load();
-    if (RC.id === id) { RC.id = null; const el = $('.rc-slot'); if (el && typeof DC !== 'undefined' && DC.doc?.id === id) el.outerHTML = rc_slot(DC.doc); }
+    if (RC.id === id) { RC.id = null; const el = $('.rc-slot'); if (el && typeof DC !== 'undefined' && DC.doc?.id === id) { el.previousElementSibling?.classList.contains('rc-also') && el.previousElementSibling.remove(); el.nextElementSibling?.classList.contains('rc-cb') && el.nextElementSibling.remove(); el.outerHTML = rc_slot(DC.doc); } }  // 2.576.0 (#4487): + the "Also in" line, no second hint
     return {};
   };
   try { await go(to, false)(); } catch { if (b) b.disabled = false; return; }
@@ -178,6 +188,12 @@ document.addEventListener('change', async e => {
   const label = tr('Changed receipt');
   histToast(label, histAdd({label, undo: () => rc_put(id, from), redo: () => rc_put(id, to)}));
 });
+document.addEventListener('click', e => {  // 2.576.0 (#4487): a jump of "Also in" closes the document's sheet (a phone, the file store)
+  const b = e.target.closest?.('.rc-also [data-rcgo]'); if (!b) return;
+  e.preventDefault(); e.stopPropagation();
+  $('.dc-md:not(.dc-pane)')?.remove();
+  go(b.dataset.rcgo);
+}, true);
 document.addEventListener('click', async e => {
   const b = e.target.closest('.rc-slot [data-rc]'); if (!b) return;
   const [act, sid] = b.dataset.rc.split(':'), id = RC.id;

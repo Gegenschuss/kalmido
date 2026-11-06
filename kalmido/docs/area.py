@@ -90,8 +90,8 @@ def ar_of(c, m, off, uid):
     if not off or not m:
         return None
     if m["ws"] == off[1]:
-        if off[0] == "org":
-            return "office"
+        if off[0] == "org" and m["area"] != "office" and not ar_is_receipt(c, m["node_id"]):
+            return None  # 2.576.0 (#4487): the organisation's other documents (a contract): its file store, not the office
         return "office" if m["area"] == "office" or ar_is_receipt(c, m["node_id"]) else "private"
     if off[0] == "org" and m["ws"] == S.doc_ws(None, uid):
         return "office" if ar_is_receipt(c, m["node_id"]) else "private"  # an old receipt of the personal office (#4434 moves them)
@@ -124,13 +124,17 @@ def ar_view(c, node, m, uid):
 
 
 def ar_sql(c, uid, want):
-    """(SQL condition on d = doc_meta, params) of the documents list ?area=office | private; None = no filter (no office)."""
+    """(SQL condition on d = doc_meta, params) of the documents list ?area=office | private; None = no filter (no office).
+    Only ever ANDed to the list's visibility (docs/web.py doc_query: doc_visible), so it narrows a list and never shows more.
+    2.576.0 (#4487, decision 04.11.2026: the office's receipts and the file store apart): an organisation's office takes
+    only its office documents (area 'office': the office's own uploads, a sorted / moved invoice) and receipts out of the
+    file store; the organisation's other documents (contracts, letters) stay there."""
     off = ar_office(c, uid) if want in AR_AREAS else None
     if not off:
         return None
     rc = "EXISTS (SELECT 1 FROM rc_receipts r WHERE r.node_id=d.node_id)"
-    if off[0] == "org":
-        office = f"(d.ws=? OR (d.ws=? AND {rc}))"
+    if off[0] == "org":  # 2.576.0 (#4487): only the organisation's office documents / receipts, its contracts stay in the file store
+        office = f"((d.ws=? AND (d.area='office' OR {rc})) OR (d.ws=? AND {rc}))"
         params = [off[1], S.doc_ws(None, uid)]
     else:
         office = f"(d.ws=? AND (d.area='office' OR {rc}))"
