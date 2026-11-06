@@ -531,7 +531,7 @@ async function doSave(key, retry) {
     outReject({method: 'PATCH', url: '/api/tasks/' + s.id, body: {[s.field]: s.value}}, e); renderTop();
     return;
   }
-  unsavedMark(s, false);
+  if (!OUT.q.some(x => x.url === '/api/tasks/' + s.id && x.tries)) unsavedMark(s, false);  // 2.574.0 (#4589): still waiting after a server error = the mark stays
   if (t.conflicts?.length) {
     const own = t.conflicts.filter(c => c.field === s.field && ownVal(key, c.server));
     if (own.length === t.conflicts.length && !retry) {  // only our own earlier text: send the newest on top of it

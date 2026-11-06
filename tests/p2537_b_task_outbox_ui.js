@@ -5,6 +5,7 @@
 //   (joins the same undo step); Undo puts both back on the server
 // - a locked list: its change never waits in the outbox (only ciphers leave; straight to the server as before)
 // - a refusal (409) and a field changed elsewhere meanwhile land in the conflicts dialog, never lost silently
+//   (2.574.0 #4589: its toast says "change not applied", no "offline")
 // kalmido-suite: fresh
 const {boot, errs, B, login, until} = require('./boot');
 const F = []; let ok = 0;
@@ -101,6 +102,9 @@ const rejected = w => w.eval('S.conflicts').filter(c => c.field === 'rejected');
   check(t409 === 'Refused words', '409: shown at once');
   check(await until(() => w.eval('OUT.q.length') === 0 && rejected(w).some(c => c.tid === A && /Refused words/.test(c.mine) && /Changed elsewhere/.test(c.server))), '409: the change waits in the conflicts dialog with its text ' + JSON.stringify(rejected(w)));
   check(await until(() => w.eval(`S.tasks.get(${A}).title`) === 'Design the big poster'), '409: the page shows the server state again');
+  // 2.574.0 (#4589): a change sent online and refused: the toast does not say "offline"
+  check(await until(() => /1 change not applied/.test(w.document.querySelector('#toast')?.textContent || '')), '409: the toast says the change was not applied ' + w.document.querySelector('#toast')?.textContent);
+  check(!/offline/i.test(w.document.querySelector('#toast')?.textContent || ''), '409: … without "offline"');
   fake = null;
   w.eval("S.conflicts = []; LS.set('conflicts', [])");
   await call('PATCH', '/api/tasks/' + A, {content: 'Written on the phone'});

@@ -1022,7 +1022,7 @@ async function outFlush() {
         if (j?.link_waits) toast(tr(ML_WAITS));  // 2.363.3 (#3133): "also in" sent after a move: kept for the way back
         if (j?.order_kept) toast(tr(MO_KEPT));  // 2.363.3 (#3133)
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });  // 2.126.0 D (#1989): out of the shared queue first
-        e.res = j;
+        e.res = j; if (e.tries) outUnsaved(e, false);  // 2.574.0 (#4589)
         if (outAnswer(e, j)) sentTk++;  // 2.537.0 (#4568): the answer for the one who wrote it
       } catch (err) {
         if (err instanceof Offline || err.message === 'auth') { outSave(() => { delete e.sending; delete e.live; }); if (err instanceof Offline) flushSoon(); return; }  // 2.25.0 (UX-55): try again in 2 s
@@ -1033,7 +1033,7 @@ async function outFlush() {
         const st = err.status || 0;
         if (st >= 500 || st === 429 || st === 408) {
           const tries = (e.tries || 0) + 1;
-          if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; delete e.live; e.tries = tries; }); outRetry(); return; }  // 2.551.0 (#4649): a later try is no "at once" any more (a refusal then waits in the dialog)
+          if (st === 503 || st === 429 || tries < OUT_MAX_TRIES) { outSave(() => { delete e.sending; delete e.live; e.tries = tries; }); outUnsaved(e, true); outRetry(); return; }  // 2.574.0 (#4589): the field says it waits  // 2.551.0 (#4649): a later try is no "at once" any more (a refusal then waits in the dialog)
         }
         if (err.data?.code === 'skip_stale') {  // 2.528.0 (#4305 B1): skipped elsewhere already = not skipped twice, the current date
           if (err.data.task && typeof putTask === 'function') putTask(err.data.task);
@@ -1052,7 +1052,7 @@ async function outFlush() {
         if (typeof ntReject === 'function' && ntU(e.url) && ntReject(e, err)) { /* 2.536.0 (#4567): 409 = the note's own dialog (chat.js) */ }
         else if (!(wiki && typeof wkoReject === 'function' && await wkoReject(e, err).catch(() => false))) { if (wiki) wdropped++; else dropped++; outReject(e, err); }  // 2.169.0 (#2671): changed elsewhere = waits at the page; 2.169.1 (#2672): own words for a page
         outSave(() => { OUT.q = OUT.q.filter(x => x !== e); });
-        e.res = null;
+        e.res = null; if (e.tries) outUnsaved(e, false);  // 2.574.0 (#4589): it waits in the conflicts dialog now
         outAnswer(e, null);  // 2.537.0 (#4568): refused: its waiter hears it (the change waits in the conflicts dialog)
       }
       e.done = true;
@@ -1064,7 +1064,7 @@ async function outFlush() {
     if (sent && !OUT.q.length && globalThis.document) { S.syncOk = Date.now(); staleDraw(); }  // 2.25.0 (UX-55): the "waiting" chip goes at once
     renderTop();
     if (sent && sent > sentNt + sentTk && !OUT.q.length && !dropped && !wdropped && !skipped && !refused.length) savedChip();  // 2.536.0 (#4567): a note says "Saved" itself; 2.537.0 (#4568): a task's change said "Saved" already
-    if (dropped) setTimeout(() => toast(trn('{0} offline change not applied (task deleted or invalid)', '{0} offline changes not applied (task deleted or invalid)', dropped)), 400);
+    if (dropped) setTimeout(() => toast(trn('{0} change not applied (task deleted or invalid)', '{0} changes not applied (task deleted or invalid)', dropped)), 400);
     else if (wdropped) setTimeout(() => toast(trn('{0} offline change of a knowledge page not applied (page deleted or no right)', '{0} offline changes of knowledge pages not applied (page deleted or no right)', wdropped)), 400);
     else if (skipped) setTimeout(() => toast(tr('Recurring task was already checked off, not advanced twice')), 400);
     // 2.551.0 (#4649): left early (an entry behind it waits for the connection / another try): the refused ones are settled here
@@ -1079,6 +1079,13 @@ async function outFlush() {
   if (typeof qfSend === 'function') qfSend();  // 2.359.0 A (#3023): files of a quick add made offline (attachments.js)
 }
 window.addEventListener('online', () => { OUT.retryAt = 0; flush(); });
+// 2.574.0 (#4589): a task's typed title / description whose send failed with a server error waits first in the queue for
+// another try: its field says "Not saved yet, trying again" (attachments.js unsavedMark) until it went out or was refused
+function outUnsaved(e, on) {
+  const m = e?.method === 'PATCH' && /^\/api\/tasks\/(\d+)$/.exec(e.url);
+  if (!m || typeof unsavedMark !== 'function' || !globalThis.document) return;
+  for (const f of ['title', 'content']) if (e.body && f in e.body) unsavedMark({id: +m[1], field: f}, on);
+}
 // 2.359.0 A (#3023): the next try after a server error: 2 s, 4 s, 8 s ... at most a minute (a success starts again at 2 s)
 const OUT_MAX_TRIES = 12;
 function outRetry() {
