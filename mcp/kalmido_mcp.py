@@ -1354,11 +1354,23 @@ TOOLS += [
                         "expect_rev (strict): 409 (error.cells = the current cells) when the table changed at all since that rev. 2.564.0: "
                         "send expect_rev (rev from sheet_read) or a prev with EVERY cell, else 400 version_required. "
                         "One call = one batch; a wrong formula changes nothing (the error says why). The answer has the "
-                        "changed cells and those depending on them.",
+                        "changed cells and those depending on them. 2.578.0: a cell's format with fmt (the whole format, null = none) "
+                        "or fmt_patch (only these keys, null removes one), without raw only the format changes: {bold, italic, wrap: "
+                        "true, color / fill: a | a2 | g1 | g2 | g3 (accent, light accent, dark / middle / light grey; no other "
+                        "colours), align: left | center | right, merge: [rows, columns] on the top left cell}; prev_fmt = the format "
+                        "you read (a cell formatted otherwise since lands in conflicts with what: fmt).",
      _obj({"sheet_id": S_ID, "cells": {"type": "array", "maxItems": 5000, "items": {"type": "object", "description": "{row_id, col_id, raw, prev?} or {cell, raw, prev?}"}},
            "expect_rev": {"type": "integer", "description": "rev from sheet_read (2.564.0: required unless every cell has prev)"}},
           ["sheet_id", "cells"]),
      lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/cells", body={"cells": a.get("cells") or [], **_pick(a, ("expect_rev",))})),
+    ("sheet_set_rules", "2.578.0 (scope sheets:write): the colour rules of a table (the WHOLE list, [] = none; read them with "
+                        "sheet_read: rules). A rule: {cols: [column ids], rows: [first row id, last row id] | null (whole columns), "
+                        "op: gt | lt | eq | between | contains | empty | overdue (a date before today), a, b (between), color / fill: "
+                        "a | a2 | g1 | g2 | g3}. expect_rev (rev from sheet_read) is required; 409 = changed since (current rules in "
+                        "the error).",
+     _obj({"sheet_id": S_ID, "rules": {"type": "array", "maxItems": 50, "items": {"type": "object"}},
+           "expect_rev": {"type": "integer"}}, ["sheet_id", "rules", "expect_rev"]),
+     lambda api, a: api.call("PUT", f"/sheets/{_id(a, 'sheet_id')}/rules", body={"rules": a.get("rules") or [], **_pick(a, ("expect_rev",))})),
     ("sheet_append_rows", "2.89.0 (scope sheets:write): append rows (inputs in the order of the columns) at the end or after_row_id. "
                           "One call = one batch.",
      _obj({"sheet_id": S_ID, "rows": _SH_ROWS, "after_row_id": S_ID}, ["sheet_id", "rows"]),
@@ -2743,7 +2755,7 @@ TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)
 TOOL_SCOPES["structure"] += ("propose_rule",)  # 2.71.0 A (#1457)
 TOOL_SCOPES["sheets:read"] = ("sheets_list", "sheet_read", "sheet_vars", "sheet_tabs")  # 2.89.0 C (#1916); 2.124.0 E (#2116): + sheet_tabs
 TOOL_SCOPES["sheets:write"] = ("sheet_create", "sheet_update", "sheet_set_cells", "sheet_append_rows", "sheet_add_column", "sheet_undo_batch",
-                               "sheet_add_tab")  # 2.124.0 E (#2116): + sheet_add_tab
+                               "sheet_add_tab", "sheet_set_rules")  # 2.124.0 E (#2116): + sheet_add_tab; 2.578.0 (#3462 C): + sheet_set_rules
 TOOL_SCOPES["sheets:read"] += ("propose_sheet_tasks",)  # 2.126.1 B (#2125)
 TOOL_SCOPES["comments"] += ("add_video_comment", "set_video_comment_done")  # 2.99.1 C (#1959)
 TOOL_SCOPES["wiki:read"] = ("wiki_list", "wiki_read", "wiki_files", "wiki_read_file")  # 2.200.0 C (#1781); 2.488.0 B (#2209): + files
@@ -2806,7 +2818,7 @@ TOOLSETS = {
         get_timer start_timer stop_timer list_time_entries get_time_gaps add_time_entry update_time_entry delete_time_entry check_time_entries
         time_from_events propose_time_entries
         sheets_list sheet_read sheet_create sheet_update sheet_set_cells sheet_append_rows sheet_add_column sheet_vars sheet_undo_batch sheet_tabs
-        sheet_add_tab propose_sheet_tasks
+        sheet_add_tab propose_sheet_tasks sheet_set_rules
         list_address_books create_address_book update_address_book delete_address_book share_address_book unshare_address_book import_vcards
         export_vcards search_contacts get_contact create_contact update_contact delete_contact bulk_contacts link_contact unlink_contact set_contact_care
     """,

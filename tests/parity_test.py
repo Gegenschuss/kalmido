@@ -258,6 +258,7 @@ APP_TO_API = {
     # the files of export / import are the same data as reading / creating
     "GET /api/sheets": ["GET /sheets"], "POST /api/sheets": ["POST /sheets"], "GET /api/sheets/{}": ["GET /sheets/{}"],
     "PATCH /api/sheets/{}": ["PATCH /sheets/{}"], "PUT /api/sheets/{}/cells": ["PUT /sheets/{}/cells"],
+    "PUT /api/sheets/{}/rules": ["PUT /sheets/{}/rules"],  # 2.578.0 (#3462 C): the colour rules
     "GET /api/sheets/{}/tabs": ["GET /sheets/{}/tabs"], "POST /api/sheets/{}/tabs": ["POST /sheets/{}/tabs"],  # 2.124.0 E (#2116)
     "POST /api/sheets/{}/rows": ["POST /sheets/{}/rows"], "POST /api/sheets/{}/columns": ["POST /sheets/{}/columns"],
     "GET /api/sheets/{}/vars": ["GET /sheets/{}/vars"], "POST /api/sheets/{}/batches/{}/undo": ["POST /sheets/{}/batches/{}/undo"],

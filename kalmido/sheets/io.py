@@ -43,6 +43,8 @@ from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh
                       sh_fn_key, sh_tokens)
 from .shfuncs import SHF_DE, SHF_EXCEL
 from .shfuncs2 import shf_arg_fill  # 2.578.0 (#3462)
+from .shfmt import (ShfmXl, shfm_import_apply, shfm_load, shfm_xl_merges, shfm_xl_read_rules, shfm_xl_rules,  # 2.578.0 (#3462 C)
+                    shfm_xl_styles)
 from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, shb_quote, shb_xl_ref  # 2.369.5 (#2517): pulled up from functions
 
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
@@ -258,12 +260,13 @@ def _xl_name_ok(name):
     return bool(name) and not re.fullmatch(r"[rRcC]|[rR]\d*[cC]\d*|[rR]\d+|[cC]\d+", name) and len(name) <= 255
 
 
-def shx_xlsx(c, sheet, xl_names=None):
+def shx_xlsx(c, sheet, xl_names=None, xl_reg=None):
     """The .xlsx bytes of the sheet (one visible sheet; a hidden sheet "_lists" only when a drop-down list is too long to
     be written inline). 2.124.0 E (#2116): xl_names = {sheet id: name in the file} of the table's sheets (sheets/shbook.py
     shb_xlsx puts the files of all sheets together; formulas into another sheet keep their reference then)."""
     book, res, at = _grid(c, sheet)
     book.shb_xl = xl_names
+    reg = xl_reg or ShfmXl()  # 2.578.0 (#3462 C): the cell formats (sheets/shfmt.py); one registry for all sheets of a table
     ncols = len(book.cols)
     nrows = _used_rows(book, at, res)
     last_row = nrows + 1                       # the header is row 1
@@ -288,6 +291,8 @@ def shx_xlsx(c, sheet, xl_names=None):
             s = style_of.get(col["kind"])
             if isinstance(v, date):
                 s = 4
+            cf = shfm_load(x.get("fmt"))  # 2.578.0 (#3462 C): bold, colours, alignment of the cell
+            s = reg.style(s or 0, cf) or None
             sa = f' s="{s}"' if s else ""
             f = None
             if raw.startswith("=") and not x["frozen"]:
@@ -302,6 +307,8 @@ def shx_xlsx(c, sheet, xl_names=None):
             elif v is None:
                 if fx:
                     parts.append(f'<c r="{ref}"{sa} t="str">{fx}<v></v></c>')
+                elif cf and sa:
+                    parts.append(f'<c r="{ref}"{sa}/>')  # 2.578.0 (#3462 C): an empty cell with a format
                 continue
             elif isinstance(v, bool):
                 parts.append(f'<c r="{ref}"{sa} t="b">{fx}<v>{1 if v else 0}</v></c>')
@@ -351,6 +358,8 @@ def shx_xlsx(c, sheet, xl_names=None):
         if rules:
             rng = f"A2:{sh_col_letter(max(ncols - 1, 0))}{dv_end}" if col["color_mode"] == "row" else sq
             cfs.append(f'<conditionalFormatting sqref="{rng}">{"".join(rules)}</conditionalFormatting>')
+    rx, prio = shfm_xl_rules(sheet, book, dv_end, dxfs, prio)  # 2.578.0 (#3462 C): the colour rules of the table
+    cfs.append(rx)
     # columns + view
     cols_xml = "".join(f'<col min="{i + 1}" max="{i + 1}" width="{round(max(4.0, (col["width"] or 110) / 7.0), 2)}" customWidth="1"/>'
                        for i, col in enumerate(book.cols))
@@ -359,7 +368,8 @@ def shx_xlsx(c, sheet, xl_names=None):
           f'xmlns:r="{_NS}/officeDocument/2006/relationships"><dimension ref="{dim}"/>',
           '<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/>'
           '<selection pane="bottomLeft" activeCell="A2" sqref="A2"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>',
-          f"<cols>{cols_xml}</cols>" if cols_xml else "", f'<sheetData>{"".join(cells_xml)}</sheetData>', "".join(cfs),
+          f"<cols>{cols_xml}</cols>" if cols_xml else "", f'<sheetData>{"".join(cells_xml)}</sheetData>',
+          shfm_xl_merges(book, at, nrows), "".join(cfs),  # 2.578.0 (#3462 C): mergeCells (OOXML: after sheetData, before the rules)
           f'<dataValidations count="{len(dvs)}">{"".join(dvs)}</dataValidations>' if dvs else "",
           '<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>',
           '<legacyDrawing r:id="rId2"/>' if notes else "", "</worksheet>"]
@@ -379,16 +389,7 @@ def shx_xlsx(c, sheet, xl_names=None):
           + '<calcPr calcId="191029" fullCalcOnLoad="1"/></workbook>')
     styles = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="{_MAIN}">'
               f'<numFmts count="1"><numFmt numFmtId="164" formatCode="{_q(_currency_fmt(cur))}"/></numFmts>'
-              '<fonts count="2"><font><sz val="11"/><name val="Calibri"/><family val="2"/></font>'
-              '<font><b/><sz val="11"/><name val="Calibri"/><family val="2"/></font></fonts>'
-              '<fills count="2"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill></fills>'
-              '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>'
-              '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'
-              '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'
-              '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>'
-              '<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
-              '<xf numFmtId="10" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>'
-              '<xf numFmtId="14" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/></cellXfs>'
+                            + reg.xml() +  # 2.578.0 (#3462 C): fonts, fills, cellXfs of the five fixed styles + the cell formats
               '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>'
               f'<dxfs count="{len(dxfs)}">{"".join(dxfs)}</dxfs></styleSheet>')
     ct = [f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="{_NS}/package/2006/content-types">',
@@ -466,6 +467,7 @@ class ShxGrid:
     def __init__(self):
         self.rows, self.lists, self.colors, self.row_mode, self.names = [], {}, {}, set(), {}
         self.n_filled = 0  # 2.576.0 (#4188): filled cells counted while reading
+        self.merges, self.fmt_rules = [], []  # 2.578.0 (#3462 C): merged blocks (file rows / 0-based columns), colour rules
 
 
 def _shx_too_many():
@@ -503,7 +505,7 @@ def shx_read_csv(raw):
 def _num_fmts(z, names, budget):
     """{style index: 'date' | 'percent' | 'currency' | None} of the workbook's cell formats."""
     if "xl/styles.xml" not in names:
-        return {}, []
+        return {}, [], ({}, [])
     st = _budget_xml(z, "xl/styles.xml", budget)
     custom = {}
     dxf_fill = []
@@ -540,7 +542,7 @@ def _num_fmts(z, names, budget):
                 out[i] = "percent"
             elif nid in (5, 6, 7, 8, 42, 44) or re.search(r"[€$£]|\[\$|CHF|EUR|USD", code):
                 out[i] = "currency"
-    return out, dxf_fill
+    return out, dxf_fill, shfm_xl_styles(st, _local)  # 2.578.0 (#3462 C): + the cell formats and the rules' colours
 
 
 def _shift_formula(f, dr, dc):
@@ -619,7 +621,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     if "wb" not in ctx:
         # 2.576.0 (#4188): streamed, at most XL_STRINGS_MAX entries
         strings = xl_strings(z, budget, SHX_UNZIPPED_MAX) if "xl/sharedStrings.xml" in names else []
-        fmts, dxf_fill = _num_fmts(z, names, budget)
+        fmts, dxf_fill, sty = _num_fmts(z, names, budget)
         wb = _budget_xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", [0])
         sheets = []  # (name, path, hidden)
@@ -628,7 +630,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
                 rid = next((v for k, v in sh.attrib.items() if _local(k) == "id"), None)
                 if wrels.get(rid) in names:
                     sheets.append(((sh.get("name") or ""), wrels[rid], sh.get("state") in ("hidden", "veryHidden")))
-        ctx.update(strings=strings, fmts=fmts, dxf_fill=dxf_fill, wb=wb, sheets=sheets)
+        ctx.update(strings=strings, fmts=fmts, dxf_fill=dxf_fill, wb=wb, sheets=sheets, sty=sty)
     strings, fmts, dxf_fill, wb, sheets = ctx["strings"], ctx["fmts"], ctx["dxf_fill"], ctx["wb"], ctx["sheets"]
     visible = [s for s in sheets if not s[2]] or sheets
     if not visible or which >= len(visible):
@@ -670,7 +672,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
             row.remove(cel)
             if _local(cel.tag) == "c":
                 k += 1
-                _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full)
+                _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full, ctx["sty"][0])
             continue
         if cel is row:
             row.clear()
@@ -687,6 +689,12 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
                 dvs = [x for x in cel if _local(x.tag) == "dataValidation"]
             elif tag == "conditionalFormatting":
                 cfs.append(cel)
+            elif tag == "mergeCells":  # 2.578.0 (#3462 C): merged blocks (file rows / 0-based columns)
+                for mc in cel:
+                    m = re.fullmatch(r"\$?([A-Z]{1,3})\$?(\d{1,7}):\$?([A-Z]{1,3})\$?(\d{1,7})", mc.get("ref") or "")
+                    if m:
+                        g.merges.append((int(m.group(2)), _col_index(m.group(1)), int(m.group(4)), _col_index(m.group(3))))
+                root.remove(cel)
             else:
                 root.remove(cel)
     g.n_filled = full[0]  # 2.576.0 (#4188): of this and the sheets read before it
@@ -736,6 +744,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
                     ci = _col_index(m.group(1))
                     g.colors.setdefault(ci, {})[m.group(2).replace('""', '"')] = color
                     g.row_mode.add(ci)
+    g.fmt_rules = shfm_xl_read_rules(cfs, ctx["sty"][1], _local, _col_index)  # 2.578.0 (#3462 C): the colour rules
     # names of single cells of this sheet
     for dn in wb.iter(f"{{{_MAIN}}}definedName"):
         nm, val = dn.get("name") or "", (dn.text or "").strip()
@@ -747,7 +756,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     return g
 
 
-def _shx_cell(cel, k, r, cells, shared, strings, fmts, full):
+def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None):
     """2.576.0 (#4188): one <c> of row r (its k-th cell) into cells {(r, col): ...}; True = a filled cell. Moved out of the
     sheet loop of _read_xlsx unchanged, the filled cells count in full[0] over all sheets of the file."""
     ref = cel.get("r")
@@ -806,6 +815,12 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full):
             if full[0] > SHX_CELLS_MAX + SH_COLS_MAX:
                 raise _shx_too_many()
     cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
+    try:  # 2.578.0 (#3462 C): the cell's format (bold, colours, alignment)
+        st_ = (sty or {}).get(int(cel.get("s") or 0))
+    except ValueError:
+        st_ = None
+    if st_:
+        cells[(r, ci)]["sty"] = st_
     return bool(v or f)
 
 
@@ -1060,6 +1075,7 @@ def shx_import(c, uid, grid, space, title, list_id=None, into=None):
     book.shh_off = True  # 2.124.0 B (#2112)
     for i in range(0, len(ok), SHX_CHUNK):
         _write_cells(c, sheet, ok[i:i + SHX_CHUNK], uid, None, None, book)
+    shfm_import_apply(c, sheet, book, grid, hdr, width, uid)  # 2.578.0 (#3462 C): formats, merged blocks, colour rules
     sh_touch(c, sid, uid)
     return sid, report
 

@@ -27,6 +27,7 @@ from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, s
                    sh_may_rebind, sh_need, sh_reload, sh_rev_conflict, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
 from .shbook import shb_patch, shb_spec  # 2.369.5 (#2517): pulled up from functions
 from .shshare import shs_need_own  # 2.369.5 (#2517): pulled up from functions
+from .shfmt import shfm_spec  # 2.578.0 (#3462 C)
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
 
@@ -372,4 +373,5 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
              "created too -- except rows / columns / a table a person has typed values into since: they stay (kept). An agent may "
              "take back only its own calls.")}
     shb_spec(paths, schemas, op, ok, errs, ref, pid, q, inputs, col_in, write)  # 2.124.0 E (#2116): the sheets of a table
+    shfm_spec(paths, schemas, op, ok, errs, pid)  # 2.578.0 (#3462 C): cell format (fmt in cells) and the colour rules
 

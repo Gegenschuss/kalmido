@@ -226,6 +226,7 @@ ORDER = (
     "sheets.shshare",  # 2.124.0 C (#2113): one table shared with single people / agents (sheet_shares)
     "sheets.shchart",  # 2.124.0 A (#2115): the simple chart of a table (its setting; drawn by static/js/sheetchart.js)
     "sheets.shbook",  # 2.124.0 E (#2116): several sheets in one table (the sheet bar's routes; rights / formulas hang in core)
+    "sheets.shfmt",  # 2.578.0 (#3462 C): cell format and colour rules of a table (drawn by static/js/sheetfmt.js)
     "collab.teamchat",
     "collab.teamchan",  # 2.113.1 B (#2059): channels, groups, files of the team chat (after teamchat)
     "collab.msgsearch",  # 2.33.0 (#1080)

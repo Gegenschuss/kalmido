@@ -1888,6 +1888,19 @@ list of tables shows each table once with `sheets` (its number of sheets). `GET 
 `{name?, after_id?, copy_of?}`). Shares and the list belong to the first sheet (409 on a further one). Formulas reach into
 another sheet with `Name!A1` / `'Sheet name'!A1:B5`; the .xlsx export / import carries all sheets.
 
+2.578.0: cell format and colour rules. A cell answer has `fmt` (`null` = none): `{bold, italic, wrap: true, color / fill:
+a | a2 | g1 | g2 | g3, align: left | center | right, merge: [rows, columns]}` - the colours are keys of the app's palette
+(accent, light accent, dark / middle / light grey; no other colours), `merge` sits on the top left cell of a merged block
+(the covered cells keep their input). It comes on top of the column's kind. `PUT /api/v1/sheets/{id}/cells` (and the app's
+route) takes per cell `fmt` (the whole format, `null` = none) or `fmt_patch` (only these keys, `null` removes one), without
+`raw` only the format changes; `prev_fmt` = the format you read (formatted otherwise since: not changed, in `conflicts`
+with `what: "fmt"`). An agent's format change belongs to its batch (taken back with it). The table answer has `rules`, the
+colour rules `[{id, cols: [column ids], rows: [first row id, last row id] | null, op: gt | lt | eq | between | contains |
+empty | overdue, a, b, color, fill}]`; `PUT /api/v1/sheets/{id}/rules` `{rules, expect_rev}` replaces the list (`expect_rev`
+required for agents, `409` with the current `rules` when the table changed since; the app: `PUT /api/sheets/{id}/rules`).
+The .xlsx export writes fonts, fills, alignment, merged cells and the rules (conditional formatting); the import reads them
+back (colours to the nearest palette key).
+
 ```bash
 curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   -d '{"title": "Angebot Dreh", "space": "private",

@@ -4294,7 +4294,8 @@ with the reason).
 | What formulas of a table may use | `GET /api/v1/sheets/{id}/vars` | `sheet_vars` | sheets:read |
 | Create a table in one step | `POST /api/v1/sheets` | `sheet_create` | sheets:write |
 | Rename / attach to a project | `PATCH /api/v1/sheets/{id}` | `sheet_update` | sheets:write |
-| Set cells | `PUT /api/v1/sheets/{id}/cells` | `sheet_set_cells` | sheets:write |
+| Set cells (2.578.0: also their format, `fmt` / `fmt_patch`) | `PUT /api/v1/sheets/{id}/cells` | `sheet_set_cells` | sheets:write |
+| Colour rules of a table (2.578.0) | `PUT /api/v1/sheets/{id}/rules` | `sheet_set_rules` | sheets:write |
 | Append rows | `POST /api/v1/sheets/{id}/rows` | `sheet_append_rows` | sheets:write |
 | Add a column | `POST /api/v1/sheets/{id}/columns` | `sheet_add_column` | sheets:write |
 | Take back one of your calls | `POST /api/v1/sheets/{id}/batches/{batch}/undo` | `sheet_undo_batch` | sheets:write |
@@ -4307,6 +4308,14 @@ answer name the table and its sheets, the list of tables shows each table once (
 space, project and shares are the table's: whoever may read the table reads all its sheets. A formula reaches into another
 sheet of the same table with `Name!A1` or `'Sheet name'!A1:B5` (also in `SUMMEWENN`, `SVERWEIS` ...); a renamed sheet keeps
 its formulas, a sheet in the trash gives `ref`. Taking back the call that added a sheet moves the sheet to the trash.
+
+**Cell format and colour rules (2.578.0).** A cell of `sheet_read` has `fmt` (`null` = none): `{bold, italic, wrap: true,
+color / fill: a | a2 | g1 | g2 | g3 (accent, light accent, dark / middle / light grey - no other colours), align: left |
+center | right, merge: [rows, columns]}` on top of its column's kind. Change it with `sheet_set_cells`: `fmt_patch:
+{"bold": true}` changes only these keys (`null` removes one), `fmt` sets the whole format; without `raw` the input stays.
+Send `prev_fmt` (the format you read) so a person's newer format is kept (`conflicts` with `what: "fmt"`). The table's
+`rules` colour cells by their value (`gt`, `lt`, `eq`, `between`, `contains`, `empty`, `overdue`); `sheet_set_rules` replaces
+the whole list and needs `expect_rev`. Your format changes are part of your call: taking it back removes them.
 
 **Never overwrite a person's newer input (2.270.0).** Address cells with `row_id` / `col_id` from `sheet_read`: an address
 like `B4` points at another row once someone sorts or inserts rows (it still works). Send `prev` with every cell, the input

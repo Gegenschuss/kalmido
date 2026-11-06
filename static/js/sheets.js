@@ -214,7 +214,7 @@ function shvSheetHtml(sh) {
   const head = `<thead><tr><th class="shvcorner" scope="col"><span class="sr">${tr('Row')}</span></th>${cols.map(c => shvTh(sh, c, filt)).join('')}${w ? `<th class="shvaddc"><button type="button" class="iconbtn" data-shv="coladd" title="${esc(tr('Add column'))}" aria-label="${esc(tr('Add column'))}">${ic('plus', 's')}</button></th>` : ''}${shz ? shz_headHtml(sh) : ''}</tr></thead>`;
   const body = `<tbody>${rows.map(r => shvTr(sh, r)).join('')}</tbody>${shz ? shz_bodyHtml(sh) : ''}`;
   const foot = `<div class="shvfoot">${w ? `<button type="button" class="btn sm" data-shv="rowadd">${ic('plus', 's')}${tr('Add row')}</button>` : ''}${nf ? `<span class="muted">${tr('{0} of {1} rows shown', rows.length, all)}</span>` : ''}</div>`;
-  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${shvRefsHtml(sh)}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}
+  return `<div class="shvwrap shvsheet" data-k="shv-${sh.id}">${top}${pres}${shvRefsHtml(sh)}${typeof shc_html === 'function' ? shc_html(sh) : ''}${bar}${typeof shfm_barHtml === 'function' ? shfm_barHtml(sh) : '' /* 2.578.0 (#3462 C) */}
     <div class="shvbody"><div class="shvgridw"><div class="shzbox"${typeof shz_boxAttr === 'function' ? shz_boxAttr(sh) : ''}><div class="shvscroll" id="shv-scroll" tabindex="0" role="grid" aria-label="${esc(sh.title || tr('Table'))}" aria-rowcount="${all + 1}" aria-colcount="${cols.length + 1}" aria-multiselectable="true" ${c0 ? `aria-activedescendant="shv-c-${c0.r}-${c0.c}"` : ''}>
       <table class="shvgrid" role="presentation">${colgroup}${head}${body}</table><svg class="shvdeps" id="shv-deps" aria-hidden="true"></svg></div>${typeof shz_gripHtml === 'function' ? shz_gripHtml(sh) : ''}</div>${foot}${typeof shb_barHtml === 'function' ? shb_barHtml(sh) : ''}</div>
     <aside class="shvside" id="shv-side" aria-label="${esc(tr('Cell details'))}">${shvSideHtml(sh)}</aside></div></div>`;
@@ -259,10 +259,12 @@ function shvTd(sh, rid, col) {
     } else inner = shvShow(c);
   }
   if (typeof shk_td === 'function') { const x = shk_td(sh, col, c, rid, cls); if (x != null) inner = x; }  // 2.124.0 B (#2110): sheetkinds.js
+  const fm = typeof shfm_td === 'function' ? shfm_td(sh, col, c, rid, cls) : null;  // 2.578.0 (#3462 C): format, rules, merged cells (sheetfmt.js)
+  if (fm?.hide) return '';
   if (col.kind === 'select' && sh.can_write) inner += `<span class="shvdd" aria-hidden="true">${ic('down', 's')}</span>`;
   if (sel) cls.push('sel'); if (cur) cls.push('cur'); if (pres) cls.push('shvpc');
   const tip = c ? shvTip(c, pres) : '';
-  return `<td id="${id}" class="${cls.join(' ')}" data-r="${rid}" data-c="${col.id}" role="gridcell" aria-selected="${!!sel}" ${style ? `style="${style}"` : ''} ${tip ? `title="${esc(tip)}"` : ''}>${inner}</td>`;
+  return `<td id="${id}" class="${cls.join(' ')}" data-r="${rid}" data-c="${col.id}" role="gridcell" aria-selected="${!!sel}" ${style ? `style="${style}"` : ''} ${tip ? `title="${esc(tip)}"` : ''}${fm?.at || ''}>${inner}</td>`;
 }
 function shvShow(c) {  // what a cell reads (errors with their reason, "Source deleted" with the last value)
   if (c.error) {
@@ -372,6 +374,7 @@ function shvBarSync() {
   if (ad) ad.textContent = cur ? (c?.name || shvAddr(cur.r, cur.c)) : '';
   if (document.activeElement !== inp && !(SHV.ed && SHV.ed.bar)) { inp.value = SHV.ed ? SHV.ed.val ?? '' : c?.raw || ''; inp.readOnly = !sh.can_write || !cur; inp.placeholder = cur ? (sh.can_write ? tr('Value or =formula') : '') : tr('Choose a cell'); }
   shvRefPaint();  // 2.543.0 (#4611)
+  if (typeof shfm_sync === 'function') shfm_sync();  // 2.578.0 (#3462 C): the format bar shows the active cell's format
 }
 function shvSideSync() { const s = $('#shv-side'); if (s && SHV.sh && !s.contains(document.activeElement)) s.innerHTML = shvSideHtml(SHV.sh); }
 function shvAfter() { shvBarSync(); shvDepsDraw(); if (typeof shz_fill === 'function') shz_fill(); if (typeof shk_after === 'function') shk_after(); }  // 2.124.0 B (#2111): + the rows / columns kept in view  // 2.98.0 C (#2181): the empty cells that fill the frame
@@ -404,10 +407,10 @@ function shvMerge(sid, r, sent) {
   for (const c of r.cells || []) {
     got.add(c.row_id + ':' + c.col_id);
     const i = sh.cells.findIndex(x => x.row_id === c.row_id && x.col_id === c.col_id);
-    const empty = (c.raw == null || c.raw === '') && !c.name && !c.frozen;
+    const empty = (c.raw == null || c.raw === '') && !c.name && !c.frozen && !c.fmt;  // 2.578.0 (#3462 C): + a formatted empty cell stays
     if (empty) { if (i >= 0) sh.cells.splice(i, 1); } else if (i >= 0) sh.cells[i] = c; else sh.cells.push(c);
   }
-  for (const s of sent || []) if (!got.has(s.row_id + ':' + s.col_id) && (s.raw == null || s.raw === '')) { const i = sh.cells.findIndex(x => x.row_id === s.row_id && x.col_id === s.col_id); if (i >= 0) sh.cells.splice(i, 1); }
+  for (const s of sent || []) if (!got.has(s.row_id + ':' + s.col_id) && ('raw' in s) && (s.raw == null || s.raw === '') && !shvCell(s.row_id, s.col_id, sh)?.fmt) { const i = sh.cells.findIndex(x => x.row_id === s.row_id && x.col_id === s.col_id); if (i >= 0) sh.cells.splice(i, 1); }  // 2.578.0 (#3462 C): a format-only write empties nothing
   for (const x of r.conflicts || []) if (!x.cell_id) { const i = sh.cells.findIndex(c => c.row_id === x.row_id && c.col_id === x.col_id); if (i >= 0) sh.cells.splice(i, 1); }  // 2.270.0 B (#3021): emptied elsewhere
   if (r.rev != null) sh.rev = r.rev;
   shvPrep(sh);
@@ -455,7 +458,7 @@ function shvOptimistic(sh, chg) {
     const k = x.row_id + ':' + x.col_id, c = shvCell(x.row_id, x.col_id, sh), raw = x.raw ?? '';
     was.set(k, c);
     const i = c ? sh.cells.indexOf(c) : -1;
-    if (raw === '' && !(c && (c.name || c.frozen))) { if (i >= 0) sh.cells.splice(i, 1); continue; }
+    if (raw === '' && !(c && (c.name || c.frozen || c.fmt))) { if (i >= 0) sh.cells.splice(i, 1); continue; }  // 2.578.0 (#3462 C): + fmt
     const f = raw.startsWith('='), n = {...(c || {row_id: x.row_id, col_id: x.col_id}), raw, pend: f};
     if (!f) { n.display = raw; n.value = raw; n.error = null; }
     if (i >= 0) sh.cells[i] = n; else sh.cells.push(n);

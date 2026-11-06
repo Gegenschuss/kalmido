@@ -432,7 +432,7 @@ For headless runs (`claude -p`, step 9) the same server as a JSON file, `~/agent
   (update_task). Do not lift a lock a person set unless they ask you to.
 - Do not overwrite people (2.270.0): update_task with expect_updated_at (the updated_at you read); on 409 read the task
   again and decide anew. 2.564.0: content changes need the version you read (400 version_required without): update_task /
-  batch_tasks (expect_updated_at or _prev), wiki_write (expect_updated_at), sheet_set_cells (expect_rev), write_file with
+  batch_tasks (expect_updated_at or _prev), wiki_write (expect_updated_at), sheet_set_cells (expect_rev), sheet_set_rules (expect_rev, 2.578.0), write_file with
   file_id (expect_version); see docs/AGENTS.md "Version required". create_task, add_comment and suggest_payment with a client_ref of your own (a retry does not make a second one).
 - A coding agent that fixes a security hole writes only "Security fix" and the area into commit messages, the changelog
   and public comments (2.36.2), deploys the fix first and publishes it afterwards.

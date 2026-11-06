@@ -123,7 +123,7 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   `expect_updated_at` = the task's `updated_at` from your last `get_task`; a `409` means someone changed it since: read
   it again (the answer's `current`), decide anew, never just resend. 2.564.0: a version is required for content
   changes (`400 version_required` without): `update_task` / `batch_tasks` (`expect_updated_at` or `_prev`), `wiki_write`
-  (`expect_updated_at`), `sheet_set_cells` (`expect_rev` or `prev` per cell), `write_file` with `file_id` (`expect_version`).
+  (`expect_updated_at`), `sheet_set_cells` (`expect_rev` or `prev` per cell), `sheet_set_rules` (`expect_rev`), `write_file` with `file_id` (`expect_version`).
   A change of a locked task shows as `locked_bypass` in its history. `create_task` gets a `client_ref` of your own, so a
   retry after a timeout does not make a second task (2.370.2: `add_comment` and `suggest_payment` too); `update_note` and `update_offer_draft` take `expect_updated_at` too,
   and positions you keep in `update_offer_draft` go with their `id`.
@@ -621,7 +621,8 @@ there / error), ticks rows and takes them over. The answer comes as the event `j
 With `sheets:read` / `sheets:write` (off until a person turns them on) you read and fill tables: `sheets_list`, `sheet_read`,
 `sheet_vars` (what formulas may use, with the current value), `sheet_create` (title, space, list_id?, columns with choices and
 colours, rows with inputs and formulas - all in ONE call), `sheet_update`, `sheet_set_cells` (`[{row_id, col_id, raw, prev}]`: ids from `sheet_read`, `prev` = the input you read, so a newer input of a person is kept and comes back in `conflicts`),
-`sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`. You see only tables attached to a project shared with you, those
+`sheet_append_rows`, `sheet_add_column`, `sheet_undo_batch`; 2.578.0: a cell's format through `sheet_set_cells` (`fmt_patch:
+{"bold": true}`, colours only `a | a2 | g1 | g2 | g3`, `prev_fmt`) and the colour rules with `sheet_set_rules` (`expect_rev`). You see only tables attached to a project shared with you, those
 you created, tables a person shared with you one by one and (2.199.0) tables in a folder shared with you (`shared_in`,
 `folder_in`; role `read` = never write them). Every write call is one batch the person can take back; a cell with error `denied` is a source not shared with
 you: never guess its value. Formulas: `=SUM(B2:B9)`, `=hours*rate`, `=project.<name>.total_time` (arguments with `;`; the German names `SUMME`, `projekt.`, `zeit_gesamt` work as well, cells come back in your language).
@@ -799,7 +800,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
-`sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
+`sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_set_rules`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
 `set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,

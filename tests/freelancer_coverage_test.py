@@ -68,7 +68,8 @@ KINDS = {
     "sheets": ("matrix", "p289_b_api_test.py, p289_c_api_test.py, p289_d_api_test.py: tables (2.89.0) in the private workspace of a "
                          "person without an organisation and with that person's own agent; rows to tasks / quotation drafts; "
                          "p2124_c_api_test.py: sharing a private table (2.124.0); p2199_c_sheets_test.py: tables in her "
-                         "private folders, shared with her own agent (2.199.0)"),
+                         "private folders, shared with her own agent (2.199.0); p2578_c_fmt_test.py: cell formats and colour rules "
+                         "of her private table, her agent's formats taken back (2.578.0)"),
     "bookmarks": ("matrix", "p297_a_api_test.py: bookmarks (2.97.0) in the private workspace of a person without an organisation"),  # 2.97.0 A (#1950)
     "life_org": ("matrix", "p2173_a_travel_care_scope_test.py: trips, staying in touch and travel expenses from a trip (2.173.0) in the "
                  "private workspace and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
@@ -888,6 +889,7 @@ ROUTES = {
     "GET /api/sheets/{}/shares": "sheets", "POST /api/sheets/{}/shares": "sheets",
     "PATCH /api/sheets/{}/shares/{}": "sheets", "DELETE /api/sheets/{}/shares/{}": "sheets",
     "PUT /api/sheets/{}/chart": "sheets",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
+    "PUT /api/sheets/{}/rules": "sheets", "PUT /api/v1/sheets/{}/rules": "sheets",  # 2.578.0 (#3462 C): colour rules (p2578_c_fmt_test.py)
     "GET /api/sheets/folders": "sheets", "POST /api/sheets/folders": "sheets",  # 2.199.0 C (#2742): p2199_c_sheets_test.py
     "GET /api/sheets/trash": "sheets", "GET /api/sheets/{}/trash": "sheets", "POST /api/sheets/purge": "sheets",  # 2.528.0 (#4306 B22): p2528_c_sheets_test.py
     "GET /api/contacts/folders": "pim", "POST /api/contacts/folders": "pim",  # 2.351.0 B (#2749): p2351_b_contacts_tree_test.py

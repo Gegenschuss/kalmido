@@ -41,7 +41,8 @@ def shh_log(c, book, xid, rid, cid, old, new, uid, agent_id, ts):
 
 
 # 2.564.0 (#4701): changes of the table itself in the same history (sheet_hist.what): their label
-SHH_META = {"title": N_("Title"), "tab": N_("Sheet"), "chart": N_("Chart"), "name": N_("Name"), "freeze": N_("Frozen value")}
+SHH_META = {"title": N_("Title"), "tab": N_("Sheet"), "chart": N_("Chart"), "name": N_("Name"), "freeze": N_("Frozen value"),
+            "format": N_("Format"), "rules": N_("Colour rules")}  # 2.578.0 (#3462 C)
 
 
 def shh_meta(c, sid, what, old, new, uid, cell=None):

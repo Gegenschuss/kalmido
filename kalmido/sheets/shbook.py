@@ -14,6 +14,7 @@ renamed sheet keeps its formulas). The other sheet is evaluated for the same vie
 evaluates afresh: a change in one sheet shows in the other at its next load; sh_touch counts the whole table's rev up).
 Sheets reading each other in a circle get "Circular reference" after SHB_DEPTH sheets.
 """
+import json
 import re
 
 from flask import jsonify
@@ -377,9 +378,9 @@ def _copy(c, src, tid, uid, ts):
         raise BadInput(tr("The table is full (at most {0} MB)", SH_BOOK_MB_MAX))
     for x in cells:
         raw = "" if kinds.get(x["col_id"]) == "file" else (x["raw"] or "")  # a cell file belongs to its sheet
-        xmap[x["id"]] = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,name,frozen,frozen_value,updated_by,updated_at) "
-                                     "VALUES(?,?,?,?,?,?,?,?,?)", (tid, rmap[x["row_id"]], cmap[x["col_id"]], raw, x["name"], x["frozen"],
-                                                                  x["frozen_value"], uid, ts))
+        xmap[x["id"]] = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,name,frozen,frozen_value,updated_by,updated_at,fmt) "
+                                     "VALUES(?,?,?,?,?,?,?,?,?,?)", (tid, rmap[x["row_id"]], cmap[x["col_id"]], raw, x["name"], x["frozen"],
+                                                                  x["frozen_value"], uid, ts, x["fmt"]))  # 2.578.0 (#3462 C): + fmt
 
     def remap(m):
         t, i = m.group(1), int(m.group(2))
@@ -392,6 +393,10 @@ def _copy(c, src, tid, uid, ts):
             if new != raw:
                 c.execute("UPDATE sheet_cells SET raw=? WHERE id=?", (new, xmap[x["id"]]))
     c.execute("UPDATE sheets SET freeze_rows=?, freeze_cols=? WHERE id=?", (src["freeze_rows"], src["freeze_cols"], tid))
+    from .shfmt import shfm_rules_load, shfm_rules_remap  # 2.578.0 (#3462 C): the colour rules on the copied columns / rows
+    rules = shfm_rules_remap(shfm_rules_load(src), cmap, rmap)
+    if rules:
+        c.execute("UPDATE sheets SET fmt_rules=? WHERE id=?", (json.dumps(rules, separators=(",", ":")), tid))
 
 
 def _need_book(c, sid, write=False):
@@ -638,12 +643,14 @@ def shb_xlsx(c, sheet_row):
     parts, dxfs, wsheets, lists, defs, notes = {}, [], [], [], [], 0
     styles = None
     n = len(rows)
+    from .shfmt import ShfmXl  # 2.578.0 (#3462 C): the cell formats of all sheets in one registry
+    reg = ShfmXl()
     for k, r in enumerate(rows, 1):
-        z = zipfile.ZipFile(_io.BytesIO(shx_xlsx(c, dict(r) | {"title": names[r["id"]]}, names)))
+        z = zipfile.ZipFile(_io.BytesIO(shx_xlsx(c, dict(r) | {"title": names[r["id"]]}, names, reg)))
         st = z.read("xl/styles.xml").decode()
         m = _DXF.search(st)
         own = re.findall(r"<dxf>.*?</dxf>", m.group(1), re.S) if m else []
-        styles = styles or st
+        styles = st  # 2.578.0 (#3462 C): the last one holds every sheet's cell formats (the registry only grows)
         ws = z.read("xl/worksheets/sheet1.xml").decode()
         off = len(dxfs)
         dxfs.extend(own)

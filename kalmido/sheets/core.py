@@ -874,8 +874,9 @@ def sh_col_dict(r, i=None):
 def sh_cell_dicts(c, sheet_row, book, res, ids=None, uid=None):
     """The cell dicts (raw in the display form) of the live cells with content (or only ids)."""
     uid = uid or me()
+    from .shfmt import shfm_load  # 2.578.0 (#3462 C): a later module (ORDER)
     cells = [x for x in book.cells.values() if book.live(x) and (ids is None or x["id"] in ids)
-             and (ids is not None or x["raw"] or x.get("name") or x["frozen"])]
+             and (ids is not None or x["raw"] or x.get("name") or x["frozen"] or x.get("fmt"))]  # 2.578.0 (#3462 C): + formatted
     names = user_names(c, {x["updated_by"] for x in cells} | {x["agent_id"] for x in cells if x.get("agent_id")})
     out = []
     for x in sorted(cells, key=lambda x: (book.row_idx[x["row_id"]], book.col_idx[x["col_id"]])):
@@ -889,6 +890,7 @@ def sh_cell_dicts(c, sheet_row, book, res, ids=None, uid=None):
              "option": (x["raw"] if kind == "select" and not (x["raw"] or "").startswith("=") and x["raw"] else None)}
         for k in ("value", "vtype", "display", "origin", "error", "error_text", "last_value", "refs", "sources"):
             d[k] = r.get(k)
+        d["fmt"] = shfm_load(x.get("fmt"))  # 2.578.0 (#3462 C)
         out.append(d)
     return out
 
@@ -933,6 +935,7 @@ def sh_list_title(c, r, uid):
 def sh_dict(c, sheet_row, uid=None, book=None):
     """The whole sheet as GET /api/sheets/<id> answers it, evaluated for the current principal."""
     uid = uid or me()
+    from .shfmt import shfm_rules_load  # 2.578.0 (#3462 C): a later module (ORDER)
     book = book or ShBook(c, sheet_row)
     res = sh_eval(c, sheet_row, book, uid)
     cells = sh_cell_dicts(c, sheet_row, book, res, uid=uid)
@@ -953,7 +956,8 @@ def sh_dict(c, sheet_row, uid=None, book=None):
             "rev": sheet_row["rev"], "deleted_at": sheet_row["deleted_at"], "updated_at": sheet_row["updated_at"],
             "freeze_rows": sheet_row["freeze_rows"], "freeze_cols": sheet_row["freeze_cols"],  # 2.124.0 B (#2111)
             "agent": ({"id": sheet_row["agent_id"], "batch": sheet_row["agent_batch"]} if sheet_row["agent_id"] else None),
-            "chart": _chart_of(sheet_row), **shb_dict(c, sheet_row)}  # 2.124.0 A (#2115); E (#2116): book_id, book_title, tab_name, tabs
+            "chart": _chart_of(sheet_row), "rules": shfm_rules_load(sheet_row),  # 2.578.0 (#3462 C): the colour rules
+            **shb_dict(c, sheet_row)}  # 2.124.0 A (#2115); E (#2116): book_id, book_title, tab_name, tabs
 
 
 def _chart_of(sheet_row):
@@ -1201,6 +1205,11 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book, conflicts=None
         if not isinstance(d, dict):
             raise BadInput(tr("Invalid value: {0}", "cells"))
         rid, cid = _resolve_target(book, d)
+        if "fmt" in d or "fmt_patch" in d:  # 2.578.0 (#3462 C): the cell's format (sheets/shfmt.py); without raw only that
+            from .shfmt import shfm_write
+            changed.add(shfm_write(c, sheet_row, book, d, rid, cid, uid, ts, agent_id, batch, conflicts))
+            if "raw" not in d:
+                continue
         if "prev" in d and _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
             continue
         raw = d.get("raw")
@@ -1374,6 +1383,10 @@ def sh_undo_batch(c, sheet_row, batch, uid, kept=None):
                     y["raw"] = r["old_raw"] or ""  # the next change of this call sees the cell as it is now
             c.execute("UPDATE sheet_cells SET raw=?, frozen=0, frozen_value=NULL, updated_by=?, updated_at=?, agent_id=NULL, agent_batch=NULL "
                       "WHERE id=?", (r["old_raw"] or "", uid, ts, r["cell_id"]))
+        elif r["kind"] == "fmt":  # 2.578.0 (#3462 C): the cell's former format, unless formatted otherwise since
+            from .shfmt import shfm_undo
+            if not shfm_undo(c, r, uid):
+                continue
         elif r["kind"] in ("row", "col", "create") and shx_undo_keeps(c, sheet_row, r, batch, uid, ts, kept):
             c.execute("UPDATE sheet_changes SET undone_at=? WHERE id=?", (ts, r["id"]))  # 2.528.0 (#4306 B24): stays, see kept
             sh_touch(c, sheet_row["id"], uid)

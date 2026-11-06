@@ -1112,6 +1112,7 @@ ROUTES = {
     "GET /api/time/sheets": "timesheet", "POST /api/time/sheets": "own", "POST /api/time/sheets/decide": "timesheet",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
     "POST /api/sheets/{}/print.pdf": "sheet",  # 2.578.0 (#3462): the print view as PDF (p2578_d_api_test.py: a stranger 404)
+    "PUT /api/sheets/{}/rules": "sheet", "PUT /api/v1/sheets/{}/rules": "sheet",  # 2.578.0 (#3462 C): colour rules (p2578_c_fmt_test.py)
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
     "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",
     "DELETE /api/sheets/{}/tabs/{}": "sheet", "POST /api/sheets/{}/tabs/{}/restore": "sheet",
