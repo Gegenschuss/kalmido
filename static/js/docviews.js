@@ -1,3 +1,4 @@
+// @ts-check
 /* Kalmido web client: saved views of the documents search (2.579.0, #4802; server: kalmido/docs/dviews.py, a kind of the
    shared core). Classic script sharing the global scope with the others; loaded on demand (lazyload.js 'docviews') by the
    documents list, the sidebar of Files and Today.
