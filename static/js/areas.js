@@ -443,7 +443,7 @@ const sbb_on = () => !isMobile() && !S.me?.kid && !document.documentElement.clas
 // 2.224.0 A (#2817): areas whose panel only repeated the page's head (the calendar: its views are the head's tabs, its
 // Calendars window the head's button; Habits one entry; Time / Review two): on a computer no panel, the page takes the
 // width and an area's parts are the tabs on top (mg_tabsHtml). The phone's drawer keeps them (sbm_*)
-const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home', 'notes'];  // 2.398.0 (#3405): Notes have their own list and filter on the page  // 2.364.0 B (#3031): Start has no panel either
+const SBB_NOPANEL = ['cal', 'habits', 'time', 'review', 'home'];  // 2.364.0 B (#3031): Start has no panel either; 2.602.0 (#4817): Notes have one again - their list (chat.js nt_panelHtml, was on the page since 2.398.0 #3405)
 const sbb_noPan = (id = sbb_area()) => sbb_on() && SBB_NOPANEL.includes(id);
 // 2.196.0 A (#2737): the phone's drawer follows sidebar B: the row of the area icons and ONE panel (sbm_*); children and
 // mini windows keep their sidebar. sbb_panelOn = the panel logic runs (computer bar or phone drawer)
@@ -1033,6 +1033,7 @@ function sbb_panelHtml0(id) {
       : p[0] === 'family' ? (n => n ? `<span class="c nunread">${n}</span>` : '')((S.kids || []).reduce((n, k) => n + (k.requests || 0), 0)) : '';
     return sbb_row(p[0], p[1], tr(mg_partName(p[0], p[2])), p[0] === S.route.mod, `data-sbbpart="${p[0]}" data-navk="${id}:${p[0]}"`, after);
   }).join('')}</div>`;
+  if (id === 'notes' && sbb_on()) return title + (SBB_LAST.notes = nt_panelHtml());  // 2.602.0 (#4817): the note list (the phone's drawer keeps its entry)
   if (id === 'team') return title + tc_panelHtml();  // 2.479.0 (#2814): channels and direct messages (chat.js)
   // the agents: their overview, then each agent (its page; the status dot as in the sidebar's conversations)
   if (id === 'agents') return title + `<div class="sgroup sbbp">${sbb_row('agents', 'bot', tr('Agents'), S.route.mod === 'agents' && !S.route.agent)}${(S.agents || []).map(x => `<button type="button" class="srow steam sbbi ${S.route.agent === x.id ? 'on' : ''}" data-go="agents/${x.id}"${S.route.agent === x.id ? ' aria-current="page"' : ''}><span class="sdot">${hdot(agentHst(x))}</span><span class="n">${esc(x.name)}</span>${x.waiting || x.chat_unread ? `<span class="c nunread">${x.waiting + x.chat_unread}</span>` : ''}</button>`).join('')}</div>`;

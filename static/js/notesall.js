@@ -37,17 +37,19 @@ function sb_noteCardsHtml() {
       <span class="ntm"><span class="sbnl">${l ? licMark(l, 'sm', true) : ''}${esc(l ? lname(l) : '?')}</span>${(n.tags || []).map(t => `<span class="tag">#${esc(t)}</span>`).join('')}<time title="${esc(fmtWhen(n.updated_at))}">${esc(relTime(n.updated_at))}</time></span></a></li>`;
   }).join('')}</ul>`;
 }
-function sb_notesView() {
+function sb_notesView() { return `<div class="ntwrap"><div class="ntview sbnall">${sb_notesListHtml()}</div></div>`; }
+// 2.602.0 (#4817): the list alone - the page's on a phone, the panel's on a computer (chat.js nt_panelHtml)
+function sb_notesListHtml() {
   sb_noteExcerpts();
   const ids = new Set(nt_wsNotes().map(n => n.list_id)), ls = S.lists.filter(l => ids.has(l.id) || l.id === S.sbn.lid);  // 2.398.0 (#3405)
   const opt = l => `<option value="${l.id}" ${l.id === S.sbn.lid ? 'selected' : ''}>${esc(lname(l))}</option>`;
   const prj = ls.filter(l => !l.is_inbox), oth = ls.filter(l => l.is_inbox);  // 2.352.0 B (#2752)
   const sel = ls.length > 1 || S.sbn.lid ? `<select id="sbn-l" class="sbnsel" aria-label="${esc(tr('Project'))}"><option value="0">${tr('All projects')}</option>${prj.length && oth.length ? `<optgroup label="${esc(tr('Projects'))}">${prj.map(opt).join('')}</optgroup><optgroup label="${esc(tr('Other projects'))}">${oth.map(opt).join('')}</optgroup>` : ls.map(opt).join('')}</select>` : '';
-  return `<div class="ntwrap"><div class="ntview sbnall"><div class="ntlist">
+  return `<div class="ntlist sbnlist">
     <div class="ntbar sbnbar"><div class="ssearch">${ic('search', 's')}<input id="sbn-q" type="search" value="${esc(S.sbn.q)}" placeholder="${esc(tr('Search notes'))}" aria-label="${esc(tr('Search notes'))}" autocomplete="off"></div>${sel}
       ${S.me?.kid ? '' : `<button type="button" class="btn sm pri" data-sb="note-new">${ic('plus', 's')}${tr('New note')}</button>` /* 2.477.0 (#3881): always (the list Notes comes with it) */}</div>
     ${o3a_orgView() && !S.me?.kid && (!S.sbn.lid || qn_isList(S.sbn.lid)) ? `<p class="muted shint sbnpriv">${ic('lock', 's')} ${esc(tr('New notes stay private: only you see them. To share one, move it into a project.'))}</p>` : '' /* 2.398.0 (#3405) */}
-    <div id="sbn-res">${sb_noteCardsHtml()}</div></div></div></div>`;
+    <div id="sbn-res">${sb_noteCardsHtml()}</div></div>`;
 }
 function sb_notesPatch() { const r = $('#sbn-res'); if (r) fl_set(r, sb_noteCardsHtml()); }  // 2.46.2 (#1718)
 function sb_notesSearch() {
@@ -74,7 +76,7 @@ document.addEventListener('change', e => {
 // 2.551.0 (#4607): a right click (computer) or a long press (phone) on a note card opens that note's menu (chat.js noteMenu,
 // on the phone the sheet with its title); the click ending the press does not open the note. Cards of the trash are no links.
 const nt_cardMenu = r => { const id = +(r.getAttribute('href') || '').replace('#note/', ''); if (!id) return false; noteMenu(r, id); return true; };
-cm_bind('#view a.ntcard[href^="#note/"]', nt_cardMenu);
+cm_bind('#view a.ntcard[href^="#note/"], #side a.ntcard[href^="#note/"]', nt_cardMenu);  // 2.602.0 (#4817): + the panel's list
 document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-sb="note-new"]'); if (!b) return;
   e.preventDefault(); e.stopPropagation();

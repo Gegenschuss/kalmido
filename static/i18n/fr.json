@@ -16945,6 +16945,7 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Dans la corbeille (restaurable) : {0} tâches, {1} fichiers, pages, tableaux ou clients.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Reste car modifié depuis l'importation : {0} tâches, {1} autres entrées.",
   "possible until {0}": "possible jusqu'au {0}",
+  "Choose a note in the list on the left.": "Choisis une note dans la liste à gauche.",
   "Bank and cash (strict)": "Banque et caisse (strict)",
   "Basis of the income statement": "Base du compte de résultat",
   "Only what went through the bank account, the cash book or a credit card counts. A receipt without a booking stays open; a booking without a receipt counts with a warning.": "Seul compte ce qui est passé par le compte bancaire, le livre de caisse ou une carte de crédit. Un justificatif sans opération reste ouvert ; une opération sans justificatif compte avec un avertissement.",

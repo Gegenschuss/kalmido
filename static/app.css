@@ -4179,6 +4179,15 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 /* #442 notes */
 .ntview{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
 .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,1fr)}
+/* 2.602.0 (#4817): the note list in the panel of sidebar B (chat.js nt_panelHtml): the bar wraps (search on a line of its own),
+   the page beside it shows the open note alone or the hint (nt_pageHtml) */
+#side .ntpan{padding:0 .5rem .5rem}
+#side .ntpan .ntbar{flex-wrap:wrap}
+#side .ntpan .ntbar .ssearch{flex:1 1 100%}
+#side .ntpan .sbnbar .sbnsel{flex:1 1 auto}
+.ntview.ntsolo,.ntview.ntsolo.open{grid-template-columns:minmax(0,1fr)}
+.ntpick{justify-items:center;padding-top:2rem}
+.ntpickb{display:flex;flex-wrap:wrap;gap:.5rem;justify-content:center}
 .ntbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem}
 .ntbar .ssearch,.ntbar .ctsearch{flex:1 1 auto}
 .ntcards{list-style:none;margin:0;padding:0;display:grid;gap:.375rem}

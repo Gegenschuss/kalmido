@@ -183,7 +183,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   // ================= jsdom: #442 notes
   w = await boot({user: 'alice', hash: 'notes/' + L}); d = w.document;
   await until(() => d.querySelector('.ntview'));
-  check(d.querySelector('.ntview .nempty svg.i') && d.querySelector('[data-act="nt-new"]'), '#442: no notes yet: the symbol and "New note"');  // 2.223.0 (#2822): the symbol pattern instead of the bot
+  check(d.querySelector('#side .ntpan .nempty svg.i') && d.querySelector('#side [data-act="nt-new"]'),  // 2.602.0 (#4817): the list is in the panel on a computer
+    '#442: no notes yet: the symbol and "New note"');  // 2.223.0 (#2822): the symbol pattern instead of the bot
     // 2.136.0 (#2193)
   click(w, d.querySelector('[data-act="nt-new"]'));
   await until(() => d.querySelector('#nt-title'));

@@ -888,13 +888,28 @@ function noteRoute(lid, id) {
   if (S.nt.lid !== lid) { S.nt = {...S.nt, lid, notes: null, err: null, trash: null}; loadNotes(lid).then(() => { if (S.route.mod === 'notes') renderView(); }); }
   if (S.nt.id !== id) { noteFlush(); S.nt.id = id; S.nt.edit = !!id && S.nt.newId === id; S.nt.newId = null; }
 }
-function viewNotes() {
-  if (!S.nt.lid) return sb_notesView();  // 2.45.0 (#1516)
-  const l = listById(S.nt.lid);
-  if (!l) return botEmpty('ruhig', tr('This project does not exist (any more).'));
+// 2.602.0 (#4817): on a computer (sidebar B) the note list sits in the panel #side like the folders of Knowledge (wiki.js
+// wk_panelHtml): it hides with the panel's button (.sbbhide) and takes the panel's width (its grip); the page shows the open
+// note alone, without one a hint with "New note". Phones keep list and note one after the other (nt_inPanel false)
+const nt_inPanel = () => typeof sbb_on === 'function' && sbb_on() && sbb_area() === 'notes';
+function nt_panelHtml() {
+  const h = !S.nt.lid ? sb_notesListHtml() : nt_listOf().list;
+  return `<div class="sgroup sbbp ntpan">${h || `<p class="muted sbbtl">${esc(S.nt.err || tr('Loading…'))}</p>`}</div>`;
+}
+// the page beside the panel: the open note, else the hint (the panel hidden: a button brings the list back)
+function nt_pageHtml(cur) {
+  if (cur) return `<div class="ntwrap"><div class="ntview ntsolo open"><article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article></div></div>`;
+  const hid = LS.get('sideFold', false) || $('#app')?.classList.contains('side-rail');  // the panel hidden or a drawer: its buttons here
+  const nw = !hid || S.me?.kid ? '' : !S.nt.lid || S.nt.mayWrite ? `<button type="button" class="btn sm pri" ${S.nt.lid ? 'data-act="nt-new"' : 'data-sb="note-new"'}>${ic('plus', 's')}${tr('New note')}</button>` : '';
+  const show = hid ? `<button type="button" class="btn sm" data-act="sbb-panel">${ic('panelhide', 's')}${tr('Show the sidebar')}</button>` : '';
+  return `<div class="ntwrap"><div class="ntview ntsolo ntpick">${symEmpty('note', tr('Choose a note in the list on the left.'), '')}${hid ? `<div class="ntpickb">${show}${nw}</div>` : ''}</div></div>`;
+}
+// the list of one list's notes (search, trash, "New note", the cards) and the open note; list null = not loaded yet
+function nt_listOf() {
+  const l = listById(S.nt.lid); if (!l) return {list: null, cur: null, gone: true};
   const dr = S.nt.id === QN_DRAFT ? noteCur() : null, qn = qn_isList(l.id);  // 2.477.0 (#3881): the quick note being written (open at once)
   const ns = S.nt.notes || (dr ? [] : null);
-  if (!ns) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
+  if (!ns) return {list: null, cur: null};
   const q = qn ? '' : S.nt.q.trim().toLowerCase();  // 2.477.0 (#3881): the list "Notes" is a plain list, newest first, no search
   const vis = q ? ns.filter(n => (n.title + ' ' + n.body + ' ' + n.tags.join(' ')).toLowerCase().includes(q)) : ns;
   const cur = dr || (S.nt.id && ns.find(n => n.id === S.nt.id));
@@ -903,6 +918,15 @@ function viewNotes() {
       ${S.nt.mayWrite || dr ? `<button type="button" class="iconbtn ${S.nt.trash ? 'on' : ''}" data-act="nt-trash" title="${esc(tr('Trash'))}" aria-label="${esc(tr('Trash'))}">${ic('trash')}</button><button type="button" class="btn sm pri" data-act="nt-new">${ic('plus', 's')}${tr('New note')}</button>` : ''}</div>
     <div id="nt-res">${S.nt.trash ? ntTrashHtml() : ntCardsHtml(vis, q, cur)}</div>
   </div>`;
+  return {list, cur};
+}
+function viewNotes() {
+  const pan = nt_inPanel(); if (pan) sbb_sync('notes');  // 2.602.0 (#4817): the panel follows what the page draws
+  if (!S.nt.lid) return pan ? nt_pageHtml(null) : sb_notesView();  // 2.45.0 (#1516)
+  const {list, cur, gone} = nt_listOf();
+  if (gone) return botEmpty('ruhig', tr('This project does not exist (any more).'));
+  if (!list) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
+  if (pan) return nt_pageHtml(cur);
   return `<div class="ntwrap"><div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;
 }
 // the cards alone: typing in the search field re-renders only these (the field keeps the focus)

@@ -16945,6 +16945,7 @@
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "In den Papierkorb (wiederherstellbar): {0} Aufgaben, {1} Dateien, Seiten, Tabellen oder Kunden.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Bleibt, weil seit dem Import geändert: {0} Aufgaben, {1} weitere Einträge.",
   "possible until {0}": "möglich bis {0}",
+  "Choose a note in the list on the left.": "Wähle links in der Liste eine Notiz.",
   "Bank and cash (strict)": "Bank und Kasse (streng)",
   "Basis of the income statement": "Grundlage der EÜR",
   "Only what went through the bank account, the cash book or a credit card counts. A receipt without a booking stays open; a booking without a receipt counts with a warning.": "Es zählt nur, was über das Bankkonto, das Kassenbuch oder eine Kreditkarte geflossen ist. Ein Beleg ohne Buchung bleibt offen; eine Buchung ohne Beleg zählt mit Warnung.",

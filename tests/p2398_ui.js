@@ -42,13 +42,13 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   // ================= #3405 the organisation's view
   check((await call('PATCH', '/api/settings', {workspace: 'org:' + ORG})).http === 200, 'workspace = Alpha');
   let w = await boot({user: 'alice', hash: 'notes', ls: {'tasks.ws': `"org:${ORG}"`, 'tasks.sideOpenG': JSON.stringify(['views'])}}); let d = w.document;
-  await until(() => d.querySelector('#view .sbnall'), 40);
+  await until(() => d.querySelector('#side .ntpan .sbnlist'), 40);  // 2.602.0 (#4817): the list sits in the panel on a computer
   check(w.eval('wsCur()') === 'org:' + ORG && w.eval('S.route.mod') === 'notes', '#3405: #notes opens in the organisation (no switch to Private): ' + w.eval('wsCur()'));
   check(!!d.querySelector('#srail [data-sbb="notes"].on'), '#3405: Notes is an icon of the bar, marked as open');
   check(!d.querySelector('#side .sg-views [data-go="notes"]'), '#3405: no Notes row under Projects > Views');
-  const hrefs = () => [...d.querySelectorAll('#view .sbncard')].map(a => a.getAttribute('href')).sort();
+  const hrefs = () => [...d.querySelectorAll('#side .sbncard')]  /* 2.602.0 (#4817): in the panel */.map(a => a.getAttribute('href')).sort();
   check(await until(() => hrefs().length === 2) && hrefs().join() === [`#note/${NO}`, `#note/${NQ}`].sort().join(), '#3405: the organisation shows its project\'s note and my private list Notes, not the private project\'s: ' + hrefs());
-  check(!!d.querySelector('#view .sbnpriv'), '#3405: the line that new notes stay private');
+  check(!!d.querySelector('#side .sbnpriv'), '#3405: the line that new notes stay private');
   check(w.eval('nt_inWs({list_id: ' + PRV + '})') === false && w.eval('nt_inWs({list_id: ' + QL + '})') === true, '#3405: nt_inWs: a private project no, the list Notes yes');
 
   // ================= #3406 review and statistics in the organisation
@@ -74,7 +74,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   check(urls.some(u => /\/api\/life\/review\?.*space=private/.test(u)), '#3406: Private: the review asks for Private');
   w.eval(`go('notes')`);
   check(await until(() => hrefs().length === 2) && hrefs().join() === [`#note/${NP}`, `#note/${NQ}`].sort().join(), '#3405: Private shows the private project\'s note and the list Notes, not the organisation\'s: ' + hrefs());
-  check(!d.querySelector('#view .sbnpriv'), '#3405: Private: no extra privacy line');
+  check(!d.querySelector('#side .sbnpriv'), '#3405: Private: no extra privacy line');
   w.close();
 
   // ================= a person without an organisation: as before
@@ -85,7 +85,7 @@ const until = (fn, n) => require('./boot').until(fn, {timeout: n ? n * 150 : 150
   const FL = (await call('POST', '/api/lists', {name: 'Portfolio'}, CF)).id;
   const FN = (await call('POST', `/api/lists/${FL}/notes`, {title: 'Reel cuts', body: 'x'}, CF)).id;
   w = await boot({user: 'frida', hash: 'notes'}); d = w.document;
-  await until(() => d.querySelector('#view .sbnall'), 40);
+  await until(() => d.querySelector('#side .ntpan .sbnlist'), 40);  // 2.602.0 (#4817): the list sits in the panel on a computer
   check(!!d.querySelector('#srail [data-sbb="notes"]') && hrefs().join() === `#note/${FN}`, '#3405 freelancer: the Notes icon and her note: ' + hrefs());
   w.eval(`go('review')`);
   check(await until(() => !!d.querySelector('#view .rvjournal'), 60), '#3406 freelancer: the review with the journal');

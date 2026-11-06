@@ -20,7 +20,7 @@ const pe = (w, el, type) => {  // a touch pointer (jsdom: a MouseEvent with poin
 const menuOpen = w => { const p = w.document.querySelector('#pop'); return p && !p.classList.contains('hidden') && p.querySelector('[role="menu"]') ? p : null; };
 const acts = w => [...(menuOpen(w)?.querySelectorAll('[role="menuitem"][data-act]') || [])].map(b => b.dataset.act);
 const pick = (w, act) => { const b = menuOpen(w)?.querySelector(`[data-act="${act}"]`); b?.click(); return !!b; };
-const card = (w, id) => w.document.querySelector(`#view a.ntcard[href="#note/${id}"]`);
+const card = (w, id) => w.document.querySelector(`#view a.ntcard[href="#note/${id}"], #side a.ntcard[href="#note/${id}"]`);  // 2.602.0 (#4817): on a computer the cards are in the panel
 
 (async () => {
   await fetch(B + 'api/auth/setup', {method: 'POST', headers: H, body: JSON.stringify({username: 'alice', display_name: 'Alice', password: 'password123'})});

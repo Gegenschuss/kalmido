@@ -143,8 +143,8 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   // 2.398.0 (#3405, intended change): Notes are an icon of the main bar (an area of their own), no longer a row of Views
   const nrow = d.querySelector('#srail [data-sbb="notes"]');
   check(nrow && !d.querySelector('#side .sg-views .srow[data-go="notes"]'), '#1516 / #3405: "Notes" is an icon of the bar, not in Views ' + nrow?.textContent);
-  click(w, nrow); await until(() => d.querySelector('#view .sbnall'));
-  const cards = () => [...d.querySelectorAll('#view .sbncard')];
+  click(w, nrow); await until(() => d.querySelector('#side .sbnlist'));  // 2.602.0 (#4817): the list sits in the panel on a computer
+  const cards = () => [...d.querySelectorAll('#side .sbncard')];  // 2.602.0 (#4817): in the panel
   check(cards().length === 3 && cards()[0].getAttribute('href') === `#note/${N2}` && /Website/.test(cards()[0].querySelector('.sbnl').textContent) && /Garden/.test(cards().find(a => a.getAttribute('href') === `#note/${N3}`)?.textContent || ''), '#1516: all notes, pinned first, the list on each card');
   check(d.querySelector('#top h1')?.textContent.trim() === 'Notes', '#1516: the title "Notes" ' + d.querySelector('#top h1')?.textContent);
   check(await until(() => /harbour/.test(cards().find(a => a.getAttribute('href') === `#note/${N1}`)?.textContent || '')), '#1516: the first words of a note');
@@ -173,15 +173,15 @@ const groups = d => [...d.querySelectorAll('#side .sgroup')].map(x => (x.classNa
   check(await until(async () => (await call('GET', `/api/lists/${GAR}/notes`)).notes.some(n => n.title === 'Compost')), '#1516: stored in Garden');
   check((await call('GET', `/api/lists/${GAR}/notes`)).notes.length === 2, '#1516: … one more note in Garden');
   w.eval(`go('notes/${WEB}')`);
-  check(await until(() => d.querySelector('#view .ntview .ntcard') && !d.querySelector('#view .sbnall') && /Website/.test(d.querySelector('#top h1')?.textContent || '')), '#1516: #notes/<id> stays the notes of one list ' + d.querySelector('#top h1')?.textContent + ' ' + d.querySelector('#view')?.textContent.slice(0, 80));
+  check(await until(() => d.querySelector('#side .ntpan .ntcard') && !d.querySelector('#side .sbnlist') && /Website/.test(d.querySelector('#top h1')?.textContent || '')), '#1516: #notes/<id> stays the notes of one list ' + d.querySelector('#top h1')?.textContent + ' ' + d.querySelector('#view')?.textContent.slice(0, 80));
   w.close();
   // Bob (member of Website) sees its notes, not the private list's; Carol (view only) cannot write
   w = await boot({user: 'bob', hash: 'notes'}); d = w.document;
-  await until(() => d.querySelector('#view .sbnall'));
+  await until(() => d.querySelector('#side .sbnlist'));
   check(cards().length === 2 && !cards().some(a => /Seeds/.test(a.textContent)) && d.querySelector('[data-sb="note-new"]'), '#1516: Bob: only the shared notes, may write');
   w.close();
   w = await boot({user: 'carol', hash: 'notes'}); d = w.document;
-  await until(() => d.querySelector('#view .sbnall'));
+  await until(() => d.querySelector('#side .sbnlist'));
   // 2.477.0 (#3881): "New note" is her own quick note now (her private list Notes), never one in the list she only reads
   check(cards().length === 2 && !!d.querySelector('[data-sb="note-new"]'), '#1516: Carol (view): reads; "New note" = her own quick note');
   w.close();
