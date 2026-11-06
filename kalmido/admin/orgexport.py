@@ -179,6 +179,18 @@ def _ox_dec_row(c, oid, table, row):
         except Exception:  # noqa: BLE001  (sealed under an older server key: leave the address out, not the export)
             row["email"] = ""
         row.pop("email_hash", None)
+    if table == "doc_rules":  # 2.581.0 (#4803 review): a flow's webhook secret (and its address, a key itself for many services, like the
+        # webhooks table) never leave; the import takes no webhook / notify anyway (docs/rules.py clean_rule without extra)
+        try:
+            fl = json.loads(row["data"]) if isinstance(row.get("data"), str) else row.get("data")
+        except ValueError:
+            fl = None
+        if isinstance(fl, dict):
+            for k in ("hook_secret", "webhook"):
+                fl.pop(k, None)
+            row["data"] = json.dumps(fl, ensure_ascii=False)
+        elif row.get("data") is not None:
+            row["data"] = None  # not readable as a flow: nothing of it goes out
     if table == "rss_feeds":  # 2.455.0 (#3469): the feed stays visible by its title, never its key; the import takes none without address
         if OX_FEED_KEY_RE.search(row.get("url") or ""):
             row["url"] = ""
