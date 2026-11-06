@@ -50,10 +50,10 @@ function shfl_dateText(iso, like) {
   if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(like)) return `${d}.${m}.${y}`;
   return iso;
 }
-function shfl_addDays(iso, n) { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); }
+function shfl_addDays(iso, n) { const [y, m, d] = iso.split('-').map(Number); return ds(new Date(y, m - 1, d + n)); }  // local calendar day (#2978 rule)
 function shfl_addMonths(iso, n) {
-  const [y, m, d] = iso.split('-').map(Number), t = new Date(Date.UTC(y, m - 1 + n, 1)), last = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth() + 1, 0)).getUTCDate();
-  t.setUTCDate(Math.min(d, last)); return t.toISOString().slice(0, 10);
+  const [y, m, d] = iso.split('-').map(Number), t = new Date(y, m - 1 + n, 1), last = new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate();
+  t.setDate(Math.min(d, last)); return ds(t);
 }
 function shfl_series(src, n, vertical, plain) {  // plain: the column kind takes no series (selection, person, ...): repeat
   const k = src.length, out = [];
