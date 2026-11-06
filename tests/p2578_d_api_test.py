@@ -268,13 +268,17 @@ if IM:
     check(x.get("raw") == "=ROUNDUP(B1/3;1)" and abs((x.get("value") or 0) - 0.4) < 1e-9, "import C7: ROUNDUP " + json.dumps(x)[:250])
     A.post(B + f"/api/sheets/{IM}/columns", json={"title": "Check", "kind": "text"})
     check(put(A, IM, [{"cell": "D1", "raw": '=VERGLEICH("b";A1:A3)'}, {"cell": "D2", "raw": "=KALENDERWOCHE(DATUM(2026;11;6))"},
-                      {"cell": "D3", "raw": "=NETTOARBEITSTAGE(DATUM(2026;11;2);DATUM(2026;11;6))"}]).ok, "Kalmido-only defaults")
+                      {"cell": "D3", "raw": "=NETTOARBEITSTAGE(DATUM(2026;11;2);DATUM(2026;11;6))"},
+                      # 2.578.0 (#3462) review F5: TEXT formats go to Excel in its form
+                      {"cell": "D4", "raw": '=TEXT(DATUM(2026;11;6);"TT.MM.JJJJ")'}, {"cell": "D5", "raw": '=TEXT(B1;"#.##0,00 €")'},
+                      {"cell": "D6", "raw": '=TEXT(B1;"0,0")'}]).ok, "Kalmido-only defaults")
     r = A.get(B + f"/api/sheets/{IM}/export.xlsx")
     check(r.ok, "export .xlsx")
     sx = zipfile.ZipFile(io.BytesIO(r.content)).read("xl/worksheets/sheet1.xml").decode()
     for part in ("SUMIFS(B2:B4,A2:A4,&quot;a&quot;)", "COUNTIFS(A2:A4,&quot;a&quot;,B2:B4,&quot;&gt;1&quot;)", "MATCH(2,B2:B4,1)",
                  "WEEKNUM(DATE(2027,1,1),1)", "IFERROR(1/0,&quot;x&quot;)", "_xlfn.ISOWEEKNUM(DATE(2027,1,1))", "ROUNDUP(B2/3,1)",
-                 "MATCH(&quot;b&quot;,A2:A4,0)", "WEEKNUM(DATE(2026,11,6),21)", "NETWORKDAYS(DATE(2026,11,2),DATE(2026,11,6))"):
+                 "MATCH(&quot;b&quot;,A2:A4,0)", "WEEKNUM(DATE(2026,11,6),21)", "NETWORKDAYS(DATE(2026,11,2),DATE(2026,11,6))",
+                 'TEXT(DATE(2026,11,6),"dd.MM.yyyy")', 'TEXT(B2,"#,##0.00 €")', 'TEXT(B2,"0.0")'):
         plain = html.unescape(part)
         check(plain in html.unescape(sx), f"export holds {plain} " + sx[sx.find('<f>'):sx.find('<f>') + 200])
 

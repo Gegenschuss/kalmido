@@ -42,7 +42,7 @@ from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_
 from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
                       sh_fn_key, sh_tokens)
 from .shfuncs import SHF_DE, SHF_EXCEL
-from .shfuncs2 import shf_arg_fill  # 2.578.0 (#3462)
+from .shfuncs2 import shf_arg_fill, shf_text_fmts, shf_xl_text_fmt  # 2.578.0 (#3462)
 from .shfmt import (ShfmXl, shfm_import_apply, shfm_load, shfm_xl_merges, shfm_xl_read_rules, shfm_xl_rules,  # 2.578.0 (#3462 C)
                     shfm_xl_styles)
 from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, shb_quote, shb_xl_ref  # 2.369.5 (#2517): pulled up from functions
@@ -182,12 +182,14 @@ def _shx_xl_formula(book, raw, self_cell, last_row):
     except ShErr:
         return None
     out, v3 = [], shf_arg_fill(toks, "xl")  # 2.124.0 A (#2109): VLOOKUP with three arguments is approximate in Excel; 2.578.0 (#3462): + MATCH, WEEKNUM
+    fmts = shf_text_fmts(toks)  # review 2.578 F5: TEXT formats in Excel's form
     for i, (kind, val, _a, _b) in enumerate(toks):
         if i in v3:
             out.append(v3[i])
         if kind == "num":
             out.append(_xl_num(val))
         elif kind == "str":
+            val = shf_xl_text_fmt(val) if i in fmts else val
             out.append('"' + val.replace('"', '""') + '"')
         elif kind in ("op", "cmp", "(", ")", ":", "%"):
             out.append(val)

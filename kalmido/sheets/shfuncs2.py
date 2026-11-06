@@ -425,6 +425,61 @@ def _seps(lg):
     return (".", ",") if lang == "en" else (",", " " if lang == "fr" else ".")
 
 
+def _dec_at(core):
+    """The index of the decimal sign in the places part of a number format, None without one (the last of . and , ; one alone is
+    thousands when three places follow and a # stands before it)."""
+    dots = [i for i, ch in enumerate(core) if ch in ".,"]
+    if not dots:
+        return None
+    last = dots[-1]
+    if len({core[i] for i in dots}) > 1:
+        return last
+    alone_thousands = len(core) - last - 1 == 3 and "#" in core[:last]
+    return None if alone_thousands or len(dots) > 1 else last
+
+
+def _xl_fmt_sec(f):
+    """One section of a TEXT format in Excel's (English) form: JJ -> yy, TT -> dd; in a number format the decimal sign becomes
+    "." and the thousands signs ",". Quoted text and \\x stay."""
+    plain = re.sub(r'"[^"]*"|\\.', lambda m: "\x01" * len(m.group()), f)
+    if _is_date_fmt(f):
+        return "".join({"J": "y", "j": "y", "T": "d", "t": "d"}.get(ch, ch) if p != "\x01" else ch for ch, p in zip(f, plain))
+    m = re.search(r"[0#?][0#?.,\s]*[0#?]|[0#?]", plain)
+    if not m:
+        return f
+    core = m.group()
+    at = _dec_at(core)
+    xs = "".join("." if k == at else "," if ch in ".," or (ch.isspace() and 0 < k < len(core) - 1) else ch
+                 for k, ch in enumerate(core))
+    return f[:m.start()] + xs + f[m.end():]
+
+
+def shf_xl_text_fmt(f):
+    """A TEXT format string as Excel reads it (export, review 2.578 F5); the import reads both forms already."""
+    if len(f) > 200:
+        return f
+    secs = re.split(r';(?=(?:[^"]*"[^"]*")*[^"]*\Z)', f)
+    return ";".join(_xl_fmt_sec(x) for x in secs)
+
+
+def shf_text_fmts(toks):
+    """The indexes of the text tokens that are the whole second argument of a TEXT call (the format)."""
+    from .formula import sh_fn_key
+    out, stack = set(), []
+    for i, t in enumerate(toks):
+        if t[0] == "(":
+            fn = toks[i - 1][1] if i and toks[i - 1][0] == "fn" else ""
+            stack.append([fn and sh_fn_key(fn) == "text", 0])
+        elif t[0] == "sep" and stack:
+            stack[-1][1] += 1
+        elif t[0] == ")" and stack:
+            stack.pop()
+        elif t[0] == "str" and stack and stack[-1][0] and stack[-1][1] == 1 and toks[i - 1][0] == "sep" \
+                and i + 1 < len(toks) and toks[i + 1][0] in (")", "sep"):
+            out.add(i)
+    return out
+
+
 def _fmt_number(x, f, lg):
     """A number in an Excel number format: 0 / # places, a decimal sign (the last of . and , ; one alone is thousands when
     three places follow and a # stands before it), thousands, %, text around it ("0,00 €", "#.##0", "0%")."""
@@ -444,16 +499,7 @@ def _fmt_number(x, f, lg):
     post = re.sub(r'"([^"]*)"', r"\1", f[m.end():]).replace("\\", "")
     if "%" in pre + post:
         x *= 100
-    dots = [i for i, ch in enumerate(core) if ch in ".,"]
-    dec_at = None
-    if dots:
-        last = dots[-1]
-        if len({core[i] for i in dots}) > 1:
-            dec_at = last
-        else:
-            after = core[last + 1:]
-            alone_thousands = len(after) == 3 and "#" in core[:last]
-            dec_at = None if alone_thousands or len(dots) > 1 else last
+    dec_at = _dec_at(core)
     intpart = core if dec_at is None else core[:dec_at]
     decs = 0 if dec_at is None else sum(1 for ch in core[dec_at + 1:] if ch in "0#?")
     group = any(ch in ".," for ch in intpart) or bool(re.search(r"[0#]\s[0#]", intpart))
