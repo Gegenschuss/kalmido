@@ -797,6 +797,8 @@ def fsl_version(fid):
     except ValueError as e:
         return err(str(e))
     quota_guard(c, uid, len(data))
+    from .web import fs_web_expect  # 2.577.0 (#4708 3): an older version read -> 409, as the plain file routes
+    fs_web_expect(c, fid, request.form.get("expect_version"))
     no = _store_version(c, fid, fs_space(n["org_id"], n["owner_id"]), data, FSL_MIME, uid)
     if (n["e2e_gen"] or 0) != gen:
         c.execute("UPDATE fs_nodes SET e2e_gen=? WHERE id=?", (gen, fid))  # the name stays of its generation (still readable)

@@ -223,6 +223,7 @@ function fsl_newVersion(n) {
 async function fsl_newVersionFile(n, f) {
   const fd = new FormData();
   try { fd.append('file', new Blob([await fslFileEnc(n.lock_id, {name: n.name, type: f.type, data: new Uint8Array(await f.arrayBuffer())})]), 'encrypted.kenc'); } catch (x) { fslToast(x); return; }
+  if (n.version) fd.append('expect_version', n.version);  // 2.577.0 (#4708 3)
   try { await api('POST', `/api/files/lock/version/${n.id}`, fd); } catch { return; }
   ab_reload(); toast(tr('New version of “{0}” saved', n.name));
 }

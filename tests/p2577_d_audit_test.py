@@ -138,6 +138,31 @@ waited, r = while_held(f"from kalmido.core.pg import write_lock\nwrite_lock(c, '
                        lambda: Fr.post(B + f"/api/lists/{LID}/fields", json={"name": "Budget", "type": "number"}))
 check(waited and r is not None and r.status_code in (200, 201), f"(2) a new field waits for the project's field lock {waited} {r.status_code if r is not None else '-'}")
 
+# ================================================================== (3) file versions with expect_version
+r = Fr.post(B + "/api/files/upload", files={"file": ("Bericht.txt", b"eins")})
+FN = r.json()["items"][0]["id"] if r.status_code == 201 else 0
+
+
+def cur_version():
+    return (kt.dbx("SELECT cur_version FROM fs_nodes WHERE id=?", (FN,)) or [[0]])[0][0]
+
+
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions", files={"file": ("Bericht.txt", b"zwei")}, data={"expect_version": "1"})
+check(r.status_code == 201 and cur_version() == 2, f"(3) a new version with the version read (1) is stored {r.status_code} {r.text[:120]}")
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions", files={"file": ("Bericht.txt", b"veraltet")}, data={"expect_version": "1"})
+check(r.status_code == 409 and (r.json().get("current") or {}).get("version") == 2 and cur_version() == 2,
+      f"(3) a new version on top of an older one read -> 409 with the file now, nothing stored {r.status_code} {r.text[:160]}")
+r = Fr.post(B + "/api/files/upload", files={"file": ("Bericht.txt", b"gleicher Name")}, data={"expect_version": "1"})
+check(r.status_code == 409 and cur_version() == 2, f"(3) an upload of the same name with an older version read -> 409 {r.status_code}")
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions/1/restore", json={"expect_version": 1})
+check(r.status_code == 409 and cur_version() == 2, f"(3) a restore with an older version read -> 409 {r.status_code}")
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions", files={"file": ("Bericht.txt", b"x")}, data={"expect_version": "zwei"})
+check(r.status_code == 400 and cur_version() == 2, f"(3) a version that is no number -> 400 {r.status_code}")
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions", files={"file": ("Bericht.txt", b"drei")})
+check(r.status_code == 201 and cur_version() == 3, f"(3) without expect_version (old clients) as before {r.status_code}")
+r = Fr.post(B + f"/api/files/nodes/{FN}/versions/1/restore", json={"expect_version": 3})
+check(r.ok and cur_version() == 4, f"(3) a restore with the current version {r.status_code} {r.text[:120]}")
+
 # @@NEXT@@
 
 sys.exit(kt.done("p2577_d_audit"))

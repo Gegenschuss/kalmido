@@ -11,6 +11,7 @@ from flask import Response, jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES
 from ..core.i18n import tr
+from ..core.errors import BadInput  # 2.577.0 (#4708 3)
 from ..core.db import bump, body, db, err, insert_id, iso
 from ..accounts.session import me
 from ..core.access import Denied, acx_of, collab_all
@@ -310,6 +311,7 @@ def files_upload():
             name = safe_fs_name(f.filename)
             same = _same_name_file(c, pid, owner, org, name) if replace else None
             if same and ROLE_RANK[fs_role(c, same, uid)] >= ROLE_RANK["edit"]:
+                fs_web_expect(c, same, request.form.get("expect_version") if len(files) == 1 else None)  # 2.577.0 (#4708 3): one file
                 no = fs_new_version(c, same, data, f.mimetype)
                 fs_log_add(c, same, "version", str(no))
                 out.append(same)
@@ -496,6 +498,26 @@ def files_thumb(nid):
     return r
 
 
+def fs_web_expect(c, nid, v):
+    """2.577.0 (#4708 3): the version check of the app's file routes, as the API's (v1.py fs_version_check): v = the version
+    number the client read (form / body field expect_version, or the header If-Match); another version came meanwhile ->
+    409 with the file as it is now under "current", nothing stored. Optional for people (old clients), required for agents."""
+    from ..core.conflict import Conflict, need_version
+    from ..core.pg import write_lock
+    need_version({"expect_version": v}, "expect_version")
+    if v in (None, "") and (request.headers.get("If-Match") or "").strip():
+        v = request.headers["If-Match"].strip().removeprefix("W/").strip('"')
+    if v in (None, ""):
+        return
+    if isinstance(v, str) and v.strip().isdigit():
+        v = int(v.strip())
+    if isinstance(v, bool) or not isinstance(v, int):
+        raise BadInput(tr("Invalid value: {0}", "expect_version"))
+    write_lock(c, f"fs_version:{int(nid)}")  # the lock of the new number (store.py _store_version): no upload between check and write
+    if c.execute("SELECT cur_version FROM fs_nodes WHERE id=?", (nid,)).fetchone()[0] != v:
+        raise Conflict("current", files_node_get(nid).get_json())
+
+
 @app.post("/api/files/nodes/<int:nid>/versions")
 def files_version_upload(nid):
     """multipart file: a new version of the file (keeps its name)."""
@@ -509,6 +531,7 @@ def files_version_upload(nid):
     f = request.files.get("file")
     if not f:
         return err(tr("File missing"))
+    fs_web_expect(c, nid, request.form.get("expect_version"))  # 2.577.0 (#4708 3)
     try:
         no = fs_new_version(c, nid, h6d_read(f), f.mimetype)
     except ValueError as e:
@@ -530,6 +553,7 @@ def files_version_restore(nid, no):
     v = fs_version_row(c, nid, no)
     if n["kind"] != "file" or not v:
         raise Denied(404)
+    fs_web_expect(c, nid, (request.get_json(silent=True) or {}).get("expect_version", request.args.get("expect_version")))  # 2.577.0 (#4708 3)
     from .fslock import fl_is_locked, fsl_restore_version
     if fl_is_locked(c, nid):  # 2.353.0 A (#2758): the ciphertext as it is
         new = fsl_restore_version(c, n, no)

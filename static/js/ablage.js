@@ -356,6 +356,7 @@ function ab_newVersion(n) {
 async function ab_newVersionFile(n, f) {
   if (n.locked) return typeof fsl_newVersionFile === 'function' ? fsl_newVersionFile(n, f) : ab_noFsl();  // never plain (as above)
   const fd = new FormData(); fd.append('file', f, f.name);
+  if (n.version) fd.append('expect_version', n.version);  // 2.577.0 (#4708 3): another version came meanwhile -> 409, nothing stored
   try { await api('POST', `/api/files/nodes/${n.id}/versions`, fd); } catch { return; }
   ab_reload(); toast(tr('New version of “{0}” saved', n.name));
   if ($('.abdlg')) ab_details(n.id);
