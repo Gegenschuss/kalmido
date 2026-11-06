@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.562.0** (2026-11-05):
-- **Account**: delete your own account (7 days locked with a cancel link, then deleted).
-- **Customer portal**: requests by e-mail become tickets with a status link; answers go out by mail.
-- **Files and Office**: see who a folder or file is shared with; equipment warranty and maintenance become tasks.
-- **Speed**: many actions and dialogs show at once without waiting for the server.
+**2.570.0** (2026-11-06):
+- **Trash**: deleted budget entries, templates, sections, sprints and office items stay 30 days and can be restored.
+- **Agents**: the Kalmido AI prepares invoice drafts from tracked time; a model per starter routine; agents must send the version they read.
+- **Office**: finalised documents are protected by a database trigger (rolling back past 2.542 needs the DROP TRIGGER in docs/OFFICE.md).
+- **Teams**: team chat channels can be shared with groups; budget warnings at 80 % and 100 %.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
