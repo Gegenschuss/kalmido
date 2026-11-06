@@ -139,6 +139,7 @@ _CHAT = "a team chat room (room_id -> tchat_rooms: a list's room or a direct cha
 _AGENT = "the agent's own rows (agent_id -> agents.org_id; its lists through list_members)"
 _FAM = "the household of a family (Family module): private by definition, never an organisation's"
 TENANT_EXEMPT = {
+    "hub_mailbox_rules": "2.581.0 (#4804): the document rules of one workspace mailbox (box_id -> hub_mailboxes, which carries org_id; created_by only records who wrote it; the app checks the manage right of the mailbox's workspace)",
     "module_card_people": "2.575.0 (#3778): who has a module card of an organisation (the card row carries org_id; the app checks the card and that the person is a member)",
     "appt_pages": "2.94.0 B (#1929): a person's own public booking page (like ev_cals: owned by the person, no workspace; the lead goes to office_org_id, checked by the app)",
     "appt_types": "2.94.0 B (#1929): the appointment types of a person's own booking page (user_id = the owner)",

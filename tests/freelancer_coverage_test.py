@@ -360,6 +360,9 @@ ROUTES = {
     # 2.141.0 A (#2141, #2138): the own mailbox of the private workspace, Reply / New e-mail (p2141_a_api_test.py, freelancer-matrix: hub)
     "GET /api/hubmail/mailboxes": "hub", "GET /api/hubmail/mailbox": "hub", "PUT /api/hubmail/mailbox": "hub", "DELETE /api/hubmail/mailbox": "hub",
     "POST /api/hubmail/mailbox/check": "hub", "POST /api/hubmail/mailbox/poll": "hub", "GET /api/hubmail/compose": "hub", "POST /api/hubmail/send": "hub",
+    # 2.581.0 (#4804): the document rules of the private mailbox (p2581_d_mailrules_test.py, freelancer-matrix: hub)
+    "GET /api/hubmail/mailbox/rules": "hub", "POST /api/hubmail/mailbox/rules": "hub", "PUT /api/hubmail/mailbox/rules/{}": "hub",
+    "DELETE /api/hubmail/mailbox/rules/{}": "hub", "POST /api/hubmail/mailbox/rules/fetch": "hub",
     "POST /api/hubmail/mails/{}/restore": "hub",
     "GET /api/v1/mails": "hub", "GET /api/v1/mails/{}": "hub",  # 2.483.0 (#1902): p2483_a_mail_api_test.py
     "GET /api/hubmail/mails/{}/html": "hub", "GET /api/hubmail/mails/{}/make": "hub", "POST /api/hubmail/mails/{}/task": "hub",  # 2.141.0 B (#2140, #2139)

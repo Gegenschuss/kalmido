@@ -94,6 +94,7 @@ MBX_ERR = {  # error code -> the text people see (never the server's own words: 
 }
 MBX_WAKE = threading.Event()
 _DUE = set()  # workspaces whose mailbox is fetched in the next round (Fetch now)
+MBX_AFTER_POLL = []  # 2.581.0 (#4804): f(M, box) on the open connection after the filing (hub/mailrules.py mbr_run: documents)
 
 
 from ..core.db import now_iso as _now  # noqa: E402  2.149.0 G (#2517): was an own copy
@@ -617,6 +618,11 @@ def mbx_poll_one(box, hold=None):
         try:
             n = mail_fetch(M, _folder_arg(box["imap_folder"] or "INBOX"), lambda c2, raw: mbx_import(c2, box, raw), max_bytes=MBX_MAIL_MAX,
                            box=f"mbx:{box['id']}")  # 2.193.0 D (#2220)
+            for f in MBX_AFTER_POLL:  # 2.581.0 (#4804): the document rules; their errors are their own (docs_error)
+                try:
+                    f(M, box)
+                except Exception as e:  # noqa: BLE001
+                    print("mailbox: after poll", type(e).__name__, flush=True)
         finally:
             try:
                 M.logout()

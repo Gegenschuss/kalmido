@@ -71,7 +71,7 @@ const LD_MODS = {
   ofundo: ['office_undo'],  // 2.111.0 A (#2233): undo of the office editors, clients and tables (office, sheets and the client dialog load it)
   objsave: ['objsave'],  // 2.558.0 (#4709): the dialogs of the areas on the shared core (saveDialog, merge bar, undo; core/writes.py)
   voice: ['voice'],  // 2.139.0 B (#2128): voice messages of the team chat (the composer's microphone, the audio player)
-  hubmailbox: ['hubmailbox'],
+  hubmailbox: ['hubmailbox', 'mailrules'],  // 2.581.0 (#4804): mailrules.js = the document rules of the mailbox dialog
   listprint: ['listprint'],
   evinvite: ['evinvite'],
   projtime: ['projtime'],

@@ -70,8 +70,10 @@ async function hmb_dialog(ws) {
   const md = modal(`<div class="lhdr"><h3>${tr('Mailbox')} · ${esc(name)}</h3><span class="spacer"></span><button class="iconbtn" data-m="close" aria-label="${tr('Close')}" title="${tr('Close')}">${ic('x')}</button></div>
     <p class="muted">${tr('E-mails of this mailbox are filed in this workspace only; the passwords are stored encrypted and never shown again.')}</p>
     <div class="hmbform">${hmb_formHtml(j.box)}</div><div class="hmbres">${hmb_checkHtml(j)}</div><p class="hmb-err" role="alert"></p>
+    <div class="hmbrules"></div>
     <div class="foot">${hmb_footHtml(j.box)}</div>`);
   md.classList.add('hmbdlg');
+  if (j.box?.imap_host && typeof mbr_mount === 'function') mbr_mount(hmb_q(md, '.hmbrules'), ws);  // 2.581.0 (#4804): mailrules.js
   const errEl = hmb_q(md, '.hmb-err');
   // 2.166.0 (#2633): every field saves itself when it is left (the settings pattern of #2247); while the set is incomplete
   // the server's reason shows ("Not saved yet: ..."), "Check connection" saves and logs in to both servers

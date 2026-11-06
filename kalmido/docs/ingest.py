@@ -380,10 +380,9 @@ def docs_mail_import(c, msg, raw, pre=None):
     """A mail to a document address (plus address with a doc_mail token): its attachments become documents of that
     person / organisation. None = not a document address (the task import goes on); else the first node id or 0.
     pre (2.424.0 B2, #3450): the result of docs_mail_prefetch (the downloads made before this transaction); False = it
-    failed (nothing downloaded); None = not prefetched (a direct call): the links are downloaded here."""
-    from ..admin.hosting import QuotaExceeded
-    import hashlib
-    toks, mail_text, ei_is = _mail_toks(msg)
+    failed (nothing downloaded); None = not prefetched (a direct call): the links are downloaded here.
+    2.581.0 (#4804): the files / links / the mail itself go through _docs_mail_into (also the mailbox rules, docs_mailbox_import)."""
+    toks = _mail_toks(msg)[0]
     if not toks:
         return None
     with system_ctx(c):  # docs mail: resolving a secret address token (like a public link), membership checked below
@@ -401,59 +400,90 @@ def docs_mail_import(c, msg, raw, pre=None):
             return 0
         if org and int(org) not in acx_of(c, uid).org_ids:
             return 0  # no longer a member: nothing goes in
-        mid = str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
         # 2.522.0 (#4433): the person's own general document address sorts; an organisation's address and the answer
         # address of a letter are bound (they land where they belong)
         sort = "sort" if r and not org and letter is None else None
-        _text, files = mail_text(msg, att_images=True)
-        first, made, cand = 0, [], False
-        for _i, parts in _mail_parts(files, ei_is, mid):
-            cand = True
-            for pname, pmime, pdata, pext in parts:
-                try:
-                    with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
-                        nid = docs_ingest(c, uid, org, pname, pdata, pmime, "mail", {"ext_id": pext}, dedup=True, area=sort)
-                    first = first or nid
-                    made.append(nid)
-                except (Denied, ValueError, QuotaExceeded) as e:
-                    print("docs: mail attachment refused", type(e).__name__, flush=True)
-        if not cand and letter is None:
-            # 2.424.0 B (#3450): no file attached -> the invoice download links of the mail (docs/maillink.py: https, SSRF
-            # guard, limits, PDF only); a link that gives no PDF (a login page) -> the mail itself, tagged "needs a login"; no
-            # link at all -> the mail itself too (an invoice in the mail text, a confirmation code of a mail filter)
-            if pre is None and r:  # a direct call: the downloads here (within this transaction), with the same budget
-                pre = ml_collect(msg, limit=ml_budget(c, r["token"], "links", len(ml_links(msg))))
-            links, got = pre or ([], [])
-            for k, pname, pdata in got:
-                try:
-                    with c.savepoint():
-                        nid = docs_ingest(c, uid, org, pname, pdata, "application/pdf", "mail", {"ext_id": f"mail:{mid}:link:{k}"}, dedup=True, area=sort)
-                    first = first or nid
-                    made.append(nid)
-                except (Denied, ValueError, QuotaExceeded) as e:
-                    print("docs: receipt link refused", type(e).__name__, flush=True)
-            if not got and not (r and ml_budget(c, r["token"], "eml")):
-                pass  # 2.424.0 B2 (#3450): the hour's budget of mails filed without a file is spent (ml_budget logs it)
-            elif not got:
-                tag = tr(ML_TAG, lg=lang(c, uid)) if links else ""
-                meta = {"ext_id": f"mail:{mid}:eml", "text": ((tag + "\n\n" if tag else "") + _text)[:200_000] or ml_mail_name(msg)}
-                if tag:
-                    meta["tags"] = [tag]
-                try:
-                    with c.savepoint():
-                        nid = docs_ingest(c, uid, org, ml_mail_name(msg), raw, "message/rfc822", "mail", meta, dedup=True, area=sort)
-                    first = first or nid
-                    made.append(nid)
-                except (Denied, ValueError, QuotaExceeded) as e:
-                    print("docs: mail document refused", type(e).__name__, flush=True)
-        if made:  # 2.153.0 (#2029): the answer to a letter sent by e-mail (In-Reply-To / References) -> linked to it
-            try:
-                from ..office.lettermail import ltm_link_replies
-                with c.savepoint():
-                    ltm_link_replies(c, uid, org, msg, made, letter)
-            except Exception as e:  # noqa: BLE001 -- the documents are in; a failed link is assigned by hand
-                print("docs: letter link failed", type(e).__name__, flush=True)
+        budget = (lambda kind, n=1: ml_budget(c, r["token"], kind, n)) if r else None
+        first, _made = _docs_mail_into(c, msg, raw, uid, org, sort=sort, letter=letter, budget=budget, pre=pre)
     c.commit()
     if first:
         docs_kick()
     return first
+
+
+def _mail_mid(msg, raw):
+    import hashlib
+    return str(msg.get("Message-ID", "")).strip()[:200] or ("sha:" + hashlib.sha256(raw).hexdigest())
+
+
+def _docs_mail_into(c, msg, raw, uid, org, sort=None, letter=None, budget=None, pre=None, take_files=True, take_mail=False,
+                    meta_add=None, parent_id=None, source="mail"):
+    """2.581.0 (#4804): the one documents input of a mail (pulled out of docs_mail_import, unchanged for the document address):
+    its files (ZIP / winmail unpacked, e-invoice XML, images as files), else its invoice links, else the mail itself; the same
+    bytes / the same ext_id already in the workspace are linked, not stored twice. Called inside system_ctx; the caller commits.
+    budget(kind, n) = how many link downloads ("links") / mails without a file ("eml") are left this hour (None = none at all);
+    take_files False = no files / links / fallback (only the mail itself, take_mail); take_mail = the mail itself as .eml
+    too; meta_add = given fields for every document (tags, sender); parent_id = a target folder (fs_put checks uid's right);
+    source = doc_meta.source ("mail", "mailbox"). -> (first node id or 0, [node ids])."""
+    from ..admin.hosting import QuotaExceeded
+    _toks, mail_text, ei_is = _mail_toks(msg)
+    mid = _mail_mid(msg, raw)
+    add = dict(meta_add or {})
+
+    def put(name, data, mime, ext, meta=None):
+        try:
+            with c.savepoint():  # 2.146.0 B (#2452): a file already there is linked, not stored again
+                nid = docs_ingest(c, uid, org, name, data, mime, source, {**add, **(meta or {}), "ext_id": ext}, dedup=True, area=sort,
+                                  parent_id=parent_id)
+            made.append(nid)
+            return nid
+        except (Denied, ValueError, QuotaExceeded) as e:
+            print("docs: mail document refused", type(e).__name__, flush=True)
+            return 0
+    _text, files = mail_text(msg, att_images=True)
+    made, cand, eml_done = [], False, False
+    for _i, parts in (_mail_parts(files, ei_is, mid) if take_files else []):
+        cand = True
+        for pname, pmime, pdata, pext in parts:
+            put(pname, pdata, pmime, pext)
+    if take_files and not cand and letter is None:
+        # 2.424.0 B (#3450): no file attached -> the invoice download links of the mail (docs/maillink.py: https, SSRF
+        # guard, limits, PDF only); a link that gives no PDF (a login page) -> the mail itself, tagged "needs a login"; no
+        # link at all -> the mail itself too (an invoice in the mail text, a confirmation code of a mail filter)
+        if pre is None and budget:  # a direct call: the downloads here (within this transaction), with the same budget
+            pre = ml_collect(msg, limit=budget("links", len(ml_links(msg))))
+        links, got = pre or ([], [])
+        for k, pname, pdata in got:
+            put(pname, pdata, "application/pdf", f"mail:{mid}:link:{k}")
+        if not got and not (budget and budget("eml")):
+            pass  # 2.424.0 B2 (#3450): the hour's budget of mails filed without a file is spent (ml_budget logs it)
+        elif not got:
+            tag = tr(ML_TAG, lg=lang(c, uid)) if links else ""
+            meta = {"text": ((tag + "\n\n" if tag else "") + _text)[:200_000] or ml_mail_name(msg)}
+            if tag:
+                meta["tags"] = list(dict.fromkeys([*(add.get("tags") or []), tag]))
+            eml_done = bool(put(ml_mail_name(msg), raw, "message/rfc822", f"mail:{mid}:eml", meta))
+    if take_mail and not eml_done:  # 2.581.0 (#4804): a mailbox rule keeps the mail itself too (the same ext_id: never twice)
+        put(ml_mail_name(msg), raw, "message/rfc822", f"mail:{mid}:eml", {"text": _text[:200_000] or ml_mail_name(msg)})
+    if made:  # 2.153.0 (#2029): the answer to a letter sent by e-mail (In-Reply-To / References) -> linked to it
+        try:
+            from ..office.lettermail import ltm_link_replies
+            with c.savepoint():
+                ltm_link_replies(c, uid, org, msg, made, letter)
+        except Exception as e:  # noqa: BLE001 -- the documents are in; a failed link is assigned by hand
+            print("docs: letter link failed", type(e).__name__, flush=True)
+    return (made[0] if made else 0), made
+
+
+def docs_mailbox_import(c, uid, org, msg, raw, meta=None, parent_id=None, take_files=True, take_mail=False, budget=None, pre=None):
+    """2.581.0 (#4804): a mail a rule of a workspace mailbox took (hub/mailrules.py) -> documents of that workspace as uid (the
+    mailbox's holder), through the same input as the document address (_docs_mail_into), doc_meta.source 'mailbox'. Checks
+    that uid is active and (an organisation) still a member; the private space without a target folder sorts like the own
+    document address. -> (first node id or 0, [node ids]); the caller commits (then docs_kick)."""
+    with system_ctx(c):  # the background round of the mailbox: the person and the membership are checked here
+        u = c.execute("SELECT disabled FROM users WHERE id=?", (uid,)).fetchone()
+        if not u or u["disabled"] or (org and int(org) not in acx_of(c, uid).org_ids):
+            return 0, []
+        sort = "sort" if not org and not parent_id else None
+        return _docs_mail_into(c, msg, raw, uid, org, sort=sort, budget=budget, pre=pre, take_files=take_files, take_mail=take_mail,
+                               meta_add=meta, parent_id=parent_id, source="mailbox")

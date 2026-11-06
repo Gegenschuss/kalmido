@@ -332,6 +332,7 @@ ORDER = (
     "hub.hmv1",  # 2.483.0 (#1902): the filed mails in the REST API v1 (read only, agents too)
     "hub.mailview",  # 2.141.0 B (#2140, #2139): the HTML view of a filed mail, a task / an event made from it
     "hub.mailbox",  # 2.141.0 A (#2141, #2138): the own mailbox of a workspace, sending from the e-mail filing
+    "hub.mailrules",  # 2.581.0 (#4804): documents from the own mailbox (mail rules)
     "office.packs",  # 2.36.1 (#1021): country packs (data), used by office.model
     "office.homecur",  # 2.189.0 (#2475): the office's home currency (no routes; used by office.model and the money modules)
     "office.model",  # 2.36.1 (#1021): office & finance (B); C/D append office.calc, office.docs, office.pdf

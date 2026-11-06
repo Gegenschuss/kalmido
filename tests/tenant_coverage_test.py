@@ -204,6 +204,7 @@ KINDS = {
     "hubmail": ("matrix", "p284_a_api_test.py: a mail / attachment / address of another organisation or a private client of another person 404, a forged sender finds only the recipient's workspace, after leaving nothing, assigning across workspaces refused, agents 403; "
                 "p2553_b_reqmail_test.py (2.553.0 #3460): the request address of a project: another person 404, a mail to it lands only in its own project / space, a ticket reference sent to another project's address never reaches the ticket; "
                 "p2141_a_api_test.py (2.141.0): another organisation's mailbox 404, a member 403, a workspace mailbox files into its own workspace only (a foreign token counts as none), compose / send for another organisation's mail or client 404, agents 403; "
+                "p2581_d_mailrules_test.py (2.581.0 #4804): the document rules of another organisation's mailbox 404 (read, change, delete), a member 403, a stale version 409, a target folder of another organisation refused, the documents land in the mailbox's workspace only, agents refused; "
                 "2.141.0 B: p2141_b_api_test.py the HTML view / task / event from a mail of another organisation 404, into a list / calendar of another workspace 409, the mail of a task only with the mail's rights; "
                 "2.483.0 (#1902): p2483_a_mail_api_test.py the API v1 for agents / tokens: another organisation's client / project / mail 404, a project not shared with the agent 404, \"Not assigned\" never"),
     # 2.112.1 B (#2058): external share links of the file store (files/extlinks.py)
@@ -1318,6 +1319,9 @@ ROUTES = {
     # 2.141.0 A (#2141, #2138): the mailbox of a workspace (its admins / the own private workspace), compose + send (hbm_can write)
     "GET /api/hubmail/mailboxes": "hubmail", "GET /api/hubmail/mailbox": "hubmail", "PUT /api/hubmail/mailbox": "hubmail", "DELETE /api/hubmail/mailbox": "hubmail",
     "POST /api/hubmail/mailbox/check": "hubmail", "POST /api/hubmail/mailbox/poll": "hubmail", "GET /api/hubmail/compose": "hubmail", "POST /api/hubmail/send": "hubmail",
+    # 2.581.0 (#4804): the document rules of a workspace mailbox (p2581_d_mailrules_test.py, tenant-matrix: hubmail)
+    "GET /api/hubmail/mailbox/rules": "hubmail", "POST /api/hubmail/mailbox/rules": "hubmail", "PUT /api/hubmail/mailbox/rules/{}": "hubmail",
+    "DELETE /api/hubmail/mailbox/rules/{}": "hubmail", "POST /api/hubmail/mailbox/rules/fetch": "hubmail",
     # 2.85.0 B (#1162): feeds; 2.172.0 B (#2677): private or per organisation (p2172_b_reading_scope_test.py), was "own"
     "GET /api/feeds": "reading", "POST /api/feeds": "reading", "DELETE /api/feeds/{}": "reading", "POST /api/feeds/{}/restore": "reading",
     "GET /api/feeds/items": "reading", "POST /api/feeds/read": "reading", "POST /api/feeds/items/{}/later": "reading",
