@@ -37,6 +37,7 @@
   /* 2.149.0 F (#2519): names some rules used without defining them (the property was dropped); aliases of the scale above, both themes */
   --shadow-s:0 1px .125rem rgba(0,0,0,.2);--fs:var(--fs-b);--fs-sm:var(--fs-s);--text3:var(--faint);--warn:var(--st-wait-t);
   /* 2.534.0 A (#4551): the four page widths (only upper limits, centred: static/css/start-breite.css assigns every page one): reading text, a form section, lists / office, board / calendar / timeline / matrix / sheet / mind map */ --w-lesen:46rem;--w-form:40rem;--w-seite:96rem;--w-voll:none;
+  /* 2.602.0 (#4817): ONE width for the lists that stay in the page (file store without sidebar B, team chat, contacts, clients, notes without the panel): as the panel (--sideW 15rem, at least 14rem) */ --w-leiste:15rem;--w-leiste-min:14rem;
 }
 /* font size per device (Appearance): the root font size carries the whole rem scale */
 :root[data-fsize="s"]{--ui:.9}:root[data-fsize="l"]{--ui:1.12}:root[data-fsize="xl"]{--ui:1.25}
@@ -4086,7 +4087,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 
 /* ---- 2.17.0 package B "Communication" ------------------------------------------------------------------------- */
 /* #419 team chat: the conversations next to the open one (desktop), one or the other on phones */
-.tcview{display:grid;grid-template-columns:minmax(15rem,20rem) minmax(0,1fr);gap:0;height:calc(100dvh - 6.5rem);min-height:20rem;border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--bg)}
+.tcview{display:grid;grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr);gap:0;height:calc(100dvh - 6.5rem);min-height:20rem;border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden;background:var(--bg)}
 .tclist{display:flex;flex-direction:column;overflow-y:auto;border-right:1px solid var(--line);background:var(--bg2);min-width:0}
 .tchead{display:flex;align-items:center;gap:.5rem;padding:.625rem .75rem;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg2);z-index:1}
 .tcrow{display:flex;align-items:center;gap:.625rem;width:100%;padding:.5rem .75rem;text-align:left;border-bottom:1px solid var(--line);min-height:3.25rem;color:var(--text2)}
@@ -4138,7 +4139,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .tcxn b,.tcxn span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tcxmem{max-height:14rem;overflow:auto;margin-bottom:.625rem}
 /* 2.139.0 A (#2127): threads: the pane right of the conversation (desktop), the line under a first message, the thread view */
-.tcview.inthread{grid-template-columns:minmax(13rem,17rem) minmax(0,1fr) minmax(18rem,24rem)}
+.tcview.inthread{grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr) minmax(18rem,24rem)}  /* 2.602.0 (#4817): --w-leiste (was 13-17rem) */
 /* 2.479.0 (#2814): the area "Chat" on a computer: its conversations are the panel, the page only the open one (and its thread) */
 .tcview.nolist{grid-template-columns:minmax(0,1fr)}
 .tcview.nolist.inthread{grid-template-columns:minmax(0,1fr) minmax(18rem,24rem)}
@@ -4178,7 +4179,7 @@ button.trdline:hover,button.trdline:focus-visible{background:var(--bg3);color:va
 }
 /* #442 notes */
 .ntview{display:grid;grid-template-columns:minmax(0,1fr);gap:1rem}
-.ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,1fr)}
+.ntview.open{grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) minmax(0,1fr)}  /* 2.602.0 (#4817): --w-leiste (was 14-22rem) */
 /* 2.602.0 (#4817): the note list in the panel of sidebar B (chat.js nt_panelHtml): the bar wraps (search on a line of its own),
    the page beside it shows the open note alone or the hint (nt_pageHtml) */
 #side .ntpan{padding:0 .5rem .5rem}
@@ -4692,7 +4693,7 @@ button.lkchip:hover{border-color:var(--accent)}
 /* 2.138.0 E (#2234): the magnifier sits inside the field and there is one frame only (no second ring around the input on focus) */
 .ctsearch>svg,.ctsearch>.ic{flex:none}
 .ctsearch input:focus,.ctsearch input:focus-visible{border:0;box-shadow:none}
-.ctcols{display:grid;grid-template-columns:minmax(16rem,22rem) 1fr;gap:1rem;min-height:0;flex:1}
+.ctcols{display:grid;grid-template-columns:minmax(var(--w-leiste-min),var(--w-leiste)) 1fr;gap:1rem;min-height:0;flex:1}
 .ctlistw{overflow:auto;min-height:0}
 .ctlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:1px}
 .ctrow{display:flex;align-items:center;gap:.625rem;width:100%;text-align:left;padding-inline:.5rem;border-radius:var(--radius)}
@@ -6838,7 +6839,7 @@ button.lnph:hover{border-color:var(--accent)}
 /* 2.48.0 D (#1152) Paperless-ngx in the documents settings: connection, progress, the mapping of the preview */
 .pl-url { font-family: var(--mono, monospace); font-size: var(--fs-m); overflow-wrap: anywhere; }
 /* 2.48.0 A (#1207) the file store "Ablage" (ablage.js): spaces on the left (a row of buttons on phones), the path, the list */
-.abview{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:1rem;align-items:start;min-height:12rem;border-radius:var(--r-l);transition:box-shadow .15s}
+.abview{display:grid;grid-template-columns:var(--w-leiste) minmax(0,1fr);gap:1rem;align-items:start;min-height:12rem;border-radius:var(--r-l);transition:box-shadow .15s}
 .abview.abdrop{box-shadow:inset 0 0 0 2px var(--accent)}
 .abspaces{display:flex;flex-direction:column;gap:.125rem;position:sticky;top:0}
 .abspace{display:flex;align-items:center;gap:.5rem;min-height:2.5rem;padding:0 .75rem;border:0;border-radius:var(--radius);background:none;color:inherit;text-align:left;cursor:pointer}
