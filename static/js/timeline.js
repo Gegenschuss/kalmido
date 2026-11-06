@@ -132,7 +132,10 @@ function viewTimeline(listId, inCal) {
   // 2.7.1 (#410): milestones of project lists as markers in the list's row (a list with only milestones in range shows too)
   const msIn = l => !l.is_inbox && (!listId || l.id === listId) ? (l.milestones || []).filter(m => m.day >= start && m.day <= end) : [];
   // 2.18.0 (#431): the list of a list timeline always has its group (an empty project can be planned right here)
-  const groups = S.lists.filter(l => dated.some(t => t.list_id === l.id) || und.some(t => t.list_id === l.id) || listId === l.id).map(l => ({l, ts: dated.filter(t => t.list_id === l.id).sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: und.filter(t => t.list_id === l.id)}));
+  // 2.579.0 (#4199): the tasks per list in one pass (was a scan of the tasks per list)
+  const byL = (ts, m = new Map()) => { for (const t of ts) { const a = m.get(t.list_id); if (a) a.push(t); else m.set(t.list_id, [t]); } return m; };
+  const dL = byL(dated), uL = byL(und);
+  const groups = S.lists.filter(l => dL.has(l.id) || uL.has(l.id) || listId === l.id).map(l => ({l, ts: (dL.get(l.id) || []).slice().sort((a, b) => (a.start || a.due).localeCompare(b.start || b.due) || bySort(a, b)), nd: (uL.get(l.id) || []).slice()}));
   let head = '', months = '', lastM = '';
   for (let i = 0; i < ND; i++) {
     const d = addDays(start, i), dd = pd(d), wk = dd.getDay() === 0 || dd.getDay() === 6;

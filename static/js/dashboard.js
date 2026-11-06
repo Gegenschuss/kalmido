@@ -399,9 +399,11 @@ function dashCard(k) {
       ps = all.filter(l => !act || !['complete', 'on_hold'].includes(l.status));
     if (!all.length) return '';
     if (!ps.length) return slim(tr('Active projects: nothing'));
-    const prog = l => { const a = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id); return a.length ? a.filter(t => t.status === 2).length / a.length : 0; };
+    // 2.579.0 (#4199): the top-level tasks per list counted once (was a scan of every task per list and per comparison of the sort)
+    const pn = new Map(); for (const t of S.tasks.values()) if (!t.parent_id) { const x = pn.get(t.list_id) || pn.set(t.list_id, {n: 0, dn: 0}).get(t.list_id); x.n++; if (t.status === 2) x.dn++; }
+    const prog = l => { const x = pn.get(l.id); return x ? x.dn / x.n : 0; };
     if (srt === 'name') ps.sort((a, b) => lname(a).localeCompare(lname(b), LOCALE())); else if (srt === 'progress') ps.sort((a, b) => prog(b) - prog(a));
-    return card(`<ul class="dpl">${ps.slice(0, lyo_get('home', 'projects', 'n', 5)).map(l => { const all = [...S.tasks.values()].filter(t => t.list_id === l.id && !t.parent_id), dn = all.filter(t => t.status === 2).length, pc = all.length ? Math.round(dn / all.length * 100) : 0;
+    return card(`<ul class="dpl">${ps.slice(0, lyo_get('home', 'projects', 'n', 5)).map(l => { const pc = Math.round(prog(l) * 100);
       return `<li><a href="#l/${l.id}"><span class="dpn">${esc(lname(l))}</span><span class="dpb" role="img" aria-label="${esc(tr('{0} % done', pc))}"><i style="width:${pc}%"></i></span><span class="dpp">${pc} %</span></a></li>`; }).join('')}</ul>${overviewOn() ? `<a class="linkbtn hpall" href="#overview">${tr('All projects')}</a>` : ''}`, '', ps.length, act ? tr('Active projects') : tr('Projects'));
   }
   if (k === 'pinned') {

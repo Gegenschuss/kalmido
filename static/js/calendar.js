@@ -9,10 +9,12 @@ function viewKanban() {
   const secs = S.sections.filter(s => s.list_id === lid), ro = !canEditList(lid);
   const tasks = sortTasks(openTasks().filter(t => (t.list_id === lid || ml_in(t, lid)) && !t.parent_id && sprKeep(t, k)));  // 2.60.0 (#343): the sprint filter; 2.71.0 B (#1459): + linked tasks
   const cols = [], sc = t => ml_sec(t, lid);  // (a linked task in the column of its link)
-  const loose = tasks.filter(t => !sc(t) || !secs.some(s => s.id === sc(t)));
+  // 2.579.0 (#4199): the columns in one pass over the tasks (was a scan of the sections per task and of the tasks per section)
+  const bySec = new Map(secs.map(s => [s.id, []])), loose = [];
+  for (const t of tasks) (bySec.get(sc(t)) || loose).push(t);
   // 2.445.0 (#3011): the first column is always "Tasks" (it was "Unassigned" next to sections)
   if (loose.length || !secs.length) cols.push({id: null, name: tr('Tasks'), tasks: loose});
-  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: tasks.filter(t => sc(t) === s.id)});
+  for (const s of secs) cols.push({id: s.id, name: s.name, tasks: bySec.get(s.id)});
   // 2.138.0 D (#2060): the column parts are shared with the board in swimlanes (swimlanes.js); a lane's "+ Task" carries its key
   const head = c => `<div class="khead" ${c.id ? `data-ksec="${c.id}"` : ''}>${c.id && !ro ? secHandle(c.id) : ''}${esc(c.name)} ${wip_kHead(c)}${spt_kSum(c, lid)}${c.id && !ro ? `<button class="iconbtn" data-act="section-menu" data-id="${c.id}" title="${esc(tr('More') + ': ' + c.name)}" aria-label="${esc(tr('More') + ': ' + c.name)}">${ic('dots', 's')}</button>` : ''}</div>`;
   const add = (c, sw, swn) => ro ? '' : `<div class="kadd"><input placeholder="${tr('+ Task')}" aria-label="${esc(tr('New task in {0}', sw == null ? c.name : c.name + ' · ' + swn))}" data-kadd="${c.id ?? ''}"${sw == null ? '' : ` data-swl="${esc(sw)}"`} enterkeyhint="done"></div>`;

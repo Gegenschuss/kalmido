@@ -219,8 +219,20 @@ const fieldsAll = lid => (S.fields || []).filter(f => f.list_id === lid).sort((a
 // 2.39.1 (#1217): custom fields in every list (plain lists too); time tracking and dependencies stay project-only
 const fieldsOf = lid => !fieldsOn() ? [] : td_rc('fo' + lid, () => (S.fields || []).filter(f => f.list_id === lid).sort((a, b) => a.sort - b.sort || a.id - b.id));  // 2.40.0 (#1430): once per render
 const fieldById = id => (S.fields || []).find(f => f.id === id);
-const inbox = () => S.lists.find(l => l.is_inbox);
-const listById = id => S.lists.find(l => l.id === id);
+const inbox = () => td_rc('inbox', () => S.lists.find(l => l.is_inbox));  // 2.579.0 (#4199): once per draw (it runs per task in counts)
+// 2.579.0 (#4199): a lookup through a map instead of a scan (it runs several times per task and draw). S.lists is replaced, pushed
+// to, spliced and its entries swapped in many places: the map is built again when the array or its length changed, and a hit
+// counts only when the entry at its place still carries that id (else built again); an id not in the map is looked up the old way
+let _lbx = {a: null, n: -1, m: new Map()};
+function listById(id) {
+  const a = S.lists; if (!a) return undefined;
+  if (_lbx.a !== a || _lbx.n !== a.length) { const m = new Map(); a.forEach((l, i) => { if (l && !m.has(l.id)) m.set(l.id, i); }); _lbx = {a, n: a.length, m}; }  // the first one with an id, as find
+  const i = _lbx.m.get(id);
+  if (i !== undefined) { const l = a[i]; if (l && l.id === id) return l; }
+  const l = a.find(x => x.id === id);
+  if (l || i !== undefined) _lbx.a = null;  // the map is out of date (an entry swapped or moved): built again on the next lookup
+  return l;
+}
 // sharing: role of the logged-in user in a list. 1.10.0: owner | admin | edit ("Member") | participant | view ("Viewer").
 // admin / edit change the whole list; a participant sees and changes only the tasks assigned to them (the server sends
 // no others) and may add tasks there; the parents of their subtasks come as read-only context (t.context).
@@ -344,7 +356,7 @@ const bySort = (a, b) => ((a.also || b.also) ? ml_sortOf(a, ml_viewList()) - ml_
 const archivedTask = t => !!t && !!listById(t.list_id)?.archived;
 const archHidden = t => archivedTask(t) && !(S.route.mod === 'tasks' && S.route.key === 'l:' + t.list_id);
 // ctx: include the read-only context parents of a participant's subtasks (only the list view shows them, above their subtask)
-function openTasks(ctx = false) { return [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && !ovHidden(t) && (ctx || !t.context)); }  // 2.28.0 (#935): + the workspace
+function openTasks(ctx = false) { return td_rc(ctx ? 'ot1' : 'ot0', () => [...S.tasks.values()].filter(t => t.status === 0 && !archHidden(t) && !wsHidden(t) && !ovHidden(t) && (ctx || !t.context))).slice(); }  // 2.28.0 (#935): + the workspace; 2.579.0 (#4199): once per draw (td_rc), a copy for the caller
 
 // ------------------------------------------------------------------ api + offline outbox
 // While offline, task/habit writes are applied locally and queued (localStorage outbox); on reconnect

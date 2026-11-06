@@ -115,9 +115,10 @@ S.ov = {only: LS.get('ovOnly', false)};
 const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l) && (l.status === 'at_risk' || l.status === 'off_track'));
 const ovProblems = () => statusOn() ? riskLists().length : 0;
 function ovRows() {
-  const open = openTasks(), t0 = today();
+  const open = openTasks(), t0 = today(), byL = new Map();
+  for (const t of open) { const a = byL.get(t.list_id); if (a) a.push(t); else byL.set(t.list_id, [t]); }  // 2.579.0 (#4199): grouped once, not scanned per list
   return S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)).map(l => {  // 2.352.0 B (#2752): tracked projects; 2.380.2 (#3407): only the shown workspace
-    const ts = open.filter(t => t.list_id === l.id);
+    const ts = byL.get(l.id) || [];
     const overdue = ts.filter(t => t.due && t.due < t0).sort((a, b) => a.due.localeCompare(b.due));
     const blocked = depsOn() ? ts.filter(t => t.blocked) : [];
     const unassigned = collab() && l.shared ? ts.filter(t => !t.parent_id && !t.assignee_id) : [];

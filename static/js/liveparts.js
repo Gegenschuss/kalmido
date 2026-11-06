@@ -156,7 +156,7 @@ async function lpDelta(v, ch, n, since) {
   S.v = Math.max(S.v, j.v);
   lpCacheSoon();
   if (!changed.size) {
-    if (wside && !follow && lpSideCnt() + lpSideSig() !== side) { renderSide(); renderTop(); renderTabs(); badgeSync(); }  // lpFollow draws itself
+    if (wside && !follow) td_rcRun(() => { if (lpSideCnt() + lpSideSig() !== side) { renderSide(); renderTop(); renderTabs(); badgeSync(); } });  // lpFollow draws itself; 2.579.0 (#4199): one counting for the check and the draw
     return true;
   }
   if (S.extra) await loadExtra().catch(() => {});
@@ -166,7 +166,7 @@ async function lpDelta(v, ch, n, since) {
     if (S.dp.id === sel) loadDeps(sel);
   }
   if (lpBusy()) { S.viewStale = true; return true; }  // unsaved input: drawn once it is saved or dropped
-  if (lpSideCnt() + (wside ? lpSideSig() : '') !== side) { renderSide(); renderTop(); renderTabs(); badgeSync(); }
+  td_rcRun(() => { if (lpSideCnt() + (wside ? lpSideSig() : '') !== side) { renderSide(); renderTop(); renderTabs(); badgeSync(); } });  // 2.579.0 (#4199): one counting for the check and the draw
   if (!LP_KEEP.has(S.route.mod) && !LP_NOTASKS.has(S.route.mod)) lpMorphView();
   if (sel && changed.has(sel)) {
     if (S.tasks.has(sel)) { if (!$('#detail')?.contains(document.activeElement)) renderDetail(); }
