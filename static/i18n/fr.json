@@ -6251,7 +6251,6 @@
   "{0} / {1} characters": "{0} / {1} caractères",
   "Changed in the meantime": "Modifié entre-temps",
   "Someone else saved this document in the meantime. Your last change was not saved; reload to see the current version.": "Quelqu'un d'autre a enregistré ce document entre-temps. Ta dernière modification n'a pas été enregistrée ; recharge pour voir la version actuelle.",
-  "Reload shows the saved version; your input here is not saved.": "« Recharger » affiche la version enregistrée ; ta saisie ici n’est pas enregistrée.",
   "Someone saved a newer version while you were writing.": "Quelqu’un a enregistré une version plus récente pendant que tu écrivais.",
   "Save mine anyway": "Enregistrer la mienne quand même",
   "Playbook saved": "Playbook enregistré",
