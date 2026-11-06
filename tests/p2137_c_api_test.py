@@ -367,9 +367,9 @@ dbx("INSERT INTO nl_members(seg_id,org_id,email,remote_ref,state,synced_at) VALU
 dbx("INSERT INTO nl_runs(conn_id,org_id,kind,state,started_at,counts) VALUES(?,?,?,?,?,?)", (NC, ORG, "manual", "done", NOW, '{"added": 1}'))
 # harmless settings of the organisation
 dbx("UPDATE orgs SET color=?, hub_leave_approval=1 WHERE id=?", ("#336699", ORG))
-# 2.575.0 (#3778): module cards of the organisation (the default card with a module this server does not know, one for bob and dora)
+# 2.575.0 (#3778): module cards of the organisation (the default card, one for bob and dora with an icon this server does not know)
 MC2 = [dbx("INSERT INTO module_cards(org_id,name,icon,mods,known,dflt,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?) RETURNING id",
-           (ORG, n, i, m, k, d, NOW, NOW))[0][0] for n, i, m, k, d in (("Team", "users", "cal,wiki,nope", "cal,wiki", 1), ("Bob", "bad icon!", "sheets", "cal", 0))][1]
+           (ORG, n, i, m, k, d, NOW, NOW))[0][0] for n, i, m, k, d in (("Team", "users", "cal,wiki", "cal,wiki", 1), ("Bob", "bad icon!", "sheets", "cal", 0))][1]
 dbx("INSERT INTO module_card_people(card_id,user_id) VALUES(?,?),(?,?)", (MC2, BOB, MC2, DORA))
 # 2.137.1 (#2399): ids inside the history data (bob ticked, dora not; an id of a row that does not come along)
 dbx("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)",
@@ -472,7 +472,7 @@ hl = [json.loads(d) if isinstance(d, str) else d for (d,) in T("SELECT data FROM
 check(hl == [{"to": BOB, "from_name": "Dora", "to_name": "Bob"}], f"list history: dora dropped, bob mapped {hl}")
 # the organisation's settings (empty target)
 check(T("SELECT color, hub_leave_approval FROM orgs WHERE id=?", (ORG3,)) == [("#336699", 1)], "harmless settings came along")
-# 2.575.0 (#3778): the module cards (an unknown module and a bad icon dropped), their people: bob ticked, dora not
+# 2.575.0 (#3778): the module cards (a bad icon becomes the default one), their people: bob ticked, dora not
 mcs = T("SELECT name, icon, mods, known, dflt, user_id FROM module_cards WHERE org_id=? ORDER BY id", (ORG3,))
 check(mcs == [("Team", "users", "cal,wiki", "cal,wiki", 1, None), ("Bob", "grid", "sheets", "cal", 0, None)], f"module cards came along {mcs}")
 mcp = T("SELECT p.user_id FROM module_card_people p JOIN module_cards k ON k.id=p.card_id WHERE k.org_id=?", (ORG3,))
