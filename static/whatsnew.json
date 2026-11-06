@@ -1,6 +1,20 @@
 {
  "versions": [
   {
+   "version": "2.601.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "Sicherungen findest du jetzt unter Einstellungen → Server → Sicherung.",
+     "en": "Backups now live under Settings → Server → Backup."
+    },
+    {
+     "de": "Der Aufgaben-Bereich in Listen lässt sich bis an die Liste heran breiter ziehen.",
+     "en": "The task panel in lists can be dragged wider, right up to the list."
+    }
+   ]
+  },
+  {
    "version": "2.596.0",
    "date": "2026-11-06",
    "items": [

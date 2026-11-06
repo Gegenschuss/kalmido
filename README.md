@@ -19,10 +19,10 @@
 
 ## What's new
 
-**2.596.0** (2026-11-06):
-- **Tasks**: My tasks gets personal sections (Now / Soon / Someday, your own), due tasks move to Now.
-- **Kalmido AI**: team server agents of an organisation with a limit per member.
-- **Moving**: an account import can be undone for 30 days.
+**2.601.0** (2026-11-06):
+- **Settings**: backups, off-site backup and the storage check moved to Settings > Server > Backup.
+- **Agents**: reading time entries needs the `time` scope; sorting proposals never expose health or budget content.
+- **Tasks**: the task panel in lists can be dragged wider.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
@@ -159,7 +159,7 @@ start in `./secret/kalmido.key` (mode 0600) and keeps using it; a key in `.env` 
 and the organisation data, and it is deliberately **not** in `./data`, so a backup never carries the key next to the
 data it protects: keep a copy of the file somewhere safe (a password manager). Without any key, *Settings > Server >
 Server* shows a warning. A new server makes an **automatic backup every day** (03:30, 14 daily and 8 weekly kept, in
-`./data/backups`; *Settings > Organisation > Data > Backups*); copy that folder to another disk too. The backup page warns when the
+`./data/backups`; *Settings > Server > Backup*); copy that folder to another disk too. The backup page warns when the
 disk has room for fewer than three more archives; set a passphrase (see `docs/SELF-HOSTING.md`, "Disk space and passphrase").
 
 The server remembers the fingerprint of its key: a different key than before does not start (`KALMIDO_SECRET_KEY_CHANGED=1` for a wanted change, then rewrap; see docs/SELF-HOSTING.md).
@@ -279,7 +279,7 @@ for good with `KALMIDO_UPDATE_CHECK=0` in `.env`. The update check uses api.gith
 
 ## Backups and restore
 
-*Settings > Organisation > Data > Backups* (admins):
+*Settings > Server > Backup* (admins):
 
 - **Automatic backups:** once a day at a set time (default 03:30) Kalmido writes one archive into `data/backups/`
   (`KALMIDO_BACKUP_DIR`): `kalmido-backup-<date>-<time>-auto.zip` with `kalmido.dump` (a consistent `pg_dump` made while Kalmido
