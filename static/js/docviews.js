@@ -91,7 +91,7 @@ function dcv_barHtml() {
 // ---- writes (the core's routes: version check, history, trash with undo)
 async function dcv_save() {
   const name = await askDialog({title: tr('Save view'), body: tr('Keeps the search, the filters and the sort under a name. It shows in the sidebar under Documents.'),
-    input: {value: '', placeholder: tr('Name of the view'), max: 120}, ok: tr('Save')});
+    input: {value: '', placeholder: tr('Name of the view'), max: 120}, ok: tr('Save'), cancel: undefined, after: undefined});
   if (!name || !name.trim()) return;
   const ws = typeof wsCur === 'function' ? wsCur() : 'all';
   let v; try { v = await api('POST', '/api/obj/docview', {title: name.trim(), query: dcv_queryNow(), ws}); } catch { return; }
@@ -109,7 +109,7 @@ async function dcv_patch(v, b, label) {
   return r;
 }
 async function dcv_rename(v) {
-  const name = await askDialog({title: tr('Rename view'), input: {value: v.title, placeholder: tr('Name of the view'), max: 120}, ok: tr('Rename')});
+  const name = await askDialog({title: tr('Rename view'), input: {value: v.title, placeholder: tr('Name of the view'), max: 120}, ok: tr('Rename'), cancel: undefined, after: undefined});
   if (!name || !name.trim() || name.trim() === v.title) return;
   dcv_patch(v, {title: name.trim()}, tr('View renamed'));
 }
@@ -171,7 +171,7 @@ function dcv_todayParts() {
 }
 
 document.addEventListener('click', e => {
-  const t = e.target.closest?.('[data-dcv]'); if (!t) return;
+  const t = /** @type {any} */ (e.target).closest?.('[data-dcv]'); if (!t) return;
   e.preventDefault();
   const a = t.dataset.dcv, v = dcv_get(t.dataset.dcvid);
   if (a === 'save') dcv_save();
@@ -180,7 +180,7 @@ document.addEventListener('click', e => {
 });
 // right-click / long press on a view's row in the sidebar: its menu (sidebar rows of other kinds keep theirs)
 document.addEventListener('contextmenu', e => {
-  const t = e.target.closest?.('#side [data-sbbpart="docs-view"]'); if (!t) return;
+  const t = /** @type {any} */ (e.target).closest?.('#side [data-sbbpart="docs-view"]'); if (!t) return;
   const v = dcv_get(t.dataset.dcvid); if (!v) return;
   e.preventDefault(); e.stopPropagation();
   menu(t, dcv_menuItems(v));
