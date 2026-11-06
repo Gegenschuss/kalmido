@@ -682,8 +682,8 @@ city, region, country, pobox?, ext?, type?}]`; `bday` / `anniversary`: `YYYY-MM-
 `photo`: `data:image/jpeg;base64,...` (JPEG, PNG, GIF, WebP).
 2.55.0 (#1455): every contact carries `newsletter`: `{status: ""|yes|pending|unsub|bounce, at, source}` -- the
 newsletter consent, read only here (people change it in the app; unsub / bounce come from the newsletter service).
-2.577.0 (#4708): every contact (and every event, `## Events`) carries `updated_by`: the account that changed it last (a
-person or an agent account; the app, the API, CardDAV / CalDAV and the bulk changes write it; `null` before 2.577).
+2.571.0 (#4776): every contact (and every event, `## Events`) carries `updated_by`: the account that changed it last (a
+person or an agent account; the app, the API, CardDAV / CalDAV and the bulk changes write it; `null` before 2.571).
 2.141.0 (#2143): the web app imports consent proof from a CSV (E-mail, Date, Source): `POST /api/newsletter/consent/import`
 `{ws, csv, filename?, apply?}` -- a preview first (`apply` false), then `apply` true; contacts already consented, unsubscribed or
 bounced stay as they are, unknown addresses are counted, none is created. Web app only (not an agent route).
