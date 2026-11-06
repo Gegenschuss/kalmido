@@ -14,6 +14,11 @@ freelancer-matrix: sheets
    conditionalFormatting (OOXML order: sheetData, mergeCells, conditionalFormatting, dataValidations); the import of that
    file gives the same formats, merges and rules again
  - a copied sheet (POST …/tabs copy_of) keeps formats and rules on its own columns
+ - review fixes (Fable 2, G1-G8): formatted empty cells / merged blocks of an imported file count against the table's cap (the
+   rest is left out and reported); a format on a missing cell counts as a new cell; overlapping merged blocks are refused /
+   end inside a new block / are left out of an import and its export; lists as rule ids / columns: 400; huge row numbers in a
+   file are skipped; a changed input skips its entry's format too; a rule whose rows are in the trash is not exported; one
+   broken rule of a file drops only itself
 All as a person without an organisation (frida) with her personal agent; alice (the admin) as the other person.
 usage: p2578_c_fmt_test.py <datadir>"""
 import io
@@ -31,7 +36,8 @@ from freelancer_fixture import freelancer  # noqa: E402
 from kt import B, FAILS, OKS, check  # noqa: E402
 
 V = B + "/api/v1"
-kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces"}, prefix="P2578C")
+# 2.578.0 (#3462, review G1 / G2): a small cap of cells per table, so the fixes show with a few hundred cells
+kt.fresh(env={"KALMIDO_INSTANCE_MODE": "workspaces", "KALMIDO_SHEET_CELLS_MAX": "300"}, prefix="P2578C")
 A = kt.setup()
 A.patch(B + "/api/settings", json={"lang": "en", "features": "cal,comments,collab,sheets", "tour": "done"})
 FID, Fr = freelancer(B, A)
@@ -228,6 +234,110 @@ if rr:
     check(r.ok and len(r.json().get("rules") or []) == 2, "a rule whose row is gone drops out, the others stay " + r.text[:200])
     r = Fr.put(B + f"/api/sheets/{CP['id']}/rules", json={"rules": [{**rr, "id": "new1"}]})
     check(r.status_code == 400, "a new rule on a row in the trash: 400")
+
+
+# ================================================================== review fixes (Fable 2: G1-G8)
+def rezip(content, fn):
+    """The .xlsx with its first sheet's XML changed by fn."""
+    zi, out = zipfile.ZipFile(io.BytesIO(content)), io.BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zo:
+        for n in zi.namelist():
+            data = zi.read(n)
+            if n == "xl/worksheets/sheet1.xml":
+                data = fn(data.decode()).encode()
+            zo.writestr(n, data)
+    return out.getvalue()
+
+
+def imp(content, title):
+    return Fr.post(B + "/api/sheets/import", data={"space": "private", "title": title}, files={"file": (title + ".xlsx", content)})
+
+
+# a table of 40 rows x 10 columns, one filled cell per row (from a CSV)
+csv_ = "h1;h2;h3;h4;h5;h6;h7;h8;h9;h10\n" + "".join(f"x{i};;;;;;;;;\n" for i in range(40))
+r = Fr.post(B + "/api/sheets/import", data={"space": "private", "title": "Grid"}, files={"file": ("grid.csv", csv_.encode())})
+check(r.status_code == 201, "a 40 x 10 table " + r.text[:200])
+GID = r.json()["sheet"]["id"]
+G = get(GID)
+check(len(G["rows"]) == 40 and len(G["columns"]) == 10, "40 rows, 10 columns")
+# G2: 360 formats on missing cells (40 stored + 360 > 300): refused like inputs, nothing stored
+r = put(GID, [{"cell": f"{L}{n}", "fmt": {"fill": "g3"}} for L in "BCDEFGHIJ" for n in range(1, 41)])
+check(r.status_code == 400 and "full" in r.text, "G2: formats on missing cells count against the table's cap " + str(r.status_code) + r.text[:120])
+check(len(get(GID)["cells"]) == 40, "G2: no cell made")
+# G6: an input changed in the meantime skips the whole entry, its format too
+r = put(GID, [{"cell": "A1", "raw": "y", "prev": "not x0", "fmt": {"bold": True}}])
+d = get(GID)
+check(r.ok and (r.json().get("conflicts") or []) and cell(d, "A1").get("fmt") is None and cell(d, "A1")["raw"] == "x0",
+      "G6: prev no longer fits: neither input nor format " + r.text[:200])
+# G3: overlapping merged blocks
+check(put(GID, [{"cell": "A1", "fmt": {"merge": [2, 2]}}]).ok, "G3: block A1:B2")
+r = put(GID, [{"cell": "B2", "fmt": {"merge": [2, 2]}}])
+check(r.status_code == 400 and cell(get(GID), "B2").get("fmt") is None, "G3: B2:C3 reaches into A1:B2: 400, nothing changed " + str(r.status_code))
+r = put(GID, [{"cell": "C1", "fmt": {"merge": [1, 2]}}])
+check(r.ok, "G3: a block beside it is fine " + r.text[:120])
+check(put(GID, [{"cell": "A4", "fmt": {"merge": [1, 2], "bold": True}}]).ok, "G3: block A4:B4")
+r = put(GID, [{"cell": "C1", "fmt": None}, {"cell": "A1", "fmt": {"merge": [4, 4]}}])
+d = get(GID)
+check(r.ok and cell(d, "A1").get("fmt") == {"merge": [4, 4]} and cell(d, "A4").get("fmt") == {"bold": True},
+      "G3: a block lying inside a new one ends (its other format stays) " + str(cell(d, "A4").get("fmt")) + r.text[:120])
+# G4: lists as rule ids / columns: 400 instead of 500
+for bad, what in (({"id": [1], "cols": [G["columns"][0]["id"]], "op": "empty", "fill": "a"}, "a list as id"),
+                  ({"cols": [[5]], "op": "empty", "fill": "a"}, "a list as column"),
+                  ({"cols": [G["columns"][0]["id"]], "rows": [{"a": 1}, [2]], "op": "empty", "fill": "a"}, "lists as rows")):
+    r = Fr.put(B + f"/api/sheets/{GID}/rules", json={"rules": [bad]})
+    ok_ = r.status_code < 500 if what == "a list as id" else r.status_code == 400  # a list as id: a new id is given
+    check(ok_, f"G4: {what}: no 500 " + str(r.status_code))
+
+# a small table to export: A1 bold, a rule on two rows, a rule on a whole column
+r = Fr.post(B + "/api/sheets", json={"title": "Caps", "space": "private"})
+CA = r.json()
+CID, CC, CR = CA["id"], [c["id"] for c in CA["columns"]], [x["id"] for x in CA["rows"]]
+put(CID, [{"cell": f"{L}{n}", "raw": "x"} for L in "ABC" for n in range(1, 5)] + [{"cell": "A1", "fmt": {"bold": True}}])
+r = Fr.put(B + f"/api/sheets/{CID}/rules", json={"rules": [{"cols": [CC[1]], "op": "empty", "fill": "a"},
+                                                             {"cols": [CC[0]], "rows": [CR[0], CR[1]], "op": "contains", "a": "x", "color": "g1"}]})
+check(r.ok, "Caps: two rules " + r.text[:200])
+E1 = Fr.get(B + f"/api/sheets/{CID}/export.xlsx").content
+s_bold = re.search(r'<c r="A2" s="(\d+)"', zipfile.ZipFile(io.BytesIO(E1)).read("xl/worksheets/sheet1.xml").decode()).group(1)
+# G1: 420 formatted empty cells in a file (a cap of 300 per table): imported up to the cap, the rest reported
+many = "".join(f'<row r="{n}">' + "".join(f'<c r="{L}{n}" s="{s_bold}"><v></v></c>' for L in "ABC") + "</row>" for n in range(20, 160))
+many += '<row r="160"><c r="A160" t="inlineStr"><is><t>end</t></is></c></row>'  # a value at the end keeps the rows
+r = imp(rezip(E1, lambda x: x.replace("</sheetData>", many + "</sheetData>")), "Many")
+check(r.status_code == 201, "G1: the file imports " + r.text[:200])
+if r.status_code == 201:
+    rep_ = r.json()["report"]
+    n = len(get(r.json()["sheet"]["id"])["cells"])
+    check(n <= 300 and rep_.get("fmt_left_out", 0) >= 100, f"G1: formatted empty cells count against the cap ({n} cells, {rep_})")
+    check(any("left out" in m for m in r.json().get("messages") or []), "G1: the message names the left-out formats " + str(r.json().get("messages")))
+# G3: overlapping blocks in a file: the first one wins, the export has no overlap
+mc = '<mergeCells count="2"><mergeCell ref="A2:B3"/><mergeCell ref="B3:C4"/></mergeCells>'
+r = imp(rezip(E1, lambda x: x.replace("</sheetData>", "</sheetData>" + mc)), "Overlap")
+check(r.status_code == 201, "G3: the file with overlapping blocks imports " + r.text[:200])
+if r.status_code == 201:
+    OV = get(r.json()["sheet"]["id"])
+    ms = sorted((x["addr"], (x.get("fmt") or {}).get("merge")) for x in OV["cells"] if (x.get("fmt") or {}).get("merge"))
+    check(ms == [("A1", [2, 2])], "G3: only the first block of the file " + str(ms))
+    ws2 = zipfile.ZipFile(io.BytesIO(Fr.get(B + f"/api/sheets/{OV['id']}/export.xlsx").content)).read("xl/worksheets/sheet1.xml").decode()
+    check(re.findall(r'<mergeCell ref="([^"]+)"', ws2) == ["A2:B3"], "G3: the export has one block " + ws2[ws2.find("<mergeCells"):][:160])
+# G5: huge row numbers in a merge / a rule's range are skipped, the file still imports
+huge = "1" * 5000
+bad = (f'</sheetData><mergeCells count="1"><mergeCell ref="A2:B{huge}"/></mergeCells>'
+       f'<conditionalFormatting sqref="C2:C{huge}"><cfRule type="containsBlanks" dxfId="0" priority="9"><formula>LEN(TRIM(C2))=0</formula></cfRule></conditionalFormatting>')
+r = imp(rezip(E1, lambda x: x.replace("</sheetData>", bad, 1)), "Huge")
+check(r.status_code == 201, "G5: a file with huge row numbers imports " + str(r.status_code) + r.text[:160])
+# G8: one broken rule of a file (its text over 200 characters) drops only itself
+long_ = "z" * 250
+br = (f'<conditionalFormatting sqref="B2:B3"><cfRule type="containsText" dxfId="0" priority="9" operator="containsText" text="{long_}">'
+      f'<formula>NOT(ISERROR(SEARCH("{long_}",B2)))</formula></cfRule></conditionalFormatting>')
+r = imp(rezip(E1, lambda x: x.replace("<conditionalFormatting", br + "<conditionalFormatting", 1)), "Rules")
+check(r.status_code == 201, "G8: the file imports " + r.text[:200])
+if r.status_code == 201:
+    ops = sorted(x["op"] for x in get(r.json()["sheet"]["id"]).get("rules") or [])
+    check(ops == ["contains", "empty"] and r.json()["report"].get("rules_left_out") == 1,
+          "G8: the two good rules stay, the broken one is counted " + str(ops) + str(r.json()["report"]))
+# G7: a rule whose rows went to the trash is not in the export (the client colours nothing either)
+Fr.delete(B + f"/api/sheets/{CID}/rows/{CR[0]}")
+ws3 = zipfile.ZipFile(io.BytesIO(Fr.get(B + f"/api/sheets/{CID}/export.xlsx").content)).read("xl/worksheets/sheet1.xml").decode()
+check('type="containsBlanks"' in ws3 and 'type="containsText"' not in ws3, "G7: the rule on trashed rows is left out of the file " + ws3[ws3.find("<conditionalFormatting"):][:200])
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

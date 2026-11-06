@@ -26,14 +26,15 @@ from flask import jsonify
 from ..core.access import need_feat
 from ..core.config import app
 from ..core.conflict import Conflict, need_version
-from ..core.db import body, db, insert_id
+from ..core.db import body, db, insert_id, iso_ms, now_utc
 from ..core.errors import BadInput, UnknownFields
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
 from ..api.common import v1_json, v1_view
-from .core import sh_change, sh_need, sh_reload, sh_touch
+from .core import SH_BOOK_CELLS_MAX, sh_change, sh_need, sh_reload, sh_touch
 from .formula import sh_col_letter
+from .shbook import shb_cell_stats
 from .shhist import shh_meta
 
 SHFM_PALETTE = ("a", "a2", "g1", "g2", "g3")  # accent, light accent, dark / middle / light grey (static/js/sheetfmt.js SHFM_PAL)
@@ -144,6 +145,7 @@ def shfm_write(c, sheet_row, book, d, rid, cid, uid, ts, agent_id, batch, confli
             return None
     if new == old:
         return None
+    _shfm_merge_room(c, sheet_row, book, rid, cid, new, uid, ts, agent_id, batch)  # 2.578.0 (#3462, review G3)
     if x:
         c.execute("UPDATE sheet_cells SET fmt=? WHERE id=?", (new, x["id"]))
         x["fmt"] = new
@@ -152,12 +154,64 @@ def shfm_write(c, sheet_row, book, d, rid, cid, uid, ts, agent_id, batch, confli
         xid = insert_id(c, "INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,fmt,updated_by,updated_at) VALUES(?,?,?,'',?,?,?)",
                         (sheet_row["id"], rid, cid, new, uid, ts))
         book._add(dict(c.execute("SELECT * FROM sheet_cells WHERE id=?", (xid,)).fetchone()))
+    if getattr(book, "_shfm_mb", None) is not None:  # 2.578.0 (review G3): the merged blocks of this call stay right
+        if (shfm_load(new) or {}).get("merge"):
+            book._shfm_mb[(rid, cid)] = book.at[(rid, cid)]
+        else:
+            book._shfm_mb.pop((rid, cid), None)
     sh_change(c, sheet_row["id"], batch, agent_id, "fmt", cell_id=xid, row_id=rid, col_id=cid, old=old, new=new)
     n = getattr(book, "_shf_hist", 0)
     if n < 50 and not getattr(book, "shh_off", False):  # the history keeps the first 50 cells of one call
         book._shf_hist = n + 1
         shh_meta(c, sheet_row["id"], "format", shfm_text(old), shfm_text(new), uid, cell={"id": xid, "row_id": rid, "col_id": cid})
     return xid
+
+
+def _shfm_block(book, x, f=None):
+    """(first row, first col, last row, last col) of the merged block on cell x (indexes of the live rows / columns, cut to the
+    sheet), None when x is no block or not on a live row / column."""
+    m = (f if f is not None else (shfm_load(x.get("fmt")) or {})).get("merge")
+    ri, ci = book.row_idx.get(x["row_id"]), book.col_idx.get(x["col_id"])
+    if not m or ri is None or ci is None:
+        return None
+    r1, c1 = min(ri + m[0], len(book.rows)) - 1, min(ci + m[1], len(book.cols)) - 1
+    return (ri, ci, r1, c1) if (r1 - ri + 1) * (c1 - ci + 1) > 1 else None
+
+
+def _shfm_merge_room(c, sheet_row, book, rid, cid, new, uid, ts, agent_id, batch):
+    """2.578.0 (#3462, review G3): a new merged block on (rid, cid): blocks lying wholly inside it end (their merge goes, in the
+    same batch / history as the call); a block that reaches into it from outside (or covers its top left cell) -> 400, so
+    blocks never overlap (an overlapping mergeCells makes Excel repair the file)."""
+    me_ = _shfm_block(book, {"row_id": rid, "col_id": cid}, shfm_load(new) or {})
+    if not me_:
+        return
+    r0, c0, r1, c1 = me_
+    inner = []
+    for k, y in list(_shfm_blocks(book).items()):
+        if k == (rid, cid):
+            continue
+        b = _shfm_block(book, y)
+        if not b or b[0] > r1 or b[2] < r0 or b[1] > c1 or b[3] < c0:
+            continue  # no block / apart
+        if not (r0 <= b[0] and b[2] <= r1 and c0 <= b[1] and b[3] <= c1):
+            raise BadInput(tr("These cells overlap another merged block"))
+        inner.append(y)
+    for y in inner:
+        f = dict(shfm_load(y.get("fmt")) or {})
+        f.pop("merge", None)
+        raw, was = shfm_clean(f), y.get("fmt") or ""
+        c.execute("UPDATE sheet_cells SET fmt=? WHERE id=?", (raw, y["id"]))
+        y["fmt"] = raw
+        _shfm_blocks(book).pop((y["row_id"], y["col_id"]), None)
+        sh_change(c, sheet_row["id"], batch, agent_id, "fmt", cell_id=y["id"], row_id=y["row_id"], col_id=y["col_id"], old=was, new=raw)
+
+
+def _shfm_blocks(book):
+    """The cells of the book carrying a merge {(row id, col id): cell}, worked out once per call (shfm_write keeps it)."""
+    m = getattr(book, "_shfm_mb", None)
+    if m is None:
+        m = book._shfm_mb = {k: x for k, x in book.at.items() if x.get("fmt") and (shfm_load(x["fmt"]) or {}).get("merge")}
+    return m
 
 
 def shfm_undo(c, ch, uid):
@@ -210,6 +264,10 @@ def _arg(v, what):
     return s
 
 
+def _shfm_id(x):
+    return isinstance(x, int) and not isinstance(x, bool)
+
+
 def shfm_rules_clean(c, sid, v, kept=()):
     """The rules of a request -> the stored list. Columns / rows must be live ones of this sheet. kept = the ids of the rules
     stored before: such a rule whose column / row went to the trash since loses that column (a row: the rule) instead of
@@ -227,14 +285,15 @@ def shfm_rules_clean(c, sid, v, kept=()):
         op = r.get("op")
         if op not in SHFM_OPS:
             raise BadInput(tr("Invalid value: {0}", "op"))
-        cs, rs, old = r.get("cols"), r.get("rows"), r.get("id") in kept
+        # 2.578.0 (#3462, review G4): ids / columns / rows only as numbers (a list as a key: 400, not a 500 of the set lookup)
+        cs, rs, old = r.get("cols"), r.get("rows"), isinstance(r.get("id"), str) and r.get("id") in kept
         if old and isinstance(cs, list):
-            cs = [x for x in cs if not isinstance(x, bool) and x in cols]
-            if not cs or (isinstance(rs, list) and any(x not in rows for x in rs)):
+            cs = [x for x in cs if _shfm_id(x) and x in cols]
+            if not cs or (isinstance(rs, list) and any(not _shfm_id(x) or x not in rows for x in rs)):
                 continue  # its columns / its rows are gone
-        if not isinstance(cs, list) or not cs or len(cs) > 200 or any(isinstance(x, bool) or x not in cols for x in cs):
+        if not isinstance(cs, list) or not cs or len(cs) > 200 or any(not _shfm_id(x) or x not in cols for x in cs):
             raise BadInput(tr("Invalid value: {0}", "cols"))
-        if rs is not None and (not isinstance(rs, list) or len(rs) != 2 or any(isinstance(x, bool) or x not in rows for x in rs)):
+        if rs is not None and (not isinstance(rs, list) or len(rs) != 2 or any(not _shfm_id(x) or x not in rows for x in rs)):
             raise BadInput(tr("Invalid value: {0}", "rows"))
         a, b = _arg(r.get("a"), "a"), _arg(r.get("b"), "b")
         if op in ("gt", "lt", "eq", "contains") and a == "":
@@ -406,16 +465,29 @@ class ShfmXl:
 
 def shfm_xl_merges(book, at, nrows):
     """<mergeCells> of a sheet being written (data rows start at row 2), '' when there are none."""
-    out = []
+    out, hid = [], {}
     ncols = len(book.cols)
-    for (ri, ci), x in at.items():
+    for (ri, ci), x in sorted(at.items(), key=lambda kv: kv[0]):
         m = (shfm_load(x.get("fmt")) or {}).get("merge")
         if not m or ri >= nrows:
             continue
         h, w = min(m[0], nrows - ri), min(m[1], ncols - ci)
         if h * w > 1:
+            if not _shfm_take(hid, ri, ci, h, w):
+                continue  # 2.578.0 (#3462, review G3): overlapping blocks (older data) like the client: the first one wins
             out.append(f'<mergeCell ref="{sh_col_letter(ci)}{ri + 2}:{sh_col_letter(ci + w - 1)}{ri + h + 1}"/>')
     return f'<mergeCells count="{len(out)}">{"".join(sorted(out))}</mergeCells>' if out else ""
+
+
+def _shfm_take(hid, ri, ci, h, w):
+    """2.578.0 (#3462, review G3): True and the block marked as covered in hid ({row: bit mask of its columns}) when it covers
+    no cell of a block taken before; False (nothing marked) when it would overlap one."""
+    bm = ((1 << w) - 1) << ci
+    if any(hid.get(r, 0) & bm for r in range(ri, ri + h)):
+        return False
+    for r in range(ri, ri + h):
+        hid[r] = hid.get(r, 0) | bm
+    return True
 
 
 def _xl_lit(v):
@@ -436,6 +508,8 @@ def shfm_xl_rules(sheet_row, book, dv_end, dxfs, prio):
         rs = r.get("rows")
         if rs and all(x in book.row_idx for x in rs):
             r0, r1 = sorted(book.row_idx[x] + 2 for x in rs)
+        elif rs:
+            continue  # 2.578.0 (#3462, review G7): its rows are in the trash - the client colours nothing, the file neither
         else:
             r0, r1 = 2, dv_end
         sq = " ".join(f"{sh_col_letter(ci)}{r0}:{sh_col_letter(ci)}{r1}" for ci in cis)
@@ -557,7 +631,7 @@ def shfm_xl_read_rules(cfs, dxfs, local, col_index):
         sq = (cf.get("sqref") or "").split()
         spans = []
         for rg in sq:
-            m = re.fullmatch(r"\$?([A-Z]{1,3})\$?(\d+)(?::\$?([A-Z]{1,3})\$?(\d+))?", rg)
+            m = re.fullmatch(r"\$?([A-Z]{1,3})\$?(\d{1,7})(?::\$?([A-Z]{1,3})\$?(\d{1,7}))?", rg)  # 2.578.0 (review G5): no huge numbers
             if m:
                 spans.append((col_index(m.group(1)), int(m.group(2)), col_index(m.group(3) or m.group(1)), int(m.group(4) or m.group(2))))
         if not spans:
@@ -596,8 +670,14 @@ def shfm_xl_read_rules(cfs, dxfs, local, col_index):
     return out[:SHFM_RULES_MAX]
 
 
-def shfm_import_apply(c, sheet, book, grid, hdr, width, uid):
-    """The formats, merges and rules of a read file into the new sheet (sheets/io.py shx_import, after its cells)."""
+def shfm_import_apply(c, sheet, book, grid, hdr, width, uid, report=None):
+    """The formats, merges and rules of a read file into the new sheet (sheets/io.py shx_import, after its cells).
+    2.578.0 (#3462, review G1 / G8): a format on a cell the file left empty (a merged block's top left cell too) makes a new
+    cell: they count against the import's SHX_CELLS_MAX and the table's SH_BOOK_CELLS_MAX (checked before writing), the rest is
+    left out and counted in report["fmt_left_out"]; written in two statements (UPDATE / INSERT lists); a broken colour rule
+    drops only itself (report["rules_left_out"])."""
+    from .io import SHX_CELLS_MAX  # sheets/io.py imports this module
+    report = report if report is not None else {}
     nrows = len(book.rows)
     want = {}
     for ri, r in enumerate(grid.rows[hdr:]):
@@ -607,13 +687,16 @@ def shfm_import_apply(c, sheet, book, grid, hdr, width, uid):
             f = r[ci].get("sty") if isinstance(r[ci], dict) else None
             if f:
                 want[(ri, ci)] = dict(f)
+    hid = {}
     for (r0, c0, r1, c1) in getattr(grid, "merges", []):
         ri, ci = r0 - 1 - hdr, c0
         if ri < 0 or ri >= nrows or ci >= width:
             continue
         h, w = min(r1 - r0 + 1, SHFM_MERGE_MAX[0], nrows - ri), min(c1 - c0 + 1, SHFM_MERGE_MAX[1], width - ci)
-        if h * w > 1:
+        # review G3: a block overlapping an earlier one of the file is left out
+        if h > 0 and w > 0 and h * w > 1 and _shfm_take(hid, ri, ci, h, w):
             want.setdefault((ri, ci), {})["merge"] = [h, w]
+    upd, new = [], []
     for (ri, ci), f in want.items():
         try:
             raw = shfm_clean(f)
@@ -621,9 +704,26 @@ def shfm_import_apply(c, sheet, book, grid, hdr, width, uid):
             continue
         if not raw:
             continue
-        x = book.ensure(book.rows[ri]["id"], book.cols[ci]["id"], uid)
-        c.execute("UPDATE sheet_cells SET fmt=? WHERE id=?", (raw, x["id"]))
-        x["fmt"] = raw
+        rid, cid = book.rows[ri]["id"], book.cols[ci]["id"]
+        x = book.at.get((rid, cid))
+        if x:
+            upd.append((raw, x["id"]))
+            x["fmt"] = raw
+        else:
+            new.append((rid, cid, raw))
+    have, _b = shb_cell_stats(c, sheet["book_id"] or sheet["id"])
+    room = max(0, min(SHX_CELLS_MAX, SH_BOOK_CELLS_MAX - have))
+    left = max(0, len(new) - room) + getattr(grid, "fmt_left_out", 0)
+    new = new[:room]
+    if upd:
+        c.executemany("UPDATE sheet_cells SET fmt=? WHERE id=?", upd)
+    if new:
+        ts = iso_ms(now_utc())
+        c.executemany("INSERT INTO sheet_cells(sheet_id,row_id,col_id,raw,fmt,updated_by,updated_at) VALUES(?,?,?,'',?,?,?) "
+                      "ON CONFLICT (row_id, col_id) DO UPDATE SET fmt=EXCLUDED.fmt",
+                      [(sheet["id"], rid, cid, raw, uid, ts) for rid, cid, raw in new])
+    if left:
+        report["fmt_left_out"] = report.get("fmt_left_out", 0) + left
     rules = []
     for r in getattr(grid, "fmt_rules", []):
         cols = [book.cols[ci]["id"] for ci in r["cols"] if ci < width]
@@ -639,9 +739,13 @@ def shfm_import_apply(c, sheet, book, grid, hdr, width, uid):
         rules.append({"cols": cols, "rows": rows, "op": r["op"], "a": r.get("a", ""), "b": r.get("b", ""),
                       "color": r["color"], "fill": r["fill"]})
     if rules:
-        try:
-            clean = shfm_rules_clean(c, sheet["id"], rules)
-        except BadInput:
-            clean = []
+        clean, bad = [], 0
+        for r in rules:  # one by one: a broken rule drops only itself (review G8)
+            try:
+                clean += shfm_rules_clean(c, sheet["id"], [r])
+            except BadInput:
+                bad += 1
+        if bad:
+            report["rules_left_out"] = report.get("rules_left_out", 0) + bad
         if clean:
             c.execute("UPDATE sheets SET fmt_rules=? WHERE id=?", (json.dumps(clean, separators=(",", ":")), sheet["id"]))

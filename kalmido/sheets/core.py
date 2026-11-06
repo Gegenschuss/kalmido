@@ -1176,8 +1176,13 @@ def _book_cells_check(c, sheet_row, book, cells):
     call adds cells)."""
     new = size = 0
     for d in cells:
-        if isinstance(d, dict) and d.get("raw") not in (None, ""):
+        if not isinstance(d, dict):
+            continue
+        has_raw = d.get("raw") not in (None, "")
+        if has_raw:
             size += len(str(d["raw"]).encode("utf-8", "replace"))
+        # 2.578.0 (#3462, review G2): a format on a missing cell makes a cell as well
+        if has_raw or d.get("fmt") not in (None, "", {}) or d.get("fmt_patch") not in (None, {}):
             try:
                 if _resolve_target(book, d) not in book.at:
                     new += 1
@@ -1205,13 +1210,14 @@ def _write_cells(c, sheet_row, cells, uid, agent_id, batch, book, conflicts=None
         if not isinstance(d, dict):
             raise BadInput(tr("Invalid value: {0}", "cells"))
         rid, cid = _resolve_target(book, d)
+        # 2.578.0 (#3462, review G6): prev first - an input changed in the meantime skips the whole entry, its format too
+        if "prev" in d and _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
+            continue
         if "fmt" in d or "fmt_patch" in d:  # 2.578.0 (#3462 C): the cell's format (sheets/shfmt.py); without raw only that
             from .shfmt import shfm_write
             changed.add(shfm_write(c, sheet_row, book, d, rid, cid, uid, ts, agent_id, batch, conflicts))
             if "raw" not in d:
                 continue
-        if "prev" in d and _sh_cell_conflict(c, sheet_row, book, rid, cid, d, conflicts):
-            continue
         raw = d.get("raw")
         typed = isinstance(raw, str) and not d.get("verbatim")  # 2.263.0 (#2976): undo / redo / numbers are stored as they are
         if raw is None:

@@ -470,6 +470,7 @@ class ShxGrid:
         self.rows, self.lists, self.colors, self.row_mode, self.names = [], {}, {}, set(), {}
         self.n_filled = 0  # 2.576.0 (#4188): filled cells counted while reading
         self.merges, self.fmt_rules = [], []  # 2.578.0 (#3462 C): merged blocks (file rows / 0-based columns), colour rules
+        self.fmt_left_out = 0  # 2.578.0 (#3462, review G1): formats / merged blocks over the import's cell limit
 
 
 def _shx_too_many():
@@ -644,6 +645,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     # the filled-cell limit stops reading early instead of after a tree of the whole part; only the parts after
     # <sheetData> that are used (drop-down lists, conditional formats) stay as small trees
     cells, shared = {}, {}
+    fl = [0, 0]  # 2.578.0 (#3462, review G1): formatted empty cells kept, formats / merged blocks left out
     full = ctx.setdefault("full", [0])  # filled cells of every sheet read so far
     dvs, cfs = [], []
     # fable review: every child of <sheetData> and of a <row> leaves the tree when it ends (also what is not a row / cell),
@@ -674,7 +676,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
             row.remove(cel)
             if _local(cel.tag) == "c":
                 k += 1
-                _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full, ctx["sty"][0])
+                _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full, ctx["sty"][0], fl)
             continue
         if cel is row:
             row.clear()
@@ -694,12 +696,15 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
             elif tag == "mergeCells":  # 2.578.0 (#3462 C): merged blocks (file rows / 0-based columns)
                 for mc in cel:
                     m = re.fullmatch(r"\$?([A-Z]{1,3})\$?(\d{1,7}):\$?([A-Z]{1,3})\$?(\d{1,7})", mc.get("ref") or "")
-                    if m:
+                    if m and len(g.merges) >= SHX_CELLS_MAX:  # review G1: at most SHX_CELLS_MAX blocks, the rest counted
+                        fl[1] += 1
+                    elif m:  # review G5: row numbers of at most 7 digits
                         g.merges.append((int(m.group(2)), _col_index(m.group(1)), int(m.group(4)), _col_index(m.group(3))))
                 root.remove(cel)
             else:
                 root.remove(cel)
     g.n_filled = full[0]  # 2.576.0 (#4188): of this and the sheets read before it
+    g.fmt_left_out = fl[1]
     if cells:
         # 2.148.1 D (#2485): no full grid of empty cells: each row only up to its last cell, empty places share one entry
         h = max(k[0] for k in cells)
@@ -758,7 +763,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     return g
 
 
-def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None):
+def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None, fl=None):
     """2.576.0 (#4188): one <c> of row r (its k-th cell) into cells {(r, col): ...}; True = a filled cell. Moved out of the
     sheet loop of _read_xlsx unchanged, the filled cells count in full[0] over all sheets of the file."""
     ref = cel.get("r")
@@ -821,6 +826,11 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None):
         st_ = (sty or {}).get(int(cel.get("s") or 0))
     except ValueError:
         st_ = None
+    if st_ and not (v or f) and fl is not None:  # 2.578.0 (#3462, review G1): a formatted empty cell becomes a cell - counted
+        fl[0] += 1
+        if fl[0] > SHX_CELLS_MAX:
+            fl[1] += 1
+            st_ = None
     if st_:
         cells[(r, ci)]["sty"] = st_
     return bool(v or f)
@@ -1077,7 +1087,7 @@ def shx_import(c, uid, grid, space, title, list_id=None, into=None):
     book.shh_off = True  # 2.124.0 B (#2112)
     for i in range(0, len(ok), SHX_CHUNK):
         _write_cells(c, sheet, ok[i:i + SHX_CHUNK], uid, None, None, book)
-    shfm_import_apply(c, sheet, book, grid, hdr, width, uid)  # 2.578.0 (#3462 C): formats, merged blocks, colour rules
+    shfm_import_apply(c, sheet, book, grid, hdr, width, uid, report)  # 2.578.0 (#3462 C): formats, merged blocks, colour rules
     sh_touch(c, sid, uid)
     return sid, report
 
@@ -1095,6 +1105,10 @@ def shx_report_text(rep):
         out.append(trn("{0} formula taken over as a value", "{0} formulas taken over as a value", rep["as_value"]))
     if rep["options_added"]:
         out.append(trn("{0} value added as a new choice", "{0} values added as new choices", rep["options_added"]))
+    if rep.get("fmt_left_out"):  # 2.578.0 (#3462, review G1)
+        out.append(trn("{0} cell format left out (too many cells)", "{0} cell formats left out (too many cells)", rep["fmt_left_out"]))
+    if rep.get("rules_left_out"):  # 2.578.0 (#3462, review G8)
+        out.append(trn("{0} colour rule left out (not readable)", "{0} colour rules left out (not readable)", rep["rules_left_out"]))
     return out
 
 

@@ -561,6 +561,9 @@ def shb_import(c, uid, grids, space, title, list_id=None):
         made.append((g, tid, name))
         for k in ("rows", "formulas", "as_value", "options_added", "names"):
             rep[k] += r2[k]
+        for k in ("fmt_left_out", "rules_left_out"):  # 2.578.0 (#3462, review G1 / G8)
+            if r2.get(k):
+                rep[k] = rep.get(k, 0) + r2[k]
         rep["columns"] = max(rep["columns"], r2["columns"])
     xs = {g.sheet_name: (name, getattr(g, "hdr", 0)) for g, _t, name in made}
     for g, tid, _name in made:
