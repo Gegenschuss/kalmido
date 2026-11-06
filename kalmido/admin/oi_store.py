@@ -215,6 +215,8 @@ def _history(c, run, src, d, ctx):
         if not new or not _not_agent(c, new):
             return False
         d["detail"] = f"user:{int(new)}:{m.group(3)}"
+        if sid in (_st(run).get("own_create") or ()) and _own_share_line(run, ctx, src):
+            return False
     elif act == "share" and det.startswith("merged:"):
         d["detail"] = "merged:" + _share_id(run, det[7:])
     elif act == "unshare" and det:
@@ -222,6 +224,27 @@ def _history(c, run, src, d, ctx):
     elif act == "share_change" and ":" in det:
         d["detail"] = _share_id(run, det.split(":", 1)[0]) + ":" + det.split(":", 1)[1]
     return d
+
+
+def _own_share_line(run, ctx, src):
+    """2.581.0 (#4811): a project's node is the target's own (lf_place); its member shares are made again by the sharing with
+    the ticked people after the areas (acctimport.py umz_share -> lists.py _folder_member_add -> lmc_share), which writes their
+    share lines itself. The archive's last share line of each person on a project's node is that one: it goes (each share
+    once in the history, like the node's "create" line); earlier lines of a share made, taken and made again stay."""
+    st = _st(run)
+    if "last_share" not in st:
+        oi = ctx.data.get("oi") or {}
+        lists = {_oidi(r.get("id")) for r in oi.get("store/nodes.json") or [] if r.get("kind") == "ref" and r.get("ref_kind") == _LIST_REF}
+        now = {(_oidi(r.get("node_id")), _oidi(r.get("user_id"))) for r in oi.get("store/shares.json") or [] if r.get("user_id")}
+        last = {}
+        for r in oi.get("store/history.json") or []:
+            m = re.fullmatch(r"user:(-?\d+):.*", str(r.get("detail") or "")) if r.get("action") == "share" else None
+            nid, rid = _oidi(r.get("node_id")), _oidi(r.get("id"))
+            k = (nid, int(m.group(1))) if m else None
+            if k and nid in lists and rid and k in now:  # a share the archive still has (a person taken off keeps the line)
+                last[k] = max(last.get(k, 0), rid)
+        st["last_share"] = set(last.values())
+    return _oidi(src.get("id")) in st["last_share"]
 
 
 def _area_root(c, run, src, d, ctx):
