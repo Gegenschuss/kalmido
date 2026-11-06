@@ -7,3 +7,4 @@ http-ece==1.2.1
 openapi-spec-validator==0.9.0
 pillow==13.0.0
 pypdf==6.21.4
+vdirsyncer==0.19.3
