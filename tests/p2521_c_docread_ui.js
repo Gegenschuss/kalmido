@@ -23,7 +23,8 @@ const DATA = process.argv[2] || path.join(__dirname, '.data');
 if (!process.env.P2521C_NOSTART) execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'});
 let CK;
 const call = async (method, url, body) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: CK}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
-const until = async (fn, n = 60) => { for (let i = 0; i < n; i++) { const x = await fn(); if (x) return x; await sleep(200); } return fn(); };
+// 2.582.0 (#4830): the shared wait of tests/boot.js by time (at least 15 s), not 60 rounds - under a loaded Mac the new start took longer
+const until = (fn, n = 60) => require('./boot').until(fn, {timeout: Math.max(15000, n * 200), step: 200});
 const click = (w, el, o = {}) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ...o}));
 const keyOn = (w, el, k, o = {}) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: k, bubbles: true, cancelable: true, ...o}));
 
@@ -117,7 +118,7 @@ const WIDE = {'(min-width:64rem)': true};  // jsdom: a computer window wide enou
   // a new start keeps the view (same device)
   w.close();
   const w2 = await boot({user: 'alice', hash: `docs/${order[2]}`, media: WIDE, shared}), d2 = w2.document;
-  check(await until(() => +(d2.querySelector('.dc-pane .dc-body')?.dataset.id || 0) === order[2] && d2.querySelector('.dc-wrap.dc-read .dc-pane .dc-rv') && d2.querySelector('.dc-pane .dc-main.dc-pcol')), 'a new start: the reading view and the folded properties kept');
+  check(await until(() => +(d2.querySelector('.dc-pane .dc-body')?.dataset.id || 0) === order[2] && d2.querySelector('.dc-wrap.dc-read .dc-pane .dc-rv') && d2.querySelector('.dc-pane .dc-main.dc-pcol'), 150), 'a new start: the reading view and the folded properties kept');  // 2.582.0 (#4830): a cold boot, up to 30 s
   click(w2, d2.querySelector('.dc-pane [data-dc="rprops"]'));
   await until(() => !d2.querySelector('.dc-pane .dc-main.dc-pcol'));
   // off again: the pane as before, with the grip of its width (#4399)
