@@ -40,6 +40,20 @@ function dragRestRun() {
   for (const f of fs) { DRAGREST.n++; try { f(); } catch (e) { console.error(e); } }
 }
 function dragRestFlush() { clearTimeout(DRAGREST.t); dragRestRun(); }
+// 2.599.0 (#4506): the one delay helper. f(...) runs fn once, ms after the last call, with the latest arguments (and this);
+// f.flush() runs a waiting call at once (a dialog closes, the page hides) and returns its result, f.cancel() drops it,
+// f.pending() says whether one waits. New code uses it instead of a hand-made clearTimeout / setTimeout pair:
+// tools/perf_budget.py counts the calls of clearTimeout in static/js and that count may only go down.
+function debounce(fn, ms) {
+  let id = 0, args = null, self = null;
+  const stop = () => { clearTimeout(id); id = 0; };
+  const run = () => { stop(); const a = args, t = self; args = self = null; return a ? fn.apply(t, a) : undefined; };
+  const f = function (...a) { stop(); args = a; self = this; id = setTimeout(run, ms); };
+  f.flush = run;
+  f.cancel = () => { stop(); args = self = null; };
+  f.pending = () => !!args;
+  return f;
+}
 
 // ------------------------------------------------------------------ dates
 // 2.223.3 A (#2877): while the server's deletion runs only count (KALMIDO_RETENTION_PURGE off), no trash promises a period
@@ -628,12 +642,13 @@ async function rawFetch0(method, url, body, key) {
 const jobNoOk = n => Number.isInteger(n) && n > 0 && n <= 2147483647;
 const queueable = (method, url) => method !== 'GET' && /^\/api\/(tasks|habits\/\d+\/log|time\/(start|stop|entries))/.test(url) && !/\/(comments|seen|timeline)$/.test(url);
 // 2.25.0 (UX-56): a write of the open task that reached the server shows "Saved" in its header for a moment
+const savedPingOff = debounce(el => el.classList.remove('on'), 1600);  // 2.599.0 (#4506)
 function savedPing() {
   const top = S.sel && $('#detail .dtop'); if (!top) return;
   let el = $('.dsaved', top);
   if (!el) { el = document.createElement('span'); el.className = 'dsaved'; el.setAttribute('role', 'status'); (top.querySelector('.spacer') || top.lastElementChild).after(el); }
   el.innerHTML = `${ic('check', 's')}<span>${esc(tr('Saved'))}</span>`; el.classList.add('on');
-  clearTimeout(savedPing.t); savedPing.t = setTimeout(() => el.classList.remove('on'), 1600);
+  savedPingOff(el);
 }
 // 2.298.0 A1 (#3186): a field that saves itself confirms with a quiet tick right after it (no toast over the bottom bar);
 // screen readers hear "Saved". el = the field or a selector (looked up again after a redraw); no field on the page = the toast
@@ -1130,11 +1145,12 @@ function outRetry() {
 }
 // 2.25.0 (UX-55): after waiting changes went out: "All saved ✓" for a moment where the "waiting" chip was (not as a toast,
 // which would push away an Undo that is still on screen)
+const savedChipOff = debounce(el => el.classList.remove('on'), 2500);  // 2.599.0 (#4506)
 function savedChip() {
   let el = $('#savedok');
   if (!el) { el = document.createElement('div'); el.id = 'savedok'; el.setAttribute('role', 'status'); document.body.appendChild(el); }
   el.innerHTML = `${ic('check', 's')}<span>${esc(tr('All saved'))}</span>`; el.classList.add('on');
-  clearTimeout(savedChip.t); savedChip.t = setTimeout(() => el.classList.remove('on'), 2500);
+  savedChipOff(el);
 }
 // 2.31.0 (#378): the own connection as a small dot at the own picture (sidebar / drawer, desktop and phone): green online,
 // grey offline (with the number of waiting changes), yellow while changes go out. The colour is never the only sign: the dot

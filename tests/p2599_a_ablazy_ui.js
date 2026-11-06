@@ -6,6 +6,8 @@
 //   a second try does not run the broken file again, the toast offers a reload
 // - the file in flight is inserted once even when two chains ask for it
 // - normal: Settings > Data draws the sharing defaults once the module ablage is there (settings.js xl_stdLater)
+// - 2.599.0 (#4506): debounce(fn, ms) of core.js runs once after the calls stop (the latest arguments), flush() runs a waiting
+//   call at once and only once, cancel() drops it; the "All saved" tick (savedChip) goes away through it
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {boot, sleep, B, login} = require('./boot');
@@ -58,6 +60,24 @@ const kind = (w, n) => w.eval(`(() => { try { return typeof ${n}; } catch (e) { 
   const box = await until(() => w.document.querySelector('.smodal #s-xlstd-sec #s-xlstd'));
   check(box && w.document.querySelector('#s-xlstd-h') && kind(w, 'xl_stdHtml') === 'function', 'Settings > Data draws the sharing defaults after the module');
   check(await until(() => w.document.querySelector('#s-xlstd-exp')), 'and loads their values');
+  w.close();
+
+  // ---- 2.599.0 (#4506): debounce
+  w = await boot({user: 'alice', lazy: true, ls: {'tasks.lang': '"en"'}});
+  w.eval(`window.__dc = []; window.__db = debounce(function (v) { __dc.push(v + ':' + (this && this.k)); return 'r' + v; }, 40); 0`);
+  w.eval(`__db.call({k: 'a'}, 1); __db.call({k: 'b'}, 2); 0`);
+  check(w.eval(`__dc.length === 0 && __db.pending()`), 'nothing runs while the calls go on');
+  await until(() => w.eval(`__dc.length`) > 0);
+  check(w.eval(`__dc.join()`) === '2:b' && !w.eval(`__db.pending()`), 'one run after the calls stopped, with the latest arguments and this: ' + w.eval(`__dc.join()`));
+  const fl = w.eval(`(() => { __db.call({k: 'c'}, 3); const r = __db.flush(), r2 = __db.flush(); return [r, r2 === undefined, __dc.join(), __db.pending()].join('|'); })()`);
+  check(fl === 'r3|true|2:b,3:c|false', 'flush runs the waiting call at once and only once: ' + fl);
+  w.eval(`__db.call({k: 'd'}, 4); __db.cancel(); __db.call({k: 'e'}, 5); 0`);
+  await until(() => w.eval(`__dc.length`) > 2);
+  check(w.eval(`__dc.join()`) === '2:b,3:c,5:e', 'cancel drops the waiting call: ' + w.eval(`__dc.join()`));
+  check(w.eval(`__db.flush()`) === undefined && w.eval(`__dc.length`) === 3, 'flush with nothing waiting does nothing');
+  w.eval(`savedChip(); 0`);
+  check(w.document.querySelector('#savedok.on'), 'savedChip shows its tick');
+  check(await until(() => !w.document.querySelector('#savedok.on')), 'and the tick goes away through debounce');
   w.close();
 
   console.log(`${ok} ok, ${F.length} failed`);

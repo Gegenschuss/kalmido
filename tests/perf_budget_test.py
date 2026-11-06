@@ -81,6 +81,26 @@ with tempfile.TemporaryDirectory() as tmp:
     check(rc == 1 and "Budget exceeded: decke_js_gzip" in out, "(c) enlarged state over the JS ceiling exits 1: " + out)
     rc, out = run("--root", os.path.join(tmp, "tree"), "--budget", BUDGET)
     check(rc == 1, "(c) with the real budget file too")
+    os.remove(os.path.join(root, "static", "js", "bloat.js")); open(p, "w", encoding="utf-8").write(open(os.path.join(ROOT, "static", "index.html"), encoding="utf-8").read())
+
+    # (d) 2.599.0 (#4506): the hand-made delays may only go down: one more clearTimeout( is red and names debounce, a comment
+    # does not count, one less asks to lower CLEARTIMEOUT_MAX
+    rc, out = run("--root", root, "--json")
+    ct = json.loads(out)["measured"]["js_cleartimeouts"]
+    check(rc == 0 and ct > 100, f"(d) the copy counts {ct} hand-made delays")
+    extra = os.path.join(root, "static", "js", "zz_delay.js")
+    open(extra, "w").write("// clearTimeout(x) in a comment does not count\n")
+    rc, out = run("--root", root)
+    check(rc == 0 and "Too many hand-made delays" not in out, "(d) a comment is not counted: " + out[-300:])
+    open(extra, "w").write("let zz_t = 0;\nfunction zz_go() { clearTimeout(zz_t); zz_t = setTimeout(() => {}, 9); }\n")
+    rc, out = run("--root", root)
+    check(rc == 1 and "Too many hand-made delays" in out and "debounce(fn, ms)" in out, "(d) one more clearTimeout( is red and names debounce: " + out[-300:])
+    os.remove(extra)
+    core = os.path.join(root, "static", "js", "core.js")
+    c = open(core, encoding="utf-8").read()
+    open(core, "w", encoding="utf-8").write(c.replace("clearTimeout(", "cancelT(", 1))
+    rc, out = run("--root", root)
+    check(rc == 0 and f"lower CLEARTIMEOUT_MAX in tools/perf_budget.py to {ct - 1}" in out, "(d) one less asks to lower the number: " + out[-300:])
 
 print(f"{'FAILED ' + str(len(FAILS)) if FAILS else 'all ok'}")
 sys.exit(1 if FAILS else 0)

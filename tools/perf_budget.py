@@ -14,6 +14,7 @@ Only the project owner raises a ceiling.
 
 usage: python3 tools/perf_budget.py [--json] [--budget FILE] [--root DIR]
 """
+import glob
 import gzip
 import importlib.util
 import json
@@ -29,6 +30,10 @@ KEYS = ("start_js_bytes", "start_js_gzip", "start_css_bytes", "start_css_gzip", 
 # 2.521.0 (#4391): ceiling in tools/perf_budget.json -> the measured value it caps; nothing else is red
 CEILINGS = (("decke_js_gzip", "start_js_gzip"), ("decke_css_gzip", "start_css_gzip"), ("decke_i18n_gzip", "start_i18n_gzip"),
             ("decke_scripts", "start_scripts"))
+# 2.599.0 (#4506): hand-made delays (clearTimeout / setTimeout pairs) in static/js/*.js, counted as "clearTimeout(" in the
+# bytes the server sends (no comments). New code uses debounce() of static/js/core.js; the count may only go down: over it is
+# red, under it the tool asks to lower this number to the new count in the same commit. Kept here, not in perf_budget.json.
+CLEARTIMEOUT_MAX = 237  # 06.11.2026: the count of 2.599.0 on main e645af24c (dragRestFlush of 2.586.0 A counted too)
 SHRINK_HINT = ("only the project owner raises a ceiling; make the start smaller by loading on demand (static/js/lazyload.js LD_MODS / LD_CALL / "
                "LD_VIEW) or by moving texts out of the language core, never by cutting code, comments or names")
 
@@ -108,6 +113,14 @@ def pbg_i18n(root, code="de"):
             "lazy_i18n_parts": len(p), "i18n_file_bytes": os.path.getsize(path)}
 
 
+def pbg_cleartimeouts(root):
+    """2.599.0 (#4506): "clearTimeout(" in the client scripts as they go out (comments stripped), vendor code not counted."""
+    n = 0
+    for p in sorted(glob.glob(os.path.join(root, "static", "js", "*.js"))):
+        n += pbg_served(root, p).count(b"clearTimeout(")
+    return n
+
+
 def pbg_fmt(n):
     return f"{n:,}".replace(",", ".")
 
@@ -134,6 +147,9 @@ def main(argv):
     with open(budget, encoding="utf-8") as f:
         lim = json.load(f)
     over = [c for c, k in CEILINGS if c in lim and k in got and got[k] > lim[c]]  # a tree without language files has no start_i18n_*
+    got["js_cleartimeouts"] = pbg_cleartimeouts(root)  # 2.599.0 (#4506)
+    if got["js_cleartimeouts"] > CLEARTIMEOUT_MAX:
+        over.append("cleartimeout_max")
     cap = {k: lim[c] for c, k in CEILINGS if c in lim}
     if as_json:
         print(json.dumps({"measured": got, "limits": {c: lim.get(c) for c, _ in CEILINGS + (("start_ms", None),)}, "over": over}, indent=2))
@@ -147,6 +163,14 @@ def main(argv):
         if "start_i18n_bytes" in got:  # 2.191.0 A (#2518)
             print(f"language texts (de): core at start {pbg_fmt(got['start_i18n_bytes'])} bytes ({pbg_fmt(got['start_i18n_gzip'])} gzip) "
                   f"of the file's {pbg_fmt(got['i18n_file_bytes'])}, {got['lazy_i18n_parts']} module parts {pbg_fmt(got['lazy_i18n_bytes'])} bytes")
+    ct = got["js_cleartimeouts"]  # 2.599.0 (#4506)
+    if not as_json:
+        print(f"hand-made delays (clearTimeout( in static/js): {ct}, may only go down from {CLEARTIMEOUT_MAX}")
+    if ct > CLEARTIMEOUT_MAX:
+        print(f"Too many hand-made delays: {ct} x clearTimeout( in static/js > {CLEARTIMEOUT_MAX} (CLEARTIMEOUT_MAX in tools/perf_budget.py); "
+              "use debounce(fn, ms) of static/js/core.js (with flush / cancel) instead of a clearTimeout / setTimeout pair", file=sys.stderr)
+    elif ct < CLEARTIMEOUT_MAX:
+        print(f"fewer hand-made delays than allowed: lower CLEARTIMEOUT_MAX in tools/perf_budget.py to {ct}", file=sys.stderr)
     for c, k in CEILINGS:
         if c in over:
             print(f"Budget exceeded: {c} ({k} {pbg_fmt(got[k])} > {pbg_fmt(lim[c])}, tools/perf_budget.json); {SHRINK_HINT}", file=sys.stderr)
