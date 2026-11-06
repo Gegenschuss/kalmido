@@ -564,7 +564,7 @@ def bw_choice_history(cid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _choice(c, oid, cid)
-    return ow_history_answer(c, "office_meal_choice", cid)
+    return ow_history_answer(c, "office_meal_choice", cid, oid)
 
 
 @app.delete("/api/office/meals/choices/<int:cid>")
@@ -652,7 +652,7 @@ def bw_meal_history(mid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _meal(c, oid, mid)
-    return ow_history_answer(c, "office_meal", mid)
+    return ow_history_answer(c, "office_meal", mid, oid)
 
 
 @app.delete("/api/office/meals/<int:mid>")

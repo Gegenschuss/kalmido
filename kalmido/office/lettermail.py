@@ -430,7 +430,7 @@ def ltb_history(bid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = ltb_ctx()
     ltb_row(c, oid, bid)
-    return ow_history_answer(c, "office_md_texts", bid)
+    return ow_history_answer(c, "office_md_texts", bid, oid)
 
 
 @app.delete("/api/office/letter-blocks/<int:bid>")

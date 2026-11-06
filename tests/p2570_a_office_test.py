@@ -14,6 +14,7 @@ tenant-matrix: office
  - office groups: "Read only" sees a trip but not its history (saving needs "edit"); "Staff" (level own) reads the history
    of an own trip, somebody else's is 404; "Bookkeeping" (travel edit) reads a trip's history but not a vehicle's (the
    vehicles' save needs "manage")
+ - 2.570.0 (#4783 review F1): read-only / accounting / guest get no history (403 like saving), also inside an office group
  - two writers: A opened, B saved, A saves with the old version -> 409 with the current state under "current", B's change stays
 usage: p2570_a_office_test.py <datadir>"""
 import base64
@@ -144,6 +145,20 @@ for s, who in ((Ca, "another org's admin"), (Bo, "a member (Previous access)")):
             check(h.status_code in DENY, f"{who} {what}: nothing of Alpha {h.status_code}")
             check("Kernstadt" not in h.text and "Example Client" not in h.text, f"{who} {what}: no content")
 
+# ---- 2.570.0 (#4783 review F1): the organisation roles that read but do not save (read-only, accounting, guest) get no
+# history (403 like the save; accounting and guests may not see the client at all: 404); the member keeps it
+cli = next(x for x in objs_org if x[0] == "client")
+r = Bo.get(B + cli[5])
+check(r.status_code == 200 and r.json().get("items"), f"member: the client's history {r.status_code} {r.text[:120]}")
+for role in ("readonly", "accounting", "guest"):
+    check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": role}).ok, f"role: bob {role}")
+    check(Bo.request(cli[2], B + cli[1], json=cli[3]).status_code in DENY, f"{role}: saving the client is denied")
+    h = Bo.get(B + cli[5])
+    check(h.status_code == 403 or (role != "readonly" and h.status_code == 404), f"{role}: the client's history is denied like the save {h.status_code} {h.text[:120]}")
+    for what, url, method, change, field, hist in objs_org:
+        h = Bo.get(B + hist)
+        check(h.status_code in DENY, f"{role} {what}: the history needs the role of saving {h.status_code} {h.text[:120]}")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": "member"}).ok, "role: bob member again")
 trip = next(x for x in objs_org if x[0] == "trip")
 veh = next(x for x in objs_org if x[0] == "vehicle")
 # ---- office groups: read only, staff (own), bookkeeping
@@ -154,6 +169,9 @@ check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:bookke
 r = Bo.get(B + trip[5])
 check(r.status_code == 200 and r.json().get("items"), f"bookkeeping (travel edit): the trip's history {r.status_code} {r.text[:120]}")
 check(Bo.get(B + veh[5]).status_code == 403, f"bookkeeping: a vehicle's history needs manage like saving it {Bo.get(B + veh[5]).status_code}")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": "readonly"}).ok, "role: bob read-only in bookkeeping")
+check(Bo.get(B + trip[5]).status_code == 403, f"bookkeeping + read-only role (#4783 review F1): no history, the role cannot save {Bo.get(B + trip[5]).status_code}")
+check(A.put(B + f"/api/orgs/{ORG}/members", json={"user_id": BOB, "role": "member"}).ok, "role: bob member in bookkeeping")
 check(A.put(B + f"/api/office/rights/people/{BOB}", json={"groups": ["tpl:staff"]}).ok, "rights: bob staff")
 r = Bo.post(B + "/api/office/trips", json={"date_from": D, "date_to": D, "dest": "Bobs Ziel"})
 btid = made(r, "staff: an own trip")

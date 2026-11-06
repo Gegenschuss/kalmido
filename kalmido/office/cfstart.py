@@ -195,7 +195,7 @@ def cfs_adjust_history(aid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _adj_row(c, oid, aid)
-    return ow_history_answer(c, "office_cf_adjust", aid)
+    return ow_history_answer(c, "office_cf_adjust", aid, oid)
 
 
 @app.delete("/api/office/cashflow/adjust/<int:aid>")

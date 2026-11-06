@@ -23,9 +23,9 @@ Interface:
   ow_check(b, have, cur, alias=None)                            the version check alone (OwConflict)
   ow_crypt(table, office) -> (dec, enc)                         for a table with encrypted columns (core/orgcrypt.py)
   ow_undo_ctx(kind, fn)                                         the session undo of the kind (office/undo.py route)
-  ow_history(c, kind, rid, limit=50) -> the entries (the caller checked the rights to read the row)
+  ow_history(c, kind, rid, oid, limit=50) -> the entries (the caller checked the rights to read the row)
   ow_is_agent(c, uid) -> bool, ow_uid() -> the signed-in account or None
-  ow_history_answer(c, kind, rid) -> {items}                   2.570.0 (#4783): the answer of a history route GET <save path>/history
+  ow_history_answer(c, kind, rid, oid) -> {items}              2.570.0 (#4783): the answer of a history route GET <save path>/history
                                                                 (the route runs the rights checks of its save route first; office/rights.py
                                                                 ofr_need asks a group for what saving needs)
   ow_need_row(c, table, where, args)                            404 when the row is not there (the where of the save route)"""
@@ -174,20 +174,26 @@ def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=Non
     return (dec(c, new) if dec else dict(new)), changed
 
 
-def ow_history(c, kind, rid, limit=50):
-    """The history of row rid of kind, newest first. The caller checked the rights to read it (the office's own)."""
-    rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (kind, int(rid), int(limit))).fetchall()
+def ow_history(c, kind, rid, oid, limit=50):
+    """The history of row rid of kind, newest first. The caller checked the rights to read it (the office's own).
+    2.570.0 (#4783 review F2): only the entries of office area oid (defence in depth on top of the route's row check);
+    oid None = no filter (a client moves between organisations, its history goes along; need_client checked the row)."""
+    if oid is None:
+        rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (kind, int(rid), int(limit))).fetchall()
+    else:
+        rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? AND (org_id=? OR org_id IS NULL) ORDER BY id DESC LIMIT ?",
+                         (kind, int(rid), int(oid), int(limit))).fetchall()
     names = user_names(c, [r["user_id"] for r in rows if r["user_id"]])
     return [{"id": r["id"], "at": r["updated_at"], "user_id": r["user_id"], "name": names.get(r["user_id"], ""), "agent": bool(r["agent"]),
              "action": r["action"], "fields": sorted(set(json.loads(r["vals_before"] or "{}")) | set(json.loads(r["vals_after"] or "{}")))}
             for r in rows]
 
 
-def ow_history_answer(c, kind, rid):
+def ow_history_answer(c, kind, rid, oid):
     """2.570.0 (#4783): {items: the history of row rid of kind} -- the routes GET <the save route's path>/history call it after
     the rights checks of their save route (the gate, the row in the organisation, the level "own"; no state checks like
     "draft only": a finished row's history stays readable)."""
-    return jsonify(items=ow_history(c, kind, rid))
+    return jsonify(items=ow_history(c, kind, rid, oid))
 
 
 def ow_need_row(c, table, where, args):

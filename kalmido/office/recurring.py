@@ -658,7 +658,7 @@ def rin_history(sid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     rin_row(c, oid, sid)
-    return ow_history_answer(c, "office_inv_series", sid)
+    return ow_history_answer(c, "office_inv_series", sid, oid)
 
 
 @app.delete("/api/office/series/<int:sid>")

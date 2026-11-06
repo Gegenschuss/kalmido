@@ -238,7 +238,7 @@ def cl_history(lid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid, every = cc_ctx()
     cl_row(c, oid, lid, uid, every)
-    return ow_history_answer(c, "office_cc_line", lid)
+    return ow_history_answer(c, "office_cc_line", lid, oid)
 
 
 @app.delete("/api/office/cards/lines/<int:lid>")

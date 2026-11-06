@@ -877,7 +877,7 @@ def lt_history(lid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = lt_ctx()
     lt_row(c, oid, lid)
-    return ow_history_answer(c, "office_letter", lid)
+    return ow_history_answer(c, "office_letter", lid, oid)
 
 
 @app.delete("/api/office/letters/<int:lid>")

@@ -161,6 +161,25 @@ OWN_ROUTES = {
     "GET /api/office/drives/<int:did>/history", "GET /api/office/meals/<int:mid>/history", "GET /api/office/cards/lines/<int:lid>/history",
 }
 
+# 2.570.0 (#4783 review F3): GET <save path>/history (office/owrite.py ow_history_answer) -> "METHOD rule" of its save route; the
+# history needs the level, the special and the organisation role of saving the row (ofr_need, office/model.py office_org).
+# An explicit set, not a suffix: a later read-only "/history" of the office stays a read.
+HISTORY_ROUTES = {f"GET /api/office/{p}/history": f"{m} /api/office/{p}" for m, p in (
+    ("PATCH", "agreements/<int:aid>"), ("PATCH", "cards/<int:cid>"), ("PUT", "bank/rules/<int:rid>"),
+    ("PATCH", "cards/lines/<int:lid>"), ("PATCH", "cashflow/adjust/<int:aid>"), ("PATCH", "fixed-costs/<int:fid>"),
+    ("PATCH", "doc-templates/<int:tid>"), ("PATCH", "gen-docs/<int:gid>"), ("PATCH", "vehicles/<int:vid>"),
+    ("PATCH", "drives/<int:did>"), ("PATCH", "letter-blocks/<int:bid>"), ("PATCH", "letters/<int:lid>"),
+    ("PATCH", "meals/choices/<int:cid>"), ("PATCH", "meals/<int:mid>"), ("PATCH", "deals/<int:did>"),
+    ("PATCH", "series/<int:sid>"), ("PATCH", "trips/<int:tid>"), ("PATCH", "trips/<int:tid>/items/<int:iid>"),
+    ("PATCH", "trips/purposes/<int:pid>"))}
+
+
+def ofr_history_save():
+    """2.570.0 (#4783 review F1/F3): "METHOD rule" of the save route when the request is the history of an office row, else None."""
+    if not has_request_context() or request.url_rule is None:
+        return None
+    return HISTORY_ROUTES.get(ofr_rule())
+
 # 2.545.0 (#4592, decision of 2026-11-04): an org member in "Previous access" works in these areas on the level "own" (their
 # own entries through the OWN_ROUTES, like the group "Staff"); every other route of the area stays for the office's admins
 LEGACY_OWN = frozenset({"travel"})
@@ -242,14 +261,15 @@ def ofr_need(admin=False):
     needs "manage" (review)."""
     rule = request.url_rule.rule if request.url_rule is not None else request.path
     read = request.method in ("GET", "HEAD", "OPTIONS")
-    if read and rule.endswith("/history"):  # 2.570.0 (#4783): an office row's history (office/owrite.py) needs what saving the row needs
-        rule, read = rule[:-len("/history")], False
+    save = ofr_history_save()  # 2.570.0 (#4783): an office row's history (office/owrite.py) needs what saving the row needs
+    if save:
+        rule, read = save.split(" ", 1)[1], False
     if read:
         area = ofr_area_of(request.path)
         need = "manage" if rule in MANAGE_READ or (admin and AREA_LEGACY.get(area) == "member") else "view"
     else:
         need = "manage" if rule in MANAGE_ROUTES or ofr_area_of(request.path) == "settings" else "edit"
-    return need, SPECIAL_ROUTES.get(ofr_rule())
+    return need, SPECIAL_ROUTES.get(save or ofr_rule())  # 2.570.0 (#4783 review F3): the history asks for the special of saving
 
 
 # ---------------------------------------------------------------- what a person may

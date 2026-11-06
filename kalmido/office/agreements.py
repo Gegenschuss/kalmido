@@ -513,7 +513,7 @@ def agr_history(aid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _row(c, oid, aid)
-    return ow_history_answer(c, "office_agreement", aid)
+    return ow_history_answer(c, "office_agreement", aid, oid)
 
 
 @app.delete("/api/office/agreements/<int:aid>")

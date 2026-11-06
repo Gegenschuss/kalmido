@@ -213,7 +213,10 @@ def office_org(c, uid, admin=False, area=None):
         fk = office_path_feature(request.path)
         if fk and not office_feature_on(office_settings(c, oid), fk):
             raise Denied(404, tr(OF_FEATURE_OFF))
-    no = office_allowed(c, uid, oid)  # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports
+    from .rights import ofr_history_save
+    # 2.143.0 A (#2151): guest none; read-only reads; accounting reads + exports. 2.570.0 (#4783 review F1): a row's history
+    # (GET <save path>/history) needs the role of saving it (read-only / accounting: 403 like the save)
+    no = office_allowed(c, uid, oid, write=True if ofr_history_save() else None)
     if role != "admin" and has_request_context():
         from .rights import ofr_check
         if (area or request.path.startswith("/api/office/")) and ofr_check(c, uid, oid, area, admin):

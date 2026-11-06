@@ -234,7 +234,7 @@ def rk_fixed_history(fid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _fixed_row(c, oid, fid)
-    return ow_history_answer(c, "office_fixed_cost", fid)
+    return ow_history_answer(c, "office_fixed_cost", fid, oid)
 
 
 @app.delete("/api/office/fixed-costs/<int:fid>")

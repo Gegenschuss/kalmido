@@ -838,7 +838,7 @@ def dt_tpl_history(tid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     dt_tpl(c, oid, tid)
-    return ow_history_answer(c, "office_doctpl", tid)
+    return ow_history_answer(c, "office_doctpl", tid, oid)
 
 
 @app.delete("/api/office/doc-templates/<int:tid>")
@@ -1074,7 +1074,7 @@ def dt_doc_history(gid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     dt_doc(c, oid, gid)
-    return ow_history_answer(c, "office_gendoc", gid)
+    return ow_history_answer(c, "office_gendoc", gid, oid)
 
 
 @app.delete("/api/office/gen-docs/<int:gid>")

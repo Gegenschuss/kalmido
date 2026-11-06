@@ -401,7 +401,7 @@ def br_history(rid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     ow_need_row(c, "office_bank_rules", "id=? AND org_id=? AND deleted_at IS NULL", (rid, oid))
-    return ow_history_answer(c, "office_bank_rule", rid)
+    return ow_history_answer(c, "office_bank_rule", rid, oid)
 
 
 @app.delete("/api/office/bank/rules/<int:rid>")

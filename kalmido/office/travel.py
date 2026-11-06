@@ -534,7 +534,7 @@ def rk_trip_history(tid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _trip(c, oid, tid)
-    return ow_history_answer(c, "office_trip", tid)
+    return ow_history_answer(c, "office_trip", tid, oid)
 
 
 @app.delete("/api/office/trips/<int:tid>")
@@ -628,7 +628,7 @@ def rk_item_history(tid, iid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _item(c, oid, tid, iid)
-    return ow_history_answer(c, "office_trip_item", iid)
+    return ow_history_answer(c, "office_trip_item", iid, oid)
 
 
 @app.delete("/api/office/trips/<int:tid>/items/<int:iid>")
@@ -782,7 +782,7 @@ def rka_purpose_history(pid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     ow_need_row(c, "office_trip_purposes", "id=? AND org_id=? AND deleted_at IS NULL", (pid, oid))
-    return ow_history_answer(c, "office_trip_purpose", pid)
+    return ow_history_answer(c, "office_trip_purpose", pid, oid)
 
 
 @app.delete("/api/office/trips/purposes/<int:pid>")

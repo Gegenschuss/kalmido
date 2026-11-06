@@ -266,7 +266,7 @@ def lb_vehicle_history(vid):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _vehicle(c, oid, vid)
-    return ow_history_answer(c, "office_vehicle", vid)
+    return ow_history_answer(c, "office_vehicle", vid, oid)
 
 
 def _drive(c, oid, did, deleted=False):
@@ -574,7 +574,7 @@ def lb_drive_history(did):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _drive(c, oid, did)
-    return ow_history_answer(c, "office_drive", did)
+    return ow_history_answer(c, "office_drive", did, oid)
 
 
 @app.delete("/api/office/drives/<int:did>")

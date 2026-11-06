@@ -472,8 +472,10 @@ def client_history(cid):
     c = db()
     uid = me()
     _gate(c)
-    need_client(c, cid, uid)
-    return ow_history_answer(c, "client", cid)
+    r = need_client(c, cid, uid)
+    if r["org_id"]:
+        need_org_write(c, uid, r["org_id"])  # 2.570.0 (#4783 review F1): the level of the save (need_client checks it only on writes)
+    return ow_history_answer(c, "client", cid, None)  # 2.570.0 (#4783 review F2): None = unfiltered, a client moves between organisations
 
 
 @app.delete("/api/clients/<int:cid>")

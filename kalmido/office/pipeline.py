@@ -343,7 +343,7 @@ def pl2_history(did):
     """2.570.0 (#4783): the history (office/owrite.py ow_history) with the rights of the save route."""
     c, uid, oid = _ctx()
     _row(c, oid, did)
-    return ow_history_answer(c, "office_deal", did)
+    return ow_history_answer(c, "office_deal", did, oid)
 
 
 @app.delete("/api/office/deals/<int:did>")
