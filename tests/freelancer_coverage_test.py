@@ -759,6 +759,9 @@ ROUTES = {
     "DELETE /api/deps/{}/{}": "tasks", "DELETE /api/envs/{}": "tasks", "DELETE /api/envs/{}/deploys/{}": "tasks",
     "DELETE /api/list-checks/{}": "tasks", "DELETE /api/notepads/{}": "tasks", "DELETE /api/notes/{}": "tasks",
     "POST /api/notes/{}/restore": "tasks", "POST /api/v1/notes/{}/restore": "tasks",  # 2.272.0 E1 (#3038)
+    # 2.576.0 (#3371): saved relations between tasks (p2576_d_links_api_test.py, freelancer-matrix: tasks)
+    "GET /api/tasks/{}/relations": "tasks", "POST /api/tasks/{}/relations": "tasks", "DELETE /api/tasks/{}/relations/{}": "tasks",
+    "GET /api/v1/tasks/{}/relations": "tasks", "POST /api/v1/tasks/{}/relations": "tasks", "DELETE /api/v1/tasks/{}/relations/{}": "tasks",
     "POST /api/notes/quick-list": "tasks",  # 2.477.0 (#3881): the private list Notes (p2477_quicknote_api_test.py, freelancer-matrix: tasks)
     "DELETE /api/repos/{}": "tasks", "DELETE /api/sample": "tasks", "DELETE /api/sprints/{}": "tasks",
     "DELETE /api/tasks/{}": "tasks", "DELETE /api/tasks/{}/contacts/{}": "tasks", "DELETE /api/tasks/{}/enc-note": "tasks",

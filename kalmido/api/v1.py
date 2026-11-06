@@ -19,7 +19,7 @@ from ..core.db import body, bump, db, err, gsetting, inbox_default, iso, local_n
 from ..accounts.session import _rate_blocked, _rate_fail, _token_hash, FAIL_WINDOW, client_ip, me, rate_ip
 from ..accounts.login import twofa_methods
 from ..core.access import collab_all, Denied, list_role, my_inbox, need_collab, need_list, need_task, need_time, time_all, token_lists, tvis, vis_sql
-from ..core.serializers import load_tasks
+from ..core.serializers import load_tasks, rel_of
 from ..core.instance import semver, update_state
 from ..core.state import search_tasks, visible_lists, visible_sections
 from ..lists.lists import clean_folder, clean_list_value, list_create, LIST_KIND_ALIASES, LIST_KINDS, list_update
@@ -349,6 +349,7 @@ def v1_task(d):
     out["key"] = tk_key(db(), d)  # 2.390.0 (#3353): "APP-12" (null = the project has no key)
     out["partial_until"] = d.get("partial_until")  # 2.392.0 B (#3364): done in part: only this version completes it
     out["field_at"] = d.get("field_at") or {}  # 2.553.0 C (#3538): {field id: since when it has its value}, a field absent = not known
+    out["relations"] = d.get("relations") or []  # 2.576.0 (#3371): saved relations, only to tasks the reader sees
     out.update(blocked=bool(d.get("blocked")), comment_count=d.get("comment_count", 0), context=bool(d.get("context")),
                attachments=[{**{k: a[k] for k in ("id", "name", "mime", "size")}, **({"encrypted": True} if a.get("enc") else {})}
                             for a in d.get("attachments") or []])
@@ -379,6 +380,7 @@ def task_for(c, row, uid):
                                                        (row["id"], row["list_id"]))}  # 2.553.0 C (#3538): as in v1_task
     from ..tasks.watchers import wat_users
     out["watchers"] = sorted(wat_users(c, row["id"]))  # 2.473.0 (#3357): webhook payloads and agent events too
+    out["relations"] = rel_of(c, {row["id"]}, lambda: vis_ids(c, uid), uid).get(row["id"], [])  # 2.576.0 (#3371): as uid sees them
     if c.execute("SELECT 1 FROM task_enc_notes WHERE task_id=? LIMIT 1", (row["id"],)).fetchone():
         out["encrypted_note"] = True  # 2.42.0 (#828): agents learn only that there is an encrypted note
     if c.execute("SELECT 1 FROM task_note_locks WHERE task_id=?", (row["id"],)).fetchone():

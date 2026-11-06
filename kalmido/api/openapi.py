@@ -16,6 +16,7 @@ from ..integrations.importers import IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOU
 from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_TASK_IN
 from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
+from ..tasks.relations import rel_spec  # 2.576.0 (#3371)
 from ..tasks.oneway import dec_spec
 from ..hub.hmv1 import hmv_spec  # 2.483.0 (#1902)
 from ..tasks.watchers import wat_spec  # 2.369.5 (#2517): pulled up from functions
@@ -205,6 +206,9 @@ def openapi_spec():
                                   description="2.111.0: a reminder at a fixed local date and time (server time zone, like due / "
                                   "due_time), with or without a due date; null = none. Fires once, like the reminders before the "
                                   "due time; on a recurring task it moves along with the due date")
+    task_props["relations"] = {"type": "array", "items": {"type": "object", "properties": {"id": {"type": "integer"}, "kind": {
+        "type": "string", "enum": ["relates", "duplicate_of", "has_duplicate"]}}}, "description": "2.576.0: saved relations to other tasks you "
+        "may see (read only here; POST /tasks/{id}/relations, DELETE /tasks/{id}/relations/{other_id})"}
     # 2.390.0 B (#3355): the sprint, the reviewer and the review state
     task_props["sprint_id"] = nul("integer", description="2.390.0: the sprint of the task's project it is planned in (null = "
                                   "backlog). Writable: an open sprint of the same project (edit rights); a task moved to another "
@@ -811,6 +815,7 @@ def openapi_spec():
     git_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     overview_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)
     groups_spec(paths, schemas, op, ok, errs, ref, pid, nul, page)  # 2.10.0 (#441)
+    rel_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.576.0 (#3371): saved relations of a task
     dayplan_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.10.0 (#440)
     api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.15.0 (#479)
     notes_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q)  # 2.17.0 (#442)

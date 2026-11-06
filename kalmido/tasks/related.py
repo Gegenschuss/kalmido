@@ -48,7 +48,8 @@ from ..core.access import Denied, need_task, reading_sql, tvis, vis_sql, acx_lis
 from ..api.common import v1_args, v1_view
 from ..core.env import env_bool
 from ..core.orgcrypt import oc_active, oc_dec, oc_enc, OrgCryptError, PREFIX  # 2.149.0 G (#2517): pulled up from functions
-from ..core.serializers import load_tasks  # 2.149.0 G (#2517): pulled up from functions
+from ..core.serializers import load_tasks, rel_of  # 2.149.0 G (#2517): pulled up from functions; 2.576.0 (#3371): rel_of
+from ..personal.timetrack import vis_ids  # 2.576.0 (#3371)
 from ..accounts.session import GATE  # 2.369.5 (#2517): pulled up from functions
 from ..collab.liste2e import le2e_mode  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.users import need_admin  # 2.369.5 (#2517): pulled up from functions
@@ -611,7 +612,23 @@ def rt9_related(c, uid, tid, k=EMB_K):
     t = c.execute("SELECT title, content FROM tasks WHERE id=?", (tid,)).fetchone()
     vis = _visible(c, uid, exclude=(tid,))
     scored = _mix(c, qv, t["title"], (t["title"] or "") + "\n" + (t["content"] or ""), _score_vec(c, qv, vis), vis, k, own=tid)
-    return {"enabled": True, "pending": False, "items": _items(c, scored)}
+    return {"enabled": True, "pending": False, "items": rt9_saved(c, uid, tid, _items(c, scored))}
+
+
+def rt9_saved(c, uid, tid, items):
+    """2.576.0 (#3371): the saved relations of tid next to the computed ones: a computed item that is saved already carries
+    saved = its kind (relates | duplicate_of | has_duplicate); saved ones the computation did not find come in the part apart
+    (ref, like tasks named by #number). Only relations whose other task uid sees (core/serializers.rel_of)."""
+    saved = {x["id"]: x["kind"] for x in rel_of(c, {tid}, lambda: vis_ids(c, uid), uid).get(tid, [])}
+    if not saved:
+        return items
+    for it in items:
+        if it["id"] in saved:
+            it["saved"] = saved.pop(it["id"])
+    more = _items(c, [(0.0, x, False, True) for x in sorted(saved)])
+    for it in more:
+        it["saved"] = saved[it["id"]]
+    return items + more
 
 
 def rt9_event(c, tid, aid, k=EMB_K):

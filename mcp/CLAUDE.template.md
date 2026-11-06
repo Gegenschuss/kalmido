@@ -758,11 +758,13 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
 Related tasks (2.59.0): task events may carry `task.related` = up to 5 tasks close in meaning `[{id, title, score}]` (only
 tasks you may see; missing while the server has not computed the task yet or runs without its embedding service). Before
 creating a task, `related_tasks` (or `search_tasks` with `semantic: true`) shows likely duplicates (`dup: true`): mention
-them instead of adding a second task.
+them instead of adding a second task. A duplicate you are sure of can be saved (2.576.0): `add_relation` with kind `duplicate`
+(`close: true` also closes it as won't do with a comment), or kind `relates` for tasks that belong together; `list_relations`
+and a task's `relations` show only relations to tasks you may see.
 
 Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get_document` (text, sender, amount) ->
 `add_comment`, `add_contract`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
-`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_relation`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `add_video_comment`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `check_time_entries`, `clear_plan_usage`, `clear_waiting`, `client_id`,
 `comment_typing`, `complete_task`, `confirm_abort`, `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`,
@@ -786,13 +788,13 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `list_events`, `list_fields`, `list_filed_mails`, `list_files`, `list_filters`, `list_flow`, `list_folders`, `list_forms`, `list_groups`, `list_habits`,
 `list_invoice_series`, `list_jobs`, `list_kids`, `list_layout_blocks`, `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`,
 `list_notepads`, `list_notes`, `list_objects`, `list_office_data`, `list_office_documents`, `list_office_leads`, `list_packing_templates`,
-`list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_repos`, `list_rules`, `list_schedules`,
+`list_payment_suggestions`, `list_polls`, `list_project_files`, `list_receipt_suggestions`, `list_relations`, `list_repos`, `list_rules`, `list_schedules`,
 `list_sections`, `list_stale_tasks`, `list_subtasks`, `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`,
 `list_time_entries`, `list_trash`, `list_upkeep_presets`, `list_video_reviews`, `list_waiting`, `list_watchers`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`,
 `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`, `propose_contract_notice`, `propose_import`, `propose_layout`, `propose_playbook`,
 `propose_rule`, `propose_sheet_tasks`, `propose_shoot`, `propose_time_entries`, `propose_to_other_topic`,
 `propose_to_person`, `react`, `react_team_message`, `react_to_chat`, `read_attachment`, `read_briefing`, `read_file`,
-`read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `rename_folder`, `rename_section`, `reopen_task`,
+`read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`, `rename_folder`, `rename_section`, `reopen_task`,
 `reorder_project_links`, `reorder_sections`, `reply_to_event`, `report_plan_usage`, `report_progress`, `report_usage`,
 `request_approval`, `request_chat_approval`, `request_comment_approval`, `request_deploy_approval`,
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,

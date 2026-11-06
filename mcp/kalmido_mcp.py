@@ -690,8 +690,8 @@ TOOLS = [
      lambda api, a: api.call("GET", "/search", {**_pick(a, ("q", "limit", "cursor")), **({"semantic": "1"} if a.get("semantic") else {}),
                                                 **({"fulltext": "1"} if a.get("fulltext") else {})})),
     ("related_tasks", "2.59.0: up to 5 tasks close in meaning to a task (local text vectors on the server, similar titles, "
-                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref}]}. "
-                      "dup = probably a duplicate, ref = named by #number in either direction. enabled false = the server has no embedding service; pending = not computed yet. "
+                      "#references), only tasks you may see: {enabled, pending, items: [{id, title, list_id, done, score, dup, ref, saved?}]}. "
+                      "dup = probably a duplicate, ref = named by #number in either direction or a saved relation (2.576.0: saved = its kind, see list_relations). enabled false = the server has no embedding service; pending = not computed yet. "
                       "Use it before creating a task (duplicates) and to find context. Read-only.",
      _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/related")),
     ("search_messages", "2.33.0: full-text search in task comments, team chat and your own chats with people (only what you may read: "
@@ -1654,6 +1654,19 @@ TOOLS += [
      lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/dependencies", body={"blocked_by": a["blocked_by"]})),
     ("remove_dependency", "task_id is no longer blocked by blocked_by.", _obj({"task_id": S_ID, "blocked_by": S_ID}, ["task_id", "blocked_by"]),
      lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/dependencies/{_id(a, 'blocked_by')}")),
+    # ---- 2.576.0 (#3371): saved relations between tasks (relates to, duplicate of)
+    ("list_relations", "2.576.0: the saved relations of a task: relates (both ways), duplicate_of (this task is a duplicate of the other), "
+     "has_duplicate. Only relations whose other task you may see.", _obj({"task_id": S_ID}, ["task_id"]),
+     lambda api, a: api.call("GET", f"/tasks/{_id(a, 'task_id')}/relations")),
+    ("add_relation", "2.576.0: relate a task to another one (kind relates) or mark it as a duplicate of the other (kind duplicate). "
+     "Needs write access to task_id; the other task must be visible to you; at most 50 per task. A duplicate does not close the task: "
+     "close: true (duplicate only) also marks task_id as won't do with a comment pointing at the other task. Computed similar tasks: related_tasks.",
+     _obj({"task_id": S_ID, "other_id": S_ID, "kind": {"type": "string", "enum": ["relates", "duplicate"]},
+           "close": {"type": "boolean"}}, ["task_id", "other_id"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/relations", body=_pick(a, ("other_id", "kind", "close")))),
+    ("remove_relation", "2.576.0: remove the saved relation between task_id and other_id (any kind). Needs write access to task_id.",
+     _obj({"task_id": S_ID, "other_id": S_ID}, ["task_id", "other_id"]),
+     lambda api, a: api.call("DELETE", f"/tasks/{_id(a, 'task_id')}/relations/{_id(a, 'other_id')}")),
     # ---- custom fields
     ("list_fields", "Custom field definitions of a project (id, name, type, options). Values: the task's fields {field id: value}.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/fields")),
@@ -2680,7 +2693,7 @@ TOOL_SCOPES = {
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
                     "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_decision", "set_delivery", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "duplicate_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
-                    "reopen_task", "partial_task", "skip_occurrence", "take_task", "watch_task", "unwatch_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
+                    "reopen_task", "partial_task", "skip_occurrence", "take_task", "watch_task", "unwatch_task", "add_subtask", "add_dependency", "remove_dependency", "add_relation", "remove_relation", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval", "restore_note"),  # 2.272.0 E1 (#3038): restore_note
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
                  "delete_chat_attachment"),
@@ -2758,7 +2771,7 @@ TOOLSETS = {
         shift_list_dates list_members share_list unshare_list share_list_with_group unshare_list_from_group get_group list_sections create_section
         rename_section reorder_sections delete_section list_folders rename_folder delete_folder move_task link_task_to_list unlink_task_from_list
         batch_tasks reopen_task delete_task partial_task skip_occurrence take_task list_subtasks add_subtask list_trash restore_task empty_trash list_tags
-        get_roadmap get_dependencies add_dependency remove_dependency list_fields create_field update_field delete_field get_key_figures create_list_tag
+        get_roadmap get_dependencies add_dependency remove_dependency list_relations add_relation remove_relation list_fields create_field update_field delete_field get_key_figures create_list_tag
         update_list_tag delete_list_tag list_templates create_template update_template delete_template apply_template duplicate_list duplicate_task list_filters
         create_filter update_filter delete_filter upload_attachment create_text_file delete_attachment update_comment delete_comment set_project_overview
         add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints

@@ -10,6 +10,7 @@ from ..core.i18n import tr
 from ..core.ctx import me  # 2.149.0 G (#2517): was accounts.session
 from ..core.access import plists, PROJ_SQL, pvis
 from ..core.pg import st_ids
+from ..core.dlock import dl_tasks_locked  # 2.576.0 (#3371)
 from ..core.db import iso, iso_ms, now_utc  # 2.149.0 G (#2517): pulled up from functions
 from ..core.retention import ret_days  # 2.272.0 E2 (#3038)
 
@@ -158,6 +159,34 @@ def wat_of(c, ids):
     return out
 
 
+# 2.576.0 (#3371): the saved relations as the reading side sees them (tasks/relations.py)
+REL_OUT = {("relates", True): "relates", ("relates", False): "relates", ("duplicate", True): "duplicate_of", ("duplicate", False): "has_duplicate"}
+
+
+def rel_of(c, ids, mkvis, uid=None):
+    """2.576.0 (#3371): {task id: [{id, kind}]} of the saved relations of the tasks ids whose other task is visible
+    (mkvis() -> personal.timetrack.VisIds, built only when there is a relation) and not in the trash; for an agent uid, other
+    tasks its data lock covers are left out too (core/dlock.py; nothing for people)."""
+    out = {}
+    if not ids:
+        return out
+    st = st_ids(sorted(ids))
+    rows = c.execute("""SELECT r.task_id, r.other_id, r.kind, a.list_id AS al, b.list_id AS bl FROM task_relations r
+                        JOIN tasks a ON a.id=r.task_id JOIN tasks b ON b.id=r.other_id
+                        WHERE (r.task_id = ANY(CAST(? AS BIGINT[])) OR r.other_id = ANY(CAST(? AS BIGINT[])))
+                        AND a.deleted_at IS NULL AND b.deleted_at IS NULL ORDER BY r.id""", (st, st)).fetchall()
+    if not rows:
+        return out
+    vis = mkvis()
+    lck = dl_tasks_locked(c, uid, [r[k] for r in rows for k in ("task_id", "other_id")]) if uid else set()
+    for r in rows:
+        if r["task_id"] in ids and r["other_id"] not in lck and r["bl"] in vis and vis.task_ok(r["other_id"], r["bl"]):
+            out.setdefault(r["task_id"], []).append({"id": r["other_id"], "kind": REL_OUT[(r["kind"], True)]})
+        if r["other_id"] in ids and r["task_id"] not in lck and r["al"] in vis and vis.task_ok(r["task_id"], r["al"]):
+            out.setdefault(r["other_id"], []).append({"id": r["task_id"], "kind": REL_OUT[(r["kind"], False)]})
+    return out
+
+
 def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     """lean_notes: 2.280.0 A (#3108) the start state (GET /api/state): a note longer than ST_NOTE_MAX goes without its text
     (no "content" key, content_n = its length); the detail loads it (GET /api/tasks/<id>), the delta and every other answer
@@ -269,6 +298,7 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     ppl = people_of(c, ids)  # 2.19.0 (#653): who comes along
     wat = wat_of(c, ids - ctx)  # 2.473.0 (#3357): who watches it (not on a read-only context task)
     wk = wk_for(c, ids - ctx) if uid else {}  # 2.407.0 A (#3513): an agent works on it now
+    rel = rel_of(c, ids - ctx, lambda: vis or vis_ids(c, uid), uid) if uid and ids else {}  # 2.576.0 (#3371): saved relations
     out = []
     for r in rows:
         d = task_dict(r, tags, full_snips)
@@ -306,6 +336,8 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
             d["ai_usage"] = aiu[r["id"]]
         if r["id"] in wk:
             d["working"] = wk[r["id"]]
+        if r["id"] in rel:
+            d["relations"] = rel[r["id"]]  # 2.576.0 (#3371): absent = none
         if r["id"] in ctx:
             d.update(content="", url=None, attachments=[], comment_count=0, unread=0, fields={}, irreversible_reason="", delivery_note="",
                      blockers=[], blocked=0, blocking=0, context=True)

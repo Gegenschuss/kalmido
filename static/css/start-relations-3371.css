@@ -1,0 +1,7 @@
+/* 2.576.0 (#3371): saved relations in a task (related.js) and the two actions per similar task */
+.rt9row{display:flex;align-items:center;gap:.25rem;min-width:0}
+.rt9row>.rt9it{flex:1}
+.rt9acts{display:flex;flex:none;gap:.125rem}
+.rt9saved{flex:none;font-size:var(--fs-s)}
+.relsec .relk{flex:none;font-size:var(--fs-s)}
+.relkind{flex-wrap:wrap;gap:.25rem 1rem}

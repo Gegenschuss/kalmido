@@ -670,6 +670,8 @@ function actText0(a, U) {
     case 'dep_rm': return d.hidden ? tr('{0} removed a dependency on a task you cannot see', who) : tr('{0} removed the dependency on {1}', who, q(d.title || ''));
     case 'blocks_add': return d.hidden ? tr('{0} marked the task as blocking a task you cannot see', who) : tr('{0} marked the task as blocking {1}', who, q(d.title || ''));
     case 'blocks_rm': return d.hidden ? tr('{0} removed the task as a blocker of a task you cannot see', who) : tr('{0} removed the task as a blocker of {1}', who, q(d.title || ''));
+    case 'rel_add': return tr({duplicate_of: N_('{0} marked the task as a duplicate of {1}'), has_duplicate: N_('{0} marked {1} as a duplicate of this task')}[d.k] || N_('{0} related the task to {1}'), who, q(d.title || ''));  // 2.576.0 (#3371)
+    case 'rel_rm': return tr('{0} removed the relation to {1}', who, q(d.title || ''));
     case 'unblocked': return d.hidden ? tr('{0} completed the last task blocking this one', who) : tr('{0} completed {1}, the task is no longer blocked', who, q(d.title || ''));
     case 'field': return d.v == null ? tr('{0} cleared the field {1}', who, q(d.name || '')) : tr('{0} set {1} to {2}', who, q(d.name || ''), q(actField(d)));
     case 'apstate': return {pending: tr('{0} asked {1} for approval', who, q(uname(d.approver, U))), approved: tr('{0} approved the task', who), changes: tr('{0} asked for changes', who),

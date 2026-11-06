@@ -21,13 +21,17 @@ function rt9_detailHtml(t) {
   const open = !!LS.get('rt9Open', false), c = RT9.cache.get(t.id);
   if (open && (!c || Date.now() - c.at > RT9.TTL) && !c?.busy) setTimeout(() => rt9_load(t.id), 0);
   const dup = (c?.items || []).some(x => x.dup);
-  return `<details class="dsec rt9sec" id="d-rel" data-tid="${t.id}" ${open ? 'open' : ''}><summary><span>${tr('Related tasks')}</span>${dup ? `<span class="rt9dupb">${esc(tr('probably a duplicate'))}</span>` : ''}</summary><div class="rt9list" aria-live="polite">${rt9_listHtml(c)}</div></details>`;
+  return `<details class="dsec rt9sec" id="d-rel" data-tid="${t.id}" ${open ? 'open' : ''}><summary><span>${tr('Related tasks')}</span>${dup ? `<span class="rt9dupb">${esc(tr('probably a duplicate'))}</span>` : ''}</summary><div class="rt9list" aria-live="polite">${rt9_listHtml(c, t)}</div></details>`;
 }
-function rt9_listHtml(c) {
+function rt9_listHtml(c, t) {
   if (!c || (c.busy && !c.items)) return `<div class="muted rt9empty">${tr('Loading…')}</div>`;
   if (c.pending) return `<div class="muted rt9empty">${esc(tr('Being computed, please check again in a minute.'))}</div>`;
   if (!c.items?.length) return `<div class="muted rt9empty">${esc(tr('Nothing similar found.'))}</div>`;
-  const row = x => `<button type="button" class="rt9it ${x.done ? 'rt9done' : ''}" data-act="open-id" data-id="${x.id}"><span class="rt9n">#${x.id}</span><span class="rt9t">${esc(mdPlain(x.title))}</span>${x.dup ? `<span class="rt9dup">${esc(tr('probably a duplicate'))}</span>` : ''}</button>`;
+  // 2.576.0 (#3371): a saved relation says so; else, with write access, two actions: remember as related, close as its duplicate
+  const acts = x => x.saved ? `<span class="muted rt9saved">${esc(tr(REL_KIND[x.saved] || x.saved))}</span>` : !t || !canEdit(t) ? ''
+    : `<span class="rt9acts"><button type="button" class="iconbtn" data-rel="mark" data-tid="${t.id}" data-o="${x.id}" title="${esc(tr('Remember as related'))}" aria-label="${esc(tr('Remember as related'))}">${ic('link', 's')}</button>`
+    + (t.status === 0 ? `<button type="button" class="iconbtn" data-rel="close" data-tid="${t.id}" data-o="${x.id}" title="${esc(tr('Close as duplicate'))}" aria-label="${esc(tr('Close as duplicate'))}">${ic('copy', 's')}</button>` : '') + '</span>';
+  const row = x => `<div class="rt9row"><button type="button" class="rt9it ${x.done ? 'rt9done' : ''}" data-act="open-id" data-id="${x.id}"><span class="rt9n">#${x.id}</span><span class="rt9t">${esc(mdPlain(x.title))}</span>${x.dup ? `<span class="rt9dup">${esc(tr('probably a duplicate'))}</span>` : ''}</button>${acts(x)}</div>`;
   const sim = c.items.filter(x => !x.ref), refs = c.items.filter(x => x.ref);  // part M: tasks named by #number apart, not mixed in
   return (sim.length ? sim.map(row).join('') : `<div class="muted rt9empty">${esc(tr('Nothing similar found.'))}</div>`)
     + (refs.length ? `<div class="rt9refh">${esc(tr('Mentioned'))}</div>` + refs.map(row).join('') : '');
@@ -44,7 +48,7 @@ async function rt9_load(tid) {
   const box = document.querySelector(`#d-rel[data-tid="${tid}"]`);
   if (!box) return;
   if (RT9.on === false) { box.remove(); return; }
-  $('.rt9list', box).innerHTML = rt9_listHtml(c);
+  $('.rt9list', box).innerHTML = rt9_listHtml(c, taskById(tid));
   const s = $('summary', box), dup = c.items.some(x => x.dup), b = $('.rt9dupb', s);
   if (dup && !b) s.insertAdjacentHTML('beforeend', `<span class="rt9dupb">${esc(tr('probably a duplicate'))}</span>`);
   else if (!dup && b) b.remove();
@@ -126,3 +130,84 @@ async function rt9_adminDraw(md) {
     });
   }
 }
+
+// ---- 2.576.0 (#3371): saved relations of a task ("related to", "duplicate of"), next to the dependencies in a task.
+// GET /api/tasks/<id>/relations when the task opens or its relations change; adding / removing needs write access to the task
+// (the server checks it, and that the other task is visible). "Duplicate of" does not close the task by itself: the row offers
+// "Close as duplicate" (won't do + a comment, with Undo). The computed similar tasks above stay a suggestion apart.
+const REL = {id: null, items: null, err: null, n: -1};
+const REL_KIND = {relates: N_('Related to'), duplicate_of: N_('Duplicate of'), has_duplicate: N_('Has duplicate')};
+async function rel_load(id) {
+  if (!(id > 0) || taskById(id)?.context) return;
+  try { const j = await rawFetch('GET', `/api/tasks/${id}/relations`); if (S.sel === id) { REL.id = id; REL.items = j.relations || []; REL.err = null; rel_draw(); } }
+  catch (e) { if (e.message !== 'auth' && S.sel === id) { REL.id = id; REL.items = null; REL.err = e instanceof Offline ? 'offline' : e.message; rel_draw(); } }
+}
+function rel_draw() { const el = $('#d-rels'), t = taskById(S.sel); if (el && t) el.innerHTML = rel_html(t); }
+function rel_secHtml(t) {
+  if (!t || !(t.id > 0) || t.context) return '';
+  const n = (t.relations || []).map(x => x.id + x.kind).join();  // the task object's relations changed (another device, an agent): load again
+  if (REL.id !== t.id || REL.n !== n) { REL.n = n; setTimeout(() => { if (S.sel === t.id) rel_load(t.id); }, 0); }
+  return `<div class="dsec relsec" id="d-rels">${rel_html(t)}</div>`;
+}
+function rel_html(t) {
+  const ro = !canEdit(t), head = `<h5>${tr('Relations')}</h5>`;
+  if (REL.id !== t.id) return head + `<div class="muted mhint">${tr('Loading…')}</div>`;
+  if (REL.err) return head + `<div class="muted mhint">${REL.err === 'offline' ? tr('Only available online.') : esc(REL.err)}</div>`;
+  const rows = (REL.items || []).map(x => `<div class="dep relit ${x.status ? 'done' : ''}" data-kind="${esc(x.kind)}"><span class="muted relk">${esc(tr(REL_KIND[x.kind] || x.kind))}</span>`
+    + `<button type="button" class="dt" data-act="open-dep" data-id="${x.id}">${esc(x.title)}</button>`
+    + (!ro && x.kind === 'duplicate_of' && t.status === 0 ? `<button type="button" class="btn sm" data-rel="close" data-o="${x.id}">${tr('Close as duplicate')}</button>` : '')
+    + (ro ? '' : `<button type="button" class="iconbtn" data-rel="rm" data-o="${x.id}" title="${esc(tr('Remove'))}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`) + '</div>').join('');
+  if (ro && !rows) return head + `<div class="muted mhint">${tr('No relations.')}</div>`;
+  return head + rows + (ro ? '' : `<button type="button" class="btn sm dadd" data-rel="add" data-tid="${t.id}">${ic('plus', 's')} ${tr('Relation…')}</button>`);
+}
+async function rel_post(tid, other, kind) {
+  try { await api('POST', `/api/tasks/${tid}/relations`, {other_id: other, kind}); } catch { return false; }
+  await load(); render(); rel_load(tid); RT9.cache.delete(tid); return true;
+}
+async function rel_closeDup(tid, other) {
+  const snaps = withKids(tid), t = taskById(tid), go = () => api('POST', `/api/tasks/${tid}/relations`, {other_id: other, kind: 'duplicate', close: true});
+  let j; try { j = await go(); } catch { return; }
+  await load(); render(); rel_load(tid); RT9.cache.delete(tid);
+  const lbl = tr('Closed as a duplicate: {0}', qn(toastClip(t?.title)));
+  if (!j.undo) { toast(lbl); return; }
+  offerUndo(lbl, histAdd({label: lbl, snaps, ids: [tid], res: j,
+    undo: async e => { const r = await histBatch('undo', [tid], {items: {[tid]: e.res.undo}}); rel_load(tid); return r; },
+    redo: async e => { const r = await go(); e.res = r; rel_load(tid); return {res: r, skipped: [], none: !r.undo}; }}));
+}
+function rel_picker(tid) {
+  const self = taskById(tid), have = new Set((REL.id === tid ? REL.items || [] : []).map(x => x.id));
+  const md = modal(`<h3>${tr('Relation…')}</h3>
+    <div class="row relkind" role="radiogroup" aria-label="${esc(tr('Kind'))}"><label class="chkl"><input type="radio" name="rel-k" value="relates" checked> ${tr('Related to')}</label>
+    <label class="chkl"><input type="radio" name="rel-k" value="duplicate"> ${tr('“{0}” is a duplicate of', esc(toastClip(self?.title || '', 40)))}</label></div>
+    <input id="rel-q" placeholder="${tr('Search tasks')}" autocomplete="off" style="width:100%;margin-top:.5rem">
+    <div class="dplist tpk" id="rel-list" role="listbox" aria-label="${esc(tr('Tasks'))}"></div>
+    <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button></div>`);
+  md.classList.add('dpmodal');
+  const draw = () => {
+    const q = norm($('#rel-q', md).value || ''), qid = q.replace(/^#/, '');
+    const arr = [...S.tasks.values()].filter(x => x.id > 0 && x.id !== tid && !x.context && !have.has(x.id) && (!q || norm(x.title).includes(q) || String(x.id) === qid))
+      .sort((a, b) => (+!!a.status - +!!b.status) || (+(b.list_id === self?.list_id) - +(a.list_id === self?.list_id)) || bySort(a, b)).slice(0, 60);
+    $('#rel-list', md).innerHTML = arr.length ? arr.map(x => `<button type="button" class="tpkrow" role="option" data-pick="${x.id}"><span class="tpkt">${esc(x.title)}</span><span class="tpkm">#${x.id} · ${esc(lname(listById(x.list_id)))}</span></button>`).join('')
+      : `<div class="muted mhint">${tr('No matching task.')}</div>`;
+  };
+  draw();
+  md.addEventListener('input', e => { if (e.target.id === 'rel-q') draw(); });
+  md.addEventListener('click', async e => {
+    const b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.pick) { const k = $('input[name="rel-k"]:checked', md)?.value || 'relates'; if (await rel_post(tid, +b.dataset.pick, k)) md.remove(); }
+  });
+  setTimeout(() => { if (!isMobile()) $('#rel-q', md).focus(); }, 50);
+}
+document.addEventListener('click', async e => {
+  const b = e.target.closest?.('[data-rel]'); if (!b) return;
+  const tid = +(b.dataset.tid || S.sel), o = +b.dataset.o;
+  if (!(tid > 0)) return;
+  e.preventDefault();
+  switch (b.dataset.rel) {
+    case 'add': rel_picker(tid); break;
+    case 'rm': try { await api('DELETE', `/api/tasks/${tid}/relations/${o}`); } catch { break; } await load(); render(); rel_load(tid); RT9.cache.delete(tid); break;
+    case 'close': rel_closeDup(tid, o); break;
+    case 'mark': if (await rel_post(tid, o, 'relates')) toast(tr('Remembered as related')); break;  // from the similar tasks
+  }
+});

@@ -701,6 +701,13 @@ def undo_status(c, tid, u):
               (me(), at, *fam))
     c.execute(f"DELETE FROM activity WHERE kind='unblocked' AND user_id=? AND created_at>=? AND (data->>'id') IN ({q})",
               (me(), at, *fam))
+    dup = u.get("dup")  # 2.576.0 (#3371): closed as a duplicate (tasks/relations.py): the relation it added and its comment go too
+    if isinstance(dup, dict):
+        if isinstance(dup.get("rel"), int):
+            c.execute("DELETE FROM task_relations WHERE id=? AND task_id=? AND kind='duplicate'", (dup["rel"], tid))
+        if isinstance(dup.get("cm"), int):
+            c.execute("UPDATE comments SET body='', mentions='', deleted_at=? WHERE id=? AND task_id=? AND user_id=? AND deleted_at IS NULL",
+                      (ts, dup["cm"], tid, me()))
     log_act(c, tid, "reopen")
     return None
 

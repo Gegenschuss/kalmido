@@ -247,3 +247,4 @@ def completed_ids(c, tid):
 
 
 DEP_ACTS = ("dep_add", "dep_rm", "blocks_add", "blocks_rm", "unblocked")
+DEP_ACTS += ("rel_add", "rel_rm")  # 2.576.0 (#3371): saved relations -- the other task's title only for who sees it

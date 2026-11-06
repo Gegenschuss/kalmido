@@ -249,6 +249,7 @@ OX_AREAS = (
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
     ("tasks.json", "tasks", f"list_id IN ({LSQ})"),
     ("tasks/dependencies.json", "task_deps", f"task_id IN ({TSQ})"),
+    ("tasks/relations.json", "task_relations", f"task_id IN ({TSQ}) AND other_id IN ({TSQ})"),  # 2.576.0 (#3371): both tasks of the organisation
     ("tasks/field_values.json", "task_field_values", f"task_id IN ({TSQ})"),
     ("tasks/tags.json", "task_list_tags", f"task_id IN ({TSQ})"),
     ("tasks/people.json", "task_people", f"task_id IN ({TSQ})"),

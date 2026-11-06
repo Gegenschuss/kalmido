@@ -467,7 +467,8 @@ def _reading(c, run, src, d, ctx):
 _ACT_IDS = {"list_id": "lists", "section_id": "sections", "task_id": "tasks", "parent_id": "tasks", "milestone_id": "tasks",
             "comment": "comments", "sheet": "sheets", "signoff": "office_signoffs"}
 _ACT_KIND_IDS = {"field": {"id": "list_fields"}, "subtask": {"id": "tasks"}, "milestone": {"id": "tasks"}, "dep_add": {"id": "tasks"},
-                 "dep_rm": {"id": "tasks"}, "blocks_add": {"id": "tasks"}, "blocks_rm": {"id": "tasks"}, "unblocked": {"id": "tasks"}}
+                 "dep_rm": {"id": "tasks"}, "blocks_add": {"id": "tasks"}, "blocks_rm": {"id": "tasks"}, "unblocked": {"id": "tasks"},
+                 "rel_add": {"id": "tasks"}, "rel_rm": {"id": "tasks"}}  # 2.576.0 (#3371)
 _ACT_PEOPLE = ("user_id", "assignee_id", "agent_id", "agent", "approver", "reviewer", "by")  # by: tidy (comments.py names it)
 _ACT_DROP = ("hook",)  # the inbound webhook of the old server (log_act "via": "webhook")
 _ACT_KIND_PEOPLE = {"assign": ("to", "from"), "owner": ("from", "to"), "delegate": ("to", "from"), "watch": ("to",)}

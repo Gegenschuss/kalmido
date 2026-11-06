@@ -832,6 +832,7 @@ def umz_export_queries(uid):
         "list_fields": (f"SELECT * FROM list_fields WHERE list_id IN {own}", (uid,)),
         "task_field_values": (f"SELECT * FROM task_field_values WHERE task_id IN {task_ids}", (uid,)),
         "task_deps": (f"SELECT * FROM task_deps WHERE task_id IN {task_ids} OR blocker_id IN {task_ids}", (uid, uid)),
+        "task_relations": (f"SELECT * FROM task_relations WHERE task_id IN {task_ids} AND other_id IN {task_ids}", (uid, uid)),  # 2.576.0 (#3371)
         "list_status": (f"SELECT * FROM list_status WHERE list_id IN {own}", (uid,)),
         # 2.7.1 (#410): the overview of project lists (project files stay in data/attachments/lists/)
         "list_links": (f"SELECT * FROM list_links WHERE list_id IN {own} AND deleted_at IS NULL", (uid,)),  # 2.567.0 A (#4707)

@@ -3863,6 +3863,11 @@ with the scope it needs). The tools:
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
   `take_task`, `list_subtasks`, `add_subtask`, `list_trash`, `restore_task`, `empty_trash`, `list_tags`, `get_roadmap`
+- saved relations (2.576.0): `list_relations`, `add_relation` (kind `relates` or `duplicate`; a duplicate does not close the task,
+  `close: true` also closes it as won't do with a comment "Duplicate of #X", the person can undo it in the app), `remove_relation`;
+  only relations whose other task you may see, also in a task's `relations` (`[{id, kind}]`, kind `relates` / `duplicate_of` /
+  `has_duplicate`; `GET/POST /api/v1/tasks/{id}/relations`, `DELETE /api/v1/tasks/{id}/relations/{other_id}`). `related_tasks`
+  stays the computed suggestion; its items carry `saved` when the relation is saved already
 - dependencies and fields: `get_dependencies`, `add_dependency`, `related_tasks`, `remove_dependency`, `list_fields`, `create_field`,
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every project; creating a field or
   showing it with `set_list_columns` switches the module *Custom fields* on for the project's owner, the answer's `modules_on` names it;
@@ -3913,7 +3918,7 @@ those the token's scopes allow). `tests/agent_docs_coverage_test.py` checks that
 endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md), and in `mcp/CLAUDE.template.md`.
 
 `add_comment`, `add_contract`, `add_decision`, `add_deadline`, `add_dependency`, `add_device`, `add_health_entry`, `add_milestone`,
-`add_occasion`, `add_preparation_task`, `add_project_link`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
+`add_occasion`, `add_preparation_task`, `add_project_link`, `add_relation`, `add_reward`, `add_rule`, `add_shop_areas`, `add_snippet`,
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
@@ -3935,11 +3940,11 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `list_filed_mails`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_invoice_series`, `list_jobs`, `list_kids`,
 `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
 `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_polls`, `list_project_files`,
-`list_receipt_suggestions`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
+`list_receipt_suggestions`, `list_relations`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,
 `list_tags`, `list_tasks`, `list_team_channels`, `list_team_chats`, `list_templates`, `list_time_entries`, `list_trash`,
 `list_upkeep_presets`, `list_waiting`, `leave_team_channel`, `mark_news_read`, `mark_team_chat_read`, `move_task`, `pin_chat_message`, `pin_team_message`, `post_team_message`,
 `propose_playbook`, `propose_to_other_topic`, `propose_to_person`, `react`, `react_team_message`, `react_to_chat`,
-`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`,
+`read_attachment`, `read_briefing`, `read_file`, `read_project_status`, `read_team_chat`, `related_tasks`, `remove_dependency`, `remove_relation`,
 `rename_folder`, `rename_section`, `reopen_task`, `reorder_project_links`, `reorder_sections`, `reply_to_event`,
 `report_plan_usage`, `report_progress`, `report_usage`, `request_approval`, `request_chat_approval`,
 `request_comment_approval`, `request_deploy_approval`, `request_integration_approval`, `request_merge_approval`,

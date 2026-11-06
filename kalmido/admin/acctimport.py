@@ -170,6 +170,7 @@ UMZ_READ = frozenset((
     "notes", "task_enc_notes",  # 2.362.0 (#3090): project notes, my encrypted task notes
     "sprints", "task_links", "list_rules", "portal_tickets",  # 2.455.0 (#3469)
     "task_decisions",  # 2.392.0 C (#3370)
+    "task_relations",  # 2.576.0 (#3371)
     "template_files",  # 2.464.0 (#3865)
     "private_files", "private_versions", "private_area_roots", "wiki_pages", "wiki_files",  # #3470: umz_private (UMZ_PRIVATE)
     "private_locks", "private_lock_keys",  # #4300: admin/oilock.py
@@ -220,6 +221,7 @@ UMZ_LEFT_PARTS = frozenset(p for _w, ps in UMZ_LEFT for p in ps) - UMZ_READ
 UMZ_REFUSED_AREA = {
     "lists": N_("Projects"), "sections": N_("Sections"), "list_fields": N_("Custom fields"), "list_tags": N_("Project tags"),
     "list_milestones": N_("Milestones"), "sprints": N_("Sprints"), "tasks": N_("Tasks"), "task_deps": N_("Dependencies"),
+    "task_relations": N_("Relations"),  # 2.576.0 (#3371)
     "task_field_values": N_("Custom fields"), "task_tags": N_("Tags"), "task_list_tags": N_("Project tags"),
     "task_note_locks": N_("Encrypted notes"), "task_enc_notes": N_("Encrypted notes"), "notes": N_("Project notes"),
     "comments": N_("Comments"), "attachments": N_("Attachments"), "list_files": N_("Files"), "time_entries": N_("Time entries"),
@@ -496,6 +498,7 @@ UMZ_ORG_MAP = {
     "lists/tags.json": "list_tags", "lists/status.json": "list_status", "lists/links.json": "list_links",
     "lists/milestones.json": "list_milestones", "lists/files.json": "list_files", "tasks.json": "tasks",
     "tasks/dependencies.json": "task_deps", "tasks/field_values.json": "task_field_values", "tasks/tags.json": "task_list_tags",
+    "tasks/relations.json": "task_relations",  # 2.576.0 (#3371)
     "tasks/decisions.json": "task_decisions", "comments.json": "comments", "attachments.json": "attachments", "calendars.json": "event_calendars", "events.json": "events",
     "events/attendees.json": "event_attendees", "books.json": "address_books", "books/contacts.json": "contacts",
     "members.json": "members",
@@ -1659,6 +1662,14 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             continue
         if a and b and a != b and umz_insert(c, "task_deps", {"task_id": a, "blocker_id": b, "created_by": uid, "created_at": ts}, rid=False):
             run.count("task_deps")
+    for r in data.get("task_relations", []):  # 2.576.0 (#3371): both tasks came along (else the relation stays behind)
+        a, b = run.m("tasks", r.get("task_id")), run.m("tasks", r.get("other_id"))
+        kind = r.get("kind") if r.get("kind") in ("relates", "duplicate") else None
+        if not (a and b and a != b and kind) or (run.old("tasks", a) and run.old("tasks", b)):
+            continue
+        a, b = (min(a, b), max(a, b)) if kind == "relates" else (a, b)
+        if umz_insert(c, "task_relations", {"task_id": a, "other_id": b, "kind": kind, "created_by": uid, "created_at": ts}, rid=False):
+            run.count("task_relations")
     for r in data.get("task_field_values", []):
         tid, fid = run.m("tasks", r.get("task_id")), run.m("list_fields", r.get("field_id"))
         if tid and fid and run.field_list.get(fid) == run.task_list.get(tid) and not run.old("tasks", tid):  # 2.531.0 (#4317) F16

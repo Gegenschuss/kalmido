@@ -182,6 +182,10 @@ KINDS = {
     # 2.59.0 B (#1375): related tasks -- candidates only among the tasks the asker sees
     "related": ("matrix", "p259_b_api_test.py: related tasks, the hint while adding, search semantic=1, API v1 and agent events never "
                           "name a task of another organisation, an unshared list or a private list; another organisation's task 404"),
+    # 2.576.0 (#3371): saved relations between tasks (tasks/relations.py)
+    "relation": ("matrix", "p2576_d_links_api_test.py: a relation only between two tasks the person sees (another organisation's / an "
+                           "unshared task 404, nothing stored), a relation to a task that became invisible is never shown (app, API v1, "
+                           "task object, related tasks), an agent only with its shared list, a person without an organisation"),
     # 2.71.0 B (#1459): a task shown in further lists (task_links); rights stay with the task's own list
     "tasklink": ("matrix", "p271_b_api_test.py: linking into a list of another organisation / private <-> organisation refused, "
                            "a reader of only the further list gets the task nowhere (state, search, feed, public link, agent), "
@@ -1204,6 +1208,9 @@ ROUTES = {
     "GET /api/newsletter": "newsletter", "PUT /api/newsletter": "newsletter", "DELETE /api/newsletter": "newsletter",
     "GET /api/newsletter/lists": "newsletter", "POST /api/newsletter/segments": "newsletter", "PATCH /api/newsletter/segments/{}": "newsletter",
     "DELETE /api/newsletter/segments/{}": "newsletter", "POST /api/newsletter/sync": "newsletter", "PUT /api/newsletter/consent": "newsletter", "POST /api/newsletter/consent/import": "newsletter",
+    # 2.576.0 (#3371): saved relations (p2576_d_links_api_test.py)
+    "GET /api/tasks/{}/relations": "relation", "POST /api/tasks/{}/relations": "relation", "DELETE /api/tasks/{}/relations/{}": "relation",
+    "GET /api/v1/tasks/{}/relations": "relation", "POST /api/v1/tasks/{}/relations": "relation", "DELETE /api/v1/tasks/{}/relations/{}": "relation",
     # 2.59.0 B (#1375): related tasks (tasks/related.py)
     "GET /api/tasks/{}/related": "related", "GET /api/v1/tasks/{}/related": "related", "POST /api/tasks/similar": "related",
     "GET /api/related/config": "public", "GET /api/admin/related": "admin", "PUT /api/admin/related": "admin",
