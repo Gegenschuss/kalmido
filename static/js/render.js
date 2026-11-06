@@ -1035,7 +1035,7 @@ function keepFocus(root, fn) {
   return r;
 }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
-    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); return r; }); }
+    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); topw_later(); return r; }); }
 // ---- 2.599.0 (#4814): the page reports its width once to #main: data-w = lesen | form | seite (the widths of :root,
 // static/css/start-breite.css), eigen (an element with data-pw: its own centred block, e.g. notes / a knowledge page) or voll;
 // --pw = that width in px, --pw-sb = the scrollbar of #view. static/css/start-kopf-4814.css gives #top the same middle and
@@ -1061,12 +1061,15 @@ function topw_sync() {
     if (hit && mw > 0 && mid(hit)) { w = key === 'eigen' ? named.get(Math.round(mw)) || 'eigen' : key; px = mw; }
   }
   if (m.dataset.w !== w) m.dataset.w = w;
+  $('#top')?.classList.toggle('topw', w !== 'voll');  // the class on #top itself: its padding follows at once (no wait for an attribute two levels up)
   const pw = px ? Math.round(px) + 'px' : '', sb = Math.max(0, v.offsetWidth - v.clientWidth) + 'px';
   if (m.style.getPropertyValue('--pw') !== pw) { if (pw) m.style.setProperty('--pw', pw); else m.style.removeProperty('--pw'); }
   if (m.style.getPropertyValue('--pw-sb') !== sb) m.style.setProperty('--pw-sb', sb);
 }
 let topw_raf = 0;
-window.addEventListener('resize', () => { if (S.booted && !topw_raf) topw_raf = requestAnimationFrame(() => { topw_raf = 0; topw_sync(); }); });  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
+// once more after the next frame: a part of the page drawn later (a page loaded, a patched view, a menu's choice) counts too
+const topw_later = () => { if (!topw_raf) topw_raf = requestAnimationFrame(() => { topw_raf = 0; topw_sync(); }); };
+window.addEventListener('resize', () => { if (S.booted) topw_later(); });  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   lzGate();  // 2.369.2 (#3136): a view of the start set loads the lists it shows first (liveparts.js)

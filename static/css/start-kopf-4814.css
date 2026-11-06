@@ -1,10 +1,11 @@
 /* 2.599.0 (#4814): heads flush with the page. Every page reports its width to #main (render.js topw_sync: data-w = lesen | form |
    seite | eigen | voll, --pw = that width in px, --pw-sb = the scrollbar of #view); #top gets the same middle and width as the
-   content below it: padding-inline max(1.75rem, (100% - width) / 2), on the right plus the scrollbar #view has and #top has not.
+   content below it (class topw on #top): padding-inline max(1.75rem = the padding of #view, (100% - width) / 2), on the right plus
+   the scrollbar #view has and #top has not.
    voll and everything below 1700 px (1440 x 900, tablets, phones) stay as they were. Head bars inside the content stand in the
    width of the content below them. */
 @media (min-width:1700px){
-  #main:is([data-w=lesen],[data-w=form],[data-w=seite],[data-w=eigen]) > #top{
+  #top.topw{
     --pw-in:max(1.75rem,calc((100% - var(--pw-sb,0px) - var(--pw,100%)) / 2));
     padding-left:var(--pw-in);padding-right:calc(var(--pw-in) + var(--pw-sb,0px))}
   /* calendar, agenda: its bar over the list (.agview = --w-seite, app.css) */
