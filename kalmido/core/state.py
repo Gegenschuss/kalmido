@@ -41,6 +41,13 @@ def _org_names(c, uid):  # 2.22.0 (#752)
     return org_names(c, uid)
 
 
+def _st_org_labels(c, uid):
+    """2.609.0 (#3373, review F3): the labels of the organisations uid fully sees (the roles of accounts/orgroles.py FULL_READ,
+    as the templates of the state)."""
+    return [dict(r) for r in c.execute("""SELECT id, org_id, name, color FROM org_tags WHERE org_id IN (SELECT org_id FROM org_members
+                                          WHERE user_id=? AND role IN ('admin', 'member', 'readonly')) ORDER BY org_id, sort, lower(name), id""", (uid,))]
+
+
 def _jtrip(v):
     try:
         t = json.loads(v) if v else None
@@ -427,9 +434,9 @@ def state():
         templates=[dict(r) for r in c.execute("""SELECT id, kind, name, org_id FROM templates WHERE deleted_at IS NULL AND ((org_id IS NULL AND user_id=?) OR org_id IN
                                                  (SELECT org_id FROM org_members WHERE user_id=? AND role IN ('admin', 'member', 'readonly')))
                                                  ORDER BY lower(name), id""", (uid, uid))],
-        # 2.609.0 (#3373): the labels of the organisations whose projects the person sees (lists/orglabels.py)
-        org_labels=[dict(r) for r in c.execute(f"""SELECT id, org_id, name, color FROM org_tags WHERE org_id IN (SELECT org_id FROM lists
-                                                    WHERE id IN {vis_sql()} AND org_id IS NOT NULL) ORDER BY org_id, sort, lower(name), id""", (uid, uid))],
+        # 2.609.0 (#3373): the labels of the person's organisations (lists/orglabels.py); review F3: only with the full view
+        # (user_orgs_full) -- a guest / accounting person sees the labels linked in a shared project there (its tags), no more
+        org_labels=_st_org_labels(c, uid),
         timer=time_running(c, uid) if time_all() else None,
         time_totals=time_totals(c, uid) if time_all() else {},
         time_lists=time_list_totals(c, uid, own=True) if time_all() else {},  # 2.7.0 (#407); 2.144.5 C (#1523): own=True

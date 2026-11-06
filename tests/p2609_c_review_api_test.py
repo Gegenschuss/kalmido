@@ -6,6 +6,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
    403; its project template makes the project in the organisation only: a read-only member 403 (was: privately), a support
    session without the organisation's own support access 403 support_session
  - F2 an admin who makes another admin's organisation template private owns it now (with its file copies)
+ - F3 a guest gets no organisation labels in the app state and cannot reach them by name (a plain project tag at most)
  - F4 an organisation's templates stay when their maker's account goes (the heir owns them, their files still open);
    they no longer count for their maker's limit
  - F5 the trash lists an organisation's deleted template for its admins (also when another admin made it), not for a member
@@ -189,5 +190,20 @@ check(TE in trash_tpls(A), "F5: the admin who deleted it finds it in the trash")
 check(TE in trash_tpls(Ev), "F5: the other admin too")
 check(TE not in trash_tpls(Bo), "F5: a member does not")
 check(A.post(B + f"/api/templates/{TE}/restore").ok, "F5: restored from there")
+
+# ================================================================== F3 labels and a guest
+r = A.post(B + "/api/org-labels", json={"org_id": ORG, "name": "Acme deal", "color": "#f87171"})
+assert r.status_code == 201, r.text
+OLB = r.json()["id"]
+check(any(x["id"] == OLB for x in st(Bo).get("org_labels", [])), "F3: a member gets the label")
+check(any(x["id"] == OLB for x in st(Ri).get("org_labels", [])), "F3: a read-only member too (full view)")
+check(st(Gi).get("org_labels") == [], f"F3: a guest of a shared project does not {st(Gi).get('org_labels')}")
+TG = task(A, L1, "Guest's ticket")
+Gi.patch(B + f"/api/tasks/{TG}", json={"ltags": ["Acme deal"]})
+lt = next(x for x in st(A)["lists"] if x["id"] == L1)["tags"]
+check(not any(x.get("org_tag_id") == OLB for x in lt), f"F3: the guest's tag by that name is no link to the label {lt}")
+check(Bo.patch(B + f"/api/tasks/{TG}", json={"ltags": ["Acme deal"]}).ok, "F3: a member uses the label")
+lt = next(x for x in st(A)["lists"] if x["id"] == L1)["tags"]
+check(any(x.get("org_tag_id") == OLB for x in lt) or any(x["name"] == "Acme deal" for x in lt), f"F3: the member's use works {lt}")
 
 sys.exit(kt.done("p2609_c_review_api"))

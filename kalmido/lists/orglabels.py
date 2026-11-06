@@ -61,9 +61,12 @@ def olb_out(c, r):
 
 
 def olb_match(c, lid, name):
-    """The label of list lid's organisation named name (any case), or None (a list without an organisation: never)."""
-    return c.execute("""SELECT o.* FROM org_tags o JOIN lists l ON l.org_id=o.org_id WHERE l.id=? AND lower(o.name)=lower(?)""",
-                     (lid, name)).fetchone()
+    """The label of list lid's organisation named name (any case), or None (a list without an organisation: never).
+    2.609.0 (#3373, review F3): only for a person with the full view of that organisation -- a guest / accounting person who
+    may tag in a shared project gets a plain project tag, so the labels' names are no oracle for them."""
+    r = c.execute("""SELECT o.* FROM org_tags o JOIN lists l ON l.org_id=o.org_id WHERE l.id=? AND lower(o.name)=lower(?)""",
+                  (lid, name)).fetchone()
+    return r if r and r["org_id"] in user_orgs_full(c, me()) else None
 
 
 @app.get("/api/org-labels")
