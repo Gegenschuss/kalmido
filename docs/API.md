@@ -1002,7 +1002,7 @@ checks of the app (who may manage a webhook, an organisation admin, the project 
 | `POST /me/webhooks/{id}/test` | integrations | send a `ping` now (no retries): `{ok, status, ms, error}` |
 | `GET /me/webhooks/{id}/log` | integrations | the recent deliveries |
 | `… /orgs/{id}/webhooks…` | integrations | the same for an organisation's webhooks: its admins only |
-| `GET /me/tokens` | integrations + account | your tokens (`name`, `prefix`, `scopes`, `effective_scopes`, `allowed_ips`, `list_ids`, `expires_at`, `last_used_at`); never their value |
+| `GET /me/tokens` | integrations + account | your tokens (`name`, `prefix`, `scopes`, `effective_scopes`, `allowed_ips`, `list_ids`, `expires_at`, `last_used_at`); never their value. A project-limited caller sees `list_ids` only within its own limit, trimmed entries carry `list_ids_partial: true` |
 | `POST /me/tokens` | integrations + account | `{name, scopes?, allowed_ips?, list_ids?, expires_days?}` -> `201` with `token` (shown only in this answer) |
 | `DELETE /me/tokens/{id}` | integrations + account | revoke a token (also the calling one); a scan inbox key is removed in the document settings (`403`) |
 | `POST /lists/{id}/repos` | integrations | `{repo, provider?, base_url?, owner?, token?}` connects a repository (the provider's `token` is only stored, sealed, and never returned: `token: true`) |

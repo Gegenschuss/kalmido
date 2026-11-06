@@ -43,6 +43,7 @@ P1 = F.post(B + "/api/lists", json={"name": "App", "kind": "project"}).json()["i
 P2 = F.post(B + "/api/lists", json={"name": "Site", "kind": "project"}).json()["id"]
 P3 = F.post(B + "/api/lists", json={"name": "Docs", "kind": "project"}).json()["id"]
 t_lim, t_two, t_all = tok(list_ids=[P1]), tok(list_ids=[P1, P2]), tok()
+t_other = tok(list_ids=[P3])
 
 
 def listing(t):
@@ -51,10 +52,19 @@ def listing(t):
     return {x["id"]: x["list_ids"] for x in r.json()["data"]}
 
 
+def partial(t):
+    r = requests.get(V + "/me/tokens", headers={"Authorization": "Bearer " + t["token"]}, timeout=60)
+    return {x["id"]: bool(x.get("list_ids_partial")) for x in r.json()["data"]}
+
+
 got = listing(t_lim)
 check(got[t_two["id"]] == [P1], f"L2: a limited token sees only its own projects of another token {got}")
 check(P2 not in sum(got.values(), []) and P3 not in sum(got.values(), []), "L2: no project id outside its limit")
 check(got[t_lim["id"]] == [P1], "L2: its own limit")
+pa = partial(t_lim)
+check(got[t_other["id"]] == [] and pa[t_other["id"]], f"L2: an empty cut is marked partial, not read as all projects {pa}")
+check(pa[t_two["id"]] and pa[t_all["id"]] and not pa[t_lim["id"]], f"L2: partial only where trimmed {pa}")
+check(not any(partial(t_all).values()), "L2: an unlimited caller sees nothing partial")
 got = listing(t_all)
 check(got[t_two["id"]] == [P1, P2] and got[t_lim["id"]] == [P1], f"L2: an unlimited token sees all {got}")
 

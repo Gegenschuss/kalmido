@@ -124,7 +124,10 @@ def v1s_token_list():
     tl = token_lists()
     if tl is not None:  # 2.575.0 (#3948): a project-limited token sees the others' projects only within its own limit
         for t in j["tokens"]:
-            t["list_ids"] = [x for x in t["list_ids"] if x in tl] if t["list_ids"] else sorted(tl)
+            seen = [x for x in t["list_ids"] if x in tl] if t["list_ids"] else sorted(tl)
+            if seen != t["list_ids"]:  # trimmed: an empty list here must not read as "every project" (empty = all)
+                t["list_ids_partial"] = True
+            t["list_ids"] = seen
     return jsonify(data=j["tokens"], scopes=j["scopes"], limit=j["limit"], enabled=j["enabled"], rate=j["rate"])
 
 
