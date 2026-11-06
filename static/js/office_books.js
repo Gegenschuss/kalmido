@@ -259,7 +259,7 @@ async function tcLoad() {
   catch (x) { if (seq === TC.seq) TC.err = x.message || tr('unknown'); }
   ofcDraw();
 }
-const tcGo = (p, inner) => !p.link ? inner : p.link.startsWith('setgo:') ? `<button type="button" class="linkbtn tc-go" data-setgo="${esc(p.link.slice(6))}">${inner}</button>` : `<a class="tc-go" href="${esc(p.link)}">${inner}</a>`;
+const tcGo = (p, inner) => !p.link ? inner : p.link.startsWith('setgo:') ? `<button type="button" class="linkbtn tc-go" data-setgo="${esc(p.link.slice(6))}">${inner}</button>` : p.link.startsWith('#') ? `<a class="tc-go" href="${esc(p.link)}">${inner}</a>` : inner;  // 2.589.0 (#3458, review): only in-app links
 const tcRow = p => `<li class="tc-pt tc-${esc(p.ampel)}" data-tc="${esc(p.punkt)}"><span class="tc-dot" aria-hidden="true"></span><div class="tc-body">
   ${tcGo(p, `<b>${esc(p.title)}</b>`)} <span class="tc-st">${esc(tr(TC_LBL[p.ampel] || p.ampel))}</span><p>${esc(p.text)}</p>
   ${(p.details || []).length ? `<ul class="tc-det">${p.details.map(x => `<li>${esc(x)}</li>`).join('')}</ul>` : ''}</div></li>`;
