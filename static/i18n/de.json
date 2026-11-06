@@ -16571,7 +16571,7 @@
   "Set again meanwhile: the earlier value was not restored.": "Inzwischen neu gesetzt: der frühere Wert wurde nicht wiederhergestellt.",
   "The target folder is no longer open to you: documents land in the documents folder": "Der Zielordner ist für dich nicht mehr erreichbar: Dokumente landen im Dokumente-Ordner",
   "Target folder unavailable": "Zielordner nicht erreichbar",
-  "Switched off: mails to this address are refused": "Abgeschaltet: E-Mails an diese Adresse werden abgewiesen",
+  "Switched off: e-mails to this address are refused": "Abgeschaltet: E-Mails an diese Adresse werden abgewiesen",
   "for example Bank statements": "z. B. Kontoauszüge",
   "Accent": "Akzent",
   "Light accent": "Heller Akzent",

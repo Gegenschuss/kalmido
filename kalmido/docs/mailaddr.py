@@ -26,7 +26,7 @@ DMN_TAG_MAX = 40
 GENERAL = N_("General")
 GONE_MSG = N_("The target folder is no longer open to you: documents land in the documents folder")
 GONE_TAG = N_("Target folder unavailable")
-OFF_MSG = N_("Switched off: mails to this address are refused")
+OFF_MSG = N_("Switched off: e-mails to this address are refused")
 
 
 def dmn_token():
