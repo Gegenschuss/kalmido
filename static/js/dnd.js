@@ -60,6 +60,8 @@ document.addEventListener('drop', async e => {
 function dropTask(id, el, clientY) { return histGroup(async () => { if (await swlDrop(id, el)) return dropTask0(id, el, clientY); }); }  // 2.138.0 D (#2060): a swimlane's value first (same step)
 async function dropTask0(id, el, clientY) {
   const t = S.tasks.get(id); if (!t || !el) return;
+  // 2.579.0 (#4798): as this device saw it before the drop - a patchTask below changes t at once (outbox, #4568): undo, _prev, lock move
+  const before = snapTask(t);
   if (!canEdit(t) && !ml_in(t, ml_viewList())) { roToast(); return; }  // 2.71.0 B (#1459): a further list's writer moves the link
   const side = el.closest('.srow[data-drop]');
   const row = el.closest('.trow');
@@ -132,9 +134,8 @@ async function dropTask0(id, el, clientY) {
   }
   if (item.list_id && !canEditList(item.list_id)) { roToast(); return; }
   if (tlkHits(t, item)) { tlkToast(t); render(); return; }  // 2.36.0 (#1118): a locked task keeps its list / day / priority
-  const before = snapTask(t);
   // 2.64.1 (#1817): into / out of a list with the lock: a PATCH, so the browser re-encrypts the texts on the way (reorder cannot)
-  const xe2e = item.list_id && item.list_id !== t.list_id && typeof le2eOn === 'function' && (le2eOn(item.list_id) || le2eOn(t.list_id));
+  const xe2e = item.list_id && item.list_id !== before.list_id && typeof le2eOn === 'function' && (le2eOn(item.list_id) || le2eOn(before.list_id));
   if (!xe2e) { Object.assign(t, item); render(); }
   let res;
   try { res = xe2e ? await api('PATCH', `/api/tasks/${id}`, Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id'))) : await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { /* api() showed it */ return; }
