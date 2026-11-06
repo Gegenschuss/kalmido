@@ -2299,15 +2299,19 @@ def backups_passphrase_check():
     if e is not None:
         return e
     uid = g.user["id"]
+    pw = b.get("passphrase")
+    try:  # 2.581.0 (#4826, review): a lone surrogate from JSON cannot be encoded - 400, not a 500; bad input costs no try
+        pwb = pw.encode() if isinstance(pw, str) and pw and len(pw) <= 200 else None
+    except UnicodeEncodeError:
+        pwb = None
+    if pwb is None:
+        return err(tr("Invalid value: {0}", "passphrase"))
     if hit_limit(f"bkpc:{uid}", BKPC_TRIES, BKPC_WINDOW):
         return jsonify(error=tr("Too many attempts, please wait a few minutes"), code="rate"), 429
-    pw = b.get("passphrase")
-    if not isinstance(pw, str) or not pw or len(pw) > 200:
-        return err(tr("Invalid value: {0}", "passphrase"))
     cur = bk_passphrase(c)
     if not cur:
         return jsonify(error=tr("No backup passphrase is set yet."), code="no_passphrase"), 409
-    ok = hmac.compare_digest(pw.encode(), cur.encode())
+    ok = hmac.compare_digest(pwb, cur.encode())
     # the own harmless check is not pushed to oneself; one that does not match goes to every admin (a stolen session guessing)
     aa_now("security", f"bk-passcheck:{uid}:{time.time_ns()}", BKPC_OK if ok else BKPC_NO, [g.user["username"]], skip=uid if ok else None)
     return jsonify(ok=ok)

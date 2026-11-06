@@ -65,11 +65,11 @@ check(r.status_code == 409 and r.json().get("code") == "no_passphrase", f"no pas
 check(A.patch(B + "/api/admin/backups", json={"passphrase": STORED}).ok, "setup: the stored passphrase")
 check(A.get(B + "/api/admin/backups").json().get("passphrase_set") is True, "setup: passphrase_set")
 
-# ---- bad input (tries 2, 3; the step-up holds for the session now)
-for bad in ({"passphrase": 5}, {"passphrase": ""}):
-    r = A.post(B + PC, json=bad)
+# ---- bad input (no try counted; the step-up holds for the session now). 2.581.0 (#4826, review): a lone surrogate is a 400, not a 500
+for bad in ('{"passphrase": 5}', '{"passphrase": ""}', '{"passphrase": "\\ud800x"}'):
+    r = A.post(B + PC, data=bad, headers={"Content-Type": "application/json"})
     check(r.status_code == 400, f"bad input 400 {bad} ({r.status_code})")
-# ---- matches / does not match (tries 4, 5)
+# ---- matches / does not match (tries 2, 3)
 r = pc(A, STORED)
 check(r.ok and r.json() == {"ok": True}, f"the stored passphrase matches ({r.status_code} {r.text[:160]})")
 r = pc(A, WRONG)
@@ -78,7 +78,10 @@ al = until(lambda: alerts() if len(alerts()) >= 2 else None, 20) or alerts()
 check(len(al) == 2 and "it matches" in al[0] and "does not match" in al[1] and all("alice" in m for m in al),
       f"the admin log names both checks: {al}")
 
-# ---- the 6th try within the window: 429
+# ---- tries 4, 5, then the 6th within the window: 429
+for _ in range(2):
+    r = pc(A, WRONG)
+    check(r.ok, f"try 4/5 still answered ({r.status_code})")
 r = pc(A, STORED)
 check(r.status_code == 429, f"the 6th try: 429 ({r.status_code} {r.text[:160]})")
 
