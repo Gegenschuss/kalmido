@@ -147,7 +147,7 @@ async function otk_open() {
     if (!pick.length && !dpick.length) { toast(tr('Select at least one entry')); return; }
     const hours = {};
     for (const x of $$('[data-otkh]', md)) { const k = x.dataset.otkh || '', v = /** @type {HTMLInputElement} */ (x).value.trim().replace(',', '.'); if (pick.includes(k)) hours[k] = v === '' ? null : +v; }
-    const req = {pick, hours, ...(dpick.length ? {dispo: {pick: dpick, dates}} : {})};
+    const req = /** @type {any} */ ({pick, hours, ...(dpick.length ? {dispo: {pick: dpick, dates}} : {})});
     if (!j.list_id) { const name = (/** @type {HTMLInputElement|null} */ ($('#otk-name', md))?.value || '').trim(); if (!name) { toast(tr('Please enter a name')); return; } req.create = {name}; }
     /** @type {HTMLButtonElement} */ (b).disabled = true;
     let r;
