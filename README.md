@@ -19,9 +19,10 @@
 
 ## What's new
 
-**2.587.0** (2026-11-06):
-- **Tables**: cell format, colour rules, fill handle, print as PDF, pie / ring / stacked charts and 20 more functions.
-- **Industry**: one switch for the whole app (default none); Film unlocks the film features, new accounts get a neutral sample project.
+**2.596.0** (2026-11-06):
+- **Tasks**: My tasks gets personal sections (Now / Soon / Someday, your own), due tasks move to Now.
+- **Kalmido AI**: team server agents of an organisation with a limit per member.
+- **Moving**: an account import can be undone for 30 days.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
