@@ -1284,10 +1284,15 @@ def _wd_events(c, users, S, LG, now):
             _wd_fail(c, "reminder of event", r["id"], e)
     if ret_due("events"):  # 2.272.0 A (#3026): hourly, trash period + switch like every retention run (off = count only)
         cut, purge = ret_trash_cut(), ret_on("trash")
-        old = c.execute("SELECT id, cal_id FROM events WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()
+        # 2.582.0 (#4810): the events and the calendars in the trash (#4707) in one read - the second table had made the
+        # watchdog tick with nothing due one statement dearer (p2191_c_perf #2516: at most 4)
+        rows = c.execute("""SELECT 'e', id FROM events WHERE deleted_at IS NOT NULL AND deleted_at<?
+                            UNION ALL SELECT 'c', id FROM ev_cals WHERE deleted_at IS NOT NULL AND deleted_at<?""", (cut, cut)).fetchall()
+        old = [(r[1],) for r in rows if r[0] == "e"]
         if old and purge:
-            c.executemany("DELETE FROM events WHERE id=?", [(r[0],) for r in old])
-        ncal = KERN["purge"](c, cut, purge) if "purge" in KERN else 0  # 2.566.0 (#4707): the calendars in the trash (events/evkern.py)
+            c.executemany("DELETE FROM events WHERE id=?", old)
+        # 2.566.0 (#4707): the calendars in the trash (events/evkern.py)
+        ncal = KERN["purge"](c, cut, purge, [r[1] for r in rows if r[0] == "c"]) if "purge" in KERN else 0
         ret_report(c, "trash", {"events": len(old), "calendars": ncal}, purge, run="events")
         c.commit()
     c.execute("DELETE FROM ev_reminded WHERE at<?", (iso(now_utc() - timedelta(days=60)),))

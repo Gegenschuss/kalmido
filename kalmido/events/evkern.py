@@ -124,10 +124,12 @@ def ev_cal_restore(c, uid, cid):
     return row
 
 
-def ev_cal_trash_purge(c, cut, purge):
+def ev_cal_trash_purge(c, cut, purge, old=None):
     """The calendars in the trash longer than the trash period (events/model.py ev_reminders' retention run): deleted for
-    good with their events and node (purge False: only counted). Returns their number."""
-    old = [r[0] for r in c.execute("SELECT id FROM ev_cals WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()]
+    good with their events and node (purge False: only counted). Returns their number. old: their ids when the caller
+    has read them already (2.582.0, #4810: _wd_events reads them with the events in one statement)."""
+    if old is None:
+        old = [r[0] for r in c.execute("SELECT id FROM ev_cals WHERE deleted_at IS NOT NULL AND deleted_at<?", (cut,)).fetchall()]
     if old and purge:
         for cid in old:
             fs_ref_drop(c, EV_KIND, cid)
