@@ -12,6 +12,7 @@ week numbers of German calendars; Excel: 1 = weeks from Sunday with 1 January in
 (shf_arg_fill), so a formula keeps its meaning in both directions.
 The values know no time of day: JETZT/NOW is the date and time as text ("06.11.2026 14:05"); TEXT reads it back.
 """
+import math
 import re
 from datetime import date, datetime, timedelta
 from decimal import ROUND_DOWN, ROUND_HALF_UP, ROUND_UP, Decimal
@@ -213,6 +214,13 @@ def _bools(sv, args):
 _ROUNDING = {"roundup": ROUND_UP, "rounddown": ROUND_DOWN}
 
 
+def _dec_ok(x):
+    """x as a Decimal for quantize, only for finite numbers below 1E15 (more places raise InvalidOperation, review 2.578 F1)."""
+    if not math.isfinite(x) or abs(x) >= 1e15:
+        raise ShErr("type")
+    return Decimal(repr(x))
+
+
 def _round_dir(sv, args, key):
     _args("AUFRUNDEN" if key == "roundup" else "ABRUNDEN", args, 1, 2)
     x = _num(sv.scalar(args[0]))
@@ -221,7 +229,7 @@ def _round_dir(sv, args, key):
         raise ShErr("type")
     mode = _ROUNDING[key]  # away from zero / towards zero, like spreadsheets
     q = Decimal(1).scaleb(-d)
-    return float((Decimal(repr(x)) / q).quantize(Decimal(1), rounding=mode) * q)
+    return float((_dec_ok(x) / q).quantize(Decimal(1), rounding=mode) * q)
 
 
 # ---------------------------------------------------------------- work days and weeks
@@ -451,7 +459,7 @@ def _fmt_number(x, f, lg):
     group = any(ch in ".," for ch in intpart) or bool(re.search(r"[0#]\s[0#]", intpart))
     q = Decimal(1).scaleb(-decs)
     neg = x < 0
-    s = format(abs(Decimal(repr(x))).quantize(q, rounding=ROUND_HALF_UP), "f")
+    s = format(abs(_dec_ok(x)).quantize(q, rounding=ROUND_HALF_UP), "f")
     whole, _, frac = s.partition(".")
     need = intpart.count("0")
     whole = whole.lstrip("0").rjust(max(need, 0), "0") if whole != "0" or need else ""

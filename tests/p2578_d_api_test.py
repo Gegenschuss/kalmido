@@ -167,6 +167,23 @@ T = [
     ('=TEXT(5)', ("err", "syntax")),
 ]
 run_set(A, SID, "F", T, "TEXT")
+# 2.578.0 (#3462) review F1: a huge number in AUFRUNDEN / ABRUNDEN / TEXT is an error in its cell, the table stays readable
+r = A.post(B + "/api/sheets", json={"title": "Huge", "space": f"org:{ORG}"})
+HID = r.json()["id"]
+A.post(B + f"/api/sheets/{HID}/rows", json={"count": 10})
+HUGE = [('=AUFRUNDEN(1E30;0)', ("err", "type")), ('=ABRUNDEN(1E29;2)', ("err", "type")), ('=TEXT(1E30;"0,00")', ("err", "type")),
+        ('=TEXT(1E13;"0%")', ("err", "type")), ('=AUFRUNDEN(1E308*10;0)', ("err", "type")), ('=TEXT("NaN";"0,00")', "NaN"),
+        ('=AUFRUNDEN(123456789012,1;0)', 123456789013)]
+check(put(A, HID, [{"cell": f"A{i + 1}", "raw": f} for i, (f, _w) in enumerate(HUGE)]).ok, "huge numbers: the formulas are taken")
+r = A.get(B + f"/api/sheets/{HID}")
+check(r.status_code == 200, f"huge numbers: the table stays readable {r.status_code}")
+if r.status_code == 200:
+    run_set(A, HID, "A", HUGE, "huge numbers")
+for path in ("export.xlsx", "export.csv"):
+    r = A.get(B + f"/api/sheets/{HID}/{path}")
+    check(r.status_code == 200, f"huge numbers: {path} {r.status_code}")
+r = A.post(B + f"/api/sheets/{HID}/print.pdf", json={})
+check(r.status_code == 200, f"huge numbers: print.pdf {r.status_code}")
 # WENNFEHLER does not hide a cycle: the cells of the cycle stay marked
 r = put(A, SID, [{"cell": "E10", "raw": "=WENNFEHLER(E11;0)"}, {"cell": "E11", "raw": "=E10+1"}])
 d = get(A, SID)

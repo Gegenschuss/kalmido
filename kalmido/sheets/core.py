@@ -764,7 +764,7 @@ class ShEvaluator:
             r = self.out(v, kind, origin)
         except ShErr as e:
             r = dict(_err_res(e.kind, e.detail), origin=origin, _v=None)
-        except (OverflowError, ValueError, ZeroDivisionError):
+        except (OverflowError, ValueError, ArithmeticError):  # ArithmeticError: decimal signals too (review 2.578 F1)
             r = dict(_err_res("type"), origin=origin, _v=None)
         except RecursionError:  # review 4
             r = dict(_err_res("syntax", "deep"), origin=origin, _v=None)
