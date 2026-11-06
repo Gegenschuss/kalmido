@@ -164,7 +164,7 @@ function multiDateMenu(a) {
     {label: tr('Tomorrow'), icon: 'sunrise', fn: () => batch('patch', {due: addDays(today(), 1)})},
     {label: tr('Next week (Mon)'), icon: 'week', fn: () => batch('patch', {due: nextWeekday(1)})},
     {label: tr('Pick a date…'), icon: 'cal', fn: () => {
-      dpOpen(a, {kind: 'date', value: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) batch('patch', {due: v}); }});
+      dpOpen(a, {kind: 'date', value: today(), clear: false, future: true, label: tr('Pick a date…'), onPick: v => { if (v) batch('patch', {due: v}); }});
     }},
     {label: tr('No date|clear'), icon: 'ban', fn: () => batch('patch', {due: null})},
   ]);

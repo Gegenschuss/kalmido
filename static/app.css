@@ -1874,6 +1874,7 @@ body.tdrag .sdrop{display:flex}
 .tpk .tpl{color:var(--muted);font-size:var(--fs-s)}
 .tpin{flex:1;font:var(--fs-l) var(--mono);font-variant-numeric:tabular-nums;padding:.375rem .5rem}
 .tpin.bad{border-color:var(--danger)}
+.dpk{display:flex;margin-bottom:.5rem}.dpk .tpin{min-width:0}  /* 2.607.0 (#4867): the typed date above the month */
 #l-name[aria-invalid="true"]{border-color:var(--danger)}  /* 2.354.0 C (#3013): New project without a name */
 .tpcols{display:grid;grid-template-columns:3fr 2fr;gap:.625rem}
 .tph,.tpm{display:grid;gap:2px;align-content:start}

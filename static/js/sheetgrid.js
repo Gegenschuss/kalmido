@@ -186,7 +186,7 @@ function sgEdit(c, typed) {
     SG.ttl = t.id;
     return;
   }
-  if (c.k === 'due') { dpOpen(el, {kind: 'date', value: t.due || '', label: tr('Due'), onPick: d => sgMulti() ? sgSetAll(d || null, 'due') : sgWrite([{tid: t.id, k: 'due', v: d || null}], tr('Due date changed'))}); return; }
+  if (c.k === 'due') { dpOpen(el, {kind: 'date', value: t.due || '', future: true, label: tr('Due'), onPick: d => sgMulti() ? sgSetAll(d || null, 'due') : sgWrite([{tid: t.id, k: 'due', v: d || null}], tr('Due date changed'))}); return; }
   if (c.k === 'who') { if (sgMulti()) sgWhoMenu(el, t); else assignMenu(el, t.id); return; }
   if (!el.dataset.fe) return;
   tcEdit(el);

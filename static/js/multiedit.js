@@ -87,7 +87,7 @@ function meDateMenu(a) {
     {label: tr('Today'), icon: 'sun', fn: () => setDue(today())},
     {label: tr('Tomorrow'), icon: 'sunrise', fn: () => setDue(addDays(today(), 1))},
     {label: tr('Next week (Mon)'), icon: 'week', fn: () => setDue(nextWeekday(1))},
-    {label: tr('Pick a date…'), icon: 'cal', fn: () => dpOpen(a, {kind: 'date', value: today(), clear: false, label: tr('Pick a date…'), onPick: v => { if (v) setDue(v); }})},
+    {label: tr('Pick a date…'), icon: 'cal', fn: () => dpOpen(a, {kind: 'date', value: today(), clear: false, future: true, label: tr('Pick a date…'), onPick: v => { if (v) setDue(v); }})},
     ...(ts.some(t => t.due) ? [{label: tr('Time…'), icon: 'clock', fn: () => dpOpen(a, {kind: 'time', value: times.size === 1 ? [...times][0] : '', label: tr('Time'),
       onPick: v => meApply('date', t => t.due && (t.due_time || '') !== (v || '') ? {due_time: v || null} : null, v ? tr('Time: {0}', fmtTimeLoc(v)) : tr('No time'))})}] : []),
     '-', {label: tr('No date|clear'), icon: 'ban', fn: () => setDue(null)}]);

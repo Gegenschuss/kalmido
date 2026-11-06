@@ -450,6 +450,41 @@ function parseHM(v) {
   if (am && h === 12) h = 0;
   return h > 23 || mi > 59 ? null : `${pad(h)}:${pad(mi)}`;
 }
+// 2.607.0 (#4867): a date typed into the picker: 6.11. / 06.11.2026 / 6.11.26 / 61126 / 06112026 / 2026-11-06 / 11/6/2026
+// (month first where the region writes so, mdFirst), today / tomorrow / +3 / -2 (de, en and the app language)
+// -> 'YYYY-MM-DD', '' (empty) or null (not a date / outside min..max). o.ref = the day words count from (default today);
+// without a year: this year, with o.future (due dates) the next time the day comes
+const DP_WORDS = {heute: 0, today: 0, morgen: 1, tomorrow: 1, 'übermorgen': 2, uebermorgen: 2, 'day after tomorrow': 2, gestern: -1, yesterday: -1};
+function parseDMY(v, o = {}) {
+  let s = String(v ?? '').trim().toLowerCase().replace(/[‎‏]/g, '');
+  if (!s) return '';
+  const t0 = /^\d{4}-\d\d-\d\d$/.test(o.ref || '') ? o.ref : today();
+  const fit = x => x && (!o.min || x >= o.min) && (!o.max || x <= o.max) ? x : null;
+  const w = {...DP_WORDS, [tr('Today').toLowerCase()]: 0, [tr('Tomorrow').toLowerCase()]: 1};
+  if (s in w) return fit(addDays(t0, w[s]));
+  let x = s.match(/^([+-])\s*(\d{1,4})$/);
+  if (x) return fit(addDays(t0, (x[1] === '-' ? -1 : 1) * +x[2]));
+  s = s.replace(/\s+/g, '');
+  const mk = (y, m, d) => {
+    const free = y === undefined || y === '';
+    let Y = free ? +t0.slice(0, 4) : +y; if (!free && String(y).length <= 2) Y += 2000;
+    m = +m; d = +d; if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+    const ok = Y2 => { const dt = new Date(Y2, m - 1, d); return dt.getFullYear() === Y2 && dt.getMonth() === m - 1 && dt.getDate() === d ? ds(dt) : null; };
+    let r = ok(Y);
+    if (free && o.future && (!r || r < t0)) for (let k = 1; k <= 8 && !(r && r >= t0); k++) r = ok(Y + k);  // 29.02.: the next leap year
+    return fit(r);
+  };
+  const md = mdFirst();
+  if ((x = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/))) return mk(x[1], x[2], x[3]);
+  if ((x = s.match(/^(\d{1,2})\.(\d{1,2})\.?(?:(\d{2}|\d{4}))?$/))) return mk(x[3], x[2], x[1]);
+  if ((x = s.match(/^(\d{1,2})([/-])(\d{1,2})(?:\2(\d{2}|\d{4}))?$/))) return md ? mk(x[4], x[1], x[3]) : mk(x[4], x[3], x[1]);
+  if (/^\d{3,8}$/.test(s)) {  // digits only: 611 / 0611 (no year), 61126 / 061126, 6112026 / 06112026; 3 digits for day + month: 6|11 first, else 15|3
+    const L = s.length, yl = L >= 7 ? 4 : L >= 5 ? 2 : 0, dm = s.slice(0, L - yl), y = s.slice(L - yl);
+    for (const c of dm.length === 4 ? [2] : [1, 2]) { const a = dm.slice(0, c), b = dm.slice(c), r = md ? mk(y, a, b) : mk(y, b, a); if (r !== null) return r; }
+    return L === 8 ? mk(s.slice(0, 4), s.slice(4, 6), s.slice(6)) : null;  // 20261106
+  }
+  return null;
+}
 function dpInner(kind, v, o) {
   const txt = kind === 'date' ? fmtDateLoc(v) : fmtTimeLoc(v);
   return `${ic(kind === 'date' ? 'cal' : 'clock', 's')}<span class="dpv ${txt ? '' : 'muted'}">${esc(txt || o.empty || (kind === 'date' ? tr('No date|clear') : tr('No time')))}</span>`;
@@ -457,7 +492,7 @@ function dpInner(kind, v, o) {
 function dpField(kind, id, v, o = {}) {
   v = v || '';
   const lab = o.label || '';
-  return `<span class="dpw" id="${id}-w" ${o.hidden ? 'hidden' : ''}><input type="hidden" id="${id}" value="${esc(v)}" data-dp="${kind}" ${o.min ? `data-min="${esc(o.min)}"` : ''} ${o.max ? `data-max="${esc(o.max)}"` : ''} ${o.after ? `data-after="${esc(o.after)}"` : ''} ${o.clear === false ? 'data-noclear="1"' : ''} data-label="${esc(lab)}" data-empty="${esc(o.empty || '')}" ${o.ro ? 'disabled' : ''} ${o.attrs || ''}><button type="button" class="dpbtn" data-dpfor="${id}" aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(lab ? `${lab}: ${(kind === 'date' ? fmtDateLoc(v) : fmtTimeLoc(v)) || o.empty || tr('none')}` : '')}" ${o.ro ? 'disabled' : ''}>${dpInner(kind, v, o)}</button></span>`;
+  return `<span class="dpw" id="${id}-w" ${o.hidden ? 'hidden' : ''}><input type="hidden" id="${id}" value="${esc(v)}" data-dp="${kind}" ${o.min ? `data-min="${esc(o.min)}"` : ''} ${o.max ? `data-max="${esc(o.max)}"` : ''} ${o.after ? `data-after="${esc(o.after)}"` : ''} ${o.clear === false ? 'data-noclear="1"' : ''} ${o.future ? 'data-future="1"' : ''} data-label="${esc(lab)}" data-empty="${esc(o.empty || '')}" ${o.ro ? 'disabled' : ''} ${o.attrs || ''}><button type="button" class="dpbtn" data-dpfor="${id}" aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(lab ? `${lab}: ${(kind === 'date' ? fmtDateLoc(v) : fmtTimeLoc(v)) || o.empty || tr('none')}` : '')}" ${o.ro ? 'disabled' : ''}>${dpInner(kind, v, o)}</button></span>`;
 }
 const dateIn = (id, v, o) => dpField('date', id, v, o);
 const timeIn = (id, v, o) => dpField('time', id, v, o);
@@ -488,7 +523,7 @@ function dpOpen(anchor, o) {
   DP.el = el; DP.anchor = anchor; anchor?.setAttribute?.('aria-expanded', 'true');
   const v = o.value || '';
   DP.st = {...o, cur: o.kind === 'date' ? (v || o.ref || (o.min && o.min > today() ? o.min : today())) : v, sel: v};  // 2.117.0 A (#2290): ref = the anchor day (also in the past)
-  o.kind === 'date' ? dpDrawDate() : dpDrawTime();
+  if (o.kind === 'date') { dpDateShell(v); dpDrawDate(); } else dpDrawTime();
   dpPlace();
   el.addEventListener('keydown', dpKey);
   el.addEventListener('click', dpClick);
@@ -498,8 +533,17 @@ function dpOpen(anchor, o) {
     if (DP.st.min && c < DP.st.min.slice(0, 7) + '-01') c = DP.st.min; if (DP.st.max && c > DP.st.max) c = DP.st.max.slice(0, 7) + '-01';
     DP.st.cur = c; dpDrawDate(); $('.dpy', DP.el)?.focus();
   });
-  el.addEventListener('input', e => { if (e.target.id === 'dp-tin') e.target.classList.toggle('bad', parseHM(e.target.value) === null); });
-  setTimeout(() => (o.kind === 'date' ? $('.dpg [tabindex="0"]', el) : $('#dp-tin', el))?.focus(), 20);
+  el.addEventListener('input', e => {
+    if (e.target.id === 'dp-tin') e.target.classList.toggle('bad', parseHM(e.target.value) === null);
+    if (e.target.id === 'dp-din') dpTyped(e.target);
+  });
+  // 2.607.0 (#4867): the date picker focuses its text field (value selected); on a phone the grid, so the keyboard stays shut
+  setTimeout(() => {
+    if (DP.el !== el) return;
+    if (o.kind !== 'date') { $('#dp-tin', el)?.focus(); return; }
+    const din = $('#dp-din', el);
+    if (din && !el.classList.contains('sheet')) { din.focus(); din.select(); } else $('.dpg [tabindex="0"]', el)?.focus();
+  }, 20);
   return el;
 }
 function dpPlace() {
@@ -511,8 +555,27 @@ function dpPlace() {
   if (y + h > innerHeight - 12) y = Math.max(12, r.top - h - 6);
   el.style.left = Math.max(12, x) + 'px'; el.style.top = y + 'px';
 }
+// 2.607.0 (#4867): the date picker's text field above the month (stays while the month redraws below it)
+const dpFuture = o => !!o.future || !!(o.min && o.min >= today());
+// a day as the field shows it: the numbers of the region (fmtDateNum) when parseDMY reads them back the same, else 06.11.2026
+// (the app language "en" without a region writes 11/06/2026 but reads day first, mdFirst)
+function dpTxt(v) {
+  if (!/^\d{4}-\d\d-\d\d$/.test(v || '')) return '';
+  const t = fmtDateNum(pd(v)); return parseDMY(t) === v ? t : `${v.slice(8)}.${v.slice(5, 7)}.${v.slice(0, 4)}`;
+}
+function dpDateShell(v) {
+  const el = DP.el, mob = matchMedia('(max-width:767px)').matches, ph = dpTxt(today());
+  el.innerHTML = `<div class="dpk"><input id="dp-din" class="tpin" value="${esc(dpTxt(v))}" inputmode="${mob ? 'numeric' : 'text'}" autocomplete="off" enterkeyhint="done" spellcheck="false" placeholder="${esc(ph)}" aria-label="${esc(tr('Date'))}" aria-describedby="dp-t"></div><div class="dpcal"></div>`;
+}
+const dpParse = inp => parseDMY(inp.value, {min: DP.st?.min, max: DP.st?.max, future: dpFuture(DP.st || {})});
+function dpTyped(inp) {  // typing: red when not a date, the month follows
+  const st = DP.st; if (!st) return;
+  const v = dpParse(inp); inp.classList.toggle('bad', v === null); inp.setAttribute('aria-invalid', v === null ? 'true' : 'false');
+  if (v && v !== st.typed) { st.typed = v; st.cur = v; dpDrawDate(); }
+  else if (!v && st.typed) { st.typed = ''; dpDrawDate(); }
+}
 function dpDrawDate() {
-  const st = DP.st, el = DP.el, [y, m] = st.cur.split('-').map(Number), first = `${st.cur.slice(0, 7)}-01`;
+  const st = DP.st, box = $('.dpcal', DP.el) || DP.el, sel = st.typed || st.sel, [y, m] = st.cur.split('-').map(Number), first = `${st.cur.slice(0, 7)}-01`;
   const start = weekStartOf(first), order = wdOrder(), t0 = today();
   const ok = d => (!st.min || d >= st.min) && (!st.max || d <= st.max);
   let rows = '';
@@ -520,12 +583,12 @@ function dpDrawDate() {
     let cells = '';
     for (let i = 0; i < 7; i++) {
       const d = addDays(start, w * 7 + i), x = pd(d), out = x.getMonth() !== m - 1;
-      cells += `<button type="button" role="gridcell" class="dpd ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === st.sel ? 'sel' : ''} ${d === st.ref && !st.sel ? 'ref' : ''}" data-d="${d}" tabindex="${d === st.cur ? 0 : -1}" aria-selected="${d === st.sel}" ${ok(d) ? '' : 'disabled aria-disabled="true"'} aria-label="${esc(fmtDay('year', x))}${d === t0 ? ' · ' + esc(tr('Today')) : ''}">${x.getDate()}</button>`;
+      cells += `<button type="button" role="gridcell" class="dpd ${out ? 'out' : ''} ${d === t0 ? 'today' : ''} ${d === sel ? 'sel' : ''} ${d === st.ref && !sel ? 'ref' : ''}" data-d="${d}" tabindex="${d === st.cur ? 0 : -1}" aria-selected="${d === sel}" ${ok(d) ? '' : 'disabled aria-disabled="true"'} aria-label="${esc(fmtDay('year', x))}${d === t0 ? ' · ' + esc(tr('Today')) : ''}">${x.getDate()}</button>`;
     }
     rows += `<div role="row" class="dpr">${cells}</div>`;
     if (w >= 3 && pd(addDays(start, w * 7 + 7)).getMonth() !== m - 1) break;
   }
-  el.innerHTML = `<div class="dph"><button type="button" class="iconbtn" data-dm="-1" aria-label="${tr('Previous month')}">${ic('left')}</button><span class="dpt"><span id="dp-t" aria-live="polite">${MON[m - 1]}<span class="sr"> ${y}</span></span> <select class="dpy" data-native aria-label="${esc(tr('Year'))}">${dpYears(y).map(n => `<option value="${n}" ${n === y ? 'selected' : ''}>${n}</option>`).join('')}</select></span><button type="button" class="iconbtn" data-dm="1" aria-label="${tr('Next month')}">${ic('right')}</button></div>
+  box.innerHTML = `<div class="dph"><button type="button" class="iconbtn" data-dm="-1" aria-label="${tr('Previous month')}">${ic('left')}</button><span class="dpt"><span id="dp-t" aria-live="polite">${MON[m - 1]}<span class="sr"> ${y}</span></span> <select class="dpy" data-native aria-label="${esc(tr('Year'))}">${dpYears(y).map(n => `<option value="${n}" ${n === y ? 'selected' : ''}>${n}</option>`).join('')}</select></span><button type="button" class="iconbtn" data-dm="1" aria-label="${tr('Next month')}">${ic('right')}</button></div>
     <div class="dpg" role="grid" aria-labelledby="dp-t"><div role="row" class="dpr dpwd">${order.map(i => `<span role="columnheader" aria-label="${esc(WDL[i])}">${esc(WD[i])}</span>`).join('')}</div>${rows}</div>
     <div class="dpf"><button type="button" class="btn sm" data-dq="today" ${ok(t0) ? '' : 'disabled'}>${tr('Today')}</button>${st.clear === false ? '' : `<button type="button" class="btn sm" data-dq="clear">${tr('No date|clear')}</button>`}<span class="spacer"></span><button type="button" class="btn sm" data-dq="close">${tr('Cancel')}</button></div>`;
 }
@@ -587,6 +650,13 @@ function dpKey(e) {
     if (mv !== undefined) { e.preventDefault(); e.stopPropagation(); const n = bs[Math.max(0, Math.min(bs.length - 1, i + mv))]; bs.forEach(x => { x.tabIndex = -1; }); n.tabIndex = 0; n.focus(); }
     return;
   }
+  if (a && a.id === 'dp-din') {  // 2.607.0 (#4867): Enter takes the typed day; arrows stay in the field
+    if (e.key !== 'Enter') return;
+    e.preventDefault(); e.stopPropagation();
+    const v = dpParse(a);
+    if (v === null || (v === '' && st.clear === false)) { a.classList.add('bad'); a.setAttribute('aria-invalid', 'true'); return; }
+    dpPick(v); return;
+  }
   if (!a?.dataset?.d) return;
   let d = a.dataset.d;
   const k = e.key;
@@ -607,6 +677,7 @@ document.addEventListener('click', e => {  // a field button opens its picker
   const a = inp.dataset.after ? document.getElementById(inp.dataset.after)?.value || '' : '', ref = /^\d{4}-\d{2}-\d{2}$/.test(a) ? a : '';  // 2.117.0 A (#2290): an end field (after = its start field) opens at the start, days before it disabled
   const min = ref && !(inp.dataset.min > ref) ? ref : inp.dataset.min;
   dpOpen(b, {kind: inp.dataset.dp, value: inp.value, ref, min, max: inp.dataset.max, clear: !inp.dataset.noclear, label: inp.dataset.label, empty: inp.dataset.empty,
+    future: !!inp.dataset.future || /due|frist/i.test(inp.id),  // 2.607.0 (#4867): a typed "6.11." on a due date = the next 6.11.
     onPick: v => { if (inp.isConnected) dpSet(inp, v); }});
 }, true);
 document.addEventListener('pointerdown', e => { if (DP.el && !DP.el.contains(e.target) && !(DP.anchor && DP.anchor.contains?.(e.target))) dpClose(false); }, true);

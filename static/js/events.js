@@ -710,7 +710,7 @@ document.addEventListener('click', async e => {
     case 'done-clean': doneCleanup(); break;
     case 'qd-date': {
       const inp = $('#qinput'), cur = qovPick(S.qov || {}, parseQuick(inp?.value || '', S.quick.ignore), quickDefaults()).due || '';
-      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qovChipWins('date'); }});
+      dpOpen(a, {kind: 'date', value: cur || today(), clear: true, future: true, label: tr('Date'), onPick: v => { S.qov.due = v || null; qovChipWins('date'); }});
       break;
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
