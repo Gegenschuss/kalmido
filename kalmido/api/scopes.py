@@ -10,12 +10,12 @@ import time
 from flask import g, jsonify, request, Response
 
 from ..core.config import API_PREFIX, app
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids
 from ..core.i18n import N_, tr, trn
 from ..core.db import bump, db, err, gsetting, iso, now_utc, usettings
 from ..accounts.session import me
 from ..accounts.login import login_log_who  # 2.239.0 B (#2888)
-from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role, MANAGE_ROLES
+from ..core.access import Denied, need_list, need_task, need_time, ROLES, task_visible, token_lists, tvis, vis_sql, wr_sql, list_role, list_roles, MANAGE_ROLES
 from ..core.access import qn_private  # 2.477.0 (#3881)
 from ..core.serializers import load_tasks
 from ..core.state import visible_lists
@@ -365,10 +365,13 @@ def h6e_batch_detail(c, approver, lg, lids, data):
     for x in lids:
         cnt[x] = cnt.get(x, 0) + 1
     names, hidden = [], 0
+    # 2.602.0 D (#4508): the names in one query and the approver's roles through list_roles (one bundle, same answers)
+    lnames = {r[0]: r[1] for r in c.execute("SELECT id, name FROM lists WHERE id = ANY(CAST(? AS BIGINT[]))",
+                                            (st_ids(cnt),)).fetchall()} if cnt else {}
+    roles = list_roles(c, approver, list(cnt)) if approver else {}
     for lid, n in sorted(cnt.items(), key=lambda kv: -kv[1]):
-        r = c.execute("SELECT name FROM lists WHERE id=?", (lid,)).fetchone()
-        if r and approver and list_role(c, lid, approver) and len(names) < 4:
-            names.append(f"{r[0][:40]} ({n})")
+        if lid in lnames and roles.get(lid) and len(names) < 4:
+            names.append(f"{lnames[lid][:40]} ({n})")
         else:
             hidden += 1
     if hidden:

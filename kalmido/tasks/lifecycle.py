@@ -516,8 +516,8 @@ def do_complete(c, tid, status=2, undo=None):
             vals["sub_snapshot"] = "" if (_jparse(t["fam"]) or {}).get("kind") in FAM_OCC else rsn_take(c, tid)
         cur_id = insert_id(c, f"INSERT INTO tasks({','.join(cols)}) VALUES({','.join('?' * len(cols))})",
                         [vals[k] for k in cols])
-        for r in c.execute("SELECT user_id, tag FROM task_tags WHERE task_id=?", (tid,)).fetchall():
-            c.execute("INSERT INTO task_tags(task_id,user_id,tag) VALUES(?,?,?)", (cur_id, r["user_id"], r["tag"]))
+        # 2.602.0 D (#4508): one INSERT ... SELECT instead of one INSERT per tag
+        c.execute("INSERT INTO task_tags(task_id,user_id,tag) SELECT ?, user_id, tag FROM task_tags WHERE task_id=?", (cur_id, tid))
         c.execute("INSERT INTO task_field_values(task_id,field_id,value) SELECT ?, field_id, value FROM task_field_values WHERE task_id=?",
                   (cur_id, tid))
         chn_note(c, cur_id, "complete")  # 2.367.3 (#2973): the original is open again after this; its completed copy is what the channels report

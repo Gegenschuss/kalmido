@@ -1582,8 +1582,14 @@ def v1_tags():
                          JOIN tasks t ON t.id=g.task_id WHERE g.user_id=? AND t.deleted_at IS NULL AND t.list_id IN {vis_sql()}
                          AND {tvis(c, uid, "t.")} GROUP BY g.tag ORDER BY lower(g.tag)""", (uid, uid, uid)).fetchall()
     out = [{"name": r["tag"], "tasks": r["n"], "open": r["open"], "kind": "personal"} for r in rows]
-    for lid in [d["id"] for d in visible_lists(c, uid)]:  # 2.0.0: the list tags of the lists I see
-        out += [{**v1_ltag(c, r), "kind": "list"} for r in c.execute("SELECT * FROM list_tags WHERE list_id=? ORDER BY sort, lower(name)", (lid,))]
+    lids = [d["id"] for d in visible_lists(c, uid)]  # 2.0.0: the list tags of the lists I see
+    by = {}  # 2.602.0 D (#4508): one query for all of them; still list by list in visible_lists' order, each by sort, name
+    if lids:
+        for r in c.execute("SELECT * FROM list_tags WHERE list_id = ANY(CAST(? AS BIGINT[])) ORDER BY list_id, sort, lower(name)",
+                           (st_ids(lids),)).fetchall():
+            by.setdefault(r["list_id"], []).append(r)
+    for lid in lids:
+        out += [{**v1_ltag(c, r), "kind": "list"} for r in by.get(lid, ())]
     return jsonify(data=out, next_cursor=None)
 
 
