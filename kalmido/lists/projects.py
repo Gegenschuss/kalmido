@@ -31,6 +31,7 @@ from ..collab.news import bell_custom_clean, BELL_MODES, list_bell, list_push, n
 from ..personal.timetrack import time_day_h, time_list_totals
 from ..core.errors import BadInput, web_fields
 from ..api.common import v1_call  # 2.149.0 G (#2517): pulled up from functions
+from ..api.common import agent_time_hidden  # 2.582.0 (#4380)
 from ..core.orgcrypt import oc_plain_size, oc_send_file  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.layouts import page_layouts  # 2.369.5 (#2517): pulled up from functions
 from ..core.db import local_day as _local_day  # 2.369.5 (#2517): pulled up from functions
@@ -288,7 +289,7 @@ def overview_build(c, lid, uid):
            "task_files": sc_up(c, "att", tfiles), "members": members,
            "status": {"current": lst["status"] or None, "note": lst["status_note"] or "", "at": lst["status_at"], "history": status},
            "time": None}
-    if time_all() and lst["time_tracking"]:  # 2.41.0 (#1471): "Tracked" only with the list's time tracking on
+    if time_all() and lst["time_tracking"] and not agent_time_hidden():  # 2.41.0 (#1471): "Tracked" only with the list's time tracking on; 2.582.0 (#4380, fable review F2): an agent needs the scope time
         t = time_list_totals(c, uid).get(lid) or {"s": 0, "b": None}
         dh = lst["day_hours"] or time_day_h(c)
         out["time"] = {"seconds": t["s"] or 0, "budget_h": t["b"], "day_hours": dh}

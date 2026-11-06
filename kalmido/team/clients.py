@@ -20,6 +20,7 @@ from ..accounts.orgs import INSTANCE_ENV, user_orgs, is_org_admin, ws_chosen_org
 from ..accounts.orgroles import user_orgs_full, is_write_request  # 2.369.5 (#2517): pulled up from functions
 from ..personal.timetrack import time_report  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.supportgrant import sga_org_foreign
+from ..api.common import agent_time_hidden  # 2.582.0 (#4380)
 from ..office.owrite import ow_history_answer, ow_write  # 2.567.0 (#4711): the office's write layer (the clients save through it)
 
 
@@ -278,9 +279,17 @@ def client_public(c, uid, r, stats=False, month=None):
         d["bill_edit"] = cl_bill_ok(c, uid, r["org_id"], "edit")
     if stats:
         st = client_stats(c, uid, r["id"], lids, month)
+        if agent_time_hidden():  # 2.582.0 (#4380, fable review F2): an agent without the scope time: no hours / amounts
+            d["stats"], d["budget"] = cl_stats_blank(st), {"pct_h": None, "pct_amount": None, "level": "none"}
+            return d
         d["stats"] = st
         d["budget"] = budget_state(st, r)
     return d
+
+
+def cl_stats_blank(st):
+    """2.582.0 (#4380, fable review F2): client_stats without the tracked time and the amounts (None), the task counts stay."""
+    return {**st, **{k: None for k in ("seconds", "rounded", "amount", "month_seconds", "month_amount")}}
 
 
 def clients_brief(c, uid):
@@ -340,10 +349,12 @@ def client_get(cid):
     r = need_client(c, cid, uid)
     d = client_public(c, uid, r, stats=True, month=request.args.get("month"))
     # estimate vs. actual per list (#330): the sum of the tasks' durations next to the tracked time
-    per = []
+    per, hide = [], agent_time_hidden()
     for lid in d["lists"]:
         l = c.execute("SELECT id, name, kind, rate, status FROM lists WHERE id=?", (lid,)).fetchone()
         st = client_stats(c, uid, cid, [lid], request.args.get("month"))
+        if hide:  # 2.582.0 (#4380, fable review F2): an agent without the scope time
+            st = cl_stats_blank(st)
         per.append({"id": lid, "name": l["name"], "kind": l["kind"], "rate": l["rate"], "status": l["status"], **st})
     d["per_list"] = per
     d["blocks_off"] = client_blocks_off(c, r)  # 2.435.0 A (#3600)

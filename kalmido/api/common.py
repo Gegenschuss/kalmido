@@ -177,3 +177,18 @@ def v1_feature(f):
     if f not in (usettings(db(), me()).get("features") or "").split(","):
         raise Denied(403, tr("Collaboration is turned off in your settings") if f == "collab"
                      else tr("Time tracking is turned off in your settings"))
+
+
+def agent_time_hidden():
+    """2.582.0 (#4380, fable review F2): True for a request with an agent's token without the scope time - then tracked
+    hours and amounts stay empty (clients, the project overview, sheet variables), like lists/report.py time_allowed.
+    A person's own token and the browser stay as they were."""
+    if not has_request_context() or g.get("auth_via") != "token":
+        return False
+    u = g.get("user")
+    try:
+        if not u or (u["kind"] or "user") != "agent":
+            return False
+    except (KeyError, IndexError, TypeError):
+        return False
+    return "time" not in (g.get("scopes") or set())

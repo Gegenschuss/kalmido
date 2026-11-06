@@ -15,6 +15,7 @@ import math
 from flask import g, has_request_context
 
 from ..core.access import list_role, tvis, vis_sql, plists, task_visible
+from ..api.common import agent_time_hidden  # 2.582.0 (#4380)
 from ..core.i18n import N_, LANGS, tr
 from .formula import ShErr, sh_is_de, sh_slug
 from .formula import sh_parse_date  # 2.369.5 (#2517): pulled up from functions
@@ -170,6 +171,8 @@ def sh_task_field(c, uid, r, field):
     if field == "faellig":
         return sh_parse_date(str(r["due"])[:10]) if r["due"] else None
     if field == "zeit":
+        if agent_time_hidden():  # 2.582.0 (#4380, fable review F2): as _list_hours
+            return None
         s = c.execute(f'SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND task_id=? '
                       f'AND {evis(c, uid, "")} AND {th_sql("")}', (r["id"],)).fetchone()[0]
         return round((s or 0) / 3600, 2)
@@ -230,6 +233,8 @@ def sh_id_of(c, sheet, uid, typ, slug):
 
 
 def _list_hours(c, uid, lid):
+    if agent_time_hidden():  # 2.582.0 (#4380, fable review F2): an agent without the scope time reads no hours
+        return None
     s = c.execute(f'SELECT COALESCE(SUM(seconds), 0) FROM time_entries WHERE "end" IS NOT NULL AND list_id=? '
                   f'AND {evis(c, uid, "")} AND {th_sql("")}', (lid,)).fetchone()[0]
     return round((s or 0) / 3600, 2)
@@ -290,6 +295,8 @@ def sh_client_field(c, sheet, uid, r, field):
     if field == "budget_betrag":
         return float(r["budget_amount"]) if r["budget_amount"] is not None else None
     if field == "zeit_gesamt":
+        if agent_time_hidden():  # 2.582.0 (#4380, fable review F2): as _list_hours
+            return None
         tot, cap = 0.0, _agent_cap(c, uid) if _is_agent(c, uid) else None
         for (lid,) in c.execute("SELECT id FROM lists WHERE client_id=?", (r["id"],)).fetchall():
             if list_role(c, lid, uid) and (cap is None or lid in cap):
