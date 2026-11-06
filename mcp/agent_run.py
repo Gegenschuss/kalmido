@@ -32,6 +32,8 @@ that arrive together: one run), the same way a hosted chat service does it:
   - approval state:   open cards survive a restart (state.json), one reminder after 2 h, expired after 7 days (#1444)
   - permissions:      Claude Code: a PermissionRequest hook (`agent_run.py --perm-hook`, per run via --settings) asks the
                       person in the chat before a tool outside the allow list; 9 min without an answer = no (#1442)
+  - command guard:    Claude Code: a PreToolUse hook (`agent_run.py --guard-hook`, per run via --settings) refuses force-push,
+                      deleting / moving tags, docker ... prune and reboot / shutdown, whatever the allow list says (#3758)
   - conversations:    Claude Code: each person's chat goes on in one conversation (--resume); a new one after size, runs,
                       a pause, a new day, a model change, Reset now -- with a summary as context (#1446)
   - robust runs:      429 tried again, time limit per run (process group), 2 tries, event queue on disk, a lock (#1448)
@@ -39,7 +41,7 @@ that arrive together: one run), the same way a hosted chat service does it:
                       `codex exec --json -` (steps, answer, conversation from its event stream; no permission questions, no
                       plan usage); generic = the prompt on stdin, stdout is the answer (2.391.0, #3359)
 
-usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]   |   agent_run.py --perm-hook
+usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [ARGS...]   |   agent_run.py --perm-hook | --guard-hook
   KALMIDO_URL, KALMIDO_TOKEN    from the environment (the launcher loads the env file)
   KALMIDO_PROMPT_FILE           optional text put in front of every event (default: read CLAUDE.md, handle the event)
   KALMIDO_STATE_DIR             event cursor, state.json, queue, lock, permission files (default ~/.cache/kalmido-agent)
@@ -52,6 +54,7 @@ usage: agent_run.py [--state DIR] [--once-event FILE] [--dry-run] -- COMMAND [AR
   KALMIDO_PERMISSION_MODE       the permission mode of a Claude Code COMMAND without --permission-mode; set, the mode counts as
                                 fixed by this computer: the switch in the chat header (runtime permission_mode) is not applied
   KALMIDO_APPROVAL_CHECK        0 = no approval check of chat answers (default 1)
+  KALMIDO_BLOCK_DANGEROUS       0 = no guard against force-push / tag delete / docker prune / reboot (default 1, #3758)
   KALMIDO_AGENT_PROFILE         claude | codex | generic (default: from the command's name; other names = as Claude Code)
   KALMIDO_RUN_LOG               the runner's own log file (default on Windows: agent_run.log next to agent_run.py; "0" = none;
                                 one old generation .1 after 1 MiB) -- stderr of Start-Process never reaches agent.log there
@@ -61,6 +64,7 @@ Never prints the token or message contents; the log has event types, ids and len
 import json
 import os
 import re
+import shlex
 import shutil
 import subprocess
 import sys
@@ -1782,6 +1786,209 @@ SUMMARY_PROMPT = ("(Launcher: this conversation ends now ({why}) and a new one s
                   "no greeting, no tools.)")
 
 
+# kalmido-capability: dangerous_guard (2.615.0, #3758)
+# 2.615.0 C (#3758): a PreToolUse hook (`agent_run.py --guard-hook`, Bash only) in the per-run settings refuses force-push,
+# deleting / moving tags, docker ... prune and reboot / shutdown, whatever the allow list and the permission mode say.
+# On by default; KALMIDO_BLOCK_DANGEROUS=0 switches it off. The command is taken apart the way a shell reads it (quotes,
+# ; && || | & and new lines, $( ) and backticks, sh -c "...", eval, ssh host ..., sudo / env / timeout ... in front,
+# heredocs fed to a shell); when in doubt it refuses. Its limits are in docs/AGENT-SECURITY.md.
+GUARD_PUNCT = ";&|()`\n"
+GUARD_SHELLS = {"sh", "bash", "zsh", "dash", "ksh", "ash", "fish", "busybox", "eval", "source", ".", "su", "runuser",
+                "pwsh", "powershell", "cmd"}
+GUARD_WRAP = GUARD_SHELLS | {"sudo", "doas", "env", "nice", "nohup", "timeout", "command", "builtin", "exec", "time", "ionice",
+                             "chrt", "stdbuf", "setsid", "systemd-run", "xargs", "watch", "flock", "ssh", "caffeinate",
+                             "unbuffer", "strace", "nsenter", "chroot", "torsocks", "proxychains", "proxychains4"}
+GUARD_SKIP = {"$", "{", "}", "!", "if", "then", "else", "elif", "do", "while", "until", "fi", "done", "esac", "in"}
+GUARD_TEXT = {"echo", "printf"}  # their words are text -- unless the same command line feeds a shell
+GUARD_HALT = {"reboot", "poweroff", "halt", "shutdown", "kexec", "restart-computer", "stop-computer"}
+GUARD_MGMT = {"system", "image", "volume", "container", "builder", "network", "buildx", "pod", "machine"}  # docker X prune
+GUARD_UNITS = {"reboot", "poweroff", "halt", "kexec", "soft-reboot"}
+GUARD_NAMES = re.compile(r"(?i)(?<![a-z0-9_-])(git|docker|podman|nerdctl|reboot|poweroff|halt|shutdown|kexec|systemctl|"
+                         r"loginctl|init|telinit|restart-computer|stop-computer)(?![a-z0-9_-])")
+GUARD_HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n(.*?)(?:\n[ \t]*\2[ \t]*(?=\n|$)|\Z)", re.S)
+GUARD_FEEDS = re.compile(r"(?i)(?<![a-z0-9_.-])(sh|bash|zsh|dash|ksh|ash|fish|eval|su|sudo|doas|ssh|pwsh|powershell|"
+                         r"python[0-9.]*|node|perl|ruby|xargs)(?![a-z0-9_-])")
+GUARD_NO = "Refused by the Kalmido starter (#3758): "
+GUARD_TAIL = (" This holds whatever the allow list or the permission mode say (KALMIDO_BLOCK_DANGEROUS). Do not try another "
+              "way (no script, alias, variable or other tool around it); say in your answer what was refused, the person "
+              "can run it themselves.")
+
+
+def guard_on():
+    """2.615.0 C (#3758): the guard is on unless KALMIDO_BLOCK_DANGEROUS=0 (read when a run's settings are written)."""
+    return os.environ.get("KALMIDO_BLOCK_DANGEROUS", "1").strip() != "0"
+
+
+def guard_suspicious(text):
+    """A text that names one of the guarded commands (quotes and backslashes ignored): refused when the check itself fails."""
+    return bool(GUARD_NAMES.search(re.sub(r"[\\\"']", "", str(text or ""))))
+
+
+def _guard_exe(word):
+    name = word.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].lower()
+    return name[:-4] if name.endswith(".exe") else name
+
+
+def _guard_tokens(cmd):
+    """The words of a command line the way a POSIX shell splits them; ; & | ( ) ` and new lines are tokens of their own."""
+    lx = shlex.shlex(cmd, posix=True, punctuation_chars=GUARD_PUNCT)
+    lx.whitespace = " \t\r"
+    lx.whitespace_split = True
+    lx.commenters = ""  # a "#" inside a word is no comment for the shell; a real comment can only cause a refusal too many
+    return list(lx)
+
+
+def _guard_heredocs(cmd):
+    """A heredoc body is text (cat, tee, git commit -F -) unless its line hands it to a shell or an interpreter: then it is
+    checked as commands too."""
+    def sub(m):
+        line = cmd[:m.start()].rsplit("\n", 1)[-1] + " " + m.group(3)
+        return m.group(3) + ("\n" + m.group(4) if GUARD_FEEDS.search(line) else "")
+    return GUARD_HEREDOC.sub(sub, cmd)
+
+
+def _guard_git(args):
+    """Why a git command line is refused, or None (args: the words after "git")."""
+    i = 0
+    while i < len(args) and args[i].startswith("-"):  # git -C dir -c k=v --git-dir x ... SUB
+        i += 2 if args[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--exec-path") else 1
+    if i >= len(args):
+        return None
+    sub, rest = args[i], args[i + 1:]
+    short = [a for a in rest if re.fullmatch(r"-[A-Za-z]+", a)]
+    if sub == "push":
+        if any(a in ("--force", "--force-with-lease", "--force-if-includes", "--mirror", "--delete", "--prune")
+               or a.startswith(("--force=", "--force-with-lease=")) for a in rest) or any("f" in a or "d" in a for a in short):
+            return GUARD_NO + "git push with --force / -f / --force-with-lease / --mirror / --delete / --prune (a force-push or deleting remote branches or tags)."
+        if any(a.startswith(("+", ":")) for a in rest if not a.startswith("-")):
+            return GUARD_NO + "git push with a +refspec (a force-push) or :ref (deleting a remote branch or tag)."
+    elif sub == "tag":
+        if any(a in ("--delete", "--force") for a in rest) or any("d" in a or "f" in a for a in short):
+            return GUARD_NO + "git tag -d / -f (deleting or moving a tag)."
+    elif sub == "update-ref" and any("refs/tags" in a for a in rest):
+        return GUARD_NO + "git update-ref on refs/tags (deleting or moving a tag)."
+    return None
+
+
+def _guard_rule(exe, args):
+    """Why this one command (exe + its words) is refused, or None."""
+    if exe == "git":
+        return _guard_git(args)
+    pos = [a for a in args if not a.startswith("-")]
+    if exe in ("docker", "podman", "nerdctl") and any(a == "prune" and (i == 0 or pos[i - 1] in GUARD_MGMT) for i, a in enumerate(pos)):
+        return GUARD_NO + f"{exe} ... prune (deletes images, containers, volumes or build cache for good)."
+    if exe in GUARD_HALT or (exe in ("init", "telinit") and any(a in ("0", "6") for a in args)) or (
+            exe in ("systemctl", "loginctl") and any(a in GUARD_UNITS or re.sub(r"\.target$", "", a) in GUARD_UNITS for a in args)):
+        return GUARD_NO + "restarting or shutting down the computer."
+    return None
+
+
+def _guard_head(w):
+    """The command a simple command runs, and what its wrappers run (sudo -u root X, timeout 60 X, ssh host X, sh -c X,
+    xargs X ...): every start after a wrapper is tried once (options with values need no table). Returns (why, exe)."""
+    todo, seen, first = [0], set(), ""
+    while todo:
+        s = todo.pop()
+        while s < len(w) and (w[s] in GUARD_SKIP or re.match(r"[A-Za-z_][A-Za-z0-9_]*=", w[s])):
+            s += 1
+        if s >= len(w) or s in seen:
+            continue
+        seen.add(s)
+        exe = _guard_exe(w[s])
+        first = first or exe
+        why = _guard_rule(exe, w[s + 1:])
+        if why:
+            return why, first
+        if exe in GUARD_WRAP:
+            todo.extend(i for i in range(s + 1, len(w)) if not w[i].startswith("-") and i not in seen)
+    return None, first
+
+
+def _guard_words(w, fed, depth):
+    """One simple command (its words): the command and what its wrappers run (_guard_head), and every word that is a
+    command line of its own (spaces, ; | $( ...; also the value of FOO="..." / alias x='...') -- except the text of
+    echo / printf and of a git message, as long as nothing on the line feeds a shell."""
+    why, exe = _guard_head(w)
+    if why:
+        return why
+    s = 0
+    while s < len(w) and (w[s] in GUARD_SKIP or re.match(r"[A-Za-z_][A-Za-z0-9_]*=", w[s])):
+        s += 1
+    text = set()
+    if not fed and s < len(w):
+        if exe in GUARD_TEXT:
+            text = set(range(s + 1, len(w)))
+        elif exe == "git":
+            text = {i + 1 for i in range(s + 1, len(w) - 1) if w[i] in ("-m", "--message")} | {
+                i for i in range(s + 1, len(w)) if w[i].startswith(("--message=", "-m")) and w[i] != "-m"}
+    for i, a in enumerate(w):
+        if i in text and not re.search(r"`|\$\(", a):  # text -- but a substitution inside it runs
+            continue
+        m = re.match(r"[A-Za-z_][A-Za-z0-9_-]*=(.*)", a, re.S)
+        for part in ([a] + ([m.group(1)] if m else [])):
+            if re.search(r"[\s;&|`]|\$\(", part):
+                why = guard_reason(part, depth + 1)
+                if why:
+                    return why
+    return None
+
+
+def guard_reason(cmd, depth=0):
+    """2.615.0 C (#3758): why a Bash command line is refused, or None. Errs on the side of refusing: unbalanced quotes are
+    read as plain words, a line nested deeper than the check goes is refused when it names a guarded command."""
+    cmd = str(cmd or "")
+    if not cmd.strip():
+        return None
+    if depth > 8:
+        return (GUARD_NO + "a command nested too deeply to check that names a guarded command.") if guard_suspicious(cmd) else None
+    cmd = _guard_heredocs(cmd.replace("\\\r\n", " ").replace("\\\n", " "))
+    try:
+        toks = _guard_tokens(cmd)
+    except ValueError:  # unbalanced quotes: the shell refuses too; the plain words give more refusals, never fewer
+        toks = [t for t in re.split(r"([;&|()`\n])|[ \t\r\"']+", cmd) if t]
+    segs, cur = [], []
+    for t in toks:
+        if all(c in GUARD_PUNCT for c in t):
+            if cur:
+                segs.append(cur)
+            cur = []
+        else:
+            cur.append(t)
+    if cur:
+        segs.append(cur)
+    exes = set()
+    for s in segs:
+        s2 = [x for x in s if x not in GUARD_SKIP]
+        if s2:
+            exes.add(_guard_exe(s2[0]))
+    fed = bool(exes & (GUARD_SHELLS | {"xargs", "ssh", "watch"})) or bool(GUARD_FEEDS.search(cmd) and "|" in cmd)
+    for s in segs:
+        why = _guard_words(s, fed, depth)
+        if why:
+            return why
+    return None
+
+
+def guard_hook(argv):
+    """2.615.0 C (#3758) `agent_run.py --guard-hook`: the PreToolUse hook of a Claude Code run (Bash only, the runner hands it
+    in with --settings). A refused command gets Claude Code's deny with the reason the agent reads; anything else no output
+    (the normal permission rules decide). The hook's own failure refuses only a command that names a guarded command:
+    a bug here must not stop every Bash step of the agent, and must not let a dangerous one through."""
+    raw = ""
+    try:
+        raw = sys.stdin.read()
+        d = json.loads(raw or "{}")
+        if d.get("tool_name") != "Bash":
+            return 0
+        why = guard_reason((d.get("tool_input") or {}).get("command") or "")
+    except Exception as e:  # noqa: BLE001 - fail closed only for what looks dangerous (see above)
+        why = (GUARD_NO + f"the check failed ({type(e).__name__}) on a command that names a guarded command.") if guard_suspicious(raw) else None
+    if why:
+        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+                                                 "permissionDecisionReason": why + GUARD_TAIL}}))
+    return 0
+
+
 def perm_hook(argv):
     """2.44.0 (#1442) `agent_run.py --perm-hook`: the PermissionRequest hook of a Claude Code run (the runner hands it in
     with --settings). It writes the request into KALMIDO_PERM_DIR, waits until the runner wrote the person's answer
@@ -1910,6 +2117,9 @@ class Runner:
         if PERM_RELAY:
             s["hooks"]["PermissionRequest"] = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd,
                                                                             "timeout": PERM_TIMEOUT_S + 60}]}]
+        if guard_on():  # 2.615.0 C (#3758): the guard against dangerous commands, also without perm_relay
+            gcmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --guard-hook'
+            s["hooks"]["PreToolUse"] = [{"matcher": "Bash", "hooks": [{"type": "command", "command": gcmd, "timeout": 30}]}]
         # kalmido-capability: usage_hook (2.306.0, #2927)
         # 2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
         # Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
@@ -2961,6 +3171,8 @@ def stop_on_signal(r):
 def main(argv):
     if argv[:1] == ["--perm-hook"]:  # 2.44.0 (#1442): the PermissionRequest hook of a run
         return perm_hook(argv[1:])
+    if argv[:1] == ["--guard-hook"]:  # 2.615.0 C (#3758): the PreToolUse hook against dangerous commands
+        return guard_hook(argv[1:])
     state = os.environ.get("KALMIDO_STATE_DIR") or "~/.cache/kalmido-agent"
     once, dry = None, False
     i = 0

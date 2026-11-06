@@ -346,6 +346,49 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   `dontAsk` stay the real limit; for a stronger wall run the command as an own OS user without write access to the
   state folder and the starter files.
 
+**Dangerous commands refused (2.615.0, `dangerous_guard`).** In event mode with Claude Code the same per-run settings
+file also carries a `PreToolUse` hook for Bash (`agent_run.py --guard-hook`). It refuses, before the command runs and
+**whatever the allow list or the permission mode say** (also `acceptEdits`, `bypassPermissions`, `dontAsk` and a
+command the person allowed in the chat), these command lines:
+
+- force-push: `git push -f`, `--force`, `--force-with-lease`, `--mirror`, `--prune`, a `+refspec`;
+- deleting remote branches or tags: `git push --delete` / `-d`, `git push origin :ref`;
+- deleting or moving tags: `git tag -d` / `--delete` / `-f`, `git update-ref` on `refs/tags/...`;
+- `docker` / `podman` / `nerdctl` `... prune` (system, image, volume, container, builder, network, buildx);
+- restarting or shutting down the computer: `reboot`, `poweroff`, `halt`, `shutdown`, `kexec`, `systemctl` /
+  `loginctl reboot | poweroff | halt | kexec | soft-reboot` (also `start reboot.target`), `init 0` / `6`,
+  `Restart-Computer` / `Stop-Computer`.
+
+It is **on** by default for Claude Code (also with `KALMIDO_PERM_RELAY=0`); `KALMIDO_BLOCK_DANGEROUS=0` in the env file
+switches it off (both launchers pass the env file on). The agent gets Claude Code's *deny* with the reason and the
+instruction not to look for another way but to name the refused step in its answer; the person can run it themselves.
+
+How it reads a command: like a shell splits it (quotes, `;` `&&` `||` `|` `&` and new lines, `( )` / `{ }`, `$( )` and
+backticks, `if ... then`), through wrappers in front (`sudo -u x`, `env`, `VAR=1`, `timeout 60`, `nice`, `nohup`,
+`xargs`, `ssh host ...`, `sh -c "..."`, `bash -c`, `eval`), the value of `alias x='...'` / `FOO="..."`, and a heredoc
+that a shell, `ssh`, `sudo` or an interpreter reads (`bash <<EOF`, `cat <<EOF | sh`); options in any order and joined
+short options (`-uf`). It errs on the side of refusing: the words of a line with unbalanced quotes are read plainly, and
+a quoted text that is itself a command line counts as one (`echo "please reboot"` passes, but `echo 'git push -f' | sh`
+and `python3 -c "import os; os.system('git push -f')"` are refused). Text stays text: the words of `echo` / `printf`, a
+git message (`-m`, `--message`) and a heredoc read by `cat` / `tee` / `git commit -F -`, as long as nothing on the same
+line hands them to a shell. When the check itself fails (a bug, unreadable input), it refuses a command that names one of
+the guarded programs and lets any other pass: an error in the guard must not stop every step of the agent, nor let a
+dangerous one through.
+
+What it does **not** cover (state it to the people you run the agent for):
+
+- a script the agent writes first and runs later (`cat > x.sh`, then `sh x.sh`), a git alias or config
+  (`git config alias.p "push -f"`, a `+` refspec in `remote.*.push`), a variable as command (`$GIT push -f`), code inside
+  another language beyond the simple `os.system('...')` text (`subprocess.run(["git", "push", "-f"])`), a Makefile or
+  npm script target;
+- other tools than Bash: an MCP server or a plugin of the person that runs commands, or the PowerShell tool;
+- a command with its own `--settings` (the runner then adds no settings file, see above) and other profiles (Codex CLI,
+  generic commands have no such hook);
+- an agent that may change its own setup: whoever can edit the env file, `.claude/settings.json` (`disableAllHooks`) or
+  the starter files can switch the guard off; if the hook cannot start at all (Python missing), Claude Code runs the
+  command. Like the permission relay it guards against mistakes and plain injected commands; the wall against a hostile
+  agent stays the own OS user, the narrow allow list and branch / tag protection on the git server.
+
 ### 5. Event loop with back-off
 
 `bin/events.sh` long-polls `GET /api/v1/agent/events?wait=60` and prints one line per event for the session to handle.

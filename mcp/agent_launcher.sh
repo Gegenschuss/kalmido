@@ -116,6 +116,7 @@ fi
 # (2.44.0: agent_run.py; perm_relay and session_resume only when COMMAND is Claude Code; 2.391.0: session_resume also Codex CLI)
 # (2.126.0: perm_relay asks only the agent's operator: owner, KALMIDO_PERM_USER, KALMIDO_OWNER_IDS)
 # kalmido-capability: usage_hook (2.306.0, #2927: claude_usage_hook.py as Stop / SubagentStop hook in the run settings, in mcp/agent_run.py)
+# kalmido-capability: dangerous_guard (2.615.0, #3758: a PreToolUse hook in the run settings refuses force-push, tag delete, docker prune, reboot; KALMIDO_BLOCK_DANGEROUS=0 from the env file switches it off, in mcp/agent_run.py)
 # (2.126.0: playbook names the authors of a foreign Playbook; texts marked untrusted are framed as data)
 # (event mode: mcp/agent_run.py does them for both launchers, so .sh and .ps1 cannot drift apart)
 if [[ $EVENTS == 1 ]]; then

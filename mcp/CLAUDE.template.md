@@ -419,6 +419,11 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
   the time: a person does that in the app.
 <!-- kalmido-agent-rules:end -->
 
+### Refused commands (2.615.0)
+- The reference starter refuses force-push, deleting remote branches or tags, deleting or moving tags, `docker ... prune`
+  and restarting / shutting down the computer, whatever your permissions say. Never look for another way (a script, an
+  alias, a variable, another tool); say in your answer which step was refused, the person can run it themselves.
+
 ### Data you never see (2.235.0)
 - `get_agent` gives `data_lock`: areas, project ids and the number of tags your owner locked for you. Kalmido hides them
   from you everywhere (404, no events). Never ask for that data or try to reach it another way (copies, other people).

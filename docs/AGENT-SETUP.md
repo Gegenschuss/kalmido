@@ -675,6 +675,12 @@ chat messages of one person that arrive together: one run). It does what a hoste
   before its next run, no change on the computer needed. When someone else chats with a team agent and a step needs a
   permission, the step is denied and that person gets a short note. `KALMIDO_PERM_RELAY=0` switches it off; it needs a
   permission mode that asks (`default`). See [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
+- **Dangerous commands refused** (2.615.0, Claude Code only): the same run settings carry a `PreToolUse` hook for Bash that
+  refuses force-push, deleting remote branches or tags, deleting or moving tags, `docker ... prune` and reboot / shutdown,
+  whatever the allow list or the permission mode say (also `bypassPermissions`); it reads chains, `$( )`, `sh -c`, `ssh`,
+  `sudo` and the like. On by default, also without the permission questions; `KALMIDO_BLOCK_DANGEROUS=0` in `agent.env`
+  (Windows: the same key in the env file) switches it off. What it cannot see (scripts written first, git aliases, other
+  tools): [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
 - **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same
   conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person
   has a conversation of their own. A new one starts at the limits of the agent's runtime section *Interim summary*

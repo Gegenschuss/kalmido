@@ -2912,7 +2912,7 @@ as `--events`), `KALMIDO_PROMPT_FILE`, `KALMIDO_STATE_DIR` (event cursor, defaul
 `KALMIDO_OWNER_IDS` the only ones who answer permission questions; anyone else chatting gets the step denied; 2.312.0: a
 person chosen in the agent's runtime settings comes first), `KALMIDO_APPROVAL_REMIND`,
 `KALMIDO_APPROVAL_TTL`, `KALMIDO_SESSION_RESUME`, `KALMIDO_SESSION_MAX_TOKENS`, `KALMIDO_SESSION_MAX_RUNS`,
-`KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
+`KALMIDO_SESSION_IDLE_MIN`, `KALMIDO_RUN_TIMEOUT` (2.44.0), `KALMIDO_BLOCK_DANGEROUS` (2.615.0: 0 = the starter no longer refuses force-push, tag delete, docker prune and reboot, see [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings)), `KALMIDO_USAGE_LIMIT`, `KALMIDO_USAGE_FILE`, `KALMIDO_USAGE_MAX_AGE_H` (default 6: older
 values count as unknown), `KALMIDO_PYTHON` (2.443.0: both launchers and both setup scripts use it for every Python call),
 `KALMIDO_AGENT_CMD` and `KALMIDO_AGENT_PROFILE` (2.391.0: the command when none follows `--`, and its tool `claude` | `codex` |
 `generic`; Codex CLI runs `codex exec --json` per event, see [mcp/README.md](../mcp/README.md) and
