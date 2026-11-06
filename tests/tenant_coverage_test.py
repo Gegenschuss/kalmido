@@ -229,7 +229,7 @@ ROUTES = {
     "GET /api/admin/storage-check": "admin",
     "GET /api/admin/backups": "admin", "PATCH /api/admin/backups": "admin", "POST /api/admin/backups": "admin",
     "GET /api/admin/backups/{}/download": "admin", "POST /api/admin/backups/{}/download": "admin", "DELETE /api/admin/backups/{}": "admin",
-    "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin",
+    "POST /api/admin/backups/{}/verify": "admin", "POST /api/admin/backups/upload": "admin", "POST /api/admin/backups/passphrase-check": "admin",  # 2.581.0 (#4826)
     "POST /api/admin/backups/restore": "admin", "GET /api/admin/backups/purged-preview": "admin",
     # 2.143.0 B (#2152): the off-site target of the backups (instance admins, p2143_b_api_test.py)
     "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
@@ -477,7 +477,7 @@ ROUTES = {
     "POST /api/office/meals/{}/file/{}/restore": "office", "GET /api/office/meals/{}/pdf": "office", "GET /api/office/meals/report": "office",
     "GET /api/office/meals/choices": "office", "POST /api/office/meals/choices": "office", "PATCH /api/office/meals/choices/{}": "office",
     "DELETE /api/office/meals/choices/{}": "office",
-    "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
+    "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office", "POST /api/office/fixed-costs/category-rename": "office",  # 2.581.0 (#4820)
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
