@@ -17083,6 +17083,7 @@
   "“{0}” needs these fields:": "«{0}» richiede questi campi:",
   "own ticket types": "tipi di ticket propri",
   "own field templates": "modelli di campo propri",
+  "{0}: more than {1} projects have this field": "{0}: più di {1} progetti hanno questo campo",
   "Apply what was learned": "Applica quanto appreso",
   "Sorts every document in To review again with the rules and what was learned (no new text recognition)": "Riclassifica ogni documento in Da controllare con le regole e quanto appreso (senza nuovo riconoscimento del testo)",
   "Applying what was learned… {0} of {1}": "Applicazione di quanto appreso… {0} di {1}",

@@ -17082,6 +17082,7 @@
   "“{0}” needs these fields:": "„{0}“ braucht diese Felder:",
   "own ticket types": "eigene Ticket-Typen",
   "own field templates": "eigene Feldvorlagen",
+  "{0}: more than {1} projects have this field": "{0}: mehr als {1} Projekte haben dieses Feld",
   "Apply what was learned": "Gelerntes anwenden",
   "Sorts every document in To review again with the rules and what was learned (no new text recognition)": "Ordnet jedes Dokument in Zu prüfen mit den Regeln und dem Gelernten neu ein (keine neue Texterkennung)",
   "Applying what was learned… {0} of {1}": "Gelerntes wird angewendet… {0} von {1}",

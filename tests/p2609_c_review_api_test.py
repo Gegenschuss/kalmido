@@ -14,6 +14,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
    colour of the types its shared project offers; the task counts only for the types' managers
  - F7 a project admin without the full view switches on no field of the schema (404), switching off stays
  - F8 deleting a ticket type changes its tasks' updated_at; the API needs the scope delete for it
+ - F9 fkey_<key> over more than 200 projects' fields: 400
 freelancer-matrix: orgschema. A person without an organisation: her template's trash, her ticket types as before
 usage: p2609_c_review_api_test.py <datadir>"""
 import os
@@ -259,6 +260,17 @@ r = Gi.put(B + f"/api/lists/{L1}/org-fields/{OFL}", json={"on": False})
 check(r.ok, f"F7: switching off stays {r.status_code} {r.text[:120]}")
 check(A.put(B + f"/api/lists/{L1}/org-fields/{OFL}", json={"on": True}).ok, "setup: linked again")
 check(Bo.put(B + f"/api/lists/{L1}/org-fields/{OFX}", json={"on": True}).status_code == 403, "F7: a member without project admin: 403 as before")
+
+# ================================================================== F9 fkey_ over too many projects
+PA = tok(A, ("read",))
+r = requests.get(V + "/tasks", headers=PA, params={"fkey_region": "north"})
+check(r.ok, f"setup: fkey_region works {r.status_code} {r.text[:120]}")
+dbw("INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at,org_field_id) SELECT ?, 'Region ' || g, 'text', '{}', 0, 1000 + g, "
+    "'2026-01-01T00:00:00Z', ? FROM generate_series(1, 200) g", (L1, OFL))
+r = requests.get(V + "/tasks", headers=PA, params={"fkey_region": "north"})
+check(r.status_code == 400 and "200" in r.text, f"F9: more than 200 linked fields: 400 {r.status_code} {r.text[:160]}")
+dbw("DELETE FROM list_fields WHERE list_id=? AND name LIKE 'Region %'", (L1,))
+check(requests.get(V + "/tasks", headers=PA, params={"fkey_region": "north"}).ok, "F9: back under the limit it works")
 
 # ================================================================== freelancer-matrix: orgschema
 FL = mklist(Fr, "My work", None)

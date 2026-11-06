@@ -1121,11 +1121,17 @@ def v1_tasks_more(c, uid, a, where, args):
         args.append(tsq)
 
 
+V1_FKEY_MAX = 200  # 2.609.0 (#3373, review F9): projects one fkey_ filter spans (each is a part of the query)
+
+
 def v1_fkey_filter(c, key, v, where, args):
     """2.609.0 (#3373): fkey_<key>=v: tasks of every visible project whose field linked to the schema field <key> (of the
-    project's organisation, or its owner's own) matches v -- the same rules as field_<id> per field, joined with OR."""
+    project's organisation, or its owner's own) matches v -- the same rules as field_<id> per field, joined with OR.
+    More than V1_FKEY_MAX such projects: 400 (review F9: the query stays bounded)."""
     fids = [r[0] for r in c.execute(f"""SELECT f.id FROM list_fields f JOIN org_fields o ON o.id=f.org_field_id
-                                       WHERE o.key=? AND f.list_id IN {vis_sql()} ORDER BY f.id""", (key, me(), me()))]
+                                       WHERE o.key=? AND f.list_id IN {vis_sql()} ORDER BY f.id LIMIT ?""", (key, me(), me(), V1_FKEY_MAX + 1))]
+    if len(fids) > V1_FKEY_MAX:
+        raise BadInput(tr("{0}: more than {1} projects have this field", f"fkey_{key}", V1_FKEY_MAX))
     if not fids:
         where.append("FALSE")
         return
