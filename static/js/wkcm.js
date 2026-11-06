@@ -21,7 +21,7 @@
 'use strict';
 
 /** @type {any} */
-const WKCM = {view: null, pid: 0, p: null, base: '', baseDoc: null, ld: null, ok: false, fail: false, cache: new Map(), px: null, foc: false, defs: null, cell: null, dgT: 0};
+const WKCM = {view: null, pid: 0, p: null, base: '', baseDoc: null, ld: null, ok: false, fail: false, cache: new Map(), px: null, foc: false, defs: null, cell: null, dgT: 0, sTok: null};
 const wkcm_C = () => /** @type {any} */ (window).CM6;
 // ---- loading (the bundle once; a failure is forgotten so the next opening tries again)
 function wkcm_load() {
@@ -141,8 +141,36 @@ function wkcm_ext(p) {
     C.Prec.high(C.keymap.of([{key: 'Enter', run: wkcm_enter}, {key: 'Tab', run: v => wkcm_indent(v, 1)}, {key: 'Shift-Tab', run: v => wkcm_indent(v, -1)}])),
     C.keymap.of([...C.historyKeymap, ...C.searchKeymap, ...C.defaultKeymap.filter(k => !WKCM_NOKEY.has(k.key) && !WKCM_NOKEY.has(k.mac))]),
     WKCM_FIELD, C.EditorView.domEventHandlers({focus: (_e, v) => wkcm_focFx(v), blur: (_e, v) => wkcm_focFx(v)}),
+    C.EditorView.scrollHandler.of(wkcm_scroll),  // 2.580.0 (#4800)
     C.EditorView.updateListener.of(wkcm_upd),
   ];
+}
+// 2.580.0 (#4800): bringing the cursor, a find or a jump into sight. The page scrolls in #view: the editor has no scroller of
+// its own (wiki.css .cm-scroller overflow visible). CodeMirror's own way placed a far line by the estimated heights of the
+// lines between it and the screen (widgets, tables, wrapped lines) and on a long page landed at its end (seen on the Mac:
+// line 1000 of 2000 -> #view at its bottom). Here #view is moved to the line's place - its real one once drawn, else the
+// estimated one - and corrected after each of CodeMirror's next measures (the heights there are real then) until the line
+// stays inside the visible part for two measures in a row (the estimated heights above it change once lines are drawn), at
+// most 8 rounds. The margins are #view's scroll-padding (the bar at the bottom, the header).
+function wkcm_scroll(v, range, o) {
+  const sc = v.dom.closest('#view'); if (!sc || o.isSnapshot) return false;  // somewhere else (a dialog): CodeMirror's own way
+  const pos = range.head, y = o.y, st = getComputedStyle(sc), m = typeof o.yMargin === 'number' ? o.yMargin : 5;
+  const mt = Math.max(m, parseFloat(st.scrollPaddingTop) || 0), mb = Math.max(m, parseFloat(st.scrollPaddingBottom) || 0);
+  const tok = WKCM.sTok = {};  // a newer bringing-into-sight ends this one
+  const go = (left, calm) => {
+    if (!v.dom.isConnected || WKCM.view !== v || WKCM.sTok !== tok) return;
+    // the drawn line's place as CodeMirror's own way reads it (view.coordsAtPos refuses during its measure / update)
+    const r = sc.getBoundingClientRect(), c = (() => { try { return v.docView?.coordsAt(pos, range.assoc || (range.head > range.anchor ? -1 : 1)) || null; } catch { return null; } })();
+    let top, bot;
+    if (c) { top = c.top; bot = c.bottom; } else { const b = v.lineBlockAt(pos); top = v.documentTop + b.top; bot = top + b.height; }
+    const vt = r.top + mt, vb = r.top + sc.clientHeight - mb;
+    const d = y === 'center' ? (top + bot - vt - vb) / 2 : y === 'start' ? top - vt : y === 'end' ? bot - vb : top < vt ? top - vt : bot > vb ? Math.min(bot - vb, top - vt) : 0;
+    if (Math.abs(d) >= 1) sc.scrollTop += d;
+    const still = Math.abs(d) < 1 && !!c ? calm + 1 : 0;
+    if (still < 2 && left > 0) requestAnimationFrame(() => { if (v.dom.isConnected) v.requestMeasure({key: wkcm_scroll, read: () => null, write: () => go(left - 1, still)}); });
+  };
+  go(8, 0);
+  return true;
 }
 // the words of CodeMirror's search panel
 function wkcm_phrases() {
