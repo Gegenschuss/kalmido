@@ -83,7 +83,7 @@ from ..accounts.session import me
 from ..files.fsref import fs_ref_drop, fs_ref_node, fs_ref_node_role, fs_ref_register
 from ..files.fsroots import fs_area_root, fs_area_rule
 from ..files.store import ROLE_RANK, _now, fs_chain, fs_deleted, fs_log_add, fs_role
-from .pages import WIKI_BAD_CHARS, WIKI_DEPTH, wiki_clean_path, wiki_relink, wiki_space, wiki_space_sql
+from .pages import WIKI_BAD_CHARS, WIKI_DEPTH, wiki_clean_path, wiki_lock_pages, wiki_relink, wiki_space, wiki_space_sql
 from .wikie2e import _wke_free_path, wke_mode, wke_open_sql, wke_page_mode
 from .wkhist import wkh_body
 from .wkshare import wsh_repath
@@ -527,7 +527,7 @@ def wkf_repath(c, uid, oid, owner, refs, old_folder=None, new_folder=None):
         if old_folder is not None and new_folder is not None and old_folder != new_folder:
             wsh_repath(c, oid, owner, old_folder, new_folder, True)  # an empty folder's share follows too
         return 0
-    ids = [r["ref_id"] for r, _ in refs]
+    ids = wiki_lock_pages(c, [r["ref_id"] for r, _ in refs])  # 2.577.0 (#4708 2): each page's save lock before it is read
     q = ",".join(str(int(x)) for x in ids)
     w, a = wiki_space_sql(oid, owner)
     pages = {p["id"]: p for p in c.execute(f"SELECT * FROM wiki_pages WHERE id IN ({q}) AND deleted_at IS NULL AND {w}", a)}

@@ -145,6 +145,8 @@ def otk_budget_field(c, lid, create=False):
     """The project's number field "Budget h" (any language, like time_list_totals) -> its row; create: made when missing
     (like the agency type's field: pinned while there is room) -> (row, made)."""
     names = set(BUDGET_FIELD_NAMES) | {tr("Budget h", lg=x).lower() for x in LANGS}
+    if create:
+        write_lock(c, f"list-fields-{int(lid)}")  # 2.577.0 (#4708 2): as field_create (the look for it and the new one under the lock)
     for f in c.execute("SELECT * FROM list_fields WHERE list_id=? AND type='number' ORDER BY sort, id", (lid,)).fetchall():
         if (f["name"] or "").strip().lower() in names:
             return f, False

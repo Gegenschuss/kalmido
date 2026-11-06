@@ -557,13 +557,11 @@ def ctx_groups_change(c, uid, b):
     key = name.casefold()
     rows, todo, undo, skipped = {}, {}, [], 0
     pat = "%" + like_escape(json.dumps(name, ensure_ascii=False)) + "%"
-    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups ILIKE ? ESCAPE '\\' AND deleted_at IS NULL", [*books, pat]).fetchall():
+
+    def groups_of(r):
         g = ctx_jl(r["groups"])
         if not any(isinstance(x, str) and x.casefold() == key for x in g):
-            continue
-        if r["book_id"] not in w:
-            skipped += 1
-            continue
+            return g, None
         g2 = []
         for x in g:
             y = to if isinstance(x, str) and x.casefold() == key else x
@@ -571,7 +569,21 @@ def ctx_groups_change(c, uid, b):
                 g2.append(y)
         if action == "delete":
             g2 = [x for x in g2 if x.casefold() != key]
-        if g2 != g:
+        return g, (g2 if g2 != g else None)
+
+    def redo(r):  # 2.577.0 (#4708 2): made again from the row read under its lock (a save in between keeps its groups)
+        g2 = groups_of(r)[1] if r["deleted_at"] is None else None
+        return {"groups": json.dumps(g2[:ITEMS_MAX], ensure_ascii=False)} if g2 is not None else None
+
+    for r in c.execute(f"SELECT * FROM contacts WHERE book_id IN ({','.join('?' * len(books))}) AND groups ILIKE ? ESCAPE '\\' AND deleted_at IS NULL", [*books, pat]).fetchall():
+        g = ctx_jl(r["groups"])
+        if not any(isinstance(x, str) and x.casefold() == key for x in g):
+            continue
+        if r["book_id"] not in w:
+            skipped += 1
+            continue
+        g2 = groups_of(r)[1]
+        if g2 is not None:
             rows[r["id"]] = r
             todo[r["id"]] = {"groups": json.dumps(g2[:ITEMS_MAX], ensure_ascii=False)}
             # 2.119.1 review F5 (#2085): the undo value as bulk restore will take it (strings, ITEMS_MAX, no commas)
@@ -579,8 +591,8 @@ def ctx_groups_change(c, uid, b):
     if not todo and not skipped:
         raise Denied(404)
     bk_gate(c, N_("Change {0} contacts at once"), len(todo))
-    ts = ms_write(c, rows, todo, uid=uid)  # 2.571.0 (#4776): updated_by
-    undo = [{**u, "expect": ts} for u in undo]  # 2.273.0 C (#3048): the undo leaves a contact changed again since then
+    ts = ms_write(c, rows, todo, uid=uid, redo=redo)  # 2.571.0 (#4776): updated_by
+    undo = [{**u, "expect": ts} for u in undo if u["id"] in todo]  # 2.273.0 C (#3048): the undo leaves a contact changed again since then
     return {"action": action, "changed": len(todo), "skipped": skipped, "undo": undo}
 
 

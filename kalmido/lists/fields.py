@@ -342,6 +342,7 @@ def field_create(lid):
     b = body()
     c = db()
     need_list(c, lid, manage=True)  # 2.39.1 (#1217): plain lists too; (#1327): owner and list admins
+    write_lock(c, f"list-fields-{int(lid)}")  # 2.577.0 (#4708 2): the count, the sort place and col_cfg read-change-write
     if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
         return err(tr("At most {0} fields per project", FIELD_MAX))
     name, ftype, opts = field_clean_def(b)

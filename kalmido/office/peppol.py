@@ -47,7 +47,7 @@ from .ledger import ofx_company, ofx_locked  # 2.369.5 (#2517): pulled up from f
 from ..accounts.login import seal  # 2.369.5 (#2517): pulled up from functions
 from .einvoice import ein_ubl_build, ein_ubl_check  # 2.369.5 (#2517): pulled up from functions
 from .pdfweb import _model, _file_response, epdf_name  # 2.369.5 (#2517): pulled up from functions
-from ..core.pg import IntegrityError, insert_id  # 2.369.5 (#2517): pulled up from functions
+from ..core.pg import IntegrityError, insert_id, write_lock  # 2.369.5 (#2517): pulled up from functions
 from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .model import office_need_feature  # 2.369.5 (#2517): pulled up from functions
 
@@ -242,6 +242,7 @@ def pep_save(c, oid, uid, b):
     bad = set(b) - known
     if bad:
         raise BadInput(tr("Invalid value: {0}", sorted(bad)[0]))
+    write_lock(c, f"office_peppol_{int(oid)}")  # 2.577.0 (#4708 2): read-change-write of the setup, one save at a time
     cur = pep_conf(c, oid)
     new = dict(cur)
     if "provider" in b:

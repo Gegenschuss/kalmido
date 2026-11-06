@@ -476,6 +476,16 @@ def dvb_wiki_locked(c, ids):
     return out
 
 
+def wiki_lock_pages(c, ids):
+    """2.577.0 (#4708 2): the save lock of every page a path change writes, taken before the pages are read (after the relink
+    lock, then in id order, as dvb_wiki_locked): a save in between is never undone by the row read before. -> the ids sorted."""
+    write_lock(c, "wiki-relink")
+    out = sorted({int(x) for x in ids})
+    for i in out:
+        write_lock(c, f"wiki-{i}")
+    return out
+
+
 def wiki_relink(c, r, old, new, uid, ts, only_edit=False):
     """[[old]] -> [[new]] in the other pages of the space (also [[old|label]] and [[old#part]]); the number of pages changed.
     only_edit (2.200.0 F, #2747 review B7: a rename through a share): only pages uid may edit, the others stay untouched."""
@@ -635,8 +645,10 @@ def wiki_move():
     if dst.lower() == src.lower() or dst.lower().startswith(src.lower() + "/"):
         raise BadInput(tr("Invalid value: {0}", "to"))
     w, a = wiki_space_sql(oid, uid)
-    rows = c.execute(f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')",
-                     [*a, src.lower(), src.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]).fetchall()
+    q = f"SELECT * FROM wiki_pages WHERE deleted_at IS NULL AND {w} AND (lower(path)=? OR lower(path) ILIKE ? ESCAPE '\\')"
+    qa = [*a, src.lower(), src.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "/%"]
+    locked = set(wiki_lock_pages(c, [r["id"] for r in c.execute(q.replace("SELECT *", "SELECT id", 1), qa).fetchall()]))  # 2.577.0 (#4708 2)
+    rows = [r for r in c.execute(q, qa).fetchall() if r["id"] in locked]  # read again under the locks (a page made in between stays)
     if not rows:
         raise Denied(404)
     moves = [(r, wiki_clean_path(dst + r["path"][len(src):])) for r in rows]

@@ -327,6 +327,7 @@ def pol_save(c, oid, uid, b):
     bad = set(b) - {"provider", "enabled", "secret_key", "webhook_secret"}
     if bad:
         raise BadInput(tr("Invalid value: {0}", sorted(bad)[0]))
+    write_lock(c, f"office_payonline_{int(oid)}")  # 2.577.0 (#4708 2): read-change-write of the setup, one save at a time
     cur = pol_conf(c, oid)
     new = dict(cur)
     if "provider" in b:
@@ -892,6 +893,7 @@ def pol_check():
 def pol_rotate():
     """A new webhook address (the old one stops at once); enter it at the provider."""
     c, uid, oid = _admin()
+    write_lock(c, f"office_payonline_{int(oid)}")  # 2.577.0 (#4708 2): as pol_save
     conf = pol_conf(c, oid)
     if not conf["provider"]:
         raise Denied(409, tr("Select a provider first"))
