@@ -686,6 +686,8 @@ pwsh -File $HOME\kalmido\mcp\agent_launcher.ps1 -e $HOME\.config\kalmido\agent.e
 In the background: a scheduled task *At log on* (`New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME`) with the
 action from guide A, registered without a password (`Register-ScheduledTask … -User $env:USERNAME`). Usage hook:
 `"command": "python C:/Users/<you>/kalmido/mcp/claude_usage_hook.py C:/Users/<you>/.config/kalmido/agent.env"`.
+A launcher killed hard (the scheduled task ended, the task manager) runs no clean-up; its event runner sees that
+(`KALMIDO_LAUNCHER_PID`, 2.609.0 #3660: also on Windows) and ends by itself within about a minute.
 
 ## Receiving events
 

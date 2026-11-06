@@ -169,6 +169,12 @@ never reaches that file, so it keeps its own `agent_run.log` next to it (runs, a
 moves to `agent_run.log.1` (one old generation), so it neither grows without end nor loses the last runs at a restart.
 `KALMIDO_RUN_LOG=0` in the env file switches it off. macOS / Linux: unchanged, everything stays in the one log.
 
+**Checked on Windows (2.609.0, #3660):** whenever something under `mcp/` changes, and every night, Kalmido's CI runs
+`agent_launcher.ps1 --events` on a Windows machine (PowerShell 7 and Windows PowerShell 5.1) against a stand-in server with a
+stand-in for Claude Code: it starts, works off an event, a pause in Kalmido ends the runner with everything it started, and
+when the launcher itself is killed hard (the scheduled task ended, the task manager) the event runner ends on its own
+within about a minute, so the next start of the task is never kept out by a leftover runner.
+
 ## Path B: do it yourself
 
 Run the commands as a user with sudo unless a step says *as the agent user* (`sudo -iu kalmido-agent`).

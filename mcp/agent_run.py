@@ -3794,13 +3794,46 @@ class Runner:
             self.queue_drop([e for e in taken if str(e.get("seq")) not in kept])
 
 
+def win_pid_gone(pid, k32=None):
+    """2.609.0 (#3660): Windows has no os.kill(pid, 0) probe: open the process for a query and read its exit code
+    (STILL_ACTIVE = 259 while it runs). No such process (ERROR_INVALID_PARAMETER) = gone; refused (another user's
+    process, ERROR_ACCESS_DENIED) or anything unclear = not gone, as the POSIX branch. k32: kernel32 (a test passes a stand-in)."""
+    import ctypes
+    if k32 is None:
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+        k32.OpenProcess.restype = wintypes.HANDLE
+        k32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+        k32.GetExitCodeProcess.restype = wintypes.BOOL
+        k32.CloseHandle.argtypes = (wintypes.HANDLE,)
+        k32.get_last_error = ctypes.get_last_error
+    h = k32.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+    if not h:
+        return k32.get_last_error() == 87  # ERROR_INVALID_PARAMETER: no process with this number
+    try:
+        code = ctypes.c_ulong(0)
+        if not k32.GetExitCodeProcess(h, ctypes.byref(code)):
+            return False
+        return code.value != 259  # it has ended, only a handle kept it listed
+    finally:
+        k32.CloseHandle(h)
+
+
 def launcher_gone():
     """2.157.0 (#1517): this runner was started by agent_launcher.sh (KALMIDO_LAUNCHER_PID) and that launcher is gone (killed
     hard, so it could not end its process group): end too, between two runs, so the launcher that launchd / systemd starts
-    again takes over (the runner lock would keep its runner out) and an uninstall leaves nothing running. POSIX only."""
+    again takes over (the runner lock would keep its runner out) and an uninstall leaves nothing running. 2.609.0 (#3660):
+    also on Windows (agent_launcher.ps1 sets KALMIDO_LAUNCHER_PID; a scheduled task that is ended or a launcher killed in
+    the task manager runs no finally, so its runner went on), through win_pid_gone."""
     p = os.environ.get("KALMIDO_LAUNCHER_PID") or ""
-    if os.name == "nt" or not p.isdigit():
+    if not p.isdigit():
         return False
+    if os.name == "nt":
+        try:
+            return win_pid_gone(int(p))
+        except Exception:  # no ctypes / kernel32 here: as before, never end on a guess
+            return False
     try:
         os.kill(int(p), 0)
     except ProcessLookupError:
