@@ -28,9 +28,13 @@ def view_rules(rules):
 
 def view_plain(c, lid, name, rules):
     """2.577.0 (#3356): a view's name and text rule are stored readable: refused in a project encrypted in the browser, like a
-    notepad (its text rule could not match there anyway)."""
+    notepad (its text rule could not match there anyway).
+    2.577.0 (#3356, review): also a text condition of the newer format (rules.conds [{f: "text", v}]), not only rules.text."""
     from ..collab.liste2e import le2a_locked_text
-    le2a_locked_text(c, lid, name, (rules or {}).get("text") if isinstance(rules, dict) else None)
+    r = rules if isinstance(rules, dict) else {}
+    conds = r.get("conds") if isinstance(r.get("conds"), list) else []
+    texts = [x.get("v") for x in conds if isinstance(x, dict) and x.get("f") == "text"]
+    le2a_locked_text(c, lid, name, r.get("text"), *[v if isinstance(v, str) or v is None else json.dumps(v) for v in texts])
 
 
 @app.post("/api/filters")

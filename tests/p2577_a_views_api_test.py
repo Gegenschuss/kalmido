@@ -9,7 +9,9 @@ freelancer-matrix: lists (a person without an organisation, the own project)
  - GET / POST /api/v1/lists/<id>/views, scopes; agents only in projects shared with them
  - organisation boundary: a project of another organisation, a project moved to another workspace
  - deleted creator: the view stays; delta sync: full for the project's people only
+ - review (#3356): in a project encrypted in the browser a text condition (rules.conds f=text) is refused, not stored readable
 usage: p2577_a_views_api_test.py <datadir>      (KMT_NOSTART=1 / PR2472C_NOSTART=1: a running server)"""
+import os
 import sys
 
 import requests
@@ -301,5 +303,22 @@ V6 = A.post(B + "/api/filters", json={"name": "Moved", "list_id": L6}).json()["i
 check(A.patch(B + f"/api/lists/{L6}", json={"org_id": ORG}).ok, "the project moves into the organisation")
 check(requests.get(V + f"/lists/{L6}/views", headers=token(A)).json()["data"][0]["id"] == V6, "its view goes along")
 check(requests.get(V + "/tasks", headers=TG, params={"filter_id": V6}).status_code == 404, "and stays out of reach of the other organisation")
+
+# 2.577.0 (#3356, review): a project encrypted in the browser after its shared view was made: a text condition of the newer
+# format (rules.conds f=text) is refused like rules.text, never stored readable; other conditions still work
+L7 = new_list(A, "Locked later")
+V7 = A.post(B + "/api/filters", json={"name": "Before the lock", "list_id": L7, "rules": {"prios": [5]}}).json()["id"]
+_c = kt._dbx.connect(os.path.join(kt.DATA, "tasks.db"), timeout=10)
+_c.execute("UPDATE lists SET e2e='on', e2e_gen=1 WHERE id=?", (L7,))
+_c.commit()
+_c.close()
+CT = {"op": "and", "conds": [{"f": "text", "op": "has", "v": "Zqxw secret word"}]}
+r = A.patch(B + f"/api/filters/{V7}", json={"rules": CT})
+check(r.status_code == 409 and (r.json() or {}).get("code") == "list_e2e_plain", f"locked: a text condition (conds) refused 409 list_e2e_plain ({r.status_code} {r.text[:160]})")
+check(not any("Zqxw" in (x[0] or "") for x in kt.dbx("SELECT rules FROM filters WHERE id=?", (V7,))), "locked: the word never lands in filters.rules")
+r = A.patch(B + f"/api/filters/{V7}", json={"rules": {"text": "Zqxw old format"}})
+check(r.status_code == 409, f"locked: the older rules.text refused as before ({r.status_code})")
+r = A.patch(B + f"/api/filters/{V7}", json={"rules": {"op": "and", "conds": [{"f": "prio", "op": "in", "v": [5]}, {"f": "text", "op": "has", "v": ""}]}})
+check(r.ok, f"locked: other conditions (and an empty text) still allowed ({r.status_code} {r.text[:160]})")
 
 sys.exit(done("p2577_a_views_api"))
