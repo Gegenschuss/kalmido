@@ -56,6 +56,12 @@ check(h == 3 and len(plan) == 6 and [k for k, _, _ in plan] == list(range(1, 7))
 check({i for k, idx, _ in plan if k <= h for i in idx} == {0, 1, 2, 3}, "with total the hard shards still hold the hard groups")
 plan, h = shards.split_plan(costs, [], 28, 30, 10, total=5)
 check(h == 0 and len(plan) == 5, "total without hard groups = exactly total shards")
+# 2.573.0 (#4748): --soft-shards N = H hard + exactly N others, --total / --shards / --target-min do not count for the others
+plan, h = shards.split_plan(costs, [0, 1, 2, 3], 28, 30, 10, total=6, soft_shards=5)
+check(len(plan) == h + 5 and {i for k, idx, _ in plan if k > h for i in idx} == set(range(4, len(costs))),
+      f"soft_shards 5 = {h} hard + 5 others: {len(plan)}")
+plan, h = shards.split_plan(costs, [], 28, 30, 10, soft_shards=3)
+check(h == 0 and len(plan) == 3, "soft_shards without hard groups = exactly that many shards")
 plan, h = shards.split_plan(costs, [0, 1, 2, 3], 28, 30, 1, hard_most=8, total=4)
 check(h == 3 and len(plan) == 4, f"many hard shards leave at least one for the others: {h} {len(plan)}")
 
@@ -108,8 +114,8 @@ try:
     hh, n = int(o.get("hard") or 0), int(o.get("count") or 0)
     check(hh >= 1 and n == len(mx) and [x["shard"] for x in mx] == list(range(1, n + 1)), f"matrix 1..{n} in order, {hh} hard")
     check([x["hart"] for x in mx] == [" hart"] * hh + [""] * (n - hh), "the hard shards first, marked ' hart'")
-    # 2.556 (#4388): the full run plans exactly 20 shards in all (GitHub runs ~20 at once), limit 60 min
-    check(n == 20, f"full run: 20 shards in all, hard ones included: {n}")
+    # 2.573.0 (#4748): the full run plans the hard shards + exactly 20 others (was 20 in all, #4388: 13 others at 80-84 of 90 min)
+    check(n == hh + 20, f"full run: {hh} hard + 20 others: {n}")
     # job/2867 (CI v2.560.0): 60 was too short for 13 soft shards (~70 min each), all 13 were cut - 90 now
     check(re.search(r"needs: plan\n\s+timeout-minutes: 90\b", ci), "the shard job has the 90 min limit")
     tpl = re.search(r"^\s+name: (Test suites \$\{\{ matrix\.shard \}\}.*)$", ci, re.M)

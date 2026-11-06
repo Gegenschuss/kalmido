@@ -105,7 +105,7 @@ jobs:
           done
           printf '%s\n' $order > /tmp/timings/order.txt
           echo "runs (oldest first): ${order:-none - estimates only}"
-      - name: Plan (full 20 shards, push stage ~15 min per shard, hard shards first ~9 min)
+      - name: Plan (full H hard + 20 others, push stage ~15 min per shard, hard shards first ~9 min)
         id: plan
         env:
           STAGE: ${{ steps.stage.outputs.stage }}
@@ -124,8 +124,10 @@ jobs:
             # #4557: + the hard groups on their own shards 1..H (~9 min each, at most 8) in front of the 28
             # 2.556 (#4388): 28 + H queued (GitHub runs ~20 at once: the rest waited 27-34 min, a run took ~70 min) - now
             # exactly 20 in all (H hard + 20-H others), the times still from the measured runs, limit 60 min (job "tests"; 90 since job/2867)
-            python3 tools/shards.py --total 20 --hard-target-min 9 $t | tail -6
-            python3 tools/shards.py --total 20 --hard-target-min 9 --assign $t > shard-plan.txt
+            # #4748 (CI v2.563.1): with 20 in all the 13 others ran 80-84 of their 90 min, the 7 hard ones only 7-13 - now H hard
+            # + exactly 20 others: the H queued others start when the hard ones end (~10 min), each holds ~2/3 of the old time
+            python3 tools/shards.py --soft-shards 20 --hard-target-min 9 $t | tail -6
+            python3 tools/shards.py --soft-shards 20 --hard-target-min 9 --assign $t > shard-plan.txt
           fi
           test -s shard-plan.txt
           n=$(awk '!/^#/ && $2 > m {m = $2} END {print m + 0}' shard-plan.txt)
