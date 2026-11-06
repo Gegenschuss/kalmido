@@ -24,7 +24,8 @@ from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgroles import org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_write, org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.supportgrant import sga_scope_check  # 2.609.0 (#3373, review F1)
 from ..accounts.orgs import is_org_admin, ws_default_org  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
@@ -667,6 +668,9 @@ def template_apply(tid):
     if r["kind"] == "task":
         lid = int(b.get("list_id") or 0) or my_inbox(c)
         need_list(c, lid)
+        if r["org_id"]:  # 2.609.0 (#3373, review F1): an organisation's template into another space = out of it (its admin, logged)
+            to = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()
+            org_out(c, r["org_id"], to[0] if to else None, "template", r["name"], list_id=lid)
         from ..collab.liste2eguard import le2b_list_locked, le2b_off
         if le2b_list_locked(c, lid):  # 2.64.1 B (#1817): the server would write plain texts into a list with the lock
             return jsonify(error=le2b_off(), code="list_e2e"), 409
@@ -687,9 +691,12 @@ def template_apply(tid):
         return jsonify(task=one_task(c, new), skipped_files=st["skipped"])
     name = str(b.get("name") or "").strip()[:200] or d.get("name") or r["name"]
     start, end = tpl_dates(b, base)
+    if r["org_id"]:  # 2.609.0 (#3373, review F1): an organisation's project template makes its project there only: who may not
+        need_org_write(c, uid, r["org_id"])  # add contents there gets 403 (no longer "auto" = private / another organisation),
+        sga_scope_check(c, r["org_id"])  # and a support session none in an organisation without its own support access
     st = tx_state()
     try:
-        lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id=r["org_id"] if r["org_id"] and org_writes(c, uid, r["org_id"]) else "auto",  # 2.609.0 (#3373)
+        lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id=r["org_id"] or "auto",  # 2.609.0 (#3373)
                              color=clean_color(b["color"]) if b.get("color") else None, extra=tx_of_template(c, r), st=st)
         bump(c)
         c.commit()
