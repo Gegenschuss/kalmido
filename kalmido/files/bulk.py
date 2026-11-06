@@ -148,7 +148,7 @@ def files_bulk_purge():
     uid = me()
     b = body()
     if b.get("all") is True:
-        rows = [(r["id"], role) for r, role in fs_trash_entries(c, uid)]
+        return files_trash_empty(c, uid)
     else:
         rows = []
         for i in abm_ids(b.get("ids")):
@@ -178,6 +178,36 @@ def files_bulk_purge():
     bump(c)
     c.commit()
     fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
+    return jsonify(ok=True, deleted=deleted, kept=kept, locked=locked)
+
+
+def files_trash_empty(c, uid):
+    """2.589.0 (#4875, review F2): {all: true} of POST /api/files/trash/purge. The trash list (fs_trash_entries) reads at most
+    500 rows, so a bigger trash is emptied in rounds: purge what the person owns, read again, until a round brings nothing
+    new; what stays (others' nodes, legal retention) is counted once."""
+    seen, deleted, kept, locked = set(), 0, 0, 0
+    for _round in range(100):
+        new = [(r["id"], role) for r, role in fs_trash_entries(c, uid) if r["id"] not in seen]
+        if not new:
+            break
+        seen.update(i for i, _role in new)
+        kept += len([1 for _i, role in new if role != "owner"])
+        ids, paths = [], []
+        for nid in abm_outermost(c, [i for i, role in new if role == "owner"]):
+            if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
+                continue
+            try:
+                with c.savepoint():
+                    i, p = fs_purge(c, nid)  # this node and what is below it
+            except Denied:  # a hook keeps it (legal retention, #2168)
+                locked += 1
+                continue
+            deleted += 1
+            ids += i
+            paths += p
+        bump(c)
+        c.commit()
+        fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
     return jsonify(ok=True, deleted=deleted, kept=kept, locked=locked)
 
 

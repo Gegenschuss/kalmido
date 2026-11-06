@@ -144,5 +144,12 @@ check(r.ok and r.json()["deleted"] == 2 and not any(exists(x) for x in (FF, F1, 
 check(trash_ids(Fr) == set(), "freelancer: the trash is empty")
 check(Fr.post(B + PURGE, json={"ids": [KEEP]}).status_code == 404, "freelancer: a file of carol 404")
 
+# ---- review F2: a trash bigger than the trash list (500 rows) is emptied whole, in rounds (red before: 500 of 505 went)
+MANY = [upload(Fr, f"viele-{k}.txt", b"x") for k in range(505)]
+for k in range(0, len(MANY), 250):
+    check(Fr.post(B + "/api/files/trash", json={"ids": MANY[k:k + 250]}).ok, f"setup: {k}.. into the trash")
+r = Fr.post(B + PURGE, json={"all": True})
+check(r.ok and r.json()["deleted"] == 505 and not any(exists(x) for x in MANY), f"freelancer: 505 rows emptied at once ({r.text[:200]})")
+
 print(f"p2589_a_trash_api: {OKS[0]} ok, {len(FAILS)} failed", flush=True)
 sys.exit(1 if FAILS else 0)
