@@ -1,6 +1,36 @@
 {
  "versions": [
   {
+   "version": "2.573.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "Rückgängig überschreibt keine Änderung mehr, die jemand anderes inzwischen gemacht hat.",
+     "en": "Undo no longer overwrites a change someone else has made in the meantime."
+    },
+    {
+     "de": "Gelöschte Kalender landen im Papierkorb und lassen sich mit ihren Terminen wiederherstellen.",
+     "en": "Deleted calendars go to the trash and can be restored with their events."
+    },
+    {
+     "de": "Am Rechner und Tablet gleiten Seitenfenster, Seitenleiste, Menüs und Meldungen jetzt kurz herein und hinaus.",
+     "en": "On computers and tablets the side panel, sidebar, menus and messages now briefly slide in and out."
+    },
+    {
+     "de": "Am Handy holst du deine Favoriten mit einem Wisch nach oben auf der unteren Leiste herein.",
+     "en": "On a phone, swipe up on the bottom bar to bring in your favourites."
+    },
+    {
+     "de": "Gleiche Favoriten-Symbole bekommen automatisch ihre Farbe oder einen Anfangsbuchstaben.",
+     "en": "Favourites with the same symbol get their colour or first letter on their own."
+    },
+    {
+     "de": "Die Suche in der Kopfleiste macht zuerst Platz, wenn viele Favoriten dazukommen.",
+     "en": "The search in the head bar makes room first when you add many favourites."
+    }
+   ]
+  },
+  {
    "version": "2.570.0",
    "date": "2026-11-06",
    "items": [

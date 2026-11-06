@@ -14,7 +14,38 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.570.0] - 2026-11-06
+## [2.573.0] - 2026-11-06
+
+Package 2.566 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2113_a_api, CI-only rot: p2501_a_nosham).
+
+### Added
+- Calendars: a deleted calendar goes into the trash with its events; the calendars dialog lists the trash and the owner restores a calendar from there (#4712, #4707).
+
+### Changed
+- Calendars and address books run on the shared core: their shares are core shares (members mirrored, old member rows only read as fallback), leaving or retiring an organisation closes them through the core's revocation, and an agent's data lock covers calendars and contacts; the object's node in the file store decides (it follows into the private tree, stays decisive in the trash and is checked on a workspace move) (#4712, #4697, #4699).
+- Calendar settings save through the core with a version (409 with the current calendar); event writes also accept the core's expect_updated_at (#4712, #4703).
+- Every write route of the office (settings, rows, import, bank accounts, packs, letterhead, contract files, DATEV suppliers, legacy import, sign-off, retention, logo) and of tables, wiki style, calendar subscriptions, bookmarks, address book sources and public list links ticks its area, so other devices reload; an after-hook of the core ticks write routes that forget it (#4706).
+
+### Fixed
+- Undo no longer overwrites someone else's change: a toast or history undo sends only the keys the step changed with the version of the own save; changed elsewhere it says "Changed elsewhere, not undone" (office toasts, budget, event drags, booking page, wiki versions, polls) (#4704).
+
+### Fixed
+- main: p4286_restore / p2192_c_upgrade compare the old fixture's tasks including the completed ones beyond the start state's 14 days (red from 06.11.2026 on); p22232_c_offsite copies its stand-in once, so no fake starts from a half-written file; AG_RULES in agentchat.js equals the agent template again (answer buttons of 200 characters).
+
+Package 2.573 (Bündel: CI-only rot: p2141_a_api, CI-only rot: p2172_a_edit_ui, CI-only rot: p2273_c_ui u. 7 weitere).
+### Added
+- Computer and tablet (from 768 px): short motion like on the phone - the side panel slides in and out, the sidebar glides in when it unfolds, menus and the date picker pop up and fade out, toasts slide in and fade out, opened subtasks, groups, sidebar folders and the knowledge tree roll in; "reduce motion" turns it all off (#4763).
+### Changed
+- CI: the full run plans the hard shards plus exactly 20 others (`tools/shards.py --soft-shards`) instead of 20 in all, so no shard runs close to its 90 min limit (#4748).
+
+Package 2.572.0 (Bündel: Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI v2.551.0 rot ohne).
+
+### Changed
+- Head bar (computer, tablet): the search is narrower (12rem) and gives way first when favourites need the room - it shrinks to 7rem, then shows only the magnifier (a click opens the search as before), only then the rest goes under "+N" (#4746).
+- Phone: the favourites row under the header is gone; a swipe up on the bottom tab bar, or a tap on the small grip above it, slides the favourites in above the tab bar; a tile, a swipe down, a tap next to it or Escape closes it. No grip while "Favourites" is pinned as a tab, while typing, or without favourites (#4747).
+
+### Added
+- Favourites with the same symbol in one row (for example several tags) are told apart on their own: the target's own colour when it is unique, else a small badge with the first letter (two when letters collide); a look set by hand always wins (#4749).
 
 Package 2.567 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Added
@@ -101,6 +132,10 @@ Package 2.570 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher))
 ### Fixed
 - Office > Devices > New device opens the editor again instead of doing nothing (#4750).
 - Turning encryption on or off for the whole instance (encrypt-all, decrypt-all) now also seals or opens the copies in the office trash, so a restored item is stored the same way as everything else; the trash is not emptied, and copies that cannot be opened are counted as failed and kept (#4716).
+
+## [2.570.0] - 2026-11-06
+
+Not released (the CI of this version was red); its changes are listed under 2.573.0.
 
 ## [2.563.1] - 2026-11-06
 
@@ -1666,7 +1701,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.570.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.573.0...HEAD
+[2.573.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.573.0
 [2.570.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.570.0
 [2.563.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.1
 [2.563.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.0
