@@ -133,9 +133,11 @@ async function bm_patch(id, ch, label, hl = label, x0 = null) {
   const old = {}; for (const k of Object.keys(ch)) old[k] = x[k];
   const go = () => api('PATCH', `/api/bookmarks/${id}`, ch);
   const nx = await optWrite(optSet(() => bm_item(id), ch), () => (bm_q = bm_q.catch(() => {}).then(go)), bm_draw);
-  offerUndo(label, histAdd({label: hl,
-    undo: async () => { await api('PATCH', `/api/bookmarks/${id}`, old); await bm_reload(); },
-    redo: async () => { await api('PATCH', `/api/bookmarks/${id}`, ch); await bm_reload(); }}));
+  // 2.570.0 (#4770): undo / redo send only the changed keys against the version the step before left (core.js undoStep; the
+  // preview fetch no longer moves it): changed in another session since -> "Changed elsewhere, not undone", their change stays
+  let ver = nx?.updated_at || '';
+  const st = (v, from) => undoStep(`/api/bookmarks/${id}`, v, ver, {now: from, label: hl, then: j => { ver = j?.updated_at || ver; }}).finally(bm_reload);
+  offerUndo(label, histAdd({label: hl, undo: () => st(old, ch), redo: () => st(ch, old)}));
   if ('url' in ch) BM.polls = 0;
   if ('state' in ch || 'tags' in ch || 'url' in ch) bm_reload();
   return nx;
