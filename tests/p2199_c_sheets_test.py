@@ -255,7 +255,10 @@ FT = new(Fl, "Rates", folder_id=FF)
 check(idx(Fl)[FT]["folder_id"] == FF, "freelancer: a table in her folder")
 check(da.get(V + f"/sheets/{FT}").status_code == 404, "her agent: nothing without a share")
 fshare(Fl, FF, agent_id=DA, role="edit")
-check(da.get(V + f"/sheets/{FT}").ok and cell(da, FT) == 200, "her agent with an edit share: reads and writes")
+r = da.get(V + f"/sheets/{FT}")
+# 2.564.0 (#4702): an agent writes with the version it read (expect_rev)
+check(r.ok and da.put(V + f"/sheets/{FT}/cells", json={"cells": [{"cell": "A1", "raw": "1"}], "expect_rev": r.json().get("rev")}).status_code == 200,
+      "her agent with an edit share: reads and writes")
 check(Fl.delete(B + f"/api/files/nodes/{FF}").ok and Fl.get(B + f"/api/sheets/{FT}").status_code == 404, "her folder into the trash: the table too")
 check(Fl.post(B + f"/api/files/nodes/{FF}/restore").ok and Fl.get(B + f"/api/sheets/{FT}").ok, "and back")
 

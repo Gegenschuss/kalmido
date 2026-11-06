@@ -253,7 +253,8 @@ check(r.ok and r.content == b"version one", "the agent downloads a file")
 check(AGS.post(B + f"/api/v1/files/{P1}/versions", json={"content": "agent"}).status_code == 403, "view: no new version")
 check(AGS.post(B + f"/api/v1/files/{F1}/shares", json={}).status_code in (403, 404, 405), "no sharing through the API")
 A.post(B + f"/api/files/nodes/{F1}/shares", json={"agent_id": PAG, "role": "edit"})
-r = AGS.post(B + f"/api/v1/files/{P1}/versions", json={"content_base64": base64.b64encode(b"by the agent").decode()})
+r = AGS.post(B + f"/api/v1/files/{P1}/versions", json={"content_base64": base64.b64encode(b"by the agent").decode(),  # 2.564.0 (#4702): the version the agent read
+                                                    "expect_version": AGS.get(B + f"/api/v1/files/{P1}").json()["version"]})
 check(r.status_code == 201 and content(A, P1).content == b"by the agent", f"edit: the agent uploads a new version ({r.text[:120]})")
 log = A.get(B + f"/api/files/nodes/{P1}").json().get("log", [])
 acts = {x["action"] for x in log if x["agent"]}
@@ -261,7 +262,7 @@ check({"download", "version"} <= acts, f"the history has the agent's accesses ({
 check(not any(x["action"] == "download" and not x["agent"] for x in log), "people's reads are not logged")
 # review: an agent never writes a new version of an executable file; the API path shows only visible folders
 SH_ = up(A, "deploy.sh", b"echo ok", parent=F1).json()["items"][0]["id"]
-check(AGS.post(B + f"/api/v1/files/{SH_}/versions", json={"content": "rm -rf /"}).status_code == 403, "no new version of a .sh by an agent")
+check(AGS.post(B + f"/api/v1/files/{SH_}/versions", json={"content": "rm -rf /", "expect_version": 1}).status_code == 403, "no new version of a .sh by an agent")
 SUB = folder(A, "Deep", parent=F1)
 A.post(B + f"/api/files/nodes/{SUB}/shares", json={"user_id": DAVE, "role": "view"})
 Dv = sess("dave")

@@ -29,7 +29,8 @@ const call = async (ck, method, url, body, h = {}) => { const r = await fetch(B 
   await call(CA, 'PUT', `/api/lists/${L}/members`, {user_id: ag.id, role: 'edit'});
   const T = [];
   for (const t of ['Alpha task', 'Beta task', 'Gamma task', 'Delta task', 'Epsilon task']) T.push((await call(CA, 'POST', '/api/tasks', {title: t, list_id: L})).id);
-  const agPatch = (id, body) => call(null, 'PATCH', `/api/v1/tasks/${id}`, body, AGH);
+  // 2.564.0 (#4702): an agent's title change carries the version it read (else 400 version_required)
+  const agPatch = async (id, body) => call(null, 'PATCH', `/api/v1/tasks/${id}`, {...body, expect_updated_at: (await call(null, 'GET', `/api/v1/tasks/${id}`, null, AGH)).updated_at}, AGH);
   const agc = (id, body) => call(null, 'POST', `/api/v1/tasks/${id}/comments`, body, AGH);
 
   await firefox(async o => {
