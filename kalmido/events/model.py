@@ -1089,7 +1089,9 @@ def ev_actor(uid=None):
         return uid
     from flask import g, has_request_context
     u = getattr(g, "user", None) if has_request_context() else None
-    return u["id"] if u is not None else None
+    # #3506 (CI red of 2.575.0): the visitor of a public page is PUB_ACTOR with id 0 - no account, so no updated_by (0 broke the
+    # foreign key: a customer's cancel on the booking page answered 400)
+    return (u["id"] or None) if u is not None else None
 
 
 def ev_delete(c, r, uid=None):
