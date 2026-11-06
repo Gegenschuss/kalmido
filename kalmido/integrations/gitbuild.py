@@ -623,6 +623,9 @@ def gb_partial(c, t, version, note=""):
     keep = {k: t[k] for k in ("section_id", "parent_id", "priority", "ttype", "assignee_id", "assignee_group_id") if t[k]}
     if list_role(c, lid) == "participant":  # their new task is theirs (task_create), the people stay
         keep = {k: v for k, v in keep.items() if k not in ("assignee_id", "assignee_group_id")}
+    # the rest takes t's lock, not the "an agent's task starts locked" default (#1118): since 2.542.0 (#4609) the release pass
+    # never completes a locked task, and the rest of an open task must go with the release of Y like the task itself
+    keep["locked"] = 1 if t["locked"] else 0
     rest = v1_call(task_create, body={"title": f"Rest: {t['title']}", "list_id": lid, "content": note, "fields": {f["id"]: val}, **keep})["id"]
     ts = iso_ms(now_utc())
     c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?)", (tid, rest, me(), ts))
