@@ -230,7 +230,7 @@ async function wsPaneDraw(md) {
     ${o.role === 'admin' && j.manage ? `<div class="row wsadd"><button type="button" class="btn sm" data-oinv="new">${ic('send', 's')} ${tr('Invite people')}</button></div>${''/* 2.364.0 C (#3041): one dialog (e-mail or link) instead of the field + Add */}
     <div class="row"><label for="ws-name-${o.id}">${tr('Name')}</label><input id="ws-name-${o.id}" value="${esc(o.name)}" maxlength="60" data-wsf="name"><label for="ws-dom-${o.id}">${tr('E-mail domains')}</label><input id="ws-dom-${o.id}" value="${esc(o.domains || '')}" ${S.me?.is_admin ? 'placeholder="example.com" data-wsf="domains"' : 'readonly'}></div>${S.me?.is_admin ? '' : `<div class="muted mhint" id="ws-dom-hint-${o.id}">${tr('Only an admin of this server sets the e-mail domains of an organisation')}</div>`}` : ''}${''/* 2.166.0 (#2633): name and domains save themselves (no Save button); 2.467.0 (#3898): domains read only unless an admin of the server */}
     ${o.role === 'admin' && j.manage ? `<div class="row wsic"><label>${tr('Symbol')}</label><span class="wsicprev">${orgIconHtml(o)}</span><button type="button" class="btn sm" data-wsic="up">${ic('picture', 's')} ${tr('Upload a picture…')}</button>${o.icon_url ? `<button type="button" class="btn sm" data-wsic="rm">${tr('Remove the picture')}</button>` : ''}</div>` : ''}${''/* 2.87.9 (#1913) */}
-    ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button></div>` : ''}
+    ${o.role === 'admin' ? `<div class="row"><button type="button" class="btn sm" data-oadm="${o.id}">${ic('list', 's')} ${tr('Projects of the organisation')}</button><button type="button" class="btn sm" data-otk="${o.id}">${ic('done', 's')} ${tr('Tasks of the organisation')}</button></div>` : ''}${''/* 2.574.0 (#3376): + the read-only task view */}
     ${o.role === 'admin' && inl ? dataBoxes(o) : ''}${''/* 2.42.0 (#828): encryption + recovery key, export; 2.146.0 D (#2468): the retention export */}
     ${o.role === 'admin' ? whoBoxHtml(o) : ''}${''/* 2.115.0 A (#2061): the organisation's webhooks; lazy-ok: 2.149.0 F (#2519): settings dialog only (LD_NEED loads integrations) */}
     ${o.role === 'admin' && typeof chn_orgBoxHtml === 'function' ? chn_orgBoxHtml(o) : ''}${''/* 2.142.0 A (#2145): its notification channels */}
@@ -277,6 +277,8 @@ function wsPaneWire(md) {
   md.addEventListener('click', async e => {
     const oa = e.target.closest('[data-oadm]');
     if (oa) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +oa.dataset.oadm); oadmOpen(+oa.dataset.oadm, o?.name || ''); return; }  // 2.35.0 (#1101)
+    const otk = e.target.closest('[data-otk]');
+    if (otk) { const o = (($('#s-ws', md)._j || {}).orgs || []).find(x => x.id === +otk.dataset.otk); otkOpen(+otk.dataset.otk, o?.name || ''); return; }  // 2.574.0 (#3376)
     const wi = e.target.closest('[data-wsic]');
     if (wi) { wsIconPick(md, +wi.closest('[data-oid]').dataset.oid, wi.dataset.wsic); return; }  // 2.87.9 (#1913)
     const ok = e.target.closest('[data-wsok]');
@@ -341,7 +343,8 @@ const OADM_ACT = {archive: N_('{0} archived {1}'), restore: N_('{0} restored {1}
   edit: N_('{0} changed {1}'), icon: N_('{0} changed the icon of {1}'),  // 2.56.0 (#1795)
   moveout: N_('{0} moved {1} out of the organisation'),  // 2.148.1 B (#2483)
   outok: N_('{0} released {1} for its maker to take it back'), outno: N_('{0} declined to give {1} back'),  // 2.361.2 (#2923)
-  export: N_('{0} exported {1} with the account export')};  // 2.148.1 C (#2492)
+  export: N_('{0} exported {1} with the account export'),  // 2.148.1 C (#2492)
+  tasks: N_('{0} looked at the tasks of {1}'), tasksall: N_('{0} looked at the tasks of all projects')};  // 2.574.0 (#3376): the read-only task view
 function oadmRow(x) {
   const sub = [x.owner_agent ? tr('Owner: {0} (agent)', x.owner_name) : tr('Owner: {0}', x.owner_name), tr('{0} open', x.open) + ' / ' + trn('{0} task', '{0} tasks', x.tasks),
     trn('{0} member', '{0} members', x.members), tr('changed {0}', fmtDateLoc(String(x.changed_at || '').slice(0, 10)) || '–'), x.folder && tr('Folder: {0}', fDisp(x.folder))].filter(Boolean);  // 2.39.1 (#1188): + folder path

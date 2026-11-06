@@ -113,7 +113,8 @@ const RARE = ['Agent access', 'Tasks from notes…', 'Notifications: Default', '
   check(!pan.items.includes('New date…') && !pan.items.includes('High') && !pan.items.includes('Today'), '#1056 task menu in the panel: no date / priority ' + pan.items.join('|'));
   check(d.querySelector('#detail .dtop [data-act="date"]') && d.querySelector('#detail .dtop [data-act="prio"]'), '#1056 ... the panel header has both');
   // 2.445.0 (#3008): Pin, Start time tracking (header buttons) and Assign… (the chip in .dmeta) are not repeated either
-  const lost = row.all.filter(x => !pan.all.includes(x) && !['New date…', 'Today', 'Tomorrow', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down', 'Pin', 'Start time tracking', 'Assign…'].includes(x));
+  // 2.574.0 (#3376): + Urgent (the priority row of the row menu)
+  const lost = row.all.filter(x => !pan.all.includes(x) && !['New date…', 'Today', 'Tomorrow', 'Urgent', 'High', 'Medium', 'Low', 'None', 'Move up', 'Move down', 'Pin', 'Start time tracking', 'Assign…'].includes(x));
   check(!lost.length, '#1056 the panel menu lost nothing else ' + lost.join('|'));
   check(pan.items.includes('Skip this occurrence') && pan.items.includes('Assign…') === !d.querySelector('#detail .dmeta [data-act="assign"]'), '#1056 panel: skip stays under Plan, Assign… only without the chip');
   // "More" in the tab bar: Views / Areas, "Customise tab bar" last (2.489.0 #2664: no heading Conversations)

@@ -201,7 +201,7 @@ def _cd_name(cd):
 
 S_ID = {"type": "integer", "minimum": 1}
 _DW_H = {"type": ["integer", "null"], "minimum": 0, "maximum": 8760}  # 2.553.0 C (#3538): a column time limit in hours (null / 0 = none)
-PRIO = {"type": "string", "enum": ["none", "low", "medium", "high"]}
+PRIO = {"type": "string", "enum": ["none", "low", "medium", "high", "urgent"]}  # 2.574.0 (#3376): urgent
 STRS = {"type": "array", "items": {"type": "string"}}
 TASK_FIELDS = {
     "title": {"type": "string"}, "list_id": S_ID, "notes": {"type": "string", "description": "Markdown (a task with note_locked: true refuses it: 409)"},
@@ -632,7 +632,7 @@ TOOLS = [
            "milestone_id": {**S_ID, "description": "2.18.0: only the tasks of this milestone"},
            # 2.390.0 B (#3355)
            "priority": {"oneOf": [{"type": "string"}, {"type": "array", "items": PRIO}],
-                        "description": "2.390.0: none | low | medium | high, several as a list or comma separated"},
+                        "description": "2.390.0: none | low | medium | high | urgent, several as a list or comma separated"},
            "priority_min": {**PRIO, "description": "2.390.0: at least this priority"},
            "section_id": {"type": "string", "description": "2.390.0: a column (section) id, or none"},
            "sprint_id": {"type": "string", "description": "2.390.0: a sprint id, current (the active sprint of the task's project) or none (backlog)"},
@@ -959,7 +959,7 @@ TOOLS = [
                         "ideas (2.156.0, sub-branches for a branch of a mind map; input: list, path, levels, hint, lang only): "
                         "{items: [{title, children?: [{title}] (only when input.levels is 2)}]} -- short titles in input.lang, at "
                         "most 50 entries in all; the person takes single ideas or all over. "
-                        "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high. "
+                        "Every kind may add summary (a short explanation). Dates YYYY-MM-DD, priority none | low | medium | high | urgent. "
                         "At most 200 entries; resubmitting replaces the proposal until the person applied or discarded it.",
      _obj({"job_id": S_ID, "proposal": {"type": "object"}}, ["job_id", "proposal"]), t_submit_proposal),
     ("update_job", "Update a job: state, title, log (replace) or append_log (add lines).",
@@ -1712,6 +1712,11 @@ TOOLS += [
                        "(default \"<project> (copy)\"), done = also the completed tasks, folder optional (default your folder of the project).",
      _obj({"list_id": S_ID, "name": {"type": "string"}, "done": {"type": "boolean"}, "folder": {"type": "string"}}, ["list_id"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/duplicate", body=_without(a, "list_id"))),
+    # 2.574.0 (#3376)
+    ("duplicate_task", "2.574.0: duplicate a task right below it: subtasks, ticket type, points, assignee, fields, snippets and files come "
+                       "along, comments and times do not; the copy is open. Answer: the new task + skipped_files. A project encrypted in "
+                       "the browser: 403 list_e2e (duplicate it in the app).",
+     _obj({"task_id": S_ID}, ["task_id"]), lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/duplicate")),
     # ---- saved filters
     ("list_filters", "Your saved filters (name + rules).", _obj({}), lambda api, a: api.call("GET", "/filters")),
     ("create_filter", "Save a filter: rules as the app stores them (see docs/API.md).",
@@ -2506,7 +2511,7 @@ _RULE_TRIG = {"type": "object", "description": "{kind: section (a task comes int
                                                "section_id?, tag_id?, user_id?, field_id?, value?}"}
 _RULE_ACT = {"type": "object", "description": "{kind: assign (user_id, a person of the project) | due (days from today 0..365, null = clear) | "
                                               "comment (text, at most 2000 characters) | move (list_id and / or section_id) | priority "
-                                              "(2.138.0: priority none / low / medium / high) | tag (2.138.0: tag_id, a project tag) | field "
+                                              "(2.138.0: priority none / low / medium / high / urgent) | tag (2.138.0: tag_id, a project tag) | field "
                                               "(2.138.0: field_id + value of a custom field, null = clear)}"}
 TOOLS += [
     ("list_rules", "2.71.0: the rules of a project you may change (trigger, action, active, paused_reason, who set it up). A rule runs with the rights "
@@ -2674,7 +2679,7 @@ TOOL_SCOPES = {
               "submit_proposal", "propose_to_other_topic", "propose_to_person", "update_job", "list_chats", "get_reply_style", "chat_typing", "send_chat", "request_chat_approval", "use_approval", "withdraw_chat_choices", "pin_chat_message", "report_usage", "get_usage",
               "report_plan_usage", "get_plan_usage", "clear_plan_usage", "list_schedules", "propose_playbook"),
     "tasks:write": ("add_contract", "add_device", "add_upkeep", "sync_read_later", "add_occasion", "add_deadline", "ingredients_to_shopping", "give_stars", "add_reward", "update_reward", "request_reward",
-                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_decision", "set_delivery", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
+                    "decide_reward", "create_note", "update_note", "create_task", "update_task", "add_decision", "set_delivery", "add_snippet", "complete_task", "set_waiting", "clear_waiting", "tidy_task", "move_task", "duplicate_task", "link_task_to_list", "unlink_task_from_list", "batch_tasks",
                     "reopen_task", "partial_task", "skip_occurrence", "take_task", "watch_task", "unwatch_task", "add_subtask", "add_dependency", "remove_dependency", "create_habit",
                     "update_habit", "check_in_habit", "shift_list_dates", "request_approval", "restore_note"),  # 2.272.0 E1 (#3038): restore_note
     "comments": ("comment_typing", "request_comment_approval", "withdraw_comment_choices", "post_team_message", "edit_team_message", "delete_team_message", "react_team_message", "pin_team_message", "mark_team_chat_read", "add_comment", "react", "request_merge_approval", "request_integration_approval", "request_deploy_approval", "update_comment", "delete_comment", "mark_news_read",
@@ -2754,7 +2759,7 @@ TOOLSETS = {
         rename_section reorder_sections delete_section list_folders rename_folder delete_folder move_task link_task_to_list unlink_task_from_list
         batch_tasks reopen_task delete_task partial_task skip_occurrence take_task list_subtasks add_subtask list_trash restore_task empty_trash list_tags
         get_roadmap get_dependencies add_dependency remove_dependency list_fields create_field update_field delete_field get_key_figures create_list_tag
-        update_list_tag delete_list_tag list_templates create_template update_template delete_template apply_template duplicate_list list_filters
+        update_list_tag delete_list_tag list_templates create_template update_template delete_template apply_template duplicate_list duplicate_task list_filters
         create_filter update_filter delete_filter upload_attachment create_text_file delete_attachment update_comment delete_comment set_project_overview
         add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task

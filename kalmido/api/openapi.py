@@ -316,6 +316,8 @@ def openapi_spec():
                               "its tasks get keys like APP-12 (field key of a task); null = none"),
             "time_tracking": {"type": "boolean", "description": "2.41.0 (#1471): time tracking on for this project (any type; owner). Default for a new project: its folder's setting, else on when the creator has the module Time on (2.489.0); new time entries need it; tracked time stays visible when it is switched off"},
             "mail_guests": {"type": "boolean", "description": "2.395.0 (#3380): guests of the project (participant / view) read its filed e-mails (GET /mails); default off, set by the owner / a project admin in the app. Edit roles always read them"},
+            "two_eyes": {"type": "boolean", "description": "2.574.0 (#3376): integrate / deploy / merge requests need the approval of two "
+                         "different people (the first stays open, suggestion.approvals names who); set by the owner in the app, default off"},
             "modules_on": {"type": "array", "items": {"type": "string"}, "description": "2.39.1 (#1293): only in the answer of a PATCH with "
                            "columns or project_type: the modules it switched on (custom field columns: [\"fields\"] for the project's owner)"},
             "is_inbox": {"type": "boolean"}, "archived": {"type": "boolean"},
@@ -629,7 +631,7 @@ def openapi_spec():
                      q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
                      # 2.390.0 B (#3355): the further filters and the sort
                      q("priority", "2.390.0: none, low, medium or high; several comma separated (or the parameter repeated)"),
-                     q("priority_min", "2.390.0: at least this priority", {"type": "string", "enum": ["none", "low", "medium", "high"]}),
+                     q("priority_min", "2.390.0: at least this priority", {"type": "string", "enum": list(PRIO_VALUES)}),  # 2.574.0 (#3376): + urgent
                      q("section_id", "2.390.0: a column (section) id, or none = no column"),
                      q("sprint_id", "2.390.0: a sprint id, current = the active sprint of the task's project, none = backlog"),
                      q("created_by", "2.390.0: me or a user id"), q("reviewer", "2.390.0: me, none or a user id"),

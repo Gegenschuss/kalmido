@@ -45,7 +45,7 @@ RUL_DUE_BATCH = 500         # tasks per watchdog tick (due date reached)
 RUL_PROP_DAY_MAX = 20       # rule proposals of one agent per 24 hours
 RUL_TRIGGERS = ("section", "done", "reopen", "ltag", "due", "created", "assigned", "field")  # 2.138.0 D (#2060): + created, assigned, field
 RUL_ACTIONS = ("assign", "due", "comment", "move", "priority", "tag", "field")  # 2.138.0 D (#2060): + priority, tag, field
-RUL_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5}  # 2.138.0 D (#2060): action priority (names as in API v1)
+RUL_PRIO = {"none": 0, "low": 1, "medium": 3, "high": 5, "urgent": 7}  # 2.138.0 D (#2060): action priority (names as in API v1)
 RUL_PAUSE = {  # paused_reason -> the text the settings show
     "creator": N_("the person who set it up has no access to the project any more"),
     "role": N_("the person who set it up is no longer owner or admin of the project"),

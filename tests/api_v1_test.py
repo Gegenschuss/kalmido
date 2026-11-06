@@ -225,8 +225,9 @@ check(t1["priority"] == "high" and t1["notes"] == "call **first**" and t1["due"]
       and t1["reminders"] == [0, 15] and sorted(t1["tags"]) == ["calls", "health"] and t1["pinned"] is True and t1["duration"] == 30
       and t1["status"] == "open" and t1["created_by"] == 1 and t1["list_id"] == L2["id"], "task fields " + json.dumps(t1)[:300])
 check(a.post("/tasks", {"title": "inbox task"}).json()["list_id"] == ls["data"][0]["id"], "default list = inbox")
+# 2.574.0 (#3376): "urgent" is a valid priority now, "critical" is the bad one
 check(a.post("/tasks", {"title": "p3", "priority": 3}).json()["priority"] == "medium", "numeric priority accepted")
-for bad, what in (({"title": ""}, "empty title"), ({"title": "x", "due": "2026-13-01"}, "bad date"), ({"title": "x", "priority": "urgent"}, "bad priority"),
+for bad, what in (({"title": ""}, "empty title"), ({"title": "x", "due": "2026-13-01"}, "bad date"), ({"title": "x", "priority": "critical"}, "bad priority"),
                   ({"title": "x", "tags": "a,b"}, "tags as string"), ({"title": "x", "foo": 1}, "unknown field"), ({"title": "x", "url": "javascript:x"}, "bad url"),
                   ({"title": "x", "repeat": "FREQ=SECONDLY"}, "sub-daily rule"), ({"title": "x", "pinned": "yes"}, "pinned not boolean"),
                   ({"title": "x", "due_time": "25:00", "due": str(T)}, "bad time"), ({"title": "x", "list_id": 999999}, "unknown list"),

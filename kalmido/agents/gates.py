@@ -10,6 +10,10 @@ in the suggestion under "irreversible"); only an approver's yes per task does (a
 approved by 👍: the approver either finishes those tasks first or approves on purpose with "Approve anyway" (POST
 /api/comments/<id>/decide {decision: approve, skip_checklist: true}); the skipped tasks are recorded in the request.
 Kalmido never integrates or deploys anything: the agent does, after the approval event ("reaction" with data.gate).
+2.574.0 (#3376): with the list switch "Approvals need two people" (lists.two_eyes, default off) the first 👍 of an approver
+only counts (state stays open, suggestion.approvals names who, the agent gets no approval yet); the 👍 of a second, DIFFERENT
+approver approves. The same person twice never does. A 👎 of any approver rejects at once. The same for merge requests
+(collab/reactions.py). A project without a second person who may approve never gets there: the switch shows a hint then.
 """
 import json
 from flask import g, jsonify
@@ -94,10 +98,27 @@ def gate_clean(c, t, s):
     return _gate_irr_in(c, t, out)
 
 
+def gate_two_eyes(c, k, t, sug, uid):
+    """2.574.0 (#3376): True when the approval of uid on the request in comment k still waits for a second person (lists.two_eyes):
+    uid is recorded in sug["approvals"] (stored), the request stays open. False = this approval decides."""
+    r = c.execute("SELECT two_eyes FROM lists WHERE id=?", (t["list_id"],)).fetchone()
+    if not r or not r["two_eyes"]:
+        return False
+    ap = [a for a in (sug.get("approvals") or []) if isinstance(a, dict)]
+    if any(a.get("by") != uid for a in ap):
+        sug["approvals"] = ap + [{"by": uid, "at": iso(now_utc())}]
+        return False
+    if not ap:
+        ap = [{"by": uid, "at": iso(now_utc())}]
+    sug["approvals"], sug["needs"] = ap, 2
+    c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sug, ensure_ascii=False), k["id"]))
+    return True
+
+
 def gate_decide(c, k, t, uid, approve, skip=False):
     """An approver's decision on a gate comment (the caller checked is_approver and commits). Returns the new state:
     approved | rejected | blocked (deploy with open checklist items and no skip, or irreversible tasks without a yes: stays
-    open; skip does not pass those, 2.392.0 C #3370)."""
+    open; skip does not pass those, 2.392.0 C #3370) | waiting (2.574.0 #3376: the list wants a second approver, stays open)."""
     sug = json.loads(k["suggestion"])
     if sug.get("state") != "open":
         return sug.get("state")
@@ -118,6 +139,8 @@ def gate_decide(c, k, t, uid, approve, skip=False):
     if irr:
         c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
         return "blocked"
+    if approve and gate_two_eyes(c, k, t, new, uid):
+        return "waiting"
     new.update(state="approved" if approve else "rejected", by=uid, at=iso(now_utc()))
     c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(new, ensure_ascii=False), k["id"]))
     return new["state"]
@@ -126,7 +149,7 @@ def gate_decide(c, k, t, uid, approve, skip=False):
 def gate_event(sug):
     """The part of the agent's reaction event about the request (data.gate)."""
     out = {"kind": sug["kind"], "state": sug.get("state")}
-    for k in ("source", "target", "integrations", "checklist", "skipped", "irreversible"):
+    for k in ("source", "target", "integrations", "checklist", "skipped", "irreversible", "approvals"):
         if k in sug:
             out[k] = sug[k]
     return out
@@ -152,7 +175,11 @@ def gate_decide_route(cid):
         return err(tr("This request was already decided"), 409)
     approve = b["decision"] == "approve"
     st = gate_decide(c, k, t, me(), approve, b.get("skip_checklist", False))
-    if st != "blocked":
+    if st == "waiting":  # 2.574.0 (#3376): the first of two approvals -- the thumb is recorded, nobody is told yet
+        c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
+                  (cid, me(), "up", iso_ms(now_utc())))
+        log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": True, "waiting": True})
+    elif st != "blocked":
         c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                   (cid, me(), "up" if approve else "down", iso_ms(now_utc())))
         log_act(c, t["id"], "approval", {"agent": k["user_id"], "comment": cid, "ok": approve})

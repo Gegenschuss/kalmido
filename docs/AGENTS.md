@@ -672,7 +672,9 @@ Every event has the same envelope, whether it arrives as a webhook or through po
 ### Webhooks
 
 (2.138.1: the inbound webhook of a project and the webhooks of an organisation are for other tools, set up by people; see
-[API.md](API.md#inbound-webhook-of-a-list). An agent creates tasks with `POST /api/v1/tasks` and its own token.)
+[API.md](API.md#inbound-webhook-of-a-list). An agent creates tasks with `POST /api/v1/tasks` and its own token.
+2.574.0 (#3376): a person's webhook `task.updated` carries `data.diff` `{field: {old, new}}` next to `data.changes`, in the
+names and values of API v1 (`priority` as a name, up to `urgent`); agent events do not carry it.)
 
 If the agent has a webhook URL, Kalmido POSTs every event to it as JSON. The headers are the same as for [user webhooks](API.md):
 
@@ -2610,7 +2612,7 @@ rule proposals per agent and day.
 anybody; fires only when the person is new on the task; 2.144.6 (#2400): not when an approval request or "changes" of an
 approval hands the task over) and `field` (`field_id` of the project's custom fields; `value` = only
 when set to that option id / `"1"` checked / `"0"` unchecked / 2.473.0 `"*"` has a value, null = any change; formula fields never trigger). New actions
-`priority` (`priority` none / low / medium / high), `tag` (`tag_id`: adds a tag of this project; personal tags never) and `field`
+`priority` (`priority` none / low / medium / high / urgent), `tag` (`tag_id`: adds a tag of this project; personal tags never) and `field`
 (`field_id` + `value`, checked like a normal field value, null clears it). A deleted field or project tag pauses the rule
 (`paused_reason` `field` / `tag`). The loop protection stays: a value set by a rule never triggers a `field` rule.
 
@@ -3171,7 +3173,7 @@ the proposal in the app.
 
 **Proposals** (the body of `POST /api/v1/agent/jobs/{id}/proposal`). Every kind may carry `summary` (a short
 explanation, Markdown, at most 2,000 characters) and `kind` (must match the job). Dates are `YYYY-MM-DD`, priority
-`none`, `low`, `medium` or `high`, titles at most 300 characters, notes 5,000. At most 200 entries (tasks + subtasks).
+`none`, `low`, `medium`, `high` or `urgent` (2.574.0), titles at most 300 characters, notes 5,000. At most 200 entries (tasks + subtasks).
 
 ```jsonc
 // project
@@ -3869,6 +3871,7 @@ with the scope it needs). The tools:
 - project tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),
+  `duplicate_task` (2.574.0: a copy of a task right below it with subtasks, type, points, assignee, fields, snippets and files; open, without comments and times),
   `list_filters`, `create_filter`, `update_filter`, `delete_filter`
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - decisions and one-way steps (2.392.0): `add_decision`, `update_task` with `irreversible`
@@ -3921,7 +3924,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `delete_field`, `delete_filter`, `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`,
 `delete_milestone`, `delete_note`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`,
 `delete_task`, `delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`,
-`draft_reminder`, `duplicate_list`, `edit_team_message`, `empty_trash`, `end_working`, `export_brief`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
+`draft_reminder`, `duplicate_list`, `duplicate_task`, `edit_team_message`, `empty_trash`, `end_working`, `export_brief`, `export_data`, `export_ics`, `export_vcards`, `get_absences`,
 `get_agent`, `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`,
 `get_delivery_report`, `get_dependencies`, `get_document`, `get_event`, `get_family`, `get_filed_mail`, `get_group`, `get_habit_stats`, `get_job`, `get_life`, `get_list`, `get_me`,
 `get_milestone`, `get_note`, `get_office`, `get_office_document`, `get_office_subscriptions`, `get_plan_usage`, `get_playbook`, `get_poll`,
@@ -4527,6 +4530,10 @@ With the project's switch on, a marked task without a yes cannot be completed, t
 - The owner of a project switches on `irreversible_needs_yes` (off by default). Then an `integrate` request waits for a yes to its own
   task, a `deploy` request for a yes to every open marked task of the project. "Approve anyway" does not pass that: the request stays
   open (`blocked`), the tasks stand in `suggestion.irreversible` and in the event's `gate.irreversible` (you get only those you see).
+- 2.574.0: the owner can also switch on "Approvals need two people" (`two_eyes` in `GET /lists`, off by default). Then the first 👍 of
+  an approver on an `integrate`, `deploy` or merge request only counts: the request stays `open`, `suggestion.approvals` names who
+  approved, and you get no approval yet. The 👍 of a second, different approver approves (the event's `gate.approvals` has both); the
+  same person twice never does, a 👎 of any approver rejects. Wait for the approval event as always.
 - The yes is a person's: an approver of the project, per task, in the task panel; it is logged and never open to agents or the API.
   A new reason takes it back. Each project with the lock (encrypted in the browser) takes the mark without a reason and no decisions.
 - Environments can bring an acceptance task (`acceptance_task`, off by default): a version that arrives makes one task "Accept vX.Y" for

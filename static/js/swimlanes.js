@@ -28,7 +28,7 @@ const swlModeName = (lid, m) => m === 'prio' ? tr('Priority') : m === 'person' ?
 // the lanes: [{key, name, has(task)}], the lane without a value last. Priority: all four; person: the people (and groups)
 // with tasks on the board; a field: its options (checkbox: yes / no)
 function swlLanes(lid, m, tasks) {
-  if (m === 'prio') return [5, 3, 1, 0].map(p => ({key: 'p' + p, name: p ? tr(PRIO_NAMES[p]) : tr('No priority'), cls: 'flag-' + p, has: t => (t.priority || 0) === p}));
+  if (m === 'prio') return [7, 5, 3, 1, 0].map(p => ({key: 'p' + p, name: p ? tr(PRIO_NAMES[p]) : tr('No priority'), cls: 'flag-' + p, has: t => (t.priority || 0) === p}));
   if (m === 'person') {
     const us = new Set(), gs = new Set();
     for (const t of tasks) { if (t.assignee_id) us.add(t.assignee_id); else if (t.assignee_group_id) gs.add(t.assignee_group_id); }

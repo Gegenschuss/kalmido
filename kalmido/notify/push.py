@@ -914,7 +914,7 @@ def _wd_rem_flush(who, items, s, lg, now):
     head = trn("{0} task today", "{0} tasks today", len(items), lg=lg) if all(t["due"] == today for t, _a, _k in items) else \
         trn("{0} reminder", "{0} reminders", len(items), lg=lg)
     lines = [f"- {t['title']}" for t, _a, _k in items[:15]]
-    return notify(who, tr("Reminders", lg=lg), head + "\n" + "\n".join(lines), push_prio(s, 4 if any(t["priority"] == 5 for t, _a, _k in items) else None),
+    return notify(who, tr("Reminders", lg=lg), head + "\n" + "\n".join(lines), push_prio(s, 4 if any(t["priority"] >= 5 for t, _a, _k in items) else None),
                   f"{PUBLIC_URL}/#today", s=s, tag="reminders", kind="reminder", scope="private", chn_msg=head)  # like the digest: the channels get the number
 
 
@@ -988,7 +988,7 @@ def _wd_reminder(c, t, users, S, LG, now, memo=None):
                 short_day(date.fromisoformat(t["due"]), lgw)
             lname = tr("Basket", lg=lgw) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
             push = ((who, t["title"], tr("Due {0} {1} · {2}", day, when, lname, lg=lgw),
-                     push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}"),
+                     push_prio(sw, 4 if t["priority"] >= 5 else None), f"{PUBLIC_URL}/#t/{t['id']}"),
                     {"s": sw, "actions": [(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}"),
                                           (tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
                      "task": t["id"], "due": t["due"] if t["repeat"] else None})
@@ -1094,7 +1094,7 @@ def _wd_nag(c, t, users, S, LG, now):
     lname = tr("Basket", lg=lg) if t["list_inbox"] and inbox_default(t["list_name"]) else t["list_name"]
     head = tr("Deadline", lg=lg) if t["deadline"] else tr("Still open", lg=lg)
     notify(rcpt, t["title"], tr("{0} · due {1} {2} · {3}", head, day, when, lname, lg=lg),
-           push_prio(s, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,
+           push_prio(s, 4 if t["priority"] >= 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=s,
            actions=[(tr("Done|action", lg=lg), f"{PUBLIC_URL}/#done/{t['id']}"),
                     (tr("Stop reminding", lg=lg), f"{PUBLIC_URL}/#nagoff/{t['id']}"),
                     (tr("Snooze", lg=lg), f"{PUBLIC_URL}/#snooze/{t['id']}")],

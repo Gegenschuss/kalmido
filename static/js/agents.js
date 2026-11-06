@@ -285,7 +285,7 @@ function sugHtml(c, ro) {
   if (s.kind === 'merge_request') return mrHtml(c, s, ro);  // 2.2.0 (#339)
   if (s.kind === 'integrate' || s.kind === 'deploy') return gateHtml(c, s, ro);  // 2.26.0 (#949)
   const t = taskById(S.sel), sec = s.section_id && S.sections.find(x => x.id === s.section_id);
-  const pr = {none: N_('None'), low: N_('Low'), medium: N_('Medium'), high: N_('High')};
+  const pr = {none: N_('None'), low: N_('Low'), medium: N_('Medium'), high: N_('High'), urgent: N_('Urgent')};  // 2.574.0 (#3376): + urgent
   const rows = [s.title && [tr('Title'), esc(s.title)], s.notes && [tr('Notes'), esc(s.notes).replace(/\n/g, '<br>')], sec && [tr('Section'), esc(sec.name)],
     s.list_tags?.length && [tr('Project tags'), s.list_tags.map(g => ltagChip(g, t?.list_id)).join(' ')], s.priority && [tr('Priority'), esc(tr(pr[s.priority] || s.priority))]].filter(Boolean);
   const st = s.state === 'applied' ? tr('applied') : s.state === 'rejected' ? tr('rejected') : '';
@@ -798,7 +798,7 @@ function propEdit(el) {
     const s = $('[data-f="section_id"]', row); if (s) s.outerHTML = propSecSel(e.list_id, null);
   } else if (f === 'section_id') { e.section_id = v ? +v : null; if (!('list_id' in e)) e.list_id = +$('[data-f="list_id"]', row)?.value || null; }
 }
-const propPrio = p => p ? `<span class="ppchip flag-${p}">${ic('flag', 's')}${esc(tr({1: N_('Low'), 3: N_('Medium'), 5: N_('High')}[p] || ''))}</span>` : '';
+const propPrio = p => p ? `<span class="ppchip flag-${p}">${ic('flag', 's')}${esc(tr({1: N_('Low'), 3: N_('Medium'), 5: N_('High'), 7: N_('Urgent')}[p] || ''))}</span>` : '';
 function propSecSel(lid, sid) {
   const l = (S.prop.v.input.lists || []).find(x => x.id === lid);
   return `<select data-f="section_id" aria-label="${esc(tr('Section'))}" ${l && l.sections.length ? '' : 'hidden'}><option value="">${tr('No section')}</option>${(l?.sections || []).map(s => `<option value="${s.id}" ${s.id === sid ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select>`;

@@ -51,7 +51,7 @@ function flt_vals(c, cs) {
     case 'list': o = sideOrder().filter(l => !l.archived).map(l => [l.id, lname(l)]); break;
     case 'folder': o = folderNames().map(p => [p, fDisp(p)]); break;
     case 'date': o = DATE_OPTS.map(([v, n]) => [v, tr(n)]); break;
-    case 'prio': o = [[5, tr('High')], [3, tr('Medium')], [1, tr('Low')], [0, tr('None')]]; break;
+    case 'prio': o = [[7, tr('Urgent')], [5, tr('High')], [3, tr('Medium')], [1, tr('Low')], [0, tr('None')]]; break;  // 2.574.0 (#3376): + Urgent
     case 'type': o = [...TTYPES.map(([k, n]) => [k, tr(n)]), ['', tr('No type')]]; break;
     case 'tag': o = [...new Set(tasks.flatMap(t => t.tags || []))].sort(cmpText).map(g => [g, '#' + g]); break;
     case 'who': {

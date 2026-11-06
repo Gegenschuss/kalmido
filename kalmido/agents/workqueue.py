@@ -21,7 +21,7 @@ from ..agents.workstyle import ws_get, ws_need_editor
 from ..accounts.session import me
 
 WQ_ORDER_MAX = 500
-WQ_PRIO = {0: "none", 1: "low", 3: "medium", 5: "high"}  # the names of api/v1.py PRIO_NAMES
+WQ_PRIO = {0: "none", 1: "low", 3: "medium", 5: "high", 7: "urgent"}  # the names of api/v1.py PRIO_NAMES
 
 
 @contextlib.contextmanager

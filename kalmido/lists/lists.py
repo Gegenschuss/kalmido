@@ -30,6 +30,7 @@ LIST_FIELDS = ("name", "color", "folder", "sort", "view", "archived", "checklist
 LIST_FIELDS += ("time_tracking",)  # 2.41.0 (#1471): time tracking on for this list (owner; any type, default off)
 LIST_FIELDS += ("points_on",)  # 2.60.0 (#1511): story points shown in the app (owner; default off)
 LIST_FIELDS += ("irreversible_needs_yes",)  # 2.392.0 C (#3370): one-way tasks wait for a person's yes at the gates (owner; default off)
+LIST_FIELDS += ("two_eyes",)  # 2.574.0 (#3376): gate and merge approvals need two different people (owner; default off)
 LIST_FIELDS += ("mail_guests",)  # 2.395.0 (#3380): guests of the project read its filed e-mails (owner + project admins; default off)
 LIST_FIELDS += ("def_ttype",)  # 2.483.0 (#3916): default type of new tasks (owner; '' | bug | feature | task, needs ticket types on)
 LIST_KINDS = ("list", "project")
@@ -284,7 +285,7 @@ def clean_list_value(k, v, member=False):
         return v
     if k in ("archived", "checklist", "dep_shift", "tickets", "time_tracking"):
         return 1 if v else 0
-    if k in ("points_on", "irreversible_needs_yes", "mail_guests"):  # 2.60.0 (#1511); 2.392.0 C (#3370); 2.395.0 (#3380)
+    if k in ("points_on", "irreversible_needs_yes", "two_eyes", "mail_guests"):  # 2.60.0 (#1511); 2.392.0 C (#3370); 2.395.0 (#3380); 2.574.0 (#3376)
         return 1 if v else 0
     if k == "def_ttype":  # 2.483.0 (#3916)
         v = v or ""

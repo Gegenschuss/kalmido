@@ -172,7 +172,8 @@ check(post_in(URL, json={"title": "seventh"}).status_code == 429, "the seventh: 
 time.sleep(RATE_S + 1)  # 2.192.0 B (#2513): a new rate window
 check(post_in(URL, json={}).status_code == 400, "no title: 400")
 check(post_in(URL, json={"title": "x", "due": "31.12.2031"}).status_code == 400, "an invalid date: 400")
-check(post_in(URL, json={"title": "x", "priority": "urgent"}).status_code == 400, "an invalid priority: 400")
+# 2.574.0 (#3376): "urgent" is a valid priority now, "critical" is not
+check(post_in(URL, json={"title": "x", "priority": "critical"}).status_code == 400, "an invalid priority: 400")
 check(post_in(URL, json=["x"]).status_code == 400, "not an object: 400")
 check(post_in(URL, data=b"{" + b" " * 70000 + b"}", headers={"Content-Type": "application/json"}).status_code == 413, "too large: 413")
 check(post_in(B + "/api/hooks/in/khi_wrong", json={"title": "x"}).status_code == 404, "a wrong token: 404")

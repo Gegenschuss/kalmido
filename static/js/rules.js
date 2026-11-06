@@ -13,7 +13,7 @@ const RUL_TRIG = [['section', N_('A task comes into a column')], ['done', N_('A 
   ['created', N_('A task is created')], ['assigned', N_('A task is assigned')], ['field', N_('A custom field changes')]];
 const RUL_ACT = [['assign', N_('Assign to')], ['due', N_('Set the due date')], ['comment', N_('Write a comment')], ['move', N_('Move to')],
   ['priority', N_('Set the priority')], ['tag', N_('Add a project tag')], ['field', N_('Set a custom field')]];  // 2.138.0 D (#2060)
-const RX_PRIO = [['none', N_('None')], ['low', N_('Low')], ['medium', N_('Medium')], ['high', N_('High')]];
+const RX_PRIO = [['none', N_('None')], ['low', N_('Low')], ['medium', N_('Medium')], ['high', N_('High')], ['urgent', N_('Urgent')]];
 const RUL_DAYS = [0, 1, 2, 3, 7, 14, 30];
 const rul_on = l => !!l && !l.is_inbox && l.life !== 'health' && canManage(l);
 const rul_secs = lid => S.sections.filter(s => s.list_id === lid);

@@ -25,7 +25,7 @@ from ..collab.comments import h6r_shared_people, user_names  # 2.369.5 (#2517): 
 from ..personal.timetrack import evis, th_sql  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import task_visible  # 2.369.5 (#2517): pulled up from functions
 
-LEX_PRIO = {1: "Low", 3: "Medium", 5: "High"}
+LEX_PRIO = {1: "Low", 3: "Medium", 5: "High", 7: "Urgent"}
 LEX_CB = re.compile(r"^\s*[-*]\s+\[( |x|X)\]\s*(.*)")  # a Markdown checkbox line of the notes (like renderMd)
 
 

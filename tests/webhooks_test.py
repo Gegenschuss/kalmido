@@ -161,6 +161,8 @@ check(not got("/b", timeout=2), "scoping: bob does not get events of alice's pri
 A.patch(B + f"/api/tasks/{t['id']}", json={"title": "Water the roses", "due": "2026-10-02"})
 r = got("/a", "task.updated")
 check(r and json.loads(r[0]["body"])["data"]["changes"] == ["title", "due"], "task.updated with changes " + (r[0]["body"][:300] if r else ""))
+dd = json.loads(r[0]["body"])["data"].get("diff") if r else None  # 2.574.0 (#3376): old -> new of what changed
+check(dd == {"title": {"old": "Water roses", "new": "Water the roses"}, "due": {"old": "2026-10-01", "new": "2026-10-02"}}, f"task.updated with diff {dd}")
 A.post(B + f"/api/tasks/{t['id']}/complete", json={})
 r = got("/a", "task.completed")
 check(r and json.loads(r[0]["body"])["data"]["task"]["status"] == "done", "task.completed")
@@ -192,6 +194,25 @@ tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "write"
 requests.post(B + "/api/v1/tasks", headers={"Authorization": "Bearer " + tok}, json={"title": "via api", "list_id": lid})
 r = wait_for(lambda: [x for x in hooks_log() if x["path"] == "/a" and '"via api"' in x["body"]])
 check(r and json.loads(r[0]["body"])["via"] == "api", "via = api for API changes")
+# 2.574.0 (#3376): data.diff speaks API v1: every key is a key of data.task and its new value is the task's value there
+sec = A.post(B + "/api/sections", json={"list_id": lid, "name": "Front lawn"}).json()["id"]
+A.patch(B + f"/api/tasks/{t2['id']}", json={"priority": 7, "assignee_id": 1, "section_id": sec, "url": "https://example.com/mow"})
+
+
+def _t2_diff():
+    for x in hooks_log():
+        p = json.loads(x["body"]) if x["path"] == "/a" else {}
+        if p.get("event") == "task.updated" and p["data"]["task"]["id"] == t2["id"] and "priority" in (p["data"].get("diff") or {}):
+            return p["data"]
+    return None
+
+
+d2 = wait_for(_t2_diff) or {}
+dd = d2.get("diff") or {}
+check(set(dd) == {"priority", "assignee_id", "section_id", "url"}, f"diff keys = the changed v1 fields: {sorted(dd)}")
+check(all(k in d2["task"] and v["new"] == d2["task"][k] for k, v in dd.items()) if dd else False,
+      f"diff names and values as in data.task: {dd}")
+check(dd.get("priority") == {"old": "none", "new": "urgent"} and dd.get("section_id") == {"old": None, "new": sec}, f"v1 values: {dd}")
 # event filter: carol only wants completions
 wc = mk(Ca, STUB + "/c", ["task.completed"], "carol")
 A.put(B + f"/api/lists/{lid}/members", json={"user_id": 3, "role": "edit"})

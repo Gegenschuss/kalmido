@@ -105,7 +105,7 @@ async function dropTask0(id, el, clientY) {
   } else if (wad) {
     item.due = wad.dataset.day; item.due_time = null;
   } else if (quad) {
-    item.priority = +quad.dataset.quad;
+    if (mxQuad(t) !== +quad.dataset.quad) item.priority = +quad.dataset.quad;  // 2.574.0 (#3376): Urgent stays Urgent in its quadrant
   } else {
     if (kcol) item.section_id = kcol.dataset.kcol ? +kcol.dataset.kcol : null;
     if (kcol && t.parent_id && !row) { try { await patchTask(id, {parent_id: null, section_id: item.section_id}); } catch { return; } toast(tr('Subtask is now standalone')); return; }
@@ -117,7 +117,7 @@ async function dropTask0(id, el, clientY) {
       const mode = sortMode();
       let rows = dndNeighbours(vl_ids().map(i => S.tasks.get(i)), target, id);  // 2.65.0 (#1825): neighbours from the data (vl_ids)
       if (mode === 'prio' && !kcol) {  // dropping into another priority block takes over that priority
-        if (target.priority !== t.priority) { item.priority = target.priority; toast(tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][target.priority]))); }
+        if (target.priority !== t.priority) { item.priority = target.priority; toast(tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][target.priority]))); }
         rows = rows.filter(x => x.priority === target.priority);
       }
       item.sort = dndSortAt(rows, target, dropAfter(row, clientY));
@@ -144,7 +144,7 @@ async function dropTask0(id, el, clientY) {
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);
   if (res?.shifted?.length) { shiftUndo(before, {...after, shifted: res.shifted}, after?.due ? tr('Date: {0}', dayLabel(after.due)) : ''); return; }
   { const wn = rev && before.list_id !== after.list_id && wsc_moveMsg(before.list_id, after.list_id, ''); if (wn) { offerUndo(wn, histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res})); return; } }  // 2.53.0 (#1474): Private -> organisation
-  if (rev) offerUndo(before.list_id !== after.list_id ? tr('Moved to {0}', lname(listById(after.list_id))) : (before.section_id || null) !== (after.section_id || null) && before.due === after.due ? wip_msg(tr('Moved to section {0}', secName(after.section_id)), after.section_id) : before.priority !== after.priority && before.due === after.due ? tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][after.priority] || N_('None'))) : after.due ? tr('Date: {0}', dayLabel(after.due)) : tr('Date removed'),
+  if (rev) offerUndo(before.list_id !== after.list_id ? tr('Moved to {0}', lname(listById(after.list_id))) : (before.section_id || null) !== (after.section_id || null) && before.due === after.due ? wip_msg(tr('Moved to section {0}', secName(after.section_id)), after.section_id) : before.priority !== after.priority && before.due === after.due ? tr('Priority: {0}', tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][after.priority] || N_('None'))) : after.due ? tr('Date: {0}', dayLabel(after.due)) : tr('Date removed'),
     histFields(histLabel(before, after), [[before, after, UNDO_FIELDS]], {res}));
 }
 

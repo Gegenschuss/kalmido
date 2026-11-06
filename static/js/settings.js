@@ -1263,7 +1263,7 @@ function impInit(md) {
   };
   const lists = () => (S.lists || []).filter(l => canEditList(l.id) && !l.archived);
   const sel = (id, label, opts, v) => `<div class="row"><label for="${id}">${label}</label><select id="${id}" data-io="${id.slice(6)}">${opts.map(([k, n]) => `<option value="${esc(k)}" ${String(v ?? '') === String(k) ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
-  const prio = p => p ? `<span class="imp-p p${p}">${tr(['', N_('Low'), '', N_('Medium'), '', N_('High')][p] || '')}</span>` : '';
+  const prio = p => p ? `<span class="imp-p p${p}">${tr(['', N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][p] || '')}</span>` : '';  // 2.574.0 (#3376): + Urgent
   const warns = ws => ws.length ? `<ul class="slist impwarn">${ws.map(w => `<li>${esc(w.text)}${w.count > 1 ? ` <span class="muted">(${w.count}×)</span>` : ''}${w.examples?.length ? ` <span class="muted">– ${w.examples.map(esc).join(', ')}</span>` : ''}${dvaImpRows(w)}</li>`).join('')}</ul>` : '';
   // 2.533.0 (#4318) F8: the row numbers of the file (skipped rows, cells without a header, shortened texts)
   function dvaImpRows(w) {

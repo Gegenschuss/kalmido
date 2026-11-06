@@ -116,7 +116,7 @@ headers: call the API from a server, a script or an app, not from JavaScript on 
 | Dates | `YYYY-MM-DD`, local dates in the server's time zone (`TZ`); reminders, digest and briefing read them on the person's clock (setting `tz`) |
 | Times | `HH:MM`, local; `due_time: null` = all day |
 | Timestamps | ISO 8601 in UTC (`2026-09-29T08:15:00+00:00`) |
-| Priorities | `none`, `low`, `medium`, `high` (numbers 0, 1, 3, 5 are accepted on input) |
+| Priorities | `none`, `low`, `medium`, `high`, `urgent` (2.574.0, above high; numbers 0, 1, 3, 5, 7 are accepted on input) |
 | Status | `open`, `done`, `wont_do` |
 
 **Errors** always look the same, with a fitting HTTP status:
@@ -326,6 +326,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/batch` | tasks:write (+ delete) | 2.15.0: `{ids (1-500), action: update \| complete \| reopen \| wont_do \| delete \| restore, changes? (update)}`: one transaction; tasks you may not change are skipped (`errors`). `delete` / `restore` also need `delete`. Agents: 10 or more tasks wait for approval (`202`); 2.190.0: a team agent's batch over projects of different people needs one person who manages all of them, else `409` (one batch per project). 2.370.0: `_prev` (update) `{id: {field: value you read}}` keeps a field changed since and skips a task with nothing left to write; `expect` (complete, wont_do) `{id: {expect_due, expect_time?}}` skips a task that moved on or is done; both listed in `conflicts` `[{id, title, field, server, mine}]`, neither sent = nothing compared |
 | `POST /tasks/{id}/partial` | tasks:write | 2.392.0 (#3364): `{version, note?}`: done in part, the rest comes in `version`: the task stays open, `partial_until` and its version field become that version and only a tag of it completes the task, a new task "Rest: <title>" (same list, place, assignee, tags and people) gets the version, the task waits on it (dependency), a comment says "Partly in X, rest in Y". Answers `{task, rest, version, partly_in, already}`; the same version again: `already: true`, `rest: null`. `400` no version field / not a version / already released, `409` closed or encrypted. The same as a comment whose first line is `partly: rest in Y` or `teilweise: Rest in Y` (needs write access and tasks:write): the comment's answer then has `partial` `{applied, version?, rest_id?, reason?}`, and a comment that could do nothing stays a plain comment |
 | `POST /tasks/{id}/skip` | tasks:write | 2.15.0: skip this occurrence of a repeating task (next date, no completed copy). 2.528.0: `{expect_due?}` = the due date you read: moved on since (skipped elsewhere) = `409`, nothing is skipped twice; with an `Idempotency-Key` a retry gets the first answer |
+| `POST /tasks/{id}/duplicate` | tasks:write | 2.574.0: a copy right below the original, open: subtasks, ticket type, points, assignee, fields, snippets and files come along, comments and times do not (the same as the app's "Duplicate"); `201` with the new task + `skipped_files`; `403 list_e2e` in a project encrypted in the browser (as every v1 route there) |
 | `GET /trash` · `DELETE /trash` | read · delete | 2.15.0: tasks in the trash (`list_id`, pages; the newest 5000); empty it for good (lists you own; admins also shared lists they may edit; agents: approval) -> `{deleted, kept}`, 2.281.0: more than 200 tasks are deleted in the background within seconds (`queued: true`). 2.138.1: the server deletes a task for good once it has been in the trash for the trash period (`KALMIDO_TRASH_DAYS`, 30 days; while the operator's retention switch is off it only counts) |
 | `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
 | `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (both tasks outside the basket, no cycles), remove |
@@ -360,7 +361,7 @@ had been made in the app. Webhooks fire too.
 **Task filters** (`GET /tasks`): `list_id`, `status` (`open` default, `done`, `wont_do`, `all`), `due_from`, `due_to`,
 `tag` (one of your tags or a project tag, without `#`), `list_tag` (only project tags), `assignee` (`me`, `none` or a user id), `assignee_group` (2.10.0: `mine` or a group id), `updated_since` (ISO timestamp),
 `parent_id`, `top_level=true`, `waiting=true|false` (2.1.0), `pinned=true|false` (2.16.0, the *Pinned* view), `limit`, `cursor`.
-2.390.0 (#3355): `priority` (`none`, `low`, `medium`, `high`; several comma separated or repeated), `priority_min`, `section_id`
+2.390.0 (#3355): `priority` (`none`, `low`, `medium`, `high`, `urgent`; several comma separated or repeated), `priority_min`, `section_id`
 (an id or `none`), `sprint_id` (an id, `current` = the active sprint of the task's project, `none` = backlog), `created_by`
 (`me` or a user id), `reviewer` (`me`, `none` or a user id), `review` (`pending`, `approved`, `changes`, `none`),
 `field_<id>=value` (a custom field of a project you see, only its tasks: `select` = option id or name, `text` = contains,
@@ -1030,7 +1031,7 @@ with them; with collaboration switched off only their own). What they cannot see
 | Event | When |
 |---|---|
 | `task.created` | a task (or subtask) was created |
-| `task.updated` | title, notes, date, priority, assignee, list, section, repetition, link, a custom field, dependencies, ... changed; `data.changes` lists what |
+| `task.updated` | title, notes, date, priority, assignee, list, section, repetition, link, a custom field, dependencies, ... changed; `data.changes` lists what; 2.574.0: `data.diff` has `{field: {old, new}}` for title, due, due_time, start, priority, assignee_id, list_id, section_id, parent_id, repeat, url, type and points |
 | `task.completed` | a task was completed (also through a public list link; 2.392.0: `via: "release"`, `actor: null` when the repository's poll completed it because its package or code is released) |
 | `task.reopened` | a completed task was opened again |
 | `task.deleted` | moved to the trash (`permanent: false`) or deleted for good (`permanent: true`) |
@@ -1082,6 +1083,11 @@ sends `task.completed` only.
 - `data.task` has the same fields as the API, as the webhook's owner sees the task (their own tags). `data.changes`
   (for `task.updated`), `data.permanent` (for `task.deleted`), `data.comment` (`{id, author_id, text, created_at,
   files}` for `comment.created`), `data.member` and `data.role` (for `project.shared`).
+- 2.574.0: `data.diff` (for `task.updated`, next to the list `data.changes`): `{"priority": {"old": "high", "new": "urgent"}, ...}`
+  with the names and values of the task object `data.task` (API v1: `assignee_id`, `list_id`, `section_id`, `parent_id`, `type`,
+  `priority` as a name, ...); within one request the first old and the last new value. Notes are not in it (only in
+  `changes`), nor title / link of a project encrypted in the browser; `list_id.old` is `null` when the webhook's owner cannot see
+  the old project.
 - Never in a payload: passwords, tokens, secrets, attachment contents.
 
 **Headers**
@@ -1967,7 +1973,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 
 | Route | Scope | |
 |---|---|---|
-| `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due / created / assigned / field (2.138.0), section_id, tag_id, user_id (assigned: null = anybody), field_id + value (field: option id, "1" / "0" for a checkbox, "*" = has a value (2.473.0), null = any change)}, `action` {kind assign / due / comment / move / priority / tag / field (2.138.0), user_id, days, text, list_id, section_id, priority (none / low / medium / high), tag_id (a list tag), field_id + value (null clears)}, `names`, `active`, `paused_reason`, `created_by` |
+| `GET /lists/{id}/rules` | read | people: owner / list admin (like the web), agents: write access to the list (else 403); `trigger` {kind section / done / reopen / ltag / due / created / assigned / field (2.138.0), section_id, tag_id, user_id (assigned: null = anybody), field_id + value (field: option id, "1" / "0" for a checkbox, "*" = has a value (2.473.0), null = any change)}, `action` {kind assign / due / comment / move / priority / tag / field (2.138.0), user_id, days, text, list_id, section_id, priority (none / low / medium / high / urgent), tag_id (a list tag), field_id + value (null clears)}, `names`, `active`, `paused_reason`, `created_by` |
 | `POST /lists/{id}/rules/proposals` | structure | agents only: `name`, `trigger`, `action`, `summary`, `title`, `user_id`; 201 = a ready proposal job (kind `rule`) |
 
 ## Tidy up contacts
@@ -2189,7 +2195,7 @@ and pauses itself; the owner or a list admin resumes it with their own rights (`
 
 | Body | |
 |---|---|
-| `application/json` | `{"title": "..." (required), "notes", "due": "YYYY-MM-DD" or an ISO date-time (with an offset: converted to the server's time zone), "priority": "none" \| "low" \| "medium" \| "high", "tags": [list tags], "fields": {"field name or id": value}}` |
+| `application/json` | `{"title": "..." (required), "notes", "due": "YYYY-MM-DD" or an ISO date-time (with an offset: converted to the server's time zone), "priority": "none" \| "low" \| "medium" \| "high" \| "urgent", "tags": [list tags], "fields": {"field name or id": value}}` |
 | form fields | the same names, `tags` comma separated |
 | `text/plain` (or anything else) | the first line is the title, the rest the notes |
 

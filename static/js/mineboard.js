@@ -8,7 +8,7 @@
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
-const MB_PRIOS = [{p: 5, n: N_('High')}, {p: 3, n: N_('Medium')}, {p: 1, n: N_('Low')}, {p: 0, n: N_('None')}];
+const MB_PRIOS = [{p: 7, n: N_('Urgent')}, {p: 5, n: N_('High')}, {p: 3, n: N_('Medium')}, {p: 1, n: N_('Low')}, {p: 0, n: N_('None')}];
 const mb_weekEnd = t0 => addDays(weekStartOf(t0), 6);
 const mb_byDue = (a, b) => (a.due || '9999').localeCompare(b.due || '9999') || (a.due_time || '99').localeCompare(b.due_time || '99') || moCmp(a, b);
 
@@ -50,7 +50,7 @@ async function mb_drop(t, el) {
     const p = +key.slice(1);
     if ((t.priority || 0) === p) return true;
     if (tlkHits(t, {priority: p})) { tlkToast(t); render(); return true; }
-    await patchUndoable(t.id, {priority: p}, tr('Priority: {0}', tr((MB_PRIOS.find(x => x.p === p) || MB_PRIOS[3]).n))).catch(() => {});
+    await patchUndoable(t.id, {priority: p}, tr('Priority: {0}', tr((MB_PRIOS.find(x => x.p === p) || MB_PRIOS[4]).n))).catch(() => {});
     return true;
   }
   if (by === 'list') {

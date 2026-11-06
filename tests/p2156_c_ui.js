@@ -82,7 +82,7 @@ const day = (d, add = 0) => { const x = new Date(d); x.setDate(x.getDate() + add
     await ev(`(async () => { await dropTask(${T4.id}, document.querySelector('#view .mboard .mbcol[data-mbcol="today"]'), 10); return 1; })()`);
     check(await ready(ev, `taskById(${T4.id})?.due === today()`, 40), '#2072: dropped on Today = due today');
     await ev(`(() => { document.querySelector('#view .mobar [data-act="mo-by"][data-k="prio"]').click(); return 1; })()`);
-    check(await ready(ev, `[...document.querySelectorAll('#view .mboard .mbcol')].map(c => c.dataset.mbcol).join() === 'p5,p3,p1,p0'`), '#2072: columns by priority');
+    check(await ready(ev, `[...document.querySelectorAll('#view .mboard .mbcol')].map(c => c.dataset.mbcol).join() === 'p7,p5,p3,p1,p0'`), '#2072: columns by priority (2.574.0, #3376: + Urgent)');
     await ev(`(async () => { await dropTask(${T1.id}, document.querySelector('#view .mboard .mbcol[data-mbcol="p5"]'), 10); return 1; })()`);
     check(await ready(ev, `taskById(${T1.id})?.priority === 5`, 40), '#2072: dropped on High = high priority');
     await sleep(800);

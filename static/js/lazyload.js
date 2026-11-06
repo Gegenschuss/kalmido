@@ -95,7 +95,7 @@ const LD_NEED = {settings: ['agentchat', 'calendar', 'integrations', 'playbook',
 // 2.501.0 (#4198): module ablage: settings (the sharing defaults), docs (the folder tree, moves, menus), office (FS_REF_ICON, requests) and the parts of the file store use its globals
 // functions of a module that code loaded at start calls: a stand-in loads the module and then calls the real one (the
 // module's own function declaration replaces the stand-in on window)
-const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation)
+const LD_CALL = {settings: ['settingsModal', 'setApply', 'settingsSync', 'modCountsSync', 'setSaved', 'setLocal', 'ojn_open', 'otkOpen'],  // 2.149.0 F (#2519): setLocal (the command bar's "Theme: …"); bundle B: ojn_open (2.148.1 #2480, bell item of an invitation); 2.574.0 (#3376): otkOpen (acctset.js)
   ablage: ['ab_linkFile'],  // 2.501.0 (#4198): the button of a file row in a task / project
   fltdlg: ['filterModal'],  // 2.521.0 (#4479): the filter dialog (sidebar, palette, a filter's menu)
   family: ['occModal', 'dlModal', 'famPack', 'shopModeOpen', 'paskOpen', 'kd_pinAsk'],  // 2.501.0 (#4198): the palette, the first start, a child's PIN

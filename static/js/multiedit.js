@@ -32,7 +32,7 @@ function meFields(ts) {
     ...(anyDue ? [{k: 'deadline', lab: N_('Deadline'), icon: 'flag', get: t => t.deadline || 0, text: v => tr(DL_TXT[v] || DL_TXT[0]),
       open: a => menu(a, DL_TXT.map((n, i) => ({label: tr(n), icon: i ? 'flag' : 'x', fn: () => meApply('deadline', t => t.due && (t.deadline || 0) !== i ? {deadline: i} : null, tr('Deadline'))})))}] : []),
     {k: 'priority', lab: N_('Priority'), icon: 'flag', get: t => t.priority || 0, text: v => prioWord(v),
-      open: a => menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => meApply('priority', t => (t.priority || 0) !== p ? {priority: p} : null, tr('Priority'))})))},
+      open: a => menu(a, [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => meApply('priority', t => (t.priority || 0) !== p ? {priority: p} : null, tr('Priority'))})))},
     ...(shared ? [{k: 'assignee', lab: N_('Assignee'), icon: 'user', get: t => t.assignee_group_id ? 'g' + t.assignee_group_id : t.assignee_id || 0, perm: canAssign,
       text: v => !v ? tr('Nobody') : String(v)[0] === 'g' ? (S.groups || []).find(g => 'g' + g.id === v)?.name || tr('Group') : personNameAny(v) || '?',
       open: a => menu(a, [{label: tr('Nobody'), icon: 'x', fn: () => meApply('assignee', t => t.assignee_id || t.assignee_group_id ? {assignee_id: null, assignee_group_id: null} : null, tr('Assignee'))}, '-',

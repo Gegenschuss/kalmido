@@ -197,7 +197,7 @@ bad = [({**GOOD, "name": ""}, 400, "missing name"),
        ({**GOOD, "tasks": [{"title": "t%d" % i} for i in range(201)]}, 400, "> 200 tasks"),
        ({**GOOD, "tasks": [{"title": "t", "subtasks": [{"title": "s"}] * 50}] * 4}, 400, "> 200 with subtasks"),
        ({**GOOD, "tasks": [{"title": "x", "due": "31.05.2031"}]}, 400, "bad date"),
-       ({**GOOD, "tasks": [{"title": "x", "priority": "urgent"}]}, 400, "bad priority"),
+       ({**GOOD, "tasks": [{"title": "x", "priority": "critical"}]}, 400, "bad priority"),  # 2.574.0 (#3376): "urgent" is valid now
        ({**GOOD, "kind": "triage"}, 400, "wrong kind"),
        ({**GOOD, "tasks": [{"title": "x" * 301}]}, 400, "title too long"),
        ({**GOOD, "tasks": [{"title": "x", "notes": "n" * 300000}]}, 413, "body > 256 KB")]

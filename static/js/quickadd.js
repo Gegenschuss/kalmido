@@ -79,7 +79,8 @@ function msBurnSvg(b, total) {
   const lab = tr('Burndown: {0} of {1} tasks open on {2}', last, total, fmtDate(b.end)) + (b.due ? ' · ' + tr('Due: {0}', fmtDate(b.due)) : '');
   return `<svg class="msburn" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="${esc(lab)}"><line class="msb-ax" x1="${P}" y1="${H - P}" x2="${W - P}" y2="${H - P}"/>${id.length === 2 ? `<line class="msb-ideal" x1="${X(id[0].day)}" y1="${Y(id[0].open)}" x2="${X(id[1].day)}" y2="${Y(id[1].open)}"/>` : ''}<polyline class="msb-act" points="${pts}"/></svg><div class="msblg" aria-hidden="true"><span class="lg-act">${tr('Open tasks')}</span>${id.length === 2 ? `<span class="lg-ideal">${tr('Ideal')}</span>` : ''}</div>${few}`;
 }
-const PRIO_WORDS = {'!!!': 5, '!3': 5, '!hoch': 5, '!high': 5, '!!': 3, '!2': 3, '!mittel': 3, '!medium': 3, '!': 1, '!1': 1, '!niedrig': 1, '!low': 1};
+const PRIO_WORDS = {'!!!!': 7, '!4': 7, '!dringend': 7, '!urgent': 7, '!!!': 5,  // 2.574.0 (#3376): Urgent
+  '!3': 5, '!hoch': 5, '!high': 5, '!!': 3, '!2': 3, '!mittel': 3, '!medium': 3, '!': 1, '!1': 1, '!niedrig': 1, '!low': 1};
 const WDAY = {sonntag: 0, montag: 1, dienstag: 2, mittwoch: 3, donnerstag: 4, freitag: 5, samstag: 6,
   sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6};
 const WDAY_RE = Object.keys(WDAY).join('|'), WDAY_EN_RE = Object.keys(WDAY).slice(7).join('|');
@@ -258,7 +259,7 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
     out.wait = (m[1] || m[2] || m[3] || m[4] || '').replace(/_/g, ' ').trim().slice(0, 300); return out.wait ? '⏳ ' + out.wait : false;
   });
   // priority: standalone token
-  take(/\s(!!!|!!|!hoch|!mittel|!niedrig|!high|!medium|!low|![123]|!)(?=\s)/i, 'prio', m => { out.priority = PRIO_WORDS[m[1].toLowerCase()]; return tr(['', N_('Low'), '', N_('Medium'), '', N_('High')][out.priority]); });
+  take(/\s(!!!!|!!!|!!|!dringend|!urgent|!hoch|!mittel|!niedrig|!high|!medium|!low|![1234]|!)(?=\s)/i, 'prio', m => { out.priority = PRIO_WORDS[m[1].toLowerCase()]; return tr(['', N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][out.priority]); });
   // tags
   if (!ignore.has('tag')) {
     out.tags = [];

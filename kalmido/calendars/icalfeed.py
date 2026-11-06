@@ -173,7 +173,7 @@ def ics_event(t, s, lg, host, key, stamp):
         return out
 
     def vevent(uid, st, rr):
-        prio = {5: 1, 3: 5, 1: 9}.get(t["priority"])
+        prio = {7: 1, 5: 1, 3: 5, 1: 9}.get(t["priority"])  # 2.574.0 (#3376)
         return (["BEGIN:VEVENT", f"UID:{uid}", f"DTSTAMP:{stamp}", f"CREATED:{ics_utc(parse_iso(t['created_at']))}",
                  f"LAST-MODIFIED:{ics_utc(parse_iso(t['updated_at']))}", f"SUMMARY:{ics_text(md_plain(t['title']))}"] + when(st) +
                 ([f"RRULE:{rr}"] if rr else []) +

@@ -2,10 +2,10 @@
 @font-face{font-family:"Geist";src:url("/static/fonts/Geist-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 @font-face{font-family:"Geist Mono";src:url("/static/fonts/GeistMono-Variable.woff2") format("woff2");font-weight:100 900;font-display:swap}
 :root{--bg:#0f1012;--bg2:#16171a;--bg3:#1e2024;--line:#212328;--line2:#2a2c31;--text:#eeeef0;--text2:#b8bbc2;--muted:#9497a0;
-  --accent:#4fb3c1;--ink:#04201f;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
+  --accent:#4fb3c1;--ink:#04201f;--p7:#ff4136;--p5:#e5776e;--p3:#d6a54a;--p1:#79a3dc;--danger:#ef7068;color-scheme:dark;
   --sans:"Geist",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;--mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace}
 @media (prefers-color-scheme:light){:root{--bg:#ffffff;--bg2:#f8f8f9;--bg3:#efeff1;--line:#eeeef0;--line2:#e3e3e6;--text:#131418;
-  --text2:#464951;--muted:#60636c;--accent:#187381;--ink:#fff;--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--danger:#b3372f;color-scheme:light}}
+  --text2:#464951;--muted:#60636c;--accent:#187381;--ink:#fff;--p7:#8f1209;--p5:#b3372f;--p3:#97600b;--p1:#3565a8;--danger:#b3372f;color-scheme:light}}
 *{box-sizing:border-box}
 html{font-size:16px;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:.9375rem/1.5 var(--sans);-webkit-font-smoothing:antialiased}
@@ -24,7 +24,7 @@ form{margin:0}
 .chk{display:block;width:1.375rem;height:1.375rem;border:2px solid var(--muted);border-radius:50%;background:transparent;margin-top:.0625rem;
   cursor:pointer;padding:0;position:relative}
 span.chk{cursor:default}
-li.p5>.chk,li.p5>form .chk{border-color:var(--p5)}li.p3>.chk,li.p3>form .chk{border-color:var(--p3)}li.p1>.chk,li.p1>form .chk{border-color:var(--p1)}
+li.p7>.chk,li.p7>form .chk{border-color:var(--p7)}li.p5>.chk,li.p5>form .chk{border-color:var(--p5)}li.p3>.chk,li.p3>form .chk{border-color:var(--p3)}li.p1>.chk,li.p1>form .chk{border-color:var(--p1)}
 .chk.on{background:var(--accent);border-color:var(--accent)}
 .chk.on::after{content:"";position:absolute;left:.375rem;top:.1875rem;width:.3125rem;height:.625rem;border:solid var(--ink);border-width:0 2px 2px 0;transform:rotate(45deg)}
 button.chk:focus-visible{outline:2px solid var(--accent);outline-offset:2px}

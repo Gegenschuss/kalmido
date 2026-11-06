@@ -3,6 +3,8 @@
 'use strict';
 
 // ------------------------------------------------------------------ matrix
+// 2.574.0 (#3376): Urgent (7) sits in the top quadrant with High
+const mxQuad = t => t.priority === 7 ? 5 : (t.priority || 0);
 const QUADS = [[5, N_('Urgent & important')], [3, N_('Not urgent, but important')], [1, N_('Urgent, not important')], [0, N_('Neither urgent nor important')]];
 // 1.5.3: the matrix can be narrowed (per device, LS 'mx'): scope = all | a list | a folder | a saved filter (same
 // filter engine), "only mine" (assigned to me, or created by me and unassigned; only with collaboration) and "due by"
@@ -65,7 +67,7 @@ function viewMatrix() {
   // 2.15.1 (#633): on a phone (one column) a tap on a quadrant's heading folds it; remembered per device
   const fold = isMobile() ? new Set(LS.get('mxFold', [])) : null;
   return `${mxBar()}<div class="matrix">${QUADS.map(([p, n]) => {
-    const ts = all.filter(t => t.priority === p).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || bySort(a, b));
+    const ts = all.filter(t => mxQuad(t) === p).sort((a, b) => dueKey(a).localeCompare(dueKey(b)) || bySort(a, b));
     const hd = `<span class="${p ? 'flag-' + p : 'muted'}">${ic('flag', 's')}</span>${tr(n)} <span class="c">${ts.length}</span>`;
     return `<div class="quad q${p} ${fold?.has(p) ? 'fold' : ''}" data-quad="${p}"><h3>${fold ? `<button type="button" class="qfold" data-act="mx-fold" data-p="${p}" aria-expanded="${!fold.has(p)}">${hd}${ic('chev', 's qcar')}</button>` : hd}</h3>
       <div class="qlist">${ts.map(t => taskRow(t, {showList: true, compact: true})).join('') || `<div class="muted" style="padding:.5rem .375rem;font-size:var(--fs-m)">${tr(PRIO_NAME[p] || N_('No priority'))}</div>`}</div>

@@ -32,7 +32,7 @@
 .impr .n{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:60%}
 .impr .muted{font-size:var(--fs-s)}
 .imp-p{font-size:var(--fs-xs);font-family:var(--mono)}
-.imp-p.p5{color:var(--p5)}
+.imp-p.p7{color:var(--p7)}.imp-p.p5{color:var(--p5)}
 .imp-p.p3{color:var(--p3)}
 .imp-p.p1{color:var(--p1)}
 .impHelp{margin-bottom:.375rem}
@@ -243,3 +243,6 @@
 .mcnew{color:var(--accent)}.mcedmods{display:grid;grid-template-columns:repeat(auto-fill,minmax(13rem,1fr));gap:.5rem}
 .mcedg{border:.0625rem solid var(--line);border-radius:var(--radius);padding:.375rem .5rem;margin:0;min-width:0}.mcedg legend{font-weight:600;padding:0 .25rem}
 .mcedppl{display:flex;flex-wrap:wrap;gap:.25rem 1rem}
+/* 2.574.0 (#3376): the read-only task view of an organisation admin (Settings > Workspaces, loads with the settings) */
+.otkbar{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}.otkbar input{flex:1 1 10rem;min-width:8rem}.otkbar select{max-width:100%}
+.otkrow{padding:.5rem 2px;border-bottom:1px solid var(--line)}.otkrow .n{display:flex;flex-direction:column;gap:.125rem;min-width:0;white-space:normal;overflow-wrap:anywhere}.otkrow .n small{font-size:var(--fs-s)}

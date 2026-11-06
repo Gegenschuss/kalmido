@@ -409,7 +409,7 @@ function dgDrop(e, id) {
     batch('patch', {due: wcol.dataset.day, due_time: `${pad(Math.floor(m / 60))}:${pad(m % 60)}`}, false, may);
     return true;
   }
-  if (quad) { batch('patch', {priority: +quad.dataset.quad}, false, may); return true; }
+  if (quad) { const q = +quad.dataset.quad; if (q !== 5 || ids.some(i => (S.tasks.get(i)?.priority || 0) !== 7)) batch('patch', {priority: q}, false, may); return true; }  // 2.574.0 (#3376): Urgent stays in the top quadrant
   return true;
 }
 // 2.122.3 B (#2334): a single dragged task (mouse or finger) onto the middle of another becomes its subtask, as a

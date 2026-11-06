@@ -91,7 +91,8 @@ def run(who, s, uid):
     r = requests.get(V + "/tasks", headers=T, params=[("list_id", L), ("priority", "medium"), ("priority", "none")])
     check(r.ok and sorted(t["id"] for t in r.json()["data"]) == sorted([T2, T5]), f"{who}: priority repeated {r.text[:120]}")
     check(ids(list_id=L, priority_min="medium") == sorted([T1, T2, T3]), f"{who}: priority_min=medium")
-    check(get(priority="urgent").status_code == 400 and get(priority_min="5").status_code == 400, f"{who}: an unknown priority = 400")
+    # 2.574.0 (#3376): "urgent" is a valid priority now, "critical" is the unknown one
+    check(get(priority="critical").status_code == 400 and get(priority_min="5").status_code == 400, f"{who}: an unknown priority = 400")
     # column, sprint, creator, reviewer, review
     check(ids(list_id=L, section_id=SEC) == [T1], f"{who}: section_id {ids(list_id=L, section_id=SEC)}")
     check(ids(list_id=L, section_id="none") == sorted([T2, T3, T4, T5]), f"{who}: section_id=none")

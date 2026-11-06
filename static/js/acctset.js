@@ -1033,3 +1033,41 @@ async function ltSigSettings() {
     ltProfileModal({profile, url, done: () => toast(tr('Saved'))});
   } catch (e) { toast(e instanceof Offline ? tr('Only available online.') : e.message); }
 }
+
+// 2.574.0 (#3376): an organisation admin reads the tasks of the organisation's projects (the ones "Projects of the organisation"
+// shows; never private or encrypted ones), also without being a member. Read only; every opening is in the history (OADM_ACT,
+// account.js). Here since it opens from Settings > Workspaces (start budget #4198; otkOpen has a stand-in, LD_CALL).
+const OTK_ST = [['open', N_('Open')], ['done', N_('Completed')], ['all', N_('All')]];
+async function otkLoad(md, oid, more) {
+  const f = md._f, box = $('#otk-body', md);
+  let j; try { j = await api('GET', `/api/orgs/${oid}/tasks?` + new URLSearchParams({status: f.st, ...(f.lid ? {list_id: f.lid} : {}), ...(f.q ? {q: f.q} : {}), offset: more ? md._rows.length : 0})); }
+  catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
+  md._rows = more ? [...md._rows, ...j.tasks] : j.tasks;
+  const sel = $('#otk-l', md);
+  if (sel && !sel.options.length) sel.innerHTML = `<option value="">${esc(tr('All projects'))}</option>` + j.lists.map(l => `<option value="${l.id}">${esc(l.name)}${l.archived ? ' (' + esc(tr('archived')) + ')' : ''}</option>`).join('');
+  const st = {done: tr('Completed'), wont_do: tr('Won’t do')};
+  box.innerHTML = (md._rows.length ? md._rows.map(t => `<div class="mrow otkrow ${t.status !== 'open' ? 'off' : ''}" data-otid="${t.id}"><span class="n"><b>${esc(t.title)}${prioMark(t.priority)}</b><small class="muted">${esc([t.list_name, t.section, t.assignee_name && tr('Assigned to {0}', t.assignee_name), t.due && fmtDateLoc(t.due), st[t.status], t.parent_id && tr('Subtask of #{0}', t.parent_id)].filter(Boolean).join(' · '))}</small></span></div>`).join('')
+    : `<div class="muted mhint">${tr('No tasks.')}</div>`)
+    + (md._rows.length < j.total ? `<div class="row"><button type="button" class="btn sm" data-otk-more="1">${esc(tr('Show more'))} <span class="muted">${j.total - md._rows.length}</span></button></div>` : '');
+}
+function otkOpen(oid, name) {
+  const md = modal(`<h3>${esc(tr('Tasks of the organisation {0}', name))}</h3>
+    <div class="shint keep">${ic('eye', 's')} ${esc(tr('Read only: the tasks of the projects listed under "Projects of the organisation", also where you are not a member. Private and encrypted projects stay invisible. Every look is recorded in the history there.'))}</div>
+    <div class="row otkbar"><label for="otk-l" class="sr">${tr('Project')}</label><select id="otk-l"></select>
+      <div class="seg" role="group" aria-label="${esc(tr('Show'))}">${OTK_ST.map(([k, n]) => `<button type="button" class="${k === 'open' ? 'on' : ''}" data-otk-st="${k}" aria-pressed="${k === 'open'}">${esc(tr(n))}</button>`).join('')}</div>
+      <input id="otk-q" type="search" placeholder="${esc(tr('Search'))}" aria-label="${esc(tr('Search'))}" maxlength="200"></div>
+    <div class="members oadm" id="otk-body"><div class="muted mhint">${tr('Loading…')}</div></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-m="close">${tr('Close')}</button></div>`);
+  md.classList.add('oadmmd', 'otkmd');
+  md._f = {st: 'open', lid: '', q: ''}; md._rows = [];
+  otkLoad(md, oid);
+  md.addEventListener('click', e => {
+    if (e.target.closest('[data-m="close"]')) { md.remove(); return; }
+    const s = e.target.closest('[data-otk-st]');
+    if (s) { md._f.st = s.dataset.otkSt; $$('[data-otk-st]', md).forEach(b => { b.classList.toggle('on', b === s); b.setAttribute('aria-pressed', b === s); }); otkLoad(md, oid); return; }
+    if (e.target.closest('[data-otk-more]')) otkLoad(md, oid, true);
+  });
+  $('#otk-l', md).addEventListener('change', e => { md._f.lid = e.target.value; otkLoad(md, oid); });
+  let tm = 0;
+  $('#otk-q', md).addEventListener('input', e => { clearTimeout(tm); tm = setTimeout(() => { md._f.q = e.target.value.trim(); otkLoad(md, oid); }, 300); });
+}

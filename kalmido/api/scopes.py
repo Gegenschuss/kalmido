@@ -36,7 +36,7 @@ from ..personal.habits import habit_create, habit_delete, habit_update, need_hab
 from ..personal.timetrack import time_delete, time_running, time_start, time_stop, time_update
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..accounts.settings import export_json
-from ..lists.templates import list_duplicate, template_apply, template_create, template_delete, template_update, templates_list
+from ..lists.templates import list_duplicate, task_duplicate, template_apply, template_create, template_delete, template_update, templates_list
 from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
@@ -916,6 +916,19 @@ def v1_list_duplicate(lid):
     return jsonify(j), 201
 
 
+@app.post("/api/v1/tasks/<int:tid>/duplicate")
+@v1_view
+def v1_task_duplicate(tid):
+    """2.574.0 (#3376): the web's duplicate (POST /api/tasks/<id>/duplicate): a copy right below the original with its subtasks,
+    ticket type, points, assignee, fields, snippets and files; open, without comments and times -> the new task + skipped_files.
+    A project encrypted in the browser: 403 list_e2e from the v1 guard (the browser duplicates there)."""
+    v1_args(())
+    c = db()
+    _v1_live(c, tid)
+    j = v1_call(task_duplicate, tid, body={})
+    return jsonify({**v1_one(c, j["task"]["id"]), "skipped_files": j.get("skipped_files") or []}), 201
+
+
 # attachments + comments
 @app.post("/api/v1/tasks/<int:tid>/attachments")
 @v1_view
@@ -1406,6 +1419,11 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                         body={"type": "object", "properties": {"expect_due": {"type": "string", "format": "date", "description":
                                               "2.528.0: the due date you read; moved on since (skipped elsewhere) = 409, nothing is skipped twice"}}},
                                         desc="Send an Idempotency-Key: a retry of the same call gets the first answer.")},
+        "/tasks/{id}/duplicate": {"post": op("Duplicate a task with its subtasks", T, ok(ref("Task"), "Created", "201") | errs("403", "404"),
+                                             [pid()], scope="tasks:write",
+                                             desc="2.574.0 (#3376): a copy right below the original, open: subtasks, ticket type, points, "
+                                                  "assignee, fields, snippets and files come along, comments and times do not. The answer is "
+                                                  "the new task plus skipped_files (files left behind). 403 list_e2e: a project encrypted in the browser.")},
         "/tasks/{id}/restore": {"post": op("Restore a task from the trash", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="delete")},
         "/trash": {"get": op("Tasks in the trash", T, ok(ref("TaskPage")) | errs("400"), [q("list_id", "Only this project", {"type": "integer"}),
                                                                                             q("limit", "Page size"), q("cursor", "next_cursor")]),

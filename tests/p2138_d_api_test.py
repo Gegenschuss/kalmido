@@ -275,7 +275,7 @@ def part_rules():
     check(Bo.post(B + f"/api/lists/{L1}/rules", json={"name": "x", "trigger": {"kind": "created"},
                                                       "action": {"kind": "priority", "priority": "high"}}).status_code == 403,
           "an edit member cannot add a rule with the new kinds (403)")
-    rule(A, L1, "bad prio", {"kind": "created"}, {"kind": "priority", "priority": "urgent"}, 400)
+    rule(A, L1, "bad prio", {"kind": "created"}, {"kind": "priority", "priority": "critical"}, 400)  # 2.574.0 (#3376): "urgent" is valid now
     R1 = rule(A, L1, "Hot", {"kind": "created"}, {"kind": "priority", "priority": "high"})
     t1 = task(Bo, L1, "New lead")
     check(get(A, t1).get("priority") == 5, f"created -> priority high ({get(A, t1).get('priority')})")
@@ -386,7 +386,7 @@ def part_rules():
     sch = requests.get(V + "/openapi.json").json()["components"]["schemas"]["ListRule"]["properties"]
     check(set(sch["trigger"]["properties"]["kind"]["enum"]) >= {"created", "assigned", "field"}
           and set(sch["action"]["properties"]["kind"]["enum"]) >= {"priority", "tag", "field"}
-          and sch["action"]["properties"]["priority"]["enum"] == ["none", "low", "medium", "high"], "OpenAPI: every new enum value")
+          and sch["action"]["properties"]["priority"]["enum"] == ["none", "low", "medium", "high", "urgent"], "OpenAPI: every new enum value")  # 2.574.0 (#3376): urgent
 
     # ---- a person without an organisation: private list with the new rules (freelancer-matrix: lists)
     FID, Fr = freelancer(B, A, "frida")

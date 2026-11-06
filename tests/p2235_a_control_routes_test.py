@@ -100,6 +100,7 @@ ROUTES = {
     "POST /api/v1/life/devices": "change", "POST /api/v1/life/health": "change", "POST /api/v1/life/karakeep/sync": "change",
     "POST /api/v1/life/trips": "change", "POST /api/v1/life/upkeep": "change", "POST /api/v1/lists": "change",
     "POST /api/v1/lists/{}/deployments": "change", "POST /api/v1/lists/{}/duplicate": "change",
+    "POST /api/v1/tasks/{}/duplicate": "change",  # 2.574.0 (#3376)
     "POST /api/v1/lists/{}/fields": "change", "POST /api/v1/lists/{}/files": "change", "POST /api/v1/lists/{}/forms": "change",
     "POST /api/v1/lists/{}/join": "change", "POST /api/v1/lists/{}/links": "change", "POST /api/v1/lists/{}/milestones": "change",
     "POST /api/v1/lists/{}/notepads": "change", "POST /api/v1/lists/{}/notes": "change", "POST /api/v1/lists/{}/owner": "change",

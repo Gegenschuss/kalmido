@@ -291,7 +291,7 @@ function histLabel(b, a) {
   if (has('parent_id')) return a.parent_id ? tr('{0} is now a subtask', n) : tr('{0} is now a main task', n);
   if (ch.length === 1 && has('title')) return tr('Renamed {0}', n);
   if (ch.length === 1 && has('content')) return tr('Description of {0}', n);
-  if (ch.length === 1 && has('priority')) return tr('Priority of {0}: {1}', n, tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+a.priority || 0] || N_('None')));
+  if (ch.length === 1 && has('priority')) return tr('Priority of {0}: {1}', n, tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][+a.priority || 0] || N_('None')));
   if (ch.length === 1 && has('tags')) return tr('Tags of {0}', n);
   if (ch.length === 1 && has('assignee_id')) return a.assignee_id ? tr('{0} assigned to {1}', n, personName(a.list_id, a.assignee_id) || '?') : tr('{0} unassigned', n);
   if (ch.length === 1 && has('fields')) { const f = Object.keys(reverseOf(b, a, ['fields']).fields); return f.length === 1 ? tr('{0} of {1}', fieldById(+f[0])?.name || tr('Custom field'), n) : tr('Custom fields of {0}', n); }

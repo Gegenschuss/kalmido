@@ -242,7 +242,7 @@ function palAll() {
     add('a:tomorrow', 'task', tr('Move {0} to tomorrow', n), 'sunrise', () => patchUndoable(t.id, {due: addDays(today(), 1)}, tr('Date: {0}', dayLabel(addDays(today(), 1)))));
     add('a:move', 'task', tr('Move {0} to another project…', n), 'folder', () => openPalette('move'), {keep: true, keys: 'm'});
     if (t.status === 0) add('a:wait', 'task', t.waiting_at ? tr('{0}: no longer waiting', n) : tr('{0}: waiting on someone…', n), 'hourglass', () => t.waiting_at ? waitClear(t.id) : waitDialog(t.id));  // 2.22.0 (#686)
-    for (const [p, nm] of [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]]) add('a:prio' + p, 'task', tr('Priority of {0}: {1}', n, tr(nm)), 'flag', () => patchTask(t.id, {priority: p}), {cls: p ? 'pf' + p : '', qonly: true});
+    for (const [p, nm] of [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]]) add('a:prio' + p, 'task', tr('Priority of {0}: {1}', n, tr(nm)), 'flag', () => patchTask(t.id, {priority: p}), {cls: p ? 'pf' + p : '', qonly: true});
     if (feat('pomo') && t.status === 0) add('a:focus', 'task', tr('Start focus on {0}', n), 'timer', () => { pomoStart(t.id); go('pomo'); });
     if (propBreakOk(t)) add('a:propbreak', 'task', tr('Break down {0} with an agent…', n), 'bot', () => propRequest('subtasks', {tid: t.id}));  // 2.3.0 (#261)
     if (tFor(t)) add('a:ttimer', 'task', S.timer && S.timer.task_id === t.id ? tr('Stop timer') : tr('Start timer on {0}', n), 'clock', () => S.timer && S.timer.task_id === t.id ? timerStop() : timerStart({task_id: t.id}));

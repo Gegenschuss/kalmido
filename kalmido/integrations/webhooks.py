@@ -32,7 +32,7 @@ from ..notify.alerts import _env_int, aa_count, aa_now
 from ..calendars.subscriptions import (
     _cal_opener, cal_allow, cal_allow_parse, CAL_ERR, cal_host_allowed, cal_ip_public, CalError, CAL_SEND_S, cal_left, cal_until,
 )
-from ..api.v1 import task_core, task_for, WH_ON
+from ..api.v1 import PRIO_NAMES, task_core, task_for, WH_ON
 from ..api.common import act_via
 from ..accounts.orgs import org_role, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
 
@@ -255,8 +255,32 @@ def wh_host(url):
     return urllib.parse.urlsplit(url or "").hostname or ""
 
 
+# 2.574.0 (#3376): data.diff uses the names of API v1. 2.574.0: the other columns of WH_DIFF_COLS (assignee_id, list_id,
+# section_id, parent_id, due_time, ...) are already the task object's names (api/v1.py task_core); only ttype is renamed
+WH_DIFF_NAMES = {"ttype": "type"}
+
+
+def wh_diff_out(c, d, uid, base):
+    """2.574.0 (#3376): data.diff of task.updated for the webhook of person uid: {field: {old, new}} (API v1 names and values)
+    of what changed in this request. Never a text of a project encrypted in the browser; the old project only when uid sees it."""
+    out = {}
+    e2e = bool((c.execute("SELECT e2e FROM lists WHERE id=?", (base["list_id"],)).fetchone() or [None])[0])
+    for k, (o, v) in (d or {}).items():
+        if o == v or (e2e and k in ("title", "url")):
+            continue
+        if k == "priority":
+            o, v = PRIO_NAMES.get(o or 0, "none"), PRIO_NAMES.get(v or 0, "none")
+        elif k == "ttype":
+            o, v = o or None, v or None
+        elif k == "list_id" and o and not list_role(c, o, uid):
+            o = None
+        out[WH_DIFF_NAMES.get(k, k)] = {"old": o, "new": v}
+    return out
+
+
 def wh_enqueue(c, n, by=None):
     """by = (actor, via) of a change without a request (2.392.0 B, #3364: the git poll), else the current request's."""
+    diffs = g.pop("wh_diff", None) if has_request_context() else None  # 2.574.0 (#3376): tasks/validation.py log_changes
     hooks = c.execute("""SELECT w.* FROM webhooks w JOIN users u ON u.id=w.user_id
                          WHERE w.enabled=1 AND u.disabled=0 AND w.agent=0 ORDER BY w.id""").fetchall()
     hooks = who_admin_ok(c, hooks)  # 2.115.0 A (#2061): an organisation's webhook only while its creator is an admin there
@@ -315,6 +339,9 @@ def wh_enqueue(c, n, by=None):
                     data = {"task": task, "list": lst(lid)}
                     if ev == "task.updated":
                         data["changes"] = e["kinds"]
+                        dv = wh_diff_out(c, (diffs or {}).get(tid), w["user_id"], base) if row else None
+                        if dv:
+                            data["diff"] = dv  # 2.574.0 (#3376): {field: {old, new}}; changes stays the list of kinds
                     if ev == "task.deleted":
                         data["permanent"] = row is None
                     if ev == "comment.created" and e["cid"]:

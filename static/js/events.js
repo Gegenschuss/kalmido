@@ -715,7 +715,7 @@ document.addEventListener('click', async e => {
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
     case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
-    case 'qd-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
+    case 'qd-prio': menu(a, [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;
     case 'mx-due': mxSet({due: a.dataset.k}); break;
@@ -752,7 +752,7 @@ document.addEventListener('click', async e => {
     case 'mb-date': multiDateMenu(a); break;
     case 'mb-today': batch('patch', {due: today()}); break;
     case 'mb-tomorrow': batch('patch', {due: addDays(today(), 1)}); break;
-    case 'mb-prio': menu(a, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => batch('patch', {priority: p})}))); break;
+    case 'mb-prio': menu(a, [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => batch('patch', {priority: p})}))); break;
     case 'mb-list': mv_batch(a); break;  // 2.38.0 (#1177); 2.455.0 (#3848)
     case 'mb-ms': {  // 2.18.0 (#430): the selected tasks (one list) into one of its open milestones, or out
       const lid = msBulkList(); if (!lid) break;

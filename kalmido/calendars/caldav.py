@@ -467,7 +467,7 @@ def dav_vtodo(t, ctx):
             else:
                 anchor = datetime(s.year, s.month, s.day)
                 L.append(f"DTSTART;TZID={key}:{s:%Y%m%d}T000000" if timed else f"DTSTART;VALUE=DATE:{s:%Y%m%d}")
-    prio = {5: 1, 3: 5, 1: 9}.get(t["priority"])
+    prio = {7: 1, 5: 1, 3: 5, 1: 9}.get(t["priority"])  # 2.574.0 (#3376): urgent is a 1 as well
     if prio:
         L.append(f"PRIORITY:{prio}")
     if t["status"] == 2:
@@ -1116,6 +1116,8 @@ def dav_patch(c, u, cur, v, caps, lid):
     for k in ("title", "content", "priority", "due", "due_time", "url"):
         if e2e and k in ("title", "content", "url"):
             continue
+        if k == "priority" and cur[k] == 7 and v[k] == 5:
+            continue  # 2.574.0 (#3376): iCalendar knows no "urgent": a 1-4 from the app keeps an urgent task urgent
         if (cur[k] or None) != (v[k] or None) and not (k == "content" and locked):
             p[k] = v[k]
     if cur["status"] == 0 or v["status"] == 0:  # completing moves a recurring task on: dates of a done task are kept

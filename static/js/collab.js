@@ -636,7 +636,7 @@ function actText0(a, U) {
     case 'due': return d.due ? tr('{0} set the due date to {1}', who, due()) : tr('{0} removed the due date', who);
     case 'snooze': return tr('{0} snoozed the task to {1}', who, due());
     case 'dep_shift': return tr('{0} moved a task that blocks this one, so it moved along to {1}', who, due());
-    case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+d.p] || N_('None'))));
+    case 'priority': return tr('{0} changed the priority to {1}', who, q(tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][+d.p] || N_('None'))));
     case 'assign': return d.to ? tr('{0} assigned the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the assignee', who);
     case 'delegate': return d.to ? tr('{0} delegated the task to {1}', who, q(uname(d.to, U))) : tr('{0} removed the delegation', who);  // 2.473.0 (#3357)
     case 'watch':
@@ -680,7 +680,7 @@ function actText0(a, U) {
     case 'delivery': return !d.state ? tr('{0} cleared the delivery state', who) : d.state === 'parked' ? (d.note ? tr('{0} parked the task: {1}', who, q(d.note)) : tr('{0} parked the task', who))  // 2.392.2 (#3365)
       : d.state === 'waiting' ? tr('{0} set the task to waiting for {1}', who, q(d.task ? '#' + d.task : d.note || '')) : tr('{0} set the task to in progress', who);
     case 'decision': return tr('{0} recorded a decision', who);
-    case 'approval': return d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
+    case 'approval': return d.waiting ? tr('{0} approved the comment of {1} (one of two approvals)', who, q(uname(d.agent, U))) : d.ok ? tr('{0} approved the comment of {1}', who, q(uname(d.agent, U))) : tr('{0} rejected the comment of {1}', who, q(uname(d.agent, U)));
     case 'agent_job': {
       const jt = q(d.title_key ? tr(...d.title_key) : d.title || '');  // 2.454.0 (#3808): a proposal's title in the reader's language
       return d.action === 'approve' ? tr('{0} approved the job {2} of {1}', who, q(uname(d.agent, U)), jt)

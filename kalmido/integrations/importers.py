@@ -643,7 +643,7 @@ def imp_nl_date(text, lg="en"):
 
 def imp_prio_word(v):
     v = str(v or "").strip().lower()
-    return {"high": 5, "hoch": 5, "urgent": 5, "dringend": 5, "wichtig": 5, "important": 5, "medium": 3, "mittel": 3,
+    return {"high": 5, "hoch": 5, "urgent": 7, "dringend": 7, "wichtig": 5, "important": 5, "medium": 3, "mittel": 3,
             "normal": 0, "low": 1, "niedrig": 1, "gering": 1}.get(v, 0)
 
 
@@ -1291,8 +1291,8 @@ def imp_prio_any(v):
         return 0
     if v in ("0", "1", "2", "3", "4", "5"):
         return {"0": 0, "1": 1, "2": 1, "3": 3, "4": 5, "5": 5}[v]
-    for words, p in ((("highest", "blocker", "critical", "urgent", "dringend", "kritisch", "high", "hoch", "höchste", "wichtig",
-                       "important", "p1", "!!!"), 5),
+    for words, p in ((("blocker", "critical", "urgent", "dringend", "kritisch", "!!!!"), 7),  # 2.574.0 (#3376)
+                     (("highest", "high", "hoch", "höchste", "wichtig", "important", "p1", "!!!"), 5),
                      (("medium", "mittel", "normal", "major", "p2", "!!"), 3),
                      (("low", "lowest", "niedrig", "gering", "minor", "trivial", "p3", "p4", "!"), 1)):
         if v in words:

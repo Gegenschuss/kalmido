@@ -1462,7 +1462,7 @@ const fieldCols = lid => td_colsWide() && !!LS.get('fcols.' + lid, false) && fie
 // "Columns…"): which columns the rows show and in which order, custom fields and the task number included. null = the
 // default layout (date, assignee, time as before; fields as chips). Narrow widths show the first two columns, the rest
 // moves into the second line (classes o2 … o10: the cell's index needs at least that many columns of room).
-const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
+const PRIO_NAMES = {1: N_('Low'), 3: N_('Medium'), 5: N_('High'), 7: N_('Urgent')};
 const COLS = [['due', N_('Due')], ['prio', N_('Priority')], ['who', N_('Assignee')], ['tags', N_('Tags')], ['time', N_('Tracked time')],
   ['progress', N_('Subtasks')], ['deps', N_('Blocked by')], ['created', N_('Created')], ['delivery', N_('Delivery state')]];  // 2.392.2 (#3365): delivery
 const COL_ICON = {due: 'cal', prio: 'flag', who: 'user', tags: 'tag', time: 'clock', progress: 'sub', deps: 'deps', created: 'plus', delivery: 'pause'};
@@ -1813,7 +1813,7 @@ function qdockChips() {
   if (S.qov?.key !== S.route.key) S.qov = {key: S.route.key};
   const d = quickDefaults(), r = parseQuick(inp.value, S.quick.ignore), o = S.qov;
   const q = qovPick(o, r, d), due = q.due, lid = q.list_id || inbox()?.id, pr = q.priority;
-  const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High')};
+  const PRN = {0: N_('No priority'), 1: N_('Low'), 3: N_('Medium'), 5: N_('High'), 7: N_('Urgent')};
   box.innerHTML = `<button type="button" class="qdc ${due ? 'set' : ''} ${'due' in o && q.due === o.due ? 'ov' : ''}" data-act="qd-date">${ic('cal', 's')}${esc(due ? dayLabel(due) : tr('No date'))}</button>` +
     (d.who ? `<span class="qdc set dsxwho">${ic('user', 's')}${esc(personNameAny(d.who) || '?')}</span>` : '') +  // 2.36.2 (#1138): for that person
     (d.noList && !o.list_id && !r.list_id ? `<span class="qnote dsxwho" role="note">${ic('alert', 's')}${esc(tr('No project with {0} that you can add to: share a project with them first.', personNameAny(d.who) || '?'))}</span>` :

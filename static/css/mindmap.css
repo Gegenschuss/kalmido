@@ -33,7 +33,7 @@
 /* 2.156.0 A (#1948): the properties of a branch (second line), the peek below the selected one, the outline */
 .mmnode .mmp{fill:var(--muted);font:var(--fs-xs) system-ui,-apple-system,"Segoe UI",sans-serif}
 .mmnode .mmpi{color:var(--muted);stroke-width:1.8}
-.mmpd.p5{fill:var(--p5);background:var(--p5)}.mmpd.p3{fill:var(--p3);background:var(--p3)}.mmpd.p1{fill:var(--p1);background:var(--p1)}
+.mmpd.p7{fill:var(--p7);background:var(--p7)}.mmpd.p5{fill:var(--p5);background:var(--p5)}.mmpd.p3{fill:var(--p3);background:var(--p3)}.mmpd.p1{fill:var(--p1);background:var(--p1)}
 .mmbar .iconbtn.on{color:var(--accent);background:var(--accent-soft)}
 .mmpeek{position:absolute;z-index:2;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem .5rem;padding:.25rem .5rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--bg2);color:var(--muted);font-size:var(--fs-xs);pointer-events:none;box-shadow:0 .125rem .5rem rgba(0,0,0,.08)}
 .mmpeek .mmpx,.mmop .mmpx{display:inline-flex;align-items:center;gap:.1875rem;white-space:nowrap;max-width:12rem;overflow:hidden;text-overflow:ellipsis}

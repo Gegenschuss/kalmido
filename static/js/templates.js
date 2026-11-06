@@ -16,7 +16,8 @@ async function saveTemplate(src, def) {
 function tpl_skipped(j) { if (j?.skipped_files?.length) toast(tr('Not copied: {0}', j.skipped_files.slice(0, 5).join(', ')), null, 9000); }
 // 2.363.3 (#3134): a copy of the task on the server (subtasks, assignees, files, ...); offline or not saved yet: the fields the device has
 async function taskDuplicate(t, plain) {
-  if (t.id < 0 || !navigator.onLine) return plain();
+  // 2.574.0 (#3376): a project encrypted in the browser keeps the copy in the browser (the server answers 409 list_e2e there)
+  if (t.id < 0 || !navigator.onLine || listById(t.list_id)?.e2e) return plain();
   let j; try { j = await api('POST', `/api/tasks/${t.id}/duplicate`); } catch { return; }
   putTask(j.task); await load(); render();
   const lab = tr('Created {0}', qn(String(j.task.title).slice(0, 40)));
@@ -120,7 +121,7 @@ function tplParse(text, old, list) {
 }
 function templateModal(tp, done) {
   const d = JSON.parse(JSON.stringify(tp.data)), task = tp.kind === 'task', root = task ? d.task : null;
-  const prios = [[0, N_('None')], [1, N_('Low')], [3, N_('Medium')], [5, N_('High')]];
+  const prios = [[0, N_('None')], [1, N_('Low')], [3, N_('Medium')], [5, N_('High')], [7, N_('Urgent')]];  // 2.574.0 (#3376): + Urgent
   const md = modal(`<h3>${tr('Edit template')}</h3>
     <div class="row"><label for="tp-name">${tr('Template name')}</label><input id="tp-name" value="${esc(tp.name)}" maxlength="200"></div>
     ${task ? `<div class="row"><label for="tp-title">${tr('Title')}</label><input id="tp-title" value="${esc(root.title)}"></div>

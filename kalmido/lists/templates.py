@@ -14,7 +14,7 @@ from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
-    clean_reminders, clean_ticket_tpl, log_act, POINTS, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
+    clean_reminders, clean_ticket_tpl, log_act, POINTS, PRIORITIES, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
 )
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
@@ -131,7 +131,7 @@ def tpl_clean_node(n, depth, count):
     return {**({"k": key} if key else {}), "title": title, "content": str(n.get("content") or "")[:20000],
             **({"fv": {k: v for k, v in list(fv.items())[:FIELD_MAX] if re.fullmatch(r"\d{1,2}", str(k))
                        and isinstance(v, (str, int, float)) and not isinstance(v, bool) and len(str(v)) <= 2000}} if fv else {}),
-            "priority": num("priority", 0, 5) if num("priority", 0, 5) in (0, 1, 3, 5) else 0,
+            "priority": num("priority", 0, 7) if num("priority", 0, 7) in PRIORITIES else 0,  # 2.574.0 (#3376): urgent too
             "tags": [str(x).strip().lstrip("#")[:60] for x in (n.get("tags") or []) if str(x).strip().lstrip("#")][:30]
             if isinstance(n.get("tags"), list) else [],
             "url": url if url and valid_link(url) else None,

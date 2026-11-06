@@ -196,7 +196,7 @@ function prioMenu(anchor, id) {
   const t = taskById(id);
   if (!canEdit(t)) { roToast(); return; }
   if (tlkStop(t)) return;  // 2.36.0 (#1118): locked
-  menu(anchor, [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', on: t.priority === p, cls: p ? 'flag-' + p : '', fn: () => patchTask(id, {priority: p})})));
+  menu(anchor, [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', on: t.priority === p, cls: p ? 'flag-' + p : '', fn: () => patchTask(id, {priority: p})})));
 }
 // 2.6.1 (#401): by default every change in the date popover (day, time, start, duration, reminders, repeat) is saved at
 // once (a short pause bundles quick taps); the popover stays open for more, "Saved" shows in its foot, and closing it
@@ -751,7 +751,7 @@ async function waitClear(id) {
 // 2.24.0 (UX-09): ONE task menu in a fixed order (right-click, "…" in the row / the task panel, "All…" of the short
 // menus): date · priority · assignee · time · list / section · waiting · pin · More… · delete. The short
 // menus (swipe, selection) keep the same order and end with "All…".
-const PRIO_ROW = id => { const t = taskById(id); return {row: [[5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
+const PRIO_ROW = id => { const t = taskById(id); return {row: [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', on: t?.priority === p, title: tr('Priority') + ': ' + tr(n), fn: () => patchTask(id, {priority: p})}))}; };
 // 2.455.0 (#3848): the task's own workspace; the other ones through moveWsItem, the entry beside it (spacemove.js)
 const mv_taskO = id => ({filter: l => l.id !== taskById(id)?.list_id && canAddTo(l.id), pick: l => patchUndoable(id, {list_id: l.id}, tr('Moved to {0}', lname(l)))});
 const moveListItem = (anchor, id) => ({label: tr('Move to project…'), icon: 'list', keys: 'm', fn: () => { if (!tlkStop(taskById(id))) mv_picker(anchor, [id], mv_taskO(id)); }});

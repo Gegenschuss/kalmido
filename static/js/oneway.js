@@ -74,9 +74,18 @@ document.addEventListener('click', async e => {
 // the project dialog's switch (saved at once, like story points)
 function ow_listRow(l, own) {
   if (!own || !isProject(l.id)) return '';
-  return `<div class="row"><label>${tr('One-way steps')}</label><label class="chkl"><input type="checkbox" id="l-owyes" data-lid="${l.id}" ${l.irreversible_needs_yes ? 'checked' : ''}> ${tr('Tasks marked as one-way steps need a yes before integration and deployment')}</label></div>`;
+  return `<div class="row"><label>${tr('One-way steps')}</label><label class="chkl"><input type="checkbox" id="l-owyes" data-lid="${l.id}" ${l.irreversible_needs_yes ? 'checked' : ''}> ${tr('Tasks marked as one-way steps need a yes before integration and deployment')}</label></div>`
+    // 2.574.0 (#3376): the four-eyes rule of the gates; alone in the project it would never approve -> a hint
+    + `<div class="row"><label>${tr('Approvals')}</label><label class="chkl"><input type="checkbox" id="l-2eyes" data-lid="${l.id}" ${l.two_eyes ? 'checked' : ''}> ${tr('Integration, deployment and merge approvals need two people')}</label></div>`
+    + `<div class="shint lhint" id="l-2eyes-h" ${l.two_eyes && !l.shared ? '' : 'hidden'}>${tr('Only useful with members: the second 👍 must come from another person who may approve (project owner, project admin or an admin). Share the project first.')}</div>`;
 }
 document.addEventListener('change', async e => {
+  if (e.target.id === 'l-2eyes') {  // 2.574.0 (#3376)
+    const on = e.target.checked, l = listById(+e.target.dataset.lid); if (!l) return;
+    try { await api('PATCH', '/api/lists/' + l.id, {two_eyes: on}); } catch { e.target.checked = !on; return; }
+    l.two_eyes = on ? 1 : 0; const h = document.getElementById('l-2eyes-h'); if (h) h.hidden = !(on && !l.shared);
+    return;
+  }
   if (e.target.id !== 'l-owyes') return;
   const on = e.target.checked, l = listById(+e.target.dataset.lid); if (!l) return;
   try { await api('PATCH', '/api/lists/' + l.id, {irreversible_needs_yes: on}); } catch { e.target.checked = !on; return; }

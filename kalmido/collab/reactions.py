@@ -82,6 +82,10 @@ def react(c, k, uid, emoji, on):
     res = {"approval": None, "applied": False}
     if not on:
         c.execute("DELETE FROM comment_reactions WHERE comment_id=? AND user_id=? AND emoji=?", (k["id"], uid, emoji))
+        sg = json.loads(k["suggestion"]) if emoji == "up" and k["suggestion"] else None
+        if sg and sg.get("state") == "open" and any(isinstance(a, dict) and a.get("by") == uid for a in sg.get("approvals") or []):
+            sg["approvals"] = [a for a in sg["approvals"] if not (isinstance(a, dict) and a.get("by") == uid)]  # 2.574.0 (#3376): a first of two taken back
+            c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sg, ensure_ascii=False), k["id"]))
         return res
     if not c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                      (k["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
@@ -99,14 +103,16 @@ def react(c, k, uid, emoji, on):
         res["approval"] = None  # 2.148.1 D (#2495): integrate / deploy: the assignee alone does not decide (as approval jobs, #1974)
     if res["approval"]:  # 2.126.0 review: logged only once the approval counts
         log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
+    from ..agents.gates import gate_decide, gate_two_eyes
     if sug and sug.get("kind") in ("integrate", "deploy"):  # 2.26.0 (#949): only an approver decides (see agents/gates.py)
-        from ..agents.gates import gate_decide
         if sug.get("state") == "open" and res["approval"]:
             res["gate"] = gate_decide(c, k, t, uid, emoji == "up")
-            if res["gate"] == "blocked":  # open checklist: 👍 alone does not approve a deploy
+            if res["gate"] in ("blocked", "waiting"):  # open checklist: 👍 alone does not approve a deploy; 2.574.0 (#3376): nor a first of two
                 res["approval"] = None
     elif sug and sug.get("kind") == "merge_request":  # 2.2.0 (#339): only an approver decides; the agent merges itself
-        if sug.get("state") == "open" and res["approval"]:
+        if sug.get("state") == "open" and res["approval"] == "approved" and gate_two_eyes(c, k, t, sug, uid):
+            res["merge"], res["approval"] = "waiting", None  # 2.574.0 (#3376): the list wants a second approver
+        elif sug.get("state") == "open" and res["approval"]:
             st = "approved" if emoji == "up" else "rejected"
             c.execute("UPDATE comments SET suggestion=? WHERE id=?",
                       (json.dumps({**sug, "state": st, "by": uid, "at": iso(now_utc())}, ensure_ascii=False), k["id"]))

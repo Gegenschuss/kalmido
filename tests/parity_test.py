@@ -140,6 +140,7 @@ APP_TO_API = {
     "DELETE /api/templates/{}": ["DELETE /templates/{}"],
     "POST /api/templates/{}/apply": ["POST /templates/{}/apply"],
     "POST /api/lists/{}/duplicate": ["POST /lists/{}/duplicate"],  # 2.78.0 (#1881)
+    "POST /api/tasks/{}/duplicate": ["POST /tasks/{}/duplicate"],  # 2.574.0 (#3376): MCP duplicate_task
     "POST /api/habits": ["POST /habits"],
     "PATCH /api/habits/{}": ["PATCH /habits/{}"],
     "DELETE /api/habits/{}": ["DELETE /habits/{}"],
@@ -414,8 +415,7 @@ APP_ONLY = [
                                                    "* /api/docs/{}/task", "* /api/docs/settings", "* /api/docs/rules", "* /api/docs/labels/",
                                                    "* /api/docs/mail", "* /api/docs/fields")),  # 2.153.0 (#2179): agents fill in custom fields via /documents, never define them
     # 2.154.0 A (#1111): splitting a stack and linking a document with a task are a person's steps (an agent suggests, a person confirms)
-    ("2.363.3 (#3134): \"Duplicate\" of a task is a person's step in the task menu; agents create tasks with POST /tasks and copy a whole project with /lists/{id}/duplicate",
-     ("=POST /api/tasks/{}/duplicate",)),
+    # 2.574.0 (#3376): "Duplicate" of a task has its v1 route now (POST /tasks/{id}/duplicate, MCP duplicate_task), see the mapping above
     ("2.154.0 A (#1111): a stack scan split into documents (its pages, previews, split, undo, \"no stack\", the separator sheet) and a "
      "document linked with an existing task / the documents of a task are a person's steps in the app; agents read documents with "
      "/documents and never split, link or delete", ("* /api/docs/{}/split", "=POST /api/docs/{}/unsplit", "=GET /api/docs/split-sheet.pdf",

@@ -84,9 +84,9 @@ function dayLabel(s, long) {
 const dueLabel = (t, range = true) => !t.due ? '' : (range && t.start && t.start < t.due ? dayLabel(t.start) + ' – ' : '') + dayLabel(t.due) + (t.due_time ? ', ' + fmtTimeLoc(t.due_time) : '');  // 2.368.0 B (#2982): fmtTimeLoc
 const dueClass = t => !t.due || t.status ? '' : t.due < today() ? 'over' : t.due === today() ? 'today' : '';
 // 2.16.0 (#473, WCAG 1.4.1): the priority as a shape too (! / !! / !!!, like the quick add), named for screen readers
-const PRIO_NAME = {5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};
-const prioWord = p => tr({5: N_('High'), 3: N_('Medium'), 1: N_('Low')}[p] || N_('None'));
-const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-label="${esc(tr(PRIO_NAME[p]))}" title="${esc(tr(PRIO_NAME[p]))}">${{5: '!!!', 3: '!!', 1: '!'}[p]}</span>` : '';
+const PRIO_NAME = {7: N_('Urgent priority'), 5: N_('High priority'), 3: N_('Medium priority'), 1: N_('Low priority')};  // 2.574.0 (#3376): + Urgent
+const prioWord = p => tr({7: N_('Urgent'), 5: N_('High'), 3: N_('Medium'), 1: N_('Low')}[p] || N_('None'));
+const prioMark = p => PRIO_NAME[p] ? `<span class="prm p${p}" role="img" aria-label="${esc(tr(PRIO_NAME[p]))}" title="${esc(tr(PRIO_NAME[p]))}">${{7: '!!!!', 5: '!!!', 3: '!!', 1: '!'}[p]}</span>` : '';
 // timeline, roadmap, statistics and time reports use weekStartOf (the locale's first weekday, 1.5.1); habits keep Mondays
 function mondayOf(s) { const d = pd(s); const k = (d.getDay() + 6) % 7; d.setDate(d.getDate() - k); return ds(d); }
 
@@ -1174,7 +1174,7 @@ function cfInline(id, field, c, mine) {
 }
 function fmtVal(field, v) {
   if (v == null || v === '' || (Array.isArray(v) && !v.length)) return tr('(empty)');
-  if (field === 'priority') return tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High')][+v] || '') || String(v);
+  if (field === 'priority') return tr([N_('None'), N_('Low'), '', N_('Medium'), '', N_('High'), '', N_('Urgent')][+v] || '') || String(v);
   if (field === 'list_id') return lname(listById(+v)) || String(v);
   if (field === 'due' || field === 'start') return fmtDate(v);
   if (field === 'tags') return v.map(g => '#' + g).join(' ');

@@ -114,7 +114,7 @@ UPLOAD_ROUTES = {("POST", API_PREFIX + "documents"), ("GET", API_PREFIX + "docum
 API_PAGE_MAX, API_PAGE_DEFAULT = 500, 100
 API_USED_EVERY = 60                           # s between two last_used_at updates of one token
 API_VERSION = "1.0"
-PRIO_NAMES = {0: "none", 1: "low", 3: "medium", 5: "high"}
+PRIO_NAMES = {0: "none", 1: "low", 3: "medium", 5: "high", 7: "urgent"}  # 2.574.0 (#3376): urgent
 PRIO_VALUES = {v: k for k, v in PRIO_NAMES.items()}
 STATUS_NAMES = {0: "open", 2: "done", -1: "wont_do"}
 
@@ -508,6 +508,7 @@ def v1_list(d):
             "points_on": bool(d.get("points_on")),  # 2.60.0 (#1511): story points shown in the app
             "mail_guests": bool(d.get("mail_guests")),  # 2.395.0 (#3380): guests read the project's filed e-mails (read only here)
             "irreversible_needs_yes": bool(d.get("irreversible_needs_yes")),  # 2.392.0 C (#3370): the gates wait for a person's yes to one-way tasks
+            "two_eyes": bool(d.get("two_eyes")),  # 2.574.0 (#3376): approvals of integrate / deploy / merge requests need two people
             "header_style": d.get("header_style") or "",  # 2.83.0 (#1427): the list's header strip in the app (read only)
             "nag": d.get("nag") or "", "day_hours": d.get("day_hours"),  # 2.7.0 (#413, #407)
             "columns": d.get("columns"),  # 2.14.0 (#425): the list's columns (null = default)

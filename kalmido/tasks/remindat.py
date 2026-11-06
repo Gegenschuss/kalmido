@@ -88,7 +88,7 @@ def rat_fire(c, t, users, S, LG, now):
             msg = tr("Due {0} {1} · {2}", day, when, lname, lg=lgw)
         else:
             msg = lname
-        notify(who, t["title"], msg, push_prio(sw, 4 if t["priority"] == 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
+        notify(who, t["title"], msg, push_prio(sw, 4 if t["priority"] >= 5 else None), f"{PUBLIC_URL}/#t/{t['id']}", s=sw,
                actions=([(tr("Snooze", lg=lgw), f"{PUBLIC_URL}/#snooze/{t['id']}")] if t["due"] else [])  # snoozing moves the due date
                + [(tr("Done|action", lg=lgw), f"{PUBLIC_URL}/#done/{t['id']}")],
                task=t["id"], due=t["due"] if t["repeat"] else None)

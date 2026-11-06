@@ -785,6 +785,7 @@ ROUTES = {
     # 2.35.0 (#1101): an organisation admin's lists of the organisation (p2350_c_api_test.py: other organisation, private list, member 403)
     "GET /api/orgs/{}/out-requests": "org", "POST /api/orgs/{}/out-requests": "org", "POST /api/orgs/{}/out-requests/{}": "org",  # 2.361.2 (#2923)
     "GET /api/orgs/{}/lists": "org", "POST /api/orgs/{}/lists/{}/archive": "org", "DELETE /api/orgs/{}/lists/{}": "org",
+    "GET /api/orgs/{}/tasks": "org",  # 2.574.0 (#3376): p2574_d_api_test.py (the admin of another organisation: 404)
     "POST /api/orgs/{}/lists/{}/owner": "org",
     # 2.56.0 (#1795): an organisation admin changes name, icon and colour of a list of the organisation (p256_b_api_test.py)
     "PATCH /api/orgs/{}/lists/{}": "org", "PUT /api/orgs/{}/lists/{}/icon": "org", "POST /api/orgs/{}/lists/{}/icon": "org",
@@ -964,6 +965,7 @@ ROUTES = {
     "DELETE /api/v1/templates/{}": "template", "POST /api/v1/templates/{}/apply": "template",
     "GET /api/templates": "template", "POST /api/templates": "template", "PATCH /api/templates/{}": "template",
     "DELETE /api/templates/{}": "template", "POST /api/templates/{}/apply": "template",
+    "POST /api/v1/tasks/{}/duplicate": "task",  # 2.574.0 (#3376): p2574_d_api_test.py (no access to the project: 403 / 404)
     "POST /api/lists/{}/duplicate": "template", "POST /api/v1/lists/{}/duplicate": "template",  # 2.78.0 (#1881): also p278_dup_api_test.py
     # ---- token (2)
     "POST /api/hooks/issues/{}/{}": "token", "POST /api/hooks/issues/{}": "token", "POST /api/hooks/git/{}": "token",

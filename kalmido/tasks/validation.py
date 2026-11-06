@@ -87,6 +87,11 @@ def log_act(c, tid, kind, data=None, uid=None):
     c.execute("INSERT INTO activity(task_id,user_id,kind,data,created_at) VALUES(?,?,?,?,?)", (tid, uid, kind, js, ts))
 
 
+# 2.574.0 (#3376): the columns whose old -> new value the webhook task.updated carries (data.diff, integrations/webhooks.py)
+WH_DIFF_COLS = ("title", "due", "due_time", "start", "priority", "assignee_id", "list_id", "section_id", "parent_id", "repeat", "url", "ttype",
+                "points")
+
+
 def log_changes(c, tid, old, act=None):
     """Compares the task row before a change (old) with the stored row now and logs what a person
     would care about."""
@@ -95,6 +100,11 @@ def log_changes(c, tid, old, act=None):
     if not old or not new:
         return
     ch = lambda k: _norm(old[k]) != _norm(new[k])  # noqa: E731
+    if has_request_context():  # 2.574.0 (#3376): first old and last new value per field and request, for the webhooks
+        d = g.setdefault("wh_diff", {}).setdefault(tid, {})
+        for k in WH_DIFF_COLS:
+            if k in new.keys() and ch(k):
+                d[k] = [d[k][0] if k in d else old[k], new[k]]
     if ch("title"):
         log_act(c, tid, "title", {"to": new["title"][:200]})
     if ch("content") and act == "md_subtasks" and (old["content"] or "").strip():
@@ -170,7 +180,7 @@ NAG_HOUR_CAP = 30   # at most this many nag pushes per person and hour, all task
 DAY_HOURS_DEFAULT = 8.0  # 2.7.0 (#407): hours of a working day / shift (admin: time_day_h, a list: lists.day_hours)
 DURATION_MAX = 7 * 1440
 TITLE_MAX, CONTENT_MAX = 2000, 200000
-PRIORITIES = (0, 1, 3, 5)
+PRIORITIES = (0, 1, 3, 5, 7)  # 2.574.0 (#3376): 7 = urgent, above high
 
 
 def valid_date(v):

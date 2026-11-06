@@ -307,7 +307,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - For a small open choice, pick the sensible default, record it as a decision on the task and continue; the owner can
   veto it later. Only irreversible or costly choices wait for a person.
 - Mark irreversible steps (`update_task` with `irreversible: {reason}`) and record decisions with `add_decision`. Where the project
-  has `irreversible_needs_yes` on, your integrate / deploy request stays open until a person said yes to that task.
+  has `irreversible_needs_yes` on, your integrate / deploy request stays open until a person said yes to that task. With `two_eyes`
+  on (2.574.0), one 👍 is not enough: wait for the approval event, it comes after the second person's 👍.
 - "Wait with X" holds only X, not your whole queue. If the scope is unclear, ask.
 
 ### Privacy
@@ -772,7 +773,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`, `delete_field`, `delete_filter`,
 `delete_folder`, `delete_form`, `delete_habit`, `delete_list`, `delete_list_tag`, `delete_milestone`, `delete_note`,
 `delete_notepad`, `delete_project_file`, `delete_project_link`, `delete_reward`, `delete_section`, `delete_task`,
-`delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`, `draft_reminder`, `duplicate_list`,
+`delete_team_message`, `delete_template`, `delete_time_entry`, `draft_invoice_from_offer`, `draft_reminder`, `duplicate_list`, `duplicate_task`,
 `edit_team_message`, `empty_trash`, `export_brief`, `export_data`, `export_ics`, `export_vcards`, `freebusy`, `get_absences`, `get_agent`,
 `get_announcement`, `get_attachment`, `get_client`, `get_contact`, `get_day_plan`, `get_day_review`, `get_delivery_report`, `get_dependencies`,
 `get_dispo`, `get_dispo_free`, `get_document`, `get_event`, `get_family`, `get_filed_mail`, `get_group`, `get_habit_stats`, `get_job`, `get_key_figures`,

@@ -16,8 +16,8 @@ from ..accounts.session import me
 
 _WD = {"MO": "monday", "TU": "tuesday", "WE": "wednesday", "TH": "thursday", "FR": "friday", "SA": "saturday", "SU": "sunday"}
 TD_HEAD = ["TYPE", "CONTENT", "DESCRIPTION", "PRIORITY", "INDENT", "AUTHOR", "RESPONSIBLE", "DATE", "DATE_LANG", "TIMEZONE"]
-TD_PRIO = {5: "1", 3: "2", 1: "3"}  # Kalmido high / medium / low -> Todoist p1 / p2 / p3 (p4 = none)
-MD_PRIO = {5: "high", 3: "medium", 1: "low"}
+TD_PRIO = {7: "1", 5: "1", 3: "2", 1: "3"}  # Kalmido high / medium / low -> Todoist p1 / p2 / p3 (p4 = none)
+MD_PRIO = {7: "urgent", 5: "high", 3: "medium", 1: "low"}
 
 
 def ex_rr_text(rr, after=False):

@@ -455,6 +455,7 @@ ROUTES = {
     "PUT /api/tasks/{}/delivery": "tasks", "DELETE /api/tasks/{}/delivery": "tasks",  # 2.392.2 (#3365)
     "GET /api/tasks/{}/decisions": "tasks", "POST /api/tasks/{}/decisions": "tasks", "GET /api/v1/tasks/{}/decisions": "tasks", "POST /api/v1/tasks/{}/decisions": "tasks",
     "POST /api/v1/lists": "lists", "POST /api/v1/lists/{}/deployments": "lists", "POST /api/v1/lists/{}/duplicate": "lists",
+    "POST /api/v1/tasks/{}/duplicate": "tasks",  # 2.574.0 (#3376): p2574_d_api_test.py (a person without an organisation)
     "POST /api/v1/lists/{}/fields": "lists", "POST /api/v1/lists/{}/files": "lists", "POST /api/v1/lists/{}/forms": "lists",
     "POST /api/v1/lists/{}/join": "lists", "POST /api/v1/lists/{}/links": "lists", "POST /api/v1/lists/{}/milestones": "lists",
     "POST /api/v1/lists/{}/notepads": "lists", "POST /api/v1/lists/{}/notes": "lists", "POST /api/v1/lists/{}/owner": "lists",
@@ -601,6 +602,7 @@ ROUTES = {
     "DELETE /api/orgs/{}/members/{}": "orgadmin", "GET /api/admin/orgs": "orgadmin", "GET /api/orgs/{}/encryption": "orgcrypt",
     "GET /api/orgs/{}/export": "office", "GET /api/retention/me": "office", "GET /api/retention/me/export.zip": "office", "GET /api/retention/org/{}": "orgadmin", "GET /api/retention/org/{}/export.zip": "orgadmin",
     "GET /api/orgs/{}/export/file": "office", "GET /api/orgs/{}/lists": "orgadmin",
+    "GET /api/orgs/{}/tasks": "orgadmin",  # 2.574.0 (#3376): an organisation admin's read-only task view (404 without one, p2574_d_api_test.py)
     "GET /api/orgs/{}/out-requests": "orgadmin", "POST /api/orgs/{}/out-requests": "orgadmin",  # 2.361.2 (#2923)
     "POST /api/orgs/{}/out-requests/{}": "orgadmin",
     # 2.223.2 C (#2871): the step-up before a download (POST -> a one-time ticket; p22232_c_offsite_test.py, freelancer too)
@@ -1338,7 +1340,6 @@ POST /api/clients/merge
 POST /api/clients/merges/{}/undo
 POST /api/comments/{}/apply
 POST /api/comments/{}/choice
-POST /api/comments/{}/reactions
 POST /api/disc/blocks/{}
 POST /api/disc/check
 POST /api/disc/confirm
