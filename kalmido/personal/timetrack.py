@@ -12,7 +12,7 @@ from ..core.pg import IntegrityError, insert_id, Row
 from ..core.pg import write_lock  # 2.528.0 (#4305)
 from ..core.conflict import Conflict  # 2.528.0 (#4305)
 from ..core.i18n import dec_comma, lang, LANGS, tr
-from ..core.db import body, bump, db, err, gsetting, iso, local_now, now_utc, parse_iso, usettings
+from ..core.db import body, bump, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso, usettings
 from ..core.usertz import hm_text, tz_of_s
 from ..accounts.session import me, user_public
 from ..core.access import (
@@ -658,7 +658,8 @@ def time_update(eid):
         args += [iso(start), iso(end), sec]
     if sets:
         guard = " AND billed_doc_id IS NULL" if tbill_guard(r, b) else ""  # 2.144.6 A (#2053 review 1): billed meanwhile -> 409
-        if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso(now_utc()), eid)).rowcount == 0:
+        # 2.576.0 (#4764): to the millisecond: two saves in one second are two versions for the dialog's watch (objsave.js dlgStale)
+        if c.execute(f"UPDATE time_entries SET {', '.join(sets)}, updated_at=? WHERE id=?{guard}", (*args, iso_ms(now_utc()), eid)).rowcount == 0:
             tbill_lost(c, eid, False)
         if r["end"] is not None:  # 2.555.0 (#4570): a finished entry changed its time or its place (the old place too)
             from .budgetwarn import bw_check

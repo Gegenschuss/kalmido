@@ -144,6 +144,8 @@ const bg_body = e => ({day: e.day, amount: e.amount, kind: e.kind, title: e.titl
 // with the version it was opened on; saved elsewhere meanwhile -> the dialog again with the saved entry, the input of the person
 // over it and the other's fields marked (cf = that conflict); an open dialog shows the bar "Changed ..." with "Take over"
 const BG_FLD = {kind: 'bg-kind', amount: 'bg-amt', day: 'bg-day', title: 'bg-title', cat_id: 'bg-cat', counterpart: 'bg-cp', note: 'bg-note'};
+// the server's entry in the dialog's shape (the month view and the single entry write the amount / empty fields differently)
+const bg_view = x => ({...x, amount: x.amount == null || x.amount === '' ? null : +x.amount, note: x.note || '', counterpart: x.counterpart || '', cat_id: x.cat_id ?? null});
 const bg_field = (md, k) => BG_FLD[k] ? ($('#' + BG_FLD[k], md)?.closest('.row') || null) : null;
 function bg_entryModal(e, cf) {
   const d = BG.data, w = d.can_write, kind = e?.kind || 'out';
@@ -186,9 +188,10 @@ function bg_entryModal(e, cf) {
     // 2.559.0 (#4660): saved elsewhere in between (409 with the saved entry): the row goes back and the dialog opens again;
     // 2.576.0 (#4764): with the saved entry, the input of the person over it and the other's fields marked (objsave.js)
     if (typeof saveDialog !== 'function') await loadModule('objsave').catch(() => { /* offline without the copy: the whole entry as before */ });
+    const o0 = bg_view(open), v0 = open.updated_at;  // before the optimistic row: it changes the very entry object (optSet)
     const req = typeof saveDialog === 'function'
-      ? () => saveDialog(url, open, body, {key: 'entry', base}).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; })
-      : () => rawFetch('PATCH', url, open.updated_at ? {...body, expect_updated_at: open.updated_at} : body);  // 2.269.0 C (#3017)
+      ? () => saveDialog(url, o0, body, {key: 'entry', base, view: bg_view}).then(j => { if (j?.conflict) throw Object.assign(new Error('conflict'), {cf: j.conflict}); return j; })
+      : () => rawFetch('PATCH', url, v0 ? {...body, expect_updated_at: v0} : body);  // 2.269.0 C (#3017)
     let r;
     try { r = await optWrite(optSet(() => BG.data?.entries.find(x => x.id === id), {...body, amount: String(amount)}), req, bg_draw); }
     catch (x) {
@@ -217,7 +220,7 @@ function bg_entryModal(e, cf) {
     const again = (cur, theirs, mine) => { md.remove(); bg_entryModal({...cur, ...mine}, {cur, theirs, mine, both: []}); };
     loadModule('objsave').then(() => {
       if (!md.isConnected) return;
-      dlgStale(md, `/api/budget/entries/${e.id}`, () => open.updated_at, cur => again(cur, Object.keys(form()).filter(k => !objSame(open[k], cur[k])), objDiff(base, form())));
+      dlgStale(md, `/api/budget/entries/${e.id}`, () => open.updated_at, cur => { const o = bg_view(open), c = bg_view(cur); again(cur, Object.keys(form()).filter(k => !objSame(o[k], c[k])), objDiff(base, form())); });
       if (cf?.theirs.length) objMerge(md, cf, () => {}, {field: k => bg_field(md, k),
         take: keys => again(cf.cur, [], Object.fromEntries(Object.entries(cf.mine || {}).filter(([k]) => !keys.includes(k))))});
     }, () => { /* offline without the copy: saved as before */ });
@@ -377,7 +380,8 @@ async function bg_recModal() {
     const again = (cur, mine, theirs) => { items = items.map(y => y.id === cur.id ? cur : y); $('.bgrwrap', md).innerHTML = listHtml(); showForm(cur, {cur, mine, theirs, both: []}); };
     d.stop = dlgStale(md, `/api/budget/recurring/${r.id}`, () => d.open.updated_at, cur => {
       if (rd !== d) return;
-      again(cur, objDiff(d.base, recForm()), Object.keys(recForm()).filter(k => !objSame(d.open[k], cur[k])));
+      const o = bg_view(d.open), c = bg_view(cur);
+      again(cur, objDiff(d.base, recForm()), Object.keys(recForm()).filter(k => !objSame(o[k], c[k])));
     });
     if (cf?.theirs.length) objMerge(md, cf, () => {}, {field: k => R_FLD[k] ? $('#' + R_FLD[k], md)?.closest('.row') || null : null,
       take: keys => again(cf.cur, Object.fromEntries(Object.entries(cf.mine || {}).filter(([k]) => !keys.includes(k))), [])});
@@ -419,9 +423,9 @@ async function bg_recModal() {
           const r0 = d?.open || items.find(x => x.id === rid), before = pickR(r0), url = `/api/budget/recurring/${rid}`;
           let ver = '';
           if (d) {  // 2.576.0 (#4764): saved elsewhere meanwhile: the form again with the saved template + the input (objsave.js)
-            const j = await saveDialog(url, r0, body, {key: 'item', base: d.base});
-            if (j?.conflict) { const c = j.conflict; items = items.map(y => y.id === c.cur.id ? c.cur : y); $('.bgrwrap', md).innerHTML = listHtml(); showForm(c.cur, c); toast(tr('Changed by someone else in the meantime')); return; }
-            if (j === r0) { showForm(null); return; }  // nothing changed: no request, no undo step
+            const o0 = bg_view(r0), j = await saveDialog(url, o0, body, {key: 'item', base: d.base, view: bg_view});
+            if (j?.conflict) { const c = j.conflict; items = items.map(y => y.id === c.raw.id ? c.raw : y); $('.bgrwrap', md).innerHTML = listHtml(); showForm(c.cur, c); toast(tr('Changed by someone else in the meantime')); return; }
+            if (j === o0) { showForm(null); return; }  // nothing changed: no request, no undo step
             ver = j?.updated_at || '';
           } else ver = (await rawFetch('PATCH', url, r0?.updated_at ? {...body, expect_updated_at: r0.updated_at} : body))?.updated_at || '';  // 2.269.0 C (#3017)
           // 2.566.0 (#4704): only the changed keys, against the version the step before left (core.js undoStep)

@@ -522,7 +522,10 @@ function rv_conflict(r, day, cf) {
   if (!sec || !ta || ta.dataset.day !== day) { rv_put(r, {...cf.cur, day}); toast(tr('Changed by someone else in the meantime')); return; }
   clearTimeout(RV.t); RV.t = null;
   objMerge(sec, cf, cur => rv_put(r, {...cur, day}), {field: k => k === 'text' ? ta : k === 'mood' ? $('.rvmood', sec) : null,  // lazy-ok: cf comes from saveDialog
-    take: () => { clearTimeout(RV.t); RV.t = null; renderView(); }});
+    take: () => {  // the saved entry in the field (a redraw keeps a focused field as it is)
+      clearTimeout(RV.t); RV.t = null; ta.value = cf.cur.text || ''; rv_unmark();
+      $$('[data-act="rv-mood"]', sec).forEach(x => { const on = +x.dataset.v === cf.cur.mood; x.classList.toggle('on', on); x.setAttribute('aria-checked', on); });
+    }});
   const bar = $('.obj-merge', sec);
   bar?.querySelector('[data-om="mine"]')?.addEventListener('click', () => {
     const on = $('.rvmood .on', sec);

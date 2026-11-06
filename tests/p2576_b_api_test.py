@@ -8,6 +8,8 @@ freelancer-matrix: personal, time
 tenant-matrix: budget, own
 Regression: before 2.576 these GET routes did not exist (405) and a time entry had no updated_at.
 usage: p2576_b_api_test.py <datadir>"""
+from datetime import date, timedelta
+
 import kt
 from kt import B, check
 from freelancer_fixture import freelancer
@@ -46,7 +48,7 @@ check(Fr.get(B + f"/api/budget/entries/{E['id']}").status_code == 404, "… then
 # ================================================================== time
 P = Fr.post(B + "/api/lists", json={"name": "Garden", "kind": "project", "time_tracking": 1}).json()["id"]
 T = Fr.post(B + "/api/tasks", json={"title": "Cut the hedge", "list_id": P}).json()["id"]
-TE = Fr.post(B + "/api/time/entries", json={"task_id": T, "start": f"{M}-02T09:00", "minutes": 30, "note": "Front"}).json()
+TE = Fr.post(B + "/api/time/entries", json={"task_id": T, "start": (date.today() - timedelta(days=2)).isoformat() + "T09:00", "minutes": 30, "note": "Front"}).json()
 check(TE.get("updated_at"), f"a time entry carries updated_at {TE}")
 r = Fr.get(B + f"/api/time/entries/{TE['id']}")
 check(r.ok and r.json()["note"] == "Front" and r.json()["updated_at"] == TE["updated_at"], f"the time entry reads {r.status_code} {r.text[:200]}")

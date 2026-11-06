@@ -25,6 +25,7 @@ const call = async (ck, method, url, body) => { const r = await fetch(B + url.re
 const until = (fn, t = 15000) => until0(fn, {timeout: t, step: 100});
 const click = (w, el) => el && el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
 const DAY = TC.today(), MONTH = DAY.slice(0, 7);
+const PAST = (d => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`)(new Date(Date.now() - 2 * 86400000));  // a time entry may not lie in the future
 const spy = w => {
   w.__sent = []; const f1 = w.__f1 || (w.__f1 = w.fetch);
   w.fetch = (u, o = {}) => { const m = o.method || 'GET'; if (m === 'PATCH' || m === 'PUT') { try { w.__sent.push({m, u: String(u), b: JSON.parse(o.body)}); } catch { w.__sent.push({m, u: String(u), b: null}); } } return f1(u, o); };
@@ -95,7 +96,7 @@ async function budgetChecks(LID) {
 async function timeChecks() {
   const L = (await call(CK, 'POST', '/api/lists', {name: 'Garden', kind: 'project', time_tracking: 1})).id;
   const T = (await call(CK, 'POST', '/api/tasks', {title: 'Cut the hedge', list_id: L})).id;
-  const te = await call(CK, 'POST', '/api/time/entries', {task_id: T, start: `${DAY}T09:00`, minutes: 30, note: 'Front'});
+  const te = await call(CK, 'POST', '/api/time/entries', {task_id: T, start: `${PAST}T09:00`, minutes: 30, note: 'Front'});
   check(te.id && te.updated_at, 'time: an entry with its version ' + JSON.stringify(te).slice(0, 200));
   const w = await boot({user: 'alice', hash: 'l/' + L}), d = w.document;
   await until(() => w.eval('typeof entryModal === "function"'));
@@ -103,18 +104,23 @@ async function timeChecks() {
   w.eval(`entryModal(${JSON.stringify(te)})`);
   let md = await until(() => d.querySelector('.modal #te-note') && typeof w.saveDialog === 'function' && d.querySelector('#te-note').closest('.modal'));
   check((await call(CK2, 'PATCH', `/api/time/entries/${te.id}`, {note: 'Front and back'})).http === 200, 'time: the other session changes the note');
+  // the server checks field by field (_prev): a change of another field alone is no conflict; the same field is
+  md.querySelector('#te-note').value = 'Front (mine)';
   md.querySelector('#te-bill').checked = false;
   click(w, md.querySelector('[data-m="save"]'));
   md = await until(() => { const m = d.querySelector('.modal .obj-merge')?.closest('.modal'); return m && m.querySelector('#te-note') && m; });
   check(!!md, 'time: the dialog comes back with the merge bar');
   const first = w.__sent.find(x => x.u.endsWith(`/api/time/entries/${te.id}`));
-  check(keys(first?.b) === keys({billable: 1, _prev: 1}) && first.b._prev.billable === true, 'time: only the changed field went, with what the dialog showed ' + JSON.stringify(first?.b));
+  check(keys(first?.b) === keys({billable: 1, note: 1, _prev: 1}) && first.b._prev.billable === true && first.b._prev.note === 'Front', 'time: only the changed fields went, with what the dialog showed ' + JSON.stringify(first?.b));
   if (md) {
-    check(md.querySelector('#te-note').value === 'Front and back' && marked(md.querySelector('#te-note')), 'time: the saved note, marked');
+    check(md.querySelector('#te-note').value === 'Front (mine)' && marked(md.querySelector('#te-note')) && /Front and back/.test(md.querySelector('#te-noterow').title), 'time: the own note stays, marked with the saved one');
     check(md.querySelector('#te-bill').checked === false && !marked(md.querySelector('#te-bill')), 'time: the own switch stays');
     check(!md.querySelector('[data-oxb-reload]'), 'time: no Reload bar');
-    click(w, md.querySelector('[data-m="save"]'));
+    click(w, md.querySelector('[data-om="theirs"]'));
   }
+  md = await until(() => { const m = d.querySelector('#te-note')?.closest('.modal'); return m && m.querySelector('#te-note').value === 'Front and back' && !m.querySelector('.obj-merge') && m; });
+  check(md && md.querySelector('#te-bill').checked === false, 'time: "Take theirs": the saved note, the own switch still off');
+  if (md) click(w, md.querySelector('[data-m="save"]'));
   check(await until(async () => { const x = await call(CK, 'GET', `/api/time/entries/${te.id}`); return x.note === 'Front and back' && x.billable === false; }), 'time: the second save keeps both');
   w.close();
 }
