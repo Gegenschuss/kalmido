@@ -1929,15 +1929,52 @@ GUARD_WRAP = GUARD_SHELLS | {"sudo", "doas", "env", "nice", "nohup", "timeout", 
                              "chrt", "stdbuf", "setsid", "systemd-run", "xargs", "watch", "flock", "ssh", "caffeinate",
                              "unbuffer", "strace", "nsenter", "chroot", "torsocks", "proxychains", "proxychains4"}
 GUARD_SKIP = {"$", "{", "}", "!", "if", "then", "else", "elif", "do", "while", "until", "fi", "done", "esac", "in"}
-GUARD_TEXT = {"echo", "printf"}  # their words are text -- unless the same command line feeds a shell
+# 2.615.0 E (#3758): their words are text -- unless the same command line feeds a shell (Fable review: grep 'git push -f')
+GUARD_TEXT = {"echo", "printf", "grep", "egrep", "fgrep", "rg", "ag", "ack", "awk", "gawk", "mawk", "nawk", "sed", "jq", "cut",
+              "tr", "sort", "wc", "head", "tail", "less", "diff", "test", "["}
+GUARD_CODE = {"awk", "gawk", "mawk", "nawk", "sed", "perl", "ruby", "node", "php"}  # + python*: words that may run commands
 GUARD_HALT = {"reboot", "poweroff", "halt", "shutdown", "kexec", "restart-computer", "stop-computer"}
 GUARD_MGMT = {"system", "image", "volume", "container", "builder", "network", "buildx", "pod", "machine"}  # docker X prune
 GUARD_UNITS = {"reboot", "poweroff", "halt", "kexec", "soft-reboot"}
+GUARD_READONLY = {"status", "show", "cat", "help", "list-units", "list-unit-files", "list-dependencies", "list-jobs",
+                  "list-timers", "list-sockets", "list-sessions", "is-active", "is-enabled", "is-failed", "show-session"}
 GUARD_NAMES = re.compile(r"(?i)(?<![a-z0-9_-])(git|docker|podman|nerdctl|reboot|poweroff|halt|shutdown|kexec|systemctl|"
                          r"loginctl|init|telinit|restart-computer|stop-computer)(?![a-z0-9_-])")
 GUARD_HEREDOC = re.compile(r"(?<!<)<<(?!<)-?[ \t]*(['\"]?)([A-Za-z_][A-Za-z0-9_]*)\1([^\n]*)\n(.*?)(?:\n[ \t]*\2[ \t]*(?=\n|$)|\Z)", re.S)
 GUARD_FEEDS = re.compile(r"(?i)(?<![a-z0-9_.-])(sh|bash|zsh|dash|ksh|ash|fish|eval|su|sudo|doas|ssh|pwsh|powershell|"
                          r"python[0-9.]*|node|perl|ruby|xargs)(?![a-z0-9_-])")
+GUARD_SUB = re.compile(r"@ksub([0-9a-f]*)@")  # a $( ) / backtick / <( ) as ONE word of the outer command, its text in hex
+GUARD_MAX = 256 * 1024  # longer command lines are not taken apart (time), only checked for a guarded name
+# 2.615.0 E (#3758): what a wrapper runs is the first word after its options; these options take a value (next word),
+# GUARD_WPOS words come before the program (timeout DURATION, ssh HOST, flock FILE, chroot DIR, chrt PRIO),
+# GUARD_WCMD options carry a whole command line (su -c "...", env -S "...", flock -c "...").
+GUARD_WVAL = {k: set(v.split()) for k, v in {
+    "sudo": "-u -g -h -p -C -D -U -r -t -T -R --user --group --host --prompt --close-from --chdir --other-user --role "
+            "--type --command-timeout --chroot",
+    "doas": "-u -C", "env": "-u -C --unset --chdir", "nice": "-n --adjustment",
+    "ionice": "-c -n -p -P -u --class --classdata --pid --pgid --uid", "timeout": "-s -k --signal --kill-after",
+    "ssh": "-b -c -D -E -e -F -I -i -J -L -l -m -O -o -p -Q -R -S -W -w -B",
+    "xargs": "-I -n -P -L -d -s -E -a --arg-file --delimiter --max-args --max-procs --max-lines --max-chars --eof",
+    "stdbuf": "-i -o -e --input --output --error",
+    "systemd-run": "-u -p -E -M -H --unit --property --setenv --description --slice --uid --gid --nice "
+                   "--working-directory --machine --host",
+    "flock": "-w -E --timeout --conflict-exit-code", "strace": "-o -e -p -s -u -E -a -b -I -O -P -S -X",
+    "nsenter": "-t -S -G --target --setuid --setgid", "time": "-f -o --format --output", "exec": "-a",
+    "caffeinate": "-t -w", "proxychains": "-f", "proxychains4": "-f", "watch": "-n --interval",
+    "su": "-g -G -s -w --group --supp-group --shell --whitelist-environment",
+    "runuser": "-u -g -G -s -w --user --group --supp-group --shell --whitelist-environment",
+    "bash": "-o -O --rcfile --init-file", "sh": "-o", "zsh": "-o", "ksh": "-o", "dash": "-o", "ash": "-o",
+    "pwsh": "-executionpolicy -ep -ex -windowstyle -w -workingdirectory -wd -outputformat -of -inputformat -if "
+            "-configurationname -settingsfile -file -f",
+    "powershell": "-executionpolicy -ep -ex -windowstyle -w -workingdirectory -wd -outputformat -of -inputformat -if "
+                  "-configurationname -settingsfile -file -f",
+}.items()}
+GUARD_WPOS = {"timeout": 1, "ssh": 1, "flock": 1, "chroot": 1, "chrt": 1}
+GUARD_WCMD = {"su": {"-c", "--command"}, "runuser": {"-c", "--command"}, "env": {"-S", "--split-string"},
+              "flock": {"-c", "--command"}}
+GUARD_JOIN = {"eval", "ssh", "watch"}  # they hand their words, joined with spaces, to a shell
+GUARD_SCTL = {"-H", "-M", "-t", "-p", "-P", "-s", "-n", "-o", "--host", "--machine", "--type", "--property", "--signal",
+              "--lines", "--output", "--root", "--state", "--kill-whom", "--job-mode", "--when"}
 GUARD_NO = "Refused by the Kalmido starter (#3758): "
 GUARD_TAIL = (" This holds whatever the allow list or the permission mode say (KALMIDO_BLOCK_DANGEROUS). Do not try another "
               "way (no script, alias, variable or other tool around it); say in your answer what was refused, the person "
@@ -1955,7 +1992,11 @@ def guard_suspicious(text):
 
 
 def _guard_exe(word):
-    name = word.replace("\\", "/").rstrip("/").rsplit("/", 1)[-1].lower()
+    """The program name of a word (path and .exe off, lower case); a word that cannot be a program (ends in /, has
+    spaces: a pattern like /reboot/, a text) stays as it is, so no rule matches it (2.615.0 E, #3758)."""
+    if not word or word.endswith(("/", "\\")) or re.search(r"\s", word):
+        return word.lower()
+    name = word.replace("\\", "/").rsplit("/", 1)[-1].lower()
     return name[:-4] if name.endswith(".exe") else name
 
 
@@ -1977,10 +2018,113 @@ def _guard_heredocs(cmd):
     return GUARD_HEREDOC.sub(sub, cmd)
 
 
+def _guard_backtick(cmd, i):
+    """The index of the backtick that closes the one before i (len(cmd) when it stays open)."""
+    while i < len(cmd) and cmd[i] != "`":
+        i += 2 if cmd[i] == "\\" else 1
+    return min(i, len(cmd))
+
+
+def _guard_close(cmd, i):
+    """The index of the ")" that closes a $( / <( / >( whose "(" is just before i (len(cmd) when it stays open): quotes,
+    backslashes, nested substitutions and backticks counted the way a shell does (one level per substitution)."""
+    n, st = len(cmd), [[0, False]]  # per level: open "(" inside it, inside "..."
+    while i < n:
+        c, lv = cmd[i], st[-1]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "`":
+            i = _guard_backtick(cmd, i + 1) + 1
+            continue
+        if c == "'" and not lv[1]:
+            j = cmd.find("'", i + 1)
+            i = n if j < 0 else j + 1
+            continue
+        if (c == "$" or (c in "<>" and not lv[1])) and cmd.startswith("(", i + 1):
+            st.append([0, False])
+            i += 2
+            continue
+        if c == '"':
+            lv[1] = not lv[1]
+        elif c == "(" and not lv[1]:
+            lv[0] += 1
+        elif c == ")" and not lv[1]:
+            if lv[0]:
+                lv[0] -= 1
+            else:
+                st.pop()
+                if not st:
+                    return i
+        i += 1
+    return n
+
+
+def _guard_subst(cmd):
+    """2.615.0 E (#3758): every $( ), backtick and <( ) / >( ) outside '...' becomes ONE word of the outer command (so
+    `git push origin $(git branch --show-current) --force` keeps its --force) and its text is checked on its own.
+    Returns (outer command line, [texts of the substitutions])."""
+    out, inner, i, last, n, dq = [], [], 0, 0, len(cmd), False
+    while i < n:
+        c = cmd[i]
+        if c == "\\":
+            i += 2
+            continue
+        if c == "'" and not dq:
+            j = cmd.find("'", i + 1)
+            i = n if j < 0 else j + 1
+            continue
+        if c == '"':
+            dq = not dq
+        elif c == "`" or ((c == "$" or (c in "<>" and not dq)) and cmd.startswith("(", i + 1)):
+            if c == "`":
+                end = _guard_backtick(cmd, i + 1)
+                body = cmd[i + 1:end].replace("\\`", "`")
+            else:
+                end = _guard_close(cmd, i + 2)
+                body = cmd[i + 2:end]
+            inner.append(body)
+            out += [cmd[last:i], "@ksub" + body.encode("utf-8", "replace").hex() + "@"]
+            i = last = end + 1
+            continue
+        i += 1
+    out.append(cmd[last:])
+    return "".join(out), inner
+
+
+def _guard_named(word):
+    """The texts of the substitutions in one word (see _guard_subst)."""
+    return [bytes.fromhex(h).decode("utf-8", "replace") for h in GUARD_SUB.findall(word)]
+
+
+def _guard_literals(word):
+    """The quoted strings inside a piece of code ('git push -f' in os.system('git push -f')), and all of them joined
+    (['git', 'push', '-f'])."""
+    lits = [a if a else b for a, b in re.findall(r"'([^']*)'|\"([^\"]*)\"", word)]
+    return lits + ([" ".join(lits)] if len(lits) > 1 else [])
+
+
+def _guard_gitcfg(kv):
+    """2.615.0 E (#3758): a git setting (git -c k=v, git config k v) that turns into a refused push / tag later: an alias
+    with push / tag / update-ref (or a ! shell alias with a refused command), remote.*.push with a +refspec or :ref."""
+    k, _, v = str(kv).partition("=")
+    k, v = k.strip().lower(), v.strip()
+    if k.startswith("alias."):
+        if v.startswith("!") and guard_reason(v[1:], 1, True):
+            return GUARD_NO + "a git shell alias that runs a refused command."
+        if re.search(r"(?<![\w-])(push|tag|update-ref)(?![\w-])", v):
+            return GUARD_NO + "a git alias for push / tag / update-ref (an alias around a force-push or a tag change)."
+    if re.fullmatch(r"remote\..+\.push", k) and v.startswith(("+", ":")):
+        return GUARD_NO + "a remote.*.push setting with a +refspec (a force-push) or :ref (deleting on the remote)."
+    return None
+
+
 def _guard_git(args):
     """Why a git command line is refused, or None (args: the words after "git")."""
     i = 0
     while i < len(args) and args[i].startswith("-"):  # git -C dir -c k=v --git-dir x ... SUB
+        if args[i] == "-c" and i + 1 < len(args) and _guard_gitcfg(args[i + 1]):
+            return _guard_gitcfg(args[i + 1])
         i += 2 if args[i] in ("-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env", "--exec-path") else 1
     if i >= len(args):
         return None
@@ -1997,6 +2141,12 @@ def _guard_git(args):
             return GUARD_NO + "git tag -d / -f (deleting or moving a tag)."
     elif sub == "update-ref" and any("refs/tags" in a for a in rest):
         return GUARD_NO + "git update-ref on refs/tags (deleting or moving a tag)."
+    elif sub == "config":  # 2.615.0 E (#3758): git config alias.p "push -f", git config remote.origin.push +main:main
+        for j, a in enumerate(rest):
+            if (a.lower().startswith("alias.") or re.fullmatch(r"(?i)remote\..+\.push", a)) and "=" not in a:
+                why = _guard_gitcfg(a + "=" + (rest[j + 1] if j + 1 < len(rest) else ""))
+                if why:
+                    return why
     return None
 
 
@@ -2005,54 +2155,162 @@ def _guard_rule(exe, args):
     if exe == "git":
         return _guard_git(args)
     pos = [a for a in args if not a.startswith("-")]
-    if exe in ("docker", "podman", "nerdctl") and any(a == "prune" and (i == 0 or pos[i - 1] in GUARD_MGMT) for i, a in enumerate(pos)):
+    if exe in ("docker", "podman", "nerdctl") and any(
+            a == "prune" and (i == 0 or pos[i - 1] in GUARD_MGMT or GUARD_SUB.search(pos[i - 1])) for i, a in enumerate(pos)):
         return GUARD_NO + f"{exe} ... prune (deletes images, containers, volumes or build cache for good)."
-    if exe in GUARD_HALT or (exe in ("init", "telinit") and any(a in ("0", "6") for a in args)) or (
-            exe in ("systemctl", "loginctl") and any(a in GUARD_UNITS or re.sub(r"\.target$", "", a) in GUARD_UNITS for a in args)):
+    if exe in ("systemctl", "loginctl"):  # 2.615.0 E (#3758): the verb decides (systemctl status halt is a look)
+        pos, i = [], 0
+        while i < len(args):
+            if args[i] in GUARD_SCTL:
+                i += 1
+            elif not args[i].startswith("-"):
+                pos.append(re.sub(r"\.target$", "", args[i]))
+            i += 1
+        if pos and (pos[0] in GUARD_UNITS or (pos[0] not in GUARD_READONLY and any(a in GUARD_UNITS for a in pos[1:]))):
+            return GUARD_NO + "restarting or shutting down the computer."
+        return None
+    if exe in GUARD_HALT or (exe in ("init", "telinit") and any(a in ("0", "6") for a in args)):
         return GUARD_NO + "restarting or shutting down the computer."
     return None
 
 
-def _guard_head(w):
-    """The command a simple command runs, and what its wrappers run (sudo -u root X, timeout 60 X, ssh host X, sh -c X,
-    xargs X ...): every start after a wrapper is tried once (options with values need no table). Returns (why, exe)."""
-    todo, seen, first = [0], set(), ""
-    while todo:
-        s = todo.pop()
-        while s < len(w) and (w[s] in GUARD_SKIP or re.match(r"[A-Za-z_][A-Za-z0-9_]*=", w[s])):
-            s += 1
-        if s >= len(w) or s in seen:
-            continue
-        seen.add(s)
-        exe = _guard_exe(w[s])
-        first = first or exe
-        why = _guard_rule(exe, w[s + 1:])
+def _guard_rule_sub(word, args):
+    """2.615.0 E (#3758): a program that is itself a substitution ($(which git) push -f, $(echo reboot)): the rules of
+    git / docker / systemctl with its words, and of a halt command or init that its text names."""
+    named = set(re.findall(r"[a-z0-9_.-]+", " ".join(_guard_named(word)).lower())) | {_guard_exe(GUARD_SUB.sub("", word))}
+    for exe in ["git", "docker", "podman", "nerdctl", "systemctl", "loginctl"] + sorted(named & (GUARD_HALT | {"init", "telinit"})):
+        why = _guard_rule(exe, args)
         if why:
-            return why, first
-        if exe in GUARD_WRAP:
-            todo.extend(i for i in range(s + 1, len(w)) if not w[i].startswith("-") and i not in seen)
-    return None, first
+            return why
+    return None
+
+
+def _guard_skip(w, s):
+    while s < len(w) and (w[s] in GUARD_SKIP or re.match(r"[A-Za-z_][A-Za-z0-9_]*=", w[s])):
+        s += 1
+    return s
+
+
+def _guard_wrapped(exe, w, i):
+    """2.615.0 E (#3758): after the wrapper exe (its words start at w[i]): (index of the program it runs or None, [command
+    lines it hands to a shell]). Only the first word that is no option and no option value is the program (sudo -u
+    root X, timeout 60 X, ssh host X, xargs -n 1 X); sh -c X, su -c X, eval X, ssh host X, cmd /c X are command lines."""
+    vals, cmdo, npos = GUARD_WVAL.get(exe, set()), GUARD_WCMD.get(exe, set()), GUARD_WPOS.get(exe, 0)
+    win = exe in ("pwsh", "powershell", "cmd")
+    lines, shc = [], False
+    while i < len(w):
+        a = w[i]
+        k = a.lower() if win else a
+        if a == "--":
+            i += 1
+            break
+        if exe == "cmd" and k in ("/c", "/k", "/r"):
+            return None, [" ".join(w[i + 1:])]
+        if exe == "cmd" and k.startswith("/"):  # cmd /q /d ...
+            i += 1
+            continue
+        if exe in ("pwsh", "powershell") and len(k) > 1 and k.startswith("-") and "-command".startswith(k):
+            return None, [" ".join(w[i + 1:])]
+        if a.startswith("-") and len(a) > 1:
+            key = a.split("=", 1)[0] if a.startswith("--") else a
+            if key in cmdo:
+                if "=" in a:
+                    lines.append(a.split("=", 1)[1])
+                elif i + 1 < len(w):
+                    lines.append(w[i + 1])
+                    i += 1
+            elif exe in ("sh", "bash", "zsh", "dash", "ksh", "ash", "fish") and re.fullmatch(r"-[A-Za-z]*c[A-Za-z]*", a):
+                shc = True
+            elif (key.lower() if win else key) in vals and "=" not in a:
+                i += 1
+            i += 1
+            continue
+        if exe == "env" and re.match(r"[A-Za-z_][A-Za-z0-9_]*=", a):
+            i += 1
+            continue
+        if npos:
+            npos -= 1
+            i += 1
+            continue
+        break
+    rest = w[i:]
+    if exe in GUARD_JOIN or (win and rest):
+        return None, lines + [" ".join(rest)]
+    if shc:
+        return None, lines + rest[:1]
+    if exe == "su":  # its further words are arguments of the shell, no program
+        return None, lines
+    return (i if rest else None), lines
+
+
+def _guard_head(w, depth=0):
+    """The command a simple command runs, through its wrappers (_guard_wrapped). Returns (why, exe, index): the program
+    that finally runs and where it stands (the text rules look at the words after it)."""
+    s = _guard_skip(w, 0)
+    exe, idx = "", s
+    while s < len(w):
+        cur = _guard_exe(w[s])
+        why = _guard_rule(cur, w[s + 1:]) or (_guard_rule_sub(w[s], w[s + 1:]) if GUARD_SUB.search(w[s]) else None)
+        if why:
+            return why, cur, s
+        exe, idx = cur, s
+        if cur not in GUARD_WRAP:
+            break
+        nxt, lines = _guard_wrapped(cur, w, s + 1)
+        for line in lines:
+            why = guard_reason(line, depth + 1, True)
+            if why:
+                return why, cur, s
+        if nxt is None:
+            break
+        s = _guard_skip(w, nxt)
+    return None, exe, idx
+
+
+def _guard_code(exe, word, depth):
+    """2.615.0 E (#3758): a word of awk / sed / an interpreter that runs commands: system("reboot"), print | "sh",
+    os.system('git push -f'), subprocess.run(['git', 'push', '-f']), the e flag of sed (s/x/reboot/e)."""
+    if exe == "sed":
+        if re.search(r"(?:^|[;{}\s])e(?:[\s;}]|$)|/[gpiImM0-9]*e[gpiImM0-9w]*(?:[\s;}]|$)", word) and guard_suspicious(word):
+            return GUARD_NO + "sed code that runs a guarded command."
+        return None
+    if exe in ("awk", "gawk", "mawk", "nawk"):
+        if not re.search(r"system\s*\(|\||getline", word):
+            return None
+    elif not re.search(r"system|popen|exec|spawn|subprocess|`", word):
+        return None
+    for t in _guard_literals(word):
+        why = guard_reason(t, depth + 1, True)
+        if why:
+            return why
+    return None
 
 
 def _guard_words(w, fed, depth):
     """One simple command (its words): the command and what its wrappers run (_guard_head), and every word that is a
-    command line of its own (spaces, ; | $( ...; also the value of FOO="..." / alias x='...') -- except the text of
-    echo / printf and of a git message, as long as nothing on the line feeds a shell."""
-    why, exe = _guard_head(w)
+    command line of its own (spaces, ; | ...; also the value of FOO="..." / alias x='...') -- except the text of
+    echo / printf / grep / sed ... and of a git message, as long as nothing on the line feeds a shell."""
+    why, exe, s = _guard_head(w, depth)
     if why:
         return why
-    s = 0
-    while s < len(w) and (w[s] in GUARD_SKIP or re.match(r"[A-Za-z_][A-Za-z0-9_]*=", w[s])):
-        s += 1
+    if exe in GUARD_CODE or exe.startswith("python"):
+        for a in w[s + 1:]:
+            why = _guard_code(exe, a, depth)
+            if why:
+                return why
+    if fed and exe in ("echo", "printf") and s + 1 < len(w):  # echo git push -f | sh
+        why = guard_reason(" ".join(w[s + 1:]), depth + 1, True)
+        if why:
+            return why
     text = set()
     if not fed and s < len(w):
         if exe in GUARD_TEXT:
             text = set(range(s + 1, len(w)))
-        elif exe == "git":
-            text = {i + 1 for i in range(s + 1, len(w) - 1) if w[i] in ("-m", "--message")} | {
-                i for i in range(s + 1, len(w)) if w[i].startswith(("--message=", "-m")) and w[i] != "-m"}
+        elif exe == "git":  # -m MSG, -am / -qm / -sm / -anm MSG (2.615.0 E), -mMSG, -amMSG, --message[=MSG]
+            text = {i + 1 for i in range(s + 1, len(w) - 1) if w[i] == "--message" or re.fullmatch(r"-[A-Za-z]*m", w[i])} | {
+                i for i in range(s + 1, len(w)) if w[i].startswith("--message=") or re.fullmatch(r"-[A-Za-z]*m.+", w[i], re.S)}
     for i, a in enumerate(w):
-        if i in text and not re.search(r"`|\$\(", a):  # text -- but a substitution inside it runs
+        if i in text:
             continue
         m = re.match(r"[A-Za-z_][A-Za-z0-9_-]*=(.*)", a, re.S)
         for part in ([a] + ([m.group(1)] if m else [])):
@@ -2063,15 +2321,17 @@ def _guard_words(w, fed, depth):
     return None
 
 
-def guard_reason(cmd, depth=0):
+def guard_reason(cmd, depth=0, fed=False):
     """2.615.0 C (#3758): why a Bash command line is refused, or None. Errs on the side of refusing: unbalanced quotes are
-    read as plain words, a line nested deeper than the check goes is refused when it names a guarded command."""
+    read as plain words, a line nested deeper than the check goes (or longer than GUARD_MAX) is refused when it names a
+    guarded command. fed: the line's output goes to a shell (its text is no text)."""
     cmd = str(cmd or "")
     if not cmd.strip():
         return None
-    if depth > 8:
-        return (GUARD_NO + "a command nested too deeply to check that names a guarded command.") if guard_suspicious(cmd) else None
+    if depth > 8 or len(cmd) > GUARD_MAX:
+        return (GUARD_NO + "a command nested too deeply or too long to check that names a guarded command.") if guard_suspicious(cmd) else None
     cmd = _guard_heredocs(cmd.replace("\\\r\n", " ").replace("\\\n", " "))
+    cmd, inner = _guard_subst(cmd)
     try:
         toks = _guard_tokens(cmd)
     except ValueError:  # unbalanced quotes: the shell refuses too; the plain words give more refusals, never fewer
@@ -2091,12 +2351,40 @@ def guard_reason(cmd, depth=0):
         s2 = [x for x in s if x not in GUARD_SKIP]
         if s2:
             exes.add(_guard_exe(s2[0]))
-    fed = bool(exes & (GUARD_SHELLS | {"xargs", "ssh", "watch"})) or bool(GUARD_FEEDS.search(cmd) and "|" in cmd)
+    fed = fed or bool(exes & (GUARD_SHELLS | {"xargs", "ssh", "watch"})) or bool(GUARD_FEEDS.search(cmd) and "|" in cmd)
+    for body in inner:  # what a substitution runs (its output goes where the outer line sends it)
+        why = guard_reason(body, depth + 1, fed)
+        if why:
+            return why
     for s in segs:
         why = _guard_words(s, fed, depth)
         if why:
             return why
     return None
+
+
+def hook_settings(perm_relay=False, usage=True):
+    """2.44.0 (#1442) / 2.615.0 E (#3758, free function so that jobs get it too): the hooks of the settings file handed to a
+    Claude Code run with --settings (never the person's own settings): the PermissionRequest hook that asks in the chat
+    (perm_relay), the guard against dangerous commands (PreToolUse / Bash, unless KALMIDO_BLOCK_DANGEROUS=0) and the
+    usage hook (usage)."""
+    cmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --perm-hook'
+    s = {"hooks": {}}
+    if perm_relay:
+        s["hooks"]["PermissionRequest"] = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd,
+                                                                        "timeout": PERM_TIMEOUT_S + 60}]}]
+    if guard_on():  # 2.615.0 C (#3758): the guard against dangerous commands, also without perm_relay
+        gcmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --guard-hook'
+        s["hooks"]["PreToolUse"] = [{"matcher": "Bash", "hooks": [{"type": "command", "command": gcmd, "timeout": 30}]}]
+    # kalmido-capability: usage_hook (2.306.0, #2927)
+    # 2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
+    # Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
+    uh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_usage_hook.py")
+    if usage and os.environ.get("KALMIDO_USAGE_HOOK", "1").strip() != "0" and os.path.isfile(uh):
+        ucmd = [{"hooks": [{"type": "command", "command": f'"{sys.executable}" "{uh}"', "timeout": 30}]}]
+        s["hooks"]["Stop"] = ucmd
+        s["hooks"]["SubagentStop"] = ucmd
+    return s
 
 
 def guard_hook(argv):
@@ -2241,24 +2529,8 @@ class Runner:
 
     def hook_settings(self):
         """2.44.0 (#1442): the settings file handed to every run with --settings (never the person's own settings): the
-        PermissionRequest hook that asks in the chat. Further hooks of other parts go in here too."""
-        cmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --perm-hook'
-        s = {"hooks": {}}
-        if PERM_RELAY:
-            s["hooks"]["PermissionRequest"] = [{"matcher": "*", "hooks": [{"type": "command", "command": cmd,
-                                                                            "timeout": PERM_TIMEOUT_S + 60}]}]
-        if guard_on():  # 2.615.0 C (#3758): the guard against dangerous commands, also without perm_relay
-            gcmd = f'"{sys.executable}" "{os.path.abspath(__file__)}" --guard-hook'
-            s["hooks"]["PreToolUse"] = [{"matcher": "Bash", "hooks": [{"type": "command", "command": gcmd, "timeout": 30}]}]
-        # kalmido-capability: usage_hook (2.306.0, #2927)
-        # 2.306.0 E (#2927): the usage hook next to this file as Stop / SubagentStop hook ("Usage" and the usage limits in
-        # Kalmido); it reads KALMIDO_URL / KALMIDO_TOKEN from the run's environment. KALMIDO_USAGE_HOOK=0 switches it off.
-        uh = os.path.join(os.path.dirname(os.path.abspath(__file__)), "claude_usage_hook.py")
-        if os.environ.get("KALMIDO_USAGE_HOOK", "1").strip() != "0" and os.path.isfile(uh):
-            ucmd = [{"hooks": [{"type": "command", "command": f'"{sys.executable}" "{uh}"', "timeout": 30}]}]
-            s["hooks"]["Stop"] = ucmd
-            s["hooks"]["SubagentStop"] = ucmd
-        return s
+        PermissionRequest hook that asks in the chat. Further hooks of other parts go in here too (see hook_settings)."""
+        return hook_settings(PERM_RELAY)
 
     def child_env(self, uid, tid):
         """2.44.0 (#1442): the environment of one run (the hook finds the runner through it)."""

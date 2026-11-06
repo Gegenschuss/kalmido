@@ -9,6 +9,8 @@
    leaves it out
  - the hook's answer is Claude Code's PreToolUse format (deny + reason); an allowed command or another tool: no output
  - the hook's own failure refuses only a command that names a guarded command (fail closed for those, open for the rest)
+ - 2.615.0 E (#3758, Fable review): each confirmed finding as a case (substitutions inside the words, jobs get the hook,
+   quoted search text, git commit -am, wrapper options with values, git -c aliases / remote.*.push, very long input)
 usage: p2615_c_guard_test.py"""
 import contextlib
 import importlib.util
@@ -17,6 +19,8 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
+import time
 
 from kt import check, done  # noqa: E402
 
@@ -151,6 +155,172 @@ for c in ALLOWED:
 check("force" in ar.guard_reason("git push -f") and "tag" in ar.guard_reason("git tag -d v1")
       and "prune" in ar.guard_reason("docker image prune") and "shutting down" in ar.guard_reason("reboot"),
       "each refusal names what was refused")
+
+# ---- 2.615.0 E (#3758): the findings of the Fable review, each with its case (without the fix every one of them is wrong)
+REFUSED_E = [
+    # 1: $( ) / backticks in the middle of the words: one word of the outer command, its text checked on its own
+    "git push origin $(git branch --show-current) --force",
+    "git push origin `git branch --show-current` --force",
+    "git push origin $(cat .b) -f",
+    "git push origin HEAD:$(git branch --show-current) --force-with-lease",
+    "git -C $(pwd) push -f",
+    "git tag $(cat v) -d",
+    "docker $(echo system) prune",
+    "$(which git) push -f",
+    "$(echo reboot)",
+    "diff <(git push -f) x",
+    "git commit -am \"$(git push -f)\"",
+    "echo \"$(echo git push -f)\" | sh",
+    "sh -c \"$(cat <<EOF\ngit push -f\nEOF\n)\"",
+    # 3: code that runs a command stays refused (awk system(), sed e flag, interpreters)
+    "awk 'BEGIN{system(\"reboot\")}'",
+    "awk 'BEGIN{print \"reboot\" | \"sh\"}'",
+    "sed 's/x/reboot/e' f",
+    "perl -e 'system(\"reboot\")'",
+    "python3 -c \"import subprocess; subprocess.run(['git', 'push', '-f'])\"",
+    "echo git push -f | sh",
+    # 5: the program after a wrapper's options (with values), command lines of wrappers
+    "sudo -u root -g wheel git push -f",
+    "timeout -s KILL 60 git push -f",
+    "ssh -p 22 -i key host git push -f",
+    "xargs -n 1 -I {} git push -f",
+    "su -c reboot",
+    "su root -c 'git push -f'",
+    "env -S 'git push -f'",
+    "watch -n 5 git push -f",
+    "eval git push -f",
+    "bash -lc reboot",
+    "sudo -E bash -c 'docker system prune -af'",
+    "nice -n 5 timeout 9 sudo git push -f",
+    "busybox reboot",
+    "cmd /c shutdown /r",
+    "pwsh -NoProfile -Command Restart-Computer",
+    "powershell -ExecutionPolicy Bypass Restart-Computer",
+    "systemctl -H host reboot",
+    "sudo systemctl start reboot.target",
+    "sudo systemctl isolate poweroff.target",
+    # 6: git settings that turn into a force-push / tag change
+    "git -c alias.p='push -f' p",
+    "git -c remote.origin.push=+main:main push",
+    "git -c alias.x='!reboot' x",
+    "git config alias.p 'push -f'",
+    "git config --global alias.t 'tag -d'",
+    "git config remote.origin.push +main:main",
+    # 8: very long input with unbalanced quotes: not taken apart, refused because it names a guarded command
+    "git push -f \"" + "a " * 200000,
+]
+ALLOWED_E = [
+    # 3: search / text tools: their quoted words are text
+    "grep -rn 'git push -f' docs/",
+    "grep -n \"git push --force\" mcp/agent_run.py",
+    "rg 'docker system prune' docs/",
+    "sed -n '/reboot/p' log",
+    "awk 'BEGIN{system(\"echo hi\")}'",
+    "jq '.reboot' x.json",
+    "test -f reboot",
+    "python3 -c \"import subprocess; subprocess.run(['git', 'status'])\"",
+    # 4: git commit -am / -qm / -sm / -anm, git tag -am: the next word is the message
+    "git commit -am 'reboot handling'",
+    "git commit -qm 'reboot'",
+    "git commit -sm \"git push -f is refused\"",
+    "git commit -anm 'x reboot y'",
+    "git tag -am 'reboot release' v2",
+    "git commit -m \"$(cat <<'EOF'\nDon't reboot\nEOF\n)\"",
+    # 5: words after a wrapper are no programs, a pattern / path is no program
+    "find . -name '*.sh' | xargs grep -l reboot",
+    "ssh host grep reboot /var/log/syslog",
+    "sudo systemctl status halt",
+    "sudo cat /sbin/reboot",
+    "awk '/reboot/ {print}' file",
+    "sudo ls /etc/init 0",
+    "sudo -u www systemctl restart nginx",
+    "bash -c 'git status'",
+    "cmd /c dir",
+    # 1: an ordinary substitution
+    "git push origin $(git branch --show-current)",
+    "head -n 5 <(git log)",
+    "$(which python3) script.py 0",
+    # 6: harmless git settings
+    "git -c alias.co=checkout co main",
+    "git config alias.st status",
+    "git -c remote.origin.push=refs/heads/main:refs/heads/main push",
+]
+for c in REFUSED_E:
+    t0 = time.time()
+    why = ar.guard_reason(c)
+    check(bool(why) and why.startswith(ar.GUARD_NO), f"E refused: {c[:100]!r} -> {why!r}")
+    check(time.time() - t0 < 10, f"E in time: {c[:60]!r} {time.time() - t0:.1f} s")
+for c in ALLOWED_E:
+    why = ar.guard_reason(c)
+    check(why is None, f"E allowed: {c!r} -> {why!r}")
+# 8: a long line (over GUARD_MAX) with unbalanced quotes is answered at once, also when it names nothing guarded
+for c, refused in (("git push \"" + "x " * 420000, True), ("echo \"" + "x " * 420000, False)):
+    t0 = time.time()
+    why = ar.guard_reason(c)
+    check(bool(why) == refused and time.time() - t0 < 5, f"long input ({len(c)} bytes): refused {refused} in {time.time() - t0:.1f} s")
+# the whole table of C again: no form refused before passes now (REFUSED above runs on the fixed code too)
+check(all(ar.guard_reason(c) for c in REFUSED), "every command line of the C table stays refused")
+
+# 2: a job (agent_job.py) gets the guard as its own settings file; KALMIDO_BLOCK_DANGEROUS=0: none; never with its own --settings
+JOB = os.path.join(HERE, "..", "mcp", "agent_job.py")
+jspec = importlib.util.spec_from_file_location("agent_job_guard", JOB)
+aj = importlib.util.module_from_spec(jspec)
+jspec.loader.exec_module(aj)
+jtmp = tempfile.mkdtemp(prefix="kalmido-p2615e-")
+os.environ.pop("KALMIDO_BLOCK_DANGEROUS", None)
+os.environ.pop("KALMIDO_AGENT_PROFILE", None)
+base = ar.profile_args("claude", ["claude"])
+extra = aj.job_settings(ar, {"cmd": ["claude"]}, base, jtmp)
+jhs = json.load(open(extra[1], encoding="utf-8")) if extra[:1] == ["--settings"] else {}
+check(extra[:1] == ["--settings"] and extra[1].startswith(jtmp) and "--guard-hook" in json.dumps(jhs.get("hooks", {}).get("PreToolUse"))
+      and "PermissionRequest" not in jhs.get("hooks", {}), f"job: settings file in the job folder with the PreToolUse guard {extra} {jhs}")
+check(aj.job_settings(ar, {"cmd": ["claude", "--settings", "x.json"]}, base + ["--settings", "x.json"], jtmp) == [],
+      "job with its own --settings: none added")
+check(aj.job_settings(ar, {"cmd": ["codex"]}, ["codex", "exec"], jtmp) == [], "job of another profile: none")
+os.environ["KALMIDO_BLOCK_DANGEROUS"] = "0"
+check(aj.job_settings(ar, {"cmd": ["claude"]}, base, jtmp) == [], "job with KALMIDO_BLOCK_DANGEROUS=0: no settings")
+os.environ.pop("KALMIDO_BLOCK_DANGEROUS", None)
+check(ar.hook_settings(True, usage=False)["hooks"].keys() >= {"PermissionRequest", "PreToolUse"}
+      and ar.Runner.hook_settings(None)["hooks"].get("PreToolUse") == ar.hook_settings(False)["hooks"]["PreToolUse"],
+      "hook_settings is a free function; the chat runs use the same one")
+
+
+# the start command of a real job run: a fake claude records its arguments (no API: the calls fail quietly)
+def job_run(block):
+    sd = tempfile.mkdtemp(prefix="kalmido-p2615e-job-")
+    binp = os.path.join(sd, "bin")
+    os.makedirs(binp)
+    fake = os.path.join(binp, "claude")
+    rec = os.path.join(sd, "args.json")
+    with open(fake, "w") as f:
+        f.write("#!" + sys.executable + "\n" + "import json, sys\n"
+                f"json.dump(sys.argv[1:], open({rec!r}, 'w'))\n"
+                "sys.stdin.readline()\n"
+                "print(json.dumps({'type': 'result', 'result': 'done', 'session_id': 's1'}), flush=True)\n")
+    os.chmod(fake, 0o755)
+    jd = os.path.join(sd, "jobs", "1")
+    os.makedirs(jd)
+    with open(os.path.join(jd, "brief.txt"), "w") as f:
+        f.write("Do nothing.")
+    with open(os.path.join(jd, "job.json"), "w") as f:
+        json.dump({"id": 1, "title": "t", "cmd": [fake], "cwd": sd, "state": "queued", "timeout_s": 120}, f)
+    env = dict(os.environ, KALMIDO_STATE_DIR=sd, KALMIDO_URL="http://127.0.0.1:9", KALMIDO_TOKEN="abk_" + "z" * 30,
+               KALMIDO_BLOCK_DANGEROUS=block)
+    env.pop("KALMIDO_AGENT_PROFILE", None)
+    subprocess.run([sys.executable, JOB, "_run", "1"], env=env, capture_output=True, text=True, timeout=120)
+    args = json.load(open(rec)) if os.path.exists(rec) else None
+    hs = {}
+    if args and "--settings" in args:
+        hs = json.load(open(args[args.index("--settings") + 1], encoding="utf-8"))
+    return args, hs
+
+
+args, hs = job_run("1")
+check(args is not None and "--settings" in args and "--guard-hook" in json.dumps((hs.get("hooks") or {}).get("PreToolUse")),
+      f"a job's start command carries the settings with the PreToolUse guard: {args} {hs}")
+args, hs = job_run("0")
+check(args is not None and "--settings" not in args, f"KALMIDO_BLOCK_DANGEROUS=0: a job starts without the settings: {args}")
+
 
 # ---- the per-run settings: PreToolUse / Bash, also without the permission relay; switched off with the variable
 for relay in (True, False):

@@ -691,9 +691,10 @@ chat messages of one person that arrive together: one run). It does what a hoste
 - **Dangerous commands refused** (2.615.0, Claude Code only): the same run settings carry a `PreToolUse` hook for Bash that
   refuses force-push, deleting remote branches or tags, deleting or moving tags, `docker ... prune` and reboot / shutdown,
   whatever the allow list or the permission mode say (also `bypassPermissions`); it reads chains, `$( )`, `sh -c`, `ssh`,
-  `sudo` and the like. On by default, also without the permission questions; `KALMIDO_BLOCK_DANGEROUS=0` in `agent.env`
-  (Windows: the same key in the env file) switches it off. What it cannot see (scripts written first, git aliases, other
-  tools): [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
+  `sudo` and the like. Jobs (`agent_job.py`) get it too, as a settings file in the job's folder (2.615.0 E). On by
+  default, also without the permission questions; `KALMIDO_BLOCK_DANGEROUS=0` in `agent.env`
+  (Windows: the same key in the env file) switches it off. What it cannot see (scripts written first, variables as
+  commands, other tools): [AGENT-SECURITY.md](AGENT-SECURITY.md#4-claude-code-project-settings).
 - **One conversation per chat** (2.44.0, Claude Code only): the runs of one person's chat go on in the same
   conversation (`--resume`) instead of starting fresh; task events and other commands still run fresh, and every person
   has a conversation of their own. A new one starts at the limits of the agent's runtime section *Interim summary*

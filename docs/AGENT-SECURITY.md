@@ -347,40 +347,55 @@ commands (they have no such hook); `KALMIDO_PERM_RELAY=0` switches it off. What 
   state folder and the starter files.
 
 **Dangerous commands refused (2.615.0, `dangerous_guard`).** In event mode with Claude Code the same per-run settings
-file also carries a `PreToolUse` hook for Bash (`agent_run.py --guard-hook`). It refuses, before the command runs and
+file also carries a `PreToolUse` hook for Bash (`agent_run.py --guard-hook`). Jobs (`agent_job.py`) get the same hook
+as a settings file of their own in the job's folder (`run-settings.json`, only the guard: no permission questions, no
+usage hook; not when the job command has its own `--settings`). It refuses, before the command runs and
 **whatever the allow list or the permission mode say** (also `acceptEdits`, `bypassPermissions`, `dontAsk` and a
 command the person allowed in the chat), these command lines:
 
 - force-push: `git push -f`, `--force`, `--force-with-lease`, `--mirror`, `--prune`, a `+refspec`;
 - deleting remote branches or tags: `git push --delete` / `-d`, `git push origin :ref`;
 - deleting or moving tags: `git tag -d` / `--delete` / `-f`, `git update-ref` on `refs/tags/...`;
+- git settings that turn into one of these: an alias for `push` / `tag` / `update-ref` or a `!` alias with a refused
+  command (`git -c alias.p='push -f' p`, `git config alias.p 'push -f'`), `remote.*.push` with a `+refspec` or `:ref`;
 - `docker` / `podman` / `nerdctl` `... prune` (system, image, volume, container, builder, network, buildx);
 - restarting or shutting down the computer: `reboot`, `poweroff`, `halt`, `shutdown`, `kexec`, `systemctl` /
-  `loginctl reboot | poweroff | halt | kexec | soft-reboot` (also `start reboot.target`), `init 0` / `6`,
+  `loginctl reboot | poweroff | halt | kexec | soft-reboot` (also `start reboot.target`; `status halt` is a look and
+  passes), `init 0` / `6`,
   `Restart-Computer` / `Stop-Computer`.
 
 It is **on** by default for Claude Code (also with `KALMIDO_PERM_RELAY=0`); `KALMIDO_BLOCK_DANGEROUS=0` in the env file
 switches it off (both launchers pass the env file on). The agent gets Claude Code's *deny* with the reason and the
 instruction not to look for another way but to name the refused step in its answer; the person can run it themselves.
 
-How it reads a command: like a shell splits it (quotes, `;` `&&` `||` `|` `&` and new lines, `( )` / `{ }`, `$( )` and
-backticks, `if ... then`), through wrappers in front (`sudo -u x`, `env`, `VAR=1`, `timeout 60`, `nice`, `nohup`,
-`xargs`, `ssh host ...`, `sh -c "..."`, `bash -c`, `eval`), the value of `alias x='...'` / `FOO="..."`, and a heredoc
+How it reads a command: like a shell splits it (quotes, `;` `&&` `||` `|` `&` and new lines, `( )` / `{ }`, `if ...
+then`); a `$( )`, backtick or `<( )` stays ONE word of the outer command (`git push origin $(git branch --show-current)
+--force` keeps its `--force`) and its own text is checked as well; a program that is itself a substitution
+(`$(which git) push -f`) gets the rules of the guarded programs. Through wrappers in front it takes the first word after
+their options as the program (`sudo -u x`, `env`, `VAR=1`, `timeout 60`, `nice -n 5`, `nohup`, `xargs -n 1`, `ssh -p 22
+host ...`), so `sudo cat /sbin/reboot` or `xargs grep -l reboot` pass; command lines of wrappers are checked as such
+(`sh -c "..."`, `bash -lc`, `su -c`, `env -S`, `eval ...`, `ssh host ...`, `watch ...`, `cmd /c`, `pwsh -Command`), the value of `alias x='...'` / `FOO="..."`, and a heredoc
 that a shell, `ssh`, `sudo` or an interpreter reads (`bash <<EOF`, `cat <<EOF | sh`); options in any order and joined
 short options (`-uf`). It errs on the side of refusing: the words of a line with unbalanced quotes are read plainly, and
 a quoted text that is itself a command line counts as one (`echo "please reboot"` passes, but `echo 'git push -f' | sh`
-and `python3 -c "import os; os.system('git push -f')"` are refused). Text stays text: the words of `echo` / `printf`, a
-git message (`-m`, `--message`) and a heredoc read by `cat` / `tee` / `git commit -F -`, as long as nothing on the same
-line hands them to a shell. When the check itself fails (a bug, unreadable input), it refuses a command that names one of
+and `python3 -c "import os; os.system('git push -f')"` are refused). Text stays text: the words of `echo` / `printf` and of
+search and text tools (`grep`, `rg`, `ag`, `ack`, `sed`, `awk`, `jq`, `cut`, `tr`, `sort`, `wc`, `head`, `tail`, `less`,
+`diff`, `test`: `grep -rn 'git push -f' docs/` passes), a git message (`-m`, `--message`, also in a bundle: `-am`,
+`-qm`, `-sm`, `-anm`) and a heredoc read by `cat` / `tee` / `git commit -F -`, as long as nothing on the same
+line hands them to a shell (`echo git push -f | sh` is refused). Code that runs commands is no text: a quoted command
+in awk `system("...")` / `print | "sh"`, in `os.system('...')` / `subprocess.run(['git', 'push', '-f'])` of an
+interpreter, and a sed `e` flag that names a guarded command. A command line longer than 256 KB is not taken apart
+(that would take too long for the hook); it is refused when it names a guarded program. When the check itself fails (a bug, unreadable input), it refuses a command that names one of
 the guarded programs and lets any other pass: an error in the guard must not stop every step of the agent, nor let a
 dangerous one through.
 
 What it does **not** cover (state it to the people you run the agent for):
 
-- a script the agent writes first and runs later (`cat > x.sh`, then `sh x.sh`), a git alias or config
-  (`git config alias.p "push -f"`, a `+` refspec in `remote.*.push`), a variable as command (`$GIT push -f`), code inside
-  another language beyond the simple `os.system('...')` text (`subprocess.run(["git", "push", "-f"])`), a Makefile or
-  npm script target;
+- a script the agent writes first and runs later (`cat > x.sh`, then `sh x.sh`), a git alias or setting that is
+  already in a config file or comes through `GIT_CONFIG_*` variables, a variable as command (`$GIT push -f`), the output
+  of a substitution as the dangerous word itself (`docker system $(echo prune)`), code inside another language whose
+  command is not a quoted text (`subprocess.run(cmd)`), a wrapper option with a value the guard does not know (then the
+  value is taken as the program), a Makefile or npm script target; `--help` of a guarded command is refused too;
 - other tools than Bash: an MCP server or a plugin of the person that runs commands, or the PowerShell tool;
 - a command with its own `--settings` (the runner then adds no settings file, see above) and other profiles (Codex CLI,
   generic commands have no such hook);

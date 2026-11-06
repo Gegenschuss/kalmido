@@ -838,6 +838,23 @@ def limit_wait(result, stderr_text, resets_at):
     return max(300.0, min(wait, 18000.0))
 
 
+# kalmido-capability: dangerous_guard (2.615.0, #3758)
+def job_settings(ar, j, base, d):
+    """2.615.0 E (#3758): ["--settings", <job folder>/run-settings.json] for a Claude Code job without its own --settings:
+    the guard against dangerous commands (agent_run.hook_settings: PreToolUse / Bash, KALMIDO_BLOCK_DANGEROUS=0 = off),
+    never the person's own settings. No permission relay (nobody answers it for a job) and no usage hook (the job's
+    usage stays as before); [] for other profiles, without hooks or when agent_run.py cannot be loaded."""
+    if not ar or ar.agent_profile(j["cmd"]) != "claude" or not ar.claude_native(j["cmd"]) or \
+            any(a == "--settings" or a.startswith("--settings=") for a in base):
+        return []
+    hs = ar.hook_settings(perm_relay=False, usage=False)
+    if not hs["hooks"]:
+        return []
+    f = os.path.join(d, "run-settings.json")
+    write_json(f, hs)
+    return ["--settings", f]
+
+
 def cmd_run(argv):
     j = load(argv[0])
     if not j:
@@ -857,6 +874,7 @@ def cmd_run(argv):
     streaming = profile == "claude" and "claude" in os.path.basename(base[0]).lower()
     if streaming and "--input-format" not in base:
         base += ["--input-format", "stream-json"]
+    base += job_settings(ar, j, base, d)  # 2.615.0 E (#3758): the guard against dangerous commands, as in the chat runs
     env = dict(os.environ, KALMIDO_OUTBOX=outbox, KALMIDO_JOB_ID=str(j["id"]))
     env.pop("KALMIDO_JOB_CMD", None)  # a job does not start jobs
     exe = shutil.which(base[0]) or base[0]
