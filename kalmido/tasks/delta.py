@@ -348,7 +348,10 @@ def state_delta():
         evlinks=ev_links(c, uid, sorted(seen)) if seen and events_on(c, uid) else {},
         tcontacts=task_contacts(c, uid, seen) if seen else {},
         timer=time_running(c, uid) if tall else None,
-        time_totals=time_totals(c, uid) if tall else {},
+        # 2.579.0 (#4184): a client that mixes (tt=1, liveparts.js) gets the totals of the changed tasks only, with their ids
+        # (time_ids: drop what is not in time_totals); without tt=1 every total as before (older clients replace them)
+        **(dict(time_totals=time_totals(c, uid, ids) if ids else {}, time_ids=sorted(ids))
+           if tall and request.args.get("tt") == "1" else {"time_totals": time_totals(c, uid) if tall else {}}),
         time_lists=time_list_totals(c, uid, own=True) if tall else {},  # 2.144.5 C (#1523)
         **(dl_side(c, uid) if request.args.get("side") == "1" else {}),  # 2.280.0 A (#3109)
         # 2.369.2 (#3136): a client with the start set (lz=1) takes the counts of the touched lists it has not loaded

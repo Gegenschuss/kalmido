@@ -207,8 +207,9 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
             rows = [r for r in rows if r["list_id"] not in pl or r["id"] in pv]
     ids = {r["id"] for r in rows}
     # 2.65.0 (#1505): files, comments, field values and AI usage read only the rows of these tasks (one array parameter, the
-    # tables' task_id indexes) instead of every row of the instance; the Python filters on ids stay (same result). The
-    # dependency queries stay as they were (with the array the planner picks a far slower plan)
+    # tables' task_id indexes) instead of every row of the instance; the Python filters on ids stay (same result).
+    # 2.579.0 (#4184): the dependency queries now too (were left whole for a slower plan with the array; the array now only
+    # limits the task_deps side: its primary key / blocker index, tests/p2579_b_api_test.py prints both EXPLAINs)
     idl = st_ids(sorted(ids))
     tags = tags_for(c, ids)
     ltags = ltags_for(c, ids) if ids else {}
@@ -270,13 +271,14 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
         fx_fill(c, fvs, {r["id"]: r["list_id"] for r in rows if r["list_id"]})  # 2.43.0 (#1328): formula fields, computed
         for r in c.execute(f"""SELECT d.task_id, d.blocker_id, b.list_id FROM task_deps d JOIN tasks b ON b.id=d.blocker_id
                               JOIN tasks w ON w.id=d.task_id
-                              WHERE b.status=0 AND b.deleted_at IS NULL AND b.list_id IN {PROJ_SQL} AND w.list_id IN {PROJ_SQL}"""):
+                              WHERE b.status=0 AND b.deleted_at IS NULL AND b.list_id IN {PROJ_SQL} AND w.list_id IN {PROJ_SQL}
+                              AND d.task_id = ANY(CAST(? AS BIGINT[]))""", (idl,)):
             if r["task_id"] in ids:
                 blk.setdefault(r["task_id"], []).append((r["blocker_id"], r["list_id"]))
         for r in c.execute(f"""SELECT d.blocker_id, COUNT(*) AS n FROM task_deps d JOIN tasks t ON t.id=d.task_id
                               JOIN tasks b ON b.id=d.blocker_id
                               WHERE t.status=0 AND t.deleted_at IS NULL AND t.list_id IN {PROJ_SQL} AND b.list_id IN {PROJ_SQL}
-                              GROUP BY d.blocker_id"""):
+                              AND d.blocker_id = ANY(CAST(? AS BIGINT[])) GROUP BY d.blocker_id""", (idl,)):
             if r["blocker_id"] in ids:
                 bing[r["blocker_id"]] = r["n"]
     vis = vis_ids(c, uid) if blk and uid else set()

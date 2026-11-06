@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, APP_NAME, APP_VERSION, PUBLIC_URL, SECRET_KEY
-from ..core.pg import insert_id
+from ..core.pg import insert_id, st_ids
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, connect, db, err, iso, now_utc, parse_iso
 from ..accounts.session import GATE, me
@@ -879,10 +879,14 @@ def git_code_for(c, ids):
     ids = set(ids)
     if not ids or not c.execute("SELECT 1 FROM git_links LIMIT 1").fetchone():
         return {}
-    out = {}
+    # 2.579.0 (#4184): only the links of these tasks (git_links' primary key starts with task_id), was: every link of the
+    # instance, filtered here. The pull request is found by its conn_id (the first column of git_prs' key) from these few
+    # links; CAST(p.number AS TEXT) stays (ref is text for commits too, casting it to a number could fail)
+    out, idl = {}, st_ids(sorted(ids))
     for x in c.execute("""SELECT l.task_id, p.*, k.owner, k.repo, k.provider FROM git_links l JOIN git_conns k ON k.id=l.conn_id
                           JOIN git_prs p ON p.conn_id=l.conn_id AND CAST(p.number AS TEXT)=l.ref WHERE l.kind='pr'
-                          ORDER BY p.state!='open', p.updated_at DESC, p.number DESC"""):
+                          AND l.task_id = ANY(CAST(? AS BIGINT[]))
+                          ORDER BY p.state!='open', p.updated_at DESC, p.number DESC""", (idl,)):
         if x["task_id"] in ids:
             lst = out.setdefault(x["task_id"], {"prs": [], "commits": []})["prs"]
             if len(lst) < GIT_TASK_PRS:
@@ -890,7 +894,8 @@ def git_code_for(c, ids):
                             "state": x["state"], "ci": x["ci"] or None, "author": x["author"], "url": x["url"], "branch": x["head_ref"],
                             "merged_at": x["merged_at"], "tag": git_tag_out(x["tag"])})  # 2.151.0 A (#2558): its first version tag
     for x in c.execute("""SELECT l.task_id, m.*, k.owner, k.repo FROM git_links l JOIN git_conns k ON k.id=l.conn_id
-                          JOIN git_commits m ON m.conn_id=l.conn_id AND m.sha=l.ref WHERE l.kind='commit' ORDER BY m.at DESC"""):
+                          JOIN git_commits m ON m.conn_id=l.conn_id AND m.sha=l.ref WHERE l.kind='commit'
+                          AND l.task_id = ANY(CAST(? AS BIGINT[])) ORDER BY m.at DESC""", (idl,)):
         if x["task_id"] in ids:
             lst = out.setdefault(x["task_id"], {"prs": [], "commits": []})["commits"]
             if len(lst) < GIT_TASK_COMMITS:

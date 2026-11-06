@@ -556,8 +556,9 @@ def ev_links(c, uid, task_ids):
         return {}
     q = ",".join("?" * len(ids))
     tset, out = set(task_ids), {}
+    # 2.579.0 (#4184): only the events of these tasks (events_task index), was: every event with a task of my calendars
     for r in c.execute(f"SELECT id, task_id, title, start, all_day FROM events WHERE cal_id IN ({q}) AND task_id IS NOT NULL "
-                       "AND deleted_at IS NULL", list(ids)):
+                       "AND deleted_at IS NULL AND task_id = ANY(CAST(? AS BIGINT[]))", [*ids, st_ids(sorted(tset))]):
         if r["task_id"] in tset:
             out.setdefault(r["task_id"], []).append({"id": r["id"], "title": r["title"], "start": r["start"], "all_day": bool(r["all_day"])})
     return out

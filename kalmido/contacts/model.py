@@ -12,7 +12,7 @@ from datetime import date, datetime, timedelta
 from flask import has_request_context
 
 from ..core.i18n import lang, N_, tr
-from ..core.pg import insert_id, like_escape, system_ctx
+from ..core.pg import insert_id, like_escape, st_ids, system_ctx
 from ..core.db import bump, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import acx_org_ok, collab_all, Denied, list_role, org_trips_hidden, task_visible, WRITE_ROLES
@@ -1092,8 +1092,12 @@ def task_contacts(c, uid, task_ids=None):
         return {}
     q = ",".join("?" * len(ids))
     out = {}
+    # 2.579.0 (#4184): with task_ids only their links (contact_tasks_task index), was: every link of the books, filtered here
+    one, extra = ("", []) if task_ids is None else (" AND l.task_id = ANY(CAST(? AS BIGINT[]))", [st_ids(sorted(task_ids))])
+    if task_ids is not None and not task_ids:
+        return out
     for r in c.execute(f"""SELECT l.task_id, l.contact_id, l.kind, k.fn, k.org FROM contact_tasks l JOIN contacts k ON k.id=l.contact_id
-                           WHERE k.book_id IN ({q}) AND k.deleted_at IS NULL ORDER BY l.added_at""", list(ids)):
+                           WHERE k.book_id IN ({q}) AND k.deleted_at IS NULL{one} ORDER BY l.added_at""", [*ids, *extra]):
         if task_ids is None or r[0] in task_ids:
             out.setdefault(r[0], []).append({"contact_id": r[1], "kind": r[2], "fn": r[3] or r[4]})
     return out

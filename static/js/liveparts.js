@@ -129,7 +129,7 @@ async function lpDelta(v, ch, n, since) {
   const light = ch.filter(k => LP_LIGHT.has(k)), follow = since !== undefined, wside = follow || light.length > 0;
   const w0 = S.wseq || 0;
   let j;
-  try { j = await api('GET', `/api/state/delta?since=${follow ? since : S.v}&lean=1${wside ? '&side=1' : ''}${S.lz ? '&lz=1' : ''}`); } catch { return false; }  // 2.369.2 (#3136): + lz
+  try { j = await api('GET', `/api/state/delta?since=${follow ? since : S.v}&lean=1${wside ? '&side=1' : ''}${S.lz ? '&lz=1' : ''}&tt=1`); } catch { return false; }  // 2.369.2 (#3136): + lz
   if (!j || j.full !== false || (S.wseq || 0) !== w0 || OUT.q.length) return false;  // a write of mine overtook it: the full way
   if (light.length && !follow) lpLive(v, light, n, true);  // comments of the open task, the open chat, news (their own fetches)
   S.lpN.delta++;
@@ -148,7 +148,11 @@ async function lpDelta(v, ch, n, since) {
     const m = S[k] || (S[k] = {});
     for (const id of changed) { if (src[id]) m[id] = src[id]; else delete m[id]; }
   }
-  if (j.timer !== undefined) { S.timer = j.timer || null; S.timeTotals = j.time_totals || {}; S.timeLists = j.time_lists || {}; }
+  if (j.timer !== undefined) {  // 2.579.0 (#4184): time_ids = the delta has the totals of these tasks only: mix, not replace
+    S.timer = j.timer || null; S.timeLists = j.time_lists || {};
+    if (Array.isArray(j.time_ids)) { const m = S.timeTotals || (S.timeTotals = {}); for (const id of j.time_ids) delete m[id]; Object.assign(m, j.time_totals || {}); }
+    else S.timeTotals = j.time_totals || {};
+  }
   S.v = Math.max(S.v, j.v);
   lpCacheSoon();
   if (!changed.size) {

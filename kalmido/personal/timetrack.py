@@ -9,7 +9,7 @@ from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import IntegrityError, insert_id, Row
-from ..core.pg import write_lock  # 2.528.0 (#4305)
+from ..core.pg import st_ids, write_lock  # 2.528.0 (#4305); 2.579.0 (#4184): + st_ids
 from ..core.conflict import Conflict  # 2.528.0 (#4305)
 from ..core.i18n import dec_comma, lang, LANGS, tr
 from ..core.db import body, bump, db, err, gsetting, iso, iso_ms, local_now, now_utc, parse_iso, usettings
@@ -271,12 +271,15 @@ def time_running(c, uid):
     return entry_out(r, uid, vis_ids(c, uid), now_utc(), 0)
 
 
-def time_totals(c, uid):
-    """{task_id: [seconds of everyone I can see, my seconds]} of finished entries (the client adds my running timer)."""
+def time_totals(c, uid, task_ids=None):
+    """{task_id: [seconds of everyone I can see, my seconds]} of finished entries (the client adds my running timer).
+    2.579.0 (#4184): task_ids = only these tasks (the delta: its changed tasks, the time_task index), same rights."""
     out = {}
+    one, extra = ("", ()) if task_ids is None else (" AND task_id = ANY(CAST(? AS BIGINT[]))", (st_ids(sorted(task_ids)),))
     for r in c.execute(f"""SELECT task_id, SUM(seconds) AS s, SUM(CASE WHEN user_id=? THEN seconds ELSE 0 END) AS m
-                           FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL
-                             AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} GROUP BY task_id""", (uid, uid, uid, uid)):
+                           FROM time_entries WHERE task_id IS NOT NULL AND "end" IS NOT NULL{one}
+                             AND (user_id=? OR list_id IN {vis_sql()}) AND {evis(c, uid, "")} AND {th_sql("")} GROUP BY task_id""",
+                       (uid, *extra, uid, uid, uid)):
         if r["s"]:
             out[r["task_id"]] = [r["s"], r["m"]]
     return out
