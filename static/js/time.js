@@ -247,8 +247,32 @@ function targetOptions(tid, lid) {
     return `<optgroup label="${esc(lname(l))}"><option value="l:${l.id}" ${!tid && lid === l.id ? 'selected' : ''}>${esc(tr('(whole project, no task)'))}</option>${ts.flatMap(sub).map(t => `<option value="t:${t.id}" ${t.id === tid ? 'selected' : ''}>${' '.repeat(depthOf(t))}${esc(t.title)}</option>`).join('')}</optgroup>`;
   }).join('');
 }
+// 2.576.0 (#4764): an entry as its dialog sees it (objsave.js saveDialog compares these keys): the target, start / end to the
+// minute, note, billable; teSrv turns the changed ones into the PATCH body with _prev = what the dialog showed (the server's
+// field check, timetrack.py oxb_time_prev)
+const teMin = v => { if (!v) return ''; const d = new Date(v); if (isNaN(d)) return ''; d.setSeconds(0, 0); return d.toISOString(); };
+const teView = x => ({target: x.task_id ? 't:' + x.task_id : 'l:' + x.list_id, start: teMin(x.start), ...(x.running ? {} : {end: teMin(x.end)}), note: x.note || '', billable: x.billable !== false, updated_at: x.updated_at});
+function teSrv(b, now, x) {
+  const o = {};
+  if ('target' in b) { const [k, v] = String(b.target).split(':'); Object.assign(o, k === 't' ? {task_id: +v} : {list_id: +v}); }
+  if ('start' in b || 'end' in b) { o.start = now.start; if ('end' in now) o.end = now.end; }
+  if ('note' in b) o.note = b.note;
+  if ('billable' in b) o.billable = b.billable;
+  o._prev = Object.fromEntries(Object.keys(o).map(k => [k, k === 'billable' ? x.billable !== false : x[k] ?? null]));
+  return o;
+}
+// what a conflict's own input (the dialog's keys) makes of the server's entry: the dialog is drawn from it
+function teOver(x, mine) {
+  const o = {...x};
+  if (mine.target) { const [k, v] = String(mine.target).split(':'); Object.assign(o, k === 't' ? {task_id: +v, list_id: taskById(+v)?.list_id ?? x.list_id} : {task_id: null, list_id: +v}); }
+  for (const k of ['start', 'end', 'note', 'billable']) if (k in mine && mine[k] !== '') o[k] = mine[k];
+  return o;
+}
 // new entry (e = null; preset {task_id} | {list_id}) or edit my entry (a running timer: start time, note, task)
-function entryModal(e, preset = {}) {
+// 2.576.0 (#4764): cf = a conflict of objsave.js saveDialog: the dialog shows the saved entry (cf.raw) with the own input over
+// it, the other's fields marked; an open dialog shows the bar "Changed ..." with "Take over"
+function entryModal(e, preset = {}, cf) {
+  const raw = cf ? cf.raw : e; if (cf) e = teOver(cf.raw, cf.mine || {});
   const run = !!(e && e.running), s = e ? new Date(e.start) : null, en = e && e.end ? new Date(e.end) : null;
   const tid = e ? e.task_id : preset.task_id || null, lid = e ? e.list_id : preset.list_id || (tid ? taskById(tid)?.list_id : null) || (mtTime(routeList()?.id) ? routeList().id : null) || S.lists.find(l => mtTime(l.id) && !l.archived)?.id;  // 2.41.0 (#1471)
   const md = modal(`<h3>${run ? tr('Running timer') : e ? tr('Edit time entry') : tr('Add time')}</h3>
@@ -299,32 +323,55 @@ function entryModal(e, preset = {}) {
     if (!e || fmtClock(tm.start) !== fmtClock(s) || ds(tm.start) !== ds(s) || (!run && (!en || fmtClock(tm.end) !== fmtClock(en) || ds(tm.end) !== ds(en)))) {
       body.start = iso(tm.start); if (!run) body.end = iso(tm.end);
     }
-    // 2.528.0 B (#4305): with what this dialog showed (_prev): changed elsewhere meanwhile = 409, the dialog stays with its input
-    // and says so; Reload opens it again with the saved version (as the life dialogs, life.js lifeConflict)
+    // 2.576.0 (#4764): a change goes through objsave.js saveDialog (only the changed fields, _prev = what the dialog showed): changed
+    // elsewhere meanwhile = 409, the dialog comes again with the saved entry, the own input over it, the other's fields marked
+    if (e && typeof saveDialog !== 'function') await loadModule('objsave').catch(() => { /* offline without the copy: saved as before */ });
+    if (e && typeof saveDialog === 'function') {  // lazy-ok-begin: objsave.js is loaded just above
+      const now = form(), d = objDiff(base, now), url = `/api/time/entries/${e.id || 0}`;
+      let j;
+      try { j = await saveDialog(url, teView(raw), now, {key: 'entry', base, view: teView, send: x => api('PATCH', url, teSrv(x, now, raw))}); } catch { return; }  // api() said it
+      if (j?.conflict) { md.remove(); entryModal(j.conflict.raw, {}, j.conflict); return; }
+      md.remove();
+      if (!Object.keys(d).length) return;  // nothing changed: no request
+      toast(j.queued ? tr('Will be sent as soon as the server is reachable') : tr('Saved'));
+      await timeChanged(j);
+      if ('billable' in d) teBillStep(e, j, bill);
+      return;
+    }  // lazy-ok-end
     if (e) body._prev = Object.fromEntries(Object.keys(body).map(k => [k, k === 'billable' ? e.billable !== false : e[k] ?? null]));
     let j;
     try { j = e ? await api('PATCH', `/api/time/entries/${e.id || 0}`, body) : await api('POST', '/api/time/entries', {...target, ...body, client_id: newCid()}); }  // 2.143.0 C (#2153): sent again from the outbox = one entry
-    catch (er) { if (er.status === 409 && er.data?.entry && e) oxbTeStale(md, er.data.entry); return; }
+    catch { return; }  // api() said it (a 409 without objsave.js: the dialog stays with its input)
     md.remove();
     toast(j.queued ? tr('Will be sent as soon as the server is reachable') : e ? tr('Saved') : tr('Time added: {0}', hmm(j.seconds)));
     await timeChanged(j);
-    if (e && 'billable' in body) {  // 2.144.6 A (#2053): the switch is one undo step
-      const set = async v => { const r = await api('PATCH', `/api/time/entries/${e.id}`, {billable: v}); await timeChanged(r); return {q: r?._q || null}; };
-      histAdd({label: bill ? tr('Time marked billable') : tr('Time marked not billable'), res: j, lids: e.list_id ? [e.list_id] : [],
-        undo: () => set(!bill), redo: () => set(bill)});
-    }
+    if (e && 'billable' in body) teBillStep(e, j, bill);
   });
+  // 2.576.0 (#4764): what the dialog would save now (teView's keys); the form as it opened (fields typed before a conflict always
+  // count as changed); the version watch and the marks of a conflict once objsave.js is in
+  function form() {
+    const tm = times(), o = {target: $('#te-target', md).value, start: tm ? teMin(tm.start) : ''};
+    if (!run) o.end = tm?.end ? teMin(tm.end) : '';
+    return {...o, note: $('#te-noterow', md).hidden ? '' : $('#te-note', md).value.trim(), billable: $('#te-bill', md).checked};
+  }
+  const base = e ? (typeof objBase === 'function' ? objBase(form(), cf?.mine) : form()) : null;  // lazy-ok: cf only comes from objsave.js
+  if (e && e.id) loadModule('objsave').then(() => {  // lazy-ok-begin: loaded here
+    if (!md.isConnected) return;
+    const open = teView(raw), again = (x, theirs, mine) => { md.remove(); entryModal(x, {}, {raw: x, cur: teView(x), theirs, mine, both: []}); };
+    dlgStale(md, `/api/time/entries/${e.id}`, () => raw.updated_at, x => { const c = teView(x); again(x, Object.keys(form()).filter(k => !objSame(open[k], c[k])), objDiff(base, form())); });
+    if (cf?.theirs.length) objMerge(md, cf, () => {}, {field: k => ({target: $('#te-target', md), start: $('#te-from', md), end: $('#te-to', md), note: $('#te-noterow', md), billable: $('#te-bill', md)})[k]?.closest('.row') || null,
+      take: keys => again(cf.raw, [], Object.fromEntries(Object.entries(cf.mine || {}).filter(([k]) => !keys.includes(k))))});
+  }, () => { /* offline without the copy: saved as before */ });  // lazy-ok-end
   md.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.tagName === 'INPUT') $('[data-m="save"]', md).click(); });
   if (!isTouch()) setTimeout(() => $(e ? '#te-note' : run ? '#te-from' : '#te-dur', md)?.focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
-// 2.528.0 B (#4305): the entry changed elsewhere while its dialog was open (the words of life.js lifeConflict, which may not be
-// loaded here): Reload = the dialog again with the saved version
-function oxbTeStale(md, x) {
-  let h = $('.oxbte', md);
-  if (!h) { h = document.createElement('div'); h.className = 'shint oxbte'; h.setAttribute('role', 'alert'); $('.foot', md).before(h); }
-  h.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-oxb-reload>${tr('Reload')}</button>`;
-  $('[data-oxb-reload]', h).addEventListener('click', ev => { ev.stopPropagation(); md.remove(); entryModal(x); });
+// 2.144.6 A (#2053): the billable switch of a saved change is one undo step
+function teBillStep(e, j, bill) {
+  const set = async v => { const r = await api('PATCH', `/api/time/entries/${e.id}`, {billable: v}); await timeChanged(r); return {q: r?._q || null}; };
+  histAdd({label: bill ? tr('Time marked billable') : tr('Time marked not billable'), res: j, lids: e.list_id ? [e.list_id] : [],
+    undo: () => set(!bill), redo: () => set(bill)});
 }
+// 2.576.0 (#4764): oxbTeStale (the bar "Reload" = own input dropped) is gone: entryModal goes through objsave.js saveDialog
 async function teDelete(id) {
   const e = findEntry(id); if (!e) return;
   let r;

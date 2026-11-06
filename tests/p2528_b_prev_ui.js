@@ -104,6 +104,8 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   check(w.eval(`S.conflicts.some(c => c.tid === ${T3} && c.field === 'due' && c.mine === '2027-06-02')`), 'A16: patch_each conflict in the dialog ' + w.eval('JSON.stringify(S.conflicts)'));
 
   // A13: the time entry dialog sends what it showed; changed elsewhere meanwhile = 409, said in the dialog, Reload = the saved one
+  // 2.576.0 (#4764): objsave.js saveDialog - the dialog comes again with the saved entry, the own note over it and marked; "Take
+  // theirs" (instead of Reload) puts the saved note in
   const te = await call('POST', '/api/time/entries', {task_id: T1, start: '2026-10-05T09:00', minutes: 30, note: 'Hedge, front'});
   check(te.id, 'time entry ' + JSON.stringify(te));
   w.eval(`entryModal(${JSON.stringify(te)})`);
@@ -111,13 +113,14 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
   await call('PATCH', `/api/time/entries/${te.id}`, {note: 'Hedge, front and back'});
   w.document.querySelector('#te-note').value = 'Hedge, front (mine)';
   w.document.querySelector('[data-m="save"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
-  const hint = await until(() => w.document.querySelector('.oxbte'));
-  check(hint && /Changed in the meantime/.test(hint.textContent), 'A13: the dialog says the entry changed meanwhile');
+  const hint = await until(() => w.document.querySelector('.modal .obj-merge'));
+  check(hint && /Changed by someone else in the meantime/.test(hint.textContent), 'A13: the dialog says the entry changed meanwhile');
+  check(w.document.querySelector('#te-note')?.value === 'Hedge, front (mine)' && w.document.querySelector('#te-noterow')?.classList.contains('obj-theirs'), 'A13: the own note stays, marked as changed elsewhere');
   let tv = (await call('GET', `/api/time/entries?task_id=${T1}`)).entries?.find(x => x.id === te.id);
   check(tv?.note === 'Hedge, front and back', 'A13: the other note stays ' + tv?.note);
   check(sent.some(x => x.u.endsWith(`/api/time/entries/${te.id}`) && x.b._prev?.note === 'Hedge, front'), 'A13: the PATCH carries _prev');
-  hint.querySelector('[data-oxb-reload]').dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
-  check(await until(() => w.document.querySelector('#te-note')?.value === 'Hedge, front and back'), 'A13: Reload shows the saved version');
+  hint.querySelector('[data-om="theirs"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
+  check(await until(() => w.document.querySelector('#te-note')?.value === 'Hedge, front and back'), 'A13: "Take theirs" shows the saved version');
   w.document.querySelector('#te-note').value = 'Hedge, all sides';
   w.document.querySelector('[data-m="save"]').dispatchEvent(new w.MouseEvent('click', {bubbles: true}));
   check(await until(async () => (await call('GET', `/api/time/entries?task_id=${T1}`)).entries?.find(x => x.id === te.id)?.note === 'Hedge, all sides'), 'A13: saved on the new base');
