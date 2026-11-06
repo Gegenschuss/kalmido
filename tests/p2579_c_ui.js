@@ -52,6 +52,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   const VID = await until(() => w.eval(`(DCV.items || []).find(v => v.title === 'Koala docs')?.id`), 100);
   check(VID, 'saved: the view is there');
   check(await until(() => w.location.hash === '#docs/v/' + VID), 'the saved view opens (#docs/v/<id>)');
+  const st = () => w.eval(`JSON.stringify({q: DC.q, total: DC.total, loading: DC.loading, dv: DC.dv, route: S.route, applied: DCV.applied, now: typeof dc_params === 'function' ? dcv_queryNow() : '', hash: location.hash})`);
   const v0 = w.eval(`dcv_get(${VID})`);
   check(v0 && v0.query === 'q=Koala&area=private' && v0.ws === 'private' && v0.count === 1, 'it keeps the search and counts its hits ' + JSON.stringify(v0));
   const side = await until(() => d.querySelector(`#side [data-sbbpart="docs-view"][data-dcvid="${VID}"]`), 60);
@@ -60,13 +61,13 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(d.querySelector('.dcv-name')?.textContent.includes('Koala docs') && !d.querySelector('[data-dcv="update"]'), 'the bar names the open view, nothing changed yet');
   // leaving the view empties the search, the row brings it back
   w.location.hash = 'docs';
-  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`)), 'back to Documents: the whole list again');
+  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`)), 'back to Documents: the whole list again ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   check(await until(() => w.eval(`DC.q === 'Koala' && DC.total === 1 && !DC.loading`)), 'the sidebar row applies the view again');
   // a changed search: "Update view" takes it over
   w.eval(`DC.q = 'Emu'; dc_load()`);
   const upd = await until(() => !w.eval('DC.loading') && d.querySelector('[data-dcv="update"]'));
-  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered');
+  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st());
   click(w, upd);
   check(await until(() => w.eval(`dcv_get(${VID})?.query === 'q=Emu&area=private'`)), 'updated: the view keeps the new search');
   await w.eval(`histStep('undo')`);
