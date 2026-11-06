@@ -1064,12 +1064,28 @@ const wsa_areaOn = (id, ws = wsCur()) => ws === 'all' ? wsa_spaces().some(w => w
 function wsa_featOff(f) {
   if (WSA.raw || !S.settings) return false;
   const cur = wsCur();
-  if (cur !== WSA.cur || S.settings.ws_areas_off !== WSA.own || S.me?.workspaces !== WSA.ws) {
-    WSA.cur = cur; WSA.own = S.settings.ws_areas_off; WSA.ws = S.me?.workspaces;
+  if (cur !== WSA.cur || S.settings.ws_areas_off !== WSA.own || S.me?.workspaces !== WSA.ws || S.settings.ws_mods_off !== WSA.mods || MC.gen !== WSA.mcg) {
+    WSA.cur = cur; WSA.own = S.settings.ws_areas_off; WSA.ws = S.me?.workspaces; WSA.mods = S.settings.ws_mods_off; WSA.mcg = MC.gen;
     WSA.off = new Set(WSA_AREAS.filter(id => !wsa_areaOn(id, cur)).flatMap(wsa_feats));  // 2.398.0 (#3406): review like the others
+    mc_offIn(cur).forEach(x => WSA.off.add(x));  // 2.575.0 (#3778): outside the card's cap / hidden by me in this workspace
   }
   return WSA.off.has(f);
 }
+// ---- 2.575.0 (#3778): module cards. An organisation's cards cap the modules of a member there (S.me.workspaces[].mods_cap,
+// null = no cap; the server refuses the routes outside it, accounts/modcards.py mc_gate); below the cap and the main switch
+// every person hides modules per workspace (setting ws_mods_off, json {ws: [module]}; a private card writes it for Private).
+// "All workspaces" shows a module that is on in at least one workspace. Nothing is deleted. Settings > Modules: settings.js mc_*
+const MC = {gen: 0, ownS: null, ownO: {}};
+const mc_all = () => FEATS.map(x => x[0]);
+const mc_capOf = ws => ws?.startsWith('org:') ? wsOrg(ws.slice(4))?.mods_cap ?? null : null;
+function mc_own() {
+  const s = S.settings?.ws_mods_off || '{}';
+  if (s !== MC.ownS) { MC.ownS = s; try { const o = JSON.parse(s); MC.ownO = o && typeof o === 'object' && !Array.isArray(o) ? o : {}; } catch { MC.ownO = {}; } }
+  return MC.ownO;
+}
+const mc_inCap = (ws, f) => { const cap = mc_capOf(ws); return !cap || !mc_all().includes(f) || cap.includes(f); };
+const mc_wsOn = (ws, f) => mc_inCap(ws, f) && !(mc_own()[ws] || []).includes(f);
+const mc_offIn = cur => mc_all().filter(f => cur === 'all' ? !wsa_spaces().some(w => mc_wsOn(w, f)) : !mc_wsOn(cur, f));
 // an area of the main switch that is on (some part) -- what Settings > Modules offers per workspace
 const wsa_mainOn = id => wsa_raw(() => mg_area(id) ? mg_on(id) : modOn(id));
 // Settings > Modules: one group per workspace with a switch per area (only with organisations: alone, Private = the main switches)

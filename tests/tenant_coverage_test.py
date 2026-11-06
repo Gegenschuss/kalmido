@@ -40,6 +40,7 @@ KINDS = {
     "list": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: a list by id (read, change, members, sections, fields, notes, owner)"),
     "folder": ("matrix", "p2300_tenant_test.py: folder settings / people / groups are the own folders' only"),
     "news": ("matrix", "p2280_api_test.py: News of other workspaces"),
+    "modcard": ("matrix", "p2575_a_api_test.py: module cards -- a stranger neither reads nor changes a private card or an organisation's card, a member does not change one (2.575.0, #3778)"),
     "lytpl": ("matrix", "p255_a_api_test.py: arrangement templates only to people of the own organisations, never to agents, a project page only with access (#1068)"),
     "team": ("matrix", "p2280_api_test.py: team chat rooms and direct messages"),
     "agent": ("matrix", "p2280_api_test.py, p2300_tenant_test.py: agents, their chat, events and jobs"),
@@ -206,6 +207,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.575.0 (#3778): module cards (private: the owner only; an organisation's: its members read, its admins write): p2575_a_api_test.py
+    "GET /api/modcards": "modcard", "POST /api/modcards": "modcard", "PATCH /api/modcards/{}": "modcard", "DELETE /api/modcards/{}": "modcard",
     # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py
     "GET /api/office/trips/{}/history": "office", "GET /api/office/trips/{}/items/{}/history": "office", "GET /api/office/trips/purposes/{}/history": "office", "GET /api/office/fixed-costs/{}/history": "office",
     "GET /api/office/cashflow/adjust/{}/history": "office", "GET /api/office/cards/{}/history": "office", "GET /api/office/cards/lines/{}/history": "office", "GET /api/office/bank/rules/{}/history": "office",

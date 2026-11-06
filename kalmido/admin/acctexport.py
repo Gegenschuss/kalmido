@@ -135,6 +135,7 @@ UMZ_LEFT_USERS = {
     "office_rgroup_members": _U_ORG, "office_sub_reminders": _U_ORG, "office_undo": _U_ORG, "org_joins": _U_ORG, "org_members": _U_ORG, "tchat_files": _U_ORG,
     "budget_files": "the receipt files of household budgets (UMZ_NOT_INCLUDED)",
     "chat_saves": _U_LATER, "ctr_notices": _U_LATER, "fs_log": _U_LATER, "section_templates": _U_LATER,
+    "module_card_people": _U_ORG,  # 2.575.0 (#3778): which module cards of an organisation a member has
 }
 
 # 2.278.0 C (#3091): what the manifest says about browser-encrypted content (only what the import really does)
@@ -368,6 +369,8 @@ def umz_extra_queries(uid):
                          FROM hub_mails WHERE owner_id=? AND org_id IS NULL AND deleted_at IS NULL""", (uid,)),
         # 2.89.0 (#1916): my private tables (organisation tables are in the organisation export)
         "sheets": (f"SELECT * FROM sheets WHERE {sheets} AND deleted_at IS NULL", (uid,)),
+        # 2.575.0 (#3778): my private module cards (an organisation's cards are in the organisation export)
+        "module_cards": ("SELECT id, name, icon, mods, known, created_at, updated_at FROM module_cards WHERE org_id IS NULL AND user_id=?", (uid,)),
         "sheet_columns": (f"SELECT * FROM sheet_columns WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         "sheet_rows": (f"SELECT * FROM sheet_rows WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),
         "sheet_cells": (f"SELECT * FROM sheet_cells WHERE sheet_id IN (SELECT id FROM sheets WHERE {sheets})", (uid,)),

@@ -541,6 +541,28 @@ def _not_me(c, run, src, d, ctx):
     return d
 
 
+def _modcard(c, run, src, d, ctx):
+    """2.575.0 (#3778): a module card of the organisation: only known modules (accounts/modcards.py), never a person's
+    private card; a module unknown here is dropped (it counts as new on the card, off)."""
+    from ..accounts.modcards import MC_ICON_RE, MC_MODS, MC_NAME_MAX
+    if not run.org or src.get("org_id") is None:
+        return False
+    name = _txt(src.get("name"), MC_NAME_MAX)
+    if not name:
+        return None
+    d["user_id"] = None
+    d["name"] = name
+    d["icon"] = src["icon"] if isinstance(src.get("icon"), str) and MC_ICON_RE.fullmatch(src["icon"]) else "grid"
+    for k in ("mods", "known"):
+        xs = set((src.get(k) or "").split(",")) if isinstance(src.get(k), str) else set()
+        d[k] = ",".join(m for m in MC_MODS if m in xs)
+    d["dflt"] = 1 if src.get("dflt") in (1, True) else 0
+    if d["dflt"]:  # one default card per organisation: an existing one stays the default
+        if c.execute("SELECT 1 FROM module_cards WHERE org_id=? AND dflt=1", (run.org,)).fetchone():  # the importing admin's organisation
+            d["dflt"] = 0
+    return d
+
+
 # ---------------------------------------------------------------- the organisation's own settings
 _ORG_KEEP = ("color", "hub_holiday_state", "hub_leave_approval")  # harmless: nothing about sign-in, security, joining or privacy
 
@@ -585,6 +607,11 @@ SPECS = [
         label=N_("Playbooks")),
     # 2.362.0 (#3096): section templates of the organisation (into the private space: the importing person's own)
     OiT("lists/section_templates.json", "section_templates", people={"user_id": "me"}, enc=False, label=N_("Section templates")),
+    # 2.575.0 (#3778): the module cards of the organisation (only into an organisation; a card is a cap there) + their people
+    OiT("settings/module_cards.json", "module_cards", people={"user_id": "null", "created_by": "null"}, private=False, enc=False,
+        label=N_("Module cards"), prep=_modcard),
+    OiT("settings/module_card_people.json", "module_card_people", refs={"card_id": "module_cards"}, need=("card_id",),
+        people={"user_id": "member"}, space=(), private=False, rid=False, enc=False, label=N_("Module cards")),
     OiT("lists/sprints.json", "sprints", refs={"list_id": "lists"}, need=("list_id",), people={"created_by": "null"}, space=(),
         label=N_("Sprints"), prep=_sprint),
     OiT("lists/rules.json", "list_rules", refs={"list_id": "lists", "target_list_id": "lists"}, need=("list_id",),

@@ -302,7 +302,7 @@ function modulesHtmlMain(hint) {
       <div class="row"><label for="s-tstop">${tr('Stop automatically after')}</label><input type="number" id="s-tstop" value="${esc(s.time_autostop_h ?? '12')}" min="0" max="72" step="0.5" class="numin"><span class="muted">${tr('hours, end = start + value, 0 = off')}</span></div>
       <div class="row"><label>${tr('Focus sessions')}</label><label class="chkl wtfocus"><input type="checkbox" id="s-tfocus" ${s.time_focus !== '0' ? 'checked' : ''}> ${tr('count as time entries (not while a timer runs)')}</label></div></details>` : '';
   const row = k => k.startsWith('a:') ? mg_modAreaHtml(k.slice(2), x => modRowHtml(x, opt)) : modRowHtml(k, opt);  // 2.44.0 (#1187)
-  return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${pm_allHtml('s-modsall', pm_allShown())}
+  return `<h4 id="s-purpose-h">${tr('What do you use Kalmido for?')}</h4>${purposeCards(S.settings.purpose || '')}${mc_secHtml() /* 2.575.0 (#3778) */}${pm_allHtml('s-modsall', pm_allShown())}
     ${pk2_setupHtml()}
     ${hint(tr('Switched off disappears from the menus; nothing is deleted.'))}
     <div class="modtot muted" id="s-modtot">${esc(modCount())}</div>
@@ -1845,4 +1845,133 @@ function biz_integrHtml() {
   if (!S.me || S.me.kind === 'agent' || !officeOn()) return '';
   return `<h4 id="s-pep-h">${tr('E-invoice (Peppol)')}</h4><div class="shint">${tr('The Peppol access of the office (provider, account, sender id) is set with its invoices.')}</div>
     <div class="row"><button type="button" class="btn sm" data-setgo="biz-peppol">${ic('building', 's')} ${esc(tr('Settings › Company & office › {0}', tr('Peppol')))}</button></div>`;
+}
+// ---- 2.575.0 (#3778): own module cards (Settings > Modules, below "What do you use Kalmido for?"). Private: any number of
+// cards, a tap applies one for the workspace Private only (the main switches turn its modules on, ws_mods_off hides the rest
+// in Private and the newly switched on ones in every organisation, one undo step). An organisation's admins make cards,
+// assign them to members and mark the default card; a member's cap there = the union of their cards (areas.js mc_*), inside
+// it the member hides modules. Server: accounts/modcards.py (GET/POST /api/modcards, PATCH/DELETE /api/modcards/<id>)
+const MC_ICONS = ['grid', 'user', 'home', 'family', 'users', 'code', 'brief', 'clock', 'book', 'folder', 'star', 'heart', 'chart', 'receipt', 'wallet', 'journal', 'bot', 'file', 'news', 'sparkle'];
+const MC_DATA = {};  // space -> the answer of GET /api/modcards
+const mc_name = k => tr(FEATS.find(x => x[0] === k)?.[1] || k);
+// the modules grouped by area: the groups of Settings > Modules, each area (a:<id>) a group of its own with its parts
+function mc_groups(mods) {
+  const has = new Set(mods), seen = new Set(), out = [];
+  const add = (name, ks) => { const r = ks.filter(k => has.has(k) && !seen.has(k)); r.forEach(k => seen.add(k)); if (r.length) out.push([name, r]); };
+  for (const [g, ks] of MOD_GROUPS) {
+    add(g, ks.filter(k => !k.startsWith('a:')));
+    for (const k of ks.filter(x => x.startsWith('a:'))) add(mg_area(k.slice(2))?.[2] || k, mg_feats(k.slice(2)));
+  }
+  add(N_('Other'), mods);
+  return out;
+}
+const mc_spaces = () => ['private', ...(S.me?.workspaces || []).map(w => 'org:' + w.id)];
+// the modules Private shows now (main switch, minus what I hide there)
+const mc_privNow = () => { const fs = new Set((S.settings.features ?? '').split(',').filter(Boolean)), off = mc_own().private || []; return mc_all().filter(f => fs.has(f) && !off.includes(f)); };
+const mc_sameSet = (a, b) => a.length === b.length && a.every(x => b.includes(x));
+const mc_privOn = card => mc_sameSet(mc_privNow(), card.mods.filter(f => mc_all().includes(f)));
+function mc_cardBtn(cd, ws) {
+  const on = ws === 'private' && mc_privOn(cd), d = MC_DATA[ws] || {};
+  const sub = ws === 'private' ? trn('{0} module', '{0} modules', cd.mods.length) : [trn('{0} module', '{0} modules', cd.mods.length), cd.dflt ? tr('Default card') : '', d.admin ? trn('{0} person', '{0} people', (cd.people || []).length) : ''].filter(Boolean).join(' · ');
+  const nw = d.admin && (cd.new_mods || []).length ? `<small class="mcnew">${esc(tr('New module available: {0}', cd.new_mods.map(mc_name).join(', ')))}</small>` : '';
+  const main = ws === 'private' ? `<button type="button" class="ptcard mccard ${on ? 'on' : ''}" role="radio" aria-checked="${on}" data-mcapply="${cd.id}">${ic(cd.icon || 'grid', 's')}<b>${esc(cd.name)}</b><small class="muted">${esc(sub)}</small></button>`
+    : `<div class="ptcard mccard">${ic(cd.icon || 'grid', 's')}<b>${esc(cd.name)}</b><small class="muted">${esc(sub)}</small>${nw}</div>`;
+  return `<div class="mcwrap" data-mccard="${cd.id}">${main}${d.admin ? `<button type="button" class="btn sm ghost mcedit" data-mcedit="${cd.id}" data-mcws="${ws}" aria-label="${esc(tr('Edit card {0}', cd.name))}">${ic('edit', 's')}</button>` : ''}</div>`;
+}
+function mc_wsHtml(ws) {
+  const d = MC_DATA[ws]; if (!d) return '';
+  const cards = d.cards || [], priv = ws === 'private';
+  let h = `<div class="mcgrp" data-mcgrp="${ws}"><h5>${priv ? esc(tr('My cards')) : esc(tr('Cards of {0}', wsName(ws)))}</h5>`;
+  if (!priv) h += `<div class="shint keep">${esc(d.admin ? tr('A card is the upper limit for the people it is assigned to: they can hide modules inside it, never add more. Several cards add up; the default card applies to everybody without a card. Nothing is deleted.') : tr('The admins of {0} set which modules you can use there.', wsName(ws)))}</div>`;
+  else h += `<div class="shint keep">${esc(tr('A tap applies a card to the workspace Private, like the answers above; organisations stay as they are.'))}</div>`;
+  if (!priv && d.admin && cards.some(cd => (cd.new_mods || []).length)) h += `<div class="shint cnote mcnewhint">${esc(tr('New module available: open a card to switch it on there.'))}</div>`;
+  h += `<div class="ptcards mccards" ${priv ? `role="radiogroup" aria-label="${esc(tr('My cards'))}"` : ''}>${cards.map(cd => mc_cardBtn(cd, ws)).join('')}${d.admin ? `<button type="button" class="ptcard mcadd" data-mcnew="${ws}">${ic('plus', 's')}<b>${esc(tr('New card'))}</b></button>` : ''}</div>`;
+  if (!priv && d.cap) {  // inside the cap: my own switches of this workspace
+    h += `<details class="modgrp mccap"><summary><span class="mgn">${esc(tr('Your modules in {0}', wsName(ws)))}</span><span class="mgc muted">${esc(tr('{0} of {1} on', d.cap.filter(f => mc_wsOn(ws, f)).length, d.cap.length))}</span>${ic('chev', 's fcar')}</summary><div class="modlist">${d.cap.filter(f => mc_all().includes(f)).map(f => `<label class="chkl"><input type="checkbox" data-mchide="${f}" data-mcws="${ws}" ${mc_wsOn(ws, f) ? 'checked' : ''}> ${esc(mc_name(f))}</label>`).join('')}</div></details>`;
+  }
+  return h + '</div>';
+}
+async function mc_load(ws) {
+  const j = await api('GET', '/api/modcards?space=' + encodeURIComponent(ws));
+  MC_DATA[ws] = j;
+  const w = ws.startsWith('org:') ? wsOrg(ws.slice(4)) : null;
+  if (w && !mc_sameSet(w.mods_cap || [], j.cap || []) || w && (w.mods_cap == null) !== (j.cap == null)) { w.mods_cap = j.cap; MC.gen++; render(); }
+  return j;
+}
+async function mc_draw(box = $('#s-mcards')) {
+  if (!box?.isConnected || S.me?.kid) return;
+  try { await Promise.all(mc_spaces().map(mc_load)); } catch { return; }
+  if (!box.isConnected) return;
+  box.innerHTML = `<h4 id="s-mcards-h">${esc(tr('Own cards'))}</h4>${mc_spaces().map(mc_wsHtml).join('')}`;
+}
+const mc_secHtml = () => S.me && !S.me.kid && S.me.kind !== 'agent' ? (setTimeout(() => mc_draw(), 0), '<div id="s-mcards" class="mcards"></div>') : '';
+// a tap on a private card: Private shows exactly its modules, the organisations stay as they are (one undo step)
+async function mc_apply(cd) {
+  const all = mc_all(), mods = cd.mods.filter(f => all.includes(f));
+  const fs = (S.settings.features ?? '').split(',').filter(Boolean), o = JSON.parse(JSON.stringify(mc_own()));
+  const orgs = mc_spaces().filter(w => w !== 'private');
+  let nfs;
+  if (!orgs.length) { nfs = [...fs.filter(f => !all.includes(f)), ...mods]; delete o.private; }  // alone: the main switches are Private
+  else {
+    const neu = mods.filter(f => !fs.includes(f));
+    nfs = [...fs, ...neu];
+    const off = all.filter(f => !mods.includes(f)); if (off.length) o.private = off; else delete o.private;
+    for (const w of orgs) { const xs = new Set([...(o[w] || []), ...neu]); if (xs.size) o[w] = all.filter(f => xs.has(f)); }
+  }
+  await setApply({features: FEATS.map(x => x[0]).filter(x => nfs.includes(x)).concat(nfs.filter(x => !FEATS.some(y => y[0] === x))).join(','), ws_mods_off: JSON.stringify(o)}, tr('Card {0}', cd.name));
+  render(); mc_draw();
+}
+document.addEventListener('click', async e => {
+  const a = e.target.closest?.('.smodal [data-mcapply]');
+  if (a) { e.preventDefault(); e.stopPropagation(); const cd = (MC_DATA.private?.cards || []).find(x => x.id === +a.dataset.mcapply); if (cd) await mc_apply(cd); return; }
+  const n = e.target.closest?.('.smodal [data-mcnew], .smodal [data-mcedit]'); if (!n) return;
+  e.preventDefault(); e.stopPropagation();
+  const ws = n.dataset.mcnew || n.dataset.mcws, cd = n.dataset.mcedit ? (MC_DATA[ws]?.cards || []).find(x => x.id === +n.dataset.mcedit) : null;
+  modalSub(n.closest('.smodal'), () => mc_editor(ws, cd));
+});
+document.addEventListener('change', async e => {
+  const el = e.target; if (!el?.dataset?.mchide || !el.dataset.mcws) return;
+  e.stopPropagation();
+  const f = el.dataset.mchide, ws = el.dataset.mcws, on = el.checked, o = JSON.parse(JSON.stringify(mc_own())), xs = new Set(o[ws] || []);
+  on ? xs.delete(f) : xs.add(f);
+  if (xs.size) o[ws] = mc_all().filter(x => xs.has(x)); else delete o[ws];
+  const lb = `${mc_name(f)} · ${wsName(ws)}`;
+  await setApply({ws_mods_off: JSON.stringify(o)}, on ? tr('{0} on', lb) : tr('{0} off', lb));
+  render(); mc_draw();
+}, true);
+// the editor of a card: name, icon, the modules by area; an organisation's card also the default switch and its people
+function mc_editor(ws, cd) {
+  const d = MC_DATA[ws] || {}, priv = ws === 'private', on = new Set(cd ? cd.mods : []), ppl = new Set(cd?.people || []);
+  const nw = new Set(cd?.new_mods || []);
+  const md = modal(`<form class="mced" novalidate><h3 id="mced-t">${esc(cd ? tr('Edit card') : tr('New card'))}</h3>
+    <div class="row"><label for="mced-n">${esc(tr('Name'))}</label><input id="mced-n" maxlength="60" value="${esc(cd?.name || '')}" autocomplete="off"></div>
+    <div class="row"><label for="mced-i">${esc(tr('Icon'))}</label><select id="mced-i">${MC_ICONS.map(i => `<option value="${i}" ${(cd?.icon || 'grid') === i ? 'selected' : ''}>${esc(i)}</option>`).join('')}</select></div>
+    ${priv ? '' : `<label class="chkl"><input type="checkbox" id="mced-d" ${cd?.dflt ? 'checked' : ''}> ${esc(tr('Default card for everybody without a card'))}</label>`}
+    <h4>${esc(tr('Modules'))}</h4><div class="mcedmods">${mc_groups(d.mods || mc_all()).map(([g, ks]) => `<fieldset class="mcedg"><legend>${esc(tr(g))}</legend>${ks.map(k => `<label class="chkl"><input type="checkbox" data-mcmod="${k}" ${on.has(k) ? 'checked' : ''}> ${esc(mc_name(k))}${nw.has(k) ? ` <span class="ad-tag">${esc(tr('New module'))}</span>` : ''}</label>`).join('')}</fieldset>`).join('')}</div>
+    ${priv ? '' : `<h4>${esc(tr('People'))}</h4><div class="mcedppl">${(d.members || []).map(m => `<label class="chkl"><input type="checkbox" data-mcp="${m.id}" ${ppl.has(m.id) ? 'checked' : ''}> ${esc(m.name)}</label>`).join('') || `<div class="muted">${esc(tr('No members yet'))}</div>`}</div>`}
+    <div class="aerr" role="alert" id="mced-err"></div>
+    <div class="foot">${cd ? `<button type="button" class="btn danger" data-mced="del">${esc(tr('Delete'))}</button>` : ''}<span class="spacer"></span><button type="button" class="btn" data-mced="no">${esc(tr('Cancel'))}</button><button type="submit" class="btn pri">${esc(tr('Save'))}</button></div></form>`);
+  md.classList.add('mcedit');
+  const val = () => ({name: $('#mced-n', md).value.trim(), icon: $('#mced-i', md).value, mods: $$('input[data-mcmod]', md).filter(x => x.checked).map(x => x.dataset.mcmod),
+    ...(priv ? {} : {dflt: $('#mced-d', md).checked, people: $$('input[data-mcp]', md).filter(x => x.checked).map(x => +x.dataset.mcp)})});
+  const v0 = JSON.stringify(val()), close = modalGuard(md, () => JSON.stringify(val()) !== v0);
+  const done = async () => { md.remove(); await mc_load(ws).catch(() => {}); mc_draw(); };
+  $('[data-mced="no"]', md).onclick = close;
+  $('[data-mced="del"]', md)?.addEventListener('click', async () => {
+    if (!await askConfirm(tr('Delete card {0}?', cd.name), tr('The modules, their data and the settings stay as they are.'), {ok: tr('Delete'), danger: true})) return;
+    try { await api('DELETE', `/api/modcards/${cd.id}`); } catch { return; }
+    toast(tr('Card deleted')); await done();
+  });
+  $('form', md).onsubmit = async ev => {
+    ev.preventDefault();
+    const b = val(), er = $('#mced-err', md);
+    if (!b.name) { er.textContent = tr('Please enter a name'); $('#mced-n', md).focus(); return; }
+    try {
+      if (cd) await api('PATCH', `/api/modcards/${cd.id}`, {...b, expect_updated_at: cd.updated_at});
+      else await api('POST', '/api/modcards', {...b, space: ws});
+    } catch (x) { if (x?.status === 409) { await done(); } return; }
+    toast(tr('Saved')); await done();
+  };
+  setTimeout(() => $('#mced-n', md)?.focus(), 0);
+  return md;
 }

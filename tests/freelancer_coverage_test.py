@@ -57,6 +57,7 @@ KINDS = {
                        "rename / archive / restore as its own admin, groups only with people one works with (2.113.1)"),
     "hub": ("matrix", SUITE + ", p2125_a_api_test.py, p2361_a_texts_test.py, p2141_a_api_test.py, p2141_b_api_test.py, p2352_d_mailtrim_test.py, p2155_b_absence_cal_test.py: absences, bookings and hub mail in the personal area (the freelancer is its own admin); "
                       "2.125.0: the own vacation account and working week, never a vacation request; 2.141.0 A: the own mailbox, reply / new e-mail; 2.141.0 B: HTML view, task / event from a private mail; 2.352.0 D: the shortened view of a private mail; p2483_a_mail_api_test.py (2.483.0): her private client's mails through the API v1 with her token and her own agent"),
+    "modcards": ("matrix", "p2575_a_api_test.py: her own module cards in the private workspace (create, change, apply, delete; 2.575.0)"),
     "personal": ("matrix", SUITE + ": budget, Home & life, family, feeds, other servers, supporter licence -- private by nature; "
                            "p2140_a_api_test.py: shopping amounts, recipes, the meal plan beyond a week (2.140.0)"),
     "videos": ("matrix", "p2991_a_api_test.py: video sign-offs (2.99.1) at a private task / list / client of a person without an "
@@ -103,6 +104,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.575.0 (#3778): own module cards of the private workspace (p2575_a_api_test.py, freelancer-matrix: modcards)
+    "GET /api/modcards": "modcards", "POST /api/modcards": "modcards", "PATCH /api/modcards/{}": "modcards", "DELETE /api/modcards/{}": "modcards",
     # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py
     "GET /api/office/trips/{}/history": "office", "GET /api/office/trips/{}/items/{}/history": "office", "GET /api/office/trips/purposes/{}/history": "office", "GET /api/office/fixed-costs/{}/history": "office",
     "GET /api/office/cashflow/adjust/{}/history": "office", "GET /api/office/cards/{}/history": "office", "GET /api/office/cards/lines/{}/history": "office", "GET /api/office/bank/rules/{}/history": "office",

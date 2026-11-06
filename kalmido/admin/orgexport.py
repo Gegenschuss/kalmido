@@ -426,6 +426,9 @@ OX_AREAS = (
     # and its read-later project (the feeds of a project the admin does not see stay out with the project)
     ("feeds/feeds.json", "rss_feeds", "org_id=?"),
     ("feeds/reading.json", "reading_orgs", f"org_id=? AND list_id IN ({LSQ})"),
+    # 2.575.0 (#3778): the module cards of the organisation and the members they are assigned to
+    ("settings/module_cards.json", "module_cards", "org_id=?"),
+    ("settings/module_card_people.json", "module_card_people", "card_id IN (SELECT id FROM module_cards WHERE org_id=?)"),
 )
 OX_NOT_INCLUDED = (
     N_("private lists and private sharing of the members (lists without the organisation), other organisations"),

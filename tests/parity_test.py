@@ -270,6 +270,8 @@ APP_TO_API = {
 }
 # app routes with no API counterpart on purpose (prefix match on "METHOD /api/path"; reason first)
 APP_ONLY = [
+    ("2.575.0 (#3778): module cards are how a person arranges Settings > Modules and how an organisation's admins cap the modules of its "
+     "members -- people only; an agent's setup proposal switches the main switches and never reaches past a card's cap", ("* /api/modcards",)),
     ("2.570.0 A (#4783): the history of a client (who changed which field when, office/owrite.py ow_history) is read in the app like "
      "the core objects' history -- an agent reads the client itself with GET /clients/{id}", ("=GET /api/clients/{}/history",)),
     ("2.567.0 A (#4707): sections, planned sprints, key links and templates in the trash are restored by a person (Undo, the trash "

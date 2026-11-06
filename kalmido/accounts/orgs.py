@@ -366,6 +366,7 @@ def org_label(c, uid=None):
 # ---------------------------------------------------------------- 2.28.0 (#935): workspaces of lists and agents
 def workspaces_for(c, uid):
     """[{id, name, icon, role}] -- the organisations uid belongs to, with the person's role (the app's switch)."""
+    from .modcards import mc_cap_list  # 2.575.0 (#3778): modcards imports this module
     oids = user_orgs(c, uid)
     if not oids:
         return []
@@ -374,7 +375,8 @@ def workspaces_for(c, uid):
     # 2.409.0 (#3490): + areas_off (the areas its admins switched off for the members, accounts/wsareas.py)
     return [{"id": r["id"], "name": r["name"], **org_icon_fields(r), "color": r["color"] or "", "role": org_role(c, uid, r["id"]) or "member",
              "areas_off": [x for x in (r["areas_off"] or "").split(",") if x],
-             "nav_off": nav_org_off(r)}  # 2.418.0 (#3560): menu points its admins switched off
+             "nav_off": nav_org_off(r),  # 2.418.0 (#3560): menu points its admins switched off
+             "mods_cap": mc_cap_list(c, uid, r["id"])}  # 2.575.0 (#3778): the modules of my cards there (None = no cap)
             for r in c.execute(f"SELECT id, name, icon, color, areas_off, nav_off FROM orgs WHERE id IN ({q}) ORDER BY id", oids)]
 
 
