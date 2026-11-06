@@ -136,7 +136,7 @@ def docs(s1, s2, who):
     r = s2.patch(B + f"/api/docs/{nid}", json={"name": f"umbenannt-{who}.txt"})
     check(r.ok and r.json()["edited_at"] != u2, f"{who}: B renames - a new version " + r.text[:160])
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": "2027-01-15", "expect_updated_at": u2})
-    check(r.status_code == 409 and (r.json().get("current") or {}).get("name") == f"umbenannt-{who}.txt",
+    check(r.status_code == 409 and (r.json().get("doc") or {}).get("name") == f"umbenannt-{who}.txt",
           f"{who}: A's redo with the old version: 409 with the current document " + r.text[:200])
     check(not one("SELECT due_date FROM doc_meta WHERE node_id=?", (nid,)), f"{who}: the due date was not written")
     r = s1.patch(B + f"/api/docs/{nid}", json={"due": "2027-02-01"})

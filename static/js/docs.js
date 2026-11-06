@@ -595,7 +595,8 @@ const DC_PEND = new Map();
 const DC_VER = new Map(), DC_Q = new Map();  // 2.564.0 D (#4701): id -> the version the sheet saves against / its chain of changes
 // the newest version this sheet knows: its own last answer or the document as the sheet shows it (opened, undo, accept);
 // ISO texts compare in time order (".123" after the same second without)
-const dc_ver = id => { const a = DC_VER.get(id) || '', b = DC.doc?.id === id ? DC.doc.updated_at || '' : ''; return a > b ? a : b; };
+// 2.570.0 (#4770): the version is edited_at (people's changes; a recognition run moves updated_at only)
+const dc_ver = id => { const a = DC_VER.get(id) || '', b = DC.doc?.id === id ? DC.doc.edited_at || '' : ''; return a > b ? a : b; };
 async function dc_patch(id, body, label) {
   const before = DC.doc && DC.doc.id === id ? Object.fromEntries(Object.keys(body).map(k => [k, dc_cur(DC.doc, k, body[k])])) : null;
   const d0 = DC.doc?.id === id ? DC.doc : null, pend = DC_PEND.get(id) || [];
@@ -607,14 +608,14 @@ async function dc_patch(id, body, label) {
   // elsewhere = 409, api() says why and the sheet shows the current document instead of overwriting it
   const run = (DC_Q.get(id) || Promise.resolve()).catch(() => {}).then(async () => {
     const v = dc_ver(id), x = await api('PATCH', `/api/docs/${id}`, v ? {...body, expect_updated_at: v} : body);
-    if (x?.updated_at) DC_VER.set(id, x.updated_at);
+    if (x?.edited_at) DC_VER.set(id, x.edited_at);
     return x;
   });
   DC_Q.set(id, run);
   try { d = await run; } catch (x) {  // the fields of this change as they were (the others stay)
     done();
     const cur = x?.status === 409 ? x.data?.doc : null;
-    if (cur) { DC_VER.set(id, cur.updated_at); if (DC.doc?.id === id) DC.doc = pend.reduce(dc_localDoc, cur); }
+    if (cur) { DC_VER.set(id, cur.edited_at); if (DC.doc?.id === id) DC.doc = pend.reduce(dc_localDoc, cur); }
     else if (d0 && DC.doc?.id === id) DC.doc = {...DC.doc, ...Object.fromEntries(Object.keys(body).map(k => [k, d0[k]]))};
     dc_mdDraw($('.dc-md')); return;
   }

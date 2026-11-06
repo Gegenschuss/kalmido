@@ -111,7 +111,7 @@ def run(S, who, uid):
     check(bool(d), f"{who}: the document's recognition ended")
     d = d or S.get(B + f"/api/docs/{nid}").json()
     trio(S, who, "document", "PATCH", f"/api/docs/{nid}", {"name": "Doc of B"}, {"name": "Doc of A"}, "doc",
-         d["updated_at"], lambda j: j.get("updated_at"), "Doc of B")
+         d["edited_at"], lambda j: j.get("edited_at"), "Doc of B")  # 2.570.0 (#4770): a document's version is edited_at
     # 6. a calendar subscription (stored directly: no feed to fetch)
     ts = datetime.now(timezone.utc).isoformat(timespec="seconds")
     sql("INSERT INTO cal_subs(user_id,kind,name,color,visible,interval,url,url_hint,username,password,created_at,changed_at) "
