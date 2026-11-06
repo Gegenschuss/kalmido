@@ -508,7 +508,7 @@ function renderSide0() {
   const sbmTop = sbm ? `<div class="sbmtop"><div class="sbmsrch">${scmd}</div></div>${sbm_rowHtml(hid)}` : '';
   const sset = `<button class="srow sset" data-act="settings" title="${esc(kt(tr('Settings'), 'g s'))}">${ic('gear')}<span class="n">${tr('Settings')}</span>${updDot() ? `<span class="c nunread" title="${esc(tr('Update available'))}">●</span>` : ''}</button>`;
   const sbmX = sbm ? $('#side .sbmr')?.scrollLeft : null;
-  $('#side').innerHTML = `
+  const sideHtml = `
     <div class="sbfix${sbb ? ' sbfix-flow' : sbm ? ' sbfix-flow sbfix-m' : ''}">${'' /* 2.331.0 A (#3303): in sidebar B the head scrolls along; 2.442.0 (#3739): in the phone's drawer too, only the search stays on top */}${'' /* 2.57.0 (#1798): the fixed head (workspace, favourites) stays while the rest scrolls */}
     <div class="sbhead">${'' /* 2.138.2 C (#2392): the 4 px stripe of #2389 is #side's top border (app.css); fold + fold-all show on hover / focus, the dot only offline or while syncing. 2.161.2 A (#2607): the brand (logo + word mark) is the workspace switch, the small mark at the bottom (2.145.0 A #2437) is gone. 2.152.3 A (#2619): on a computer the brand, the switch and the dot moved into the head bar (#kbar); the panel's head is the area's name, fold all and hide the panel (sbb_headHtml) */}${sbb ? sbb_headHtml(sbbArea, pan) : `${wsBarHtml()}${netDotHtml()}<span class="spacer"></span><span class="sbtools">${tasksP ? kbFoldAllBtn() + fv2_svToolBtn() /* 2.156.0 D (#2186) */ : ''}${!isMobile() && innerWidth < 1100 ? `<button class="iconbtn sfold" data-act="side-fold" aria-pressed="${!!LS.get('sideFold', false)}" title="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}" aria-label="${esc(LS.get('sideFold', false) ? tr('Keep the sidebar open') : tr('Fold the sidebar away'))}">${ic('chev', 's')}</button>` : ''}</span>`}</div>
     ${tasksP && !sbm ? favSideHtml(lists, listRow, head) : ''}${sbm ? sbmTop + planFix : planFix + sbmTop}</div>
@@ -517,12 +517,50 @@ function renderSide0() {
       ${sset}
     </div>`}
     <div class="sbdock${sbm ? ' sbmdock' : ''}">${S.me ? `<button type="button" class="sbacct" data-act="user-menu" aria-haspopup="menu" title="${esc(acctLabel())}" aria-label="${esc(acctLabel())}">${av(S.me.id, S.me.display_name, 'avatar', '', '', true)}</button>` : '' /* 2.138.2 C (#2392): the account picture, without dots, next to the search */}${sbm ? sset : scmd}</div>`}`;
-  const newAcct = $('#side .sbacct');
-  if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
-  if (tasksP) sv_after();  // 2.156.0 D (#2186): what the active view hides goes under "Others (N)" (sideviews.js)
+  const sd = $('#side'), keep = side_keep(sd, sideHtml, tasksP);  // 2.609.0 (#4509): the same sidebar: no new nodes (scroll, focus, hover stay)
+  if (!keep) {
+    const y = sd.scrollTop;
+    sd.innerHTML = sideHtml;
+    const newAcct = $('#side .sbacct');
+    if (oldAcct && newAcct && oldAcct.innerHTML === newAcct.innerHTML && oldAcct.title === newAcct.title) newAcct.replaceWith(oldAcct);
+    side_mark(sd, sideHtml);
+    if (y && sd.scrollTop !== y) sd.scrollTop = y;
+    if (tasksP) sv_after();  // 2.156.0 D (#2186): what the active view hides goes under "Others (N)" (sideviews.js)
+  }
   sbb_render(hid);  // 2.152.2 (#2622)
-  if (sbm) sbm_after(sbmX);  // 2.196.0 A (#2737)
+  if (sbm && keep !== 'same') sbm_after(keep ? null : sbmX);  // 2.196.0 A (#2737)
   sideRove();
+}
+// 2.609.0 (#4509): renderSide0 ran on every render() and replaced the whole sidebar (innerHTML): the scroll position, a hover
+// and the nodes went each time. Its signature is the HTML it would draw now -- it holds everything the sidebar shows (route,
+// projects, names, colours, folders, counts, filters, fold state, sync / offline dots, language, rights, favourites, areas),
+// so nothing can be left out of it. The same HTML: the nodes stay ('same'). Only the open view moved (the classes on / sgon
+// and aria-current differ, nothing else): those marks are switched on the nodes in place ('act'). Anything else: drawn anew
+// (null). Drawn anew always while a sidebar view hides rows (sideviews.js sv_after changes the nodes after drawing), when
+// another script replaced or added nodes, or #side itself is new.
+const SIDE_ACT_RE = /\s(class="[^"]*")|\saria-current="[^"]*"/g;
+const side_norm = html => html.replace(SIDE_ACT_RE, (m, cls) => cls ? ' ' + cls.replace(/(^class="|\s)(?:on|sgon)(?=[\s"])/g, '$1') : '');
+function side_mark(sd, html) {  // what side_keep compares with next time: the drawn HTML and the nodes in their order
+  const nodes = [...sd.getElementsByTagName('*')];
+  S._sideSig = {sd, html, norm: null, nodes, n: nodes.length};
+}
+function side_keep(sd, html, tasksP) {
+  const p = S._sideSig;
+  if (!p || !sd || p.sd !== sd || (tasksP && fv2_svHas() && (typeof sv_cur !== 'function' || sv_cur())) || sd.getElementsByTagName('*').length !== p.n || p.nodes[0]?.parentNode !== sd) return null;
+  if (p.html === html) return 'same';
+  if (p.norm == null) p.norm = side_norm(p.html);
+  if (p.norm !== side_norm(html)) return null;
+  const t = document.createElement('template'); t.innerHTML = html;
+  const nw = t.content.querySelectorAll('*');
+  if (nw.length !== p.n) return null;
+  for (let i = 0; i < nw.length; i++) {
+    const a = nw[i], b = p.nodes[i];
+    for (const c of ['on', 'sgon']) if (a.classList.contains(c) !== b.classList.contains(c)) b.classList.toggle(c);
+    const ac = a.getAttribute('aria-current');
+    if (ac !== b.getAttribute('aria-current')) { if (ac == null) b.removeAttribute('aria-current'); else b.setAttribute('aria-current', ac); }
+  }
+  p.html = html; p.norm = null;
+  return 'act';
 }
 // 2.13.0 (#453 A9): the sidebar is ONE tab stop (roving tabindex): Tab lands on the open view's row (or the first one),
 // ↑ / ↓ / Home / End walk through every row, folder and group header, Enter / Space open it, Tab goes on to the content.

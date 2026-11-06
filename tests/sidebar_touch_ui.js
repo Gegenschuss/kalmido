@@ -65,7 +65,8 @@ const spy = w => { const calls = []; const of = w.fetch; w.fetch = (u, o = {}) =
   // ---- CI of 2.223.2: a redraw of the drawer during the hold (the reload after the last drop, a change from another device)
   // replaces the held row; its touchmove / touchend no longer reach the document, the drag still has to end with the drop
   await sleep(300);
-  { const el = row(L3); touch(w, el, 'touchstart'); await sleep(200); w.eval('renderSide()'); await sleep(220);
+  // 2.609.0 (#4509): a renderSide() without a change keeps the nodes now; the forgotten signature forces the real redraw
+  { const el = row(L3); touch(w, el, 'touchstart'); await sleep(200); w.eval('S._sideSig = null; renderSide()'); await sleep(220);
     check(!el.isConnected && d.querySelector('.side-ghost'), 'a redraw during the hold: the row was replaced, the drag lifted');
     under = fold('Hobby'); touch(w, el, 'touchmove', 60); touch(w, el, 'touchend', 60); under = null; swallow(); }
   check(await until(async () => (await folderOf(L3)) === 'Hobby'), 'a redraw during the hold: the drop still moves into the folder');
