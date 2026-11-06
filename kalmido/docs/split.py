@@ -52,6 +52,7 @@ from ..files.fsref import fs_trash_prepare  # 2.237.0
 from ..tasks.attachtext import file_kind  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import _free_name  # 2.369.5 (#2517): pulled up from functions
+from .ingest import docs_ingest, docs_kick  # 2.580.0 (#4401): pulled up from functions (ingest loads this module only inside its functions)
 
 SP_PAGES = O._env_int("KALMIDO_SPLIT_PAGES", 100, 2, 500)  # pages of a stack at most
 SP_SEP = "KALMIDO-SPLIT"     # the text of the separator sheet's QR code
@@ -428,7 +429,6 @@ def docs_split_get(nid):
         if v.get("state") != "scan":
             _put(c, nid, {**v, "state": "scan", "was": v.get("state") or "", "at": _now()})
             c.commit()
-            from .ingest import docs_kick
             docs_kick()
         return jsonify(scanning=True, pages=m["pages"]), 202
     starts, drop, stack = sp_plan(pages)
@@ -530,7 +530,6 @@ def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
     (deleted_by = uid, so its owner can undo it). The caller holds write_lock docs_split_<nid>, checked the state, the right
     (_sp_trash_need) and the parts, and commits; on an exception (_SpCut, QuotaExceeded, ValueError, Denied) it rolls back.
     Returns the new ids."""
-    from .ingest import docs_ingest
     try:
         pdfs = _cut(data, parts)
     except (ValueError, OSError, subprocess.SubprocessError) as e:
@@ -572,7 +571,6 @@ def docs_split(nid):
     """{parts: [[1, 2], [3], ...]} (1-based pages; pages left out are dropped: blank pages, separator sheets) -> the new
     documents in the stack's folder (with its shares), the stack into the trash. 201 {ids, stack_id}."""
     from ..admin.hosting import QuotaExceeded
-    from .ingest import docs_kick
     _no_agent()
     c = db()
     uid = me()
@@ -641,7 +639,6 @@ def sp_auto_queued(c):
                 raise _SpCut("unreadable")
             _sp_do(c, uid, nid, m, n, v, parts, data, auto=True)
             c.commit()
-            from .ingest import docs_kick
             docs_kick()
             return 1
         except Exception as e:  # noqa: BLE001 -- _SpCut, Denied (locked month, receipt, rights), quota, a broken file: a person decides
