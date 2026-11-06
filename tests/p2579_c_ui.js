@@ -63,13 +63,14 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(d.querySelector('.dcv-name')?.textContent.includes('Koala docs') && !d.querySelector('[data-dcv="update"]'), 'the bar names the open view, nothing changed yet');
   // leaving the view empties the search, the row brings it back
   w.location.hash = 'docs';
-  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`) && d.querySelector('#dc-q')?.value === ''), 'back to Documents: the whole list again ' + st() + ' LOG ' + w.eval('JSON.stringify(window.__qlog || [])'));
+  // (Documents itself brings back its own last search text when one comes back: viewmem.js, #3439)
+  check(await until(() => w.eval(`DC.dv === null && DCV.applied === null && !DC.vsort && !DC.f.review && !DC.loading`)), 'back to Documents: the view is left (its sort and filters go) ' + st());
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   check(await until(() => w.eval(`DC.q === 'Koala' && DC.total === 1 && !DC.loading`)), 'the sidebar row applies the view again');
   // a changed search: "Update view" takes it over
   type('Emu');
   const upd = await until(() => !w.eval('DC.loading') && d.querySelector('[data-dcv="update"]'));
-  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st());
+  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st() + ' LOG ' + w.eval('JSON.stringify(window.__qlog || [])'));
   click(w, upd);
   check(await until(() => w.eval(`dcv_get(${VID})?.query === 'q=Emu&area=private'`)), 'updated: the view keeps the new search');
   await w.eval(`histStep('undo')`);
