@@ -186,7 +186,8 @@ con = dbx.connect(os.path.join(DATA, "tasks.db"))
 cols = [x[0] for x in con.execute("SELECT column_name FROM information_schema.columns WHERE table_schema=current_schema() "
                                    "AND table_name='agent_usage' ORDER BY ordinal_position")]  # 2.37.0 (#1150): Postgres
 check(cols == ["id", "agent_id", "model", "input_tokens", "output_tokens", "cache_read_tokens", "cache_write_tokens", "cost_usd", "task_id",
-               "list_id", "job_id", "note", "day", "created_at", "flow"], f"only numbers + ids stored: {cols}")
+               "list_id", "job_id", "note", "day", "created_at", "flow", "web_searches", "web_fetches"],
+      f"only numbers + ids stored: {cols}")  # 2.571.0 (#4676): + the counts of a server agent's web tools (numbers)
 # 2.565.0 (#4674): + flow = the fixed name of a server agent's starter routine (briefing | tidy | meetings | followup | ''), no content
 con.close()
 
