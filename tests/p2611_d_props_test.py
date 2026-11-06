@@ -123,13 +123,15 @@ check(r.ok and r.json().get("created") == 1, f"dora applies the extract {r.statu
 check(dbx("SELECT COUNT(*) FROM tasks WHERE list_id=? AND title='Order chairs' AND deleted_at IS NULL", (P,)) == [(1,)], "the task is there")
 
 # ---------------------------------------------------------------- review 2.611: the notes of a subtasks request follow the task
-CP = Ca.post(B + "/api/lists", json={"name": "Carl private"}).json()["id"]
+P4 = Bo.post(B + "/api/lists", json={"name": "Project without dora", "org_id": ORG}).json()["id"]
+check(Bo.put(B + f"/api/lists/{P4}/members", json={"user_id": uid["carl"], "role": "edit"}).ok, "setup: carl in the project without dora")
 T4 = Ca.post(B + "/api/tasks", json={"title": "Noted owl task", "list_id": P, "content": "CARL-TASK-NOTE keep it short"}).json()["id"]
 J3 = ask(Ca, {"kind": "subtasks", "task_id": T4}, len(runs()))
 propose(J3, {"kind": "subtasks", "items": [{"title": "Noted step"}]})
 r = Do.get(B + f"/api/proposals/{J3}")
 check(r.ok and "CARL-TASK-NOTE" in r.text, f"dora sees the notes of the task while she sees the task {r.status_code}")
-check(Ca.patch(B + f"/api/tasks/{T4}", json={"list_id": CP}).ok, "carl moves the task into his private list")
+r = Bo.patch(B + f"/api/tasks/{T4}", json={"list_id": P4})
+check(r.ok, f"bob moves the task into a project dora is not in {r.status_code} {r.text[:160]}")
 r = Do.get(B + f"/api/proposals/{J3}")
 check("CARL-TASK-NOTE" not in r.text, f"... then dora no longer gets its notes from the request {r.status_code}")
 r = Ca.get(B + f"/api/proposals/{J3}")
