@@ -38,7 +38,7 @@ from ..core.errors import BadInput
 from ..api.common import hit_limit  # 2.149.0 G (#2517): pulled up from functions
 from ..team.clients import client_rows  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import office_role  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgroles import org_sees_all, org_writes  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import need_org_say, org_sees_all, org_writes  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import is_org_admin, user_orgs  # 2.369.5 (#2517): pulled up from functions; 2.549.0 (#4536): user_orgs
 from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
@@ -340,6 +340,8 @@ def vdr_version_add(c, r, link, uid):
 def vdr_comment_add(c, r, uid, b, ext_name=None):
     """A comment {body, version_id?, at_sec?, parent_id?} on review r (checked: the version is the review's, a reply answers a
     top-level comment of the same version and carries no timecode of its own, a link without time control none) -> id."""
+    if not ext_name:  # 2.607.0 (#4549): a guest / read-only person of the review's organisation only reads (the client's page: as before)
+        need_org_say(c, uid, r["org_id"], lambda: vdr_may(c, uid, r, write=True))
     text = vdr_clean(b.get("body"), VDR_BODY_MAX)
     if not text:
         raise BadInput(tr("Please write a comment."))
@@ -566,6 +568,7 @@ def vdr_comment_patch(vid, cid):
     if "body" in b:
         if not mine:
             raise Denied(403)
+        need_org_say(c, uid, r["org_id"], lambda: wr)  # 2.607.0 (#4549)
         t = vdr_clean(b.get("body"), VDR_BODY_MAX)
         if not t:
             return err(tr("Please write a comment."))

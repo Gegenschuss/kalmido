@@ -35,7 +35,7 @@ from ..tasks.deliver import dv_apply, dv_filter, dv_view  # 2.392.2 (#3365)
 from ..tasks.ticketkey import tk_ids_ordered, tk_key, tk_parse  # 2.390.0 (#3353)
 from ..tasks.roadmap import list_shift, roadmap_build
 from ..tasks.lifecycle import task_complete, task_reopen, trash_task
-from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, MAIL_REPLY, user_names
+from ..collab.comments import att_dicts, comment_create, comment_dict, comment_plain, MAIL_REPLY, need_task_say, user_names
 from ..collab.news import bell_custom_clean, bell_custom_of, BELL_MODES, notif_matrix, notif_update
 from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
@@ -1637,6 +1637,7 @@ def v1_comment_create(tid):
     from ..api.scopes import need_approval  # (api.scopes imports this module) 2.393.2 B (#3375): one import for both answers below
     c = db()
     _v1_live(c, tid, write=False, full=True)  # view-only members may comment (as in the app)
+    need_task_say(c, tid)  # 2.607.0 (#4549): not a guest / read-only person of the organisation (before any approval card)
     again = ref and c.execute("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND client_ref=? AND deleted_at IS NULL", (tid, me(), ref.strip())).fetchone()
     if not again and b.get("portal") not in (None, False, 0, "0", "false", "") and not any(b.get(k) for k in ("suggestion", "choices", "approval")):
         # 2.126.0 B (#1979 G5): an agent's answer to a customer waits for a person (need_approval: agents only)

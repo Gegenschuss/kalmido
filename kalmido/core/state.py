@@ -184,6 +184,10 @@ def visible_lists(c, uid, light=False):
         if r["org_id"]:
             from ..accounts.orgroles import cap_list_role
             d["role"] = cap_list_role(c, uid, r["org_id"], d["role"])  # 2.143.0 A (#2151): read-only in the organisation -> view
+            from ..accounts.orgroles import org_say_refusal
+            sn = org_say_refusal(c, uid, r["org_id"])  # 2.607.0 (#4549): a guest / read-only person who cannot change the list
+            if sn and d["role"] not in WRITE_ROLES:  # only reads: no comment box, no reactions (the server says 403 too)
+                d["say_no"] = tr(sn)
         d["members"] = members.get(r["id"], [])
         if d["role"] == "participant" and d["members"]:  # 2.86.0 (N20 review): only the people who share a task with uid
             from ..collab.comments import h6r_shared_people

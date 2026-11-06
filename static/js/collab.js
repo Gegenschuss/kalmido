@@ -797,10 +797,11 @@ function commentHtml(c, U, ro = false) {
   const agc = !ro && !c.deleted, cs = agc && !c.saved_task_id && !editing && canEditList(taskById(c.task_id || S.sel)?.list_id);
   const csv = agc && c.saved_task_id ? `<button type="button" class="csaved" data-act="cm-saved" data-tid="${c.saved_task_id}" title="${esc(tr('Saved as a task: open it'))}">${ic('bookmark', 's')}<span>${tr('Saved')}</span></button>` : '';
   const cpb = editing || c.deleted ? '' : `<button type="button" class="iconbtn" data-act="cm-copy" data-cid="${c.id}" title="${esc(tr('Copy'))}" aria-label="${esc(tr('Copy'))}" aria-haspopup="menu">${ic('copy', 's')}</button>`;  // 2.46.2 (#1666)
-  const acts = ro ? (cpb ? `<span class="cacts">${cpb}</span>` : '') : `<span class="cacts">${editing ? '' : replyBtn()}${cpb}${cs ? `<button class="iconbtn" data-act="cm-save" data-cid="${c.id}" title="${esc(tr('Save as task'))}" aria-label="${esc(tr('Save as task'))}">${ic('bookmark', 's')}</button>` : ''}${mine ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
+  const sn = !ro && !!cmSayNo(taskById(c.task_id || S.sel));  // 2.607.0 (#4549): only reads: no reply, edit, reactions (delete own stays)
+  const acts = ro ? (cpb ? `<span class="cacts">${cpb}</span>` : '') : `<span class="cacts">${editing || sn ? '' : replyBtn()}${cpb}${cs ? `<button class="iconbtn" data-act="cm-save" data-cid="${c.id}" title="${esc(tr('Save as task'))}" aria-label="${esc(tr('Save as task'))}">${ic('bookmark', 's')}</button>` : ''}${mine && !sn ? `<button class="iconbtn" data-act="c-edit" data-cid="${c.id}" title="${tr('Edit')}">${ic('edit', 's')}</button>` : ''}${mine || S.tl.moderator ? `<button class="iconbtn" data-act="c-del" data-cid="${c.id}" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</span>`;
   const files = c.attachments?.length ? `<div class="atts catts">${c.attachments.map(a => cattHtml(a, c.id, editing)).join('')}</div>` : '';
   const main = editing ? `<div class="cedit"><textarea class="c-edit-input" data-cid="${c.id}" rows="2">${esc(decodeMentions(c.body, U))}</textarea><div class="mpick hidden"></div>${files}<div class="cbar"><span class="spacer"></span><button class="btn sm" data-act="c-edit-cancel">${tr('Cancel')}</button><button class="btn sm pri" data-act="c-edit-save" data-cid="${c.id}">${tr('Save')}</button></div></div>`
-    : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro)}${ccCommentHtml(c, ro)}${reactHtml(c, ro)}`;
+    : `${ro ? '' : replyQuoteHtml(c, 'c')}${c.body ? `<div class="cbody">${commentBody(c.body, U, taskById(c.task_id || S.sel)?.list_id)}</div>` : ''}${files}${sugHtml(c, ro || sn)}${ccCommentHtml(c, ro || sn)}${reactHtml(c, ro || sn)}`;
   // 2.5.1 (#395): the author's avatar opens the same card as an @mention (only in the comment list, not read-only copies)
   const cav = ro || c.ext_name ? av(c.user_id, cv_who(c, U)) : `<button type="button" class="cmav" data-mcard="${c.user_id}" data-mname="${esc(uname(c.user_id, U))}" aria-haspopup="dialog" title="${esc(tr('Show {0}', uname(c.user_id, U)))}">${av(c.user_id, uname(c.user_id, U))}</button>`;  // 2.50.0 (#329): a customer's comment: their name, no card
   return `<div class="cm ${isNew ? 'new' : ''}${isAgentUser(c.user_id) ? ' agc' : ''}${rxShow('k' + c.id)}" data-cid="${c.id}" data-mid="c:${c.id}">${cav}<div class="cmain"><div class="chead"><b>${esc(cv_who(c, U))}</b>${isAgentUser(c.user_id) ? agentBadge(c.user_id) : ''}${c.portal && typeof ptl_mark === 'function' ? ptl_mark(c) : '' /* 2.63.0 B (#1513) */}${rul_cmtTag(c) /* 2.71.0 A (#1457) */}<span class="muted cwhen" title="${esc(fmtWhen(c.created_at))}">${fmtWhenHead(c.created_at)}${c.edited_at ? ' · ' + tr('edited') : ''}</span>${csv}${acts}</div>${main}</div></div>`;
@@ -844,7 +845,13 @@ function timelineHtml(t) {
 }
 // 2.0.6: the comment box at the bottom edge of the task panel, visible while scrolling (sticky with the
 // footer); one line until it is used (focus, text or files), then the bar with files and Send
+// 2.607.0 (#4549): a guest / read-only person of the list's organisation only reads (the list's say_no from /api/state, else the
+// timeline's): a short hint instead of the comment box, no reactions -- the server answers 403 with the same text
+const cmSayNo = t => (t && listById(t.list_id)?.say_no) || (t && S.tl.id === t.id && S.tl.say_no) || '';
+const sayNoHtml = msg => `<div class="tcarch sayno" role="status">${ic('lock', 's')}<span>${esc(msg)}</span></div>`;
 function cmComposer(t, top = false) {  // top: 2.4.2 (#386) newest first, the box above the newest comment
+  const sn = cmSayNo(t);
+  if (sn) return `<div class="dcomp ${top ? 'dctop' : ''}">${sayNoHtml(sn)}</div>`;
   const soc = cmSocial(t), used = !!cmtDraft(t.id) || !!(S.cfiles[t.id] || []).length;
   return `<div class="dcomp ${top ? 'dctop' : ''}">${replyBarHtml('c:' + t.id)}<div class="ccomp ${used ? 'used' : ''}"><textarea id="c-input" rows="1" name="kalmido-comment" autocomplete="off" data-form-type="other" data-lpignore="true" placeholder="${soc ? tr('Write a comment… (@ mentions someone)') : tr('Write a comment…')}" aria-label="${tr('Comment')}">${esc(cmtDraft(t.id))}</textarea>
       <div class="mpick hidden"></div>

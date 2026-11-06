@@ -9,9 +9,9 @@ from ..core.db import body, db, err, iso, iso_ms, now_utc, usettings, usettings_
 from ..accounts.session import me
 from ..accounts.pictures import avatar_map
 from ..accounts.orgs import may_see
-from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql
+from ..core.access import collab_all, Denied, FULL_ROLES, list_role, MANAGE_ROLES, task_visible, vis_sql, WRITE_ROLES
 from ..core.access import access_note, health_hidden, org_trips_hidden, otr_live, ov_open, reading_sql, token_lists  # 2.281.0 B (#3110)
-from ..accounts.orgroles import FULL_READ, role_known
+from ..accounts.orgroles import FULL_READ, org_say_refusal, role_known
 from ..accounts.orgs import INSTANCE_ENV
 from ..tasks.validation import as_int
 from ..collab.comments import collab_on, comment_plain, lang_of, MENTION_RE, push_gate, push_gate_due, push_gate_reset, user_names
@@ -185,6 +185,27 @@ def tchat_dm_open(c, r, uid):
 def need_dm_open(c, r):
     if not tchat_dm_open(c, r, me()):
         raise Denied(403, tr("You no longer work together - this conversation is read-only"))
+
+
+def tchat_say_refusal(c, r, uid):
+    """2.607.0 (#4549): None when uid may write (post, edit, react, pin) in room r as far as its organisation goes, else the
+    refusal text (orgroles RO_MSG / GUEST_MSG, not translated). A list's channel: a guest / read-only person of the list's
+    organisation who cannot change the list only reads; a channel / group of an organisation: its guests / read-only people
+    only read; a DM (a conversation of two people, no organisation object) and private spaces: as before."""
+    if r["kind"] == "list":
+        x = c.execute("SELECT org_id FROM lists WHERE id=?", (r["list_id"],)).fetchone()
+        msg = org_say_refusal(c, uid, x[0]) if x and x[0] else None
+        return msg if msg and list_role(c, r["list_id"], uid) not in WRITE_ROLES else None
+    if r["kind"] in TCX_KINDS and r["org_id"]:
+        return org_say_refusal(c, uid, r["org_id"])
+    return None
+
+
+def need_room_say(c, r):
+    """2.607.0 (#4549): 403 with the organisation role's text when I may only read in room r."""
+    msg = tchat_say_refusal(c, r, me())
+    if msg:
+        raise Denied(403, tr(msg))
 
 
 def need_room(c, rid):
@@ -534,7 +555,8 @@ def tchat_messages(rid):
                "thread_read": tth_last_read(c, root["id"], me())}
     return jsonify(room={"id": r["id"], "kind": r["kind"], "list_id": r["list_id"], "muted": muted, "last_read": lr, "e2e": bool(r["e2e"]),
                          "members": [{"id": u, "name": names.get(u, "?"), "agent": u in ags} for u in sorted(mem)], **le2c_room(c, r), **xr,
-                         "read_ok": None if marks is None else sorted(marks)},  # 2.139.0 A (#2129): who may show up in "Read by"
+                         "read_ok": None if marks is None else sorted(marks),  # 2.139.0 A (#2129): who may show up in "Read by"
+                         "say_no": tr(sn) if (sn := tchat_say_refusal(c, r, me())) else None},  # 2.607.0 (#4549): read only, the box's hint
                    messages=le2c_out(c, r, [{**tchat_msg_dict(c, m, rx, qs, fs, th), "saved_task_id": saved.get(m["id"]),
                                              **trd_field(marks, m, me())} for m in rows]), has_more=more,
                    users={str(k): v for k, v in names.items()}, pins=le2c_out(c, r, cpin_team_list(c, rid)), **out)  # 2.62.0 (#1848): also older than the page; 2.64.2 C: the lock
@@ -548,6 +570,7 @@ def tchat_post(rid):
     need_tchat(c)
     r = need_room(c, rid)
     need_dm_open(c, r)  # 2.266.0 (#2970)
+    need_room_say(c, r)  # 2.607.0 (#4549): guests / read-only people of the organisation only read
     from .teamchan import tcx_add, tcx_files_refused, tcx_input, tcx_members, tcx_store
     b, files = tcx_input(body())  # 2.113.1 (#2059): JSON, or a multipart form with files (field file, repeatable)
     if r["kind"] == "channel" and r["archived_at"]:
@@ -814,6 +837,7 @@ def tchat_edit(mid):
     need_tchat(c)
     m, r = need_tmsg(c, mid, edit=True)
     need_dm_open(c, r)  # 2.266.0 (#2970): a frozen DM takes no edits (deleting one's own stays)
+    need_room_say(c, r)  # 2.607.0 (#4549)
     b = body()
     # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); edited meantime -> 409 + the message
     write_lock(c, f"tchat_msgs-{mid}")
@@ -904,6 +928,7 @@ def tchat_react(mid):
     if on and m["user_id"] == me():  # 2.23.0 (#823): not on one's own message
         return err(tr("You cannot react to your own message"))
     if on:
+        need_room_say(c, _r)  # 2.607.0 (#4549): taking a reaction back stays
         c.execute("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING", (mid, me(), emoji, iso_ms(now_utc())))
     else:
         c.execute("DELETE FROM tchat_rx WHERE message_id=? AND user_id=? AND emoji=?", (mid, me(), emoji))

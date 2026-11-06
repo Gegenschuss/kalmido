@@ -4191,6 +4191,17 @@ conversations). Opening channels or groups, renaming, archiving and managing mem
 people are members, an agent never joins through a group - only when a person adds it. Leaving the organisation or a role
 going down to guest / accounting ends the membership, as before.
 
+2.607.0 (#4549): **guests and read-only people of an organisation only read there.** A person whose organisation role is
+*Guest* or *Read-only* gets `403` (text "Your role in this organisation is read-only" / "Your role in this organisation does
+not include this") for: a comment on a task of the organisation's projects (`POST /tasks/{id}/comments`, editing one with
+`PATCH /comments/{id}`), a reaction (`POST /comments/{id}/reactions`), an answer to an agent's buttons
+(`POST /comments/{id}/choice`), a comment on a video sign-off of the organisation, and writing in its team chat (a project's
+channel, channels and groups of the organisation: post, edit, react, pin). Exception: who may change the task or project
+itself (a guest with a personal *Edit* share) keeps commenting there. Reading, taking back one's own reaction, deleting
+one's own comment or message and read marks stay; direct messages, private projects, the *Accounting* role and people
+without an organisation are not affected. The app shows a short hint instead of the comment box and the chat input
+(`say_no` on the project in the state, on the timeline and on the room of a conversation).
+
 2.139.0 (#2128): **voice messages**. People record them in the app (the microphone in the composer); a voice message is
 an audio attachment with `voice: true` and `duration_ms` (the length the browser measured, `null` = unknown); every
 attachment carries both fields (`voice: false` for normal files). Kalmido does not transcribe: an agent downloads the

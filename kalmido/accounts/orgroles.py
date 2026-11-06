@@ -2,7 +2,8 @@
 
     admin       manages the organisation (members, roles, settings) and sees / changes everything in it
     member      sees everything the organisation shares with all its members and changes it (the role every member had)
-    readonly    "Read-only": sees what a member sees, changes nothing in the organisation (the team chat stays open)
+    readonly    "Read-only": sees what a member sees, changes nothing in the organisation (2.607.0, #4549: also no comments,
+                reactions or team chat messages there)
     guest       "Guest": sees in the organisation only what is shared with them personally (lists, pages, calendars,
                 address books they are a member of); no organisation-wide lists, no office, no agents, no invitations
     accounting  "Accounting": like a guest, plus the organisation's office to read and export, and receipts to upload;
@@ -97,6 +98,29 @@ def need_org_write(c, uid, oid):
     """403 when uid's role in organisation oid does not allow changes (read-only, guest, accounting)."""
     if oid and not org_writes(c, uid, oid):
         raise Denied(403, tr(RO_MSG if org_role_key(c, uid, oid) == "readonly" else GUEST_MSG))
+
+
+# 2.607.0 (#4549): guests and read-only people only read in the organisation's objects: no comments,
+# no reactions, no answers to an agent's buttons, no messages in its team chat. Accounting stays as it was.
+SAY_NO = ("guest", "readonly")
+
+
+def org_say_refusal(c, uid, oid):
+    """2.607.0 (#4549): None when uid may say something (comment, react, answer, chat) in an object of organisation oid,
+    else the refusal text (not translated). Private objects (oid None), people who are not a member of oid, members, admins
+    and accounting: None. The caller lets someone through who may change the object itself (a guest's personal edit share)."""
+    r = org_role_key(c, uid, oid)
+    if r not in SAY_NO:
+        return None
+    return RO_MSG if r == "readonly" else GUEST_MSG
+
+
+def need_org_say(c, uid, oid, writes=None):
+    """2.607.0 (#4549): 403 with RO_MSG / GUEST_MSG when uid is a guest / read-only in organisation oid -- unless writes (a
+    callable, asked only then) says uid may change the object itself."""
+    msg = org_say_refusal(c, uid, oid)
+    if msg and not (writes and writes()):
+        raise Denied(403, tr(msg))
 
 
 def need_org_area(c, uid, oid, write=None):

@@ -27,7 +27,7 @@ from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 
 # ---------------------------------------------------------------- comments + activity timeline
 # Everyone who sees a task may comment on it (view-only members too; they still cannot change the
-# task). A private task's comments are a personal log. Authors edit / delete their own comments; the
+# task) -- 2.607.0 (#4549): except a guest / read-only person of the list's organisation (task_say_refusal). A private task's comments are a personal log. Authors edit / delete their own comments; the
 # list owner and the list's admins (1.10.0) may delete any comment in the list (moderation). Instance admins have no extra
 # rights here. Participants comment only on their own tasks (never on a context parent).
 # Deleted comments disappear (soft delete: body, mentions and files are wiped).
@@ -143,6 +143,23 @@ def need_live_comment(c, cid):
     return r, need_task(c, r["task_id"], write=False, full=True)
 
 
+def task_say_refusal(c, tid, uid):
+    """2.607.0 (#4549): None when uid may comment / react / answer on task tid as far as the task's organisation goes, else
+    the refusal text (orgroles RO_MSG / GUEST_MSG, not translated): a guest / read-only person of the list's organisation who
+    cannot change the task only reads. Private lists, people without that role and participants of other roles: None."""
+    from ..accounts.orgroles import org_say_refusal
+    r = c.execute("SELECT l.org_id FROM tasks t JOIN lists l ON l.id=t.list_id WHERE t.id=?", (tid,)).fetchone()
+    msg = org_say_refusal(c, uid, r[0]) if r and r[0] else None
+    return msg if msg and not task_visible(c, tid, uid, write=True) else None
+
+
+def need_task_say(c, tid, uid=None):
+    """2.607.0 (#4549): 403 with the organisation role's text when uid (default: me) may only read task tid."""
+    msg = task_say_refusal(c, tid, uid or me())
+    if msg:
+        raise Denied(403, tr(msg))
+
+
 @app.get("/api/tasks/<int:tid>/timeline")
 def timeline(tid):
     """Comments + activity of a task (loaded when the detail panel opens) and the mention picker.
@@ -205,6 +222,7 @@ def timeline(tid):
                    people=ppl, seen=seen[0] if seen else 0, moderator=role in MANAGE_ROLES,
                    agents=sorted(i for i in ids | {p["id"] for p in ppl} if i in ag),
                    can_write=task_visible(c, tid, me(), write=True),
+                   say_no=tr(sn) if (sn := task_say_refusal(c, tid, me())) else None,  # 2.607.0 (#4549): the box's hint
                    approver=is_approver(c, c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone(), me()),  # 2.2.0 (#339)
                    ticket=pt_ticket_info(c, tid, me()),  # 2.63.0 B (#1513): a customer's report (box in the task panel)
                    mail_reporter=MAIL_REPLY["info"](c, tid, me()) if MAIL_REPLY else None,  # 2.393.2 B (#3375)
@@ -274,6 +292,7 @@ def comment_create(tid):
     if not is_agent(g.user):
         need_feat("comments")
     need_task(c, tid, write=False, full=True)  # view-only members may comment (participants: on their own tasks)
+    need_task_say(c, tid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if t["deleted_at"]:
         return err(tr("The task is in the trash"), 409)
@@ -397,6 +416,7 @@ def comment_update(cid):
     r, _ = need_live_comment(c, cid)
     if r["user_id"] != me():
         return err(tr("Only the author can edit this comment"), 403)
+    need_task_say(c, r["task_id"])  # 2.607.0 (#4549): a guest / read-only person changes no comment (deleting one's own stays)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (r["task_id"],)).fetchone()
     b = web_fields(body(), {"body", "mentions", "expect_updated_at"}, "PATCH /api/comments/{cid}")
     # 2.564.0 D (#4701): the version the edit box opened with (edited_at, else created_at); changed meantime -> 409 + the comment

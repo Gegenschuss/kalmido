@@ -11,7 +11,7 @@ from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.errors import BadInput, reject_unknown, UnknownFields
 from ..tasks.validation import as_int
 from ..collab.comments import user_names
-from .teamchat import tchat_msg_dict, tchat_rx, need_tchat, need_tmsg  # 2.369.5 (#2517): pulled up from functions
+from .teamchat import tchat_msg_dict, tchat_rx, need_room_say, need_tchat, need_tmsg  # 2.369.5 (#2517): pulled up from functions
 from ..core.access import list_role, WRITE_ROLES  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -68,6 +68,7 @@ def cpin_team(mid):
     if r["kind"] == "list":  # 2.148.1 E (#2496): read-only members of a list do not pin
         if list_role(c, r["list_id"]) not in WRITE_ROLES:
             raise Denied(403)
+    need_room_say(c, r)  # 2.607.0 (#4549): guests / read-only people of the organisation pin nothing in its channels
     try:
         on = cpin_want(body(), bool(m["pinned_at"]))
     except BadInput as e:

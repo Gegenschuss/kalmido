@@ -13,7 +13,7 @@ from ..lists.lists import clean_color, clean_list_value
 from ..tasks.validation import as_int, CONTENT_MAX, descendants, log_act, PRIORITIES, TITLE_MAX
 from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
-from ..collab.comments import comment_plain, need_live_comment, user_names
+from ..collab.comments import comment_plain, need_live_comment, need_task_say, user_names
 from ..core.errors import BadInput, UnknownFields
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..agents.core import (
@@ -89,6 +89,7 @@ def react(c, k, uid, emoji, on):
             sg["approvals"] = [a for a in sg["approvals"] if not (isinstance(a, dict) and a.get("by") == uid)]  # 2.574.0 (#3376): a first of two taken back
             c.execute("UPDATE comments SET suggestion=? WHERE id=?", (json.dumps(sg, ensure_ascii=False), k["id"]))
         return res
+    need_task_say(c, k["task_id"], uid)  # 2.607.0 (#4549): a guest / read-only person reacts not (taking one back stays)
     if not c.execute("INSERT INTO comment_reactions(comment_id,user_id,emoji,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                      (k["id"], uid, emoji, iso_ms(now_utc()))).rowcount:
         return res

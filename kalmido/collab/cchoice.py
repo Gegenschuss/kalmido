@@ -22,7 +22,7 @@ from ..accounts.session import me
 from ..core.access import Denied, need_feat, need_task, task_visible
 from ..core.errors import BadInput, reject_unknown
 from ..api.common import v1_args, v1_json, v1_view
-from ..collab.comments import user_names, att_dicts, comment_dict  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import user_names, att_dicts, comment_dict, need_task_say  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import log_act  # 2.369.5 (#2517): pulled up from functions
 from ..collab.reactions import with_reactions  # 2.369.5 (#2517): pulled up from functions
 from ..collab.replies import with_replies  # 2.369.5 (#2517): pulled up from functions
@@ -120,6 +120,7 @@ def lv_answer(c, r, uid, ids, via="button"):
     """The person uid answers comment r with ids: stored once, logged, the agent hears it. -> (row, the person's comment id
     of a suggestion or None). Denied / BadInput."""
     from ..agents.core import agent_comment, agent_emit, agent_task_data, is_agent
+    need_task_say(c, r["task_id"], uid)  # 2.607.0 (#4549): a guest / read-only person answers no buttons (403)
     ch = lv_jload(r["choices"])
     au = c.execute("SELECT kind FROM users WHERE id=?", (r["user_id"],)).fetchone() if r["user_id"] else None
     if not ch or not au or au["kind"] != "agent":
