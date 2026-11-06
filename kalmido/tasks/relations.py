@@ -28,7 +28,7 @@ from ..collab.liste2e import le2e_task_mode
 from ..personal.timetrack import vis_ids
 from ..tasks.validation import log_act
 from ..tasks.tasks import one_task
-from ..tasks.lifecycle import do_complete, need_live, signed
+from ..tasks.lifecycle import complete_stale, do_complete, need_live, signed
 from ..tasks.dependencies import completed_ids, unblock_events
 
 REL_MAX = 50  # relations of one task (both directions)
@@ -90,9 +90,10 @@ def rel_add(c, tid, b):
     rid = have.get((a, kind))
     added = False
     if rid is None and not (kind == "relates" and any(k == "duplicate" for _, k in have)):
-        n = c.execute("SELECT COUNT(*) FROM task_relations WHERE task_id=? OR other_id=?", (tid, tid)).fetchone()[0]
-        if n >= REL_MAX:
-            raise BadInput(tr("At most {0} relations per task", REL_MAX))
+        for t in (tid, other):  # 2.576.0 (fable review): both tasks, so a task one may only read is not hung with endless ones
+            n = c.execute("SELECT COUNT(*) FROM task_relations WHERE task_id=? OR other_id=?", (t, t)).fetchone()[0]
+            if n >= REL_MAX:
+                raise BadInput(tr("At most {0} relations per task", REL_MAX))
         c.execute("DELETE FROM task_relations WHERE kind='relates' AND task_id=? AND other_id=?", (min(tid, other), max(tid, other)))
         rid = insert_id(c, "INSERT INTO task_relations(task_id,other_id,kind,created_by,created_at) VALUES(?,?,?,?,?) "
                            "ON CONFLICT DO NOTHING", (a, z, kind, me(), iso_ms(now_utc())))
@@ -103,8 +104,9 @@ def rel_add(c, tid, b):
             if task_visible(c, other, me(), write=True):  # a history line in the other task only with write access to it (as dependencies)
                 log_act(c, other, "rel_add", {"id": tid, "title": _title(c, tid), "k": "relates" if kind == "relates" else "has_duplicate"})
     undo = None
-    if kind == "duplicate" and isinstance(b, dict) and b.get("close") is True and rid and \
-            c.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()[0] == 0:
+    t = c.execute("SELECT status, repeat, due FROM tasks WHERE id=?", (tid,)).fetchone()
+    if kind == "duplicate" and isinstance(b, dict) and b.get("close") is True and rid and t["status"] == 0 and \
+            not (t["repeat"] and complete_stale(c, tid, t["due"])):  # 2.576.0 (fable review): as the status route
         undo = rel_close_dup(c, tid, other, rid if added else None)
     bump(c)
     c.commit()
@@ -113,11 +115,15 @@ def rel_add(c, tid, b):
 
 def rel_close_dup(c, tid, other, rid):
     """Closes tid as won't do, a duplicate of other (a comment says so, outside a list with the lock): the signed undo record.
-    rid = the relation this request added (the undo removes it), None when it was there before (it stays)."""
+    rid = the relation this request added (the undo removes it), None when it was there before (it stays).
+    2.576.0 (fable review): the same steps as the status route for "won't do" (its notification closed on my other devices;
+    no task event, the route sends none for won't do either; a recurring task ticked meanwhile elsewhere is left alone, rel_add)."""
+    from ..notify.push import push_handled
     undo = {}
     do_complete(c, tid, -1, undo)
     log_act(c, tid, "wont")
     unblock_events(c, completed_ids(c, tid))
+    push_handled(c, me(), [tid])
     cid = None
     if not le2e_task_mode(c, tid):  # a project encrypted in the browser: no plain text from the server
         cid = insert_id(c, "INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,'',?)",

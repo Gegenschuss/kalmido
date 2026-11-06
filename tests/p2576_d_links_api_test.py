@@ -10,6 +10,8 @@ Invented names only (example.com).  tenant-matrix: relation
    404, nothing stored); a relation to a task the reader cannot see is never shown (member, another organisation, the
    agent with only its shared list - app, API v1, task object); a task in the trash drops out and comes back
  - a person without an organisation relates her own tasks (freelancer-matrix: tasks), never to someone else's
+ - fable review: the limit of 50 counts for the other task as well; closing as duplicate marks its notification on the
+   other devices handled like the status route
 usage: p2576_d_links_api_test.py <datadir>      (P2576DL_NOSTART=1 = the server already runs like that)"""
 # freelancer-matrix: tasks
 import os
@@ -176,6 +178,30 @@ check(r.ok and [x["id"] for x in r.json()["relations"]] == [TR2], f"a read-only 
 # ---------------------------------------------------------------- remove
 check(A.delete(B + f"/api/tasks/{T1}/relations/{TP}").ok and n_rows(T1, TP) == 0, "remove: gone")
 check(A.delete(B + f"/api/tasks/{T1}/relations/{TP}").status_code == 404, "remove twice: 404")
+
+# ---------------------------------------------------------------- fable review N1: the limit counts for the other task too
+TX = mk(A, LA, "Busy target")
+for i in range(50):
+    check(A.post(B + f"/api/tasks/{mk(A, LP, f'Filler {i}')}/relations", json={"other_id": TX}).ok, f"setup: relation {i} on the target")
+check(A.post(B + f"/api/tasks/{TX}/relations", json={"other_id": T4}).status_code == 400, "N1: the full task itself takes no more")
+LB = Bo.post(B + "/api/lists", json={"name": "Bob own", "org_id": None}).json()["id"]
+TB = mk(Bo, LB, "Bob own task")
+r = Bo.post(B + f"/api/tasks/{TB}/relations", json={"other_id": TX})
+check(r.status_code == 400 and "50" in r.text and n_rows(TB, TX) == 0,
+      f"N1: relating one's own task to a full one: 400 with the limit, nothing stored {r.status_code} {r.text[:160]}")
+
+# ---------------------------------------------------------------- fable review N2: close as duplicate closes its notification elsewhere
+AID = kt.dbx("SELECT id FROM users WHERE username='alice'")[0][0]
+TD = mk(A, LA, "Duplicate with a notification")
+kt.dbx("INSERT INTO push_subs(user_id,endpoint,p256dh,auth,label,created_at) VALUES(?,?,?,?,?,?)",
+       (AID, "https://push.example.com/p2576dl", "k", "a", "Phone", "2026-01-01T00:00:00+00:00"))
+SUBID = kt.dbx("SELECT id FROM push_subs WHERE endpoint=?", ("https://push.example.com/p2576dl",))[0][0]
+kt.dbx("INSERT INTO push_tags(sub_id,tag,sent_at,handled_at) VALUES(?,?,?,NULL)", (SUBID, f"t-{TD}", 1.0))
+r = A.post(B + f"/api/tasks/{TD}/relations", json={"other_id": T1, "kind": "duplicate", "close": True})
+check(r.ok and r.json()["task"]["status"] == -1, f"N2: closed as duplicate {r.status_code} {r.text[:160]}")
+check(kt.dbx("SELECT handled_at FROM push_tags WHERE sub_id=? AND tag=?", (SUBID, f"t-{TD}"))[0][0] is not None,
+      "N2: its notification on the other device is marked handled (as the status route does)")
+kt.dbx("DELETE FROM push_subs WHERE id=?", (SUBID,))
 
 # ---------------------------------------------------------------- a person without an organisation
 FID, Fr = freelancer(B, A, features=FEAT)
