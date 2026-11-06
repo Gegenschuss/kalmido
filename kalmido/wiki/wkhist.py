@@ -37,7 +37,6 @@ from ..core.serializers import unlink_files  # 2.528.0 D (#4306)
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..core.writes import obj_history_add, obj_track  # 2.571.0 (#4766)
 from ..collab.liste2e import le2e_is_cipher
 from .pages import wiki_need, wiki_dict, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from .wikie2e import wke_page_mode, wke_denied  # 2.369.5 (#2517): pulled up from functions
@@ -202,13 +201,15 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
 # 2.571.0 (#4766): a page's name is its own field: a rename goes into the core's history (obj_history, kind "wiki"), the
 # versions above stay for its text (a save that changes only the name makes no version any more)
 WKH_KIND = "wiki"
-obj_track(WKH_KIND, "wiki_pages")
 
 
 def wkh_rename(c, r, path, uid):
     """2.571.0 (#4766): page row r (before the save) is now called path -> obj_history (not for a space with the lock: its
     names are ciphertexts)."""
     if path != r["path"] and not _locked(r):
+        from ..core.writes import OBJ_TRACK, obj_history_add, obj_track  # core/writes.py -> core/objects.py -> files: a cycle at the top
+        if WKH_KIND not in OBJ_TRACK:
+            obj_track(WKH_KIND, "wiki_pages")
         obj_history_add(c, uid, WKH_KIND, r["id"], {"path": r["path"]}, {"path": path}, org_id=r["org_id"] or None)
 
 

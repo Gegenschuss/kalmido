@@ -16,7 +16,6 @@ from ..core.db import db, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..accounts.session import me
 from ..collab.comments import user_names
-from ..core.writes import obj_history_add, obj_track  # 2.571.0 (#4766)
 from .shkinds import SHK_FILE_RE, shk_bool, shk_people  # 2.369.5 (#2517): pulled up from functions
 
 SHH_KEEP = 200
@@ -63,7 +62,15 @@ def shh_meta(c, sid, what, old, new, uid, cell=None):
 SHH_KIND = "sheet"
 SHH_CORE = {"title": "title", "tab_name": "tab", "list_id": "list"}  # column of sheets -> what (SHH_META)
 SHH_META["list"] = N_("Project")
-obj_track(SHH_KIND, "sheets")
+
+
+def _core():
+    """2.571.0 (#4766): the core's write layer, imported on first use (core/writes.py -> core/objects.py -> files/web.py ->
+    ... -> sheets: a module-level import would be a cycle); the kind is tracked once."""
+    from ..core.writes import OBJ_TRACK, obj_history_add, obj_track
+    if SHH_KIND not in OBJ_TRACK:
+        obj_track(SHH_KIND, "sheets")
+    return obj_history_add
 
 
 def shh_meta_write(c, uid, r, b, clean, public, version=True):
@@ -71,6 +78,7 @@ def shh_meta_write(c, uid, r, b, clean, public, version=True):
     checks may refuse), public(c, cur) -> the current state of a 409 ("current"); version=False: the caller checked its own
     version (API v1: expect_rev). The table's name in its folder, the list on its other sheets, rev + the area follow.
     Returns {column: (before, after)}. The caller commits."""
+    _core()
     from ..office.owrite import ow_write
     from ..files.fsref import fs_ref_rename
     from .core import sh_touch
@@ -91,7 +99,7 @@ def shh_meta_note(c, sid, col, old, new, uid):
     """2.571.0 (#4766): a change of one own field of table sid written by a route of its own (a sheet's name in the bar) ->
     the core's history (the changes of one person within ten minutes merge there)."""
     if ("" if old is None else str(old)) != ("" if new is None else str(new)):
-        obj_history_add(c, uid, SHH_KIND, sid, {col: old}, {col: new})
+        _core()(c, uid, SHH_KIND, sid, {col: old}, {col: new})
 
 
 def shh_core_entries(c, sheet, uid, limit):
