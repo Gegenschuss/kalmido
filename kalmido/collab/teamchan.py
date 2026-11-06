@@ -36,7 +36,7 @@ from ..core.errors import BadInput, reject_unknown
 from ..core.conflict import ccf_check  # 2.564.0 D (#4701)
 from ..api.common import v1_args, v1_call, v1_json, v1_view
 from ..core.orgcrypt import oc_list_space, oc_seal_path, oc_user_space, OrgCryptError  # 2.149.0 G (#2517): pulled up from functions
-from ..accounts.orgroles import FULL_READ, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions; 2.565.0 (#4719): FULL_READ
+from ..accounts.orgroles import FULL_READ, org_say_refusal, user_orgs_full, need_org_write  # 2.369.5 (#2517): pulled up from functions; 2.565.0 (#4719): FULL_READ
 from .teamchat import tchat_coworkers, need_tchat, need_room  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import may_see  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.attachments import safe_name, unexec_name, send_stored  # 2.369.5 (#2517): pulled up from functions
@@ -157,6 +157,8 @@ def tcx_can_manage(c, r, uid, mem=None):
     mem = tcx_members(c, r) if mem is None else mem  # 2.281.0 B (#3110)
     if r["kind"] == "group":
         return uid in mem
+    if r["org_id"] and org_say_refusal(c, uid, r["org_id"]):
+        return False  # 2.607.0 (#4549, review): a creator who is a guest / read-only person of the organisation now only reads
     if r["org_id"] and is_org_admin(c, uid, r["org_id"]):
         return True
     return r["created_by"] == uid and uid in mem  # 2.113.1 (#2059): removed / left = no longer manages it
