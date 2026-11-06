@@ -11,6 +11,8 @@ const B = process.env.BASE || `http://127.0.0.1:${process.env.KALMIDO_TEST_PROXY
 const F = []; let ok = 0; const errs = [];
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+// 2.589.0: wait for the real state (an element), not a fixed time - under load the saved user's prompt came after 900 ms
+const waitSel = async (d, sel, ms = 10000) => { for (let t = 0; t < ms; t += 100) { const e = d.querySelector(sel); if (e) return e; await sleep(100); } return null; };
 const fresh = () => execFileSync('bash', [path.join(__dirname, 'start.sh')], {stdio: 'ignore'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 
@@ -94,7 +96,7 @@ const feats = st => st.settings.features.split(',');
     click(w, um.querySelector('[data-m="save"]')); await sleep(900);
   };
   await addUser('bob');
-  let ask = d.querySelector('.modal.collabask');
+  let ask = await waitSel(d, '.modal.collabask');
   check(ask && /Turn on collaboration now\?/.test(ask.textContent), 'second user: "Turn on collaboration now?"');
   click(w, ask.querySelector('[data-m="yes"]')); await sleep(900);
   st = await api(jar, 'GET', '/api/state');
@@ -115,12 +117,12 @@ const feats = st => st.settings.features.split(',');
   jar = {}; w = await open(jar); d = w.document;
   await step1(w); click(w, d.querySelector('[data-su="go"]')); await sleep(800);
   w.close(); w = await open(jar); d = w.document; await sleep(300);
-  await w.eval(`settingsModal('users')`); await sleep(400);  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
-  click(w, d.querySelector('[data-acc="user-new"]')); await sleep(200);
+  await w.eval(`settingsModal('users')`); await waitSel(d, '[data-acc="user-new"]');  // 2.53.0 (#1410): settings.js loads on demand (own jsdom page, no boot())
+  click(w, d.querySelector('[data-acc="user-new"]')); await waitSel(d, '.modal #u-user');
   let um = [...d.querySelectorAll('.modal')].pop();
   um.querySelector('#u-user').value = 'dave'; um.querySelector('#u-pw').value = 'password123';
-  click(w, um.querySelector('[data-m="save"]')); await sleep(900);
-  ask = d.querySelector('.modal.collabask');
+  click(w, um.querySelector('[data-m="save"]'));
+  ask = await waitSel(d, '.modal.collabask');
   check(!!ask, 'prompt shown again on a fresh install');
   click(w, ask.querySelector('[data-m="no"]')); await sleep(400);
   st = await api(jar, 'GET', '/api/state');
