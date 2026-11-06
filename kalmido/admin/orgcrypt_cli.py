@@ -36,6 +36,7 @@ import sys
 import threading
 import time
 import warnings
+from decimal import Decimal, InvalidOperation
 
 from ..core.config import ATT_DIR, OFFICE_DIR, app, SECRET_KEY
 from ..core.pg import system_ctx, write_lock
@@ -797,6 +798,8 @@ def encrypt_org(c, oid, stop=None):
     if key is None:
         return {"fields": 0, "files": 0, "failed": 0}
     nf = fields_pass(c, oid, True, key, stop)
+    tp = trash_pass(c, oid, True, key, stop)  # 2.570.0 D (#4716): the copies in the office trash sealed too
+    nf += tp["changed"]
     from ..tasks.related import emb_drop_org
     emb_drop_org(c, oid, sealed=False)  # 2.59.0 B (#1375): plain task vectors go, the embedding worker computes them sealed
     c.commit()
@@ -805,7 +808,7 @@ def encrypt_org(c, oid, stop=None):
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
             c.execute("UPDATE org_keys SET migrated_at=? WHERE org_id=?", (_now(), oid))
         c.commit()
-    return {"fields": nf, "files": ns, "failed": bad}
+    return {"fields": nf, "files": ns, "failed": bad + tp["failed"]}
 
 
 def encrypt_all(c, stop=None, pause=0.0):
@@ -848,6 +851,9 @@ def decrypt_all(c):
         if key is None:
             continue
         tot["fields"] += fields_pass(c, oid, False, key)
+        tp = trash_pass(c, oid, False, key)  # 2.570.0 D (#4716): the copies in the office trash plain again (not emptied)
+        tot["fields"] += tp["changed"]
+        tot["failed"] += tp["failed"]
     tot["fields"] += _bud().bud_settle(c, plain=lambda sid: True)  # 2.72.0 (#1333): the household budget plain again
     tot["fields"] += _wkh().wkh_settle(c, plain=lambda sid: True)["changed"]  # 2.123.0 A (#2105): the knowledge pages plain again
     tot["fields"] += _priv_rows(c, plain=lambda sid: True)  # 2.306.0 A (#2885): the journal and the private filed mails plain again
@@ -859,7 +865,8 @@ def decrypt_all(c):
     c.commit()
     st = {}
     n, bad = files_decrypt(c, all_files(c), stats=st)
-    tot["files"], tot["failed"], tot["kept"] = n, bad, st.get("kept", 0)
+    tot["files"], tot["kept"] = n, st.get("kept", 0)
+    tot["failed"] += bad  # 2.570.0 D (#4716): added, no longer replaced (the trash copies' and documents' values that did not open)
     return tot
 
 
@@ -1182,27 +1189,99 @@ def rot_trash(c, oid, k1, k2, bad, stop=None):
     """2.558.0 (#4669): the copies in the office trash of organisation oid (office_trash.snap) keep the rows' sealed
     columns as stored; they are re-encrypted with the rest (compare and set, in batches), so a restore after a rotation
     brings readable values back. -> changed copies (unreadable values are added to bad)."""
-    n, last, jobs = 0, 0, _rot_snap_jobs()
+    jobs = _rot_snap_jobs()
+    return _trash_walk(c, oid, lambda snap: rot_snap(k1, k2, oid, snap, bad, jobs), bad, stop, sealed=True)
+
+
+def _trash_walk(c, oid, edit, bad, stop=None, sealed=False):
+    """2.570.0 D (#4716): every copy in the office trash of organisation oid (sealed: only copies holding a sealed value)
+    through edit(snap) (changes it in place, True when it did), written back compare and set, in batches with a commit each.
+    -> changed copies; a copy that is no JSON counts in bad (a one-item list) and stays."""
+    n, last = 0, 0
     while True:
         if stop and stop():
             return n
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
             write_lock(c, "orgcrypt")
-            rows = c.execute("SELECT id, snap FROM office_trash WHERE org_id=? AND snap LIKE ? AND id > ? "  # pg-ok: the prefix is case-exact
-                             f"ORDER BY id LIMIT {BATCH}", (oid, "%" + oc.PREFIX + "%", last)).fetchall()
+            sql, args = "SELECT id, snap FROM office_trash WHERE org_id=? AND id > ?", [oid, last]
+            if sealed:
+                sql += " AND snap LIKE ?"  # pg-ok: the prefix is case-exact
+                args.append("%" + oc.PREFIX + "%")
+            rows = c.execute(sql + f" ORDER BY id LIMIT {BATCH}", args).fetchall()
             for r in rows:
                 try:
                     snap = json.loads(r["snap"] or "{}")
                 except ValueError:
                     bad[0] += 1
                     continue
-                if isinstance(snap, dict) and rot_snap(k1, k2, oid, snap, bad, jobs):
+                if isinstance(snap, dict) and edit(snap):
                     n += c.execute("UPDATE office_trash SET snap=? WHERE id=? AND org_id=? AND snap=?",
                                    (json.dumps(snap, default=str), r["id"], oid, r["snap"])).rowcount
         c.commit()
         if len(rows) < BATCH:
             return n
         last = rows[-1]["id"]
+
+
+def _snap_cost(key, oid, enc, row):
+    """2.570.0 D (#4716): office_doc_items in a trash copy: cost <-> cost_enc like _cost_pass. -> True when changed."""
+    ctx = "office_doc_items.cost_enc"
+    if enc:
+        if row.get("cost_enc") is not None or row.get("cost") in (None, ""):
+            return False
+        try:
+            if Decimal(str(row["cost"])) == 0:
+                return False
+        except InvalidOperation:
+            return False
+        row["cost_enc"], row["cost"] = oc.oc_enc_k(key, oid, ctx, str(row["cost"])), 0
+        return True
+    v = row.get("cost_enc")
+    if v is None:
+        return False
+    row["cost"], row["cost_enc"] = (oc.oc_dec_k(key, oid, ctx, v) if oc.oc_is_enc(v) else v) or "0", None
+    return True
+
+
+def trash_snap(key, oid, enc, snap, bad):
+    """2.570.0 D (#4716): the copy snap of office/otrash.py with every protected value sealed (enc) or opened, the same
+    columns and kinds as fields_pass (FIELD_JOBS, the cost of positions like _cost_pass). -> True when something changed; a
+    value that does not open counts in bad and stays as it is."""
+    jobs = {}
+    for t, _idc, col, kind in FIELD_JOBS:
+        jobs.setdefault(t, []).append((col, kind))
+    changed = False
+    for table, rows in snap.get("rows") or []:
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            for col, kind in jobs.get(table, ()):
+                v = row.get(col)
+                if not isinstance(v, str):
+                    continue
+                try:
+                    new = _tx(key, oid, table, col, kind, v, enc)
+                except (oc.OrgCryptError, ValueError):
+                    bad[0] += 1
+                    continue
+                if new != v:
+                    row[col] = new
+                    changed = True
+            if table == "office_doc_items":
+                try:
+                    changed = _snap_cost(key, oid, enc, row) or changed
+                except (oc.OrgCryptError, ValueError):
+                    bad[0] += 1
+    return changed
+
+
+def trash_pass(c, oid, enc, key, stop=None):
+    """2.570.0 D (#4716): encrypt-all (enc) / decrypt-all also over the copies in the office trash of organisation oid
+    (office_trash.snap keeps the rows' columns as stored), so a restore after the switch brings readable values in the
+    current form back; the trash is not emptied. -> {"changed": copies, "failed": values that did not open}."""
+    bad = [0]
+    n = _trash_walk(c, oid, lambda snap: trash_snap(key, oid, enc, snap, bad), bad, stop, sealed=not enc)
+    return {"changed": n, "failed": bad[0]}
 
 
 def _rot_dirs():
