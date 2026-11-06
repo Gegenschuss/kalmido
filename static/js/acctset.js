@@ -730,6 +730,14 @@ function bkWire(md) {
     b.disabled = true;
     try {
       if (b.dataset.bk === 'now') { await bkDraw(md, await api('POST', '/api/admin/backups')); toast(tr('Backup started')); }
+      // 2.581.0 (#4826): does a passphrase (e.g. from the password manager) match the stored one? Typed into its own dialog,
+      // not into #bk-pass (that field saves a new one); the server answers only matches / does not match, with the step-up
+      if (b.dataset.bk === 'pcheck') {
+        const pass = await askPrompt(tr('Check passphrase'), '', {body: tr('Type the passphrase you have noted. Only whether it matches is shown.'), ok: tr('Check'), input: {type: 'password', max: 200}});
+        if (!pass) return;
+        const r = await suApi('POST', '/api/admin/backups/passphrase-check', {passphrase: pass}, tr('Check passphrase'));
+        toast(r.ok ? tr('The passphrase matches.') : tr('The passphrase does not match.'));
+      }
       if (b.dataset.bk === 'del' && item) { if (!await askConfirm(tr('Delete the backup of {0}?', aaWhen(item.created_at)), tr('The file is removed from the server.'), {ok: tr('Delete'), danger: true})) return; await bkDraw(md, await api('DELETE', '/api/admin/backups/' + encodeURIComponent(name))); }
       if (b.dataset.bk === 'verify' && item) {
         let pass = item.encrypted && !j.passphrase_set ? await askPrompt(tr('Passphrase of this backup'), '', {input: {type: 'password'}}) : '', r;

@@ -172,7 +172,7 @@ ROUTES = {
     "POST /api/admin/agents/{}/secret": "admin", "POST /api/admin/agents/{}/setup-code": "admin",
     "POST /api/admin/agents/{}/test": "admin", "POST /api/admin/agents/{}/token": "admin",
     "POST /api/admin/alerts/test": "admin", "POST /api/admin/backups": "admin", "POST /api/admin/backups/restore": "admin",
-    "POST /api/admin/backups/upload": "admin",
+    "POST /api/admin/backups/upload": "admin", "POST /api/admin/backups/passphrase-check": "admin",  # 2.581.0 (#4826)
     # 2.143.0 B (#2152): the off-site target is a setting of the server (its operator), not of a workspace
     "GET /api/admin/backups/offsite": "admin", "PATCH /api/admin/backups/offsite": "admin",
     "POST /api/admin/backups/offsite/test": "admin", "POST /api/admin/backups/offsite/upload": "admin",

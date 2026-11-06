@@ -45,6 +45,7 @@ from ..accounts.users import need_admin
 from ..calendars.caldav import _DAV_CACHE, _DAV_CACHE_LOCK, _DAV_INST
 from ..notify.push import _b64u, _b64u_dec, _VAPID
 from ..notify.alerts import _clamp_int, _env_int, aa_count, aa_disk, aa_now, aa_oserr, aa_switch
+from ..api.common import hit_limit  # 2.581.0 (#4826): the core layer's counter (the passphrase check)
 from ..calendars.subscriptions import _CAL_KEY
 from . import bkstore as bks  # 2.432.0 (#3584): the shared file store
 from ..core.retention import ret_days, ret_on, ret_report  # 2.369.5 (#2517): pulled up from functions
@@ -2276,6 +2277,40 @@ def backups_settings():
 
 def BK_ERR_TEXT(code, *a):
     return tr(BK_ERR[code], *a)
+
+
+BKPC_TRIES, BKPC_WINDOW = 5, 15 * 60  # 2.581.0 (#4826): tries of "Check passphrase" per account in the window (seconds)
+BKPC_OK, BKPC_NO = N_("{0} checked the backup passphrase: it matches."), N_("{0} checked the backup passphrase: it does not match.")
+
+
+@app.post("/api/admin/backups/passphrase-check")
+def backups_passphrase_check():
+    """2.581.0 (#4826): {passphrase} -> {ok: true|false}: does the typed passphrase match the one for new backups
+    (bk_passphrase: KALMIDO_BACKUP_PASSPHRASE before the stored one)? The instance admin only (need_backups), behind the
+    step-up (offsite.py stepup_need, as restore and download), at most BKPC_TRIES tries per account in BKPC_WINDOW (429; the
+    shared counter of api/common.py hit_limit, counted after the step-up so asking for the password costs no try),
+    compared in constant time (hmac.compare_digest). No passphrase set: 409 code no_passphrase. The answer and the admin
+    log (admin alerts, "security") carry only matches / does not match -- never the value or a part of it."""
+    from .offsite import stepup_need
+    need_backups()
+    c, b = db(), body()
+    b = b if isinstance(b, dict) else {}
+    e = stepup_need(c, b, proxy_ok=True)
+    if e is not None:
+        return e
+    uid = g.user["id"]
+    if hit_limit(f"bkpc:{uid}", BKPC_TRIES, BKPC_WINDOW):
+        return jsonify(error=tr("Too many attempts, please wait a few minutes"), code="rate"), 429
+    pw = b.get("passphrase")
+    if not isinstance(pw, str) or not pw or len(pw) > 200:
+        return err(tr("Invalid value: {0}", "passphrase"))
+    cur = bk_passphrase(c)
+    if not cur:
+        return jsonify(error=tr("No backup passphrase is set yet."), code="no_passphrase"), 409
+    ok = hmac.compare_digest(pw.encode(), cur.encode())
+    # the own harmless check is not pushed to oneself; one that does not match goes to every admin (a stolen session guessing)
+    aa_now("security", f"bk-passcheck:{uid}:{time.time_ns()}", BKPC_OK if ok else BKPC_NO, [g.user["username"]], skip=uid if ok else None)
+    return jsonify(ok=ok)
 
 
 @app.post("/api/admin/backups")
