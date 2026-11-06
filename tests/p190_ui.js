@@ -119,7 +119,8 @@ const clip = w => { w.__clip = []; Object.defineProperty(w.navigator, 'clipboard
   [...d.querySelectorAll('#pop .menu-list button')].find(b => /Delete tag/.test(b.textContent)).click(); await idle(w);
   check(/Delete the tag #old\?/.test(asked) && /removed from 2 tasks \(2 open\)/.test(asked) && /tasks themselves stay/.test(asked), 'dialog names the count: ' + asked);
   check(![...w.eval('[...S.tasks.values()]')].some(t => t.tags.includes('old')) && w.eval(`S.tasks.get(${T1}).tags.join()`) === 'keep', 'tag gone from both tasks, other tags stay');
-  check(!d.querySelector('#side .srow[data-drop="tag:old"]'), 'sidebar row gone');
+  // 2.609.0 (#4509): red only under a full Mac load - tagDelete redraws the sidebar after its load(); wait for that real state
+  check(await until(() => !d.querySelector('#side .srow[data-drop="tag:old"]'), {timeout: 15000}), 'sidebar row gone');
   check(/removed from 2 tasks/.test(d.querySelector('#toast').textContent), 'toast with undo: ' + d.querySelector('#toast').textContent);
   await w.eval(`histStep('undo')`); await sleep(1200);
   check(w.eval(`S.tasks.get(${T1}).tags.slice().sort().join()`) === 'keep,old' && !!d.querySelector('#side .srow[data-drop="tag:old"]'), 'undo brings the tag back');
