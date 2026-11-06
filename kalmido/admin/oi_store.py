@@ -85,6 +85,14 @@ _REF_KINDS = {"wiki": "wiki_pages", "sheet": "sheets"}
 # imported calendar / book in _finish_refs (one that did not come along goes again, like a page's node)
 _CORE_REF_KINDS = {"evcal": "ev_cals", "address_book": "books"}
 _CORE_MEMBERS = {"evcal": ("ev_cal_members", "cal_id"), "address_book": ("book_members", "book_id")}
+# 2.581.0 (#4811): reference nodes of the shared core (#4709) outside the areas' trees. Calendars and address books (#4712) are
+# in when the store comes (base import): their node points at the new row at once (the trigger kalmido_kern_node_made mirrors
+# their member rows, the shares of the archive land on it). The team chat's channels (#4719) come later (oi_team): their node
+# is set in _finish_refs like a page's. A project's node (#4739) is made by the base import itself (lists/lffolder.py lf_place):
+# the archive's node maps onto it, so its own member shares and its history follow (its "create" line is the target's).
+_CORE_NOW = {"evcal": "ev_cals", "address_book": "books"}
+_CORE_LATE = {"tchat_room": "tchat_rooms"}
+_LIST_REF = "list"
 
 
 def _areas(run, ctx):
@@ -138,6 +146,8 @@ def _node(c, run, src, d, ctx):
             run.put("fs_nodes", sid, have[0])
             st["merged"].add(have[0])
             return False
+    if d["kind"] == "ref" and src.get("ref_kind") in (*_CORE_NOW, *_CORE_LATE, _LIST_REF):
+        return _core_node(c, run, src, d, ctx, st, sid)
     if d["kind"] == "ref":
         if not (src.get("ref_kind") in _REF_KINDS and area or src.get("ref_kind") in _CORE_REF_KINDS):
             return None
@@ -153,6 +163,64 @@ def _node(c, run, src, d, ctx):
         d["ref_id"] = ref
     elif d["kind"] != "ref":
         d["ref_kind"] = None
+    return d
+
+
+def _core_node(c, run, src, d, ctx, st, sid):
+    """2.581.0 (#4811): the reference node of a core object (_CORE_NOW / _CORE_LATE / a project). Only an object THIS import
+    made in the target counts (run.m): a node whose object did not come along goes (False: silently, the object warned)."""
+    kind = src["ref_kind"]
+    if kind == _LIST_REF:  # the base import placed the project's node in the target's tree: the archive's node is that one
+        lid = run.m("lists", src.get("ref_id"))
+        n = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=? AND org_id IS NOT DISTINCT FROM ?",
+                      (_LIST_REF, lid, ctx.space or None)).fetchone() if lid else None
+        if n:
+            run.put("fs_nodes", sid, n[0])
+            st.setdefault("own_create", set()).add(sid)
+        return False
+    if kind in _CORE_NOW:
+        new = run.m(_CORE_NOW[kind], src.get("ref_id"))
+        if not new:
+            return False
+        have = c.execute("SELECT id FROM fs_nodes WHERE kind='ref' AND ref_kind=? AND ref_id=?", (kind, new)).fetchone()
+        if have:  # never a second node of one object
+            run.put("fs_nodes", sid, have[0])
+            st.setdefault("own_create", set()).add(sid)
+            return False
+        d["ref_id"] = new
+    else:
+        d["ref_id"] = None  # the channel comes with oi_team: _finish_refs sets it (or the node goes)
+        st["refs"].append((sid, kind, src.get("ref_id")))
+    if not ctx.space:
+        d["owner_id"], d["org_access"] = ctx.uid, ""
+    return d
+
+
+def _share_id(run, v):
+    n = run.m("fs_shares", v)
+    return str(n) if n else ""
+
+
+def _history(c, run, src, d, ctx):
+    """2.581.0 (#4811): a node's history line. A node mapped onto one the target made itself keeps the target's "create" line;
+    ids inside the detail point at the target (a person not ticked, a group or an agent: the line goes; a share id that did
+    not come along: no id)."""
+    sid = _oidi(src.get("node_id"))
+    act, det = str(src.get("action") or ""), str(src.get("detail") or "")
+    if act == "create" and sid in (_st(run).get("own_create") or ()):
+        return False
+    m = re.fullmatch(r"(user|group|agent):(-?\d+):(.*)", det) if act == "share" else None
+    if m:
+        new = ctx.who(int(m.group(2))) if m.group(1) == "user" else None
+        if not new or not _not_agent(c, new):
+            return False
+        d["detail"] = f"user:{int(new)}:{m.group(3)}"
+    elif act == "share" and det.startswith("merged:"):
+        d["detail"] = "merged:" + _share_id(run, det[7:])
+    elif act == "unshare" and det:
+        d["detail"] = _share_id(run, det)
+    elif act == "share_change" and ":" in det:
+        d["detail"] = _share_id(run, det.split(":", 1)[0]) + ":" + det.split(":", 1)[1]
     return d
 
 
@@ -534,9 +602,9 @@ def _finish_wiki(c, run, oi):
 
 def _finish_refs(c, run):
     """2.353.0 C (#2829): the reference nodes point at the new page / table; one whose page / table did not come along (a
-    locked page, the trash) goes again."""
+    locked page, the trash) goes again. 2.581.0 (#4811): the same for a team chat channel's node."""
     for sid, kind, ref in _st(run).get("refs") or []:
-        nid, new = run.m("fs_nodes", sid), run.m({**_REF_KINDS, **_CORE_REF_KINDS}[kind], ref)
+        nid, new = run.m("fs_nodes", sid), run.m({**_REF_KINDS, **_CORE_REF_KINDS, **_CORE_LATE}[kind], ref)
         if nid and new and not c.execute("SELECT 1 FROM fs_nodes WHERE ref_kind=? AND ref_id=? AND kind='ref'", (kind, new)).fetchone():
             c.execute("UPDATE fs_nodes SET ref_id=? WHERE id=?", (new, nid))
             if kind in _CORE_MEMBERS:  # 2.566.0 (#4712): the node is the truth now -- the member rows the object has (also of a
@@ -627,7 +695,8 @@ SPECS = [
     OiT("store/lock_keys.json", "fs_lock_keys", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "me"}, space=(), rid=False, prep=_lock_key),
     OiT("store/shares.json", "fs_shares", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "member", **_P}, space=(),
         prep=_share),
-    OiT("store/history.json", "fs_log", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"}, space=()),
+    OiT("store/history.json", "fs_log", refs={"node_id": "fs_nodes"}, need=("node_id",), people={"user_id": "null"}, space=(),
+        prep=_history),  # 2.581.0 (#4811)
     # documents: labels first (found by name in the target), then the links of the tags, rules, settings, the documents
     OiT("documents/senders.json", "doc_senders", prep=_label("sender")),
     OiT("documents/types.json", "doc_types", prep=_label("type")),

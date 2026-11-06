@@ -282,6 +282,8 @@ ok(Bo.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Passt", "reply_
 ok(Do.post(B + f"/api/team/rooms/{RID}/messages", json={"body": "Ich komme später"}), "dora writes")
 M1 = M1 or one("SELECT MIN(id) FROM tchat_msgs WHERE room_id=?", (RID,))
 dbx("INSERT INTO tchat_rx(message_id,user_id,emoji,created_at) VALUES(?,?,?,?)", (M1, BOB, "up", NOW))
+# 2.581.0 (#4811): a channel of the organisation with bob (the team chat on the core, #4719: its node carries bob's share)
+ok(A.post(B + "/api/team/channels", json={"name": "Studio", "org_id": ORG, "members": [BOB]}), "a channel with bob")
 # notes, notepads, playbook, form, rules
 ok(A.post(B + f"/api/lists/{LO}/notes", json={"title": "Kick-off", "body": "Ziele des Projekts", "pinned": True}), "a project note")
 ok(A.post(B + f"/api/lists/{LO}/notepads", json={"title": "Entscheidungen", "body": "- Drehtag fix"}), "a notepad")
@@ -517,6 +519,20 @@ check(not bad, "round trip: every entry equal after export -> import -> export: 
 for x in other:  # parts A / B (not counted until P2137C_STRICT=1)
     print("FAIL? not counted (other part): ROUNDTRIP " + x[:400], flush=True)
 print(f"round trip: {len(diffs)} differences, {len(bad)} counted", flush=True)
+# 2.581.0 (#4811): the core's nodes of the target point at the target's own objects and carry the shares (not only counted)
+check(T("SELECT s.user_id, s.role FROM fs_nodes n JOIN ev_cals k ON k.id=n.ref_id JOIN fs_shares s ON s.node_id=n.id "
+        "WHERE n.kind='ref' AND n.ref_kind='evcal' AND k.org_id=? AND n.org_id=?", (ORG4, ORG4)) == [(BOB, "edit")],
+      "round trip: the calendar's node with bob's share in the target")
+check(T("SELECT s.user_id FROM fs_nodes n JOIN books k ON k.id=n.ref_id JOIN fs_shares s ON s.node_id=n.id "
+        "WHERE n.kind='ref' AND n.ref_kind='address_book' AND k.org_id=? AND n.org_id=?", (ORG4, ORG4)) == [(BOB,)],
+      "round trip: the address book's node with bob's share in the target")
+check(sorted(T("SELECT s.user_id, s.list_own FROM fs_nodes n JOIN lists l ON l.id=n.ref_id JOIN fs_shares s ON s.node_id=n.id "
+               "WHERE n.kind='ref' AND n.ref_kind='list' AND l.org_id=? AND l.name='Alpha Projekt'", (ORG4,))) == [(BOB, 1), (DORA, 1)],
+      "round trip: the project's own member shares on the project's node of the target")
+check(BOB in [r[0] for r in T("SELECT s.user_id FROM fs_nodes n JOIN tchat_rooms r ON r.id=n.ref_id JOIN fs_shares s ON s.node_id=n.id "
+                              "WHERE n.kind='ref' AND n.ref_kind='tchat_room' AND r.org_id=? AND r.name='Studio'", (ORG4,))],
+      "round trip: the channel's node with bob's share in the target")
+check(not dbx("SELECT 1 FROM fs_nodes WHERE kind='ref' AND org_id=? AND ref_id IS NULL", (ORG4,)), "round trip: no node without its object")
 r = A.post(B + f"/api/imports/{(j.get('result') or {}).get('import_id')}/undo")
 check(r.ok and not dbx("SELECT 1 FROM lists WHERE org_id=? AND deleted_at IS NULL", (ORG4,)), f"undo of the round trip import (lists into the trash, #3027) {r.text[:160]}")
 
