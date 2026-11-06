@@ -26,7 +26,7 @@ from ..core.errors import BadInput
 from ..core.config import WATCHDOG_INTERVAL  # 2.149.0 G (#2517): pulled up from functions
 from ..api.common import v1_err  # 2.149.0 G (#2517): pulled up from functions
 from ..life.model import contract_out, feat_on  # 2.369.5 (#2517): pulled up from functions
-from ..collab.comments import user_names  # 2.369.5 (#2517): pulled up from functions
+from ..collab.comments import need_task_say, user_names  # 2.369.5 (#2517): pulled up from functions
 from ..agents.safety import ids_parse  # 2.369.5 (#2517): pulled up from functions
 from ..agents.core import agent_active, agent_emit, agent_ids, agent_row, job_dict, JOB_TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from ..office.model import office_on  # 2.369.5 (#2517): pulled up from functions
@@ -243,6 +243,7 @@ def ctr_run(c, j, sel, ed, extra, rec):
     p, inp, uid = json.loads(j["proposal"]), json.loads(j["input"] or "{}"), me()
     tid = p["task_id"]
     need_task(c, tid, write=False, full=True)  # view-only members may comment, as everywhere
+    need_task_say(c, tid)  # 2.607.0 (#4549): ... but not a guest / read-only person of the list's organisation
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if t["deleted_at"]:
         raise Denied(409, tr("The task is in the trash"))
