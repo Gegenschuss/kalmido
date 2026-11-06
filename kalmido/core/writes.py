@@ -157,6 +157,48 @@ def obj_history_add(c, uid, kind, rid, before, after, action="update", org_id=No
     return hid
 
 
+def obj_history_add_many(c, uid, kind, items, agent=None):
+    """2.609.0 (#4928): obj_history_add(action 'update') for many objects at once, in a few statements per 500 instead of a
+    lookup, a write and a count per object (a renamed knowledge folder: one rename per page). items: [(id, before, after,
+    org_id)] with each id once; org_id is taken as given (None = a private space, no lookup). The same merge within
+    OBJ_MERGE_MIN and the same OBJ_HISTORY_MAX per object as obj_history_add."""
+    if not items:
+        return
+    _reg(kind)
+    ag = 1 if (obj_is_agent(c, uid) if agent is None else agent) else 0
+    ts = _now()
+    lim = iso_ms(now_utc() - timedelta(minutes=OBJ_MERGE_MIN))
+    for i in range(0, len(items), 500):
+        part = items[i:i + 500]
+        ids = [int(x[0]) for x in part]
+        q = ",".join("?" * len(ids))
+        last = {r["ref_id"]: r for r in c.execute(f"SELECT DISTINCT ON (ref_id) * FROM obj_history WHERE kind=? AND ref_id IN ({q}) "
+                                                  "ORDER BY ref_id, id DESC", [kind, *ids])}
+        upd, ins = [], []
+        for rid, before, after, oid in part:
+            x = last.get(int(rid))
+            if x is not None and x["action"] == "update" and x["user_id"] == uid and x["agent"] == ag and str(x["updated_at"]) >= lim:
+                b0, a0 = json.loads(x["vals_before"] or "{}"), json.loads(x["vals_after"] or "{}")
+                for k, v in before.items():
+                    b0.setdefault(k, v)
+                a0.update(after)
+                for k in [k for k in a0 if k in b0 and _same(a0[k], b0[k])]:
+                    a0.pop(k)
+                    b0.pop(k)
+                upd += [x["id"], json.dumps(b0, default=str), json.dumps(a0, default=str)]
+            else:
+                ins += [kind, int(rid), oid, uid, ag, "update", json.dumps(before, default=str), json.dumps(after, default=str), ts, ts]
+        if upd:
+            c.execute("UPDATE obj_history SET vals_before=v.b, vals_after=v.a, updated_at=? FROM (VALUES "
+                      + ",".join(["(CAST(? AS bigint), CAST(? AS text), CAST(? AS text))"] * (len(upd) // 3))
+                      + ") AS v(id, b, a) WHERE obj_history.id=v.id", [ts, *upd])
+        if ins:
+            c.execute("INSERT INTO obj_history(kind,ref_id,org_id,user_id,agent,action,vals_before,vals_after,created_at,updated_at) "
+                      "VALUES " + ",".join(["(?,?,?,?,?,?,?,?,?,?)"] * (len(ins) // 10)), ins)
+            c.execute(f"DELETE FROM obj_history WHERE id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER (PARTITION BY ref_id ORDER BY id DESC) "
+                      f"AS rn FROM obj_history WHERE kind=? AND ref_id IN ({q})) t WHERE rn > ?)", [kind, *ids, OBJ_HISTORY_MAX])
+
+
 def obj_history(c, uid, kind, rid, limit=50):
     """The history of the object, newest first ('view' on it)."""
     obj_need(c, uid, kind, rid, "view")

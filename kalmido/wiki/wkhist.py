@@ -213,6 +213,17 @@ def wkh_rename(c, r, path, uid):
         obj_history_add(c, uid, WKH_KIND, r["id"], {"path": r["path"]}, {"path": path}, org_id=r["org_id"] or None)
 
 
+def wkh_rename_many(c, moves, uid):
+    """2.609.0 (#4928): wkh_rename for every (page row, new path) of a folder rename (pages.wiki_move) in a few statements
+    (core/writes.obj_history_add_many), not three to four per page."""
+    items = [(r["id"], {"path": r["path"]}, {"path": nw}, r["org_id"] or None) for r, nw in moves if nw != r["path"] and not _locked(r)]
+    if items:
+        from ..core.writes import OBJ_TRACK, obj_history_add_many, obj_track  # as wkh_rename: a cycle at the top
+        if WKH_KIND not in OBJ_TRACK:
+            obj_track(WKH_KIND, "wiki_pages")
+        obj_history_add_many(c, uid, WKH_KIND, items)
+
+
 def wkh_renames(c, r, uid, info=None, limit=100):
     """2.571.0 (#4766): the renames of page row r, newest first: [{at, by_name, agent, from, to}] -- the paths as uid sees
     them (through a share from the shared node down, wkfolder.wkf_shown_path)."""

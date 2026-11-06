@@ -658,9 +658,8 @@ def wiki_move():
         c.execute("UPDATE wiki_pages SET path=v.p, updated_by=?, updated_at=? FROM (VALUES "
                   + ",".join(["(CAST(? AS bigint), CAST(? AS text))"] * len(part)) + ") AS v(id, p) WHERE wiki_pages.id=v.id",
                   [uid, ts, *[x for r, nw in part for x in (r["id"], nw)]])
-    from .wkhist import wkh_rename  # 2.585.0 (#4795): each page's new name in the core's history, as a page's own rename
-    for r, nw in moves:
-        wkh_rename(c, r, nw, uid)
+    from .wkhist import wkh_rename_many  # 2.585.0 (#4795): each page's new name in the core's history, as a page's own rename
+    wkh_rename_many(c, moves, uid)  # 2.609.0 (#4928): in a few statements per 500 pages (was: three to four per page)
     n = wiki_relink_many(c, oid, uid, [(r["path"], nw) for r, nw in moves], ts)
     from .wkshare import wsh_repath  # 2.123.0 B (#2104): the shares of the folder and of its pages follow
     wsh_repath(c, oid, None if oid else uid, src, dst, True)
