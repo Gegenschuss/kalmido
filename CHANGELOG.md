@@ -14,6 +14,60 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.575.0] - 2026-11-06
+
+Package 2.571 (Bündel: Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2509_b).
+
+### Added
+- Kalmido AI: read-only web research, switched on per routine in the server settings ("Web research per routine", off by default): web search and reading one page through the provider's own server tools (Kalmido itself fetches no address), and a VAT ID check against the EU VIES service. While a run has web access every change and every message to others needs an approval card, web content reaches the model marked as foreign data, and every message and proposal of the run names its web sources; the usage view counts searches, pages and VAT checks (#4676).
+- Long press (phone) or right click (computer) opens a row's own menu in more places: team chat messages (also in a thread), comments in the task panel, agent chat messages, the section heads of a list and the calendar names of the timeline. The reactions of a comment or an agent message are an item of that menu now ("React"); where a long press drags or selects nothing changes (#4608).
+- Events and contacts record who changed them last (`updated_by`, also through the API, CalDAV and CardDAV); leads and quotations keep their version stamp to the millisecond (#4776).
+
+### Changed
+- Tables and knowledge pages: renaming a table, a sheet or a page and moving a table to another project go through the shared write path (version check with 409, one history entry in the shared history, other devices refresh); a pure rename of a page makes no new page version, its history dialog lists the renames. Withdrawing the share of a linked object in the file store dialog is recorded like every other withdrawn share of the shared core (#4766).
+
+### Fixed
+- Phone (narrow screens): in the office the row of area tiles in the side drawer keeps its height, so you can always switch from the office to another area (#4790).
+- Wide monitors: an invoice or quotation opened beside its list grows with the screen again (up to 160rem), so header and positions stand side by side from about 2560 px (#4740).
+
+Package 2.575 (Bündel: Bündel: CI-only rot: p2141_a_api, CI-only rot: p2172_a_edit_ui, CI-only rot: p2273_c_ui u. 7 weitere, Sammelpaket: Aufgaben ohne Pak).
+### Added
+- Settings > Modules: own module cards next to the six fixed ones. In Private any number of own cards (name, symbol, modules grouped by area), one click applies them to the private area only. In an organisation the admin makes several cards, assigns them to people and picks one default card for everyone without one; a person's cards together are the upper limit - members may hide modules within it, never add, the server refuses the rest (as for areas), nothing is deleted. A module added by an update stays off on own cards, the admin sees "new module available". Cards travel with the organisation export / import (#3778).
+- Sidebar: right click (computer) or long press (phone) on an area symbol opens a menu - move up / down (on the computer also by dragging, one order per person on every device), hide from the bar (with undo and where to bring it back), customise menu, set as start area (the app opens there), and for organisation admins, set apart, switch the area off in the organisation (#4051).
+### Changed
+- Start state: task keys at their default value are left out of `/api/state` and `/api/state/lists` with `td=1`, the app fills them in again (one table sent along); the start set of the 20,600-task measurement falls from 5.5 MB to 1.94 MB, budget 2 MB. Older apps without `td=1` get everything as before; `/api/v1` is unchanged (#3966).
+- Agent tokens: `GET /api/v1/me/tokens` shows a project-limited token the other tokens' projects only within its own limit (`list_ids_partial: true` where cut); the idempotency wait is 10 s instead of 3 s; API.md says the rate-limit headers count per server process; `setup.ps1` asks for the tool with a 120 s timeout like `setup.sh`, its Codex wrapper cuts comments behind values, paths with an apostrophe work (#3948).
+
+Package 2.574 (Bündel: Rot auf main allein: p260_ui, Rot auf main allein: agent_docs_coverage, Sammelpaket: Aufgaben ohne Paket (Dispatcher) u. 2 weitere).
+
+### Added
+- #3376 Ticket small items: priority "Urgent" above High (menus, filters, My tasks board column, matrix, quick entry `!!!!` / `!urgent`, API name `urgent`); duplicate a task with its subtasks through `POST /api/v1/tasks/{id}/duplicate` and the MCP tool `duplicate_task`; organisation admins see the tasks of the organisation's shared projects read-only (Settings > Workspaces, every look logged); project switch "Merge needs two approvals" (`two_eyes`) for gate, deploy and merge approvals; webhook `task.updated` carries `data.diff {field: {old, new}}`.
+- #3759 The agent setup commands (setup.sh, setup.ps1, also uninstall) speak Spanish, French, Italian and Dutch; unknown languages stay English, a missing text falls back to English.
+
+### Changed
+- #4681 Knowledge page editor: on long pages (600+ lines) formatting is rebuilt only around the visible part (measured 17-19 ms per keystroke on 2000 lines, now 3-4 ms).
+- #4023 The save button for the browser (bookmarklet) offers "Read later · Private" (preselected, Enter), "Read later · <Org> (Team)" per organisation, or a bookmark; already saved links are reported, not doubled; buttons already in the bookmarks bar get the new choice without dragging again. Settings > Integrations: section "Save button for the browser".
+- #3779 Sharing through the ntfy app is gone: the personal share inbox (Settings > Notifications), its polling and the old `NTFY_INBOX_*` variables (now ignored); the table `ntfy_inboxes` is dropped. Notifications through ntfy, the share menu, /drop and the mail inbox stay; the hint now points to the upload way (/drop, HTTP Shortcuts). The migration lint allows a DROP only in AFTER with a `# drop-ok` line.
+
+### Fixed
+- #4792 Dark theme: the task link in the agent status line of the chat has text contrast >= 4.5:1 again.
+- #4589 A refused task change says "change not applied" (no longer "offline"), and the field mark "Not saved yet, trying again" shows again while the outbox retries after a server error.
+- #4556 Account import: re-asked connection requests notify the other person like a request by hand (same notification switch), at most 50 per run; the rest is named in a warning.
+- #4692 The service worker's background send of a rebased outbox entry uses the entry's own idempotency key.
+- #3376 Duplicating a task in a browser-encrypted project is done by the browser again.
+
+### Security
+- #3376 Duplicating a task or a project and saving a template through the API leave out the tasks the copying agent's data lock covers (project copy and template through v1 had this gap since 2.78); approvals lock the request's comment row, the activity log shows a first of two approvals as waiting; webhook `data.diff` hides old section, parent and assignee the owner may not see.
+- #4556 The account import re-asks only people who are findable in the connection search (others are named in a warning); its undo withdraws requests like by hand, so a second import notifies nobody twice.
+
+CI-Fix: main rot von 2.570.0.
+### Fixed
+- main: an account import brings the reference nodes of calendars and address books along with their shares and history, and sharing a folder (also by an import or an accepted invitation) writes the shared core's share row (#4712, #4739)
+- main: an account-import undo keeps a habit that got a logged day since (its fingerprint is back, #4701)
+- main: the rest of a partly released task takes the task's lock, so both close with the release (#4609)
+- main: tests follow 2.542-2.570 (private office wording, agents send the version they read, sprint settings version, history routes in the freelancer sweep, conflict wording, the trigger's sanctioned bypass in a test setup)
+- main: p292_d_ui opens the people settings only once the account is loaded and measures the list once it stands still; p2504_c_ui marks the rows again after a late redraw (both CI red of 2.570.0 on the slower runner)
+
 ## [2.573.0] - 2026-11-06
 
 Package 2.566 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2113_a_api, CI-only rot: p2501_a_nosham).
@@ -1701,7 +1755,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.573.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.575.0...HEAD
+[2.575.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.575.0
 [2.573.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.573.0
 [2.570.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.570.0
 [2.563.1]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.563.1

@@ -19,11 +19,11 @@
 
 ## What's new
 
-**2.570.0** (2026-11-06):
-- **Trash**: deleted budget entries, templates, sections, sprints and office items stay 30 days and can be restored.
-- **Agents**: the Kalmido AI prepares invoice drafts from tracked time; a model per starter routine; agents must send the version they read.
-- **Office**: finalised documents are protected by a database trigger (rolling back past 2.542 needs the DROP TRIGGER in docs/OFFICE.md).
-- **Teams**: team chat channels can be shared with groups; budget warnings at 80 % and 100 %.
+**2.575.0** (2026-11-06):
+- **Agents**: the Kalmido AI can research the web read-only per routine and check VAT IDs; every change then needs an approval.
+- **Tasks**: new priority "Urgent"; duplicate a task with its subtasks; a browser save button with "Read later".
+- **Settings**: own module cards for Private and organisations; area symbols in the sidebar have a menu (move, hide, start area).
+- **Performance**: the start state shrinks from 5.5 MB to 1.94 MB in the 20,600-task measurement.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
