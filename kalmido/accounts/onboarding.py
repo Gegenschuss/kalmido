@@ -487,9 +487,9 @@ def _ind_data(c, oid):
     return (d if isinstance(d, dict) else {}), (r["updated_at"] if r else None)
 
 
-def ind_of_area(c, oid):
-    """The industry of office area oid: the first built-in pack switched on there, "" = none."""
-    packs = _ind_data(c, oid)[0].get("industry_packs")
+def ind_of_area(c, oid, d=None):
+    """The industry of office area oid (d: its settings data, read already): the first built-in pack switched on, "" = none."""
+    packs = (_ind_data(c, oid)[0] if d is None else d).get("industry_packs")
     return next((x for x in packs if x in ind_codes()), "") if isinstance(packs, list) else ""
 
 
@@ -501,8 +501,8 @@ def app_industry(c, uid):
 def ind_state(c, uid):
     """The field industry of /api/state and GET /api/industry."""
     oid, may = ind_area(c, uid)
-    return {"code": ind_of_area(c, oid), "can_set": bool(may), "choices": ind_choices(lang(c, uid)),
-            "updated_at": _ind_data(c, oid)[1]}
+    d, at = _ind_data(c, oid)
+    return {"code": ind_of_area(c, oid, d), "can_set": bool(may), "choices": ind_choices(lang(c, uid)), "updated_at": at}
 
 
 def ind_set(c, uid, code, b=None):
