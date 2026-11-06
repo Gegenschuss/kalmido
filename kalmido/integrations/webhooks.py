@@ -23,7 +23,7 @@ from ..core.i18n import N_, tr
 from ..core.db import body, connect, db, err, inbox_default, iso, iso_ms, local_now, now_utc, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, GATE, me
 from ..accounts.login import seal, unseal
-from ..accounts.orgs import is_org_admin
+from ..accounts.orgs import is_org_admin, may_see  # may_see: 2.574.0 (#3376, review F4)
 from ..core.access import Denied, list_role, reading_sql, task_visible
 from ..collab.comments import collab_on, comment_plain, user_names
 from ..collab.integfail import integ_org_admins, integ_tell
@@ -265,6 +265,8 @@ def wh_diff_out(c, d, uid, base):
     of what changed in this request. Never a text of a project encrypted in the browser; the old project only when uid sees it."""
     out = {}
     e2e = bool((c.execute("SELECT e2e FROM lists WHERE id=?", (base["list_id"],)).fetchone() or [None])[0])
+    lo = (d or {}).get("list_id")  # review F4: with the old project hidden, its section and parent task go too
+    old_hidden = bool(lo and lo[0] and lo[0] != lo[1] and not list_role(c, lo[0], uid))
     for k, (o, v) in (d or {}).items():
         if o == v or (e2e and k in ("title", "url")):
             continue
@@ -272,7 +274,9 @@ def wh_diff_out(c, d, uid, base):
             o, v = PRIO_NAMES.get(o or 0, "none"), PRIO_NAMES.get(v or 0, "none")
         elif k == "ttype":
             o, v = o or None, v or None
-        elif k == "list_id" and o and not list_role(c, o, uid):
+        elif k in ("list_id", "section_id", "parent_id") and old_hidden:
+            o = None
+        elif k == "assignee_id" and o and not may_see(c, uid, o):  # review F4: only an account the webhook's owner may see
             o = None
         out[WH_DIFF_NAMES.get(k, k)] = {"old": o, "new": v}
     return out

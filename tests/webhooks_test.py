@@ -213,6 +213,27 @@ check(set(dd) == {"priority", "assignee_id", "section_id", "url"}, f"diff keys =
 check(all(k in d2["task"] and v["new"] == d2["task"][k] for k, v in dd.items()) if dd else False,
       f"diff names and values as in data.task: {dd}")
 check(dd.get("priority") == {"old": "none", "new": "urgent"} and dd.get("section_id") == {"old": None, "new": sec}, f"v1 values: {dd}")
+# 2.574.0 (#3376, review F4): a task moved out of a project bob does not see: the old project, section and parent task are null
+lp = A.post(B + "/api/lists", json={"name": "Alice only"}).json()["id"]
+sp = A.post(B + "/api/sections", json={"list_id": lp, "name": "Hidden part"}).json()["id"]
+pp = A.post(B + "/api/tasks", json={"title": "Hidden parent", "list_id": lp}).json()["id"]
+t3 = A.post(B + "/api/tasks", json={"title": "Moved out", "list_id": lp, "section_id": sp, "parent_id": pp}).json()
+r = A.patch(B + f"/api/tasks/{t3['id']}", json={"list_id": lid, "section_id": None, "parent_id": None})
+check(r.ok, f"F4: the task moves into the shared list {r.status_code} {r.text[:120]}")
+
+
+def _t3_diff():
+    for x in hooks_log():
+        p = json.loads(x["body"]) if x["path"] == "/b" else {}
+        if p.get("event") == "task.updated" and p["data"]["task"]["id"] == t3["id"] and "list_id" in (p["data"].get("diff") or {}):
+            return p["data"]["diff"]
+    return None
+
+
+d3 = wait_for(_t3_diff) or {}
+check(d3.get("list_id") == {"old": None, "new": lid}, f"F4: bob's diff hides the old project {d3}")
+check(d3.get("section_id", {}).get("old") is None and d3.get("parent_id", {}).get("old") is None and "section_id" in d3 and "parent_id" in d3,
+      f"F4: ... and its section and parent task {d3}")
 # event filter: carol only wants completions
 wc = mk(Ca, STUB + "/c", ["task.completed"], "carol")
 A.put(B + f"/api/lists/{lid}/members", json={"user_id": 3, "role": "edit"})
