@@ -166,10 +166,12 @@ const ALL = 'cal,timeline,matrix,habits,pomo,collab,stats,time,progress,agents,c
     check(st === 200, tag + ': login');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: vw, height: vh}});
     await nav(B + '#today');
-    const TILE = '.fv2bar .fv2-tile';  // 2.552.0 (#4618): the head bar's row, on a phone #favrow under the header (it is a .fv2bar too; #4014 had put them into the sidebar)
+    const TILE = '.fv2bar .fv2-tile';  // 2.552.0 (#4618): the head bar's row, on a phone #favup over the tab bar (2.572.0 #4747; it is a .fv2bar too; #4014 had put them into the sidebar)
     for (let i = 0; i < 100 && !(await ev(`!!document.querySelector('${TILE}') && document.querySelectorAll('#side .srow[data-list]').length > 25 && document.querySelector('#side').scrollHeight - document.querySelector('#side').clientHeight > 300`).catch(() => false)); i++) await sleep(300);  // the extra lists drawn and the sidebar really scrolls
     await sleep(600);
     if (touch) { await ev(`(() => { sideOpenDrawer(); return 1; })()`); await sleep(600); }
+    // 2.572.0 (#4747): a phone's row sits closed over the tab bar: opened (the grip), so its tiles have a size to measure
+    if (touch) { await ev(`(() => { fvd_set(true); return 1; })()`); for (let i = 0; i < 40 && !(await ev(`!document.querySelector('#favup').classList.contains('hidden')`).catch(() => false)); i++) await sleep(100); }
     const m = await ev(`(() => { const s = document.querySelector('#side'), f = document.querySelector('#side .sbfix-m .sbhead') || document.querySelector('#side .sbfix') /* 2.442.0 (#3739): on a phone .sbfix has no box of its own */, t = document.querySelector('${TILE}'); if (!f || !t) return null;
       const top0 = f.getBoundingClientRect().top, r = t.getBoundingClientRect(); s.scrollTop = 600;
       return new Promise(res => requestAnimationFrame(() => { const top1 = f.getBoundingClientRect().top, fr = f.getBoundingClientRect(), ft = document.elementFromPoint(fr.left + fr.width / 2, fr.top + 8);
