@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from flask import jsonify, request
 
 from ..core.config import app, ATT_DIR, INLINE_TYPES, MAX_FILE_MB, TZ
+from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
 from ..core.pg import insert_id
 from ..core.i18n import N_, tr
 from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, parse_iso
@@ -740,6 +741,8 @@ def list_row_purge(c, lid, gone):
     gf_before_list_delete(c, lid)  # 2.33.0 (#934): a folder repository hanging on it moves to another list of its folder
     from ..receipts.suggest import olk_keep_project
     olk_keep_project(c, lid)  # 2.239.0 D (#2874): booked receipts keep the project name
+    from .lmcore import LMC_KIND
+    obj_rows_drop(c, LMC_KIND, lid)  # 2.578.0 (#4796): the settings' history / undo of the core go with the list
     n = c.execute("DELETE FROM lists WHERE id=?", (lid,)).rowcount
     gone.append((lid, r["icon"], paths))
     return n

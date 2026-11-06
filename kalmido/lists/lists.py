@@ -6,6 +6,7 @@ import secrets
 from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app
+from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
 from ..core.pg import insert_id
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
@@ -788,6 +789,8 @@ def list_purge(c, lid, inbox):
     olk_keep_project(c, lid)  # 2.239.0 D (#2874): booked receipts keep the project name
     from ..videos.vdrescue import vdr_rescue
     vdr_rescue(c, list_ids=[lid])  # 2.530.0 D (#4316): its video sign-offs go to the video trash, not with it by the cascade
+    from .lmcore import LMC_KIND
+    obj_rows_drop(c, LMC_KIND, lid)  # 2.578.0 (#4796): the settings' history / undo of the core go with the list
     c.execute("DELETE FROM lists WHERE id=?", (lid,))
     return icon, lfiles
 

@@ -9,6 +9,7 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
+from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc
 from ..core.pg import system_ctx, write_lock  # 2.269.0 B (#3034); 2.370.3 (#2760): system_ctx
@@ -167,6 +168,7 @@ def op_book_purge(c, uid, bid):
         raise Denied(409, tr("Only what is in the trash can be deleted for good"))
     c.execute("DELETE FROM books WHERE id=?", (bid,))
     from .ctfolder import CTF_BOOK, ctf_dropped
+    obj_rows_drop(c, CTF_BOOK, bid)  # 2.578.0 (#4796): its history / undo rows of the core go with it
     ctf_dropped(c, CTF_BOOK, bid)  # 2.351.0 B (#2749): its folder node goes
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
