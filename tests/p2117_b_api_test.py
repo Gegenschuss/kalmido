@@ -3,6 +3,8 @@
 Own container (start.sh, org encryption on). Invented companies, people and figures only.
 tenant-matrix: office
 freelancer-matrix: office
+ - #2293 (2.385.0): with the industry pack Film & Video three more samples (filming permission, location agreement, model
+   release), without it neither listed nor accepted; also for a person without organisation
  - #2283: the samples list = the three contract samples + seven letters (cover letter, payment reminder, dunning letter,
    notice of termination, power of attorney, handover record, credit note cover letter) in German / English (the office's
    document language, ?lang= the other); each only uses known variables; "use sample" makes an own template in the current
@@ -126,7 +128,7 @@ check(len([x for x in A.get(B + TP + "/starters").json()["starters"] if x["key"]
 r = A.post(B + TP, json={"starter": "handover", "lang": "en"})
 check(r.status_code == 201 and r.json()["name"] == "Handover record" and r.json()["sign"] == 1, "#2283: handover (signable) in English")
 TH = r.json()["id"]
-check(A.post(B + TP, json={"starter": "film_release"}).status_code == 400, "#2283: an unknown sample 400")
+check(A.post(B + TP, json={"starter": "film_release"}).status_code == 400, "#2283: an unknown sample 400")  # 2.385.0 (#2293): a film sample, unknown without the pack
 check(A.post(B + TP, json={"starter": ["letter"]}).status_code == 400, "#2283: a sample key not a string 400")
 r = A.post(B + GD, json={"template_id": TH, "client_id": CL})
 check(r.status_code == 201, "#2283: a document from the handover sample " + r.text[:200])
@@ -140,6 +142,25 @@ for s in (Bo, Ev):
     check(s.get(B + TP + "/starters").status_code == 403 and s.post(B + TP, json={"starter": "letter"}).status_code == 403,
           "#2283: member / member without office: no samples")
 check(requests.get(B + TP + "/starters", headers=AGH).status_code == 403, "#2283: agent 403")
+# 2.385.0 (#2293): the three film samples only with the industry pack Film & Video (above: off, film_release is unknown)
+check(A.put(B + O + "/settings", json={"industry_packs": ["film"]}).ok, "#2293: Film & Video on")
+FILM = ["film_permit", "film_location", "film_release"]
+for lg_ in ("de", "en"):
+    sf = A.get(B + TP + "/starters?lang=" + lg_).json()["starters"]
+    check([x["key"] for x in sf][-3:] == FILM and len(sf) == 16, f"#2293: the film samples follow the others ({lg_}) {[x['key'] for x in sf]}")
+    for s_ in [x for x in sf if x["key"] in FILM]:
+        used = set(re.findall(r"\{\{\s*([A-Za-z0-9_.]+)\s*\}\}", s_["body"]))
+        check(used and used <= VARS and s_["body"].startswith("# ") and s_["legal"] == 1 and s_["name"],
+              f"#2293: {s_['key']}/{lg_} known variables, heading, legal {used - VARS}")
+        check(("keine Rechtsberatung" if lg_ == "de" else "no legal advice") in s_["body"], f"#2293: {s_['key']}/{lg_} says to have it checked")
+check({x["key"]: x["name"] for x in A.get(B + TP + "/starters").json()["starters"]}.get("film_release") == "Model-Release", "#2293: German name")
+r = A.post(B + TP, json={"starter": "film_location"})
+check(r.status_code == 201 and r.json()["name"] == "Location-Vertrag" and r.json()["kind"] == "contract" and r.json()["sign"] == 1,
+      "#2293: use the location agreement " + r.text[:200])
+check(A.delete(B + f"{TP}/{r.json()['id']}").ok, "#2293: the film template removed again (the lists below count)")
+check(A.put(B + O + "/settings", json={"industry_packs": []}).ok, "#2293: Film & Video off")
+check(len(A.get(B + TP + "/starters").json()["starters"]) == 13 and A.post(B + TP, json={"starter": "film_permit"}).status_code == 400,
+      "#2293: without the pack neither listed nor accepted")
 # a fresh organisation (its admin had no template before)
 r = Ca.post(B + TP, json={"starter": "letter", "lang": "en"})
 check(r.status_code == 201 and r.json()["name"] == "Cover letter" and Ca.get(B + TP).json()["templates"][0]["id"] == r.json()["id"],
@@ -230,6 +251,13 @@ check(len(st["starters"]) == 13, "freelancer: the samples in the personal office
 r = Fr.post(B + TP, json={"starter": "credit"})
 check(r.status_code == 201 and r.json()["kind"] == "other", "freelancer: use sample " + r.text[:200])
 check([t["id"] for t in Fr.get(B + TP).json()["templates"]] == [r.json()["id"]], "freelancer: only the own template")
+# 2.385.0 (#2293): a person without organisation switches Film & Video on for her own area and gets the film samples
+check(Fr.post(B + TP, json={"starter": "film_release"}).status_code == 400, "freelancer #2293: no film sample without the pack")
+check(Fr.put(B + O + "/settings", json={"industry_packs": ["film"]}).ok, "freelancer #2293: Film & Video on")
+check([x["key"] for x in Fr.get(B + TP + "/starters").json()["starters"]][-3:] == FILM, "freelancer #2293: the film samples")
+r2 = Fr.post(B + TP, json={"starter": "film_release", "lang": "en"})
+check(r2.status_code == 201 and r2.json()["name"] == "Model release" and r2.json()["sign"] == 1, "freelancer #2293: model release " + r2.text[:200])
+check(Fr.delete(B + f"{TP}/{r2.json()['id']}").ok, "freelancer #2293: removed again")
 CF = Fr.post(B + O + "/contracts", json={"name": "Rahmenvertrag privat"}).json()["id"]
 r = up(Fr, CF, pdf("privat"), "privat.pdf")
 check(r.status_code == 201, "freelancer: upload " + r.text[:200])

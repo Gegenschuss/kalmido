@@ -2598,7 +2598,9 @@ new template dialog) takes over
 one of thirteen short samples in the office's document language (or another one) as an own, freely editable template of
 the current area (organisation or private): service agreement, order confirmation, non-disclosure agreement, cover
 letter, payment reminder, dunning letter, notice of termination, power of attorney, handover record, credit note
-cover letter, data processing agreement, privacy notice and consent to data processing. What no variable knows (an
+cover letter, data processing agreement, privacy notice and consent to data processing. With the industry Film & Video
+three more follow (2.385.0, #2293): filming permission, location agreement and model release (legal, with signature);
+without the industry they are neither listed nor accepted as `starter`. What no variable knows (an
 invoice number, a deadline) stays as `[placeholder]` in square brackets.
 Samples are sample text, no legal advice; the picker marks the legal ones (contracts, dunning, termination, power of
 attorney) to be checked before use. The samples live in the code (`kalmido/office/doctpl_samples.py`), never in the

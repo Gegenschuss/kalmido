@@ -395,5 +395,202 @@ The consent is voluntary. It can be withdrawn at any time without giving reasons
 More information is given in our privacy information.
 
 Date: {{today}}""")},
+    # 2.385.0 (#2293): three film samples, only offered while the area has the industry pack Film & Video on (pack: film,
+    # doctpl.dt_sample_on); neutral texts, the first line says to have them checked
+    "film_permit": {"kind": "other", "sign": 1, "legal": 1, "pack": "film",
+                    "de": ("Drehgenehmigung", """# Drehgenehmigung
+
+[Mustertext, keine Rechtsberatung: vor der Verwendung prüfen, anpassen und diese Zeile löschen.]
+
+{{client.name}}
+{{client.address}}
+vertreten durch {{client.contact}}
+
+erlaubt
+
+{{company.name}}
+{{company.address}}
+
+für das Projekt {{project.title}} Film- und Fotoaufnahmen an folgendem Ort:
+
+- Ort: [Adresse, Bereich, Räume]
+- Drehtage: [Datum] von [Uhrzeit] bis [Uhrzeit], Ausweichtermin [Datum]
+- Umfang: [Anzahl Personen im Team, Fahrzeuge, Technik, Strom, Parkflächen]
+- Aufbau und Abbau: [Zeiten]
+
+## Auflagen
+- Zugänge, Wege und Rettungswege bleiben frei; Anweisungen der Ansprechperson vor Ort ([Name, Telefon]) werden befolgt.
+- Der Ort wird im vorgefundenen Zustand zurückgegeben; Schäden werden sofort gemeldet.
+- [weitere Auflagen, zum Beispiel Ruhezeiten, keine Aufnahmen von Personen ohne deren Einwilligung]
+
+## Nutzung der Aufnahmen
+Die Aufnahmen dürfen für [Zweck, Medien, Gebiet, Dauer] genutzt werden. Der Ort wird [nicht] namentlich genannt.
+
+## Entgelt und Versicherung
+Entgelt: [Betrag oder unentgeltlich]. {{company.name}} hat eine Haftpflichtversicherung für die Dreharbeiten [Versicherer, Deckungssumme].
+
+Behördliche Genehmigungen (zum Beispiel für öffentlichen Grund) holt [wer] ein; diese Erlaubnis ersetzt sie nicht.
+
+Datum: {{today}}"""),
+                    "en": ("Filming permission", """# Filming permission
+
+[Sample text, no legal advice: check it before use, adapt it and delete this line.]
+
+{{client.name}}
+{{client.address}}
+represented by {{client.contact}}
+
+permits
+
+{{company.name}}
+{{company.address}}
+
+to film and take photographs for the project {{project.title}} at the following location:
+
+- Location: [address, area, rooms]
+- Shoot days: [date] from [time] to [time], alternative date [date]
+- Scope: [crew size, vehicles, equipment, power, parking]
+- Set-up and strike: [times]
+
+## Conditions
+- Entrances, paths and emergency exits stay clear; the instructions of the contact on site ([name, phone]) are followed.
+- The location is handed back in the condition it was found in; any damage is reported at once.
+- [further conditions, e.g. quiet hours, no recordings of people without their consent]
+
+## Use of the recordings
+The recordings may be used for [purpose, media, territory, period]. The location is [not] named.
+
+## Fee and insurance
+Fee: [amount or free of charge]. {{company.name}} holds liability insurance for the shoot [insurer, sum insured].
+
+Official permits (e.g. for public ground) are obtained by [who]; this permission does not replace them.
+
+Date: {{today}}""")},
+    "film_location": {"kind": "contract", "sign": 1, "legal": 1, "pack": "film",
+                      "de": ("Location-Vertrag", """# Location-Vertrag
+
+[Mustertext, keine Rechtsberatung: vor der Verwendung prüfen, anpassen und diese Zeile löschen.]
+
+zwischen {{client.name}}, {{client.address}} (Überlassende Seite)
+und {{company.name}}, {{company.address}} (Produktion)
+
+## 1. Gegenstand
+Die überlassende Seite stellt der Produktion für das Projekt {{project.title}} folgenden Ort für Film- und Fotoaufnahmen zur Verfügung: [Adresse, Räume, Außenflächen, mitbenutzte Einrichtung].
+
+## 2. Zeitraum
+Vorbereitung und Aufbau: [Datum, Uhrzeit]
+Drehtage: [Datum, Uhrzeit von bis]
+Abbau und Rückgabe: [Datum, Uhrzeit]
+Verschiebt sich der Dreh (zum Beispiel wegen Wetter), gilt nach Absprache [Ausweichtermin].
+
+## 3. Entgelt
+Die Produktion zahlt [Betrag] [zuzüglich Umsatzsteuer] für den gesamten Zeitraum, fällig [Zahlungsziel]. Zusätzliche Tage: [Betrag je Tag]. Nebenkosten (Strom, Reinigung): [inklusive / nach Aufwand].
+
+## 4. Zustand und Rückgabe
+Der Zustand des Ortes wird vor Beginn festgehalten [Übergabeprotokoll, Fotos]. Veränderungen (Möbel umstellen, Dekoration, Befestigungen) nur nach Absprache; die Produktion stellt den ursprünglichen Zustand bis zur Rückgabe wieder her.
+
+## 5. Haftung und Versicherung
+Die Produktion haftet für Schäden, die sie, ihr Team oder ihre Dienstleister verursachen. Sie hat eine Haftpflichtversicherung [Versicherer, Deckungssumme]. Für Wertgegenstände der überlassenden Seite gilt: [Regelung].
+
+## 6. Nutzung der Aufnahmen
+Die Produktion darf die Aufnahmen des Ortes zeitlich, räumlich und inhaltlich [unbeschränkt / beschränkt auf …] nutzen. Name und Adresse des Ortes werden [nicht] genannt.
+
+## 7. Rücktritt
+Sagt eine Seite ab, gilt: [Fristen, Ausfallentgelt].
+
+## 8. Schluss
+Änderungen bedürfen der Textform. Ist eine Bestimmung unwirksam, bleibt der Vertrag im Übrigen wirksam.
+
+Datum: {{today}}"""),
+                      "en": ("Location agreement", """# Location agreement
+
+[Sample text, no legal advice: check it before use, adapt it and delete this line.]
+
+between {{client.name}}, {{client.address}} (owner)
+and {{company.name}}, {{company.address}} (production)
+
+## 1. Subject
+The owner provides the production with the following location for filming and photography for the project {{project.title}}: [address, rooms, outdoor areas, furnishings used].
+
+## 2. Period
+Preparation and set-up: [date, time]
+Shoot days: [date, time from to]
+Strike and handback: [date, time]
+If the shoot is postponed (e.g. due to weather), [alternative date] applies by agreement.
+
+## 3. Fee
+The production pays [amount] [plus VAT] for the whole period, due [payment term]. Additional days: [amount per day]. Utilities (power, cleaning): [included / at cost].
+
+## 4. Condition and handback
+The condition of the location is recorded before the start [handover record, photos]. Changes (moving furniture, set dressing, fixings) only by agreement; the production restores the original condition by the handback.
+
+## 5. Liability and insurance
+The production is liable for damage caused by it, its crew or its contractors. It holds liability insurance [insurer, sum insured]. For valuables of the owner: [arrangement].
+
+## 6. Use of the recordings
+The production may use the recordings of the location [without limitation / limited to …] in time, territory and content. The name and address of the location are [not] stated.
+
+## 7. Cancellation
+If one party cancels: [notice periods, cancellation fee].
+
+## 8. Final provisions
+Changes must be made in text form. Should a provision be invalid, the rest of the agreement remains valid.
+
+Date: {{today}}""")},
+    "film_release": {"kind": "contract", "sign": 1, "legal": 1, "pack": "film",
+                     "de": ("Model-Release", """# Model-Release (Einwilligung in Bild- und Tonaufnahmen)
+
+[Mustertext, keine Rechtsberatung: vor der Verwendung prüfen, anpassen und diese Zeile löschen.]
+
+Ich, {{client.name}}, {{client.address}}, willige ein, dass {{company.name}} im Projekt {{project.title}} Bild- und Tonaufnahmen von mir macht und nutzt.
+
+## Aufnahmen
+- Datum und Ort: [Datum, Ort]
+- Art: [Foto, Video, Ton]
+- Rolle: [zum Beispiel Darstellerin, Interviewpartner, Komparse]
+
+## Nutzungsumfang
+- Zweck: [zum Beispiel Werbefilm für …, Dokumentation, Social Media]
+- Medien: [Internet, TV, Kino, Print, Messe]
+- Gebiet und Dauer: [Gebiet], [Dauer]
+- Bearbeitung: Die Aufnahmen dürfen geschnitten, bearbeitet und mit anderen Inhalten verbunden werden, ohne den Sinn zu entstellen.
+- Namensnennung: [ja / nein]
+
+## Vergütung
+[Betrag oder unentgeltlich]. Weitere Ansprüche aus der Nutzung im vereinbarten Umfang bestehen nicht.
+
+## Datenschutz und Widerruf
+Die Aufnahmen und die Angaben dieser Erklärung werden zur Herstellung und Auswertung des Projekts verarbeitet. Die Einwilligung ist freiwillig. Ein Widerruf ist an [E-Mail-Adresse] möglich und gilt für die Zukunft; bereits veröffentlichte oder fertiggestellte Produktionen bleiben davon [unberührt / betroffen, Regelung]. Mehr dazu in unseren Datenschutzhinweisen.
+
+[Bei Minderjährigen: Einwilligung der Sorgeberechtigten, Name und Unterschrift.]
+
+Datum: {{today}}"""),
+                     "en": ("Model release", """# Model release (consent to image and sound recordings)
+
+[Sample text, no legal advice: check it before use, adapt it and delete this line.]
+
+I, {{client.name}}, {{client.address}}, consent to {{company.name}} making and using image and sound recordings of me in the project {{project.title}}.
+
+## Recordings
+- Date and place: [date, place]
+- Type: [photo, video, sound]
+- Role: [e.g. actor, interviewee, extra]
+
+## Scope of use
+- Purpose: [e.g. commercial for …, documentary, social media]
+- Media: [internet, TV, cinema, print, trade fair]
+- Territory and period: [territory], [period]
+- Editing: the recordings may be cut, edited and combined with other content without distorting their meaning.
+- Credit: [yes / no]
+
+## Fee
+[amount or free of charge]. No further claims arise from the use within the agreed scope.
+
+## Data protection and withdrawal
+The recordings and the details of this declaration are processed to produce and exploit the project. The consent is voluntary. It can be withdrawn by writing to [e-mail address] with effect for the future; productions already published or completed remain [unaffected / affected, arrangement]. More in our privacy information.
+
+[For minors: consent of the parents or guardians, name and signature.]
+
+Date: {{today}}""")},
 }
 sample_langs(DMA_SAMPLES)

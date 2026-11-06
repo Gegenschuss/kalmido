@@ -775,6 +775,12 @@ def dt_sample_body(c, oid, text):
     return text
 
 
+def dt_packs(c, oid):
+    """2.385.0 (#2293): the industry packs switched on in the office area (the samples with a pack need theirs)."""
+    pk = office_settings(c, oid).get("industry_packs")
+    return pk if isinstance(pk, list) else []
+
+
 @app.get("/api/office/doc-templates/starters")
 def dt_starters_get():
     """?lang= (default: the office's document language) -> {starters: [{key, kind, name, lang, body, machine}], note}.
@@ -782,12 +788,14 @@ def dt_starters_get():
     c, uid, oid = _ctx()
     lg = dt_lang(c, oid, request.args.get("lang") or None)
     mt = lambda k: int(k in SAMPLE_MT and lg not in ("de", "en"))  # noqa: E731
+    pks = dt_packs(c, oid)
     # 2.117.0 B (#2283): the letters of doctpl_samples after the contract samples; legal = the picker says to check it
     return jsonify(starters=[{"key": k, "kind": k, "kind_label": dt_kind_label(k), "name": sample_text(v, lg)[0], "lang": lg,
                               "body": dt_sample_body(c, oid, sample_text(v, lg)[1]), "legal": int(k != "confirmation"), "machine": mt(k)}
                              for k, v in DT_STARTERS.items()] +
                    [{"key": k, "kind": v["kind"], "kind_label": dt_kind_label(v["kind"]), "name": sample_text(v, lg)[0], "lang": lg,
-                     "body": sample_text(v, lg)[1], "legal": v["legal"], "machine": mt(k)} for k, v in DMA_SAMPLES.items()], note=tr(DT_NOTE), lang=lg)
+                     "body": sample_text(v, lg)[1], "legal": v["legal"], "machine": mt(k)} for k, v in DMA_SAMPLES.items()
+                    if v.get("pack") in (None, *pks)], note=tr(DT_NOTE), lang=lg)
 
 
 @app.post("/api/office/doc-templates")
@@ -800,6 +808,8 @@ def dt_tpl_post():
     if b.get("starter") is not None:
         st = DT_STARTERS.get(b.get("starter")) if isinstance(b.get("starter"), str) else None
         sm = DMA_SAMPLES.get(b.get("starter")) if isinstance(b.get("starter"), str) and not st else None  # 2.117.0 B (#2283)
+        if sm and sm.get("pack") not in (None, *dt_packs(c, oid)):  # 2.385.0 (#2293): a film sample without the film pack is unknown here
+            sm = None
         if not st and not sm:
             raise BadInput(tr("Invalid value: {0}", "starter"))
         lg = dt_lang(c, oid, b.get("lang"))
