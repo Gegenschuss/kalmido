@@ -441,6 +441,10 @@ APP_ONLY = [
     ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
      "documents); agents keep their shares, read and change documents with /documents and files with /files",
      ("=PUT /api/files/nodes/{}/recognition",)),
+    # 2.607.0 (#4872)
+    ("2.607.0 (#4872): Apply what was learned on many documents at once (sorting again with the stored text, its undo) is a "
+     "person's step in the app, like bulk and Recognise again; agents set sender / type / tags one by one through /documents",
+     ("=POST /api/docs/apply-learned",)),
     # 2.122.0 B (#2294 #2099)
     ("2.122.0 (#2294, #2099): a person's own steps on many documents at once (bulk tags / type / sender with its undo, the ZIP of a "
      "selection for the browser) and the tags of files / folders in the file store app; agents filter with /documents (the same "

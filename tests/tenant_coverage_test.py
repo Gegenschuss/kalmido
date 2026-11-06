@@ -1168,6 +1168,8 @@ ROUTES = {
     # organisation / person: nothing changed, nothing in the ZIP, 404 on the tags of a node, no hit in the tag filter)
     "POST /api/docs/bulk": "document", "POST /api/docs/zip": "document", "GET /api/docs/zip/{}": "document",
     "GET /api/files/nodes/{}/tags": "file", "PUT /api/files/nodes/{}/tags": "file", "GET /api/files/tags": "file", "GET /api/files/tagged": "file",
+    # 2.607.0 (#4872): p2607_c_learn_api_test.py: another person's document left out, read-only counted as denied, nothing changed
+    "POST /api/docs/apply-learned": "document",
     "PUT /api/files/nodes/{}/recognition": "file",  # 2.353.0 D (#2759): p2353_d_ablagedocs_test.py (c): another person 404, read-only 403
     # 2.48.0 (#1207 / #1152 / #1356)
     "DELETE /api/files/nodes/{}": "file", "DELETE /api/files/shares/{}": "file", "DELETE /api/paperless": "paperless",
