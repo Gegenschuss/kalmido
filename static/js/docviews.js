@@ -64,6 +64,8 @@ function dcv_apply(v) {
   f.notag = p.get('no_tag') === '1'; f.nosender = p.get('no_sender') === '1'; f.review = p.get('review') === '1';
   f.ftype = (p.get('ftype') || '').split(',').filter(Boolean);
   DC.f = f; DC.q = p.get('q') || ''; DC.under = p.get('under') || null;
+  const qi = $('#dc-q'); if (qi) qi.value = DC.q;  // the field keeps its text in a redraw (docs.js "Remove filter q"): its next input would bring the old search back
+  if (typeof dc_qTimer !== 'undefined') clearTimeout(dc_qTimer);
   DC.vsort = v && p.get('sort') ? {k: p.get('sort'), d: p.get('dir') === 'asc' ? 'asc' : 'desc'} : v ? {k: 'date', d: 'desc'} : null;
   DC.more = false; DC.at = 0; DC.facets = null;
   DCV.applied = v ? {id: v.id, query: v.query} : null;
