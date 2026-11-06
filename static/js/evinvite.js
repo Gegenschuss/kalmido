@@ -59,7 +59,7 @@ async function evf_modal(c) {
     if (!j.url && !j.active) { box.innerHTML = `<div class="row"><button class="btn pri" data-evf="create">${ic('cal', 's')} ${esc(tr('Create subscription link'))}</button></div>`; return; }
     // 2.577.0 (#4708 6): the server keeps only a hash: the link is in the answer of create / rotate once, later "active since"
     const at = j.created_at ? new Date(j.created_at) : null;
-    if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="evf-act">${esc(at && !isNaN(at) ? tr('Subscription link active since {0}', fmtDateNum(/** @type {any} */ (at))) : tr('Subscription link active'))}</span></div>
+    if (!j.url) { box.innerHTML = `<div class="row"><span class="muted" id="evf-act">${esc(at && !isNaN(at.getTime()) ? tr('Subscription link active since {0}', fmtDateNum(at)) : tr('Subscription link active'))}</span></div>
       <div class="row evfbtns"><button class="btn" data-evf="rotate">${ic('key', 's')} ${esc(tr('New link'))}</button><button class="btn danger" data-evf="off">${esc(tr('Turn the link off'))}</button></div>`; return; }
     box.innerHTML = `<div class="row icalrow"><input id="evf-url" readonly value="${esc(j.url)}" aria-label="${esc(tr('Subscription link'))}"><button class="btn pri" data-evf="copy">${ic('copy', 's')} ${esc(tr('Copy'))}</button></div>
       <div class="shint keep" role="status">${esc(tr('Only visible now: copy it now. If you lose it, create a new one.'))}</div>
