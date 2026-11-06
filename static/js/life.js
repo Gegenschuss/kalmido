@@ -114,12 +114,7 @@ async function lifeDone(md, t, msg) {
   if (t) toast(msg || tr('Added: {0}', t.title), () => openDetail(t.id), 6000, tr('Open'));
 }
 function lifeErr(md, er) { const e = $('.aerr', md); if (e) e.textContent = er.message || ''; }
-// 2.269.0 C (#3017): saved elsewhere in between (409) -- a bar with "Reload" instead of overwriting (also the budget dialogs)
-function lifeConflict(md, reload) {
-  const e = $('.aerr', md); if (!e) return;
-  e.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-lf-reload>${tr('Reload')}</button>`;
-  $('[data-lf-reload]', e).addEventListener('click', ev => { ev.stopPropagation(); reload(); });
-}
+// 2.576.0 (#4764): lifeConflict (the bar "Reload" = own input dropped) is gone: the budget dialogs use objsave.js saveDialog
 const lifeFoot = (ok = tr('Add')) => `<div class="aerr" role="alert"></div><div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${esc(ok)}</button></div>`;
 function lifeModal(html, save, focus) {
   const md = modal(html);

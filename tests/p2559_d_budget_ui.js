@@ -5,7 +5,8 @@
 // - Add: the dialog closes and the row (provisional id) shows while the answer is still held; a refusal (500) takes the row
 //   away with the server's message; let through, the row carries the real id and the undo is offered
 // - Change: the dialog closes, the row shows the new amount before the answer; a refusal (400) puts the old amount back; saved
-//   elsewhere in between (a real 409): the row goes back and the dialog opens again with the input and "Reload"
+//   elsewhere in between (a real 409): the row goes back and the dialog opens again with the input and the merge bar
+//   2.576.0 (#4764): objsave.js saveDialog -- the saved amount marked, "Take theirs" instead of "Reload"
 // - Delete with a receipt: the row goes at once (2.567.0, #4707: no question, it waits in the trash); a refusal brings it back
 // - none of these actions fetches the whole state again (no GET /api/state)
 // The held answers wait in the page (window.fetch wrapped) until the test lets them go: every wait is on a real state.
@@ -101,11 +102,13 @@ async function round(who, ck) {
   check(await until(() => w.__held.length === 2), `${who}: the second Save is held`);
   check((await call(ck, 'PATCH', `/api/budget/entries/${rent.id}`, {title: 'Rent', amount: 850})).http === 200, `${who}: changed elsewhere in between`);
   w.__held[1].go();
-  check(await until(() => /Changed in the meantime/.test(dlg()?.querySelector('.aerr')?.textContent || '')), `${who}: the conflict opens the dialog again with "Changed in the meantime"`);
+  // 2.576.0 (#4764): the merge bar of objsave.js instead of "Changed in the meantime · Reload" (the own input stays)
+  check(await until(() => /Changed by someone else in the meantime/.test(dlg()?.querySelector('.obj-merge')?.textContent || '')), `${who}: the conflict opens the dialog again with the merge bar`);
   check(dlg()?.querySelector('#bg-amt')?.value.replace(/[.,]00$/, '') === '99', `${who}: ... with the own input ` + dlg()?.querySelector('#bg-amt')?.value);
   check(+(await onServer()).find(x => x.id === rent.id)?.amount === 850, `${who}: the other change stays on the server`);
-  click(w, dlg().querySelector('[data-lf-reload]'));
-  check(await until(() => /^850/.test(dlg()?.querySelector('#bg-amt')?.value || '')), `${who}: Reload shows the saved version`);
+  check(!!dlg()?.querySelector('#bg-amt')?.closest('.obj-theirs'), `${who}: ... the amount changed elsewhere is marked`);
+  click(w, dlg().querySelector('[data-om="theirs"]'));
+  check(await until(() => /^850/.test(dlg()?.querySelector('#bg-amt')?.value || '')), `${who}: "Take theirs" shows the saved version`);
   check(await until(() => /850[.,]00/.test(rowOf(/Rent/)?.textContent || '')), `${who}: the row shows the saved version`);
   // the saved version changed and let through
   dlg().querySelector('#bg-amt').value = '99'; click(w, dlg().querySelector('[data-m="save"]'));
