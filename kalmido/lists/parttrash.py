@@ -21,11 +21,13 @@ from ..core.db import bump, db, iso, now_utc
 from ..core.i18n import tr
 from ..core.pg import write_lock
 from ..accounts.session import me
+from ..accounts.orgroles import user_orgs_full  # 2.609.0 (#3373, review F5)
 from ..core.access import Denied, acx_of, list_role, need_list, wr_sql, WRITE_ROLES
 from ..tasks.validation import log_changes
 from ..collab.comments import user_names
 from .listtrash import OTR_TRASH_DAYS
 from .sprints import spr_dict, spr_row
+from .templates import tpl_may_write  # 2.609.0 (#3373, review F5)
 
 LPT_COL = re.compile(r"^[a-z_][a-z0-9_]*$")
 LPT_LIST_MAX = 300  # the trash view shows the newest ones
@@ -170,7 +172,12 @@ def lpt_index():
         if _writable(c, uid, r["list_id"], can):
             items.append({"kind": "link", "id": r["id"], "list_id": r["list_id"], "name": r["title"] or r["url"], "deleted_at": r["deleted_at"],
                           "deleted_by": r["deleted_by"]})
-    for r in c.execute("SELECT id, name, deleted_at, deleted_by FROM templates WHERE user_id=? AND deleted_at IS NOT NULL", (uid,)).fetchall():
+    orgs = user_orgs_full(c, uid)  # 2.609.0 (#3373, review F5): + the organisations' templates whose admin may bring them back
+    for r in c.execute("SELECT id, name, deleted_at, deleted_by, org_id, user_id FROM templates WHERE deleted_at IS NOT NULL AND "
+                       "((org_id IS NULL AND user_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")",
+                       (uid, *orgs)).fetchall():
+        if not tpl_may_write(c, r):  # as template_restore: a member's own one made for the organisation is no longer theirs
+            continue
         items.append({"kind": "template", "id": r["id"], "list_id": None, "name": r["name"], "deleted_at": r["deleted_at"],
                       "deleted_by": r["deleted_by"]})
     items += _budget_items(c, uid)

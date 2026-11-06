@@ -8,6 +8,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F2 an admin who makes another admin's organisation template private owns it now (with its file copies)
  - F4 an organisation's templates stay when their maker's account goes (the heir owns them, their files still open);
    they no longer count for their maker's limit
+ - F5 the trash lists an organisation's deleted template for its admins (also when another admin made it), not for a member
 usage: p2609_c_review_api_test.py <datadir>"""
 import os
 import sys
@@ -180,5 +181,13 @@ r = A.post(B + f"/api/templates/{TD}/apply", json={"list_id": LA})
 nt = r.json().get("task", {}).get("id") if r.ok else None
 f = files_of(nt) if nt else []
 check(f and A.get(B + f"/api/attachments/{f[0][0]}").content == b"step one\n", f"F2: its file still opens {r.text[:120]} {f}")
+
+# ================================================================== F5 the trash of the organisation's templates
+TE = tpl(Ev, kind="task", data={"task": {"title": "Eve's"}}, name="Eve's routine", space=f"org:{ORG}")
+check(A.delete(B + f"/api/templates/{TE}").ok, "setup: alice deletes eve's organisation template")
+check(TE in trash_tpls(A), "F5: the admin who deleted it finds it in the trash")
+check(TE in trash_tpls(Ev), "F5: the other admin too")
+check(TE not in trash_tpls(Bo), "F5: a member does not")
+check(A.post(B + f"/api/templates/{TE}/restore").ok, "F5: restored from there")
 
 sys.exit(kt.done("p2609_c_review_api"))
