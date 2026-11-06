@@ -28,7 +28,7 @@ from .fsroots import fs_area_after, fs_area_before, fs_area_folder_name, fs_area
 from .fsroots import fs_area_share  # 2.200.0 B (#2747)
 from .fsref import fs_unshare_hooks  # 2.623.0 (#4778)
 from .fsviews import fsv_collections, fsv_drop, fsv_hidden  # 2.429.0 (#3580): the file store shows only its own folders
-from ..core.conflict import Conflict, need_version  # 2.577.0 (#4708 3)
+from ..core.conflict import Conflict, need_version, version_rule  # 2.577.0 (#4708 3)
 from ..core.pg import system_ctx, write_lock  # 2.149.0 G (#2517): pulled up from functions
 from ..accounts.orgs import visible_people  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import grp_visible  # 2.369.5 (#2517): pulled up from functions
@@ -306,13 +306,20 @@ def files_upload():
     owner, org = _place(c, uid, pid, oid)
     replace = request.form.get("replace", "1") != "0"
     out, added = [], 0
+    # 2.577.0 (#4708 3, review): several files carry no version each: an agent (version_rule) that would replace an existing
+    # file this way gets a clear 400 before anything is stored; nothing to replace / people (old clients) as before
+    if len(files) > 1 and replace and version_rule() and any(
+            (sm := _same_name_file(c, pid, owner, org, safe_fs_name(f.filename))) and ROLE_RANK[fs_role(c, sm, uid)] >= ROLE_RANK["edit"]
+            for f in files):
+        raise BadInput(tr("To replace existing files, upload them one at a time with expect_version"))
     try:
         for f in files:
             data = h6d_read(f)  # 2.86.0 (N22): at most MAX_FILE_MB + 1 bytes in memory (_check_data refuses more)
             name = safe_fs_name(f.filename)
             same = _same_name_file(c, pid, owner, org, name) if replace else None
             if same and ROLE_RANK[fs_role(c, same, uid)] >= ROLE_RANK["edit"]:
-                fs_web_expect(c, same, request.form.get("expect_version") if len(files) == 1 else None)  # 2.577.0 (#4708 3): one file
+                if len(files) == 1:  # 2.577.0 (#4708 3): one file; several = no version possible (refused above for agents)
+                    fs_web_expect(c, same, request.form.get("expect_version"))
                 no = fs_new_version(c, same, data, f.mimetype)
                 fs_log_add(c, same, "version", str(no))
                 out.append(same)

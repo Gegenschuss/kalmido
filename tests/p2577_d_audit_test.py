@@ -162,6 +162,50 @@ r = Fr.post(B + f"/api/files/nodes/{FN}/versions", files={"file": ("Bericht.txt"
 check(r.status_code == 201 and cur_version() == 3, f"(3) without expect_version (old clients) as before {r.status_code}")
 r = Fr.post(B + f"/api/files/nodes/{FN}/versions/1/restore", json={"expect_version": 3})
 check(r.ok and cur_version() == 4, f"(3) a restore with the current version {r.status_code} {r.text[:120]}")
+# 2.577.0 (#4708 3, review): an agent's upload of several files carries no version each: replacing an existing file this way
+# is refused with a clear 400 before anything is stored; several new files, keep-both (replace=0) and one file with its
+# version go through. Agents reach this app route neither by token (/api/v1 only) nor by session (sessions skip agents):
+# the guard is checked inside the container with the agent as the request's user (g.user, as version_rule reads it), in a
+# folder shared with it
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = Fr.post(B + "/api/my/agents", json={"username": "upbot", "display_name": "Up Bot", "scopes": ["read", "files:read", "files:write"]})
+check(r.status_code == 201, f"(3) setup: the freelancer's own agent {r.status_code} {r.text[:120]}")
+UAG = r.json().get("id") or 0
+r = Fr.post(B + "/api/files/folders", json={"name": "Agentenordner 4708", "space": "private"})
+UFD = r.json().get("id") if r.status_code == 201 else 0
+r = Fr.post(B + f"/api/files/nodes/{UFD}/shares", json={"agent_id": UAG, "role": "edit"})
+check(bool(UFD) and r.status_code == 201, f"(3) setup: a folder shared with her agent (edit) {UFD} {r.status_code} {r.text[:120]}")
+UPC = f"""from io import BytesIO
+from flask import g
+from kalmido.core.config import app as FA
+from kalmido.files import web as fw
+u = c.execute("SELECT * FROM users WHERE id=?", ({UAG},)).fetchone()
+def up(tag, files, **form):
+    data = dict(form, parent_id="{UFD}", file=[(BytesIO(b), n) for n, b in files])
+    with FA.test_request_context("/api/files/upload", method="POST", data=data, content_type="multipart/form-data"):
+        g.user, g.auth_via = u, "token"
+        try:
+            rv = fw.files_upload()
+            print(tag, rv[1] if isinstance(rv, tuple) else 200, flush=True)
+        except Exception as e:
+            print(tag, getattr(e, "code", None) or type(e).__name__, str(e), flush=True)  # BadInput = 400
+up("ONE", [("Agentenplan.txt", b"eins")])
+up("MIXED", [("Agentenplan.txt", b"zwei"), ("Neu 4708.txt", b"neu")])
+up("NEW", [("Neu A 4708.txt", b"a"), ("Neu B 4708.txt", b"b")])
+up("KEEP", [("Agentenplan.txt", b"drei"), ("Neu C 4708.txt", b"c")], replace="0")
+up("VER", [("Agentenplan.txt", b"vier")], expect_version="1")"""
+out = box(UPC)
+res = {x.split(" ", 1)[0]: x.split(" ", 1)[1] for x in out.splitlines() if x.split(" ", 1)[0] in ("ONE", "MIXED", "NEW", "KEEP", "VER")}
+AFN = (kt.dbx("SELECT id FROM fs_nodes WHERE name='Agentenplan.txt' AND parent_id=? ORDER BY id LIMIT 1", (UFD,)) or [[0]])[0][0]
+check(res.get("ONE", "").startswith("201") and AFN, f"(3) the agent uploads one new file {res.get('ONE')} {out[-300:]}")
+check(res.get("MIXED", "").split(" ")[0] in ("400", "BadInput") and "one at a time" in res.get("MIXED", "") and not kt.dbx("SELECT 1 FROM fs_nodes WHERE name='Neu 4708.txt'"),
+      f"(3) agent: several files, one replaces an existing file -> 400 'one at a time', nothing stored {res.get('MIXED')}")
+check(res.get("NEW", "").startswith("201"), f"(3) agent: several new files go through {res.get('NEW')}")
+check(res.get("KEEP", "").startswith("201"), f"(3) agent: several files with keep-both (replace=0) go through {res.get('KEEP')}")
+check(res.get("VER", "").startswith("201") and (kt.dbx("SELECT cur_version FROM fs_nodes WHERE id=?", (AFN,)) or [[0]])[0][0] == 2,
+      f"(3) agent: one file with expect_version replaces as before {res.get('VER')}")
+r = Fr.post(B + "/api/files/upload", files=[("file", ("Bericht.txt", b"fuenf")), ("file", ("Anhang 4708.txt", b"x"))])
+check(r.status_code == 201 and cur_version() == 5, f"(3) a person: several files replace as before (old clients) {r.status_code} {r.text[:120]}")
 
 # ================================================================== (6) the event calendar link's secret as a hash
 import requests  # noqa: E402 (only this block reads the feed without login)

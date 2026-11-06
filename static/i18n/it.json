@@ -16860,6 +16860,7 @@
   "Delete the address “{0}”?": "Eliminare l’indirizzo «{0}»?",
   "Address on: {0}": "Indirizzo attivo: {0}",
   "Address off: {0}": "Indirizzo disattivato: {0}",
+  "To replace existing files, upload them one at a time with expect_version": "Per sostituire file esistenti, caricali uno alla volta con expect_version",
   "Delete the e-mail from the mailbox afterwards": "Eliminare poi l'e-mail dalla casella",
   "Delete the e-mails?": "Eliminare le e-mail?",
   "Delete the rule?": "Eliminare la regola?",

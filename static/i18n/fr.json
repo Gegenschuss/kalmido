@@ -16859,6 +16859,7 @@
   "Delete the address “{0}”?": "Supprimer l’adresse « {0} » ?",
   "Address on: {0}": "Adresse activée : {0}",
   "Address off: {0}": "Adresse désactivée : {0}",
+  "To replace existing files, upload them one at a time with expect_version": "Pour remplacer des fichiers existants, téléversez-les un par un avec expect_version",
   "Delete the e-mail from the mailbox afterwards": "Supprimer ensuite l'e-mail de la boîte",
   "Delete the e-mails?": "Supprimer les e-mails ?",
   "Delete the rule?": "Supprimer la règle ?",

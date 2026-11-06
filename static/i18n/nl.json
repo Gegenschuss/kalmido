@@ -16859,6 +16859,7 @@
   "Delete the address “{0}”?": "Adres ‘{0}’ verwijderen?",
   "Address on: {0}": "Adres aan: {0}",
   "Address off: {0}": "Adres uit: {0}",
+  "To replace existing files, upload them one at a time with expect_version": "Upload bestaande bestanden één voor één met expect_version om ze te vervangen",
   "Delete the e-mail from the mailbox afterwards": "E-mail daarna uit de mailbox verwijderen",
   "Delete the e-mails?": "E-mails verwijderen?",
   "Delete the rule?": "Regel verwijderen?",
