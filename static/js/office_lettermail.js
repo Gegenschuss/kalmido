@@ -190,7 +190,10 @@ async function ofmSigModal(done) {
 async function ltmMailModal(id) {
   let j, info;
   const prof = await ofmProfile();
+  // 2.595.0 (#4906): an e-mail address typed a moment ago is still in LT.pend (saved 1.5 s after the last key): save it first
+  if (typeof LT !== 'undefined' && LT.pend && LT.pend.d.id === id) await ltSave(LT.pend.d, true);
   try { [j, info] = await Promise.all([api('GET', `/api/office/letters/${id}/mail-draft`), ltmInfo()]); } catch (x) { toast(x.message || ''); return; }
+  if (!j.to) j.to = ($('#lt-rcpt_email')?.value || '').trim();  // 2.595.0 (#4906): the form's E-mail field, when the server has none yet
   const hint = j.reply_address ? tr('Answers go to {0} and are linked to this letter automatically.', j.reply_address)
     : tr('There is no document address for this office: answers go to the company e-mail and are assigned to the letter by hand.');
   /** @type {any} */
