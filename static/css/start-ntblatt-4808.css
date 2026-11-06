@@ -1,0 +1,26 @@
+/* 2.599.0 (#4808): an open note and an open knowledge page alike (both .ntwrap > ... > .ntedit, one rule for both).
+   The width switch (chat.js pgw_*, the class pgw-<key> on .ntwrap): Read = --w-lesen (the default), Wide = --w-seite, Full =
+   no limit. --ntsheet = the outer width of the page: from 1700 px the page lies as a sheet (surface, fine border, radius,
+   inner space) whose text column keeps the chosen width; below 1700 px (1440 x 900, tablets, phones) no sheet, as before.
+   After start-breite.css (name order), whose .ntedit rule this one refines. */
+.ntwrap{--ntpw:var(--w-lesen);--ntpad:0px;--ntsheet:var(--ntpw)}
+.ntwrap.pgw-breit{--ntpw:var(--w-seite)}
+.ntwrap.pgw-voll{--ntpw:none;--ntsheet:none}
+.ntwrap .ntedit:not(.wktagview){max-width:var(--ntsheet)}
+@media (min-width:1700px){
+  .ntwrap{--ntpad:2rem;--ntsheet:calc(var(--ntpw) + 2 * var(--ntpad) + 2px)}
+  .ntwrap.pgw-voll{--ntsheet:none}
+  .ntwrap .ntedit:not(.wktagview){padding:1.25rem var(--ntpad) 1.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius)}
+  /* the reading style Notepad keeps its own paper and border (wiki.css): no second one around it */
+  .ntwrap .ntedit.wkst-notepad{background:none;border-color:transparent}
+  /* Read: code blocks and tables may reach into the sheet's inner space (and scroll sideways beyond it, .mdtbl / pre.mdpre) */
+  .ntwrap.pgw-lesen .ntedit:not(.wkst-notepad) :is(.wkmd,.ntmd) > :is(.mdtbl,pre.mdpre,.mdcode){margin-inline:calc(-1 * var(--ntpad));max-width:calc(100% + 2 * var(--ntpad))}
+  /* knowledge, a page open: the bar (Find a page, New page, Today, New folder) and the hints above it in the middle and width
+     of the sheet below - no empty space left of it */
+  .wkdesk.wkpgo > :not(.ntedit){width:100%;max-width:var(--ntsheet);margin-inline:auto}
+  /* notes and a knowledge page with its list beside it: list + page as one block in the middle (one head line: the list's bar
+     and the page's head side by side on its top edge); render.js topw_sync takes its width for #top (data-pw) */
+  .ntwrap > .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,var(--ntsheet));max-width:calc(23rem + var(--ntsheet));margin-inline:auto}
+  .ntwrap.pgw-voll > .ntview.open{grid-template-columns:minmax(14rem,22rem) minmax(0,1fr);max-width:none}
+  .ntwrap > .ntview.open > .ntedit{max-width:none}
+}

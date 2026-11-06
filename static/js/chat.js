@@ -931,7 +931,36 @@ function viewNotes() {
   if (gone) return botEmpty('ruhig', tr('This project does not exist (any more).'));
   if (!list) return `<div class="muted mhint">${S.nt.err ? esc(S.nt.err) : tr('Loading…')}</div>`;
   if (pan) return nt_pageHtml(cur);
-  return `<div class="ntwrap"><div class="ntview ${cur ? 'open' : ''}">${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;
+  return `<div class="ntwrap${cur ? pgw_cls('notes', cur.id) : ''}"><div class="ntview ${cur ? 'open' : ''}"${cur ? ' data-pw="1"' : ''}>${list}${cur ? `<article class="ntedit" aria-label="${esc(cur.title)}">${noteEditHtml(cur)}</article>` : ''}</div></div>`;  // 2.599.0 (#4808): its width (pgw_*), data-pw = the block reports its width to #top (render.js topw_sync)
+}
+// ---- 2.599.0 (#4808): the width of an open note / knowledge page: Read (--w-lesen, the default), Wide (--w-seite), Full (no
+// limit); a fixed choice, the class pgw-<key> on .ntwrap (static/css/start-blatt-4808.css). The default per area is the person's
+// like the own reading style (#3152): LOOK_KEYS wkW (knowledge) / ntW (notes), the account's appearance on every device. A page
+// overrides it on this device (LS pgW {"w<page id>" | "n<note id>": key}, the newest PGW_MAX), so no page changes for others.
+const PGW = {lesen: N_('Read|page width'), breit: N_('Wide|page width'), voll: N_('Full|page width')};
+const PGW_MAX = 200;
+const pgw_dkey = area => area === 'wiki' ? 'wkW' : 'ntW';
+const pgw_def = area => (k => PGW[k] ? k : 'lesen')(LS.get(pgw_dkey(area), ''));
+const pgw_own = (area, id) => (k => PGW[k] ? k : '')((LS.get('pgW', null) || {})[area[0] + id]);
+const pgw_of = (area, id) => pgw_own(area, id) || pgw_def(area);
+const pgw_cls = (area, id) => ' pgw-' + pgw_of(area, id);
+function pgw_set(area, id, k) {
+  const o = {...(LS.get('pgW', null) || {})}, key = area[0] + id;
+  delete o[key]; if (PGW[k]) o[key] = k;  // newest at the end
+  const ks = Object.keys(o); for (const x of ks.slice(0, Math.max(0, ks.length - PGW_MAX))) delete o[x];
+  if (Object.keys(o).length) LS.set('pgW', o); else LS.del('pgW');
+  renderView();
+}
+function pgw_items(area, id) {
+  if (id == null || S.me?.kind === 'agent') return [];
+  return [{label: tr('Page width…'), icon: 'expand', act: 'm-pgw', more: pgw_menu(area, id)}];
+}
+function pgw_menu(area, id) {
+  const d = pgw_def(area), own = pgw_own(area, id), name = k => tr(PGW[k]);
+  return [{head: tr('This page')}, {label: tr('Like the default ({0})', name(d)), on: !own, fn: () => pgw_set(area, id, '')},
+    ...Object.keys(PGW).map(k => ({label: name(k), on: own === k, act: 'm-pgw-' + k, fn: () => pgw_set(area, id, k)})),
+    {head: area === 'wiki' ? tr('Default for knowledge pages') : tr('Default for notes')},
+    ...Object.keys(PGW).map(k => ({label: name(k), on: d === k, act: 'm-pgwd-' + k, fn: () => { if (k === 'lesen') LS.del(pgw_dkey(area)); else LS.set(pgw_dkey(area), k); renderView(); }}))];
 }
 // the cards alone: typing in the search field re-renders only these (the field keeps the focus)
 function ntCardsHtml(vis, q, cur) {
@@ -1036,6 +1065,7 @@ function noteMenu(anchor, id) {
         if (!r.queued) for (const x of [(S.nt.notes || []).find(y => y.id === n.id), (S.notes || []).find(y => y.id === n.id)]) if (x) x.pinned = r.pinned;
         renderView(); }).catch(err => toast(err instanceof Offline ? tr('Offline: only works again with a connection') : err.message))}] : [])] : []),
     {label: tr('Copy link'), icon: 'link', act: 'm-copy-link', fn: () => { navigator.clipboard?.writeText(`${location.origin}${location.pathname}#note/${n.id}`).then(() => toast(tr('Link copied'))); }},
+    ...(card ? [] : pgw_items('notes', n.id)),  // 2.599.0 (#4808): the open note's width
     ...(others.length ? [{label: tr('Move to project…'), icon: 'folder', act: 'm-move', fn: () => tch_listPicker(anchor, {filter: l => others.includes(l), pick: async l => {  // 2.38.0 (#1177)
       let r; try { r = await rawFetch('PATCH', `/api/notes/${n.id}`, {list_id: l.id}); } catch (e) {
         // 2.477.0 (#3881): out of the private list "Notes" to other people only after the warning that names them
