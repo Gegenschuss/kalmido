@@ -36,7 +36,8 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   click(w, md.querySelector('[data-evsc="one"]'));
   md.querySelector('#ev-title').value = 'Only this date';
   click(w, md.querySelector('[data-evm="save"]'));
-  check(await until(() => /changed meanwhile/i.test(d.querySelector('#toast')?.textContent || '')), 'the 409 hint of the stale copy shows: ' + (d.querySelector('#toast')?.textContent || ''));
+  check(await until(() => /changed meanwhile|changed by someone else in the meantime/i.test(d.querySelector('#toast')?.textContent || '')), 'the 409 hint of the stale copy shows: ' + (d.querySelector('#toast')?.textContent || ''));
+  // 2.565.0 (#4705): the conflict toast says "Changed by someone else in the meantime"
   // 2.559.0 (#4659): the editor closes at once on Save and comes back with what was typed when the server refuses
   check(await until(() => d.querySelector('.modal.evmodal')?.querySelector('#ev-title')?.value === 'Only this date'), 'the editor stays open (nothing lost)');
   const after = await call('GET', `/api/events/${eid}`);
