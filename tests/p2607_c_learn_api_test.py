@@ -151,4 +151,4 @@ check(r.ok, "share view-only " + r.text[:120])
 assert A.post(B + "/api/docs/rules", json={"ws": "private", "kind": "any", "match": "Stadtwerke", "sender": "Stadtwerke Nord"}).status_code == 201
 j = learn(Bo, [P])
 check(j.get("denied") == 1 and j.get("changed") == [] and get(A, P)["sender"] is None, "view-only: denied, unchanged " + str(j))
-done("p2607_c_learn_api")
+sys.exit(done("p2607_c_learn_api"))
