@@ -373,6 +373,7 @@ def acx_drop():
         g.pop("org_roles", None)  # 2.143.0 A (#2151): accounts/orgroles.py
         g.pop("_lr_cache", None)  # 2.280.0 B (#3116): list_role's request cache
         g.pop("org_rq", None)  # 2.369.6 (#3139): accounts/orgs.py _rq (visible people, organisation names / peers, workspaces)
+        g.pop("ofr_kind", None)  # 2.602.0 (#4729): office/rights.py _is_agent per request (an account turned into an agent / back)
 
 
 def acx_session_apply(ctx=None):

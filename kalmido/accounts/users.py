@@ -21,7 +21,7 @@ from ..accounts.pictures import (
 )
 from ..accounts.login import session_via, twofa_clear, twofa_methods
 from ..accounts.sessions import ses_end  # 2.190.0 A (#1991)
-from ..core.access import collab_all, Denied, joined_lists_sql, list_role, need_list, vis_sql
+from ..core.access import acx_drop, collab_all, Denied, joined_lists_sql, list_role, need_list, vis_sql
 from ..core.serializers import unlink_files
 from ..core.errors import BadInput
 from ..core.orgcrypt import oc_drop_key, oc_list_org, oc_send_file, oc_write_file, rck_admin_gone, rck_admin_orgs  # 2.149.0 G (#2517): pulled up from functions; 2.539.0 (#4373): rck_*
@@ -366,6 +366,7 @@ def user_update(uid):
                 c.execute("DELETE FROM webhooks WHERE id=?", (a["webhook_id"],))
             c.execute("DELETE FROM agents WHERE user_id=?", (uid,))
             c.execute("UPDATE users SET kind='user' WHERE id=?", (uid,))
+            acx_drop()  # 2.602.0 (#4729): the account kind is cached per request (office/rights.py _is_agent)
         u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
     if is_agent(u) and b.get("is_admin"):
         c.rollback()

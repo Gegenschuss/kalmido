@@ -140,6 +140,7 @@ def agent_enable(c, aid, on):
 def make_agent(c, uid):
     """users row uid becomes an agent (never admin, no web sessions); its tokens and lists stay."""
     c.execute("UPDATE users SET kind='agent', is_admin=0, paperless_access=0 WHERE id=?", (uid,))
+    acx_drop()  # 2.602.0 (#4729): the account kind is cached per request (office/rights.py _is_agent)
     user_forget_conns(c, uid)  # personal connection rows, stored tokens, grants go
     from ..accounts.sessions import ses_end  # 2.190.0 A (#1991): with the push subscriptions made in them
     ses_end(c, uid)
