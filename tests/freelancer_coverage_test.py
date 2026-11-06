@@ -320,6 +320,7 @@ ROUTES = {
     "POST /api/files/trash": "files", "POST /api/files/restore": "files", "POST /api/files/trash/purge": "files",  # 2.589.0 (#4875)
     "GET /api/files/zip": "files", "POST /api/files/scan": "files",
     "POST /api/docs": "files", "POST /api/docs/labels/{}": "files", "POST /api/docs/mail": "files",
+    "GET /api/docs/{}/flowruns": "files", "POST /api/docs/flowruns/{}/undo": "files",  # 2.581.0 (#4803): p2581_c_flows_test.py
     "POST /api/docs/rules": "files", "POST /api/docs/{}/accept": "files", "POST /api/docs/{}/redo": "files", "POST /api/docs/{}/redo/undo": "files",
     "POST /api/docs/{}/review": "files", "POST /api/docs/{}/task": "files", "POST /api/files/folders": "files",
     "POST /api/files/links": "files", "POST /api/files/nodes/{}/restore": "files", "POST /api/files/nodes/{}/shares": "files",
