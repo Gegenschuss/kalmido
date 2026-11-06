@@ -163,9 +163,15 @@ check(r.ok and r.json().get("closed") is True and Ag.get(V + f"/tasks/{TA2}").js
       f"agent: close as duplicate {r.status_code} {r.text[:160]} {Ag.get(V + f'/tasks/{TA2}').json().get('status')}")
 ro = A.post(B + "/api/admin/agents", json={"scopes": ["read"], "username": "readbot", "display_name": "Read bot", "org_id": ALPHA})
 RO_ID, Ro = ro.json()["id"], bearer(ro.json()["token"])
-A.put(B + f"/api/lists/{LAG}/members", json={"user_id": RO_ID, "role": "edit"})
-check(Ro.post(V + f"/tasks/{TA1}/relations", json={"other_id": TA2}).status_code == 403, "a read-only token adds no relation (403)")
-check(Ro.get(V + f"/tasks/{TA1}/relations").ok, "a read-only token reads them")
+LRO = A.post(B + "/api/lists", json={"name": "Read plan", "org_id": ALPHA}).json()["id"]
+r = A.put(B + f"/api/lists/{LRO}/members", json={"user_id": RO_ID, "role": "view"})
+check(r.ok, f"setup: the read-only agent's own list {r.status_code} {r.text[:160]}")
+TR1, TR2 = mk(A, LRO, "Read task 1"), mk(A, LRO, "Read task 2")
+A.post(B + f"/api/tasks/{TR1}/relations", json={"other_id": TR2})
+check(Ro.post(V + f"/tasks/{TR1}/relations", json={"other_id": TR2, "kind": "duplicate"}).status_code == 403 and n_rows(TR1, TR2) == 1,
+      "a read-only token adds no relation (403)")
+r = Ro.get(V + f"/tasks/{TR1}/relations")
+check(r.ok and [x["id"] for x in r.json()["relations"]] == [TR2], f"a read-only token reads them {r.status_code} {r.text[:160]}")
 
 # ---------------------------------------------------------------- remove
 check(A.delete(B + f"/api/tasks/{T1}/relations/{TP}").ok and n_rows(T1, TP) == 0, "remove: gone")
