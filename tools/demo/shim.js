@@ -248,14 +248,14 @@
     }
     const me = DB.me;
     return {
-      v: DB.v, me: {auth: 'session', avatar: me.avatar, display_name: me.display_name, has_password: true, id: 1, is_admin: false, ntfy_inbox: false, username: me.username},
+      v: DB.v, me: {auth: 'session', avatar: me.avatar, display_name: me.display_name, has_password: true, id: 1, is_admin: false, username: me.username},
       lists: DB.lists.map(listOut).sort((a, b) => b.is_inbox - a.is_inbox || a.sort - b.sort || a.id - b.id),
       filters: clone(DB.filters), sections: clone(DB.sections).sort((a, b) => a.sort - b.sort || a.id - b.id), fields: clone(DB.fields),
       tasks, habits: clone(DB.habits), pomo: null, pomo_today: {count: 0, minutes: 0},
       counts: {done: live().filter(t => t.status !== 0).length, trash: DB.tasks.filter(t => t.deleted_at).length},
       settings: clone(DB.settings), notify: {},
       mine_hidden: [...(DB.mineHidden || [])],  // 2.41.0 (#1365)
-      ntfy_inbox: {enabled: false, server: '', topic: ''}, ntfy_url: '', max_depth: 5, /* 2.156.0 A (#1949) */ webpush: {devices: 0, enabled: false, key: ''},
+      ntfy_url: '', max_depth: 5, /* 2.156.0 A (#1949) */ webpush: {devices: 0, enabled: false, key: ''},
       languages: [{beta: false, code: 'de', name: 'Deutsch'}, {beta: false, code: 'en', name: 'English'}, {beta: true, code: 'es', name: 'Español'},
         {beta: true, code: 'fr', name: 'Français'}, {beta: true, code: 'it', name: 'Italiano'}, {beta: true, code: 'nl', name: 'Nederlands'}],
       news: {unread: 0, sig: '0'}, avatars: {[AGENT]: 'static/avatars/robot.svg'}, templates: [],
@@ -412,7 +412,7 @@
     // 2.470.0 (#3596): office/settings opens Settings, whose panes ask for these on their own
     'GET /api/share-defaults': () => ({space: 'private', can_edit: true, stored: {}, defaults: {link_expires: '7d', req_days: 14, req_mb: 50, req_files: 20, req_types: ['docs', 'images']}, limits: {days: 90, max_mb: 500, max_files: 100, types: ['docs', 'images', 'design', 'archives', 'media']}}),
     'GET /api/team/absences/feed': () => ({states: STATES, countries: COUNTRIES, own: MD().state || '', state: ''}), 'GET /api/me/mail': () => ({enabled: false, lists: [], digest: {enabled: false}}),
-    'GET /api/me/ntfy-inbox': () => ({enabled: false, default_server: '', url: ''}), 'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
+    'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
     'GET /api/account/export': () => ({state: 'none'}), 'GET /api/account/import': () => ({current: null}), 'GET /api/videos/signoffs/orphaned': () => ({signoffs: []}),
     'GET /api/hubmail/mailboxes': () => ({spaces: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo

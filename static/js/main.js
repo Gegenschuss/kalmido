@@ -60,7 +60,7 @@ function bootDone() {
     } catch { /* no cache api */ }
     // Chrome on Android currently hands over no files to installed web apps (verified 2026-09-25)
     const refused = Array.isArray(meta.refused) ? meta.refused : [];  // 2.143.0 C2 (#2154): too large / too many, kept out by the service worker
-    if (!files.length && !refused.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files via the ntfy app (Settings)'));
+    if (!files.length && !refused.length && !meta.text && !meta.url && !meta.title) toast(tr('Please share images and files with HTTP Shortcuts or the Shortcuts app (Settings > Integrations > Share from your phone)'));  // 2.574.0 (#3779): the upload way (/drop), no longer the ntfy app
     if (refused.length) toast(tr('Share: not added: {0} (at most {1} files of {2} MB each)', refused.map(f => f.name).join(', '), meta.max_files || 20, meta.max_mb || 50), null, 8000);
     history.replaceState(null, '', '/#inbox');
     await route();

@@ -2,9 +2,8 @@
 // #2148: Settings > Data: next to "Download JSON" the links "Todoist CSV" and "Markdown" (the two ZIP routes, as downloads) + a hint.
 // #2149: Settings > Integrations > Tasks by e-mail: an admin sees "Fetch e-mails now", a click locks it while it runs and shows a short
 //        result; a member does not see the button.
-// #2150: Settings > Notifications: "Share inbox (ntfy)": off by default; the switch gives a long topic, copy + "New topic" (asks first,
-//        a different topic), "Own ntfy server" with server + read token (token field empty and hidden after saving: "set (hidden)",
-//        removable); off hides the topic again. Nothing of the token on the page.
+// #2150: Settings > Notifications: "Share inbox (ntfy)" - 2.574.0 (#3779): taken out; the ntfy notifications stay, no inbox block,
+//        Integrations has no ntfy app hint any more.
 // P2142C_NOSTART=1 = the server already runs.
 const path = require('path');
 const {execFileSync} = require('child_process');
@@ -61,34 +60,16 @@ const until = (fn, n, ms = 150) => require('./boot').until(fn, {timeout: n ? n *
   w.close();
 
   // ================= #2150 share inbox
+  // 2.574.0 (#3779): sharing through the ntfy app is gone: Settings > Notifications keeps the ntfy notifications (topic, test)
+  // without the block "Share inbox (ntfy)"; Settings > Integrations points to the upload way, not to the ntfy app
   w = await boot({user: 'bob'}); d = w.document;
   w.eval(`settingsModal('notify')`);
-  const sw = await until(() => d.querySelector('#s-ntfyin #s-nion'));
-  check(sw && !sw.checked && !d.querySelector('#s-nitopic'), 'off by default, no topic shown');
-  sw.checked = true; sw.dispatchEvent(new w.Event('change', {bubbles: true}));
-  const tp = await until(() => d.querySelector('#s-nitopic'));
-  const t1 = tp?.textContent || '';
-  check(t1.length >= 16 && /^[\w-]+$/.test(t1), 'on: a long topic ' + t1);
-  check(d.querySelector('#s-ntfyin [data-ni="copy"]') && d.querySelector('#s-ntfyin [data-ni="dice"]'), 'copy + new topic buttons');
-  check(/Android/.test(d.querySelector('#s-ntfyin')?.textContent || ''), 'short instructions');
-  d.querySelector('#s-ntfyin [data-ni="dice"]').click();
-  (await until(() => d.querySelector('[data-cd="yes"]')))?.click();
-  const t2 = await until(() => { const x = d.querySelector('#s-nitopic')?.textContent; return x && x !== t1 ? x : ''; });
-  check(t2 && t2.length >= 16, 'new topic is a different one');
-  const det = d.querySelector('#s-ntfyin details');
-  check(det && d.querySelector('#s-niurl') && d.querySelector('#s-nitok')?.type === 'password', 'own server: url + password field');
-  d.querySelector('#s-niurl').value = 'https://127.0.0.1:8099';  // 2.306.0 (#2875): http:// only for hosts an admin allowed
-  d.querySelector('#s-nitok').value = 'tk_ui_secret_token';
-  d.querySelector('#s-ntfyin [data-ni="save"]').click();
-  await until(() => /set \(hidden\)/.test(d.querySelector('#s-nitok')?.getAttribute('placeholder') || ''));
-  check(d.querySelector('#s-nitok').value === '' && d.querySelector('#s-niurl').value === 'https://127.0.0.1:8099', 'token field empty after saving, server kept');
-  check(!(d.querySelector('#s-ntfyin')?.innerHTML || '').includes('tk_ui_secret_token'), 'no token on the page');
-  d.querySelector('#s-ntfyin [data-ni="rmtok"]').click();
-  await until(() => !d.querySelector('#s-ntfyin [data-ni="rmtok"]'));
-  check(!d.querySelector('#s-ntfyin [data-ni="rmtok"]'), 'token removed');
-  const sw2 = d.querySelector('#s-nion'); sw2.checked = false; sw2.dispatchEvent(new w.Event('change', {bubbles: true}));
-  await until(() => !d.querySelector('#s-nitopic'));
-  check(!d.querySelector('#s-nitopic'), 'off: topic hidden again');
+  await until(() => d.querySelector('#s-ntfy .topic'));
+  check(d.querySelector('#s-ntfy .topic') && !d.querySelector('#s-ntfyin, #s-nion'), '#3779: ntfy notifications stay, no share inbox block');
+  check(!/Share inbox/.test(d.querySelector('.smodal')?.textContent || ''), '#3779: no "Share inbox" text in the notifications');
+  w.eval(`settingsModal('integr')`);
+  await until(() => d.querySelector('#s-share-h'));
+  check(d.querySelector('#s-share-h') && !/ntfy app/.test(d.querySelector('#s-share-h').closest('[data-pane]')?.textContent || ''), '#3779: Integrations: sharing from the phone without the ntfy app');
   check(!errs.length, 'no script errors ' + JSON.stringify(errs).slice(0, 200));
   w.close();
 

@@ -11,7 +11,8 @@ webhook stub on 127.0.0.1:8097 and the SMTP sink on 127.0.0.1:1025). Invented na
  - a failed message gets exactly one more try (one failure counted); it arrives when the receiver is back
  - a channel that turns itself off: News + push for its owner, for an organisation's channel its admins; the same for a webhook
  - an inbound webhook that pauses: who set it up and the project's owner, once
- - a mailbox, a git connection, an ntfy inbox at INTEG_FAILS failures in a row: once; the notification switch turns it off
+ - a mailbox, a git connection at INTEG_FAILS failures in a row: once; the notification switch turns it off (2.574.0 #3779: the
+   ntfy inbox is gone)
  - a failed backup with the admin alerts off: News + mail to the instance's admins, once for the same error on one day
  freelancer-matrix: channels
 usage: p23673_notify_test.py <datadir>      (a fresh container; P23673_NOSTART=1 = the server already runs)"""
@@ -94,7 +95,7 @@ if not os.environ.get("P23673_NOSTART"):
     os.makedirs(DATA, exist_ok=True)
     env = dict(os.environ, KEEP="1", EXTRA=os.environ.get("EXTRA", "") +
                " -e KALMIDO_WEBHOOK_ALLOW_HOSTS=127.0.0.1:8097 -e KALMIDO_CHANNEL_TICK=1 -e KALMIDO_CHANNEL_RETRY=1"
-               f" -e KALMIDO_CHANNEL_FAILS={FAILS_MAX} -e KALMIDO_WEBHOOK_TICK=1 -e KALMIDO_WEBHOOK_BACKOFF=1 -e KALMIDO_NTFYIN_TICK=1"
+               f" -e KALMIDO_CHANNEL_FAILS={FAILS_MAX} -e KALMIDO_WEBHOOK_TICK=1 -e KALMIDO_WEBHOOK_BACKOFF=1"
                " -e TASKS_WATCHDOG_INTERVAL=1 -e KALMIDO_IMAP_INTERVAL=10 -e KALMIDO_BACKUP_TICK=1 -e KALMIDO_BACKUPS=1"
                " -e KALMIDO_SMTP_HOST=127.0.0.1 -e KALMIDO_SMTP_PORT=1025 -e KALMIDO_SMTP_TLS=none -e KALMIDO_MAIL_FROM=kalmido@example.test")
     r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], env=env, capture_output=True, text=True)
@@ -247,11 +248,11 @@ it = news(Fi, "git")
 check(it and "acme/tool" in it[0]["data"]["text"] and "2026-10-01" in it[0]["data"]["text"] and it[0]["data"]["list"] == FL, f"#2971: the git notice {it}")
 
 check(Bo.patch(B + "/api/settings", json={"notify": {"integration": {"news": False, "push": False}}}).ok, "bob switches the event off")
-dbx("INSERT INTO ntfy_inboxes(user_id,enabled,topic,url,fails,last_ok,updated_at) VALUES(?,1,'bob-in','http://127.0.0.1:9',4,?,?)", (uid["bob"], now, now))
-check(until(lambda: list(dbx("SELECT fails FROM ntfy_inboxes WHERE user_id=?", (uid["bob"],))[0])[0] >= 5, 30), "setup: the ntfy inbox failed")
-check(not news(Bo, "ntfy"), "#2971: the notification switch turns it off")
-dbx("INSERT INTO ntfy_inboxes(user_id,enabled,topic,url,fails,last_ok,updated_at) VALUES(?,1,'frida-in','http://127.0.0.1:9',4,?,?)", (FID, now, now))
-check(until(lambda: news(Fi, "ntfy"), 30), "#2971: an ntfy inbox at 5 failures in a row: told once")
+# 2.574.0 (#3779): the ntfy share inbox is gone; the switch is checked with a git connection of bob's instead
+dbx("INSERT INTO git_conns(list_id,provider,base_url,owner,repo,fails,polled_at,next_at,created_by,created_at) VALUES(?,'gitea','http://127.0.0.1:9/','bob','tool',4,?,0,?,?)",
+    (BL, now, uid["bob"], now))
+check(until(lambda: list(dbx("SELECT fails FROM git_conns WHERE list_id=?", (BL,))[0])[0] >= 5, 30), "setup: bob's git connection failed")
+check(not news(Bo, "git"), "#2971: the notification switch turns it off")
 
 # ================================================================ #2971: a failed backup, the admin alerts off
 BK = os.path.join(DATA, "backups")

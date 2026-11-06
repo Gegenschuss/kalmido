@@ -270,7 +270,6 @@ ORDER = (
     "files.filereq",  # 2.122.0 A (#2097): file requests - a public link /u/<token> through which a client uploads files
     "accounts.sharedefs",  # 2.470.0 (#3596): the sharing defaults of a workspace (external links, file requests)
     "integrations.mail",
-    "integrations.ntfyin",  # 2.142.0 C (#2150)
     "integrations.exporters",  # 2.142.0 C (#2148)
     "accounts.invite",
     "accounts.sessions",  # 2.115.0 B (#2062): active sessions

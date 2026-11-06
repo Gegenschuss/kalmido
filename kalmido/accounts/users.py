@@ -10,7 +10,7 @@ from flask import g, jsonify, request, Response, send_file
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from ..core.objhooks import person_revoked  # 2.558.0 (#4709): the shared core without importing the domain layer
-from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, ntfy_topic_taken, PUBLIC_URL, USERNAME_RE
+from ..core.config import app, COOKIE, EMAIL_RE, MIN_PASSWORD, PUBLIC_URL, USERNAME_RE
 from ..core.i18n import lang, LANGS, N_, tr, trn
 from ..core.db import body, bump, create_user, db, ensure_inbox, err, gsetting, now_utc, uset, usettings, iso
 from ..core.pg import system_ctx
@@ -219,9 +219,6 @@ def _active_admins(c, without=None):
     return c.execute("SELECT COUNT(*) FROM users WHERE is_admin=1 AND disabled=0 AND id IS DISTINCT FROM ?", (without,)).fetchone()[0]
 
 
-NTFY_PUSH_TAKEN = N_("This ntfy topic is not available. Choose another one.")  # 2.549.0 (#4515)
-
-
 @app.post("/api/users")
 def user_create():
     from ..notify.push import NTFY_TOPIC_RE
@@ -244,8 +241,6 @@ def user_create():
     topic = str(b.get("ntfy_topic") or "").strip()
     if topic and not NTFY_TOPIC_RE.fullmatch(topic):
         return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
-    if ntfy_topic_taken(c, None, topic, push=True):  # 2.549.0 (#4515): no push into a share inbox (neutral answer)
-        return err(tr(NTFY_PUSH_TAKEN))
     orgs = om_orgs_arg(c, b)  # 2.46.0 (#1561): checked before the account exists
     if isinstance(orgs, str):
         return err(orgs)
@@ -409,9 +404,6 @@ def user_update(uid):
         topic = str(b["ntfy_topic"] or "").strip()
         if topic and not NTFY_TOPIC_RE.fullmatch(topic):
             return err(tr("ntfy topic: 1-64 characters a-z, A-Z, 0-9, dash, underscore"))
-        if ntfy_topic_taken(c, uid, topic, push=True):  # 2.549.0 (#4515): no push into a share inbox (neutral answer)
-            c.rollback()
-            return err(tr(NTFY_PUSH_TAKEN))
         uset(c, uid, "ntfy_topic", topic)
     if "avatar_preset" in b:  # 1.9.0: a preset picture or none (e.g. for the bot user of an API integration);
         p = b["avatar_preset"]  # an own photo is uploaded by the user only, an admin can remove it (null)

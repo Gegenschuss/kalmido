@@ -350,12 +350,9 @@ to *deny* and allow each app per group, so a new account does not open every app
   message goes there in full, as before.
 - **Your own ntfy server:** for the phone's battery set the server's `keepalive-interval` to about 3 minutes, use the
   WebSocket protocol in the Android app, and let your proxy pass WebSocket upgrades.
-- **Share inbox per person (ntfy):** 2.142.0 (#2150): everyone switches it on in *Settings > Notifications > Share inbox*
-  and gets an own long random topic (optionally an own ntfy server and a read token; the token is stored sealed with the
-  server key and never sent back to a browser). What is shared to the topic becomes a task in that person's basket. The
-  server polls the topics of all people who switched it on (a failure counts for that person only); a guessable topic on the
-  public `ntfy.sh` is refused. An own server on an internal address needs an entry in `KALMIDO_CALENDAR_ALLOW_HOSTS` like a
-  calendar subscription. The `NTFY_INBOX_*` variables stay as before for one person.
+- **Share inbox (ntfy):** taken out in 2.574.0 (#3779), the personal inboxes and `NTFY_INBOX_*` alike (old variables are
+  ignored; the table `ntfy_inboxes` is dropped at the first start). Files from the phone go through `/drop` (HTTP Shortcuts on
+  Android, the Shortcuts app on the iPhone), links and text through the share menu, and the mail inbox stays.
 - **Export to other tools:** *Settings > Data* offers, next to the JSON file, a ZIP with one Todoist CSV per list and a ZIP
   with one Markdown checklist per list. Lists locked with a password stay out (the server only holds ciphertext).
 - **Fetch mails now:** admins see a button under *Settings > Integrations > Tasks by e-mail* that asks the mailbox at once
@@ -2007,7 +2004,7 @@ Notes:
 5. **Tell people what to redo,** because it is bound to the old server or name: passkeys (if the name changed), the
    installed app and push permissions (reinstall), calendar and contact accounts (CalDAV / CardDAV), shortcut URLs for
    sharing, and calendar subscription (ICS) links. With a new name also: the redirect address at your single sign-on
-   provider, incoming webhooks and Git webhooks, mail-in addresses at other services, the ntfy inbox address, and public,
+   provider, incoming webhooks and Git webhooks, mail-in addresses at other services, and public,
    form and portal links people have saved. With a new off-site target: its SFTP host fingerprint.
 
 <!-- backup-folders -->
@@ -2057,7 +2054,6 @@ or a person sets the function up.
 | Similarity service | Titles and descriptions of tasks, to the service in `KALMIDO_EMBED_URL` | in the background | off while `KALMIDO_EMBED_URL` is empty (default) |
 | Agents you connect | What the agent reads, to the AI provider you connected it with | when the agent works | do not connect agents; see [AGENT-SECURITY.md](AGENT-SECURITY.md) |
 | ntfy push | Title and text of a notification, in plain text, to `NTFY_URL` (default ntfy.sh) | per notification, for people who chose the channel ntfy (with an own ntfy server also when no device takes a Web Push) | do not choose ntfy; set `NTFY_URL` to your own server |
-| ntfy inbox | Poll of a person's ntfy topic | every 20 seconds, opt-in per person | person switches it off |
 | Browser push | Encrypted notification to the push service of the browser (Google, Mozilla, Apple, Microsoft) | per notification | `KALMIDO_WEBPUSH=0` |
 | Bookmark preview | Every saved bookmark address and its image are fetched by the server | when a bookmark is saved | leave the bookmarks module off |
 | Contact photos | Photo of a Google contact from Google's servers | at import | do not import Google contacts |
@@ -2550,9 +2546,6 @@ All settings are environment variables in `.env` (see [.env.example](../.env.exa
 | `AUTH_BOOTSTRAP_USER`, `AUTH_BOOTSTRAP_NAME`, `AUTH_BOOTSTRAP_PROXY_LOGIN` | `admin` | Account that receives the data when upgrading from the single-user version |
 | `AUTH_SESSION_DAYS` | `30` | Lifetime of a "stay logged in" session |
 | `TASKS_DROP_TOKEN` | | Becomes the first admin's `/drop` token (every user has an own one, see *Share from your phone*) |
-| `NTFY_INBOX_URL`, `NTFY_INBOX_TOKEN`, `NTFY_INBOX_TOPIC` | | Optional share inbox: each message on this ntfy topic becomes an inbox task. The topic must be access-controlled (see *Share from your phone*) |
-| `NTFY_INBOX_USER` | first admin | Username whose inbox receives the share inbox (2.142.0: everyone can also set an own share inbox under *Settings > Notifications*; this variable stays the fallback) |
-| `NTFY_INBOX_PUBLIC` | | Public ntfy URL, if attachment links use a different address than `NTFY_INBOX_URL` |
 | `KALMIDO_SECRET_KEY` | | 2.1.0: 32 random bytes, base64 (`openssl rand -base64 32`). Encrypts (2.2.0) repository tokens and webhook secrets; without it none can be stored. Keep a copy outside the server: losing it means everything encrypted with it is lost for good (attachments, private files, organisation files, office documents, see [Moving to a new server](#moving-to-a-new-server)) and everyone enters their tokens again. Never in the database or backups. 2.42.0: also wraps the per-organisation keys (encryption at rest); without it or an organisation's recovery key, encrypted office data and files are lost. 2.64.0: also the account keys of the private files (no recovery key: keep it safe; `orgcrypt_cli rewrap-accounts` after a planned change) |
 | `KALMIDO_SECRET_FILE` | `/secret/kalmido.key` (docker-compose.yml) | 2.45.0: without `KALMIDO_SECRET_KEY` the key is read from this file; a missing file is created once (32 random bytes, base64, mode 0600). Must not lie inside the data or backup folder (refused: a backup would carry the key). Keep a copy |
 | `KALMIDO_SETUP_CODE` | | 2.45.0: empty = while no account exists the server prints a one-time setup code into its log and the setup page asks for it. **Only for tests and automation:** a fixed code, or `off` (no code: whoever opens the page first becomes the admin) |

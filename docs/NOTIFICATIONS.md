@@ -77,7 +77,7 @@ Regular users never get them. Each alert comes in the admin's language.
 | Update available | the update check found a new release (once per version) |
 | Web Push delivery | a device was removed because its push service refused it (404 / 410, or 4xx five times in a row), or pushes fell back to ntfy although the user has devices |
 | Watchdog errors | rows the background job had to skip (e.g. a reminder with a broken value), summed up per hour with their ids |
-| Integration problems | the ntfy share inbox was refused (guessable topic) or cannot reach its server for more than 15 minutes, five ntfy or Web Push deliveries in a row failed |
+| Integration problems | five ntfy or Web Push deliveries in a row failed (or sign-ins with the OIDC provider; 2.574.0: the ntfy share inbox is gone) |
 | Security events | five or more failed logins within an hour and every login rate-limit trip (per user / IP), bursts of invalid `/drop` or calendar feed tokens, a new admin, a changed server switch (collaboration, time tracking, update check, admin alerts, admin topic) |
 | Storage and health | less than 5 % or 1 GB free on the data volume, data page checksum failures reported by PostgreSQL (daily check), the attachment folder not writable |
 

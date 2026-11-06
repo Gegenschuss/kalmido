@@ -1286,7 +1286,6 @@ function applyState(j) {
   lzTake(j);  // 2.369.2 (#3136): the lists whose tasks are not all here (liveparts.js)
   S.filters = j.filters || [];
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
-  S.ntfyInbox = j.ntfy_inbox || {enabled: false};
   S.webpush = j.webpush || {enabled: false};
   S.news = j.news || {unread: 0, sig: ''};
   S.templates = j.templates || [];

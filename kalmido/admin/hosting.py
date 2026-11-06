@@ -206,7 +206,7 @@ def quota_guard(c, uid, incoming=None, rate=True):
 
 
 def quota_fits(c, uid, n):
-    """For uploads without a person in front of them (mail-in, share inbox): False = skip the file, never raise."""
+    """For uploads without a person in front of them (mail-in): False = skip the file, never raise."""
     try:
         quota_guard(c, uid, n, rate=False)  # 2.281.0 E (#3117): no person in front: no hourly limit
         return True

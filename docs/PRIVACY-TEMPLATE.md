@@ -100,7 +100,7 @@ The **server** connects to other services only for what follows. Keep the rows y
 | Service | When | What is sent | Default |
 |---------|------|--------------|---------|
 | Push services of the browsers (Google `fcm.googleapis.com`, Mozilla `push.services.mozilla.com`, Apple `push.apple.com`, Microsoft `notify.windows.com`) | a person allows notifications on a device | the notification, encrypted end to end (RFC 8291); the service sees only that a message goes to a device | on (`KALMIDO_WEBPUSH`) |
-| ntfy (`NTFY_URL`, default `https://ntfy.sh`) | a person chooses ntfy for notifications or a share inbox (an own ntfy server also gets a message no device took on Web Push; the public ntfy.sh only with ntfy chosen) | title and text of the notification, **not encrypted** | off per person |
+| ntfy (`NTFY_URL`, default `https://ntfy.sh`) | a person chooses ntfy for notifications (an own ntfy server also gets a message no device took on Web Push; the public ntfy.sh only with ntfy chosen) | title and text of the notification, **not encrypted** | off per person |
 | E-mail (`KALMIDO_SMTP_*`) | invitations, password links, reminders and notifications by e-mail | address, name, task or project titles in the text | only when configured |
 | GitHub (`api.github.com`) | update check for admins, a few times a day | the installed version and the server's address | on (`KALMIDO_UPDATE_CHECK`, switch in Settings > Server > Server) |
 | Calendar subscriptions (ICS / CalDAV) and address books (CardDAV) | a person adds one | sign-in to that server, appointments / contacts to sync | per subscription |

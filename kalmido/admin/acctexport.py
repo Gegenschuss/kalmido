@@ -114,7 +114,7 @@ _U_LATER = "not part of the decision of #3469, not in the account export yet"
 UMZ_LEFT_USERS = {
     "abs_cal_feeds": _U_SECRET, "app_passwords": _U_SECRET, "contact_srcs": _U_SECRET, "disc_profiles": _U_SECRET, "disc_tokens": _U_SECRET,
     "doc_fetchers": _U_SECRET, "doc_mail": _U_SECRET, "ev_cal_feeds": _U_SECRET, "hub_tokens": _U_SECRET,
-    "list_key_pending": _U_SECRET, "list_keys": _U_SECRET, "mail_tokens": _U_SECRET, "notify_channels": _U_SECRET, "ntfy_inboxes": _U_SECRET,
+    "list_key_pending": _U_SECRET, "list_keys": _U_SECRET, "mail_tokens": _U_SECRET, "notify_channels": _U_SECRET,
     "org_invites": _U_SECRET, "pl_conn_users": _U_SECRET, "pl_tokens": _U_SECRET, "recovery_codes": _U_SECRET, "user_invites": _U_SECRET,
     "user_keys": _U_SECRET, "webauthn_creds": _U_SECRET, "wiki_key_pending": _U_SECRET, "wiki_keys": _U_SECRET, "wiki_shares": _U_SECRET,
     "list_bell": _U_VIEW, "list_folder_skip": _U_VIEW, "list_mine_hide": _U_VIEW, "rss_reads": _U_VIEW, "task_seen": _U_VIEW, "tchat_reads": _U_VIEW,

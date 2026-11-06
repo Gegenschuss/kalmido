@@ -15,6 +15,11 @@ column with ADD COLUMN IF NOT EXISTS under the same rules as a step (a table tha
 SCHEMA only creates. A UNIQUE index on a table the fragment does not create itself can fail on existing rows: it needs the line
 `# unique-ok <index>: <why no two rows can collide>` in the fragment.
 
+2.574.0 (#3779): one way back out: a table of a feature that was taken out goes with `DROP TABLE IF EXISTS <table>` in AFTER
+(runs at every start, a no-op once it is gone). That is a one-way step (its rows are lost, the version before fails on it), so
+it needs the line `# drop-ok <table>: <why>` in the fragment, and the table may be created nowhere any more (schema.py or a
+fragment), else every start would make it and drop it again.
+
 usage: python3 tools/check_migrations.py [-v]     exit code 1 on a finding
 """
 import ast
@@ -31,6 +36,8 @@ ADD_COLUMN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+ADD\s+COLUM
 CREATE_INDEX = re.compile(r"CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+(\w+)\s+ON\s+(?:ONLY\s+)?(\w+)\b", re.I)
 CREATE_TABLE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I)
 UNIQUE_OK = re.compile(r"^[ \t]*#[ \t]*unique-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
+DROP_TABLE = re.compile(r"DROP\s+TABLE\s+IF\s+EXISTS\s+(\w+)", re.I)  # 2.574.0 (#3779)
+DROP_OK = re.compile(r"^[ \t]*#[ \t]*drop-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
 
 
 def fragments(root=ROOT):
@@ -128,10 +135,14 @@ def content_findings(n, values, src):
     after, al = values.get("AFTER", ([], 0))
     for x in after:
         col = ADD_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
+        drop = DROP_TABLE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         if col:  # a column on a table made after the steps (#4300): AFTER runs at every start, so IF NOT EXISTS
             why = step_finding(col.group(1), col.group(2), x)
             if not why and not re.search(r"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\b", x, re.I):
                 why = "AFTER runs at every start: ADD COLUMN IF NOT EXISTS"
+        elif drop:  # 2.574.0 (#3779): the table of a feature taken out, with a reason
+            why = None if drop.group(1) in set(DROP_OK.findall(src)) else \
+                f"DROP TABLE is a one-way step (its rows are lost): needs a line # drop-ok {drop.group(1)}: <why>"
         else:
             why = index_finding(x, own, ok)
         if why:
@@ -182,6 +193,11 @@ def findings(root=ROOT):
     bad = [f"schema.py: new {x}: belongs into kalmido/core/migrations.d/<task id>.py (docs/ARCHITECTURE.md, Migrations)" for x in new]
     for p in fragments(root):
         bad += frag_findings(p)
+    made = names(schema_src(root))[0]
+    for p in fragments(root):  # 2.574.0 (#3779): a dropped table that is still created would come back at every start
+        with open(p, encoding="utf-8") as f:
+            for t in sorted(set(DROP_OK.findall(f.read())) & made):
+                bad.append(f"{os.path.basename(p)}: drops {t}, but schema.py or a fragment still creates it (every start would make it again)")
     return bad
 
 

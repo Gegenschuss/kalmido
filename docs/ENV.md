@@ -108,7 +108,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_DISMISS_WAIT` | `30` | Seconds before a read notification is removed from the other devices. |
 | `KALMIDO_EVENT_MAIL_DELAY` | `600` | Seconds after the first event before a summary mail goes out. |
 | `KALMIDO_EVENT_MAIL_GAP` | `600` | Least seconds between two summary mails to one person. |
-| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox, git connection or ntfy inbox after which its people get a notice. |
+| `KALMIDO_INTEG_FAILS` | `5` | Failed polls in a row of a mailbox or git connection after which its people get a notice. |
 | `KALMIDO_NOTIF_TEMPLATE` | `read` | Notification template of a share without one: read, work or all. |
 | `KALMIDO_PUSH_BUNDLE` | `1` | `0` = no summary pushes per person and chat room (one push per event). |
 | `KALMIDO_QUIET_PUSH` | `1` | `0` = quiet hours hold only repeated reminders and notification channels, as before 2.367. |
@@ -117,11 +117,6 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_WEBPUSH` | `1` | Switch: browser push notifications. |
 | `KALMIDO_WEBPUSH_APPLE` | `(empty)` | Endpoint prefixes that behave like Apple's push service (tests). |
 | `KALMIDO_WEBPUSH_HOSTS` | `(empty)` | Additional push services allowed (host, *.domain or an exact origin). |
-| `NTFY_INBOX_PUBLIC` | `(empty)` | Public address of the inbox's ntfy server shown in the settings. |
-| `NTFY_INBOX_TOKEN` | `(empty)` | Read token of the share inbox. |
-| `NTFY_INBOX_TOPIC` | `inbox` | Topic of the share inbox (16+ characters on the public ntfy.sh). |
-| `NTFY_INBOX_URL` | `(empty)` | ntfy server of the share inbox (Android share to Kalmido). |
-| `NTFY_INBOX_USER` | `(empty)` | Account that receives the shared items (empty = the first admin). |
 | `NTFY_TOKEN` | `(empty)` | Write token for an own ntfy server. |
 | `NTFY_TOPIC` | `(empty)` | ntfy topic of the first admin (later accounts get their own). |
 | `NTFY_URL` | `https://ntfy.sh` | ntfy server for push notifications. |
@@ -252,7 +247,6 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_IMPORT_MAX_MB` | `20` | Size in MB of an import file (other task apps). |
 | `KALMIDO_IMPORT_MAX_TASKS` | `20000` | Tasks per import at most. |
 | `KALMIDO_IMPORT_RATE` | `30` | Imports and previews per person in 10 minutes. |
-| `KALMIDO_NTFYIN_TICK` | `20` | Seconds between two rounds of the personal share inboxes. |
 | `KALMIDO_PAYONLINE_GO_RATE` | `10` | Checkouts one address may start per minute on the public pay page (2.469.0). |
 | `KALMIDO_PEPPOL_ALLOW_HOSTS` | `(empty)` | Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0). |
 | `KALMIDO_PUBLIC_LINKS` | `1` | Switch: public read-only links of lists. |

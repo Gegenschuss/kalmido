@@ -74,7 +74,7 @@ UMZ_LEFT_TABLES = {
     "abs_cal_feeds": _SECRET, "agent_setup_codes": _SECRET, "app_passwords": _SECRET, "contact_srcs": _SECRET, "disc_profiles": _SECRET, "disc_tokens":
     _SECRET, "doc_fetchers": _SECRET, "doc_mail": _SECRET, "ev_cal_feeds": _SECRET, "fs_ext_links": _SECRET,
     "fs_upload_requests": _SECRET, "git_conns": _SECRET, "hook_in": _SECRET, "hub_tokens": _SECRET, "issue_hooks": _SECRET, "list_key_pending": _SECRET,
-    "list_keys": _SECRET, "list_paperless": _SECRET, "mail_tokens": _SECRET, "notify_channels": _SECRET, "ntfy_inboxes": _SECRET, "org_invites": _SECRET,
+    "list_keys": _SECRET, "list_paperless": _SECRET, "mail_tokens": _SECRET, "notify_channels": _SECRET, "org_invites": _SECRET,
     "paperless_links": _SECRET, "pl_conn_users": _SECRET, "pl_conns": _SECRET, "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET,
     "pl_tokens": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET, "recovery_codes": _SECRET, "task_keys": _SECRET, "user_invites": _SECRET,
     "user_keys": _SECRET, "webauthn_creds": _SECRET, "wiki_key_pending": _SECRET, "wiki_keys": _SECRET, "wiki_shares": _SECRET,

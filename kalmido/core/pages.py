@@ -1,4 +1,4 @@
-"""HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox."""
+"""HTML pages, security headers, /api/version, the share target, quick capture and /drop (2.574.0 #3779: the ntfy share inbox is gone)."""
 import hashlib
 import json
 import mimetypes
@@ -7,15 +7,13 @@ import re
 import threading
 import uuid
 import time
-import urllib.error
 import urllib.parse
-import urllib.request
 from flask import g, jsonify, redirect, request, Response, send_from_directory
 
-from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, ntfy_attachment_url, NTFY_IN, PUBLIC_URL, safe_urlopen
+from ..core.config import app, APP_VERSION, ATT_DIR, ICAL_PREFIX, PUB_PREFIX, SEARCH_INDEX, MAX_FILE_MB, PUBLIC_URL
 from .pg import insert_id
 from ..core.i18n import browser_lang, lang, N_, tr, trn
-from ..core.db import bump, connect, db, default_uid, err, gset, gsetting, iso, now_utc, usettings
+from ..core.db import bump, db, err, iso, now_utc, usettings
 from ..accounts.session import client_ip, GATE, me
 from ..core.access import Denied, my_inbox, time_all, acx_token_bind, collab_all
 from ..core.orgcrypt import oc_task_org  # 2.149.0 G (#2517): pulled up from functions
@@ -260,7 +258,7 @@ def new_inbox_task(c, uid, title, content="", tt_id=None, url=None):
     inbox = my_inbox(c, uid)
     ts = iso(now_utc())
     srt = c.execute("SELECT COALESCE(MIN(sort),0)-1 FROM tasks WHERE list_id=? AND parent_id IS NULL", (inbox,)).fetchone()[0]
-    # 2.27.0 (#1001): what lands in your own inbox (mail, the share sheet, /drop, the ntfy inbox) is yours: assigned to you,
+    # 2.27.0 (#1001): what lands in your own inbox (mail, the share sheet, /drop) is yours: assigned to you,
     # so it also shows in "My tasks"
     tid = insert_id(c, "INSERT INTO tasks(list_id,title,content,sort,created_at,updated_at,tt_id,created_by,url,assignee_id) VALUES(?,?,?,?,?,?,?,?,?,?)",
                     (inbox, (title or tr("Shared", lg=lang(c, uid)))[:300], content or "", srt, ts, ts, tt_id, uid,
@@ -361,94 +359,6 @@ def save_attachment_bytes(c, tid, name, mime, data, owner=None):
     aid = insert_id(c, "INSERT INTO attachments(task_id,name,mime,size,path,created_at,user_id) VALUES(?,?,?,?,?,?,?)",
                     (tid, name, mime, len(data), rel, iso(now_utc()), who))
     up_after_store(c, "att", aid, org, info)
-
-
-def inbox_user(c):
-    """User whose inbox receives the ntfy share inbox (NTFY_INBOX_USER, default the first admin)."""
-    if NTFY_IN["user"]:
-        r = c.execute("SELECT id FROM users WHERE username=? AND disabled=0", (NTFY_IN["user"],)).fetchone()
-        if r:
-            return r[0]
-    return default_uid(c)
-
-
-def ntfy_inbox_import(c, m, who=None):
-    """One ntfy message -> one inbox task (+ attachment). Idempotent via tt_id 'ntfy:<id>'.
-    2.142.0 C (#2150): who = a person's own share inbox {"uid", "fetch": url -> bytes | None, "since": id -> stored}; without it
-    the environment's inbox (NTFY_INBOX_*) and its user as before."""
-    mid = m["id"]
-    uid = who["uid"] if who else inbox_user(c)
-    # 2.549.0 (#4515, audit F2): the same message id counts as done only among the recipient's own tasks (before: anyone's = lost)
-    if uid and not c.execute("SELECT 1 FROM tasks WHERE tt_id=? AND created_by=?", ("ntfy:" + mid, uid)).fetchone():
-        att = m.get("attachment") or None
-        msg = (m.get("message") or "").strip()
-        if att and any(msg.startswith(p) for p in SHARE_PLACEHOLDERS):  # ntfy / Android placeholder texts
-            msg = ""
-        first = msg.split("\n", 1)[0].strip()
-        if (m.get("title") or "").strip():
-            title, content = m["title"].strip(), msg
-        else:  # first line becomes the title, the rest the description
-            title = first or (os.path.splitext(att["name"])[0] if att else tr("Shared", lg=lang(c, uid)))
-            content = msg.split("\n", 1)[1].strip() if "\n" in msg else ""
-        title, content, url = split_link(title, content)
-        tid = new_inbox_task(c, uid, title, content, "ntfy:" + mid, url)
-        if att and att.get("url"):
-            # only attachments stored on the configured ntfy server (public name -> fetched via the internal URL);
-            # anything else (other hosts, file://, ...) is never fetched and never gets the token
-            if who:  # 2.142.0 C (#2150): the person's own server (checked in integrations/ntfyin.py)
-                data = who["fetch"](att["url"])
-            else:
-                data, url = None, ntfy_attachment_url(att["url"])
-                if not url:
-                    print("ntfy inbox: attachment URL is not on the ntfy server, not fetched:", repr(str(att["url"])[:200]), flush=True)
-                else:
-                    req = urllib.request.Request(url, headers={"Authorization": f"Bearer {NTFY_IN['token']}"})
-                    try:
-                        with safe_urlopen(req, timeout=120) as r:
-                            data = r.read(MAX_FILE_MB * 1024 * 1024 + 1)
-                    except (urllib.error.URLError, OSError, ValueError) as e:
-                        print("ntfy inbox: attachment download failed:", e, flush=True)
-            if data and len(data) <= MAX_FILE_MB * 1024 * 1024:  # 2.13.2: never a 0-byte file
-                save_attachment_bytes(c, tid, str(att.get("name") or "datei"), "", data)  # 2.306.0 D3 (#2875): type from the content, not the sender
-        print("ntfy inbox: task", tid, "user", uid, repr(title), "attachment" if att else "", flush=True)
-    if who:
-        who["since"](mid)
-    else:
-        gset(c, "ntfy_inbox_since", mid)
-    bump(c)
-    c.commit()
-
-
-def ntfy_inbox_loop():
-    """Stream the inbox topic (ntfy sends keepalives every 45 s); reconnect with the last id."""
-    from ..notify.alerts import aa_err, aa_fail, aa_ok
-    while True:
-        try:
-            c = connect()
-            since = gsetting(c, "ntfy_inbox_since") or ""
-            if not since:  # first start: only messages from now on
-                since = str(int(time.time()))
-                gset(c, "ntfy_inbox_since", since)
-                c.commit()
-            c.close()
-            req = urllib.request.Request(f"{NTFY_IN['url']}/{NTFY_IN['topic']}/json?since={since}",
-                                         headers={"Authorization": f"Bearer {NTFY_IN['token']}"})
-            # read timeout > ntfy keepalive-interval (ntfy server setting)
-            with safe_urlopen(req, timeout=300) as r:
-                aa_ok("inbox")
-                for line in r:
-                    m = json.loads(line or b"{}")
-                    if m.get("event") == "message":
-                        with GATE.bg():
-                            c = connect()
-                            try:
-                                ntfy_inbox_import(c, m)
-                            finally:
-                                c.close()
-        except Exception as e:  # noqa: BLE001
-            print("ntfy inbox:", e, flush=True)
-            aa_fail("inbox", aa_err(e))
-        time.sleep(10)
 
 
 def h6a_share_origin_ok():

@@ -399,18 +399,19 @@ time.sleep(2)
 # 2.358.0 C (#2784): the FAIL line names what was sent (red once in a probe at Sun 25.10.2026 23:50, not reproduced at 23:50 / 23:59)
 check(not admin_msgs(), f"env off: no alerts at all: {[(x['topic'], x['title'], x['msg'][:80]) for x in admin_msgs()[:3]]}")
 
-# ------------------------------------------------------------------ container 3: KALMIDO_ADMIN_TOPIC, refused inbox, PAPERLESS_* ignored
+# ------------------------------------------------------------------ container 3: KALMIDO_ADMIN_TOPIC, old NTFY_INBOX_* ignored (#3779), PAPERLESS_* ignored
 clear()
 start(keep=True, extra=["-e KALMIDO_ADMIN_TOPIC=env-admins", "-e NTFY_INBOX_TOKEN=tk", "-e NTFY_INBOX_URL=https://ntfy.sh",
                         "-e NTFY_INBOX_TOPIC=inbox", "-e PAPERLESS_TOKEN=pl", "-e PAPERLESS_API=http://127.0.0.1:9"])
 A = sess("alice")
 j = alerts()
 check(j["topic_env"] is True and j["topic"] == "env-admins", f"env topic shown (fixed): {j['topic']}")
-m = wait_for(lambda: admin_msgs("env-admins"))
-check(m and "share inbox was not started" in m[0]["msg"], f"refused share inbox reported to the env topic: {m}")
-check(not admin_msgs("t-alice") and not admin_msgs("t-carol"), "env topic: nothing to the own topics")
 r = A.post(B + "/api/admin/alerts/test")
 check(r.ok and r.json()["ok"] and admin_msgs("env-admins")[-1]["title"] == "Kalmido test alert", "test alert to the env topic (first admin's language)")
+check(not admin_msgs("t-alice") and not admin_msgs("t-carol"), "env topic: nothing to the own topics")
+# 2.574.0 (#3779): the ntfy share inbox is gone: old NTFY_INBOX_* variables start nothing and report nothing (before: the
+# refused inbox was reported to the env topic)
+check(not [x for x in admin_msgs("env-admins") if "share inbox" in x["msg"]], f"#3779: no share inbox alert from old NTFY_INBOX_*: {admin_msgs('env-admins')}")
 check(patch({"integ_min": 1}).ok, "integrations: 1 minute")
 time.sleep(5)
 check(not [x for x in admin_msgs("env-admins") if "Paperless" in x["msg"]], "2.36.0: no Paperless probe or alert (PAPERLESS_* ignored)")

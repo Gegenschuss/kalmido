@@ -765,8 +765,7 @@ function settingsModal(focus) {
       <div id="s-ntfy"><h4>${S.webpush?.enabled ? 'ntfy' : tr('Notifications (ntfy)')}</h4>
       <div class="row"><label>${tr('Topic')}</label><code class="topic">${esc(s.ntfy_topic)}</code>${S.webpush?.enabled ? '' : `<button class="btn sm" data-m="test">${ic('bell', 's')} ${tr('Send test')}</button>`}</div>${''/* 2.555.0 C (#4664): with Web Push "Test all channels" above covers ntfy */}
       ${S.webpush?.enabled ? '' : prio}
-      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}${/ntfy\.sh/.test(S.ntfyUrl) || !S.me?.ntfy_inbox ? '' : tr(', signed in with the ntfy sign-in your admin gave you')}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
-      <div id="s-ntfyin"></div>
+      ${hint(`${tr('Subscribe in the ntfy app: server {0}, topic as above', esc(S.ntfyUrl))}. <a href="${esc(topicUrl)}" target="_blank" rel="noopener">${tr('Web view')}</a>`)}</div>
       <div id="s-chn"></div>${''/* 2.142.0 A (#2145, #2146): channels + e-mail for single events (integrations.js chn_meDraw) */}
       ${notifMatrixHtml(s, hint)}${bl9SetHtml(s, hint)}${typeof tbl_setHtml === 'function' ? tbl_setHtml(chk, hint) : ''}
       ${typeof trd_setHtml === 'function' ? trd_setHtml(s, chk, hint) : ''}${typeof kbd_setHtml === 'function' ? kbd_setHtml(s, chk, hint) : ''}
@@ -800,8 +799,6 @@ function settingsModal(focus) {
       ${kks_html()}${nwls_html()}${apbs_html()}${''/* 2.365.2 B (#2789): Karakeep, newsletter service, booking page (integrations.js) */}
       <h4 id="s-mail-h">${tr('Tasks by e-mail')}</h4><div id="s-mail"></div>
       ${shareHtml(hint)}
-      <ul class="slist">
-        ${S.ntfyInbox?.enabled && S.me?.ntfy_inbox ? `<li>${tr('Single files also via the ntfy app:')} ${tr('In the ntfy app, add server {0} once and sign in with the ntfy sign-in your admin gave you.', `<code class="topic">${esc(S.ntfyInbox.server)}</code>`)} ${tr('Then: share an image or text > ntfy > server as above, topic {0}. A few seconds later it is a task in the basket, files as attachments.', `<code class="topic">${esc(S.ntfyInbox.topic)}</code>`)}</li>` : ''}</ul>
       ${bmls_html()}
       ${acz_linkHtml(S.webhooks?.enabled)}`,  // 2.166.0 (#2633): the webhooks moved to Access
     access: acz_html(),  // 2.166.0 (#2633): API tokens, webhooks and agent tokens in one place
@@ -1127,7 +1124,6 @@ function settingsModal(focus) {
   if ($('#s-navmenus', md)) loadModule('navmenu').then(() => nav_pageDraw($('#s-navmenus', md)), () => {});  // 2.418.0 (#3560)
   if (S.me) accountWire(md);
   mailWire(md);  // 2.17.0 (#443)
-  niWire(md);  // 2.142.0 C (#2150)
   if (typeof chn_meDraw === 'function') chn_meDraw(md);  // 2.142.0 A (#2145)
   md.addEventListener('click', async e => {
     const hz = e.target.closest('#s-hszip'); if (hz) { tkh_zipClick(e, hz, md); return; }  // 2.138.0 C (#1907)

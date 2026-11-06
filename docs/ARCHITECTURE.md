@@ -144,7 +144,7 @@ The most used helpers:
 | `core/serializers.py` | JSON shapes of database rows (tasks, lists, users ...) as the web client and the API see them. |
 | `core/csvimport.py` | 2.140.0 (#2134): the statement reader of the household budget and the office's bank reconciliation: CSV (delimiter, header row, guess, known bank layouts, mapping, rows), CAMT.052 / .053 (no DOCTYPE / ENTITY), the duplicate count. |
 | `core/compress.py` | 2.65.0 (#1505): JSON answers from 1 KB on go out gzip-compressed when the client accepts it (not files, streams, HEAD, 304 or answers that already carry a Content-Encoding). |
-| `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture, /drop and the ntfy share inbox. |
+| `core/pages.py` | HTML pages, security headers, /api/version, the share target, quick capture and /drop (2.574.0 #3779: the ntfy share inbox is gone). |
 | `core/mailframe.py` | 2.420.0 (#3499): the one HTML frame of every mail (mail_html: table layout, 560 px card, petrol button, escaped texts); the text parts stay with their callers. |
 | `core/instance.py` | Version, update check and instance settings (admins). |
 | `core/state.py` | GET /api/state: everything the web client loads at start and after a change. |
@@ -225,7 +225,6 @@ The most used helpers:
 | `collab/chatsave.py` | 2.37.0 (#1159): a chat message (agent chat, team chat) saved as a task by a person: text, file copies, link back (`#msg/...`); `chat_saves` per person, `saved_task_id` in the chat pages. 2.42.0 (#1383): also an agent's comment on a task (kind `comment`: a subtask of the task or a new task in its list). |
 | `collab/replies.py` | 2.33.0: replies to one message (comments, team chat, agent chat): `reply_to` checks and the short quotes. |
 | `integrations/mail.py` | Tasks by e-mail (IMAP) and the daily summary by e-mail (SMTP). |
-| `integrations/ntfyin.py` | 2.142.0 (#2150): the ntfy share inbox per person (`GET/PUT /api/me/ntfy-inbox`, table `ntfy_inboxes`): topic, optional own server + sealed read token; `ni_loop` polls the topics of all people who switched it on into their own basket. |
 | `integrations/exporters.py` | 2.142.0 (#2148): `GET /api/export/todoist.zip` and `/api/export/markdown.zip`: one Todoist-template CSV / Markdown checklist per own list. |
 | `integrations/mailtrim.py` | 2.49.0 (#971): `md_trim_forward(text)`, a pure function: a forwarded mail becomes one line "From <sender>, <date>" + the message without signature, legal notice and older quoted replies. Used by *Tasks by e-mail* when the person switches *Shorten forwarded mails* on (`mail_trim_fwd`, off by default; the original stays as `.eml` unless `mail_trim_eml` is `0`). |
 | `integrations/taskmail.py` | 2.393.2 B (#3375): the mail thread of a task (`task_mail`: Message-IDs src / in / out; the reporter = the `src` row, the only one with an address). `tmr_take` (called by `mail_import`) turns a reply into a comment of the task (In-Reply-To / References or the signed reply address `+r<id>[u<account>]x<sig>`; only the reporter or a person who sees the task, by In-Reply-To only through a token address whose account sees the task, #4071: never by From alone; in a person's name only through their own signed address and, 2.539.0 #4381, a sender domain the receiving server confirmed (`hub/hubmail.py hbm_from_verified`); the quote cut by `tmr_trim`), `tmr_send` mails a comment to the reporter (switch *Also by e-mail to the reporter*, `mail_reporter`). Hooks: `mail.MAIL_TASK_HOOK`, `comments.MAIL_REPLY`. |
@@ -677,7 +676,9 @@ Since 2.37.0 Kalmido runs on PostgreSQL 17 only (`DATABASE_URL`); SQLite is gone
   index in `core/schema.py` (list: `tools/migrations_frozen.json`, it never grows) and a fragment with anything but data.
   It also reads the statements (2.509): a step adds exactly its own column, nullable or with a `DEFAULT`; `SCHEMA` only creates;
   a `UNIQUE` index on a table the fragment does not create can fail on existing rows and needs a line
-  `# unique-ok <index>: <why no two rows can collide>` in the fragment. `tests/p2192_c_upgrade_test.py` starts the current
+  `# unique-ok <index>: <why no two rows can collide>` in the fragment. The one way out (2.574, #3779): the table of a feature
+  that was taken out goes with `DROP TABLE IF EXISTS <table>` in `AFTER` and a line `# drop-ok <table>: <why>` (a one-way
+  step; the table may be created nowhere any more). `tests/p2192_c_upgrade_test.py` starts the current
   server on the old dump with a row in every table.
   A fragment's `SCHEMA` may also hold a trigger (`CREATE OR REPLACE FUNCTION` with a `$$` body, then `CREATE OR REPLACE
   TRIGGER` on one statement; `trigger_skip_present` leaves an unchanged trigger alone), e.g. 2.542.0 (#4598)

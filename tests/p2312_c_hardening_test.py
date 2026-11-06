@@ -1,15 +1,11 @@
 #!/usr/bin/env python3
-"""2.312.0 C (#3265): hardening rest of 2.306, own container (start.sh, a tiny ntfy server inside: stub_ntfyin.py). Invented
-accounts only (example.com). One case per rule:
- - the ntfy share inbox polls people at the same time: a person whose server hangs does not hold another person's poll
-   (the other one's message arrives while the slow request is still open); the slow one still arrives later
- - an existing inbox on an own server over http:// to a host no admin allowed: the settings answer says so (a hint, it
-   keeps running); https:// or an allowed host: no hint; saving it unchanged still works, a new such address is refused
+"""2.312.0 C (#3265): hardening rest of 2.306, own container (start.sh). Invented accounts only (example.com). One case per rule:
+ - (the ntfy share inbox: parallel polls, old http:// inboxes - 2.574.0 #3779: the inbox is gone, its route is a 404)
  - the sign-in exception "known address" (the per-name ceiling skipped for an address the account signed in from) holds
    for every process: remembered by one process, used by another with an empty memory; another address stays limited
  - saved number schemes with more than four text building blocks are reported at the start (log line + admin alert),
    nothing is changed; four blocks are fine
-freelancer-matrix: ntfy_inbox (the own inbox, the hint), core_hardening (the sign-in), office (the personal office's scheme is reported too)
+freelancer-matrix: ntfy_inbox (2.574.0: the route is gone for them too), core_hardening (the sign-in), office (the personal office's scheme is reported too)
 usage: p2312_c_hardening_test.py <datadir>"""
 import json
 import os
@@ -24,8 +20,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from freelancer_fixture import freelancer  # noqa: E402
 
 N = os.path.dirname(os.path.abspath(__file__))
-STUB = "http://127.0.0.1:8099"
-ENV = {"KALMIDO_CALENDAR_ALLOW_HOSTS": "127.0.0.1:8099", "KALMIDO_NTFYIN_TICK": "1"}
+ENV = {}
 
 
 def dbw(q, a=()):
@@ -36,23 +31,6 @@ def dbw(q, a=()):
         c.commit()
     finally:
         c.close()
-
-
-def stub_start():
-    subprocess.run(["cp", os.path.join(N, "stub_ntfyin.py"), kt.DATA])
-    subprocess.run(["docker", "exec", "-d", CT, "python", "/data/stub_ntfyin.py"])
-    until(lambda: subprocess.run(["docker", "exec", CT, "python", "-c", "import urllib.request; urllib.request.urlopen('" + STUB + "/x/json?poll=1')"],
-                                 capture_output=True).returncode == 0, timeout=15)
-
-
-def publish(msgs):
-    with open(os.path.join(kt.DATA, "ntfyin_msgs.json"), "w") as f:
-        json.dump(msgs, f)
-
-
-def stub_log():
-    p = os.path.join(kt.DATA, "ntfyin.log")
-    return [json.loads(x) for x in open(p).read().splitlines() if x.strip()] if os.path.exists(p) else []
 
 
 def py(code, env=None):
@@ -74,7 +52,6 @@ def py(code, env=None):
 
 
 kt.fresh(env=ENV)
-stub_start()
 A = kt.sess(None)
 assert A.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice", "password": "password123"}).ok
 A = sess("alice")
@@ -90,55 +67,10 @@ for u in ("bob", "carol"):  # bob first: the lower id, the one a round one after
 FID, Fr = freelancer(B, A)
 Bo, Ca = sess("bob"), sess("carol")
 
-# ================================================================ 1. the ntfy inbox: one slow server holds nobody else
-SLOW, FAST = "slow-bobs-share-topic-12345", "carols-share-topic-1234567"
-publish([{"topic": SLOW, "id": "s1", "message": "Shared by bob slowly"}, {"topic": FAST, "id": "c1", "message": "Shared by carol"}])
-r = Bo.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": SLOW, "url": STUB})
-check(r.ok, "bob on (slow server) " + r.text[:120])
-check(until(lambda: [x for x in stub_log() if SLOW in x["path"] and not x.get("end")], timeout=20), "bob's slow poll has started")
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": FAST, "url": STUB})
-check(r.ok, "carol on " + r.text[:120])
-got = until(lambda: kt.dbx("SELECT created_by FROM tasks WHERE title='Shared by carol'"), timeout=30)
-check(got and got[0][0] == uid["carol"], f"carol's message arrives {got}")
-log = stub_log()
-slow_end = min([x["t"] for x in log if SLOW in x["path"] and x.get("end")] or [float("inf")])
-fast_at = min([x["t"] for x in log if FAST in x["path"] and not x.get("end")] or [float("inf")])
-check(fast_at < slow_end, f"carol is polled while bob's slow request is still open (carol {fast_at}, bob's end {slow_end})")
-got = until(lambda: kt.dbx("SELECT created_by FROM tasks WHERE title='Shared by bob slowly'"), timeout=45)
-check(got and got[0][0] == uid["bob"], f"bob's message still arrives from the slow server {got}")
-n = len([x for x in stub_log() if SLOW in x["path"] and not x.get("end")])
-check(n <= len([x for x in stub_log() if SLOW in x["path"] and x.get("end")]) + 1, f"bob is never polled twice at the same time ({n} starts)")
-Bo.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-
-# freelancer-matrix: ntfy_inbox
-r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "url": STUB})
-check(r.ok, "freelancer: inbox on " + r.text[:120])
-ft = r.json().get("topic", "")
-publish([{"topic": ft, "id": "f1", "message": "Frida shares"}])
-got = until(lambda: kt.dbx("SELECT created_by FROM tasks WHERE title='Frida shares'"), timeout=30)
-check(got and got[0][0] == FID, "freelancer: the message arrives in the own basket")
-Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-
-# ================================================================ 2. old inboxes over http:// to a host no admin allowed: a hint
-dbw("UPDATE ntfy_inboxes SET url='http://ntfy.example.com', enabled=1 WHERE user_id=?", (uid["bob"],))
-g = Bo.get(B + "/api/me/ntfy-inbox").json()
-check(g.get("insecure") is True and g.get("enabled") is True, f"an http:// server of a host nobody allowed: the hint, still on {g}")
-r = Bo.put(B + "/api/me/ntfy-inbox", json={"enabled": True})
-check(r.ok and r.json().get("insecure") is True, "saving it unchanged still works (nothing is switched off) " + r.text[:120])
-r = Bo.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "url": "http://other.example.com"})
-check(r.status_code == 400 and "https://" in r.text, "a new http:// address of such a host: the message of 2.306 " + r.text[:120])
-r = Bo.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "url": "https://ntfy.example.com"})
-check(r.ok and r.json().get("insecure") is False, "https://: no hint " + r.text[:120])
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "url": STUB})
-check(r.ok and r.json().get("insecure") is False, "http:// to a host an admin allowed: no hint " + r.text[:120])
-check(Ca.get(B + "/api/me/ntfy-inbox").json().get("insecure") is False and "insecure" in Ca.get(B + "/api/me/ntfy-inbox").json(),
-      "the field is in every answer")
-for s_ in (Bo, Ca):
-    s_.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-dbw("UPDATE ntfy_inboxes SET url='http://ntfy.example.com', enabled=1 WHERE user_id=?", (FID,))
-check(Fr.get(B + "/api/me/ntfy-inbox").json().get("insecure") is True, "freelancer (ntfy_inbox): the same hint")
-Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
+# ================================================================ 1./2. the ntfy share inbox (parallel polls, old http:// inboxes)
+# 2.574.0 (#3779): the share inbox is gone (decided 30.10.2026), its two cases with it: the route answers 404 for everyone
+for who, s_ in (("member", Bo), ("freelancer", Fr)):
+    check(s_.get(B + "/api/me/ntfy-inbox").status_code == 404, f"#3779: {who}: no share inbox any more")
 
 # ================================================================ 3. the known sign-in address holds for every process
 KN = """

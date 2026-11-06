@@ -77,11 +77,5 @@ same place and follow the guide there (*Get Contents of URL* to the address + `/
 generic shortcut (`KALMIDO_IOS_SHORTCUT_URL`), an *Add the Kalmido shortcut* button appears; it asks for the server
 address (without `/drop`, it adds that itself) and the token on import.
 
-**ntfy** (one file per share): set the `NTFY_INBOX_*` variables, then share to the ntfy app on that topic.
-
-> [!IMPORTANT]
-> Everything published to the inbox topic becomes a task in that user's inbox, so the topic must be
-> access-controlled: use your own ntfy server with access control (a read token for Kalmido, write access only for
-> you), or at least an unguessable topic name. Kalmido refuses to start the inbox on the public `ntfy.sh` with a short
-> or the default topic name (`inbox`). Attachments are only downloaded when their URL points to your ntfy server
-> (`NTFY_INBOX_URL` or `NTFY_INBOX_PUBLIC`); the inbox token is never sent anywhere else.
+(2.574.0: the share inbox through the ntfy app is gone; use HTTP Shortcuts / the Shortcuts app above, the share menu or
+the mail inbox. `NTFY_INBOX_*` variables are ignored.)

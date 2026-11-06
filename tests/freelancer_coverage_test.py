@@ -621,7 +621,7 @@ ROUTES = {
     "POST /api/orgs/{}/join": "own", "DELETE /api/orgs/{}/join": "own",
     # ---- own (61)
     "DELETE /api/account/export": "own", "DELETE /api/account/import/{}": "own", "DELETE /api/me/app-passwords/{}": "own",
-    "DELETE /api/me/avatar": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",
+    "DELETE /api/me/avatar": "own",  # 2.574.0 (#3779): GET / PUT /api/me/ntfy-inbox are gone
     "DELETE /api/me/mail/token": "own", "DELETE /api/me/tokens/{}": "own",
     "DELETE /api/me/wait-suggestions": "own", "DELETE /api/me/webhooks/{}": "own", "DELETE /api/push/subs/{}": "own",
     "DELETE /api/v1/me/app-passwords/{}": "own", "GET /api/account/export": "own", "GET /api/account/delete": "own", "POST /api/account/delete": "own", "GET /api/account/export/file": "own", "POST /api/account/export/file": "own",
@@ -1413,7 +1413,6 @@ POST /api/newsletter/segments
 POST /api/newsletter/sync
 POST /api/notes/{}/restore
 POST /api/notify-templates/asked
-POST /api/ntfy/test
 POST /api/office/catalog/refresh
 POST /api/office/datev/import
 POST /api/office/datev/import/check

@@ -2500,14 +2500,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS life_device_links_task ON life_device_links(ta
 CREATE UNIQUE INDEX IF NOT EXISTS life_device_links_eq ON life_device_links(user_id, equipment_id) WHERE equipment_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS ix2281_life_device_links_equipment_id ON life_device_links(equipment_id) WHERE equipment_id IS NOT NULL;
 -- (2.140.0 B, last line)
--- 2.142.0 C (#2150): a person's own ntfy share inbox (integrations/ntfyin.py): on/off, topic, optional own ntfy server (url) and
--- read token (sealed with the server key, never sent to a client), since = the last imported message id (or unix time),
--- fails / last_error / last_ok = the state of the last rounds. Goes with the account. New table only: 2.141 ignores it
-CREATE TABLE IF NOT EXISTS ntfy_inboxes (
-  user_id BIGINT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, enabled BIGINT NOT NULL DEFAULT 0,
-  topic TEXT NOT NULL DEFAULT '', url TEXT NOT NULL DEFAULT '', token TEXT NOT NULL DEFAULT '', since TEXT NOT NULL DEFAULT '',
-  fails BIGINT NOT NULL DEFAULT 0, last_error TEXT NOT NULL DEFAULT '', last_ok TEXT, updated_at TEXT NOT NULL DEFAULT '');
--- (2.142.0 C, last line)
+-- 2.142.0 C (#2150): the table ntfy_inboxes (a person's own ntfy share inbox) was here; 2.574.0 (#3779) took the feature out,
+-- migrations.d/3779.py drops it
 -- 2.148.0 A (#2471): locked accounting periods of an office area (one row per month 'YYYY-MM', office/periodlock.py; locked up
 -- to MAX(period), never unlocked). New table only: 2.147 ignores it
 CREATE TABLE IF NOT EXISTS office_period_locks (
@@ -4706,7 +4700,6 @@ GLOBAL_DEFAULTS = {
     "time_all": "1",            # admin: time tracking for everyone (0 = module off for all; entries stay)
     "update_check": "1",        # admin: daily check for a new release (see UPDATE_URL)
     "update_info": "",          # json cache of the last check: {checked_at, latest, url, error}
-    "ntfy_inbox_since": "",     # last imported ntfy message id (or unix time on first start)
     # admin alerts via ntfy (see "admin alerts"; KALMIDO_ADMIN_ALERTS=0 / KALMIDO_ADMIN_TOPIC override)
     "aa_on": "1",               # admin: operational alerts to the admins
     "aa_topic": "",             # '' = every admin's own ntfy topic, else one shared admin topic
@@ -4718,7 +4711,7 @@ GLOBAL_DEFAULTS = {
     "aa_max_hour": "10",        # at most N alerts per hour (the rest is only listed)
     "aa_disk_pct": "5",         # low disk: free space below N % ...
     "aa_disk_mb": "1024",       # ... or below N MB (0 = that check off)
-    "aa_integ_min": "15",       # ntfy inbox failing for N minutes
+    "aa_integ_min": "15",       # an integration failing for N minutes (2.574.0 #3779: its only user, the ntfy inbox, is gone)
     "aa_update_notified": "",   # last version an update alert went out for
     "aa_digest_sent": "",       # day of the last daily summary
     "cal_allow_hosts": "",      # admin: internal hosts calendar subscriptions may reach ("host, host:port")

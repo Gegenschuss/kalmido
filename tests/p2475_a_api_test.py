@@ -7,7 +7,8 @@ fragment folder made here, the app itself has none yet; invented names only.
  - frag_load: name order, only .py, no folder = nothing
  - tools/check_migrations.py: schema.py as it is passes, a new step / table / index there is a finding, a fragment with code too;
    the checks that read the schema see the fragments (schema_src)
- - 2.509.0 (#4285): and it reads the statements: only additive steps, indexes in AFTER, UNIQUE on an existing table with a reason;
+ - 2.509.0 (#4285): and it reads the statements: only additive steps, indexes in AFTER, UNIQUE on an existing table with a reason
+   (2.574.0 #3779: and a DROP TABLE IF EXISTS in AFTER with a line # drop-ok <table>: <why>, of a table created nowhere any more);
    a step that fails in the middle of a start leaves nothing behind and the next start goes through; two starts at once both
    go through and do the step once
 No routes, no person (freelancer-matrix: n/a).
@@ -166,7 +167,9 @@ try:
                  'AFTER = ["ALTER TABLE events ADD COLUMN IF NOT EXISTS x BIGINT"]\n',
                  'SCHEMA = """-- the person\'s own rows\nCREATE TABLE IF NOT EXISTS n2 (id BIGINT, t TEXT DEFAULT \'--\');\nCREATE UNIQUE INDEX IF NOT EXISTS u4 ON n2(id);"""\n',
                  '# unique-ok u1: the column is new and NULL in every row\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u1 ON events(x)"]\n',
-                 'SCHEMA = """CREATE TABLE IF NOT EXISTS n1 (id BIGINT); CREATE UNIQUE INDEX IF NOT EXISTS u2 ON n1(id);"""\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u3 ON n1(id)"]\n'):
+                 'SCHEMA = """CREATE TABLE IF NOT EXISTS n1 (id BIGINT); CREATE UNIQUE INDEX IF NOT EXISTS u2 ON n1(id);"""\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u3 ON n1(id)"]\n',
+                 # 2.574.0 (#3779): the table of a feature taken out, with a reason, created nowhere any more
+                 '# drop-ok old_t: the feature was taken out\nAFTER = ["DROP TABLE IF EXISTS old_t"]\n'):
         bad, p = frag("3481.py", text)
         check(bad == [], f"#4285: additive passes: {text.strip()[:90]} {bad}")
         os.remove(p)
@@ -191,7 +194,11 @@ try:
                        ('SCHEMA = """CREATE UNIQUE INDEX IF NOT EXISTS u ON events(x);"""\n', "UNIQUE on an existing table in SCHEMA"),
                        ('SCHEMA = """DROP TABLE events;"""\n', "a DROP in SCHEMA"),
                        ('SCHEMA = """CREATE TABLE IF NOT EXISTS n3 (id BIGINT); -- don\'t\nDROP TABLE events; -- x\'\n"""\n', "a DROP behind a comment with an apostrophe"),
-                       ('SCHEMA = """CREATE TABLE n4 (id BIGINT);"""\n', "CREATE TABLE without IF NOT EXISTS (runs at every start)")):
+                       ('SCHEMA = """CREATE TABLE n4 (id BIGINT);"""\n', "CREATE TABLE without IF NOT EXISTS (runs at every start)"),
+                       # 2.574.0 (#3779): a DROP TABLE without its reason, of a table schema.py still creates, without IF EXISTS
+                       ('AFTER = ["DROP TABLE IF EXISTS old_t"]\n', "a DROP TABLE without a # drop-ok line"),
+                       ('# drop-ok events: gone\nAFTER = ["DROP TABLE IF EXISTS events"]\n', "a dropped table schema.py still creates"),
+                       ('# drop-ok old_t: gone\nAFTER = ["DROP TABLE old_t"]\n', "DROP TABLE without IF EXISTS")):
         bad, p = frag("3482.py", text)
         check(len(bad) == 1, f"#4285: {what} is a finding {bad}")
         os.remove(p)

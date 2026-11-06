@@ -425,13 +425,8 @@ def _aa_integrations(c, cfg, ints, now):
     for name, s in ints.items():
         if s.get("alerted") and now - s["alerted"] < max(cfg["cooldown_h"] * 3600, AA_WINDOW):
             continue
-        mins = int((now - s["since"]) // 60)
-        if name == "inbox":
-            if now - s["since"] < cfg["integ_min"] * 60:
-                continue
-            st = aa_emit(c, cfg, "integration", "inbox:" + s["err"],
-                         N_("The ntfy share inbox has not reached its ntfy server for {0} min ({1})."), [mins, s["err"]])
-        elif s["n"] >= AA_FAIL_ROW and name == "oidc":
+        # 2.574.0 (#3779): the ntfy share inbox ("inbox", after integ_min minutes) is gone
+        if s["n"] >= AA_FAIL_ROW and name == "oidc":
             st = aa_emit(c, cfg, "integration", "oidc:" + s["err"], N_("{0} sign-ins with the OIDC provider in a row failed ({1})."),
                          [s["n"], s["err"]])
         elif s["n"] >= AA_FAIL_ROW and name == "ntfy":

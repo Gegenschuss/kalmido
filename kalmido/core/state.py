@@ -4,7 +4,7 @@ import time
 from datetime import timedelta
 from flask import g, has_request_context, jsonify, request
 
-from ..core.config import app, COOKIE, MAX_FILE_MB, IOS_SHORTCUT_URL, NTFY_IN, NTFY_URL, PUBLIC_URL
+from ..core.config import app, COOKIE, MAX_FILE_MB, IOS_SHORTCUT_URL, NTFY_URL, PUBLIC_URL
 from ..core.i18n import languages, tr
 from ..core.schema import MAX_DEPTH
 from ..core.retention import ret_on
@@ -18,7 +18,6 @@ from ..core.access import (
 )
 from ..core.serializers import load_tasks, running_pomo, tags_for, td_lean, TD_DEFAULTS  # 2.575.0 B (#3966): + td_lean
 from ..core.pg import st_ids
-from ..core.pages import inbox_user
 from ..core.instance import about_info, pub_kinds_off
 from ..core.env import env_int  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import system_ctx  # 2.369.5 (#2517): pulled up from functions
@@ -334,7 +333,6 @@ def state():
     return jsonify(
         v=v0,
         me={**user_public(u), "orgs": _org_names(c, u["id"]), "is_admin": bool(u["is_admin"]), "auth": g.auth_via, "has_password": bool(u["password_hash"]),
-            "ntfy_inbox": bool(NTFY_IN["token"]) and inbox_user(c) == uid,
             # 2.138.0 C (#1907): only whether an upload token is set (the token itself is shown once, when created)
             "drop_token_set": bool(not u["kid"] and u["drop_token_hash"]), "drop_token_at": "" if u["kid"] else (u["drop_token_at"] or ""),
             "workspaces": (ws := workspaces_for(c, uid)), "sgen": session_gen(u, ws),  # 2.28.0 (#935): my organisations [{id, name, icon, role}]; 2.238.0 B (#2872): + the sign-in mark
@@ -367,7 +365,6 @@ def state():
         mine_order=vw_mine_order(c, uid),  # 2.40.0 (#1344): the own order of "My tasks" {task id: pos}
         mine_hidden=mt_mine_hidden(c, uid),  # 2.41.0 (#1365): ids of the lists I switched off for "My tasks"
         notify=notif_matrix(s),  # 2.1.0 (#317)
-        ntfy_inbox={"enabled": bool(NTFY_IN["token"]), "server": NTFY_IN["public"], "topic": NTFY_IN["topic"]},
         ntfy_url=NTFY_URL,
         trash_purge=ret_on("trash"),  # 2.223.3 A (#2877): False = the trash runs only count, nothing is deleted after the period
         max_file_mb=MAX_FILE_MB,  # 2.273.0 D (#3051): the upload limit per file (the client checks before it sends)

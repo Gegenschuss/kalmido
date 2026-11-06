@@ -806,7 +806,7 @@ ROUTES = {
     "POST /api/favorites/suggestion": "own",  # 2.46.1 (#1361): a favourite suggestion from the person's own activity
     "PUT /api/tasks/mine-order": "own", "GET /api/me/wait-suggestions": "own", "DELETE /api/me/wait-suggestions": "own",  # 2.41.0 (#1205)
     "POST /api/onboarding": "own", "POST /api/sample": "own", "DELETE /api/sample": "own", "PATCH /api/settings": "own",
-    "POST /api/ntfy/test": "own", "GET /api/me/ntfy-inbox": "own", "PUT /api/me/ntfy-inbox": "own",  # 2.142.0 C (#2150)
+    "POST /api/ntfy/test": "own",  # 2.142.0 C (#2150); 2.574.0 (#3779): GET / PUT /api/me/ntfy-inbox are gone
      "GET /api/push/vapid": "own", "GET /api/push/subs": "own", "POST /api/push/subs": "own",
     "DELETE /api/push/subs/{}": "own", "POST /api/push/unsubscribe": "own", "POST /api/push/handled": "own",
     "POST /api/push/test": "own", "GET /api/me": "own", "PATCH /api/me": "own", "POST /api/me/drop-token": "own",

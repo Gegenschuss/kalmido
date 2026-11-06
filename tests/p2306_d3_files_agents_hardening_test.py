@@ -8,7 +8,7 @@ freelancer-matrix: files, wiki, agents (a person without an organisation keeps e
  - exports: a locked office file of another version does not break the list of locked files
  - deleting a document for good removes its preview file only after the commit
  - agent jobs: user_id with a task must see the task and reach the agent there; a job's task title only with sight of the task
- - own ntfy server: http:// only for hosts an admin allowed; a shared file's type comes from its content, not the sender
+ - a shared file's type comes from its content, not the sender (2.574.0 #3779: the own ntfy server of the share inbox is gone)
  - Git server: http:// only through the allow list, localhost included; channel list events per request are capped
 usage: p2306_d3_files_agents_hardening_test.py <datadir>      (KMT_NOSTART=1 / P2306D3_NOSTART=1: a running server)"""
 import os
@@ -195,33 +195,18 @@ check(cj is not None and cj.get("task_title") is None and cj.get("list_id") is N
 aj = next((x for x in A.get(B + "/api/agents/jobs").json().get("jobs", []) if x["id"] == JOB), None)
 check(aj is not None and aj.get("task_title") == "Shared job task D3", f"#2875 the list's owner (admin) sees the title {aj and aj.get('task_title')}")
 
-# ================================================================ own ntfy server, shared file type, Git server, channel events
-TOPIC = "d3-share-topic-0123456789"
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": TOPIC, "url": "http://ntfy.example.com"})
-check(r.status_code == 400 and "https://" in r.text, f"#2875 an own ntfy server over http:// is refused ({r.status_code} {r.text[:200]})")
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": TOPIC, "url": "http://127.0.0.1:8099"})
-check(r.ok, f"#2875 ... unless an admin allowed the host ({r.status_code} {r.text[:200]})")
-r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": True, "topic": TOPIC + "f", "url": "https://ntfy.example.com"})
-check(r.ok, f"freelancer #2875: an own ntfy server over https:// ({r.status_code} {r.text[:200]})")
-out = in_app(f"from kalmido.core.pages import ntfy_inbox_import\n"
-             f"m = {{'id': 'd3att1', 'event': 'message', 'message': 'pic', 'attachment': {{'name': 'pic.png', 'type': 'text/html', 'url': 'http://x/f'}}}}\n"
-             f"ntfy_inbox_import(c, m, {{'uid': {CAROL}, 'fetch': lambda u: bytes.fromhex('{PNG.hex()}'), 'since': lambda mid: None}})\n"
-             f"print('mime', c.execute(\"SELECT a.mime FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.tt_id='ntfy:d3att1'\").fetchone()[0])")
-check("mime image/png" in out, "#2875 a shared file gets its type from its content, not the sender's word " + out[-300:])
-# 2.306.0 Fix-2a (#2875): an inbox saved before with an http:// server (no allow list then) can still be switched off / changed
-OLD_HTTP = f"c.execute(\"UPDATE ntfy_inboxes SET url='http://ntfy.example.com', enabled=1 WHERE user_id={CAROL}\")\nc.commit()\nprint('set')"
-check("set" in in_app(OLD_HTTP), "#2875 setup: an old http:// inbox")
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"token": "tk-d3-old-http"})
-check(r.ok, f"#2875 an old http:// inbox keeps running on a token change ({r.status_code} {r.text[:200]})")
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-check(r.ok and not r.json().get("enabled"), f"#2875 an old http:// inbox can always be switched off ({r.status_code} {r.text[:200]})")
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"enabled": True})
-check(r.status_code == 400 and "https://" in r.text, f"#2875 switching it on again checks the address ({r.status_code} {r.text[:200]})")
-in_app(OLD_HTTP)
-r = Ca.put(B + "/api/me/ntfy-inbox", json={"url": "http://other.example.com"})
-check(r.status_code == 400 and "https://" in r.text, f"#2875 a changed http:// address is checked ({r.status_code} {r.text[:200]})")
-r = Fr.put(B + "/api/me/ntfy-inbox", json={"enabled": False})
-check(r.ok, f"freelancer #2875: the own inbox switched off ({r.status_code} {r.text[:200]})")
+# ================================================================ shared file type, Git server, channel events
+# 2.574.0 (#3779): the ntfy share inbox (own server over http:// only with the allow list, an old http:// inbox) is gone with
+# its checks; the type of a shared file still comes from its content (files/scan.py sc_sniff_mime), here through /drop, the
+# upload way of the phone: a picture sent without a type is stored as image/png, HTML that calls itself a picture never is one
+import requests  # noqa: E402
+tok = Ca.post(B + "/api/me/drop-token").json().get("drop_token", "")
+for title, fname, data, said, want in (("pic d3", "pic.png", PNG, "application/octet-stream", "image/png"),
+                                        ("fake d3", "fake.png", b"<html><script>alert(1)</script></html>", "image/png", "application/octet-stream")):
+    r = requests.post(B + "/drop", headers={"Authorization": "Bearer " + tok}, data={"text": title}, files={"file": (fname, data, said)})
+    check(r.ok, f"#2875 setup: {fname} through /drop ({r.status_code} {r.text[:120]})")
+    mime = kt.dbx("SELECT a.mime FROM attachments a JOIN tasks t ON t.id=a.task_id WHERE t.title=? AND a.name=?", (title, fname))
+    check(mime and mime[0][0] == want, f"#2875 a shared file gets its type from its content, not the sender's word: {fname} said {said} -> {mime}")
 out = in_app("from kalmido.core.config import app as fa\nfrom kalmido.integrations.git import git_norm_base_url\n"
              "with fa.test_request_context():\n"
              "    for u in ('http://localhost:9999', 'http://127.0.0.1:8099', 'https://git.example.com/api'):\n"

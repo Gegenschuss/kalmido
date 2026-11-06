@@ -697,39 +697,3 @@ document.addEventListener('touchmove', e => {
 document.addEventListener('touchend', e => { if (lyDg?.touch) { if (lyDg.active && e.cancelable) e.preventDefault(); lydragEnd(false); } });
 document.addEventListener('touchcancel', () => { if (lyDg?.touch) lydragEnd(true); });
 document.addEventListener('contextmenu', e => { if (e.target.closest?.('.lycanvas .lyedb') && isTouch()) e.preventDefault(); });  // the long press is the drag
-
-// ------------------------------------------------------------------ 2.142.0 C (#2150) Settings > Notifications: my share inbox (ntfy)
-function niHtml(j) {  // 2.306.0 C (#2889): a hint when the shared outside service ntfy.sh carries the messages
-  if (!j) return `<div class="muted">${tr('Loading…')}</div>`;
-  const srv = j.url || j.default_server;
-  // 2.312.0 C (#3265): an own server over http:// from before 2.306 keeps running; say how to make it safe
-  const insecure = j.insecure ? `<div class="shint ni-bad" id="s-niinsecure">${tr('This ntfy server is reached over http:// without encryption: the topic and the read token travel in plain text. Switch the address to https://, or ask an admin to allow this host.')}</div>` : '';
-  const state = !j.enabled ? '' : j.fails ? `<div class="shint ni-bad">${tr('Last check failed ({0}); trying again.', esc(j.last_error || '?'))}</div>` : j.last_ok ? `<div class="shint">${tr('Working: the last check went through.')}</div>` : '';
-  return `<div class="row"><label></label>${mchk('s-nion', j.enabled, tr('Shared items from the ntfy app land in my basket'))}</div>
-    ${j.enabled ? `<div class="row"><label>${tr('Topic')}</label><code class="topic" id="s-nitopic">${esc(j.topic)}</code><button type="button" class="btn sm" data-ni="copy">${ic('copy', 's')} ${tr('Copy')}</button><button type="button" class="btn sm" data-ni="dice">${ic('sync', 's')} ${tr('New topic')}</button></div>
-    ${state}${insecure}
-    ${/ntfy\.sh/.test(srv || '') ? `<div class="shint">${tr('What you share travels through an outside service (ntfy.sh). You can use your own ntfy server instead (below).')}</div>` : ''}
-    <details class="mopt" ${j.insecure ? 'open' : ''}><summary>${tr('Own ntfy server')}</summary>
-      <div class="row"><label for="s-niurl">${tr('Server')}</label><input id="s-niurl" type="url" autocomplete="off" placeholder="${esc(j.default_server)}" value="${esc(j.url)}" maxlength="300"></div>
-      <div class="row"><label for="s-nitok">${tr('Read token')}</label><input id="s-nitok" type="password" autocomplete="off" maxlength="400" placeholder="${esc(j.has_token ? tr('set (hidden)') : tr('none'))}">${j.has_token ? `<button type="button" class="btn sm" data-ni="rmtok">${tr('Remove')}</button>` : ''}</div>
-      <div class="row"><label></label><button type="button" class="btn sm pri" data-ni="save">${tr('Save')}</button></div>
-    </details>
-    <div class="shint">${tr('Android: share an image or text > ntfy > server {0}, topic as above. A few seconds later it is a task in your basket, files as attachments. Keep the topic secret: whoever knows it can add tasks.', `<code class="topic">${esc(srv)}</code>`)}</div>` : `<div class="shint">${tr('Off. Turn it on to get a topic of your own; no one else sees what you share.')}</div>`}`;
-}
-async function niWire(md) {
-  const box = $('#s-ntfyin', md); if (!box) return;
-  let j = null;
-  const draw = () => { box.innerHTML = `<h4 id="s-ntfyin-h">${tr('Share inbox (ntfy)')}</h4>` + niHtml(j); };
-  const put = async b => { try { j = await api('PUT', '/api/me/ntfy-inbox', b); } catch { return false; } draw(); return true; };
-  box.addEventListener('click', async e => {
-    const b = e.target.closest('[data-ni]'); if (!b || !j) return;
-    const k = b.dataset.ni;
-    if (k === 'copy') { navigator.clipboard?.writeText(j.topic).then(() => toast(tr('Copied'))); return; }
-    if (k === 'dice') { if (!await askConfirm(tr('A new topic?'), tr('The old one stops working at once; set the new one in the ntfy app.'), {ok: tr('New topic')})) return; await put({new_topic: true}); return; }
-    if (k === 'rmtok') { await put({token: ''}); return; }
-    if (k === 'save') { const t = $('#s-nitok', box).value.trim(); if (await put({url: $('#s-niurl', box).value.trim(), ...(t ? {token: t} : {})})) announce(tr('Saved')); }
-  });
-  box.addEventListener('change', async e => { if (e.target.id === 's-nion') await put({enabled: e.target.checked}); });
-  try { j = await api('GET', '/api/me/ntfy-inbox'); } catch { return; }
-  draw();
-}

@@ -93,67 +93,34 @@ A.patch(B + "/api/users/1", json={"ntfy_topic": "t-alice"})
 Bo, Ca, Ma = sess("bob"), sess("carol"), sess("mallory")
 
 # ------------------------------------------------------------------ HIGH-1: ntfy inbox SSRF / file read / token leak
-t0 = time.time()
-while time.time() - t0 < 35:
-    titles = [t["title"] for t in A.get(B + "/api/state").json()["tasks"]]
-    if sum(1 for m in inbox if any(m["message"].split(" http")[0] in x for x in titles)) >= len(inbox):
-        break
-    time.sleep(1)
-st = A.get(B + "/api/state").json()
-bytitle = {t["title"]: t for t in st["tasks"]}
-check(all(any(m["message"].split(" http")[0] in x for x in bytitle) for m in inbox), "all inbox messages imported as tasks")
-fl = fake_log()
-check(not [x for x in fl if x["port"] == 8084], "no request ever reached the foreign host (8084): " + str([x["path"] for x in fl if x["port"] == 8084]))
-check(all(x["auth"] in (None, "Bearer inbox-secret-token") for x in fl if x["port"] == 8081), "inbox token only sent to the ntfy server")
-check(not [x for x in fl if x["port"] != 8081 and x["auth"] and "inbox-secret" in x["auth"]], "inbox token never sent elsewhere")
-atts = {t["title"]: [a["name"] for a in t["attachments"]] for t in st["tasks"]}
-check(atts.get("foreign host attachment") == [], "foreign attachment not stored")
-check(atts.get("file read attempt") == [], "file:// attachment not read")
-check(atts.get("lookalike host") == [] and atts.get("userinfo trick") == [], "lookalike / userinfo URLs not fetched")
-check(atts.get("redirect to other host") == [], "cross-host redirect not followed")
-check(atts.get("legit share") == ["good.txt"], "attachment on the public ntfy base is fetched (public -> internal)")
-check(atts.get("legit share internal url") == ["good2.txt"], "attachment on the internal ntfy base is fetched")
-good = next(a for a in bytitle["legit share"]["attachments"])
-check(A.get(B + f"/api/attachments/{good['id']}").content == b"good file from ntfy", "fetched attachment content")
-check([x for x in fl if x["port"] == 8081 and x["path"].startswith("/file/abc.txt") and x["auth"] == "Bearer inbox-secret-token"],
-      "public attachment URL rewritten to the internal base, with token")
-link_t = next((t for t in st["tasks"] if t["title"].startswith("link only")), None)
-check(link_t is not None and (link_t.get("url") or "").startswith("http://127.0.0.1:8084"), "shared link stored in the link field, not fetched")
+# 2.574.0 (#3779): the ntfy share inbox is gone (decided 30.10.2026) with its attachment fetch (ntfy_attachment_url) and the
+# topic check (ntfy_inbox_allowed). The NTFY_INBOX_* variables above are still set: they are ignored - nothing ever polls the
+# fake ntfy server (8081), none of the messages becomes a task, the token goes nowhere (checked at the end, after the whole run)
 # task link field is never fetched server-side
 A.post(B + "/api/tasks", json={"title": "link field", "url": "http://127.0.0.1:8084/link-field"})
 time.sleep(1)
 check(not [x for x in fake_log() if x["port"] == 8084], "task link field never fetched")
-# safe opener + attachment URL mapping (unit level, inside the container, watchdog off)
+# safe opener (unit level, inside the container, watchdog off); 2.574.0 (#3779): the attachment URL mapping went with the inbox
 unit = r'''
 import app, urllib.request, urllib.error
-app.NTFY_IN.update(url="http://ntfy-int:80", public="https://ntfy.example.test")
-f = app.ntfy_attachment_url
-res = [f("https://ntfy.example.test/file/a.txt"), f("http://ntfy-int:80/file/b"), f("https://ntfy.example.test.evil/file/a"),
-       f("https://evil@ntfy.example.test/file/a"), f("file:///etc/passwd"), f("https://ntfy.example.test:444/file/a"),
-       f("http://ntfy.example.test/file/a"), f("https://ntfy.example.test"), f(None), f("ftp://ntfy.example.test/file/a")]
-print(repr(res))
+print("gone", hasattr(app, "ntfy_attachment_url"), hasattr(app, "ntfy_inbox_allowed"), hasattr(app, "NTFY_IN"))
 for u in ("file:///etc/passwd", "ftp://example.com/x", "data:text/plain,hi"):
     try:
         app.safe_urlopen(urllib.request.Request(u), timeout=2)
         print("OPENED", u)
     except urllib.error.URLError:
         print("blocked")
-app.NTFY_IN.update(url="https://ntfy.sh", topic="inbox"); print("allowed_ntfysh_inbox", app.ntfy_inbox_allowed())
-app.NTFY_IN.update(url="https://ntfy.sh", topic="k3j4h5g6f7d8s9a0q1w2"); print("allowed_ntfysh_long", app.ntfy_inbox_allowed())
-app.NTFY_IN.update(url="https://ntfy.example.test", topic="inbox"); print("allowed_own", app.ntfy_inbox_allowed())
 '''
 out = subprocess.run(["docker", "exec", "-e", "TASKS_WATCHDOG=0", "-w", "/app", CT, "python", "-c", unit],
                      capture_output=True, text=True).stdout
 # 2.206.0 A (#2512): the start-up line of the test time; 2.437.0 (#3729): the start log of init_db, also when `import app` runs in a one-off process
 lines = [x for x in out.strip().splitlines() if not x.startswith(("WARNING test clock", "migrations:"))]
-exp = repr(["http://ntfy-int:80/file/a.txt", "http://ntfy-int:80/file/b", None, None, None, None, None, None, None, None])
-check(lines and lines[0] == exp, "ntfy_attachment_url mapping: " + (lines[0] if lines else out))
+check(lines and lines[0] == "gone False False False", "#3779: the inbox helpers are gone: " + (lines[0] if lines else out))
 check(lines[1:4] == ["blocked"] * 3, "safe_urlopen blocks file/ftp/data: " + str(lines[1:4]))
-check("allowed_ntfysh_inbox False" in out and "allowed_ntfysh_long True" in out and "allowed_own True" in out, "ntfy.sh + guessable topic refused")
 # 2.37.0 (#1150): a one-off process in the running container (it needs the test database; a bare container has none)
 r = subprocess.run(["docker", "exec", "-e", "NTFY_INBOX_URL=https://ntfy.sh", "-e", "NTFY_INBOX_TOKEN=x", "-e", "NTFY_INBOX_TOPIC=inbox",
                     "-w", "/app", CT, "python", "-c", "import app"], capture_output=True, text=True)
-check("ntfy inbox NOT started" in r.stdout + r.stderr, "importer refuses ntfy.sh with topic inbox at start")
+check(r.returncode == 0 and "ntfy inbox" not in (r.stdout + r.stderr).lower(), "#3779: old NTFY_INBOX_* start no inbox and no warning")
 
 # ------------------------------------------------------------------ HIGH-2: Paperless gate
 # 2.36.0 (#1116): the Paperless connection is removed. PAPERLESS_* are still set on this container: they are ignored, every
@@ -446,6 +413,13 @@ bo_titles = [e["title"] for e in Bo.get(B + "/api/time/entries").json().get("ent
 check("Secret new title" not in bo_titles and "Original title" in bo_titles, "former member keeps the old title: " + str(bo_titles))
 check(dbx("SELECT task_title FROM time_entries WHERE task_id=? AND user_id=1", (tt,)) == [("Secret new title",)], "owner's entry follows the rename")
 check(dbx("SELECT task_title FROM time_entries WHERE task_id=? AND user_id=?", (tt, ids["bob"])) == [("Original title",)], "former member's snapshot not updated")
+
+# 2.574.0 (#3779): after the whole run: the old NTFY_INBOX_* settings never reached the fake ntfy server, no share became a task
+fl = fake_log()
+check(not [x for x in fl if x["port"] in (8081, 8084)], "#3779: nothing polled the old ntfy inbox / fetched a foreign host: " + str([x["path"] for x in fl if x["port"] in (8081, 8084)][:5]))
+check(not [x for x in fl if x["auth"] and "inbox-secret" in x["auth"]], "#3779: the old inbox token is sent nowhere")
+titles = [t["title"] for t in A.get(B + "/api/state").json()["tasks"]]
+check(not [m for m in inbox if any(m["message"].split(" http")[0] in x for x in titles)], "#3779: no ntfy message became a task")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)

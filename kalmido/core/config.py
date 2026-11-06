@@ -214,14 +214,7 @@ if not SECRET_KEY and SECRET_KEY_PROBLEM == "unset":
     print("WARNING: no server key (KALMIDO_SECRET_KEY or KALMIDO_SECRET_FILE): access tokens cannot be stored and "
           "organisation data is not encrypted. See SELF-HOSTING.md.", file=sys.stderr, flush=True)
 
-# Optional share inbox: every message on an ntfy topic becomes an inbox task (files as attachments).
-# Needs a token with read access to that topic (NTFY_INBOX_TOKEN).
-NTFY_IN = {"token": os.environ.get("NTFY_INBOX_TOKEN", ""), "url": os.environ.get("NTFY_INBOX_URL", "").rstrip("/"),
-           "public": os.environ.get("NTFY_INBOX_PUBLIC", "").rstrip("/"), "topic": os.environ.get("NTFY_INBOX_TOPIC", "inbox"),
-           "user": os.environ.get("NTFY_INBOX_USER", "").strip().lower()}  # username; empty = first admin
-
-
-# ---- outbound HTTP (ntfy publish, ntfy inbox, Git, calendars). Only http/https (no file://, ftp://, data:),
+# ---- outbound HTTP (ntfy publish, Git, calendars). Only http/https (no file://, ftp://, data:),
 # no proxy from the environment, redirects only within the same origin (a redirect never carries a token
 # to another host). User-supplied URLs (task links, shared text) are NEVER fetched server-side.
 class _SameOriginRedirect(urllib.request.HTTPRedirectHandler):
@@ -255,75 +248,6 @@ def _origin(u):
     if p.scheme not in ("http", "https") or not p.hostname or p.username or p.password:
         return None
     return p.scheme, p.hostname.lower(), port
-
-
-def ntfy_attachment_url(u):
-    """Internal fetch URL of an inbox attachment, or None when the URL is not on the configured ntfy
-    server (NTFY_INBOX_PUBLIC or NTFY_INBOX_URL, same origin + path below the base). The inbox token is
-    only ever sent to that server."""
-    if not isinstance(u, str) or not u or len(u) > 2000:
-        return None
-    o = _origin(u)
-    if not o:
-        return None
-    path = urllib.parse.urlsplit(u).path
-    for base in (NTFY_IN["public"], NTFY_IN["url"]):
-        if not base or _origin(base) != o:
-            continue
-        bpath = urllib.parse.urlsplit(base).path.rstrip("/")
-        if not path.startswith(bpath + "/") or "/../" in path + "/" or "/./" in path + "/":
-            continue
-        rest = u.split("://", 1)[1]
-        rest = rest[rest.find("/"):] if "/" in rest else "/"
-        bp = bpath or ""
-        return NTFY_IN["url"] + rest[len(bp):]
-    return None
-
-
-def ntfy_inbox_allowed(url=None, topic=None, person=False):
-    """The share inbox imports whatever is published to the topic: refuse a guessable topic on the
-    public ntfy.sh (anyone could publish there). 2.142.0 C (#2150): url / topic of a person's own inbox (default: the environment's)."""
-    url, topic = NTFY_IN["url"] if url is None else url, NTFY_IN["topic"] if topic is None else topic
-    host = (urllib.parse.urlsplit(url).hostname or "").lower()
-    if host in ("ntfy.sh", "www.ntfy.sh") and (len(topic) < 16 or topic.lower() == "inbox"):
-        return False
-    # 2.549.0 (#4515, audit F2): a person's own inbox on the default server (NTFY_URL) needs the same length: anyone with
-    # access to that server could otherwise guess it (the environment's inbox, url None, stays as it was)
-    if person and _ntfy_base(url) == _ntfy_base(NTFY_URL) and (len(topic) < 16 or topic.lower() == "inbox"):
-        return False
-    return True
-
-
-def _ntfy_base(url):
-    # 2.549.0 (#4515, review): one server in every spelling - scheme and host without case, the default port spelled
-    # out (https://h:443 = https://h), no trailing dot or slash; otherwise ':443' slipped past the checks below
-    raw = (url or NTFY_URL).strip()
-    try:
-        p = urllib.parse.urlsplit(raw if "://" in raw else "https://" + raw)
-        scheme = (p.scheme or "https").lower()
-        port = p.port or (443 if scheme == "https" else 80)
-        return f"{scheme}://{(p.hostname or '').rstrip('.')}:{port}{p.path.rstrip('/')}"
-    except ValueError:
-        return raw.rstrip("/").lower()
-
-
-def ntfy_topic_taken(c, uid, topic, url=None, push=False):
-    """2.549.0 (#4515, audit F1): True when a topic belongs elsewhere. A share inbox (push=False, url = its own server,
-    '' = NTFY_URL) may be no push topic on NTFY_URL (the pushes of that account, the own included, would land as tasks)
-    and no other person's inbox on the same server. A push topic (push=True, always on NTFY_URL) may be no inbox there.
-    Topics compared without case (stricter than ntfy). The callers answer neutrally: never whose it is."""
-    t = (topic or "").strip().lower()
-    if not t:
-        return False
-    base = _ntfy_base(None if push else url)
-    # 2.549.0 (#4515, review): the environment's inbox (NTFY_INBOX_*) is taken as well
-    if NTFY_IN["url"] and NTFY_IN["topic"] and t == NTFY_IN["topic"].strip().lower() and _ntfy_base(NTFY_IN["url"]) == base:
-        return True
-    for r in c.execute("SELECT url FROM ntfy_inboxes WHERE lower(topic)=? AND user_id IS DISTINCT FROM ?", (t, None if push else uid)):
-        if _ntfy_base(r[0]) == base:
-            return True
-    return not push and base == _ntfy_base(None) and bool(
-        c.execute("SELECT 1 FROM user_settings WHERE key='ntfy_topic' AND lower(value)=? LIMIT 1", (t,)).fetchone())
 
 
 def _nets(s):

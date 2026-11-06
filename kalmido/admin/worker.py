@@ -4,7 +4,7 @@ GET /api/admin/health for the instance's admins: pool counters, busy threads, ve
 
 2.102.0 D (#1997): process roles. KALMIDO_ROLE=all (default: web + background loops, as before), web (requests only, no
 loop runs here) or worker (`python app.py worker`: the loops only, no web server). Every background loop -- the start-up
-ones (watchdog, calendars, backups, webhooks, mail, git, ntfy inbox, update check) and the queues started on demand (file
+ones (watchdog, calendars, backups, webhooks, mail, git, update check) and the queues started on demand (file
 text, documents, Paperless, embeddings) -- runs in ONE process of the instance at a time: before each round it holds a
 session-level pg_try_advisory_lock of its own (one connection per process keeps them), also in the role "all", so two
 replicas never push, mail or back up twice. The queues work from their tables, so a web process needs no signal of its own:
@@ -63,7 +63,7 @@ WRK_PING_S = 15  # the lock connection is checked at most this often
 WRK_HB_S = max(5, int(os.environ.get("KALMIDO_WORKER_HEARTBEAT", "") or 30))
 # the threads (by name) that take a loop lock: startup.py's loops + the queues their modules start on demand
 WRK_LAZY = ("filetext", "docs", "paperless", "paperless-zipcheck", "embed", "bgjobs")  # 2.193.0 D (#2220): + bgjobs
-WRK_LOOPS = {"watchdog", "update-check", "calendars", "backup", "webhooks", "mail-in", "mailboxes", "git", "ntfy-inbox", "ntfy-inbox-users", *WRK_LAZY}  # 2.141.0 A: + mailboxes; 2.142.0 C: + ntfy-inbox-users
+WRK_LOOPS = {"watchdog", "update-check", "calendars", "backup", "webhooks", "mail-in", "mailboxes", "git", *WRK_LAZY}  # 2.141.0 A: + mailboxes; 2.142.0 C: + ntfy-inbox-users (2.574.0 #3779: the ntfy inboxes are gone)
 _HELD = set()
 _STATE = {}  # loop name -> "running" (this process holds its lock) / "waiting" (another process runs it) / "web"
 _LCONN = {"c": None, "checked": 0.0}

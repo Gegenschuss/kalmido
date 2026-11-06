@@ -1,13 +1,11 @@
 """Start-up: init_db() and the background threads (watchdog, update check, calendars, backups, webhooks, mail, git)."""
 import os
 
-from .core.config import NTFY_IN, ntfy_inbox_allowed, UPDATE_CHECK_ENV
-from .core.i18n import N_
+from .core.config import UPDATE_CHECK_ENV
 from .core.db import connect, init_db, mig_flags_sync
-from .core.pages import ntfy_inbox_loop
 from .core.instance import update_loop
 from .notify.push import watchdog
-from .notify.alerts import aa_now, aa_secret_key
+from .notify.alerts import aa_secret_key
 from .calendars.subscriptions import cal_loop, CAL_ON
 from .admin.backup import backup_loop, bk_leftovers_alert, bk_tools_note, BK_ON_ENV
 from .api.v1 import WH_ON
@@ -16,7 +14,6 @@ from .notify.channels import chn_loop, CH_ON
 from .integrations.git import git_loop
 from .integrations.mail import MAIL_IN_ON, mail_loop
 from .hub.mailbox import mbx_loop
-from .integrations.ntfyin import ni_loop
 from .events.model import migrate_family_events
 from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
@@ -70,15 +67,8 @@ if env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":
         wrk_start("mail-in", mail_loop)
     wrk_start("mailboxes", mbx_loop)  # 2.141.0 A (#2141): the own mailboxes of the workspaces (idle without any)
     wrk_start("git", git_loop)  # 2.2.0 (#271): repositories of project lists (idle without any)
-    wrk_start("ntfy-inbox-users", ni_loop)  # 2.142.0 C (#2150): the share inboxes of single people (idle without any)
-    if NTFY_IN["token"] and NTFY_IN["url"]:
-        if ntfy_inbox_allowed():
-            wrk_start("ntfy-inbox", ntfy_inbox_loop)
-        else:
-            aa_now("integration", "inbox:refused", N_("The ntfy share inbox was not started: its topic on the public ntfy.sh is guessable, anyone could publish to it (NTFY_INBOX_TOPIC: 16+ characters, or an own ntfy server)."))
-            print("WARNING ntfy inbox NOT started: topic", repr(NTFY_IN["topic"]), "on the public ntfy.sh can be "
-                  "published to by anyone. Use an own ntfy with access control or an unguessable topic "
-                  "(NTFY_INBOX_TOPIC, 16+ characters).", flush=True)
+    # 2.574.0 (#3779): the ntfy share inboxes (NTFY_INBOX_* and the personal ones) are gone: sharing goes through the share
+    # menu, /drop and the mail inbox
 if not _OC_CLI and env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":  # 2.312.0 C (#3265): once per instance start, not per web process
     _c = connect()
     try:
