@@ -315,6 +315,8 @@ def user_update(uid):
         if all(isinstance(v, list) and all(isinstance(x, int) and not isinstance(x, bool) for x in v) for v in (b.get(k), prev.get(k))):
             cur = set(user_orgs_public(c, uid) if k == "orgs" else kid_parents(c, uid))
             b[k] = sorted((cur | (set(b[k]) - set(prev[k]))) - (set(prev[k]) - set(b[k])))
+    if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):  # 2.585.0 (#4290, review 4): before the organisation part, nothing runs before the 400
+        return err(tr("You cannot remove your own admin rights or disable yourself"))
     from ..accounts.orgs import instance_mode
     if "orgs" in b and instance_mode(c) == "workspaces":  # 2.22.0 (#752): the person's organisations (replaces them); 2.23.0: multi only; 2.28.0: + workspaces
         if not isinstance(b["orgs"], list) or not all(isinstance(x, int) for x in b["orgs"]):
@@ -342,8 +344,6 @@ def user_update(uid):
                 if o not in have:
                     if c.execute("SELECT 1 FROM orgs WHERE id=? AND personal_of IS NULL AND retired_at IS NULL", (o,)).fetchone():
                         org_join_or_add(c, o, uid)  # 2.306.0 D1 (#2875): hosted: an invitation the person accepts
-    if uid == me() and (("is_admin" in b and not b["is_admin"]) or b.get("disabled") or b.get("kind") == "agent"):
-        return err(tr("You cannot remove your own admin rights or disable yourself"))
     if "kind" in b:  # 2.0.0: person <-> agent
         if b["kind"] not in ("user", "agent"):
             return err(tr("Invalid value: {0}", "kind"))
