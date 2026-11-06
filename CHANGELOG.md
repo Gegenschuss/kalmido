@@ -14,6 +14,25 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
+## [2.596.0] - 2026-11-06
+
+Package 2.585 (Bündel: CI-only rot: p2146_d_api, CI-only rot: p2369_b_api, Sammelpaket: Aufgaben ohne Paket (Dispatcher) u. 1 weitere).
+### Added
+- An account import (moving from another Kalmido) can be undone for 30 days instead of 24 hours; task and office imports stay at 24 hours. Before the confirm the undo dialog names the last day and lists what goes for good and what goes to the trash (Settings > Data and the moving dialog; route `GET /api/imports/<id>/undo-plan`, rate limited like an import preview) (#4350).
+- Moving a folder in the knowledge base writes a rename entry per page into the shared history; new deals and leads (pipeline, CSV import, appointment booking, agent API) get a create entry (#4795).
+- Tests: concurrent finalising of invoices (one 200, one 409, gap-free numbers), a failed finalising keeps no number, the mailed PDF is the stored one and a tampered file sends no mail (#4288); sign-in negative checks - wrong current password, old cookie after logout, expired session, disabled proxy account, TOTP outside the window, disabled with an open ticket, recovery codes, passkeys, self-lock (#4290).
+### Fixed
+- A start no longer replaces the fs_nodes triggers of #4712 under a table lock (their WHEN is written as Postgres prints it); the migration lint flags such a WHEN (#4841).
+- The background encryption pass no longer reseals a budget list or a file for the space it read before an account or organisation deletion handed it on (a key about to be deleted); deletions and the file pass share the lock orgcrypt:spaces (#4836).
+- An organisation admin can remove a disabled fellow admin (the last-admin check counted only active admins) (#4290).
+
+Package 2.569 (Bündel: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), CI-only rot: p2509_b_paidrow).
+### Added
+- #4395: My tasks gets own personal sections: Now, Soon and Someday are there on first opening, below the fixed section "Recently assigned"; add, rename, move up / down, collapse (on every device) and delete own sections (tasks fall into the top one, Undo brings it back); drag tasks between sections. Tasks due today or overdue move into Now by themselves unless dragged by hand. Sections are personal and never change the project, its sections or its order. On desktop the view menu offers "Project as column".
+- #4675: The Kalmido AI in team projects: an organisation's admin creates a team server agent (dialog "Belongs to: Team agent of ..."), members give it orders, one requester per run, a token limit per member in the agent's settings; a personal server agent in a shared project takes orders only from its owner. Proposals of a team server agent in a project are seen and applied by everyone with write rights there; only who asked discards.
+### Changed
+- #4395: German name of the view "Mir zugewiesen" is now "Meine Aufgaben" (sidebar, title, messages); it is always in the sidebar, also without collaboration. The filter "Assigned to me" keeps its name.
+
 ## [2.588.0] - 2026-11-06
 
 Package 2.578 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
@@ -1808,7 +1827,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.588.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.596.0...HEAD
+[2.596.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.596.0
 [2.588.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.588.0
 [2.579.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.579.0
 [2.575.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.575.0
