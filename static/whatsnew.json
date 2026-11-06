@@ -1,6 +1,24 @@
 {
  "versions": [
   {
+   "version": "2.605.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "Im Papierkorb der Ablage kannst du jetzt alles leeren oder einzelne Einträge endgültig löschen.",
+     "en": "You can now empty the file trash or delete single items for good."
+    },
+    {
+     "de": "Der neue Steuer-Check zeigt vor der Abgabe von EÜR und USt-Erklärung mit einer Ampel, was noch klemmt.",
+     "en": "The new tax check shows with a traffic light what still needs a look before you file the EÜR and VAT return."
+    },
+    {
+     "de": "Drehtage aus dem Angebot landen als vorläufige Buchungen mit offenen Plätzen in der Disposition.",
+     "en": "Shoot days from a quotation now become pencilled-in bookings with open places in the disposition."
+    }
+   ]
+  },
+  {
    "version": "2.601.0",
    "date": "2026-11-06",
    "items": [
