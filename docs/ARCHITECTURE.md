@@ -153,6 +153,7 @@ The most used helpers:
 | `lists/grouppics.py` | Group pictures: a preset or an own photo per group, served with login to who may see the group (2.46.0). |
 | `lists/ownership.py` | Transferring the ownership of a list; orphaned lists (owner disabled or an agent). |
 | `lists/sections.py` | Saved filters, folders and sections (kanban columns). |
+| `lists/seckind.py` | The meaning of a column (sections.kind): what a move / tick does, section_kind of a task. |
 | `tasks/validation.py` | Task activity log, input validation, repeat rules (RRULE) and task tree helpers. |
 | `tasks/tasks.py` | Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on someone (outside). |
 | `tasks/roadmap.py` | The roadmap and shifting a list's dates (dependent tasks move along). |

@@ -17,6 +17,39 @@ function wip_ghead(g) {
   const lim = wip_sec(g.section)?.wip_limit;
   return lim ? wip_count(wip_open(g.section), lim) : '';
 }
+// 2.577.0 (#3354): the meaning of a column (sections.kind, kalmido/lists/seckind.py): five fixed ones, the name stays free
+const SK_KINDS = [['open', N_('Open|state')], ['progress', N_('In progress')], ['review', N_('Review')], ['done', N_('Done|section')], ['rejected', N_('Rejected')]];
+const sk_name = k => { const x = SK_KINDS.find(y => y[0] === k); return x ? tr(x[1]) : tr('No meaning'); };
+// a task's state, as the server's section_kind: status first, then its column, the rest open
+const sk_task = t => (t.status === 2 ? 'done' : t.status === -1 ? 'rejected' : S.sections.find(s => s.id === t.section_id)?.kind || 'open');
+const sk_menuItem = (sid, a) => ({label: wip_sec(sid)?.kind ? tr('Meaning: {0}', sk_name(wip_sec(sid).kind)) : tr('Meaning…'), icon: 'tag', fn: () => sk_menu(a, sid)});
+function sk_menu(a, sid) {
+  const cur = wip_sec(sid)?.kind || '';
+  menu(a, [...SK_KINDS.map(([k]) => k), ''].map(k => ({label: sk_name(k), icon: k === cur ? 'check' : 'tag', fn: () => sk_set(sid, k)})));
+}
+async function sk_set(sid, v) {
+  const s = wip_sec(sid); if (!s) return;
+  const v0 = s.kind || '';
+  if (v === v0) return;
+  try { await optWrite(optSet(() => wip_sec(sid), {kind: v}), () => api('PATCH', '/api/sections/' + sid, {kind: v})); } catch { return; }
+  const go = (to, from) => async e => {
+    const r = await api('PATCH', '/api/sections/' + secId(e.sid), {kind: to, _prev: {kind: from}});
+    if (r.conflicts?.length) return {skipped: [tr('Section {0}', qn(s.name.slice(0, 40)))], none: true};
+    const x = wip_sec(secId(e.sid)); if (x) x.kind = to;
+    return {};
+  };
+  offerUndo(tr('Meaning of {0}: {1}', qn(s.name.slice(0, 40)), sk_name(v)),
+    histAdd({label: tr('Meaning of {0}', qn(s.name.slice(0, 40))), lids: [s.list_id], sid, undo: go(v0, v), redo: go(v, v0)}));
+}
+// a recurring task moved into a done column: its completed copy stays there, the task itself is back with its next date. The
+// answer's undo takes that back (nothing else is left to undo: the task is where it was)
+function sk_moved(res, id) {
+  const m = res?.section_moved?.[id]; if (!m) return false;
+  offerUndo(tr('Completed, next date {0}', dayLabel(m.next_due)), histAdd({label: tr('Completed, next date {0}', dayLabel(m.next_due)), undo: async () => {
+    await api('POST', '/api/tasks/batch', {ids: [id], action: 'undo', data: {items: {[id]: m.undo}}}); await load(); render(); return {};
+  }, redo: async () => { await api('POST', '/api/tasks/batch', {ids: [id], action: 'complete'}); await load(); render(); return {}; }}));
+  return true;
+}
 // a move into a column over its limit says so in the move's message (moving stays allowed)
 function wip_msg(msg, sid) {
   const lim = wip_sec(sid)?.wip_limit, n = lim ? wip_open(sid) : 0;

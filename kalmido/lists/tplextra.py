@@ -25,6 +25,7 @@ from ..core.orgcrypt import oc_copy_file, oc_user_space, oc_task_org, oc_task_sp
 from .lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.tasks import check_assignee  # 2.369.5 (#2517): pulled up from functions
 from ..lists.groups import check_group_assignee  # 2.369.5 (#2517): pulled up from functions
+from ..lists.seckind import SEC_KINDS  # 2.577.0 (#3354)
 
 TX_MAX_FILES, TX_MAX_BYTES = 500, 1024 ** 3  # per request: the copy runs inside it
 TX_MAX_ROWS = 500  # 2.463.0 (#3860): per part of an imported extra
@@ -40,12 +41,13 @@ def tx_list(c, lid, base, dup, x):
     from datetime import date
     r = c.execute("SELECT sprint_cfg, points_on FROM lists WHERE id=?", (lid,)).fetchone()
     wip = {s["name"]: s["wip_limit"] for s in c.execute("SELECT name, wip_limit FROM sections WHERE list_id=? AND wip_limit IS NOT NULL", (lid,))}
+    kinds = {s["name"]: s["kind"] for s in c.execute("SELECT name, kind FROM sections WHERE list_id=? AND kind<>''", (lid,))}  # 2.577.0 (#3354)
     idx, sprints = {}, []
     for s in c.execute("SELECT * FROM sprints WHERE list_id=? AND state<>'closed' ORDER BY num", (lid,)).fetchall():
         idx[s["id"]] = len(sprints)
         sprints.append({"name": s["name"], "goal": s["goal"], "state": s["state"] if dup else "planned",
                         "s": (date.fromisoformat(s["start"]) - base).days, "e": (date.fromisoformat(s["end_day"]) - base).days})
-    x["list"] = {"wip": wip, "sprints": sprints, "sprint_cfg": r["sprint_cfg"] or "", "points_on": r["points_on"] or 0,
+    x["list"] = {"wip": wip, "kinds": kinds, "sprints": sprints, "sprint_cfg": r["sprint_cfg"] or "", "points_on": r["points_on"] or 0,
                  "ltags": [{"name": t["name"], "color": t["color"], "sort": t["sort"]}
                            for t in c.execute("SELECT name, color, sort FROM list_tags WHERE list_id=? ORDER BY sort, id", (lid,))],
                  "links": [{"title": t["title"], "url": t["url"]}
@@ -280,6 +282,9 @@ def _list_part(c, uid, lid, p, start, scale):
     ts = iso(now_utc())
     for name, n in (p.get("wip") or {}).items():
         c.execute("UPDATE sections SET wip_limit=? WHERE list_id=? AND name=?", (n, lid, name))
+    for name, k in (p.get("kinds") or {}).items():  # 2.577.0 (#3354)
+        if k in SEC_KINDS:
+            c.execute("UPDATE sections SET kind=? WHERE list_id=? AND name=?", (k, lid, name))
     c.execute("UPDATE lists SET sprint_cfg=?, points_on=? WHERE id=?", (p.get("sprint_cfg") or "", p.get("points_on") or 0, lid))
     smap = {}
     for i, s in enumerate(p.get("sprints") or []):

@@ -195,7 +195,7 @@ function caldavHtml(hint) {
     ${S.me.is_admin ? hint(tr('Admins: behind a sign-in proxy (forward auth, single sign-on) the paths /dav/ and /.well-known/caldav must bypass the proxy sign-in, because calendar apps cannot sign in there. Kalmido checks the app password itself.')) + `<a class="slink" href="${DAV_DOCS}" target="_blank" rel="noopener noreferrer">${tr('CalDAV guide')}</a>` : ''}`;
 }
 // Settings > Integrations > Webhooks
-const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'),
+const WH_EV_NAMES = {'task.created': N_('Task created'), 'task.updated': N_('Task changed'), 'task.completed': N_('Task completed'), 'task.reopened': N_('Task reopened'), 'task.status_changed': N_('Task status changed'),
   'task.deleted': N_('Task deleted'), 'comment.created': N_('New comment'), 'list.shared': N_('Project shared'),
   // 2.115.0 A (#2061): more events, grouped in the dialog
   'event.created': N_('Event created'), 'event.updated': N_('Event changed'), 'event.deleted': N_('Event deleted'), 'file.created': N_('File added'),

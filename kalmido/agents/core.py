@@ -294,8 +294,8 @@ AGENT_EVENT_COMMENT_CHARS = 2000
 
 
 def list_sections(c, uid, lid):
-    """[{id, name}] of list lid as uid sees it (participants: only sections with a task of theirs), in their order."""
-    return [{"id": r["id"], "name": r["name"]} for r in visible_sections(c, uid) if r["list_id"] == lid]
+    """[{id, name, section_kind}] of list lid as uid sees it (participants: only sections with a task of theirs), in their order."""
+    return [{"id": r["id"], "name": r["name"], "section_kind": r["kind"] or None} for r in visible_sections(c, uid) if r["list_id"] == lid]  # 2.577.0 (#3354)
 
 
 def agent_event_comments(c, tid):

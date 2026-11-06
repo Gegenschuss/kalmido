@@ -41,6 +41,7 @@ from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
+from ..lists.seckind import SEC_KINDS, sk_derive, sk_filter, sk_first, sk_of, sk_task, SK_STATUS
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
 from ..calendars.caldav import apppw_delete, apppw_list, dav_info
@@ -284,6 +285,7 @@ def task_core(r, tags, fields):
     return {"id": r["id"], "list_id": r["list_id"], "section_id": r["section_id"], "parent_id": r["parent_id"],
             "title": r["title"], "notes": r["content"], "priority": PRIO_NAMES.get(r["priority"], "none"),
             "status": STATUS_NAMES.get(r["status"], "open"), "due": r["due"], "due_time": r["due_time"], "start": r["start"],
+            "section_kind": sk_derive(r["status"], r["sec_kind"] if "sec_kind" in r.keys() else ""),  # 2.577.0 (#3354): see lists/seckind.py
             "duration": r["duration"], "reminders": _reminders_list(r["reminders"]), "repeat": r["repeat"] or "",
             "repeat_from": r["repeat_from"], "url": r["url"], "tags": tags, "list_tags": list(r["ltags"]) if "ltags" in r.keys() else [],
             "pinned": bool(r["pinned"]),
@@ -378,6 +380,7 @@ def task_for(c, row, uid):
     out["field_at"] = {str(r[0]): r[1] for r in c.execute("""SELECT v.field_id, v.set_at FROM task_field_values v JOIN list_fields f
                                                           ON f.id=v.field_id WHERE v.task_id=? AND f.list_id=? AND v.set_at IS NOT NULL""",
                                                        (row["id"], row["list_id"]))}  # 2.553.0 C (#3538): as in v1_task
+    out["section_kind"] = sk_task(c, row)  # 2.577.0 (#3354): a plain row does not carry its column's meaning
     from ..tasks.watchers import wat_users
     out["watchers"] = sorted(wat_users(c, row["id"]))  # 2.473.0 (#3357): webhook payloads and agent events too
     out["relations"] = rel_of(c, {row["id"]}, lambda: vis_ids(c, uid), uid).get(row["id"], [])  # 2.576.0 (#3371): as uid sees them
@@ -742,7 +745,7 @@ def v1_lists():
     c = db()
     secs = {}
     for r in visible_sections(c, me()):  # 2.0.8 (#333): every list with its sections [{id, name}]
-        secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"]})
+        secs.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "section_kind": r["kind"] or None})  # 2.577.0 (#3354)
     fl = v1_list_fields(c)
     fav = lc_fav_of(c, me())  # 2.46.1 (#1361): favourite of the person (an agent: of its owner)
     return jsonify(data=[{**v1_list(d), "sections": secs.get(d["id"], []), "fields": fl.get(d["id"], []), "favorite": d["id"] in fav}
@@ -878,7 +881,7 @@ def v1_list_get(lid):
         raise Denied(404)
     from ..lists.playbook import pb_effective
     pb = pb_effective(c, lid)  # 2.39.0 (#1168): the effective Playbook (null = none; never of a health list)
-    return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"]}
+    return jsonify({**v1_list(d), "sections": [{"id": r["id"], "name": r["name"], "sort": r["sort"], "section_kind": r["kind"] or None}
                                                for r in visible_sections(c, me()) if r["list_id"] == lid],
                     "fields": v1_list_fields(c, lid).get(lid, []),
                     "favorite": lid in lc_fav_of(c, me()),  # 2.46.1 (#1361)
@@ -1018,12 +1021,13 @@ def v1_tasks():
     return jsonify(data=out, next_cursor=cursor_enc("i", rows[-1]["id"]) if more else None)
 
 
-V1_COMPACT = ("id", "title", "list_id", "section_id", "parent_id", "status", "due", "due_time", "priority", "tags", "list_tags",
+V1_COMPACT = ("id", "title", "list_id", "section_id", "section_kind", "parent_id", "status", "due", "due_time", "priority", "tags", "list_tags",
               "assignee_id")
 
 
 # ---- 2.390.0 B (#3355): the further filters and the sort of GET /api/v1/tasks
-V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")  # 2.390.0 (#3353): key
+V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key",  # 2.390.0 (#3353): key
+                 "filter_id", "section_kind")  # 2.577.0 (#3356 filter_id, #3354 section_kind)
 V1_TASKS_MORE += ("delegate", "watcher")  # 2.473.0 (#3357)
 V1_TASKS_MORE += ("delivery",)  # 2.392.2 (#3365)
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
@@ -1069,6 +1073,8 @@ def v1_tasks_more(c, uid, a, where, args):
         w, x = _v1_who(a, "section_id", None)
         where.append("section_id " + w)
         args += x
+    if a.get("section_kind"):  # 2.577.0 (#3354)
+        sk_filter(_v1_multi(a, "section_kind"), where, args)
     if a.get("sprint_id"):
         if a["sprint_id"] == "current":
             where.append("sprint_id IN (SELECT id FROM sprints s WHERE s.list_id=tasks.list_id AND s.state='active')")
@@ -1489,6 +1495,36 @@ def v1_task_complete(tid):
         return jsonify({**v1_one(c, tid), "next_due": None})
     j = v1_call(task_complete, tid, body=ex)
     return jsonify({**v1_one(c, tid), "next_due": j.get("next_due"), **({"skipped": True} if j.get("skipped") else {})})
+
+
+@app.post("/api/v1/tasks/<int:tid>/state")
+@v1_view
+def v1_task_state(tid):
+    """2.577.0 (#3354): {section_kind}: the task into the first column with that meaning. done / rejected work without such
+    a column too (the status alone), the others need one (400). A subtask has no column: only done / rejected."""
+    v1_args(())
+    c = db()
+    _v1_live(c, tid)
+    r = c.execute("SELECT list_id, parent_id, section_id FROM tasks WHERE id=?", (tid,)).fetchone()
+    b = v1_json()
+    if set(b) - {"section_kind"}:
+        raise UnknownFields(set(b) - {"section_kind"})
+    k = b.get("section_kind")
+    if k not in SEC_KINDS:
+        raise BadInput(tr("Invalid value: {0}", "section_kind"))
+    there = not r["parent_id"] and sk_of(c, r["section_id"]) == k
+    sid = None if r["parent_id"] or there else sk_first(c, r["list_id"], k)
+    if not sid and not there and k not in SK_STATUS:
+        raise BadInput(tr("This project has no column with that meaning"))
+    if sid:
+        v1_call(task_update, tid, body={"section_id": sid})
+    st = SK_STATUS.get(k, 0)
+    if c.execute("SELECT status FROM tasks WHERE id=?", (tid,)).fetchone()[0] != st:
+        if st:
+            v1_call(task_complete, tid, body={"status": st})
+        else:
+            v1_call(task_reopen, tid, body={})
+    return jsonify(v1_one(c, tid))
 
 
 @app.post("/api/v1/tasks/<int:tid>/reopen")

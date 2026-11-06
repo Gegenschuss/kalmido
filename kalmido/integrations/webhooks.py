@@ -35,6 +35,7 @@ from ..calendars.subscriptions import (
 from ..api.v1 import PRIO_NAMES, task_core, task_for, WH_ON
 from ..api.common import act_via
 from ..accounts.orgs import org_role, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
+from ..lists.seckind import sk_task
 
 
 # ---------------------------------------------------------------- package B: webhooks (per user)
@@ -56,6 +57,8 @@ WH_EVENTS = ("task.created", "task.updated", "task.completed", "task.reopened", 
 # before; the new events below reach it only from its owner's private area (no organisation needed: P4). Objects outside
 # tasks are noted per request (who_note) and built once per object at queueing time (who_obj): scope = the organisation
 # that owns it, else the person whose private area it is.
+# 2.577.0 (#3354): task.status_changed = the task's section_kind changed (data.old_section_kind / new_section_kind)
+WH_EVENTS += ("task.status_changed",)
 WH_EVENTS += ("event.created", "event.updated", "event.deleted", "file.created", "invoice.created", "invoice.sent", "invoice.paid",
               "time.created")
 WH_ALLOW_ENV = os.environ.get("KALMIDO_WEBHOOK_ALLOW_HOSTS", "")
@@ -315,6 +318,7 @@ def wh_enqueue(c, n, by=None):
         if uid not in settings:
             settings[uid] = usettings(c, uid)
         return settings[uid]
+    sk0 = g.get("sk_old") or {}  # 2.577.0 (#3354): the tasks' section_kind before this request
     for key, e in n.items():
         if key[0] == "task":
             tid = key[1]
@@ -327,6 +331,10 @@ def wh_enqueue(c, n, by=None):
                 evs = [x for x in evs if x in ("task.created", "comment.created")]
             elif any(x in evs for x in ("task.completed", "task.reopened", "task.deleted")):
                 evs = [x for x in evs if x != "task.updated"]
+            kold = sk0.get(tid) if row and "task.created" not in evs else None  # 2.577.0 (#3354)
+            knew = sk_task(c, row) if kold else None
+            if kold and kold != knew:
+                evs.append("task.status_changed")
             for w in hooks:
                 want = [x for x in evs if x in w["events"].split(",")]
                 if not want or not org_ok(w, lid) or not list_role(c, lid, w["user_id"]):
@@ -346,6 +354,8 @@ def wh_enqueue(c, n, by=None):
                         dv = wh_diff_out(c, (diffs or {}).get(tid), w["user_id"], base) if row else None
                         if dv:
                             data["diff"] = dv  # 2.574.0 (#3376): {field: {old, new}}; changes stays the list of kinds
+                    if ev == "task.status_changed":
+                        data.update(old_section_kind=kold, new_section_kind=knew)
                     if ev == "task.deleted":
                         data["permanent"] = row is None
                     if ev == "comment.created" and e["cid"]:

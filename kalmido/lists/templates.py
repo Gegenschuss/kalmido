@@ -884,7 +884,8 @@ def tpl_apply_list(c, uid, d, name, folder, start, end=None, color=None, org_id=
                      json.dumps(tt, ensure_ascii=False) if tt else "",
                      (1 if d["dep_shift"] else 0) if "dep_shift" in d else 1 if lk == "project" else 0,  # 2.67.0 B (#1865)
                      ws_default_org(c, uid, folder) if org_id == "auto" else org_id))  # 2.28.0 (#935): the workspace, before anyone joins
-    secs = [insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, s, i))
+    kinds = d.get("section_kinds") or []  # 2.577.0 (#3354): the columns' meanings of a built-in project type
+    secs = [insert_id(c, "INSERT INTO sections(list_id,name,sort,kind) VALUES(?,?,?,?)", (lid, s, i, kinds[i] if i < len(kinds) else ""))
             for i, s in enumerate(d.get("sections") or [])]
     fmap = []
     for i, fd in enumerate(d.get("fields") or []):
@@ -936,7 +937,8 @@ PTYPES = {
                "fields": ()},  # 2.380 F (#3438): no "Client" text field, the client is the project's (lists.client_id); 2.551.0 (#3906): no "Budget h" either (every task has its own budget since #3433; fields of existing projects stay, offertasks makes one when an offer needs it)
     "software": {"view": "list", "tickets": 1, "dep_shift": 1, "modules": ("kanban", "deps", "fields"),  # 2.473.0 (#3378): + fields, Size and Release
                  "sections": (N_("Backlog"), N_("Next|section"), N_("In progress"), N_("Review"), N_("Done|section")),
-                 "fields": ((N_("Size|field"), "select"), (N_("Release|field"), "text"))},
+                 "fields": ((N_("Size|field"), "select"), (N_("Release|field"), "text")),
+                 "section_kinds": ("open", "open", "progress", "review", "done")},  # 2.577.0 (#3354): new projects only
     "private": {"view": "list", "tickets": 0, "dep_shift": 0, "modules": (),
                 "sections": (N_("Ideas"), N_("Planning"), N_("To do|section")), "fields": ()},
 }
@@ -1023,6 +1025,7 @@ BUG_INBOX_FIELD = "Release|field"
 def ptype_template(k, lg, sections=False):
     p = PTYPES[k]
     return {"kind": "project", "view": p["view"], "sections": [tr(x, lg=lg) for x in p["sections"]] if sections else [],
+            "section_kinds": list(p.get("section_kinds") or ()) if sections else [],
             "fields": [{"name": tr(n, lg=lg), "type": t, "options": PTYPE_FIELD_OPTS.get(n, {}), "pinned": 0 if n in PTYPE_FIELD_UNPINNED else 1}
                        for n, t in p["fields"]],
             "tasks": [], "deps": [], "rel": True, "span": 0, "tickets": p["tickets"], "ticket_tpl": {}, "dep_shift": p["dep_shift"]}

@@ -108,7 +108,7 @@ function dateMatch(t, d) {
 // name and type, select values by option name), op = in (one of) | nin (none of) | empty | has / nhas (text) | gt / lt / eq / set
 // (numbers). A "none of" holds always on top, also with OR (#4478). The old rules (one key per category, the values OR-ed inside,
 // the categories combined by op) convert on the fly into the same conditions (flt_conds) and hit exactly the same tasks.
-const FLT_OLD = [['lists', 'list'], ['dates', 'date'], ['prios', 'prio'], ['types', 'type'], ['tags', 'tag'], ['who', 'who'], ['secs', 'sec'], ['sprints', 'sprint'], ['ms', 'ms'], ['dlv', 'dlv']];
+const FLT_OLD = [['lists', 'list'], ['dates', 'date'], ['prios', 'prio'], ['types', 'type'], ['tags', 'tag'], ['who', 'who'], ['secs', 'sec'], ['sprints', 'sprint'], ['ms', 'ms'], ['dlv', 'dlv'], ['kinds', 'kind']];  // 2.577.0 (#3354): + kinds
 // what -> does the task have this one value; '' = the empty token of that what (op empty)
 const FLT_HAS = {
   list: (t, x) => t.list_id === x,
@@ -123,6 +123,7 @@ const FLT_HAS = {
   sprint: (t, x) => (x === 'none' ? !t.sprint_id : !!t.sprint_id && spr_active(listById(t.list_id))?.id === t.sprint_id),
   ms: (t, x) => (x === 'none' ? !t.milestone_id : t.milestone_id === +x),
   dlv: (t, x) => (dv_state(t) || 'none') === x,  // 2.392.2 (#3365): the delivery state
+  kind: (t, x) => sk_task(t) === x,  // 2.577.0 (#3354): the state, as section_kind in the API
 };
 const FLT_EMPTY = {folder: '', type: '', tag: '', who: 'none', sec: 'none', sprint: 'none', ms: 'none', dlv: 'none'};
 const FLT_CACHE = new WeakMap();

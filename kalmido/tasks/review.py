@@ -14,13 +14,15 @@ from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from function
 from ..tasks.validation import descendants  # 2.369.5 (#2517): pulled up from functions
 from ..collab.news import news_add, notif_ok  # 2.369.5 (#2517): pulled up from functions
 from ..collab.comments import collab_user, lang_of  # 2.369.5 (#2517): pulled up from functions
+from ..lists.seckind import sk_first, sk_snap  # 2.577.0 (#3354)
 
 
 # ---------------------------------------------------------------- 2.60.0 C (#1512): review step
 # Off until a list switches it on (lists.review_cfg = json {on, reviewer, section, gate}; '' = off; editors of the list
 # change it). A task gets a reviewer (tasks.reviewer_id: a person or an agent with access to the list) and a state
 # (tasks.review: '' | pending | approved | changes; review_at / review_by = the last change, review_by NULL = a pull request).
-#   - moving a task into the review section (the section chosen in the setting, else the one named "Review") asks for a
+#   - moving a task into the review section (the section chosen in the setting, else the first with the meaning review,
+#     2.577.0 #3354, else the one named "Review") asks for a
 #     review: the default reviewer when it has none, state pending, News + push to the reviewer (notification row "review",
 #     switchable like the others) or the agent event review_requested for an agent
 #   - the reviewer (or an owner / admin of the list) approves or sends it back ("changes", optional note): back = the section
@@ -49,7 +51,8 @@ def rvw_cfg(c, lid):
 
 
 def rvw_section(c, lid, cfg=None):
-    """The review section of list lid: the chosen one, else the section named "Review" (None = none)."""
+    """The review section of list lid: the chosen one, else the first column with the meaning review (2.577.0, #3354), else
+    the section named "Review" (None = none)."""
     cfg = rvw_cfg(c, lid) if cfg is None else cfg
     if not cfg:
         return None
@@ -57,6 +60,9 @@ def rvw_section(c, lid, cfg=None):
         r = c.execute("SELECT id FROM sections WHERE id=? AND list_id=?", (cfg["section"], lid)).fetchone()
         if r:
             return r[0]
+    sid = sk_first(c, lid, "review")
+    if sid:
+        return sid
     r = c.execute("SELECT id FROM sections WHERE list_id=? AND LOWER(TRIM(name))=? ORDER BY id LIMIT 1", (lid, "review")).fetchone()
     return r[0] if r else None
 
@@ -224,6 +230,7 @@ def rvw_apply(c, tid, b):
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     if not t or t["deleted_at"] or not task_visible(c, tid, uid):
         raise Denied(404)
+    sk_snap(c, tid)  # 2.577.0 (#3354): the steps below may change the column
     cfg = rvw_cfg(c, t["list_id"])
     if act in ("approve", "changes"):
         need_task(c, tid, write=False, full=True)

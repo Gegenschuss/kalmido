@@ -875,7 +875,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/attachments/text": "tasks", "POST /api/v1/tasks/{}/comments": "tasks",
     "POST /api/v1/tasks/{}/complete": "tasks", "POST /api/v1/tasks/{}/contacts": "tasks",
     "POST /api/v1/tasks/{}/dependencies": "tasks", "POST /api/v1/tasks/{}/links": "tasks",
-    "POST /api/v1/tasks/{}/move": "tasks", "POST /api/v1/tasks/{}/reopen": "tasks", "POST /api/v1/tasks/{}/restore": "tasks",
+    "POST /api/v1/tasks/{}/move": "tasks", "POST /api/v1/tasks/{}/reopen": "tasks", "POST /api/v1/tasks/{}/restore": "tasks", "POST /api/v1/tasks/{}/state": "tasks",
     "POST /api/v1/tasks/{}/review": "tasks", "POST /api/v1/tasks/{}/skip": "tasks", "POST /api/v1/tasks/{}/snippets": "tasks",
     "POST /api/v1/tasks/{}/subtasks": "tasks", "POST /api/v1/tasks/{}/take": "tasks", "POST /api/v1/tasks/{}/tidy": "tasks",
     "POST /api/v1/tasks/{}/to-shopping": "tasks", "POST /api/v1/tasks/{}/typing": "tasks",

@@ -61,6 +61,10 @@ def rsn_shown(d):
         return not (u and (u["kind"] or "user") == "agent")
     except (KeyError, IndexError, TypeError):
         return True
+def sk_kinds_of(c, ids):
+    """{section id: meaning} of those sections that have one."""
+    q = "SELECT id, kind FROM sections WHERE kind<>'' AND id = ANY(CAST(? AS BIGINT[]))"
+    return {r[0]: r[1] for r in c.execute(q, (st_ids(sorted(ids)),))} if ids else {}
 
 
 def task_dict(r, tags, full_snips=False):
@@ -301,10 +305,13 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     wat = wat_of(c, ids - ctx)  # 2.473.0 (#3357): who watches it (not on a read-only context task)
     wk = wk_for(c, ids - ctx) if uid else {}  # 2.407.0 A (#3513): an agent works on it now
     rel = rel_of(c, ids - ctx, lambda: vis or vis_ids(c, uid), uid) if uid and ids else {}  # 2.576.0 (#3371): saved relations
+    skinds = sk_kinds_of(c, {r["section_id"] for r in rows if r["section_id"]})  # 2.577.0 (#3354): the column's meaning, for section_kind
     out = []
     for r in rows:
         d = task_dict(r, tags, full_snips)
         d["ltags"] = ltags.get(r["id"], [])
+        if r["section_id"] in skinds:
+            d["sec_kind"] = skinds[r["section_id"]]
         if r["id"] in gcode and r["id"] not in ctx:
             d["code"] = gcode[r["id"]]
         b = gbuild.get(r["id"])

@@ -74,7 +74,7 @@ ORDER = (
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
-    "lists.sections",
+    "lists.sections", "lists.seckind",
     "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
     "lists.lmove",  # 2.401.0 (#2924): the dry run of a project's workspace change, what goes along

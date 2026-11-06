@@ -949,7 +949,7 @@ ROUTES = {
     "DELETE /api/v1/tasks/{}/working": "task",
     "POST /api/v1/tasks/{}/snippets": "task",  # 2.35.0 (#1095): append a code snippet (p2350_d_api_test.py: other tenant 404)
     "PUT /api/v1/tasks/{}/waiting": "task", "DELETE /api/v1/tasks/{}/waiting": "task",
-    "POST /api/v1/tasks/{}/complete": "task", "POST /api/v1/tasks/{}/reopen": "task",
+    "POST /api/v1/tasks/{}/complete": "task", "POST /api/v1/tasks/{}/reopen": "task", "POST /api/v1/tasks/{}/state": "task",  # 2.577.0 (#3354)
     "GET /api/v1/tasks/{}/milestone": "task", "GET /api/v1/tasks/{}/subtasks": "task",
     "POST /api/v1/tasks/{}/subtasks": "task", "GET /api/v1/tasks/{}/comments": "task",
     "POST /api/v1/tasks/{}/comments": "task", "POST /api/v1/tasks/{}/take": "task", "GET /api/tasks/{}/timeline": "task",

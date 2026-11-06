@@ -322,6 +322,8 @@ had been made in the app. Webhooks fire too.
 | `PUT /lists/{id}/sections/order` | structure | 2.15.0: `{ids}`: every section of the list exactly once, in the new order |
 | `PATCH /sections/{id}` `{wip_limit}` | structure | 2.60.0: the WIP limit of a kanban column (the most open tasks it should hold; `null` / `0` = none). A hint only: the app shows "2/3" in the column head and marks it above the limit, moving stays allowed. Sections carry `wip_limit`; `POST /lists/{id}/sections` takes it too. 2.392.0 (#3367): `{wip_hard: true}` makes the limit hard for agents: while the column holds more open tasks than the limit, `POST /agent/jobs` with a task in it answers `409 wip_full` (sections carry `wip_hard`, default `false`) |
 | `PATCH /sections/{id}` `{dwell_warn_h, dwell_alert_h}` | structure | 2.553.0 (#3538): the time limits of a kanban column: hours in the column after which a card's time turns yellow / red (1 to 8760, red above yellow; `null` / `0` = none; one of them alone keeps the other; `400` for anything else). The same checks as in the app. Sections carry both; `POST /lists/{id}/sections` takes them too. Tasks carry `section_at` (since when the task is in its board column, `null` = not known) and `field_at` (`{field id: since when the field has its value}`, a field missing = not known), both read only |
+| `PATCH /sections/{id}` `{section_kind}` | structure | 2.577.0: the meaning of a column: `open`, `progress`, `review`, `done`, `rejected`, `null` = none (also on `POST /lists/{id}/sections`; sections carry `section_kind` everywhere). The name stays free. A task moved into a `done` column is completed, into `rejected` marked won't do, out of them (same project) opened again; tasks already in the column stay as they are |
+| `POST /tasks/{id}/state` `{section_kind}` | write | 2.577.0: the task into the first column with that meaning, with the column's effect. `done` / `rejected` work without such a column too (only the status changes), the others need one (400) |
 | `GET /lists/{id}/velocity` | read | 2.60.0: the completed story points (`points`) and tasks (`count`) of the list's last up to 6 closed sprints, oldest first, and their `average` (null = no closed sprint yet). Participants count only the tasks they see |
 | `GET /lists/{id}/flow` | read | 2.393.2 (#3374): flow figures over the last `days` (30 default \| 90) days, computed from the task history over the top-level tasks you see: `lead_time` / `cycle_time` `{median, p85, n}` (days, one decimal, null = nothing completed; cycle time from the first entry into a column named In Arbeit / In progress / Doing / WIP), `cfd {columns: [{id, name, kind: column\|none\|gone, wip}], days: [{day, done, columns: [counts]}]}`, `bugs: [{week, created, done}]` (ticket type bug), `capped` (more than 2000 tasks), `e2e` (list with the lock: metadata only). Health lists: `404` for agents |
 | `POST /tasks/{id}/move` | tasks:write | 2.15.0: `{list_id?, section_id?, parent_id?, before_id? \| after_id? \| position?: top \| bottom}`: another list / section / parent and a place among the siblings; subtasks move along; the same rights as in the app (into a list you may edit, out of a shared list only as its owner) |
@@ -1064,6 +1066,7 @@ with them; with collaboration switched off only their own). What they cannot see
 | `task.updated` | title, notes, date, priority, assignee, list, section, repetition, link, a custom field, dependencies, ... changed; `data.changes` lists what; 2.574.0: `data.diff` has `{field: {old, new}}` for title, due, due_time, start, priority, assignee_id, list_id, section_id, parent_id, repeat, url, type and points |
 | `task.completed` | a task was completed (also through a public list link; 2.392.0: `via: "release"`, `actor: null` when the repository's poll completed it because its package or code is released) |
 | `task.reopened` | a completed task was opened again |
+| `task.status_changed` | 2.577.0: the task's `section_kind` changed; `data.old_section_kind`, `data.new_section_kind`. Not when a column gets another meaning (the tasks stayed where they were) |
 | `task.deleted` | moved to the trash (`permanent: false`) or deleted for good (`permanent: true`) |
 | `comment.created` | someone commented (only if the webhook's owner has collaboration on) |
 | `list.shared` | a list was shared: sent to the owner and to the person it was shared with |
@@ -1118,6 +1121,10 @@ sends `task.completed` only.
   `priority` as a name, ...); within one request the first old and the last new value. Notes are not in it (only in
   `changes`), nor title / link of a project encrypted in the browser; `list_id.old` is `null` when the webhook's owner cannot see
   the old project.
+- 2.577.0: `section_kind` of a task (API, MCP, webhooks, agent events): completed = `done`, won't do = `rejected`, else the meaning
+  of its column, the rest `open`. `status` stays the truth about completed or not: an open task in a `done` column (it was there
+  before the column got its meaning) is `status: open, section_kind: done`. `GET /tasks?section_kind=` filters by it (several comma
+  separated; without `status` every status counts).
 - Never in a payload: passwords, tokens, secrets, attachment contents.
 
 **Headers**

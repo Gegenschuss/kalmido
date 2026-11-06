@@ -13,6 +13,7 @@ from ..lists.lists import clean_folder, FOLDER_DEPTH, FOLDER_SEP, folder_under
 from ..lists.groups import grp_list_ids, grp_sync, grp_touch
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import lp_folder_rename  # 2.369.5 (#2517): pulled up from functions
+from ..lists.seckind import sk_clean  # 2.577.0 (#3354)
 
 
 @app.post("/api/filters")
@@ -280,8 +281,9 @@ def section_create():
     dw = [dw_clean(b.get(k), k) for k in DW_KEYS]  # 2.410.0 B (#3515): the same for its time limits
     dw_check(*dw)
     hard = wip_hard_clean(b.get("wip_hard")) if wip else 0  # 2.392.0 A (#3367): only with a limit
-    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit,dwell_warn_h,dwell_alert_h,wip_hard) VALUES(?,?,?,?,?,?,?)",
-                       (lid, name if le2e_is_cipher(name) else name[:200], srt, wip, *dw, hard))
+    kind = sk_clean(b.get("kind"))  # 2.577.0 (#3354): the undo of a deleted section brings its meaning back
+    cur_id = insert_id(c, "INSERT INTO sections(list_id,name,sort,wip_limit,dwell_warn_h,dwell_alert_h,wip_hard,kind) VALUES(?,?,?,?,?,?,?,?)",
+                       (lid, name if le2e_is_cipher(name) else name[:200], srt, wip, *dw, hard, kind))
     sid, moved, skipped = cur_id, [], []
     for tid in tids:
         r = c.execute("SELECT list_id, section_id, deleted_at FROM tasks WHERE id=?", (tid,)).fetchone()
@@ -299,16 +301,17 @@ def section_create():
 
 @app.patch("/api/sections/<int:sid>")
 def section_update(sid):
-    """{name?, sort?, wip_limit?, dwell_warn_h?, dwell_alert_h?, _prev?: {name, wip_limit, dwell_*}}: with _prev (undo / redo)
+    """{name?, sort?, wip_limit?, dwell_warn_h?, dwell_alert_h?, kind?, _prev?: {name, wip_limit, dwell_*, kind}}: with _prev (undo / redo)
     a name / limit changed elsewhere meanwhile stays (conflicts). 2.60.0 (#1510): wip_limit null / 0 = no limit. 2.410.0 B
-    (#3515): dwell_warn_h / dwell_alert_h = hours in the column after which a card's time turns yellow / red (null / 0 = none)."""
+    (#3515): dwell_warn_h / dwell_alert_h = hours in the column after which a card's time turns yellow / red (null / 0 = none).
+    2.577.0 (#3354): kind = the column's meaning; the tasks in it stay as they are, it counts from the next move on."""
     b = body()
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034): the _prev check and the write see no other edit in between
     need_section(c, sid)
     conflicts = []
     prev = b.get("_prev") if isinstance(b.get("_prev"), dict) else {}
-    cur = c.execute("SELECT name, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?", (sid,)).fetchone()
+    cur = c.execute("SELECT name, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h, kind FROM sections WHERE id=?", (sid,)).fetchone()
     if "name" in b:
         from ..collab.liste2e import le2a_clean_cipher, le2e_guard, le2e_is_cipher
         name = str(b["name"] or "").strip()
@@ -341,6 +344,12 @@ def section_update(sid):
             conflicts.append({"field": "dwell", "server": {k: cur[k] for k in DW_KEYS}, "mine": want})
         else:
             c.execute("UPDATE sections SET dwell_warn_h=?, dwell_alert_h=? WHERE id=?", (*want.values(), sid))
+    if "kind" in b:  # 2.577.0 (#3354)
+        kind = sk_clean(b["kind"])
+        if "kind" in prev and cur["kind"] != sk_clean(prev["kind"]) and cur["kind"] != kind:
+            conflicts.append({"field": "kind", "server": cur["kind"], "mine": kind})
+        else:
+            c.execute("UPDATE sections SET kind=? WHERE id=?", (kind, sid))
     bump(c)
     c.commit()
     return jsonify(ok=True, conflicts=conflicts)
@@ -377,8 +386,8 @@ def section_delete(sid):
     c = db()
     write_lock(c, f"section-{int(sid)}")  # 2.269.0 B (#3034)
     need_section(c, sid)
-    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h FROM sections WHERE id=?",
-                         (sid,)).fetchone())  # 2.60.0 (#1510): + limit; 2.410.0 B (#3515): + time limits
+    sec = dict(c.execute("SELECT id, list_id, name, sort, wip_limit, wip_hard, dwell_warn_h, dwell_alert_h, kind FROM sections WHERE id=?",
+                         (sid,)).fetchone())  # 2.60.0 (#1510): + limit; 2.410.0 B (#3515): + time limits; 2.577.0 (#3354): + meaning
     tids = _sec_tasks(c, sid)
     prev = body().get("_prev")
     if isinstance(prev, dict):

@@ -345,6 +345,30 @@ check(not dbx("SELECT 1 FROM webhooks WHERE user_id=3") and not dbx("SELECT 1 FR
       "user deleted: webhooks + queue gone")
 check(all(r[0] for r in dbx("SELECT enabled FROM webhooks WHERE id=?", (wb["id"],))), "bob's webhook untouched")
 
+# ---- 2.577.0 (#3354): task.status_changed only when section_kind changes, with the old and the new value
+wk = mk(Bo, STUB + "/kind", ["task.status_changed"], "kind")
+kl = Bo.post(B + "/api/lists", json={"name": "Board"}).json()["id"]
+ksec = {n: Bo.post(B + "/api/sections", json={"list_id": kl, "name": n, "kind": k}).json()["id"]
+        for n, k in (("Plain", ""), ("Back", "open"), ("Doing", "progress"), ("Over", "done"))}
+kt_ = Bo.post(B + "/api/tasks", json={"title": "ticket", "list_id": kl}).json()["id"]
+Bo.post(B + "/api/tasks/reorder", json={"items": [{"id": kt_, "section_id": ksec["Plain"]}]})  # open -> open: nothing
+Bo.patch(B + f"/api/tasks/{kt_}", json={"title": "ticket 2"})
+Bo.post(B + "/api/tasks/reorder", json={"items": [{"id": kt_, "section_id": ksec["Doing"]}]})
+r = got("/kind", "task.status_changed")
+d = json.loads(r[0]["body"])["data"] if r else {}
+check((d.get("old_section_kind"), d.get("new_section_kind")) == ("open", "progress") and d.get("task", {}).get("section_kind") == "progress",
+      "task.status_changed: old and new value " + str(d)[:150])
+check(len(r) == 1, "no event for moves and edits that leave section_kind alone")
+Bo.patch(B + f"/api/tasks/{kt_}", json={"section_id": ksec["Over"]})
+r = got("/kind", "task.status_changed", n=2)
+d = json.loads(r[1]["body"])["data"] if len(r) > 1 else {}
+check((d.get("old_section_kind"), d.get("new_section_kind")) == ("progress", "done") and d.get("task", {}).get("status") == "done",
+      "into the done column: progress -> done, completed")
+Bo.post(B + f"/api/tasks/{kt_}/reopen", json={})
+r = got("/kind", "task.status_changed", n=3)
+check(len(r) == 3 and json.loads(r[2]["body"])["data"]["new_section_kind"] == "open", "reopened: done -> open")
+Bo.delete(B + f"/api/me/webhooks/{wk['id']}")
+
 # ---- timeout (last: a hanging receiver blocks the delivery thread for 10 s per attempt)
 wsl = mk(Bo, STUB + "/slow", ["task.created"], "slow")
 Bo.post(B + "/api/tasks", json={"title": "slow"})

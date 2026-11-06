@@ -12,6 +12,7 @@
 
 const FLT_WHAT = [['list', N_('Project')], ['folder', N_('Folder')], ['date', N_('Date')], ['prio', N_('Priority')], ['type', N_('Ticket type')], ['tag', N_('Tag')],
   ['who', N_('Assignee')], ['sec', N_('Column')], ['sprint', N_('Sprint')], ['ms', N_('Milestone')], ['dlv', N_('Delivery state')], ['text', N_('Text')]];
+FLT_WHAT.splice(FLT_WHAT.length - 1, 0, ['kind', N_('Column meaning')]);  // 2.577.0 (#3354): the state (section_kind); only offered while a column has a meaning
 const FLT_OPN = {in: N_('is one of'), nin: N_('is none of'), empty: N_('is empty'), has: N_('contains'), nhas: N_('does not contain'),
   gt: N_('greater than'), lt: N_('less than'), eq: N_('equals'), set: N_('has a value')};
 const FLT_CFT = ['select', 'checkbox', 'date', 'number', 'multiselect', 'currency', 'rating'];  // the field types the engine reads
@@ -35,7 +36,7 @@ const flt_key = c => (c.f === 'cf' ? (c.fid ? 'cfid|' + c.fid : 'cf|' + c.ft + '
 const flt_ft = c => (c.f !== 'cf' ? null : c.fid ? fieldById(+c.fid)?.type : c.ft);
 function flt_ops(c) {
   if (c.f === 'text') return ['has', 'nhas'];
-  if (['list', 'prio', 'date'].includes(c.f)) return ['in', 'nin'];
+  if (['list', 'prio', 'date', 'kind'].includes(c.f)) return ['in', 'nin'];  // 2.577.0 (#3354): + kind (every task has a state)
   if (c.f !== 'cf') return ['in', 'nin', 'empty'];
   const k = c.k || flt_cfKind(flt_ft(c));
   if (k === 'num') return ['gt', 'lt', 'eq', 'empty', ...(c.op === 'set' ? ['set'] : [])];
@@ -67,6 +68,7 @@ function flt_vals(c, cs) {
     case 'sprint': o = [['cur', tr('Current sprint')], ['none', tr('Backlog')]]; break;
     case 'ms': o = [...tasks.filter(t => t.ms).map(t => [String(t.id), t.title]), ['none', tr('No milestone')]]; break;
     case 'dlv': o = [...Object.entries(DV_NAMES).map(([k, n]) => [k, tr(n)]), ['none', tr('No delivery state')]]; break;
+    case 'kind': o = SK_KINDS.map(([k]) => [k, sk_name(k)]); break;  // 2.577.0 (#3354)
     case 'cf': {
       const k = c.k || flt_cfKind(flt_ft(c));
       if (k === 'chk') o = [['1', tr('checked')], ['0', tr('not checked')]];
@@ -90,9 +92,10 @@ function flt_new(key) {
   if (key.startsWith('cf|')) { const g = flt_cfGroups().find(x => x.key === key); const c = {f: 'cf', name: g?.name || '', ft: g?.ft || 'select', op: 'in', v: []}; c.op = flt_ops(c)[0]; c.v = /** @type {any} */ (flt_isList(c) ? [] : ''); return c; }
   return key === 'text' ? {f: 'text', op: 'has', v: ''} : {f: key, op: 'in', v: []};
 }
-function flt_rowHtml(c, i, cs, groups) {
-  const key = flt_key(c), sprOn = S.lists.some(l => !l.archived && spr_on(l));
-  const std = FLT_WHAT.filter(([k]) => k === c.f || (k !== 'type' || ticketsAny()) && (k !== 'sprint' || sprOn));
+function flt_rowHtml(c, i, cs, groups, lid = 0) {
+  const key = flt_key(c), sprOn = S.lists.some(l => !l.archived && spr_on(l)), kindOn = S.sections.some(s => s.kind && (!lid || s.list_id === lid));
+  // 2.577.0 (#3354): + the column meaning while a column has one; (#3356) a shared view (lid) is its project: no project / folder
+  const std = FLT_WHAT.filter(([k]) => k === c.f || (k !== 'type' || ticketsAny()) && (k !== 'sprint' || sprOn) && (k !== 'kind' || kindOn) && (!lid || !['list', 'folder'].includes(k)));
   const own = c.fid ? (() => { const fd = fieldById(+c.fid); return fd ? [[key, `${lname(listById(fd.list_id))} › ${fd.name}`]] : []; })() : [];
   const cfo = [...groups.map(g => [g.key, g.label]), ...own];
   const opt = (/** @type {any} */ [k, n], t = true) => `<option value="${esc(k)}" ${k === key ? 'selected' : ''}>${esc(t ? tr(n) : n)}</option>`;

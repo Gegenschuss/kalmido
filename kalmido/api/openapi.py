@@ -9,6 +9,7 @@ from ..tasks.roadmap import ROADMAP_MAX_DAYS, SHIFT_MAX_DAYS, SHIFT_MAX_TASKS
 from ..collab.comments import MAX_COMMENT
 from ..collab.news import BELL_CUSTOM_ROWS, BELL_MODES, NOTIF_ROWS
 from ..personal.timetrack import TIME_SOURCES
+from ..lists.seckind import SEC_KINDS
 from ..lists.templates import PTYPES
 from ..lists.projects import LIST_STATUSES
 from ..calendars.caldav import APPPW_MAX
@@ -125,6 +126,8 @@ def openapi_spec():
                    "GET /tasks/APP-12 reads the task, commits / pull requests / branch names with it link to the task"),
         "title": {"type": "string"}, "notes": {"type": "string", "description": "Markdown"}, "priority": prio,
         "status": {"type": "string", "enum": list(STATUS_NAMES.values())}, "due": nul("string", format="date"),
+        "section_kind": {"type": "string", "enum": list(SEC_KINDS), "description": "2.577.0: completed = done, won't do = rejected, else the "  # 2.577.0 (#3354)
+                         "meaning of the task's column, the rest open"},
         "due_time": nul("string", pattern="^[0-2][0-9]:[0-5][0-9]$", description="HH:MM, local time of the server; null = all day"),
         "start": nul("string", format="date", description="First day (timeline)"), "duration": nul("integer", description="Minutes"),
         "reminders": {"type": "array", "items": {"type": "integer"}, "description": "Minutes before the due time"},
@@ -625,6 +628,7 @@ def openapi_spec():
     T, L, C, TI, H, S_, A = "Tasks", "Lists", "Comments", "Time tracking", "Habits", "Search and tags", "Admin"
     tasks_filters = [q("list_id", "Only this project", {"type": "integer"}),
                      q("status", "open (default), done, wont_do or all", {"type": "string", "enum": ["open", "done", "wont_do", "all"]}),
+                     q("section_kind", "2.577.0: open, progress, review, done, rejected, several comma separated; without status every status counts", {"type": "string"}),  # 2.577.0 (#3354)
                      q("due_from", "Due on or after (YYYY-MM-DD)", date_s), q("due_to", "Due on or before (YYYY-MM-DD)", date_s),
                      q("tag", "One of your tags or a project tag (without #)"), q("list_tag", "A project tag (without #)"),
                      q("assignee", "me, none or a user id"),
@@ -730,6 +734,12 @@ def openapi_spec():
                                 "delete": op("Clear the waiting state", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
         "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404", "409"), [pid()], scope="write",
                                           desc="2.542.0: a locked task answers 409 -- PATCH locked false first.")},
+        "/tasks/{id}/reopen": {"post": op("Reopen a completed task", T, ok(ref("Task")) | errs("403", "404"), [pid()], scope="write")},
+        # 2.577.0 (#3354)
+        "/tasks/{id}/state": {"post": op("Set a task's state: into the first column with that meaning", T, ok(ref("Task")) | errs("400", "403", "404", "409"), [pid()],
+                                         scope="write", body={"type": "object", "required": ["section_kind"], "properties": {
+                                             "section_kind": {"type": "string", "enum": list(SEC_KINDS)}}},
+                                         desc="done / rejected work without such a column too (only the status changes); the others need one (400).")},
         # 2.35.0 (#1095): append one code snippet (a diff, a log, a proposal) without sending the whole list
         "/tasks/{id}/snippets": {"post": op("Add a code snippet to a task", T, ok({"type": "object", "properties": {"snippet": ref("Snippet"), "task": ref("Task")}},
                                                                                   "Created", "201") | errs("400", "403", "404"), [pid()],

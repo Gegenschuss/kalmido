@@ -46,7 +46,7 @@ ROUTES = {
     # ---- routine
     "DELETE /api/v1/comments/{}/reactions/{}": "routine", "POST /api/v1/comments/{}/choice": "routine",
     "POST /api/v1/comments/{}/reactions": "routine", "POST /api/v1/tasks": "routine", "POST /api/v1/tasks/{}/comments": "routine",
-    "POST /api/v1/tasks/{}/complete": "routine", "POST /api/v1/tasks/{}/reopen": "routine",
+    "POST /api/v1/tasks/{}/complete": "routine", "POST /api/v1/tasks/{}/reopen": "routine", "POST /api/v1/tasks/{}/state": "change",  # 2.577.0 (#3354): may also reject
     "POST /api/v1/tasks/{}/skip": "routine", "POST /api/v1/tasks/{}/subtasks": "routine",
     "POST /api/v1/team/messages/{}/reactions": "routine", "POST /api/v1/team/rooms/{}/messages": "routine",
     "DELETE /api/v1/tasks/{}/watchers/{}": "routine", "POST /api/v1/tasks/{}/watchers": "routine",

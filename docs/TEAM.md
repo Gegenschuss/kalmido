@@ -399,6 +399,9 @@ For software teams working on a board. Everything is off until you switch it on.
 - **Velocity**: with sprints and story points on, the project page offers the block *Velocity*: the completed points of
   the last (up to six) closed sprints as bars and their average as a planning aid for the next sprint.
 - Agents read and set the same through the API and MCP (`points`, `set_wip_limit`, `get_velocity`, see AGENTS.md).
+- **Meaning of a column** (2.577.0): in the column menu *Meaning…*: open, in progress, review, done or rejected, the name stays
+  free. Dragging a task into a done column completes it, into a rejected column marks it won't do, dragging it out opens it again.
+  Ticking moves it into the first done column while completed tasks stay in their columns; reopening goes to the first open column.
 
 ## Swimlanes on the board
 

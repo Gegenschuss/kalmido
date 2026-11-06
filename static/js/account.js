@@ -1330,6 +1330,7 @@ function sectionMenu(anchor, sid) {
     {label: tr('Move right / down'), icon: 'right', fn: () => moveSection(sid, 1)},
     wip_menuItem(sid),  // 2.60.0 (#1510)
     dw_menuItem(sid),  // 2.410.0 B (#3515)
+    sk_menuItem(sid, anchor),  // 2.577.0 (#3354)
     '-',
     {label: tr('Delete section (tasks stay)'), icon: 'trash', cls: 'flag-5', fn: () => sectionDelete(sid)},
   ]);

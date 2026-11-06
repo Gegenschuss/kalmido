@@ -22,6 +22,7 @@ from ..tasks.atttrash import atr_purge_one  # 2.272.0 F (#3038, review E2-H2)
 from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..core.pg import write_lock  # review 2.528 (Fable 3)
+from ..lists.seckind import sk_after_status, sk_answer, sk_on_move, sk_snap  # 2.577.0 (#3354)
 
 
 @app.delete("/api/attachments/<int:aid>")
@@ -128,6 +129,8 @@ def task_reorder():
                 f["milestone_id"] = None  # 2.18.0 (#430): the milestone stays in its list
             f["updated_at"] = ts
             before = c.execute("SELECT * FROM tasks WHERE id=?", (it["id"],)).fetchone()
+            if "section_id" in f or "list_id" in f:  # 2.577.0 (#3354): what task.status_changed compares with
+                sk_snap(c, int(it["id"]))
             from ..lists.rules import rul_fire, rul_snap
             rb = rul_snap(c, int(it["id"]))  # 2.71.0 A (#1457): dragging into a column / list starts its rules too
             tmm = None  # 2.273.0 B (#3042): as PATCH, what the move ends is kept for the way back
@@ -151,10 +154,12 @@ def task_reorder():
                 tmm_after(c, int(it["id"]), tmm, me())
             if "due" in f and before["status"] == 0 and not before["deleted_at"]:  # dropped on a later day
                 shifted += dep_shift(c, int(it["id"]), before["due"], f["due"])
+            if "section_id" in f or "list_id" in f:  # 2.577.0 (#3354): as PATCH, into a done / rejected column
+                sk_on_move(c, int(it["id"]), before, rb)
             rul_fire(c, int(it["id"]), rb)
     bump(c)
     c.commit()
-    return jsonify(ok=True, shifted=shifted, conflicts=conflicts)
+    return jsonify(ok=True, shifted=shifted, conflicts=conflicts, **sk_answer(int(it["id"]) for it in items))
 
 
 BATCH_MAX = 1000  # 2.126.0 D (#1992 A8): tasks per batch / reorder call
@@ -307,17 +312,19 @@ def task_batch():
                     conflict(tid, "status")
                     continue
             elif action == "reopen":
-                old = c.execute("SELECT status, completed_at, completed_by FROM tasks WHERE id=?", (tid,)).fetchone()
+                old = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
                 if old["status"] == 0:
                     continue
                 from ..lists.rules import rul_fire, rul_snap
                 rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
+                sk_snap(c, tid)  # 2.577.0 (#3354)
                 c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
                 rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
                 log_act(c, tid, "reopen")
+                u = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
+                sk_after_status(c, old, 0, u)  # 2.577.0 (#3354): out of a done / rejected column
                 rul_fire(c, tid, rb)
-                undo[str(tid)] = signed(tid, {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"],
-                                              "completed_by": old["completed_by"]})
+                undo[str(tid)] = signed(tid, u)
             elif action == "delete":
                 if data.get("own_only") is True and not c.execute(f"SELECT 1 FROM tasks WHERE id=? AND {PD_OWN}", (tid, me(), me())).fetchone():
                     skipped.append(tid)  # 2.272.0 F (#3045, review M7): "Delete completed" leaves the other members' ones on the server too

@@ -24,6 +24,7 @@ from ..core.orgcrypt import oc_enabled, oc_list_space  # 2.369.5 (#2517): pulled
 from ..videos.vdrescue import vdr_rescue  # 2.530.0 D (#4316)
 from ..core.access import _org_list_writes  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
+from ..lists.seckind import sk_answer  # 2.577.0 (#3354)
 
 
 # ---- 2.18.0 (#430): milestones. A milestone is a task with ms = 1 (top level, no subtasks, a date is optional); a task
@@ -563,7 +564,7 @@ def task_update(tid):
     c.commit()
     from ..tasks.depchain import dch_chain, dch_days
     mv = (getattr(g, "tmm", None) or {}).get(tid) or {}  # 2.273.0 B (#3042): what the move ended / brought back (counts)
-    return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted,
+    return jsonify({**one_task(c, tid), "conflicts": conflicts, "shifted": shifted, **sk_answer([tid]),
                     "chain": dch_chain(shifted, skipped, dch_days(old["due"], new_due)),
                     **({"move_ended": mv["ended"]} if mv.get("ended") else {}),
                     **({"move_restored": mv["restored"]} if mv.get("restored") else {})})

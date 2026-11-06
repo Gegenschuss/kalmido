@@ -201,6 +201,8 @@ const PTYPE_UI = [['', N_('Blank'), 'list', N_('Sections and fields as needed')]
 // box "With the standard sections" in the New list dialog; a new project gets them only when the box is ticked
 const PTYPE_SECS = {agency: [N_('Request'), N_('Concept'), N_('Production'), N_('Approval'), N_('Billing')],
   software: [N_('Backlog'), N_('Next|section'), N_('In progress'), N_('Review'), N_('Done|section')], private: [N_('Ideas'), N_('Planning'), N_('To do|section')]};
+const PTYPE_KINDS = {software: ['open', 'open', 'progress', 'review', 'done']};  // 2.577.0 (#3354): as PTYPES section_kinds
+const ptSecKind = (k, n) => PTYPE_KINDS[k]?.[(PTYPE_SECS[k] || []).findIndex(x => tr(x) === n)] || '';
 const ptSecsLine = k => (PTYPE_SECS[k] || []).map(x => tr(x)).join(', ');
 const MOD_NAMES = {time: N_('Time tracking'), fields: N_('Custom fields'), kanban: N_('Kanban'), deps: N_('Dependencies')};
 // after a project type switched modules on for this person: say which
@@ -279,14 +281,14 @@ function ptypeOfferDraw(box, id, k, names) {
     const b = e.target.closest('[data-pto]'); if (!b) return;
     if (b.dataset.pto === 'no') { box.innerHTML = ''; return; }
     b.disabled = true;
-    const made = await ptypeAddSections(id, names);
+    const made = await ptypeAddSections(id, names, k);
     box.innerHTML = '';
     if (made) $('#l-ptype', box.closest('.modal') || document)?.focus();
   };
 }
-async function ptypeAddSections(id, names) {
+async function ptypeAddSections(id, names, k) {
   const made = [];
-  for (const n of names) { try { made.push({id: (await api('POST', '/api/sections', {list_id: id, name: n})).id, name: n}); } catch { break; } }
+  for (const n of names) { try { made.push({id: (await api('POST', '/api/sections', {list_id: id, name: n, kind: ptSecKind(k, n)})).id, name: n, kind: ptSecKind(k, n)}); } catch { break; } }
   if (!made.length) return null;
   await load(); render();
   const del = async () => {
@@ -294,7 +296,7 @@ async function ptypeAddSections(id, names) {
     for (const s of made) { const r = await api('DELETE', '/api/sections/' + s.id, {_prev: {name: s.name, tasks: []}}); if (r && r.ok === false) skip++; }
     return {skipped: skip ? [tr('Sections of {0}', qn(lname(listById(id)) || ''))] : []};
   };
-  const add = async () => { for (const s of made) s.id = (await api('POST', '/api/sections', {list_id: id, name: s.name})).id; return {}; };
+  const add = async () => { for (const s of made) s.id = (await api('POST', '/api/sections', {list_id: id, name: s.name, kind: s.kind})).id; return {}; };
   offerUndo(trn('{0} section added', '{0} sections added', made.length), histAdd({label: tr('Sections of {0}', qn(lname(listById(id)) || '')), undo: del, redo: add, lids: [id]}));
   return made;
 }

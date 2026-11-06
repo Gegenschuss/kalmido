@@ -269,7 +269,8 @@ def _pick(a, keys):
     return {k: a[k] for k in keys if k in a}
 
 
-COMPACT_FIELDS = ("id", "title", "list_id", "section_id", "parent_id", "status", "due", "due_time", "priority", "tags", "list_tags",
+S_KIND = {"type": "string", "enum": ["open", "progress", "review", "done", "rejected"]}  # 2.577.0 (#3354)
+COMPACT_FIELDS = ("id", "title", "list_id", "section_id", "section_kind", "parent_id", "status", "due", "due_time", "priority", "tags", "list_tags",
                   "assignee_id")
 COMPACT_AUTO = 25  # 2.0.8: without `compact`, a page with more tasks than this comes back compact
 
@@ -288,6 +289,8 @@ def t_list_tasks(api, a):
         q["milestone_id"] = a["milestone_id"]
     # 2.390.0 B (#3355): priority, column, sprint, creator, reviewer, review state, custom field values, text, sort
     q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")))
+    if a.get("section_kind"):  # 2.577.0 (#3354)
+        q["section_kind"] = ",".join(a["section_kind"]) if isinstance(a["section_kind"], list) else a["section_kind"]
     if a.get("delivery"):  # 2.392.2 (#3365)
         q["delivery"] = ",".join(a["delivery"]) if isinstance(a["delivery"], list) else a["delivery"]
     if a.get("priority"):
@@ -624,7 +627,7 @@ TOOLS = [
     ("list_list_tags", "Shared tags of one project (name, color).",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/tags")),
     ("list_tasks", "Tasks the agent can see, filtered. status: open (default) | done | wont_do | all; assignee: me | none | user id. "
-                   "compact: true = only id, title, list_id, section_id, parent_id, status, due, due_time, priority, tags, list_tags, "
+                   "compact: true = only id, title, list_id, section_id, section_kind, parent_id, status, due, due_time, priority, tags, list_tags, "
                    "assignee_id; false = full tasks; not given = full, but compact once a page has more than 25 tasks.",
      _obj({"list_id": S_ID, "status": {"type": "string", "enum": ["open", "done", "wont_do", "all"]}, "tag": {"type": "string"},
            "list_tag": {"type": "string"}, "assignee": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 500},
@@ -642,6 +645,9 @@ TOOLS = [
                         "description": "2.390.0: none | low | medium | high | urgent, several as a list or comma separated"},
            "priority_min": {**PRIO, "description": "2.390.0: at least this priority"},
            "section_id": {"type": "string", "description": "2.390.0: a column (section) id, or none"},
+           "section_kind": {"oneOf": [{"type": "string"}, {"type": "array", "items": S_KIND}],
+                            "description": "2.577.0: the task's state: open | progress | review | done | rejected, several as a list or "
+                                           "comma separated; without status every status counts"},
            "sprint_id": {"type": "string", "description": "2.390.0: a sprint id, current (the active sprint of the task's project) or none (backlog)"},
            "created_by": {"type": "string", "description": "2.390.0: me or a user id"},
            "reviewer": {"type": "string", "description": "2.390.0: me, none or a user id"},
@@ -2552,6 +2558,16 @@ TOOLS += [
                          "in their column) and field_at (since when each field has its value).",
      _obj({"section_id": S_ID, "dwell_warn_h": _DW_H, "dwell_alert_h": _DW_H}, ["section_id"]),
      lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body=_pick(a, ("dwell_warn_h", "dwell_alert_h")))),
+    # 2.577.0 (#3354): the meaning of a column, a task's state
+    ("set_section_kind", "2.577.0: set the meaning of a section (column): open, progress, review, done, rejected; null = none. The name "
+                         "stays free. A task moved into a done / rejected column is completed / marked won't do, tasks already in it stay.",
+     _obj({"section_id": S_ID, "section_kind": {"type": ["string", "null"], "enum": [*S_KIND["enum"], None]}}, ["section_id", "section_kind"]),
+     lambda api, a: api.call("PATCH", f"/sections/{_id(a, 'section_id')}", body={"section_kind": a.get("section_kind")})),
+    ("set_task_state", "2.577.0: set a task's state (section_kind): it moves into the first column of its project with that meaning, "
+                       "with the column's effect (done completes, rejected = won't do, a review column asks for the review). done and "
+                       "rejected work without such a column too; the others need one (else an error).",
+     _obj({"task_id": S_ID, "section_kind": S_KIND}, ["task_id", "section_kind"]),
+     lambda api, a: api.call("POST", f"/tasks/{_id(a, 'task_id')}/state", body={"section_kind": a["section_kind"]})),
     ("get_velocity", "2.60.0: the velocity of a project: completed story points (and tasks) of its last up to 6 closed sprints and their "
                      "average, a planning aid for the next sprint.",
      _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/velocity")),
@@ -2816,6 +2832,8 @@ TOOL_SCOPES["agent"] += ("propose_object_change",)  # 2.623.0 (#4718): a proposa
 TOOL_SCOPES["tasks:write"] += ("update_object",)  # 2.558.0 (#4709, review F9): the server asks the kind's write scope (most: tasks:write)
 TOOL_SCOPES["structure"] += ("set_wip_limit",)  # 2.60.0 (#1510)
 TOOL_SCOPES["structure"] += ("set_dwell_limits",)  # 2.553.0 C (#3538)
+TOOL_SCOPES["structure"] += ("set_section_kind",)  # 2.577.0 (#3354)
+TOOL_SCOPES["tasks:write"] += ("set_task_state",)  # 2.577.0 (#3354)
 TOOL_SCOPES["comments"] += ("leave_team_channel",)  # 2.138.1 (#2059)
 TOOL_SCOPES["import"] = ("propose_import",)  # 2.68.0 (#1839)
 TOOL_SCOPES["agent"] += ("propose_contract_notice",)  # 2.70.0 C (#1359)

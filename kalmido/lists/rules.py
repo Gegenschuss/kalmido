@@ -667,7 +667,9 @@ def rul_exec(c, r, tid):
                         e = apply_update(c, tid, b)
                         if e:
                             raise BadInput(e)
-            except Denied:
+            except Denied as e:
+                if e.code == 409:  # 2.577.0 (#3354): a done column behind the review gate: not this time, no question of rights
+                    return False
                 pause = "target" if r["act"] == "move" else "role"
             except BadInput:
                 return False  # not a question of rights (e.g. a milestone cannot move): this time nothing happens
@@ -694,7 +696,7 @@ def rul_status(c, tid, act):
         if act == "done":
             tsk_finish(c, tid, 2)
         else:
-            tsk_reopen(c, tid, t)
+            tsk_reopen(c, tid)
     except Denied as e:
         if e.code == 409:  # "done only after approval" and the like: not a question of rights, this time nothing happens
             raise BadInput(e.text()) from None

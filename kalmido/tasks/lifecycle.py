@@ -265,6 +265,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
         if any(k in f for k in ("due", "due_time", "reminders", "assignee_id")):
             f["reminded"] = "[]"
         f["updated_at"] = iso(now_utc())
+        if "section_id" in f or "list_id" in f:  # 2.577.0 (#3354): what task.status_changed compares with
+            sk_snap(c, tid)
+            if not f.get("parent_id", cur["parent_id"]) and cur["status"] != 2:
+                sk_gate(c, tid, f.get("section_id"))  # before the write: a rule that hits the gate leaves the task where it is
         tmm = None  # 2.273.0 B (#3042): what a move / indent ends is kept for the way back (tasks/movememo.py)
         if f.get("list_id", cur["list_id"]) != cur["list_id"] or ("parent_id" in f and _norm(f["parent_id"]) != _norm(cur["parent_id"])):
             from ..tasks.movememo import tmm_snap
@@ -321,6 +325,7 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     if f and ("section_id" in f or "list_id" in f):  # 2.60.0 C (#1512): into the review section = review requested
         from ..tasks.review import rvw_on_move
         rvw_on_move(c, tid, cur)
+        sk_on_move(c, tid, cur, rb)  # 2.577.0 (#3354): into a done / rejected column
     if f and "section_id" in f and not cur["parent_id"] and is_shop(c, lid):  # 2.19.0: the shop area of this item
         shop_remember(c, lid, f.get("title") or cur["title"], f["section_id"])
     if f and ("due" in f or "fam" in f) and cur["fam"]:  # 2.140.0 D (#2137): a birthday's date / year back into its address book
@@ -489,6 +494,7 @@ def do_complete(c, tid, status=2, undo=None):
     from ..notify.channels import chn_note
     write_lock(c, f"task-{tid}")  # 2.126.0 D (#1987): one completion of a task at a time (the row below is then current)
     irr_guard(c, tid)  # 2.392.0 (#3370)
+    sk_snap(c, tid)  # 2.577.0 (#3354)
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
     e = lock_done_problem(t)  # 2.542.0 (#4609): every way of completing ends here -- a locked task is unlocked first
     if e and t["status"] == status:  # review: completing a locked task that is done already changes nothing (agents may repeat it)
@@ -573,6 +579,7 @@ def do_complete(c, tid, status=2, undo=None):
             for d in descendants(c, tid):
                 c.execute("UPDATE tasks SET status=?, completed_at=?, completed_by=?, updated_at=? WHERE id=? AND status=0 AND locked=0",
                           (status, ts, who, ts, d))  # 2.542.0 (#4609): a locked subtask stays open
+    sk_after_status(c, t, status, undo, cur_id if nxt else None)  # 2.577.0 (#3354): into the project's done / rejected column
     rul_fire_done(c, tid, cur_id if nxt else None, rb)  # 2.71.0 A (#1457): a recurring task: its completed copy
     return nxt
 
@@ -603,6 +610,8 @@ def undo_status(c, tid, u):
     from ..family.family import stars_add, stars_revoke
     write_lock(c, f"task-{tid}")  # 2.272.0 B (#3025): like do_complete -- an undo and a new tick of the task one after the other
     t = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()
+    if t:
+        sk_snap(c, tid)  # 2.577.0 (#3354)
     if not t or not isinstance(u, dict) or not hmac.compare_digest(str(u.get("sig") or ""), undo_sig(tid, u)):
         return tr("unknown")
     try:  # 2.272.0 B (#3025): a signature without its time (older version) or older than UNDO_HOURS is not taken
@@ -641,6 +650,7 @@ def undo_status(c, tid, u):
                   (st, when(u.get("completed_at")), who(u.get("completed_by")), ts, tid))
         if st == 2:  # 2.19.0 (#653): the kid's stars of that completion come back
             stars_add(c, who(u.get("completed_by")), t, when(u.get("completed_at")))
+        sk_undo(c, t, u)  # 2.577.0 (#3354): back into the column the reopen took it out of
         log_act(c, tid, "wont" if st == -1 else "complete")
         return None
     if u.get("op") != "complete" or not u.get("at"):
@@ -698,6 +708,7 @@ def undo_status(c, tid, u):
         if t["status"] == 0 or t["completed_at"] != at:
             return tr("Changed in the meantime, nothing to undo")
         c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (ts, tid))
+        sk_undo(c, t, u)  # 2.577.0 (#3354): back into the column the tick took it out of
         if u.get("repeat") and not t["repeat"]:  # the last occurrence had ended the repetition
             c.execute("UPDATE tasks SET repeat=? WHERE id=?", (str(u["repeat"])[:500], tid))
         for d in descendants(c, tid):  # subtasks completed together with it
@@ -823,17 +834,15 @@ def task_skip(tid):
     return jsonify({**one_task(c, tid), "next_due": nxt})
 
 
-def tsk_reopen(c, tid, old):
-    """The reopen of task_reopen after its checks (2.633.0, #4781: also a list rule's action "reopen"); old = the task's
-    status, completed_at, completed_by before."""
-    from ..family.family import stars_revoke
+def tsk_reopen(c, tid, undo=None):
+    """The reopen of task_reopen after its checks (2.633.0, #4781: also a list rule's action "reopen"): do_reopen, the move
+    out of a done / rejected column (2.577.0, #3354: sk_after_status, as do_complete moves in) and the list rules."""
     from ..lists.rules import rul_fire, rul_snap
     rb = rul_snap(c, tid)  # 2.71.0 A (#1457)
+    old = c.execute("SELECT * FROM tasks WHERE id=?", (tid,)).fetchone()  # 2.577.0 (#3354): the whole row for sk_after_status
+    do_reopen(c, tid)
     if old["status"] != 0:
-        log_act(c, tid, "reopen")
-        stars_revoke(c, tid, at=old["completed_at"], kid=old["completed_by"])  # 2.19.0 (#653)
-    c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
-    rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
+        sk_after_status(c, old, 0, undo)  # 2.577.0 (#3354): out of a done / rejected column
     rul_fire(c, tid, rb)
 
 
@@ -845,11 +854,26 @@ def task_reopen(tid):
     old = c.execute("SELECT status, completed_at, completed_by, locked FROM tasks WHERE id=?", (tid,)).fetchone()
     if old["status"] != 0 and lock_done_problem(old):  # 2.542.0 (#4609): reopened only after unlocking
         raise Denied(409, lock_done_problem(old))
-    tsk_reopen(c, tid, old)
+    undo = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
+    tsk_reopen(c, tid, undo)
     bump(c)
     c.commit()
-    undo = {"op": "reopen", "status": old["status"], "completed_at": old["completed_at"], "completed_by": old["completed_by"]}
     return jsonify({**one_task(c, tid), "undo": signed(tid, undo) if old["status"] != 0 else None})
+
+
+def do_reopen(c, tid):
+    """The task open again, with its history line; where it stands stays to the caller. 2.577.0 (#3354): + a move out of a
+    done / rejected column."""
+    from ..family.family import stars_revoke
+    sk_snap(c, tid)
+    old = c.execute("SELECT status, completed_at, completed_by, locked FROM tasks WHERE id=?", (tid,)).fetchone()
+    if old["status"] != 0 and lock_done_problem(old):  # 2.577.0 (#3354): a locked task moved out of a done column stays done (409)
+        raise Denied(409, lock_done_problem(old))
+    if old["status"] != 0:
+        log_act(c, tid, "reopen")
+        stars_revoke(c, tid, at=old["completed_at"], kid=old["completed_by"])  # 2.19.0 (#653)
+    c.execute("UPDATE tasks SET status=0, completed_at=NULL, completed_by=NULL, updated_at=? WHERE id=?", (iso(now_utc()), tid))
+    rsn_clear(c, tid)  # 2.556.0 C review (#4583, finding 3)
 
 
 @app.delete("/api/tasks/<int:tid>")

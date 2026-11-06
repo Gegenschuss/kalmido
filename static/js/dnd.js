@@ -222,6 +222,7 @@ async function dropTask0(id, el, clientY) {
   try { res = xe2e ? await api('PATCH', `/api/tasks/${id}`, Object.fromEntries(Object.entries(item).filter(([k]) => k !== 'id'))) : await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { /* api() showed it */ return; }
   if (!xe2e && res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028): changed elsewhere meanwhile: kept; 2.528.0 B (#4305): the PATCH one api() adds itself
   await load(); render();
+  if (sk_moved(res, id)) return;  // 2.577.0 (#3354)
   // a move to another list or day can be undone (plain reordering not)
   const after = snapTask(S.tasks.get(id)), rev = after && (before.list_id !== after.list_id || before.due !== after.due || (before.due_time || null) !== (after.due_time || null) || (before.section_id || null) !== (after.section_id || null) || before.priority !== after.priority) && reverseOf(before, after);
   if (res?.shifted?.length) { shiftUndo(before, {...after, shifted: res.shifted}, after?.due ? tr('Date: {0}', dayLabel(after.due)) : ''); return; }
@@ -263,6 +264,7 @@ async function taskToSection0(id, sid) {
   try { res = await api('POST', '/api/tasks/reorder', {items: [{...item, _prev: dndPrev(before, item)}]}); } catch { await load().catch(() => {}); render(); return; }
   if (res?.conflicts?.length) addConflicts(id, res.conflicts, t.title);  // 2.270.0 D (#3028)
   await load().catch(() => {}); render();  // CI of 2.307.4: a failed reload after the move no longer swallows the message + undo
+  if (sk_moved(res, id)) return;  // 2.577.0 (#3354)
   const after = snapTask(S.tasks.get(id)), rev = after && reverseOf(before, after, ['section_id', 'parent_id']);
   const msg = wip_msg(before.parent_id ? tr('Subtask is now standalone') + ' · ' + tr('Moved to section {0}', secName(sid)) : tr('Moved to section {0}', secName(sid)), sid);  // 2.60.0 (#1510): + over the WIP limit
   if (rev) offerUndo(msg, histFields(tr('Moved {0} to section {1}', qn(t.title.slice(0, 40)), secName(sid)), [[before, after, ['section_id']]], {res})); else toast(msg);
@@ -353,7 +355,7 @@ async function sectionDelete(sid) {
   const e = histAdd({label: tr('Section {0} deleted', nm), lids: [sec.list_id], sid, tasks: r.tasks || [],
     undo: async x => {
       // 2.567.0 A (#4707): the section waits in the trash: back with the same id, its limits and the tasks still free
-      const j = r.trash ? await api('POST', `/api/sections/${secId(x.sid)}/restore`) : await api('POST', '/api/sections', {list_id: sec.list_id, name: sec.name, sort: sec.sort, wip_limit: sec.wip_limit ?? null, tasks: x.tasks.map(rid)});
+      const j = r.trash ? await api('POST', `/api/sections/${secId(x.sid)}/restore`) : await api('POST', '/api/sections', {list_id: sec.list_id, name: sec.name, sort: sec.sort, wip_limit: sec.wip_limit ?? null, kind: sec.kind || '', tasks: x.tasks.map(rid)});
       if (j.id !== secId(x.sid)) HIST.secmap.set(secId(x.sid), j.id); x.tasks = j.moved || [];
       return {skipped: (j.skipped || []).map(t => `${histTitle(t)}: ${tr('Section')}`)};
     },

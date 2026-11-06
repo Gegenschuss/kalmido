@@ -573,6 +573,12 @@ red, `null` / `0` = none); tasks carry `section_at` (since when in their column)
 average: a planning aid, never a measure of a person. `list_flow` (2.393.2) gives lead time, cycle time (median, 85 %), the
 cumulative flow per column and the bug trend of the last 30 / 90 days: describe the flow, never measure a person.
 
+### State of a task (2.577.0)
+Columns can carry a meaning: open, progress, review, done, rejected (`set_section_kind`, the name stays free). A task's
+`section_kind` says where it stands: completed = done, won't do = rejected, else the meaning of its column, the rest open; `status`
+stays the truth about completed or not. `set_task_state` moves a task into the first column with that meaning; moving into a done
+column completes it, into a rejected column marks it won't do. `list_tasks` filters with `section_kind`.
+
 ### Finding tasks (2.390.0)
 Ask `list_tasks` precisely instead of reading whole projects: `priority` / `priority_min`, `section_id`, `sprint_id`
 (`current` = the running sprint, `none` = backlog), `created_by`, `reviewer` + `review` (`reviewer: me, review: pending` = what
@@ -849,7 +855,7 @@ Flow *assign a receipt* (2.48.0): `list_documents` (e.g. `review: true`) -> `get
 `request_integration_approval`, `request_merge_approval`, `request_reward`, `restore_event`, `restore_note`, `restore_task`, `review_task`, `search_contacts`,
 `search_files`, `search_messages`, `search_notes`, `search_tasks`, `send_chat`, `sheet_add_column`, `sheet_append_rows`,
 `sheet_add_tab`, `sheet_create`, `sheet_read`, `sheet_set_cells`, `sheet_set_rules`, `sheet_tabs`, `sheet_undo_batch`, `sheet_update`, `sheet_vars`, `sheets_list`, `set_contact_care`, `set_dwell_limits`, `set_list_columns`, `set_list_review`,
-`set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_status`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
+`set_office_deal_stage`, `set_project_overview`, `set_project_status`, `set_queue_order`, `set_section_kind`, `set_status`, `set_task_state`, `set_video_comment_done`, `set_waiting`, `set_wip_limit`, `share_address_book`,
 `share_event_calendar`, `share_list`, `share_list_with_group`, `shift_list_dates`, `partial_task`, `skip_occurrence`, `start_timer`,
 `stop_timer`, `submit_proposal`, `suggest_payment`, `suggest_receipt`, `sync_read_later`, `take_task`, `tidy_task`,
 `time_from_events`, `unlink_contact`, `unlink_task_from_list`, `unshare_address_book`, `unshare_event_calendar`, `unshare_list`,

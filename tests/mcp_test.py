@@ -305,7 +305,7 @@ check("fields" not in last()["q"] and "notes" in got["data"][0] and "compact" no
 res = call(s, "list_tasks", {"list_id": 99})
 got = json.loads(res["content"][0]["text"])
 check(got.get("compact") is True and len(got["data"]) == 30 and "notes" not in got["data"][0] and "created_at" not in got["data"][0]
-      and set(got["data"][0]) == {"id", "title", "list_id", "section_id", "parent_id", "status", "due", "due_time", "priority", "tags",
+      and set(got["data"][0]) == {"id", "title", "list_id", "section_id", "section_kind", "parent_id", "status", "due", "due_time", "priority", "tags",
                                   "list_tags", "assignee_id"} and "get_task" in got.get("hint", ""), "large page without compact: compact + hint")
 got = json.loads(call(s, "list_tasks", {"list_id": 99, "compact": False})["content"][0]["text"])
 check("notes" in got["data"][0] and "compact" not in got and "fields" not in last()["q"], "compact=false: full even when large")
