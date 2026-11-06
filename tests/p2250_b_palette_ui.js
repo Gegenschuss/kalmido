@@ -42,7 +42,7 @@ const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input'
     w.eval('openPalette()'); await sleep(200);
     const inp = d.querySelector('.palette .pqin');
     const items = () => [...d.querySelectorAll('.palette .pitem .plt')].map(x => x.textContent);
-    const find = async (q, what) => { input(w, inp, q); await sleep(150); return items().some(t => what.test(t)); };
+    const find = async (q, what) => { input(w, inp, q); await until(() => !w.eval('PAL.tq')); return items().some(t => what.test(t)); };
     check(await find('cash book', /^Cash book$/) === !!o.cashbook, tag + '"cash book" ' + (o.cashbook ? 'found' : 'not offered'));
     check(await find('bank', /^Bank$/) === !!o.cashbook, tag + '"bank" follows the office rights');
     check(await find('language', /^Settings: Language$/), tag + 'settings section "Language" found');
@@ -52,7 +52,7 @@ const input = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input'
     check(await find('invoice', /^Add invoice$/), tag + '"Add invoice" is offered (quotes & invoices are open to every member)');
     check(await find('open items', /^Invoices$/), tag + '"open items" finds Invoices (no page of its own; 2.380.0 #3409: its own point)');
     check(await find('client', /^Add client$/), tag + '"Add client" is offered');
-    input(w, inp, 'vacation'); await sleep(150);
+    input(w, inp, 'vacation'); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search after the pause in typing (PAL.tq), not a fixed time
     const at = [...d.querySelectorAll('.palette .pitem')].findIndex(b => b.querySelector('.plt')?.textContent === 'Enter an absence');
     w.eval(`PAL.i = ${at}`);
     inp.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));

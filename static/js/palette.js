@@ -173,7 +173,7 @@ window.addEventListener('keydown', e => {
 document.addEventListener('mousedown', e => { if (S.kf && e.target.closest('#view .trow')) kfocus(null); });
 
 // ---- command palette (Ctrl/Cmd+K): fuzzy search over actions, views, lists, filters, tags, settings and tasks
-const PAL = {q: '', i: 0, mode: null, items: []};
+const PAL = {q: '', i: 0, mode: null, items: [], all: null, tq: 0};  // 2.579.0 (#4199): all = the set of this opening, tq = a search waiting for the pause in typing
 const fold = s => String(s || '').toLowerCase().replace(/ß/g, 'ss').normalize('NFD').replace(/[̀-ͯ]/g, '');
 // 2.38.0 (#1171): the query folded like the message search (msgVariants, chat.js): "aerger" finds "Ärger", "müller" "Mueller"
 const palQv = q => palQv.k === q ? palQv.v : (palQv.k = q, palQv.v = msgVariants(q));
@@ -390,7 +390,7 @@ function palSubLoad() {
   if (PALX.ws === ws && Date.now() - PALX.at < 60000) return;
   PALX.ws = ws; PALX.at = Date.now(); PALX.docs = null; PALX.folders = []; PALX.sheets = [];
   if (feat('sheets') && !S.me?.kid) rawFetch('GET', '/api/sheets?space=all').then(j => { if (PALX.ws === ws) { PALX.sheets = (j.sheets || []).filter(x => ws === 'all' || !wsOn() || x.space === ws || x.shared_in); redraw(); } }).catch(() => {});  // 2.124.0 C (#2113): the index, no cells
-  const redraw = () => { if (PALX.ws === ws && $('.palette') && PAL.q.trim()) palDraw(); };
+  const redraw = () => { if (PALX.ws === ws && $('.palette') && PAL.q.trim()) { PAL.all = null; palDraw(); } };  // 2.579.0 (#4199): the set again with the new parts
   if (feat('docs') && !S.me?.kid) rawFetch('GET', `/api/docs?ws=${encodeURIComponent(ws)}&limit=1`).then(j => { if (PALX.ws === ws) { PALX.docs = j.facets || null; redraw(); } }).catch(() => {});
   if (typeof ab_on === 'function' && ab_on()) {
     const sps = ws === 'all' || !wsOn() ? ['private', ...(wsOn() ? (S.me?.workspaces || []).map(w => 'org:' + w.id) : [])] : [ws];
@@ -422,7 +422,7 @@ function palItems() {
     const more = canEditList(t.list_id) && mv_wsItem($(`#view .trow[data-id="${t.id}"]`) || $('#top h1'), [t.id], o);
     return more ? [...it, {...more, id: 'mv:ws', kind: 'action', score: 1}] : it;
   }
-  const all = palAll();
+  const all = PAL.all || (PAL.all = palAll());  // 2.579.0 (#4199): the set once per opening (every task), not per key
   if (!q) {  // recently viewed tasks / lists, recent commands, then the actions for the current task, the rest of the actions + views
     const viewed = palViewed();
     const recent = LS.get('palRecent', []).map(id => all.find(x => x.id === id)).filter(x => x && x.kind !== 'task').slice(0, 5).map(x => ({...x, group: 'recent'}));
@@ -484,11 +484,14 @@ function palDraw() {
   $('.pqin', el).setAttribute('aria-activedescendant', PAL.items.length ? 'pi-' + PAL.i : '');
   $('.plist .pitem.on', el)?.scrollIntoView({block: 'nearest'});
 }
+// 2.579.0 (#4199): the search waits PAL_WAIT ms after the last key (PAL.tq = the pending search); palFlush runs it at once
+const PAL_WAIT = 80;
+function palFlush() { if (!PAL.tq) return; clearTimeout(PAL.tq); PAL.tq = 0; const inp = $('.palette .pqin'); if (inp) { PAL.q = inp.value; PAL.i = 0; palDraw(); } }
 function openPalette(mode = null) {
   if (S.me?.kid) return;  // 2.19.0: no commands for a child account
   const ret = document.activeElement && document.activeElement !== document.body && !document.activeElement.closest?.('.palette') ? document.activeElement : PAL.ret;
   closePalette(true); closePop(); PAL.ret = ret;
-  PAL.q = ''; PAL.i = 0; PAL.mode = mode;
+  PAL.q = ''; PAL.i = 0; PAL.mode = mode; PAL.all = null;
   if (!mode) palSubLoad();  // 2.87.9 (#1934)
   const t = curTask();
   const md = document.createElement('div');
@@ -500,8 +503,9 @@ function openPalette(mode = null) {
   md.addEventListener('mousedown', e => { if (e.target === md) closePalette(); });
   document.body.appendChild(md);
   const inp = $('.pqin', md);
-  inp.addEventListener('input', () => { PAL.q = inp.value; PAL.i = 0; palDraw(); });
+  inp.addEventListener('input', () => { clearTimeout(PAL.tq); PAL.tq = setTimeout(() => { PAL.tq = 0; PAL.q = inp.value; PAL.i = 0; palDraw(); }, PAL_WAIT); });  // 2.579.0 (#4199): after a short pause in typing
   inp.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.ctrlKey) palFlush();  // the typed text first, then the key
     if (e.key === 'ArrowDown' || (e.key === 'n' && e.ctrlKey)) { e.preventDefault(); PAL.i = Math.min(PAL.items.length - 1, PAL.i + 1); palDraw(); }
     else if (e.key === 'ArrowUp' || (e.key === 'p' && e.ctrlKey)) { e.preventDefault(); PAL.i = Math.max(0, PAL.i - 1); palDraw(); }
     else if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); palRun(PAL.i); }
@@ -516,6 +520,7 @@ function openPalette(mode = null) {
   setTimeout(() => inp.focus(), 0);
 }
 function closePalette(now = false) {
+  clearTimeout(PAL.tq); PAL.tq = 0; PAL.all = null;
   // 2.144.5 D (#1560): a phone's search leaves with the opening animation backwards; a palette already leaving goes at once
   $$('.palette.an-out').forEach(an_kill);
   const pl = $('.palette');

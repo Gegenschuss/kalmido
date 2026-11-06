@@ -5,7 +5,7 @@
 // and is not part of this suite.
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, errs, sleep, B, clientSource} = require('./boot');
+const {boot, errs, sleep, B, clientSource, until} = require('./boot');  // 2.579.0 (#4199): + until (the palette's pause in typing)
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -162,7 +162,8 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   // ---- command palette
   const pal = async (q) => {
     key(w, 'k', {ctrlKey: true}); await sleep(80);
-    const i = d.querySelector('.palette .pqin'); i.value = q; i.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(40);
+    const i = d.querySelector('.palette .pqin'); i.value = q; i.dispatchEvent(new w.Event('input', {bubbles: true}));
+    await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search runs after a short pause in typing - wait for it, not for a fixed time
     return d.querySelector('.palette .pitem.on');
   };
   const run = async (q, id) => { const it = await pal(q); const on = it?.dataset?.id || it?.id || ''; key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(120); return on; };
@@ -198,7 +199,7 @@ const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((m, n) => m - n);
   check(/Darstellung/.test(md.querySelector('.snav [data-sec="look"]').textContent) && /Schriftgröße/.test(t) && /Akzentfarbe/.test(t) && /Zurücksetzen \(100 %\)/.test(t) && /Auf Standard zurücksetzen/.test(t), 'German labels');
   md.remove();
   key(w, 'k', {ctrlKey: true}); await sleep(80);
-  const i = d.querySelector('.palette .pqin'); i.value = 'akzent'; i.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(40);
+  const i = d.querySelector('.palette .pqin'); i.value = 'akzent'; i.dispatchEvent(new w.Event('input', {bubbles: true})); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the pause in typing
   check(/Akzentfarbe: Violett/.test(d.querySelector('.palette .plist').textContent), 'German palette entries');
   w.close();
 

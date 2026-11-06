@@ -4,7 +4,7 @@
 // Starts its own container with KALMIDO_ONBOARDING=1 (start.sh).
 const {execFileSync} = require('child_process');
 const path = require('path');
-const {boot, errs, sleep, B} = require('./boot');
+const {boot, errs, sleep, B, until} = require('./boot');  // 2.579.0 (#4199): + until (the palette's pause in typing)
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const click = (w, el) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
@@ -61,31 +61,32 @@ async function api(cookie, method, url, body) {
   let pal = d.querySelector('.palette');
   check(pal && pal.querySelector('.pqin') && pal.querySelectorAll('.pitem').length > 5, 'Ctrl+K opens the palette with items');
   check(pal && /Actions|Recent/.test(pal.textContent) && pal.querySelector('.pitem kbd'), 'palette: groups + shortcut hints');
-  const type = (txt) => { const i = d.querySelector('.palette .pqin'); i.value = txt; i.dispatchEvent(new w.Event('input', {bubbles: true})); };
-  type('tick me'); await sleep(30);
+  // 2.579.0 (#4199): the search runs after a short pause in typing: type() waits for it (PAL.tq), Enter / the arrows take the text at once
+  const type = async (txt) => { const i = d.querySelector('.palette .pqin'); i.value = txt; i.dispatchEvent(new w.Event('input', {bubbles: true})); await until(() => !w.eval('PAL.tq')); };
+  await type('tick me');
   check(/Tick me off/.test(d.querySelector('.palette .pitem.on')?.textContent || ''), 'fuzzy: "tick me" -> Tick me off first');
-  type('gtstrd'); await sleep(30);
+  await type('gtstrd');
   check(/Getting started/.test(d.querySelector('.palette .pitem.on')?.textContent || ''), 'fuzzy subsequence: "gtstrd" -> Getting started list');
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(300);
   check(!d.querySelector('.palette') && w.eval('S.route.key') === 'l:' + gs().id, 'Enter runs the item (go to the list)');
   check(w.eval('LS.get("palRecent", [])')[0] === 'l:' + gs().id, 'palette: recent item stored');
   key(w, 'k', {metaKey: true}); await sleep(50);
-  type('tick me'); await sleep(20);
+  await type('tick me');
   key(w, 'ArrowDown', {}, d.querySelector('.palette .pqin')); key(w, 'ArrowUp', {}, d.querySelector('.palette .pqin'));
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(300);
   const tick = [...w.eval('S.tasks').values()].find(t => t.title === 'Tick me off');
   check(w.eval('S.sel') === tick.id, 'Cmd+K, task item -> detail opens');
   // actions on the selected task: move to another list via the sub mode
   key(w, 'k', {ctrlKey: true}); await sleep(50);
-  type('another project'); await sleep(20);  // 2.165.3 (#2624): Move … to another project…
+  await type('another project');  // 2.165.3 (#2624): Move … to another project…
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(80);
   check(d.querySelector('.palette .pmode') && /Basket/.test(d.querySelector('.palette .plist').textContent), 'move mode: lists offered');
-  type('bas'); await sleep(20);
+  await type('bas');
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(700);
   check(w.eval(`taskById(${tick.id}).list_id`) === w.eval('inbox().id'), 'move mode: task moved to the inbox');
   // no match + Enter = new task (quick add syntax)
   key(w, 'k', {ctrlKey: true}); await sleep(50);
-  type('Water plants zz tomorrow'); await sleep(20);
+  await type('Water plants zz tomorrow');
   check(d.querySelector('.palette .pitem.on .plt')?.textContent === 'Create as task: Water plants zz', 'no match: "Create as task" on top (2.16.0: #644) ' + d.querySelector('.palette .pitem .plt')?.textContent);
   key(w, 'Enter', {}, d.querySelector('.palette .pqin')); await sleep(700);
   const nt = [...w.eval('S.tasks').values()].find(t => t.title === 'Water plants zz');

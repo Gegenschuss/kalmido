@@ -100,7 +100,7 @@ print(made)
     check(rm2 > 0 && rm2 <= 900, `${tag}: at the end of "All" the window stays small (${rm.rows} -> ${rm2})`);
     await ev(`(() => { go('l/${L}'); return 1; })()`); await sleep(500);
     await m('render list', `render()`, 1500);
-    await m('palette open + type', `openPalette(); const i = document.querySelector('.palette .pqin'); i.value = 'review'; i.dispatchEvent(new Event('input', {bubbles: true}))`, 1500);
+    await m('palette open + type', `openPalette(); const i = document.querySelector('.palette .pqin'); i.value = 'review'; i.dispatchEvent(new Event('input', {bubbles: true})); palFlush()`, 1500);  // 2.579.0 (#4199): the search itself, not only its timer
     await ev(`(() => { closePalette(); return 1; })()`);
     await m('keyboard ↓ x10', `for (let i = 0; i < 10; i++) document.dispatchEvent(new KeyboardEvent('keydown', {key: 'j', bubbles: true}))`, 1500);
     await m('open a task', `openDetail(+document.querySelector('#view .trow').dataset.id)`, 1500);

@@ -36,7 +36,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   let w = await boot({user: 'alice', hash: 'today'}), d = w.document;
   check(d.querySelectorAll('#kbar .kbsrch[data-act="palette"], #side .scmd[data-act="palette"]').length === 1 && !d.querySelector('#side [data-go="search"]'), 'sidebar: the command-bar field is the only search entry (no extra "Search" row)');  // 2.152.3 (#2619): the search field moved from the panel into the head bar
   w.eval('openPalette()'); await sleep(200);
-  w.document.querySelector('.palette .pqin').value = 'search'; w.document.querySelector('.palette .pqin').dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(200);
+  w.document.querySelector('.palette .pqin').value = 'search'; w.document.querySelector('.palette .pqin').dispatchEvent(new w.Event('input', {bubbles: true})); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search after the pause in typing
   check([...d.querySelectorAll('.palette .pitem')].some(b => /^Search$/.test(b.querySelector('.plt')?.textContent || '')), 'the field still reaches the Search view (palette)');
   w.eval('closePalette()');
 

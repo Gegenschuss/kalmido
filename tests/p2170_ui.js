@@ -210,7 +210,7 @@ const day = n => { const d = new Date(); d.setDate(d.getDate() + n); return `${d
   w.eval(`go('l/${L}')`); await sleep(200);
   w.eval(`S.pov.add(${L}); render()`); await sleep(600);
   check(d.querySelector('.povnotes a[href="#note/' + NID + '"]'), '#442: the project overview lists the note');
-  w.eval('openPalette()'); type(w, d.querySelector('.palette .pqin'), 'kick'); await sleep(80);
+  w.eval('openPalette()'); type(w, d.querySelector('.palette .pqin'), 'kick'); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search after the pause in typing
   check([...d.querySelectorAll('.palette .pitem')].some(b => /Kick-off/.test(b.textContent) && /note/.test(b.textContent)), '#442: the command field finds notes');
   w.eval('closePalette()');
   // delete + Undo

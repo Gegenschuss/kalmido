@@ -133,9 +133,9 @@ async function firefox(fn) {
   md.querySelector('#pp-folder').value = 'Clients';
   click(w, md.querySelector('[data-m="ok"]'));
   await until(() => !d.querySelector('.modal.ppreq'));
-  w.eval('openPalette()'); const pin = d.querySelector('.pqin'); pin.value = 'briefing'; pin.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(150);
+  w.eval('openPalette()'); const pin = d.querySelector('.pqin'); pin.value = 'briefing'; pin.dispatchEvent(new w.Event('input', {bubbles: true})); await until(() => !w.eval('PAL.tq'));  // 2.579.0 (#4199): the search after the pause in typing
   check([...d.querySelectorAll('.pitem .plt')].some(x => x.textContent === 'New project from briefing…'), 'palette: New project from briefing…');
-  pin.value = 'notes'; pin.dispatchEvent(new w.Event('input', {bubbles: true})); await sleep(150);
+  pin.value = 'notes'; pin.dispatchEvent(new w.Event('input', {bubbles: true})); await until(() => !w.eval('PAL.tq'));
   check([...d.querySelectorAll('.pitem .plt')].some(x => x.textContent === 'Tasks from notes…'), 'palette (in a list): Tasks from notes…');
   w.eval('closePalette()');
   w.close();
