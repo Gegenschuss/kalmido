@@ -50,6 +50,9 @@ TOTAL2_RE = re.compile(rf"(?P<amt>{_NUM})\s*(?:EUR|€)?\s+(?:\S+\s+){{0,6}}(?:e
 HEAD_DAY_RE = re.compile(r"(?:abrechnungsdatum|abrechnung vom|abrechnung per|rechnungsdatum|datum der abrechnung|kartenabrechnung vom|abrechnung)\D{0,20}(\d{2}\.\d{2}\.\d{4})", re.I)
 # 2.595.0 (#4903): a bare rate printed right after the foreign amount ("USD 5,00 1,119801") is no part of the merchant
 BARE_RATE_RE = re.compile(r"^\s*\d{1,6},\d{3,8}\b")
+# 2.595.0 (#4903, review): footer words anywhere in a line - such a line is never kept as an unknown position
+NOTPOS_RE = re.compile(r"%|\bp\.\s?a\.|zins|rahmen|limit|betr(?:ä|ae)gt|\bbitte\b", re.I)
+UNSURE_MAX = 3  # the unknown lines are kept only within this many lines under their position
 LAST4_RE = re.compile(r"(?:\d{4}|[xX*•]{4})[ -]?(?:\d{2}[xX*•]{2}|[xX*•]{4})[ -]?[xX*•]{4}[ -]?(\d{4})\b")
 LAST4_WORD_RE = re.compile(r"karten-?\s?(?:nummer|nr\.?)\D{0,30}(\d{4})\b", re.I)
 
@@ -126,7 +129,7 @@ def ccr_mastercard(text):
     head = next((d for d in (_iso(m.group(1)) for x in rows for m in [HEAD_DAY_RE.search(x)] if m) if d), None)
     total = None
     last4 = None
-    lines, cur, letters = [], None, False
+    lines, cur, letters, after = [], None, False, 0
     for x in rows:
         if not x:
             continue
@@ -153,14 +156,18 @@ def ccr_mastercard(text):
             lines.append(cur)
             if len(lines) >= CCR_LINES_MAX:
                 break
+            after = 0
             continue
         if cur is None or SKIP_RE.match(x):
             continue
+        after += 1
         m = TAIL_RE.match(x)
         if m and FEE_RE.search(m["text"]):  # the foreign fee under its position: a position of its own
             raw, by = _signed(m)
             letters = letters or by
             lines.append({"day": cur["day"], "booked": cur["booked"], "merchant": m["text"][:CCR_TEXT_MAX], "raw": raw, "orig_amount": None, "orig_currency": None, "fee": True})
+            if len(lines) >= CCR_LINES_MAX:  # 2.595.0 (#4903, review): the limit holds for fee lines too
+                break
             continue
         _t, oa, oc = _fx(x)
         if oa is not None:
@@ -168,7 +175,7 @@ def ccr_mastercard(text):
                 cur["orig_amount"], cur["orig_currency"] = oa, oc
             continue
         # 2.595.0 (#4903): a line with an amount of its own that is no foreign amount, no rate and not only "EUR": kept, never dropped
-        if m and not RATE_RE.search(x) and not re.fullmatch(r"(?:EUR|€)?", m["text"]):
+        if m and after <= UNSURE_MAX and not NOTPOS_RE.search(x) and not RATE_RE.search(x) and not re.fullmatch(r"(?:EUR|€)?", m["text"]):
             raw, by = _signed(m)
             lines.append({"day": cur["day"], "booked": cur["booked"], "merchant": m["text"][:CCR_TEXT_MAX], "raw": raw, "orig_amount": None,
                           "orig_currency": None, "fee": False, "unsure": by})

@@ -43,20 +43,20 @@ def pos(r):
     return [(x["merchant"], str(x["amount"]), x["kind"]) for x in r["lines"]]
 
 
-# ---- the line of the statement in the task (rollback: without the fix the fee line falls away, one position only)
-r = read(["18.10.26 19.10.26 ELEVENLABS.IO, NEW YORK USD 5,00 1,119801 4,47 -", "2,5% für Währungsumrechnung 0,11 -",
+# ---- a line shaped like the statement in the task (invented shop) (rollback: without the fix the fee line falls away, one position only)
+r = read(["18.10.26 19.10.26 CLOUDSHOP INC, NEW YORK USD 5,00 1,119801 4,47 -", "2,5% für Währungsumrechnung 0,11 -",
           "Neuer Saldo 4,58 -"])
 L = r["lines"]
 check(len(L) == 2, f"two positions: the purchase and the conversion fee {pos(r)}")
 check(L and L[0]["amount"] == Decimal("4.47") and L[0]["kind"] == "purchase" and L[0]["orig_amount"] == Decimal("5.00")
       and L[0]["orig_currency"] == "USD" and L[0]["day"] == "2026-10-18" and L[0]["booked"] == "2026-10-19", f"the purchase {L[:1]}")
-check(L and L[0]["merchant"] == "ELEVENLABS.IO, NEW YORK", f"the rate is no part of the merchant {L[:1]}")
+check(L and L[0]["merchant"] == "CLOUDSHOP INC, NEW YORK", f"the rate is no part of the merchant {L[:1]}")
 check(len(L) > 1 and L[1]["amount"] == Decimal("0.11") and L[1]["kind"] == "fee" and L[1]["merchant"] == "2,5% für Währungsumrechnung"
       and L[1]["day"] == "2026-10-18", f"the conversion fee is a fee position {L[1:]}")
 check(r["total"] == Decimal("4.58") and sum(x["amount"] for x in L) == r["total"], f"the sum fits the printed total {r['total']}")
 # the same without a printed total: still two positions
-r = read(["18.10.26 19.10.26 ELEVENLABS.IO, NEW YORK USD 5,00 1,119801 4,47 -", "2,5% für Währungsumrechnung 0,11 -"])
-check(pos(r) == [("ELEVENLABS.IO, NEW YORK", "4.47", "purchase"), ("2,5% für Währungsumrechnung", "0.11", "fee")], f"no total: the same {pos(r)}")
+r = read(["18.10.26 19.10.26 CLOUDSHOP INC, NEW YORK USD 5,00 1,119801 4,47 -", "2,5% für Währungsumrechnung 0,11 -"])
+check(pos(r) == [("CLOUDSHOP INC, NEW YORK", "4.47", "purchase"), ("2,5% für Währungsumrechnung", "0.11", "fee")], f"no total: the same {pos(r)}")
 
 # ---- the other names of the conversion fee; the rate line is no position
 for fee in ("Umrechnungsentgelt 1,75% 0,35-", "Umrechnungsgebühr 0,35-", "Umrechnungsaufschlag 0,35-", "Fremdwährungszuschlag 0,35-",
@@ -76,6 +76,15 @@ check(pos(r) == [("Hotel Beispiel Lissabon", "120.00", "purchase")], f"the total
 # a minimum payment and the amount once more in euro are no positions
 r = read(["05.10. 05.10. Shop Beispiel USD 10,00 9,20-", "EUR 9,20", "Mindestzahlung 50,00"])
 check(pos(r) == [("Shop Beispiel", "9.20", "purchase")], f"'EUR 9,20' and the minimum payment are no positions {pos(r)}")
+
+# review 2.595.0: footer lines without a printed total stay no positions - footer words anywhere in the line, and nothing
+# further down than a few lines under the last position (rollback: each footer line became a position)
+r = read(["05.10. 05.10. Hotel Beispiel Lissabon 120,00-", "Ihr Verfügungsrahmen beträgt 3.000,00", "Sollzinssatz p.a. 18,90",
+          "Effektiver Jahreszins 19,94", "Bitte überweisen Sie bis 15.11. 1.234,56"])
+check(pos(r) == [("Hotel Beispiel Lissabon", "120.00", "purchase")], f"footer words: no positions {pos(r)}")
+r = read(["05.10. 05.10. Hotel Beispiel Lissabon 120,00-", "Seite 1 von 2", "Beispielbank AG", "Musterstraße 1", "Kundenservice",
+          "Punktestand Beispielprogramm 36,00"])
+check(pos(r) == [("Hotel Beispiel Lissabon", "120.00", "purchase")], f"far below the last position: no position {pos(r)}")
 
 # ---- what stayed as it was: the Auslandseinsatzentgelt, the foreign amount on a line of its own
 r = read(["03.01. 04.01. Cloud Beispiel Inc 18,40-", "USD 20,00", "Auslandseinsatzentgelt 1,75% 0,32-", "Neuer Saldo 18,72-"])
