@@ -186,6 +186,13 @@ def of_for_list(c, lid):
     return c.execute("SELECT * FROM org_fields WHERE org_id IS NULL AND owner_id=? ORDER BY sort, id", (lst["owner_id"],)).fetchall()
 
 
+def of_schema_seen(c, uid, lid, role):
+    """2.609.0 (#3373): may uid (role in list lid) see the whole schema of the list's workspace? (of_list_index, review F7: and
+    switch on a field of it that is not linked yet)"""
+    oid = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
+    return oid in user_orgs_full(c, uid) if oid else role in MANAGE_ROLES
+
+
 @app.get("/api/lists/<int:lid>/org-fields")
 def of_list_index(lid):
     """The fields of the list's organisation (its owner's own without one) with "field_id" = the linked field of the list (null = off).
@@ -196,8 +203,7 @@ def of_list_index(lid):
     c, uid = db(), me()
     role = need_list(c, lid, write=False)
     linked = {r[0]: r[1] for r in c.execute("SELECT org_field_id, id FROM list_fields WHERE list_id=? AND org_field_id IS NOT NULL", (lid,))}
-    oid = c.execute("SELECT org_id FROM lists WHERE id=?", (lid,)).fetchone()[0]
-    full = oid in user_orgs_full(c, uid) if oid else role in MANAGE_ROLES
+    full = of_schema_seen(c, uid, lid, role)
     return jsonify(fields=[{**of_out(c, uid, r), "field_id": linked.get(r["id"])} for r in of_for_list(c, lid) if full or r["id"] in linked])
 
 
@@ -208,13 +214,15 @@ def of_list_switch(lid, ofid):
     of_need_person()
     b = body()
     c = db()
-    need_list(c, lid, manage=True)
+    role = need_list(c, lid, manage=True)
     r = next((x for x in of_for_list(c, lid) if x["id"] == ofid), None)
     if not r:
         raise Denied(404)  # never a field of another organisation / person
     write_lock(c, f"list-fields-{lid}")  # 2.609.0 (#3373): two switches at once never link the field twice
     have = c.execute("SELECT id FROM list_fields WHERE list_id=? AND org_field_id=?", (lid, ofid)).fetchone()
     fid = have[0] if have else None
+    if b.get("on") and not have and not of_schema_seen(c, me(), lid, role):
+        raise Denied(404)  # 2.609.0 (#3373, review F7): a field of the schema this person does not see (switching off stays)
     if b.get("on") and not have:
         if c.execute("SELECT COUNT(*) FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0] >= FIELD_MAX:
             return err(tr("At most {0} fields per project", FIELD_MAX))

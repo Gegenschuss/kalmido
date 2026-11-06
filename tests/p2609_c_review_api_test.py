@@ -12,6 +12,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F5 the trash lists an organisation's deleted template for its admins (also when another admin made it), not for a member
  - F6 a guest gets no workspace view of the organisation's ticket types (404) and in the plain list only key, name, icon,
    colour of the types its shared project offers; the task counts only for the types' managers
+ - F7 a project admin without the full view switches on no field of the schema (404), switching off stays
  - F8 deleting a ticket type changes its tasks' updated_at; the API needs the scope delete for it
 freelancer-matrix: orgschema. A person without an organisation: her template's trash, her ticket types as before
 usage: p2609_c_review_api_test.py <datadir>"""
@@ -243,6 +244,21 @@ check(r.ok and TI in [x["id"] for x in r.json()["data"]], f"F8: updated_since fi
 spec = requests.get(V + "/openapi.json").json()
 check(spec["paths"]["/ticket-types/{id}"]["delete"].get("x-kalmido-scope") == "delete", "F8: OpenAPI names the scope delete")
 assert A.delete(B + f"/api/ticket-types/{HID}").ok
+
+# ================================================================== F7 a project admin without the full view
+OFX = A.post(B + "/api/org-fields", json={"space": f"org:{ORG}", "name": "Internal margin", "type": "text"}).json()["id"]
+OFL = A.post(B + "/api/org-fields", json={"space": f"org:{ORG}", "name": "Region", "type": "text"}).json()["id"]
+assert A.put(B + f"/api/lists/{L1}/org-fields/{OFL}", json={"on": True}).ok
+r = A.put(B + f"/api/lists/{L1}/members", json={"user_id": uid["gina"], "role": "admin"})
+check(r.ok, f"setup: a guest of the organisation administers the project {r.status_code} {r.text[:120]}")
+check([x["id"] for x in Gi.get(B + f"/api/lists/{L1}/org-fields").json()["fields"]] == [OFL], "setup: the guest admin sees only the linked field")
+r = Gi.put(B + f"/api/lists/{L1}/org-fields/{OFX}", json={"on": True})
+check(r.status_code == 404, f"F7: she cannot switch on a field of the schema she does not see {r.status_code} {r.text[:120]}")
+check(not any(f.get("org_field_id") == OFX for f in st(A)["fields"]), "F7: nothing was linked")
+r = Gi.put(B + f"/api/lists/{L1}/org-fields/{OFL}", json={"on": False})
+check(r.ok, f"F7: switching off stays {r.status_code} {r.text[:120]}")
+check(A.put(B + f"/api/lists/{L1}/org-fields/{OFL}", json={"on": True}).ok, "setup: linked again")
+check(Bo.put(B + f"/api/lists/{L1}/org-fields/{OFX}", json={"on": True}).status_code == 403, "F7: a member without project admin: 403 as before")
 
 # ================================================================== freelancer-matrix: orgschema
 FL = mklist(Fr, "My work", None)
