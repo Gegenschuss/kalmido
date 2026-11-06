@@ -427,8 +427,9 @@ function dashCard(k) {
     return !ags.length ? '' : rows.length ? card(`<ul class="dwl">${rows.join('')}</ul>`) : slim(nc ? trn('Agents: {0} not connected', 'Agents: {0} not connected', nc) : tr('Agents: all quiet'));
   }
   if (k === 'stats') {
-    const done7 = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;
-    const doneT = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && t.completed_at.slice(0, 10) === t0).length;
+    const dn = [...S.tasks.values()].filter(t => t.status === 2 && t.completed_at && !life_read(listById(t.list_id)));  // 2.609.0 (#4613): Read later is no work done (as /api/stats)
+    const done7 = dn.filter(t => t.completed_at.slice(0, 10) >= addDays(t0, -6)).length;
+    const doneT = dn.filter(t => t.completed_at.slice(0, 10) === t0).length;
     const over = openTasks().filter(t => !t.parent_id && t.due && t.due < t0).length;
     const tile = (n, l, href) => `<a class="dtile" href="${href}"><b>${n}</b><span>${esc(l)}</span></a>`;
     return card(`<div class="dtiles">${tile(doneT, tr('done today'), '#done')}${tile(done7, tr('done in 7 days'), '#stats')}${tile(over, tr('overdue'), '#today')}${tile(openTasks().filter(t => !t.parent_id).length, tr('open'), '#all')}</div>`);

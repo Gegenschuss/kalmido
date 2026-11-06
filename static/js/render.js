@@ -325,7 +325,7 @@ const sbc_ph = () => sbc_res ? sbc_slots('shr sbc-ph', '', '', '') : '';
 // the page: the same button gets it back, like the head bar and the view (keepFocus); a closed phone drawer is left alone
 // 2.417.0 A (#3559): what the sidebar's Projects panel and the start page of Projects (viewProjStart) both show, from one place:
 // the projects of the shown workspace, the folders shown, the Plan rows ([key, html], '' = not shown now)
-const sideLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && !l.quicknote && inWs(l));  // 2.28.0 (#935): the shown workspace; 2.477.0 (#3881): the list Notes has its own row
+const sideLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && !l.quicknote && !life_store(l) && inWs(l));  // 2.609.0 (#4613): an area's store list only through its area  // 2.28.0 (#935): the shown workspace; 2.477.0 (#3881): the list Notes has its own row
 // 2.45.0 (#1532): + a folder set to this workspace (a new, still empty one)
 const sideFolderShown = (lists, x) => wsCur() === 'all' || lists.some(l => fUnder(l.folder, x)) || sb_folderInWs(x);  // 2.28.0: folders with lists here
 const sidePlan = (row, c, onTasks, k) => [['inbox', kbInboxRowTip(row('inbox', ic('inbox'), tr('Basket'), msvvCount(c.lists[inbox()?.id], 'inbox')))],
@@ -424,7 +424,7 @@ function renderSide0() {
   };
   sbb_treeReg('lf', LF_TREE_H);
   lh += sbb_treeHtml(folderNames().filter(x => !fParent(x) && fShown(x)).map(fnode));
-  const archived = S.lists.filter(l => l.archived && inWs(l));
+  const archived = S.lists.filter(l => l.archived && !life_store(l) && inWs(l));  // 2.609.0 (#4613)
   const tags = Object.keys(c.tags).sort(cmpText);
   // Focus: the smart lists
   // 2.25.0 (UX-03 / UX-49): Plan (the smart lists) as [key, html]: each entry can be hidden in Settings > Appearance > Sidebar;
@@ -1941,7 +1941,7 @@ function viewListBody() {
 // 1.6.1: "Archived" = the archived lists as rows (colour / emoji, name, folder, open / done tasks, archived on, owner of a
 // shared list): Open, Restore (owner, undoable) and Delete permanently (owner; 2.39.1 #1188: also list admins and organisation admins)
 function viewArchived() {
-  const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
+  const ls = S.lists.filter(l => l.archived && !life_store(l) && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace; 2.609.0 (#4613): no area's store
     (b.archived_at || '').localeCompare(a.archived_at || '') || cmpText(lname(a), lname(b)));
   if (!ls.length) return `<div class="archv"><div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div></div>`;
   return `<div class="archv">${ls.map(l => {

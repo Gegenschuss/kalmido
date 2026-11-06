@@ -179,7 +179,7 @@ function rf_pick(k, name) {
 function rf_palItems(q) {
   q = String(q || '').trim();
   const it = [], add = (k, kind, label, icon, extra = {}) => it.push({id: 'rf:' + k, kind, label, icon, fn: () => rf_pick(k, label), ...extra});
-  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox)) add('l:' + l.id, 'list', lname(l), 'list', {lic: l, sw: cssColor(l.color), ...(l.folder ? {sub: fDisp(l.folder)} : {})});
+  for (const l of S.lists.filter(x => !x.archived && !x.is_inbox && !life_store(x))) add('l:' + l.id, 'list', lname(l), 'list', {lic: l, sw: cssColor(l.color), ...(l.folder ? {sub: fDisp(l.folder)} : {})});
   for (const f of folderNames()) add('d:' + f, 'folder', fDisp(f), 'folder');
   for (const t of S.tasks.values()) if (t.id > 0 && !t.status && !archivedTask(t)) add('t:' + t.id, 'tasks', mdPlain(t.title), 'check', {sub: '#' + t.id + (t.list_id ? '  ·  ' + lname(listById(t.list_id)) : '')});
   for (const c of RF.ct || []) add('c:' + c.id, 'Contact', c.fn || c.org || '', 'user', {sub: c.org || ''});

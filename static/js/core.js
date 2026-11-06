@@ -218,7 +218,7 @@ const progressOn = () => feat('progress');
 const statusOn = () => progressOn();  // 2.395.0 (#3379): a project status also without collaboration (one person / freelancer)
 // "Where is it stuck?" only pays off with several projects: 2+ active lists, or a shared list
 // 2.352.0 B (#2752): every list but the inbox is a project (kind is not read any more); tracked = has a status
-const isTracked = l => !!l && !l.is_inbox && !!l.status;
+const isTracked = l => !!l && !l.is_inbox && !!l.status && !life_store(l);  // 2.609.0 (#4613): an area's store list is in no project list
 const overviewOn = () => progressOn() && (S.lists.filter(l => !l.archived && isTracked(l) && inWs(l)).length >= 2 || (collab() && S.lists.some(l => l.shared && !l.archived && isTracked(l) && inWs(l))));  // 2.380.2 (#3407): inWs
 // modules "deps" / "fields" (1.2): off = hidden in the app, the data and the API stay
 const depsOn = () => feat('deps');
@@ -239,6 +239,12 @@ const inbox = () => td_rc('inbox', () => S.lists.find(l => l.is_inbox));  // 2.5
 // 2.579.0 (#4199): a lookup through a map instead of a scan (it runs several times per task and draw). S.lists is replaced, pushed
 // to, spliced and its entries swapped in many places: the map is built again when the array or its length changed, and a hit
 // counts only when the entry at its place still carries that id (else built again); an id not in the map is looked up the old way
+// 2.609.0 (#4613): a list an area uses as its store (lists.life: contracts, home, health, travel, reading, budget): never shown as
+// a project (sidebar, pickers, "Move to …", filters, project lists), only through its area; #l/<id> opens the area (parseHash).
+// Its tasks stay in Today / Upcoming / Search. life_read: only Read later leaves the statistics (server: stats.py, life review)
+const life_store = l => !!l?.life;
+const life_read = l => l?.life === 'reading';
+const LIFE_STORE_GO = {reading: 'reading', budget: 'budget', contracts: 'life', home: 'life', health: 'life'};  // travel: the trip's list IS the trip view (life.js), it stays #l/<id>
 let _lbx = {a: null, n: -1, m: new Map()};
 function listById(id) {
   const a = S.lists; if (!a) return undefined;
@@ -1707,6 +1713,7 @@ function parseHash() {
   if (a === 'prop' && b) return {mod: 'tasks', key: LS.get('lastKey', START_KEY), prop: +b};  // 2.3.0: push "Proposal ready"
   if (a === 'f' && b) return {mod: 'tasks', key: 'f:' + b};
   if (a === 'l' && listById(+b)?.life === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): a budget list opens its budget
+  if (a === 'l' && LIFE_STORE_GO[listById(+b)?.life]) { const m = LIFE_STORE_GO[listById(+b).life]; return {mod: m, key: m, lsGo: m}; }  // 2.609.0 (#4613): an area's store list opens its area
   if (a === 'budget') return {mod: 'budget', key: 'budget'};  // 2.72.0 (#1333): budget/<list id> (budget.js reads the id)
   if (b === 's' && ['ablage', 'reading', 'bookmarks', 'feeds', 'life', 'workload'].includes(a)) return {mod: a, key: a, nid: null, wsp: h.split('/')[2] || ''};  // 2.540.0 (#4575 #4588): <view>/s/<space>, the space open under "All workspaces" (areas.js spo_html)  // 2.543.0 (#4606): + workload/s/<space> (Workload, Absences, Disposition)
   if (a === 'feeds') return {mod: 'feeds', key: 'feeds'};  // 2.85.0 B (#1162)
@@ -1744,6 +1751,7 @@ function goNow(hash) { const was = location.hash; if (was !== '#' + hash) { loca
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();
+  if (r.lsGo) history.replaceState(null, '', '#' + r.lsGo);  // 2.609.0 (#4613): the address says the area, not the hidden project
   if (S.me?.kid && r.mod !== 'family' && !r.complete && !r.snooze) { r.mod = 'family'; r.key = 'family'; }  // 2.19.0 (#653): a kid's home
   o3a_toPrivate(r.mod);  // 2.83.0 (#1845): a private module in an organisation's view -> Private
   wsa_routeHint(r.mod);  // 2.409.0 (#3490): an area off in this workspace: a hint with the way to the workspace where it is on

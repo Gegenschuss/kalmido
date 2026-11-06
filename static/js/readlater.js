@@ -45,8 +45,7 @@ function viewReading() {
   if (!RDL.loading && (!RDL.done || Date.now() - RDL.at > 60000 || RDL.sp !== rdl_sp())) setTimeout(rdl_reload, 0);
   const add = `<form class="bmadd" data-rl-form><label class="sr" for="rl-url">${tr('Link')}</label><input id="rl-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link to read later'))}" maxlength="2000"><button type="submit" class="btn pri" ${RDL.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
   const seg = `<div class="seg bmseg rlseg" role="group" aria-label="${esc(tr('Show'))}"><button type="button" data-rl="open-list" class="${RDL.ticked ? '' : 'on'}" aria-pressed="${!RDL.ticked}">${tr('To read')}${RDL.count ? ` <span class="muted">${RDL.count}</span>` : ''}</button><button type="button" data-rl="done-list" class="${RDL.ticked ? 'on' : ''}" aria-pressed="${RDL.ticked}">${tr('Read|done')}${RDL.doneN ? ` <span class="muted">${RDL.doneN}</span>` : ''}</button></div>`;
-  const proj = RDL.list ? `<a class="btn sm" href="#l/${RDL.list}">${ic('list', 's')}<span>${tr('Show as project')}</span></a>` : '';
-  const head = `${rd_crumb('reading')}<div class="bmhead">${add}</div><div class="bmbar">${seg}<span class="spacer"></span>${proj}</div>`;
+  const head = `${rd_crumb('reading')}<div class="bmhead">${add}</div><div class="bmbar">${seg}<span class="spacer"></span></div>`;  // 2.609.0 (#4613): no "Show as project" any more (the list is only the area's store)
   if (!RDL.done) return `<div class="bmview rlview">${head}<p class="muted lempty">${tr('Loading…')}</p></div>`;
   if (!RDL.items.length) return `<div class="bmview rlview">${head}<div class="empty nempty">${ic('book')}<span>${RDL.ticked ? tr('Nothing ticked off yet.') : tr('Nothing to read later. Save a link above, from a feed or with the share button of your phone.')}</span></div></div>`;
   const row = x => {

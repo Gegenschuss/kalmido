@@ -112,7 +112,7 @@ function lstStatusOpt(lid, st, note = '') {
 // ---- "Where is it stuck?" overview (module view, from the state)
 S.ov = {only: LS.get('ovOnly', false)};
 // 2.380.2 (#3407): every view under Projects shows the lists of the shown workspace only ('all' = everything)
-const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && inWs(l) && (l.status === 'at_risk' || l.status === 'off_track'));
+const riskLists = () => S.lists.filter(l => !l.is_inbox && !l.archived && !life_store(l) && inWs(l) && (l.status === 'at_risk' || l.status === 'off_track'));
 const ovProblems = () => statusOn() ? riskLists().length : 0;
 function ovRows() {
   const open = openTasks(), t0 = today(), byL = new Map();

@@ -111,10 +111,11 @@ const BASE = 'cal,comments,collab,deps,progress,contacts,events';
   await w.eval('kkModal()'); md = await until(() => d.querySelector('.smodal #s-kk #kk-url') && d.querySelector('.smodal'));
   check(md && md.querySelector('#kk-tok').type === 'password' && !md.querySelector('[data-pane="integr"]').classList.contains('hidden'), 'Karakeep: address + API key (password field) in Settings > Integrations');
   md?.remove();
-  // health list bar
+  // 2.609.0 (#4613): the health list is the area's store: #l/<id> opens Home & life (was: the list with its bar "never visible to agents")
   const HL = st.lists.find(l => l.life === 'health').id;
-  w.location.hash = '#l/' + HL; await until(() => d.querySelector('#view .lifebar'));
-  check(/never visible to agents/.test(d.querySelector('#view .lifebar').textContent), 'the health list says it is private');
+  w.location.hash = '#l/' + HL;
+  check(await until(() => w.location.hash === '#life' && w.eval('S.route.mod') === 'life'), '#4613: the health list opens Home & life ' + w.eval('S.route.mod') + ' ' + w.location.hash);  // the view was Home & life already: wait for the address
+  check(!/^#l\//.test(w.location.hash) && !d.querySelector(`#side [data-list="${HL}"]`), '#4613: the address is the area, the list is no project in the sidebar ' + w.location.hash);
   w.close();
 
   // ================= staying in touch on a contact's card

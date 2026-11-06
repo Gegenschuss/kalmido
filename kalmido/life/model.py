@@ -13,7 +13,7 @@ from ..core.conflict import Conflict  # 2.269.0 C (#3017)
 from ..core.i18n import csv_dialect, lang, N_, tr
 from ..core.db import iso, iso_ms, local_now, now_utc, usettings
 from ..core.usertz import user_now
-from ..core.access import Denied, health_hidden, my_max_sort, need_list, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF
+from ..core.access import Denied, health_hidden, my_max_sort, need_list, no_reading_sql, org_trips_hidden, tvis, vis_sql, wr_sql, FEAT_OFF
 from ..core.serializers import load_tasks, csv_cell
 from ..core.state import visible_lists
 from ..lists.lists import list_created, clean_folder, LIST_NAME_MAX
@@ -855,6 +855,7 @@ def review(c, uid, period, day, journal=True, space=""):
     `day`, what is still open from it (due on or before its end), what they moved away, what comes in the next 7 days.
     2.398.0 (#3406): space "private" / "org:<id>" = only the tasks of that workspace's lists (wsa_space_lists)."""
     tv, tvt = tvis(c, uid), tvis(c, uid, "t.")  # 2.360.0 D (#2496): a participant's hidden tasks stay out (as in every view)
+    tv, tvt = f"{tv} AND {no_reading_sql('tasks.list_id')}", f"{tvt} AND {no_reading_sql('t.list_id')}"  # 2.609.0 (#4613): Read later is not reviewed
     sq = wsa_space_lists(c, uid, space)
     if sq:  # the narrowing joins the visibility condition
         tv, tvt = f"{tv} AND list_id IN {sq}", f"{tvt} AND t.list_id IN {sq}"

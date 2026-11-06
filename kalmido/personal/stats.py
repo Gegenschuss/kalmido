@@ -5,7 +5,7 @@ from flask import jsonify, request
 from ..core.config import app, TZ
 from ..core.db import db, iso, local_day as _local_day, local_now, now_utc
 from ..accounts.session import me
-from ..core.access import time_all
+from ..core.access import no_reading_sql, time_all
 from ..core.state import visible_lists
 from ..accounts.wsareas import wsa_space_lists
 from ..personal.habits import pomo_elapsed
@@ -55,7 +55,7 @@ def stats_api():
     days_all, per_day, per_week, by_list = set(), {}, [0] * STATS_WEEKS, {}
     with_due = ontime = 0
     for r in c.execute(f"""SELECT list_id, due, completed_at FROM tasks WHERE completed_by=? AND status=2
-                          AND completed_at IS NOT NULL{lw}""", (uid,)):
+                          AND completed_at IS NOT NULL AND {no_reading_sql("tasks.list_id")}{lw}""", (uid,)):  # 2.609.0 (#4613): Read later is no work done
         d = _local_day(r["completed_at"])
         days_all.add(d)
         if d < mon0 or d > today:
@@ -81,7 +81,7 @@ def stats_api():
     over = [0] * len(samples)
     for r in c.execute(f"""SELECT t.due, t.status, t.created_at, t.completed_at, t.deleted_at FROM tasks t JOIN lists l ON l.id=t.list_id
                           WHERE t.due IS NOT NULL AND t.due<? AND l.archived=0 AND (t.assignee_id=? OR (t.assignee_id IS NULL AND l.owner_id=?))
-                            AND (t.status=0 OR t.completed_at>=?){tw}""", (today.isoformat(), uid, uid, lo)):
+                            AND (t.status=0 OR t.completed_at>=?) AND {no_reading_sql("t.list_id")}{tw}""", (today.isoformat(), uid, uid, lo)):
         created, done, deleted = _local_day(r["created_at"]), _local_day(r["completed_at"]), _local_day(r["deleted_at"])
         if r["status"] != 0 and not done:
             continue

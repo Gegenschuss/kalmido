@@ -91,7 +91,7 @@ function fv2_tile(key, ctx) {
     return {key, name: o.name, place: o.label, ws: o.ws, icon: ic(d[0]), attrs: `data-fv2-go="${esc(o.to)}" data-fv2-ws="${esc(o.ws || '')}"`, on: location.hash.slice(1) === o.to};
   }
   if (p === 'l') {
-    const l = listById(+v); if (!l || l.is_inbox || l.archived || (!ctx.allWs && !inWs(l))) return null;
+    const l = listById(+v); if (!l || l.is_inbox || l.archived || life_store(l) || (!ctx.allWs && !inWs(l))) return null;  // 2.609.0 (#4613): an area's store list is no project tile
     return {key, name: lname(l), place: l.folder ? fDisp(l.folder) : '', ws: wsOf(l), icon: listIconHtml(l, {emoji: true}) || ic('list'), ...go(keyToHash('l:' + l.id), onTasks && k === 'l:' + l.id)};
   }
   if (p === 'folder') {

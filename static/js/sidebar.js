@@ -299,7 +299,7 @@ function folderMirror(arr) {
 const mirroredMsg = l => tr('{0} arranges the projects of this shared folder for everyone.', l?.owner_name || tr('The owner'));
 const folderSubs = t => folderNames().filter(p => fParent(p) === t);
 function sideOrder() {  // lists as shown: top-level lists first, then folder by folder (a folder's lists, then its subfolders)
-  const ls = S.lists.filter(l => !l.is_inbox && !l.archived);
+  const ls = S.lists.filter(l => !l.is_inbox && !l.archived && !life_store(l));  // 2.609.0 (#4613): an area's store list is no project here
   return [...ls.filter(l => !l.folder), ...folderNames().flatMap(f => ls.filter(l => l.folder === f))];
 }
 // open / closed folders: S.collapsed "fold:<path>" (as before) + the user setting folders_closed (all devices)

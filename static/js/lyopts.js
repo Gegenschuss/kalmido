@@ -23,7 +23,7 @@ function lyo_src(d) {
   if (d.type === 'person') return [...(S.me ? [[S.me.id, tr('Me')]] : []), ...teamPeople().map(p => [p.id, p.name])];
   if (d.type === 'tag') return lyo_tags().map(t => [t, '#' + t]);
   if (d.type === 'list') {
-    const ls = S.lists.filter(l => !l.archived && !l.deleted_at && (!d.pick || d.pick(l)));
+    const ls = S.lists.filter(l => !l.archived && !l.deleted_at && !life_store(l) && (!d.pick || d.pick(l)));  // 2.609.0 (#4613)
     const fs = d.folders ? [...new Set(ls.map(l => l.folder).filter(f => f && f.length <= 38))].sort((a, b) => a.localeCompare(b, LOCALE())).map(f => ['f:' + f, tr('Folder {0}', f)]) : [];
     return [...fs, ...ls.map(l => [l.id, lname(l)])];
   }

@@ -90,7 +90,6 @@ function viewLife() {
       + (kk.connected ? `<p class="muted lkk">${ic(kk.error ? 'alert' : 'sync', 's')} ${esc(kk.error ? tr('Karakeep: {0}', kk.error) : kk.synced_at ? tr('Karakeep, fetched {0}', fmtDateLoc(kk.synced_at.slice(0, 10))) : tr('Karakeep connected'))}</p>` : '');
     const acts = `<a class="btn sm" href="#${esc(rd_home('reading'))}">${ic('book', 's')}<span>${tr('Open')}</span></a>`  // 2.172.0 B (#2679): the view Read later (area Reading)
       + `<a class="btn sm" href="#${esc(rd_home('bookmarks'))}">${ic('bookmark', 's')}<span>${tr('Bookmarks')}</span></a>`  // 2.97.0 A (#1950): the bookmarks (bookmarks.js)
-      + (r.lists.length ? `<a class="btn sm" href="#l/${r.lists[0]}">${ic('book', 's')}<span>${tr('Reading list')}</span></a>` : '')
       + (kk.connected ? btn('life-kksync', 'sync', tr('Fetch now')) : '') + btn('life-kk', 'link', kk.connected ? tr('Karakeep…') : tr('Connect Karakeep…'));
     cards.push(card('reading', 'book', tr('Read later'), body, acts, r.count || ''));
   }

@@ -714,7 +714,7 @@ document.addEventListener('click', async e => {
       break;
     }
     case 'dsx-wlist': dsxWhoPick(a); break;  // 2.36.2 (#1138)
-    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
+    case 'qd-list': menu(a, (dsxWhoUid() ? dsxWhoLists(dsxWhoUid()) : S.lists.filter(l => !l.archived && !life_store(l) && canAddTo(l.id))).map(l => ({label: lname(l), icon: 'list', lic: l, fn: () => { S.qov.list_id = l.id; qovChipWins('list'); }}))); break;
     case 'qd-prio': menu(a, [[7, N_('Urgent')], [5, N_('High')], [3, N_('Medium')], [1, N_('Low')], [0, N_('None')]].map(([p, n]) => ({label: tr(n), icon: 'flag', cls: p ? 'flag-' + p : '', fn: () => { S.qov.priority = p; qovChipWins('prio'); }}))); break;
     case 'mx-scope': mxScopeMenu(a); break;
     case 'mx-mine': mxSet({mine: !mxGet().mine}); break;

@@ -1627,7 +1627,7 @@ function tabAddGroups() {
   const mg = []; mg_tabOpts((id, n) => { mg.push(it(id, n)); return ''; });
   grp('m', N_('Modules'), [...MODS.filter(([m]) => m === 'tasks' || feat(m)).map(([m, , n]) => it('m:' + m, tr(n))), ...mg]);
   grp('s', N_('Smart lists'), SMART_TABS.filter(k => k !== 'assigned' || collab()).map(k => it('s:' + k, tr(SMART[k].name))));
-  const ls = S.lists.filter(l => !l.is_inbox && !l.archived), li = (l, d) => it('l:' + l.id, listName(l.name), {d, f: l.folder || ''});
+  const ls = S.lists.filter(l => !l.is_inbox && !l.archived && !life_store(l)), li = (l, d) => it('l:' + l.id, listName(l.name), {d, f: l.folder || ''});
   grp('l', N_('Projects'), [...ls.filter(l => !l.folder).map(l => li(l, 0)), ...folderNames().flatMap(f => {
     const sub = ls.filter(l => l.folder === f).map(l => li(l, fDepth(f))).filter(Boolean);
     return sub.length ? [{head: true, label: fDisp(f), d: fDepth(f) - 1, f}, ...sub] : [];

@@ -275,7 +275,7 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
   // list: ~Name (prefix match, ignores emoji / case)
   take(/\s[~^]([^\s]+)(?=\s)/, 'list', m => {
     const q = norm(m[1]); const nm = x => norm(lname(x)) + ' ' + norm(x.name);  // display name (inbox: "Inbox" in English) or stored name
-    const W = S.lists.filter(x => canAddTo(x.id));
+    const W = S.lists.filter(x => canAddTo(x.id) && !life_store(x));  // 2.609.0 (#4613): no area's store list
     const l = W.find(x => norm(lname(x)).startsWith(q) || norm(x.name).startsWith(q)) || W.find(x => nm(x).includes(q));
     if (!l) return false; out.list_id = l.id; return lname(l);
   });
@@ -295,7 +295,7 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
 // when X is exactly the name of a list the task can go to (emoji / case ignored, several words allowed) -- "Letter to grandma
 // in Berlin" stays text unless a list is called "Berlin". Returns {list, start, end, phrase} (positions in s) or null.
 function quickListWords(s) {
-  const W = S.lists.filter(x => canAddTo(x.id) && !x.archived);
+  const W = S.lists.filter(x => canAddTo(x.id) && !x.archived && !life_store(x));  // 2.609.0 (#4613)
   if (!W.length) return null;
   const toks = [...s.matchAll(/\S+/g)].map(m => ({w: m[0], i: m.index, e: m.index + m[0].length}));
   const eqOne = (j, nw) => nw.length && j + nw.length <= toks.length && norm(toks.slice(j, j + nw.length).map(t => t.w).join('')) === norm(nw.join('')) ? nw.length : 0;

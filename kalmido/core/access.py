@@ -494,6 +494,12 @@ def reading_sql(a="l"):
     return f"(COALESCE({a}.life, '')='reading' OR EXISTS (SELECT 1 FROM reading_orgs ro WHERE ro.list_id={a}.id))"
 
 
+def no_reading_sql(col="list_id"):
+    """2.609.0 (#4613): THE condition "the task's list (column col) is no read-later project": what someone read is no work
+    done, so it leaves the statistics and the review (personal/stats.py, life/model.py review); the other areas' lists count."""
+    return f"NOT EXISTS (SELECT 1 FROM lists rdl WHERE rdl.id={col} AND {reading_sql('rdl')})"
+
+
 def reading_ids(c, ids):
     """2.172.1 A (#2689): the read-later projects among the list ids ids (see reading_sql)."""
     ids = [int(x) for x in ids or ()]

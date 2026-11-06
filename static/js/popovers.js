@@ -862,7 +862,7 @@ const moveWsItem = (anchor, id) => { const m = mv_wsItem(anchor, [id], mv_taskO(
 // from this many entries
 // 2.455.0 (#3848): ws = only this workspace's projects (and the Basket), 'all' = every project under its workspace's heading
 function tch_listPicker(anchor, o = {}) {
-  const top = o.first?.lists || [], ok = l => !!l && !l.archived && (!o.ws || inWs(l, o.ws)) && (!o.filter || o.filter(l)), ib = inbox();
+  const top = o.first?.lists || [], ok = l => !!l && !l.archived && !life_store(l) && (!o.ws || inWs(l, o.ws)) && (!o.filter || o.filter(l)), ib = inbox();
   const it = l => ({label: lname(l), icon: l.is_inbox ? 'inbox' : 'list', lic: l, cls: 'tch-l', on: !!o.on && l.id === o.on, fn: () => o.pick(l)});
   const ls = sideOrder().filter(l => ok(l) && !top.includes(l)), rows = [...(o.pre || [])];
   if (top.length) rows.push({head: o.first.head, keep: true}, ...sideOrder().filter(l => top.includes(l) && ok(l)).map(it), {head: o.first.rest || tr('Other projects'), keep: true});
