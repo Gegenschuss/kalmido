@@ -837,7 +837,7 @@ ROUTES = {
     # 2.52.0 (#1128): writing into the person's own CalDAV subscription (need_calsub: the subscription's owner only)
     "POST /api/calendars/{}/events": "own", "PATCH /api/calendars/{}/events": "own", "DELETE /api/calendars/{}/events": "own",
     "POST /api/calendars/{}/events/restore": "own", "POST /api/calendars/{}/write": "own", "POST /api/import/{}": "own",
-    "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/me/mail": "own",
+    "POST /api/imports/{}/undo": "own", "GET /api/imports": "own", "GET /api/imports/{}/undo-plan": "own", "GET /api/me/mail": "own",  # 2.585.0 (#4350): + undo-plan
     # 2.73.0 B (#1473): the account export / import: the person's own files (a folder per person, another person's id = 404);
     # the import's target organisation needs its admin (p273_b_api_test.py)
     "GET /api/account/export": "own", "POST /api/account/export": "own", "DELETE /api/account/export": "own",
