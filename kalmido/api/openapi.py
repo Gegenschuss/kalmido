@@ -543,7 +543,10 @@ def openapi_spec():
             # 2.142.0 B (#2147)
             "columns": {"type": "array", "description": "Only source csv: which column of the file went into which field (notes = unknown columns)",
                         "items": {"type": "object", "properties": {"column": {"type": "string"}, "field": {"type": "string"}}}}}},
-        "ImportUndone": {"type": "object", "properties": {k: {"type": "integer"} for k in ("tasks", "lists", "sections", "kept_lists", "kept_tasks", "kept_rows", "trash_rows")}},
+        "ImportUndone": {"type": "object", "properties": {**{k: {"type": "integer"} for k in ("tasks", "lists", "sections", "kept_lists", "kept_tasks", "kept_rows", "trash_rows")},
+                                                         # 2.611.0 (#4866): the undo names what it deleted for good, as its preview does
+                                                         "for_good": {"type": "array", "description": "Deleted for good, by area (largest first)",
+                                                                      "items": {"type": "object", "properties": {"what": {"type": "string"}, "count": {"type": "integer"}}}}}},
         "AppPassword": {"type": "object", "properties": {
             "id": {"type": "integer"}, "name": {"type": "string"}, "created_at": {"type": "string", "format": "date-time"},
             "last_used_at": nul("string", format="date-time"), "last_client": {"type": "string", "description": "User agent of the last use"}}},
