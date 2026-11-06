@@ -1,0 +1,21 @@
+/* 2.572.0 (#4747): a phone's favourites over the tab bar (favtiles.js fvd_*): the grip on the bar's top edge (a button with
+   aria-expanded) and the row that slides in above the bar (an_up ~220 ms) and out (an_down ~180 ms, an-out from
+   sheetmotion.js an_watch); "reduce motion" is the central rule (no slide). safe-area-inset-bottom: --safe-b like #tabs.
+   Neither on a computer / tablet, nor where the tab bar is away (keyboard, typing, a child, mini windows, full screen tables). */
+#favgrip,#favup{display:none}
+@media (max-width:767px){
+  #favgrip:not(.hidden){display:block;position:fixed;left:50%;bottom:calc(var(--tabs-h) + var(--safe-b) - .75rem);z-index:42;width:3.5rem;height:1.5rem;margin-left:-1.75rem;padding:0;border:0;background:none;cursor:pointer;touch-action:none}
+  #favgrip::before{content:'';position:absolute;left:50%;top:50%;width:2.25rem;height:.25rem;margin:-.125rem 0 0 -1.125rem;border-radius:.125rem;background:var(--text2);opacity:.45}
+  #favgrip[aria-expanded="true"]::before{background:var(--accent);opacity:.9}
+  #favgrip:focus-visible{outline:2px solid var(--accent);outline-offset:-2px;border-radius:.5rem}
+  #favup.hidden.an-out{display:flex!important}
+  #favup:not(.hidden),#favup.hidden.an-out{display:flex;position:fixed;left:0;right:0;bottom:calc(var(--tabs-h) + var(--safe-b));z-index:39;gap:.25rem;padding:.75rem .5rem .5rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none;background:var(--bg2);border-top:1px solid var(--line);box-shadow:0 -.5rem 1.5rem rgba(0,0,0,.2)}
+  #favup::-webkit-scrollbar{display:none}
+  #favup:not(.hidden){animation:an_up .22s cubic-bezier(.2,.8,.2,1)}
+  #favup.hidden.an-out{animation:an_down .18s ease-in forwards;pointer-events:none}
+  #tabs{touch-action:pan-x}
+  body.favup-open #fab{visibility:hidden}
+  body.kb-open #favgrip,body.kb-open #favup,body.ms-typing #favgrip,body.ms-typing #favup,body.tl-typing #favgrip,body.tl-typing #favup,
+  body.kidmode #favgrip,body.kidmode #favup,html.mini #favgrip,html.mini #favup,html.shzfull #favgrip,html.shzfull #favup{display:none!important}
+}
+@media (max-width:767px) and (pointer:coarse){ #favup .fv2-tile{width:2.75rem;height:2.75rem} }

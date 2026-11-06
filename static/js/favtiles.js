@@ -11,7 +11,7 @@
    - 2.441.0 (#3592): everything with an address of its own (a quotation, a page, a table, a contact, a file, a saved view):
      fv2_hashKey turns an address into a key, GET /api/favorites/targets checks those on the server each time (names, routes,
      workspaces of what the person may read). ONE row for all workspaces, a dot shows the workspace; a computer: in the free
-     room of the head bar (#kbar), what does not fit under "+N"; a phone (2.552.0 #4618, no sidebar section any more): a row to swipe under the header (#favrow) or, with the tab
+     room of the head bar (#kbar), what does not fit under "+N"; a phone (2.552.0 #4618, no sidebar section any more): a row over the tab bar (2.572.0 #4747: swipe up on the tab bar, #favup) or, with the tab
      "Favourites" pinned, a page (#favorites). Dividers are keys too (sep:), the own look is the setting fav_meta. */
 'use strict';
 
@@ -161,18 +161,21 @@ function fv2_tileHtml(t, page) {
   const m = fv2_meta()[t.key] || {}, dot = t.ws && wsOn() ? `<span class="fv2-wsd">${wsp_dot(t.ws)}</span>` : '';
   return `<button type="button" class="fv2-tile ${t.on ? 'on' : ''}" data-fv2="${esc(t.key)}" ${t.attrs} title="${esc(fv2_hint(t))}" aria-label="${esc(fv2_hint(t))}"${t.on ? ' aria-current="page"' : ''}${m.c || (!page && t.dk?.c) ? ` style="--fvc:${esc(m.c || t.dk.c)}"` : ''}${drag}>${m.i ? ic(m.i) : t.icon}${!page && t.dk?.b ? `<span class="fv2-bdg" aria-hidden="true">${esc(t.dk.b)}</span>` : ''}${dot}${page ? `<span class="fv2-pn">${esc(t.name)}</span>${t.place ? `<span class="fv2-pp">${esc(t.place)}</span>` : ''}` : ''}</button>`;
 }
-// the row: a computer in the head bar (left empty by sbb_barHtml), else under the header (#favrow, a phone: swipe it); hidden while the page is pinned
+// the row: a computer in the head bar (left empty by sbb_barHtml), else above the tab bar (#favup, a phone: swipe up on the
+// tab bar or tap the grip, fvd_* below); neither while the page is pinned
 // 2.552.0 (#4618): takes back #4014 -- the phone's sidebar shows no section "Favourites" (fv2_sideHtml), only this row or the tab
+// 2.572.0 (#4747): the phone's row moved from under the header (#favrow, ~120 px of every page) to a row over the tab bar
 const fv2_pagePinned = () => { try { return isMobile() && tabIds().includes('favs'); } catch { return false; } };
 function fv2_barDraw() {
-  const kb = $('#kbar .fv2bar'), row = $('#favrow'), mini = document.documentElement.classList.contains('mini') || document.documentElement.classList.contains('mini-task');
+  const kb = $('#kbar .fv2bar'), row = $('#favup'), mini = document.documentElement.classList.contains('mini') || document.documentElement.classList.contains('mini-task');
   const on = kb || (row && !mini && !fv2_pagePinned() ? row : null);
-  if (row && row !== on && row.firstChild) { row.innerHTML = ''; row.classList.add('hidden'); FV2.last.delete(row); }
+  if (row && row !== on && row.firstChild) { row.innerHTML = ''; FV2.last.delete(row); }
+  if (on !== row) fvd_sync(0);
   if (!on) return;
   fv2_fetch();
   const ts = fv2_distinct(fv2_tiles()), body = ts.map(t => fv2_tileHtml(t)).join('');
   const html = on === kb ? `${body}<button type="button" class="fv2-more" data-fv2-more hidden aria-haspopup="menu"></button>` : body;
-  if (on === row) row.classList.toggle('hidden', !ts.length);
+  if (on === row) fvd_sync(ts.filter(t => !t.sep).length);
   if (FV2.last.get(on) === html && on.firstChild) { if (on === kb) fv2_fit(); return; }
   FV2.last.set(on, html);
   on.setAttribute('aria-label', tr('Favourites'));
@@ -234,7 +237,7 @@ async function fv2_open(b) {
   go(b.dataset.fv2Go);
 }
 // the sidebar (renderSide via favSideHtml): no section "Favourites" in any layout -- a computer has them in the head bar, a phone in the row
-// under the header (#favrow) or on the tab (2.552.0 #4618, takes back #4014); "Only favourites" is in the menu of a tile (fv2_onlyItem)
+// over the tab bar (#favup, 2.572.0 #4747) or on the tab (2.552.0 #4618, takes back #4014); "Only favourites" is in the menu of a tile (fv2_onlyItem)
 // what stays: the view tiles ("Everything" + one per view, sideviews.js)
 function fv2_sideHtml() {
   const sv = sv_tilesHtml();
@@ -446,7 +449,7 @@ document.addEventListener('touchstart', e => {
     lp.active = true; FV2.held = Date.now();
     if (navigator.vibrate) navigator.vibrate(12);
     if (!lp.tile) { FV2.lp = null; fv2_rowMenu(lp.el); return; }
-    if (lp.el.closest('.fv2-page, .fv2side')) { FV2.lp = null; fv2_tileMenu(lp.el); return; }  // the page's and the sidebar's rows have only the menu
+    if (lp.el.closest('.fv2-page, .fv2side, #favup')) { FV2.lp = null; fv2_tileMenu(lp.el); return; }  // the page's and the sidebar's rows have only the menu; 2.572.0 (#4747): the phone's row too (arranging by dragging stays the computer's)
     FV2.drag = lp.el.dataset.fv2; lp.el.classList.add('dragging');
   }, 420);
 }, {passive: true});
@@ -495,3 +498,75 @@ document.addEventListener('click', e => {
   e.preventDefault(); e.stopPropagation();
   fv2_svLoad().then(() => sv_toolMenu($('#side [data-svt]') || b), () => {});  // lazy-ok: fv2_svLoad loaded sideviews.js first
 }, true);
+
+// ---- 2.572.0 (#4747): a phone's favourites over the tab bar. The row under the header is gone; a swipe up that starts ON the
+// tab bar (not at the screen's edge: the system's own gestures live there) or a tap on the small grip over it slides the row
+// in above the bar (#favup, the same tiles as the head bar, swiped sideways when they are many). A tile, a swipe down, a tap
+// next to it or Escape closes it. No grip and no row while the tab "Favourites" is pinned (fv2_pagePinned), while a field has
+// the focus (the keyboard is up: nothing sticks over it) or the tab bar itself is away. Motion: start-favswipe-4747.css (an_up
+// in, an_down out via an_watch; "reduce motion" switches both off).
+const FVD = {n: 0, g: null, sw: 0};
+const FVD_SW = 28;  // px a finger must travel up (and mostly straight) before the row opens: a tap on a tab moves far less
+const fvd_isOpen = () => { const r = $('#favup'); return !!r && !r.classList.contains('hidden'); };
+function fvd_can() {
+  const tb = $('#tabs'), b = document.body.classList;
+  return FVD.n > 0 && isMobile() && !fv2_pagePinned() && !editFocused() && !b.contains('kb-open') && !!tb && tb.offsetHeight > 0;
+}
+// n = the number of tiles in the row (fv2_barDraw), undefined = only check again (focus, keyboard)
+function fvd_sync(n) {
+  if (n !== undefined) FVD.n = n;
+  const g = $('#favgrip'); if (!g) return;
+  const can = fvd_can();
+  if (!can && fvd_isOpen()) fvd_set(false);
+  g.classList.toggle('hidden', !can);
+  if (can && g.title !== tr('Favourites')) { g.title = tr('Favourites'); g.setAttribute('aria-label', tr('Favourites')); }
+}
+function fvd_set(on) {
+  const r = $('#favup'), g = $('#favgrip'); if (!r || !g || (on && !fvd_can()) || on === fvd_isOpen()) return;
+  r.classList.toggle('hidden', !on);
+  g.setAttribute('aria-expanded', String(on));
+  document.body.classList.toggle('favup-open', on);
+  if (on) { const t = $('.fv2-tile.on', r); if (t) r.scrollLeft = Math.max(0, t.offsetLeft - (r.clientWidth - t.offsetWidth) / 2); }
+  else if (r.contains(document.activeElement)) g.focus({preventScroll: true});
+}
+// the swipe: on the tab bar, the grip and the row; up opens, down closes; the tap that follows a swipe is no tap on a tab
+function fvd_touchStart(e) {
+  const p = e.touches?.[0];
+  FVD.g = p && e.touches.length === 1 ? {x: p.clientX, y: p.clientY, done: false} : null;
+}
+function fvd_touchMove(e) {
+  const g = FVD.g, p = e.touches?.[0]; if (!g || g.done || !p) return;
+  const dx = p.clientX - g.x, dy = p.clientY - g.y;
+  if (Math.abs(dy) < FVD_SW || Math.abs(dy) < 1.5 * Math.abs(dx)) return;
+  const open = fvd_isOpen();
+  if (dy < 0 && !open) fvd_set(true); else if (dy > 0 && open) fvd_set(false); else return;
+  g.done = true; FVD.sw = Date.now();
+  if (e.cancelable) e.preventDefault();
+}
+domReady(() => {
+  for (const el of [$('#tabs'), $('#favgrip'), $('#favup')]) {
+    if (!el) continue;
+    el.addEventListener('touchstart', fvd_touchStart, {passive: true});
+    el.addEventListener('touchmove', fvd_touchMove, {passive: false});
+    el.addEventListener('touchend', () => { FVD.g = null; }, {passive: true});
+    el.addEventListener('touchcancel', () => { FVD.g = null; }, {passive: true});
+  }
+  if (typeof an_watch === 'function') an_watch($('#favup'), 'hidden');
+});
+// the grip toggles; a tile opens its target and closes the row; any other tap closes it (on window, before the app's handlers)
+window.addEventListener('click', e => {
+  const t = e.target; if (Date.now() - FV2.held < 600) return;  // the click after a long press (the tile's menu) is none
+  if (Date.now() - FVD.sw < 500 && t.closest?.('#tabs, #favgrip, #favup')) { e.preventDefault(); e.stopPropagation(); return; }
+  if (t.closest?.('#favgrip')) { e.preventDefault(); e.stopPropagation(); fvd_set(!fvd_isOpen()); return; }
+  if (!fvd_isOpen()) return;
+  if (!t.closest?.('#favup') || t.closest('#favup .fv2-tile')) fvd_set(false);
+}, true);
+document.addEventListener('pointerdown', e => { if (fvd_isOpen() && !e.target.closest?.('#favup, #favgrip, #tabs, #pop')) fvd_set(false); }, true);
+window.addEventListener('keydown', e => {
+  if (e.key !== 'Escape' || !fvd_isOpen() || !$('#pop')?.classList.contains('hidden')) return;
+  e.preventDefault(); e.stopPropagation(); fvd_set(false); $('#favgrip')?.focus({preventScroll: true});
+}, true);
+// a field takes or leaves the focus (the keyboard comes or goes), the phone turns: the grip follows
+document.addEventListener('focusin', () => fvd_sync(), true);
+document.addEventListener('focusout', () => setTimeout(() => fvd_sync(), 0), true);
+window.addEventListener('resize', () => requestAnimationFrame(() => fvd_sync()));

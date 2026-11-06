@@ -188,9 +188,12 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     await signIn(o, 'frida', '#today');
     // 2.552.0 (#4618): takes back #4014 -- no section "Favourites" in the phone's sidebar (no heading, no entries); the row under the header
     const NOSIDE = `!document.querySelector('#side .sg-favs .sgh, #side .fv2side, #side .fv2-row')`;
-    check(await ready(ev, `document.querySelectorAll('#favrow .fv2-tile').length === 4 && !document.querySelector('#favrow').classList.contains('hidden')`), 'phone: the row under the header, four tiles');
-    const p = JSON.parse(await ev(`(() => { const r = document.querySelector('#favrow').getBoundingClientRect(), t = document.querySelector('#top').getBoundingClientRect(), a = document.querySelector('#favrow .fv2-tile').getBoundingClientRect(); return JSON.stringify({under: r.top >= t.bottom - 1, h: a.height}); })()`));
-    check(p.under && p.h >= 44, 'phone: below the header, a big enough target ' + JSON.stringify(p));
+    // 2.572.0 (#4747): no row under the header any more: the grip over the tab bar, the row slides in above the bar
+    check(await ready(ev, `document.querySelectorAll('#favup .fv2-tile').length === 4 && !document.querySelector('#favrow') && !document.querySelector('#favgrip').classList.contains('hidden')`), 'phone: no row under the header, the grip over the tab bar, four tiles');
+    await ev(`(() => { document.querySelector('#favgrip').click(); return 1; })()`);
+    check(await ready(ev, `!document.querySelector('#favup').classList.contains('hidden') && document.querySelector('#favup').getBoundingClientRect().height > 0`), 'phone: the grip opens the row');
+    const p = JSON.parse(await ev(`(() => { const r = document.querySelector('#favup').getBoundingClientRect(), t = document.querySelector('#tabs').getBoundingClientRect(), a = document.querySelector('#favup .fv2-tile').getBoundingClientRect(); return JSON.stringify({over: r.bottom <= t.top + 1, h: a.height}); })()`));
+    check(p.over && p.h >= 44, 'phone: above the tab bar, a big enough target ' + JSON.stringify(p));
     check(await ev(NOSIDE), 'phone: the sidebar has no section Favourites (no heading, no entries)');
     await ev(`(() => { sideOpenDrawer(); return 1; })()`);
     await ready(ev, `!!document.querySelector('#side.open')`);
@@ -198,21 +201,22 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     await shot('p2441-phone.png');
     await ev(`(() => { closeSide(); return 1; })()`);
     // "Only favourites" is reachable without the heading: in the menu of a tile
-    await ev(`(() => { fv2_tileMenu(document.querySelector('#favrow .fv2-tile')); return 1; })()`);
+    await ev(`(() => { fv2_tileMenu(document.querySelector('#favup .fv2-tile')); return 1; })()`);
     check(await ready(ev, `[...document.querySelectorAll('.menu-list [role="menuitem"]')].some(x => /Only favourites/.test(x.textContent))`), 'phone: "Only favourites" is in the menu of a tile');
     await ev(`(() => { document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'})); return 1; })()`);
-    await ev(`(() => { document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]').click(); return 1; })()`);
+    await ev(`(() => { document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]').click(); return 1; })()`);
     // CI red of 2.560 / 2.562 only (green on the Mac): the message says where the app stood, to find the cause
-    check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target ' + await ev(`JSON.stringify({route: S.route?.key, hash: location.hash, menu: !!document.querySelector('.menu-list'), side: !!document.querySelector('#side.open'), tile: !!document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]'), attrs: document.querySelector('#favrow .fv2-tile[data-fv2="l:${FL}"]')?.outerHTML.replace(/<svg.*?<\\/svg>/g, '').slice(0, 200)})`).catch(e => String(e)));
-    // turning: wide = the row in the head bar, #favrow empty; narrow again = the row under the header
+    check(await ready(ev, `S.route.key === 'l:${FL}'`), 'phone: a tile of the row opens its target ' + await ev(`JSON.stringify({route: S.route?.key, hash: location.hash, menu: !!document.querySelector('.menu-list'), side: !!document.querySelector('#side.open'), tile: !!document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]'), attrs: document.querySelector('#favup .fv2-tile[data-fv2="l:${FL}"]')?.outerHTML.replace(/<svg.*?<\\/svg>/g, '').slice(0, 200)})`).catch(e => String(e)));
+    check(await ready(ev, `document.querySelector('#favup').classList.contains('hidden')`), '2.572.0 (#4747): the tile closed the row');
+    // turning: wide = the row in the head bar, #favup empty; narrow again = the row over the tab bar
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1024, height: 760}});
-    check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#favrow .fv2-tile')`), 'wide: the row in the head bar, #favrow empty');
+    check(await ready(ev, `document.querySelectorAll('#kbar .fv2bar .fv2-tile').length === 4 && !document.querySelector('#favup .fv2-tile') && document.querySelector('#favgrip').classList.contains('hidden')`), 'wide: the row in the head bar, #favup empty, no grip');
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
-    check(await ready(ev, `document.querySelectorAll('#favrow .fv2-tile').length === 4 && !document.querySelector('#kbar .fv2bar .fv2-tile')`), 'narrow again: the row under the header is back');
+    check(await ready(ev, `document.querySelectorAll('#favup .fv2-tile').length === 4 && !document.querySelector('#kbar .fv2bar .fv2-tile')`), 'narrow again: the row over the tab bar is back');
     check(await ev(`topMoreItems().some(x => /favourites/.test(x.label || ''))`), 'phone: the star of a page is in "…"');
     await ev(`(() => { nav_pref('tabbar').order.push('favs'); S.settings.nav_menus = S.settings.nav_menus || '{}'; LS.set('tabbar', [...tabIds(), 'favs']); render(); go('favorites'); return 1; })()`);
     check(await ready(ev, `S.route.key === 'favorites' && document.querySelectorAll('#view .fv2-page .fv2-tile').length === 4`), 'phone: the page lists them');
-    check(await ready(ev, `!document.querySelector('#favrow .fv2-tile')`), '2.552.0 (#4618): tab pinned = no row over the page');
+    check(await ready(ev, `!document.querySelector('#favup .fv2-tile') && document.querySelector('#favgrip').classList.contains('hidden')`), '2.552.0 (#4618): tab pinned = no row over the page (2.572.0 #4747: and no grip)');
     check(/Image film|Quotation/.test(await ev(`document.querySelector('#view .fv2-page').textContent`)), 'phone: names on the page');
     await shot('p2441-page.png');
   }, true);

@@ -1,6 +1,2 @@
-/* 2.552.0 (#4618): the phone shows the favourites as a row to swipe under the header (#favrow, favtiles.js fv2_barDraw); the sidebar
-   has no section for them (takes back #4014, which had put them there as entries) */
-#favrow{flex:none;padding:0 .5rem .375rem;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
-#favrow::-webkit-scrollbar{display:none}
-#favrow.hidden{display:none}
-@media (pointer:coarse){ #favrow .fv2-tile{width:2.75rem;height:2.75rem} }
+/* 2.552.0 (#4618): the sidebar has no section for the favourites (takes back #4014, which had put them there as entries).
+   2.572.0 (#4747): the phone's row under the header (#favrow) is gone: the row over the tab bar is start-favswipe-4747.css */
