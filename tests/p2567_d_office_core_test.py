@@ -168,7 +168,7 @@ run(Fr, "freelancer", FID)
 run(A, "org", AID)
 
 # the dialogs read the 409's state under "current": 2.576.0 (#4794) through objsave.js (saveDialog), the old key "row" went
-check("e.data?.current" in kt_src("static/js/objsave.js"), "UI: objsave.js saveDialog takes 'current'")
+check("const k = o.key || 'current'" in kt_src("static/js/objsave.js"), "UI: objsave.js saveDialog takes 'current'")
 for f in ("office_travel.js", "office_cashflow.js", "office_subs.js", "office_bankrules.js", "office_recurring.js"):
     js = kt_src("static/js/" + f)
     check("ofcSave(" in js and not re.search(r"data\??\.row\b", js), f"UI: {f} saves through objsave.js, no old key")
