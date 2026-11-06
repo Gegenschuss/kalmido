@@ -354,6 +354,8 @@ def op_contacts_bulk(c, uid, b):
         c.commit()
         return {"action": "undelete", "restored": len(ids)}
     if action == "purge":
+        if any(books[rows[i]["book_id"]] != "owner" for i in ids):  # 2.577.0 (#4708 1): for good only the book's owner/admin (as books, wiki)
+            raise Denied(403, tr("Only the owner of the address book can do this"))
         bk_gate(c, N_("Delete {0} contacts at once"), len(ids))
         for blk in bk_blocks(ids, 500):
             c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='contact' AND ref_id IN ({bk_in(blk)}) AND ref_id IN "
