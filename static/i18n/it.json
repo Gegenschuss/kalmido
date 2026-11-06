@@ -16797,6 +16797,7 @@
   "Web research per routine": "Ricerca web per routine",
   "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Solo lettura: cercare sul web, leggere una pagina, verificare una partita IVA con il servizio VIES dell’UE. Disattivato per impostazione predefinita. Un’esecuzione con il web non invia mai moduli; ogni modifica e ogni messaggio ad altri attende allora la tua approvazione, e ogni risultato dal web indica la sua fonte.",
   "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} ricerche, {1} pagine, {2} verifiche IVA",
+  "{0} custom field": ["{0} campo personalizzato", "{0} campi personalizzati"],
   "A view shared with the organisation searches its documents": "Una vista condivisa con l’organizzazione cerca nei suoi documenti",
   "Changed since it was saved": "Modificata dal salvataggio",
   "Delete view": "Elimina vista",

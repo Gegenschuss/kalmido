@@ -16796,6 +16796,7 @@
   "Web research per routine": "Webonderzoek per routine",
   "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Alleen lezen: op het web zoeken, een pagina lezen, een btw-nummer controleren via de EU-dienst VIES. Standaard uit. Een run met het web verstuurt nooit formulieren; elke wijziging en elk bericht aan iemand anders wacht dan op je goedkeuring, en elke webvondst noemt zijn bron.",
   "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} zoekopdrachten, {1} pagina’s, {2} btw-controles",
+  "{0} custom field": ["{0} eigen veld", "{0} eigen velden"],
   "A view shared with the organisation searches its documents": "Een met de organisatie gedeelde weergave doorzoekt haar documenten",
   "Changed since it was saved": "Gewijzigd sinds het opslaan",
   "Delete view": "Weergave verwijderen",

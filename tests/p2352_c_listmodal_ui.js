@@ -97,6 +97,15 @@ const st = (md, k) => md.querySelector(`#lm-sec-${k} .shsecst`)?.textContent || 
   check(md?.querySelector('#lm-sec-remind')?.open && !md.querySelector('#lm-sec-time').open, 'opened again: Reminders open, the others closed');
   md.querySelector('.lhdr [data-m="close"]').click();
   await until(() => !d.querySelector('.modal.lmodal'));
+  // 2.582.0 (#4490): custom fields count in the folded line of Project features (the person has no organisation)
+  await call('POST', `/api/lists/${P}/fields`, {name: 'Budget', type: 'number'});
+  await call('POST', `/api/lists/${P}/fields`, {name: 'Stage', type: 'text'});
+  await w.eval(`load()`);
+  w.eval(`listModal(${P})`);
+  md = await until(() => d.querySelector('.modal.lmodal'));
+  check(await until(() => /2 custom fields/.test(st(md, 'proj'))), 'Project features: the folded line counts the custom fields: ' + st(md, 'proj'));
+  md.querySelector('.lhdr [data-m="close"]').click();
+  await until(() => !d.querySelector('.modal.lmodal'));
   // ================= a new project: folded parts too, no switch
   w.eval('listModal()');
   md = await until(() => d.querySelector('.modal.lnew'));

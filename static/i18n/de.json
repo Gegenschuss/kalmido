@@ -16796,6 +16796,7 @@
   "Web research per routine": "Web-Recherche je Ablauf",
   "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Nur lesend: im Web suchen, eine Seite lesen, eine USt-IdNr. über den EU-Dienst VIES prüfen. Standard aus. Ein Lauf mit Web sendet nie Formulare ab; jede Änderung und jede Nachricht an andere wartet dann auf deine Freigabe, und jeder Web-Fund nennt seine Quelle.",
   "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} Suchen, {1} Seiten, {2} USt-Prüfungen",
+  "{0} custom field": ["{0} eigenes Feld", "{0} eigene Felder"],
   "A view shared with the organisation searches its documents": "Eine für die Organisation freigegebene Ansicht durchsucht deren Dokumente",
   "Changed since it was saved": "Seit dem Speichern geändert",
   "Delete view": "Ansicht löschen",

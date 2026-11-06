@@ -865,6 +865,8 @@ function lmSum(sec) {
     if (el.type !== 'hidden' && el.type !== 'radio' && el.value.trim() && el.id) out.push(`${lab(el)}: ${el.value.trim()}${el.id === 'l-rate' && S.settings.time_currency ? ' ' + S.settings.time_currency : ''}`);
   }
   const k = sec.dataset.lmsec;
+  const nf = k === 'proj' ? sec.querySelectorAll('#l-fields [data-fid]').length : 0;  // 2.582.0 (#4490): the custom fields count in the folded line
+  if (nf) out.push(trn('{0} custom field', '{0} custom fields', nf));
   if (!out.length) out.push(k === 'time' && $('#l-time', sec) ? `${tr('Time tracking')}: ${tr('Off')}` : k === 'sec' ? tr('Off') : k === 'acts' ? '' : tr('Default'));
   return out.filter(Boolean).join(' · ');
 }
