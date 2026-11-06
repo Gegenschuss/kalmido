@@ -18,8 +18,8 @@ function dsp_sheetHtml(d, w) {
   // in the box "To review" the stack question is part of the box (docs.js sugHtml); here only without a review
   if (d.split?.stack && w && !d.review) out.push(`<div class="dc-due dsp-hint" role="group" aria-label="${esc(tr('Stack - split?'))}"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Stack - split? Several archive numbers were found on its pages.'))}</span></span>
     ${dsp_stackBtns()}</div>`);
-  // 2.580.0 (#4401): a part of a stack the queue split without a person: the hint with its undo (the whole stack comes back)
-  if (d.split?.auto && d.split.from) out.push(`<div class="dc-due muted dsp-auto"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Split automatically from a stack'))}</span></span>${w ? `<button type="button" class="btn sm" data-dsp="unsplit">${tr('Undo')}</button>` : ''}</div>`);
+  // 2.580.0 (#4401): a part of a stack the queue split without a person: the hint, its undo only while the stack is in the trash (split.undo)
+  if (d.split?.auto && d.split.from) out.push(`<div class="dc-due muted dsp-auto"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Split automatically from a stack'))}</span></span>${w && d.split.undo ? `<button type="button" class="btn sm" data-dsp="unsplit">${tr('Undo')}</button>` : ''}</div>`);
   if (d.split?.no_asn) out.push(`<div class="dc-due muted dsp-noasn"><span class="dc-ht">${ic('info', 's')} <span>${esc(tr('Without an archive number: the pages before the first code of a stack.'))}</span></span></div>`);
   if (d.task) {
     out.push(`<div class="dc-due dsp-task"><span class="dc-ht">${ic(d.task.done ? 'done' : 'check', 's')} <span>${tr('Task')}: <a href="#t/${+d.task.id}">${esc(d.task.title)}</a></span></span>${w ? `<button type="button" class="btn sm" data-dsp="unlink">${tr('Unlink')}</button>` : ''}</div>`);
@@ -71,9 +71,11 @@ document.addEventListener('click', async e => {
 // its own undo splits it again with the cuts the server proposes (GET .../split clear)
 async function dsp_unsplit(d, b) {
   const sid = +d.split.from;
-  let j; try { await api('POST', `/api/docs/${sid}/unsplit`); j = await api('GET', `/api/docs/${sid}/split`); } catch { b.disabled = false; return; }
+  try { await api('POST', `/api/docs/${sid}/unsplit`); } catch { b.disabled = false; return; }
+  // review 2.580 C (7a): the undo went through -- the sheet of a part now in the trash closes in any case
   $('.dc-md')?.remove();
   dc_load();
+  let j = null; try { j = await api('GET', `/api/docs/${sid}/split`); } catch { j = null; }
   const parts = j?.clear || null, label = tr('Stack restored: {0}', j?.name || d.name);
   const unsplit = async () => { await api('POST', `/api/docs/${sid}/unsplit`); dc_load(); return {}; };
   if (!parts) { toast(label); return; }
