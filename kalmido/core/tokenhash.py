@@ -66,6 +66,23 @@ def tkh_set_evfeed(c, fid=None, cal_id=None, uid=None):
     return tok
 
 
+def tkh_evfeed_match(c, r, tok):
+    """2.577.0 (#4708 6): does tok open the event calendar link row r? Against the stored hash; a plain secret still in the
+    row (written after this start, e.g. by an older version after a roll-back) is compared in constant time and stored as
+    a hash at once, so the link keeps working and the plain value goes."""
+    if tkh_match(tok, r["secret_hash"]):
+        return True
+    plain = r["secret"] or ""
+    if not (tok and plain) or not hmac.compare_digest(plain.encode(), tok.encode()):
+        return False
+    try:  # storing the hash is a tidy-up: the link opens even if this write fails (the next start hashes it)
+        c.execute("UPDATE ev_cal_feeds SET secret='', secret_hash=? WHERE id=? AND secret=?", (tkh_hash(plain), r["id"], plain))
+        c.commit()
+    except Exception:  # noqa: BLE001
+        c.rollback()
+    return True
+
+
 def tkh_migrate_evfeeds(c):
     """2.577.0 (#4708 6), at every start (idempotent): the plain secrets of the event calendars' links (from before 2.577, or
     written by an older version after a roll-back) become hashes, the plain value goes. The links keep working. A one-way

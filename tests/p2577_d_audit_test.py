@@ -233,6 +233,13 @@ check(row[0] == "" and row[1] == hashlib.sha256(b"altesGeheimnis4708abcdefghijkl
       f"(6) the start hashes a plain secret left from before {[x for x in out.splitlines() if 'migrated' in x or 'Error' in x]} {row[0]!r}")
 r = pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics")
 check(r.status_code == 200, f"(6) ... and the old address still works {r.status_code}")
+# a plain secret written after the start (an older version after a roll-back): the link opens and is hashed on that hit
+kt.dbx("UPDATE ev_cal_feeds SET secret=?, secret_hash=NULL WHERE id=?", ("altesGeheimnis4708abcdefghijklmnopqrstuv", int(fid or 0)))
+r = pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics")
+row = (kt.dbx("SELECT secret, secret_hash FROM ev_cal_feeds WHERE id=?", (int(fid or 0),)) or [["?", None]])[0]
+check(r.status_code == 200 and row[0] == "" and row[1] == hashlib.sha256(b"altesGeheimnis4708abcdefghijklmnopqrstuv").hexdigest(),
+      f"(6) a plain secret left after the start opens the link and is hashed on the hit {r.status_code} {row[0]!r}")
+check(pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuX.ics").status_code == 404, "(6) ... a wrong plain secret: 404")
 U2 = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "rotate"}).json().get("url") or ""
 check(U2 and pub.get(B + urlparse(U2).path).status_code == 200 and r.status_code == 200
       and pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics").status_code == 404, "(6) rotate: a new address, the old one stops")

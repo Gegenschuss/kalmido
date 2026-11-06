@@ -17,7 +17,7 @@ from ..core.db import body, db, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
 from ..core.access import need_feat, acx_token_bind
 from ..core.errors import BadInput
-from ..core.tokenhash import tkh_match, tkh_set_evfeed
+from ..core.tokenhash import tkh_evfeed_match, tkh_set_evfeed
 from ..events.model import ev_role, need_evcal
 from ..calendars.icalfeed import ics_text  # 2.369.5 (#2517): pulled up from functions
 from ..events.ics import ev_dl_drop, ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
@@ -94,7 +94,7 @@ def evf_feed(token):
     f = None
     if fid.isdigit() and len(fid) < 19 and secret:
         r = c.execute("SELECT f.*, u.disabled FROM ev_cal_feeds f JOIN users u ON u.id=f.user_id WHERE f.id=?", (int(fid),)).fetchone()
-        if r and not r["disabled"] and tkh_match(secret, r["secret_hash"]):  # 2.577.0 (#4708 6): compared with the stored hash
+        if r and not r["disabled"] and tkh_evfeed_match(c, r, secret):  # 2.577.0 (#4708 6): compared with the stored hash (a plain one left is hashed)
             f = r
     if not f:
         _rate_fail(keys)
