@@ -175,6 +175,7 @@ ORDER = (
     "agents.setup",  # 2.44.0 (#1517)
     "agents.srvstarter",  # 2.557.0 C (#4670): the setup of a server agent (defaults, starter pack)
     "agents.mcpremote",  # 2.488.0 (#3363): the hosted MCP access (/mcp, OAuth 2.1, after agents.admin)
+    "agents.srvweb",  # 2.571.0 D (#4676): read-only web research of the server agent (web tools, VIES, the gate of a web run)
     "agents.srvagent",  # 2.557.0 B (#4670): the server agent (settings, provider, routes; after agents.mcpremote)
     "agents.srvagent_run",  # 2.557.0 B (#4670): its runs (a queue row of the worker)
     "lists.playbook",  # 2.39.0 (#1168)
