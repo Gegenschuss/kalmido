@@ -208,6 +208,72 @@ const RO = /read-only/, GU = /does not include this/;
   check(!d.querySelector('.tcarch.sayno'), 'member: no hint in the chat');
   w.close();
 
+  // ================= 2.607.0 review (job/3138): the ways around the gate
+  // -- a reply by mail to a task's notification (integrations/taskmail.py tmr_who): the same people as in the app
+  const CT = process.env.KALMIDO_TEST_CONTAINER || 'kalmido-test';
+  const py = code => { try { return execFileSync('docker', ['exec', '-i', CT, 'python', '-c', 'import app\nfrom kalmido.core.db import connect\nc = connect()\n' + code + '\nc.close()\n'], {encoding: 'utf8', timeout: 120000}).trim().split('\n').pop(); } catch (e) { return 'ERR ' + String(e.stderr || e).slice(-300); } };
+  const who = (tid, addr, u = 0) => py(`from kalmido.integrations.taskmail import tmr_who\nprint(tmr_who(c, ${tid}, ${JSON.stringify(addr)}, ${u}))`);
+  let m = who(T2, 'rita@example.com', uid.rita);
+  check(m === '(False, None)', `mail reply, read-only (signed address of her account): no comment ${m}`);
+  m = who(T2, 'gina@example.com');
+  check(m === '(False, None)', `mail reply, guest (by her address): no comment ${m}`);
+  m = who(T2, 'bob@example.com', uid.bob);
+  check(m === `(True, ${uid.bob})`, `mail reply, member: a comment in his name ${m}`);
+  m = who(T3, 'gina@example.com', uid.gina);
+  check(m === `(True, ${uid.gina})`, `mail reply, guest with an edit share: a comment there ${m}`);
+  m = who(T2, 'axel@example.com');
+  check(m === '(True, None)', `mail reply, accounting: as before ${m}`);
+  m = who(FT, 'frida@example.com', fr.id);
+  check(m === `(True, ${fr.id})`, `mail reply, freelancer: a comment on the own task ${m}`);
+
+  // -- rolf is a member, opens a channel, writes and comments a sign-off -- then his role goes down to read-only
+  const ro = await call('POST', '/api/users', {orgs: [{id: ORG, role: 'member'}], username: 'rolf', display_name: 'Rolf', password: 'password123', email: 'rolf@example.com'}, A);
+  const Ro = await login('rolf');
+  await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, Ro);
+  await call('PUT', `/api/lists/${L2}/members`, {user_id: ro.id, role: 'edit'}, A);
+  const CR = (await call('POST', '/api/team/channels', {name: 'Crew', org_id: ORG, open: true}, Ro)).id;
+  r = await call('PATCH', `/api/team/rooms/${CR}`, {name: 'Crew A'}, Ro);
+  check(CR > 0 && r.http === 200, `member: renames the channel he opened ${r.http} ${r.error || ''}`);
+  const MR = (await say(CR, Ro, 'Call sheet is out')).id;
+  r = await call('POST', `/api/videos/${VID}/comments`, {body: 'Cut at 0:40'}, Ro);
+  const VC = r.comment_id;
+  check(MR > 0 && VC > 0, `setup: rolf's message and sign-off comment ${MR} ${VC}`);
+  const VRo = await tok(Ro);
+  r = await call('PUT', `/api/orgs/${ORG}/members`, {user_id: ro.id, role: 'readonly'}, A);
+  check(r.http === 200, `setup: rolf is read-only now ${r.http} ${r.error || ''}`);
+  r = await call('PATCH', `/api/team/rooms/${CR}`, {name: 'Mine'}, Ro);
+  check(r.http === 403, `read-only: no longer renames the channel he opened ${r.http}`);
+  r = await call('PATCH', `/api/team/rooms/${CR}`, {archived: true}, Ro);
+  check(r.http === 403, `read-only: does not archive it ${r.http}`);
+  r = await call('POST', `/api/team/rooms/${CR}/members`, {user_id: uid.bob}, Ro);
+  check(r.http === 403, `read-only: adds nobody to it ${r.http}`);
+  check((await call('GET', `/api/team/rooms/${CR}/messages`, null, Ro)).http === 200, 'read-only: his channel stays readable');
+  r = await call('PATCH', `/api/team/rooms/${CR}`, {name: 'Crew B'}, A);
+  check(r.http === 200, `the organisation's admin still manages the channel ${r.http} ${r.error || ''}`);
+  r = await call('PATCH', `/api/videos/${VID}/comments/${VC}`, {done: true}, Ro);
+  check(r.http === 403 && RO.test(r.error || ''), `read-only: does not tick his sign-off comment ${r.http} ${r.error}`);
+  r = await v1('PATCH', `videos/${VID}/comments/${VC}`, {done: true}, VRo);
+  check(r.http === 403, `v1 read-only: does not tick it either ${r.http}`);
+  r = await call('PATCH', `/api/videos/${VID}/comments/${VC}`, {done: true, body: 'Changed'}, Ro);
+  const vc = ((await call('GET', `/api/videos/${VID}`, null, A)).comments || []).flatMap(x => [x, ...(x.replies || [])]).find(x => x.id === VC);
+  check(r.http === 403 && vc && !vc.done && vc.body === 'Cut at 0:40', `read-only: a refused change leaves the comment as it was ${r.http} ${JSON.stringify(vc || null).slice(0, 120)}`);
+  r = await call('PATCH', `/api/videos/${VID}/comments/${VC}`, {done: true}, Bo);
+  check(r.http === 200, `member: ticks the comment ${r.http} ${r.error || ''}`);
+
+  // -- the app: the menu of his own old message has no Reply, Pin or Edit (Delete stays); a member keeps them
+  const labels = async (user, mid) => {
+    const x = await boot({user, hash: 'team/' + CR}), dd = x.document;
+    const there = await until(() => dd.querySelector(`[data-mid="t:${mid}"]`) && x.eval('!!S.tc.room'));
+    if (there) x.eval(`tcMsgMenu(document.querySelector('[data-mid="t:${mid}"]'), ${mid})`);
+    const out = there ? [...dd.querySelectorAll('[role="menuitem"]')].map(b => b.textContent.trim()) : null;
+    x.close(); return out;
+  };
+  let ls = await labels('rolf', MR);
+  check(ls && ls.includes('Delete') && ls.includes('Copy') && !ls.includes('Edit') && !ls.includes('Reply') && !ls.some(t => /^Pin/.test(t)), `read-only: the message menu without Reply / Pin / Edit ${JSON.stringify(ls)}`);
+  const MB2 = (await say(CR, Bo, 'Thanks')).id;
+  ls = await labels('bob', MB2);
+  check(ls && ls.includes('Edit') && ls.includes('Reply') && ls.includes('Delete'), `member: the message menu with Reply / Edit ${JSON.stringify(ls)}`);
+
   console.log(`p2607_d_say: ${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
 })().catch(e => { console.error(e); process.exit(1); });

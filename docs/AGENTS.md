@@ -4200,7 +4200,11 @@ channel, channels and groups of the organisation: post, edit, react, pin). Excep
 itself (a guest with a personal *Edit* share) keeps commenting there. Reading, taking back one's own reaction, deleting
 one's own comment or message and read marks stay; direct messages, private projects, the *Accounting* role and people
 without an organisation are not affected. The app shows a short hint instead of the comment box and the chat input
-(`say_no` on the project in the state, on the timeline and on the room of a conversation).
+(`say_no` on the project in the state, on the timeline and on the room of a conversation). The same holds on the other
+ways: a reply by mail to a task's notification is no comment of theirs, a contract reminder they take adds no comment,
+they do not tick (`done`) a comment of a video sign-off, and a channel of the organisation they opened earlier is no
+longer theirs to rename, archive or fill (its admins do that). Group conversations and channels without an organisation
+are conversations between people, like direct messages, and stay open.
 
 2.139.0 (#2128): **voice messages**. People record them in the app (the microphone in the composer); a voice message is
 an audio attachment with `voice: true` and `duration_ms` (the length the browser measured, `null` = unknown); every
