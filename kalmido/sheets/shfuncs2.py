@@ -48,7 +48,6 @@ _FILL_TO = {"xl": {"vlookup": ",FALSE", "match": ",0", "weeknum": ",21"},  # Kal
 def shf_arg_fill(toks, way):
     """{index of the closing ")": text to put before it} for the functions whose short form means something else in Excel
     (SVERWEIS with 3, VERGLEICH with 2, KALENDERWOCHE with 1 argument); way "xl" (export) or "kalmido" (import)."""
-    from .formula import sh_fn_key
     out, stack = {}, []
     for i, t in enumerate(toks):
         if t[0] == "(":
