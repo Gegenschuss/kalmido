@@ -162,7 +162,7 @@ with app.test_request_context("/", headers={"Accept-Language": "en"}):
             if root is None:
                 root = el
             i += 1
-            if i % 50 == 0:
+            if i % 2000 == 0:
                 live["max"] = max(live["max"], sum(1 for _x in root.iter()))
             yield ev, el
     def live_max(fn):
@@ -177,8 +177,12 @@ with app.test_request_context("/", headers={"Accept-Language": "en"}):
         in_row = '<row r="1">' + "".join(junk + f'<c r="{col(i)}1"><v>{i}</v></c>' for i in range(5)) + "</row>"
         out["h1_row_legacy"] = measure(lambda: li.fi_xlsx_read(xlsx(xlsx_parts([("Contacts", in_row, "")]))))[1]
         out["h1_row_sheet"] = measure(lambda: sio.shx_read_xlsx(xlsx(xlsx_parts([("T", in_row, "")]))))[1]
-        # H1: something between the rows / the shared strings: it leaves the tree, the tree stays small
-        between = "".join(junk + f'<row r="{i}"><c r="A{i}"><v>{i}</v></c></row>' for i in range(1, 6))
+        # H1: something between the rows / the shared strings: it leaves the tree, the tree stays small. The parser builds a
+        # whole read piece (XL_CHUNK, 64 KB) before the reader sees it, so here each thing in between is larger than a piece
+        # (20 000 elements, 80 KB) and the limit 30 000: without the fix six of them stay (> 120 000 elements held)
+        li.XL_TREE_MAX = sio.XL_TREE_MAX = 30000
+        junk = "<x>" + "<y/>" * 20000 + "</x>"
+        between = "".join(junk + f'<row r="{i}"><c r="A{i}"><v>{i}</v></c></row>' for i in range(1, 7))
         raw6 = xlsx(xlsx_parts([("Contacts", between, "")]))
         out["h1_rows_legacy"] = live_max(lambda: len(li.fi_xlsx_read(raw6)["contacts"]))
         out["h1_rows_sheet"] = live_max(lambda: len(sio.shx_read_xlsx(raw6).rows))
@@ -186,7 +190,7 @@ with app.test_request_context("/", headers={"Accept-Language": "en"}):
         out["h1_rows_dv"] = live_max(lambda: sio._dv_labels(z6, set(z6.namelist()), [0], [("Contacts", "xl/worksheets/sheet1.xml", False)],
                                                             "Contacts!$A$1:$A$9", []))
         sst = ('<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
-               + "".join(junk + f"<si><t>s{i}</t></si>" for i in range(5)) + "</sst>").encode()
+               + "".join(junk + f"<si><t>s{i}</t></si>" for i in range(6)) + "</sst>").encode()
         raw7 = xlsx(xlsx_parts([("S", '<row r="1"><c r="A1" t="s"><v>4</v></c></row>', "")], extra={"xl/sharedStrings.xml": sst}))
         out["h1_sst"] = live_max(lambda: sio.shx_read_xlsx(raw7).rows[0][0]["v"])
     finally:
@@ -242,12 +246,12 @@ for which in ("sheet", "legacy"):
     b = P.get(f"busy_{which}") or [0, "", 99]
     check(b[0] == 429 and "Two spreadsheet imports" in (b[1] or "") and b[2] < 1, f"#4188 a third import ({which}): 429 at once {b}")
 check(P.get("free_again") == 2, f"#4188 the places are free again afterwards {P.get('free_again')}")
-# 6. fable review (limits scaled down to 1000 elements in the probe)
+# 6. fable review (limits scaled down in the probe: 1000 elements within a row, 30 000 between rows / entries)
 for key in ("h1_row_legacy", "h1_row_sheet"):
     check("too large" in (P.get(key) or ""), f"#4188 H1 other elements between the cells of a row count until the row ends ({key}): {P.get(key)}")
-for key, want in (("h1_rows_legacy", 5), ("h1_rows_sheet", 5), ("h1_rows_dv", ["1", "2", "3", "4", "5"]), ("h1_sst", "s4")):
-    v = P.get(key) or [None, 99999]
-    check(v[0] == want and v[1] < 800, f"#4188 H1 other elements between rows / entries leave the tree ({key}): result {v[0]}, at most {v[1]} elements held")
+for key, want in (("h1_rows_legacy", 6), ("h1_rows_sheet", 6), ("h1_rows_dv", ["1", "2", "3", "4", "5", "6"]), ("h1_sst", "s4")):
+    v = P.get(key) or [None, 999999]
+    check(v[0] == want and v[1] < 60000, f"#4188 H1 other elements between rows / entries leave the tree ({key}): result {v[0]}, at most {v[1]} elements held")
 for key in ("h2_sheet", "h2_legacy", "h2_workbook"):
     check("not a spreadsheet" in (P.get(key) or ""), f"#4188 H2 nested 100 deep: refused ({key}) {P.get(key)}")
 check(P.get("h2_shallow") is None, f"#4188 H2 nested 50 deep still reads {P.get('h2_shallow')}")
