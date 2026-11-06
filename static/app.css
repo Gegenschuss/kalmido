@@ -6550,6 +6550,30 @@ body.wgmoving,body.wgmoving *{cursor:grabbing!important;user-select:none}
   .modal.palette.an-out{animation:an_fadeout .18s ease-in forwards;pointer-events:none}
   .modal.palette.an-out>.card{animation:an_dropout .18s ease-in forwards}
 }
+/* 2.573.0 (#4763) from 768 px (computer, tablet): showing and hiding moves briefly like on a phone, 150-220 ms, the phone's
+   curves (in cubic-bezier(.2,.8,.2,1), out ease-in), translate / scale / opacity only. sheetmotion.js keeps a closing layer for
+   its exit (class an-out, then gone at once - a timeout if animationend never comes): the side panel (#detail, pinned where it
+   was while the list takes its room), menus (#pop), the date picker (.dpop), the toast; the sidebar glides in when it unfolds
+   (an-sin), the panel when it opens (also opening it again while it leaves), rows of an opened folder roll in (an-rowin).
+   Reduced motion: nothing (this block + the central rule; sheetmotion.js does not wait). */
+@keyframes an_pin{from{opacity:0;translate:3rem 0}to{opacity:1;translate:0 0}}
+@keyframes an_pout{from{opacity:1;translate:0 0}to{opacity:0;translate:3rem 0}}
+@keyframes an_sin{from{opacity:0;translate:-1.5rem 0}to{opacity:1;translate:0 0}}
+@keyframes an_mpop{from{opacity:0;scale:.96}to{opacity:1;scale:1}}
+@keyframes an_mpopout{from{opacity:1;scale:1}to{opacity:0;scale:.96}}
+@keyframes an_tin{from{opacity:0;translate:0 .75rem}to{opacity:1;translate:0 0}}
+@keyframes an_tout{from{opacity:1;translate:0 0}to{opacity:0;translate:0 .75rem}}
+@media (min-width:768px) and (prefers-reduced-motion:no-preference){
+  #app.detail-open>#detail:not(.hidden):not(.an-out){animation:an_pin .2s cubic-bezier(.2,.8,.2,1)}
+  #detail.an-out{display:flex!important;position:fixed;z-index:44;margin:0;animation:an_pout .18s ease-in forwards;pointer-events:none}
+  #side.an-sin{animation:an_sin .2s cubic-bezier(.2,.8,.2,1)}
+  #pop:not(.hidden):not(.sheet),.dpop:not(.sheet){transform-origin:top center;animation:an_mpop .16s cubic-bezier(.2,.8,.2,1)}
+  #pop.hidden.an-out:not(.sheet){display:block!important;animation:an_mpopout .15s ease-in forwards;pointer-events:none}
+  .dpop.an-out:not(.sheet){animation:an_mpopout .15s ease-in forwards;pointer-events:none}
+  #toast:not(.hidden){animation:an_tin .2s cubic-bezier(.2,.8,.2,1)}
+  #toast.hidden.an-out{display:flex!important;animation:an_tout .18s ease-in forwards;pointer-events:none}
+  .trow.an-rowin,#side .an-rowin{animation:an_rowin .2s cubic-bezier(.2,.8,.2,1)}
+}
 /* 2.46.0 C (#1606 / #1605): the question before a folder role replaces roles set per list (three buttons, wrap on a phone);
    a group's picture in the chip of a task assigned to it */
 .modal.fgrqdlg{z-index:75}

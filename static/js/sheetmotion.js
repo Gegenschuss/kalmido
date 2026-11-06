@@ -15,13 +15,16 @@
 const AN_MS = 200;
 const AN = {skip: 0};
 const an_on = () => { try { return isMobile() && !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
+// 2.573.0 (#4763): from 768 px the side panel, the sidebar, menus (#pop), the date picker (.dpop), folding and the toast move
+// too (app.css block "2.573.0 (#4763)"). Never with "reduce motion"; a browser without Web Animations (jsdom) stays still
+const an_desk = () => { try { return !isMobile() && typeof Element.prototype.getAnimations === 'function' && matchMedia('(min-width:768px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches; } catch { return false; } };
 const an_skipNext = () => { AN.skip = performance.now() + 60; };
 const an_skipped = () => { const s = AN.skip > performance.now(); AN.skip = 0; return s; };
 function an_kill(el) { clearTimeout(el._anT); el._anOut = false; el.classList.remove('an-out'); Element.prototype.remove.call(el); }
 // remove el after its exit; a second call (double tap) is a no-op
 function an_remove(el) {
   if (!el || el._anOut) return;
-  if (an_skipped() || !an_on() || !el.isConnected || el.matches('.smodal, .authscreen, .shopmode, .palette') || getComputedStyle(el).display === 'none') { an_kill(el); return; }  // the full-screen ones have no exit
+  if (an_skipped() || !(an_on() || an_desk() && el.matches('.dpop')) || !el.isConnected || el.matches('.smodal, .authscreen, .shopmode, .palette') || getComputedStyle(el).display === 'none') { an_kill(el); return; }  // the full-screen ones have no exit
   el._anOut = true; el.classList.add('an-out'); el.setAttribute('inert', '');
   el._anT = setTimeout(() => an_kill(el), AN_MS);
 }
@@ -30,7 +33,8 @@ function an_flush() { document.querySelectorAll('.an-out').forEach(e => { if (e.
 
 // layers that are switched by a class (`hidden`; the + button uses `gone`): #pop (sheet), #scrim, #mbar, #fab. keep = classes
 // the close path removes at once but the exit picture still needs; need = a class the element must have had to be a sheet
-function an_watch(el, hide = 'hidden', keep = [], need = '') {
+// desk: also from 768 px (2.573.0, #4763); need null = never on a phone
+function an_watch(el, hide = 'hidden', keep = [], need = '', desk = false) {
   if (!el || el._anW || typeof MutationObserver === 'undefined') return;
   el._anW = true;
   const has = (str, c) => new RegExp('(^| )' + c + '( |$)').test(str);
@@ -39,7 +43,7 @@ function an_watch(el, hide = 'hidden', keep = [], need = '') {
     for (const r of recs) {
       const old = r.oldValue || '', wasHid = has(old, hide), isHid = el.classList.contains(hide), out = el.classList.contains('an-out');
       if (out && !isHid) { clearTimeout(el._anT); el.classList.remove('an-out'); continue; }  // shown again while leaving
-      if (!wasHid && isHid && !out && an_on() && (typeof S === 'undefined' || S.booted) && !has(old, 'clear') && (!need || has(old, need))) {
+      if (!wasHid && isHid && !out && (need !== null && an_on() && (!need || has(old, need)) || desk && an_desk()) && (typeof S === 'undefined' || S.booted) && !has(old, 'clear')) {
         if (an_skipped()) continue;
         keep.forEach(c => { if (has(old, c)) el.classList.add(c); });
         el.classList.add('an-out'); clearTimeout(el._anT); el._anT = setTimeout(done, AN_MS);
@@ -50,8 +54,39 @@ function an_watch(el, hide = 'hidden', keep = [], need = '') {
   mo.observe(el, {attributes: true, attributeFilter: ['class'], attributeOldValue: true});
 }
 function an_init() {
-  an_watch(document.getElementById('pop'), 'hidden', ['sheet', 'overmodal'], 'sheet'); an_watch(document.getElementById('scrim'), 'hidden', ['overmodal']);
+  an_watch(document.getElementById('pop'), 'hidden', ['sheet', 'overmodal'], 'sheet', true); an_watch(document.getElementById('scrim'), 'hidden', ['overmodal']);
   an_watch(document.getElementById('fab'), 'gone'); an_watch(document.getElementById('mbar'), 'hidden');
+  an_watch(document.getElementById('toast'), 'hidden', [], null, true);  // 2.573.0 (#4763)
+  const app = document.getElementById('app');
+  if (app && typeof MutationObserver !== 'undefined') new MutationObserver(recs => {  // 2.573.0 (#4763): panel back / sidebar unfolded
+    for (const r of recs) {
+      const was = ' ' + (r.oldValue || '') + ' ', cl = app.classList;
+      if (cl.contains('detail-open') && !was.includes(' detail-open ')) an_panelIn(document.getElementById('detail'));
+      if (!cl.contains('side-rail') && was.includes(' side-rail ') && an_desk()) an_play(document.getElementById('side'), 'an-sin');
+    }
+  }).observe(app, {attributes: true, attributeFilter: ['class'], attributeOldValue: true});
+}
+// 2.573.0 (#4763): a class that plays a keyframe once; off again at its end or after the timeout (no animationend = still gone)
+function an_play(el, c) {
+  if (!el) return;
+  clearTimeout(el._anP); el.classList.remove(c); void el.offsetWidth; el.classList.add(c);
+  const off = () => { clearTimeout(el._anP); el.classList.remove(c); el.removeEventListener('animationend', off); };
+  el.addEventListener('animationend', off); el._anP = setTimeout(off, AN_MS + 50);
+}
+// 2.573.0 (#4763): the side panel (#detail) closes: it is pinned where it was (fixed, the list takes its room at once) and slides
+// out to the right; returns the ms the caller may wait before it empties the panel (0 = no exit)
+function an_panelOut(d) {
+  if (!d || !an_desk() || d.classList.contains('hidden') || !d.offsetWidth) return 0;
+  const r = d.getBoundingClientRect();
+  Object.assign(d.style, {top: r.top + 'px', left: r.left + 'px', width: r.width + 'px', height: r.height + 'px'});
+  d.classList.add('an-out'); d.setAttribute('inert', ''); clearTimeout(d._anT); d._anT = setTimeout(() => an_panelIn(d), AN_MS + 20);  // after the caller's own AN_MS step (multiedit meClose hides first)
+  return AN_MS;
+}
+// it opens again (or the exit ended): back into the grid (the entry is CSS: #app.detail-open>#detail)
+function an_panelIn(d) {
+  if (!d || !d.classList.contains('an-out')) return;
+  clearTimeout(d._anT); d.classList.remove('an-out'); d.removeAttribute('inert');
+  for (const k of ['top', 'left', 'width', 'height']) d.style[k] = '';
 }
 domReady(an_init);  // 2.191.0 B (#2505): defer
 
@@ -100,11 +135,16 @@ function ui_doneStart(id, hide) {
 }
 
 // ---- #1559: a redraw that opens a group / subtasks / the done section: the rows that were not there before fade in
+// 2.573.0 (#4763): from 768 px too, and the sidebar's folders / the knowledge tree (rows of #side that were not drawn before roll in)
+const AN_SIDEROWS = '#side .srow[data-list], #side .srow[data-go], #side .sbbt';
+const an_sideKey = r => r.dataset.list ? 'l' + r.dataset.list : r.dataset.go || r.querySelector(':scope>.sbbtn')?.dataset.go || '';
 function an_rowsIn(fn) {
-  if (!an_on()) return fn();
+  if (!an_on() && !an_desk()) return fn();
   const had = new Set([...document.querySelectorAll('#view .trow[data-id]')].map(r => r.dataset.id));
+  const hadS = new Set([...document.querySelectorAll(AN_SIDEROWS)].map(an_sideKey)), side = hadS.size > 0;
   const x = fn();
   document.querySelectorAll('#view .trow[data-id]').forEach(r => { if (!had.has(r.dataset.id)) r.classList.add('an-rowin'); });
+  if (side) document.querySelectorAll(AN_SIDEROWS).forEach(r => { const k = an_sideKey(r); if (k && !hadS.has(k)) r.classList.add('an-rowin'); });
   return x;
 }
 

@@ -41,6 +41,7 @@ function closeDetail(fromPop) {
   if ($('#stale.indet')) staleDraw();  // 2.13.2 (#478 F8): back to the bottom edge
   const d = $('#detail');
   d.classList.remove('open');
+  if (typeof an_panelOut === 'function') an_panelOut(d);  // 2.573.0 (#4763): from 768 px the panel slides out
   $('#app').classList.remove('detail-open'); fitLayout();
   $$('.trow.sel').forEach(r => r.classList.remove('sel'));
   setTimeout(() => { if (!S.sel) d.classList.add('hidden'); }, isMobile() ? 230 : 0);

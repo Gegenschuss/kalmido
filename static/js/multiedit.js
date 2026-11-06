@@ -261,8 +261,9 @@ function meClose() {
   ME.on = false; ME.sheet = false;
   const d = $('#detail'); d.classList.remove('multi');
   if (S.sel) return;  // a single task took the panel
+  const w = typeof an_panelOut === 'function' ? an_panelOut(d) : 0;  // 2.573.0 (#4763): from 768 px it slides out, emptied after
   d.classList.remove('open'); $('#app').classList.remove('detail-open'); fitLayout();
-  setTimeout(() => { if (!S.sel && !ME.on) { d.classList.add('hidden'); d.innerHTML = ''; } }, isMobile() ? 230 : 0);
+  setTimeout(() => { if (!S.sel && !ME.on) { d.classList.add('hidden'); d.innerHTML = ''; } }, isMobile() ? 230 : w);
 }
 // a single task opens (plain click, a title of the panel): the selection ends
 function meEnd() {

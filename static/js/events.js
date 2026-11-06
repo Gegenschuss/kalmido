@@ -549,7 +549,7 @@ document.addEventListener('click', async e => {
       depOpt(id, b, false).catch(() => {}); break;  // 2.559.0 (#4660): at once, an error takes it back
     }
     case 'open-dep': openTaskById(id); break;
-    case 'folder-toggle': { const f = a.dataset.folder; foldSet(f, !foldClosed(f)); renderSide(); break; }
+    case 'folder-toggle': { const f = a.dataset.folder; foldSet(f, !foldClosed(f)); an_rowsIn(renderSide); break; }  // 2.573.0 (#4763): opened rows roll in
     case 'folder-menu': e.stopPropagation(); folderMenu(a, a.dataset.folder); break;
     case 'arch-restore': listArchive(+a.dataset.id, false); break;
     case 'arch-del': listDeleteForGood(+a.dataset.id); break;

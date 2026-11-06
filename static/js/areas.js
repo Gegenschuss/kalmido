@@ -816,7 +816,7 @@ document.addEventListener('click', e => {
   const b = e.target.closest?.('[data-act="sbb-tree"]'); if (!b) return;
   const k = b.dataset.k, x = new Set(LS.get('sbbOpen', []) || []);
   if (b.dataset.open) { x.delete(k); SBB_SHUT.add(k); } else { x.add(k); SBB_SHUT.delete(k); }
-  LS.set('sbbOpen', [...x].slice(-300)); renderSide();
+  LS.set('sbbOpen', [...x].slice(-300)); an_rowsIn(renderSide);  // 2.573.0 (#4763): opened rows roll in
   $$('#side [data-act="sbb-tree"]').find(x => x.dataset.k === k)?.focus({preventScroll: true});  // 2.199.0 A (#2742): no CSS.escape (jsdom has none)
 });
 // 2.199.0 A (#2742): moving and sorting in a tree (sbb_treeHtml nodes with ns): the module registers its handlers --
