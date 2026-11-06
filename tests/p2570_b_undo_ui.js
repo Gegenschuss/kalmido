@@ -94,6 +94,8 @@ async function round(who, ck) {
   const me = (await call(CA, 'GET', '/api/state')).me;
   const org = await call(CA, 'POST', '/api/admin/orgs', {name: 'Alpha', admin_id: me.id});
   check(org.id > 0, 'an organisation');
+  // the bookmark and the document are private: the page shows the private space (an organisation of her own moves her into it)
+  await call(CA, 'PATCH', '/api/settings', {workspace: 'private'});
   await round('alice', CA);
 
   // ================= a person without an organisation: the same
