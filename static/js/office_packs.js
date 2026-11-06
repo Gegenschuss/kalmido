@@ -258,11 +258,17 @@ function ocf_chooseHtml(slim) {
   const sug = OFC.info.pack_suggest || 'DE';
   return `<section class="ocf-choose card" aria-labelledby="ocf-ch-h"><h3 id="ocf-ch-h">${ic('globe', 's')} ${tr('Where is your office?')}</h3>
     <p class="muted">${tr('The country decides tax rates, texts and functions. You can change it later.')}</p>
-    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div></section>`;
+    <div class="lacts">${opts.length ? ofcSel('ocf-ch', sug, opts, null, tr('Where is your office?')) : `<span class="muted">${tr('Loading…')}</span>`}${''/* 2.603.0 (#4927): the basis of the income statement, from this year on */}${ofcSel('ocf-eb', 'receipts', [['receipts', tr('Receipts')], ['bank', tr('Bank and cash (strict)')]], null, tr('Basis of the income statement'))}<button type="button" class="btn sm pri" data-ocf="choose" ${opts.length ? '' : 'disabled'}>${tr('Use')}</button></div>
+    <p class="muted ofchint">${tr('Basis of the income statement')}: ${esc(tr('Bank and cash (strict)'))} = ${esc(tr('only what went through the main account or the cash book counts; further accounts are possible, not required.'))}</p></section>`;
 }
 async function ocf_choose() {
   const code = $('#ocf-ch')?.value; if (!code) return;
-  try { await api('PUT', '/api/office/settings', {pack: code}); toast(tr('Country set: {0}', ocf_name(code))); }
+  const eb = $('#ocf-eb')?.value;
+  try {
+    await api('PUT', '/api/office/settings', {pack: code});
+    if (eb === 'bank') await api('PUT', '/api/office/books/basis', {year: new Date().getFullYear(), basis: 'bank'});  // 2.603.0 (#4927)
+    toast(tr('Country set: {0}', ocf_name(code)));
+  }
   catch (x) { toast(x.message || tr('unknown')); return; }
   $('.ocf-choose')?.remove();  // (the quotations keep their drawn part while they reload)
   await ofcInfo(true);

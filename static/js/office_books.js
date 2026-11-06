@@ -155,7 +155,19 @@ function bkEuerHtml() {
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
     ${(d.afa_no_receipt || []).length ? `<p class="bk-warn bk-afanorc">${esc(tr('Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.', d.afa_no_receipt.map(x => x.name).join(', ')))} <a href="#office/equipment">${esc(tr('Equipment'))}</a></p>` : ''}
     ${(d.meals?.notes || []).map((n, i) => `<p class="${i ? 'bk-warn' : 'muted ofchint'}" data-bk-meal="${i}">${esc(n)}</p>`).join('')}${''/* 2.534.0 (#4333): the 30 % and the double-count hint */}
-    <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>${bkCmpHtml(d)}`;  // 2.603.0 (#4921): + the year before
+    ${bkStrictHtml(d)}<p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>${bkCmpHtml(d)}`;  // 2.603.0 (#4921): + the year before
+}
+// 2.603.0 (#4927): the warnings of the strict basis (bank and cash): bookings without a receipt, open receipts, card totals
+function bkStrictHtml(d) {
+  const w = d.warnings; if (d.basis !== 'bank' || !w) return '';
+  const out = [`<p class="muted ofchint" data-bk-basis="bank">${esc(tr('Basis of the income statement'))}: ${esc(tr('Bank and cash (strict)'))}</p>`];
+  if (w.missing_count) out.push(`<details class="bk-warn bk-norc"><summary>${esc(trn('{0} booking without receipt counts without input tax.', '{0} bookings without receipt count without input tax.', w.missing_count))} <a href="#office/bank/norc">${esc(w.label || tr('Receipt missing'))}</a></summary>
+    <ul class="ofclist" role="list">${w.missing_receipt.map(x => `<li class="ofcrow"><span class="ofcn"><b>${esc(x.text || tr('Booking'))}</b><small class="muted">${esc(fmtDateLoc(x.day))}</small></span><span class="rksum">${ofcMoney(x.amount)}</span></li>`).join('')}</ul></details>`);
+  if (w.open_receipts) out.push(`<p class="bk-warn" data-bk-open>${esc(trn('{0} receipt has no bank, cash or card booking and does not count (open).', '{0} receipts have no bank, cash or card booking and do not count (open).', w.open_receipts))}</p>`);
+  if (w.income_open?.length) out.push(`<p class="bk-warn">${esc(trn('{0} payment received without invoice counts as income.', '{0} payments received without invoice count as income.', w.income_open.length))}</p>`);
+  if (w.payments_outside) out.push(`<p class="bk-warn">${esc(trn('{0} invoice payment without a bank or cash booking does not count.', '{0} invoice payments without a bank or cash booking do not count.', w.payments_outside))}</p>`);
+  for (const x of w.card_diff || []) out.push(`<p class="bk-warn">${esc(tr('Card statement: the bank booking of {0} ({1}) differs from the statement ({2}).', fmtDateLoc(x.day), ofcMoney(x.booking), ofcMoney(x.statement)))}</p>`);
+  return out.join('');
 }
 
 const BK_KZ = [['81', N_('Taxable sales at 19 % (base)')], ['86', N_('Taxable sales at 7 % (base)')], ['35', N_('Sales at other rates (base)')], ['36', N_('Tax on sales at other rates')],
@@ -199,7 +211,30 @@ function bkSettingsHtml() {
   const s = OFC.info?.settings || {};
   return `<section class="bk-sec" aria-labelledby="bk-sh"><h3 class="ofcgrp" id="bk-sh">${tr('Tax reserve and VAT basis')}</h3>${''/* 2.365.2 D (#2789): in Settings > Company & office > Bank & taxes */}
     ${ofcRowF('bk-reserve', tr('Tax reserve'), `<input id="bk-reserve" type="number" min="0" max="60" step="1" inputmode="numeric" class="numin bk-pct" value="${+s.tax_reserve_pct || 0}"><span class="muted">%</span>`, tr('Share of the net money received that is put aside in the cash flow (0 = off).'))}
-    <div class="row"><label id="bk-basisl">${tr('VAT')}</label><div class="seg" role="group" aria-labelledby="bk-basisl">${[['ist', tr('Cash basis (on payment)')], ['soll', tr('Accrual basis (on invoicing)')]].map(([k, n]) => `<button type="button" data-bk="basis" data-v="${k}" class="${(s.vat_basis || 'ist') === k ? 'on' : ''}" aria-pressed="${(s.vat_basis || 'ist') === k}">${esc(n)}</button>`).join('')}</div></div></section>`;
+    <div class="row"><label id="bk-basisl">${tr('VAT')}</label><div class="seg" role="group" aria-labelledby="bk-basisl">${[['ist', tr('Cash basis (on payment)')], ['soll', tr('Accrual basis (on invoicing)')]].map(([k, n]) => `<button type="button" data-bk="basis" data-v="${k}" class="${(s.vat_basis || 'ist') === k ? 'on' : ''}" aria-pressed="${(s.vat_basis || 'ist') === k}">${esc(n)}</button>`).join('')}</div></div>
+    ${ebSettingsRow(s)}</section>`;
+}
+// 2.603.0 (#4927): the basis of the income statement per whole year (server: office/euerbasis.py); a year without an entry takes the latest earlier one
+const EB_NAMES = [['receipts', N_('Receipts')], ['bank', N_('Bank and cash (strict)')]];
+function ebBasisOf(s, year) {
+  const m = s?.euer_basis || {}; const ys = Object.keys(m).filter(y => +y <= year && EB_NAMES.some(([k]) => k === m[y])).sort();
+  return ys.length ? m[ys[ys.length - 1]] : 'receipts';
+}
+function ebSettingsRow(s) {
+  const y = BK.ebYear || new Date().getFullYear(), cur = ebBasisOf(s, y), yn = new Date().getFullYear();
+  return `<div class="row"><label id="bk-ebl" for="bk-eyear">${tr('Basis of the income statement')}</label><div class="lacts">${ofcSel('bk-eyear', y, [yn - 1, yn, yn + 1].map(v => [v, String(v)]), null, tr('Year'))}<div class="seg" role="group" aria-labelledby="bk-ebl">${EB_NAMES.map(([k, n]) => `<button type="button" data-bk="ebasis" data-v="${k}" class="${cur === k ? 'on' : ''}" aria-pressed="${cur === k}">${esc(tr(n))}</button>`).join('')}</div></div></div>
+    <p class="muted ofchint">${esc(cur === 'bank' ? tr('Only what went through the bank account, the cash book or a credit card counts. A receipt without a booking stays open; a booking without a receipt counts with a warning.') : tr('Receipts count on their payment day, else on their date. Applies to the whole year; a year with a locked month keeps its basis.'))}</p>`;
+}
+async function ebSet(year, basis) {
+  await api('PUT', '/api/office/books/basis', {year, basis});
+  const j = await api('GET', '/api/office/settings'); OFC.info.settings = j.settings; BK.euer = null; BK.ustva = null; ofcDraw();
+}
+async function ebSetUndo(basis) {
+  const y = BK.ebYear || new Date().getFullYear(), from = ebBasisOf(OFC.info?.settings, y);
+  if (from === basis) return;
+  try { await ebSet(y, basis); } catch (x) { toast(x.message || tr('unknown')); ofcDraw(); return; }
+  const label = tr('Changed setting');
+  histToast(label, histAdd({label, undo: () => ebSet(y, from), redo: () => ebSet(y, basis)}));
 }
 
 // ---- 2.467.0 (#3456): the Anlage EUeR and the annual VAT return line by line (#office/books/taxforms/euer|ust); server: office/taxforms.py
@@ -522,7 +557,8 @@ async function bkPoll(id, md, touched, n) {  // the recognition runs in the back
 // ---- events (delegated)
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'bk-reserve' && t.closest('.ostax')) { bkReserve(t); return; }  // 2.365.2 D (#2789): Settings > Company & office > Bank & taxes
+  if (t.id === 'bk-reserve' && t.closest('.ostax')) { bkReserve(t); return; }
+  if (t.id === 'bk-eyear' && t.closest('.ostax')) { BK.ebYear = +t.value; ofcDraw(); return; }  // 2.603.0 (#4927)  // 2.365.2 D (#2789): Settings > Company & office > Bank & taxes
   if (S.route?.mod !== 'office' || !['books', 'receipts'].includes(ofcTab())) return;  // 2.276.0 A (#3039): the upload sits on Receipts too
   if (t.id === 'bk-file' || t.id === 'bk-files') { const fs = [...(t.files || [])]; t.value = ''; if (fs.length) bkFiles(fs); return; }  // 2.146.0 B (#2453)
   if (ofcTab() !== 'books') return;
@@ -542,6 +578,7 @@ document.addEventListener('click', e => {
   if (k === 'einv') { bkEinvTake(+b.dataset.id, b); return; }
   if (k === 'bill') { bkBillModal(null); return; }
   if (k === 'basis') { bkSetUndo('vat_basis', b.dataset.v); return; }
+  if (k === 'ebasis') { ebSetUndo(b.dataset.v); return; }  // 2.603.0 (#4927)
   if (k === 'mode' && BK.mode !== b.dataset.v) {
     BK.mode = b.dataset.v;
     const p = bkDefaultPeriod(BK.mode); BK.period = p.period; BK.pyear = p.year; bkLoadUstva();

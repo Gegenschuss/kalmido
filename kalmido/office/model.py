@@ -129,6 +129,9 @@ SETTINGS_DEFAULTS = {"pack": "DE", "company": {"name": "", "lines": [], "contact
                      "bank_vendors": {},
                      # 2.444.0 (#3447): the reminder of the card positions without a receipt (set only by its own route, office/cardnorc.py)
                      "card_norc": {},
+                     # 2.603.0 (#4927): the basis of the income statement per year {"YYYY": "bank" | "receipts"} (set only by its own
+                     # route, office/euerbasis.py; a year without an entry: the latest earlier one, else "receipts")
+                     "euer_basis": {},
                      # 2.93.0 B (#1928): the mileage allowance per business km of the logbook (set only by its own route,
                      # office/logbook.py)
                      "km_rate": "0.30",

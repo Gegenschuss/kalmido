@@ -388,6 +388,7 @@ ORDER = (
     "office.bookarch",  # 2.414.0 (#3502): the booking archive of past DATEV years (read-only)
     "office.taxforms",  # 2.467.0 (#3456): Anlage EUeR and annual VAT return line by line
     "office.taxcheck",  # 2.589.0 (#3458): the tax check before filing (traffic light)
+    "office.euerbasis",  # 2.603.0 (#4927): the basis of the EUeR per year (bank and cash, strict | receipts)
     "office.books",  # 2.90.0 A (#1921): bookkeeping light: income/expense statement (EUeR), VAT return figures, tax reserve, receipt photo
     "office.euercmp",  # 2.603.0 (#4921): the EUeR next to the year before (display only; older years from the DATEV archive)
     "office.bkexport",  # 2.147.0 (#2461): the neutral bookkeeping export (booking list CSV + documents / receipts ZIP)
