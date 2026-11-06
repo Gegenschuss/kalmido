@@ -446,8 +446,6 @@ code.topic{background:var(--bg3);padding:2px .4375rem;border-radius:var(--r-s);f
 .calbar{display:flex;align-items:center;gap:.5rem;margin-bottom:.625rem}
 .calbar h2{margin:0;font-weight:600;flex:1;letter-spacing:-.01em}
 .cal{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border:1px solid var(--line2);border-radius:var(--r-l);overflow:hidden}
-/* 2.602.0 (#4816): the frame replaces the outer cell lines - no double line at the right and bottom edge */
-.cal>:nth-child(7n){border-right:0}.cal>:nth-last-child(-n+7){border-bottom:0}
 .cal .wd{padding:.375rem .5rem;font-size:var(--fs-s);color:var(--muted);border-right:1px solid var(--line);border-bottom:1px solid var(--line)}
 .cal .cell{min-height:6.5rem;padding:.25rem;border-right:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;min-width:0;display:flex;flex-direction:column;gap:2px}
 .cal .cell:hover{background:var(--bg2)}
