@@ -128,8 +128,8 @@ const RO = /read-only/, GU = /does not include this/;
   check(r.http === 201, `v1 member: comments ${r.http} ${r.text.slice(0, 150)}`);
   r = await v1('PATCH', `comments/${CB}`, {body: 'Looks good!'}, VB);
   check(r.http === 200, `v1 member: edits the own comment ${r.http}`);
-  r = await call('POST', `/api/comments/${QC}/choice`, {choice_ids: ['Short']}, Bo);
-  check(r.http === 200, `member: answers the buttons ${r.http} ${r.error || ''}`);
+  r = await call('POST', `/api/comments/${QC}/choice`, {choice_ids: ['Short']}, A);  // (bob may not address the admin's agent)
+  check(r.http === 200, `the project's owner answers the buttons ${r.http} ${r.error || ''}`);
 
   // ================= a video sign-off of the organisation
   const VID = (await call('POST', '/api/videos', {title: 'First cut', url: 'https://vimeo.com/123456789', list_id: L2}, A)).id;
