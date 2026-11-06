@@ -44,7 +44,6 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => w.eval(`typeof DC !== 'undefined' && DC.total === 2 && typeof dcv_barHtml === 'function'`), 100);
   const type = q => { const qi = d.querySelector('#dc-q'); qi.value = q; qi.dispatchEvent(new w.Event('input', {bubbles: true})); };  // as a person types (docs.js: 300 ms later the list loads)
-  w.eval(`document.addEventListener('input', e => { if (e.target.id === 'dc-q') (window.__qlog ||= []).push(JSON.stringify([e.target.value, e.isTrusted, e.target.isConnected, document.querySelectorAll('#dc-q').length, String(new Error().stack).split('\\n').slice(2, 7).map(l => l.trim().slice(0, 80)).join(' | ')])); }, true)`);
   type('Koala');
   await until(() => w.eval(`DC.total === 1 && !DC.loading`));
   const save = await until(() => d.querySelector('[data-dcv="save"]'));
@@ -70,7 +69,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   // a changed search: "Update view" takes it over
   type('Emu');
   const upd = await until(() => !w.eval('DC.loading') && d.querySelector('[data-dcv="update"]'));
-  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st() + ' LOG ' + w.eval('JSON.stringify(window.__qlog || [])'));
+  check(upd && d.querySelector('.dcv-dirty'), 'a changed search: marked, "Update view" offered ' + st());
   click(w, upd);
   check(await until(() => w.eval(`dcv_get(${VID})?.query === 'q=Emu&area=private'`)), 'updated: the view keeps the new search');
   await w.eval(`histStep('undo')`);
