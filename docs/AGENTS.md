@@ -82,7 +82,7 @@ Every agent has **permissions** (scopes) on top of its projects and roles. New a
 | Delete & trash | `delete` | off |
 | Read / upload files of tasks, comments and projects | `attachments:read` / `attachments:write` | off |
 | The file store: read / add files and folders (2.48.0) | `files:read` / `files:write` | on |
-| Time tracking: timer and time entries; 2.582.0: also reading time entries (`GET /time/entries`, MCP `list_time_entries`), the own running timer stays *Read* | `time` | off |
+| Time tracking: timer and time entries; 2.582.0: also reading time entries (`GET /time/entries`, MCP `list_time_entries`) and the time gaps (`GET /time/gaps`, MCP `get_time_gaps`); without it the hours and amounts of clients, the project overview and table variables stay empty; the own running timer stays *Read* | `time` | off |
 | Export | `export` | off |
 | Calendar: events and event calendars (2.21.0) | `calendar` | off |
 | Contacts: address books and contacts, personal data of other people (2.21.0) | `contacts` | off |
@@ -1253,6 +1253,12 @@ lies idle.
 tasks per day). Without `user_id` it is the token user's own; an agent may pass the id of a person who may chat with
 it, and then only projects that the agent **and** that person see count (tasks and time entries). Pure data: suggest
 entries to the person (with `list_time_entries` for what is already there), never add time for them without asking.
+2.582.0: an agent needs the scope `time` for it, like for `list_time_entries`.
+
+**Other people's time entries (2.582.0).** With `scope=all` (with `task_id` too) a personal agent sees other people's
+entries only in projects where it **and** the person who set it up own or administer them (never more than that
+person). A team agent (set up for the team, no such person - also a personal agent whose person's account was deleted)
+keeps its own admin rights only. Is the person's account disabled, the agent sees no other people's entries.
 The web app shows the same as *Maybe forgotten* on top of the time page, and the timesheet can be copied as text.
 
 **Closed months (2.125.0).** A person can close a month of their time tracking (and an admin of their organisation approve
