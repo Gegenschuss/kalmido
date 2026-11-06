@@ -7465,7 +7465,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 /* 2.441.0 (#3592): the favourites as a row of symbols: on a computer only the free room of the head bar between the workspace
    switch and the search (grows from nothing, takes no room: the bar's gap on its right is given back), on a phone a row to swipe */
 .fv2bar{display:flex;align-items:center;gap:.25rem;min-width:0}
-#kbar .fv2bar{flex:1 1 0;width:0;height:100%;overflow:hidden;margin-right:-.5rem;padding:0 .5rem 0 .25rem}
+#kbar .fv2bar{flex:0 1 auto;width:auto;height:100%;overflow:hidden;margin-right:-.5rem;padding:0 .5rem 0 .25rem}
 .fv2bar [hidden]{display:none}
 .fv2bar .fv2-tile{position:relative;display:flex;align-items:center;justify-content:center;flex:none;width:1.875rem;height:1.875rem;padding:0;border:0;border-radius:.5rem;background:none;color:var(--fvc,var(--text2));cursor:pointer}
 .fv2bar .fv2-tile:hover{background:var(--bg3);color:var(--fvc,var(--text))}
@@ -8685,11 +8685,13 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbfirm>svg.i{width:var(--ic-s);height:var(--ic-s);flex:none;opacity:.7}
 #kbar .kbsw:hover .kbfirm,#kbar .kbsw:focus-visible .kbfirm,#kbar .kbsw[aria-expanded="true"] .kbfirm{background:color-mix(in srgb,var(--accent) 15%,var(--kbbg,var(--bg2)));color:var(--text)}
 #kbar .kbsw:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:.5rem}  /* 2.165.8 (#2619): the ring on the switch itself (p2160_a11y) */
-#kbar .kbsw{position:relative}
+#kbar .kbsw{position:relative;flex-shrink:.01}  /* 2.572.0 (#4746): the favourites row is sized by its tiles and shrinks first after the search; the switch gives way only when nothing else can */
 #kbar .kbupd{position:absolute;top:.125rem;left:1.375rem;width:.5rem;height:.5rem;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--kbbg,var(--bg2))}  /* 2.380.2 (#3400): an update, now that Settings sits in this menu */
-#kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:16.25rem;min-width:9rem;flex:0 1 16.25rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s);cursor:text}
+#kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:12rem;min-width:7rem;flex:0 1000 12rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}
+#kbar.kb-mini .kbsrch{width:1.875rem;min-width:1.875rem;flex:none;justify-content:center;padding:0}  /* 2.572.0 (#4746): the search shrinks first (12rem down to 7rem), then it is the loupe only (favtiles.js fv2_fit), only then +N */
+#kbar.kb-mini .kbsrch>span,#kbar.kb-mini .kbsrch>kbd{display:none}
 #kbar .kbend{display:flex;align-items:center;gap:.375rem;flex:none}
 #kbar .netdot{flex:none;width:.5rem;height:.5rem;border-radius:50%;--nd:var(--st-ready);background:var(--nd)}
 #kbar .netdot.n-on{display:none}

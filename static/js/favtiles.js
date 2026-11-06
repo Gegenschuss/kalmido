@@ -180,11 +180,14 @@ function fv2_barDraw() {
   if (on === kb) fv2_fit();
 }
 // "+N": what does not fit stays hidden in the row and is offered by the button at its end; the bar never takes room from the others
-function fv2_fit() {
+function fv2_fit(again) {
   const h = $('#kbar .fv2bar'), more = h && $('.fv2-more', h); if (!more) return;
-  const kids = $$('.fv2-tile, .fv2-sep', h);
+  const kids = $$('.fv2-tile, .fv2-sep', h), kb = $('#kbar');
   kids.forEach(x => { x.hidden = false; });
   more.hidden = true; FV2.over = [];
+  kb?.classList.toggle('kb-mini', false);  // 2.572.0 (#4746): the search shrinks first by CSS (to 7rem); if that is not enough it becomes the loupe, only then "+N"
+  if (h.scrollWidth <= h.clientWidth) return;
+  kb?.classList.toggle('kb-mini', true);
   if (h.scrollWidth <= h.clientWidth) return;
   more.hidden = false; more.textContent = '+' + kids.length;
   const cs = getComputedStyle(h), gap = parseFloat(cs.columnGap) || 0;
@@ -195,6 +198,7 @@ function fv2_fit() {
   const n = FV2.over.filter(x => !x.classList.contains('fv2-sep')).length, lab = trn('{0} more favourite', '{0} more favourites', n);
   more.textContent = '+' + n; more.title = lab; more.setAttribute('aria-label', lab);
   more.classList.toggle('on', FV2.over.some(x => x.classList.contains('on')));
+  if (!again) requestAnimationFrame(() => fv2_fit(true));  // 2.572.0 (#4746): the loupe changes the room, one more look at the settled layout
 }
 function fv2_moreMenu(b) {
   menu(b, [...FV2.over.filter(x => x.classList.contains('fv2-tile')).map(x => ({label: x.getAttribute('aria-label'), icon: 'star', on: x.classList.contains('on'), fn: () => x.click()})), ...fv2_onlyItem()], null, null, tr('Favourites'));

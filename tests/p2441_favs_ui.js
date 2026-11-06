@@ -157,7 +157,8 @@ const items = async ck => JSON.parse((await call(ck, 'GET', '/api/state')).setti
     await sleep(300);
     const fit = JSON.parse(await ev(`(() => { const b = document.querySelector('#kbar .fv2bar'), m = b.querySelector('.fv2-more'), vis = [...b.querySelectorAll('.fv2-tile')].filter(x => !x.hidden), hid = [...b.querySelectorAll('.fv2-tile')].filter(x => x.hidden); return JSON.stringify({text: m.textContent, vis: vis.length, hid: hid.length, in: m.getBoundingClientRect().right <= b.getBoundingClientRect().right + 1}); })()`));
     check(fit.vis > 0 && fit.text === '+' + fit.hid && fit.in, '+N counts what is hidden and stays inside the row ' + JSON.stringify(fit));
-    check(await ev(GEO) === g2, 'the others do not shrink: ' + g2 + ' / ' + await ev(GEO));
+    const g3 = await ev(GEO), sk = x => { const j = JSON.parse(x); return JSON.stringify([j.sw, j.en]); };
+    check(sk(g3) === sk(g2), 'the others do not shrink (the search may: 2.572.0 #4746, it gives way first): ' + g2 + ' / ' + g3);  // 2.572.0 (#4746): only the switch and the account keep their place
     await ev(`(() => { document.querySelector('#kbar .fv2-more').click(); return 1; })()`);
     // 2.521.0 (#4396): the +N menu ends with "Only favourites" (it moved out of the sidebar), so the rest is one item less
     check(await ready(ev, `document.querySelectorAll('.menu-list [role="menuitem"]').length === ${fit.hid} + 1`), '+N lists the rest (and Only favourites)');
