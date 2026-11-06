@@ -38,7 +38,7 @@ from .periodlock import pl_through
 EB_BASES = ("receipts", "bank")
 EB_DEFAULT = "receipts"
 EB_LOCKED = N_("{0} has a locked month: the basis of the income statement stays as it is for the whole year.")
-EB_MISSING = N_("Receipt missing")
+EB_NORC_LABEL = N_("Receipt missing")
 
 
 def eb_map(s):

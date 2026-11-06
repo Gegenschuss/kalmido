@@ -60,7 +60,7 @@ from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from fu
 from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .euerbasis import EB_MISSING, eb_basis_of, eb_flows, eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
+from .euerbasis import EB_NORC_LABEL, eb_basis_of, eb_flows, eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
 
 
 def _j(s):
@@ -582,7 +582,7 @@ def bk_strict_warnings(c, oid, frm, to, flows, pay_outside):
     paid = flows["paid"]
     opened = sum(1 for rc in bk_receipts(c, oid, frm, to) if rc["node_id"] not in paid)
     row = lambda x: {"day": x["day"], "amount": dstr(money(x["amount"])), "src": x.get("src", "bank"), "ref": x["ref"], "text": x.get("text") or ""}  # noqa: E731
-    return {"missing_receipt": [row(x) for x in mis[:BK_WARN_MAX]], "missing_count": len(mis), "label": tr(EB_MISSING),
+    return {"missing_receipt": [row(x) for x in mis[:BK_WARN_MAX]], "missing_count": len(mis), "label": tr(EB_NORC_LABEL),
             "income_open": [row(x) for x in flows["income_open"][:BK_WARN_MAX]],
             "card_diff": [{"ref": x["ref"], "day": x["day"], "booking": dstr(x["booking"]), "statement": dstr(x["statement"])} for x in flows["card_diff"]],
             "open_receipts": opened, "payments_outside": pay_outside}
