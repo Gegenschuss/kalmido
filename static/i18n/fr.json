@@ -16944,5 +16944,13 @@
   "Nothing is deleted for good.": "Rien n'est supprimé définitivement.",
   "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Dans la corbeille (restaurable) : {0} tâches, {1} fichiers, pages, tableaux ou clients.",
   "Stays because it changed since the import: {0} tasks, {1} other entries.": "Reste car modifié depuis l'importation : {0} tâches, {1} autres entrées.",
-  "possible until {0}": "possible jusqu'au {0}"
+  "possible until {0}": "possible jusqu'au {0}",
+  "Comparison with the year before": "Comparaison avec l’année précédente",
+  "Source: DATEV archive": "Source : archive DATEV",
+  "VAT liability": "TVA due",
+  "Comparison for display only: nothing is booked, taken over or counted into this year.": "Comparaison à titre indicatif : rien n’est comptabilisé, repris ni compté dans cette année.",
+  "The year before comes from the DATEV booking archive (sums of the profit and loss accounts and the VAT accounts); it is not added to figures in Kalmido.": "L’année précédente provient de l’archive des écritures DATEV (sommes des comptes de résultat et des comptes de TVA) ; elle ne s’ajoute pas aux chiffres de Kalmido.",
+  "Input tax": "TVA déductible",
+  "Accounts of the DATEV archive {0}": "Comptes de l’archive DATEV {0}",
+  "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Aucun chiffre pour {0}, ni dans Kalmido ni dans l’archive DATEV."
 }

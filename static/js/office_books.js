@@ -155,7 +155,7 @@ function bkEuerHtml() {
     ${d.missing_vat ? `<p class="bk-warn">${esc(trn('{0} receipt without VAT rate counts without input tax.', '{0} receipts without VAT rate count without input tax.', d.missing_vat))}</p>` : ''}
     ${(d.afa_no_receipt || []).length ? `<p class="bk-warn bk-afanorc">${esc(tr('Depreciation without a linked receipt: {0}. Link the purchase receipt at the device, else it may count twice.', d.afa_no_receipt.map(x => x.name).join(', ')))} <a href="#office/equipment">${esc(tr('Equipment'))}</a></p>` : ''}
     ${(d.meals?.notes || []).map((n, i) => `<p class="${i ? 'bk-warn' : 'muted ofchint'}" data-bk-meal="${i}">${esc(n)}</p>`).join('')}${''/* 2.534.0 (#4333): the 30 % and the double-count hint */}
-    <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>`;
+    <p class="muted ofchint">${esc(d.notes[1] || '')}</p></section>${bkCmpHtml(d)}`;  // 2.603.0 (#4921): + the year before
 }
 
 const BK_KZ = [['81', N_('Taxable sales at 19 % (base)')], ['86', N_('Taxable sales at 7 % (base)')], ['35', N_('Sales at other rates (base)')], ['36', N_('Tax on sales at other rates')],
@@ -547,3 +547,34 @@ document.addEventListener('click', e => {
     const p = bkDefaultPeriod(BK.mode); BK.period = p.period; BK.pyear = p.year; bkLoadUstva();
   }
 });
+
+// ---- 2.603.0 (#4921): the EUeR next to the year before, display only (server: office/euercmp.py GET /api/office/books/euer/compare).
+// A year before without figures in Kalmido comes from the DATEV booking archive, marked as such; never added, booked or taken over.
+const BKC = {src: null, d: null, err: null, seq: 0};
+async function bkCmpLoad(src) {
+  const seq = ++BKC.seq;
+  try { const d = await api('GET', `/api/office/books/euer/compare?year=${src.year}`); if (seq === BKC.seq && BKC.src === src) Object.assign(BKC, {d, err: null}); }
+  catch (x) { if (seq === BKC.seq) BKC.err = x.message || tr('unknown'); }
+  ofcDraw();
+}
+const bkCmpMoney = v => v == null ? '–' : ofcMoney(v);
+const bkCmpPct = p => p == null ? '' : ` <small class="muted">(${p > 0 ? '+' : ''}${p} %)</small>`;
+function bkCmpHtml(e) {
+  if (BKC.src !== e) { BKC.src = e; BKC.d = null; BKC.err = null; setTimeout(() => bkCmpLoad(e), 0); }
+  const d = BKC.d, sec = (body, src = '') => `<section class="bk-sec bk-cmp" aria-labelledby="bk-cmph"${src ? ` data-bk-cmpsrc="${esc(src)}"` : ''}><div class="ofcbar"><h3 class="ofcgrp" id="bk-cmph">${tr('Comparison with the year before')}</h3></div>${body}</section>`;
+  if (BKC.err) return sec(`<p class="muted">${esc(BKC.err)}</p>`);
+  if (!d || d.year !== e.year) return sec(`<p class="muted lempty">${tr('Loading…')}</p>`);
+  const arch = d.source === 'archive', mark = arch ? ` <small class="bk-cmpmark">${esc(d.archive.label)}</small>` : '';
+  const th = `<thead><tr><th>${tr('Group')}</th><th class="num">${d.year}</th><th class="num">${d.prev_year}${mark}</th><th class="num">${tr('Deviation')}</th></tr></thead>`;
+  const tr_ = (r, tot) => `<tr data-bk-cmp="${esc(r.key || 'vat_due')}"${tot ? ' class="bk-tot"' : ''}><th scope="row">${esc(r.label)}</th><td class="num" data-l="${d.year}">${bkCmpMoney(r.now)}</td>`
+    + `<td class="num" data-l="${d.prev_year}">${bkCmpMoney(r.prev)}</td><td class="num" data-l="${esc(tr('Deviation'))}">${bkCmpMoney(r.diff)}${bkCmpPct(r.pct)}</td></tr>`;
+  const by = k => d.rows.find(r => r.key === k);
+  const rows = d.rows.filter(r => r.group === 'income').map(r => tr_(r)).join('') + tr_(by('income_total'), true)
+    + d.rows.filter(r => r.group === 'expense').map(r => tr_(r)).join('') + tr_(by('expense_total'), true) + tr_(by('profit'), true)
+    + (d.vat ? tr_(d.vat) : '');
+  const kinds = {income: tr('Income'), expense: tr('Expenses'), ust: tr('VAT'), vst: tr('Input tax')};
+  const acc = arch && d.archive.accounts.length ? `<details class="bk-cmpacc"><summary>${esc(tr('Accounts of the DATEV archive {0}', d.prev_year))} (${esc(d.archive.chart)})</summary>
+    <table class="bk-tab"><thead><tr><th>${tr('Account')}</th><th>${tr('Group')}</th><th class="num">${tr('Amount')}</th></tr></thead><tbody>${d.archive.accounts.map(a => `<tr><th scope="row">${esc(a.account)} <small class="muted">${esc(a.label)}</small></th><td>${esc(kinds[a.kind] || '')}</td><td class="num">${ofcMoney(a.gross)}</td></tr>`).join('')}</tbody></table></details>` : '';
+  const none = d.source === 'none' ? `<p class="muted ofchint" data-bk-cmpnone>${esc(tr('No figures for {0}, neither in Kalmido nor in the DATEV archive.', d.prev_year))}</p>` : '';
+  return sec(`<table class="bk-tab bk-cmptab">${th}<tbody>${rows}</tbody></table>${none}${acc}${d.notes.slice(0, arch ? 2 : 1).map(n => `<p class="muted ofchint">${esc(n)}</p>`).join('')}`, d.source);
+}

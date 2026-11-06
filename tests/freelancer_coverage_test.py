@@ -1025,6 +1025,7 @@ ROUTES = {
     "GET /api/office/bank/tx/{}/candidates": "office", "GET /api/office/books": "office",
     "GET /api/office/books/euer": "office", "GET /api/office/books/euer.csv": "office", "GET /api/office/books/export": "office",  # 2.147.0 (#2461)
     "GET /api/office/books/euer.pdf": "office", "GET /api/office/books/ustva": "office",
+    "GET /api/office/books/euer/compare": "office",  # 2.603.0 (#4921): the EUeR next to the year before
     "GET /api/office/books/taxform/euer": "office", "GET /api/office/books/taxform/euer.csv": "office", "GET /api/office/books/taxform/euer.pdf": "office",  # 2.467.0 (#3456)
     "GET /api/office/books/taxform/ust": "office", "GET /api/office/books/taxform/ust.csv": "office", "GET /api/office/books/taxform/ust.pdf": "office",
     "PUT /api/office/books/taxform/vat": "office",

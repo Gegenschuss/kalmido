@@ -11,7 +11,8 @@ recognised (the preview says so, the import leaves it out).
 
 The archive is a world of its own: nothing here flows into the EUeR, the VAT figures, the reserve or the cash flow
 (office/books.py, kpi.py, cashflow.py never read these tables; a test checks it), nothing can be changed, nothing is booked
-anew. The view: years, bookings with filters (account, counter account, either side, period, amount, receipt field, text),
+anew. 2.603.0 (#4921): ba_euer_year sums an archived year for the comparison with the year before (office/euercmp.py), shown
+beside the EUeR only and marked as the archive's. The view: years, bookings with filters (account, counter account, either side, period, amount, receipt field, text),
 sums per account and year, the receipt image of a booking, the original files. The GoBD export (office/gobdexport.py) takes
 the bookings of the chosen period along.
 
@@ -694,6 +695,129 @@ def ba_accounts(c, oid, year):
         out.append({"account": r["acct"], "label": labels.get(r["acct"], ""), "count": r["n"], "debit": _cents(d), "credit": _cents(h),
                     "balance": _cents(abs(d - h)), "side": "S" if d >= h else "H"})
     return out
+
+
+# ---------------------------------------------------------------- 2.603.0 (#4921): the figures of an archived year for the comparison
+# Only shown next to the EUeR (office/euercmp.py), never booked, taken over or counted into a Kalmido year. Base accounts:
+# the first four digits of a ledger account (a longer ledger length cuts the rest), person accounts (one digit more) do not
+# count. Ranges per chart (no tax advice): income / expenses of the profit and loss accounts, VAT / input tax as decided
+# on 06.11.2026 (SKR03 1770-1789 / 1570-1589, SKR04 3800-3859 / 1400-1409), each checked by its ledger label.
+BA_EU_RANGES = {
+    "SKR03": {"income": ((8000, 8999), (2600, 2799)), "expense": ((3000, 3969), (4000, 4999), (2000, 2199), (2300, 2499)),
+              "ust": ((1770, 1789),), "vst": ((1570, 1589),)},
+    "SKR04": {"income": ((4000, 4999), (7000, 7299)), "expense": ((5000, 5999), (6000, 6999), (7300, 7399)),
+              "ust": ((3800, 3859),), "vst": ((1400, 1409),)},
+}
+# tax accounts that hold payments to the tax office or the carry-over, not the tax of the year (used without a label)
+BA_EU_PAYMENT = {"SKR03": (1780, 1781, 1789), "SKR04": (3820, 3830, 3840, 3841)}
+BA_EU_PAY_RE = re.compile(r"voraus|vorjahr|frühere|fruehere|laufendes jahr|1/11|erstatt|verrechn|prepay|previous year", re.I)
+BA_EU_TAX_RE = re.compile(r"steuer|ust|vst|\bvat\b|\btax\b", re.I)
+BA_EU_RATE_RE = re.compile(r"(\d{1,2}(?:[.,]\d)?)\s*%")
+# DATEV tax keys (BU-Schlüssel, the last digit of one or two digits; 4x lifts the automatic): the rate of the gross amount
+BA_EU_BU = {"1": Decimal(0), "2": Decimal(7), "3": Decimal(19), "5": Decimal(16), "7": Decimal(16), "8": Decimal(7), "9": Decimal(19)}
+BA_EU_OPEN = (9000, 9008, 9009)  # opening balances (datevimp.DI_EB): no figure of the year
+# the usual automatic accounts (DATEV adds the tax itself, office/datev.py DX_CHARTS) when a batch comes without labels
+BA_EU_AUTO = {"SKR03": (((8400, 8409), 19), ((8300, 8309), 7), ((8736, 8736), 19), ((8731, 8731), 7), ((3400, 3409), 19), ((3300, 3309), 7)),
+              "SKR04": (((4400, 4409), 19), ((4300, 4309), 7), ((4736, 4736), 19), ((4731, 4731), 7), ((5400, 5409), 19), ((5300, 5309), 7))}
+
+
+def _ba_chart(labels, fallback):
+    """SKR03 | SKR04 from the ledger labels (revenue on 8xxx = SKR03, on 4xxx = SKR04), else the office's DATEV setting."""
+    votes = {"SKR03": 0, "SKR04": 0}
+    for a, lb in labels.items():
+        if not a.isdigit() or not lb:
+            continue
+        b, low = int(a[:4]), lb.casefold()
+        if "erlös" in low or "erloes" in low or "revenue" in low:
+            if 8000 <= b <= 8999:
+                votes["SKR03"] += 1
+            elif 4000 <= b <= 4999:
+                votes["SKR04"] += 1
+    if votes["SKR03"] != votes["SKR04"]:
+        return max(votes, key=votes.get)
+    return fallback if fallback in BA_EU_RANGES else "SKR03"
+
+
+def _ba_kind(chart, acct, alen, label):
+    """income | expense | ust | vst | None for a ledger account of the archive."""
+    if not acct.isdigit() or len(acct) > alen:
+        return None  # a person account (debtor / creditor) or no number
+    b = _ba_base(acct, alen)
+    for kind, spans in BA_EU_RANGES[chart].items():
+        if any(lo <= b <= hi for lo, hi in spans):
+            if kind in ("ust", "vst"):
+                if label and (BA_EU_PAY_RE.search(label) or not BA_EU_TAX_RE.search(label)):
+                    return None
+                if not label and b in BA_EU_PAYMENT[chart]:
+                    return None
+            return kind
+    return None
+
+
+def _ba_base(acct, alen):
+    return int(acct) // 10 ** max(0, alen - 4) if acct.isdigit() and len(acct) == alen else (int(acct) if acct.isdigit() else -1)
+
+
+def _ba_rate(bu, label, chart="SKR03", base=-1):
+    """The tax rate inside a gross amount on a profit and loss account: the tax key, else the label ("Erlöse 19 % USt"), else
+    (no label) the usual automatic account of the chart."""
+    bu = re.sub(r"\D", "", bu or "")
+    if bu and len(bu) <= 2:
+        if len(bu) == 2 and bu[0] == "4":
+            return Decimal(0)  # the automatic lifted
+        if bu[-1] in BA_EU_BU:
+            return BA_EU_BU[bu[-1]]
+    if label and re.search(r"ust|umsatzsteuer|vorsteuer|vst|\bvat\b", label, re.I):
+        m = BA_EU_RATE_RE.search(label)
+        if m:
+            return Decimal(m.group(1).replace(",", "."))
+    if not label:
+        for (lo, hi), pct in BA_EU_AUTO.get(chart, ()):
+            if lo <= base <= hi:
+                return Decimal(pct)
+    return Decimal(0)
+
+
+def ba_euer_year(c, oid, year, chart="SKR03", alen=4):
+    """The income / expenses (net, their tax) and the VAT liability of an archived year, or None without bookings of the year:
+    {year, chart, income {net, vat, gross}, expense {...}, ust, vst, vat_due, accounts [{account, label, kind, gross, net, vat}]}
+    (texts with two decimals). Every booking counts on its account and, the other way round, on its counter account."""
+    if not c.execute("SELECT 1 FROM office_bookarch b JOIN office_import_runs r ON r.id=b.run_id WHERE b.org_id=? AND b.year=? "
+                     "AND r.undone_at IS NULL LIMIT 1", (oid, year)).fetchone():
+        return None
+    labels = _labels(c, oid, year)
+    chart = _ba_chart(labels, chart)
+    alen = alen if isinstance(alen, int) and 4 <= alen <= 8 else 4
+    kinds, acc = {}, {}
+    for r in c.execute("SELECT b.account, b.counter, b.side, b.amount, b.bu FROM office_bookarch b JOIN office_import_runs r ON r.id=b.run_id "
+                       "WHERE b.org_id=? AND b.year=? AND r.undone_at IS NULL", (oid, year)):
+        if _ba_base(r["account"], alen) in BA_EU_OPEN or _ba_base(r["counter"], alen) in BA_EU_OPEN:
+            continue
+        amt = Decimal(str(r["amount"] or 0))
+        for a, side in ((r["account"], r["side"]), (r["counter"], "H" if r["side"] == "S" else "S")):
+            if not a:
+                continue
+            if a not in kinds:
+                kinds[a] = _ba_kind(chart, a, alen, labels.get(a, ""))
+            k = kinds[a]
+            if not k:
+                continue
+            v = amt if side == ("H" if k in ("income", "ust") else "S") else -amt
+            rate = _ba_rate(r["bu"], labels.get(a, ""), chart, _ba_base(a, alen)) if k in ("income", "expense") else Decimal(0)
+            net = v * 100 / (100 + rate) if rate else v
+            x = acc.setdefault(a, [Decimal(0)] * 3)
+            x[0], x[1], x[2] = x[0] + v, x[1] + net, x[2] + (v - net)
+    tot = {k: [Decimal(0)] * 3 for k in ("income", "expense", "ust", "vst")}
+    for a, x in acc.items():
+        t = tot[kinds[a]]
+        t[0], t[1], t[2] = t[0] + x[0], t[1] + x[1], t[2] + x[2]
+    ust = tot["ust"][0] + tot["income"][2]  # booked VAT + the VAT inside the gross revenue (automatic accounts / tax keys)
+    vst = tot["vst"][0] + tot["expense"][2]
+    part = lambda t: {"net": _cents(t[1]), "vat": _cents(t[2]), "gross": _cents(t[0])}  # noqa: E731
+    return {"year": year, "chart": chart, "income": part(tot["income"]), "expense": part(tot["expense"]),
+            "ust": _cents(ust), "vst": _cents(vst), "vat_due": _cents(ust - vst),
+            "accounts": [{"account": a, "label": labels.get(a, ""), "kind": kinds[a], "gross": _cents(x[0]), "net": _cents(x[1]),
+                          "vat": _cents(x[2])} for a, x in sorted(acc.items(), key=lambda kv: (kv[0].zfill(alen), kv[0]))]}
 
 
 def ba_overview(c, oid):
