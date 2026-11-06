@@ -2618,7 +2618,8 @@ owner, a team agent's person given as `user_id` (someone who may chat with it, i
   - `repeat`: `monthly` (default), `quarterly`, `yearly` or `once`.
   - `start`: `YYYY-MM-DD`, the first due date (yearly and once: its month is the due month); `until`: `YYYY-MM-DD` or
     left out (no end).
-  - `category`: a free group such as "Insurances" (up to 100 characters).
+  - `category`: a free group such as "Insurances" (up to 100 characters; since 2.581 a colon and spaces at the end are
+    dropped when it is stored, "Digital Abos:" becomes "Digital Abos").
   - `vat_rate`: `0`, `7` or `19`; left out = 19; insurances, levies, contributions, bank and credit costs, taxes, service charge and memberships 0, a tax adviser 19 (as the spreadsheet import, since 2.122.2).
   Other fields of a row (an `id`, an `org_id`, `created_by`) are ignored. `note`: what you could not read or assumed.
 - **The card**: a ready proposal job (kind `import`): News + push "Proposal ready" per the person's settings and a card with
