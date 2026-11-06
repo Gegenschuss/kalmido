@@ -149,7 +149,7 @@ bad = [({"due": "not-a-date"}, "due"), ({"due": "2026-02-30"}, "impossible date"
        ({"due": "2026-10-01", "reminders": "abc"}, "reminders text"), ({"due": "2026-10-01", "reminders": "0,1e9"}, "reminders float"),
        ({"due": "2026-10-01", "reminders": "99999999"}, "reminder out of range"), ({"due": "2026-10-01", "start": "yesterday"}, "start"),
        ({"due": "2026-10-01", "due_time": "10:00", "duration": "x"}, "duration"), ({"due": "2026-10-01", "due_time": "10:00", "duration": 10 ** 9}, "duration range"),
-       ({"priority": 7}, "priority"), ({"due": "2026-10-01", "repeat": "FREQ=SECONDLY"}, "secondly"),
+       ({"priority": 8}, "priority"),  ({"due": "2026-10-01", "repeat": "FREQ=SECONDLY"}, "secondly"),  # 2.574.0 (#3376): 7 = urgent is valid now, 8 is the bad value
        ({"due": "2026-10-01", "repeat": "FREQ=MINUTELY"}, "minutely"), ({"due": "2026-10-01", "repeat": "FREQ=HOURLY"}, "hourly"),
        ({"due": "2026-10-01", "repeat": "FREQ=DAILY;BYHOUR=1,2,3"}, "byhour"), ({"due": "2026-10-01", "repeat": "FREQ=DAILY;INTERVAL=0"}, "interval 0"),
        ({"due": "2026-10-01", "repeat": "garbage"}, "garbage rule"), ({"parent_id": "abc"}, "parent id text"), ({"title": ["x"]}, "title list")]
