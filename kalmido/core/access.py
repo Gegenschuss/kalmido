@@ -561,7 +561,8 @@ def plists(c, uid):
     out = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND role='participant' ORDER BY list_id",
                                    (int(uid),))]
     if cache is not None:
-        cache[key] = tuple(out)
+        # review 2.602.0: store under the context the query really ran in (the hook resolves it inside execute)
+        cache[("plists", int(uid), getattr(c, "ctx", None))] = tuple(out)
     return out
 
 
