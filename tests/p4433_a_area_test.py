@@ -183,29 +183,32 @@ check(r.ok and r.json().get("address"), "her document address " + r.text[:160])
 MAILNO = [0]
 
 
-def mail_in(addr, name, data, mt, st):
-    """One mail with one attachment to addr through the stub mailbox -> the new document's node id (None: none came)."""
+def mail_in(addr, text, att=None):
+    """One mail to addr through the stub mailbox (att = (name, bytes, maintype, subtype); none = the mail itself becomes the
+    document, docs/ingest.py) -> the new document's node id (None: none came)."""
     MAILNO[0] += 1
+    mid = f"<p4433-mail-{MAILNO[0]}@example.com>"
     m = email.message.EmailMessage()
-    m["From"], m["To"], m["Subject"], m["Message-ID"] = "post@example.com", addr, "Fwd: Post", f"<p4433-mail-{MAILNO[0]}@example.com>"
-    m.set_content("siehe Anhang")
-    m.add_attachment(data, maintype=mt, subtype=st, filename=name)
+    m["From"], m["To"], m["Subject"], m["Message-ID"] = "post@example.com", addr, "Fwd: Post", mid
+    m.set_content(text)
+    if att:
+        m.add_attachment(att[1], maintype=att[2], subtype=att[3], filename=att[0])
     open(os.path.join(kt.DATA, "mail", "in", f"{MAILNO[0]}.eml"), "wb").write(bytes(m))
 
     def got():
         A.post(B + "/api/admin/mail/poll")
-        x = kt.dbx("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.source='mail' AND n.name=?", (name,))
+        x = kt.dbx("SELECT node_id FROM doc_meta WHERE source='mail' AND ext_id LIKE ?", (f"mail:{mid}:%",))
         return x[0][0] if x else None
     return until(got, 40)
 
 
 if r.ok and r.json().get("address"):
     ADDR = r.json()["address"]
-    m1 = mail_in(ADDR, "mail-rechnung.xml", ubl("ER-2026-91", "Beispiel Post GmbH", "DE456789123"), "application", "xml")
+    m1 = mail_in(ADDR, "siehe Anhang", ("mail-rechnung.xml", ubl("ER-2026-91", "Beispiel Post GmbH", "DE456789123"), "application", "xml"))
     d = m1 and settled(Fr, m1)
     check(d and row(m1)[:2] == ("office", "auto") and m1 in ids(Fr, area="office") and m1 not in ids(Fr, area="private"),
           f"#4487: the e-invoice of a mail to her own address is sorted into the office {m1 and row(m1)}")
-    m2 = mail_in(ADDR, "mail-bescheid.txt", NOTICE.replace(b"2026", b"2027"), "text", "plain")
+    m2 = mail_in(ADDR, NOTICE.decode().replace("2026", "2027"))  # a text without a file: the mail itself is the document
     check(m2 and settled(Fr, m2) and row(m2)[:2] == ("private", "auto") and m2 in ids(Fr, area="private"),
           f"#4487: a tax notice by mail stays private {m2 and row(m2)}")
 
