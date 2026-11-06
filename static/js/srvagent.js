@@ -38,6 +38,21 @@ function srv_flowsBody(md) {
   for (const sel of $$('[data-srv-fm]', md)) if (sel.value !== (sel.dataset.was || '')) out[sel.dataset.srvFm] = sel.value;
   return Object.keys(out).length ? out : null;
 }
+// 2.571.0 D (#4676): read-only web research per routine (srvweb.py SRV_WEB_KEYS: the routines + "other"), default off
+const SRV_WEB_KEYS = [...SRV_FLOW_KEYS, 'other'];
+const srv_webName = k => k === 'other' ? tr('Everything else (chat, mentions, tasks)') : srv_flowName(k);
+function srv_webHtml(j) {
+  const fw = j.flow_web || {};
+  return `<fieldset class="srvweb"><legend>${tr('Web research per routine')}</legend>
+    <div class="shint keep">${esc(tr('Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.'))}</div>
+    ${SRV_WEB_KEYS.map(k => `<label class="chkl"><input type="checkbox" data-srv-web="${k}" data-was="${fw[k] ? 1 : 0}" ${fw[k] ? 'checked' : ''}><span>${esc(srv_webName(k))}</span></label>`).join('')}</fieldset>`;
+}
+// only the switches that changed; null = none
+function srv_webBody(md) {
+  /** @type {Record<string, boolean>} */ const out = {};
+  for (const x of $$('[data-srv-web]', md)) if (x.checked !== (x.dataset.was === '1')) out[x.dataset.srvWeb] = x.checked;
+  return Object.keys(out).length ? out : null;
+}
 let srv_def = null;
 async function srv_defaults(fresh) {
   if (!srv_def || fresh) srv_def = await api('GET', '/api/agents/server/defaults');
@@ -142,7 +157,7 @@ async function srv_editModal(a, notes) {
   const draw = async () => {
     try { j = await api('GET', `/api/agents/${a.id}/server`); } catch (x) { $('#srv-ed', md).innerHTML = `<div class="muted mhint">${esc(x instanceof Offline ? tr('Only available online.') : x.message)}</div>`; return; }
     if (!md.isConnected) return;
-    $('#srv-ed', md).innerHTML = (j.enabled_instance === false ? srv_offHtml() : '') + srv_fieldsHtml(j, false) + srv_flowsHtml(j);
+    $('#srv-ed', md).innerHTML = (j.enabled_instance === false ? srv_offHtml() : '') + srv_fieldsHtml(j, false) + srv_flowsHtml(j) + srv_webHtml(j);
     $('[data-m="srv-save"]', md).hidden = false;
     srv_modelsFill(md, a.id, j.model).then(m => srv_flowsFill(md, m));
   };
@@ -151,7 +166,7 @@ async function srv_editModal(a, notes) {
     let r; try { r = await api('GET', `/api/agents/${a.id}/server/runs?limit=10`); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
     if (!md.isConnected) return;
     box.innerHTML = (r.runs || []).map(x => `<div class="mrow srvrun" role="listitem"><span class="n"><b>${esc(srv_stateTxt(x.state))}</b> <span class="muted">${esc(x.trigger || '')}</span>
-      <small class="muted">${esc([x.started ? fmtStamp(new Date(x.started)) : '', x.flow ? srv_flowName(x.flow) : '', x.model || '', trn('{0} step', '{0} steps', x.steps || 0), tr('{0} tokens', fmtTok((x.tokens_in || 0) + (x.tokens_out || 0)))].filter(Boolean).join(' · '))}</small>
+      <small class="muted">${esc([x.started ? fmtStamp(new Date(x.started)) : '', x.flow ? srv_flowName(x.flow) : '', x.model || '', trn('{0} step', '{0} steps', x.steps || 0), tr('{0} tokens', fmtTok((x.tokens_in || 0) + (x.tokens_out || 0))), x.web ? tr('Web: {0} searches, {1} pages, {2} VAT checks', x.web_searches || 0, x.web_fetches || 0, x.vat_checks || 0) : ''].filter(Boolean).join(' · '))}</small>
       ${x.error ? `<small class="srverr">${esc(x.error)}</small>` : ''}</span></div>`).join('') || `<div class="muted mhint">${tr('No runs yet.')}</div>`;
   };
   md.addEventListener('click', async e => {
@@ -172,8 +187,8 @@ async function srv_editModal(a, notes) {
       if (b.dataset.m === 'srv-save') {
         const key = $('#srv-key', md)?.value.trim() || '';
         b.disabled = true; show('');
-        const fm = srv_flowsBody(md);  // 2.565.0 D (#4674)
-        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key} : {}), ...(fm ? {flow_models: fm} : {})});
+        const fm = srv_flowsBody(md), fw = srv_webBody(md);  // 2.565.0 D (#4674); 2.571.0 D (#4676)
+        await calReq('PUT', `/api/agents/${a.id}/server`, {provider: $('#srv-prov', md).value, model: $('#srv-model', md).value, instructions: $('#srv-ins', md).value, ...(key ? {api_key: key} : {}), ...(fm ? {flow_models: fm} : {}), ...(fw ? {flow_web: fw} : {})});
         toast(tr('Saved')); await draw();
       }
     } catch (x) { show(x.message); } finally { b.disabled = false; }

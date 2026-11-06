@@ -78,7 +78,9 @@ cheaper one for the briefing; empty = the agent's model), and its usage shows pe
 sixth tick, off by default, *Due billing on Mondays at 08:00* reminds of billable time and due invoices and prepares
 invoice drafts only after your Yes; it needs the office rights you give the agent yourself (permission *Office drafts*,
 *May draft office documents* or an office rights group with *Quotations & invoices*, *Agents may read office data*) and
-your own right *Quotations & invoices* in that office, and is skipped with the reason until then. Nothing of
+your own right *Quotations & invoices* in that office, and is skipped with the reason until then. 2.571.0: *Web research per routine* (off by default) lets a routine search
+the web, read a page and check a VAT number with the EU service VIES, read only; in such a run every change and every message
+to someone else waits for your approval, and each web find names its source. Nothing of
 the paths below is needed: no user, no firewall, no Claude Code, no launcher, no `CLAUDE.md` file (the rules of
 `mcp/CLAUDE.template.md` are what the instructions field is for). The key is stored encrypted and shown only as its last
 four characters. Its usage is billed to you by the provider; Kalmido counts it as the agent's usage and its limits pause

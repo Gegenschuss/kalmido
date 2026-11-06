@@ -309,7 +309,7 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   token of the agent made for this one run (its scopes, projects and lists; deleted at the end of the run), so the same
   permission, scope and project checks apply as for every other agent (`/api/v1`). The tool packages are those of
   `KALMIDO_SRVAGENT_TOOLSETS` (default `tickets,chat,calendar,wiki,life,office`: every package except `code` and
-  `integrations`; `chat` always). No terminal, no files outside Kalmido, no web access. Content from tasks, comments, e-mails and files reaches the model marked as data; the circle limit of
+  `integrations`; `chat` always). No terminal, no files outside Kalmido, no web access (except the read-only web research below, when switched on). Content from tasks, comments, e-mails and files reaches the model marked as data; the circle limit of
   `agents/safety.py` and approvals work as for every other agent. The default instructions say that it works only for
   Kalmido and refuses everything else.
 - **Provider and model**: Anthropic first (the Messages API with tool use), built so that more providers can follow. The
@@ -321,6 +321,24 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   `meetings` (a proposal request *Tasks from notes*); the documents tick is none of its own, a new document starts no run.
   One run works one routine: events of another routine (or a chat) wait for the next run, with their own model. The runs,
   the usage (`GET /api/agents/usage` `flows`) and the usage ring's list in the chat header show the tokens per routine.
+- **Web research** *(2.571.0, #4676)*: read only and switched on per routine in its server settings (**Web research per
+  routine**: the four routines and *Everything else* = chat, mentions, tasks and other planned jobs), default off. A run
+  with it on gets three tools more: `web_search` and `web_fetch` are server tools of the provider (Anthropic
+  `web_search_20260209` / `web_fetch_20260209` on Opus / Sonnet 4.6 and later, the basic `web_search_20250305` /
+  `web_fetch_20250910` on other models): the provider searches and fetches, the Kalmido server itself opens no address the
+  model chose. At most `KALMIDO_SRVAGENT_WEB_SEARCHES` searches and `KALMIDO_SRVAGENT_WEB_FETCHES` pages per run (default
+  5 each, `max_uses`), a page at most `KALMIDO_SRVAGENT_WEB_TOKENS` tokens; the server's own address and
+  `KALMIDO_SRVAGENT_WEB_BLOCKED` are blocked domains; a page may only be fetched when its address came in the events or in
+  a web result, never when only a Kalmido tool returned it (no data leaving through an address the model builds).
+  `check_vat_id` checks an EU VAT number with the EU service VIES (only the country code and the number leave Kalmido;
+  valid, name and address come back; `KALMIDO_VIES_URL`, time limit `KALMIDO_VIES_S`, answers kept 6 hours, at most 10
+  checks per run). Web content is foreign data: the frame and a reminder after each step with web results say so. **While
+  such a run is on, every change waits for an approval card** - also for an agent whose control level would let it act or
+  that has none - and so does every chat message to someone other than the people of the run (who asked, the owner, the
+  people whose events started it), a standing rule and every proposal route except a proposal for a job and a task
+  proposal (409 `approval_required`, as in [Control](#control)). Every chat message, approval card and proposal of the
+  run names the web sources it used under *From the web* (a proposal also as `web_sources: [{url, label}]`). The runs show
+  the searches, pages and VAT checks; `GET /api/agents/usage` counts `web_searches` and `web_fetches`.
 - **The key**: stored encrypted, never returned, never written to a log. The app shows only its last four characters
   (`…abcd`) with *Replace* and *Delete*.
 - **Runs**: in the background queue of the worker, never in the web process; at most `KALMIDO_SRVAGENT_PARALLEL` (default
@@ -363,10 +381,10 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
 | Route | What |
 |---|---|
 | `GET /api/agents/server/defaults` | before the agent exists: `{enabled_instance, provider, default_name, default_model, default_instructions, starter, flows, followup_days, followup_max}` (people only; `flows` 2.565.0: the routines that may have a model of their own) |
-| `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model, default_instructions, server, flow_models}`, never the key; `flow_models` (2.565.0): `{briefing, tidy, meetings, followup}` each a model or `""` (= the agent's) |
-| `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?, flow_models?}`; creates the settings and sets the agent's provider to `kalmido-server`. `flow_models` (2.565.0, #4674): `{routine: model}` for the routines named (the others stay), `""` = back to the agent's model; a model not in the provider's live list for the stored key, an unknown routine or no key yet: 400; the list not readable: 502 |
+| `GET /api/agents/<id>/server` | `{provider, model, instructions, has_key, key_hint, enabled_instance, default_model, default_instructions, server, flow_models, flow_web}`, never the key; `flow_models` (2.565.0): `{briefing, tidy, meetings, followup}` each a model or `""` (= the agent's); `flow_web` (2.571.0): `{briefing, tidy, meetings, followup, other}` each `true` / `false` (web research) |
+| `PUT /api/agents/<id>/server` | `{provider?, model?, instructions?, api_key?, delete_key?, flow_models?}`; creates the settings and sets the agent's provider to `kalmido-server`. `flow_models` (2.565.0, #4674): `{routine: model}` for the routines named (the others stay), `""` = back to the agent's model; a model not in the provider's live list for the stored key, an unknown routine or no key yet: 400; the list not readable: 502. `flow_web` (2.571.0, #4676): `{key: true / false}` for the keys named (the others stay); an unknown key or no bool: 400 |
 | `GET /api/agents/<id>/server/models` | `{models: [{id, name}], default, fallback_note?}` live from the provider; 409 `{"error": "no_key"}` without a key |
-| `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state (run / done / failed / aborted), started, ended, steps, tokens_in, tokens_out, error, model, flow}]}` (`flow` 2.565.0: the routine, `""` for none) |
+| `GET /api/agents/<id>/server/runs?limit=20` | `{runs: [{id, trigger, state (run / done / failed / aborted), started, ended, steps, tokens_in, tokens_out, error, model, flow, web, web_searches, web_fetches, vat_checks}]}` (`flow` 2.565.0: the routine, `""` for none; `web` 2.571.0: the run had web research) |
 | `POST /api/agents/<id>/server/starter` | `{items: ["briefing", "tidy", "docs", "meetings", "followup", "office"], followup_days?: 5}` -> `{items: [{item, state: created / exists / skipped, id, reason}]}`; the same item twice changes nothing |
 
 Who may: the owner of a personal agent; for a team agent an admin of its organisation or an instance admin (everyone else

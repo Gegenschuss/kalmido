@@ -749,7 +749,7 @@ def agents_usage_get():
     d_win, d30, d7 = (today - timedelta(days=days - 1)).isoformat(), (today - timedelta(days=29)).isoformat(), \
         (today - timedelta(days=6)).isoformat()
     rows = c.execute(f"""SELECT agent_id, task_id, list_id, model, day, input_tokens, output_tokens, cache_read_tokens,
-                                cache_write_tokens, cost_usd, flow FROM agent_usage
+                                cache_write_tokens, cost_usd, flow, web_searches, web_fetches FROM agent_usage
                          WHERE agent_id IN ({','.join('?' * len(ids)) or 'NULL'}) AND day>=?""",
                      (*ids, min(d_win, d30))).fetchall() if ids else []
     roles, tvis = {}, {}
@@ -777,9 +777,12 @@ def agents_usage_get():
         dst["cache_write"] += r["cache_write_tokens"]
         dst["tokens"] += r["input_tokens"] + r["output_tokens"] + r["cache_write_tokens"]
         dst["calls"] += 1
+        dst["web_searches"] += r["web_searches"] or 0  # 2.571.0 D (#4676): the provider's web tools of a server agent
+        dst["web_fetches"] += r["web_fetches"] or 0
         if r["cost_usd"] is not None:
             dst["cost"] = round((dst["cost"] or 0) + r["cost_usd"], 6)
-    zero = lambda: {"tokens": 0, "input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "cost": None, "calls": 0}  # noqa: E731
+    zero = lambda: {"tokens": 0, "input": 0, "output": 0, "cache_read": 0, "cache_write": 0, "cost": None, "calls": 0,  # noqa: E731
+                    "web_searches": 0, "web_fetches": 0}
     tot = {i: {"today": zero(), "d7": zero(), "d30": zero()} for i in ids}
     td = today.isoformat()
     for r in rows:

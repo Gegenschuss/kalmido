@@ -277,6 +277,13 @@ VARS = (
     _v("KALMIDO_SRVAGENT_CALL_S", "120", "Seconds one model call of a server agent may take at most.", "agents"),
     _v("KALMIDO_SRVAGENT_MODELS_S", "15", "Seconds for the model list of the provider.", "agents"),
     _v("KALMIDO_SRVAGENT_TOOLSETS", "tickets,chat,calendar,wiki,life,office", "Tool packages of mcp/kalmido_mcp.py a server agent gets (within the scopes of its token; chat always).", "agents"),
+    # 2.571.0 D (#4676): read-only web research of server agents (agents/srvweb.py)
+    _v("KALMIDO_SRVAGENT_WEB_SEARCHES", "5", "Web searches of one server agent run with web research (max_uses of web_search).", "agents"),
+    _v("KALMIDO_SRVAGENT_WEB_FETCHES", "5", "Pages one server agent run with web research may read (max_uses of web_fetch).", "agents"),
+    _v("KALMIDO_SRVAGENT_WEB_TOKENS", "20000", "Tokens of one fetched page at most (max_content_tokens of web_fetch).", "agents"),
+    _v("KALMIDO_SRVAGENT_WEB_BLOCKED", "", "Comma separated domains the web tools of a server agent never open (the server's own address is always blocked).", "agents"),
+    _v("KALMIDO_VIES_URL", "https://ec.europa.eu/taxation_customs/vies/rest-api", "Base address of the EU VIES REST API for VAT number checks of server agents (the tests point it at a stand-in).", "agents"),
+    _v("KALMIDO_VIES_S", "10", "Seconds one VAT number check at VIES may take.", "agents"),
     _v("KALMIDO_EMBED_URL", "", "Address of the optional embedding service (related tasks, meaning search; empty = off); task titles and descriptions are sent to it.", "agents"),
     _v("KALMIDO_EMBED_EXTERNAL", "0", "Switch: allow an embedding service on another host (task titles and descriptions go there).", "agents"),
     _v("KALMIDO_EMBED_IDLE", "15", "Seconds between two looks of the embedding pass when nothing waits.", "agents"),

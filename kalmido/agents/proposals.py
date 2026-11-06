@@ -1273,6 +1273,7 @@ def v1_agent_job_proposal(jid):
     if len(request.data or b"") > PROP_MAX_BYTES:
         return v1_err(413, tr("The proposal is too large (at most {0} KB)", PROP_MAX_BYTES // 1024))
     p = oxa_prop_base(c, j["kind"], prop_validate(j["kind"], v1_json(), json.loads(j["input"] or "{}")))  # 2.528.0 (#4305 A8)
+    srvweb_prop(c, aid, j["user_id"], p)  # 2.571.0 D (#4676)
     first = j["prop_state"] != "ready"
     ts = iso(now_utc())
     c.execute("UPDATE agent_jobs SET proposal=?, prop_state='ready', state='waiting', updated_at=? WHERE id=?",
@@ -1283,6 +1284,37 @@ def v1_agent_job_proposal(jid):
     bump(c)
     c.commit()
     return jsonify({**job_dict(c, j2), "proposal": p}), 201
+
+
+def srvweb_lang(c, uid):
+    s = collab_user(c, uid, None) if uid else None
+    return lang_of(s) if s else None
+
+
+def srvweb_body(c, aid, uid, b):
+    """2.571.0 D (#4676): while agent aid's run with web access is on, a chat message (also an approval card or a notice) gets
+    the block "From the web" with the sources the run used and the text does not name yet (agents/srvweb.py)."""
+    a = agent_row(c, aid)
+    if not a or (a["provider"] or "") != "kalmido-server" or not isinstance(b, dict):
+        return
+    from ..agents.core import CHAT_MAX
+    from ..agents.srvweb import srv_web_sources, srvweb_mark, srvweb_state
+    srcs = srv_web_sources(srvweb_state(c, aid))
+    if srcs and isinstance(b.get("body") or "", str):
+        b["body"] = srvweb_mark(b.get("body") or "", srcs, srvweb_lang(c, uid), CHAT_MAX)
+
+
+def srvweb_prop(c, aid, uid, p):
+    """2.571.0 D (#4676): a proposal of a run with web access carries its sources (web_sources [{url, label}]) and names them
+    in its summary (every proposal card shows the summary)."""
+    a = agent_row(c, aid)
+    if not a or (a["provider"] or "") != "kalmido-server" or not isinstance(p, dict):
+        return
+    from ..agents.srvweb import srv_web_sources, srvweb_mark, srvweb_state
+    srcs = srv_web_sources(srvweb_state(c, aid))
+    if srcs:
+        p["web_sources"] = srcs
+        p["summary"] = srvweb_mark(p.get("summary") or "", srcs, srvweb_lang(c, uid), PROP_SUMMARY_MAX)
 
 
 def prop_cleanup(c, force=False):
@@ -1367,6 +1399,7 @@ def v1_agent_chat_post(uid):
     if b.get("kind") not in (None, "", "message", "notice"):
         raise BadInput(tr("Invalid value: {0}", "kind"))
     src = chat_source(b.pop("source", None))  # 2.388.0 (#3341): who produced the message, the app can hide a source
+    srvweb_body(c, aid, uid, b)  # 2.571.0 D (#4676): a server agent's run with web access names its web sources
     if b.get("kind") == "notice":
         r = chat_set_source(c, cx_notice_post(c, aid, uid, b, files), src)
         bump(c)
@@ -1655,6 +1688,7 @@ def v1_agent_cross_proposal():
              for t in (b.get("tasks") or [])] if isinstance(b.get("tasks"), list) else b.get("tasks")
     inp = {"list": {"id": lid, "name": lst["name"], "sections": []}, "members": [], "text": reason, "cross": True}
     p = prop_validate("extract", {"tasks": tasks, **({"summary": b["summary"]} if "summary" in b else {})}, inp)
+    srvweb_prop(c, aid, lst["owner_id"], p)  # 2.571.0 D (#4676)
     ts = iso(now_utc())
     aname = user_names(c, [aid]).get(aid, "?")
     jid = insert_id(c, """INSERT INTO agent_jobs(agent_id,task_id,user_id,title,state,log,created_at,updated_at,kind,input,prop_state,list_id,proposal)

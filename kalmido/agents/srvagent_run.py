@@ -23,6 +23,11 @@ The run:
  notes") runs with its own model when one is set (agent_server.flow_models, else the agent's model). One run = one routine: the
  events are taken up to the first one of another routine (the rest: the next run); agent_runs.flow and agent_usage.flow say
  which routine the run and its usage belonged to.
+ 2.571.0 D (#4676): a routine with read-only web research switched on (agents/srvweb.py) also gets web_search / web_fetch (server
+ tools of the provider: the provider fetches, never Kalmido) and check_vat_id (VIES); the frame then says that web results are
+ foreign data, and agent_runs.web holds the run's web state while it runs: the control gate makes every change and every
+ message to another person wait for an approval card, the posts of the run name the web sources. pause_turn of the provider
+ (its own loop of server tools paused) is resumed by sending its answer back as it came.
 The key is opened only for the provider call (srvagent.srv_key) and never logged; provider errors are neutral texts."""
 import json
 import os
@@ -43,6 +48,7 @@ from ..agents.admin import agent_token_new
 from ..agents.mcpremote import _inproc_cls, mcpr_module
 from .srvagent import ProviderError, srv_flow_models, srv_key, srv_models, srv_off, srv_pick_default, srv_provider, srv_row, srv_defaults, SRV_PROVIDER
 from .srvstarter import SRV_BRIEF_AT, SRV_FLOWS, SRV_FOLLOWUP_AT, SRV_TEXTS
+from .srvweb import SRV_VIES_TOOL, SRV_WEB_FRAME, SRV_WEB_REMIND, srv_vies_result, srv_web_on, srv_web_scan, srv_web_state, srv_web_tools  # 2.571.0 D
 
 SRV_PARALLEL = env_int("KALMIDO_SRVAGENT_PARALLEL", 2, lo=1, hi=64)   # runs at once on this server
 SRV_RUN_S = env_int("KALMIDO_SRVAGENT_RUN_S", 300, lo=10, hi=3600)     # s of one run at most
@@ -290,9 +296,15 @@ def _run(aid, rid):
         prov = srv_provider(provider, key)
         system = (instructions.strip() + "\n\n" + SRV_FRAME.format(name=name, aid=aid)).strip()
         tools, allowed = _tools(mod, api)
+        wst = None
+        if srv_web_on(row, flow):  # 2.571.0 D (#4676): read-only web research for this routine
+            wst = srv_web_state([asker, a["owner_id"], *_actors(work)])
+            _db(lambda c: c.execute("UPDATE agent_runs SET web=? WHERE id=?", (json.dumps(wst), rid)))  # the gate holds from here
+            system += "\n\n" + SRV_WEB_FRAME
+            tools = tools + srv_web_tools(model)
         messages = [{"role": "user", "content": [{"type": "text", "text": _events_text(mod, data)}]}]
         _status(api, "working", model)
-        state, text, sent = _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow)
+        state, text, sent = _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow, wst)
         if state == "done" and text.strip() and asker and asker not in sent:
             _say(api, asker, text.strip())
     except _Stop as s:
@@ -338,6 +350,16 @@ def _finish(aid, rid, tok, state, text, asker, lang):
         elif c.execute("SELECT status FROM agents WHERE user_id=?", (aid,)).fetchone()[0] != "paused":
             c.execute("UPDATE agent_server SET paused='' WHERE agent_id=?", (aid,))
     _db(tidy)
+
+
+def _actors(work):
+    """2.571.0 D (#4676): the people whose events started the run (a web run writes to them without a card)."""
+    out = []
+    for e in work:
+        x = e.get("actor") if isinstance(e.get("actor"), dict) else {}
+        if x.get("kind") != "agent" and isinstance(x.get("id"), int):
+            out.append(x["id"])
+    return out
 
 
 def _asker(work):
@@ -416,8 +438,9 @@ def _call(prov, rid, deadline, *a):
     return box["r"]
 
 
-def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow=""):
-    """The model and its tool calls -> (state, final text or error key, people written to with send_chat)."""
+def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, deadline, asker, flow="", wst=None):
+    """The model and its tool calls -> (state, final text or error key, people written to with send_chat). wst = the web state of
+    a run with web access (2.571.0 D: counted and saved after every step; check_vat_id answered here)."""
     sent = set()
     for _ in range(SRV_STEPS):
         if _aborted(rid):
@@ -438,8 +461,15 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
         r = _call(prov, rid, deadline, model, system, messages, tools, SRV_MAX_TOKENS, left)
         u = r["usage"]
         _usage(api, aid, rid, model, u, flow)
+        webin = False
+        if wst is not None:  # 2.571.0 D (#4676)
+            webin = srv_web_scan(wst, r["content"], u)
+            _db(lambda c: c.execute("UPDATE agent_runs SET web=? WHERE id=?", (json.dumps(wst), rid)))
         uses = [b for b in r["content"] if b.get("type") == "tool_use"]
         text = "\n".join(b.get("text") or "" for b in r["content"] if b.get("type") == "text").strip()
+        if r["stop"] == "pause_turn" and wst is not None:  # the provider's own web loop paused: its answer back as it came
+            messages.append({"role": "assistant", "content": r["content"]})
+            continue
         if r["stop"] != "tool_use" or not uses:
             return "done", text, sent
         messages.append({"role": "assistant", "content": r["content"]})
@@ -447,7 +477,15 @@ def _loop(aid, rid, api, mod, prov, model, system, tools, allowed, messages, dea
         for b in uses:
             if _aborted(rid):
                 return "aborted", "", sent
+            if wst is not None and b.get("name") == SRV_VIES_TOOL:
+                results.append(srv_vies_result(b, wst))
+                webin = True
+                continue
             results.append(_tool(api, mod, allowed, b, sent))
+        if wst is not None:
+            _db(lambda c: c.execute("UPDATE agent_runs SET web=? WHERE id=?", (json.dumps(wst), rid)))
+        if webin:  # web content came in: the reminder after the results (results first, as the provider wants)
+            results.append({"type": "text", "text": SRV_WEB_REMIND})
         messages.append({"role": "user", "content": results})
     return "failed", N_("The step limit of the run is reached"), sent
 
@@ -467,6 +505,9 @@ def _usage(api, aid, rid, model, u, flow=""):
     uid = (r or {}).get("id") if isinstance(r, dict) else None
     if flow and isinstance(uid, int):  # 2.565.0 D (#4674): the routine of this report (no field of the public API)
         _db(lambda c: c.execute("UPDATE agent_usage SET flow=? WHERE id=? AND agent_id=?", (flow, uid, aid)))
+    ws, wf = u.get("web_searches") or 0, u.get("web_fetches") or 0
+    if (ws or wf) and isinstance(uid, int):  # 2.571.0 D (#4676): the searches / fetched pages of the provider's web tools
+        _db(lambda c: c.execute("UPDATE agent_usage SET web_searches=?, web_fetches=? WHERE id=? AND agent_id=?", (ws, wf, uid, aid)))
 
 
 # ---------------------------------------------------------------- 2.565.0 D (#4674): the routine of the events of a run

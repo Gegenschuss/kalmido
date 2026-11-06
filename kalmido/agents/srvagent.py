@@ -17,11 +17,15 @@ as editing the agent - srv_need):
                                          while the instance switch is on. 2.565.0 D (#4674): flow_models {routine: model}
                                          (routines: srvstarter.SRV_FLOWS) = a model of its own per starter routine, '' = the
                                          agent's model; a model the provider does not list (GET …/models) -> 400, the entries
-                                         not named stay; GET gives flow_models with every routine ('' = the agent's)
+                                         not named stay; GET gives flow_models with every routine ('' = the agent's).
+                                         2.571.0 D (#4676): flow_web {key: bool} (keys: srvweb.SRV_WEB_KEYS = the routines +
+                                         "other" for runs without one) = read-only web research per routine, default off;
+                                         the keys not named stay; GET gives flow_web with every key
   GET  /api/agents/<id>/server/models   {models: [{id, name}], default, fallback_note?} live from the provider (cached
                                          SRV_MODELS_TTL s); 409 {error: no_key} without a key
   GET  /api/agents/<id>/server/runs     ?limit=20 -> {runs: [{id, trigger, state, started, ended, steps, tokens_in, tokens_out,
-                                         error, model, flow}]} (flow: the starter routine, 2.565.0)
+                                         error, model, flow, web, web_searches, web_fetches, vat_checks}]} (flow: the starter
+                                         routine, 2.565.0; web: the run had web access, 2.571.0)
 The instance switch server_agents_off ("1" = off, set through the instance settings route): no PUT, no runs.
 The runs themselves: agents/srvagent_run.py (a queue row of the worker, never the web process).
 
@@ -52,6 +56,7 @@ from ..accounts.login import seal, unseal
 from ..accounts.orgs import is_org_admin
 from ..agents.core import agent_row, need_person, RUNTIME_MODEL_MAX, RUNTIME_MODEL_RE
 from ..agents.admin import need_agent_admin
+from .srvweb import srv_flow_web, srv_flow_web_in  # 2.571.0 D (#4676)
 
 SRV_PROVIDER = "kalmido-server"     # agents.provider of a server agent
 SRV_SWITCH = "server_agents_off"    # instance setting: "1" = server agents are off on this server
@@ -139,7 +144,8 @@ class AnthropicProvider:
         if tl:
             tl[-1]["cache_control"] = {"type": "ephemeral"}
         msgs = [dict(m) for m in messages]
-        if msgs and isinstance(msgs[-1].get("content"), list) and msgs[-1]["content"]:  # the conversation so far is cached too
+        # the conversation so far is cached too (2.571.0 D: not on an assistant turn the provider resumes after pause_turn)
+        if msgs and msgs[-1].get("role") != "assistant" and isinstance(msgs[-1].get("content"), list) and msgs[-1]["content"]:
             last = [dict(b) for b in msgs[-1]["content"]]
             last[-1]["cache_control"] = {"type": "ephemeral"}
             msgs[-1] = {**msgs[-1], "content": last}
@@ -147,11 +153,16 @@ class AnthropicProvider:
                                                  **({"tools": tl} if tl else {})}, timeout=timeout)
         content = out.get("content") if isinstance(out.get("content"), list) else []
         u = out.get("usage") if isinstance(out.get("usage"), dict) else {}
-        num = lambda k: int(u.get(k) or 0) if isinstance(u.get(k), int) and u.get(k) >= 0 else 0  # noqa: E731
-        return {"content": [b for b in content if isinstance(b, dict) and b.get("type") in ("text", "tool_use")],
+        num = lambda k, d=u: int(d.get(k) or 0) if isinstance(d.get(k), int) and d.get(k) >= 0 else 0  # noqa: E731
+        st = u.get("server_tool_use") if isinstance(u.get("server_tool_use"), dict) else {}
+        # 2.571.0 D (#4676): the blocks of the provider's own web tools stay in the conversation as they came (server_tool_use and
+        # its *_tool_result: the provider needs them back unchanged); usage.server_tool_use counts searches and fetched pages
+        return {"content": [b for b in content if isinstance(b, dict) and (b.get("type") in ("text", "tool_use", "server_tool_use")
+                                                                          or str(b.get("type") or "").endswith("_tool_result"))],
                 "stop": str(out.get("stop_reason") or ""),
                 "usage": {"input": num("input_tokens"), "output": num("output_tokens"),
-                          "cache_read": num("cache_read_input_tokens"), "cache_write": num("cache_creation_input_tokens")}}
+                          "cache_read": num("cache_read_input_tokens"), "cache_write": num("cache_creation_input_tokens"),
+                          "web_searches": num("web_search_requests", st), "web_fetches": num("web_fetch_requests", st)}}
 
 
 def _status_text(code):
@@ -264,7 +275,8 @@ def srv_dict(c, a, row=None):
             "key_hint": ("…" + row["key_hint"]) if row and row["key_sealed"] and row["key_hint"] else "",
             "enabled_instance": not srv_off(c), "default_model": dm, "default_instructions": tr(di),  # 2.557.0: in the person's language
             "server": bool(row) and (a["provider"] or "") == SRV_PROVIDER,
-            "flow_models": srv_flow_models(row)}  # 2.565.0 D (#4674)
+            "flow_models": srv_flow_models(row),  # 2.565.0 D (#4674)
+            "flow_web": srv_flow_web(row)}  # 2.571.0 D (#4676)
 
 
 @app.get("/api/agents/<int:aid>/server")
@@ -283,7 +295,7 @@ def srv_put(aid):
     b = body()
     if not isinstance(b, dict):
         return err(tr("The body must be a JSON object"))
-    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key", "flow_models"))
+    unknown = sorted(k for k in b if k not in ("provider", "model", "instructions", "api_key", "delete_key", "flow_models", "flow_web"))
     if unknown:
         return err(tr("Invalid value: {0}", ", ".join(unknown)))
     sets = {}
@@ -318,6 +330,11 @@ def srv_put(aid):
             return err(str(e))
         except ProviderError as e:
             return jsonify(error=tr(e.text)), 502
+    if b.get("flow_web") is not None:  # 2.571.0 D (#4676): read-only web research per routine, default off
+        try:
+            sets["flow_web"] = srv_flow_web_in(b["flow_web"], srv_row(c, aid))
+        except BadInput as e:
+            return err(str(e))
     with system_ctx(c):  # the agent's own row; srv_need decided who may
         c.execute("""INSERT INTO agent_server(agent_id, cursor, updated_at, updated_by)
                      VALUES(?, (SELECT COALESCE(MAX(id), 0) FROM agent_events WHERE agent_id=?), ?, ?)
@@ -337,6 +354,17 @@ def srv_put(aid):
           "key replaced" if key is not None else "key deleted" if b.get("delete_key") is True else "", "by user", me(), flush=True)
     with system_ctx(c):  # the agent's own row after the change (srv_need decided who may)
         return jsonify(srv_dict(c, agent_row(c, aid)))
+
+
+def srv_run_web(r):
+    """2.571.0 D (#4676): {web, web_searches, web_fetches, vat_checks} of a run row (agent_runs.web = its web state json)."""
+    try:
+        st = json.loads(r["web"]) if "web" in r.keys() and r["web"] else None
+    except (TypeError, ValueError):
+        st = None
+    st = st if isinstance(st, dict) else None
+    n = lambda k: int(st.get(k) or 0) if st and isinstance(st.get(k), int) else 0  # noqa: E731
+    return {"web": st is not None, "web_searches": n("searches"), "web_fetches": n("fetches"), "vat_checks": n("vies")}
 
 
 # ---------------------------------------------------------------- the models of the provider
@@ -406,7 +434,7 @@ def srv_runs_get(aid):
     return jsonify(runs=[{"id": r["id"], "trigger": r["cause"], "state": r["state"], "started": r["started"], "ended": r["ended"],
                           "steps": r["steps"], "tokens_in": r["tokens_in"], "tokens_out": r["tokens_out"],
                           "error": tr(r["error"]) if r["error"] else "", "model": r["model"],
-                          "flow": r["flow"] if "flow" in r.keys() else ""} for r in rows])  # 2.565.0 D (#4674): its starter routine
+                          "flow": r["flow"] if "flow" in r.keys() else "", **srv_run_web(r)} for r in rows])  # 2.565.0 D (#4674): its starter routine
 
 
 # ---------------------------------------------------------------- the hook in agents/core.py agent_emit

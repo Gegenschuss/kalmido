@@ -379,12 +379,21 @@ def ctl_gate():
     c = db()
     a = agent_row(c, g.user["id"])
     d = ctl_get(a)
-    if d is None:
+    web = None
+    if a is not None and (a["provider"] or "") == "kalmido-server":  # 2.571.0 D (#4676): a server agent's run with web access is on
+        from .srvweb import srvweb_state
+        web = srvweb_state(c, a["user_id"])
+    if d is None and web is None:
         return None  # no level chosen: works as before
+    if web is not None:  # decision 05.11.2026: with the web, every change by card - whatever the level (also none chosen)
+        d = {**(d or CTL_DEFAULTS), "level": "approve_all", "projects": {}}
     path = ctl_rule_path(request.url_rule)
     b = request.get_json(silent=True) if request.is_json else None
     b = b if isinstance(b, dict) else {}
     step = ctl_class(request.method, path, b)
+    if step == "meta" and web is not None:  # its own channel too: messages only to the people of the run, rules by card
+        from .srvweb import srvweb_gate_step
+        step = srvweb_gate_step(web, request.method, path, b, request.view_args or {}) or step
     if step == "meta":
         return None
     lids, unknown = ctl_lists(c, a["user_id"], path, b)

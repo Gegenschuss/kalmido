@@ -300,9 +300,15 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_SRVAGENT_RUN_S` | `300` | Seconds one server agent run may take at most. |
 | `KALMIDO_SRVAGENT_STEPS` | `25` | Model calls of one server agent run at most. |
 | `KALMIDO_SRVAGENT_TOOLSETS` | `tickets,chat,calendar,wiki,life,office` | Tool packages of mcp/kalmido_mcp.py a server agent gets (within the scopes of its token; chat always). |
+| `KALMIDO_SRVAGENT_WEB_BLOCKED` | `(empty)` | Comma separated domains the web tools of a server agent never open (the server's own address is always blocked). |
+| `KALMIDO_SRVAGENT_WEB_FETCHES` | `5` | Pages one server agent run with web research may read (max_uses of web_fetch). |
+| `KALMIDO_SRVAGENT_WEB_SEARCHES` | `5` | Web searches of one server agent run with web research (max_uses of web_search). |
+| `KALMIDO_SRVAGENT_WEB_TOKENS` | `20000` | Tokens of one fetched page at most (max_content_tokens of web_fetch). |
 | `KALMIDO_STARTER_BASE` | `https://github.com/Gegenschuss/kalmido/raw/v{version}/mcp/` | Download address of the agent starter files ({version} is replaced). |
 | `KALMIDO_TIDY_QUIET_S` | `120` | Seconds a project must be quiet before its tidy agent is asked. |
 | `KALMIDO_USAGE_DAYS` | `400` | Days the agent usage records are kept. |
+| `KALMIDO_VIES_S` | `10` | Seconds one VAT number check at VIES may take. |
+| `KALMIDO_VIES_URL` | `https://ec.europa.eu/taxation_customs/vies/rest-api` | Base address of the EU VIES REST API for VAT number checks of server agents (the tests point it at a stand-in). |
 
 ## Background work and timing
 

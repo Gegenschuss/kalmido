@@ -16605,5 +16605,10 @@
   "Deleted items are deleted for good after {0} day.": ["Los elementos eliminados se borran definitivamente tras {0} día.", "Los elementos eliminados se borran definitivamente tras {0} días."],
   "Template “{0}” deleted": "Plantilla «{0}» eliminada",
   "Link “{0}” removed": "Enlace «{0}» quitado",
-  "Set again meanwhile: the earlier value was not restored.": "Se ha vuelto a establecer entretanto: el valor anterior no se ha restaurado."
+  "Set again meanwhile: the earlier value was not restored.": "Se ha vuelto a establecer entretanto: el valor anterior no se ha restaurado.",
+  "From the web (foreign sources, please check):": "De la web (fuentes externas, compruébalas):",
+  "Everything else (chat, mentions, tasks)": "Todo lo demás (chat, menciones, tareas)",
+  "Web research per routine": "Búsqueda web por rutina",
+  "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Solo lectura: buscar en la web, leer una página, comprobar un NIF-IVA con el servicio VIES de la UE. Desactivado por defecto. Una ejecución con web nunca envía formularios; cada cambio y cada mensaje a otra persona espera entonces tu aprobación, y cada hallazgo web indica su fuente.",
+  "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} búsquedas, {1} páginas, {2} comprobaciones de IVA"
 }
