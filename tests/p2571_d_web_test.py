@@ -179,7 +179,9 @@ vl = plog("vies.log")[v0:]
 check(vl == [{"cc": "DE", "num": "123456789", "keys": ["countryCode", "vatNumber"]}], f"only the country code and the number went out {vl}")
 after, rid = chat("FAKEVIES DE123456789 END")
 m = agent_says(after, "FAKEVIES result")
-check(m and '"cached": true' in m["body"] and len(plog("vies.log")) == v0 + 1, "the second check comes from the cache")
+# 2.571.0 (#4676): review F3 - the answer from the cache carries no "cached" mark (no hint what another tenant checked)
+check(m and '"valid": true' in m["body"] and "cached" not in m["body"] and len(plog("vies.log")) == v0 + 1,
+      f"the second check comes from the cache, without saying so {(m or {}).get('body', '')[:300]}")
 after, rid = chat("FAKEVIES DE999999999 END")
 m = agent_says(after, "FAKEVIES result")
 check(m and '"valid": false' in m["body"], f"invalid {(m or {}).get('body', '')[:200]}")

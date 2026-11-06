@@ -179,7 +179,7 @@ def srv_vies(v):
     with _VIES_LOCK:
         hit = _VIES.get(key)
         if hit and time.monotonic() - hit[0] < SRV_VIES_TTL:
-            return {**hit[1], "cached": True}
+            return dict(hit[1])  # review F3: no "cached" mark (the cache is the instance's: no hint what another tenant checked)
     base = {"vat_id": cc + num, "source": "VIES (EU) " + SRV_VIES_PAGE}
     req = urllib.request.Request(SRV_VIES_URL + "/check-vat-number", method="POST",
                                  data=json.dumps({"countryCode": cc, "vatNumber": num}).encode(),
