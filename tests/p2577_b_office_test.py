@@ -7,12 +7,15 @@
  - #4638: under "All workspaces" an office request names its area in the header X-Kalmido-Office-Space (office/model.py
    office_space): only "private" or one of the person's own organisations, only while the setting is "All"; another value =
    400, a chosen workspace outranks the header; a write lands in the named area
+ - #4638 (review): the same area as the query parameter _osp (links, window.open: no header); header wins, token ignores it
  - freelancer-matrix: office (a person without an organisation: "private" works, a foreign organisation is refused)
 usage: p2577_b_office_test.py <datadir>"""
 import os
 import subprocess
 import sys
 import time
+
+import requests
 
 N = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, N)
@@ -96,6 +99,28 @@ check(where(Bo)[:2] == (200, ORG), f"bob under All with one organisation: as bef
 check(where(Bo, f"org:{ORG2}")[0] == 400, f"bob under All names Bravo (no member): 400, never another office {where(Bo, f'org:{ORG2}')}")
 A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 check(where(A, f"org:{ORG2}")[:2] == (200, ORG), f"alice with a workspace chosen: the header does nothing {where(A, f'org:{ORG2}')}")
+
+
+# 2.577.0 (#4638, review): a download link / window.open cannot send the header: the same area as ?_osp= (core.js ofc_spUrl)
+def whereq(s, sp, hd=None):
+    r = s.get(B + O + "/settings", params={"_osp": sp}, headers=hd or {})
+    j = r.json() if r.ok else {}
+    return r.status_code, j.get("org_id")
+
+
+check(whereq(A, f"org:{ORG2}") == (200, ORG), f"query _osp with a workspace chosen: ignored, the setting rules {whereq(A, f'org:{ORG2}')}")
+A.patch(B + "/api/settings", json={"workspace": "all"})
+check(whereq(A, f"org:{ORG2}") == (200, ORG2), f"query _osp=org:{ORG2} under All: its office {whereq(A, f'org:{ORG2}')}")
+check(whereq(A, f"org:{ORG}") == (200, ORG), f"query _osp=org:{ORG} under All: its office {whereq(A, f'org:{ORG}')}")
+check(whereq(A, "org:999999")[0] == 400, f"query _osp of a foreign organisation: 400 {whereq(A, 'org:999999')}")
+check(whereq(A, "all")[0] == 400, "query _osp with another value: 400")
+check(whereq(A, f"org:{ORG}", {HS: f"org:{ORG2}"}) == (200, ORG2), "header and query: the header wins")
+r = A.post(B + "/api/me/tokens", json={"name": "p2577b", "scopes": ["read", "write"]})
+check(r.status_code == 201, "setup: an API token " + r.text[:160])
+TKH = {"Authorization": "Bearer " + r.json().get("token", "")}
+st = whereq(requests, f"org:{ORG}", TKH)
+check(st[0] != 200, f"an API token under All (two organisations): _osp is ignored, as before no office chosen {st}")
+A.patch(B + "/api/settings", json={"workspace": f"org:{ORG}"})
 A.patch(B + "/api/settings", json={"workspace": "all"})
 r = A.post(B + O + "/services", json={"name_de": "Beratung Bravo"}, headers={HS: f"org:{ORG2}"})
 check(r.status_code == 201, f"a write with header org:{ORG2} ({r.status_code} {r.text[:160]})")

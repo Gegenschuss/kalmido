@@ -228,7 +228,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && LT.
 window.addEventListener('pagehide', () => {
   const p = LT.pend; if (!p) return;
   clearTimeout(ltSaveTimer); LT.pend = null; LT.hid = true;
-  try { fetch(`/api/office/letters/${p.d.id}`, {method: 'PATCH', keepalive: true, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(p.d.updated_at ? {...p.b, expect_updated_at: p.d.updated_at} : p.b)}).catch(() => {}); } catch { /* the kept copy stays */ }
+  try { ofc_spFetch(`/api/office/letters/${p.d.id}`, {method: 'PATCH', keepalive: true, headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(p.d.updated_at ? {...p.b, expect_updated_at: p.d.updated_at} : p.b)}).catch(() => {}); } catch { /* the kept copy stays */ }
 });
 window.addEventListener('pageshow', e => { if (e.persisted && LT.hid) { LT.hid = false; LT.cur = null; if (S.route.mod === 'office' && S.route.tab === 'letters') ofcDraw(); } });
 
@@ -433,7 +433,7 @@ document.addEventListener('click', async e => {
     e.preventDefault();
     if (d && d.status === 'draft' && !await ltSave(d, true)) return;
     const u = b.getAttribute('href'), name = (d?.subject || 'letter') + '.pdf';
-    if (typeof pdfView === 'function') pdfView({url: u, name, dlUrl: u + '?dl=1'}); else window.open(u, '_blank', 'noopener');
+    if (typeof pdfView === 'function') pdfView({url: u, name, dlUrl: u + '?dl=1'}); else window.open(ofc_spUrl(u), '_blank', 'noopener');
     return;
   }
   e.preventDefault();
@@ -459,7 +459,7 @@ document.addEventListener('click', async e => {
     menu(b, [
       {label: tr('Edit a copy'), icon: 'copy', fn: () => ltCopy(d)},
       {label: tr('Save as template'), icon: 'file', fn: () => ltAsTemplate(d)},
-      {label: tr('Download PDF'), icon: 'download', fn: async () => { if (d.status !== 'draft' || await ltSave(d, true)) location.assign(ltPdfUrl(d, true)); }},
+      {label: tr('Download PDF'), icon: 'download', fn: async () => { if (d.status !== 'draft' || await ltSave(d, true)) location.assign(ofc_spUrl(ltPdfUrl(d, true))); }},
       // 2.356.1 (#3344): a draft into another workspace (officemove.py what letters; sent letters stay for the retention)
       ...(d.status === 'draft' && typeof ofm_can === 'function' && ofm_can(ofm_officeFrom()) ? [{label: tr('Move to another workspace…'), icon: 'brief',
         fn: async () => { if (await ltSave(d, true)) ofm_move({what: 'letters', ids: [d.id], from: ofm_officeFrom(), label: qn(d.subject || d.rcpt_name || tr('Letter')), after: async () => { LT.data = null; LT.cur = null; go('office/letters'); }}); }}] : []),

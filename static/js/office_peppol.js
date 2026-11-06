@@ -70,7 +70,7 @@ function pep_moreItems(d) {
   if (!pep_isDoc(d)) return [];
   const s = pep_conf();
   return [s?.provider ? {label: tr('Send e-invoice over the Peppol network'), icon: 'send', fn: () => pep_dialog(d)} : null,
-    {label: tr('E-invoice UBL (Peppol)'), icon: 'download', fn: () => window.open(`/api/office/docs/${d.id}/ubl`, '_blank', 'noopener')}].filter(Boolean);
+    {label: tr('E-invoice UBL (Peppol)'), icon: 'download', fn: () => window.open(ofc_spUrl(`/api/office/docs/${d.id}/ubl`), '_blank', 'noopener')}].filter(Boolean);
 }
 function pep_box(d) {
   const p = d?.peppol; if (!p || !pep_isDoc(d)) return '';

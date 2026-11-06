@@ -202,7 +202,7 @@ async function oimReadAddr(x) {
   const fd = new FormData(); fd.append('file', x.file, x.file_name); if (x.client_id) fd.append('client_id', x.client_id);
   fd.append('file_name', x.file_name || '');  // 2.533.0 (#4499): client / project of the name checked against the PDF
   try {
-    const r = await fetch('/api/office/legacy/archive/address', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    const r = await ofc_spFetch('/api/office/legacy/archive/address', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     x.addr = r.ok ? await r.json() : {status: 'error'};
   } catch { x.addr = {status: 'error'}; }
   x.addrBusy = false;
@@ -301,7 +301,7 @@ async function oimPreview(file, map) {
   const fd = new FormData(); fd.append('file', file);
   if (map) fd.append('map', JSON.stringify(map));  // 2.146.0 E (#2456): the person's column choice
   try {
-    const r = await fetch('/api/office/legacy/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    const r = await ofc_spFetch('/api/office/legacy/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     const j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
     OIM.pv = j; OIM.filter = '';
@@ -387,7 +387,7 @@ async function oimArchiveGo() {
     if (ad && x.pNew && x.addr.new_client) fd.append('new_client', JSON.stringify({name: ad.name, contact: ad.contact, street: ad.street, zip: ad.zip, city: ad.city, country: ad.country}));
     if (x.pContact && x.addr?.add_contact) { fd.append('add_contact', x.addr.add_contact); if (!x.client_id) fd.set('client_id', x.addr.client_id || ''); }
     try {
-      const r = await fetch('/api/office/legacy/archive', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+      const r = await ofc_spFetch('/api/office/legacy/archive', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
       const j = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(j.error || r.statusText);
       x.done = true; x.err = ''; ok++;

@@ -492,7 +492,7 @@ function ofcSettingsHtml() {
   const ta = (id, label, lines, hint) => `<div class="row"><label for="${id}">${esc(label)}</label><textarea id="${id}" rows="${Math.max(2, (lines || []).length + 1)}" maxlength="3000" ${adm ? '' : 'disabled'}>${esc((lines || []).join('\n'))}</textarea>${ofcHint(hint)}</div>`;  // 2.298.0 A1 (#3186)
   const svc = ofcRows('services').filter(x => !x.archived).map(x => [x.id, x.name_de]);
   const psh = typeof prd_opts === 'function' ? prd_opts().share : null, pshl = psh ? (s.lang && s.lang !== 'de' ? psh.label.en : psh.label.de) || psh.label.de : '';  // 2.185.0 C: nl / fr / es / it English  // 2.113.1 (#2251): only with an industry pack offering it
-  const logo = s.logo ? `<img class="ofclogo" src="/api/office/logo?v=${encodeURIComponent(s.logo)}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
+  const logo = s.logo ? `<img class="ofclogo" src="${esc(ofc_spUrl(`/api/office/logo?v=${encodeURIComponent(s.logo)}`))}" alt="${esc(tr('Logo'))}">` : `<span class="muted">${tr('No logo yet')}</span>`;
   const dis = adm ? '' : 'disabled';
   const orgN = OFC.info.personal ? '' : orgLabelOf(OFC.info.org_id) || '';  // 2.356.0 D (#3006): an empty company name shows the organisation's name (never saved on its own)
   // 2.113.0 (#2247): five areas (one shown) and every field saves itself (data-fg-live: no bar "Unsaved changes", no Save button)

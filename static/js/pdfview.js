@@ -33,7 +33,7 @@ const pv_isPdf = a => a?.mime === 'application/pdf' || /\.pdf$/i.test(String(a?.
 async function pdfView(o) {
   $('.lightbox')?.remove();
   const back = o.back || document.activeElement, m = document.createElement('div');
-  const url = o.url, dl = o.dlUrl || url;
+  const sp = typeof ofc_spUrl === 'function' ? ofc_spUrl : u => u, url = o.url ? sp(o.url) : o.url, dl = o.dlUrl ? sp(o.dlUrl) : url;  // 2.577.0 (#4638, review): the office's open area
   let doc = null, pages = [], base = [], fit = 1, zoom = 1, cur = 1, fail = '', io = null, gen = 0;
   m.className = 'lightbox tview pview';
   m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-label', o.name || 'PDF');

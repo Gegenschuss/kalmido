@@ -65,7 +65,7 @@ async function bp_act(a) {
   if (a === 'pick') $('#bp-file')?.click();  // 2.591.0 (#4894): the upload is the input's change (below), so a file dropped onto the window (dropany.js) uploads too
   else if (a === 'preview') {
     const u = '/api/office/letterhead/preview?v=' + Date.now();
-    typeof pdfView === 'function' ? pdfView({url: u, name: tr('Letterhead') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
+    typeof pdfView === 'function' ? pdfView({url: u, name: tr('Letterhead') + '.pdf', dlUrl: u}) : window.open(ofc_spUrl(u), '_blank', 'noopener');
   } else if (a === 'del') {
     const was = BPL.st?.file || '';
     try { await bp_send('DELETE', '/api/office/letterhead'); bp_hist(tr('Removed'), () => bp_send('POST', '/api/office/letterhead/restore', {file: was}), () => bp_send('DELETE', '/api/office/letterhead')); }

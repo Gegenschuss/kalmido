@@ -242,6 +242,7 @@ def office_org(c, uid, admin=False, area=None):
 # 2.577.0 (#4638): the office's own address under "All workspaces" (#office/s/<space>, static/js/office.js ofc_sp): the app
 # names the area of the open office per request in this header (core.js rawFetch0 ofc_spHdr, also kept on an outbox entry)
 OFFICE_SPACE_HDR = "X-Kalmido-Office-Space"
+OFFICE_SPACE_ARG = "_osp"
 
 
 def office_space(orgs, ws):
@@ -255,7 +256,9 @@ def office_space(orgs, ws):
     u = getattr(g, "user", None)
     if u is not None and "kind" in u.keys() and u["kind"] == "agent":
         return ws
-    sp = (request.headers.get(OFFICE_SPACE_HDR) or "").strip()
+    # 2.577.0 (#4638, review): a download link / window.open / image cannot carry a header: the same area as the query
+    # parameter _osp (core.js ofc_spUrl), checked exactly the same way; the header wins
+    sp = (request.headers.get(OFFICE_SPACE_HDR) or request.args.get(OFFICE_SPACE_ARG) or "").strip()
     if not sp:
         return ws
     m = re.fullmatch(r"org:(\d{1,9})", sp)

@@ -52,7 +52,7 @@ const dtPvBtn = id => `<button type="button" class="btn pri dtp-pvbtn" data-dt="
 async function dtPdfPreview(d) {
   if (!await dtSave(d, true)) return;
   const u = `/api/office/gen-docs/${d.id}/pdf`;
-  typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(u, '_blank', 'noopener');
+  typeof pdfView === 'function' ? pdfView({url: u, name: (d.title || 'document') + '.pdf', dlUrl: u}) : window.open(ofc_spUrl(u), '_blank', 'noopener');
 }
 const dtVarBar = target => `<div class="dtp-vars" role="group" aria-label="${esc(tr('Insert a variable'))}">${(DT.data?.vars || []).map(v => `<button type="button" class="btn sm ghost" data-dt="var" data-k="${esc(v.key)}" data-t="${target}" title="{{${esc(v.key)}}}">${ic('plus', 's')}<span>${esc(v.label)}</span></button>`).join('')}</div>`;
 const dtHint = () => `<p class="muted ofchint">${esc(tr('# heading, - list, variables in {{ }}, [[ … ]] an optional part (left out when a variable in it has no value)'))}</p>`;  // 2.296.0 C (#3165)
@@ -430,7 +430,7 @@ async function dsb_set(x, body) {
 function dsb_open(x, signed) {
   const u = `${DSB_API}/${x.id}/pdf${signed ? '?signed=1' : ''}`;
   if (!signed && typeof pdfView === 'function') pdfView({url: u, name: (x.title || 'sheet') + '.pdf', dlUrl: u});
-  else window.open(u, '_blank', 'noopener');  // the signed sheet may be a photo (upload / mail): the browser shows either
+  else window.open(ofc_spUrl(u), '_blank', 'noopener');  // the signed sheet may be a photo (upload / mail): the browser shows either
 }
 function dsb_menu(b, x) {
   if (!x) return;

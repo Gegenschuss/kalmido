@@ -190,7 +190,7 @@ async function fci_preview(file) {
   const fd = new FormData(); fd.append('file', file);
   let j;
   try {
-    const r = await fetch('/api/office/fixed-costs/import/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
+    const r = await ofc_spFetch('/api/office/fixed-costs/import/preview', {method: 'POST', body: fd, credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}});
     j = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(j.error || r.statusText);
   } catch (x) { toast(x.message || tr('unknown')); return; }

@@ -19,7 +19,7 @@ async function bnr_load() {
   if (BNR.rules === undefined) {  // the rules come with part B: without the route (404) the "remember" button stays hidden
     BNR.rules = null;
     // a plain fetch: an unknown route answers an HTML 404, which rawFetch would take for an expired session (reload)
-    fetch('/api/office/bank/rules', {headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'}).then(r => r.ok && (r.headers.get('content-type') || '').includes('json'), () => false)
+    ofc_spFetch('/api/office/bank/rules', {headers: {'X-Requested-With': 'kalmido'}, credentials: 'same-origin'}).then(r => r.ok && (r.headers.get('content-type') || '').includes('json'), () => false)
       .then(ok => { BNR.rules = ok; ofcDraw(); });
   }
   ofcDraw();

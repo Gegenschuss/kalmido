@@ -64,7 +64,7 @@ document.addEventListener('click', async e => {
   else if (a === 'unpick') { DMA.pending.splice(+b.dataset.i, 1); box.innerHTML = dmaListHtml([], null); }
   else if (a === 'view' && f) {
     const u = dmaUrl(cid, fid);
-    typeof pdfView === 'function' ? pdfView({url: u, name: f.name, size: f.size, dlUrl: u}) : window.open(u, '_blank', 'noopener');
+    typeof pdfView === 'function' ? pdfView({url: u, name: f.name, size: f.size, dlUrl: u}) : window.open(ofc_spUrl(u), '_blank', 'noopener');
   } else if (a === 'replace' && f) {
     dmaPick(false, async ([nf]) => {
       if (!dmaIsPdf(nf)) { dmaErr(md, tr('Only PDF files can be attached')); return; }

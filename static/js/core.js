@@ -579,6 +579,14 @@ async function docsAll(url, f = rawFetch) {
 // (header X-Kalmido-Office-Space, office/model.py office_space); '' = the server's choice from the setting workspace
 const ofc_spOpen = () => S.route?.mod === 'office' && S.route.wsp && typeof wsCur === 'function' && wsCur() === 'all' ? S.route.wsp : '';
 const ofc_spHdr = url => /^\/api\/office\//.test(String(url || '')) ? ofc_spOpen() : '';
+// 2.577.0 (#4638, review): links, window.open, images and pdfView cannot send the header: the same area as ?_osp= (once);
+// raw fetch() calls outside rawFetch0 go through ofc_spFetch (header); any <a href="/api/office/..."> gets it on its click
+const ofc_spUrl = url => { const u = String(url || ''), sp = ofc_spHdr(u); return sp && !/[?&]_osp=/.test(u) ? `${u}${u.includes('?') ? '&' : '?'}_osp=${encodeURIComponent(sp)}` : u; };
+const ofc_spFetch = (url, opt = {}) => { const sp = ofc_spHdr(url); if (sp) opt = {...opt, headers: {...(opt.headers || {}), 'X-Kalmido-Office-Space': sp}}; return fetch(url, opt); };
+['click', 'auxclick', 'contextmenu'].forEach(t => document.addEventListener(t, e => {
+  const a = e.target?.closest?.('a[href^="/api/office/"]'), h = a?.getAttribute('href'); if (!h) return;
+  const u = ofc_spUrl(h); if (u !== h) a.setAttribute('href', u);
+}, true));
 async function rawFetch(method, url, body, key, osp) {  // key: 2.270.0 C (#3022) the outbox entry's idempotency key; osp: 2.577.0 (#4638) its office area
   // 2.64.1 (#1817): texts of a locked list leave encrypted, ciphers in answers become plain texts in memory (liste2e.js)
   if (typeof le2eOut === 'function') body = await le2eOut(method, url, body);

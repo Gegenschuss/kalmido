@@ -4,6 +4,7 @@
 // - the overview (Private, Alpha, Bravo); a tap opens #office/s/org:<Alpha>: its office, the workspace on top stays "All"
 // - a link inside the area keeps it (#office/s/<space>/<tab>); a change made there lands in that area (the request names it)
 // - an outbox entry keeps the area it was made in, even when another area is open by the time it goes out
+// - #4638 (review): a download link inside the area carries ?_osp=<space>, a raw fetch the header
 // - the browser's Back leads to the overview; Private opens the personal office the same way
 // - freelancer-matrix: office (a person without an organisation: no overview, office/s/private = her own office)
 const {execFileSync} = require('child_process');
@@ -48,6 +49,16 @@ const svc = async sp => ((await call('GET', '/api/office/services', null, CK, {'
   await w.eval("api('POST', '/api/office/services', {name_de: 'Alpha service'})").catch(e => check(false, 'the change in Alpha ' + e.message));
   const sa = await svc(WA), sb = await svc(WB);
   check(sa.includes('Alpha service') && !sb.includes('Alpha service'), `a change made in Alpha lands in Alpha ${sa} / ${sb}`);
+  // 2.577.0 (#4638, review): a download link inside the area carries it (?_osp=, core.js ofc_spUrl), a raw fetch the header
+  w.eval(`(() => { const a = document.createElement('a'); a.id = 'p2577dl'; a.href = '/api/office/subs.csv'; a.download = '';
+    a.addEventListener('click', e => e.preventDefault()); document.getElementById('view').appendChild(a); a.click(); })()`);
+  const dl = d.getElementById('p2577dl')?.getAttribute('href');
+  check(dl === '/api/office/subs.csv?_osp=' + encodeURIComponent(WA), 'a download link in Alpha carries the area ' + dl);
+  d.getElementById('p2577dl').click();
+  check(d.getElementById('p2577dl').getAttribute('href') === dl, 'a second click adds it only once');
+  check(w.eval("ofc_spUrl('/api/office/docs/1/ubl?x=1')") === '/api/office/docs/1/ubl?x=1&_osp=' + encodeURIComponent(WA) && w.eval("ofc_spUrl('/api/files/1')") === '/api/files/1', 'window.open targets: only office addresses get the area');
+  const raw = await w.eval("ofc_spFetch('/api/office/settings', {credentials: 'same-origin', headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json())");
+  check(raw.org_id === A, 'a raw fetch in Alpha names the area (header) ' + raw.org_id);
   // an outbox entry: made in Alpha, sent while Bravo is open
   w.eval("enqueue('POST', '/api/office/services', {name_de: 'Queued in Alpha'}); S.route = {...S.route, wsp: 'org:" + Bo + "'};");
   check(await until(async () => (await svc(WA)).includes('Queued in Alpha')), 'the waiting change goes out into Alpha ' + (await svc(WA)));
