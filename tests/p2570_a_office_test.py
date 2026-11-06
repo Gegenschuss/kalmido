@@ -116,7 +116,10 @@ def run(s, who, uid, cl_org=None):
     for what, url, method, change, field, hist in objs:
         p = f"{who} {what}: "
         r = s.get(B + hist)
-        check(r.status_code == 200 and r.json().get("items") == [], p + f"a new row: an empty history {r.status_code} {r.text[:160]}")
+        it = r.json().get("items") if r.status_code == 200 else None
+        if what == "deal":  # 2.585.0 (#4795): a new deal starts with its create entry
+            it = [x for x in it or [] if x.get("action") != "create"] if len(it or []) == 1 else it
+        check(r.status_code == 200 and it == [], p + f"a new row: an empty history {r.status_code} {r.text[:160]}")
         r = s.request(method, B + url, json=change)
         check(r.ok, p + f"a change {r.status_code} {r.text[:160]}")
         r = s.get(B + hist)

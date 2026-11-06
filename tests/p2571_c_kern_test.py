@@ -190,7 +190,8 @@ def leads(who, s, me):
     r = s.patch(B + f"{O}/deals/{did}", json={"note": "dann", "expect_updated_at": r.json()["updated_at"]})
     check(r.ok and MS.search(r.json().get("updated_at") or ""), f"{who}: the lead changed {r.status_code} {r.text[:200]}")
     h = hist("office_deal", did)
-    check(len(h) == 1 and h[0][0] == me and h[0][2] == "update" and "note" in h[0][4], f"{who}: the change is in obj_history {h}")
+    # 2.585.0 (#4795): the lead's create entry comes first, then the change
+    check(len(h) == 2 and h[0][2] == "create" and h[1][0] == me and h[1][2] == "update" and "note" in h[1][4], f"{who}: the change is in obj_history {h}")
     old = "2026-01-02T10:00:05+00:00"  # a row of an older version: whole seconds
     dbx("UPDATE office_deals SET updated_at=? WHERE id=?", (old, did))
     r = s.patch(B + f"{O}/deals/{did}", json={"note": "alt", "expect_updated_at": "2026-01-02T10:00:04+00:00"})

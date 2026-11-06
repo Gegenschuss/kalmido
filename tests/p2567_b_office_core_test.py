@@ -71,6 +71,8 @@ def two(s, who, what, kind, table, rid, url, b1, b2, alias="row", hist=None, kee
     if uid:
         check(stored(table, rid).get("updated_by") == uid, p + f"updated_by names who saved {stored(table, rid).get('updated_by')}")
     h = sql("SELECT vals_before, vals_after, action FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id", (kind, rid))
+    # 2.585.0 (#4795): a new deal / lead starts with a create entry, the changes follow as updates
+    h = [x for x in h if x[2] != "create"] if kind == "office_deal" else h
     check(len(h) >= 1 and all(x[2] == "update" for x in h), p + f"the history has the change ({len(h)})")
     if hist and h:
         names = set()
