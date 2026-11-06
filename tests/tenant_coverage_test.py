@@ -1111,6 +1111,7 @@ ROUTES = {
     # 2.125.0 B (#2119): monthly timesheets (p2125_b_api_test.py)
     "GET /api/time/sheets": "timesheet", "POST /api/time/sheets": "own", "POST /api/time/sheets/decide": "timesheet",
     "PUT /api/sheets/{}/chart": "sheet",  # 2.124.0 A (#2115): the chart of a table (p2124_a_api_test.py)
+    "POST /api/sheets/{}/print.pdf": "sheet",  # 2.578.0 (#3462): the print view as PDF (p2578_d_api_test.py: a stranger 404)
     # 2.124.0 E (#2116): the sheets of a table (p2124_e_api_test.py: a stranger 404 on every route, another organisation's agent 404)
     "GET /api/sheets/{}/tabs": "sheet", "POST /api/sheets/{}/tabs": "sheet", "PATCH /api/sheets/{}/tabs/{}": "sheet",
     "DELETE /api/sheets/{}/tabs/{}": "sheet", "POST /api/sheets/{}/tabs/{}/restore": "sheet",

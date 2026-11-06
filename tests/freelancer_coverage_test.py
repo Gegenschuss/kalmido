@@ -879,6 +879,7 @@ ROUTES = {
     "GET /api/office/move/check": "office", "POST /api/office/move/org": "office",
     # 2.96.0 B (#1941): a table to the other workspace
     "POST /api/sheets/{}/move-space": "sheets",
+    "POST /api/sheets/{}/print.pdf": "sheets",  # 2.578.0 (#3462): the print view as PDF (p2578_d_api_test.py: a private table)
     "POST /api/lists/{}/move-space": "lists",  # 2.401.0 (#2924): p2401_a_api_test.py (409 without an organisation: no other workspace)
     # 2.407.0 A (#3513): "agent is working" on a task (p2407_a_api_test.py: the own agent of a person without an organisation)
     "GET /api/v1/tasks/{}/working": "agents", "POST /api/v1/tasks/{}/working": "agents",

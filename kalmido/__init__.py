@@ -489,6 +489,7 @@ ORDER = (
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "docs.dviews",  # 2.579.0 (#4802): saved views of the documents search (a kind of the shared core + their counts / hits)
     "sheets.io",  # 2.89.0 C (#1916): tables to / from CSV and .xlsx (export, import as a new sheet)
+    "sheets.shprint",  # 2.578.0 (#3462): the print view of a table as a PDF (portrait / landscape, fitted, page numbers)
     "sheets.v1",  # 2.89.0 C (#1916): tables for agents (API v1 + OpenAPI)
     "personal.v1focus",  # 2.116.0 D (#2067): focus sessions + habit statistics for API v1
     "videos.v1",  # 2.99.1 C (#1959): video sign-offs for agents (API v1 + OpenAPI)

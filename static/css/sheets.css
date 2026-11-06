@@ -242,6 +242,11 @@ html.mini-sheet .shvtop>a.btn{display:none}
   #shk-print tr{break-inside:avoid}
   @page{margin:12mm}
 }
+/* 2.578.0 (#3462): the print dialog (sheetprint.js) */
+.shp-set{border:0;padding:0;margin:0 0 .75rem;display:flex;flex-wrap:wrap;gap:.25rem 1rem}
+.shp-set legend{font-weight:600;margin-bottom:.25rem;width:100%}
+.shp-opts{flex-direction:column}
+.shp-hint{width:100%}
 /* 2.124.0 E (#2116): the sheet bar under the grid (sheetbook.js): tabs that scroll sideways on a phone, the open one in the
    accent; one sheet = only a quiet "+" */
 .shbbar{display:flex;align-items:center;gap:.25rem;margin-top:.5rem;min-width:0;border-top:.0625rem solid var(--line)}

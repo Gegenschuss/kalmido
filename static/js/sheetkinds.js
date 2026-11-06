@@ -235,6 +235,6 @@ document.addEventListener('click', e => {
   const c = SHV.cur && sh._col.has(SHV.cur.c) && sh._rowNo.has(SHV.cur.r) ? shvCell(SHV.cur.r, SHV.cur.c, sh) : null;
   return `<section class="shvsec shhsec">${c ? `<button type="button" class="btn sm" data-shh="cell">${ic('clock', 's')}${tr('History of the cell')}</button>` : ''}<button type="button" class="btn sm" data-shh="sheet">${ic('undo', 's')}${tr('Recent changes')}</button></section>`;
 });
-SHV_HOOKS.menu.push(sh => [{label: tr('Recent changes'), icon: 'clock', fn: () => shh_open(null)}, {label: tr('Print / PDF…'), icon: 'printer', fn: shk_print},
+SHV_HOOKS.menu.push(sh => [{label: tr('Recent changes'), icon: 'clock', fn: () => shh_open(null)}, {label: tr('Print / PDF…'), icon: 'printer', fn: () => typeof shp_dialog === 'function' ? shp_dialog(sh) : shk_print()},  // 2.578.0 (#3462): the dialog of sheetprint.js
   ...(sh.can_write && (sh.freeze_rows || sh.freeze_cols) ? [{label: tr('Release the kept rows and columns'), icon: 'pin', fn: () => shk_fixSet({rows: 0, cols: 0}, tr('Rows and columns released'))}] : [])]);
 window.addEventListener('dblclick', e => { if (/** @type {any} */ (e.target).closest?.('#shv-scroll [data-shkbox]')) e.stopPropagation(); }, true);  // two clicks on a box = two ticks, no third

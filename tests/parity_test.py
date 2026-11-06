@@ -359,6 +359,9 @@ APP_ONLY = [
     ("2.124.0 A (#2115): the chart of a table is how a person looks at it in the app (kind and columns of the drawing); an agent "
      "reads it with the table (GET /sheets/{id} answers chart) and works on the values, the drawing itself stays with people",
      ("=PUT /api/sheets/{}/chart",)),
+    ("2.578.0 (#3462): the print view of a table is a PDF for a person to print or keep (page layout of the app); an agent reads "
+     "the same values with the table (GET /sheets/{id}) and writes its own documents",
+     ("=POST /api/sheets/{}/print.pdf",)),
     ("2.124.0 B (#2110 #2111 #2112): uploading a file into a table cell and opening it, the people a person cell offers, the "
      "rows / columns kept in view and the history of the cells stay with people in the app; an agent reads and writes the new "
      "kinds through the table tools (a file cell read only: its name and id)",

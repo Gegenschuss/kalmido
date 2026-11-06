@@ -74,8 +74,12 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   *Keep columns in view up to here*. Those rows / columns stay put while you scroll (also on a phone), for everyone who
   opens the table; *Release the kept rows* / *columns* (or the table's menu) ends it. Not the same as *Freeze value*,
   which keeps one cell's value as a copy.
-- **Print / PDF.** The table's menu has *Print / PDF…*: a plain view of the rows shown (filters apply) with the column
-  titles repeated on every page. In the print dialog choose *Save as PDF* for a PDF file (on phones too).
+- **Print / PDF.** The table's menu has *Print / PDF…* (since 2.578.0 a dialog): *Portrait* or *Landscape*, the *Whole sheet*
+  (the rows your filters show) or the *Selection* (the cells you selected before), *Fit to page width* (the text gets
+  smaller until every column fits; without it, columns that do not fit continue on further pages), *Repeat the header row on
+  every page* and *Page numbers* ("Page 1 of 3"). *Show PDF* opens the PDF in the app to print or download; the values are
+  the ones you see. A cell's text stays on one line (a long one ends with "…"). *Browser print* is the quick way of before:
+  a plain view of the rows shown with the column titles repeated on every page; in the print dialog choose *Save as PDF*.
 - **History.** The panel has *History of the cell* (who changed the chosen cell when, before -> after) and *Recent changes*
   (also in the table's menu): the latest 200 changes of the table within 90 days, people and agents. Whoever may read the
   table sees its history; it moves along when the table moves to another workspace.

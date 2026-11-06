@@ -11,6 +11,9 @@ Invented names only, the .xlsx is generated here.
    formulas again, MATCH gets ;1 and WEEKNUM ;1; the export writes them back, a Kalmido VERGLEICH with 2 arguments gets ,0 and
    a KALENDERWOCHE with one ,21
  - charts: pie, donut and stacked bars are stored; a pie / donut takes one column with numbers (else 400); an unknown kind 400
+ - the print view as PDF (POST /api/sheets/<id>/print.pdf): portrait / landscape (MediaBox), the header row on every page or
+   once, page numbers on / off, a selection of rows and columns, a wide sheet across pages without "fit" and on one with it,
+   bad options 400, a stranger 404
  - a person without an organisation uses the new functions and a pie chart in the private workspace
 tenant-matrix: sheet
 freelancer-matrix: sheets
@@ -22,6 +25,7 @@ import re
 import subprocess
 import sys
 import zipfile
+import zlib
 
 import requests
 
@@ -278,6 +282,63 @@ if r.ok:
     ra = requests.get(B + f"/api/v1/sheets/{AS['id']}", headers=AG)
     check(ra.ok and (ra.json().get("chart") or {}).get("type") == "pie", "an agent's GET has the pie chart " + ra.text[:200])
 
+# ================================================================== #3462 point 4: the print view as PDF
+def pdf_parts(raw):
+    """(page count, [MediaBox sizes], the page contents unpacked) of a PDF from shprint (FlateDecode streams)."""
+    boxes = re.findall(rb"/Type /Page /Parent \d+ 0 R /MediaBox \[0 0 ([\d.]+) ([\d.]+)\]", raw)
+    text = b""
+    for m in re.finditer(rb"stream\n(.*?)\nendstream", raw, re.S):
+        try:
+            text += zlib.decompress(m.group(1)) + b"\n"
+        except zlib.error:
+            pass
+    return len(boxes), [(float(w), float(h)) for w, h in boxes], text
+
+
+def hx(s):
+    return ("<" + s.encode("cp1252").hex() + ">").encode()
+
+
+r = A.post(B + "/api/sheets", json={"title": "Print me", "space": f"org:{ORG}"})
+PS = r.json()
+PID = PS["id"]
+c1 = A.post(B + f"/api/sheets/{PID}/columns", json={"title": "Customer", "kind": "text"}).json()["column"]
+c2 = A.post(B + f"/api/sheets/{PID}/columns", json={"title": "Amount", "kind": "number"}).json()["column"]
+A.post(B + f"/api/sheets/{PID}/rows", json={"count": 80})
+check(put(A, PID, [{"cell": f"{c1['letter']}{i}", "raw": f"Client {i:03d}"} for i in range(1, 81)]
+          + [{"cell": f"{c2['letter']}{i}", "raw": str(i * 10)} for i in range(1, 81)]).ok, "print: 80 rows")
+purl = B + f"/api/sheets/{PID}/print.pdf"
+r = A.post(purl, json={"orient": "portrait", "fit": True, "head": True, "numbers": True})
+check(r.ok and r.headers.get("Content-Type", "").startswith("application/pdf") and r.content.startswith(b"%PDF"), "print: a PDF "
+      + str(r.status_code) + r.text[:200] if not r.ok else "print: a PDF")
+n, boxes, txt = pdf_parts(r.content)
+check(n >= 2 and all(b == (595.28, 841.89) for b in boxes), f"print: portrait A4 over {n} pages {boxes[:2]}")
+check(txt.count(hx("Customer")) == n, f"print: the header row on each of the {n} pages ({txt.count(hx('Customer'))})")
+check(hx(f"Page 1 of {n}") in txt and hx(f"Page {n} of {n}") in txt, "print: page numbers")
+check(hx("Print me") in txt and hx("Client 080") in txt and hx("800") in txt, "print: title and the last row")
+r = A.post(purl, json={"orient": "landscape", "fit": True, "head": False, "numbers": False})
+n2, boxes, txt = pdf_parts(r.content)
+check(r.ok and boxes and all(b == (841.89, 595.28) for b in boxes), f"print: landscape {boxes[:1]}")
+check(txt.count(hx("Customer")) == 1 and hx("Page 1 of") not in txt and n2 >= 2, f"print: header only once, no page numbers ({n2} pages)")
+rows = [x["id"] for x in get(A, PID)["rows"]]
+r = A.post(purl, json={"rows": rows[2:4], "cols": [c1["id"]]})
+n3, _b, txt = pdf_parts(r.content)
+check(r.ok and n3 == 1 and hx("Client 003") in txt and hx("Client 004") in txt and hx("Client 005") not in txt
+      and hx("Amount") not in txt, "print: the selection only (two rows, one column)")
+# a wide sheet: without "fit" the columns run onto further pages, with "fit" they share one page width
+r = A.post(B + "/api/sheets", json={"title": "Wide", "space": f"org:{ORG}"})
+WID = r.json()["id"]
+for _ in range(9):
+    A.post(B + f"/api/sheets/{WID}/columns", json={"title": "", "kind": "text"})
+wl = [c["letter"] for c in get(A, WID)["columns"]]
+put(A, WID, [{"cell": f"{L}1", "raw": f"Long text in column {L} " * 2} for L in wl])
+na = pdf_parts(A.post(B + f"/api/sheets/{WID}/print.pdf", json={"fit": False}).content)[0]
+nf = pdf_parts(A.post(B + f"/api/sheets/{WID}/print.pdf", json={"fit": True}).content)[0]
+check(na > 1 and nf == 1, f"print: without fit {na} pages across, with fit {nf}")
+for bad, what in (({"orient": "upside"}, "an unknown orientation"), ({"rows": []}, "no rows"), ({"rows": [999999999]}, "rows of no sheet"),
+                  ({"cols": "A"}, "columns not a list")):
+    check(A.post(purl, json=bad).status_code == 400, f"print: {what} = 400")
+
 # ================================================================== a person without an organisation
 FID, Fl = freelancer(B, A, "fiona", FEATURES + ",sheets")
 r = Fl.post(B + "/api/sheets", json={"title": "My hours", "space": "private"})
@@ -292,6 +353,10 @@ check(cell(d, "C1").get("value") == 6 and cell(d, "C2").get("value") == 5, "free
 r = Fl.put(B + f"/api/sheets/{FS['id']}/chart", json={"chart": {"type": "pie", "x": FS["columns"][0]["id"], "y": [FS["columns"][1]["id"]]}})
 check(r.ok and get(Fl, FS["id"])["chart"]["type"] == "pie", "freelancer: a pie chart of the own table " + r.text[:200])
 check(A.put(B + f"/api/sheets/{FS['id']}/chart", json={"chart": None}).status_code == 404, "someone else: the freelancer's table 404")
+r = Fl.post(B + f"/api/sheets/{FS['id']}/print.pdf", json={"orient": "landscape"})
+check(r.ok and r.content.startswith(b"%PDF"), "freelancer: the print view of the own table " + (r.text[:200] if not r.ok else ""))
+check(Fl.post(purl, json={}).status_code == 404 and A.post(B + f"/api/sheets/{FS['id']}/print.pdf", json={}).status_code == 404,
+      "print: a stranger gets 404 both ways (organisation table / private table)")
 
 print(f"{OKS[0]} ok, {len(FAILS)} failed")
 sys.exit(1 if FAILS else 0)
