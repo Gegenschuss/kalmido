@@ -350,13 +350,7 @@ document.addEventListener('click', async e => {
       typeof dup_open === 'function' && propOn() && dup_books().length && {label: tr('Find duplicates with an agent…'), icon: 'bot', fn: () => dup_open()}]);  // 2.70.0 B (#1357)
   } else if (k === 'cmenu' && CT.card) {
     const c = CT.card, w = ctWrite(ctBook(c.book_id));
-    menu(b, [...fv2_menuRow('r:contact:' + c.id) /* 2.441.0 (#3592): opened beside the list a contact has no address of its own */, w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: async () => {
-      // 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links)
-      if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
-      // 2.559.0 (#4660): gone at once (ct_delOpt), no GET /api/state; an error brings it back
-      if (isMobile()) go('contacts');
-      try { await ct_delOpt(c); } catch { return; }
-      toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } ctLoad(); }); }},
+    menu(b, [...fv2_menuRow('r:contact:' + c.id) /* 2.441.0 (#3592): opened beside the list a contact has no address of its own */, w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => ct_delAsk(c)},
       feat('events') && {label: tr('Invite to a new event'), icon: 'cal', fn: () => evEditor({attendees: [{contact_id: c.id, name: c.fn, email: c.emails?.[0]?.value || '', partstat: 'needs-action'}]})},
       typeof nwl_ctItem === 'function' && nwl_ctItem(c, w, b),  // 2.55.0 (#1455): the newsletter consent
       ctk_clientItem(c, ctBook(c.book_id)),  // 2.119.1 B (#2082): create a client from the contact / open its client
@@ -488,8 +482,18 @@ async function bk_move(ids, b) {
 document.addEventListener('keydown', e => {  // capture: before the global Esc (an open menu / dialog closes first)
   if (e.key === 'Escape' && CT.pick && S.route.mod === 'contacts' && !$('.modal, .lightbox') && $('#pop')?.classList.contains('hidden')) { e.preventDefault(); bk_end(); }
 }, true);
-// the phone: a long press on a row starts the selection with it (the click after it does nothing)
-const bk_lpS = ms_longPress('#view .ctrow[data-ctopen]', () => !!CT.pick, r => bk_start(+r.dataset.ctopen));
+// 2.607.0 (#4612): a long press (phone) / a right click (computer) on a row opens its menu: the name, "Select" (starts the
+// selection with it), Open, favourite, Delete; while the selection runs a long press ticks the row (the click after it does nothing)
+function bk_rowMenu(r) {
+  const id = +r.dataset.ctopen, c = (CT.items || []).find(x => x.id === id); if (!c || CT.trash) return false;
+  const w = ctWrite(ctBook(c.book_id));
+  menu(r, [...cm_selHead(c.fn, bk_canPick() ? () => bk_start(id) : null),
+    {label: tr('Open'), icon: 'eye', fn: () => { if (isMobile()) go('contacts/' + id); else ctOpen(id); }},
+    ...fv2_menuRow('r:contact:' + id),
+    w && {label: tr('Delete'), icon: 'trash', cls: 'danger', fn: () => ct_delAsk(c)}].filter(Boolean));
+  return true;
+}
+const bk_lpS = cm_bind('#view .ctrow[data-ctopen]', bk_rowMenu, r => { if (!CT.pick) return false; bk_click(+r.dataset.ctopen, false); return true; });
 
 // ---- the editor
 // 2.565.0 (#4705): an existing contact saves only the fields changed in the dialog, with the version it was opened on (objsave.js
@@ -629,6 +633,14 @@ async function ct_saveOpt(c, body, req) {  // req: 2.565.0 (#4705) the dialog's 
   if (!c || CT.sel === r.id) { CT.sel = r.id; CT.card = r; }
   ctDraw(); ctLoad();  // the list from the server in the background (not awaited)
   return r;
+}
+// 2.272.0 E1 (#3038): into the trash; Undo takes it out again (with its notes and links). The card's menu and the row's (#4612)
+async function ct_delAsk(c) {
+  if (!await askConfirm(tr('Delete the contact “{0}”?', c.fn), tr('It goes to the trash and is removed from the phones that sync this address book.'), {ok: tr('Delete'), danger: true})) return;
+  // 2.559.0 (#4660): gone at once (ct_delOpt), no GET /api/state; an error brings it back
+  if (isMobile()) go('contacts');
+  try { await ct_delOpt(c); } catch { return; }
+  toast(tr('Contact deleted'), async () => { try { await api('POST', `/api/contacts/${c.id}/restore`); } catch (x) { toast(x.message || ''); return; } ctLoad(); });
 }
 async function ct_delOpt(c) {
   const put = () => {

@@ -83,12 +83,15 @@ const ptr = (w, el, type, extra = {}) => {  // jsdom has no PointerEvent: a Mous
   d.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Escape', bubbles: true})); await sleep(50);
   check(!d.querySelector('#ct-sbar') && w.eval('CT.pick') === null, '#1554: Esc ends the selection');
   w.close();
-  // the phone: a long press starts the selection with that row
+  // the phone: a long press opens the row's menu (2.607.0 #4612: name, "Select" on top), "Select" starts the selection with that row
   w = await boot({user: 'bob', hash: 'contacts', mobile: true}); d = w.document;
   await until(() => d.querySelectorAll('#view .ctrow').length === 2, 60);
   const r2 = [...d.querySelectorAll('#view .ctrow')].find(x => x.textContent.includes('Own Person 2'));
   ptr(w, r2, 'pointerdown', {pointerType: 'touch'}); await sleep(650); ptr(w, r2, 'pointerup', {pointerType: 'touch'}); r2.click(); await sleep(50);
-  check(!!d.querySelector('#ct-sbar') && w.eval('CT.pick.size') === 1 && !/contacts\/\d/.test(w.location.hash), '#1554: a long press starts the selection with the row (the click after it does not open it)');
+  const lpm = [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"] .ml')].map(x => x.textContent);
+  check(lpm[0] === 'Own Person 2' && lpm[1] === 'Select' && lpm.includes('Open') && !d.querySelector('#ct-sbar') && !/contacts\/\d/.test(w.location.hash), '#4612: a long press opens the menu (name, Select, Open), the click after it opens nothing ' + lpm);
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(x => x.textContent.trim() === 'Select')?.click(); await sleep(50);
+  check(!!d.querySelector('#ct-sbar') && w.eval('CT.pick.size') === 1 && !/contacts\/\d/.test(w.location.hash), '#1554: "Select" starts the selection with the row');
   w.close();
 
   console.log(`p2461_c_ui: ${ok} ok, ${F.length} failed`);

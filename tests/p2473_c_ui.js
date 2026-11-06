@@ -162,7 +162,11 @@ const typeIn = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input
   await until(() => d.querySelectorAll('#view .msclients .ctrow').length === 1, 60);
   const r1 = d.querySelector('#view .msclients .ctrow');
   ptr(w, r1, 'pointerdown', {pointerType: 'touch'}); await sleep(650); ptr(w, r1, 'pointerup', {pointerType: 'touch'}); r1.click(); await sleep(50);
-  check(!!d.querySelector('#ct-sbar') && w.eval('MSC.pick.size') === 1 && !/client\/\d/.test(w.location.hash), '#1733: a long press starts the selection (the click after it does not open the card)');
+  // 2.607.0 (#4612): a long press opens the row's menu (name, "Select" on top); "Select" starts the selection
+  const lpm = [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"] .ml')].map(x => x.textContent);
+  check(lpm[1] === 'Select' && lpm.includes('Open') && !d.querySelector('#ct-sbar') && !/client\/\d/.test(w.location.hash), '#4612: a long press opens the menu, the click after it does not open the card ' + lpm);
+  [...d.querySelectorAll('#pop [role="menuitem"]')].find(x => x.textContent.trim() === 'Select')?.click(); await sleep(50);
+  check(!!d.querySelector('#ct-sbar') && w.eval('MSC.pick.size') === 1 && !/client\/\d/.test(w.location.hash), '#1733: "Select" starts the selection');
   d.querySelector('#ct-sbar [data-clb="close"]').click(); await sleep(700);  // past the guard against the click that ends a long press
   d.querySelector('#view .msclients .ctrow').click();
   await until(() => d.querySelector('#view #mscl-h'), 40);

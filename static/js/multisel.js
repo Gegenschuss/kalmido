@@ -135,8 +135,10 @@ function ms_merge(o) {
 // long press (phone) on a row matching sel: one menu, two ways, no own right-click list. open(row) -> true when a menu
 // came, otherwise the browser's menu stays. Shared by the file store and the knowledge folders (later the office documents).
 // 2.428.0 A (#3581): pick(row) given = a long press selects the row (like everywhere), the right click keeps the menu
+// 2.607.0 (#4612): a long press opens the menu like the right click (open puts "Select" on top, cm_selHead); pick(row) only
+// while choosing runs: it ticks the row and returns true (a tap ticks as well, #3581)
 function cm_bind(sel, open, pick, keep) {  // 2.571.0 (#4608): keep(e, row) true = the browser's menu stays for this right click
-  const lp = r => { if (pick) { pick(r); return true; } return open(r); };
+  const lp = r => (pick && pick(r)) || open(r);
   const st = ms_longPress(sel, () => false, lp);
   document.addEventListener('contextmenu', e => {
     const r = e.target.closest?.(sel); if (!r || e.target.closest('input, textarea, [contenteditable="true"]') || keep?.(e, r)) return;
@@ -146,6 +148,12 @@ function cm_bind(sel, open, pick, keep) {  // 2.571.0 (#4608): keep(e, row) true
   });
   window.addEventListener('click', e => { if (ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row
   return st;
+}
+// 2.607.0 (#4612): the top of a row menu opened by a long press / right click where rows can be chosen (like tasks, o.select):
+// the name as head, "Select" (starts choosing with this row), a line. pick() missing = no "Select" (head and line only)
+function cm_selHead(name, pick) {
+  const n = String(name || '').trim(), head = n ? [{label: n.length > 60 ? n.slice(0, 59) + '…' : n, cls: 'mhead', dis: true, fn: () => {}}] : [];
+  return [...head, ...(pick ? [{label: tr('Select'), icon: 'select', act: 'cm-select', fn: pick}] : []), '-'];
 }
 // 2.571.0 (#4608): a long press (phone) / a right click (computer) opens the row's own "…" menu everywhere the row has one (like tasks
 // since 2.25.0); where a long press drags or selects (calendar grid, timeline, roadmap, tiles, tables, file store, knowledge,

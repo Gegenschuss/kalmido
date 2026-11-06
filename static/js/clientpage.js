@@ -274,7 +274,14 @@ document.addEventListener('input', e => {
   MSC.q = e.target.value; clearTimeout(MSC.t); MSC.t = setTimeout(ms_clDraw, 120);
 });
 document.addEventListener('change', e => { if (e.target.id === 'mscl-arch') { MSC.arch = e.target.checked; ms_clDraw(); } else if (e.target.id === 'mscl-trash') { MSC.trash = e.target.checked; MSC.tItems = null; MSC.pick = null; ms_clDraw(); } });
-const ms_clLp = ms_longPress('#view .msclients .ctrow[data-clopen]', () => !!MSC.pick, r => ms_clClick(+r.dataset.clopen, false));
+// 2.607.0 (#4612): a long press (phone) / a right click (computer) on a row opens its menu: the name, "Select" (starts the
+// selection with it), Open; while the selection runs a long press ticks the row (the click after it does nothing)
+function ms_clRowMenu(r) {
+  const id = +r.dataset.clopen, c = (MSC.items || []).find(x => x.id === id); if (!c || MSC.trash) return false;
+  menu(r, [...cm_selHead(cdn_label(c), () => ms_clClick(id, false)), {label: tr('Open'), icon: 'eye', fn: () => go('client/' + id)}]);
+  return true;
+}
+const ms_clLp = cm_bind('#view .msclients .ctrow[data-clopen]', ms_clRowMenu, r => { if (!MSC.pick) return false; ms_clClick(+r.dataset.clopen, false); return true; });
 document.addEventListener('click', e => {
   if (S.route.mod !== 'clients') return;
   const bb = e.target.closest('#ct-sbar [data-clb]');

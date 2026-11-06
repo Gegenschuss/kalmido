@@ -32,6 +32,8 @@ const esc = (w, el) => el.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Es
 const tick = (w, el) => { el.checked = true; el.dispatchEvent(new w.Event('change', {bubbles: true})); };
 const ctrlClick = (w, el, shift) => el.dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true, ctrlKey: !shift, shiftKey: !!shift}));
 const touch = (w, el, type) => { const e = new w.Event(type, {bubbles: true, cancelable: true}); for (const [k, v] of Object.entries({pointerType: 'touch', clientX: 5, clientY: 5})) Object.defineProperty(e, k, {value: v}); el.dispatchEvent(e); };
+const menuIt = d => d.querySelector('#pop:not(.hidden)') ? [...d.querySelectorAll('#pop [role="menuitem"] .ml')].map(x => x.textContent) : [];  // 2.607.0 (#4612)
+const menuPick = (d, t) => [...d.querySelectorAll('#pop:not(.hidden) [role="menuitem"]')].find(x => x.textContent.trim() === t)?.click();
 const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
 
 (async () => {
@@ -75,9 +77,12 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   d.querySelector(`[data-k="dc${ids[1]}"] .dc-selmark`).dispatchEvent(new w.MouseEvent('click', {bubbles: true, cancelable: true}));
   check(await until(() => /1 selected/.test(count(d, 'dc-sbar')) && w.eval(`DC.sel.has(${ids[1]})`)), 'documents: the hover mark starts choosing');
   esc(w, d.body); await until(() => !w.eval('DC.selOn'));
+  // 2.607.0 (#4612): a long press opens the card's menu (name, "Select" on top); "Select" starts choosing with the card
   touch(w, d.querySelector(`[data-dco="${ids[0]}"]`), 'pointerdown');
-  check(await until(() => w.eval(`DC.selOn && DC.sel.has(${ids[0]})`)), 'documents: a long press starts choosing with the card');
+  check(await until(() => menuIt(d)[1] === 'Select') && !w.eval('DC.selOn'), 'documents: a long press opens the menu, "Select" on top ' + menuIt(d));
   touch(w, d.querySelector(`[data-dco="${ids[0]}"]`), 'pointerup');
+  menuPick(d, 'Select');
+  check(await until(() => w.eval(`DC.selOn && DC.sel.has(${ids[0]})`)), 'documents: "Select" starts choosing with the card');
   w.close();
 
   // ================= file store
@@ -98,9 +103,12 @@ const count = (d, id) => d.querySelector(`#${id} .mcount`)?.textContent || '';
   ctrlClick(w, d.querySelector(`.abrow[data-abid="${A[2]}"] .abopen`), true);
   check(await until(() => /3 selected/.test(count(d, 'ab-sbar'))) && w.location.hash === h1 && !d.querySelector('.modal'), 'file store: Ctrl-click, then Shift-click chooses the range, nothing opens');
   esc(w, d.body); await until(() => !w.eval('AB.selOn'));
+  // 2.607.0 (#4612): a long press opens the row's menu like the right click, "Select" on top starts choosing
   touch(w, d.querySelector(`.abrow[data-abid="${A[1]}"] .abopen`), 'pointerdown');
-  check(await until(() => w.eval(`AB.selOn && AB.sel.has(${A[1]})`)), 'file store: a long press starts choosing (the menu stays on the right click)');
+  check(await until(() => menuIt(d)[1] === 'Select') && !w.eval('AB.selOn'), 'file store: a long press opens the menu, "Select" on top ' + menuIt(d));
   touch(w, d.querySelector(`.abrow[data-abid="${A[1]}"] .abopen`), 'pointerup');
+  menuPick(d, 'Select');
+  check(await until(() => w.eval(`AB.selOn && AB.sel.has(${A[1]})`)), 'file store: "Select" starts choosing with the row');
   await sleep(700);  // the click that would end the press is past (ms_lpRecent)
   tick(w, box(A[2]));
   await until(() => /2 selected/.test(count(d, 'ab-sbar')));

@@ -57,7 +57,8 @@ const paths = async () => ((await call('GET', '/api/wiki?space=private')).pages 
   d.querySelector(`#view .abrow[data-abid="${INV}"] [data-ab="menu"]`).click();
   const viaDots = items(d); shut(w);
   e = ctx(w, lr.querySelector('.abopen'));
-  check(await until(() => items(d).length) && items(d).join('|') === viaDots.join('|'), 'right click and "…" show exactly the same entries');
+  // 2.607.0 (#4612): the right click puts the name and "Select" on top of the same entries
+  check(await until(() => items(d).length) && items(d)[0] === 'Invoices' && items(d)[1] === 'Select' && items(d).slice(2).join('|') === viaDots.join('|'), 'right click = name, "Select", then exactly the entries of the "…" ' + items(d));
   shut(w);
   const sp = d.querySelector('#side [data-absp="private"]');
   check(sp && !ctx(w, sp).defaultPrevented && !items(d).length, 'a space row of the panel keeps the browser\'s menu');
@@ -86,15 +87,19 @@ const paths = async () => ((await call('GET', '/api/wiki?space=private')).pages 
   check(FM.every(x => viaW.includes(x)), 'its "…" = the folder menu ' + viaW);
   const deep = await until(() => [...d.querySelectorAll('#view .wkdrow')].find(a => /Deep/.test(a.textContent)));
   e = ctx(w, deep);
-  check(e.defaultPrevented && items(d).join('|') === viaW.join('|'), 'right click on a folder of the list: the same menu');
+  // 2.607.0 (#4612): the right click on a row that can be chosen: the name and "Select" on top, then the same menu
+  const rc = items(d);
+  check(e.defaultPrevented && /Deep/.test(rc[0] || '') && rc[1] === 'Select' && rc.slice(2).join('|') === viaW.join('|'), 'right click on a folder of the list: name, "Select", then the same menu ' + rc);
   shut(w);
   // the phone: a long press (pointer events of a finger) opens it, the click ending the press opens nothing
   const pe = (type, el) => { const x = new w.MouseEvent(type, {bubbles: true, cancelable: true, clientX: 10, clientY: 10}); Object.defineProperty(x, 'pointerType', {value: 'touch'}); el.dispatchEvent(x); return x; };
   pe('pointerdown', deep); await sleep(700); pe('pointerup', deep);
-  // 2.428.0 (#3581): a long press selects the folder like everywhere; the menu stays on the right click and the "…"
-  check(await until(() => w.eval('WK.selOn && WK.sel.size === 1')) && !items(d).includes('Rename…'), 'a long press selects the folder, no menu ' + items(d));
+  // 2.607.0 (#4612): a long press opens the row's menu (name, "Select" on top), it no longer selects at once (was 2.428.0 #3581)
+  check(await until(() => items(d)[1] === 'Select' && items(d).includes('Rename…')) && !w.eval('WK.selOn'), 'a long press opens the menu with "Select" on top, nothing chosen yet ' + items(d));
+  pick(d, /^Select$/);
   const h0 = w.location.hash, cl = new w.MouseEvent('click', {bubbles: true, cancelable: true}); deep.dispatchEvent(cl);
   check(cl.defaultPrevented && w.location.hash === h0, 'the click ending the long press does not open the folder');
+  check(await until(() => w.eval('WK.selOn && WK.sel.size === 1')), '"Select" starts choosing with the folder (the click after the press does not untick it)');
   w.eval('wk_selEnd()'); shut(w); await sleep(700);  // a menu event right after a long press belongs to it (Android sends one more)
   // New page here: the dialog starts in the folder
   ctx(w, deep); pick(d, /^New page$/);

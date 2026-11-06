@@ -358,7 +358,7 @@ function ab_newVersion(n) {
   });
   inp.click();
 }
-function ab_menu(anchor, n) { menu(anchor, ab_menuItems(n), null, null, n.name); }
+function ab_menu(anchor, n, pick) { menu(anchor, pick ? [...cm_selHead(n.name, pick), ...ab_menuItems(n)] : ab_menuItems(n), null, null, pick ? '' : n.name); }  // 2.607.0 (#4612): pick = "Select" on top
 // 2.199.0 A (#2742): the items of a node's menu (the row's "…", the tree's right-click / long press); tree: + New folder…
 function ab_menuItems(n, tree) {
   const w = ab_canWrite(n.role), own = n.role === 'owner', f = n.kind !== 'folder', ref = n.kind === 'ref';
@@ -461,11 +461,15 @@ function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked fo
   const n = ab_item(id) || Object.values(AB.pt).flatMap(x => x.items || []).find(x => x.id === +id);
   return n ? Promise.resolve(n) : api('GET', `/api/files/nodes/${+id}`).catch(() => null);
 }
+// 2.607.0 (#4612): a long press too opens the menu, "Select" on top (a row of the list where choosing is offered); while choosing runs
+// a long press ticks the row (like a tap)
+const ab_canPickRow = r => AB.selHere && !!r.closest('.ablist') && !!ab_item(+r.dataset.abid);
 cm_bind('#view .abview .abrow', r => {  // the panel's folders: sbb_treeReg('ab') menu (2.199.0)
   const m = r.querySelector('[data-ab="menu"]'), id = m && m.dataset.id; if (!id) return false;  // trash rows: no menu
-  ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n); });
+  const pick = ab_canPickRow(r) ? (rid => () => ab_smvPick(rid))(+r.dataset.abid) : null;
+  ab_ctxNode(id).then(n => { if (n && r.isConnected) ab_menu(m || r.querySelector('.sbbtn') || r, n, pick); });
   return true;
-}, r => { const id = +r.dataset.abid; if (AB.selHere && r.closest('.ablist') && ab_item(id)) ab_smvPick(id); else { const m = r.querySelector('[data-ab="menu"]'), n = m && ab_item(m.dataset.id); if (n) ab_menu(m, n); } });  // 2.428.0 A (#3581): a long press selects
+}, r => { if (!AB.selOn || !ab_canPickRow(r)) return false; ab_smvPick(+r.dataset.abid); return true; });
 document.addEventListener('change', e => { if (e.target.id === 'ab-file') { const fs = e.target.files; ab_upload(fs, S.route.nid || null); e.target.value = ''; } });
 // dropping files from the computer into the open folder / onto a folder row; dragging a row onto a folder (or the path) moves it
 document.addEventListener('dragstart', e => { const r = e.target.closest?.('.abrow[draggable="true"]'); if (!r) return; AB.drag = +r.dataset.abid; e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', ab_item(r.dataset.abid)?.locked ? '' : r.querySelector('.abname')?.textContent || ''); });  // 2.353.0 F (#2758, review N9): no plain name of a locked folder

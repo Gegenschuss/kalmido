@@ -1016,9 +1016,15 @@ function dc_selToggle(id) {  // 2.430.0 (#3582): tick / untick one card; the fir
   if (typeof dt_rsAnchor === 'function') dt_rsAnchor('dc:' + dc_params(), id);  // a following Shift-click spans from here
   dc_smvToggle(id);
 }
-// a long press on a card (phone) ticks it; the click that ends the press does not open it (multisel.js)
-if (typeof ms_longPress === 'function') {
-  const dc_lp = ms_longPress('.dc-view .dc-card [data-dco]', () => false, r => dc_selToggle(+r.dataset.dco));
+// 2.607.0 (#4612): a long press (phone) / a right click (computer) on a card opens its menu: the name, "Select" (starts choosing
+// with it), Open, favourite; while choosing runs a long press ticks the card; the click that ends the press does not open it (multisel.js)
+function dc_cardMenu(r) {
+  const id = +r.dataset.dco, d = (DC.docs || []).find(x => x.id === id); if (!d) return false;
+  menu(r, [...cm_selHead(d.sender?.name || d.name, () => dc_selToggle(id)), {label: tr('Open'), icon: 'eye', fn: () => { history.replaceState(null, '', `#docs/${id}`); dc_open(id); }}, ...fv2_menuRow('doc:' + id)]);
+  return true;
+}
+if (typeof cm_bind === 'function') {
+  const dc_lp = cm_bind('.dc-view .dc-card [data-dco]', dc_cardMenu, r => { if (!DC.selOn) return false; dc_selToggle(+r.dataset.dco); return true; });
   window.addEventListener('click', e => { if (ms_lpRecent(dc_lp) && e.target.closest?.('.dc-view .dc-card')) { e.preventDefault(); e.stopPropagation(); } }, true);
 }
 function dc_smvToggle(id) {

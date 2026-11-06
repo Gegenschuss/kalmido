@@ -1333,7 +1333,10 @@ window.addEventListener('online', () => setTimeout(wko_syncAll, 3000));
 document.addEventListener('visibilitychange', () => { if (document.hidden && WK.dirty) wk_stash(); });
 window.addEventListener('pagehide', () => { if (WK.dirty) wk_stash(); });  // 2.527.0 (#4304 A2): synchronously, see wk_stash
 // 2.210 B (#2757): a right click / long press on a row of the folder list = its "…" menu (2.200.0 #2747, wk_nodeItems)
+// 2.607.0 (#4612): a long press too opens the menu; the name and "Select" on top where the row can be chosen; while choosing runs
+// a long press ticks the row (like a tap)
 const wk_lpS = cm_bind('#view .wkrow', r => {
   const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (!a) return false;
-  menu(a, wk_nodeItems(+a.dataset.nid, a)); return true;
-}, r => { const nid = wk_rowNid(r); if (nid) wk_selPick(nid); else { const a = r.querySelector(':scope > .wkmore, :scope > details > summary > .wkmore'); if (a) menu(a, wk_nodeItems(+a.dataset.nid, a)); } });  // 2.428.0 A (#3581): a long press selects
+  const nid = wk_rowNid(r), x = nid ? wk_nodeInfo(nid) : null;
+  menu(a, nid ? [...cm_selHead(x?.page ? String(x.page.path || '').split('/').pop() : x?.folder?.name || '', () => wk_selPick(nid)), ...wk_nodeItems(+a.dataset.nid, a)] : wk_nodeItems(+a.dataset.nid, a)); return true;
+}, r => { const nid = wk_rowNid(r); if (!WK.selOn || !nid) return false; wk_selPick(nid); return true; });
