@@ -720,13 +720,16 @@ def move_to_folder(c, node, fid):
     return True
 
 
-def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
+def folder_by_name(c, node, uid, name, create=True, path=False, check=False, also=None):
     """The folder `name` below the documents folder of node's workspace (made when missing and create), or None.
     2.199.0 B (#2742): path=True reads "Kunde A / 2026" as a path and walks (and makes) the subfolders (a customer's name
     with a slash stays one folder: path False). A new folder belongs to the owner of the
     documents folder (2.48.0 review: never a second "Dokumente" elsewhere).
     2.199.0 G (#2742 review): check=True (a person's request) walks only through folders uid sees (fs_role, also the hub
-    mail rule) and makes a folder only where uid edits -- otherwise None and nothing made (no hidden folder, no hint)."""
+    mail rule) and makes a folder only where uid edits -- otherwise None and nothing made (no hidden folder, no hint).
+    2.607.0 (#4872, review): also = a second person who asks along ("Apply what was learned" by someone else than the
+    uploader): the walk and a new folder need both of them -- nobody has a folder made where they may not edit themselves."""
+    who = {uid, also or uid}
     root = docs_root(c, node)
     parts = [safe_fs_name(x[:NAME_MAX]).strip() for x in (str(name or "").split("/") if path else [str(name or "")])]
     parts = [x for x in parts if x][:DEPTH_MAX - 2]
@@ -738,18 +741,18 @@ def folder_by_name(c, node, uid, name, create=True, path=False, check=False):
         r = c.execute("SELECT id FROM fs_nodes WHERE parent_id=? AND kind='folder' AND lower(name)=lower(?) AND deleted_at IS NULL "
                       "ORDER BY id LIMIT 1", (pid, nm)).fetchone()
         if r:
-            if check and not fs_role(c, r[0], uid):
+            if check and not all(fs_role(c, r[0], u) for u in who):
                 return None
             if fl_is_locked(c, r[0]):
                 return None  # 2.353.0 F (#2758, review M2): a locked folder takes no document (none is made next to it either)
             pid = r[0]
             continue
-        if not create or (check and fs_role(c, pid, uid) not in ("owner", "edit")):
+        if not create or (check and any(fs_role(c, pid, u) not in ("owner", "edit") for u in who)):
             return None
         ts = _now()
         pid = insert_id(c, """INSERT INTO fs_nodes(parent_id,kind,name,owner_id,org_id,created_by,created_at,updated_at)
                               VALUES(?,'folder',?,?,?,?,?,?)""",
-                        (pid, _free_name(c, pid, p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"], uid, ts, ts))
+                        (pid, _free_name(c, pid, p["owner_id"], p["org_id"], nm), p["owner_id"], p["org_id"], also or uid, ts, ts))
     return pid
 
 
@@ -853,7 +856,7 @@ def classify(c, m, node, text, given=None, seer=None):
             continue
         if rr.get(f):
             if f == "folder":
-                fid = folder_by_name(c, node, uid, rr[f], path=True, check=True)  # 2.199.0 B (#2742): "A / B" = a subfolder
+                fid = folder_by_name(c, node, uid, rr[f], path=True, check=True, also=seer)  # 2.199.0 B (#2742): "A / B" = a subfolder
                 # 2.351.0 A (#2823): a rule files only into a folder the uploading person may edit (walks and makes folders
                 # only where they see / edit); otherwise the file stays where it lands without the rule
                 if fid and not can(fid):
