@@ -29,7 +29,7 @@ IDEM_HEADER = "Idempotency-Key"
 IDEM_DAYS = 14  # 2.380 H (#3387): as long as the offline queue lives (a change sent after days is no false conflict)
 IDEM_MAX_KEYS = 5000  # 2.380 (#3387 review): kept keys per person; the oldest beyond go (14 days must not mean unbounded)
 IDEM_MAX_BODY = 256 * 1024  # bytes of a stored answer; a larger one is replayed as {"ok": true}
-IDEM_WAIT = 3.0  # s: a repeat that arrives while the first request is still running waits this long for its answer
+IDEM_WAIT = 10.0  # 2.575.0 (#3948): was 3 s; a 503 retry of the MCP client during a long write must not write twice; s: a repeat that arrives while the first request is still running waits this long for its answer
 _IDEM_KEY = re.compile(r"^[A-Za-z0-9_.:-]{1,100}$")
 _IDEM_METHODS = ("POST", "PATCH", "PUT", "DELETE")
 

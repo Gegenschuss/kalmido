@@ -169,7 +169,20 @@ if (-not $OnWindows -and -not $DryRun) { Die (M 'wrongos') }
 # interactive; a dry run, the uninstall or no console: Claude Code
 if (-not $Tool -and $Cmd) { $Tool = if ([IO.Path]::GetFileNameWithoutExtension($Cmd).ToLower() -eq 'codex') { 'codex' } else { 'claude' } }
 if (-not $Tool -and -not $DryRun -and -not $Uninstall -and [Environment]::UserInteractive -and -not [Console]::IsInputRedirected) {
-  try { $ans = Read-Host (M 'ask_tool') } catch { $ans = '' }
+  # 2.575.0 (#3948): with a 120 s timeout like setup.sh (read -t 120); no answer = Claude Code
+  $ans = ''
+  try {
+    Write-Host -NoNewline ((M 'ask_tool') + ' ')
+    $end = (Get-Date).AddSeconds(120)
+    while ((Get-Date) -lt $end) {
+      if (-not [Console]::KeyAvailable) { Start-Sleep -Milliseconds 100; continue }
+      $k = [Console]::ReadKey($true)
+      if ($k.Key -eq 'Enter') { break }
+      if ($k.Key -eq 'Backspace') { if ($ans.Length) { $ans = $ans.Substring(0, $ans.Length - 1); Write-Host -NoNewline "`b `b" }; continue }
+      $ans += $k.KeyChar; Write-Host -NoNewline $k.KeyChar
+    }
+    Write-Host ''
+  } catch { $ans = '' }
   if ("$ans".Trim() -in @('2', 'codex', 'Codex', 'Codex CLI')) { $Tool = 'codex' }
 }
 if (-not $Tool) { $Tool = 'claude' }
@@ -387,12 +400,20 @@ if ($Tool -eq 'codex') {
   # only a few environment variables, so a small wrapper next to the env file reads it and starts the server
   $McpJ = Join-Path $Inst 'kalmido_mcp_run.ps1'
   $PsHost = (Get-Process -Id $PID).Path -replace '\\', '/'
-  $McpArgs = "--skip-git-repo-check -c $(Q ("mcp_servers.kalmido.command='" + $PsHost + "'")) -c $(Q ("mcp_servers.kalmido.args=['-NoProfile','-ExecutionPolicy','Bypass','-File','" + ($McpJ -replace '\\', '/') + "']"))"  # TOML literal strings: no double quotes inside -Command "..."
+  # 2.575.0 (#3948): TOML basic strings (an apostrophe in the path, e.g. a user name like O'Neil, would end a literal string);
+  # their double quotes reach the tool through the command line as \" (see $InnerArg below)
+  function TomlS([string]$v) { '"' + ($v.Replace('\', '/').Replace('"', '\"')) + '"' }
+  $McpArgs = "--skip-git-repo-check -c $(Q ('mcp_servers.kalmido.command=' + (TomlS $PsHost))) -c $(Q ('mcp_servers.kalmido.args=[' + ((@('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $McpJ) | ForEach-Object { TomlS $_ }) -join ',') + ']'))"
 }
 if ($DryRun) { Say (M 'dry_mcp' @($McpJ, $Py, ($pyArgsJ -join ' '))) }
 elseif ($Tool -eq 'codex') {
+  # 2.575.0 (#3948): comments behind values (" # ...") are cut off as in the launcher: a quoted value keeps its content, an
+  # unquoted one loses everything from the first whitespace + "#"
+  $WrapLoop = @'
+foreach ($l in Get-Content -LiteralPath @@ENVF@@) { if ($l -match '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { $k = $Matches[1]; $v = $Matches[2].Trim(); if ($v -match '^"([^"]*)"(\s+#.*)?$' -or $v -match "^'([^']*)'(\s+#.*)?$") { $v = $Matches[1] } else { $v = $v -replace '\s+#.*$', '' }; [Environment]::SetEnvironmentVariable($k, $v, 'Process') } }
+'@
   $w = @('# 2.391.0 (#3359): the Kalmido MCP server for Codex CLI, with the env file of this agent',
-         "foreach (`$l in Get-Content -LiteralPath $(Q $EnvF)) { if (`$l -match '^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$') { [Environment]::SetEnvironmentVariable(`$Matches[1], `$Matches[2].Trim().Trim('`"', `"'`"), 'Process') } }",
+         $WrapLoop.Replace('@@ENVF@@', (Q $EnvF)),
          "& $(Q $Py) $(($pyArgsJ | ForEach-Object { Q $_ }) -join ' ')")
   [IO.File]::WriteAllLines($McpJ, $w)
 }
@@ -428,9 +449,10 @@ Step (M 's_auto')
 $PsExe = (Get-Process -Id $PID).Path
 $Log = Join-Path $Inst 'agent.log'
 $Inner = "Set-Location -LiteralPath $(Q $Dir); & $(Q (Join-Path $Inst 'agent_launcher.ps1')) -e $(Q $EnvF) --events -- $(Q $(if ($Agent) { $Agent } else { $Cmd })) $McpArgs *>> $(Q $Log)"
-$PsArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$Inner`""
+$InnerArg = $Inner.Replace('"', '\"')  # 2.575.0 (#3948): double quotes inside -Command "..." (TOML strings of the Codex arguments)
+$PsArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"$InnerArg`""
 # 2.443.0 (#2940): the Startup folder has no restart of its own: this loop does what RestartSec=30 / ThrottleInterval do in setup.sh
-$LoopArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"while (`$true) { $Inner; Start-Sleep -Seconds 30 }`""
+$LoopArgs = "-NoProfile -NonInteractive -WindowStyle Hidden -ExecutionPolicy Bypass -Command `"while (`$true) { $InnerArg; Start-Sleep -Seconds 30 }`""
 if ($NoAutostart) { Say (M 'noauto'); Say "  $Inner" }
 else {
   Stop-Autostart

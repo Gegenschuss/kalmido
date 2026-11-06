@@ -967,7 +967,9 @@ settings: `--sandbox`, `-c approval_policy=...`), no usage hook and no plan usag
 reach Codex (set `model` in `config.toml` or `-m` in the command). Approval cards work as for every agent: the answer ends in
 an ` ```approval ` block. Codex reads `AGENTS.md` in the project folder as its rules file; put the rules of
 [step 6](#6-claudemd-the-agents-rules) there. The one-command setup does all of this with `--tool codex` (`-Tool codex` on
-Windows); without the option it asks once.
+Windows); without the option it asks once (on a console only, 120 seconds, no answer = Claude Code; the same in `setup.sh` and
+`setup.ps1`, 2.575.0). Windows: an apostrophe in the folder or user name is fine, and comments behind values in the env file
+(`KEY=value # note`) are cut off by the Codex wrapper as by the launcher.
 
 ### Cursor
 

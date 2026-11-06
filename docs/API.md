@@ -155,7 +155,7 @@ for a while, and the admins get an alert.
 `RateLimit-Limit` (requests per minute), `RateLimit-Remaining` (left in the current window) and `RateLimit-Reset` (seconds
 until the window frees a place; the names of the IETF draft), and the same as `X-RateLimit-Limit`, `X-RateLimit-Remaining`
 and `X-RateLimit-Reset` (a Unix time in seconds, like GitHub). Reading them does not count a request. A client with
-`RateLimit-Remaining: 0` waits for `RateLimit-Reset` before its next call. The headers are also in the OpenAPI document
+`RateLimit-Remaining: 0` waits for `RateLimit-Reset` before its next call. The counter lives in each server process: with several replicas the headers show the counter of the replica that answered. The headers are also in the OpenAPI document
 (`components.headers`).
 
 **Rule for changing the API**: `/api/v1` stays; fields and routes are added, none is changed in meaning. A removal is
