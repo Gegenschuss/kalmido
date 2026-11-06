@@ -125,7 +125,7 @@ function wkcm_reset(p) {
   WKCM.base = body; WKCM.baseDoc = v.state.doc;
 }
 /** @type {any} */
-let WKCM_EXT = null, WKCM_FOC = null, WKCM_FX = null, WKCM_FIELD = null;
+let WKCM_EXT = null, WKCM_FOC = null, WKCM_FX = null, WKCM_FIELD = null, WKCM_VP = null;
 // keys of CodeMirror's default keymap that do something else here (Ctrl+I = italic, Ctrl+/ = Ctrl+Shift+7 on a German keyboard)
 const WKCM_NOKEY = new Set(['Mod-i', 'Mod-/', 'Alt-A', 'Shift-Alt-a', 'Mod-[', 'Mod-]']);
 function wkcm_ext(p) {
@@ -159,6 +159,24 @@ function wkcm_upd(u) {
   if ((u.view.contentDOM === document.activeElement) !== u.state.field(WKCM_FIELD).foc) wkcm_focFx(u.view);  // a window without the system's focus sends no focus events
   if ((u.docChanged || u.selectionSet) && u.view.contentDOM === document.activeElement) { const ta = wkcm_ta(); if (ta) wk_acUpdate(ta); }
   if (u.docChanged || u.viewportChanged || u.transactions.some(t => t.effects.length)) wkcm_dgSoon();
+  if (u.viewportChanged) wkcm_vpFx(u.view);  // 2.574.0 (#4681)
+}
+// 2.574.0 (#4681): a long page (more than WKCM_LONG lines) gets its decorations only for the lines on screen and WKCM_SPAN lines
+// above and below (one typed letter rebuilt them over the whole text: 15-17 ms for 2000 lines, measured p2574_b_wkcm_ui);
+// $$ blocks are still paired from the top (a block that starts above the part is drawn whole). Scrolled out of that part =
+// built again around the new one (after the event, like wkcm_focFx: no dispatch inside CodeMirror's own update)
+const WKCM_LONG = 600, WKCM_SPAN = 200;
+function wkcm_rng(st, vp) {
+  const doc = st.doc; if (doc.lines <= WKCM_LONG) return null;
+  const a = doc.lineAt(Math.min(vp.from, doc.length)).number, z = doc.lineAt(Math.min(Math.max(vp.to, vp.from), doc.length)).number;
+  return {from: doc.line(Math.max(1, a - WKCM_SPAN)).from, to: doc.line(Math.min(doc.lines, z + WKCM_SPAN)).to};
+}
+function wkcm_vpFx(v) {
+  queueMicrotask(() => {
+    if (!WKCM_VP || v !== WKCM.view) return;
+    const f = v.state.field(WKCM_FIELD, false), p = v.viewport;
+    if (f?.r && (p.from < f.r.from || p.to > f.r.to)) v.dispatch({effects: WKCM_VP.of({from: p.from, to: p.to})});
+  });
 }
 // formulas / diagrams in the widgets are drawn by diagram.js (it finds them in .wkmd)
 function wkcm_dgSoon() {
@@ -198,7 +216,7 @@ function wkcm_indent(v, d) {
 function wkcm_defs() {
   if (WKCM.defs) return WKCM.defs;
   const C = wkcm_C();
-  WKCM_EXT = C.Annotation.define(); WKCM_FOC = C.StateEffect.define(); WKCM_FX = C.StateEffect.define();
+  WKCM_EXT = C.Annotation.define(); WKCM_FOC = C.StateEffect.define(); WKCM_FX = C.StateEffect.define(); WKCM_VP = C.StateEffect.define();
   class Html extends C.WidgetType {
     constructor(h, block, cls) { super(); this.h = h; this.block = block; this.cls = cls || ''; }
     eq(o) { return o.h === this.h && o.block === this.block && o.cls === this.cls; }
@@ -238,13 +256,14 @@ function wkcm_defs() {
     ignoreEvent() { return true; }
     get estimatedHeight() { return 32 * this.t.rows.length; }
   }
+  // 2.574.0 (#4681): vp = the part on screen as last told (wkcm_vpFx), r = the part the decorations cover (null = all of it)
   WKCM_FIELD = C.StateField.define({
-    create: st => ({foc: false, d: wkcm_build(st, false)}),
+    create: st => { const vp = {from: 0, to: 0}, r = wkcm_rng(st, vp); return {foc: false, vp, r, d: wkcm_build(st, false, r)}; },
     update(x, t) {
-      let foc = x.foc;
-      for (const e of t.effects) if (e.is(WKCM_FOC)) foc = e.value;
-      if (t.docChanged || t.selection || foc !== x.foc || t.effects.some(e => e.is(WKCM_FX))) return {foc, d: wkcm_build(t.state, foc)};
-      return x;
+      let foc = x.foc, vp = t.docChanged ? {from: t.changes.mapPos(x.vp.from), to: t.changes.mapPos(x.vp.to)} : x.vp, far = false;
+      for (const e of t.effects) { if (e.is(WKCM_FOC)) foc = e.value; if (e.is(WKCM_VP)) { vp = e.value; far = true; } }
+      if (t.docChanged || t.selection || far || foc !== x.foc || t.effects.some(e => e.is(WKCM_FX))) { const r = wkcm_rng(t.state, vp); return {foc, vp, r, d: wkcm_build(t.state, foc, r)}; }
+      return x.vp === vp ? x : {...x, vp};
     },
     provide: f => C.EditorView.decorations.from(f, x => x.d),
   });
@@ -269,16 +288,16 @@ const WKCM_BLK = /^(mindmap|math|mermaid|seiten|pages|abfrage|query)$/i;
 const WKCM_WL = /(!?)\[\[([^\[\]\n]{1,500})\]\]/g;
 const WKCM_REF = /(?<![&\w/#\\])#(\d{1,9})\b/g;
 const WKCM_TAG = /(?<![\p{L}\p{N}_&/#\\])#(\p{L}[\p{L}\p{N}_/-]{0,59})/gu;
-function wkcm_build(st, foc) {
+function wkcm_build(st, foc, r) {  // 2.574.0 (#4681): r = {from, to}: only the lines of that part (null = all)
   const C = wkcm_C(), D = C.Decoration, W = wkcm_defs(), doc = st.doc, out = [], sel = st.selection.ranges;
-  const near = (a, z) => foc && sel.some(r => r.from <= z && r.to >= a);
+  const near = (a, z) => foc && sel.some(s => s.from <= z && s.to >= a), inR = (a, z) => !r || (a <= r.to && z >= r.from);
   const lineNear = (a, z) => near(doc.lineAt(a).from, doc.lineAt(z).to);
   const hide = (a, z) => { if (z > a) out.push(D.replace({}).range(a, z)); };
   const mark = (a, z, cls, attrs) => { if (z > a) out.push(D.mark(attrs ? {class: cls, attributes: attrs} : {class: cls}).range(a, z)); };
   const line = (a, cls) => out.push(D.line({class: cls}).range(doc.lineAt(a).from));
   const lines = (a, z, cls) => { for (let n = doc.lineAt(a).number, e = doc.lineAt(z).number; n <= e; n++) out.push(D.line({class: cls}).range(doc.line(n).from)); };
   const blocks = [], skip = [];  // ranges drawn as one widget (nothing else inside), ranges no inline pattern may touch (code)
-  const inside = (a, z, rs) => rs.some(r => a < r[1] && z > r[0]), within = (a, z, rs) => rs.some(r => a >= r[0] && z <= r[1]);
+  const inside = (a, z, rs) => rs.some(x => a < x[1] && z > x[0]), within = (a, z, rs) => rs.some(x => a >= x[0] && z <= x[1]);
   const block = (a, z, h, cls) => { out.push(D.replace({widget: new W.Html(h, true, cls), block: true}).range(a, z)); blocks.push([a, z]); };
   // front matter: muted, never parsed as a heading
   const fm = /^---[ \t]*\r?\n[\s\S]*?\r?\n---[ \t]*(?:\r?\n|$)/.exec(doc.sliceString(0, Math.min(doc.length, 20000)));
@@ -287,19 +306,19 @@ function wkcm_build(st, foc) {
   // $$ … $$ lines / blocks (wiki.js wk_dgCut makes them formulas)
   if (doc.length < 400000 && doc.sliceString(0, doc.length).includes('$$')) {
     for (let n = 1; n <= doc.lines; n++) {
-      const l = doc.line(n); if (l.from < fmEnd || wkcm_inCode(st, l.from + 1)) continue;
-      if (/^\s*\$\$(.+?)\$\$\s*$/.test(l.text)) { if (!lineNear(l.from, l.to)) block(l.from, l.to, wkcm_md(l.text, false)); skip.push([l.from, l.to]); continue; }
+      const l = doc.line(n); if (l.from < fmEnd || !l.text.includes('$$') || wkcm_inCode(st, l.from + 1)) continue;  // 2.574.0 (#4681): the cheap test first
+      if (/^\s*\$\$(.+?)\$\$\s*$/.test(l.text)) { if (inR(l.from, l.to)) { if (!lineNear(l.from, l.to)) block(l.from, l.to, wkcm_md(l.text, false)); skip.push([l.from, l.to]); } continue; }
       if (/^\s*\$\$\s*$/.test(l.text)) {
         let z = n + 1; while (z <= doc.lines && !/^\s*\$\$\s*$/.test(doc.line(z).text)) z++;
         if (z > doc.lines) continue;
-        const e = doc.line(z); if (!near(l.from, e.to)) block(l.from, e.to, wkcm_md(doc.sliceString(l.from, e.to), false)); skip.push([l.from, e.to]); n = z;
+        const e = doc.line(z); if (inR(l.from, e.to)) { if (!near(l.from, e.to)) block(l.from, e.to, wkcm_md(doc.sliceString(l.from, e.to), false)); skip.push([l.from, e.to]); } n = z;
       }
     }
   }
-  const tree = C.ensureSyntaxTree(st, doc.length, 200) || C.syntaxTree(st);
+  const tree = C.ensureSyntaxTree(st, r ? r.to : doc.length, 200) || C.syntaxTree(st), part = r ? {from: r.from, to: r.to} : {};
   // code first (no inline pattern inside), then the [[ links (the tree reads [[A|B]] as a link "[A|B]")
   // first pass: code (no inline pattern inside), tables and drawn fences as widgets (before the [[ links: nothing inside a widget)
-  tree.iterate({enter: n => {
+  tree.iterate({...part, enter: n => {
     const a = n.from, z = n.to, k = n.name;
     if (z <= fmEnd || within(a, z, blocks)) return false;
     if (k === 'FencedCode') {
@@ -315,9 +334,9 @@ function wkcm_build(st, foc) {
     if (/^(CodeBlock|InlineCode|HTMLBlock|Autolink)$/.test(k)) { skip.push([a, z]); return false; }
   }});
   const wl = [];
-  const txt = doc.sliceString(0, doc.length);
+  const o = r ? r.from : 0, txt = doc.sliceString(o, r ? r.to : doc.length);  // 2.574.0 (#4681): whole lines, the patterns never span one
   for (const m of txt.matchAll(WKCM_WL)) {
-    const a = m.index, z = a + m[0].length; if (inside(a, z, skip)) continue;
+    const a = o + m.index, z = a + m[0].length; if (inside(a, z, skip)) continue;
     wl.push([a, z]);
     if (inside(a, z, blocks)) continue;
     const body = m[2], emb = !!m[1] || /^\s*(datei|tabelle)\s*:/i.test(body);
@@ -334,7 +353,7 @@ function wkcm_build(st, foc) {
     if (open) { hide(a, a + 2); if (bar >= 0) hide(a + 2, a + 3 + bar); hide(z - 2, z); }
     mark(open ? a + (bar >= 0 ? 3 + bar : 2) : a, open ? z - 2 : z, 'cm-wkl cm-wkwl' + (pg ? '' : ' cm-wkmiss'), attrs || undefined);
   }
-  tree.iterate({enter: n => {
+  tree.iterate({...part, enter: n => {
     const a = n.from, z = n.to, k = n.name;
     if (z <= fmEnd || within(a, z, blocks)) return false;
     if (/^ATXHeading(\d)$/.test(k)) {
@@ -390,17 +409,17 @@ function wkcm_build(st, foc) {
   // #123 (tasks I see) and #tags as links, \( … \) as formulas
   const free = (a, z) => !inside(a, z, skip) && !inside(a, z, blocks) && !inside(a, z, wl) && a >= fmEnd;
   for (const m of txt.matchAll(WKCM_REF)) {
-    const a = m.index, z = a + m[0].length; if (!free(a, z)) continue;
+    const a = o + m.index, z = a + m[0].length; if (!free(a, z)) continue;
     const t = typeof taskById === 'function' ? taskById(+m[1]) : null; if (!t) continue;
     mark(a, z, 'cm-wkl cm-wkref', near(a, z) ? undefined : {'data-wkgo': '#t/' + t.id, title: String(t.title || '')});
   }
   if (typeof wkt_go === 'function') for (const m of txt.matchAll(WKCM_TAG)) {
-    const a = m.index, x = m[1].replace(/[/-]+$/, ''), z = a + 1 + x.length; if (!free(a, z)) continue;
+    const a = o + m.index, x = m[1].replace(/[/-]+$/, ''), z = a + 1 + x.length; if (!free(a, z)) continue;
     const sp = (WKCM.p || WK.pg)?.space; if (!sp) continue;
     mark(a, z, 'cm-wkl cm-wktag', near(a, z) ? undefined : {'data-wkgo': '#' + wkt_go(x, sp)});
   }
   if (txt.includes('\\(')) for (const m of txt.matchAll(/\\\((.+?)\\\)/g)) {
-    const a = m.index, z = a + m[0].length; if (!free(a, z) || near(a, z)) continue;
+    const a = o + m.index, z = a + m[0].length; if (!free(a, z) || near(a, z)) continue;
     out.push(D.replace({widget: new W.Html(wkcm_md(m[0], true), false, 'cm-wkmath')}).range(a, z));
   }
   try { return D.set(out, true); } catch (e) { console.error(e); return D.none; }  // overlapping ranges: drawn plain rather than not at all
