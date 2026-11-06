@@ -10,6 +10,9 @@ shows as cancelled). A day closing (office_cash_closings) freezes every entry up
 entries before it any more); an open day may still change entries, every change is logged (office_cash_log, values before,
 encrypted). The balance never goes below zero (a clear 400). The cash book does NOT count in the income/expense statement
 in this package (receipts and invoice payments do; books.bk_euer is untouched) -- the note says so.
+2.603.0 (#4927): with the basis "bank and cash" of a year (office/euerbasis.py) the cash book does count: money out with its
+receipt (else "receipt missing"), invoices paid in cash; money in without an invoice is a transfer (e.g. a cash withdrawal from
+the bank, its bank booking marked "cash").
 
 Every route: office_gate + office_org with the admin of the office area (like the logbook; members 403, agents and kids
 403, ids of other areas 404); a person without an organisation is the admin of the personal office."""

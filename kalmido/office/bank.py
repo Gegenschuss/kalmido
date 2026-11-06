@@ -37,7 +37,9 @@ from ..docs.store import doc_open  # 2.355.0 B (#2843)
 # 2.444.0 (#3447): card = the total of a credit card statement (match_id = office_cc_statements.id): the statement is its receipt
 # 2.469.0 (#3459): payout = the collective transfer of the online payment provider: no payment (the webhook booked the invoices,
 # office/payonline.py), so nothing counts twice; match_id = office_pay_payouts.id when the payout is known
-BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt", "card", "payout")
+# 2.603.0 (#4927): cash = a transfer between the bank and the cash box (a cash withdrawal, or cash paid in): no expense, no
+# income -- the cash book's entries are (office/euerbasis.py); an older version reads it as "matched" with an unknown kind
+BNK_KINDS = ("invoice", "receipt", "private", "ignored", "noreceipt", "card", "payout", "cash")
 BNK_STATES = ("open", "matched", "all")
 BNK_LIST_MAX = 2000
 BNK_TEXT_MAX = 300
@@ -703,7 +705,7 @@ def _tx_answer(c, oid, uid, tid):
 
 @app.post("/api/office/bank/tx/<int:tid>/match")
 def bnk_match(tid):
-    """{kind: invoice|receipt|private|ignored|noreceipt, id?} -> the booking. invoice: a payment (day, amount of the booking, transfer)
+    """{kind: invoice|receipt|private|ignored|noreceipt|cash, id?} -> the booking. invoice: a payment (day, amount of the booking, transfer)
     on that open invoice (a smaller amount = partly paid); receipt: its payment day = the booking's day. 409 when the booking
     is matched already, the direction or currency does not fit or the amount exceeds the open rest; foreign ids 404.
     2.355.0 B (#2843): invoice with parts [{id, amount}] instead of id -- one booking on several invoices (a collective

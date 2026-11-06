@@ -461,7 +461,8 @@ def bk_euer(c, oid, year):
         x["v"] = [x["v"][0] + a_["amount"], x["v"][1], x["v"][2] + a_["amount"]]
         x["count"] += 1
     for x in (flows["norc"] if strict else []):  # 2.603.0 (#4927): (2) bank / cash / card lines without a receipt: gross, no input tax
-        k = exp.setdefault("b:", {"label": tr("Bookings without receipt"), "v": [Decimal(0)] * 3, "count": 0})
+        k = exp.setdefault("b:", {"label": tr("Bookings without receipt"), "v": [Decimal(0)] * 3, "count": 0}) if x["missing"] else \
+            exp.setdefault("n:", {"label": tr("Bookings that need no receipt"), "v": [Decimal(0)] * 3, "count": 0})
         k["v"] = [k["v"][0] + x["amount"], k["v"][1], k["v"][2] + x["amount"]]
         k["count"] += 1
     # 2.536.0 (#4334): card fees and interest without a receipt, as the DATEV export books them (office/cardnorc.py; no input tax)
@@ -505,7 +506,7 @@ def bk_euer(c, oid, year):
     income = [{"key": k, "label": _income_label(k), "net": m2(v[0]), "vat": m2(v[1]), "gross": m2(v[2])}
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}
-                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "m:", kv[0] == "b:", kv[0] == "c:", kv[1]["label"].casefold()))]
+                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "m:", kv[0] in ("b:", "n:"), kv[0] == "c:", kv[1]["label"].casefold()))]
     from .catacct import ca_euer
     expenses = ca_euer(c, oid, expenses)  # 2.121.0 (#2093): the account of each receipt category line
     tot = lambda rows, f: sum((dec(r[f]) for r in rows), Decimal(0))  # noqa: E731

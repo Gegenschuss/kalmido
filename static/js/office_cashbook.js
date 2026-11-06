@@ -52,7 +52,9 @@ function cbHeadHtml(b) {
   return `<div class="cb-head"><div><span class="muted">${tr('Cash balance')}</span><b class="cb-bal">${ofcMoney(l.balance)}</b>
     <small class="muted">${esc(l.last_closed ? tr('Closed up to {0}', fmtDateLoc(l.last_closed)) : tr('No day closed yet'))}</small></div>
     <button class="btn" data-cb="close">${ic('check', 's')}<span>${tr('Close day')}</span></button></div>`
-    + `<p class="muted ofchint cb-euer">${esc(tr('The cash book does not count in the income/expense statement: book the receipts and invoice payments there as usual.'))}</p>`;
+    + `<p class="muted ofchint cb-euer">${esc(typeof ebBasisOf === 'function' && ebBasisOf(OFC.info?.settings, new Date().getFullYear()) === 'bank'  /* 2.603.0 (#4927): the strict basis counts the cash book */
+      ? tr('Basis bank and cash: money paid out of the cash book counts in the income/expense statement, with its receipt; a cash withdrawal from the bank is a transfer.')
+      : tr('The cash book does not count in the income/expense statement: book the receipts and invoice payments there as usual.'))}</p>`;
 }
 function cbQuickHtml(b) {
   if (!b || b.archived) return '';

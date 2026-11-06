@@ -5,7 +5,7 @@
 // Server: kalmido/office/bank.py. No bank access.
 const BNK = {oid: null, state: 'open', data: null, q: '', err: null, imports: null, showImp: false, other: null, cand: null, candQ: '', busy: false, split: false};
 OFC_TABS.splice(OFC_TABS.findIndex(t => t[0] === 'settings'), 0, ['bank', 'bank', N_('Bank'), 1, () => bnkHtml(), 'money']);  // admins only; 2.92.1 (#1917): in the menu group Money
-const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed'), card: N_('Credit card statement'), payout: N_('Collective payout')};  // 2.299.0 C (#3192): noreceipt; 2.444.0 (#3447): card
+const BNK_KIND = {invoice: N_('Invoice'), receipt: N_('Receipt'), private: N_('Private'), ignored: N_('Ignored'), noreceipt: N_('No receipt needed'), card: N_('Credit card statement'), payout: N_('Collective payout'), cash: N_('Cash box transfer')};  // 2.603.0 (#4927): cash  // 2.299.0 C (#3192): noreceipt; 2.444.0 (#3447): card
 
 async function bnkLoad() {
   const q = 'state=' + BNK.state; BNK.q = q;
@@ -63,7 +63,7 @@ function bnkRow(t) {
       <button class="btn sm pri" data-bnk="match" data-id="${t.id}" data-kind="${s.kind}" data-mid="${s.id}">${tr('Assign match')}</button></div>`
       : !inn ? `<p class="muted bnkmiss">${tr('Receipt missing? Upload it in the documents of the office, then match it here.')}</p>` : '';
     act = `${typeof brl_rowHint === 'function' ? brl_rowHint(t) : ''}${sug}<div class="bnkacts"><button class="btn sm" data-bnk="other" data-id="${t.id}" aria-expanded="${BNK.other === t.id}">${ic('search', 's')}<span>${inn ? tr('Other invoice…') : tr('Other receipt…')}</span></button>
-      <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="noreceipt">${tr('No receipt needed')}</button></div>
+      <button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="private">${tr('Private')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="ignored">${tr('Ignore')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="noreceipt">${tr('No receipt needed')}</button><button class="btn sm ghost" data-bnk="match" data-id="${t.id}" data-kind="cash" title="${esc(tr('Cash withdrawal or cash paid in: a transfer between the bank and the cash book, no expense'))}">${tr('Cash box transfer')}</button></div>
       ${BNK.other === t.id ? bnkOtherHtml(t) : ''}`;
   }
   return `<li class="bnkrow ${t.match ? 'done' : ''}" data-tx="${t.id}">${head}${act}</li>`;
