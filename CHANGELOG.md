@@ -14,7 +14,25 @@ minor one, anything that needs action on your side a major one.
 - [2.0-2.99](docs/changelog/2.0-2.99.md)
 - [1.x](docs/changelog/1.x.md)
 
-## [2.579.0] - 2026-11-06
+## [2.588.0] - 2026-11-06
+
+Package 2.578 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
+
+### Added
+- Industry as one switch for the whole app (default: none), chosen at setup, on the tour's last card and under Settings > General (org admins, or a person without an organisation for their own area; members see it locked); new route GET/PUT /api/industry and the state field industry. Without an industry new accounts get a neutral sample project "Website relaunch" with sections, dependencies, subtasks, budget, time and a recurring task; the image film sample, packing list and shoot calculation only come with industry Film. Who has the film pack on keeps industry Film (#4573).
+- Tables: cell format - bold, italic, text colour, fill (app palette), alignment, wrap, merged cells, format painter and clear format - from a bar under the formula line, on several selected cells, undoable, in xlsx export and import (#3462).
+- Tables: colour rules per column or selected rows (greater, less, equal, between, contains text, empty, date overdue) in the "Rules" dialog, in xlsx both ways; PUT /api/sheets/<id>/rules, /api/v1/sheets/<id>/rules and the MCP tool sheet_set_rules (#3462).
+- Tables: fill handle at the corner of the selection (mouse and finger) continues numbers, dates, weekdays, months and "Item 1" series and shifts relative formula references; Ctrl+D fills down (#3462).
+- Tables: 20 everyday functions with German and English names, completion help and xlsx mapping: SUMIFS, COUNTIFS, AVERAGEIF, INDEX, MATCH, IFERROR, AND, OR, NOT, ABS, ROUNDUP, ROUNDDOWN, NETWORKDAYS, WORKDAY, WEEKDAY, WEEKNUM, ISOWEEKNUM, TEXT, COUNTA, NOW (#3462).
+- Tables: print as PDF (portrait / landscape, fit to page width, header row on every page, page numbers, whole sheet or the selection), POST /api/sheets/<id>/print.pdf (#3462).
+- Tables: pie, ring and stacked bar charts; every second part hatched so parts differ not only by colour (#3462).
+
+### Fixed
+- Archiving an equipment item (by hand or instead of deleting it while in use) keeps the retention lock of its receipt like deleting does (#4035).
+- Deleting an account also deletes the history, undo and revoked-share rows of its private objects; shared objects keep their history without the name. Deleting a project or address book for good takes its history along (#4796).
+
+### Fixed
+- main: a viewer's or a blocked thumbs up on an agent's merge request or deploy / integrate gate no longer applies it (the plain apply way of a suggestion is again only for the other kinds); a customer's cancel on the public booking page works again (the visitor is no account, so the deleted event keeps its last editor); an import of trips brought back by its undo can be taken back again (#4707); tests follow the Urgent lane, the file store overview, the removed share inbox and the demo's new routes (#3376, #4776, #3506).
 
 Package 2.576 (Bündel: Teil 1/6: Sammelpaket: Aufgaben ohne Paket (Dispatcher), Sammelpaket: Aufgaben ohne Paket (Dispatcher)).
 ### Added
@@ -94,6 +112,10 @@ CI-Fix: main rot von 2.570.0.
 - main: the rest of a partly released task takes the task's lock, so both close with the release (#4609)
 - main: tests follow 2.542-2.570 (private office wording, agents send the version they read, sprint settings version, history routes in the freelancer sweep, conflict wording, the trigger's sanctioned bypass in a test setup)
 - main: p292_d_ui opens the people settings only once the account is loaded and measures the list once it stands still; p2504_c_ui marks the rows again after a late redraw (both CI red of 2.570.0 on the slower runner)
+
+## [2.579.0] - 2026-11-06
+
+Not released (the CI of this version was red); its changes are listed under 2.588.0.
 
 ## [2.575.0] - 2026-11-06
 
@@ -1786,7 +1808,8 @@ Not released (the CI of this version was red); its changes are listed under 2.51
 
 Not released (the CI of this version was red); its changes are listed under 2.506.0.
 
-[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.579.0...HEAD
+[Unreleased]: https://github.com/Gegenschuss/kalmido/compare/v2.588.0...HEAD
+[2.588.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.588.0
 [2.579.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.579.0
 [2.575.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.575.0
 [2.573.0]: https://github.com/Gegenschuss/kalmido/releases/tag/v2.573.0
