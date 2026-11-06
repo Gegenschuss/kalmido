@@ -49,6 +49,7 @@ ROUTES = {
     "POST /api/v1/tasks/{}/skip": "routine", "POST /api/v1/tasks/{}/subtasks": "routine",
     "POST /api/v1/team/messages/{}/reactions": "routine", "POST /api/v1/team/rooms/{}/messages": "routine",
     "DELETE /api/v1/tasks/{}/watchers/{}": "routine", "POST /api/v1/tasks/{}/watchers": "routine",
+    "DELETE /api/v1/tasks/{}/relations/{}": "routine", "POST /api/v1/tasks/{}/relations": "routine",  # 2.576.0 (#3371)
     "POST /api/v1/videos/{}/comments": "routine",
     # ---- one_way
     "DELETE /api/v1/address-books/{}": "one_way", "DELETE /api/v1/address-books/{}/members/{}": "one_way",

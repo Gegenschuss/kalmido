@@ -85,6 +85,9 @@ APP_TO_API = {
     "POST /api/comments/{}/reactions": ["POST /comments/{}/reactions", "DELETE /comments/{}/reactions/{}"],
     "POST /api/deps": ["POST /tasks/{}/dependencies"],
     "DELETE /api/deps/{}/{}": ["DELETE /tasks/{}/dependencies/{}"],
+    "GET /api/tasks/{}/relations": ["GET /tasks/{}/relations"],  # 2.576.0 (#3371)
+    "POST /api/tasks/{}/relations": ["POST /tasks/{}/relations"],
+    "DELETE /api/tasks/{}/relations/{}": ["DELETE /tasks/{}/relations/{}"],
     "POST /api/lists": ["POST /lists"],
     "PATCH /api/lists/{}": ["PATCH /lists/{}"],
     "DELETE /api/lists/{}": ["DELETE /lists/{}"],

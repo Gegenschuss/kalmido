@@ -80,6 +80,7 @@ CTL_ROUTES = (
     (("POST",), r"^/tasks$", "routine"),
     (("POST",), r"^/tasks/\{\}/(subtasks|comments|complete|reopen|skip)$", "routine"),
     (("POST", "DELETE"), r"^/tasks/\{\}/watchers(/\{\})?$", "routine"),  # 2.473.0 (#3357): small and reversible, the task itself stays as it is
+    (("POST", "DELETE"), r"^/tasks/\{\}/relations(/\{\})?$", "routine"),  # 2.576.0 (#3371): a saved relation (relates / duplicate; close as duplicate = won't do, undoable), reversible like watchers
     (("PATCH",), r"^/tasks/\{\}$", "plan"),
     (("POST",), r"^/tasks/batch$", "batch"),
     (("POST",), r"^/videos/\{\}/comments$", "routine"),
