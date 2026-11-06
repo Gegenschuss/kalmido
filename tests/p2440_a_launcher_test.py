@@ -117,13 +117,15 @@ def go(r, ev, mode="plain", final="All green.", **env):
 aps = {"55": {"title": "Deploy 1.2"}, "56": {"title": "Tag the release"}, "57": {"title": "Tag the release"}}
 check(ar.match_approval("Deploy 1.2", aps) == ("55", False), "approval-done: the exact title")
 check(ar.match_approval("No: deploy  1.2", aps) == ("55", True), "approval-done: 'No: ' = a no, case and spaces aside")
-check(ar.match_approval("Tag the release", aps)[0] is None, "approval-done: two cards with that title -> nothing")
+# 2.615.0 (#3752): two cards with the very same title are not ambiguous -- the line closes one of them
+check(ar.match_approval("Tag the release", aps)[0] in ("56", "57"), "approval-done: two identical cards -> one of them")
 check(ar.match_approval("Something else entirely here", aps)[0] is None, "approval-done: no hit -> nothing")
 r = runner("s1")
 r.approvals = {"55": {"uid": 7, "title": "Deploy 1.2", "at": time.time()}, "56": {"uid": 7, "title": "Tag", "at": time.time()},
                "58": {"uid": 8, "title": "Deploy 1.2", "at": time.time()}}
 cl = go(r, chat(1, "yes, deploy it"), final="Deploying 1.2 now.\n\n```approval-done\nDeploy 1.2\n```")
-check(cl and "Open approvals" in cl[0]["prompt"] and "- Deploy 1.2" in cl[0]["prompt"] and "- Tag" in cl[0]["prompt"]
+# 2.615.0 (#2347): each card is listed with its number ("- Card 55: Deploy 1.2")
+check(cl and "Open approvals" in cl[0]["prompt"] and "- Card 55: Deploy 1.2" in cl[0]["prompt"] and "- Card 56: Tag" in cl[0]["prompt"]
       and "approval-done" in cl[0]["prompt"], "the prompt lists the open cards of this chat with the rule")
 check(r.api.withdrawn == [(7, "55", "")] and "55" not in r.approvals and "58" in r.approvals and "56" in r.approvals,
       f"exactly that card of this chat is withdrawn (not the other person's): {r.api.withdrawn}")

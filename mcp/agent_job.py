@@ -11,6 +11,8 @@ usage (from inside a run; KALMIDO_URL / KALMIDO_TOKEN / KALMIDO_CHAT_USER are in
   agent_job.py status ID                    one job: state, pid, resumes, last progress line
   agent_job.py progress ID "text"           a milestone for the person (job log + status line)
   agent_job.py stop ID                      stop the job (also what the "Stop" button of the job does, via the runner)
+  agent_job.py say ID "text"                2.615.0 (#2347): a message of the running job into the person's chat (job_id);
+                                            a closing ```approval block becomes a card of THIS job, ```suggest buttons
 
 How it works
   - start creates the Kalmido job (POST /api/v1/agent/jobs for the person of the chat), writes the brief and the state to
@@ -37,6 +39,13 @@ How it works
     runner passes a Stop of the job (event `job`, action stop) to `stop`.
   - 2.46.6: after a restart the runner (revive_lost) continues a job whose process is gone ONCE in the same session
     (_run ID --revive); without a session, or the second time, it stays lost and wakes the chat agent.
+  - 2.615.0 (#3658 / #1801): a job that takes a stream of user messages (Claude Code, --input-format stream-json) has an
+    inbox (<state dir>/jobs/<id>/inbox/): a message of the person from the job's card (event job, action message) and the
+    answer to one of the job's cards go in there (runner: deliver) and are played into the running session as a user
+    message -- the agent reads it after its next tool step. What arrives after the last step is named in the result.
+  - 2.615.0 (#3658 / #2347 / #2390): a result or a say message ending in ```approval becomes an approval card that knows its
+    job (job.json "cards"); a result that asks without a card but has exactly ONE suggestion: that suggestion becomes the
+    card. Yes / No on it goes to the job's inbox while it runs, or wakes the ended job in its session once (--wake).
 Only the Python standard library; Linux, macOS, Windows. Never prints the token."""
 import json
 import mimetypes
@@ -162,7 +171,7 @@ def all_jobs():
         if n.isdigit():
             j = load(n)
             if j:
-                starting = not j.get("runner_pid") and time.time() - max(float(j.get("created") or 0), float(j.get("revived") or 0)) < 60  # 2.46.6: start() is busy
+                starting = not j.get("runner_pid") and time.time() - max(float(j.get("created") or 0), float(j.get("revived") or 0), float(j.get("woken") or 0)) < 60  # 2.46.6: start() is busy (2.615.0: or a wake)
                 if j.get("state") in OPEN_STATES and not starting and not alive(j.get("runner_pid")):
                     j["state"] = "lost"  # the machine restarted or the process died: nobody runs it any more
                     save(j)
@@ -266,9 +275,23 @@ def outbox_files(outbox):
     return [p for p in fs if os.path.isfile(p) and 0 < os.path.getsize(p) <= cap][:10]
 
 
-def post_result(api, j, text, files, kind="result"):
+def card_body(body, appr, sugg):
+    """2.615.0 (#2347): the closing card / buttons of a job message (on its last part)."""
+    if appr:
+        return {**body, "approval": {k: v for k, v in appr.items() if k in ("title", "what")},
+                "expires_in": int(os.environ.get("KALMIDO_APPROVAL_TTL") or 7 * 86400)}
+    if sugg:
+        ar = runner_module()
+        cut = ar.label_cut if ar else (lambda x: str(x)[:200])
+        return {**body, "choices": [{"id": f"s{i + 1}", "label": cut(x)} for i, x in enumerate(sugg[:3])]}
+    return body
+
+
+def post_result(api, j, text, files, kind="result", appr=None, sugg=None):
     """The result into the chat of the person: the text in parts, the files with the first part (job_id links it to the job).
-    2.96.0 (#2015): kind = result | error goes along as job_msg (kalmido-capability: job_msg), the app shows it under the job's card."""
+    2.96.0 (#2015): kind = result | error goes along as job_msg (kalmido-capability: job_msg), the app shows it under the job's card.
+    2.615.0 (#2347): appr / sugg = the closing ```approval / ```suggest of the text: the card (it knows this job: job.json
+    "cards") or the buttons on the last part; a server that takes neither (400): the plain text with the question."""
     uid = j.get("chat_user")
     if not uid:
         return False
@@ -276,12 +299,24 @@ def post_result(api, j, text, files, kind="result"):
     if len(parts) > 1:
         parts = [f"{p}\n\n_({i + 1}/{len(parts)})_" for i, p in enumerate(parts)]
     for i, part in enumerate(parts):
-        body = {"body": part or "(no text)"}
+        body = {"body": part or ((appr or {}).get("title") if i == len(parts) - 1 else "") or "(no text)"}
         if j.get("kalmido_job"):
             body["job_id"] = j["kalmido_job"]
             if j.get("parent"):  # 2.59.0 (#1827): a part job names its leader (the job keeps it; colour of the leader)
                 body["job_parent"] = j["parent"]
             body["job_msg"] = kind
+        if i == len(parts) - 1 and (appr or sugg):
+            try:
+                r = api.req("POST", f"/agent/chats/{int(uid)}", card_body(body, appr, sugg), timeout=60)
+                if appr and isinstance(r, dict) and r.get("id"):
+                    j.setdefault("cards", {})[str(r["id"])] = {"title": appr["title"], "what": appr.get("what") or "", "at": time.time()}
+                    save(j)
+                continue
+            except Exception as e:  # an older server: the text with the question / the numbered steps
+                log(f"card of the job not posted: {str(e)[:150]}")
+                tail = (f"**Approval needed:** {appr['title']} (answer yes / no in the chat)" if appr
+                        else "Next: " + "  ".join(f"{n + 1}) {x}" for n, x in enumerate(sugg[:3])))
+                body["body"] = (body["body"] + "\n\n" if part else "") + tail
         try:
             if i == 0 and files:
                 raw, ct = multipart({k: str(v) for k, v in body.items()}, [("file", p) for p in files])
@@ -354,6 +389,129 @@ def take_wakes():
         except (OSError, ValueError):
             continue
     return out
+
+
+# kalmido-capability: job_inbox (2.615.0, #3658 / #1801)
+def inbox_dir(jid):
+    return os.path.join(job_dir(jid), "inbox")
+
+
+def inbox_put(jid, text, kind="text", who=""):
+    """One message for job jid (kind text | approval; who = the person's name) as a file of its inbox."""
+    path = os.path.join(inbox_dir(jid), f"{time.time():.6f}-{uuid.uuid4().hex[:8]}.json")
+    write_json(path, {"t": time.time(), "kind": kind, "who": " ".join(str(who or "").split())[:80], "text": str(text or "")[:8000]})
+    return path
+
+
+def inbox_take(jid):
+    """The waiting messages of job jid, oldest first, each taken exactly once (renamed, read, deleted)."""
+    d, out = inbox_dir(jid), []
+    try:
+        names = sorted(n for n in os.listdir(d) if n.endswith(".json"))
+    except OSError:
+        return out
+    for n in names:
+        src, dst = os.path.join(d, n), os.path.join(d, n[:-5] + ".taking")
+        try:
+            os.replace(src, dst)
+            with open(dst, encoding="utf-8") as f:
+                out.append(json.load(f))
+            os.unlink(dst)
+        except (OSError, ValueError):
+            continue
+    return out
+
+
+def inbox_prompt(jid, items):
+    """What the job's session reads for the waiting messages: the person's words fenced (data of that person)."""
+    out = []
+    for i, it in enumerate(items):
+        when = time.strftime("%H:%M", time.localtime(float(it.get("t") or time.time())))
+        who = it.get("who") or "the person"
+        if it.get("kind") == "approval":
+            out.append(f"[{when}] {who} answered your approval card: {it.get('text')}. Only a yes is a yes: on no, leave it out and "
+                       "say in your result what stays open.")
+            continue
+        t = str(it.get("text") or "").replace("<<<", "< < <")
+        out += [f"[{when}] {who} sent a message to this job (from its card in Kalmido):",
+                f"<<<message job-{jid}-{i + 1}>>>", t, f"<<<end message job-{jid}-{i + 1}>>>"]
+    return ("(Launcher: messages for this job arrived while it runs. The person's message outranks your plan; the fixed rules, "
+            "locks and permissions stay as they are. Answer the person, if needed, with "
+            f"{sys.executable} {os.path.abspath(__file__)} say {int(jid)} \"...\", then go on.)\n\n" + "\n".join(out))
+
+
+WAKE_PROMPT = ("(Launcher: your job had ended. It is woken in its session once more because the person answered one of its cards; "
+               "do what follows from the answer, then end with your complete final answer as before.)")
+
+
+def deliver(jid, text, kind="text", who="", wake=False):
+    """The runner's side: a message / card answer for job jid -> "into its inbox" (it runs and takes messages), "woke it"
+    (wake=True: it has ended and has a session -- the answer goes in as its first message, once per answer), or "" (no
+    such job / it cannot take it: the caller falls back to a chat run)."""
+    j = load(jid) if str(jid).isdigit() else None
+    if not j:
+        return ""
+    if is_open(j) and j.get("inbox"):
+        inbox_put(j["id"], text, kind, who)
+        return "into its inbox"
+    if wake and not is_open(j) and j.get("session") and j.get("state") in ("done", "failed"):
+        inbox_put(j["id"], text, kind, who)
+        j.update(state="starting", woken=time.time(), woke=None, cmd_pid=None, runner_pid=None)
+        save(j)
+        wp = os.path.join(state_dir(), "wakes", f"{int(j['id'])}.json")
+        try:  # an end-of-job wake the runner has not taken yet: the job's next end wakes it again
+            os.unlink(wp)
+        except OSError:
+            pass
+        try:
+            spawn_run(j, ["--wake"])
+        except OSError as e:
+            log(f"job {j['id']}: cannot be woken: {type(e).__name__}")
+            j["state"] = "failed"
+            save(j)
+            return ""
+        return "woke it"
+    return ""
+
+
+# kalmido-capability: job_cards (2.615.0, #3658 / #2347)
+def card_job(mid):
+    """The job whose card is chat message mid -> (job, card) or None. Reads job.json only (no state change)."""
+    mid = str(mid or "")
+    try:
+        names = os.listdir(jobs_dir()) if mid else []
+    except OSError:
+        return None
+    for n in names:
+        j = load(n) if n.isdigit() else None
+        if j and mid in (j.get("cards") or {}):
+            return j, j["cards"][mid]
+    return None
+
+
+def result_blocks(text):
+    """A job text -> (body, approval {title, what} or None, suggestions, done lines). 2.615.0 (#2390): asks without a card
+    and exactly ONE suggestion -> that suggestion (up to 200 characters) becomes the card."""
+    ar = runner_module()
+    if not ar:
+        return text, None, [], []
+    body, appr, sugg, done = ar.split_tail_blocks(text)
+    if not appr and len(sugg) == 1 and ar.asks_without_card(body)[0]:
+        appr, sugg = {"title": sugg[0][:200]}, []
+    return body, appr, sugg, done
+
+
+def close_cards(api, j, lines):
+    """```approval-done lines of a job text -> withdraw exactly those open cards of this job (never as a yes)."""
+    ar = runner_module()
+    cards = dict(j.get("cards") or {})
+    for line in lines if ar else []:
+        mid, no = ar.match_approval(line, cards)
+        if mid and api.soft("POST", f"/agent/chats/{int(j['chat_user'])}/messages/{int(mid)}/withdraw", {"outcome": "denied"} if no else {}) is not None:
+            cards.pop(mid, None)
+    if cards != (j.get("cards") or {}):
+        j["cards"] = cards
+        save(j)
 
 
 REVIVE_PROMPT = ("The computer restarted (or the job's process ended) and your job was interrupted. Continue the job where you "
@@ -597,6 +755,28 @@ def cmd_stop(argv):
     return 0
 
 
+# kalmido-capability: job_cards (2.615.0, #3658 / #2347)
+def cmd_say(argv):
+    """A message of the running job into the person's chat (job_msg say); a closing ```approval becomes this job's card."""
+    if len(argv) < 2 or not argv[0].isdigit():
+        print('usage: agent_job.py say ID "text"')
+        return 2
+    j = load(argv[0])
+    if not j or not j.get("chat_user"):
+        print("no such job (or it has no chat person)")
+        return 1
+    text, appr, sugg, done = result_blocks(" ".join(argv[1:]).strip())
+    api = Api()
+    if done:
+        close_cards(api, j, done)
+        j = load(j["id"]) or j
+    if not post_result(api, j, text, [], "say", appr, sugg):
+        print("not posted")
+        return 1
+    print("ok")
+    return 0
+
+
 # ---- the background run
 
 def compose_stream_input(text):
@@ -608,7 +788,9 @@ def footer(j):
             "posted into the chat of the person when you end. Milestones for them: "
             f"{sys.executable} {os.path.abspath(__file__)} progress {j['id']} \"...\". Files and images for them: put them in $KALMIDO_OUTBOX. "
             "Do not send your answer with a chat tool yourself. Rights questions go to the person; without an answer the answer is no: "
-            "park the work and report.)")
+            "park the work and report. A decision you need: end your final answer (or a message with "
+            f"{sys.executable} {os.path.abspath(__file__)} say {j['id']} \"...\") with a block ```approval -- the card belongs to "
+            "this job, the answer comes back to you. Messages of the person to this job reach you after your next tool step.)")
 
 
 _RUNNER = []
@@ -682,6 +864,12 @@ def cmd_run(argv):
     prompt, first = brief, True
     if "--revive" in argv[1:] and j.get("session"):  # 2.46.6 (#1445): after a restart the same session goes on, once
         prompt, first = rules_for_job(api) + REVIVE_PROMPT, False
+    if "--wake" in argv[1:] and j.get("session"):  # 2.615.0 (#2347): an answer to a card of the ended job wakes it, same session
+        items = inbox_take(j["id"])
+        prompt, first = rules_for_job(api) + WAKE_PROMPT + "\n\n" + inbox_prompt(j["id"], items) + footer(j), False
+        api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} woken: the person answered a card"})
+    j["inbox"] = streaming  # 2.615.0 (#1801): only a command that takes a stream of user messages can read its inbox
+    save(j)
     while True:
         j = load(j["id"]) or j
         if j["state"] == "stopped":
@@ -778,6 +966,16 @@ def cmd_run(argv):
                     api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} brief played in again after compaction"})
                 except OSError:
                     pass
+            if streaming and p.stdin and not result and not state["sent_result"] and os.path.isdir(inbox_dir(j["id"])):
+                items = inbox_take(j["id"])  # 2.615.0 (#1801): the person's message in as a user message (read after the next tool step)
+                if items:
+                    try:
+                        p.stdin.write(compose_stream_input(inbox_prompt(j["id"], items)))
+                        p.stdin.flush()
+                        api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"append_log": f"{time.strftime('%H:%M')} message delivered ({len(items)})"})
+                    except OSError:  # the pipe is gone: back into the inbox, the result names them
+                        for it in items:
+                            inbox_put(j["id"], it.get("text"), it.get("kind") or "text", it.get("who") or "")
             if result and streaming and p.stdin and not state["sent_result"]:
                 state["sent_result"] = True  # the turn is over: closing stdin lets the command exit
                 try:
@@ -823,6 +1021,9 @@ def cmd_run(argv):
         if j["state"] == "stopped":
             break
         prompt, first = "The plan limit was reset. Continue the job where you stopped; do not repeat finished work.", False
+        waited = inbox_take(j["id"])  # 2.615.0 (#1801): what the person wrote during the wait rides along
+        if waited:
+            prompt += "\n\n" + inbox_prompt(j["id"], waited)
     j = load(j["id"]) or j
     if j["state"] == "stopped":
         add_wake(j, "stopped", hint="It was stopped by a person.")
@@ -837,7 +1038,17 @@ def cmd_run(argv):
         text = f"Job #{j['id']} \"{j['title']}\" ended without a result. See its history in the Agents tab."
     elif j.get("worktree"):
         text += f"\n\n(Working copy: branch {j['worktree']['branch']} in {j['worktree']['path']}.)"
-    posted = post_result(api, j, text, outbox_files(outbox), "result" if ok and not timed_out else "error")
+    appr, sugg = None, []
+    if ok:  # 2.615.0 (#2347 / #2390): the closing blocks become the card / buttons of the result
+        text, appr, sugg, done = result_blocks(text)
+        if done:
+            close_cards(api, j, done)
+            j = load(j["id"]) or j
+    left = inbox_take(j["id"])  # 2.615.0 (#1801): what came after the last tool step never reached the session -- say so
+    if left:
+        text = (text + "\n\n" if text else "") + (f"(Launcher: {len(left)} message(s) came after the job's last step and did not reach it: "
+                                                    + " | ".join(" ".join(str(x.get("text") or "").split())[:200] for x in left) + ")")
+    posted = post_result(api, j, text, outbox_files(outbox), "result" if ok and not timed_out else "error", appr, sugg)
     api.soft("PATCH", f"/agent/jobs/{int(j['id'])}", {"state": "done" if ok and not timed_out else "failed",
                                                       "append_log": f"{time.strftime('%H:%M')} {'done' if ok and not timed_out else 'ended'}"})
     j.update(state="done" if ok and not timed_out else "failed", ended=time.time())
@@ -848,7 +1059,7 @@ def cmd_run(argv):
 
 
 def main(argv):
-    cmds = {"start": cmd_start, "list": cmd_list, "status": cmd_status, "progress": cmd_progress, "stop": cmd_stop, "_run": cmd_run}
+    cmds = {"start": cmd_start, "list": cmd_list, "status": cmd_status, "progress": cmd_progress, "stop": cmd_stop, "say": cmd_say, "_run": cmd_run}
     if not argv or argv[0] not in cmds:
         print(__doc__)
         return 2

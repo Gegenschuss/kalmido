@@ -638,29 +638,42 @@ chat messages of one person that arrive together: one run). It does what a hoste
   2 seconds; the final answer is no step; task events get none).
 - **Model and permission mode**: the model from the stream's init event and the run's `--permission-mode`
   (default / plan = ask, everything else = auto) go into the chat header (`PUT /api/v1/agent/status`).
-- **Status and typing dots** while a run lasts, idle afterwards, error when it failed.
+- **Status and typing dots** while a run lasts, idle afterwards, error when it failed. 2.615.0: a task run shows the typing
+  dots on its task (`POST /api/v1/tasks/{id}/typing`, every 8 seconds; never in a summary run; an older server gets none).
 - **Stop** (2.144.0): the Stop button in the chat (or Shift+Esc / Ctrl+C there) sends the event `abort`; the launcher ends the
   running command with everything it started, confirms with `POST /api/v1/agent/aborted` and writes one short line into
-  the chat. A Stop in a job's history is passed on as a note only (stop the job itself with Stop on its card). Only the person the
+  the chat. 2.615.0: a Stop in a job's history (`abort` with `job_id`) ends that **one** job of `agent_job.py` (its whole
+  process group; the Kalmido job is set to stopped and the chat agent is woken as stopped), the chat run and other jobs go on;
+  a job this launcher does not run gets a note in its history as before. Only the person the
   running answer is for (or the agent's owner / `KALMIDO_OWNER_IDS` / `KALMIDO_PERM_USER`) can stop it; another person's
   Stop is ignored.
 - **Plan usage ring** from the stream, with the time it was measured (step 10).
-- **Reply reference**: when the person answers an older message, its quote goes into the prompt.
+- **Reply reference**: when the person answers an older message, its quote goes into the prompt. 2.615.0: the runner fetches
+  the whole message (`GET /api/v1/agent/chats?since=<id-1>&user_id=<person>&limit=1`) and puts it in fenced, up to 4000
+  characters, with its file names; deleted, encrypted or not loaded: the quote stays and the prompt says only its start is known.
 - **Approvals**: an answer that ends in a block ` ```approval ` (the fence at the start of a line, 2.40.0: a mention in
   the prose is no card; first line: what you want to do, more lines: what happens on yes) becomes an approval card with *Yes* / *No* (older servers: two buttons). The answer comes back as a new run
   ("Approval: yes - ..."); no answer is never a yes. The closing blocks (` ```approval `, ` ```suggest `,
   ` ```approval-done `) may stand at the end in any order (2.40.0); each one only counts with its fence at a line start.
 - **Approval check** (2.40.0): a chat answer that asks the person to decide or makes a proposal (German or English,
   questions like "shall I ...?" / "soll ich ...?" and statements like "I would ...", "Proposal: ...", "mitzunehmen",
-  "fits in 2.41"; code blocks, quotes and lines about cards already posted do not count) but has no ` ```approval `
+  "fits in 2.41"; 2.615.0: also an approval named in passing like "needs your approval" / "braucht deine Freigabe" /
+  "once you approve", while "your approval" alone counts only as a question; code blocks, quotes, quoted words or titles
+  („…“, "…", «…»), advice against ("I would not recommend", "empfehle ich nicht") and lines about cards already posted do
+  not count) but has no ` ```approval `
   block goes back to the agent **once** in the same session: the complete answer again, this time with the block, no
   tools. Still without a block it is posted with a visible note that nothing happens without an explicit yes. Chat runs
   only; `KALMIDO_APPROVAL_CHECK=0` in `agent.env` switches it off.
 - **Approvals decided in words** (2.44.0): the open approval cards of a chat stand in its prompt (*Open approvals*, one
-  title per line). When the person decides one in words, the agent ends its answer with a block ` ```approval-done `
-  (alias ` ```freigabe-erledigt `): one line per decided card, the title exactly as listed, `No: ` in front for a no. The
-  runner then closes exactly those cards (withdrawn, or denied for a no), never as a yes; a line that matches no card or
-  several cards closes nothing.
+  card per line, 2.615.0 with its number: `Card 1234: title`). When the person decides one in words, the agent ends its answer with a block ` ```approval-done `
+  (alias ` ```freigabe-erledigt `): one line per decided card, `Card 1234: ` and the title as listed, `No: ` in front for a no. The
+  runner then closes exactly those cards (withdrawn, or denied for a no), never as a yes. 2.615.0: the number wins (a stale
+  one falls back to the words); identical duplicate cards are not ambiguous (each line closes one of them); else the same
+  title, a containing one, or the one card whose words match clearly (60 % and clearly ahead of every other). Several partial
+  hits or nothing clear closes nothing.
+- **A card wanders to the newest answer** (2.615.0): an answer without its own ` ```approval ` that refers to an open
+  card (`card 1234`, "the card" while only one is open, or its wording) carries that card again; the old one is withdrawn.
+  A press on the old message that still arrives counts for the new card.
 - **Approvals survive a restart** (2.44.0): open cards are kept in the state folder (`state.json` in `KALMIDO_STATE_DIR`);
   after 2 hours the person gets one reminder (`KALMIDO_APPROVAL_REMIND`, seconds), after 7 days (`KALMIDO_APPROVAL_TTL`)
   the card is withdrawn as expired and the next prompt of that chat tells the agent (a no). A press on an expired card
@@ -732,10 +745,20 @@ chat messages of one person that arrive together: one run). It does what a hoste
   chat (name, version, state, the newest line; a tap shows the whole history), the result and errors stay visible under it
   (`agent_job.py` marks them with `job_msg`), and a filter in the chat header (2.144.0: the icon on every width) shows *All*, *Only me and <agent>*, *Me, <agent> and job results* (2.290.0: plus only each job's end result) or *Jobs*; 2.388.0: where lines with the `source` `dispatcher` exist, *Show dispatcher messages* hides them on this device. 2.153.0: each job has
   its own chat (*To the job chat*); the whole chat keeps its card with the newest results, questions and errors under it. A message typed in a
-  job's chat comes with `job_id`: the runner answers it in a chat run about that job and posts the answer into the job's chat. The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
+  job's chat comes with `job_id`: the runner answers it in a chat run about that job and posts the answer into the job's chat.
+  2.615.0: **messages reach a running job** -- a job whose command takes a stream of user messages (Claude Code: `--input-format
+  stream-json`) has an inbox (`jobs/<id>/inbox/` in the state folder); a message of the person from the job's card (event `job`,
+  action `message`) goes in there instead of a chat run and is played into the session as a user message, which the agent reads
+  after its next tool step (a message during a plan-limit wait rides along with the resume; one after the last step is named in
+  the result). **Cards know their job**: a job's result, or a message of `agent_job.py say ID "text"`, that ends in
+  ` ```approval ` becomes a card linked to that job (` ```suggest ` buttons, ` ```approval-done ` closes the job's own cards);
+  a result that asks without a card but has exactly one suggestion turns that suggestion into the card. *Yes* / *No* on a
+  job's card goes to the job, never to the chat agent: into its inbox while it runs, or it wakes the ended job once in its
+  session. A job that cannot take it (another command, no session): the chat run as before. The job is an own background run of the same command (it survives a restart of the runner), shows as a job in the Agents
   tab with its steps and progress lines (`agent_job.py progress ID "..."`), and posts its complete result, with the files in its own
   outbox, into the chat. 2.46.6: then it **wakes the chat agent** -- exactly one chat run for that person with the outcome and the
-  start of the result, in which the agent goes on (the next step or a short note); a stopped job wakes it with the hint not to
+  start of the result, in which the agent goes on (the next step or a short note; 2.615.0: after a job that is done, the single line
+  `STILL` when nothing new follows -- then nothing is posted, only logged; a card or files are posted anyway); a stopped job wakes it with the hint not to
   restart it, a failed one with what went wrong (a job without a chat person leaves a note for the next run). *Stop* on the job stops the process. When the plan
   limit ends a run, the job waits for the reset (+ 2 minutes) and continues the **same session** (`--resume`, at most 3 times).
   `--worktree` gives it its own `git worktree` and branch `job/<id>` (at most `KALMIDO_JOB_WORKTREES` open, default 2); `list`,

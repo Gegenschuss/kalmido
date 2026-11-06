@@ -247,6 +247,7 @@ nightly_due() {
 # kalmido-capability: reply_style (2.491.0, #2849: the person's wishes for the replies from the event into the prompt, in mcp/agent_run.py)
 # kalmido-capability: lang_texts (2.450.0, #3769: the texts by the agent's language, in mcp/agent_run.py)
 # kalmido-capability: job_watch (2.392.2, #3366: the watchdog hints in mcp/agent_run.py, the job chain in mcp/agent_job.py)
+# kalmido-capability: job_inbox, job_cards, approval_move (2.615.0, #3658: messages and card answers reach the job, cards wander, in mcp/agent_run.py + mcp/agent_job.py)
 # kalmido-capability: work_window (2.236.0, #2905): outside the work window of the work style (work_style.state.working
 # false) no new session starts until work_resumes_at; the events wait in Kalmido (event mode: mcp/agent_run.py holds its queue)
 CLOSED=""

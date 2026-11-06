@@ -1764,7 +1764,9 @@ with a name; a typed `Clara: …` stays as it is), so route such messages to the
 of a running job has **Message**: `POST /api/agents/jobs/{id}/action {action: "message", text}` (at most 4000 characters,
 the same people as Stop; empty 400, an ended job 409) sends the `job` event with `action: "message"` and `text`; the job's
 state, action fields and approval stay as they are. Hand the text to the running job if you can; else treat it as a chat
-message of that person about the job (the reference starter does the latter).
+message of that person about the job (the reference starter does the former since 2.615.0 for a running job that takes a
+stream of user messages -- its inbox, read after the next tool step -- and the latter otherwise; a yes / no on a card the job
+posted goes to that job too, and wakes it once in its session when it has ended).
 
 2.59.0 (#1827): **job names and colours.** Every message with a `job_id` also carries `job_name` (the job's name, `null`
 without), `job_parent` (the leader of a part job: the one sent with the message, else the one the job keeps) and
@@ -1835,7 +1837,8 @@ POST /api/v1/agent/aborted   {"seq": 812, "job_id": null}   -> the agent (status
 
 With `job_id` only that job's step was stopped and the status stays. Afterwards say in one or two lines in the chat what
 was done until then; nothing running = confirm only. MCP: `confirm_abort`. The reference launcher ends the running
-command (its whole process group) and posts the short note itself.
+command (its whole process group) and posts the short note itself; 2.615.0: a Stop with `job_id` on one of its own jobs
+(`agent_job.py`) ends that job and confirms with the `job_id`.
 
 Stop only **that person's** run: a team agent working for one person must not end it because someone else pressed Stop
 (the status `working` is the agent's, so others may see it too). Only `user.id` of the event = the person the running
