@@ -149,7 +149,7 @@ sql("INSERT INTO orgs(name, icon, created_at, personal_of) VALUES(?,?,?,?)", ("p
 POID = sql("SELECT id FROM orgs WHERE personal_of=?", (BOB,))[0][0]
 sql("INSERT INTO office_vehicles(org_id, name, created_at, updated_at) VALUES(?,?,?,?)", (POID, "Kombi", NOW, NOW), write=True)
 ok, why = reason()
-check(ok is False and "personal office" in why, f"a vehicle of the personal office named: {why}")
+check(ok is False and "private office" in why, f"a vehicle of the personal office named: {why}")
 sql("DELETE FROM office_vehicles WHERE org_id=?", (POID,), write=True)
 # a private project of bob's own agent
 Bo.patch(B + "/api/settings", json={"workspace": "private"})

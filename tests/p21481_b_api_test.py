@@ -149,9 +149,9 @@ No.patch(B + "/api/settings", json={"workspace": "private"})
 NC = No.post(B + "/api/clients", json={"name": "Nora Client", "org_id": None}).json()["id"]
 doc(No, NC)
 r = Er.delete(B + f"/api/users/{uid['nora']}")
-check(r.status_code == 409 and "personal office" in r.json().get("error", ""), "an organisation admin does not delete an account with a personal office (409, named) " + r.text[:300])
+check(r.status_code == 409 and "private office" in r.json().get("error", ""), "an organisation admin does not delete an account with a personal office (409, named) " + r.text[:300])
 r = Er.get(B + f"/api/users/{uid['nora']}/delete-info")
-check(r.ok and not r.json()["can_delete"] and "personal office" in r.json().get("reason", ""), "delete-info: no, the areas named " + r.text[:300])
+check(r.ok and not r.json()["can_delete"] and "private office" in r.json().get("reason", ""), "delete-info: no, the areas named " + r.text[:300])
 check(No.get(B + "/api/me").ok, "nora's account is still there")
 # 2.186.0 (#2599): an account whose personal office keeps finalised documents is no longer refused for a missing export
 # step: the office would be retired (rx_state "retire", no waiver). Only the delete-info is checked here: carol and the
