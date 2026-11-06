@@ -41,7 +41,8 @@ from .core import (SH_COLS_MAX, SH_ROWS_MAX, ShBook, _write_cells, sh_brief, sh_
                    sh_reload, sh_to_display, sh_to_internal, sh_touch)
 from .formula import (SH_CURRENCY_SYMBOLS, ShErr, sh_col_letter, sh_fmt_date, sh_name_ok, sh_parse_date, sh_parse_number,
                       sh_fn_key, sh_tokens)
-from .shfuncs import SHF_DE, SHF_EXCEL, shf_vlookup3
+from .shfuncs import SHF_DE, SHF_EXCEL
+from .shfuncs2 import shf_arg_fill  # 2.578.0 (#3462)
 from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, shb_quote, shb_xl_ref  # 2.369.5 (#2517): pulled up from functions
 
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
@@ -178,10 +179,10 @@ def _shx_xl_formula(book, raw, self_cell, last_row):
         toks = sh_tokens(raw[1:])
     except ShErr:
         return None
-    out, v3 = [], shf_vlookup3(toks)  # 2.124.0 A (#2109): VLOOKUP with three arguments is approximate in Excel
+    out, v3 = [], shf_arg_fill(toks, "xl")  # 2.124.0 A (#2109): VLOOKUP with three arguments is approximate in Excel; 2.578.0 (#3462): + MATCH, WEEKNUM
     for i, (kind, val, _a, _b) in enumerate(toks):
         if i in v3:
-            out.append(",FALSE")
+            out.append(v3[i])
         if kind == "num":
             out.append(_xl_num(val))
         elif kind == "str":
@@ -894,10 +895,10 @@ def shx_kalmido_formula(f, hdr, names_at, xsheets=None):
         toks = sh_tokens(f)
     except ShErr:
         return None
-    out, v3 = [], shf_vlookup3(toks)
+    out, v3 = [], shf_arg_fill(toks, "kalmido")  # 2.578.0 (#3462): + MATCH with 2, WEEKNUM with 1 argument
     for i, (kind, val, a, b) in enumerate(toks):
         if i in v3:  # 2.124.0 A (#2109): Excel's VLOOKUP without the fourth argument looks up approximately
-            out.append(";WAHR")
+            out.append(v3[i])
         if kind == "num":
             out.append(_xl_num(val))
         elif kind == "str":

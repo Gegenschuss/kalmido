@@ -25,7 +25,9 @@ budget against the time booked, or plain lists (equipment, shooting plan, contac
   are separated by `;` (a `,` works too). Functions: `SUMME/SUM`, `MITTELWERT/AVERAGE`, `MIN`, `MAX`, `ANZAHL/COUNT`,
   `WENN/IF`, `RUNDEN/ROUND`, `HEUTE/TODAY`, `TAGE/DAYS`, `SUMMEWENN/SUMIF`, `ZÄHLENWENN/COUNTIF`, `SVERWEIS/VLOOKUP`,
   `XVERWEIS/XLOOKUP`, text functions (`LINKS`, `RECHTS`, `TEIL`, `LÄNGE`, `VERKETTEN`, `GLÄTTEN`, `GROSS`, `KLEIN`) and date
-  functions (`DATUM`, `JAHR`, `MONAT`, `TAG`, `EDATUM`). References: `A1`, `A1:B5`, a cell's own name (`day_rate`) or a column's
+  functions (`DATUM`, `JAHR`, `MONAT`, `TAG`, `EDATUM`), since 2.578.0 also `SUMMEWENNS`, `ZÄHLENWENNS`, `MITTELWERTWENN`,
+  `INDEX`, `VERGLEICH`, `WENNFEHLER`, `UND`, `ODER`, `NICHT`, `ABS`, `AUFRUNDEN`, `ABRUNDEN`, `NETTOARBEITSTAGE`, `ARBEITSTAG`,
+  `WOCHENTAG`, `KALENDERWOCHE`, `ISOKALENDERWOCHE`, `TEXT`, `ANZAHL2` and `JETZT`. References: `A1`, `A1:B5`, a cell's own name (`day_rate`) or a column's
   title (all its cells). After `=` the app suggests names, columns, functions and Kalmido values; a click on another cell
   while writing a formula inserts its address.
 - **Kalmido values:** `projekt.<name>.zeit_gesamt` (hours), `.aufgaben`, `.offen`, `.erledigt`, `.budget_h`, the same with
@@ -111,6 +113,22 @@ that many days later; a date minus a date is the number of days.
 | `DATUM(year; month; day)` | `DATE` | a date; months and days may run over (`DATUM(2026;13;1)` = 1 January 2027) |
 | `JAHR(date)`, `MONAT(date)`, `TAG(date)` | `YEAR`, `MONTH`, `DAY` | the parts of a date |
 | `EDATUM(date; months)` | `EDATE` | the same day some months later (or earlier with a minus), at most the month's last day |
+| `SUMMEWENNS(sum range; range 1; criterion 1; ...)` | `SUMIFS` | sum of the cells whose row meets every criterion, e.g. `=SUMMEWENNS(C2:C9; B2:B9; "Paid"; D2:D9; ">=01.01.2026")`; all ranges the same size |
+| `ZÄHLENWENNS(range 1; criterion 1; ...)` | `COUNTIFS` | how many rows meet every criterion |
+| `MITTELWERTWENN(range; criterion; [average range])` | `AVERAGEIF` | average of the cells whose cell in the range meets the criterion (none: "Division by zero") |
+| `INDEX(range; row; [column])` | `INDEX` | the cell at that place of the range (`INDEX(A1:E1; 3)` = the third of a row) |
+| `VERGLEICH(value; range; [type])` | `MATCH` | the position of the value in a row or column; exact unless the type is `1` (largest value not above it, sorted) or `-1` (smallest not below it) |
+| `WENNFEHLER(value; if error)` | `IFERROR` | the value, or the second argument when the value is an error (e.g. `=WENNFEHLER(SVERWEIS(...); 0)`) |
+| `UND(...)`, `ODER(...)`, `NICHT(x)` | `AND`, `OR`, `NOT` | `WAHR` when every / one condition is true; the opposite |
+| `ABS(number)` | `ABS` | the number without its sign |
+| `AUFRUNDEN(value; digits)`, `ABRUNDEN(value; digits)` | `ROUNDUP`, `ROUNDDOWN` | rounds away from zero / towards zero |
+| `NETTOARBEITSTAGE(start; end; [holidays])` | `NETWORKDAYS` | Mondays to Fridays from start to end (both counted), minus the holidays (a range of dates) |
+| `ARBEITSTAG(start; days; [holidays])` | `WORKDAY` | the date that many work days later (earlier with a minus) |
+| `WOCHENTAG(date; [type])` | `WEEKDAY` | the day of the week: type 1 (default) Sunday = 1, type 2 Monday = 1, type 3 Monday = 0 |
+| `KALENDERWOCHE(date; [type])`, `ISOKALENDERWOCHE(date)` | `WEEKNUM`, `ISOWEEKNUM` | the calendar week: ISO weeks as in German calendars (Excel counts from Sunday without a type; type 1 does that here too) |
+| `TEXT(value; format)` | `TEXT` | a number or date as text: `"0,00"`, `"#.##0"`, `"0 %"`, `"TT.MM.JJJJ"` / `"DD.MM.YYYY"`, `"TTTT"` (weekday), `"MMMM"` (month), `"hh:mm"`; the separators follow your language |
+| `ANZAHL2(...)` | `COUNTA` | how many cells are not empty |
+| `JETZT()` | `NOW` | date and time now, as text (for calculating with dates use `HEUTE()`) |
 
 **Criteria** of `SUMMEWENN` / `ZÄHLENWENN`: a number, a date or a text (upper / lower case does not matter, `*` stands for any
 characters, `?` for one, `~*` for a real star), or a comparison in quotes: `">5"`, `"<>done"`, `"<=2026-01-01"`, `"="` (empty
@@ -236,7 +254,8 @@ button, as you, and the history names the agent. Rows carried over before are gr
 - **Excel (.xlsx)** holds values AND formulas where Excel has the same thing: addresses, ranges, column names, `SUMME`,
   `MITTELWERT`, `MIN`, `MAX`, `ANZAHL`, `WENN`, `RUNDEN`, `HEUTE`, `TAGE`, `SUMMEWENN`, `ZÄHLENWENN`, `SVERWEIS`, `XVERWEIS`
   and the text and date functions (as SUM, AVERAGE, SUMIF, VLOOKUP ...; a `SVERWEIS` with three arguments gets `FALSE` as the
-  fourth, because Excel would look up approximately without it). A formula with a Kalmido
+  fourth, because Excel would look up approximately without it; in the same way a `VERGLEICH` with two arguments gets `0` and
+  a `KALENDERWOCHE` with one gets `21`, and the import adds Excel's defaults). A formula with a Kalmido
   variable (`projekt.…`, `liste.…`, `kunde.…`, `hier.…`) goes in as its value, with a note on the cell showing the Kalmido
   formula. Column kinds become number formats (currency, percent, date), a selection column a drop-down list with the colour
   of each option (the cell or the whole row), cell names Excel names. The file opens in Excel, LibreOffice and Numbers.

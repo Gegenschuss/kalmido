@@ -1320,7 +1320,10 @@ _SH_ROWS = {"type": "array", "items": {"type": "array"}, "description": "Rows of
                                                                       "dates DD.MM.YYYY or YYYY-MM-DD, a select cell its label, formulas start with "
                                                                       "= (A1, B2:B9, cell / column names, SUMME, MITTELWERT, MIN, MAX, ANZAHL, WENN, "
                                                                       "RUNDEN, HEUTE, TAGE, SUMMEWENN, ZÄHLENWENN, SVERWEIS, XVERWEIS, LINKS, RECHTS, "
-                                                                      "TEIL, LÄNGE, VERKETTEN, GLÄTTEN, GROSS, KLEIN, DATUM, JAHR, MONAT, TAG, EDATUM "
+                                                                      "TEIL, LÄNGE, VERKETTEN, GLÄTTEN, GROSS, KLEIN, DATUM, JAHR, MONAT, TAG, EDATUM, "
+                                                                      "SUMMEWENNS, ZÄHLENWENNS, MITTELWERTWENN, INDEX, VERGLEICH, WENNFEHLER, UND, ODER, "
+                                                                      "NICHT, ABS, AUFRUNDEN, ABRUNDEN, NETTOARBEITSTAGE, ARBEITSTAG, WOCHENTAG, "
+                                                                      "KALENDERWOCHE, ISOKALENDERWOCHE, TEXT, ANZAHL2, JETZT "
                                                                       "(English names too), projekt.<name>.<field>, liste.<name>.<field>, "
                                                                       "kunde.<name>.<field>, hier.<field>; arguments with ;)"}
 TOOLS += [

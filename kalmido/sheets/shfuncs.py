@@ -46,6 +46,42 @@ SHF_DE = {"sumif": "SUMMEWENN", "countif": "ZÄHLENWENN", "vlookup": "SVERWEIS",
 SHF_EXCEL = {"sumif": "SUMIF", "countif": "COUNTIF", "vlookup": "VLOOKUP", "xlookup": "_xlfn.XLOOKUP", "left": "LEFT",
              "right": "RIGHT", "mid": "MID", "len": "LEN", "concat": "_xlfn.CONCAT", "trim": "TRIM", "upper": "UPPER",
              "lower": "LOWER", "date": "DATE", "year": "YEAR", "month": "MONTH", "day": "DAY", "edate": "EDATE"}
+# 2.578.0 (#3462): the everyday functions of sheets/shfuncs2.py -- names, help, the German and the .xlsx name of each
+SHF_NAMES.update({"summewenns": "sumifs", "sumifs": "sumifs", "zählenwenns": "countifs", "zaehlenwenns": "countifs",
+                  "countifs": "countifs", "mittelwertwenn": "averageif", "averageif": "averageif", "index": "index",
+                  "vergleich": "match", "match": "match", "wennfehler": "iferror", "iferror": "iferror", "und": "and", "and": "and",
+                  "oder": "or", "or": "or", "nicht": "not", "not": "not", "abs": "abs", "aufrunden": "roundup", "roundup": "roundup",
+                  "abrunden": "rounddown", "rounddown": "rounddown", "nettoarbeitstage": "networkdays", "networkdays": "networkdays",
+                  "arbeitstag": "workday", "workday": "workday", "wochentag": "weekday", "weekday": "weekday",
+                  "kalenderwoche": "weeknum", "weeknum": "weeknum", "isokalenderwoche": "isoweeknum", "isoweeknum": "isoweeknum",
+                  "text": "text", "anzahl2": "counta", "counta": "counta", "jetzt": "now", "now": "now"})
+SHF_HELP.update({
+    "SUMMEWENNS": N_("SUMIFS(sum range; range 1; criterion 1; ...): sum of the values whose row meets every criterion"),
+    "ZÄHLENWENNS": N_("COUNTIFS(range 1; criterion 1; ...): number of rows that meet every criterion"),
+    "MITTELWERTWENN": N_("AVERAGEIF(range; criterion; [average range]): average of the values whose cell meets the criterion"),
+    "INDEX": N_("INDEX(range; row; [column]): the value at that place of the range"),
+    "VERGLEICH": N_("MATCH(value; range; [type]): the position of the value in the range (0 = exact, the default)"),
+    "WENNFEHLER": N_("IFERROR(value; if error): the value, or the second argument when it is an error"),
+    "UND": N_("AND(condition; ...): TRUE when every condition is true"), "ODER": N_("OR(condition; ...): TRUE when one condition is true"),
+    "NICHT": N_("NOT(condition): the opposite"), "ABS": N_("ABS(number): the number without its sign"),
+    "AUFRUNDEN": N_("ROUNDUP(value; digits): rounded away from zero"), "ABRUNDEN": N_("ROUNDDOWN(value; digits): rounded towards zero"),
+    "NETTOARBEITSTAGE": N_("NETWORKDAYS(start; end; [holidays]): Mondays to Fridays between two dates, both included"),
+    "ARBEITSTAG": N_("WORKDAY(start; days; [holidays]): the date some work days later"),
+    "WOCHENTAG": N_("WEEKDAY(date; [type]): the day of the week as a number (type 2: Monday = 1)"),
+    "KALENDERWOCHE": N_("WEEKNUM(date; [type]): the calendar week (ISO weeks unless a type is given)"),
+    "ISOKALENDERWOCHE": N_("ISOWEEKNUM(date): the ISO calendar week"),
+    "TEXT": N_("TEXT(value; format): a number or date as text, e.g. \"0,00\" or \"DD.MM.YYYY\""),
+    "ANZAHL2": N_("COUNTA(value; ...): number of cells that are not empty"),
+    "JETZT": N_("NOW(): the date and time now (as text)")})
+SHF_DE.update({"sumifs": "SUMMEWENNS", "countifs": "ZÄHLENWENNS", "averageif": "MITTELWERTWENN", "index": "INDEX",
+               "match": "VERGLEICH", "iferror": "WENNFEHLER", "and": "UND", "or": "ODER", "not": "NICHT", "abs": "ABS",
+               "roundup": "AUFRUNDEN", "rounddown": "ABRUNDEN", "networkdays": "NETTOARBEITSTAGE", "workday": "ARBEITSTAG",
+               "weekday": "WOCHENTAG", "weeknum": "KALENDERWOCHE", "isoweeknum": "ISOKALENDERWOCHE", "text": "TEXT",
+               "counta": "ANZAHL2", "now": "JETZT"})
+SHF_EXCEL.update({"sumifs": "SUMIFS", "countifs": "COUNTIFS", "averageif": "AVERAGEIF", "index": "INDEX", "match": "MATCH",
+                  "iferror": "IFERROR", "and": "AND", "or": "OR", "not": "NOT", "abs": "ABS", "roundup": "ROUNDUP",
+                  "rounddown": "ROUNDDOWN", "networkdays": "NETWORKDAYS", "workday": "WORKDAY", "weekday": "WEEKDAY",
+                  "weeknum": "WEEKNUM", "isoweeknum": "_xlfn.ISOWEEKNUM", "text": "TEXT", "counta": "COUNTA", "now": "NOW"})
 SHF_WORK_BUDGET = 3_000_000  # cells one evaluation of a whole sheet may visit in these functions -> "type" / "big"
 _OPS = {"=": lambda a, b: a == b, "<>": lambda a, b: a != b, "<": lambda a, b: a < b, ">": lambda a, b: a > b,
         "<=": lambda a, b: a <= b, ">=": lambda a, b: a >= b}
@@ -551,4 +587,5 @@ def shf_call(sv, key, args):
     if key == "edate":
         _args("EDATUM", args, 2, 2)
         return _edate(_date(sv.scalar(args[0])), _int(sv.scalar(args[1])))
-    raise ShErr("syntax", key)
+    from .shfuncs2 import shf2_call  # 2.578.0 (#3462): SUMMEWENNS, VERGLEICH, WENNFEHLER, work days, TEXT ...
+    return shf2_call(sv, key, args)

@@ -4320,7 +4320,12 @@ strict way: `409` (`error.cells` = all current cells, `error.rev`) as soon as th
   `WENN`/`IF`, `RUNDEN`/`ROUND`, `HEUTE`/`TODAY`, `TAGE`/`DAYS`, `SUMMEWENN`/`SUMIF`, `ZÄHLENWENN`/`COUNTIF`,
   `SVERWEIS`/`VLOOKUP`, `XVERWEIS`/`XLOOKUP`, `LINKS`/`LEFT`, `RECHTS`/`RIGHT`, `TEIL`/`MID`, `LÄNGE`/`LEN`,
   `VERKETTEN`/`CONCAT`, `GLÄTTEN`/`TRIM`, `GROSS`/`UPPER`, `KLEIN`/`LOWER`, `DATUM`/`DATE`, `JAHR`/`YEAR`, `MONAT`/`MONTH`,
-  `TAG`/`DAY`, `EDATUM`/`EDATE`; arguments with `;` (`,` works too). A lookup that finds nothing gives the error `na`.
+  `TAG`/`DAY`, `EDATUM`/`EDATE`; 2.578.0: `SUMMEWENNS`/`SUMIFS`, `ZÄHLENWENNS`/`COUNTIFS`, `MITTELWERTWENN`/`AVERAGEIF`,
+  `INDEX`, `VERGLEICH`/`MATCH` (exact unless the third argument is 1 or -1), `WENNFEHLER`/`IFERROR`, `UND`/`AND`, `ODER`/`OR`,
+  `NICHT`/`NOT`, `ABS`, `AUFRUNDEN`/`ROUNDUP`, `ABRUNDEN`/`ROUNDDOWN`, `NETTOARBEITSTAGE`/`NETWORKDAYS`, `ARBEITSTAG`/`WORKDAY`,
+  `WOCHENTAG`/`WEEKDAY`, `KALENDERWOCHE`/`WEEKNUM` (ISO weeks unless a type is given), `ISOKALENDERWOCHE`/`ISOWEEKNUM`,
+  `TEXT`, `ANZAHL2`/`COUNTA`, `JETZT`/`NOW` (date and time as text); arguments with `;` (`,` works too). A lookup that finds
+  nothing gives the error `na`.
 - **Columns** (`sheet_create`, `sheet_add_column`): `{title, kind text|number|currency|percent|date|select|checkbox|person|link|file, options?:
   [{label, color?: "#rrggbb"}], color_mode?: cell|row}`. Colours: best the app's palette (the colours of project fields).
   2.124.0: a `checkbox` cell takes `1` / `0` (also `WAHR` / `FALSCH`, `ja` / `nein`) and counts as 1 / 0 in formulas; a
