@@ -335,6 +335,7 @@ ROUTES = {
     "GET /api/files/nodes/{}/tags": "files", "PUT /api/files/nodes/{}/tags": "files", "GET /api/files/tags": "files", "GET /api/files/tagged": "files",
     "PUT /api/files/nodes/{}/recognition": "files",  # 2.353.0 D (#2759): p2353_d_ablagedocs_test.py (a, b) without an organisation
     "POST /api/docs/bulk": "files", "POST /api/docs/zip": "files", "GET /api/docs/zip/{}": "files",
+    "POST /api/docs/apply-learned": "files",  # 2.607.0 (#4872): p2607_c_learn_api_test.py as a person without an organisation
     "POST /api/docs/{}/extracted": "files",  # 2.121.0 A (#2092): take over / discard the recognised receipt values
     "GET /api/docs/{}/einvoice": "files",  # 2.146.0 A (#2451): the readable view of an e-invoice
     "POST /api/v1/files/{}/versions": "files", "PUT /api/docs/settings": "files", "PUT /api/docs/{}/receipt": "files",

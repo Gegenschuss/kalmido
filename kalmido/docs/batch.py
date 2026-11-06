@@ -8,6 +8,7 @@ that cannot be read (damaged, missing, locked by the virus scanner) is left out 
 DSR_IDS documents per request, the ZIP at most DSR_ZIP_FILES files and DSR_ZIP_MB MB (checked before anything is written,
 refused with a hint), at most two ZIPs built at once. The web app only (agents: API v1)."""
 import os
+import re
 import secrets
 import tempfile
 import threading
@@ -20,6 +21,7 @@ from ..core.config import app
 from ..core.db import body, bump, db, err, local_now
 from ..core.i18n import tr
 from ..core.access import Denied
+from ..core.orgcrypt import OrgCryptError
 from ..accounts.session import me
 from ..files.store import fs_log_add, fs_read, fs_role, fs_visible_sql
 from . import store as S
@@ -128,6 +130,55 @@ def docs_bulk():
         bump(c)
     c.commit()
     return jsonify(changed=changed, denied=denied, before=before)
+
+
+# ---- 2.607.0 (#4872): "Apply what was learned" on the chosen documents / every one in "To review" (the client sends them in
+# parts of DSR_LEARN and shows the progress; ONE undo step: the same run token for all parts)
+DSR_LEARN = 100
+
+
+@app.post("/api/docs/apply-learned")
+def docs_apply_learned():
+    """{ids, run?} -- the sorting only (rules + what was learned, store.py learn_apply) on every chosen document I may change:
+    no new recognition, date / amount / archive number stay -> {run, set, suggested, changed: [ids], denied, skipped}.
+    run: the token of the step (sent along by the later parts). {undo: true, run, ids}: that step back -> {back}."""
+    c = db()
+    _no_agent()
+    uid = me()
+    b = body()
+    ids = dsr_idlist(b.get("ids"), DSR_LEARN)
+    run = str(b.get("run") or "")
+    if run and not re.fullmatch(r"[A-Za-z0-9_-]{8,40}", run):
+        return err(tr("Invalid value: {0}", "run"))
+    undo = b.get("undo") is True
+    if undo and not run:
+        return err(tr("Invalid value: {0}", "run"))
+    run = run or secrets.token_urlsafe(12)
+    out = {"run": run, "set": 0, "suggested": 0, "changed": [], "denied": 0, "skipped": 0, "back": 0}
+    for n in dsr_visible(c, uid, ids):
+        if fs_role(c, n["id"], uid) not in ("owner", "edit"):
+            out["denied"] += 1
+            continue
+        if undo:
+            if S.learn_back(c, n["id"], run):
+                out["back"] += 1
+                fs_log_add(c, n["id"], "edit", "learn:undo")
+            continue
+        try:
+            r = S.learn_apply(c, n["id"], uid, run)
+        except OrgCryptError:  # its text sealed with a key that is gone: left as it is
+            r = None
+        if r is None:
+            out["skipped"] += 1
+        elif r:
+            out["set"] += r in ("set", "both")
+            out["suggested"] += r in ("suggest", "both")
+            out["changed"].append(n["id"])
+            fs_log_add(c, n["id"], "edit", "learn")
+    if out["changed"] or out["back"]:
+        bump(c)
+    c.commit()
+    return jsonify(out)
 
 
 # ---- the ZIP

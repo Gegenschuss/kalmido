@@ -833,17 +833,21 @@ def _learn_seen(c, m, uid, f, lid):
     return bool(c.execute(f"{q} AND node_id IN {_fs_visible_sql(c, uid)} LIMIT 1", (int(lid), m["node_id"])).fetchone())
 
 
-def classify(c, m, node, text, given=None):
+def classify(c, m, node, text, given=None, seer=None):
     """(set, suggest, auto): what the levels of the workspace decide for one document.
     set = {feature: value} applied now, suggest = {feature: {value, conf, by}} offered for review, auto = {feature: how}.
-    Values: sender / type = label ids, folder = folder id text, tags = [tag ids]. given = features fixed by the caller."""
+    Values: sender / type = label ids, folder = folder id text, tags = [tag ids]. given = features fixed by the caller.
+    seer = 2.607.0 (#4872): the person who asks for the sorting ("Apply what was learned") when not the uploader: a folder
+    only one they may edit as well, a learned sender / type / tag only one they see elsewhere as well (_learn_seen)."""
+    uid = m["created_by"] or node["owner_id"]
+    can = lambda fid: all(_fs_role(c, fid, u) in ("owner", "edit") for u in {uid, seer or uid})  # noqa: E731
+    seen = lambda f, lid: all(_learn_seen(c, m, u, f, lid) for u in {uid, seer or uid})  # noqa: E731
     ws = m["ws"]
     lv = cfg_get(c, ws)["levels"]
     given = given or {}
     out, sug, auto = {}, {}, {}
     rr = RU.apply_rules(rules_get(c, ws), f"{node['name']}\n{text}") if any(lv[f] in ("rules", "learn") for f in lv) else {"tags": []}
     toks = CL.tokens(f"{node['name']}\n{text}")
-    uid = m["created_by"] or node["owner_id"]
     for f in ("sender", "type", "folder"):
         if f in given or lv[f] in ("agent", "off"):
             continue
@@ -852,7 +856,7 @@ def classify(c, m, node, text, given=None):
                 fid = folder_by_name(c, node, uid, rr[f], path=True, check=True)  # 2.199.0 B (#2742): "A / B" = a subfolder
                 # 2.351.0 A (#2823): a rule files only into a folder the uploading person may edit (walks and makes folders
                 # only where they see / edit); otherwise the file stays where it lands without the rule
-                if fid and _fs_role(c, fid, uid) not in ("owner", "edit"):
+                if fid and not can(fid):
                     fid = None
                 if fid:
                     out[f], auto[f] = str(fid), "rule"
@@ -869,9 +873,9 @@ def classify(c, m, node, text, given=None):
                 continue
             # 2.360.0 B (#2496); 2.373.0 (#3336): a learned folder only one the uploading person may edit (like a rule),
             # neither filed nor suggested otherwise -- the file stays where it lands
-            if _fs_role(c, int(label), uid) not in ("owner", "edit"):
+            if not can(int(label)):
                 continue
-        elif not label_ok(c, ws, f, label) or not _learn_seen(c, m, uid, f, label):
+        elif not label_ok(c, ws, f, label) or not seen(f, label):
             continue
         val = label if f == "folder" else int(label)
         if conf >= CL.SURE:
@@ -888,7 +892,7 @@ def classify(c, m, node, text, given=None):
         if lv["tags"] == "learn":
             maybe = []
             for tid, conf in CL.predict_tags(model_get(c, ws, "tags"), toks):
-                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags or not _learn_seen(c, m, uid, "tag", tid):
+                if not str(tid).isdigit() or not label_ok(c, ws, "tag", tid) or int(tid) in tags or not seen("tag", tid):
                     continue
                 if conf >= CL.SURE:
                     tags.append(int(tid))
@@ -914,6 +918,38 @@ def apply_values(c, m, node, values, auto, how=None):
     if "tags" in values:
         ta = auto.get("tags") if isinstance(auto.get("tags"), dict) else {}
         set_tags(c, nid, values["tags"], {t: ta.get(t, how or "") for t in values["tags"]})
+
+
+# 2.607.0 (#4872): a new sorting (a recognition run, "Recognise again", "Apply what was learned") may replace what the rules or
+# the learned models set before; a value set by hand, an import's, an e-invoice's or an agent's stays. Tags are never replaced:
+# the tags a sorting finds are added to the ones there (their marks stay, a tag set by hand has none).
+LEARN_AUTO = ("rule", "learn")
+
+
+def learn_fixed(cur, auto_all, keep=()):
+    """The features a sorting leaves alone (classify given): sender / type / folder with a value whose auto mark is not
+    LEARN_AUTO (no mark = set by hand), and keep (the features an import gave)."""
+    return {f for f in ("sender", "type", "folder") if cur[f] and auto_all.get(f) not in LEARN_AUTO} | set(keep)
+
+
+def learn_merge(c, nid, newv, auto, sug):
+    """2.607.0 (#4872): a classify result made additive for the tags: newv["tags"] = the tags there + the new ones (auto["tags"]
+    the marks of all, the old ones keep theirs), dropped when nothing is new; a suggested tag the document has already goes.
+    -> the ids of the tags added (newv / auto / sug are changed in place)."""
+    have = {t["id"]: t["auto"] for t in node_tags(c, nid)}
+    if isinstance(sug.get("tags"), dict):
+        sug["tags"]["value"] = [t for t in sug["tags"].get("value") or [] if t not in have]
+        if not sug["tags"]["value"]:
+            sug.pop("tags")
+    add = [t for t in newv.get("tags") or [] if t not in have]
+    if not add:
+        newv.pop("tags", None)
+        auto.pop("tags", None)
+        return []
+    marks = auto.get("tags") if isinstance(auto.get("tags"), dict) else {}
+    newv["tags"] = [*have, *add]
+    auto["tags"] = {**have, **{t: marks.get(t, "learn") for t in add}}
+    return add
 
 
 # 2.363.3 (#3134): "Recognise again" can be taken back for 24 h: the row's recognised values as stored (sealed ones stay sealed)
@@ -976,6 +1012,103 @@ def redo_back(c, nid):
 def redo_purge(c):
     """The queue's clean-up: what can no longer be taken back goes (the old texts stay no longer than needed)."""
     c.execute("UPDATE doc_meta SET redo_prev='', redo_at='' WHERE redo_at<>'' AND redo_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))
+    c.execute("UPDATE doc_meta SET learn_prev='', learn_at='' WHERE learn_at<>'' AND learn_at<?", (iso(now_utc() - timedelta(hours=REDO_HOURS)),))  # 2.607.0 (#4872)
+
+
+# 2.607.0 (#4872): "Apply what was learned" -- only the sorting (rules + the learned models, classify) with the stored text of a
+# document: no new recognition, no archive number, date and amount stay. Empty sender / type / folder are filled, automatic ones
+# may be found anew (LEARN_AUTO), the tags found are added; values and tags set by hand stay. One step back for 24 h:
+# doc_meta.learn_prev (learn_back), a value changed since then stays as it is.
+def learn_apply(c, nid, uid, run):
+    """Sorts document nid again for person uid (write access checked by the caller). -> "set" (a value set), "suggest" (new
+    suggestions only), "both", "" (nothing new) or None (skipped: the recognition waits / runs, a stack waiting to be split)."""
+    from .split import sp_view
+    write_lock(c, f"doc_meta-{nid}")  # like a save (web.py docs_patch); the recognition locks the row (same order: lock, row)
+    m = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    if not m or not node or m["state"] not in ("done", "failed") or (sp_view(m) or {}).get("stack"):
+        return None
+    ws = m["ws"]
+    text = meta_text(c, m)
+    auto_all = meta_json(c, m, "auto", {})
+    cur = current(c, m, node)
+    fixed = learn_fixed(cur, auto_all)
+    newv, sug, auto = classify(c, m, node, text, given=fixed, seer=uid)
+    for f in ("sender", "type", "folder"):  # the same value again is nothing new
+        if f in newv and str(newv[f] or "") == str(cur[f] or ""):
+            newv.pop(f)
+            auto.pop(f, None)
+    added = learn_merge(c, nid, newv, auto, sug)
+    old_sug = meta_json(c, m, "suggest", {})
+    keep = {k: v for k, v in old_sug.items() if k == "_given" or k in fixed or (isinstance(v, dict) and v.get("by") == "agent")}
+    new_sug = {**{k: v for k, v in sug.items() if k not in newv}, **keep}
+    for f in newv:
+        if f != "tags" and (new_sug.get(f) or {}).get("by") != "agent":
+            new_sug.pop(f, None)
+    fresh = [k for k, v in sug.items() if k in new_sug and (old_sug.get(k) or {}).get("value") != v.get("value")]
+    if not newv and new_sug == old_sug:
+        return ""
+    stamp = _now()
+    prev = {"run": run, "ws": ws, "sender_id": m["sender_id"], "type_id": m["type_id"], "parent_id": node["parent_id"],
+            "owner_id": node["owner_id"], "auto": m["auto"] or "", "suggest": m["suggest"] or "", "review": m["review"], "stamp": stamp,
+            "after": {**{f: str(v) for f, v in newv.items() if f != "tags"}, "tags": added}}
+    apply_values(c, m, node, newv, auto)
+    auto_all.update({f: (a[added[0]] if f == "tags" else a) for f, a in auto.items()})
+    review = 1 if any(k != "_given" for k in new_sug) else m["review"]
+    c.execute("UPDATE doc_meta SET auto=?, suggest=?, review=?, learn_prev=?, learn_at=?, updated_at=? WHERE node_id=?",
+              (json.dumps(auto_all, separators=(",", ":")), _jseal(c, ws, "doc_meta.suggest", new_sug) if new_sug else "", review,
+               json.dumps(prev, separators=(",", ":")), stamp, stamp, nid))
+    if "sender" in newv:  # the word index holds the sender's name
+        doc_index(c, nid, ws, index_text(c, dict(meta_row(c, nid)), node["name"], text))
+    return ("both" if fresh else "set") if newv else ("suggest" if fresh else "")
+
+
+def learn_back(c, nid, run):
+    """Takes "Apply what was learned" of run back on document nid: a sender / type / folder / tag it set comes off when it is
+    still there, the marks come back; the suggestions and "To review" only when nothing was saved since. -> done (bool)."""
+    write_lock(c, f"doc_meta-{nid}")
+    m = c.execute("SELECT * FROM doc_meta WHERE node_id=? FOR UPDATE", (nid,)).fetchone()
+    node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    try:
+        prev = json.loads(m["learn_prev"] or "{}") if m else {}
+    except ValueError:
+        prev = {}
+    fresh = m and m["learn_at"] and m["learn_at"] > iso(now_utc() - timedelta(hours=REDO_HOURS))
+    if not prev or not fresh or not run or prev.get("run") != run or prev.get("ws") != m["ws"] or not node:
+        return False
+    af = prev.get("after") or {}
+    try:
+        p_auto = json.loads(prev.get("auto") or "{}")
+    except ValueError:
+        p_auto = {}
+    auto = meta_json(c, m, "auto", {})
+    back = []
+    for f, col in (("sender", "sender_id"), ("type", "type_id")):
+        if f in af and str(m[col] or "") == af[f]:
+            c.execute(f"UPDATE doc_meta SET {col}=? WHERE node_id=?", (prev.get(col), nid))
+            back.append(f)
+    if "folder" in af and str(node["parent_id"] or "") == af["folder"] and prev.get("parent_id"):
+        chain = _fs_chain(c, int(prev["parent_id"]))  # the folder it came from: still a folder of the same space
+        if chain and chain[0]["kind"] == "folder" and not _fs_deleted(chain) and chain[0]["org_id"] == node["org_id"]:
+            c.execute("UPDATE fs_nodes SET parent_id=?, owner_id=?, updated_at=? WHERE id=?",
+                      (int(prev["parent_id"]), prev.get("owner_id") or node["owner_id"], _now(), nid))
+            back.append("folder")
+    gone = [t for t in af.get("tags") or []
+            if c.execute("DELETE FROM doc_node_tags WHERE node_id=? AND tag_id=? AND auto IN ('rule', 'learn')", (nid, int(t))).rowcount]
+    if gone and len(gone) == len(af.get("tags") or []):
+        back.append("tags")
+    for f in back:
+        if p_auto.get(f):
+            auto[f] = p_auto[f]
+        else:
+            auto.pop(f, None)
+    sets, args = "auto=?", [json.dumps(auto, separators=(",", ":"))]
+    if m["updated_at"] == prev.get("stamp"):  # nothing saved since: the suggestions and "To review" as they were
+        sets, args = sets + ", suggest=?, review=?", [*args, prev.get("suggest") or "", int(prev.get("review") or 0)]
+    c.execute(f"UPDATE doc_meta SET {sets}, learn_prev='', learn_at='', updated_at=? WHERE node_id=?", (*args, _now(), nid))
+    m = meta_row(c, nid)
+    doc_index(c, nid, m["ws"], index_text(c, dict(m), node["name"], meta_text(c, m)))
+    return True
 
 
 def thumb_store(c, m, node, data, kind):
@@ -1139,13 +1272,14 @@ def process(c, nid):
             imported["sender"] = sid         # fixed: the classifier does not override it
             auto_all["sender"] = "e-invoice"
     cur = current(c, m, node)
-    fixed = {f for f in ("sender", "type", "tags") if cur[f]} | set(imported)  # a value set by hand / imported stays
-    if cur["folder"]:
-        fixed.add("folder")
+    # 2.607.0 (#4872): a value set by hand / imported stays, an automatic one may be found anew; the tags found are added
+    # (was: every feature with a value fixed, the tags as a whole as soon as there was one)
+    fixed = learn_fixed(cur, auto_all, imported)
     newv, sug, auto = classify(c, m, node, text, given=fixed)
+    new_tags = learn_merge(c, nid, newv, auto, sug)  # auto["tags"] only when tags were added (the marks of all)
     sug = {**sug, **agent_sug}
     apply_values(c, m, node, newv, auto)
-    auto_all.update({f: (next(iter(a.values()), "rule") if isinstance(a, dict) else a) for f, a in auto.items()})
+    auto_all.update({f: (a[new_tags[0]] if f == "tags" else a) for f, a in auto.items()})
     if not given.get("text") and not ei and doc_guesses(c, m, ws, newv.get("type") or cur["type"], text):  # 2.98.0 D (#2178)
         ex = EX.extract(text, details=True)  # 2.121.0 A (#2092): + supplier, VAT, net / gross, invoice number (a suggestion)
         vals["due_date"] = given.get("due") or ex["due"]

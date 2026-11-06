@@ -160,7 +160,7 @@ function viewDocs() {
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>
-    ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_underHtml()}
+    ${DC.more && !isMobile() ? `<div class="dc-fpanel dc-flt">${dc_fltHtml()}</div>` : ''}${dc_fbarHtml()}${dc_underHtml()}${dc_learnBar() /* 2.607.0 (#4872) */}
     ${DC.waiting ? `<p class="muted dc-wait" role="status">${ic('hourglass', 's')} ${esc(trn('{0} document is being recognised…', '{0} documents are being recognised…', DC.waiting))}</p>` : ''}`;
   let body;
   if (DC.err) body = `<div class="empty">${ic('alert')}<span>${esc(DC.err)}</span></div>`;
@@ -979,6 +979,7 @@ document.addEventListener('click', e => {
   else if (a === 'more') { if (isMobile()) dc_fSheet(); else { DC.more = !DC.more; dc_draw(); } }  // 2.122.0 B (#2294): phones: a sheet
   else if (a === 'clear') { DC.f = {...dc_f0(), review: DC.f.review}; DC.q = ''; dc_load(); }
   else if (a === 'loadmore') dc_more();  // 2.476.0 (#3935)
+  else if (a === 'learnall') dc_learnReview();  // 2.607.0 (#4872)
   else if (a === 'read' && typeof dcr_toggle === 'function') dcr_toggle();  // 2.521.0 (#4476): the reading view
   else if (a === 'under-off') { DC.under = null; dc_load(); if (typeof sbb_sync === 'function') sbb_sync('ablage'); }
 });
@@ -1244,7 +1245,48 @@ async function dc_bulk(change, label) {
 }
 function dc_bulkMenu(anchor) {
   menu(anchor, [{label: tr('Add tags…'), icon: 'tag', fn: () => dc_bulkTags(true)}, {label: tr('Remove tags…'), icon: 'tag', fn: () => dc_bulkTags(false)},
-    {label: tr('Set document type…'), icon: 'file', fn: () => dc_bulkSet('type')}, {label: tr('Set sender…'), icon: 'user', fn: () => dc_bulkSet('sender')}], null, null, tr('Edit'));
+    {label: tr('Set document type…'), icon: 'file', fn: () => dc_bulkSet('type')}, {label: tr('Set sender…'), icon: 'user', fn: () => dc_bulkSet('sender')},
+    {label: tr('Apply what was learned'), icon: 'sparkle', cls: 'dc-learnsel', fn: () => dc_learn([...DC.sel.keys()])}], null, null, tr('Edit'));  // 2.607.0 (#4872)
+}
+// 2.607.0 (#4872): "Apply what was learned": only the sorting (rules + what was learned) with the stored text, no new recognition
+// (POST /api/docs/apply-learned in parts of DC_LEARN with the progress as a message; ONE undo step: the run token of all parts)
+const DC_LEARN = 100;
+const dc_learnBar = () => DC.f.review && DC.docs?.length && !DC.selOn ? `<p class="muted dc-wait dc-learnbar"><button type="button" class="btn sm" data-dc="learnall" title="${esc(tr('Sorts every document in To review again with the rules and what was learned (no new text recognition)'))}">${ic('sparkle', 's')} <span>${tr('Apply what was learned')}</span></button></p>` : '';
+async function dc_learnSend(ids, b, onStep) {  // -> the summed answers ({run, set, suggested, changed, denied, skipped, back})
+  const out = {run: b.run || null, set: 0, suggested: 0, changed: [], denied: 0, skipped: 0, back: 0};
+  for (let i = 0; i < ids.length; i += DC_LEARN) {
+    const r = await api('POST', '/api/docs/apply-learned', {...b, ids: ids.slice(i, i + DC_LEARN), ...(out.run ? {run: out.run} : {})});
+    out.run = r.run; out.changed.push(...(r.changed || []));
+    for (const k of ['set', 'suggested', 'denied', 'skipped', 'back']) out[k] += r[k] || 0;
+    if (onStep) onStep(Math.min(i + DC_LEARN, ids.length), ids.length);
+  }
+  return out;
+}
+async function dc_learn(ids) {
+  if (!ids.length) return;
+  const prog = (a, n) => { if (a < n) toast(tr('Applying what was learned… {0} of {1}', a, n), null, 60000); };
+  prog(0, ids.length > DC_LEARN ? ids.length : 0);
+  let r; try { r = await dc_learnSend(ids, {}, prog); } catch { DC.facets = null; dc_load(); return; }
+  DC.facets = null; dc_load();
+  const deny = r.denied ? ' · ' + trn('{0} document may only be viewed by you and stays as it is', '{0} documents may only be viewed by you and stay as they are', r.denied) : '';
+  if (!r.changed.length) { toast(tr('Nothing new to sort') + deny, null, deny ? 6000 : 0); return; }
+  let run = r.run, changed = r.changed;
+  const label = tr('Apply what was learned');
+  const msg = trn('{0} document sorted', '{0} documents sorted', r.set) + ', ' + trn('{0} suggestion', '{0} suggestions', r.suggested) + deny;
+  histToast(msg, histAdd({label,
+    undo: async () => { try { await dc_learnSend(changed, {undo: true, run}); } catch { /* shown */ } DC.facets = null; dc_load(); return {}; },
+    redo: async () => { try { const x = await dc_learnSend(ids, {}); run = x.run; changed = x.changed; } catch { /* shown */ } DC.facets = null; dc_load(); return {}; }}), 8000);
+}
+async function dc_learnReview() {  // every document of "To review" the search and the filters find (as "All" of the selection)
+  const p = dc_params(), ids = [];
+  p.set('facets', '0'); p.set('limit', '200'); p.set('review', '1');
+  for (let off = 0; off < DC_SMV_MAX; off += 200) {
+    p.set('offset', String(off));
+    let j; try { j = await api('GET', '/api/docs?' + p); } catch { return; }
+    for (const d of j.docs || []) if (d.review) ids.push(d.id);
+    if ((j.docs || []).length < 200) break;
+  }
+  dc_learn(ids);
 }
 async function dc_bulkTags(add) {
   const known = (DC.docs || []).filter(d => DC.sel.has(d.id)).flatMap(d => d.tags.map(t => t.name));
