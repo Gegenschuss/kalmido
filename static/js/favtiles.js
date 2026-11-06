@@ -29,7 +29,8 @@ const FV2_MODS = {cal: ['cal', N_('Calendar')], timeline: ['timeline', N_('Timel
 const FV2 = {drag: null, out: null, add: '', held: 0, lp: null, res: {}, gone: [], at: 0, busy: false, again: false, last: new Map(), over: []};
 // 2.441.0 (#3592): the symbol and the module of the objects the server knows; the symbols a person can give a favourite
 const FV2_REF = {office_doc: ['receipt', 'office'], office_letter: ['file', 'office'], office_gendoc: ['file', 'office'], office_receipt: ['receipt', 'office'],
-  wiki: ['book', 'wiki'], sheet: ['sheet', 'sheets'], contact: ['user', 'contacts'], address_book: ['book', 'contacts']};
+  wiki: ['book', 'wiki'], sheet: ['sheet', 'sheets'], contact: ['user', 'contacts'], address_book: ['book', 'contacts'],
+  docview: ['filter', 'docs']};  // 2.579.0 (#4802): a saved view of the documents search (docviews.js)
 const FV2_ICONS = [['star', N_('Star')], ['flag', N_('Flag')], ['pin', N_('Pin')], ['zap', N_('Flash')], ['tag', N_('Tag')], ['book', N_('Book')], ['folder', N_('Folder')], ['file', N_('Document')],
   ['receipt', N_('Receipt')], ['sheet', N_('Table')], ['user', N_('Person')], ['home', N_('Home')], ['brief', N_('Briefcase')], ['cal', N_('Calendar')], ['chart', N_('Chart')], ['note', N_('Note')]];
 const fv2_isObj = key => /^(?:r|file|doc):/.test(key);
@@ -62,6 +63,7 @@ function fv2_hashKey(g) {
   if ((m = /^(who|grp|f|l)\/(\d+)$/.exec(g))) return {who: 'p:', grp: 'g:', f: 'f:', l: 'l:'}[m[1]] + m[2];
   if ((m = /^office\/(offers|invoices|letters|gendocs)\/(\d+)$/.exec(g))) return `r:office_${{offers: 'doc', invoices: 'doc', letters: 'letter', gendocs: 'gendoc'}[m[1]]}:${m[2]}`;
   if ((m = /^(wiki|sheets|contacts|contacts\/b)\/(\d+)$/.exec(g))) return `r:${{wiki: 'wiki', sheets: 'sheet', contacts: 'contact', 'contacts/b': 'address_book'}[m[1]]}:${m[2]}`;
+  if ((m = /^docs\/v\/(\d+)$/.exec(g))) return 'r:docview:' + m[1];  // 2.579.0 (#4802)
   if ((m = /^(ablage|docs)\/(\d+)$/.exec(g))) return `${m[1] === 'docs' ? 'doc' : 'file'}:${m[2]}`;
   try {
     if (g.startsWith('tag/')) return 'tag:' + decodeURIComponent(g.slice(4));

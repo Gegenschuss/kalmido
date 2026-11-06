@@ -300,7 +300,8 @@ rowd_attach(document, {kind: 'ly', row: 'li', move: (from, to, li, ol) => {
 
 // Today and Time tracking (2.32.0): the first views on the builder; the blocks a view does not show right now simply stay out
 LY.today = {key: 'view_today', empty: '', title: () => tr('Customise Today'), blocks: () => [['brief', N_('Briefing'), 'sunrise', 'full'], ['wait', N_('Waiting for you'), 'hourglass', 'full'], ['review', N_('Daily review'), 'journal', 'full'],
-  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full']],
+  ['overdue', N_('Overdue'), 'alert', 'full'], ['events', N_('Events today'), 'cal', 'full'], ['tasks', N_('Tasks'), 'list', 'full', true], ['inbox', N_('Basket'), 'inbox', 'full'],
+  ...(typeof dcv_todayBlocks === 'function' ? dcv_todayBlocks() : [])],  // 2.579.0 (#4802): saved document views switched on for Today (docviews.js)
   blockItems: k => { const c = k === 'events' ? cvxTodayItems() : []; return c.length ? [{head: tr('Calendars on Today')}, ...c] : []; }};  // 2.443.0 (#3740): the block's "…" is the one the phone shows
 LY.time = {key: 'view_time', empty: '', title: () => tr('Customise time tracking'), blocks: () => [['tiles', N_('Totals'), 'clock', 'full'],
   ['chart', N_('Per day'), 'chart', 'full'], ['lists', N_('By project and task'), 'list', 'full'], ['entries', N_('Entries'), 'rows', 'full']]};

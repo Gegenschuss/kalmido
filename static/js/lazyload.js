@@ -37,6 +37,7 @@ const LD_MODS = {
   calendar: ['calview', 'caldrag', 'apptbook', 'calyear', 'listcal', 'calgest'],  // 2.94.0 B (#1929): apptbook.js = appointment booking settings; 2.155.0 C (#2078): calyear.js = the year view; 2.156.0 C (#2071): listcal.js = a list's calendar view; 2.164.0 (#2625): calgest.js = swipe / pinch
   calrrule: ['calrrule'],  // 2.155.0 C (#2075): the own repeat rule dialog, loaded by the event editor
   calabs: ['calabs'],  // 2.155.0 B (#2076, #2077): holidays / absences in the "Calendars" window, the availability bar
+  docviews: ['docviews'],  // 2.579.0 (#4802): saved views of the documents search (the list, the sidebar, Today)
   docs: ['docs', 'paperless', 'receipts', 'letterdoc', 'letteragent', 'docsplit', 'docscan', 'docfetch', 'abdocs', 'docread'],  // 2.353.0 D (#2759): abdocs.js; 2.153.0 (#2028, #2031): letterdoc.js, letteragent.js; 2.154.0 A (#1111): docsplit.js; 2.207.0 A (#2763): docscan.js
   life: ['life', 'devlink', 'budget'],  // 2.149.0 F (#2518): budget.js (its view and dialogs used life.js already)
    // 2.140.0 B (#2136): devlink.js = a device <-> office equipment
@@ -125,7 +126,7 @@ const LD_NOP = {agentchat: ['chatLoad', 'chatPatch', 'chatFit', 'stepsChanged', 
 // 2.65.0 (#1824): module -> its stylesheets in static/css/ (the same files as LAZY_CSS in sw.js, same order); loadModule loads
 // them next to the scripts and resolves only once they apply (no unstyled flash when the area opens)
 const LD_CSS = {settings: ['settings'], contacts: ['contacts'], office: ['office'], agentchat: ['agentchat'], pdf: ['pdf'], mindmap: ['mindmap'],
-  wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], life: ['life'],
+  wiki: ['wiki'], stats: ['stats'], calendar: ['calendar'], docs: ['docs'], docviews: ['docviews'], life: ['life'],
   integrations: ['integrations'], playbook: ['playbook'], timeline: ['timeline'], feeds: ['feeds'], bookmarks: ['bookmarks'], sheets: ['sheets'], videos: ['videorev'], tagsel: ['tagsel'], filereq: ['filereq'], fltdlg: ['fltdlg'], abscan: ['abscan'], ablage: ['ablage'] /* 2.558.0 (#4693) */, calabs: ['calabs'], sideviews: ['sideviews'], navmenu: ['navmenu'], whatsnew: ['whatsnew']};  // 2.418.0 (#3560): + navmenu  // 2.97.0 A (#1950): + bookmarks  // 2.85.0 B (#1162): + feeds
 const LD_VIEW = {viewFamily: ['family', 1], viewAblage: ['ablage', 1], viewContacts: ['contacts', 1], viewOffice: ['office', 1], kp_tile: ['office'], ux_info: ['office'], ofcII: ['office'],
   dpj_projHtml: ['office'],  // 2.168.0 A (#2665): a project page's quotations & invoices (only while the office is on)

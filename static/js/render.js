@@ -1867,7 +1867,7 @@ function viewListBody() {
   const odHead = S.route.key === 'today' && groups.some(g => g.id === 'd:over' && g.tasks.length);
   // 2.32.0 (#1063): Today is built from blocks (Customize): the cards above, the tasks, the inbox; the rest of h after
   // the marker becomes the block "tasks"
-  const tdc = S.route.key === 'today' ? {brief: briefCard(groups), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock()} : null;  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
+  const tdc = S.route.key === 'today' ? {brief: briefCard(groups), wait: waitCard(), review: reviewCard(), overdue: odHead ? '' : overdueBanner(), events: cevTodayBlock(), ...(S.settings?.dv_today ? (typeof dcv_todayParts === 'function' ? dcv_todayParts() : (ld_later('docviews'), {})) : {})} : null;  // 2.579.0 (#4802): saved document views  // 2.24.0 (UX-35): the planners in "…"  // 2.10.0 (#440): review + planner
   if (tdc) h += '\u0001';
   h += moSegHtml();  // 2.156.0 C (#2072): My tasks: List / Board (mineorder.js)
   h += favViewNote();  // 2.40.0 (#1361): a view filtered to favourites says so

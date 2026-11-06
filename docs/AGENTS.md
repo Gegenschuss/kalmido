@@ -4377,6 +4377,12 @@ with `view` is `403`, everything else `404`. The token needs the area's scopes (
 `tasks:write`; the MCP server lists `update_object` only for a token with `tasks:write`). Every change of yours is in the
 object's history, marked as an agent's. Creating, deleting, the trash and sharing stay with people.
 
+*Since 2.579.0 (#4802):* the saved views of the documents search are the kind `docview` (fields `title`, `query` = the
+search's parameters as a query string, as `GET /api/v1/documents` (MCP `list_documents`) takes them, `ws` = the workspace it searches). A view is private
+to the person who saved it; you see one only when a person shared it with you (an admin's "share with everyone of the
+organisation" is for people, not agents). Reading a view gives you its search, not its documents: run it yourself with
+`GET /api/v1/documents` (MCP `list_documents`) and your own access.
+
 *Since 2.566.0 (stage 3, #4712):* calendars and address books are kinds of the shared core too (`evcal`, `address_book`),
 without the generic object routes above: agents keep the calendar and address book API (`/event-calendars`, `/events`,
 `/address-books`, CalDAV / CardDAV). A calendar or address book shared with you is a share of the core on its node of the file

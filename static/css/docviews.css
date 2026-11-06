@@ -1,0 +1,5 @@
+/* 2.579.0 (#4802): saved views of the documents search (static/js/docviews.js, loaded with the module) */
+.dcv-cur{display:inline-flex;gap:4px;align-items:center;min-width:0}
+.dcv-cur .dcv-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:12rem}
+.dcv-dirty{margin-left:2px;color:var(--accent)}
+.sbbi .dcv-all{display:inline-flex;margin-left:auto;opacity:.6}

@@ -30,10 +30,12 @@ const dc_fileUrl = (d, dl) => `/api/docs/${d.id}/file?v=${d.size}${dl ? '&dl=1' 
 const DC_SORTS = [['date', N_('Document date')], ['added', N_('Date of arrival')], ['sender', N_('Sender')], ['amount', N_('Amount')], ['due', N_('Due date')], ['title', N_('Title')]];
 const dc_sortDir0 = k => (k === 'title' || k === 'sender' ? 'asc' : 'desc');
 function dc_sort() {
+  if (DC.vsort && DC_SORTS.some(x => x[0] === DC.vsort.k)) return DC.vsort;  // 2.579.0 (#4802): a saved view keeps its own sort (docviews.js)
   const s = LS.get('dc.sort', null) || {}, k = DC_SORTS.some(x => x[0] === s.k) ? s.k : 'date';
   return {k, d: s.d === 'asc' || s.d === 'desc' ? s.d : dc_sortDir0(k)};
 }
 function dc_sortSet(k, d) {
+  if (DC.vsort) { DC.vsort = {k, d}; DC.at = 0; dc_load(); dc_draw(); return; }  // 2.579.0 (#4802): in a view the sort changes the view's search, not the device's
   if (k === 'date' && d === 'desc') LS.del('dc.sort'); else LS.set('dc.sort', {k, d});
   DC.at = 0; dc_load(); dc_draw();
 }
@@ -144,7 +146,8 @@ function viewDocs() {
   const open = !document.querySelector('.dc-view');  // not on screen yet = the tab is being opened
   if (DC.ws != null && DC.ws !== dc_ws()) p61b_dcReset();  // 2.66.1 (#1945): another workspace -> its data, open or not
   if (!DC.loading && ((!DC.docs && !DC.err) || (open && (Date.now() - (DC.at || 0) > 3000 || DC.atWs !== dc_ws())))) setTimeout(dc_load, 0);
-  if (S.route.mod === 'docs' && !!DC.f.review !== !!S.route.review) { DC.f.review = !!S.route.review; if (!DC.loading) setTimeout(dc_load, 0); }  // 2.353.0 D (#2759): the saved filters Documents / To review of the file store
+  if (S.route.mod === 'docs' && (S.route.dv || null) !== (DC.dv || null)) { if (typeof dcv_routeSync === 'function') dcv_routeSync(); else if (typeof ld_later === 'function') ld_later('docviews'); }  // 2.579.0 (#4802): #docs/v/<id> = a saved view
+  if (S.route.mod === 'docs' && !S.route.dv && !DC.dv && !!DC.f.review !== !!S.route.review) { DC.f.review = !!S.route.review; if (!DC.loading) setTimeout(dc_load, 0); }  // 2.353.0 D (#2759): the saved filters Documents / To review of the file store
   const id = dc_hashId();
   if (DC.paneId && id !== DC.paneId && DC.opening == null) { DC.paneId = null; DC.doc = null; }  // 2.430.0 (#3582): back from another route without the document
   if (id && (!DC.doc || DC.doc.id !== id) && !$('.dc-md:not(.dc-pane)') && DC.opening !== id) setTimeout(() => dc_open(id), 0);
@@ -153,7 +156,7 @@ function viewDocs() {
     <div class="dc-bar">
       <div class="ctsearch">${ic('search', 's')}<input type="search" id="dc-q" value="${esc(DC.q)}" placeholder="${esc(tr('Search in the documents…'))}" aria-label="${esc(tr('Search in the documents'))}" autocomplete="off"></div>
       <div class="seg dc-seg" role="tablist"><button type="button" role="tab" data-dc="all" aria-selected="${!DC.f.review}" class="${DC.f.review ? '' : 'on'}">${tr('All')}</button><button type="button" role="tab" data-dc="review" aria-selected="${DC.f.review}" class="${DC.f.review ? 'on' : ''}">${tr('To review')}${DC.review ? ` <span class="dc-count">${DC.review}</span>` : ''}</button></div>
-      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcr_btnHtml === 'function' ? dcr_btnHtml() : '' /* 2.521.0 (#4476): Read */}
+      <button type="button" class="btn sm ${active ? 'on' : ''}" data-dc="more" aria-expanded="${!!DC.more}">${ic('filter', 's')} <span>${tr('Filter')}</span>${active ? ` <span class="dc-count">${dc_fEntries().length}</span>` : ''}</button>${dc_sortBtn()}${typeof dcv_barHtml === 'function' ? dcv_barHtml() : ''}${typeof dcr_btnHtml === 'function' ? dcr_btnHtml() : '' /* 2.521.0 (#4476): Read */}
       <span class="dc-acts2"><label class="btn pri dc-up" title="${esc(tr('Add documents'))}">${ic('plus', 's')} <span>${tr('Add documents')}</span><input type="file" id="dc-file" multiple accept="application/pdf,image/*,.pdf,.txt,.xml,application/xml,text/xml" hidden></label>
       <button type="button" class="btn sm" data-dc="scan" title="${esc(tr('Scan'))}">${ic('camera', 's')} <span>${tr('Scan')}</span></button>${dc_smvBtn()}<button type="button" class="iconbtn" data-dc="lists" aria-label="${esc(tr('Senders, types and fields'))}" title="${esc(tr('Senders, types and fields'))}">${ic('list')}</button><button type="button" class="iconbtn" data-dc="settings" aria-label="${esc(tr('Settings of the documents'))}" title="${esc(tr('Settings of the documents'))}">${ic('gear')}</button></span>
     </div>

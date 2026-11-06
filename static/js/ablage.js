@@ -150,9 +150,9 @@ function ab_panelHtml() {
   // 2.576.0 (#4487): Documents folds like the office's document areas (sbb_treeHtml, open by itself while the filter is open):
   // its folders (2.199.0 B #2742 dc_panelTree, docs.js loaded on the first unfold); the file store's documents only -- the
   // office's are in Office > Receipts (docs.js dc_params area=private)
-  const dnode = {k: 'ab:docs', name: tr('Documents'), icon: 'file', go: 'docs', on: r.mod === 'docs' && !r.review, battrs: 'data-sbbpart="docs"', kids: true, open: r.mod === 'docs',
+  const dnode = {k: 'ab:docs', name: tr('Documents'), icon: 'file', go: 'docs', on: r.mod === 'docs' && !r.review && !r.dv, battrs: 'data-sbbpart="docs"', kids: true, open: r.mod === 'docs',
     sub: () => typeof dc_panelTree === 'function' ? [{raw: dc_panelTree()}] : (typeof loadModule === 'function' && loadModule('docs').then(() => sbb_sync('ablage'), () => {}), null)};
-  const docs = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Saved filters'))}">${sbb_treeHtml([dnode], 0)}${sbb_row('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}</div>`;
+  const docs = () => `<div class="abfilt" role="group" aria-label="${esc(tr('Saved filters'))}">${sbb_treeHtml([dnode], 0)}${sbb_row('docs/review', 'check', tr('To review'), r.mod === 'docs' && !!r.review, 'data-sbbpart="docs-review"', rv)}${typeof dcv_sideHtml === 'function' ? dcv_sideHtml() : (typeof ld_later === 'function' && feat('docs') && !S.me?.kid ? (ld_later('docviews'), '') : '') /* 2.579.0 (#4802): the saved views with their numbers (docviews.js) */}</div>`;
   return `<div class="sgroup sbbp">${nav_sort('ablage', mg_parts(a).filter(p => !nav_orgOff('ablage', p[0]) && (p[0] === r.mod || !nav_hid('ablage', p[0]))), p => p[0]).map(p => p[0] === 'ablage' ? files() : p[0] === 'docs' ? docs() : sbb_row(p[0], p[1], tr(p[2]), p[0] === r.mod, `data-sbbpart="${p[0]}"`)).join('')}</div>`;  // 2.418.0 (#3560): the menu's order and hidden parts
 }
 // 2.199.0 A (#2742): the panel's folders are dragged into another folder (move) or before / after one (sort by hand), and
