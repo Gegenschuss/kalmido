@@ -16805,5 +16805,13 @@
   "View “{0}” deleted": "Vue « {0} » supprimée",
   "View “{0}” now keeps the current filters": "La vue « {0} » garde maintenant les filtres actuels",
   "View “{0}” saved": "Vue « {0} » enregistrée",
-  "saved views of the documents search (their filters name label and folder ids of this server)": "vues enregistrées de la recherche de documents (leurs filtres citent des identifiants d’étiquettes et de dossiers de ce serveur)"
+  "saved views of the documents search (their filters name label and folder ids of this server)": "vues enregistrées de la recherche de documents (leurs filtres citent des identifiants d’étiquettes et de dossiers de ce serveur)",
+  "An account import can only be undone within {0} days": "Une importation de compte ne peut être annulée que dans les {0} jours",
+  "Other entries": "Autres entrées",
+  "You can undo this import until {0}.": "Tu peux annuler cette importation jusqu'au {0}.",
+  "Deleted for good:": "Supprimé définitivement :",
+  "Nothing is deleted for good.": "Rien n'est supprimé définitivement.",
+  "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Dans la corbeille (restaurable) : {0} tâches, {1} fichiers, pages, tableaux ou clients.",
+  "Stays because it changed since the import: {0} tasks, {1} other entries.": "Reste car modifié depuis l'importation : {0} tâches, {1} autres entrées.",
+  "possible until {0}": "possible jusqu'au {0}"
 }

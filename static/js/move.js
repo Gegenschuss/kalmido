@@ -93,13 +93,25 @@ async function umzEmailOk(p, i, em) {
   const h = em.trim() ? await umzHash(em, p.people_salt) : '';
   return !h || h === p.people[i].key;
 }
+// 2.585.0 (#4350): an account import can be undone for 30 days; before the confirm the dialog names the last day and what
+// goes for good (GET /api/imports/<id>/undo-plan, nothing changes there). false = cancelled or not possible (api() said why).
+async function umzUndoAsk(id) {
+  let p; try { p = await api('GET', `/api/imports/${+id}/undo-plan`); } catch { return false; }
+  const li = x => `<li>${esc(x.what)}: ${+x.count}</li>`;
+  const html = `<p>${esc(tr('You can undo this import until {0}.', fmtWhen(p.undo_until)))}</p>`
+    + (p.for_good.length ? `<p><b>${esc(tr('Deleted for good:'))}</b></p><ul>${p.for_good.map(li).join('')}</ul>` : `<p>${esc(tr('Nothing is deleted for good.'))}</p>`)
+    + (p.trash_tasks || p.trash_rows ? `<p>${esc(tr('Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.', p.trash_tasks, p.trash_rows))}</p>` : '')
+    + (p.kept_tasks || p.kept_rows ? `<p>${esc(tr('Stays because it changed since the import: {0} tasks, {1} other entries.', p.kept_tasks, p.kept_rows))}</p>` : '')
+    + `<p class="muted">${esc(tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients, files, knowledge pages and tables go to their trash; the other imported office data, times, habits and journal entries are deleted for good. Whatever changed since the import or got something new stays.'))}</p>`;
+  return askConfirm(tr('Undo this import?'), '', {html, ok: tr('Undo'), danger: true});
+}
 function umzResultHtml(j) {
   const r = j.result || {};
   const ppl = (r.people || []).map(x => `<div class="mrow"><span class="n">${esc(x.name || x.email || '')}</span><span class="muted">${esc({shared: tr('Shared'), invited: tr('Invited'), org_invited: tr('Invited to the organisation'), skipped: tr('Skipped'), failed: tr('Not possible'), mismatch: tr('Address does not match')}[x.state] || '')}${x.lists ? ' · ' + esc(trn('{0} project', '{0} projects', x.lists)) : ''}</span></div>`).join('');
   const w = (r.warnings || []).map(x => `<li>${esc(x.text)}${x.count > 1 ? ` (${x.count})` : ''}</li>`).join('');
   return `<div class="impbox umzbox" role="status"><div class="imphead"><b>${esc(r.stopped || tr('Import finished'))}</b></div>
     <div class="umzcnt">${umzCounts(r.created)}</div>${ppl}${w ? `<ul class="impwarn">${w}</ul>` : ''}
-    <div class="row">${r.import_id ? `<button type="button" class="btn sm" data-umz="undo" data-id="${+r.import_id}">${tr('Undo this import')}</button><span class="muted">${tr('possible for 24 hours')}</span>` : ''}<button type="button" class="btn sm" data-umz="close">${tr('Close')}</button></div></div>`;
+    <div class="row">${r.import_id ? `<button type="button" class="btn sm" data-umz="undo" data-id="${+r.import_id}">${tr('Undo this import')}</button>${r.undo_until ? `<span class="muted">${esc(tr('possible until {0}', fmtWhen(r.undo_until)))}</span>` : ''}` : ''}<button type="button" class="btn sm" data-umz="close">${tr('Close')}</button></div></div>`;
 }
 function umzImpHtml(j) {
   if (!j) return '';
@@ -201,7 +213,7 @@ function umzInit(md) {
       }
       if (a === 'undo') {
         // 2.272.0 C (#3027): trash instead of delete, what changed since stays -- the texts say exactly that
-        if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.') + ' ' + tr('Calendars are removed only if nothing changed in them; address books nothing changed in go to the trash.') + ' ' + tr('The imported clients, files, knowledge pages and tables go to their trash; the other imported office data, times, habits and journal entries are deleted for good. Whatever changed since the import or got something new stays.'), {ok: tr('Undo'), danger: true})) return;  // 2.272.0 F (#3027, review M6); 2.370.4 (#3089) M6: clients / address books to the trash
+        if (!await umzUndoAsk(b.dataset.id)) return;  // 2.585.0 (#4350): the last day and what goes for good, from the plan
         const r = await api('POST', `/api/imports/${+b.dataset.id}/undo`);
         toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', r.tasks || 0),
           r.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', r.kept_tasks) : '',

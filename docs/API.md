@@ -309,7 +309,7 @@ had been made in the app. Webhooks fire too.
 | `POST /focus/start` · `POST /focus/{id}/stop` · `/pause` · `/resume` | time | 2.138.1 (#2067): `{kind?: focus\|short\|long\|stopwatch, minutes?, task_id?}`; a running session ends first; a session on a task becomes a time entry when it ends. Same rule as above: persons only |
 | `POST /habits/{id}/checkin` | tasks:write | `{date?, count?, note?}`: without `count` one more for the day |
 | `POST /import/{source}` | structure | Import an export file (multipart), see [Import](#import) |
-| `POST /imports/{id}/undo` | delete | Undo an import within 24 hours |
+| `POST /imports/{id}/undo` | delete | Undo an import within 24 hours (an account import: 30 days) |
 | `GET /admin/users` | admin-read | All users (no secrets) |
 | `GET /admin/orgs/activity` | admin-read | Numbers per organisation (members, last sign-in date, storage in bytes, lists, tasks) and one row for people without an organisation; no names or contents |
 | `GET /admin/status` | admin-read | Version, counts, update available (`latest_version`, `update_checked_at`, `update_error`), last backup, pending webhooks |
@@ -742,7 +742,8 @@ before: the same id in the other app), `lists` (per target project: name, id, ex
 first rows), `warnings` (`text`, `count`, `examples`: what could not be mapped exactly and where it went instead),
 `import_id` and `undo_until`; for `csv` also `columns` (`[{column, field}]`: which column of the file went into which
 field, `notes` for the ones without a field). Importing the same file again skips what is already there.
-`POST /imports/{import_id}/undo` takes back what that import created within 24 hours: its tasks nobody changed since go
+`POST /imports/{import_id}/undo` takes back what that import created within 24 hours (an account import, source `Kalmido`: within
+30 days, 2.585.0): its tasks nobody changed since go
 into the trash (restorable), its new projects too when nothing else is left in them, its empty sections are removed. Tasks
 changed since the import or with comments, files, time entries or subtasks added since stay, and so do projects with other
 content; answer `{tasks, lists, sections, kept_lists, kept_tasks, trash}` (`tasks` / `lists` = moved into the trash,

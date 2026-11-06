@@ -12,7 +12,7 @@ from ..personal.timetrack import TIME_SOURCES
 from ..lists.templates import PTYPES
 from ..lists.projects import LIST_STATUSES
 from ..calendars.caldav import APPPW_MAX
-from ..integrations.importers import IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOURCES, IMPORT_UNDO_HOURS
+from ..integrations.importers import ACCOUNT_IMPORT_UNDO_DAYS, IMPORT_MAX_MB, IMPORT_MAX_TASKS, IMPORT_SOURCES, IMPORT_UNDO_HOURS
 from ..api.v1 import _SPEC, API_PAGE_DEFAULT, API_PAGE_MAX, API_SCOPES, API_VERSION, PRIO_VALUES, STATUS_NAMES, V1_TASK_IN
 from ..api.common import V1_CODES
 from ..tasks.dayplan import dayplan_spec
@@ -799,7 +799,7 @@ def openapi_spec():
                                                 "People in a file are never matched to accounts by these six (their names go into the notes). "
                                                 "Idempotent: tasks imported before are skipped. Nothing inside the file is fetched."),
                                         "requestBody": {"required": True, "content": {"multipart/form-data": {"schema": ref("ImportInput")}}}}},
-        "/imports/{id}/undo": {"post": op(f"Undo an import (within {IMPORT_UNDO_HOURS} hours): removes what it created", "Import",
+        "/imports/{id}/undo": {"post": op(f"Undo an import (within {IMPORT_UNDO_HOURS} hours, an account import within {ACCOUNT_IMPORT_UNDO_DAYS} days, #4350): removes what it created", "Import",
                                           ok(ref("ImportUndone")) | errs("404", "409"), [pid("id", "Import id")], scope="write")},
         "/admin/users": {"get": op("All users (admins, scope admin-read)", A, ok(ref("AdminUserPage")) | errs("403"), scope="admin-read")},
         "/admin/orgs/activity": {"get": op("2.143.0: activity per organisation and for people without one: members, last sign-in date, storage, projects, tasks (admins, scope admin-read)", A, ok(ref("AdminOrgActivity")) | errs("403"), scope="admin-read")},

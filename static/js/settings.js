@@ -1332,7 +1332,7 @@ function impInit(md) {
       hist(); return;
     }
     // 2.272.0 C (#3027): the undo moves into the trash and keeps what changed since -- the texts say exactly that
-    if (!await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
+    if (src === 'Kalmido' ? !await umzUndoAsk(id) : !await askConfirm(tr('Undo this import?'), tr('The imported tasks nobody changed since go into the trash, where you can restore them; a new project only when nothing else is in it. Tasks changed since then or with new comments, files or times stay, and so does everything others added.'), {ok: tr('Undo'), danger: true})) return;
     const j = await api('POST', `/api/imports/${id}/undo`);
     toast([trn('Import undone: {0} task moved to the trash', 'Import undone: {0} tasks moved to the trash', j.tasks || 0),
       j.kept_tasks ? trn('{0} changed task stays', '{0} changed tasks stay', j.kept_tasks) : '',

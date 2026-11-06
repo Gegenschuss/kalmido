@@ -16805,5 +16805,13 @@
   "View “{0}” deleted": "Weergave ‘{0}’ verwijderd",
   "View “{0}” now keeps the current filters": "Weergave ‘{0}’ bewaart nu de huidige filters",
   "View “{0}” saved": "Weergave ‘{0}’ opgeslagen",
-  "saved views of the documents search (their filters name label and folder ids of this server)": "opgeslagen weergaven van het zoeken in documenten (hun filters noemen label- en map-id’s van deze server)"
+  "saved views of the documents search (their filters name label and folder ids of this server)": "opgeslagen weergaven van het zoeken in documenten (hun filters noemen label- en map-id’s van deze server)",
+  "An account import can only be undone within {0} days": "Een accountimport kan alleen binnen {0} dagen ongedaan worden gemaakt",
+  "Other entries": "Overige items",
+  "You can undo this import until {0}.": "Je kunt deze import tot {0} ongedaan maken.",
+  "Deleted for good:": "Definitief verwijderd:",
+  "Nothing is deleted for good.": "Er wordt niets definitief verwijderd.",
+  "Into the trash (restorable): {0} tasks, {1} files, pages, tables or clients.": "Naar de prullenbak (herstelbaar): {0} taken, {1} bestanden, pagina's, tabellen of klanten.",
+  "Stays because it changed since the import: {0} tasks, {1} other entries.": "Blijft omdat het sinds de import is gewijzigd: {0} taken, {1} overige items.",
+  "possible until {0}": "mogelijk tot {0}"
 }

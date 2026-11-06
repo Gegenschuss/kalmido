@@ -11,7 +11,8 @@ own project with the same name is reused) or one existing project you can edit. 
 
 - **Again is safe:** every imported task remembers its id in the other app (or, for formats without ids, a key made
   from project, section, parent and title), so importing the same file again only adds what is new.
-- **Undo:** the report after an import, and *Recent imports* below it, offer *Undo* for 24 hours: it removes the
+- **Undo:** the report after an import, and *Recent imports* below it, offer *Undo* for 24 hours (taking over a whole Kalmido
+  account: 30 days, see [SELF-HOSTING](SELF-HOSTING.md)): it removes the
   tasks, sections and (empty) projects that import created. Tasks someone added below an imported task stay.
 - **Safe with strange files:** at most 20 MB and 20,000 tasks per import (`KALMIDO_IMPORT_MAX_MB`,
   `KALMIDO_IMPORT_MAX_TASKS`), ZIP and JSON bombs are refused, text encodings UTF-8 (with or without BOM), UTF-16 and

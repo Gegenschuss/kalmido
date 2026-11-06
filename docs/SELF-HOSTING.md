@@ -1145,8 +1145,10 @@ for one). Agents and API tokens cannot do this; it is a person's step in the app
 3. **Import.** *Settings > Data > Take over from a Kalmido export*: the file is uploaded in pieces (large exports work),
    checked (every checksum, format and version) and shown as a preview: the counts, the projects with their folders, the
    people of your lists and whether an account with the same e-mail address exists here. Choose the target -- your
-   private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (24 hours)
-   removes everything the import created.
+   private space or an organisation you administer -- and start. Everything is created anew; one *Undo* (30 days)
+   removes what the import created and nobody changed since; the dialog names the last day and, before you confirm, what
+   would be deleted for good (what changed since the import stays; an imported document finalised since,
+   or one in a month locked since, stops the undo with a note, nothing is removed then).
 4. **People.** Your projects are shared with a person found by e-mail only when you tick them in the preview (an address on
    another server can belong to somebody else here). The file names the people of your lists only by a hash of their address, so
    the preview shows their name and the account found here, never an address. A server admin can also invite people that

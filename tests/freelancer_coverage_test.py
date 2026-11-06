@@ -106,6 +106,8 @@ KINDS = {
 }
 
 ROUTES = {
+    # 2.585.0 (#4350): what the undo of an account import would take back, before the confirm (p2585_d_api_test.py)
+    "GET /api/imports/{}/undo-plan": "tasks",
     # 2.575.0 (#3778): own module cards of the private workspace (p2575_a_api_test.py, freelancer-matrix: modcards)
     "GET /api/modcards": "modcards", "POST /api/modcards": "modcards", "PATCH /api/modcards/{}": "modcards", "DELETE /api/modcards/{}": "modcards",
     "GET /api/industry": "industry", "PUT /api/industry": "industry",  # 2.578.0 (#4573): p2578_b_industry_test.py

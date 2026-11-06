@@ -87,7 +87,7 @@ def tt_reminders(s):
 # Idempotent: every task gets tasks.tt_id = "<source>:<id>" (the source's own id, or a hash of list / section / parent
 # chain / title / occurrence for formats without ids), unique per user -> importing the same file again skips it.
 # Undo: the ids an import created are kept in the imports table; POST /api/imports/<id>/undo removes them again
-# (IMPORT_UNDO_HOURS). Limits: IMPORT_MAX_MB per file, IMPORT_MAX_TASKS per import, ZIP / JSON bomb guards, rate limit.
+# (IMPORT_UNDO_HOURS; an account import ACCOUNT_IMPORT_UNDO_DAYS, #4350). Limits: IMPORT_MAX_MB per file, IMPORT_MAX_TASKS per import, ZIP / JSON bomb guards, rate limit.
 def _imp_env(name, dflt):
     try:
         return max(1, int(os.environ.get(name, "") or dflt))
@@ -104,6 +104,19 @@ IMPORT_UNDO_HOURS = 24
 IMPORT_RATE = _imp_env("KALMIDO_IMPORT_RATE", 30)  # imports + previews per user and 10 minutes
 IMPORT_KEEP = 20                          # import records kept per user (2.363.2 #3106: + all that can still be undone, imp_prune)
 IMPORT_KEEP_ALWAYS = "Kalmido"            # 2.452.0 (#3810): an account import stays until undone, it is the memory of what is here already
+# 2.585.0 (#4350): an account import (move, admin/acctimport.py) can be undone for 30 days; task and office
+# imports keep IMPORT_UNDO_HOURS
+ACCOUNT_IMPORT_UNDO_DAYS = 30
+
+
+def imp_undo_hours(source):
+    """2.585.0 (#4350): the undo window of an import of this source, in hours."""
+    return ACCOUNT_IMPORT_UNDO_DAYS * 24 if source == IMPORT_KEEP_ALWAYS else IMPORT_UNDO_HOURS
+
+
+def imp_undo_until(r):
+    """2.585.0 (#4350): until when the import row r (source, created_at) can be undone."""
+    return parse_iso(r["created_at"]) + timedelta(hours=imp_undo_hours(r["source"]))
 IMPORT_SOURCES = {"todoist": "Todoist", "trello": "Trello", "asana": "Asana", "mstodo": "Microsoft To Do", "ics": "ICS",
                   # 2.142.0 B (#2147): file imports only (no API / OAuth connection, nothing fetched from the files)
                   "notion": "Notion", "gtasks": "Google Tasks", "clickup": "ClickUp", "jira": "Jira", "csv": "CSV", "markdown": "Markdown",
@@ -2413,7 +2426,9 @@ def imp_undo(c, uid, iid):
         raise Denied(404)
     if r["undone_at"]:
         raise Denied(409, tr("This import was already undone"))
-    if (now_utc() - parse_iso(r["created_at"])).total_seconds() > IMPORT_UNDO_HOURS * 3600:
+    if now_utc() > imp_undo_until(r):  # 2.585.0 (#4350): an account import 30 days, the others IMPORT_UNDO_HOURS
+        if r["source"] == IMPORT_KEEP_ALWAYS:
+            raise Denied(409, tr("An account import can only be undone within {0} days", ACCOUNT_IMPORT_UNDO_DAYS))
         raise Denied(409, tr("An import can only be undone within {0} hours", IMPORT_UNDO_HOURS))
     if r["source"] == "newsletter":  # 2.363.2 (#3104): a consent import
         from ..newsletter.web import nwl_import_undo
@@ -2543,7 +2558,8 @@ def imp_undo_trash(c, ids, back, iid):
 
 def imp_prune(c, uid):
     """2.363.2 (#3106): the user's import records beyond the last IMPORT_KEEP go, but only past their undo time.
-    #3810: an account import that is not undone stays (umz_again reads those)."""
+    #3810: an account import that is not undone stays (umz_again reads those). 2.585.0 (#4350): so it also outlives its 30 days of
+    undo (ACCOUNT_IMPORT_UNDO_DAYS); the cut-off below is only reached by the other sources and by account imports already undone."""
     c.execute("""DELETE FROM imports WHERE user_id=? AND created_at<? AND NOT (source=? AND undone_at IS NULL) AND id NOT IN
                  (SELECT id FROM imports WHERE user_id=? ORDER BY id DESC LIMIT ?)""",
               (uid, iso(now_utc() - timedelta(hours=IMPORT_UNDO_HOURS)), IMPORT_KEEP_ALWAYS, uid, IMPORT_KEEP))
@@ -2567,7 +2583,7 @@ def imports_list():
     """The user's recent imports (Settings > Data): source, file, counts, undo possible until."""
     c, out = db(), []
     for r in c.execute("SELECT * FROM imports WHERE user_id=? ORDER BY id DESC", (me(),)):  # bounded by imp_prune
-        until = parse_iso(r["created_at"]) + timedelta(hours=IMPORT_UNDO_HOURS)
+        until = imp_undo_until(r)  # 2.585.0 (#4350)
         out.append({"id": r["id"], "source": r["source"], "source_name": "Newsletter" if r["source"] == "newsletter" else imp_name(r["source"]),
                     "file_name": r["file_name"], "created_at": r["created_at"], "counts": _imp_report(r["report"]),
                     "undone_at": r["undone_at"], "can_undo": not r["undone_at"] and until > now_utc(), "undo_until": iso(until)})

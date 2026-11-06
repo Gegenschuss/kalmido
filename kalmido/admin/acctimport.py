@@ -70,7 +70,7 @@ from ..collab.e2e import _pub, e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2
 from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
 from .acctexport import umz_email_hash  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
-from ..integrations.importers import IMPORT_UNDO_HOURS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.importers import ACCOUNT_IMPORT_UNDO_DAYS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.bulk import bk_occ_drop, ctt_unlink  # 2.370.4 (#3089)
@@ -1043,7 +1043,9 @@ def umz_earlier(c, uid, src, eid=""):
 
 
 def umz_undo_until(at):
-    return at + timedelta(hours=IMPORT_UNDO_HOURS)
+    """2.585.0 (#4350): an account import can be undone for ACCOUNT_IMPORT_UNDO_DAYS (30) days, not the
+    24 hours of the task imports (integrations/importers.py imp_undo_until reads the same constant)."""
+    return at + timedelta(days=ACCOUNT_IMPORT_UNDO_DAYS)
 
 
 def umz_again(c, uid, src, eid):
@@ -2526,6 +2528,19 @@ def umz_undo_books(c, uid, bids):
         c.execute("UPDATE books SET deleted_at=? WHERE id=?", (iso_ms(now_utc()), bid))
 
 
+def umz_undo_tasks(c, uid, cr):
+    """The run's tasks: only still writable ones (in its own lists the user is the owner). 2.585.0 (#4350): also for the preview."""
+    mine = []
+    ids = [int(x) for x in cr.get("tasks") or []]
+    for i in range(0, len(ids), 500):
+        part = ids[i:i + 500]
+        q = ",".join("?" * len(part))
+        for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id ILIKE 'kalmido:%'", part + [uid]).fetchall():
+            if list_role(c, t["list_id"], uid) in WRITE_ROLES:
+                mine.append(t["id"])
+    return mine
+
+
 def umz_undo(c, uid, r):
     """Undo of an account import (called by importers.imp_undo after its own checks): everything the run created.
     2.272.0 C (#3027): tasks and lists go into the trash (restorable) instead of being deleted, and only what nobody touched
@@ -2541,15 +2556,7 @@ def umz_undo(c, uid, r):
     kept_rows += umz_more_undo(c, uid, cr, since, plan)  # 2.363.4 (#3127): bookmarks, focus sessions, arrangements, bells
     tpl_paths = umz_undo_templates(c, uid, cr, plan)  # 2.464.0 (#3865)
     own_lists = [int(x) for x in cr.get("lists") or []]
-    mine = []
-    ids = [int(x) for x in cr.get("tasks") or []]
-    for i in range(0, len(ids), 500):  # the run's tasks: only still writable ones (in its own lists the user is the owner)
-        part = ids[i:i + 500]
-        q = ",".join("?" * len(part))
-        for t in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({q}) AND created_by=? AND tt_id ILIKE 'kalmido:%'", part + [uid]).fetchall():
-            if list_role(c, t["list_id"], uid) in WRITE_ROLES:
-                mine.append(t["id"])
-    back, kept = imp_undo_split(c, uid, mine, since, cr.get("time_entries") or [])
+    back, kept = imp_undo_split(c, uid, umz_undo_tasks(c, uid, cr), since, cr.get("time_entries") or [])
     n_lists, kept_lists, went = imp_undo_lists(c, uid, own_lists, back, since)
     imp_undo_trash(c, [i for i in back if i not in went], back, r["id"])
     kept_cals = kept_books = 0
@@ -2627,6 +2634,39 @@ def umz_undo(c, uid, r):
           "into the trash", plan.trashed, flush=True)
     return {"tasks": len(back), "lists": n_lists, "sections": 0, "kept_lists": kept_lists, "kept_tasks": len(kept),
             "kept_cals": kept_cals, "kept_books": kept_books, "kept_rows": kept_rows, "trash_rows": plan.trashed, "trash": True}
+
+
+def umz_undo_preview(c, uid, iid):
+    """2.585.0 (#4350): what the undo of account import iid would do now, nothing changed (the dialog shows
+    it before the confirm, after 30 days the person has worked with the data): the last moment (undo_until), what goes for
+    good by area, how many tasks / files, pages, tables and clients go into a trash and how many entries stay. The same
+    checks as imp_undo first (own import, not undone, inside the window, oi_undo_check: admin, nothing finalised or locked)."""
+    r = c.execute("SELECT * FROM imports WHERE id=? AND user_id=? AND source=?", (iid, uid, UMZ_SOURCE)).fetchone()
+    if not r:
+        raise Denied(404)
+    if r["undone_at"]:
+        raise Denied(409, tr("This import was already undone"))
+    since = parse_iso(r["created_at"])
+    until = umz_undo_until(since)
+    if now_utc() > until:
+        raise Denied(409, tr("An account import can only be undone within {0} days", ACCOUNT_IMPORT_UNDO_DAYS))
+    cr = json.loads(r["created"] or "{}")
+    from .orgimport import oi_undo_check, oi_undo_plan, oi_undo_preview
+    oi_undo_check(c, uid, cr, r["created_at"])
+    plan = oi_undo_plan(c, cr, since)
+    back, kept = imp_undo_split(c, uid, umz_undo_tasks(c, uid, cr), since, cr.get("time_entries") or [])
+    # the plan judges these of the account import itself too (umz_undoplan._BASE, bookmarks via "more", sprints & co. via "parts")
+    gone = umz_areas_tr(oi_undo_preview(plan, {"habits": N_("Habits"), "filters": N_("Filters"), "templates": N_("Templates"),
+                                                "template_files": N_("Templates"), "time_entries": N_("Time entries"),
+                                                "bookmarks": N_("Bookmarks"), "sprints": N_("Sprints"), "list_rules": N_("Rules")}))
+    n = 0
+    for day in cr.get("journal") or []:  # as umz_undo: a day written on since stays
+        j = c.execute("SELECT updated_at FROM journal WHERE user_id=? AND day=?", (uid, day)).fetchone()
+        n += bool(j) and not imp_undo_after(j["updated_at"], since)
+    if n:
+        gone.append({"what": tr("Journal"), "count": n})
+    return {"id": r["id"], "at": r["created_at"], "undo_until": iso(until), "for_good": gone, "trash_tasks": len(back),
+            "trash_rows": len(plan.roots), "kept_tasks": len(kept), "kept_rows": plan.kept_n}
 
 
 # ---------------------------------------------------------------- routes (people only)
@@ -2751,6 +2791,13 @@ def umz_current():
             if st and (best is None or st.get("created_at", "") > best[1].get("created_at", "")):
                 best = (iid, st)
     return jsonify(current=_view(uid, *best) if best else None, chunk=UMZ_CHUNK, max_mb=UMZ_IMPORT_MAX_MB)
+
+
+@app.get("/api/imports/<int:iid>/undo-plan")
+def umz_undo_plan_get(iid):
+    """2.585.0 (#4350): what the undo of my account import iid would take back (umz_undo_preview), people only."""
+    umz_person()
+    return jsonify(umz_undo_preview(db(), me(), iid))
 
 
 @app.post("/api/account/import/<iid>/run")
