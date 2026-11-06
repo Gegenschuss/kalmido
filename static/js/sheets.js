@@ -794,7 +794,8 @@ function shvMove(d) {  // d: 'up' | 'down' | 'left' | 'right' | 'home' | 'end'; 
   let i = rs.indexOf(SHV.cur.r), j = cs.indexOf(SHV.cur.c);
   if (d === 'down' && i === rs.length - 1 && SHV.enterAdd && SHV.sh.can_write && !Object.keys(shvFilt()).length) { SHV.enterAdd = false; shvRowAdd(rs[i]); return; }
   SHV.enterAdd = false;
-  if (d === 'up') i = Math.max(0, i - 1); else if (d === 'down') i = Math.min(rs.length - 1, i + 1);
+  if (typeof shfm_step === 'function') [i, j] = shfm_step(SHV.sh, rs, cs, Math.max(0, i), Math.max(0, j), d);  // 2.589.0 (#4825): merged blocks (sheetfmt.js)
+  else if (d === 'up') i = Math.max(0, i - 1); else if (d === 'down') i = Math.min(rs.length - 1, i + 1);
   else if (d === 'left') j = Math.max(0, j - 1); else if (d === 'right') j = Math.min(cs.length - 1, j + 1);
   else if (d === 'home') j = 0; else if (d === 'end') j = cs.length - 1;
   shvSelect(rs[Math.max(0, i)], cs[Math.max(0, j)]);

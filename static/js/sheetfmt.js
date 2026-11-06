@@ -71,18 +71,28 @@ function shfm_merges(sh) {
   if (SHFM.mm && SHFM.mmSh === sh) return SHFM.mm;
   const rs = shvVisRows(sh).map(r => r.id), cs = sh.columns.map(c => c.id);
   const ri = new Map(rs.map((x, i) => [x, i])), ci = new Map(cs.map((x, i) => [x, i]));
-  const span = new Map(), hid = new Set();
+  const span = new Map(), hid = new Set(), own = new Map();  // 2.589.0 (#4825): own = covered cell -> its block's anchor
   for (const c of sh.cells || []) {
     const m = c.fmt?.merge; if (!m) continue;
     const i = ri.get(c.row_id), j = ci.get(c.col_id), k = c.row_id + ':' + c.col_id;
     if (i == null || j == null || hid.has(k)) continue;
     const h = Math.min(m[0], rs.length - i), w = Math.min(m[1], cs.length - j); if (h * w < 2) continue;
     span.set(k, [h, w]);
-    for (let a = 0; a < h; a++) for (let b = 0; b < w; b++) if (a || b) hid.add(rs[i + a] + ':' + cs[j + b]);
+    for (let a = 0; a < h; a++) for (let b = 0; b < w; b++) if (a || b) { hid.add(rs[i + a] + ':' + cs[j + b]); own.set(rs[i + a] + ':' + cs[j + b], [c.row_id, c.col_id]); }
   }
-  SHFM.mm = {span, hid}; SHFM.mmSh = sh;
+  SHFM.mm = {span, hid, own}; SHFM.mmSh = sh;
   queueMicrotask(() => { SHFM.mm = null; });  // one drawing (the grid is drawn in one go)
   return SHFM.mm;
+}
+// 2.589.0 (#4825): sheets.js shvMove -- one step of the arrow keys from shown indexes (i, j) never ends in a cell a merged block
+// covers: from a block's anchor down / right it jumps past the block, into a block it lands on the anchor -> [i, j]
+function shfm_step(sh, rs, cs, i, j, d) {
+  const mm = shfm_merges(sh), sp = mm.span.get(rs[i] + ':' + cs[j]) || [1, 1];
+  if (d === 'up') i = Math.max(0, i - 1); else if (d === 'down') i = Math.min(rs.length - 1, i + sp[0]);
+  else if (d === 'left') j = Math.max(0, j - 1); else if (d === 'right') j = Math.min(cs.length - 1, j + sp[1]);
+  else if (d === 'home') j = 0; else if (d === 'end') j = cs.length - 1;
+  const a = mm.own.get(rs[i] + ':' + cs[j]);
+  return a ? [rs.indexOf(a[0]), cs.indexOf(a[1])] : [i, j];
 }
 // sheets.js shvTd: the classes of a cell's format / its rule, the span of a merged block; hide = covered by a merged block
 function shfm_td(sh, col, c, rid, cls) {

@@ -8,7 +8,11 @@ PDF never holds a value they could not see. Written with the office PDF writer (
 embedded fonts), no PDF library and nothing in the browser. Without "fit" the columns that do not fit run onto further
 pages (down first, then across, like spreadsheets), each with the row numbers again; with "fit" the font gets smaller
 until every column fits (at least SHP_FS_MIN, longer texts end with "…"). Read right only (the export routes' rule).
+2.589.0 (#4825): a cell's own format goes along -- bold, italic (the regular font slanted), alignment and fill (the palette's
+fill colours of sheets/shfmt.py SHFM_XL_FILL, as in the .xlsx export); colour rules and merged blocks stay screen only.
 """
+import re
+
 from flask import Response
 
 from ..core.config import app
@@ -20,6 +24,7 @@ from ..office.pdf import A4_H, A4_W, C_INK2, C_RULE, C_RULE2, _Page, pdf_text_wi
 from .core import ShBook, sh_eval, sh_need
 from .formula import sh_col_letter
 from .io import _disposition, shx_file_name
+from .shfmt import SHFM_XL_FILL, shfm_load  # 2.589.0 (#4825)
 
 SHP_FS = 8.0  # the font size of the cells (points)
 SHP_FS_MIN = 3.5  # "fit": never smaller
@@ -27,6 +32,8 @@ SHP_MARGIN = 36.0  # page margins (half an inch)
 SHP_COL_MAX = 220.0  # a column is never wider than this (at SHP_FS)
 SHP_PAGES_MAX = 400  # more pages = 400 (choose fewer rows / columns)
 SHP_NUM_KINDS = ("number", "currency", "percent")
+SHP_SLANT = 0.21  # 2.589.0 (#4825): italic = the font slanted ~12 degrees (the embedded fonts have no italic face)
+SHP_ALIGN = {"left": "l", "center": "c", "right": "r"}
 
 
 class _Wide(_Page):
@@ -59,6 +66,14 @@ def _cut(s, size, width, bold=False):
     return s[:lo] + "…" if lo else ""
 
 
+def _shp_text(pg, x, y, s, size, bold, italic, align, width):
+    """2.589.0 (#4825): one cell's text; italic slants the line through its text matrix (office/pdf.py _Page.text draws with Td
+    from the origin, the same place as an absolute Tm)."""
+    pg.text(x, y, s, size, bold=bold, align=align, width=width)
+    if italic and pg.ops:
+        pg.ops[-1] = re.sub(r"(-?[\d.]+) (-?[\d.]+) Td ", lambda m: f"1 0 {SHP_SLANT} 1 {m.group(1)} {m.group(2)} Tm ", pg.ops[-1], count=1)
+
+
 def shp_pdf(c, sheet, opts):
     """The PDF bytes of sheet for the current person with opts (see the module doc)."""
     book = ShBook(c, sheet)
@@ -87,6 +102,12 @@ def shp_pdf(c, sheet, opts):
         return str(r.get("display") or "").replace("\n", " ")
 
     grid = [[text(r["id"], col) for col in cols] for r in rows]
+
+    def fmt(rid, col):  # 2.589.0 (#4825): the cell's own format (bold, italic, align, fill) or None
+        x = at.get((rid, col["id"]))
+        return shfm_load(x["fmt"]) if x and "fmt" in x.keys() else None
+
+    fmts = [[fmt(r["id"], col) for col in cols] for r in rows]
     titles = [col["title"] or sh_col_letter(book.col_idx[col["id"]]) for col in cols]
     nums = [str(book.row_idx[r["id"]] + 1) for r in rows]
     right = [col["kind"] in SHP_NUM_KINDS for col in cols]
@@ -101,9 +122,9 @@ def shp_pdf(c, sheet, opts):
         ws = []
         for ci in range(len(cols)):
             w = pdf_text_width(titles[ci], size, True)
-            for row in grid:
+            for ri, row in enumerate(grid):
                 if row[ci]:
-                    w = max(w, pdf_text_width(row[ci], size))
+                    w = max(w, pdf_text_width(row[ci], size, bool((fmts[ri][ci] or {}).get("bold"))))
                     if w >= SHP_COL_MAX * size / SHP_FS:
                         break
             ws.append(min(SHP_COL_MAX * size / SHP_FS, max(18.0 * size / SHP_FS, w)) + 2 * pad)
@@ -171,9 +192,14 @@ def shp_pdf(c, sheet, opts):
             pg.text(SHP_MARGIN + pad, y + (lh - fs) / 2, nums[ri], fs, color=C_INK2, align="r", width=nw - 2 * pad)
             x = SHP_MARGIN + nw
             for ci in chunk:
+                f = fmts[ri][ci] or {}
+                if f.get("fill") in SHFM_XL_FILL:  # 2.589.0 (#4825): under the text and the row's rule
+                    pg.rect(x, y, ws[ci], lh, "#" + SHFM_XL_FILL[f["fill"]])
                 if row[ci]:
-                    s = _cut(row[ci], fs, ws[ci] - 2 * pad)
-                    pg.text(x + pad, y + (lh - fs) / 2, s, fs, align="r" if right[ci] else "l", width=ws[ci] - 2 * pad)
+                    b = bool(f.get("bold"))
+                    s = _cut(row[ci], fs, ws[ci] - 2 * pad, b)
+                    al = SHP_ALIGN.get(f.get("align")) or ("r" if right[ci] else "l")
+                    _shp_text(pg, x + pad, y + (lh - fs) / 2, s, fs, b, bool(f.get("italic")), al, ws[ci] - 2 * pad)
                 x += ws[ci]
             y += lh
             pg.line(SHP_MARGIN, y, x1, y, w=0.3, color=C_RULE)

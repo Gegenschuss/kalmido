@@ -807,8 +807,16 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None, fl=None):
         fmt = fmts.get(int(cel.get("s") or 0))
     except ValueError:
         fmt = None
-    if v is None and f is None:
-        return False
+    try:  # 2.578.0 (#3462 C): the cell's format (bold, colours, alignment)
+        st_ = (sty or {}).get(int(cel.get("s") or 0))
+    except ValueError:
+        st_ = None
+    if v is None and f is None:  # 2.589.0 (#4825): <c r="B2" s="3"/> (no value, only a format) is read too
+        if not st_:
+            return False
+        if fl is not None and (fl[0] >= SHX_CELLS_MAX or ((r, ci) not in cells and len(cells) >= SHX_STORED_MAX)):
+            fl[1] += 1  # over the limits: left out and counted (never "too many cells" for formats alone)
+            return False
     if fmt == "date" and t in (None, "n") and v and re.fullmatch(r"-?\d+(\.\d+)?", v):
         try:
             v = (_EPOCH + timedelta(days=int(float(v)))).isoformat()
@@ -822,10 +830,6 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full, sty=None, fl=None):
             if full[0] > SHX_CELLS_MAX + SH_COLS_MAX:
                 raise _shx_too_many()
     cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
-    try:  # 2.578.0 (#3462 C): the cell's format (bold, colours, alignment)
-        st_ = (sty or {}).get(int(cel.get("s") or 0))
-    except ValueError:
-        st_ = None
     if st_ and not (v or f) and fl is not None:  # 2.578.0 (#3462, review G1): a formatted empty cell becomes a cell - counted
         fl[0] += 1
         if fl[0] > SHX_CELLS_MAX:
