@@ -44,7 +44,7 @@ for s, ws in ((Bo, f"org:{ORG}"), (Ca, f"org:{BETA}")):
 FID, Fr = freelancer(B, A)  # freelancer-matrix: office (the personal office)
 Fr.patch(B + "/api/settings", json={"workspace": "private"})
 F = "/api/office/fixed-costs"
-REN = F + "/category-rename"
+REN = "/api/office/fixed-costs/category-rename"  # the whole path (tests/tenant_coverage_test.py finds it)
 D = date.today().replace(day=1).isoformat()
 
 
