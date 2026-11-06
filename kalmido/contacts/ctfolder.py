@@ -30,6 +30,7 @@ from ..core.access import collab_all, need_feat
 from ..core.db import body, bump, db, insert_id
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, lang, tr
+from ..core.objhooks import GONE  # review 2.578 F2
 from ..core.pg import system_ctx
 from ..accounts.orgroles import org_writes, user_orgs_full
 from ..accounts.orgs import user_orgs
@@ -146,6 +147,7 @@ fs_ref_register(CTF_BOOK, label=N_("Address book"), open_url=lambda bid: f"conta
 fs_ref_register(CTF_CONTACT, label=N_("Contact"), open_url=lambda cid: f"contacts/{int(cid)}", base_role=_contact_base,
                 space=_contact_space, hidden=_hidden(CTF_CONTACT), title=_contact_title, content=_contact_content,
                 content_gate=_gate, cap=_cap)
+GONE[CTF_CONTACT] = "contacts"  # review 2.578 F2: an account's deletion takes the core rows of its contacts too (core/objhooks.py)
 
 
 # ---------------------------------------------------------------- the hooks of contacts/model.py

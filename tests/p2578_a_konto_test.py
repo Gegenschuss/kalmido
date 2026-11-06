@@ -7,6 +7,8 @@ Invented names only (example.com).  freelancer-matrix: pim
  - her private calendar shared with bob (edit) is handed on to him (#4301): it stays, its history stays, her name in it is gone
    (user_id NULL)
  - her own project deleted along (?lists=delete): its core history rows go with it (lists/lists.py list_purge)
+ - review F2/F3: a deactivated account's books (one in the trash) and contacts take their core rows along; a book deleted for
+   good takes those of its contacts
 usage: p2578_a_konto_test.py <datadir>"""
 import os
 import sys
@@ -84,5 +86,36 @@ check(S in {x["id"] for x in Bo.get(B + "/api/evcals").json()["items"]}, "bob st
 check(not sql("SELECT 1 FROM lists WHERE id=?", (L,)) and rows("list", L)["obj_history"] == 0,
       f"#4796: her project deleted along takes its core history {rows('list', L)}")
 check(not sql("SELECT 1 FROM obj_history WHERE user_id=?", (FRIDA,)), "no history row names her any more")
+
+# ---------------------------------------------------------------- 2.578.0 (#4796) review F2/F3: a deactivated account with a book in
+# the trash, a book and contacts with core rows: all go with it; a row of an object that never was there and somebody else's stay
+GINA, Gi = freelancer(B, A, "gina")
+BK = Gi.post(B + "/api/books", json={"name": "Neighbours"}).json()["id"]
+BT = Gi.post(B + "/api/books", json={"name": "Old club"}).json()["id"]
+CT = Gi.post(B + "/api/contacts", json={"book_id": BK, "fn": "Hanna Example"}).json()["id"]
+CT2 = Gi.post(B + "/api/contacts", json={"book_id": BT, "fn": "Ole Example"}).json()["id"]
+CB = Bo.post(B + "/api/contacts", json={"book_id": Bo.post(B + "/api/books", json={"name": "Bob's"}).json()["id"], "fn": "Per Example"}).json()["id"]
+check(Gi.delete(B + f"/api/books/{BT}").ok, "gina's second book in the trash")
+for kind, rid in (("address_book", BK), ("address_book", BT), ("contact", CT), ("contact", CT2), ("contact", CB), ("contact", 987654321)):
+    sql("INSERT INTO obj_revoked(src, org_id, user_id, kind, ref_id, row_json, reason, created_at) VALUES('fs_shares',NULL,?,?,?,'{}','unshare',?)",
+        (BOB, kind, rid, TS), write=True)
+    sql("INSERT INTO obj_history(kind, ref_id, org_id, user_id, action, vals_before, vals_after, created_at, updated_at) "
+        "VALUES(?,?,NULL,?,'update','{}','{}',?,?)", (kind, rid, BOB, TS, TS), write=True)
+check(A.patch(B + f"/api/users/{GINA}", json={"disabled": True}).ok, "gina's account deactivated")
+r = A.delete(B + f"/api/users/{GINA}", params={"lists": "delete", "confirm": "gina"})
+check(r.ok and not sql("SELECT 1 FROM books WHERE id IN (?,?)", (BK, BT)), "gina's account deleted with her books " + r.text[:200])
+for kind, rid in (("address_book", BK), ("address_book", BT), ("contact", CT), ("contact", CT2)):
+    check(rows(kind, rid) == {"obj_history": 0, "obj_undo": 0, "obj_revoked": 0}, f"review F2: {kind} {rid} takes its core rows {rows(kind, rid)}")
+check(rows("contact", CB)["obj_revoked"] == 1 and rows("contact", CB)["obj_history"] == 1, f"bob's contact keeps its rows {rows('contact', CB)}")
+check(rows("contact", 987654321)["obj_revoked"] == 1, "a row of an object that never was there is not touched")
+
+# ---------------------------------------------------------------- review F2: a book deleted for good takes the rows of its contacts
+BB = Bo.post(B + "/api/books", json={"name": "Bob's old"}).json()["id"]
+CBB = Bo.post(B + "/api/contacts", json={"book_id": BB, "fn": "Uwe Example"}).json()["id"]
+sql("INSERT INTO obj_revoked(src, org_id, user_id, kind, ref_id, row_json, reason, created_at) VALUES('fs_shares',NULL,?,?,?,'{}','unshare',?)",
+    (BOB, "contact", CBB, TS), write=True)
+check(Bo.delete(B + f"/api/books/{BB}").ok and Bo.post(B + f"/api/books/{BB}/purge").ok, "bob deletes a book for good")
+check(rows("contact", CBB)["obj_revoked"] == 0, f"review F2: its contact's core rows went with it {rows('contact', CBB)}")
+check(rows("contact", CB)["obj_revoked"] == 1, "his other contact keeps its rows")
 
 sys.exit(kt.done("p2578_a_konto"))

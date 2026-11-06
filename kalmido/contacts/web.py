@@ -9,7 +9,7 @@ from flask import jsonify, request, Response
 from werkzeug.exceptions import RequestEntityTooLarge
 
 from ..core.config import app
-from ..core.objhooks import obj_rows_drop  # 2.578.0 (#4796)
+from ..core.objhooks import obj_rows_drop, obj_rows_drop_many  # 2.578.0 (#4796)
 from ..core.i18n import N_, tr, trn
 from ..core.db import body, bump, connect, db, err, iso, iso_ms, now_utc
 from ..core.pg import system_ctx, write_lock  # 2.269.0 B (#3034); 2.370.3 (#2760): system_ctx
@@ -166,9 +166,11 @@ def op_book_purge(c, uid, bid):
     b, _ = need_book(c, bid, manage=True, trash=True)
     if not b["deleted_at"]:
         raise Denied(409, tr("Only what is in the trash can be deleted for good"))
+    cts = [r[0] for r in c.execute("SELECT id FROM contacts WHERE book_id=?", (bid,)).fetchall()]  # review 2.578 F2: they go along
     c.execute("DELETE FROM books WHERE id=?", (bid,))
-    from .ctfolder import CTF_BOOK, ctf_dropped
+    from .ctfolder import CTF_BOOK, CTF_CONTACT, ctf_dropped
     obj_rows_drop(c, CTF_BOOK, bid)  # 2.578.0 (#4796): its history / undo rows of the core go with it
+    obj_rows_drop_many(c, CTF_CONTACT, cts, gone="contacts")  # review 2.578 F2: + those of its contacts (cascade over book_id)
     ctf_dropped(c, CTF_BOOK, bid)  # 2.351.0 B (#2749): its folder node goes
     # 2.66.0 (#1835): the undo data of merges into this book goes with it (the history line stays)
     c.execute("UPDATE merge_runs SET snapshot='{}' WHERE kind='contact' AND book_id=?", (bid,))
