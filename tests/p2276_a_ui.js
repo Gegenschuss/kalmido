@@ -77,6 +77,11 @@ const today = TC.today();
     check(await ready(ev, `!!document.querySelector('#view .naved .navl:not(.navoffl) [data-k="kpi"]')`, 40), '#3560 phone: Plus brings Figures back');
     await click(ev, '#view .naved [data-act="nav-done"]');
     check(await ready(ev, `!document.querySelector('#view .naved') && !!document.querySelector('#view .ofmstart [data-ofmg="money"] [data-ofm="kpi"]')`, 40), '#3560 phone: Done, Figures in Money');
+    // #3506 (CI red of 2.563.1): the menu draws before the server stored the Plus (it waits for the Minus) -- asked until the
+    // server knows it, a sign-out at once cut the write off and dave's Figures stayed hidden on the next sign-in
+    const kpiHid = v => { try { return (JSON.parse(v || '{}').office?.hidden || []).includes('kpi'); } catch { return true; } };
+    let nm = ''; for (let i = 0; i < 60; i++) { nm = (await call(CK.dave, 'GET', '/api/state')).settings?.nav_menus || ''; if (!kpiHid(nm)) break; await sleep(250); }
+    check(!kpiHid(nm), '#3560: the server knows Figures is back ' + nm);
 
     // ================= computer 1280: carol's fresh office
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}});
@@ -145,7 +150,7 @@ const today = TC.today();
     await fresh(ev, nav, 'dave');
     await nav(B + '#office/offers');
     check(await ready(ev, `typeof OFC === 'object' && !!OFC.info && OFC.info.used?.invoice === true && ${money} === 'true'`, 80), '#3039: with an invoice Money is open on its own');
-    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !!document.querySelector('#side [data-ofm="travel"]')`), '#3784: the figures, the cash flow and travel show ' + await ev(side));
+    check(await ev(`!!document.querySelector('#side [data-ofm="kpi"]') && !!document.querySelector('#side [data-ofm="cashflow"]') && !!document.querySelector('#side [data-ofm="travel"]')`), '#3784: the figures, the cash flow and travel show ' + await ev(side) + ' ' + await ev(`JSON.stringify({nav: S.settings?.nav_menus, kpi: OFC.info?.features?.['money.kpi'], adm: typeof ofm_adm === 'function' ? ofm_adm() : '?', lv: ofm_lv(), role: OFC.info?.role, hid: nav_hid('office', 'kpi'), off: nav_orgOff('office', 'kpi'), ws: wsCur()})`));
   }, false);
 
   console.log(`p2276_a_ui: ${ok} ok, ${F.length} failed`);
