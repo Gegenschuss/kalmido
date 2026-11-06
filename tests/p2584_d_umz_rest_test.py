@@ -211,11 +211,30 @@ check(one("SELECT COUNT(*) FROM hub_absences WHERE deleted_at IS NULL") == 0, "#
 check([(t[0], t[1]) for t in kt.dbx("SELECT month, state FROM time_sheets WHERE user_id=? ORDER BY month", (GID,))] == [("2026-08", "open")],
       "#3965 ... the timesheet too, gina's own month stays")
 left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL or 0,)) for t in ("budget_cats", "budget_recurring", "budget_entries")}
-check(left == {"budget_cats": 0, "budget_recurring": 0, "budget_entries": 1} and one("SELECT id FROM budget_entries WHERE list_id=?", (BL or 0,)) == KEEP,
-      f"#3965 ... the budget rows too, the entry changed since stays {left}")
+# 2.584.0 (#3965, fable F5): the budget list with an entry changed since stays WHOLE (before: its unchanged rows were deleted, the
+# list went into the trash all the same - the report said "kept", the budget was gone)
+check(left == {"budget_cats": 1, "budget_recurring": 1, "budget_entries": 2} and one("SELECT deleted_at FROM lists WHERE id=?", (BL or 0,)) is None,
+      f"#3965 ... the budget list with an entry changed since stays whole, with all its rows {left}")
 check([(p[0], p[2]) for p in kt.dbx("SELECT folder, version, body FROM playbooks WHERE list_id IS NULL AND owner_id=?", (GID,))] == [("Bestand", "Gina eigen")],
       "#3965 ... the folder's playbook too, gina's own stays")
 now = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (OLIST,)) for t in OTTO_BUD}
 check(now == OTTO_BUD and one("SELECT COUNT(*) FROM lists WHERE id=? AND deleted_at IS NULL", (OLIST,)) == 1, f"#3965 otto's list is untouched {now}")
+
+# fable F5: an unchanged budget list goes into the trash with its rows (restorable), no row is deleted on its own
+FILE2 = mkzip({"lists": [{"id": 9, "name": "Haushalt Zwei", "life": "budget", "created_at": TS}],
+               "budgets": [{"list_id": 9, "name": "Haushalt Zwei", "categories": [{"id": 91, "list_id": 9, "name": "Wohnen", "kind": "out"}],
+                            "entries": [{"id": 92, "list_id": 9, "day": "2026-10-06", "amount": 12, "kind": "out", "title": "Lampe", "cat_id": 91}]}]})
+iid2, j = upload(Gi, FILE2)
+r = Gi.post(B + f"/api/account/import/{iid2}/run", json={"target": "private", "people": {}})
+j = until(lambda: state_of(Gi, iid2), 180) or {} if r.status_code == 202 else {}
+check(j.get("state") == "done", f"F5 a second import with one budget list {r.status_code} {j.get('state')} {j.get('error')}")
+IMP2 = (j.get("result") or {}).get("import_id")
+BL2 = one("SELECT id FROM lists WHERE owner_id=? AND name='Haushalt Zwei' AND life='budget'", (GID,))
+rows2 = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL2 or 0,)) for t in ("budget_cats", "budget_entries")}
+check(BL2 and rows2["budget_entries"] == 1, f"guard: it arrives {BL2} {rows2}")
+check(IMP2 and Gi.post(B + f"/api/imports/{IMP2}/undo", json={}).ok, "F5 the undo of the second import")
+after2 = {t: one(f"SELECT COUNT(*) FROM {t} WHERE list_id=?", (BL2 or 0,)) for t in ("budget_cats", "budget_entries")}
+check(one("SELECT deleted_at FROM lists WHERE id=?", (BL2 or 0,)) is not None and after2 == rows2,
+      f"F5 the unchanged budget list goes into the trash with all its rows (restorable) {after2} {rows2}")
 
 sys.exit(kt.done("p2584_d_umz_rest"))

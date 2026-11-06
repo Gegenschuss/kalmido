@@ -385,10 +385,11 @@ def umz_more_undo(c, uid, cr, since, plan):
                 gone = r is not None and not any(x["id"] not in pbs for x in c.execute(
                     "SELECT id FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?", (uid, r["folder"])))
                 kept += r is not None and not gone
-            else:
+            else:  # 2.584.0 (fable F5): a budget row is never deleted on its own - its list goes into the trash with all its rows,
+                # or stays whole when anything in it was written since (importers.imp_undo_lists, imp_budget_touched)
                 r = c.execute(f"SELECT updated_at FROM {table} WHERE id=? AND {mine}", (v, uid)).fetchone()
-                gone = r is not None and not imp_undo_after(r["updated_at"], since)
-                kept += r is not None and not gone
+                kept += r is not None and imp_undo_after(r["updated_at"], since)
+                gone = False
             if gone:
                 c.execute(f"DELETE FROM {table} WHERE id=? AND {mine}", (v, uid))
             continue
