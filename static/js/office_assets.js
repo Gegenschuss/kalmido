@@ -36,8 +36,8 @@ function astFields(r) {
   if (!ofcAdmin()) return '';
   const plan = r?.afa_plan || [];
   const life = r?.life_suggest ? tr('Suggestion: {0} months', r.life_suggest) : tr('Suggested from the category');
-  const cap = r.method === 'gwg' ? tr('Low-value asset: written off in the purchase year') : r.method === 'declining'  // 2.480.0 C (#3528)
-    ? tr('Declining depreciation at {0} %, linear from the year it gives more', fmtNum(+r.declining_pct, 2).replace(/[.,]00$/, '')) : tr('Linear depreciation over {0} months', r.life_eff);
+  const cap = r?.method === 'gwg' ? tr('Low-value asset: written off in the purchase year') : r?.method === 'declining'  // 2.480.0 C (#3528), 2.570.0 (#4750): r? - a new device has no r
+    ? tr('Declining depreciation at {0} %, linear from the year it gives more', fmtNum(+r?.declining_pct, 2).replace(/[.,]00$/, '')) : tr('Linear depreciation over {0} months', r?.life_eff);
   const tbl = plan.length ? `<table class="ast-plan"><caption>${cap}</caption>
     <thead><tr><th scope="col">${tr('Year')}</th><th scope="col">${tr('Depreciation')}</th><th scope="col">${tr('Book value')}</th></tr></thead>
     <tbody>${plan.map(p => `<tr class="${p.year === r.year ? 'cur' : ''}"><td>${p.year}</td><td>${ofcMoney(p.afa)}</td><td>${ofcMoney(p.book)}</td></tr>`).join('')}</tbody></table>` : '';

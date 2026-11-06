@@ -6,6 +6,7 @@
 //   advice"; a purchase price entered in the dialog is saved (decimal comma) and can be taken back by one undo step
 // - on a phone nothing sticks out to the side
 // - a member sees the device without any price or value
+// - 2.570.0 (#4750): "New device" opens the editor without a console error
 const path = require('path');
 const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
@@ -78,6 +79,12 @@ const FEAT = 'cal,comments,collab,office,clients';
     check(await ev(`HIST.undo[HIST.undo.length - 1]?.label === 'Edit device'`), 'one undo step');
     await ev(`(() => { histStep('undo'); return 1; })()`);
     check(await ready(ev, `fetch('/api/office/equipment/${mic.id}', {headers: {'X-Requested-With': 'kalmido'}}).then(r => r.json()).then(j => j.purchase_net === '' && j.vendor === '')`), 'undo takes the price back');
+    // 2.570.0 (#4750): "New device" opens the editor without a record (astFields read r.method of undefined)
+    await ev(`(() => { window.__e4750 = []; window.addEventListener('error', e => window.__e4750.push(String(e.message))); window.addEventListener('unhandledrejection', e => window.__e4750.push(String(e.reason))); document.querySelector('[data-ofc="new"][data-kind="equipment"]').click(); return 1; })()`);
+    check(await ready(ev, `!!document.querySelector('.modal #of-name') && !!document.querySelector('.modal #of-purchase_net')`), 'New device opens the editor with purchase and value');
+    check(await ev(`window.__e4750.length === 0`), 'New device: no error in the console ' + await ev(`window.__e4750.join(' | ')`));
+    await ev(`(() => { document.querySelector('.modal [data-m="close"]')?.click(); return 1; })()`);
+    await ready(ev, `!document.querySelector('.modal')`);
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 844}});
     await nav(B + '#office/equipment');
     check(await ready(ev, `document.querySelectorAll('.ast-sum .ast-tile').length === 3`, 80), 'phone: the sums');
