@@ -487,11 +487,11 @@ ul.ofdpick .ofcn{display:flex;flex-direction:column}
 .bk-h{margin:.75rem 0 .25rem;font-weight:600}
 .bk-note{font-size:var(--fs-s);margin:.5rem 0 0}
 .bk-warn{border-left:.2rem solid var(--accent);background:var(--bg2);padding:.5rem .75rem;border-radius:var(--radius);margin:.5rem 0}
-.tc-list{list-style:none;margin:0;padding:0}.tc-pt{display:flex;gap:.6rem;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--line)}  /* 2.589.0 (#3458): the tax check */
-.tc-pt p{margin:.15rem 0 0}.tc-body{min-width:0;flex:1}.tc-det{margin:.25rem 0 0;padding-left:1.1rem;font-size:var(--fs-s);color:var(--muted)}
-.tc-dot{display:inline-block;flex:none;width:.8rem;height:.8rem;border-radius:50%;margin-top:.3rem;background:var(--ok)}.tc-yellow .tc-dot{background:var(--st-wait)}.tc-red .tc-dot{background:var(--danger)}
+.tc-list{list-style:none;margin:0;padding:0}.tc-pt{display:flex;gap:.625rem;align-items:flex-start;padding:.5rem 0;border-bottom:1px solid var(--line)}  /* 2.589.0 (#3458): the tax check */
+.tc-pt p{margin:.125rem 0 0}.tc-body{min-width:0;flex:1}.tc-det{margin:.25rem 0 0;padding-left:1.125rem;font-size:var(--fs-s);color:var(--muted)}
+.tc-dot{display:inline-block;flex:none;width:.8rem;height:.8rem;border-radius:50%;margin-top:.3125rem;background:var(--ok)}.tc-yellow .tc-dot{background:var(--st-wait)}.tc-red .tc-dot{background:var(--danger)}
 .tc-st{font-size:var(--fs-s);color:var(--muted)}.tc-red .tc-st{color:var(--danger)}.tc-go{color:inherit}
-.tc-sum{display:flex;gap:1rem;flex-wrap:wrap;margin:.5rem 0}.tc-cnt{display:inline-flex;gap:.35rem;align-items:center}.tc-cnt .tc-dot{margin:0}
+.tc-sum{display:flex;gap:1rem;flex-wrap:wrap;margin:.5rem 0}.tc-cnt{display:inline-flex;gap:.375rem;align-items:center}.tc-cnt .tc-dot{margin:0}
 .bk-miss{color:var(--accent)}
 .bk-missing{margin:.25rem 0 .5rem}
 .bk-einvs{margin:.25rem 0 .75rem}.bk-einvrow{display:flex;align-items:center;gap:.5rem}.bk-einvrow .ofcrow{flex:1;min-width:0}  /* 2.237.0 C (#2865) */
