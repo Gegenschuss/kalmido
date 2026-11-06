@@ -548,3 +548,42 @@ jobs:
           chmod a+rx .zap && chmod a+r .zap/rules.tsv
           docker run --rm --network host -v "$PWD/.zap:/zap/wrk:rw" ghcr.io/zaproxy/zaproxy:2.17.0 \
             zap-baseline.py -t http://127.0.0.1:3040/ -c rules.tsv
+
+  install-upgrade:
+    # 2.589.0 (#4359, audit #2480 finding 6): the way of a self-hoster, nightly and by hand only (a push never waits for it).
+    # The release before this commit (the latest release, else the newest tag below VERSION with a release) is installed
+    # with ITS install.sh from the GitHub release (prebuilt image pinned to the release digest), filled by
+    # tests/upgrade_seed.py (one-time setup code from the log), updated to this commit with the update.sh the installer wrote
+    # (KALMIDO_VERSION = the commit, KALMIDO_INSTALLER_URL = this commit's install.sh) and checked: version, sign-in, the
+    # data as before, a write, the database copy of the update (tools/install_upgrade_check.py, tests/install_upgrade_verify.py).
+    # The seeded old database is kept as an artifact: the quarterly fixture of tests/fixtures/upgrade/ (README there).
+    name: Install the last release (install.sh), update to this commit (update.sh)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0  # the release tags: the release to start from
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.12"
+      - name: Test dependencies (requests for the seed and the checks)
+        run: pip install -r tests/requirements.txt
+      - name: install.sh (last release) -> data -> update.sh (this commit) -> checks
+        run: python3 tools/install_upgrade_check.py run --ref "$GITHUB_SHA" --dir "$RUNNER_TEMP/kalmido-install" --out "$RUNNER_TEMP/upgrade-fixture"
+      - name: The old database (quarterly fixture for tests/fixtures/upgrade/)
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: upgrade-fixture
+          path: ${{ runner.temp }}/upgrade-fixture
+          if-no-files-found: ignore
+          retention-days: 90
+      - name: Installation log on failure
+        if: failure()
+        run: |
+          cd "${{ runner.temp }}/kalmido-install" 2>/dev/null || exit 0
+          cat .kalmido-version .kalmido-version.prev 2>/dev/null || true
+          docker compose ps -a || true
+          docker compose logs --no-color --tail 150 kalmido db || true

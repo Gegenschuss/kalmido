@@ -7,6 +7,9 @@ requests and docker (no kt.py: that came later).
 
     python3 upgrade_seed.py <datadir>     (the old server runs: start.sh; KALMIDO_TEST_PORT as in start.sh)
     # shots: 'P2192C_DUMP_SHOTS'          the folder the dump + JSON are written to (default: tests/fixtures/upgrade)
+    # 2.589.0 (#4359): UPG_SETUP_CODE = the one-time setup code of a server that asks for one (an installation by install.sh;
+    # the test container runs without), UPG_VERSION = the old server's version when the script does not run inside its tree
+    # (tools/install_upgrade_check.py runs the candidate's copy against the release before it)
 
 Data (invented, addresses @example.com): instance admin alice with the organisation "Nordwind Studio", member bob, frida
 without an organisation (her own private workspace and personal office); an org project and a private list with tasks (due
@@ -44,7 +47,10 @@ def login(user):
 
 s0 = requests.Session()
 s0.headers.update(H)
-ok(s0.post(B + "/api/auth/setup", json={"username": "alice", "display_name": "Alice Admin", "password": PW}), "setup")
+SETUP = {"username": "alice", "display_name": "Alice Admin", "password": PW}
+if os.environ.get("UPG_SETUP_CODE"):  # 2.589.0 (#4359)
+    SETUP["setup_code"] = os.environ["UPG_SETUP_CODE"]
+ok(s0.post(B + "/api/auth/setup", json=SETUP), "setup")
 A = login("alice")
 ok(A.post(B + "/api/admin/setup", json={"org_name": "Nordwind Studio", "lang": "en", "collab_all": True, "time_all": True,
                                        "modules": ["cal", "habits", "pomo", "stats", "deps", "fields"]}),
@@ -134,7 +140,7 @@ def minutes(s):
 
 
 EXP = {
-    "version": open(os.path.join(HERE, "..", "VERSION")).read().strip(),
+    "version": os.environ.get("UPG_VERSION") or open(os.path.join(HERE, "..", "VERSION")).read().strip(),  # 2.589.0 (#4359)
     "password": PW, "org": ORG, "ids": {"team": TEAM, "private": PRIV, "t1": T1, "t2": T2, "frida_list": FL, "frida_task": FT,
                                         "offer": Q, "invoice": INV, "frida_offer": FQ, "agent": AG, "bob": BOB, "frida": FRIDA},
     "users": {u: view(s) for u, s in (("alice", A), ("bob", Bo), ("frida", Fr))},
