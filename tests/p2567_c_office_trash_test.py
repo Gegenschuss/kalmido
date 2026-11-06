@@ -170,6 +170,8 @@ def scenario(S, who, ws, other, member=None):
           f"{who}: the undo brings both trips back {r.text[:200]}")
     r = S.post(B + O + "/trips/delete", json={"ids": tids})
     tt = r.json().get("trash_id")
+    # #3506 (CI red of 2.579.0): the trips the undo brought back are unchanged, so a second take-back takes them again
+    check(r.ok and r.json().get("deleted") == 2 and tt, f"{who}: taken back again after the undo: one entry {r.text[:200]}")
     m = PM1[:7]
     lock = S.post(B + O + "/periods/lock", json={"through": m, "confirm": f"{m[5:7]}/{m[:4]}"})
     check(lock.ok, f"{who}: setup the month of the trips locked {lock.text[:200]}")

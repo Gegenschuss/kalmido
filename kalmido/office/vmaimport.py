@@ -571,6 +571,9 @@ def vmi_trash_back(c, oid, ids):
     the single trip, travel.rk_trash_check; else 409 and the restore is rolled back), its import run counts as not undone again."""
     for i in ids:
         _trip_need_open(c, oid, _trip(c, oid, i))
+    # #3506 (CI red of 2.579.0): only unchanged trips (updated_at = created_at) went into the trash, so they come back unchanged -
+    # otb_restore's new updated_at made a second take-back keep them all (no trash entry; green only within the same second)
+    c.execute("UPDATE office_trips SET updated_at=created_at WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[]))", (oid, list(ids)))
     c.execute("""UPDATE office_import_runs SET undone_at=NULL, undone_by=NULL WHERE org_id=? AND undone_at IS NOT NULL AND id IN
                  (SELECT import_run_id FROM office_trips WHERE org_id=? AND id = ANY(CAST(? AS BIGINT[])) AND import_run_id IS NOT NULL)""",
               (oid, oid, list(ids)))
