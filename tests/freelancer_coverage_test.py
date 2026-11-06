@@ -364,6 +364,7 @@ ROUTES = {
     "GET /api/hubmail/mails/{}/html": "hub", "GET /api/hubmail/mails/{}/make": "hub", "POST /api/hubmail/mails/{}/task": "hub",  # 2.141.0 B (#2140, #2139)
     "POST /api/hubmail/mails/{}/event": "hub", "GET /api/hubmail/links": "hub", "POST /api/team/absences": "hub", "POST /api/team/absences/{}/restore": "hub",
     "POST /api/team/dispo/bookings": "hub", "POST /api/team/dispo/bookings/restore": "hub",
+    "POST /api/team/dispo/bookings/{}/fill": "hub",  # 2.589.0 (#4571): open places of a shoot day from a quotation (p2589_b_dispo_test.py, freelancer-matrix: hub)
     "PUT /api/team/absences/holidays": "hub",
     # 2.125.0 A (#2117, #2118): vacation account, requests, the working week
     "GET /api/team/leave": "hub", "PUT /api/team/leave/quota": "hub", "PUT /api/team/leave/approval": "hub",
@@ -1321,7 +1322,6 @@ PATCH /api/servers/{}/tasks/{}
 PATCH /api/supporter/nudge
 PATCH /api/tasks/{}/links/{}
 PATCH /api/tasks/{}/ticket
-PATCH /api/team/dispo/bookings/{}
 PATCH /api/v1/address-books/{}
 PATCH /api/v1/clients/{}
 PATCH /api/v1/comments/{}

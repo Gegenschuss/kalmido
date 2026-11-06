@@ -124,7 +124,7 @@ def _adz_reads(c, lid):
 def adz_mask(d, c=None, known=None):
     if adz_hidden(d.get("list_id"), c):
         d.update(job="", title=tr("Booked"), list_id=None, event_id=None, hidden=True)
-    if known is not None and (d.get("kind"), d.get("rid")) not in known:
+    if known is not None and d.get("kind") != "slot" and (d.get("kind"), d.get("rid")) not in known:  # 2.589.0 (#4571): an open place names only its function
         d.update(rid=None, label="")  # 2.223.7 C (#2921): a person / contact / item the agent does not see stays nameless
     return d
 

@@ -1059,6 +1059,10 @@ button.dma-open:hover .dma-n,button.dma-open:focus-visible .dma-n{color:var(--ac
 .otktbl .otk-changed .otkst,.otktbl .otk-gone .otkst{color:var(--warn,var(--accent))}
 .otksum{font-variant-numeric:tabular-nums;margin:.25rem 0 0}
 .dpjbud{display:flex;align-items:center;gap:.375rem;margin:0 0 .5rem;font-variant-numeric:tabular-nums}
+/* 2.589.0 (#4571): the shoot days of the preview (office_docproject.js otk_dispoHtml) */
+.otkdh{margin:1rem 0 .25rem}
+.otkdhint{display:flex;align-items:flex-start;gap:.375rem;margin:.75rem 0 0}
+.otktbl .otkd-need .dpbtn{box-shadow:0 0 0 2px var(--warn,var(--accent));border-radius:var(--r-s)}
 /* 2.187.0 A (#2476): the page "Rights" of the office's settings (office_rights.js): people, groups, log, my rights */
 .orr{max-width:60rem}
 .orr-hint{display:flex;align-items:flex-start;gap:.5rem;margin:0 0 .875rem}.orr-hint svg{flex:none;margin-top:.125rem}

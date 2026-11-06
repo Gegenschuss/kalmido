@@ -96,6 +96,27 @@ function otk_line(x) {
     <td><label for="${id}"><b>${esc(x.title)}</b></label>${x.text ? `<small class="muted otktx">${esc(x.text.slice(0, 160))}</small>` : ''}</td><td class="muted">${qty}</td>
     <td>${hrs}${was}</td><td><span class="otkst">${esc(tr(OTK_STATE[x.state] || x.state))}</span></td></tr>`;
 }
+// 2.589.0 (#4571): the shoot parts as pencilled-in shoot days of the disposition (office/offerdispo.py): a date per day
+// (from the quotation's period of service, else asked here), the open places per crew function; firm bookings only marked
+const OTK_DSTATE = {new: N_('New|position'), changed: N_('Changed'), same: N_('Unchanged'), gone: N_('No longer in the quotation')};
+function otk_dline(x, i) {
+  const ck = x.state !== 'same', id = `otkd-${i}`;
+  const cnt = {};
+  for (const p of x.places || []) cnt[p.name] = (cnt[p.name] || 0) + 1;
+  const places = Object.entries(cnt).map(([n, k]) => k > 1 ? `${k} × ${n}` : n).join(', ');
+  const when = x.state === 'gone' ? `<span class="muted">${esc(x.start ? fmtDayAbs(x.start) : '')}</span>`
+    : dateIn(`${id}-d`, x.start || '', {label: tr('Date') + ': ' + x.title, ro: !ck, clear: false, empty: tr('Choose a date')});
+  const firm = x.firm ? `<small class="muted">${esc(trn('{0} firm or filled booking is only marked', '{0} firm or filled bookings are only marked', x.firm))}</small>` : '';
+  return `<tr class="otk-${x.state}${x.need_date ? ' otkd-need' : ''}"><td>${ck ? `<input type="checkbox" id="${id}" data-otkdp="${esc(x.key)}" data-otkdi="${i}" ${x.pick ? 'checked' : ''}>` : ''}</td>
+    <td><label for="${id}"><b>${esc(x.title)}</b></label>${places ? `<small class="muted otktx">${esc(tr('Open places: {0}', places))}</small>` : ''}</td><td>${when}</td>
+    <td class="muted">${esc(trn('{0} day', '{0} days', x.days))}</td><td><span class="otkst">${esc(tr(OTK_DSTATE[x.state] || x.state))}</span>${firm}</td></tr>`;
+}
+function otk_dispoHtml(dp) {
+  if (!dp || (!dp.hint && !(dp.days || []).length)) return '';
+  if (dp.hint) return `<p class="muted otkdhint">${ic('info', 's')} ${esc(dp.hint)}</p>`;
+  return `<h4 class="otkdh">${tr('Shoot days in the disposition')}</h4><p class="muted">${esc(tr('Each shoot part becomes a shoot day pencilled in as an option, with one open place per person of each crew function.'))}</p>
+    <div class="scroll otkwrap"><table class="tbl otktbl otkdtbl"><thead><tr><th></th><th>${tr('Shoot day')}</th><th>${tr('Date')}</th><th>${tr('Duration')}</th><th></th></tr></thead><tbody>${dp.days.map(otk_dline).join('')}</tbody></table></div>`;
+}
 async function otk_open() {
   const d = OFD.doc; if (!d) return;
   let j;
@@ -109,17 +130,24 @@ async function otk_open() {
   const md = /** @type {any} */ (modal(`<h3>${upd ? tr('Update budget from the quotation') : tr('Create tasks')}</h3>
     <p class="muted">${esc(tr('Each position becomes a task with its budget in hours; a day counts {0} h. No prices go into the tasks.', fmtNum(j.day_hours, 2)))}</p>${where}
     <div class="scroll otkwrap"><table class="tbl otktbl"><thead><tr><th></th><th>${tr('Task')}</th><th>${tr('Quantity')}</th><th>${tr('Budget h')}</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="5" class="muted">${tr('This quotation has no positions.')}</td></tr>`}</tbody></table></div>
-    <p class="otksum">${esc(tr('Budget of the project: {0} h · {1} net', fmtNum(j.total_h, 2), j.net_text))}</p>
+    <p class="otksum">${esc(tr('Budget of the project: {0} h · {1} net', fmtNum(j.total_h, 2), j.net_text))}</p>${otk_dispoHtml(j.dispo)}
     <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button>${can ? `<button class="btn pri" data-m="ok">${upd ? tr('Apply') : tr('Create tasks')}</button>` : ''}</div>`));
   md.classList.add('otkdlg');
   md.addEventListener('click', async e => {
     const b = /** @type {HTMLElement} */ (e.target).closest?.('[data-m]'); if (!b) return;
     if (b.dataset.m === 'close') { modalClose(md); return; }
     const pick = $$('[data-otk]', md).filter(x => /** @type {HTMLInputElement} */ (x).checked).map(x => x.dataset.otk);
-    if (!pick.length) { toast(tr('Select at least one entry')); return; }
+    const dpick = [], dates = {};  // 2.589.0 (#4571): the ticked shoot days and their dates
+    for (const x of $$('[data-otkdp]', md)) {
+      if (!/** @type {HTMLInputElement} */ (x).checked) continue;
+      const k = x.dataset.otkdp || '', day = j.dispo.days[+(x.dataset.otkdi || 0)], v = /** @type {HTMLInputElement|null} */ ($(`#otkd-${x.dataset.otkdi}-d`, md))?.value || '';
+      if (day.state !== 'gone' && !v) { toast(tr('Please choose the date of the shoot day “{0}”', day.title)); return; }
+      dpick.push(k); if (v) dates[k] = v;
+    }
+    if (!pick.length && !dpick.length) { toast(tr('Select at least one entry')); return; }
     const hours = {};
     for (const x of $$('[data-otkh]', md)) { const k = x.dataset.otkh || '', v = /** @type {HTMLInputElement} */ (x).value.trim().replace(',', '.'); if (pick.includes(k)) hours[k] = v === '' ? null : +v; }
-    const req = {pick, hours};
+    const req = {pick, hours, ...(dpick.length ? {dispo: {pick: dpick, dates}} : {})};
     if (!j.list_id) { const name = (/** @type {HTMLInputElement|null} */ ($('#otk-name', md))?.value || '').trim(); if (!name) { toast(tr('Please enter a name')); return; } req.create = {name}; }
     /** @type {HTMLButtonElement} */ (b).disabled = true;
     let r;
@@ -127,7 +155,9 @@ async function otk_open() {
     modalClose(md);
     if (r.made_project && typeof load === 'function') await load();
     if (typeof modulesOnToast === 'function') modulesOnToast(r.modules_on);
-    toast([r.created ? tr('Tasks created: {0}', r.created) : '', r.updated ? tr('Budgets updated: {0}', r.updated) : '', r.marked ? tr('Tasks marked: {0}', r.marked) : ''].filter(Boolean).join(' · ') || tr('Saved'));
+    const dr = r.dispo || {};  // 2.589.0 (#4571)
+    toast([r.created ? tr('Tasks created: {0}', r.created) : '', r.updated ? tr('Budgets updated: {0}', r.updated) : '', r.marked ? tr('Tasks marked: {0}', r.marked) : '',
+      dr.booked ? tr('Open places pencilled in: {0}', dr.booked) : '', dr.adapted ? tr('Shoot day bookings adapted: {0}', dr.adapted) : '', dr.marked ? tr('Bookings marked: {0}', dr.marked) : ''].filter(Boolean).join(' · ') || tr('Saved'));
     await ofdLoadDoc(d.id, true);
   });
 }

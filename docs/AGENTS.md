@@ -2537,7 +2537,10 @@ drafts. New rights are off for new agents: an admin (or, without an organisation
 - The disposition: an agent of an organisation reads that organisation; absences only as away, never the reason; booking
   notes are left out. 2.223.7 (#2921): a booking of a project the agent does not read (or without a project) shows only as
   *Booked* with `hidden: true` (no title, job, `list_id`, `event_id`); people are only those who share a project with the
-  agent, a booked person / contact / item it does not know has no `rid` and `label`. A personal agent (also of a freelancer)
+  agent, a booked person / contact / item it does not know has no `rid` and `label`. 2.589.0 (#4571): a shoot day taken
+  from a quotation (`offer: true`) has open places: `kind` `slot`, `rid` 0, the crew function as `label` and `slot`; a person
+  fills them in the disposition (agents do not); `offer_mark` `changed` / `gone` = a newer version of the quotation would
+  change a firm booking or a filled place. A personal agent (also of a freelancer)
   gets 404 on `GET /dispo` and `/dispo/free` (its owner's private disposition is not shared, as `/absences`); its shoot
   proposals keep working, their warnings name only the titles of projects it reads.
 - The disposition and the shoot proposals need the module *Disposition* switched on at the owner (personal agent) or at an

@@ -7092,6 +7092,7 @@ button.kptile:hover,button.kptile:focus-visible{border-color:var(--accent)}
 .dpbk.firm{background:var(--accent);color:var(--accent-ink)}
 .dpbk.option{background:var(--accent-soft);color:var(--text);border:1px dashed var(--accent)}
 .dpbk.warn{box-shadow:inset 0 0 0 2px var(--danger)}
+.dpbk.slot,.dpres .slot{font-style:italic}.dpbk.slot{background:none;color:var(--muted)}.dpjobres .dpfill{max-width:12rem}  /* 2.589.0 (#4571): open places */
 .dpbk .i,.dpres .i,.dpjobres .i{color:var(--danger);flex:none}
 .dpbk.firm .i{color:var(--accent-ink)}
 .dpdays{display:none;list-style:none;margin:.5rem 0;padding:0}

@@ -41,6 +41,7 @@ from .docs import doc_items, doc_row
 from .docproject import dpj_create, dpj_name
 from .ledger import ofx_log
 from .model import office_ctx
+from .offerdispo import odp_apply, odp_dates_in, odp_preview  # 2.589.0 (#4571): shoot days into the disposition
 from .parts import tp_parts
 from .sheet import dk_staff_days
 
@@ -198,7 +199,7 @@ def otk_preview(c, oid, uid, r):
     return {"doc_id": r["id"], "list_id": lid if role else None, "list_known": bool(role) or not lid, "can": (role in WRITE_ROLES) if lid else True,
             "day_hours": dh, "linked": len([x for x in links.values() if not x["deleted_at"]]), "rows": rows, "gone": gone,
             "total_h": round(sum(x["hours"] or 0 for x in rows), 2), "net_text": fmt_money(t.get("net") or 0, lg, r["currency"]),
-            "field": f["name"] if f is not None else None}
+            "field": f["name"] if f is not None else None, "dispo": odp_preview(c, oid, uid, r, otk_root(r))}
 
 
 def otk_offer(c, oid, did):
@@ -253,13 +254,18 @@ def _set_budget(c, f, tid, lid, h):
 
 @app.post("/api/office/docs/<int:did>/tasks")
 def otk_apply(did):
-    """{pick: [keys], hours?: {key: h|null}, create?: {name}} -> {list_id, created, updated, marked, made_project, field_made, modules_on}."""
+    """{pick: [keys], hours?: {key: h|null}, create?: {name}, dispo?: {pick: [day keys], dates: {key: YYYY-MM-DD}}} -> {list_id,
+    created, updated, marked, made_project, field_made, modules_on, dispo: {booked, adapted, marked}}. 2.589.0 (#4571): + dispo
+    (office/offerdispo.py); tasks or shoot days, at least one."""
     c, uid, oid = office_ctx()
     b = body()
     if not isinstance(b, dict) or not isinstance(b.get("pick", []), list) or not isinstance(b.get("hours") or {}, dict):
         raise BadInput(tr("Invalid data"))
     pick = {str(x) for x in b.get("pick") or [] if isinstance(x, (str, int))}
-    if not pick:
+    dsp = b.get("dispo") if isinstance(b.get("dispo"), dict) else {}
+    dpick = [str(x) for x in dsp.get("pick") or [] if isinstance(x, str)] if isinstance(dsp.get("pick"), list) else []
+    ddates = odp_dates_in(dsp.get("dates"))
+    if not pick and not dpick:
         raise BadInput(tr("Select at least one entry"))
     hin = {str(k): _hours_in(v) for k, v in (b.get("hours") or {}).items()}
     # 2.537.0 (#3433, review M1): the shared thing is the chain (two versions clicked at once made every task twice) and the
@@ -284,7 +290,8 @@ def otk_apply(did):
     if le2b_list_locked(c, lid):
         raise Denied(409, le2b_off())
     pv = otk_preview(c, oid, uid, r)
-    f, fmade = otk_budget_field(c, lid, create=True)
+    dres = odp_apply(c, oid, uid, r, otk_root(r), lid, dpick, ddates)  # 2.589.0 (#4571): before the tasks, its 400 / 409 changes nothing
+    f, fmade = otk_budget_field(c, lid, create=True) if pick else (otk_budget_field(c, lid)[0], False)
     if fmade:
         on = list(dict.fromkeys(on + tb_fields_module_on(c, lid)))
     ts, root = iso(now_utc()), otk_root(r)
@@ -325,10 +332,11 @@ def otk_apply(did):
             n_gone += 1
     # the rows left as they are follow the new version too (doc_id: the project's budget shows this quotation's net)
     c.execute("UPDATE task_offer_links SET doc_id=?, root_id=? WHERE list_id=? AND root_id=? AND (doc_id IS NULL OR doc_id<>?)", (r["id"], root, lid, root, r["id"]))  # 2.552.0 (#4647, review): a deleted version left NULL
-    ofx_log(c, oid, "tasks", doc_id=did, detail={"list_id": lid, "created": n_new, "updated": n_upd, "marked": n_gone})
+    ofx_log(c, oid, "tasks", doc_id=did, detail={"list_id": lid, "created": n_new, "updated": n_upd, "marked": n_gone, **({"dispo": dres} if dpick else {})})
     bump(c)
     c.commit()
-    return jsonify(list_id=lid, created=n_new, updated=n_upd, marked=n_gone, made_project=made, field_made=fmade, modules_on=on), 201 if n_new or made else 200
+    return jsonify(list_id=lid, created=n_new, updated=n_upd, marked=n_gone, made_project=made, field_made=fmade, modules_on=on,
+                   dispo=dres), 201 if n_new or made or dres["booked"] else 200
 
 
 def otk_project_budget(c, oid, lid):

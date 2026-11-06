@@ -6,7 +6,11 @@
 'use strict';
 
 const DPV = {data: null, start: null, days: 7, org: null, seq: 0, loading: false, filter: 'all', mine: null, free: null, wsp: ''};  // 2.543.0 (#4606): + wsp
-const DP_GROUPS = [['people', N_('People')], ['contacts', N_('Contacts')], ['equipment', N_('Equipment')], ['sets', N_('Equipment sets')]];
+const DP_GROUPS = [['slots', N_('Open places')], ['people', N_('People')], ['contacts', N_('Contacts')], ['equipment', N_('Equipment')], ['sets', N_('Equipment sets')]];  // 2.589.0 (#4571): + open places
+// 2.589.0 (#4571): a shoot day from a quotation: open places of a crew function (kind slot) and the marks a newer version left
+const DP_MARK = {changed: N_('The quotation changed: please check this booking'), gone: N_('No longer in the quotation')};
+const dp_mark = b => b.offer_mark ? tr(DP_MARK[b.offer_mark] || b.offer_mark) : '';
+const dp_label = b => b.kind === 'slot' ? tr('Open: {0}', b.label) : b.slot ? `${b.slot}: ${b.label}` : b.label;
 
 async function dp_load() {
   const seq = ++DPV.seq;
@@ -30,8 +34,8 @@ function dp_when(b) {
   if (a === e) return fmtDayAbs(a) + (ta ? ` ${ta}${te ? '–' + te : ''}` : '');
   return `${fmtDayAbs(a)}${ta ? ' ' + ta : ''} – ${fmtDayAbs(e)}${te ? ' ' + te : ''}`;
 }
-const dp_warn = b => b.conflicts?.length || b.away;
-const dp_warnText = b => [b.conflicts?.length ? tr('Double booking') : '', b.away ? tr('Away on this day') : ''].filter(Boolean).join(' · ');
+const dp_warn = b => b.conflicts?.length || b.away || b.offer_mark;
+const dp_warnText = b => [b.conflicts?.length ? tr('Double booking') : '', b.away ? tr('Away on this day') : '', dp_mark(b)].filter(Boolean).join(' · ');
 const dp_status = b => b.status === 'firm' ? tr('Firm') : tr('Option');
 
 // 2.141.0 C (#2142): download what the view shows (period, filter, area) as CSV or ICS
@@ -51,19 +55,20 @@ function dp_view() {
   const hol = Object.fromEntries((d.holidays || []).map(h => [h.date, h.name]));
   const covers = (b, day) => b.start.slice(0, 10) <= day && b.end.slice(0, 10) >= day;
   const setItems = Object.fromEntries(d.resources.sets.map(s => [s.id, s.items]));
-  const rowsOf = (kind, r) => d.bookings.filter(b => (b.kind === kind && b.rid === r.id) || (kind === 'equipment' && b.kind === 'set' && (setItems[b.rid] || []).includes(r.id)));
-  const groups = DP_GROUPS.filter(([g]) => DPV.filter === 'all' || (DPV.filter === 'people' ? ['people', 'contacts'].includes(g) : ['equipment', 'sets'].includes(g)));
-  const kindOf = {people: 'user', contacts: 'contact', equipment: 'equipment', sets: 'set'};
-  const bar = (b, via) => `<button type="button" class="dpbk ${b.status}${dp_warn(b) ? ' warn' : ''}" data-act="dp-edit" data-id="${b.id}" title="${esc([b.title, dp_when(b), dp_status(b), via ? tr('via {0}', via) : '', dp_warnText(b)].filter(Boolean).join(' · '))}">${dp_warn(b) ? ic('alert', 's') : ''}<span>${esc(b.title)}</span></button>`;
+  const rowsOf = (kind, r) => d.bookings.filter(b => (b.kind === kind && (kind === 'slot' ? b.label === r.name : b.rid === r.id)) || (kind === 'equipment' && b.kind === 'set' && (setItems[b.rid] || []).includes(r.id)));
+  const groups = DP_GROUPS.filter(([g]) => DPV.filter === 'all' || (DPV.filter === 'people' ? ['slots', 'people', 'contacts'].includes(g) : ['equipment', 'sets'].includes(g)));
+  const kindOf = {slots: 'slot', people: 'user', contacts: 'contact', equipment: 'equipment', sets: 'set'};
+  const slotRows = [...new Set(d.bookings.filter(b => b.kind === 'slot').map(b => b.label))].map(n => ({id: n, name: n}));  // 2.589.0 (#4571): one row per crew function
+  const bar = (b, via) => `<button type="button" class="dpbk ${b.status}${b.kind === 'slot' ? ' slot' : ''}${dp_warn(b) ? ' warn' : ''}" data-act="dp-edit" data-id="${b.id}" title="${esc([b.title, dp_when(b), dp_status(b), via ? tr('via {0}', via) : '', dp_warnText(b)].filter(Boolean).join(' · '))}">${dp_warn(b) ? ic('alert', 's') : ''}<span>${esc(b.title)}</span></button>`;
   let body = '';
   for (const [g, gname] of groups) {
-    let list = d.resources[g];
+    let list = g === 'slots' ? slotRows : d.resources[g];
     if (g === 'contacts' || g === 'sets') list = list.filter(r => d.bookings.some(b => b.kind === kindOf[g] && b.rid === r.id));  // only the booked ones
     if (!list.length) continue;
     body += `<tr class="dpgrp"><th scope="rowgroup" colspan="${days.length + 1}">${esc(tr(gname))}</th></tr>`;
     for (const r of list) {
       const bs = rowsOf(kindOf[g], r), away = g === 'people' ? d.away[String(r.id)] || {} : {};
-      body += `<tr><th scope="row"><span class="wlp">${g === 'people' ? av(r.id, r.name) : `<span class="dpic">${ic(g === 'contacts' ? 'users' : 'brief', 's')}</span>`}<b>${esc(r.name)}</b></span></th>${days.map(x => {
+      body += `<tr><th scope="row"><span class="wlp">${g === 'people' ? av(r.id, r.name) : `<span class="dpic">${ic(g === 'contacts' ? 'users' : g === 'slots' ? 'user' : 'brief', 's')}</span>`}<b>${esc(r.name)}</b></span></th>${days.map(x => {
         const here = bs.filter(b => covers(b, x)), dt = pd(x), we = dt.getDay() === 0 || dt.getDay() === 6;
         return `<td class="dpc${we ? ' we' : ''}${hol[x] ? ' hol' : ''}${away[x] ? ' away' : ''}"${away[x] ? ` title="${esc(tr('Away'))}"` : hol[x] ? ` title="${esc(hol[x])}"` : ''}>${here.map(b => bar(b, b.kind === 'set' && kindOf[g] === 'equipment' ? b.label : '')).join('')}</td>`;
       }).join('')}</tr>`;
@@ -75,7 +80,7 @@ function dp_view() {
     const bs = d.bookings.filter(b => covers(b, x)); if (!bs.length) return '';
     const jobs = {};
     for (const b of bs) (jobs[b.job] = jobs[b.job] || []).push(b);
-    return `<li><h4>${esc(fmtDayAbs(x))}${hol[x] ? ` <small class="muted">${esc(hol[x])}</small>` : ''}</h4>${Object.values(jobs).map(js => `<button type="button" class="dpjob${js.some(dp_warn) ? ' warn' : ''}" data-act="dp-edit" data-id="${js[0].id}"><b>${esc(js[0].title)}</b><span class="muted">${esc(dp_when(js[0]))} · ${esc(dp_status(js[0]))}</span><span class="dpres">${js.map(b => `<span class="${dp_warn(b) ? 'warn' : ''}">${dp_warn(b) ? ic('alert', 's') : ''}${esc(b.label)}</span>`).join('')}</span></button>`).join('')}</li>`;
+    return `<li><h4>${esc(fmtDayAbs(x))}${hol[x] ? ` <small class="muted">${esc(hol[x])}</small>` : ''}</h4>${Object.values(jobs).map(js => `<button type="button" class="dpjob${js.some(dp_warn) ? ' warn' : ''}" data-act="dp-edit" data-id="${js[0].id}"><b>${esc(js[0].title)}</b><span class="muted">${esc(dp_when(js[0]))} · ${esc(dp_status(js[0]))}</span><span class="dpres">${js.map(b => `<span class="${dp_warn(b) ? 'warn' : ''}${b.kind === 'slot' ? ' slot' : ''}">${dp_warn(b) ? ic('alert', 's') : ''}${esc(dp_label(b))}</span>`).join('')}</span></button>`).join('')}</li>`;
   }).join('');
   const mine = (DPV.mine || []).map(b => `<li class="dpmine ${b.status}"><b>${esc(b.title)}</b><span class="muted">${esc(dp_when(b))}${b.org ? ' · ' + esc(b.org) : ''}</span><span class="dpst ${b.status}">${esc(dp_status(b))}</span></li>`).join('');
   const f = (k, label) => `<button type="button" data-act="dp-filter" data-v="${k}" class="${DPV.filter === k ? 'on' : ''}" aria-pressed="${DPV.filter === k}">${esc(tr(label))}</button>`;
@@ -145,11 +150,32 @@ async function dp_sheet(day) {
   });
 }
 
+// 2.589.0 (#4571): fill an open place (or a filled one with someone else) with a person or contact of the area
+function dp_fillHtml(d, x) {
+  const opt = (k, r) => `<option value="${k}:${r.id}" ${x.kind === k && x.rid === r.id ? 'selected' : ''}>${esc(r.name)}</option>`;
+  return `<select class="dpfill" data-id="${x.id}" aria-label="${esc(tr('Fill the place {0}', x.slot))}"><option value="">${esc(x.kind === 'slot' ? tr('Fill …') : tr('Open again'))}</option>
+    ${d.resources.people.length ? `<optgroup label="${esc(tr('People'))}">${d.resources.people.map(r => opt('user', r)).join('')}</optgroup>` : ''}
+    ${d.resources.contacts.length ? `<optgroup label="${esc(tr('Contacts'))}">${d.resources.contacts.map(r => opt('contact', r)).join('')}</optgroup>` : ''}</select>`;
+}
+async function dp_fill(b, v) {
+  const [k, id] = v ? v.split(':') : ['slot', '0'];
+  const before = b.kind === 'slot' ? {kind: 'slot'} : {kind: b.kind, id: b.rid};
+  const want = k === 'slot' ? {kind: 'slot'} : {kind: k, id: +id};
+  try {
+    const r = await api('POST', `/api/team/dispo/bookings/${b.id}/fill`, want);
+    const put = x => async () => { await api('POST', `/api/team/dispo/bookings/${b.id}/fill`, x); dp_reload(); };
+    histAdd({label: tr('Place filled: {0}', b.slot), undo: put(before), redo: put(want)});
+    dp_reload();
+    const nb = r.booking || {};
+    toast(nb.conflicts?.length || nb.away ? tr('Filled, with a warning: double booking or away') : nb.kind === 'slot' ? tr('The place is open again') : tr('Filled'));
+  } catch { /* api() said it */ }
+}
+
 // a booking: change the job (title, period, option / firm) or delete it (one resource or the whole job), with Undo
 function dp_editSheet(b) {
   const d = DPV.data, job = d.bookings.filter(x => x.job === b.job), can = d.can_book;  // 2.502.0 (#4308): read-only people only look
   const md = modal(`<h3>${esc(b.title)}</h3><p class="muted">${esc(dp_when(b))}</p>
-    <ul class="dpjobres">${job.map(x => `<li class="${dp_warn(x) ? 'warn' : ''}"><span>${dp_warn(x) ? ic('alert', 's') : ''}${esc(x.label)}</span>${dp_warn(x) ? `<small>${esc(dp_warnText(x))}</small>` : ''}${can ? `<button type="button" class="iconbtn" data-m="delone" data-id="${x.id}" aria-label="${esc(tr('Remove {0}', x.label))}" title="${esc(tr('Remove {0}', x.label))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>
+    <ul class="dpjobres">${job.map(x => `<li class="${dp_warn(x) ? 'warn' : ''}${x.kind === 'slot' ? ' slot' : ''}"><span>${dp_warn(x) ? ic('alert', 's') : ''}${esc(dp_label(x))}</span>${dp_warn(x) ? `<small>${esc(dp_warnText(x))}</small>` : ''}${can && x.slot ? dp_fillHtml(d, x) : ''}${can ? `<button type="button" class="iconbtn" data-m="delone" data-id="${x.id}" aria-label="${esc(tr('Remove {0}', x.label))}" title="${esc(tr('Remove {0}', x.label))}">${ic('x', 's')}</button>` : ''}</li>`).join('')}</ul>
     <div class="row"><label for="dpe-title">${tr('What')}</label><input id="dpe-title" maxlength="200" value="${esc(b.title)}"></div>
     <div class="row ab2dates"><label>${tr('From')}${dateIn('dpe-from', b.start.slice(0, 10))}</label><label>${tr('To')}${dateIn('dpe-to', b.end.slice(0, 10))}</label></div>
     <div class="row ab2dates"><label>${tr('Start time')}${timeIn('dpe-t0', dp_time(b.start))}</label><label>${tr('End time')}${timeIn('dpe-t1', dp_time(b.end) === '23:59' && !dp_time(b.start) ? '' : dp_time(b.end))}</label></div>
@@ -158,6 +184,12 @@ function dp_editSheet(b) {
     <div class="foot">${can ? `<button class="btn danger" data-m="del">${ic('trash', 's')} ${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${can ? tr('Cancel') : tr('Close')}</button>${can ? `<button class="btn pri" data-m="save">${ic('check', 's')} ${tr('Save')}</button>` : ''}</div>`);
   md.classList.add('ab2md', 'dpmd');
   if (!can) $$('input, select, .dpstat button', md).forEach(x => { x.disabled = true; });
+  md.addEventListener('change', e => {  // 2.589.0 (#4571)
+    const sel = e.target.closest?.('.dpfill'); if (!sel) return;
+    const x = job.find(y => y.id === +sel.dataset.id); if (!x) return;
+    if (!sel.value && x.kind === 'slot') return;
+    md.remove(); dp_fill(x, sel.value);
+  });
   const del = async (id, all) => {
     try {
       const r = await api('DELETE', `/api/team/dispo/bookings/${id}${all ? '?all=1' : ''}`);

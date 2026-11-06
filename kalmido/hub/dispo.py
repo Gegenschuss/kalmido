@@ -36,6 +36,7 @@ from ..core.serializers import csv_cell as cell  # 2.369.5 (#2517): pulled up fr
 from ..core.access import list_role  # 2.369.5 (#2517): pulled up from functions
 
 DSP_KINDS = ("user", "contact", "equipment", "set")
+DSP_SLOT = "slot"  # 2.589.0 (#4571): an open place of a crew function (resource_id 0, slot_name), from a quotation; filled by dsp_fill
 DSP_STATUS = ("option", "firm")
 DSP_DAYS_MAX = 62
 DSP_RES_MAX = 60  # resources of one booking
@@ -125,6 +126,8 @@ def dsp_units(b, sets):
     """The physical things a booking holds: ("user", id) / ("contact", id) / ("equipment", id), a set -> its equipment."""
     if b["resource_kind"] == "set":
         return {("equipment", e) for e in sets.get(b["resource_id"], [])} | {("set", b["resource_id"])}
+    if b["resource_kind"] == DSP_SLOT:  # 2.589.0 (#4571): an open place holds nobody yet: never a double booking
+        return set()
     return {(b["resource_kind"], b["resource_id"])}
 
 
@@ -157,6 +160,9 @@ def dsp_public(r, conf=None):
     d = {"id": r["id"], "job": r["job"], "title": r["title"], "start": r["start"], "end": r["end"],
          "kind": r["resource_kind"], "rid": r["resource_id"], "label": r["res_label"], "status": r["status"],
          "note": r["note"] or "", "list_id": r["list_id"], "event_id": r["event_id"]}
+    k = r.keys()
+    if "offer_root" in k:  # 2.589.0 (#4571): from a quotation (its crew function, a mark a newer version left)
+        d.update(offer=bool(r["offer_root"]), offer_mark=r["offer_mark"] or "", slot=r["slot_name"] or "")
     if conf is not None:
         d.update(conflicts=conf.get("double", []), away=conf.get("away", False))
     return d
@@ -293,7 +299,7 @@ def dsp_export():
                 x = c.execute("SELECT name, e2e FROM lists WHERE id=?", (r["list_id"],)).fetchone()  # row-level security: lists I may see
                 # 2.141.0 C (#2142, review): only names of lists I am a member of (the view shows no other names either)
                 lists[r["list_id"]] = "" if not x or x["e2e"] or not list_role(c, r["list_id"], uid) else x["name"]
-        kind = {"user": tr("Person"), "contact": tr("Contact"), "equipment": tr("Equipment"), "set": tr("Equipment set")}
+        kind = {"user": tr("Person"), "contact": tr("Contact"), "equipment": tr("Equipment"), "set": tr("Equipment set"), DSP_SLOT: tr("Open place")}
         status = {"option": tr("Option"), "firm": tr("Firm")}
         buf = io.StringIO()
         w = csv.writer(buf, delimiter=";" if dec_comma(lang()) else ",", lineterminator="\r\n")
@@ -421,7 +427,8 @@ def dsp_edit(bid):
         skipped, targets = len(targets) - len(own), own
     if v:
         for t in targets:
-            c.execute(f"UPDATE hub_bookings SET {', '.join(_q(k) + '=?' for k in v)}, updated_at=? WHERE id=?", (*v.values(), iso(now_utc()), t["id"]))
+            # 2.589.0 (#4571): a change by hand takes the mark of a newer quotation version off
+            c.execute(f"UPDATE hub_bookings SET {', '.join(_q(k) + '=?' for k in v)}, offer_mark='', updated_at=? WHERE id=?", (*v.values(), iso(now_utc()), t["id"]))
         if v.get("status") == "firm":
             for t in targets:
                 if t["status"] != "firm":
@@ -437,6 +444,39 @@ def dsp_edit(bid):
 
 def _q(k):
     return '"end"' if k == "end" else k
+
+
+@app.post("/api/team/dispo/bookings/<int:bid>/fill")
+def dsp_fill(bid):
+    """2.589.0 (#4571): fills an open place {kind user|contact|equipment|set, id} of the area, or opens it again {kind: "slot"}
+    (Undo). The place keeps its crew function (slot_name), status and period; a firm one tells the person booked (News).
+    Answers {booking (with conflicts / away)}."""
+    c, uid = _gate()
+    r = _row(c, bid)
+    if r["deleted_at"] or not (r["slot_name"] or r["resource_kind"] == DSP_SLOT):
+        raise Denied(404)
+    _may_change(c, uid, [r])
+    b = body()
+    k = b.get("kind") if isinstance(b, dict) else None
+    if k == DSP_SLOT:
+        pick, label = (DSP_SLOT, 0), r["slot_name"] or r["res_label"]
+    else:
+        try:
+            pick = (k, int(b.get("id")))
+        except (AttributeError, TypeError, ValueError):
+            raise BadInput(tr("Invalid data")) from None
+        idx = _res_index(dsp_resources(c, uid, r["org_id"]))
+        if k not in DSP_KINDS or pick not in idx:
+            raise Denied(404, tr("unknown"))
+        label = idx[pick]["name"]
+    c.execute("UPDATE hub_bookings SET resource_kind=?, resource_id=?, res_label=?, offer_mark='', updated_at=? WHERE id=?",
+              (pick[0], pick[1], label[:200], iso(now_utc()), bid))
+    x = dict(_row(c, bid))
+    _notify(c, x)
+    bump(c)
+    c.commit()
+    d0, d1 = date.fromisoformat(x["start"][:10]), date.fromisoformat(x["end"][:10])
+    return jsonify(booking=dsp_public(x, dsp_conflicts(c, x["org_id"], [x], d0, d1).get(x["id"])))
 
 
 @app.delete("/api/team/dispo/bookings/<int:bid>")
