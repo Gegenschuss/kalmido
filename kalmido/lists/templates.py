@@ -22,7 +22,7 @@ from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
 from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
-from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
+from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_reown, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import need_org_write, org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.supportgrant import sga_scope_check  # 2.609.0 (#3373, review F1)
@@ -527,16 +527,38 @@ def template_update(tid):
     write_lock(c, f"template-{tid}")
     r = c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()
     ccf_check(b, r["updated_at"], "template", lambda: tpl_dict(r))
-    gone = []
+    gone, made = [], []
+    try:
+        res = _tpl_update(c, tid, r, b, gone, made)
+    except Exception:
+        c.rollback()
+        unlink_files(made)
+        raise
+    if res is not None:  # an error answer: nothing of it stays
+        c.rollback()
+        unlink_files(made)
+        return res
+    unlink_files(gone)
+    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
+
+
+def _tpl_update(c, tid, r, b, gone, made):
+    """The changes of template_update (committed here) -> None, or an error answer (the caller rolls back)."""
     if "space" in b:  # 2.609.0 (#3373): into an organisation (its admin) / back to private (an admin of the old one, logged)
         try:
             to = tpl_space(c, b["space"])
         except BadInput as e:
             return err(str(e))
         if to != r["org_id"]:
+            full = tpl_room(c, to, me())  # review F2: the limit of the new space (the new owner's own templates)
+            if full:
+                return full
             if r["org_id"]:
                 org_out(c, r["org_id"], to, "template", r["name"])
-            c.execute("UPDATE templates SET org_id=? WHERE id=?", (to, tid))
+            # 2.609.0 (#3373, review F2): the admin who moves it out of the organisation owns it now (no longer its first maker),
+            # its file copies follow (sealed for the new owner)
+            c.execute("UPDATE templates SET org_id=?, user_id=? WHERE id=?", (to, me(), tid))
+            gone += tx_reown(c, tid, me(), made)
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
         if not name:
@@ -549,12 +571,11 @@ def template_update(tid):
         except (ValueError, TypeError) as e:
             return err(str(e) or tr("Invalid template"))
         c.execute("UPDATE templates SET data=? WHERE id=?", (json.dumps(data, ensure_ascii=False), tid))
-        gone = tx_prune(c, tid, r["extra"], tx_keys(data))
+        gone += tx_prune(c, tid, r["extra"], tx_keys(data))
     c.execute("UPDATE templates SET updated_at=? WHERE id=?", (iso(now_utc()), tid))
     bump(c)
     c.commit()
-    unlink_files(gone)
-    return jsonify(tpl_dict(c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()))
+    return None
 
 
 @app.delete("/api/templates/<int:tid>")

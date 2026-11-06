@@ -5,6 +5,7 @@ regression check. Own container (hosted, a server key: sealed files and a suppor
  - F1 an organisation's task template goes into a private project / the inbox only through its admin (logged), a member gets
    403; its project template makes the project in the organisation only: a read-only member 403 (was: privately), a support
    session without the organisation's own support access 403 support_session
+ - F2 an admin who makes another admin's organisation template private owns it now (with its file copies)
  - F4 an organisation's templates stay when their maker's account goes (the heir owns them, their files still open);
    they no longer count for their maker's limit
 usage: p2609_c_review_api_test.py <datadir>"""
@@ -164,5 +165,20 @@ check(r.ok, f"F4: 200 organisation templates do not block her own {r.status_code
 r = A.post(B + "/api/templates", json={"kind": "task", "data": {"task": {"title": "One more"}}, "name": "Org 201", "space": f"org:{ORG}"})
 check(r.status_code == 400, f"F4: the organisation has its own limit {r.status_code}")
 dbw("DELETE FROM templates WHERE org_id=? AND name LIKE 'bulk %'", (ORG,))
+
+# ================================================================== F2 an admin makes another admin's template private
+TD0 = task(Ev, L1, "Eve's checklist")
+attach(Ev, TD0, "steps.txt", b"step one\n")
+TD = tpl(Ev, task_id=TD0, name="Eve's checklist", space=f"org:{ORG}")
+check(dbx("SELECT user_id FROM template_files WHERE template_id=?", (TD,)) == [(uid["eve"],)], "setup: the template has eve's file copy")
+r = A.patch(B + f"/api/templates/{TD}", json={"space": "private"})
+check(r.ok and r.json()["org_id"] is None and r.json()["mine"] is True, f"F2: the admin who makes it private owns it {r.text[:160]}")
+check(dbx("SELECT user_id FROM templates WHERE id=?", (TD,)) == [(ALICE,)], "F2: user_id = the admin")
+check(dbx("SELECT user_id FROM template_files WHERE template_id=?", (TD,)) == [(ALICE,)], "F2: its file copies follow")
+check(not any(x["id"] == TD for x in Ev.get(B + "/api/templates").json()["templates"]), "F2: not eve's private template")
+r = A.post(B + f"/api/templates/{TD}/apply", json={"list_id": LA})
+nt = r.json().get("task", {}).get("id") if r.ok else None
+f = files_of(nt) if nt else []
+check(f and A.get(B + f"/api/attachments/{f[0][0]}").content == b"step one\n", f"F2: its file still opens {r.text[:120]} {f}")
 
 sys.exit(kt.done("p2609_c_review_api"))
