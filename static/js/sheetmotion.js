@@ -40,6 +40,7 @@ function an_watch(el, hide = 'hidden', keep = [], need = '', desk = false) {
   const has = (str, c) => new RegExp('(^| )' + c + '( |$)').test(str);
   const done = () => { clearTimeout(el._anT); if (el.classList.contains('an-out')) { el.classList.remove('an-out'); if (el.classList.contains(hide)) keep.forEach(c => el.classList.remove(c)); } };
   const mo = new MutationObserver(recs => {
+    if (typeof document === 'undefined' || !el.isConnected) return;  // 2.582.0 (#4809): the page is gone (jsdom closed the window)
     for (const r of recs) {
       const old = r.oldValue || '', wasHid = has(old, hide), isHid = el.classList.contains(hide), out = el.classList.contains('an-out');
       if (out && !isHid) { clearTimeout(el._anT); el.classList.remove('an-out'); continue; }  // shown again while leaving
@@ -59,6 +60,7 @@ function an_init() {
   an_watch(document.getElementById('toast'), 'hidden', [], null, true);  // 2.573.0 (#4763)
   const app = document.getElementById('app');
   if (app && typeof MutationObserver !== 'undefined') new MutationObserver(recs => {  // 2.573.0 (#4763): panel back / sidebar unfolded
+    if (typeof document === 'undefined' || !app.isConnected) return;  // 2.582.0 (#4809): a record delivered after the window was closed (jsdom) found no document
     for (const r of recs) {
       const was = ' ' + (r.oldValue || '') + ' ', cl = app.classList;
       if (cl.contains('detail-open') && !was.includes(' detail-open ')) an_panelIn(document.getElementById('detail'));
