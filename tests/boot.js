@@ -185,6 +185,26 @@ exports.officeWs = async hd => {
   const ws = j.me?.workspaces || [], cur = j.settings?.workspace || 'all';
   if (j.workspaces && ws.length === 1 && !/^(private|org:\d+)$/.test(cur)) await fetch(B + 'api/settings', {method: 'PATCH', headers: H, body: JSON.stringify({workspace: 'org:' + ws[0].id})});
 };
+// 2.609.0 (#4929, CI red p248_d_ui / p2299_d_ui: on a phone the document's sheet was missing in the CI only): every window
+// notes its history steps (push / replace / back, popstate, hashchange), the dialogs added to / removed from the page and the
+// failed requests with the time since the window began; navTrace(w) gives that log with the hash and the open dialogs, for
+// the message of a failed check (cheap: at most NAV_MAX entries)
+const NAV_MAX = 200;
+function navNote(w, x) { const t = w.__nav; if (t && t.log.length < NAV_MAX) t.log.push(`${Math.round(performance.now() - t.t0)} ${x}`); }
+function navWatch(w) {
+  w.__nav = {t0: performance.now(), log: []};
+  const h = w.history, ps = h.pushState.bind(h), rs = h.replaceState.bind(h), bk = h.back.bind(h);
+  h.pushState = (st, t, u) => { navNote(w, `push ${JSON.stringify(st)} ${u ?? ''}`); return ps(st, t, u); };
+  h.replaceState = (st, t, u) => { navNote(w, `replace ${JSON.stringify(st)} ${u ?? ''}`); return rs(st, t, u); };
+  h.back = () => { navNote(w, 'back'); return bk(); };
+  w.addEventListener('popstate', e => navNote(w, `popstate ${JSON.stringify(e.state)} ${w.location.hash}`), true);
+  w.addEventListener('hashchange', () => navNote(w, `hashchange ${w.location.hash}`), true);
+  w.addEventListener('DOMContentLoaded', () => new w.MutationObserver(ms => { for (const mu of ms) {
+    for (const n of mu.addedNodes) if (n.classList?.contains('modal')) navNote(w, `dialog in ${n.className}`);
+    for (const n of mu.removedNodes) if (n.classList?.contains('modal')) navNote(w, `dialog out ${n.className}`);
+  } }).observe(w.document.body, {childList: true}));
+}
+exports.navTrace = w => { try { return JSON.stringify({hash: w.location.hash, state: w.history.state, dialogs: [...w.document.querySelectorAll('.modal')].map(m => m.className), log: w.__nav?.log || []}); } catch (e) { return 'navTrace: ' + e.message; } };
 exports.boot = async function boot({user = 'alice', mobile = false, hash = '', ls = {}, wait = null, proxy = null, path = '', media = {}, setup = null, lazy = false, rowIcons, startPage, shared = null, allWs = false} = {}) {
   const cookie = proxy ? '' : await exports.login(user, undefined, {rowIcons, startPage});
   if (proxy) await rowIconsSet({'Remote-User': proxy}, {rowIcons, startPage});  // 2.56.1 (#1799)
@@ -208,7 +228,9 @@ exports.boot = async function boot({user = 'alice', mobile = false, hash = '', l
         return fetch(new URL(String(u), B), {...o, headers: hd, ...(sg ? {signal: sg} : {})}); };
       { const f0 = w.fetch; w.__net = {n: 0, at: performance.now(), open: new Map()}; let k = 0;  // 2.192.0 B (#2513): for idle(w)
         w.fetch = (u, o) => { const id = ++k, done = () => { w.__net.n--; w.__net.at = performance.now(); w.__net.open.delete(id); };
-          w.__net.n++; w.__net.at = performance.now(); w.__net.open.set(id, String(u)); const p = f0(u, o); p.then(done, done); return p; }; }
+          w.__net.n++; w.__net.at = performance.now(); w.__net.open.set(id, String(u)); const p = f0(u, o); p.then(done, done);
+          p.then(r => { if (r.status >= 400) navNote(w, `${r.status} ${(o && o.method) || 'GET'} ${String(u).replace(B, '/')}`); }, e => navNote(w, `failed ${String(u).replace(B, '/')}: ${e && e.message}`)); return p; }; }
+      navWatch(w);  // 2.609.0 (#4929): what the page did with its history and its dialogs (navTrace on a failed check)
       w.Request = Request; w.Response = Response; w.Headers = Headers; w.FormData = FormData; w.File = File; w.Blob = Blob;
       Object.defineProperty(w.navigator, 'serviceWorker', {configurable: true, value: {register: () => Promise.resolve(), addEventListener() {}, controller: null}});
       w.scrollTo = () => {}; w.Element.prototype.scrollIntoView = () => {};

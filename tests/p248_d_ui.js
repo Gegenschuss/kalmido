@@ -3,10 +3,11 @@
 //   mapping (a tag left out), the import in the background, the result line, following switched on = one undo step
 // - document sheet: an agent's receipt suggestion with Accept; Accept sets the project; Undo brings the suggestion back
 // - phone width: the section and the suggestion are usable
+// - 2.609.0 (#4929): a redraw while the documents module still loads opens the sheet only with its receipt part (receipts.js held back)
 const {execFileSync} = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const {boot, sleep, B, login} = require('./boot');
+const {boot, sleep, B, login, navTrace} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
@@ -106,7 +107,7 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   check(sg.status === 201, 'setup: the agent suggests ' + JSON.stringify(sg).slice(0, 200));
   const v = await boot({user: 'alice', hash: `docs/${D}`}), e = v.document;
   const box = await until(() => e.querySelector('.rc-slot .rc-sug'), 80);
-  check(box && /Rcbot/.test(box.textContent) && /Fair 2026/.test(box.textContent) && /Travel/.test(box.textContent), 'the sheet shows the suggestion with agent, project and category');
+  check(box && /Rcbot/.test(box.textContent) && /Fair 2026/.test(box.textContent) && /Travel/.test(box.textContent), 'the sheet shows the suggestion with agent, project and category' + (box ? '' : ' ' + v.eval(`JSON.stringify({doc: DC.doc && DC.doc.id, opening: DC.opening, pane: DC.paneId, rc: RC.id, rcd: !!RC.d, sug: RC.d && RC.d.suggestions && RC.d.suggestions.length, slots: document.querySelectorAll('.rc-slot').length, slot: (document.querySelector('.rc-slot') || {}).outerHTML ? document.querySelector('.rc-slot').outerHTML.slice(0, 300) : null, props: document.querySelectorAll('.dc-props').length})`) + ' ' + navTrace(v)));
   box?.querySelector('[data-rc^="accept"]').click();
   await until(() => !e.querySelector('.rc-slot .rc-sug') && e.querySelector('#rc-proj')?.value === String(P));
   check(e.querySelector('#rc-proj')?.value === String(P) && e.querySelector('#rc-cat')?.value === 'Travel', 'Accept: project + category set');
@@ -116,10 +117,27 @@ execFileSync('docker', ['exec', '-d', CT, 'python', '/data/fake_paperless.py']);
   check(e.querySelector('.rc-slot .rc-sug') && !e.querySelector('#rc-proj')?.value, 'Undo: the suggestion is open again, no project');
   v.close();
 
+  // 2.609.0 (#4929, CI red): the module "docs" runs its files one after the other. A redraw right after docs.js ran (on a slow
+  // runner: another module done, a poll) opened the sheet before receipts.js had run - without the suggestion, and nothing
+  // drew it again. Here receipts.js is held back until the redraw has happened (before the fix: red, no .rc-slot at all)
+  let letGo; const held = new Promise(r => { letGo = r; });
+  const hold = w => { const ap = w.Node.prototype.appendChild;
+    w.Node.prototype.appendChild = function (n) { if (n && n.tagName === 'SCRIPT' && /\/receipts\.js/.test(n.src || '')) { held.then(() => ap.call(this, n)); return n; } return ap.call(this, n); }; };
+  const lz = await boot({user: 'alice', hash: `docs/${D}`, lazy: true, setup: hold}), g = lz.document;
+  await until(() => typeof lz.dc_open === 'function' && typeof lz.rc_slot !== 'function', 80);
+  lz.eval('renderView()');
+  await until(() => lz.eval('DC.opening === null && !!DC.doc') || g.querySelector('.dc-props'), 15);  // the early draw (before the fix) or nothing yet
+  letGo();
+  const lb = await until(() => g.querySelector('.rc-slot .rc-sug [data-rc^="accept"]'), 80);
+  check(lb, 'a redraw while the documents module still loads: the sheet waits for it and shows the suggestion '
+    + (lb ? '' : lz.eval(`JSON.stringify({doc: DC.doc && DC.doc.id, rc: typeof rc_slot, slots: document.querySelectorAll('.rc-slot').length})`)));
+  lz.close();
+
   // ================= phone width
   const m = await boot({user: 'alice', hash: `docs/${D}`, mobile: true}), f = m.document;
   const mb = await until(() => f.querySelector('.rc-slot .rc-sug [data-rc^="accept"]'), 80);
-  check(mb, 'phone: the suggestion with its buttons');
+  // 2.609.0 (#4929): CI only red here - the message says what the page did (history, dialogs, failed requests) and what the sheet held
+  check(mb, 'phone: the suggestion with its buttons' + (mb ? '' : ' ' + m.eval(`JSON.stringify({doc: DC.doc && DC.doc.id, opening: DC.opening, rc: RC.id, rcd: !!RC.d, sug: RC.d && RC.d.suggestions && RC.d.suggestions.length, slot: (document.querySelector('.rc-slot') || {}).innerHTML ? document.querySelector('.rc-slot').innerHTML.slice(0, 300) : null})`) + ' ' + navTrace(m)));
   m.close();
 
   console.log(`p248_d_ui: ${ok} ok, ${F.length} failed`);

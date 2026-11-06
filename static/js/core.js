@@ -1534,6 +1534,7 @@ S.syncOk = Date.now();
 // 2.13.0 (#453 A13): offline (or changes not sent yet) is said in words too, not only with the cloud icon: "Offline · 2
 // changes waiting"; a tap explains it and tries again
 function staleDraw() {
+  if (typeof document === 'undefined' || !document) return;  // 2.609.0 (#4929): a poll that ends after its window was closed (the tests' late rejection)
   const age = Date.now() - (S.syncOk || Date.now()), q = OUT.q.length, off = !OUT.online;
   const on = !document.hidden && (age > 30000 || off || (q && age > 8000));
   let el = $('#stale');
