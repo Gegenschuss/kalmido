@@ -1065,6 +1065,20 @@ counts on the day of the payment it takes back); with the yearly tax dates setti
 bookkeeping links there). A **tax reserve** (percentage of the net money received) shows up per month in the cash flow
 as "Tax reserve" and "Freely available". No tax advice; figures without guarantee. Kalmido sends nothing to the tax office.
 
+**Basis of the income statement** (2.603). Per whole year, in **Settings > Company & office > Bank & taxes** (and on the
+first card of a new office): *Receipts* (the default, as before) or *Bank and cash (strict)*. With *Bank and cash* only what
+went through the bank account, the cash book or a credit card counts: a receipt without such a booking stays open and does
+not count; a bank booking without a receipt counts (its amount, without input tax) in the line *Bookings without receipt*
+with the warning *Receipt missing* (marked *No receipt needed*: its own line, no warning); income only through the bank or
+the cash book (a payment typed by hand on an invoice does not count, money received without an invoice counts with a
+warning); bookings marked *Private* (withdrawal / deposit) or *Ignored* do not count. A credit card: the monthly total on the
+bank account is a transfer to the card, the positions of the statement are the expenses (each with its receipt, else
+*Receipt missing*), a total that differs from the statement is a warning. A cash withdrawal is a *Cash box transfer* (bank
+match) and no expense; the expenses are the cash book's entries. An entertainment receipt counts only through the booking it
+proves (*Paid with* in the entertainment receipt): that booking gets the 70 / 30 split instead of counting a second time.
+The VAT figures, the tax reserve, the cash flow and the DATEV export follow the same rule; depreciation, travel expenses and
+the mileage allowance count as before. A year with a locked month keeps its basis.
+
 **Reverse charge and the client's country** (2.502, 2.538). The VAT return and the DATEV export take the tax case of a
 reverse charge document from the client's country (the one stored when it was finalised, else the client's current one):
 the own country = section 13b at home (field 60, DATEV 8337), another EU country = field 21 (8336), a country outside the
@@ -1491,7 +1505,8 @@ stays.
   income, expense, VAT,
   balance, cancellation link, receipt / invoice, the day closings and the change log.
 - The cash book is a record of the cash and its balance; it does **not** count in the income/expense statement (the
-  receipts and invoice payments do, as before), so nothing counts twice. No tax advice; figures without guarantee.
+  receipts and invoice payments do, as before), so nothing counts twice. 2.603: with the basis *Bank and cash* of a year it
+  does - money out with its receipt, invoices paid in cash; a cash withdrawal from the bank is a transfer. No tax advice; figures without guarantee.
 
 Routes (office admins only; members 403, other areas 404, agents 403; no agent API): `GET|POST /api/office/cashbooks`,
 `PATCH /api/office/cashbooks/<id>` (name, opening, opening_day, archived), `GET /api/office/cashbooks/links`,
