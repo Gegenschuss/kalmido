@@ -529,7 +529,7 @@ function fvd_set(on) {
   if (on) { const t = $('.fv2-tile.on', r); if (t) r.scrollLeft = Math.max(0, t.offsetLeft - (r.clientWidth - t.offsetWidth) / 2); }
   else if (r.contains(document.activeElement)) g.focus({preventScroll: true});
 }
-// the swipe: on the tab bar, the grip and the row; up opens, down closes; the tap that follows a swipe is no tap on a tab
+// the swipe: on the tab bar, the grip and the row; up opens, down closes; a click on a tab right after a swipe is no tap on it
 function fvd_touchStart(e) {
   const p = e.touches?.[0];
   FVD.g = p && e.touches.length === 1 ? {x: p.clientX, y: p.clientY, done: false} : null;
@@ -556,7 +556,7 @@ domReady(() => {
 // the grip toggles; a tile opens its target and closes the row; any other tap closes it (on window, before the app's handlers)
 window.addEventListener('click', e => {
   const t = e.target; if (Date.now() - FV2.held < 600) return;  // the click after a long press (the tile's menu) is none
-  if (Date.now() - FVD.sw < 500 && t.closest?.('#tabs, #favgrip, #favup')) { e.preventDefault(); e.stopPropagation(); return; }
+  if (Date.now() - FVD.sw < 350 && t.closest?.('#tabs')) { e.preventDefault(); e.stopPropagation(); return; }
   if (t.closest?.('#favgrip')) { e.preventDefault(); e.stopPropagation(); fvd_set(!fvd_isOpen()); return; }
   if (!fvd_isOpen()) return;
   if (!t.closest?.('#favup') || t.closest('#favup .fv2-tile')) fvd_set(false);
