@@ -918,11 +918,14 @@ def files_share_delete(sid):
     if not s:
         raise Denied(404)
     n = _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
-    # 2.571.0 (#4766): taken back like in the other areas -- the row goes into obj_revoked (restorable), a share on a
-    # reference node keeps its object's kind / id; the log line as before (core/objects.py obj_node_unshare)
-    from ..core.objects import obj_node_unshare  # core/objects.py imports this module at its top
-    ref = (n["ref_kind"], n["ref_id"]) if n["kind"] == "ref" else (None, None)
-    obj_node_unshare(c, me(), n, sid, kind=ref[0], ref_id=ref[1], org=n["org_id"] or None)
+    from ..core.objects import OBJ, obj_node_unshare  # core/objects.py imports this module at its top
+    if n["kind"] == "ref" and n["ref_kind"] in OBJ:
+        # 2.571.0 (#4766): the share of a core object's reference node is taken back like in the other areas -- the row goes
+        # into obj_revoked under the object's kind / id (its restore finds it there); the log line as before
+        obj_node_unshare(c, me(), n, sid, kind=n["ref_kind"], ref_id=n["ref_id"], org=n["org_id"] or None)
+    else:  # review F7: a folder / file share has no restore way (obj_revoked rows are found by kind / id): deleted as before
+        c.execute("DELETE FROM fs_shares WHERE id=?", (sid,))
+        fs_log_add(c, s["node_id"], "unshare", str(sid))
     bump(c)
     c.commit()
     return jsonify(shares=_shares(c, s["node_id"]))
