@@ -1035,7 +1035,7 @@ function keepFocus(root, fn) {
   return r;
 }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
-    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); topw_later(); return r; }); }
+    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); topw_later(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)  // 2.599.0 (#4814): topw_sync = the page's width for #top
 // ---- 2.599.0 (#4814): the page reports its width once to #main: data-w = lesen | form | seite (the widths of :root,
 // static/css/start-breite.css), eigen (an element with data-pw: its own centred block, e.g. notes / a knowledge page) or voll;
 // --pw = that width in px, --pw-sb = the scrollbar of #view. static/css/start-kopf-4814.css gives #top the same middle and
@@ -1078,7 +1078,7 @@ function topw_watch(el) {
 }
 // once more after the next frame: a part of the page drawn later (a page loaded, a patched view, a menu's choice) counts too
 const topw_later = () => { if (!topw_raf) topw_raf = requestAnimationFrame(() => { topw_raf = 0; topw_sync(); }); };
-window.addEventListener('resize', () => { if (S.booted) topw_later(); });  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
+window.addEventListener('resize', () => { if (S.booted) topw_later(); });
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   lzGate();  // 2.369.2 (#3136): a view of the start set loads the lists it shows first (liveparts.js)
