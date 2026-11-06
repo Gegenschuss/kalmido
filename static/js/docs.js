@@ -784,7 +784,7 @@ async function dcs_draw(md) {
   DC.set = s; dc_sDraw(box);
 }
 function dc_wsName(ws) {
-  if (ws === 'private') return tr('Your own documents');
+  if (ws === 'private') return tr('Private|workspace');  // 2.582.0 (#4831): same name as in the file store
   const w = (S.me?.workspaces || []).find(x => 'org:' + x.id === ws);
   return w ? w.name : ws;
 }

@@ -106,7 +106,7 @@ for m, p in (("GET", "/documents"), ("GET", "/me"), ("GET", f"/files/{D1}/conten
     r = requests.request(m, V + p, headers=bearer(K1), json={} if m != "GET" else None)
     check(r.status_code == 403 and "only upload" in r.text, f"{m} {p} with the upload key: 403 {r.status_code} {r.text[:120]}")
 r = requests.get(V + "/documents/upload-target", headers=bearer(K1))
-check(r.ok and r.json().get("name") == "Scanner" and r.json().get("target") == "Your own documents / Belege" and isinstance(r.json().get("max_mb"), int),
+check(r.ok and r.json().get("name") == "Scanner" and r.json().get("target") == "Private / Belege" and isinstance(r.json().get("max_mb"), int),
       f"upload-target names the place {r.text[:200]}")
 check(requests.get(V + "/documents/upload-target", headers=bearer("abk_" + "x" * 40)).status_code == 401, "upload-target with an unknown key: 401")
 

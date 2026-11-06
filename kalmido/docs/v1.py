@@ -286,7 +286,7 @@ def docs_spec(paths, schemas, op, ok, errs, ref, pid, q):
     paths["/documents/upload-target"] = {"get": op(
         "Where this upload key puts documents (2.207.0)", T,
         ok({"type": "object", "properties": {"name": {"type": "string", "description": "Name of the scan inbox"},
-                                              "target": {"type": "string", "description": "Readable place, e.g. Your own documents / Receipts"},
+                                              "target": {"type": "string", "description": "Readable place, e.g. Private / Receipts"},
                                               "max_mb": {"type": "integer", "description": "Largest file the server takes (MB)"}}}) | errs("403", "409"),
         [], scope="docs:upload",
         desc="Only for keys with the scope docs:upload (scan inboxes for the folder watcher): such a key has no other scope and "

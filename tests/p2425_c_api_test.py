@@ -89,7 +89,7 @@ j = Fr.get(B + "/api/docs/fetchers?ws=private").json()
 check(j.get("api") is True and j.get("fetchers") == [], f"frida: the API is on, no fetcher yet {j}")
 ntok = len(kt.dbx("SELECT id FROM api_tokens"))
 r = Fr.post(B + "/api/docs/fetchers", json={"ws": "private", "name": "Mac Studio"})
-check(r.status_code == 201 and r.json().get("target") == "Your own documents", f"frida connects a fetcher {r.status_code} {r.text[:200]}")
+check(r.status_code == 201 and r.json().get("target") == "Private", f"frida connects a fetcher {r.status_code} {r.text[:200]}")
 FX, C = r.json().get("id"), decode(r.json().get("code", "kalmido-fetch:1:"))
 K = C.get("key", "")
 check(C.get("url", "").startswith("http") and K.startswith("kbh_") and C.get("name") == "Mac Studio", f"the setup code: url, key, name {C}")
@@ -98,7 +98,7 @@ check(row and row[0][0] != K and K not in row[0][0] and row[0][1] == FRIDA and r
 check(len(kt.dbx("SELECT id FROM api_tokens")) == ntok, "no API token was made")
 check(K not in json.dumps(Fr.get(B + "/api/docs/fetchers?ws=private").json()), "the key is not listed again")
 r = requests.get(V + "/fetcher", headers=bearer(K))
-check(r.ok and r.json().get("name") == "Mac Studio" and r.json().get("target") == "Your own documents" and r.json().get("portals") == []
+check(r.ok and r.json().get("name") == "Mac Studio" and r.json().get("target") == "Private" and r.json().get("portals") == []
       and isinstance(r.json().get("max_mb"), int), f"GET /fetcher with the key {r.text[:200]}")
 
 # ---- the key's rights are narrow: nothing else of the API, nothing of the web app

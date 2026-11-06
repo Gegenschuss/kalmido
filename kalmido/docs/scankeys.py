@@ -95,7 +95,7 @@ def sk_resolve(c, uid, t):
 
 def _sk_ws_name(c, oid):
     if not oid:
-        return tr("Your own documents")
+        return tr("Private|workspace")  # 2.582.0 (#4831)
     r = c.execute("SELECT name FROM orgs WHERE id=?", (oid,)).fetchone()
     return r["name"] if r else "?"
 

@@ -1761,7 +1761,7 @@ The key has no `read` and reaches exactly two routes; every other route answers 
 | Route | Answer |
 |---|---|
 | `POST /documents` | multipart with the field `file` only (no `ws`, `parent_id`, `title` or other fields: `400`); the place comes from the key and is checked with the person's rights at that moment -> `201 {id, name}` (nothing else: the key reads nothing) |
-| `GET /documents/upload-target` | `{name, target, max_mb}`: the inbox's name, the readable place (e.g. `Your own documents / Receipts`), the largest file in MB |
+| `GET /documents/upload-target` | `{name, target, max_mb}`: the inbox's name, the readable place (e.g. `Private / Receipts`), the largest file in MB |
 
 Errors: `401` key unknown or revoked (or the person deactivated), `403` the place is no longer open to the person (left the
 organisation, read-only role), `409` its folder is gone, `413` too large / no space left, `400` / `415` file not accepted,

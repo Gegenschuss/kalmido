@@ -43,7 +43,7 @@ const closeAll = d => d.querySelectorAll('.modal').forEach(m => m.remove());
   const pane = await until(() => d.querySelectorAll('#s-dcs [data-dcl]').length && d.querySelector('#s-dcs'));
   check(pane && shown(d, 'docs'), 'the gear opens Settings > Documents');
   check(!d.querySelector('.modal.dc-smd'), 'no documents dialog besides the settings');
-  check(d.querySelectorAll('#s-dcs [data-dcl]').length === (s0.levels ? Object.keys(s0.levels).length : 4) && d.querySelector('#s-dcs #dcs-asn') && d.querySelector('#s-dcs-rules-h') && /Your own documents/.test(pane?.textContent || ''),
+  check(d.querySelectorAll('#s-dcs [data-dcl]').length === (s0.levels ? Object.keys(s0.levels).length : 4) && d.querySelector('#s-dcs #dcs-asn') && d.querySelector('#s-dcs-rules-h') && /Private/.test(pane?.textContent || ''),
     'Settings > Documents: levels, archive number prefix, rules, the own workspace named');
   check(!d.querySelector('#s-dcs [data-dsc="inbox"]') && !d.querySelector('#s-dcs [data-dcs="inbox"]') && !d.querySelector('#s-dcs .dc-mail') && !d.querySelector('#s-dcs [data-dsc]'), 'Settings > Documents: no inboxes (they are in Integrations)');
   check(!!d.querySelector('#s-dcs [data-dcs="lists"]') && !!d.querySelector('#s-dcs [data-dcs="go-integr"]'), 'Settings > Documents: links to the lists and to the inboxes');
