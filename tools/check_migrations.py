@@ -18,7 +18,10 @@ SCHEMA only creates. A UNIQUE index on a table the fragment does not create itse
 2.574.0 (#3779): one way back out: a table of a feature that was taken out goes with `DROP TABLE IF EXISTS <table>` in AFTER
 (runs at every start, a no-op once it is gone). That is a one-way step (its rows are lost, the version before fails on it), so
 it needs the line `# drop-ok <table>: <why>` in the fragment, and the table may be created nowhere any more (schema.py or a
-fragment), else every start would make it and drop it again.
+fragment), else every start would make it and drop it again. Review F5: `DROP TABLE` without IF EXISTS is a finding of its own (AFTER
+runs at every start, the second one would fail); a column of a feature taken out goes the same way with
+`ALTER TABLE <table> DROP COLUMN IF EXISTS <column>` in AFTER and the line `# drop-ok <table>.<column>: <why>`, and the column may be
+added nowhere any more.
 
 usage: python3 tools/check_migrations.py [-v]     exit code 1 on a finding
 """
@@ -36,12 +39,28 @@ ADD_COLUMN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+ADD\s+COLUM
 CREATE_INDEX = re.compile(r"CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+(\w+)\s+ON\s+(?:ONLY\s+)?(\w+)\b", re.I)
 CREATE_TABLE = re.compile(r"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(\w+)", re.I)
 UNIQUE_OK = re.compile(r"^[ \t]*#[ \t]*unique-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
-DROP_TABLE = re.compile(r"DROP\s+TABLE\s+IF\s+EXISTS\s+(\w+)", re.I)  # 2.574.0 (#3779)
-DROP_OK = re.compile(r"^[ \t]*#[ \t]*drop-ok[ \t]+(\w+)[ \t]*:[ \t]*\S", re.M)
+DROP_TABLE = re.compile(r"DROP\s+TABLE\s+(IF\s+EXISTS\s+)?(\w+)", re.I)  # 2.574.0 (#3779); review F5: IF EXISTS checked on its own
+DROP_COLUMN = re.compile(r"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?(\w+)\s+DROP\s+COLUMN\s+(IF\s+EXISTS\s+)?(\w+)", re.I)  # review F5
+DROP_OK = re.compile(r"^[ \t]*#[ \t]*drop-ok[ \t]+(\w+(?:\.\w+)?)[ \t]*:[ \t]*\S", re.M)
 
 
 def fragments(root=ROOT):
     return sorted(glob.glob(os.path.join(root, "kalmido", "core", "migrations.d", "*.py")))
+
+
+def column_made(src, table, col):
+    """Review F5 (#3779): does src still create column table.col (in its CREATE TABLE or by ADD COLUMN)?"""
+    if re.search(rf"ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?{table}\s+ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?\"?{col}\"?\s", src, re.I):
+        return True
+    for m in re.finditer(rf"CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?{table}\s*\(", src, re.I):
+        depth, i, body = 1, m.end(), ""
+        while i < len(src) and depth:
+            depth += (src[i] == "(") - (src[i] == ")")
+            body += src[i] if depth == 1 and src[i] != ")" else ","  # the top level only: REFERENCES x(id) names no column here
+            i += 1
+        if any(re.match(rf"\s*\"?{col}\"?\s", part + " ") for part in body.split(",")):
+            return True
+    return False
 
 
 def schema_src(root=ROOT):
@@ -136,13 +155,20 @@ def content_findings(n, values, src):
     for x in after:
         col = ADD_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         drop = DROP_TABLE.fullmatch(sql_bare(x).strip().rstrip(";").strip())
+        dcol = DROP_COLUMN.fullmatch(sql_bare(x).strip().rstrip(";").strip())
         if col:  # a column on a table made after the steps (#4300): AFTER runs at every start, so IF NOT EXISTS
             why = step_finding(col.group(1), col.group(2), x)
             if not why and not re.search(r"ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\b", x, re.I):
                 why = "AFTER runs at every start: ADD COLUMN IF NOT EXISTS"
         elif drop:  # 2.574.0 (#3779): the table of a feature taken out, with a reason
-            why = None if drop.group(1) in set(DROP_OK.findall(src)) else \
-                f"DROP TABLE is a one-way step (its rows are lost): needs a line # drop-ok {drop.group(1)}: <why>"
+            why = "AFTER runs at every start: DROP TABLE IF EXISTS" if not drop.group(1) else \
+                None if drop.group(2) in set(DROP_OK.findall(src)) else \
+                f"DROP TABLE is a one-way step (its rows are lost): needs a line # drop-ok {drop.group(2)}: <why>"
+        elif dcol:  # review F5: a column of a feature taken out, the same way
+            key = f"{dcol.group(1)}.{dcol.group(3)}"
+            why = "AFTER runs at every start: DROP COLUMN IF EXISTS" if not dcol.group(2) else \
+                None if key in set(DROP_OK.findall(src)) else \
+                f"DROP COLUMN is a one-way step (its values are lost): needs a line # drop-ok {key}: <why>"
         else:
             why = index_finding(x, own, ok)
         if why:
@@ -193,11 +219,15 @@ def findings(root=ROOT):
     bad = [f"schema.py: new {x}: belongs into kalmido/core/migrations.d/<task id>.py (docs/ARCHITECTURE.md, Migrations)" for x in new]
     for p in fragments(root):
         bad += frag_findings(p)
-    made = names(schema_src(root))[0]
+    full = schema_src(root)
+    made = names(full)[0]
     for p in fragments(root):  # 2.574.0 (#3779): a dropped table that is still created would come back at every start
         with open(p, encoding="utf-8") as f:
-            for t in sorted(set(DROP_OK.findall(f.read())) & made):
+            ok = set(DROP_OK.findall(f.read()))
+            for t in sorted(ok & made):
                 bad.append(f"{os.path.basename(p)}: drops {t}, but schema.py or a fragment still creates it (every start would make it again)")
+            for t in sorted(x for x in ok if "." in x and column_made(full, *x.split(".", 1))):  # review F5
+                bad.append(f"{os.path.basename(p)}: drops {t}, but schema.py or a fragment still adds it (every start would make it again)")
     return bad
 
 

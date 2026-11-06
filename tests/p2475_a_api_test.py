@@ -8,7 +8,8 @@ fragment folder made here, the app itself has none yet; invented names only.
  - tools/check_migrations.py: schema.py as it is passes, a new step / table / index there is a finding, a fragment with code too;
    the checks that read the schema see the fragments (schema_src)
  - 2.509.0 (#4285): and it reads the statements: only additive steps, indexes in AFTER, UNIQUE on an existing table with a reason
-   (2.574.0 #3779: and a DROP TABLE IF EXISTS in AFTER with a line # drop-ok <table>: <why>, of a table created nowhere any more);
+   (2.574.0 #3779: and a DROP TABLE IF EXISTS in AFTER with a line # drop-ok <table>: <why>, of a table created nowhere any more;
+   review F5: DROP COLUMN IF EXISTS the same way with # drop-ok <table>.<column>, IF EXISTS missing is a finding of its own);
    a step that fails in the middle of a start leaves nothing behind and the next start goes through; two starts at once both
    go through and do the step once
 No routes, no person (freelancer-matrix: n/a).
@@ -169,7 +170,9 @@ try:
                  '# unique-ok u1: the column is new and NULL in every row\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u1 ON events(x)"]\n',
                  'SCHEMA = """CREATE TABLE IF NOT EXISTS n1 (id BIGINT); CREATE UNIQUE INDEX IF NOT EXISTS u2 ON n1(id);"""\nAFTER = ["CREATE UNIQUE INDEX IF NOT EXISTS u3 ON n1(id)"]\n',
                  # 2.574.0 (#3779): the table of a feature taken out, with a reason, created nowhere any more
-                 '# drop-ok old_t: the feature was taken out\nAFTER = ["DROP TABLE IF EXISTS old_t"]\n'):
+                 '# drop-ok old_t: the feature was taken out\nAFTER = ["DROP TABLE IF EXISTS old_t"]\n',
+                 # review F5 (#3779): a column of a feature taken out, the same way
+                 '# drop-ok events.old_c: the feature was taken out\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS old_c"]\n'):
         bad, p = frag("3481.py", text)
         check(bad == [], f"#4285: additive passes: {text.strip()[:90]} {bad}")
         os.remove(p)
@@ -198,9 +201,19 @@ try:
                        # 2.574.0 (#3779): a DROP TABLE without its reason, of a table schema.py still creates, without IF EXISTS
                        ('AFTER = ["DROP TABLE IF EXISTS old_t"]\n', "a DROP TABLE without a # drop-ok line"),
                        ('# drop-ok events: gone\nAFTER = ["DROP TABLE IF EXISTS events"]\n', "a dropped table schema.py still creates"),
-                       ('# drop-ok old_t: gone\nAFTER = ["DROP TABLE old_t"]\n', "DROP TABLE without IF EXISTS")):
+                       ('# drop-ok old_t: gone\nAFTER = ["DROP TABLE old_t"]\n', "DROP TABLE without IF EXISTS"),
+                       # review F5 (#3779): DROP COLUMN only with IF EXISTS, its reason, of a column added nowhere any more
+                       ('AFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS old_c"]\n', "a DROP COLUMN without a # drop-ok line"),
+                       ('# drop-ok old_c: gone\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS old_c"]\n', "the reason without the table"),
+                       ('# drop-ok events.old_c: gone\nAFTER = ["ALTER TABLE events DROP COLUMN old_c"]\n', "DROP COLUMN without IF EXISTS"),
+                       ('# drop-ok events.location: gone\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS location"]\n',
+                        "a dropped column schema.py still creates"),
+                       ('# drop-ok events.imp_at: gone\nAFTER = ["ALTER TABLE events DROP COLUMN IF EXISTS imp_at"]\n',
+                        "a dropped column a step still adds")):
         bad, p = frag("3482.py", text)
         check(len(bad) == 1, f"#4285: {what} is a finding {bad}")
+        if "without IF EXISTS" in what:  # review F5: the finding says what is missing
+            check(bool(bad) and "IF EXISTS" in bad[0] and "INDEX" not in bad[0], f"#3779: {what} names IF EXISTS {bad}")
         os.remove(p)
 finally:
     shutil.rmtree(tmp, ignore_errors=True)
