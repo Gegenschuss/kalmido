@@ -1038,6 +1038,8 @@ def _folder_member_add(c, lid, uid, role, actor):
     c.execute("INSERT INTO list_members(list_id,user_id,role,own_role,sort,added_at) VALUES(?,?,?,?,?,?)",
               (lid, uid, role, role, my_max_sort(c, uid) + 1, iso(now_utc())))
     member_folder_adopt(c, lid, uid)
+    from .lmcore import lmc_share
+    lmc_share(c, actor, lid, uid, role, None)  # 2.568.0 (#4739): the core's share row, as PUT .../members (also an import's share)
     news_add(c, uid, "share", list_id=lid, data={"role": role, "name": l["name"]}, actor=actor)
     if is_agent(u):
         from ..admin.hosting import agent_joined_notice

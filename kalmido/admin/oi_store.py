@@ -80,6 +80,11 @@ def _not_agent(c, uid):
 # 2.353.0 C (#2829): reference nodes of the areas' trees that come along (their ref_id is set in _finish_store, once the
 # pages / tables are in; a node whose page / table did not come along goes again)
 _REF_KINDS = {"wiki": "wiki_pages", "sheet": "sheets"}
+# 2.566.0 (#4712): the core's calendars / address books carry their shares (fs_shares) on their reference node, which lies at
+# the top of the workspace's tree or in any folder (no area): it comes along with its shares and history and points at the
+# imported calendar / book in _finish_refs (one that did not come along goes again, like a page's node)
+_CORE_REF_KINDS = {"evcal": "ev_cals", "address_book": "books"}
+_CORE_MEMBERS = {"evcal": ("ev_cal_members", "cal_id"), "address_book": ("book_members", "book_id")}
 
 
 def _areas(run, ctx):
@@ -134,7 +139,7 @@ def _node(c, run, src, d, ctx):
             st["merged"].add(have[0])
             return False
     if d["kind"] == "ref":
-        if src.get("ref_kind") not in _REF_KINDS or not area:
+        if not (src.get("ref_kind") in _REF_KINDS and area or src.get("ref_kind") in _CORE_REF_KINDS):
             return None
         d["ref_id"] = None
         st["refs"].append((sid, src["ref_kind"], src.get("ref_id")))
@@ -531,9 +536,12 @@ def _finish_refs(c, run):
     """2.353.0 C (#2829): the reference nodes point at the new page / table; one whose page / table did not come along (a
     locked page, the trash) goes again."""
     for sid, kind, ref in _st(run).get("refs") or []:
-        nid, new = run.m("fs_nodes", sid), run.m(_REF_KINDS[kind], ref)
+        nid, new = run.m("fs_nodes", sid), run.m({**_REF_KINDS, **_CORE_REF_KINDS}[kind], ref)
         if nid and new and not c.execute("SELECT 1 FROM fs_nodes WHERE ref_kind=? AND ref_id=? AND kind='ref'", (kind, new)).fetchone():
             c.execute("UPDATE fs_nodes SET ref_id=? WHERE id=?", (new, nid))
+            if kind in _CORE_MEMBERS:  # 2.566.0 (#4712): the node is the truth now -- the member rows the object has (also of a
+                t, col = _CORE_MEMBERS[kind]  # calendar of the target this one went into) are mirrored onto it, as on a node made
+                c.execute(f"UPDATE {t} SET role=role WHERE {col}=?", (new,))  # (trigger kalmido_kern_mirror, 4712_a.py)
         elif nid:
             c.execute("DELETE FROM fs_nodes WHERE id=? AND kind='ref' AND ref_id IS NULL", (nid,))
 
