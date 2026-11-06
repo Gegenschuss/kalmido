@@ -145,7 +145,7 @@
 .aitblctl{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
 .aitblctl input{flex:1 1 12rem}
 .aitblctl select{flex:0 1 14rem;min-width:0}
-.agwhy{margin:.375rem 0 .625rem;font-size:var(--fs-s);max-width:44rem}
+.agwhy{margin:.375rem 0 .625rem;font-size:var(--fs-s)}
 .aisub button{flex:1 0 auto}
 .aisub{scroll-padding-inline:.5rem}
 .shint.warn.shkey{color:var(--text);background:var(--bg3);border-left:.1875rem solid var(--danger);border-radius:var(--radius);padding:.625rem .75rem;margin:0 0 .75rem}

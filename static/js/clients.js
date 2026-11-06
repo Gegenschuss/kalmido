@@ -64,13 +64,6 @@ function viewClients() {
   if (!clientsOn()) return `<div class="empty">${tr('Clients are off (Settings > Modules)')}</div>`;
   return ms_clView();  // 2.47.3 (#1734): list + card like the contacts (clientpage.js) instead of the grid / the detail page
 }
-function clientsGridHtml(cs) {
-  if (!cs.length) return `<div class="dash clients"><div class="empty nempty eact">${ic('brief')}<span>${typeof wsCur === 'function' && wsCur() === 'private' ? tr('Clients sit above your projects: hours, budget and the timesheet per client. Only you see them.') : tr('Clients sit above your projects: hours, budget and the timesheet per client. Only people of this workspace see them.')}</span><button class="btn pri" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div></div>`;
-  return `<div class="dash clients"><div class="clhead"><span class="spacer"></span><button class="btn sm" data-act="client-new">${ic('plus', 's')} ${tr('New client')}</button></div><div class="dgrid">${cs.map(c => `<section class="dcard clcard"><h2>${clientIco(c)}<a href="#client/${c.id}">${esc(c.name)}</a><span class="spacer"></span><span class="dcn">${c.lists.length || ''}</span></h2>
-    ${c.contact || c.email ? `<p class="muted clsub">${esc([c.contact, c.email].filter(Boolean).join(' · '))}</p>` : ''}
-    <div class="clnums"><span><b>${esc(fmtHours(c.stats.month_seconds))}</b><small>${esc(monthLabel(c.stats.month))}</small></span><span><b>${esc(fmtHours(c.stats.seconds))}</b><small>${tr('in total')}</small></span>${c.stats.amount ? `<span><b>${esc(fmtMoney(c.stats.amount))}</b><small>${tr('amount')}</small></span>` : ''}</div>
-    ${budgetBar(c)}</section>`).join('')}</div></div>`;
-}
 // 2.55.0 (#1067): the parts of the client's card below its details (blocks of the view builder, clientpage.js)
 function clientDetailParts(c) {
   const st = c.stats, est = st.estimate_min;

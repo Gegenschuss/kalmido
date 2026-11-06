@@ -1941,7 +1941,7 @@ function viewListBody() {
 function viewArchived() {
   const ls = S.lists.filter(l => l.archived && inWs(l)).sort((a, b) =>  // 2.380.2 (#3407): the shown workspace
     (b.archived_at || '').localeCompare(a.archived_at || '') || cmpText(lname(a), lname(b)));
-  if (!ls.length) return `<div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div>`;
+  if (!ls.length) return `<div class="archv"><div class="empty">${ic('archive')}${tr('No archived projects.')}<br><span class="muted">${tr('Archive a project from its “…” menu; it disappears from the sidebar and its tasks from Today and the calendar.')}</span></div></div>`;
   return `<div class="archv">${ls.map(l => {
     const p = l.progress || {done: 0, total: 0}, own = isOwner(l), em = leadEmoji(l.name), name = em ? l.name.slice(em.length).trim() : listName(l.name);
     const mark = listIconHtml(l, {cls: 'aemo', emoji: true});  // 2.38.0 (#1174)
@@ -1955,7 +1955,9 @@ function viewArchived() {
 // 2.116.0 A (#2063): days until a trashed task is deleted for good (null = no period known); 0 = in the next run
 const ttpLeft = t => { const d = S.hist?.days; if (!d || !t.deleted_at || S.hist.purge_on === false || trashKeeps()) return null;  // 2.223.3 A (#2877): no countdown while nothing is deleted
    return Math.max(0, Math.ceil((Date.parse(t.deleted_at) + d * 864e5 - Date.now()) / 864e5)); };
-function viewHistory() {
+// 2.580.0 (#4815): Completed / Trash in the list shell (.hview = --w-seite, start-breite.css)
+function viewHistory() { return `<div class="hview">${hist_body()}</div>`; }
+function hist_body() {
   const trash = S.route.key === 'trash';
   const arr = S.extra || [];
   const otr = trash ? otr_html() + vtr_html() + ptr_html() : '';  // 2.102.0 A (#1988): "Deleted lists" above the tasks; 2.549.0 (#4536): + video sign-offs (trashui.js); 2.567.0 A (#4707): + the other parts

@@ -37,7 +37,7 @@ function viewStats() {
   if ((st.v !== S.v || st.sp !== st_space() || !st.data) && !st.loading) setTimeout(loadStats, 0);
   const j = st.sp === st_space() ? st.data : null;  // 2.398.0 (#3406): never another workspace's numbers
   if (!j && S.ly.view === 'stats') return `<div class="stats">${lyHtml('stats', {})}</div>`;  // 2.55.0 (#1067)
-  if (!j) return `<div class="empty">${st.err ? (st.err === 'offline' ? tr('Statistics are only available online.') : esc(st.err)) : tr('Loading…')}</div>`;
+  if (!j) return `<div class="stats"><div class="empty">${st.err ? (st.err === 'offline' ? tr('Statistics are only available online.') : esc(st.err)) : tr('Loading…')}</div></div>`;
   const wl = j.weeks.map(shortDay), tipW = (i, s) => `${tr('Week of {0}', fmtDate(j.weeks[i]))}: ${s}`;
   const tiles = [
     [j.done.this_week, tr('completed this week'), trn('{0} today', '{0} today', j.done.today)],

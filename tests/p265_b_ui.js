@@ -161,7 +161,7 @@ const NEW = {agentchat: ['agentchat', 'agentsetup', 'agentrotate', 'agentwork', 
     check(fetched === '[]', 'Firefox: the start fetches no module and no module stylesheet ' + fetched);
     await nav(B + '#docs');
     for (let i = 0; i < 60 && !(await ev('!!document.querySelector("#view .dc-view")').catch(() => false)); i++) await sleep(150);
-    check(await ev(`(() => { const v = document.querySelector('#view .dc-view'); return !!v && getComputedStyle(v).maxWidth !== 'none'; })()`), 'Firefox: the documents view is drawn with its style (docs.css)');
+    check(await ev(`(() => { const v = document.querySelector('#view .dc-view'); return !!v && getComputedStyle(v).position === 'relative'; })()`), 'Firefox: the documents view is drawn with its style (docs.css)');
     const cached = await ev(`(async () => { const reg = await navigator.serviceWorker.ready; const want = ${JSON.stringify(LAZY.map(f => '/static/js/' + f + '.js').concat(LAZY_CSS.map(f => '/static/css/' + f + '.css')))};
       let c, miss = want; for (let i = 0; i < 60 && miss.length; i++) { const ks = (await caches.keys()).filter(k => k.startsWith('tasks-shell')); c = ks.length ? await caches.open(ks.pop()) : null;
         if (c) { const m = []; for (const u of want) if (!await c.match(u, {ignoreSearch: true})) m.push(u); miss = m; } if (miss.length) await new Promise(r => setTimeout(r, 250)); }

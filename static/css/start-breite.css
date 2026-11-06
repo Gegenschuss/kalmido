@@ -11,10 +11,12 @@
 /* --w-seite: the limit itself is set on the rule of each page (app.css); here the pages that stood left get centred and the
    task lists / file store / archive (no limit before) get theirs */
 .pstart,.stats,.pov,.lwrap,.abview,.dc-wrap:not(.dc-paneon),.tgview,.mwv,.archv{max-width:var(--w-seite);margin-inline:auto}
+/* 2.580.0 (#4815): the rest of the lists and overviews: tables overview and folder (.shvov), a knowledge folder, Completed / Trash (.hview) */
+.shvwrap.shvov,.wkfolder,.hview{max-width:var(--w-seite);margin-inline:auto}
 
-/* --w-lesen: news bars stood left (47.5rem) - now centred, the swipe hint keeps its own side margin on narrow screens */
-#view > :is(.ntabs,.nbar,.nlist,.nchips){margin-inline:auto}  /* only the news page itself, not a news tile on the start page */
-#view > .nswipe{margin-inline:max(.625rem,calc((100% - var(--w-lesen)) / 2))}
+/* --w-lesen: the news page is ONE shell (.nwview, collab.js viewNews): bars, bundles, sections, empty states and the swipe hint
+   inside it (2.580.0, #4815; before single rules for some of the parts). A news tile on the start page is not in it. */
+.nwview{max-width:var(--w-lesen);margin-inline:auto}
 /* a note / knowledge page (title, fields, text, files, backlinks) in one reading column right of its list */
 .ntedit{width:100%;max-width:var(--w-lesen);margin-inline:auto}
 /* team chat: the room keeps its full width (header, borders, drop zone); history and composer read in the middle */
@@ -22,7 +24,7 @@
 .tcroom .tccomp{padding-inline:max(.75rem,calc((100% - var(--w-lesen)) / 2))}
 
 /* --w-voll: named so a later rule cannot limit them by accident */
-.kanban,.matrix,.shvwrap,.mmwrap,.lcal,.tl{max-width:var(--w-voll)}
+.kanban,.matrix,.shvwrap,.mmwrap,.lcal,.tl,.calv{max-width:var(--w-voll)}  /* .calv: the calendar's month / week / year grid (calview.js, calyear.js) */
 
 /* 2.552.0 (#4552): wide screens B -- tiles in a grid by the space (repeat(auto-fill, minmax(22rem, 1fr)): the number of columns
    follows the width of the page, no fixed count). Only from 1700 px of screen: 1440 x 900 and smaller stay as they were.

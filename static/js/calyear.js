@@ -32,7 +32,7 @@ function cyr_month(y, m, cnt, t0) {
 function cyr_view() {
   const y = +(S.calSel || today()).slice(0, 4), lo = `${y}-01-01`, hi = `${y}-12-31`, t0 = today();
   const cnt = cyr_counts(lo, hi);
-  return `${calBar(String(y))}<div class="cyear" id="cyear">${[...Array(12).keys()].map(m => cyr_month(y, m, cnt, t0)).join('')}</div>`;
+  return `${calBar(String(y))}<div class="cyear calv" id="cyear">${[...Array(12).keys()].map(m => cyr_month(y, m, cnt, t0)).join('')}</div>`;
 }
 document.addEventListener('click', e => {
   const b = /** @type {HTMLElement|null} */ (e.target instanceof Element ? e.target.closest('[data-cyd], [data-cym]') : null);

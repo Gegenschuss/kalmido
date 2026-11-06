@@ -154,8 +154,8 @@ const ALL = 'cal,timeline,comments,collab,events,contacts';
   // agenda
   click(w, d.querySelector('#view .calbar [data-k="agenda"]')); await sleep(200);
   w.eval(`S.calSel = '${t0}'; renderView()`);
-  await until(() => d.querySelector('#view .agview .agday'));
-  const ag = d.querySelector('#view .agview').textContent;
+  await until(() => d.querySelector('#view .agendav .agday'));
+  const ag = d.querySelector('#view .agendav').textContent;
   check(/Dentist \(check-up\)/.test(ag) && /Buy flowers/.test(ag) && /Team day/.test(ag) && d.querySelector('#view .agday h3'), 'agenda: events and tasks by day');
   // calendars dialog: hide, share
   click(w, d.querySelector('#view [data-act="ev-cals"]'));

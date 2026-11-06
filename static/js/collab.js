@@ -329,7 +329,9 @@ function newsItemHtml(it, i, pop) {
 // 2.25.0 (UX-47): what lands in News (the bell) and what does not
 const newsWhat = () => teamOn() ? tr('Assignments, @mentions and comments land here. Messages: team chat.') : tr('Assignments, @mentions and comments land here.');
 const newsTab = () => { const t = LS.get('newsTab', 'all'); return ['me', 'act', 'all'].includes(t) ? t : 'all'; };  // 2.28.0 (#987): all = both sections, For you first
-function viewNews() {
+// 2.580.0 (#4815): the news page in ONE reading shell (.nwview = --w-lesen, start-breite.css)
+function viewNews() { return `<div class="nwview">${news_body()}</div>`; }
+function news_body() {
   const f = S.nf.filter, fresh = S.nf.sig === (S.news?.sig ?? '') && S.nf.f === f && !!S.nf.items;
   // 1.9.0 (#246): "Loading…" only while a request really runs; an empty feed says so instead of loading forever
   if (!fresh && !S.nf.loading && !S.nf.queued) { S.nf.queued = true; setTimeout(() => { S.nf.queued = false; loadNews(); }, 0); }

@@ -486,7 +486,7 @@ function viewAgenda() {
     h += `<section class="agday ${d === today() ? 'today' : ''}" aria-label="${esc(dayLabel(d, true) + ' ' + fmtDate(d))}"><h3>${esc(dayLabel(d, true))} <span class="muted">${esc(fmtDate(d))}</span></h3>
       ${evs.length ? `<div class="cevlist">${evs.map(e => cevRow(e, d)).join('')}</div>` : ''}${ts.map(t => taskRow(t, {showList: true, drag: false})).join('')}</section>`;
   }
-  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + `<div class="agenda agview">${h || `<div class="empty">${ic('cal')}${tr('Nothing in the next two weeks.')}</div>`}</div>`;
+  return calBar(tr('Agenda') + ` <span class="muted agrange">${esc(fmtDayAbs(from))} – ${esc(fmtDayAbs(to))}</span>`) + `<div class="agenda agendav">${h || `<div class="empty">${ic('cal')}${tr('Nothing in the next two weeks.')}</div>`}</div>`;
 }
 
 // ---- calendars: list, new, rename / colour, hide, share, import (ICS), export, delete; the phone setup

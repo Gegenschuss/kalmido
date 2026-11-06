@@ -2216,6 +2216,8 @@ button.tvr-task:hover{color:var(--accent)}
 .ltcols{display:flex;gap:.375rem;padding:.5rem;flex-wrap:wrap;max-width:14rem}
 .ltcols button{width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid transparent}.ltcols button.on{border-color:var(--text)}
 .agview{max-width:var(--w-seite);margin:0 auto;padding:0;display:flex;flex-direction:column;gap:.75rem}  /* 2.586.0 (#4818): no own padding, #view gives it; merged with the second .agview rule */
+/* 2.580.0 (#4815): the calendar agenda had borrowed the class .agview of the agents page; it has its own now (no own padding, #4818) */
+.agendav{max-width:var(--w-seite);margin:0 auto;padding:0;display:flex;flex-direction:column;gap:.75rem}
 .agcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.625rem;align-items:start}/* 2.505 (#4325): an opened "Projects" makes only its own card longer */
 .agcard{display:flex;align-items:center;align-content:flex-start;gap:.75rem;padding:.75rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);flex-wrap:wrap}
 .agcard.off{opacity:.6}
@@ -2308,7 +2310,7 @@ button.tvr-task:hover{color:var(--accent)}
 .chnew.hidden{display:none}
 /* 2.12.2 (#453 N4): phone chat with the keyboard up: all the room for the messages (height set by chatFit()) */
 body.kb-open #tabs,body.kb-open #fab,body.kb-open .chview .chnote,body.kb-open .cwsw{display:none}
-@media (max-width:767px){.achip .act{max-width:34vw}.agview{padding:.5rem .75rem 7rem}.chview{height:calc(100dvh - 7.5rem)}}
+@media (max-width:767px){.achip .act{max-width:34vw}.agview,.agendav{padding:.5rem .75rem 2rem}.chview{height:calc(100dvh - 7.5rem)}}
 .rx.rxplus{padding:0 .375rem}.rx.rxplus .i{width:.75rem;height:.75rem}
 .rxpick{padding:.5rem;display:flex;flex-direction:column;gap:.5rem;max-width:17rem}
 .rxgrid{display:grid;grid-template-columns:repeat(8,1fr);gap:.125rem}
@@ -3039,8 +3041,6 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (prefers-reduced-motion:reduce){ .bphl .bpchev{transition:none} }
 /* 2.7.1 (#410): the overview of a project list */
 .pov{max-width:var(--w-seite)}
-.povg{display:grid;grid-template-columns:minmax(0,1fr);gap:0 1.25rem}
-@media (min-width:1100px){ .povg{grid-template-columns:minmax(0,1fr) minmax(16rem,22rem)} }
 .povc{min-width:0}
 .povs{background:var(--bg2);border:1px solid var(--line2);border-radius:var(--r-l);padding:.75rem 1rem .875rem;margin-top:.75rem;min-width:0}
 .povh{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem;min-height:1.75rem}
@@ -4142,7 +4142,7 @@ body.lcmoving{cursor:grabbing!important;user-select:none!important}  /* 2.331.0 
 .tcview.nolist{grid-template-columns:minmax(0,1fr)}
 .tcview.nolist.inthread{grid-template-columns:minmax(0,1fr) minmax(18rem,24rem)}
 .tcview.nolist .tcback{display:none}
-.tcview.listpage{grid-template-columns:minmax(0,1fr)}
+.tcview.listpage{grid-template-columns:minmax(0,1fr);max-width:var(--w-seite);margin-inline:auto}  /* 2.580.0 (#4815): the channel list = --w-seite */
 .tcview.listpage .tclist{border-right:0}
 #side .tcpanel .tcsec{padding:.625rem .5rem .125rem;font-size:var(--fs-xs)}
 #side .tcpanel .tcmute{display:inline-flex;color:var(--muted);flex:none}
@@ -4266,7 +4266,7 @@ a.tref:hover{background:var(--accent-soft)}
 .dsearch input{flex:1}
 .dmore{margin:.25rem 0 0;font-size:var(--fs-s)}
 .dng .ngroup:last-child{border-bottom:0}
-.dcust{list-style:none;margin:0 0 1rem;padding:0;display:grid;gap:.25rem;max-width:32rem}
+.dcust{list-style:none;margin:0 0 1rem;padding:0;display:grid;gap:.25rem;max-width:var(--w-form)}
 .dcust li{display:flex;align-items:center;gap:.5rem;padding:.375rem .5rem;border:1px solid var(--line2);border-radius:var(--radius);background:var(--bg2);min-height:3rem}
 .dcust .dcl{flex:1}
 .sbrand .sbhome.on{background:var(--bg3)}
@@ -4898,10 +4898,9 @@ button.lkchip:hover{border-color:var(--accent)}
 #side .fhead .n{font-weight:500;color:var(--muted);font-size:var(--fs-s);letter-spacing:.01em}
 #side .fhead.on .n{color:var(--text)}
 /* 2.23.0 (#463): clients */
-.clients .clhead{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;flex-wrap:wrap}
-.clients .clhead h2,.wload .clhead h2{margin:0;font-weight:600}
-.clients .clhead .sic,.clcard h2 .sic{width:1.5rem;display:inline-flex;justify-content:center;font-size:var(--fs-h)}
-.clients .sic .sw,.clcard .sic .sw{width:.625rem;height:.625rem;border-radius:50%;background:var(--muted);display:inline-block}
+.wload .clhead h2{margin:0;font-weight:600}
+.clcard h2 .sic{width:1.5rem;display:inline-flex;justify-content:center;font-size:var(--fs-h)}
+.clcard .sic .sw{width:.625rem;height:.625rem;border-radius:50%;background:var(--muted);display:inline-block}
 .clcard h2 a{color:inherit;text-decoration:none;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .clcard h2 a:hover,.clcard h2 a:focus-visible{text-decoration:underline}
 .clsub{margin:.25rem 0 .75rem;font-size:var(--fs-s);overflow-wrap:anywhere}
@@ -5005,7 +5004,6 @@ button.lkchip:hover{border-color:var(--accent)}
 .wltable{table-layout:fixed}
 .wltable th:first-child{width:13rem}
 .wlbar{max-width:8rem}
-.clients .clhead .sic{justify-content:flex-start;width:auto}
 .clsub{color:var(--text2)}
 .cmsg.rxshow .rxrow{gap:.375rem}
 .cmsg .rxrow .rxtog[aria-expanded="true"]{background:color-mix(in srgb,var(--accent) 14%,transparent);border-radius:99rem;box-shadow:none;outline:0}
@@ -5727,7 +5725,6 @@ body.lydragging,body.lydragging *{cursor:grabbing!important;-webkit-user-select:
 @media (pointer:coarse) and (max-width:37.5rem){
   .chath{gap:.5rem} .chath .chback{margin-right:.125rem}
 }
-.lyed{max-width:none}  /* 2.35.0 (#1097): the blocks get the view's width (two side by side as in the view); the list stays narrow */
 .lyed .lylist,.lyed .lyopts{max-width:var(--w-form)}
 /* 2.36.0 (#1118): the lock of a task: a small lock after the title in the row, the lock button in the task header */
 .ttl .tlkr{display:inline-flex;vertical-align:-.15em;margin-left:.375rem;color:var(--muted)}

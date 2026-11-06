@@ -1,6 +1,6 @@
 /* Kalmido web client: the styles of the module "docs" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
-.dc-view{position:relative;max-width:68.75rem;margin:0 auto;padding:0}
+.dc-view{position:relative;padding:0}  /* 2.580.0 (#4815): the width is the shell's (.dc-wrap = --w-seite, start-breite.css), no own 68.75rem; head, filters and tiles share its edges (#4814); no own padding (#4818) */
 .dc-up,.dc-acts2 [data-dc="scan"]{min-height:2.75rem}
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}
@@ -60,7 +60,7 @@
 @keyframes dc-bnc-n{30%{transform:translateX(-1.25rem)}to{transform:none}}
 @keyframes dc-bnc-p{30%{transform:translateX(1.25rem)}to{transform:none}}
 /* 2.430.0 (#3582): the list left, the open document in a pane right of it (computer); the card of the open one marked */
-.dc-wrap.dc-paneon{display:flex;align-items:flex-start;gap:1rem;max-width:100rem;margin:0 auto}
+.dc-wrap.dc-paneon{display:flex;align-items:flex-start;gap:1rem;max-width:var(--w-seite);margin:0 auto}
 .dc-wrap.dc-paneon>.dc-view{flex:1 1 0;min-width:0;max-width:none;margin:0}
 .dc-pane{position:sticky;top:.5rem;flex:0 0 clamp(20rem,42%,36rem);max-height:calc(var(--dc-paneh,100dvh - 7rem) - 2rem);overflow-y:auto;margin-top:.75rem;padding:1rem;border:1px solid var(--line);border-radius:var(--radius);background:var(--bg2);box-sizing:border-box;overscroll-behavior:contain}
 /* 2.519.0 (#4467): a sticky box stays only inside its parent; the parent .dc-wrap now reaches down over the bottom room of

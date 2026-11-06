@@ -9,7 +9,7 @@
 .vdrst{width:.625rem;height:.625rem;border-radius:50%;border:2px solid var(--muted);flex:0 0 auto}
 .vdrst.st-approved{background:var(--accent);border-color:var(--accent)}
 .vdrst.st-changes{border-color:var(--accent)}
-.vdrpov .vdrrows,.vdrcl .vdrrows{max-width:40rem}
+.vdrpov .vdrrows,.vdrcl .vdrrows{max-width:var(--w-form)}
 .vdrform label{display:block;margin:.75rem 0 .25rem;font-size:var(--fs-m);color:var(--text2)}
 .vdrform input{width:100%}
 /* the review view: wide on a desktop, the whole screen on a phone */

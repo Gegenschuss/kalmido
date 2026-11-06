@@ -37,8 +37,8 @@ function mwRow(x) {
   return `<a class="wcrow mwa" href="${esc(mwHref(x))}">${body}</a>`;
 }
 function viewMineWait() {
-  if (S.mw.items === null) { mwLoad(true); return `<div class="empty">${esc(tr('Loading…'))}</div>`; }
-  if (!S.mw.items.length) return symEmpty('done', tr('Nothing waits for you'));
+  if (S.mw.items === null) { mwLoad(true); return `<div class="mwv"><div class="empty">${esc(tr('Loading…'))}</div></div>`; }
+  if (!S.mw.items.length) return `<div class="mwv">${symEmpty('done', tr('Nothing waits for you'))}</div>`;
   return `<div class="mwv">${MW_GROUPS.map(([k, name]) => {
     const xs = S.mw.items.filter(x => x.kind === k);
     return xs.length ? `<section class="waitcard mwg" aria-label="${esc(tr(name))}"><h3>${esc(tr(name))} <span class="muted">${xs.length}</span></h3>${xs.map(mwRow).join('')}</section>` : '';
