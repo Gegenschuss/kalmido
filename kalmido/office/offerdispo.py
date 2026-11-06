@@ -19,11 +19,14 @@ import secrets
 from datetime import date, timedelta
 from decimal import Decimal
 
+from ..accounts.onboarding import ind_of_area
+from ..accounts.orgroles import org_writes
 from ..core.access import Denied, acx_org_ok, need_feat
 from ..core.db import iso, now_utc
 from ..core.errors import BadInput
 from ..core.i18n import tr
 from ..core.pg import insert_id
+from ..hub.absence import abs_admin, abs_org
 from .calc import calc_lang
 from .docs import doc_items
 from .parts import tp_parts
@@ -35,9 +38,6 @@ ODP_DAYS_MAX = 31    # shoot days of one part (the disposition takes 62 per book
 
 def odp_gate(c, uid, oid):
     """'' when uid may book shoot days in office area oid, else the hint the preview shows."""
-    from ..accounts.onboarding import ind_of_area
-    from ..accounts.orgroles import org_writes
-    from ..hub.absence import abs_org
     if ind_of_area(c, oid) != "film":
         return tr("Shoot days go into the disposition only with the industry Film & Video.")
     try:
@@ -176,7 +176,6 @@ def odp_apply(c, oid, uid, r, root, lid, pick, dates):
     hint = odp_gate(c, uid, oid)
     if hint:
         raise Denied(409, hint)
-    from ..hub.absence import abs_admin
     pv = odp_preview(c, oid, uid, r, root)
     have = odp_existing(c, oid, root)
     ts = iso(now_utc())
