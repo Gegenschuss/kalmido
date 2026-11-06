@@ -18,6 +18,7 @@ from ..core.db import body, bump, connect, db, iso, iso_ms, now_utc
 from ..core.retention import ret_due, ret_on, ret_report, ret_trash_cut  # 2.272.0 A (#3026)
 from ..core.pg import insert_id, write_lock
 from ..core.access import Denied
+from ..core.conflict import ccf_check  # 2.570.0 (#4770)
 from ..core.orgcrypt import oc_copy_file, oc_send_file, oc_user_space, oc_write_file
 from ..accounts.session import bg_here, me
 from ..accounts.bgjobs import bgj_add, bgj_fn  # 2.370.3 (#2760)
@@ -188,6 +189,11 @@ def bm_get(c, uid, bid, write=False, deleted=False):
     return r
 
 
+def bm_img_v(r):
+    """The version of the bookmark's picture: when it was fetched (else the row's updated_at, e.g. a Karakeep import)."""
+    return str((r["fetched_at"] if "fetched_at" in r.keys() else "") or r["updated_at"] or "")
+
+
 def bm_out(c, uid, r, full=False, can=None):
     """The bookmark for the client (r: a row or dict; can = the write right when the caller knows it already)."""
     try:
@@ -196,7 +202,8 @@ def bm_out(c, uid, r, full=False, can=None):
         tags = []
     d = {"id": r["id"], "url": r["url"], "title": r["title"] or bm_site(r["url"]) or r["url"], "description": r["description"],
          "site": r["site"] or bm_site(r["url"]), "tags": tags, "note": r["note"], "state": r["state"],
-         "image": f"/api/bookmarks/{r['id']}/image?v={urllib.parse.quote(r['updated_at'] or '')}" if r["image"] else "",
+         # 2.570.0 (#4770): the picture's cache key is the fetch's stamp (the fetch no longer moves updated_at)
+         "image": f"/api/bookmarks/{r['id']}/image?v={urllib.parse.quote(bm_img_v(r))}" if r["image"] else "",
          "preview": r["preview"], "preview_error": bm_err_text(r["preview_error"]) if r["preview"] == "failed" else "",
          "has_text": bool(r["has_text"] if "has_text" in r.keys() else r["text"]), "src": r["src"], "space": bm_space_key(r["org_id"]),
          "mine": r["user_id"] == uid, "can_edit": bm_may_write(c, uid, r) if can is None else can,
@@ -250,7 +257,7 @@ def bm_list(c, uid, a):
         args.append(_like(json.dumps(tag, ensure_ascii=False)))  # stored with ensure_ascii=False (review L3)
     off = as_int(a.get("offset") or 0, "offset", 0, 1_000_000)
     rows = c.execute(f"""SELECT b.id, b.user_id, b.org_id, b.url, b.title, b.description, b.site, b.tags, b.note, b.state, b.image,
-                         b.preview, b.preview_error, b.src, b.created_at, b.updated_at, b.text<>'' AS has_text FROM bookmarks b WHERE {w}
+                         b.preview, b.preview_error, b.src, b.created_at, b.updated_at, b.fetched_at, b.text<>'' AS has_text FROM bookmarks b WHERE {w}
                          ORDER BY b.created_at DESC, b.id DESC LIMIT ? OFFSET ?""", (*args, BM_PAGE + 1, off)).fetchall()
     admin = {}
     items = []
@@ -303,8 +310,14 @@ def bm_create(c, uid, b, src="", src_id="", preview="pending"):
 
 
 def bm_patch(c, uid, bid, b):
-    """{title?, description?, note?, tags?, state?, url?} -> the row (a new link: the preview is fetched again)."""
+    """{title?, description?, note?, tags?, state?, url?, expect_updated_at?} -> the row (a new link: the preview is fetched
+    again). 2.570.0 (#4770): expect_updated_at set and the row changed since -> 409 with the bookmark under "current" (an undo
+    never overwrites another session's change); missing -> the old behaviour."""
+    write_lock(c, f"bookmarks-{int(bid)}")
     r = bm_get(c, uid, bid, write=True)
+    b = dict(b) if isinstance(b, dict) else {}
+    ccf_check(b, r["updated_at"], "current", lambda: bm_out(c, uid, r, full=True))
+    b.pop("expect_updated_at", None)
     unknown = sorted(set(b) - {"title", "description", "note", "tags", "state", "url"})
     if unknown:
         raise BadInput(tr("Unknown field: {0}", ", ".join(unknown)[:200]))
@@ -545,15 +558,17 @@ def bm_fetch_one(bid):
         rel = bm_store_image(c, cur, img) if img else ""
         ts = iso_ms(now_utc())
         if res["error"]:
-            c.execute("UPDATE bookmarks SET preview='failed', preview_error=?, fetched_at=?, updated_at=? WHERE id=?",
-                      (res["error"][:40], ts, ts, bid))
+            # 2.570.0 (#4770): the background fetch stamps fetched_at only - updated_at is the version of the person's
+            # changes, a preview arriving must not turn their undo into a conflict (the list polls the preview state)
+            c.execute("UPDATE bookmarks SET preview='failed', preview_error=?, fetched_at=? WHERE id=?",
+                      (res["error"][:40], ts, bid))
         else:
-            c.execute("""UPDATE bookmarks SET preview='ok', preview_error='', fetched_at=?, updated_at=?,
+            c.execute("""UPDATE bookmarks SET preview='ok', preview_error='', fetched_at=?,
                          title=CASE WHEN title='' THEN ? ELSE title END, description=CASE WHEN description='' THEN ? ELSE description END,
                          site=CASE WHEN ?<>'' THEN ? ELSE site END, text=CASE WHEN ?<>'' THEN ? ELSE text END,
                          image_url=CASE WHEN ?<>'' THEN ? ELSE image_url END, image=CASE WHEN ?<>'' THEN ? ELSE image END,
                          image_mime=CASE WHEN ?<>'' THEN ? ELSE image_mime END WHERE id=?""",
-                      (ts, ts, res.get("title", ""), res.get("description", ""), res.get("site", ""), res.get("site", ""),
+                      (ts, res.get("title", ""), res.get("description", ""), res.get("site", ""), res.get("site", ""),
                        res.get("text", ""), res.get("text", ""), res.get("image_url", ""), res.get("image_url", ""), rel, rel,
                        img[1] if img else "", img[1] if img else "", bid))
         c.commit()
