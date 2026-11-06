@@ -65,8 +65,9 @@ def shp_pdf(c, sheet, opts):
     res = sh_eval(c, sheet, book, me())
     rows = _ids(opts.get("rows"), book.row_idx, "rows")
     cols = _ids(opts.get("cols"), book.col_idx, "cols")
-    rows = [r for r in book.rows if rows is None or r["id"] in set(rows)]
-    cols = [col for col in book.cols if cols is None or col["id"] in set(cols)]
+    rset, cset = set(rows or ()), set(cols or ())
+    rows = [r for r in book.rows if rows is None or r["id"] in rset]
+    cols = [col for col in book.cols if cols is None or col["id"] in cset]
     if not rows or not cols:
         raise BadInput(tr("Nothing to print"))
     land, fit = opts.get("orient") == "landscape", bool(opts.get("fit", True))
