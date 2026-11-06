@@ -1424,7 +1424,6 @@ POST /api/layouts/offers/{}/decline
 POST /api/layouts/saved
 POST /api/layouts/saved/standard
 POST /api/layouts/saved/{}/activate
-POST /api/life/contracts
 POST /api/life/karakeep/sync
 POST /api/life/upkeep
 POST /api/list-checks/{}/run
