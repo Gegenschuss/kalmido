@@ -168,19 +168,29 @@ def tf_euer(c, oid, year):
                 vat_paid=dstr(paid), vat_refund=dstr(refund), missing_vat=d["missing_vat"], notes=notes)
 
 
-def tf_advance(c, oid, year, s):
-    """(sum of the advance payments of a year, rhythm of the tax dates): the figures of each month / quarter as Kalmido computes
-    them; the rhythm "year" has none, "none" is unknown (0, the note says so)."""
+def tf_periods(c, oid, year, s):
+    """2.589.0 (#3458): (rhythm of the tax dates, [bk_ustva of each month / quarter]) -- the advance returns of a year as Kalmido
+    computes them, shared by tf_advance and the tax check (office/taxcheck.py); "year" and "none" have none."""
     mode = txd_clean(s)["ustva"]
+    if s.get("small_business"):
+        return mode, []
     periods = {"month": [f"m{m:02d}" for m in range(1, 13)], "quarter": ["q1", "q2", "q3", "q4"]}.get(mode, [])
-    return sum((dec(bk_ustva(c, oid, year, p)["kz"]["83"]) for p in periods), Decimal(0)), mode
+    return mode, [bk_ustva(c, oid, year, p) for p in periods]
 
 
-def tf_ust(c, oid, year):
+def tf_advance(c, oid, year, s, vas=None):
+    """(sum of the advance payments of a year, rhythm of the tax dates): the figures of each month / quarter as Kalmido computes
+    them; the rhythm "year" has none, "none" is unknown (0, the note says so). vas: tf_periods computed before (2.589.0, #3458)."""
+    mode, vas = (txd_clean(s)["ustva"], vas) if vas is not None else tf_periods(c, oid, year, s)
+    return sum((dec(v["kz"]["83"]) for v in vas), Decimal(0)), mode
+
+
+def tf_ust(c, oid, year, vas=None, yd=None):
     """The annual VAT return of a year: {year, known, small_business, basis, basis_code (Kz 133), rows: [{key, line, kz, label, amount,
-    base (whole euros) and tax where the form has both, sum}], notes}; a small business or a year without a table: no rows, a note."""
+    base (whole euros) and tax where the form has both, sum}], notes}; a small business or a year without a table: no rows, a note.
+    2.589.0 (#3458): vas (tf_periods) and yd (bk_ustva of the year) when the caller computed them already (the tax check)."""
     s = office_settings(c, oid)
-    d = bk_ustva(c, oid, year, "y")
+    d = yd if yd is not None else bk_ustva(c, oid, year, "y")
     head = {"year": year, "currency": d["currency"], "small_business": bool(d.get("small_business")), "basis": d["basis"]}
     notes = [tr(BK_NOTE), tr(TF_NOTE)]
     if year not in TF_UST:
@@ -190,7 +200,7 @@ def tf_ust(c, oid, year):
     z, t = d["kz"], TF_UST[year]
     tax = dec(d["tax"]["19"]) + dec(d["tax"]["7"]) + dec(z["36"])
     pre = dec(z["66"])
-    adv, mode = tf_advance(c, oid, year, s)
+    adv, mode = tf_advance(c, oid, year, s, vas)
     due = tax - pre
     rows = []
 
