@@ -126,6 +126,9 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
     check(name, '390: the open view in the bar');
     const fit = await ev(`(() => { const b = document.querySelector('.dcv-name').getBoundingClientRect(); return {r: Math.round(b.right), sw: document.documentElement.scrollWidth, vw: window.innerWidth}; })()`);
     check(fit && fit.r <= fit.vw && fit.sw <= fit.vw, '390: the view\'s button inside the screen, no sideways scrolling ' + JSON.stringify(fit));
+    const nm = await ev(`(() => { const s = document.querySelector('.dcv-name > span:not(.dcv-dirty)'); const r = s.getBoundingClientRect(); return {w: Math.round(r.width), t: s.textContent}; })()`);
+    check(nm && nm.w > 20 && nm.t === 'Koala invoices', '390: the open view shows its name (not the symbol alone) ' + JSON.stringify(nm));
+    await u(`!!document.querySelector('.dc-grid') || /No documents/.test(document.querySelector('#view')?.textContent || '')`, {timeout: 20000});
     await shot('p2579c-390-view.png');
   }, true);
 

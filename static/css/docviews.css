@@ -3,3 +3,8 @@
 .dcv-cur .dcv-name span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:12rem}
 .dcv-dirty{margin-left:2px;color:var(--accent)}
 .sbbi .dcv-all{display:inline-flex;margin-left:auto;opacity:.6}
+/* phones: the bar shows its buttons as symbols only (docs.css) -- the open view keeps its name, cut short */
+@media (max-width:767px) {
+  .dc-bar .dcv-cur .dcv-name>span:not(.dcv-dirty){position:static;width:auto;height:auto;overflow:hidden;clip:auto;clip-path:none;max-width:9rem}
+  .dc-bar .dcv-cur .dcv-name{padding:0 .6rem}
+}
