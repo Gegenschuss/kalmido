@@ -781,8 +781,9 @@ def openapi_spec():
                                     [q("from", "First day (default: 6 days ago)", date_s), q("to", "Last day (default: today)", date_s),
                                      q("scope", "mine (default) or all (everyone in shared projects)", {"type": "string", "enum": ["mine", "all"]}),
                                      q("list_id", "Only this project", {"type": "integer"}), q("task_id", "Only this task", {"type": "integer"}), limit, cursor],
-                                    desc="2.582.0: an agent token needs the scope time (x-kalmido-agent-scope); scope=all shows other people's entries "
-                                         "only in the projects whose owner / admin the agent is and the person who set it up is too."),
+                                    desc="2.582.0: an agent token needs the scope time (x-kalmido-agent-scope); scope=all (with task_id too) shows other people's entries "
+                                         "only in the projects whose owner / admin the agent is and the person who set it up is too; a team agent "
+                                         "(set up by nobody, or its person's account was deleted): where the agent is; the person's account disabled: none."),
                                     "x-kalmido-agent-scope": "time"},  # 2.582.0 (#4380, audit #2483 M3)
                           "post": op("Add a time entry", TI, ok(ref("TimeEntry"), "Created", "201") | errs("400", "403", "404"),
                                      body=ref("TimeEntryInput"), scope="write")},

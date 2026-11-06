@@ -5,7 +5,7 @@ import math
 import re
 import time
 from datetime import date, datetime, timedelta, timezone
-from flask import g, jsonify, request, Response
+from flask import g, has_request_context, jsonify, request, Response
 
 from ..core.config import app, PUBLIC_URL, TZ
 from ..core.pg import IntegrityError, insert_id, Row
@@ -128,13 +128,38 @@ def n43_admin_lists(c, uid):
     """2.63.0 (#1523): ids of the lists in which uid sees everyone's time entries: lists they own, lists where they are an
     admin (MANAGE_ROLES) and the lists of organisations they administer. None = no limit (the callers' own choice).
     2.582.0 (#4380, audit #2483 M3): no exception for agents any more - an agent sees everyone's entries only in the lists
-    where it is such an admin itself AND the person who set it up (agents.owner_id) is one too, never more than that person."""
+    where it is such an admin itself AND the person who set it up (agents.owner_id) is one too, never more than that person.
+    2.582.0 (fable review F4, F7): agent_row only for an agent (the signed-in account by its kind, no query for a person);
+    a team agent (owner_id NULL, also after its owner's account was deleted) keeps its own admin rights only; a disabled
+    owner gives an empty set (their old rights count no more)."""
     from ..agents.core import agent_row
     ids = n43_admin_ids(c, uid)
+    u = getattr(g, "user", None) if has_request_context() else None
+    if u is not None and _uid_of(u) == uid and (_kind_of(u) or "user") != "agent":
+        return ids
     a = agent_row(c, uid)
     if a is not None and a["owner_id"]:
+        o = c.execute("SELECT disabled FROM users WHERE id=?", (a["owner_id"],)).fetchone()
+        if not o or o[0]:
+            return set()
         ids &= n43_admin_ids(c, a["owner_id"])
     return ids
+
+
+def _uid_of(u):
+    """2.582.0 (#4380, fable review F7): the id of a user row / dict, None when it has none."""
+    try:
+        return u["id"]
+    except (KeyError, IndexError, TypeError):
+        return None
+
+
+def _kind_of(u):
+    """2.582.0 (#4380, fable review F7): the kind of a user row / dict (user | agent | ...), None when it has none."""
+    try:
+        return u["kind"]
+    except (KeyError, IndexError, TypeError):
+        return None
 
 
 def n43_admin_ids(c, uid):

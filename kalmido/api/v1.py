@@ -1677,8 +1677,9 @@ def v1_time_entries():
          "scope": a.get("scope", "mine")}
     if a.get("task_id"):
         q["task_id"] = str(as_int(a["task_id"], "task_id", 1))
-    # 2.63.0 (#1523): as /api/time/entries (the entries of one task: unchanged); 2.582.0 (#4380): agents no longer unlimited
-    rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") else n43_admin_lists(c, uid))
+    # 2.63.0 (#1523): as /api/time/entries (the entries of one task: unchanged); 2.582.0 (#4380): agents no longer unlimited,
+    # 2.582.0 (fable review F1): for an agent the limit holds with task_id too (a person's task view stays everyone's)
+    rows, _, _, _ = time_rows(c, uid, q, own=None if q.get("task_id") and (g.user["kind"] or "user") != "agent" else n43_admin_lists(c, uid))
     vis, ref, rm = vis_ids(c, uid), now_utc(), time_rounding(usettings(c, uid))
     out = [entry_out(r, uid, vis, ref, rm) for r in rows]
     if a.get("list_id"):
