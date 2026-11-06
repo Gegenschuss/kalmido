@@ -17,6 +17,7 @@ const nav_up = (t, sel) => /** @type {HTMLElement|null} */ (/** @type {HTMLEleme
 /** @param {Element|null|undefined} el */
 const nav_focus = el => /** @type {HTMLElement|null} */ (el || null)?.focus({preventScroll: true});
 
+let NAV_Q = Promise.resolve();  // the last write of nav_menus (nav_write): the next one waits for it
 // write the person's arrangement of one menu (fn changes {order, hidden, shown}); one undo step
 /** @param {string} area @param {(m: {order: string[], hidden: Set<string>, shown: Set<string>}) => void} fn @param {string} label */
 function nav_write(area, fn, label) {
@@ -26,7 +27,9 @@ function nav_write(area, fn, label) {
   o1[area] = {order: m.order, hidden: [...m.hidden], shown: [...m.shown]};
   for (const k of ['order', 'hidden', 'shown']) if (!o1[area][k].length) delete o1[area][k];
   if (!Object.keys(o1[area]).length) delete o1[area];
-  const put = o => async () => { const v = JSON.stringify(o); S.settings.nav_menus = v; render(); await api('PATCH', '/api/settings', {nav_menus: v}); return {}; };
+  // #3506 (CI red of 2.563.1, p2276_a_ui): the writes go one after the other -- Minus and Plus pressed quickly were two requests
+  // at once, the server could store the Minus last and the point stayed hidden on the next sign-in
+  const put = o => async () => { const v = JSON.stringify(o); S.settings.nav_menus = v; render(); const q = NAV_Q.then(() => api('PATCH', '/api/settings', {nav_menus: v})); NAV_Q = q.catch(() => {}); await q; return {}; };
   const from = JSON.stringify(o0), to = JSON.stringify(o1); if (from === to) return Promise.resolve();
   return put(o1)().then(() => offerUndo(label, histAdd({label, undo: put(o0), redo: put(o1)})), () => { S.settings.nav_menus = from; render(); });
 }
