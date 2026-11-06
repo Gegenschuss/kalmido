@@ -12,7 +12,7 @@
 //       values of a checkbox field, the field action the value input of a number field.
 // ---- swimlanes (Firefox, the real layout):
 // #2060 (#2033): Kanban swimlanes. The button above the board picks the lanes (none / person / priority / a select or
-// checkbox field); none = the board as before. With priority: all four lanes, the cards in the lane of their priority and
+// checkbox field); none = the board as before. With priority: all five lanes (Urgent since 2.574.0), the cards in the lane of their priority and
 // the column of their section, the column heads (with their menu) once on top. A card dropped into another lane and
 // column takes over both (one undo step puts both back); "+ Task" in a lane creates the task with the lane's value; a
 // lane folds and stays folded; the choice is remembered after a reload. Lanes by field and by person set the field / the
@@ -262,8 +262,9 @@ async function part_swimlanes() {
     const items = await pick(ev, '/^Priority$/');
     check(['None', 'Person', 'Priority', 'Stage'].every(x => items.includes(x)), `${tag}: the menu offers none, person, priority and the select field ` + JSON.stringify(items));
     const lanes = await ev(`[...document.querySelectorAll('#view .swlane')].map(l => l.dataset.swl + ':' + l.querySelector('.swln').textContent + ':' + l.querySelector('.swlh .c').textContent).join('|')`);
-    const want = theme === 'light' ? 'p5:High:1|p3:Medium:1|p1:Low:0|p0:No priority:1' : 'p5:High:1|p3:Medium:2|p1:Low:0|p0:No priority:1';  // (dark: + the task added in the light run)
-    check(lanes === want, `${tag}: four priority lanes, "No priority" last, with counts ` + lanes);
+    // 2.574.0 (#3376): Urgent (7) above High is a lane of its own, empty here
+    const want = theme === 'light' ? 'p7:Urgent:0|p5:High:1|p3:Medium:1|p1:Low:0|p0:No priority:1' : 'p7:Urgent:0|p5:High:1|p3:Medium:2|p1:Low:0|p0:No priority:1';  // (dark: + the task added in the light run)
+    check(lanes === want, `${tag}: five priority lanes (Urgent first), "No priority" last, with counts ` + lanes);
     check(await inCell(ev, T1, 'p5', S1) && await inCell(ev, T3, 'p3', S1) && await inCell(ev, T2, 'p0', S2), `${tag}: every card in the lane of its priority and the column of its section`);
     check(await ev(`document.querySelectorAll('#view .swlhrow .khead').length === 2 && document.querySelectorAll('#view .khead').length === 2 && !!document.querySelector('#view .swlhrow [data-act="section-menu"][data-id="${S1}"]')`), `${tag}: the column heads (with their menu) once, on top`);
     if (theme === 'dark') { await shot('p2138d-prio-1440-dark.png'); return; }
