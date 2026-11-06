@@ -129,7 +129,7 @@ ROUTES = {
     "PUT /api/v1/lists/{}/groups/{}": "change", "PUT /api/v1/lists/{}/links/order": "change",
     "PUT /api/v1/lists/{}/members/{}": "change", "PUT /api/v1/lists/{}/review": "change",
     "PUT /api/v1/lists/{}/sections/order": "change", "PUT /api/v1/lists/{}/status": "change",
-    "PUT /api/v1/lists/{}/status-pad": "change", "PUT /api/v1/sheets/{}/cells": "change",
+    "PUT /api/v1/lists/{}/status-pad": "change", "PUT /api/v1/sheets/{}/cells": "change", "PUT /api/v1/sheets/{}/rules": "change",  # 2.578.0 (#3462): colour rules of a table
     "PUT /api/v1/tasks/{}/waiting": "change",
     # 2.407.0 (#3513): the agent marks a task it works on -- its own status channel like typing, no approval card
     "POST /api/v1/tasks/{}/working": "meta", "PATCH /api/v1/tasks/{}/working": "meta", "DELETE /api/v1/tasks/{}/working": "meta",
