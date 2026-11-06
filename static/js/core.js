@@ -1650,7 +1650,11 @@ function parseHash() {
   if (SMART[a]) return {mod: 'tasks', key: a};
   return {mod: 'tasks', key: START_KEY};
 }
-function go(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
+function go(hash) {
+  if (typeof f8d_defer === 'function' && f8d_defer(() => goNow(hash))) return;  // #3506: after the Back of a closed menu on its way (backclose.js)
+  goNow(hash);
+}
+function goNow(hash) { if (location.hash !== '#' + hash) location.hash = hash; else route(); }
 async function route() {
   vm_leave();  // 2.413.0 A (#3439): the view left keeps its place (viewmem.js)
   const r = parseHash();

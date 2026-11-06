@@ -2,7 +2,7 @@
    instead of changing the route. While an overlay is open one history entry is pushed; Back pops it and closes the overlay,
    closing the overlay another way takes the entry away again. The popstate listener runs first (capture) and keeps the
    other popstate handlers (detail panel, shopping mode) from also reacting to that Back. */
-const f8d_bk = {pushed: false, skip: false, queued: false};
+const f8d_bk = {pushed: false, skip: false, queued: false, after: /** @type {Array<() => void>} */ ([]), t: 0};  // after / t: f8d_defer
 const f8d_open = () => {
   if ($('.palette:not(.an-out)')) return 'palette';
   if ($('.lightbox')) return 'lightbox';
@@ -32,8 +32,18 @@ function f8d_sync() {
   }
 }
 const f8d_queue = () => { if (!f8d_bk.queued) { f8d_bk.queued = true; setTimeout(f8d_sync, 0); } };
+// #3506 (CI red of 2.560.0 - 2.563.1, p2441_favs_ui): a route change while our own history.back() is still on its way
+// (a tile tapped right after its menu closed) was taken back by that Back when it landed: the app stayed on the old page.
+// go() waits for the Back (f8d_defer) and then changes the route; at most F8D_WAIT ms, should the Back never arrive.
+const F8D_WAIT = 600;
+function f8d_flush() { clearTimeout(f8d_bk.t); f8d_bk.t = 0; for (const f of f8d_bk.after.splice(0)) f(); }
+function f8d_defer(fn) {
+  if (!f8d_bk.skip) return false;
+  f8d_bk.after.push(fn); if (!f8d_bk.t) f8d_bk.t = setTimeout(f8d_flush, F8D_WAIT);
+  return true;
+}
 window.addEventListener('popstate', e => {
-  if (f8d_bk.skip) { f8d_bk.skip = false; e.stopImmediatePropagation(); f8d_queue(); return; }
+  if (f8d_bk.skip) { f8d_bk.skip = false; e.stopImmediatePropagation(); f8d_queue(); if (f8d_bk.after.length) setTimeout(f8d_flush, 0); return; }
   if (f8d_bk.pushed && !history.state?.f8d) { f8d_bk.pushed = false; e.stopImmediatePropagation(); f8d_closeTop(); f8d_queue(); }
 }, true);
 if (typeof isTouch === 'function' && isTouch()) {
