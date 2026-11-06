@@ -65,7 +65,7 @@ r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "undo"})
 check(r.ok and cli() == ("First", "DE987654321", 30), f"undo: the note goes back, the invoicing fields stay ({r.status_code} {cli()} {r.text[:160]})")
 r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "redo"})
 check(r.ok and cli() == ("Second", "DE987654321", 30), f"redo: the note again, the invoicing fields untouched ({r.status_code} {cli()})")
-check(A.put(B + f"{R}/people/{BOB}", json={"groups": []}).ok, "alice takes bob out of the groups again")
+check(A.put(B + f"{R}/people/{BOB}", json={"groups": ["tpl:legacy"]}).ok, "alice gives bob his previous access again (tpl:legacy)")
 r = Bo.post(B + O + f"/undo/client/{CL}", json={"sess": TOK, "op": "undo"})
 check(r.ok and cli() == ("First", "DE123456789", 14), f"with the right back: the undo puts the invoicing fields back too ({r.status_code} {cli()})")
 

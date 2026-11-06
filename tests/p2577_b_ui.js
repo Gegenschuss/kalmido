@@ -52,9 +52,11 @@ const svc = async sp => ((await call('GET', '/api/office/services', null, CK, {'
   w.eval("enqueue('POST', '/api/office/services', {name_de: 'Queued in Alpha'}); S.route = {...S.route, wsp: 'org:" + Bo + "'};");
   check(await until(async () => (await svc(WA)).includes('Queued in Alpha')), 'the waiting change goes out into Alpha ' + (await svc(WA)));
   check(!(await svc(WB)).includes('Queued in Alpha'), 'never into the area open when it goes out');
-  w.history.back(); w.history.back();
-  check(await until(() => w.location.hash === '#office' && rows(d) === `private,${WA},${WB}`), 'Back leads to the overview ' + w.location.hash);
-  d.querySelector('#view .spov [data-spov="private"]').click();
+  w.history.back();
+  check(await until(() => w.location.hash === '#office/s/' + WA), 'Back: the area\'s start ' + w.location.hash);
+  w.history.back();
+  check(await until(() => w.location.hash === '#office' && rows(d) === `private,${WA},${WB}`), 'Back again leads to the overview ' + w.location.hash);
+  d.querySelector('#view .spov [data-spov="private"]')?.click();
   check(await until(() => w.location.hash === '#office/s/private' && w.eval('OFC.info && OFC.info.personal')), 'Private: the personal office at its own address ' + w.location.hash);
   w.close();
 
