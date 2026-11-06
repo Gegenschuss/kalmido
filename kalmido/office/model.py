@@ -1425,6 +1425,9 @@ def office_update(c, oid, kind, rid, b):
     if kind == "equipment" and "receipt_node_id" in sets and r.get("receipt_node_id"):  # 2.490.0 (#3796): swapping the receipt
         from ..receipts.suggest import olk_rc_keep  # keeps the old one's lock (olk_fs_locked reads the equipment live)
         olk_rc_keep(c, r["receipt_node_id"])
+    if kind == "equipment" and "archived" in sets and vals[sets.index("archived")] and not r.get("archived") and r.get("receipt_node_id"):
+        from ..receipts.suggest import olk_rc_keep  # 2.578.0 (#4035): archiving keeps the lock running now (this year) like deleting
+        olk_rc_keep(c, r["receipt_node_id"])
     if m.get("kind"):  # 2.47.0 (#1649)
         _sr_costs(c, oid, sets, vals, {f: r.get(f) for f in SR_COSTS})
     _md_crypt(c, oid, kind, sets, vals)
@@ -1529,6 +1532,9 @@ def office_delete(c, oid, kind, rid):
         from .eqcare import eqc_end
         eqc_end(c, oid, r["id"])
     if office_in_use(c, kind, r["id"], oid):
+        if kind == "equipment" and r.get("receipt_node_id") and not r.get("archived"):  # 2.578.0 (#4035): archiving instead
+            from ..receipts.suggest import olk_rc_keep  # of deleting keeps the receipt's lock running now, like deleting
+            olk_rc_keep(c, r["receipt_node_id"])
         c.execute(f"UPDATE {m['table']} SET archived=1 WHERE id=? AND org_id=?", (r["id"], oid))
         return "archived"
     from .otrash import otb_put  # 2.272.0 E2 (#3038): into the office trash first (restore); circular (otrash reads office_ctx)

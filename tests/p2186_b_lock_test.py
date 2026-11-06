@@ -7,6 +7,7 @@ freelancer-matrix: office
  - #2600 removing the VAT rate / the payment day keeps the lock (doc_meta.kept_until); the books count only what is booked now
  - #2600 the lock also covers a receipt of the cash book, of the equipment list and one billed on a finalised invoice
  - #3796 deleting an item of the equipment list or swapping its receipt keeps the old receipt's lock
+ - #4035 archiving an item (API or the delete of an item in use) keeps its receipt's lock too
  - #4034 purging a receipt swapped out of an item (no lock running) while a recognition run is busy: 200, no deadlock
  - #2600 the version clean-up (more than 20 versions) leaves every version of a booked receipt alone
  - #2601 the running month cannot be closed (400), a past one can
@@ -203,6 +204,24 @@ check(r.ok, "#3796: the item deleted " + r.text[:200])
 check(not sql("SELECT 1 FROM office_equipment WHERE id=?", (it2.json()["id"],)), "#3796: the item is gone (not archived)")
 r = purge(A, R_E3)
 check(r.status_code == 409 and "Kept by law until" in r.text, "#3796: the receipt of a deleted item keeps its lock " + r.text[:200])
+# 2.578.0 (#4035): archiving an item (by the API, and the delete that archives an item in use) keeps the lock running now
+# like deleting; before, the archived item counted only purchase year + useful life (2013, 36 months: over -> purgeable).
+# 2013, not 2015 of the brief: with the law + 1 year buffer (#4595) a 2015 item's own period still runs, the test would not bite
+R_E6, R_E7 = (receipt(A, WSO, f"anlage{i}.pdf", 19) for i in (6, 7))
+it6 = A.post(B + EQ, json={"name": "Blitz", "purchase_date": "2013-02-01", "life_months": 36, "receipt_node_id": R_E6})
+it7 = A.post(B + EQ, json={"name": "Funke", "purchase_date": "2013-02-01", "life_months": 36, "receipt_node_id": R_E7})
+check(it6.status_code in (200, 201) and it7.status_code in (200, 201), "#4035: two items of 2013 " + it6.text[:200] + it7.text[:200])
+sql("DELETE FROM rc_receipts WHERE node_id IN (?,?)", (R_E6, R_E7), write=True)  # only the equipment list keeps them now
+r = A.patch(B + f"{EQ}/{it6.json()['id']}", json={"archived": 1})
+check(r.ok and sql("SELECT archived FROM office_equipment WHERE id=?", (it6.json()["id"],)) == [(1,)], "#4035: the item archived " + r.text[:200])
+r = purge(A, R_E6)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#4035: the receipt of an item archived by the API keeps its lock " + r.text[:200])
+sql("INSERT INTO office_sets(org_id, name, items, created_at, updated_at) VALUES(?,?,?,?,?)",
+    (ORG, "Satz", '[{"equipment_id": %d}]' % it7.json()["id"], ts, ts), write=True)  # in use: delete archives it
+r = A.delete(B + f"{EQ}/{it7.json()['id']}")
+check(r.ok and sql("SELECT archived FROM office_equipment WHERE id=?", (it7.json()["id"],)) == [(1,)], "#4035: the item in use archived " + r.text[:200])
+r = purge(A, R_E7)
+check(r.status_code == 409 and "Kept by law until" in r.text, "#4035: the receipt of an item archived instead of deleted keeps its lock " + r.text[:200])
 # 2.493.0 (#4034): a receipt swapped out of an item, no lock running (the swap fell after its period), is purged for good
 # with 200 - also while a recognition run of it is busy: the run writes the document row first, then a row that needs the
 # node (here fs_log, like its tags / index); the purge used to take the node row first -> deadlock, 500. Now the purge locks
@@ -329,6 +348,13 @@ sql("DELETE FROM rc_receipts WHERE node_id=?", (F_E,), write=True)
 check(Fr.delete(B + f"{EQ}/{fit.json()['id']}").ok, "freelancer #3796: the item deleted")
 r = purge(Fr, F_E)
 check(r.status_code == 409 and "Kept by law until" in r.text, "freelancer #3796: the receipt keeps its lock " + r.text[:200])
+F_E2 = receipt(Fr, "private", "frei-anlage2.pdf", "19")  # 2.578.0 (#4035): archiving keeps the lock in the personal office too
+fit2 = Fr.post(B + EQ, json={"name": "Licht", "purchase_date": "2013-02-01", "life_months": 36, "receipt_node_id": F_E2})
+check(fit2.status_code in (200, 201), "freelancer #4035: an item of 2013 " + fit2.text[:200])
+sql("DELETE FROM rc_receipts WHERE node_id=?", (F_E2,), write=True)
+check(Fr.patch(B + f"{EQ}/{fit2.json()['id']}", json={"archived": 1}).ok, "freelancer #4035: the item archived")
+r = purge(Fr, F_E2)
+check(r.status_code == 409 and "Kept by law until" in r.text, "freelancer #4035: the receipt of an archived item keeps its lock " + r.text[:200])
 FV = Fr.post(B + V, json={"name": "Rad", "kind": "private", "odo_start": "0"}).json()["id"]
 r = Fr.post(B + LB + "/close", json={"month": TODAY.isoformat()[:7], "vehicle_id": FV})
 check(r.status_code == 400 and "Only past months" in r.text, "freelancer #2601: the running month cannot be closed (400) " + r.text[:160])
