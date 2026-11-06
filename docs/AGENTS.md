@@ -3867,7 +3867,8 @@ with the scope it needs). The tools:
   `close: true` also closes it as won't do with a comment "Duplicate of #X", the person can undo it in the app), `remove_relation`;
   only relations whose other task you may see, also in a task's `relations` (`[{id, kind}]`, kind `relates` / `duplicate_of` /
   `has_duplicate`; `GET/POST /api/v1/tasks/{id}/relations`, `DELETE /api/v1/tasks/{id}/relations/{other_id}`). `related_tasks`
-  stays the computed suggestion; its items carry `saved` when the relation is saved already
+  stays the computed suggestion; its items carry `saved` when the relation is saved already; at most 50 relations per task,
+  counted for both tasks (400 "At most 50 relations per task" when either is full)
 - dependencies and fields: `get_dependencies`, `add_dependency`, `related_tasks`, `remove_dependency`, `list_fields`, `create_field`,
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every project; creating a field or
   showing it with `set_list_columns` switches the module *Custom fields* on for the project's owner, the answer's `modules_on` names it;
