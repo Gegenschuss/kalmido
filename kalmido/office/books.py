@@ -60,6 +60,7 @@ from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from fu
 from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
+from .euerbasis import EB_MISSING, eb_basis_of, eb_flows, eb_income_payment_ids  # 2.603.0 (#4927): the basis of the EUeR per year
 
 
 def _j(s):
@@ -123,7 +124,7 @@ def _uid_filter(uid):
 
 
 # ---------------------------------------------------------------- receipts (contract with part B)
-def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
+def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
     """The receipts of office area oid in [frm, to] (ISO days, both included) ->
     [{node_id, date, amount (Decimal gross, office currency), vat_pct, net, vat, category, title, paid_at, doc_date, checked_at,
     checked_by (2.420.0 C, #3448: a person's tick, the user id)}].
@@ -131,25 +132,39 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
     by="paid": the day = paid_at, else the document date (cash principle, the EUeR); by="doc": the document date, else
     paid_at (input tax). uid: only documents this person sees (default: the signed-in person; 0 = all, for jobs).
     2.356.0 (#3097): gaps = a dict the exports fill with what they leave out: "no_amount" / "no_date" ([titles] of receipts
-    this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open)."""
+    this person sees: no amount in the period, no date at all) and "hidden" (count of receipts in folders uid cannot open).
+    2.603.0 (#4927): paid = {node id: {day, amount, src, ref}} of the strict basis (office/euerbasis.py eb_flows): only these
+    receipts, on the day of their bank / card / cash line and with its amount as the gross (frm / to: the caller's flows);
+    each row then carries "src" / "ref" (the line)."""
     from ..docs.store import doc_opener  # 2.546.0 (#4186)
     ws = bk_ws(c, oid)
     s = office_settings(c, oid)
     uid = _uid_filter(uid)
     day = "COALESCE(NULLIF(r.paid_at, ''), d.doc_date)" if by == "paid" else "COALESCE(NULLIF(d.doc_date, ''), NULLIF(r.paid_at, ''))"
-    rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
-                     f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
-                     f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
-                     (ws, frm, to)).fetchall()
+    if paid is not None:  # 2.603.0 (#4927): the receipts of the strict basis, whatever their own days say
+        ids = sorted(paid)[:20000] or [0]
+        rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
+                         f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+                         f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND r.node_id IN ({','.join('?' * len(ids))})",
+                         (ws, *ids)).fetchall()
+        rows = sorted(rows, key=lambda r: (paid[r["node_id"]]["day"], r["node_id"]))
+    else:
+        rows = c.execute(f"SELECT r.node_id, r.vat_pct, r.rc13b, r.paid_at, r.checked_at, r.checked_by, r.category, d.doc_date, d.amount, d.currency, d.ws, n.name, "
+                         f"{day} AS day FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
+                         f"WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND {day}>=? AND {day}<=? ORDER BY {day}, r.node_id",
+                         (ws, frm, to)).fetchall()
     out, amts, opener = [], {}, {}
     for r in rows:  # 2.546.0 (#4186): the amounts first (key read once), then trash and rights of the rest in one go (fs_roles_many)
         if r["ws"] not in opener:
             opener[r["ws"]] = doc_opener(c, r["ws"], "doc_meta.amount")
         raw = opener[r["ws"]](r["amount"]) or ""
         amts[r["node_id"]] = dec(raw, "0") if raw else dec(0)
-    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0 or gaps is not None], uid)
+    acc = fs_roles_many(c, [i for i, a in amts.items() if a != 0 or gaps is not None or (paid is not None and paid[i].get("amount"))], uid)
     for r in rows:
         a = amts[r["node_id"]]
+        pl = paid.get(r["node_id"]) if paid is not None else None
+        if pl is not None and pl.get("amount"):
+            a = pl["amount"]  # 2.603.0 (#4927): the line's amount (home currency) is the gross
         if a == 0 and gaps is None:
             continue
         if acc[r["node_id"]][0]:
@@ -162,6 +177,8 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
             gaps.setdefault("no_amount", []).append(r["name"] or "")
             continue
         cur, rate = bk_home_rate(r["currency"], s)
+        if pl is not None and pl.get("amount"):
+            cur, rate = hc_home(s), 1  # 2.603.0 (#4927): the bank / card / cash line is in the home currency already
         gross = money(a / rate if rate else a)
         vat_pct = r["vat_pct"] if r["vat_pct"] in BK_VAT else None
         rc13b = r["rc13b"] if r["rc13b"] in BK_RC13B else ""
@@ -170,11 +187,12 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None):
             rc13b_pct = "7" if vat_pct == "7" else "19"  # owes it at its own rate: 7 when chosen, else 19 (bk_ustva 47 / 85 = 67)
             vat_pct = "0"
         net, vat = _split(gross, vat_pct)
-        out.append({"node_id": r["node_id"], "date": r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
+        out.append({"node_id": r["node_id"], "date": pl["day"] if pl is not None else r["day"], "amount": gross, "vat_pct": vat_pct, "net": net, "vat": vat,
                     "rc13b": rc13b, "rc13b_pct": rc13b_pct,
                     "category": r["category"] or "", "title": r["name"] or "", "paid_at": r["paid_at"], "doc_date": r["doc_date"],
                     "unrated": cur if rate is None else None,  # 2.189.0 B (#2475): a foreign receipt without office rate
-                    "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None})  # 2.420.0 C (#3448)
+                    "checked_at": r["checked_at"], "checked_by": r["checked_by"] if r["checked_at"] else None,  # 2.420.0 C (#3448)
+                    **({"src": pl["src"], "ref": pl["ref"]} if pl is not None else {})})  # 2.603.0 (#4927)
     if gaps is not None:  # 2.356.0 (#3097): receipts without any date belong to no period -- every export names them
         undated = c.execute("SELECT r.node_id, n.name FROM rc_receipts r JOIN doc_meta d ON d.node_id=r.node_id JOIN fs_nodes n ON n.id=r.node_id "
                            "WHERE d.ws=? AND n.kind='file' AND n.deleted_at IS NULL AND COALESCE(NULLIF(r.paid_at, ''), NULLIF(d.doc_date, '')) IS NULL "
@@ -289,7 +307,8 @@ def _income_label(key):
         return tr("Revenue {0} % VAT", key[3:])
     return {"small": tr("Revenue (small business)"), "reverse": tr("Tax-free revenue / reverse charge"),
             "abroad": tr("Tax-free revenue / reverse charge"), "exempt": tr("Tax-free revenue / reverse charge"),
-            "fee": tr("Reminder fees received (not taxable)")}[key]  # 2.545.0 (#4387)
+            "fee": tr("Reminder fees received (not taxable)"),  # 2.545.0 (#4387)
+            "bank": tr("Money received without invoice")}[key]  # 2.603.0 (#4927): the strict basis
 
 
 def bk_reverse_key(c, oid, r, memo):
@@ -398,7 +417,15 @@ def bk_euer(c, oid, year):
     small = bool(s.get("small_business"))
     y0, y1 = f"{year}-01-01", f"{year}-12-31"
     inc = {}
+    # 2.603.0 (#4927): the basis "bank" (strict): only what flowed through the bank, the cash book or a card (office/euerbasis.py)
+    strict = eb_basis_of(s, year) == "bank"
+    flows = eb_flows(c, oid, y0, y1) if strict else None
+    inc_ids = eb_income_payment_ids(c, oid) if strict else None
+    pay_outside = 0
     for p, r in bk_payments(c, oid, y0, y1, home):
+        if strict and p["id"] not in inc_ids:
+            pay_outside += 1  # (6) a payment typed by hand without its bank / cash booking does not count
+            continue
         for k, gross, net, vat in _pay_parts(p, r, home):
             k = "exempt" if k in ("reverse", "abroad", "eu_goods", "export") else k  # 2.355.0 C (#2844): + goods
             x = inc.setdefault(k, [Decimal(0)] * 3)
@@ -406,6 +433,9 @@ def bk_euer(c, oid, year):
     for f in bk_fees_paid(c, oid, y0, y1, home):  # 2.545.0 (#4387): paid reminder fees, without VAT
         x = inc.setdefault("fee", [Decimal(0)] * 3)
         x[0], x[2] = x[0] + f["amount"], x[2] + f["amount"]
+    for t in (flows["income_open"] if strict else []):  # 2.603.0 (#4927): money received that no invoice matched (warning)
+        x = inc.setdefault("bank", [Decimal(0)] * 3)
+        x[0], x[2] = x[0] + t["amount"], x[2] + t["amount"]
     exp, missing, unrated = {}, 0, set()
     # 2.92.0 (#1931): equipment with a purchase price is depreciated (office/assets.py ast_afa_year): the year's depreciation
     # is an expense of its own, the device's receipt counts only with its input tax (else the purchase would count twice).
@@ -414,7 +444,7 @@ def bk_euer(c, oid, year):
     if not small:
         from .assets import ast_afa_year
         afa = ast_afa_year(c, oid, year)
-    for rc in bk_receipts(c, oid, y0, y1):
+    for rc in (bk_receipts(c, oid, y0, y1, paid=flows["paid"]) if strict else bk_receipts(c, oid, y0, y1)):
         k = "c:" + rc["category"].casefold() if rc["category"] else "c:"
         x = exp.setdefault(k, {"label": rc["category"] or tr("Other"), "v": [Decimal(0)] * 3, "count": 0})
         if rc["node_id"] in afa["receipt_ids"]:
@@ -430,6 +460,10 @@ def bk_euer(c, oid, year):
         x = exp.setdefault("a:", {"label": tr("Depreciation"), "v": [Decimal(0)] * 3, "count": 0})
         x["v"] = [x["v"][0] + a_["amount"], x["v"][1], x["v"][2] + a_["amount"]]
         x["count"] += 1
+    for x in (flows["norc"] if strict else []):  # 2.603.0 (#4927): (2) bank / cash / card lines without a receipt: gross, no input tax
+        k = exp.setdefault("b:", {"label": tr("Bookings without receipt"), "v": [Decimal(0)] * 3, "count": 0})
+        k["v"] = [k["v"][0] + x["amount"], k["v"][1], k["v"][2] + x["amount"]]
+        k["count"] += 1
     # 2.536.0 (#4334): card fees and interest without a receipt, as the DATEV export books them (office/cardnorc.py; no input tax)
     from .cardnorc import cc_norc_lines
     for x in cc_norc_lines(c, oid, y0, y1):
@@ -455,6 +489,8 @@ def bk_euer(c, oid, year):
         exp["km"] = {"label": tr("Mileage allowance"), "v": [km["amount"], Decimal(0), km["amount"]], "count": km["count"]}
     # 2.534.0 (#4333): the approved entertainment receipts (office/meals.py): 70 % as an expense, the input tax in full
     meals = ofc_meals_home(c, oid, y0, y1, s)
+    if strict:  # 2.603.0 (#4927): (5) a meal counts only through its bank / cash / card line
+        meals = bk_meals_strict(c, oid, meals, flows, exp)
     meal_sum, meal_notes = None, []
     if meals:
         v, meal_sum = ofc_meals_euer(meals, small)
@@ -462,14 +498,14 @@ def bk_euer(c, oid, year):
         unrated |= {m["unrated"] for m in meals if m["unrated"]}
         meal_notes = [tr("Entertainment: {0} (30 %) are not deductible and are not in the expenses.",
                          pdf_money(meal_sum["not_deductible"], calc_lang(lang()), home)),
-                      tr(OFC_MEAL_TWICE)]
+                      tr(OFC_MEAL_STRICT if strict else OFC_MEAL_TWICE)]
         meal_sum["notes"] = meal_notes
     m2 = lambda v: dstr(money(v))  # noqa: E731
     order = lambda k: (0, -int(dec(k[3:]))) if k.startswith("vat") else ({"exempt": 1, "fee": 3}.get(k, 2), 0)  # noqa: E731
     income = [{"key": k, "label": _income_label(k), "net": m2(v[0]), "vat": m2(v[1]), "gross": m2(v[2])}
               for k, v in sorted(inc.items(), key=lambda kv: order(kv[0]))]
     expenses = [{"key": k, "label": x["label"], "net": m2(x["v"][0]), "vat": m2(x["v"][1]), "gross": m2(x["v"][2]), "count": x["count"]}
-                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "m:", kv[0] == "c:", kv[1]["label"].casefold()))]
+                for k, x in sorted(exp.items(), key=lambda kv: (kv[0] == "km", kv[0][:2] == "t:", kv[0] == "m:", kv[0] == "b:", kv[0] == "c:", kv[1]["label"].casefold()))]
     from .catacct import ca_euer
     expenses = ca_euer(c, oid, expenses)  # 2.121.0 (#2093): the account of each receipt category line
     tot = lambda rows, f: sum((dec(r[f]) for r in rows), Decimal(0))  # noqa: E731
@@ -483,13 +519,41 @@ def bk_euer(c, oid, year):
             "expense_total": {"net": m2(e_net), "vat": m2(tot(expenses, "vat")), "gross": m2(e_gross)},
             "profit": m2(profit), "missing_vat": 0 if small else missing, "tax_reserve_pct": pct,
             "tax_reserve": m2(profit * pct / 100) if pct and profit > 0 else "0.00",
-            "notes": [tr(BK_NOTE), tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]
+            "notes": [tr(BK_NOTE), tr(BK_STRICT_NOTE) if strict else tr("Income = payments received (cash principle); expenses = receipts and travel expenses.")]
             + ([tr("Mileage allowance from the logbook (business drives with a private car).")] if km["count"] else [])
             # 2.189.0 B (#2475): receipts in a foreign currency without an office rate count 1:1 in the home currency
             + [tr("Receipts in {0} without an exchange rate in the office settings count as {1}.", x, home) for x in sorted(unrated)]
             + meal_notes,  # 2.534.0 (#4333)
             "unrated": sorted(unrated), "meals": meal_sum,
-            "afa_no_receipt": afa["no_receipt"]}  # 2.536.0 (#4335): depreciated devices without a linked receipt (the client warns)
+            "afa_no_receipt": afa["no_receipt"],  # 2.536.0 (#4335): depreciated devices without a linked receipt (the client warns)
+            "basis": "bank" if strict else "receipts", "warnings": bk_strict_warnings(c, oid, y0, y1, flows, pay_outside) if strict else None}
+
+
+BK_STRICT_NOTE = N_("Basis: bank and cash (strict). Income = payments received through the bank or the cash book; expenses = the bookings of the bank, the cash book and the credit cards with their receipts. Depreciation, travel expenses and the mileage allowance count as before.")
+OFC_MEAL_STRICT = N_("Entertainment receipts count only through their bank, cash or card booking (their proof), never as an expense of their own.")
+BK_WARN_MAX = 200
+
+
+def bk_meals_strict(c, oid, meals, flows, exp):
+    """2.603.0 (#4927) point 5, the strict basis: the meals that hang on a bank / cash / card line of the period
+    (office_meals.pay_kind / pay_id); that line leaves the other expenses (its receipt or "without receipt"), the meal gives
+    its 70 / 30 split instead. A meal without a line does not count. -> the meals that count."""
+    return [m for m in meals if m.get("pay")]  # no link yet (step 4 of #4927)
+
+
+def bk_strict_warnings(c, oid, frm, to, flows, pay_outside):
+    """2.603.0 (#4927): what the strict basis warns about -> {missing_receipt: [{day, amount, src, ref, text}] (bookings
+    without a receipt, point 2), missing_count, income_open: [...] (money received without an invoice), card_diff: [...]
+    (a card total that differs from its statement, point 3), open_receipts (receipts of the period without a bank, cash or card
+    line: they do not count, point 1), payments_outside (invoice payments without a bank / cash booking, point 6)}."""
+    mis = [x for x in flows["norc"] if x["missing"]]
+    paid = flows["paid"]
+    opened = sum(1 for rc in bk_receipts(c, oid, frm, to) if rc["node_id"] not in paid)
+    row = lambda x: {"day": x["day"], "amount": dstr(money(x["amount"])), "src": x.get("src", "bank"), "ref": x["ref"], "text": x.get("text") or ""}  # noqa: E731
+    return {"missing_receipt": [row(x) for x in mis[:BK_WARN_MAX]], "missing_count": len(mis), "label": tr(EB_MISSING),
+            "income_open": [row(x) for x in flows["income_open"][:BK_WARN_MAX]],
+            "card_diff": [{"ref": x["ref"], "day": x["day"], "booking": dstr(x["booking"]), "statement": dstr(x["statement"])} for x in flows["card_diff"]],
+            "open_receipts": opened, "payments_outside": pay_outside}
 
 
 # ---------------------------------------------------------------- VAT return figures
@@ -527,9 +591,13 @@ def bk_ustva(c, oid, year, period):
     home = _home(s)
     frm, to = bk_period(year, period)
     basis = s.get("vat_basis") if s.get("vat_basis") in ("ist", "soll") else "ist"
-    head = {"year": year, "period": period, "from": frm, "to": to, "basis": basis, "currency": home, "note": tr(BK_NOTE)}
+    strict = eb_basis_of(s, year) == "bank"  # 2.603.0 (#4927): the strict basis of the EUeR also for the VAT figures
+    head = {"year": year, "period": period, "from": frm, "to": to, "basis": basis, "currency": home, "note": tr(BK_NOTE),
+            "euer_basis": "bank" if strict else "receipts"}
     if s.get("small_business"):
         return dict(head, small_business=True)
+    flows = eb_flows(c, oid, frm, to) if strict else None
+    inc_ids = eb_income_payment_ids(c, oid) if strict and basis == "ist" else None
     sums, items = {}, []
 
     memo = {}
@@ -542,6 +610,8 @@ def bk_ustva(c, oid, year, period):
 
     if basis == "ist":
         for p, r in bk_payments(c, oid, frm, to, home):
+            if inc_ids is not None and p["id"] not in inc_ids:
+                continue  # 2.603.0 (#4927): (6) only payments of a bank / cash booking
             gross_all = Decimal(0)
             for k, gross, net, vat in _pay_parts(p, r, home):
                 add(k, net, vat, r)
@@ -571,7 +641,8 @@ def bk_ustva(c, oid, year, period):
                           "source": "skonto"})
     kz66, missing = Decimal(0), 0
     r13 = {"eu": [Decimal(0), Decimal(0)], "other": [Decimal(0), Decimal(0)]}  # 2.545.0 (#4387): [base, tax] of 46 / 47, 84 / 85
-    for rc in bk_receipts(c, oid, frm, to, by="doc"):
+    # 2.603.0 (#4927): the strict basis: the input tax of the receipts with a bank / card / cash line, on the line's day
+    for rc in (bk_receipts(c, oid, frm, to, paid=flows["paid"]) if strict else bk_receipts(c, oid, frm, to, by="doc")):
         if rc["rc13b"]:
             x = r13[rc["rc13b"]]
             x[0], x[1] = x[0] + rc["net"], x[1] + money(rc["net"] * dec(rc["rc13b_pct"]) / 100)
@@ -591,7 +662,10 @@ def bk_ustva(c, oid, year, period):
             items.append({"kind": "travel", "trip_id": t["id"], "title": it.get("text") or rk_cat_label(it["category"] or "other"), "date": day,
                           "gross": dstr(gross), "vat": dstr(vat), "vat_pct": it["vat_pct"]})
     # 2.534.0 (#4333): the input tax of the approved entertainment receipts counts in full (by the day of the meal)
-    for m in ofc_meals_home(c, oid, frm, to, s):
+    meals = ofc_meals_home(c, oid, frm, to, s)
+    if strict:
+        meals = bk_meals_strict(c, oid, meals, flows, {})
+    for m in meals:
         kz66 += m["vat"]
         items.append({"kind": "meal", "meal_id": m["id"], "title": m["title"], "date": m["date"], "gross": dstr(m["gross"]),
                       "vat": dstr(m["vat"]), "vat_pct": None})
