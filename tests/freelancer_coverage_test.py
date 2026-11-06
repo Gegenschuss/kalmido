@@ -1371,7 +1371,6 @@ POST /api/folders/rename
 POST /api/folders/repos
 POST /api/hubmail/mailbox/check
 POST /api/hubmail/mails/{}/assign
-POST /api/ical
 POST /api/layouts/offers
 POST /api/layouts/offers/{}/accept
 POST /api/layouts/offers/{}/decline
@@ -1472,7 +1471,6 @@ POST /api/tags/restore
 POST /api/tasks/similar
 POST /api/tasks/{}/bell/undo
 POST /api/tasks/{}/chain/pull
-POST /api/tasks/{}/contacts
 POST /api/tasks/{}/editing
 POST /api/tasks/{}/enc-attachments
 POST /api/tasks/{}/list-attachments
