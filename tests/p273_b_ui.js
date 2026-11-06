@@ -97,10 +97,15 @@ async function dataPane(w) {
   check(nl && nl.id !== L, 'bob has the list (new id)');
   const CC = await login('carol');
   check(((await call(CC, 'GET', '/api/state')).lists || []).some(x => nl && x.id === nl.id), 'carol (ticked) got the list shared');
+  // 2.585.0 (#4350): the undo dialog opens after the plan is loaded (GET /api/imports/<id>/undo-plan); the bridge of
+  // tests/boot.js would answer it before a look, so this dialog is driven by hand
+  w.__dialogs = 'manual';
   click(w, md.querySelector('#s-umz-imp [data-umz="undo"]'));
-  const yes = await until(() => w.document.querySelector('[data-cd="yes"]'));
+  const yes = await until(() => w.document.querySelector('.modal.cdlg [data-cd="yes"]'));
   check(yes, 'undo asks first');
-  click(w, yes);
+  check(yes && /You can undo this import until/.test(w.document.querySelector('.modal.cdlg').textContent), '2.585.0 (#4350): the dialog names the last day of the undo');
+  if (yes) click(w, yes);
+  w.__dialogs = undefined;
   await until(async () => !((await call(CB, 'GET', '/api/state')).lists || []).some(x => x.name === 'Umzug UI Liste'), 60);
   check(!((await call(CB, 'GET', '/api/state')).lists || []).some(x => x.name === 'Umzug UI Liste'), 'undo removed the list');
   check(!md.querySelector('#s-umz-imp .umzbox'), 'the box is closed');
