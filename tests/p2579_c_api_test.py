@@ -168,7 +168,7 @@ PAID, PAH = agent("ownbot", "private")  # alice's own agent of her private works
 check(agent_ids(OAH) == [] and agent_ids(PAH) == [] and requests.get(B + f"/api/v1/agent/objects/{K}/{VID}", headers=PAH, timeout=30).status_code == 404,
       "agents: nothing without a share")
 st = (requests.get(B + "/api/docs/views", headers=OAH, timeout=30).status_code, requests.get(B + f"/api/docs/views/{VID}/hits", headers=PAH, timeout=30).status_code)
-check(st == (403, 403), f"agents: the person routes refuse them {st}")
+check(all(x in (401, 403) for x in st), f"agents: the person routes refuse them (an agent token is no session there) {st}")
 check(A.post(B + f"/api/docs/views/{VID}/share", json={"all": True}).ok and agent_ids(OAH) == [], "shared with everyone: still nothing for the organisation's agent")
 check(A.post(B + f"/api/docs/views/{VID}/share", json={"all": False}).ok, "back to private")
 r = A.post(B + f"/api/obj/{K}/{VID}/shares", json={"agent_id": PAID, "role": "view"})
