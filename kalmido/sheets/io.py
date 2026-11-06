@@ -32,7 +32,7 @@ from ..core.access import need_feat
 from ..core.db import db
 from ..core.i18n import dec_comma, lang, tr, trn
 from ..accounts.session import me
-from ..office.legacyimport import _col_index, _local, _rels
+from ..office.legacyimport import _col_index, _local, _rels, _xml, xl_events, xl_slot, xl_strings, XL_TREE_MAX  # 2.576.0 (#4188)
 from ..personal.timetrack import _csv_cell
 from ..core.serializers import csv_uncell  # 2.273.0 D (#3051)
 from ..core.errors import BadInput
@@ -47,6 +47,7 @@ from .shbook import shb_xlsx, shb_import, shb_pairs, shb_create, SHB_TABS_MAX, s
 SHX_FILE_MAX = 10 * 1024 * 1024        # an uploaded file
 SHX_UNZIPPED_MAX = 60 * 1024 * 1024    # the parts of an .xlsx read in all (zip bomb guard)
 SHX_CELLS_MAX = 50_000                 # non-empty cells of an import
+SHX_STORED_MAX = 4 * SHX_CELLS_MAX     # 2.576.0 (#4188): cells kept while reading (filled ones and empty <v/> ones)
 _SHX_EMPTY = {"v": "", "f": None, "fmt": None}  # 2.148.1 D (#2485): read only, shared by every empty place of a read grid
 SHX_CHUNK = 4000                       # cells per write (the core takes at most SH_CELLS_MAX at once)
 SHX_EXCEL_FN = {"sum": "SUM", "avg": "AVERAGE", "min": "MIN", "max": "MAX", "count": "COUNT", "if": "IF", "round": "ROUND",
@@ -463,6 +464,7 @@ class ShxGrid:
 
     def __init__(self):
         self.rows, self.lists, self.colors, self.row_mode, self.names = [], {}, {}, set(), {}
+        self.n_filled = 0  # 2.576.0 (#4188): filled cells counted while reading
 
 
 def _shx_too_many():
@@ -554,7 +556,13 @@ def _shift_formula(f, dr, dc):
 
 
 def shx_read_xlsx(raw):
-    """The first sheet of an .xlsx -> ShxGrid (values, formulas, number formats, drop-down lists, their colours, names)."""
+    """The first sheet of an .xlsx -> ShxGrid (values, formulas, number formats, drop-down lists, their colours, names).
+    2.576.0 (#4188): one of the two import places (xl_slot)."""
+    with xl_slot():
+        return _shx_first(raw)
+
+
+def _shx_first(raw):
     if not raw.startswith(b"PK"):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
     try:
@@ -575,12 +583,18 @@ def shx_read_xlsx(raw):
 
 def shx_read_xlsx_all(raw, most):
     """2.124.0 E (#2116): every visible sheet of an .xlsx (at most `most`) -> [ShxGrid] with .sheet_name; the cell limit counts
-    for all sheets together."""
-    first = shx_read_xlsx(raw)
+    for all sheets together. 2.576.0 (#4188): one import place for the whole file; the cells count over the sheets while
+    reading (ctx["full"])."""
+    with xl_slot():
+        return _shx_all(raw, most)
+
+
+def _shx_all(raw, most):
+    first = _shx_first(raw)
     if first.n_sheets < 2 or most < 2:
         return [first]
     z = zipfile.ZipFile(io.BytesIO(raw))
-    names, budget, ctx = set(z.namelist()), [0], {}
+    names, budget, ctx = set(z.namelist()), [0], {"full": [first.n_filled]}
     try:
         out = [first] + [_read_xlsx(z, names, budget, k, ctx) for k in range(1, min(first.n_sheets, most))]
     except BadInput:
@@ -593,25 +607,17 @@ def shx_read_xlsx_all(raw, most):
 
 
 def _budget_xml(z, name, budget):
-    if z.getinfo(name).file_size + budget[0] > SHX_UNZIPPED_MAX:
-        raise BadInput(tr("The file is too large"))
-    budget[0] += z.getinfo(name).file_size
-    data = z.read(name)
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper() \
-            or data[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in data[:4]:  # no entity tricks; 2.148.1 G (#2496): single-byte encodings only
-        raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    return ET.fromstring(data)
+    """A small part as a tree (workbook, styles); 2.576.0 (#4188): streamed with the same guards, at most XL_TREE_MAX
+    elements (legacyimport._xml). Sheets and sharedStrings are never read as a whole tree."""
+    return _xml(z, name, budget, SHX_UNZIPPED_MAX)
 
 
 def _read_xlsx(z, names, budget, which=0, ctx=None):
     """The visible sheet number `which` (2.124.0 E #2116: ctx = the parts every sheet shares, read once for all of them)."""
     ctx = {} if ctx is None else ctx
     if "wb" not in ctx:
-        strings = []
-        if "xl/sharedStrings.xml" in names:
-            for si in _budget_xml(z, "xl/sharedStrings.xml", budget):
-                if _local(si.tag) == "si":
-                    strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
+        # 2.576.0 (#4188): streamed, at most XL_STRINGS_MAX entries
+        strings = xl_strings(z, budget, SHX_UNZIPPED_MAX) if "xl/sharedStrings.xml" in names else []
         fmts, dxf_fill = _num_fmts(z, names, budget)
         wb = _budget_xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", [0])
@@ -629,71 +635,54 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     sname, path, _h = visible[which]
     g = ShxGrid()
     g.sheet_name, g.n_sheets = sname, len(visible)  # 2.124.0 E (#2116)
-    cells, shared, full = {}, {}, 0
-    root = _budget_xml(z, path, budget)
+    # 2.576.0 (#4188): the sheet is streamed (iterparse) one cell after the other and every read cell is dropped again, so
+    # the filled-cell limit stops reading early instead of after a tree of the whole part; only the parts after
+    # <sheetData> that are used (drop-down lists, conditional formats) stay as small trees
+    cells, shared = {}, {}
+    full = ctx.setdefault("full", [0])  # filled cells of every sheet read so far
     dvs, cfs = [], []
-    for el in root:
-        tag = _local(el.tag)
-        if tag == "dataValidations":
-            dvs = [x for x in el if _local(x.tag) == "dataValidation"]
-        elif tag == "conditionalFormatting":
-            cfs.append(el)
-    for row in root.iter(f"{{{_MAIN}}}row"):
-        r = int(row.get("r") or (max((k[0] for k in cells), default=0) + 1))
-        if r > SH_ROWS_MAX + 1:
-            raise BadInput(tr("Too many rows (at most {0})", SH_ROWS_MAX))
-        for k, cel in enumerate(x for x in row if _local(x.tag) == "c"):
-            ref = cel.get("r")
-            ci = _col_index(ref) if ref else k
-            if ci >= SH_COLS_MAX:
-                continue
-            t, v, f = cel.get("t"), None, None
-            for ch in cel:
-                tag = _local(ch.tag)
-                if tag == "v":
-                    v = ch.text or ""
-                elif tag == "is":
-                    v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
-                elif tag == "f":
-                    if ch.get("t") == "shared":
-                        si = ch.get("si")
-                        if ch.text:
-                            shared[si] = (ch.text, r, ci)
-                            f = ch.text
-                        elif si in shared:
-                            base, r0, c0 = shared[si]
-                            f = _shift_formula(base, r - r0, ci - c0)
-                    elif ch.get("t") != "array" and ch.text:
-                        f = ch.text
-                    elif ch.text:
-                        f = "\x00array"  # an array formula: its value only
-            if t == "s" and v is not None:
-                try:
-                    v = strings[int(v)]
-                except (ValueError, IndexError):
-                    v = ""
-            elif t == "b" and v is not None:
-                v = "WAHR" if v == "1" else "FALSCH"
-            elif t == "e":
-                v = ""
-            elif t in (None, "n") and v and re.fullmatch(r"-?\d+\.0+", v):
-                v = v.split(".")[0]
-            try:
-                fmt = fmts.get(int(cel.get("s") or 0))
-            except ValueError:
-                fmt = None
-            if v is None and f is None:
-                continue
-            if fmt == "date" and t in (None, "n") and v and re.fullmatch(r"-?\d+(\.\d+)?", v):
-                try:
-                    v = (_EPOCH + timedelta(days=int(float(v)))).isoformat()
-                except (OverflowError, ValueError):
-                    pass
-            if v or f:
-                full += 1
-                if full > SHX_CELLS_MAX + SH_COLS_MAX:
-                    raise _shx_too_many()
-            cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
+    root = sd = row = None
+    depth = k = r = n = 0
+    for ev, cel in xl_events(z, path, budget, SHX_UNZIPPED_MAX):
+        if ev == "start":
+            depth += 1
+            if root is None:
+                root = cel
+            elif depth == 2 and _local(cel.tag) == "sheetData":
+                sd = cel
+            elif depth == 3 and sd is not None and cel.tag == f"{{{_MAIN}}}row":
+                r = int(cel.get("r") or (r + 1))
+                if r > SH_ROWS_MAX + 1:
+                    raise BadInput(tr("Too many rows (at most {0})", SH_ROWS_MAX))
+                row, k = cel, 0
+            continue
+        depth -= 1
+        n += 1
+        if n > XL_TREE_MAX:  # one cell / row / part with endless children
+            raise BadInput(tr("The file is too large"))
+        if row is not None and depth == 3 and _local(cel.tag) == "c":
+            n = 0
+            row.remove(cel)
+            k += 1
+            _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full)
+            continue
+        if cel is row:
+            row.clear()
+            if len(sd) and sd[0] is row:
+                del sd[0]
+            row, n = None, 0
+        elif cel is sd:
+            sd.clear()
+            n = 0
+        elif depth == 1:
+            tag = _local(cel.tag)
+            if tag == "dataValidations":
+                dvs = [x for x in cel if _local(x.tag) == "dataValidation"]
+            elif tag == "conditionalFormatting":
+                cfs.append(cel)
+            else:
+                root.remove(cel)
+    g.n_filled = full[0]  # 2.576.0 (#4188): of this and the sheets read before it
     if cells:
         # 2.148.1 D (#2485): no full grid of empty cells: each row only up to its last cell, empty places share one entry
         h = max(k[0] for k in cells)
@@ -706,7 +695,7 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
         if dv.get("type") != "list":
             continue
         f1 = next((x.text or "" for x in dv if _local(x.tag) == "formula1"), "")
-        labels = _dv_labels(z, names, budget, sheets, f1)
+        labels = _dv_labels(z, names, budget, sheets, f1, strings)
         if not labels:
             continue
         for rg in (dv.get("sqref") or "").split():
@@ -751,6 +740,66 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     return g
 
 
+def _shx_cell(cel, k, r, cells, shared, strings, fmts, full):
+    """2.576.0 (#4188): one <c> of row r (its k-th cell) into cells {(r, col): ...}; True = a filled cell. Moved out of the
+    sheet loop of _read_xlsx unchanged, the filled cells count in full[0] over all sheets of the file."""
+    ref = cel.get("r")
+    ci = _col_index(ref) if ref else k
+    if ci >= SH_COLS_MAX:
+        return False
+    t, v, f = cel.get("t"), None, None
+    for ch in cel:
+        tag = _local(ch.tag)
+        if tag == "v":
+            v = ch.text or ""
+        elif tag == "is":
+            v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
+        elif tag == "f":
+            if ch.get("t") == "shared":
+                si = ch.get("si")
+                if ch.text:
+                    shared[si] = (ch.text, r, ci)
+                    f = ch.text
+                elif si in shared:
+                    base, r0, c0 = shared[si]
+                    f = _shift_formula(base, r - r0, ci - c0)
+            elif ch.get("t") != "array" and ch.text:
+                f = ch.text
+            elif ch.text:
+                f = "\x00array"  # an array formula: its value only
+    if t == "s" and v is not None:
+        try:
+            v = strings[int(v)]
+        except (ValueError, IndexError):
+            v = ""
+    elif t == "b" and v is not None:
+        v = "WAHR" if v == "1" else "FALSCH"
+    elif t == "e":
+        v = ""
+    elif t in (None, "n") and v and re.fullmatch(r"-?\d+\.0+", v):
+        v = v.split(".")[0]
+    try:
+        fmt = fmts.get(int(cel.get("s") or 0))
+    except ValueError:
+        fmt = None
+    if v is None and f is None:
+        return False
+    if fmt == "date" and t in (None, "n") and v and re.fullmatch(r"-?\d+(\.\d+)?", v):
+        try:
+            v = (_EPOCH + timedelta(days=int(float(v)))).isoformat()
+        except (OverflowError, ValueError):
+            pass
+    if (r, ci) not in cells:
+        if len(cells) >= SHX_STORED_MAX:  # 2.576.0 (#4188): empty <v/> cells count here
+            raise _shx_too_many()
+        if v or f:
+            full[0] += 1
+            if full[0] > SHX_CELLS_MAX + SH_COLS_MAX:
+                raise _shx_too_many()
+    cells[(r, ci)] = {"v": v or "", "f": f, "fmt": fmt, "num": t in (None, "n") and bool(v)}
+    return bool(v or f)
+
+
 def _in_rph(si, t):
     for rph in si:
         if _local(rph.tag) == "rPh" and any(x is t for x in rph.iter()):
@@ -758,8 +807,9 @@ def _in_rph(si, t):
     return False
 
 
-def _dv_labels(z, names, budget, sheets, f1):
-    """The labels of a list validation: inline "a,b,c" or a range of a sheet of the file."""
+def _dv_labels(z, names, budget, sheets, f1, strings=None):
+    """The labels of a list validation: inline "a,b,c" or a range of a sheet of the file. 2.576.0 (#4188): the shared
+    strings read once (strings), the sheet streamed and left after the last row of the range."""
     f1 = (f1 or "").strip()
     if f1.startswith('"') and f1.endswith('"'):
         return [x.strip() for x in f1[1:-1].replace('""', '"').split(",") if x.strip()][:100]
@@ -773,32 +823,45 @@ def _dv_labels(z, names, budget, sheets, f1):
     c1, r1, c2, r2 = _col_index(m.group(3)), int(m.group(4)), _col_index(m.group(5)), int(m.group(6))
     if r2 - r1 > 200 or c2 - c1 > 0:
         return []
-    strings = []
-    if "xl/sharedStrings.xml" in names:
-        for si in _budget_xml(z, "xl/sharedStrings.xml", budget):
-            if _local(si.tag) == "si":
-                strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t"))
-    out = {}
-    for row in _budget_xml(z, path, budget).iter(f"{{{_MAIN}}}row"):
-        r = int(row.get("r") or 0)
-        if not r1 <= r <= r2:
+    if strings is None:
+        strings = xl_strings(z, budget, SHX_UNZIPPED_MAX) if "xl/sharedStrings.xml" in names else []
+    out, sd, row, n = {}, None, None, 0
+    for ev, el in xl_events(z, path, budget, SHX_UNZIPPED_MAX):
+        if ev == "start":
+            if sd is None and _local(el.tag) == "sheetData":
+                sd = el
+            elif el.tag == f"{{{_MAIN}}}row" and row is None:
+                row = el
             continue
-        for cel in row:
-            if _local(cel.tag) != "c" or _col_index(cel.get("r") or "A") != c1:
-                continue
-            v = None
-            for ch in cel:
-                if _local(ch.tag) == "v":
-                    v = ch.text or ""
-                elif _local(ch.tag) == "is":
-                    v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
-            if cel.get("t") == "s" and v is not None:
-                try:
-                    v = strings[int(v)]
-                except (ValueError, IndexError):
-                    v = None
-            if v:
-                out[r] = v.strip()
+        n += 1
+        if n > XL_TREE_MAX:
+            raise BadInput(tr("The file is too large"))
+        if el is not row:
+            continue
+        n, row = 0, None
+        r = int(el.get("r") or 0)
+        if r > r2:
+            break
+        if r1 <= r:
+            for cel in el:
+                if _local(cel.tag) != "c" or _col_index(cel.get("r") or "A") != c1:
+                    continue
+                v = None
+                for ch in cel:
+                    if _local(ch.tag) == "v":
+                        v = ch.text or ""
+                    elif _local(ch.tag) == "is":
+                        v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
+                if cel.get("t") == "s" and v is not None:
+                    try:
+                        v = strings[int(v)]
+                    except (ValueError, IndexError):
+                        v = None
+                if v:
+                    out[r] = v.strip()
+        el.clear()
+        if sd is not None and len(sd) and sd[0] is el:
+            del sd[0]
     return [out[k] for k in sorted(out)][:100]
 
 

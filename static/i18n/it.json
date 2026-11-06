@@ -16577,6 +16577,7 @@
   "Template “{0}” deleted": "Modello «{0}» eliminato",
   "Link “{0}” removed": "Link «{0}» rimosso",
   "Set again meanwhile: the earlier value was not restored.": "Nel frattempo è stato impostato di nuovo: il valore precedente non è stato ripristinato.",
+  "Two spreadsheet imports are running already. Please try again in a minute.": "Sono già in corso due importazioni di fogli di calcolo. Riprova tra un minuto.",
   "{0} change not applied (task deleted or invalid)": ["{0} modifica non applicata (attività eliminata o non valida)", "{0} modifiche non applicate (attività eliminata o non valida)"],
   "Save button for the browser": "Pulsante Salva per il browser",
   "Drag the button to your bookmarks bar. On any page, click it: a small window shows the page and asks where it goes: “Read later · Private” (Enter), “Read later” in one of your organisations, or a bookmark. A link you already saved there is not saved twice. It runs no code of ours on that page and uses your normal sign-in.": "Trascina il pulsante nella barra dei segnalibri. Su qualsiasi pagina, fai clic: una piccola finestra mostra la pagina e chiede dove salvarla: «Da leggere · Privato» (Invio), «Da leggere» in una delle tue organizzazioni o come segnalibro. Un link già salvato lì non viene salvato due volte. Sulla pagina non gira alcun nostro codice e usa il tuo accesso normale.",

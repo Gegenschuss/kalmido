@@ -19,12 +19,14 @@ builds on yet (a client with a list, document, contract or archived document sta
 document) and says what stayed. Only the organisation's admins (the stricter of "master data" and "clients"); agent
 tokens and kids are stopped by office_gate."""
 import codecs
+import contextlib
 import hashlib
 import hmac
 import io
 import json
 import os
 import re
+import threading
 import unicodedata
 import zipfile
 import zlib
@@ -63,6 +65,14 @@ FI_ROWS_MAX = 2000  # rows per sheet taken into the preview
 FI_COLS_MAX = 200  # 2.148.1 D (#2485): columns per sheet / table range
 FI_PARTS_MAX = 64  # 2.148.1 D (#2485): sheets and tables read per workbook
 FI_NAME_MAX = 80  # clients.name
+# 2.576.0 (#4188): the parts are read as a stream (iterparse): a sheet stops at its row limit, the filled cells of the
+# whole workbook at FI_CELLS_MAX, before the file is read in all; a part read as a tree holds at most XL_TREE_MAX elements
+FI_CELLS_MAX = 200_000  # filled cells of all sheets together
+XL_STRINGS_MAX = 200_000  # entries of sharedStrings.xml (sheets/io.py uses the same reader)
+XL_TREE_MAX = 200_000  # elements of a part kept as a whole tree (workbook, styles, relations, tables)
+XL_CHUNK = 1 << 16  # bytes fed to the parser at once
+XL_IMPORTS_AT_ONCE = 2  # .xlsx files read at the same time (per app process); one more = 429 at once, no waiting
+_XL_SLOTS = threading.BoundedSemaphore(XL_IMPORTS_AT_ONCE)
 
 # ---------------------------------------------------------------- reasons shown next to an uncertain split
 FI_REASONS = {
@@ -87,16 +97,86 @@ def _local(tag):
     return tag.rsplit("}", 1)[-1]
 
 
-def _xml(z, name, budget):
+@contextlib.contextmanager
+def xl_slot():
+    """2.576.0 (#4188): one of the XL_IMPORTS_AT_ONCE places for reading an .xlsx; none free = Denied 429 with a clear text
+    (a third large file must not wait in a request thread nor push the app over its memory)."""
+    if not _XL_SLOTS.acquire(blocking=False):
+        raise Denied(429, tr("Two spreadsheet imports are running already. Please try again in a minute."))
+    try:
+        yield
+    finally:
+        _XL_SLOTS.release()
+
+
+def xl_events(z, name, budget, most, events=("start", "end")):
+    """2.576.0 (#4188): a part of the archive as (event, element) pairs of ET.XMLPullParser, read in XL_CHUNK pieces. The
+    unpacked size counts against budget (at most `most` for the whole file); the guards against entity tricks stay
+    (no DOCTYPE in the first 4 KB, no ENTITY anywhere, single-byte encodings only), checked on every piece BEFORE the
+    parser sees it. The caller clears what it has read; stopping early stops reading the part."""
     info = z.getinfo(name)
-    budget[0] += info.file_size
-    if budget[0] > FI_XLSX_UNZIPPED_MAX:
+    if info.file_size + budget[0] > most:
         raise BadInput(tr("The file is too large"))
-    data = z.read(name)
-    if b"<!DOCTYPE" in data[:4096].upper() or b"<!ENTITY" in data.upper() \
-            or data[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in data[:4]:  # no entity tricks; 2.148.1 G (#2496): single-byte encodings only
-        raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    return ET.fromstring(data)
+    budget[0] += info.file_size
+    bad = BadInput(tr("This is not a spreadsheet file (.xlsx)"))
+    p = ET.XMLPullParser(events)
+    seen, tail = 0, b""
+    with z.open(name) as fh:  # ZipExtFile reads at most file_size bytes
+        while True:
+            chunk = fh.read(XL_CHUNK)
+            if not chunk:
+                break
+            if not seen and (chunk[:2] in (b"\xff\xfe", b"\xfe\xff") or b"\x00" in chunk[:4]):  # 2.148.1 G (#2496)
+                raise bad
+            probe = (tail + chunk).upper()  # a word cut between two pieces is still seen
+            if b"<!ENTITY" in probe or (seen < 4096 and b"<!DOCTYPE" in probe[:4096 - seen + len(tail)]):
+                raise bad
+            seen += len(chunk)
+            tail = chunk[-16:]
+            p.feed(chunk)
+            yield from p.read_events()
+    p.close()
+    yield from p.read_events()
+
+
+def _xml(z, name, budget, most=FI_XLSX_UNZIPPED_MAX):
+    """A (small) part as a whole tree; 2.576.0 (#4188): streamed, at most XL_TREE_MAX elements."""
+    root, n = None, 0
+    for ev, el in xl_events(z, name, budget, most):
+        if ev == "start":
+            if root is None:
+                root = el
+            continue
+        n += 1
+        if n > XL_TREE_MAX:
+            raise BadInput(tr("The file is too large"))
+    if root is None:
+        raise ET.ParseError("empty part")
+    return root
+
+
+def xl_strings(z, budget, most):
+    """2.576.0 (#4188): the texts of xl/sharedStrings.xml, one <si> after the other (plain <t> or rich text runs <r><t>;
+    phonetic hints <rPh> are not text); at most XL_STRINGS_MAX entries."""
+    out, sst, n = [], None, 0
+    for ev, el in xl_events(z, "xl/sharedStrings.xml", budget, most):
+        if ev == "start":
+            if sst is None:
+                sst = el
+            continue
+        n += 1
+        if n > XL_TREE_MAX:  # one <si> with endless runs
+            raise BadInput(tr("The file is too large"))
+        if el is sst or _local(el.tag) != "si":
+            continue
+        out.append("".join(t.text or "" for t in el.iter() if _local(t.tag) == "t" and not _in_rph(el, t)))
+        if len(out) > XL_STRINGS_MAX:
+            raise BadInput(tr("Too many filled cells (at most {0})", XL_STRINGS_MAX))
+        el.clear()
+        if len(sst) and sst[0] is el:
+            del sst[0]
+        n = 0
+    return out
 
 
 def _col_index(ref):
@@ -146,13 +226,14 @@ def fi_xlsx_read(raw):
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)")) from None
     if "xl/workbook.xml" not in names or len(names) > 2000:
         raise BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    budget = [0]
+    with xl_slot():  # 2.576.0 (#4188): at most two at once
+        return _xlsx_book(z, names)
+
+
+def _xlsx_book(z, names):
+    budget, filled = [0], [0]
     try:
-        strings = []
-        if "xl/sharedStrings.xml" in names:
-            for si in _xml(z, "xl/sharedStrings.xml", budget):
-                if _local(si.tag) == "si":  # plain <t> or rich text runs <r><t>; phonetic hints <rPh> are not text
-                    strings.append("".join(t.text or "" for t in si.iter() if _local(t.tag) == "t" and not _in_rph(si, t)))
+        strings = xl_strings(z, budget, FI_XLSX_UNZIPPED_MAX) if "xl/sharedStrings.xml" in names else []  # 2.576.0 (#4188)
         wb = _xml(z, "xl/workbook.xml", budget)
         wrels = _rels(z, "xl/workbook.xml", budget)
         zeros = _fmt_zeros(z, names, budget)
@@ -168,7 +249,7 @@ def fi_xlsx_read(raw):
             path = wrels.get(rid)
             if not path or path not in names:
                 continue
-            grid = _sheet(z, path, strings, budget, zeros)
+            grid = _sheet(z, path, strings, budget, zeros, filled)
             out.setdefault((sh.get("name") or "").strip().lower(), grid)
             for t in _rels(z, path, budget).values():  # the sheet's tables (Excel "Format as table"; Power Query output)
                 if t in names and "/tables/" in t:
@@ -218,26 +299,40 @@ def _fmt_zeros(z, names, budget):
     return out
 
 
-def _sheet(z, path, strings, budget, zeros=None):
-    rows = {}
-    for row in _xml(z, path, budget).iter():
-        if _local(row.tag) != "row":
+def _sheet(z, path, strings, budget, zeros=None, filled=None):
+    """2.576.0 (#4188): streamed, one cell after the other: reading stops after FI_ROWS_MAX + 50 rows; the filled cells of
+    the workbook (filled = [count] shared by its sheets) stop at FI_CELLS_MAX."""
+    rows, filled = {}, [0] if filled is None else filled
+    sd = row = cells = None
+    k = r = n = 0
+    for ev, el in xl_events(z, path, budget, FI_XLSX_UNZIPPED_MAX):
+        tag = _local(el.tag)
+        if ev == "start":
+            if tag == "sheetData":
+                sd = el
+            elif tag == "row" and sd is not None and row is None:
+                r = int(el.get("r") or (max(rows) + 1 if rows else 1))
+                if r > FI_ROWS_MAX + 50:
+                    break
+                row, cells, k = el, {}, 0
             continue
-        r = int(row.get("r") or (max(rows) + 1 if rows else 1))
-        if r > FI_ROWS_MAX + 50:
-            break
-        cells = {}
-        for k, cel in enumerate(x for x in row if _local(x.tag) == "c"):
+        n += 1
+        if n > XL_TREE_MAX:  # one cell or row with endless children
+            raise BadInput(tr("The file is too large"))
+        if row is not None and tag == "c" and el in row:
+            n = 0
+            cel, k = el, k + 1
             ref = cel.get("r")
-            ci = _col_index(ref) if ref else k
-            if ci > 200:
-                continue
-            t, v = cel.get("t"), None
-            for ch in cel:
-                if _local(ch.tag) == "v":
-                    v = ch.text or ""
-                elif _local(ch.tag) == "is":
-                    v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
+            ci = _col_index(ref) if ref else k - 1
+            v = None
+            if ci <= 200:
+                t = cel.get("t")
+                for ch in cel:
+                    if _local(ch.tag) == "v":
+                        v = ch.text or ""
+                    elif _local(ch.tag) == "is":
+                        v = "".join(x.text or "" for x in ch.iter() if _local(x.tag) == "t")
+            row.remove(cel)
             if v is None:
                 continue
             if t == "s":
@@ -253,8 +348,20 @@ def _sheet(z, path, strings, budget, zeros=None):
                 v = v.split(".")[0]
             if zeros and t in (None, "n") and v.isdigit() and cel.get("s") in zeros:
                 v = v.zfill(zeros[cel.get("s")])
+            if v != "" and ci not in cells:
+                filled[0] += 1
+                if filled[0] > FI_CELLS_MAX:
+                    raise BadInput(tr("Too many filled cells (at most {0})", FI_CELLS_MAX))
             cells[ci] = v
-        rows[r] = cells
+        elif el is row:
+            rows[r] = cells
+            row.clear()
+            if len(sd) and sd[0] is row:
+                del sd[0]
+            row = cells = None
+            n = 0
+        elif el is sd:
+            break  # the rest of the sheet (merged cells, tables, ...) is not read
     if not rows:
         return []
     width = max((max(c) + 1 for c in rows.values() if c), default=0)

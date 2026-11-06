@@ -16576,6 +16576,7 @@
   "Template “{0}” deleted": "Sjabloon ‘{0}’ verwijderd",
   "Link “{0}” removed": "Link ‘{0}’ verwijderd",
   "Set again meanwhile: the earlier value was not restored.": "Intussen opnieuw ingesteld: de eerdere waarde is niet hersteld.",
+  "Two spreadsheet imports are running already. Please try again in a minute.": "Er lopen al twee spreadsheetimports. Probeer het over een minuut opnieuw.",
   "{0} change not applied (task deleted or invalid)": ["{0} wijziging niet toegepast (taak verwijderd of ongeldig)", "{0} wijzigingen niet toegepast (taak verwijderd of ongeldig)"],
   "Save button for the browser": "Opslaanknop voor de browser",
   "Drag the button to your bookmarks bar. On any page, click it: a small window shows the page and asks where it goes: “Read later · Private” (Enter), “Read later” in one of your organisations, or a bookmark. A link you already saved there is not saved twice. It runs no code of ours on that page and uses your normal sign-in.": "Sleep de knop naar je bladwijzerbalk. Klik er op een willekeurige pagina op: een klein venster toont de pagina en vraagt waar die heen moet: ‘Later lezen · Privé’ (Enter), ‘Later lezen’ in een van je organisaties of als bladwijzer. Een link die je daar al hebt bewaard, wordt niet dubbel opgeslagen. Er draait geen code van ons op die pagina en je normale aanmelding wordt gebruikt.",
