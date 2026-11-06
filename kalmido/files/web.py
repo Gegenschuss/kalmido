@@ -223,6 +223,11 @@ def files_list():
 
 def _trash(c, uid):
     """Nodes in the trash the asker may restore (owner of the branch, organisation admin, or who deleted it with edit)."""
+    return _items(c, [r for r, _role in fs_trash_entries(c, uid)])
+
+
+def fs_trash_entries(c, uid):
+    """2.589.0 (#4875): the rows of _trash with the asker's role [(row, role)] -- also for emptying the trash (files/bulk.py)."""
     out = []
     # candidates only (own branches, what the person deleted, organisation nodes -- row-level security keeps those to their
     # organisations); fs_role decides
@@ -234,8 +239,8 @@ def _trash(c, uid):
             continue  # inside a deleted folder: restored with it
         role = fs_role(c, r["id"], uid, chain=chain)
         if role == "owner" or (role == "edit" and r["deleted_by"] == uid):
-            out.append(r)
-    return _items(c, out)
+            out.append((r, role))
+    return out
 
 
 def _parent_arg(c, b):

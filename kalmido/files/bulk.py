@@ -2,6 +2,7 @@
 
 POST /api/files/trash {ids}      several rows into the trash (a folder with everything in it), all or nothing
 POST /api/files/restore {ids}    the undo of it: every id back out of the trash, all or nothing
+POST /api/files/trash/purge {ids | all}  2.589.0 (#4875): delete for good what the person owns in the trash, the rest stays
 GET  /api/files/zip?ids=1,2,3    the chosen files and folders as one ZIP (only what the person may see)
 POST /api/files/scan             photographed pages (multipart "page", in order) -> ONE PDF, stored like an upload
 
@@ -25,12 +26,12 @@ from ..core.db import bump, db, body, err, local_now
 from ..core.i18n import N_, tr
 from ..core.access import Denied
 from ..accounts.session import me
-from .store import DEPTH_MAX, fs_chain, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
+from .store import DEPTH_MAX, fs_chain, fs_deleted, fs_purge, fs_purge_files, fs_log_add, fs_put, fs_read, fs_role, fs_visible_ids, need_node, safe_fs_name, _free_name, _now
 from .fsref import fs_ref_need_move, fs_ref_trashed, fs_trash_prepare, fs_trash_restored  # 2.199.0 A (#2742); 2.238.0 A (#2863)
 from .fsroots import fs_area_before, fs_area_root_need_free  # 2.199.0 F (#2742, review G1); 2.200.0 (#2747)
 from .fslock import fl_is_locked, fsl_denied, fsl_map  # 2.353.0 A (#2758); F: + scan
 from .scan import sc_guard  # 2.369.5 (#2517): pulled up from functions
-from .web import _parent_arg, _items  # 2.369.5 (#2517): pulled up from functions
+from .web import _parent_arg, _items, fs_trash_entries, fs_trash_root_by  # 2.589.0 (#4875): + fs_trash_entries, fs_trash_root_by; 2.369.5 (#2517): pulled up from functions
 
 ABM_IDS_MAX = 500  # ids per request
 ABM_ZIP_MAX_MB = int(os.environ.get("KALMIDO_FILES_ZIP_MAX_MB", "1024"))
@@ -134,6 +135,50 @@ def files_bulk_restore():
     bump(c)
     c.commit()
     return jsonify(ok=True, ids=[n["id"] for n in rows], stays=stays)
+
+
+@app.post("/api/files/trash/purge")
+def files_bulk_purge():
+    """2.589.0 (#4875): {ids} (rows of the trash) or {all: true} (the whole trash the person sees) -> deleted for good like
+    DELETE /api/files/nodes/<id>?purge=1: only nodes the person owns (role owner: the branch's owner, an organisation's
+    admin); the others stay (what someone with edit rights deleted from another's branch). A node a hook keeps (legal
+    retention, #2168) stays too. -> {ok, deleted, kept, locked}. A document's archive number goes with its doc_meta row
+    (ON DELETE CASCADE), so it is free again."""
+    c = db()
+    uid = me()
+    b = body()
+    if b.get("all") is True:
+        rows = [(r["id"], role) for r, role in fs_trash_entries(c, uid)]
+    else:
+        rows = []
+        for i in abm_ids(b.get("ids")):
+            n = need_node(c, i, write=True, trash=True)  # like the single purge: 404 unseen, 403 read only
+            chain = fs_chain(c, i)
+            if not fs_deleted(chain):
+                return err(tr("Only what is in the trash can be deleted for good"), 409)
+            if n["role"] != "owner" and fs_trash_root_by(chain) != uid:
+                raise Denied(404)  # the trash hides a withdrawn branch from everybody but who may restore it (files/web.py files_node)
+            rows.append((i, n["role"]))
+    own = abm_outermost(c, [i for i, role in rows if role == "owner"])
+    kept = len([1 for _i, role in rows if role != "owner"])
+    deleted = locked = 0
+    ids, paths = [], []
+    for nid in own:
+        if not c.execute("SELECT 1 FROM fs_nodes WHERE id=?", (nid,)).fetchone():
+            continue
+        try:
+            with c.savepoint():
+                i, p = fs_purge(c, nid)  # this node and what is below it
+        except Denied:  # a hook keeps it (legal retention, #2168), like the trash run (files/trashpurge.py tp_files)
+            locked += 1
+            continue
+        deleted += 1
+        ids += i
+        paths += p
+    bump(c)
+    c.commit()
+    fs_purge_files(ids, paths)  # 2.86.0 (N25): after the commit
+    return jsonify(ok=True, deleted=deleted, kept=kept, locked=locked)
 
 
 # ---- the ZIP

@@ -92,9 +92,9 @@ function viewAblage() {
   const desk = typeof sbb_on === 'function' && sbb_on();  // 2.152.3 B (#2621): a computer: spaces and folders are in the panel (ab_panelHtml), the path on top
   const trash = !r.nid && sp === 'trash', canAdd = r.nid ? ab_canWrite(d?.node?.role) : (sp === 'private' || (sp || '').startsWith('org:'));
   const crumbs = r.nid && d ? `<nav class="abcrumbs" aria-label="${esc(tr('Path'))}">${ab_all() ? spo_upHtml('ablage') : '' /* 2.540.0 (#4575) */}<button type="button" class="linkbtn" data-ab="space" data-sp="${esc(sp === 'shared' || !sp ? 'shared' : sp)}" data-abdrop="top">${esc(ab_spaceName(sp || 'shared'))}</button>${(d.crumbs || []).map((c, i, a) => `<span class="abcsep" aria-hidden="true">/</span>${i === a.length - 1 ? `<span class="abccur" aria-current="page">${esc(c.name)}</span>` : `<button type="button" class="linkbtn" data-go="ablage/${c.id}" data-abdrop="${c.id}">${esc(c.name)}</button>`}`).join('')}</nav>` : ab_all() ? spo_crumbHtml('ablage', ab_spaceName(sp)) : `<h3 class="abtitle">${esc(ab_spaceName(sp))}</h3>`;  // 2.540.0 (#4575): under "All" the path back to the overview
-  const tools = trash ? '' : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
+  const tools = trash ? ab_trashTools(d) : `<div class="abtools">${canAdd ? `<button type="button" class="btn sm" data-ab="new-folder">${ic('folder', 's')} ${tr('New folder')}</button><button type="button" class="btn sm pri" data-ab="upload">${ic('upload', 's')} ${tr('Upload')}</button>${d?.node?.locked ? '' : `<button type="button" class="btn sm" data-ab="scan">${ic('camera', 's')} ${tr('Scan')}</button>`}<input type="file" id="ab-file" multiple hidden>` : ''}${typeof dt_abOn === 'function' && dt_abOn(sp || d?.space) ? '' : ab_smvTools(d)}${typeof dt_abBtn === 'function' ? dt_abBtn(sp || d?.space) : ''}${!trash && d && typeof abd_toolsHtml === 'function' ? abd_toolsHtml(d, key) : ''}${r.nid && d?.node?.share_with ? `<button type="button" class="btn sm abshbtn" data-ab="share" data-id="${d.node.id}" title="${esc(tr('Share…'))}">${ic('users', 's')} ${tr('Share')}</button>` : '' /* 2.558.0 (#4693) */}${r.nid && d?.node ? `<button type="button" class="iconbtn" data-ab="menu" data-id="${d.node.id}" aria-label="${esc(tr('More actions for {0}', d.node.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>` : ''}</div>`;
   // 2.428.0 A (#3581): where "Select" is offered the rows' boxes show on hover too (ab_smvBox), not in the trash / tag filter / search
-  AB.selHere = !trash && !!d?.items?.length && !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
+  AB.selHere = !!d?.items?.length &&  /* 2.589.0 (#4875): the trash too */ !(typeof dt_abOn === 'function' && dt_abOn(sp || d.space)) && !(typeof ftxtActive === 'function' && ftxtActive());
   let body;
   if (r.aus) return `<div class="abview ${desk ? 'abdesk' : ''}">${desk ? '' : spaces}<div class="abmain">${ab_collHtml(d, sp)}</div></div>`;  // 2.429.0 (#3580)
   if (AB.err && AB.key === key) body = `<div class="empty">${ic('folder')}<span>${esc(AB.err)}</span><button type="button" class="btn" data-ab="space" data-sp="private">${tr('Private|workspace')}</button></div>`;
@@ -108,7 +108,7 @@ function viewAblage() {
   if (search && ftxtActive()) body = ftxtResults();
   const hint = !r.nid && sp === 'private' && d && !d.items.length ? `<p class="muted abhint">${tr('Share a folder with a person or an agent: they see exactly that folder, nothing else.')}</p>` : '';
   const tdays = trash && d?.trash_days ? `<p class="muted abhint abtrashdays">${esc(trashNote(tr('Files and folders in the trash are deleted for good after {0} days.', d.trash_days), d.purge_on === false))}</p>` : '';  // 2.152.0 B (#2165)
-  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + (trash ? '' : ab_smvBar())}</div></div>`;
+  return `<div class="abview ${canAdd ? 'abdropok' : ''} ${desk ? 'abdesk' : ''}" data-abzone="${r.nid || ''}">${desk ? '' : spaces}<div class="abmain">${search}${search && ftxtActive() ? `<h3 class="abtitle">${tr('Search results')}</h3>` : crumbs + tools + (r.nid ? ab_shHead(d) : '') + ab_scanDoneHtml() + (!trash && d && typeof abd_recogLine === 'function' ? abd_recogLine(d) : '')}${body}${search && ftxtActive() ? '' : hint + tdays + ab_smvBar(trash)}</div></div>`;
 }
 // 2.152.3 B (#2621): the panel of the file store (sidebar B on a computer): its parts (Files, Documents) as entries; below
 // Files the top folders of the shown workspace (several workspaces: each one first), a folder's subfolders loaded and drawn
@@ -234,9 +234,9 @@ function ab_rowHtml(n, trash) {
     + (typeof abd_badge === 'function' ? abd_badge(n) : '');  // 2.353.0 D (#2759): a document (being recognised / to review)
   const main = trash ? `<span class="abopen">${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></span>`
     : `<button type="button" class="abopen" data-ab="open" data-id="${n.id}" ${n.kind === 'folder' ? `data-abdrop="${n.id}"` : ''}>${ab_icon(n)}<span class="abtxt"><span class="abname">${esc(n.name)}</span>${meta ? `<span class="abmeta2 muted">${esc(meta)}</span>` : ''}</span></button>`;  // abmeta2: the details below the name on phones
-  const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>`
+  const acts = trash ? `<button type="button" class="btn sm" data-ab="restore" data-id="${n.id}">${ic('undo', 's')} ${tr('Restore')}</button>${n.role === 'owner' ? `<button type="button" class="btn sm danger" data-ab="purge" data-id="${n.id}">${ic('trash', 's')} ${tr('Delete for good')}</button>` : ''}`  // 2.589.0 (#4875): + for good (owners)
     : `<button type="button" class="iconbtn" data-ab="menu" data-id="${n.id}" aria-label="${esc(tr('More actions for {0}', n.name))}" title="${esc(tr('More'))}">${ic('dots')}</button>`;
-  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${trash ? '' : ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
+  return `<div class="abrow" role="listitem" data-abid="${n.id}" ${!trash && ab_canWrite(n.role) ? 'draggable="true"' : ''}>${ab_smvBox(n)}${main}${typeof dt_abTags === 'function' ? dt_abTags(n) : ''}<span class="abmeta muted">${esc(meta)}</span><span class="abbadges">${badges}</span>${acts}</div>`;
 }
 const ab_item = id => (AB.data?.items || []).find(x => x.id === +id) || (AB.data?.node?.id === +id ? AB.data.node : null) || (typeof ftxtItem === 'function' ? ftxtItem(id) : null) || (typeof dt_abItem === 'function' ? dt_abItem(id) : null);  // 2.61.0 (#1820): + search hits; 2.122.0 B: + tag filter hits
 
@@ -344,7 +344,7 @@ async function ab_restore(n) {
 async function ab_purge(n) {
   if (!await askConfirm(tr('Delete “{0}” for good?', n.name), tr('All versions are removed. This cannot be undone.'), {ok: tr('Delete for good'), danger: true})) return;
   try { await api('DELETE', `/api/files/nodes/${n.id}?purge=1`); } catch { return; }
-  ab_reload(); toast(tr('Deleted for good'));
+  AB.sel.delete(n.id); ab_reload(); toast(tr('Deleted for good'));
 }
 function ab_newVersion(n) {
   if (n.locked) return typeof fsl_newVersion === 'function' ? fsl_newVersion(n) : ab_noFsl();  // 2.353.0 A (#2758); F (review N8): never plain
@@ -453,6 +453,8 @@ document.addEventListener('click', e => {
   if (a === 'share') { e.preventDefault(); e.stopPropagation(); ab_share(+b.dataset.id); return; }  // 2.558.0 (#4693): the names / "Share" on top
   if (a === 'scandone-x') { AB.scanDone = null; ab_draw(); return; }
   if (a === 'restore' && n) ab_restore(n);
+  if (a === 'purge' && n) ab_purge(n);  // 2.589.0 (#4875)
+  if (a === 'trash-empty') abm_purge(null);
 });
 // 2.210 B (#2757): a right click / long press on a row of the list or a folder of the panel = its "…" menu (ab_menu)
 function ab_ctxNode(id) {  // the panel's folders: from its cache, else asked for (the menu opens once it is there)
@@ -511,8 +513,9 @@ const ab_smvSel = () => (AB.data?.items || []).filter(n => AB.sel.has(n.id));
 const ab_smvTools = d => d?.items?.length && !(typeof ftxtActive === 'function' && ftxtActive()) ? `<button type="button" class="btn sm ${AB.selOn ? 'on' : ''}" data-absel="mode" aria-pressed="${!!AB.selOn}">${ic('check', 's')} ${tr('Select')}</button>` : '';
 const ab_smvBox = n => AB.selOn || AB.selHere ? `<label class="absel" title="${esc(tr('Select {0}', n.name))}"><input type="checkbox" data-absel="one" data-id="${n.id}" ${AB.sel.has(n.id) ? 'checked' : ''} aria-label="${esc(tr('Select {0}', n.name))}"></label>` : '';
 // 2.428.0 A (#3581): the shared floating bar (multisel.js ms_barHtml): Move, Download, Delete (trash); another workspace under "More"
-function ab_smvBar() {
+function ab_smvBar(trash) {
   if (!AB.selOn) return '';
+  if (trash) return ab_trashBar();  // 2.589.0 (#4875)
   const ns = ab_smvSel(), all = (AB.data?.items || []).length, ok = ns.length > 0 && ns.every(ab_smvOk);
   const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
     ['move', 'arrow', tr('Move')], ['dl', 'download', tr('Download')], ['trash', 'trash', tr('Delete'), 'danger'], ...smv_can(ns[0]?.org_id || null) ? [['more', 'dots', tr('More')]] : []]);
@@ -575,6 +578,8 @@ document.addEventListener('click', e => {
   else if (a === 'dl') abm_download(ab_smvSel());  // 2.112.1 A (#2058)
   else if (a === 'trash') abm_trash(ab_smvSel());
   else if (a === 'more') ab_smvMore(b, ab_smvSel());
+  else if (a === 'restore') abm_restoreSel(ab_smvSel());  // 2.589.0 (#4875): the trash's bar
+  else if (a === 'purge') abm_purge(ab_smvSel());
 });
 // 2.428.0 A (#3581): a box ticked on hover starts choosing; Ctrl / Cmd / Shift + click on a row (computer) chooses it, a tap
 // while choosing too; a long press (phone) starts it (cm_bind below); Esc ends it
@@ -605,6 +610,43 @@ async function abm_trash(ns) {
   ab_smvEnd(); ab_reload();
   offerUndo([trn('{0} item moved to the trash', '{0} items moved to the trash', ns.length), fs_keptText(r.kept)].filter(Boolean).join(' · '), histAdd({label: tr('Move to the trash'),  // 2.199.0 A (#2742): + what stayed
     undo: () => ab_req('POST', '/api/files/restore', {ids}), redo: () => ab_req('POST', '/api/files/trash', {ids})}));
+}
+// ---- 2.589.0 (#4875): the trash: "Empty trash" on top, several rows back or for good (POST /api/files/trash/purge: only what
+// the person owns goes, the rest stays and is counted)
+const ab_trashTools = d => d?.items?.length ? `<div class="abtools">${ab_smvTools(d)}<button type="button" class="btn sm danger" data-ab="trash-empty">${ic('trash', 's')} ${tr('Empty trash')}</button></div>` : '';
+function ab_trashBar() {
+  const ns = ab_smvSel(), all = (AB.data?.items || []).length;
+  const h = ms_barHtml('ab-sbar', 'absel', ns.length, tr('Tap files'), [['all', 'all', ns.length && ns.length === all ? tr('Select none') : tr('All')],
+    ['restore', 'undo', tr('Restore')], ['purge', 'trash', tr('Delete for good'), 'danger']]);
+  return ns.length && !ns.some(n => n.role === 'owner') ? h.replace(/(data-absel="purge")/, '$1 disabled') : h;
+}
+// "1 file, 2 folders" of the rows (a folder: with everything in it)
+const abm_countText = ns => { const d = ns.filter(n => n.kind === 'folder').length, f = ns.length - d;
+  return [f ? trn('{0} file', '{0} files', f) : '', d ? trn('{0} folder', '{0} folders', d) : ''].filter(Boolean).join(', '); };
+async function abm_restoreSel(ns) {
+  if (!ns.length) return;
+  const ids = ns.map(n => n.id);
+  let r; try { r = await api('POST', '/api/files/restore', {ids}); } catch { return; }
+  ab_smvEnd(); ab_reload();
+  offerUndo(trn('{0} item restored', '{0} items restored', (r.ids || ids).length), histAdd({label: tr('Restore'),
+    undo: () => ab_req('POST', '/api/files/trash', {ids}), redo: () => ab_req('POST', '/api/files/restore', {ids})}));
+}
+// ns = the chosen rows; null = the whole trash ("Empty trash")
+async function abm_purge(ns) {
+  const rows = ns || AB.data?.items || [];
+  if (!rows.length) return;
+  const own = rows.filter(n => n.role === 'owner'), other = rows.length - own.length;
+  const what = abm_countText(own);
+  const txt = [what ? tr('Deleted for good: {0}. Folders go with everything in them. This cannot be undone.', what) : '',
+    other ? trn('{0} item stays: it belongs to someone else, only they can delete it for good.', '{0} items stay: they belong to others, only they can delete them for good.', other) : ''].filter(Boolean).join(' ');
+  if (!own.length) { toast(txt); return; }
+  if (!await askConfirm(ns ? trn('Delete {0} item for good?', 'Delete {0} items for good?', own.length) : tr('Empty the trash permanently?'), txt,
+    {ok: ns ? tr('Delete for good') : tr('Empty trash'), danger: true})) return;
+  let r; try { r = await api('POST', '/api/files/trash/purge', ns ? {ids: rows.map(n => n.id)} : {all: true}); } catch { return; }
+  ab_smvEnd(); ab_reload();
+  toast([trn('{0} item deleted for good', '{0} items deleted for good', r.deleted || 0),
+    r.kept ? trn('{0} stayed, it belongs to someone else', '{0} stayed, they belong to others', r.kept) : '',
+    r.locked ? trn('{0} stayed, it is kept by law (retention)', '{0} stayed, they are kept by law (retention)', r.locked) : ''].filter(Boolean).join(' · '), null, r.kept || r.locked ? 6000 : undefined);
 }
 async function abm_download(ns) {
   ns = ns.filter(abm_dlOk); if (!ns.length) return;

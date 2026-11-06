@@ -1182,7 +1182,8 @@ ROUTES = {
     # 2.96.0 A (#1941): files / folders / documents to the other workspace (p296_a_api_test.py)
     "POST /api/files/move-space": "file",
     # 2.112.1 A (#2058): several nodes into the trash / back, the ZIP download, the phone scan (p21121_a_api_test.py)
-    "POST /api/files/trash": "file", "POST /api/files/restore": "file", "GET /api/files/zip": "file", "POST /api/files/scan": "file",
+    "POST /api/files/trash": "file", "POST /api/files/restore": "file", "POST /api/files/trash/purge": "file",  # 2.589.0 (#4875): p2589_a_trash_api_test.py
+    "GET /api/files/zip": "file", "POST /api/files/scan": "file",
     "POST /api/files/links": "file", "POST /api/files/nodes/{}/restore": "file", "POST /api/files/nodes/{}/shares": "file",
     "POST /api/files/nodes/{}/order": "file", "POST /api/files/refs": "file", "GET /api/files/refs/{}/{}": "file",  # 2.199.0 A (#2742)
     "GET /api/fsref/office_doc/{}": "office", "GET /api/fsref/office_doc/{}/pdf": "office", "PATCH /api/fsref/office_doc/{}": "office",
