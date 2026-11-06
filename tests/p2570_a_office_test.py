@@ -140,7 +140,10 @@ for s, who in ((Ca, "another org's admin"), (Bo, "a member (Previous access)")):
         w = s.request(method, B + url, json={})
         check(h.status_code != 200 or w.status_code not in DENY, f"{who} {what}: saving is denied ({w.status_code}), so the history too: {h.status_code}")
         check(h.status_code not in DENY or w.status_code in DENY, f"{who} {what}: the history is denied ({h.status_code}), so is saving: {w.status_code}")
-        check(h.status_code in (200, 403, 404), f"{who} {what}: no error but a refusal {h.status_code} {h.text[:120]}")
+        if w.status_code in DENY:  # 2.570.0 (#4783): one answer per case - denied saving = denied history, else the history
+            check(h.status_code in DENY, f"{who} {what}: saving denied, the history refused too {h.status_code} {h.text[:120]}")
+        else:
+            check(h.status_code == 200, f"{who} {what}: saving allowed, the history readable {h.status_code} {h.text[:120]}")
         if who.startswith("another"):
             check(h.status_code in DENY, f"{who} {what}: nothing of Alpha {h.status_code}")
             check("Kernstadt" not in h.text and "Example Client" not in h.text, f"{who} {what}: no content")
