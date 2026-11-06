@@ -313,7 +313,10 @@ function rk_tripModal(t) {
         const old = {date_from: t.date_from, date_to: t.date_to, dest: t.dest, overnight: t.overnight, people: t.people, purpose: t.purpose, client_id: t.client_id, project: t.project, km: t.km, note: t.note,
           country: t.country, place: t.place, t_start: t.t_start, t_end: t.t_end, vma_days: t.vma_days, vma_off: t.vma_off};  // 2.95.0 A (#1932)
         // 2.560.0 D (#4700) kept: the save checks the version (409 = saved elsewhere meanwhile: row back, the saved one opens)
-        let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => (t.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}`, ofcVerBody(body, t)), ofcDraw); } catch (x) { ofcVerLate(x, t.updated_at, () => rk_tripModal({...t, ...body}), row => { rk_reload(); rk_tripModal(row); }); return; }
+        // 2.576.0 (#4794): objsave.js - only the changed fields; a 409 opens the dialog again on the saved trip with the input and the merge bar
+        const t0 = ofcBase(md, t);
+        let j; try { j = await optWrite(optSet(() => rk_trip(t.id), loc), () => ofcSave(null, `/api/office/trips/${t.id}`, t0, body), ofcDraw); } catch (x) { ofcSaveErr(null, x, r => { const m2 = rk_tripModal(r); rk_reload(); return m2; }); return; }
+        if (!j) { rk_refresh(); return; }
         rk_tripSet(j); rk_refresh();
         toast(tr('Saved'), async () => { const r = await undoWrite(`/api/office/trips/${t.id}`, old, j?.updated_at, {now: body}).catch(() => null); if (r?.id) rk_tripSet(r); rk_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
@@ -324,7 +327,7 @@ function rk_tripModal(t) {
         rk_tripSet(j, tmp); rk_refresh();
         toast(tr('Added'), async () => { await api('DELETE', `/api/office/trips/${j.id}`); if (RK.open === j.id) RK.open = null; rk_refresh(); });
       }
-    } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_tripModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   return md;
 }
@@ -373,7 +376,9 @@ function rk_itemModal(t, i) {
       if (i) {
         const old = {date: i.date, category: i.category, amount: i.amount, currency: i.currency, fx_rate: i.fx_rate, amount_home: i.amount_home, text: i.text, datev: i.datev, datev_no: i.datev_no, vat_pct: i.vat_pct ?? null};  // 2.545.0 (#4387): + VAT rate
         // 2.560.0 D (#4700) kept: the save checks the version (409: row back, the saved receipt opens)
-        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => (i.updated_at ? rawFetch : api)('PATCH', `/api/office/trips/${t.id}/items/${i.id}`, ofcVerBody(body, i)), ofcDraw); } catch (x) { ofcVerLate(x, i.updated_at, () => rk_itemModal(t, {...i, ...body}), row => { rk_reload(); rk_itemModal(t, row); }); return; }
+        const i0 = ofcBase(md, i);
+        let j; try { j = await optWrite(rk_itemsPut(t.id, its => its.map(x => x.id === i.id ? {...x, ...loc} : x)), () => ofcSave(null, `/api/office/trips/${t.id}/items/${i.id}`, i0, body), ofcDraw); } catch (x) { ofcSaveErr(null, x, r => { const m2 = rk_itemModal(t, r); rk_reload(); return m2; }); return; }  // 2.576.0 (#4794)
+        if (!j) { rk_refresh(); return; }
         rk_tripSet(j); rk_refresh();
         const now = j?.items?.find(x => x.id === i.id);
         toast(tr('Saved'), async () => { const r = await undoWrite(`/api/office/trips/${t.id}/items/${i.id}`, old, now?.updated_at, {now: body}).catch(() => null); if (r?.id) rk_tripSet(r); rk_refresh(); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
@@ -383,7 +388,7 @@ function rk_itemModal(t, i) {
         rk_tripSet(j); rk_refresh();
         toast(tr('Added'), async () => { rk_tripSet(await api('DELETE', `/api/office/trips/${t.id}/items/${j.item_id}`).then(x => x.trip)); rk_refresh(); });
       }
-    } catch (x) { if (ofcVerConflict(md, x, row => { rk_reload(); rk_itemModal(t, row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
   return md;
 }
@@ -710,25 +715,16 @@ document.addEventListener('click', e => {
   e.preventDefault(); rk_impPick();
 });
 
-// 2.560.0 D (#4700): the version check of the office dialogs that save a whole form (trips, receipts, logbook, cash book,
-// credit cards, entertainment): the body carries the updated_at the dialog was opened with (saved elsewhere meanwhile -> 409
-// with the current row under "current" (2.567.0 #4711; "row" of the older routes), never overwritten), the undo writes back only the keys this save changed, with the new
-// version. Without a version (an old row) the save goes as before.
-function ofcVerBody(body, r) { return r?.updated_at ? {...body, expect_updated_at: r.updated_at} : body; }
-// 2.566.0 (#4704): the undo of these saves is core.js undoWrite(url, old, version, {now: body}) (ofcVerUndo went into it)
-// 2.559.0 (#4660): the same 409 after a dialog that closed at once (the change is taken back already): again() opens the
-// dialog once more with the person's input, the bar below says so with "Reload" (reopen: the saved state), nothing typed is
-// lost; another error of rawFetch (ver: the save went that way, api() shows its own) as a toast
-function ofcVerLate(x, ver, again, reopen) {
-  if (x?.status === 409 && (x.data?.current || x.data?.row)) { let m2 = null; try { m2 = again(); } catch { /* the toast below */ } if (!m2 || !ofcVerConflict(m2, x, reopen)) toast(tr('Changed in the meantime')); }
-  else if (ver && x?.message) toast(x.message);
-}
-// a 409 of such a save: the dialog's error line says so with "Reload" (reopen: the dialog with the saved state); -> handled
-function ofcVerConflict(md, x, reopen) {
-  const cur = x?.data?.current || x?.data?.row;  // 2.567.0 D (#4711): the routes on the core's write layer answer "current"
-  if (x?.status !== 409 || !cur) return false;
-  const el = $('.aerr', md); if (!el) { toast(tr('Changed in the meantime')); return true; }
-  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-ofc-reload>${tr('Reload')}</button>`;
-  $('[data-ofc-reload]', el).addEventListener('click', () => { md.remove(); reopen(cur); });
-  return true;
+// 2.576.0 (#4794): the office dialogs whose rows save through the core's write layer (office/owrite.py ow_write) save with
+// objsave.js (objSaveForm: only the fields that differ from what the dialog opened, with expect_updated_at; a 409 = the
+// shared merge bar, nothing typed is lost). They replace the own version helpers and Reload bars of 2.559.0 / 2.560.0. The undo
+// of these saves is core.js undoWrite(url, old, version, {now: body}) (2.566.0, #4704).
+async function ofcSave(md, url, rec, body, method) { await loadModule('objsave'); return objSaveForm(md, url, rec, body, method); }
+// the base of a save that shows at once (optWrite / optSet change the row object itself before the request): a copy taken first
+const ofcBase = (md, r) => ({...(md?._objBase || r?._objBase || r)});
+// a failed save: a conflict -> objConflict (again(state) opens the dialog once more when it closed at once); another error ->
+// the dialog's error line, or a toast once it is gone
+async function ofcSaveErr(md, x, again) {
+  if (typeof objConflict === 'function' && await objConflict(md, x, again)) return;
+  const el = md?.isConnected && $('.aerr', md); if (el) el.textContent = x?.message || ''; else if (x?.message) toast(x.message);
 }

@@ -71,10 +71,13 @@ function pp_card(x) {
     ${offer || x.list_id ? `<span class="ppmeta">${offer}${x.list_id ? `<span class="rotag">${ic('brief', 's')}${tr('Project')}</span>` : ''}</span>` : ''}</div></li>`;
 }
 
-async function pp_patch(id, body, msg = tr('Saved'), expect = null) {  // 2.559.0 (#4660): at once, see above; throws on a refusal (api() / the caller says why)
-  // 2.560.0 C (#4700): the dialog sends the updated_at it opened with (saved elsewhere meanwhile -> 409); the undo
-  // writes back only the keys that really changed, with the version this save left
-  const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => (expect ? rawFetch : api)('PATCH', `/api/office/deals/${id}`, expect ? {...body, expect_updated_at: expect} : body), ofcDraw);
+async function pp_patch(id, body, msg = tr('Saved'), rec = null) {  // 2.559.0 (#4660): at once, see above; throws on a refusal (api() / the caller says why)
+  // 2.576.0 (#4794): the dialog's save (rec = the deal it opened) goes through objsave.js: only the changed fields with
+  // expect_updated_at (saved elsewhere meanwhile -> 409, the caller's merge bar); the undo writes back only the keys that
+  // really changed, with the version this save left
+  const r0 = rec && ofcBase(null, rec);  // before the card shows the new values (optSet changes the row object)
+  const j = await optWrite(optSet(() => pp_item(id), pp_local(body)), () => r0 ? ofcSave(null, `/api/office/deals/${id}`, r0, body) : api('PATCH', `/api/office/deals/${id}`, body), ofcDraw);
+  if (!j) { pp_refresh(); return rec; }
   pp_itemSet(j); pp_refresh();
   const before = Object.fromEntries(Object.entries(j.before || {}).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(j[k] ?? null)));
   if (Object.keys(before).length) toast(msg, async () => { const r = await undoWrite(`/api/office/deals/${id}`, before, j.updated_at, {label: j.title}).catch(() => null); if (r?.id) pp_itemSet(r); pp_refresh(); });  // 2.566.0 (#4704): core.js undoWrite
@@ -155,18 +158,8 @@ function pp_modal(x, stage) {
       // 2.559.0 (#4660): the dialog closes at once, the card shows (a new one: provisional); a refusal puts the board back
       md.remove();
       if (x) {
-        try { await pp_patch(x.id, body, tr('Saved'), x.updated_at || null); } catch (x2) {
-          // 2.560.0 C (#4700) kept: saved elsewhere meanwhile -> the card is back, the dialog opens again with this input and the
-          // bar; "Reload" opens the saved state (this input is not saved)
-          if (x2.status === 409 && x2.data?.row) {
-            const m2 = pp_modal({...x, ...body}), el = $('.aerr', m2);
-            if (el) {
-              el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-pp-reload>${tr('Reload')}</button>`;
-              $('[data-pp-reload]', el).addEventListener('click', () => { m2.remove(); pp_reload(); pp_modal(x2.data.row); });
-            } else toast(tr('Changed in the meantime'));
-          }
-          else if (x.updated_at && x2.message) toast(x2.message);  // rawFetch does not show it itself
-        }
+        // 2.576.0 (#4794): saved elsewhere meanwhile -> the card is back, the dialog opens again on the saved deal with this input and the merge bar
+        try { await pp_patch(x.id, body, tr('Saved'), x); } catch (x2) { ofcSaveErr(null, x2, r => { const m2 = pp_modal(r); pp_reload(); return m2; }); }
         return;
       }
       const tmp = -Date.now(), was = PPS.stage;

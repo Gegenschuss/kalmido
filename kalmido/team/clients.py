@@ -392,7 +392,7 @@ def _contacts_from_body(c, cid, oid, b, f):
 @app.patch("/api/clients/<int:cid>")
 def client_update(cid):
     """2.567.0 (#4711): through the office's write layer (office/owrite.py ow_write): the lock, the version (409 with the
-    current client under "current" and "client"), only the fields sent, the undo step with the contact persons, the
+    current client under "current"; 2.576.0 #4794: the old key client went), only the fields sent, the undo step with the contact persons, the
     history, updated_by, bump. The rights stay need_client's."""
     c = db()
     uid = me()
@@ -431,7 +431,7 @@ def client_update(cid):
             cdn_fill_address(c, cid)
 
     # 2.269.0 C (#3017): a contact person change counts too (force); 2.111.0 A (#2233): the step for "Saved · Undo"
-    ow_write(c, uid, "client", cid, b, clean, where="id=?", args=(cid,), alias="client", lock=f"clients-{cid}",
+    ow_write(c, uid, "client", cid, b, clean, where="id=?", args=(cid,), lock=f"clients-{cid}",
              public=lambda c, cur: client_public(c, uid, need_client(c, cid, uid), stats=True), extra=extra, force=contacts)
     c.commit()
     return jsonify(client_public(c, uid, need_client(c, cid, uid), stats=True))

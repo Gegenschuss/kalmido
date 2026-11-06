@@ -29,6 +29,7 @@ function obj_hdr(method, url) {
 //   o.base  what the dialog showed when it opened, in the shape of `now` (its form read once): the diff is taken against it
 //           (default `open`); OBJ_MINE in it = a field typed here before a conflict, always sent again
 //   o.view  the server's object -> the dialog's shape of `open` (e.g. one date of a series), for the fields someone else changed
+//   o.method  the write's method (default PATCH; 2.576.0 (#4794): the bank rules save with PUT)
 //   o.send  (body) -> the answer, instead of rawFetch PATCH url (api() with its toasts, an optimistic put)
 // the conflict carries `mine` too: the fields typed here, to be put over cur when the dialog is drawn again
 const OBJ_MINE = Object.freeze({mine: 1});
@@ -46,7 +47,7 @@ async function saveDialog(url, open, now, o = {}) {
   if (!Object.keys(d).length) return open;
   try {
     const b = {...d, [o.exp || 'expect_updated_at']: open.updated_at};
-    const j = await (o.send ? o.send(b) : rawFetch('PATCH', url, b));
+    const j = await (o.send ? o.send(b) : rawFetch(o.method || 'PATCH', url, b));
     const s = OBS.s[url]; if (s) s.seen = j.updated_at;
     return j;
   } catch (e) {
@@ -78,6 +79,30 @@ function objMerge(md, cf, onBase, o = {}) {
     if (a === 'theirs') fs.forEach((f, i) => { if (!f) return; const v = cf.cur[cf.theirs[i]]; if (f.type === 'checkbox') f.checked = !!v; else f.value = v ?? ''; f.dispatchEvent(new Event('input', {bubbles: true})); });
     fs.forEach(f => { if (f) { f.classList.remove('obj-theirs'); f.style.outline = ''; } }); b.remove();
   });
+}
+// 2.576.0 (#4794): the dialogs that save a whole form (the office's rows, the clients): objSaveForm = saveDialog against the
+// state the dialog opened (md._objBase / rec._objBase once a conflict reopened it) -> the saved object, null when nothing changed; a conflict
+// throws (status 409) and objConflict shows it: the dialog md still open -> the merge bar on it; closed at once (an optimistic
+// save) -> again(state) opens it on the current state with the person's changes on top, then the bar. "Keep mine" = the next
+// save goes against the current version, "Take theirs" opens it on theirs. -> true when it was such a conflict
+/** @param {any} md @param {string} url @param {any} rec @param {any} body @param {string} [method] */
+async function objSaveForm(md, url, rec, body, method) {
+  const base = md?._objBase || rec?._objBase || rec, j = await saveDialog(url, base, body, {method});
+  if (j?.conflict) throw Object.assign(new Error(tr('Changed by someone else in the meantime')), {status: 409, conflict: j.conflict, base, body});
+  if (md?._objBase) md._objBase = null;  // saved: the dialog's own state is the base again
+  return j === base ? null : j;
+}
+/** @param {any} md @param {any} x @param {(rec: any) => any} again */
+async function objConflict(md, x, again) {
+  const cf = x?.conflict; if (!cf) return false;
+  /** @type {any} */ let m = md?.isConnected ? md : null;
+  if (!m) {  // the state to open: theirs with the person's changes; its base (not enumerable: never sent, never spread) = theirs
+    const rec = {...cf.cur, ...objDiff(x.base, x.body)}; Object.defineProperty(rec, '_objBase', {value: cf.cur});
+    m = await Promise.resolve().then(() => again(rec)).catch(() => null);
+  }
+  if (!m?.isConnected) { toast(tr('Changed by someone else in the meantime')); return true; }
+  objMerge(m, cf, cur => { m._objBase = cur; }, {take: () => { m.remove(); again(cf.cur); }});
+  return true;
 }
 // the version watch of an open dialog: when the counter of the app moved (S.v), the object is read again; another updated_at
 // than the one the dialog works on = the calm bar "Changed by someone else in the meantime" (saving then shows the merge)

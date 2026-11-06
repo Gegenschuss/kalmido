@@ -524,7 +524,7 @@ def rk_trip_patch(tid):
             _trip_need_open(c, oid, t, row.get("date_from"), row.get("date_to"))  # 2.148.0 A (#2471)
         return row
     ow_write(c, uid, "office_trip", tid, b, clean, oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_trips", r),
-             enc=lambda c, v: oc_enc_fields(c, oid, "office_trips", v), alias="row", public=lambda c, t: _one(c, oid, tid))
+             enc=lambda c, v: oc_enc_fields(c, oid, "office_trips", v), public=lambda c, t: _one(c, oid, tid))
     c.commit()
     return jsonify(_one(c, oid, tid))
 
@@ -618,7 +618,7 @@ def rk_item_patch(tid, iid):
         return row
     ow_write(c, uid, "office_trip_item", iid, b, clean, where="id=? AND trip_id=? AND org_id=?", args=(iid, tid, oid), oid=oid,
              dec=lambda c, r: oc_dec_fields(c, oid, "office_trip_items", r), enc=lambda c, v: oc_enc_fields(c, oid, "office_trip_items", v),
-             alias="row", public=lambda c, cur: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))
+             public=lambda c, cur: next((x for x in _one(c, oid, tid)["items"] if x["id"] == iid), None))
     c.commit()
     return jsonify(_one(c, oid, tid))
 
@@ -772,7 +772,7 @@ def rka_purpose_patch(pid):
         if r["name"].casefold() == name.casefold():
             raise BadInput(tr("This purpose already exists"))
     row, _ = ow_write(c, uid, "office_trip_purpose", pid, b, lambda c, b, cur: {"name": name}, where="id=? AND org_id=? AND deleted_at IS NULL",
-                      oid=oid, alias="row", public=lambda c, cur: {"id": cur["id"], "name": cur["name"], "updated_at": cur["updated_at"]})
+                      oid=oid, public=lambda c, cur: {"id": cur["id"], "name": cur["name"], "updated_at": cur["updated_at"]})
     c.commit()
     return jsonify(id=pid, name=row["name"], updated_at=row["updated_at"])
 

@@ -135,6 +135,12 @@ c.commit()
   (agents must send it), only the fields sent, undo step, `updated_at` / `updated_by`, history (an encrypted column stays
   sealed there), `bump`. The area checks its rights before, as it always did. `office/undo.py` keeps its route and header
   and runs on `obj_undo_run` (the steps live in `obj_undo`).
+- Stage 2b (2.576.0, #4794): a 409 of `ow_write` carries the current state under `current` only (the old keys `row` /
+  `letter` / `client` went). Every office row on `ow_write` has its history route `GET <its save path>/history`
+  (`ow_history_answer`; e.g. `/api/office/trips/<id>/history`, `/api/clients/<id>/history`): the route runs the rights
+  checks of the save route (the gate, the row in the organisation, the level "own"), and office/rights.py `ofr_need`
+  asks a group for what saving needs (a "Read only" group sees the row but not its history). No state checks: the
+  history of a finished row stays readable.
 
 ## 5. Routes you get
 
@@ -158,6 +164,15 @@ const r = await saveDialog(url, obj, values);  // only the changed fields + expe
 if (r.conflict) objMerge(md, r.conflict, cur => { obj = cur; });   // fields someone else changed are marked
 else obj = r;
 await objUndo(url);                            // the server's undo of this dialog's own steps
+```
+
+A dialog that saves a whole form (the office's rows, the clients; 2.576.0, #4794) uses the two wrappers around it:
+
+```js
+const j = await objSaveForm(md, url, rec, body);   // saveDialog against rec (md._objBase after a conflict); null = nothing changed
+// a 409 throws {status: 409, conflict}: the dialog still open -> the merge bar on it; closed at once (optimistic) ->
+// again(state) opens it on the current state with the person's changes on top, then the bar
+catch (x) { if (await objConflict(md, x, state => openDialog(state))) return; ... }
 ```
 
 ## 7. Tests

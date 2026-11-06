@@ -71,16 +71,12 @@ function brl_edit(r, init) {
       amount_min: num('#brl-min'), amount_max: num('#brl-max'), action: val('#brl-act'), category: val('#brl-category'), account: val('#brl-acct')};
     b.disabled = true;
     try {
-      if (r) await brl_put(r.id, body, r); else await brl_new({...body, apply_open: !!$('#brl-open', md)?.checked});
+      if (r) await brl_put(r.id, body, r, md); else await brl_new({...body, apply_open: !!$('#brl-open', md)?.checked});
       md.remove();
     } catch (x) {
       b.disabled = false;
       const el = $('.aerr', md);
-      if (r && x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-brl-reload>${tr('Reload')}</button>`;
-        $('[data-brl-reload]', el).addEventListener('click', () => { md.remove(); brl_load(); brl_edit(x.data.current || x.data.row); });
-        return;
-      }
+      if (r && typeof objConflict === 'function' && await objConflict(md, x, s => { const m2 = brl_edit(s); brl_load(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
       el.textContent = x.message || tr('unknown');
     }
   });
@@ -98,10 +94,12 @@ async function brl_new(body) {
     redo: async () => { await api('POST', `/api/office/bank/rules/${id}/restore`); if (body.apply_open) await api('POST', `/api/office/bank/rules/${id}/apply`); brl_stale(); brl_load(); }}));
   return j;
 }
-async function brl_put(id, body, was) {
+async function brl_put(id, body, was, md) {
   // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten); undo / redo
   // write only the keys this save changed, each with the version the step before left
-  const j = await (was?.updated_at ? rawFetch : api)('PUT', `/api/office/bank/rules/${id}`, was?.updated_at ? {...body, expect_updated_at: was.updated_at} : body); brl_stale(); brl_load();
+  // 2.576.0 (#4794): objsave.js - only the changed fields; a 409 = the merge bar (objConflict, md: the dialog)
+  const j = await ofcSave(md, `/api/office/bank/rules/${id}`, was, body, 'PUT'); brl_stale(); brl_load();
+  if (!j) { toast(tr('Saved')); return; }
   const old = brl_body(was), now = brl_body(j.rule), ks = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
   let ver = j.rule.updated_at;
   // 2.566.0 (#4704): core.js undoStep (PUT takes only the keys sent) - changed elsewhere since -> said, the step leaves the history

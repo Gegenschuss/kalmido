@@ -6,8 +6,8 @@ them to shares and folders). The transition docs/dev/kern.md names: the kinds ar
 (core/writes.py obj_track), and ow_write does for one row in ONE call what obj_write does for a core object:
 
   write_lock('obj-<kind>-<id>') -> the row again under the lock (FOR UPDATE) -> an AGENT must send expect_updated_at (400
-  without, as obj_write) -> the version check (core/conflict.py ccf_check: 409 with the current state under "current", or
-  under the route's old key too, OwConflict) -> only the fields sent (the module's own cleaner, partial) -> nothing changed = nothing written ->
+  without, as obj_write) -> the version check (core/conflict.py ccf_check: 409 with the current state under "current",
+  OwConflict; 2.576.0 #4794: the routes' old keys row / letter / client went, the dialogs read "current" through objsave.js) -> only the fields sent (the module's own cleaner, partial) -> nothing changed = nothing written ->
   the undo step (header X-Kalmido-Undo, people only: obj_undo_pre / obj_undo_post) -> updated_at (milliseconds, the base of
   the next save), updated_by -> the history (obj_history: before / after of the changed columns AS STORED -- an encrypted
   column stays sealed there, an agent marked) -> bump. The caller commits.
@@ -18,9 +18,9 @@ the same undo step.
 
 Interface:
   ow_kind(kind, table, scope=None, keep=None, nofp=None)       track a kind (at import of its module)
-  ow_write(c, uid, kind, rid, b, clean, *, where=..., args=..., dec=None, enc=None, public=None, alias=None,
+  ow_write(c, uid, kind, rid, b, clean, *, where=..., args=..., dec=None, enc=None, public=None,
            version=True, extra=None, force=False) -> (row after (dec'd dict), {column: (before, after)})
-  ow_check(b, have, cur, alias=None)                            the version check alone (OwConflict)
+  ow_check(b, have, cur)                                        the version check alone (OwConflict)
   ow_crypt(table, office) -> (dec, enc)                         for a table with encrypted columns (core/orgcrypt.py)
   ow_undo_ctx(kind, fn)                                         the session undo of the kind (office/undo.py route)
   ow_history(c, kind, rid, org, limit=50) -> the entries (the caller checked the rights to read the row)
@@ -46,27 +46,23 @@ from ..core.writes import (NEED_VERSION, OBJ_TRACK, _same, _val, obj_history_add
                            obj_undo_pre)
 
 class OwConflict(Conflict):
-    """409 {"error", "current": the current state, <alias>: the same} -- "current" as obj_write; alias = the key the route
-    answered with before (row, letter, client), so the clients and agents reading it go on working."""
+    """409 {"error", "current": the current state} -- as obj_write. 2.576.0 (#4794): the alias key of before (row, letter,
+    client) went once every dialog read "current" (objsave.js)."""
 
-    def __init__(self, cur, alias=None):
+    def __init__(self, cur):
         super().__init__("current", cur)
-        self.alias = alias
 
 
 @app.errorhandler(OwConflict)
 def ow_conflict_answer(e):
-    out = {"error": e.text(), "current": e.cur}
-    if e.alias and e.alias != "current":
-        out[e.alias] = e.cur
-    return jsonify(out), 409
+    return jsonify({"error": e.text(), "current": e.cur}), 409
 
 
-def ow_check(b, have, cur, alias=None):
+def ow_check(b, have, cur):
     """The version check (core/conflict.py ccf_check, answered with OwConflict): expect_updated_at set and not the row's -> 409."""
     exp = b.get("expect_updated_at") if isinstance(b, dict) else None
     if exp and str(exp) != str(have or ""):
-        raise OwConflict(cur(), alias)
+        raise OwConflict(cur())
 
 
 OW_UNDO_CTX = {}  # undo kind -> fn(ref) -> (c, uid, oid, after(c) -> the answer): how office/undo.py checks the rights (ow_undo_ctx)
@@ -113,10 +109,10 @@ def _stored(v):
 
 
 def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=None, oid=None, dec=None, enc=None, public=None,
-             alias=None, version=True, extra=None, force=False, lock=None, write=None):
+             version=True, extra=None, force=False, lock=None, write=None):
     """Change row rid of kind (module docstring). b = the request body (expect_updated_at in it); clean(c, b, cur) -> {column:
     clean value} of the fields sent; dec(c, raw) -> the row as dict (decrypted), enc(c, {column: value}) -> as stored;
-    public(c, cur) -> the current state of a 409 (under "current", and under alias too: the key the route used before);
+    public(c, cur) -> the current state of a 409 (under "current");
     version=False for the module's own internal writes (no version check);
     extra(c, cur, changed) runs inside the step (more rows of the object); force = stamp the row even when no own column
     changed (extra changed something); lock = the name of the row's lock when the module's other writes use one already
@@ -138,7 +134,7 @@ def ow_write(c, uid, kind, rid, b, clean, *, where="id=? AND org_id=?", args=Non
     if version:
         if agent and not b.get("expect_updated_at"):
             raise VersionRequired(("expect_updated_at",), tr(NEED_VERSION))  # 2.564.0 (#4702): the agents' one code version_required
-        ow_check(b, raw["updated_at"], lambda: public(c, cur) if public else dict(cur), alias)
+        ow_check(b, raw["updated_at"], lambda: public(c, cur) if public else dict(cur))
     vals = clean(c, b, cur) or {}
     changed = {k: (cur.get(k), v) for k, v in vals.items() if not _same(cur.get(k), v)}
     if not changed and not force:

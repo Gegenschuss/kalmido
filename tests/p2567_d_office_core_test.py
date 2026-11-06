@@ -15,6 +15,7 @@ usage: p2567_d_office_core_test.py <datadir>      (KMT_NOSTART=1: a running serv
 import base64
 import json
 import os
+import re
 import sys
 from datetime import date
 
@@ -92,7 +93,7 @@ def two(S, who, uid, what, kind, table, rid, url, first, second, ver, method="PA
         check(ver(cur) == v1, p + f"'current' is the stored version {ver(cur)!r} == {v1!r}")
         if same:
             check(same(cur), p + f"'current' shows writer 1's change {cur}")
-        check(r.json().get("row") == cur, p + "the older key 'row' carries the same state (old clients)")
+        check("row" not in r.json(), p + "2.576.0 (#4794): the older key 'row' went (the dialogs read current)")
     check(row(table, rid) == after, p + "the 409 wrote nothing")
     # without expect_updated_at: as before
     r = S.request(method, B + url, json=second)
@@ -166,10 +167,10 @@ def run(S, who, uid):
 run(Fr, "freelancer", FID)
 run(A, "org", AID)
 
-# the dialogs read the 409's state under "current" (the older routes' "row" still works)
-tj = kt_src("static/js/office_travel.js")
-check("x?.data?.current || x?.data?.row" in tj and "(x.data?.current || x.data?.row)" in tj, "UI: ofcVerConflict / ofcVerLate take 'current'")
-for f in ("office_cashflow.js", "office_subs.js", "office_bankrules.js", "office_recurring.js"):
-    check("x.data?.current || x.data?.row" in kt_src("static/js/" + f), f"UI: {f} takes 'current'")
+# the dialogs read the 409's state under "current": 2.576.0 (#4794) through objsave.js (saveDialog), the old key "row" went
+check("e.data?.current" in kt_src("static/js/objsave.js"), "UI: objsave.js saveDialog takes 'current'")
+for f in ("office_travel.js", "office_cashflow.js", "office_subs.js", "office_bankrules.js", "office_recurring.js"):
+    js = kt_src("static/js/" + f)
+    check("ofcSave(" in js and not re.search(r"data\??\.row\b", js), f"UI: {f} saves through objsave.js, no old key")
 
 sys.exit(done("p2567_d_office_core"))

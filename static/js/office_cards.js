@@ -106,8 +106,8 @@ function ccCardDlg(k) {
     ${ofcRowF('cc-a', tr('Business account'), ofcIn('cc-a', k?.account, {max: 120, list: 'cc-al'}) + `<datalist id="cc-al">${ac.map(a => `<option value="${esc(a)}">`).join('')}</datalist>`, tr('the total of the statements leaves this account'))}`, tr('Save'), async m => {
     const v = id => $('#' + id, m).value.trim(), h = v('cc-h');
     const req = {holder_id: h ? +h : null, holder_name: h ? '' : v('cc-n'), provider: v('cc-p'), last4: v('cc-l'), account: v('cc-a')};
-    try { if (k) await (k.updated_at ? rawFetch : api)('PATCH', `/api/office/cards/${k.id}`, ofcVerBody(req, k)); else await api('POST', '/api/office/cards', req); }  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409
-    catch (x) { if (ofcVerConflict(m, x, row => { ccStale(); ccCardDlg(row); })) return false; throw x; }
+    try { if (k) await ofcSave(m, `/api/office/cards/${k.id}`, k, req); else await api('POST', '/api/office/cards', req); }  // 2.576.0 (#4794): only the changed fields; saved elsewhere meanwhile -> the merge bar
+    catch (x) { if (typeof objConflict === 'function' && await objConflict(m, x, r => { const m2 = ccCardDlg(r); ccStale(); return m2; })) return false; throw x; }
     ccStale(); return true;
   });
   return md;
@@ -122,8 +122,8 @@ function ccLineDlg(x) {
     ${ofcRowF('cl-k', tr('Kind'), ofcSel('cl-k', x?.kind || 'purchase', [['purchase', tr('Purchase')], ['fee', tr('Fee')], ['credit', tr('Money back')]]))}`, tr('Save'), async m => {
     const v = id => $('#' + id, m).value.trim(), n = id => { const t = v(id); if (!t) return null; const r = ofcNum(t); return r == null ? t : String(r); };
     const req = {day: v('cl-d'), merchant: v('cl-m'), amount: n('cl-a'), orig_amount: n('cl-o'), orig_currency: v('cl-c'), kind: v('cl-k')};
-    try { if (x) await (x.updated_at ? rawFetch : api)('PATCH', `/api/office/cards/lines/${x.id}`, ofcVerBody(req, x)); else await api('POST', `/api/office/cards/statements/${s.id}/lines`, req); }  // 2.560.0 D (#4700)
-    catch (e) { if (ofcVerConflict(m, e, row => { ccStale(); ccLineDlg(row); })) return false; throw e; }
+    try { if (x) await ofcSave(m, `/api/office/cards/lines/${x.id}`, x, req); else await api('POST', `/api/office/cards/statements/${s.id}/lines`, req); }  // 2.576.0 (#4794)
+    catch (e) { if (typeof objConflict === 'function' && await objConflict(m, e, r => { const m2 = ccLineDlg(r); ccStale(); return m2; })) return false; throw e; }
     ccStale(); return true;
   });
 }

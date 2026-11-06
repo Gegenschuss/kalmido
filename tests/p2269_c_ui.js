@@ -1,6 +1,6 @@
 // 2.269.0 C (#3017) UI tests, own container (start.sh), jsdom, invented data only:
-// - the client dialog: saved elsewhere meanwhile -> the save shows "Changed in the meantime" with "Reload" (nothing is
-//   overwritten, the dialog stays open); "Reload" opens it with the saved state; a contact person removed in the dialog
+// - the client dialog: saved elsewhere meanwhile -> the save shows the merge bar (2.576.0 #4794: objsave.js, nothing is
+//   overwritten, the dialog stays open with the input); "Take theirs" opens it with the saved state; a contact person removed in the dialog
 //   is deleted (contacts_removed), one added in another tab meanwhile stays
 // - the letter editor: typed text is saved when the editor is left before the pause is over (another view at once)
 const {execFileSync} = require('child_process');
@@ -39,15 +39,16 @@ const FEAT = 'cal,comments,collab,office,clients';
   check(other.http === 200, 'the other tab saved');
   md.querySelector('#cl-note').value = 'this tab';
   click(w, md.querySelector('[data-m="save"]'));
-  await until(() => md.querySelector('[data-cl-reload]'), 40);
-  check(md.isConnected && /Changed in the meantime/.test(md.querySelector('.aerr')?.textContent || '') && md.querySelector('[data-cl-reload]'),
-    'conflict: the dialog stays open with "Changed in the meantime" and "Reload": ' + (md.querySelector('.aerr')?.textContent || ''));
+  // 2.576.0 (#4794): the shared merge bar of objsave.js instead of the own "Reload" line
+  await until(() => md.querySelector('.obj-merge [data-om="theirs"]'), 40);
+  check(md.isConnected && /Changed by someone else in the meantime/.test(md.querySelector('.obj-merge')?.textContent || '') && md.querySelector('#cl-note').value === 'this tab',
+    'conflict: the dialog stays open with the input and the merge bar: ' + (md.querySelector('.obj-merge')?.textContent || md.querySelector('.aerr')?.textContent || ''));
   let cj = await call('GET', `/api/clients/${CL}`);
   check(cj.note === 'other tab' && cj.contacts.length === 3, 'conflict: nothing was overwritten');
-  click(w, md.querySelector('[data-cl-reload]'));
+  click(w, md.querySelector('.obj-merge [data-om="theirs"]'));
   await until(() => d.querySelector('.modal.cldlg') && d.querySelector('.modal.cldlg') !== md, 30);
   md = d.querySelector('.modal.cldlg');
-  check(md && md.querySelector('#cl-note').value === 'other tab' && md.querySelectorAll('.clkc').length === 3, 'reload: the dialog shows the saved state');
+  check(md && md.querySelector('#cl-note').value === 'other tab' && md.querySelectorAll('.clkc').length === 3, 'take theirs: the dialog shows the saved state');
   // remove "Max Sample" in the dialog, save: deleted, the others stay
   const i = [...md.querySelectorAll('[data-clk="name"]')].findIndex(el => el.value === 'Max Sample');
   click(w, md.querySelectorAll('[data-clk-rm]')[i]);

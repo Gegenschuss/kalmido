@@ -15,7 +15,8 @@ tenant-matrix: office
    of an own trip, somebody else's is 404; "Bookkeeping" (travel edit) reads a trip's history but not a vehicle's (the
    vehicles' save needs "manage")
  - 2.570.0 (#4783 review F1): read-only / accounting / guest get no history (403 like saving), also inside an office group
- - two writers: A opened, B saved, A saves with the old version -> 409 with the current state under "current", B's change stays
+ - two writers: A opened, B saved, A saves with the old version -> 409 with the current state under "current" (the old keys
+   row / letter / client went), B's change stays
 usage: p2570_a_office_test.py <datadir>"""
 import base64
 import os
@@ -195,6 +196,7 @@ for what, table, field, v_b, v_a in (("trip", "office_trips", "dest", "Ziel von 
     r = A.patch(B + url, json={field: v_a, "expect_updated_at": seen})
     cur = r.json().get("current") if r.status_code == 409 else None
     check(r.status_code == 409 and isinstance(cur, dict) and cur.get(field) == v_b, f"{what}: A with the old version: 409 with B's state under current {r.status_code} {r.text[:200]}")
+    check(r.status_code == 409 and not ({"row", "letter", "client"} & set(r.json())), f"{what}: the old keys of the 409 went (only current) {sorted(r.json())}")
     check(kt.dbx(f"SELECT updated_at FROM {table} WHERE id=?", (rid,))[0][0] != seen and (what != "letter" or A.get(B + url).json().get(field) == v_b), f"{what}: B's change stays")
 
 sys.exit(kt.done("p2570_a_office"))

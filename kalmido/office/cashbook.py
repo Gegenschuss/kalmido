@@ -529,7 +529,7 @@ def cb_entry_patch(eid):
     cur = oc_dec_fields(c, oid, "office_cash_entries", _entry(c, oid, eid))
     b = _body()
     write_lock(c, f"office_cash_entries-{int(eid)}")  # 2.560.0 D (#4700): (under the box's lock) the row's own, like the other office dialogs
-    ccf_check(b, cur["updated_at"], "row", lambda: _one(c, oid, uid, eid))  # saved elsewhere meanwhile: 409 with the entry, never overwritten
+    ccf_check(b, cur["updated_at"], "current", lambda: _one(c, oid, uid, eid))  # saved elsewhere meanwhile: 409 with the entry, never overwritten (2.576.0 #4794: under "current" like ow_write, the dialog's merge bar reads it)
     last = cb_last_closed(c, bid)
     if last and cur["day"] <= last:
         raise _locked(N_("This entry lies on a closed day and cannot change any more; cancel it instead."))

@@ -391,7 +391,7 @@ def br_edit(rid):
         return {k: d[k] for k in _FIELDS if not (d[k] in (None, "") and cur.get(k) in (None, ""))}
     ow_write(c, uid, "office_bank_rule", rid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
              dec=lambda c, r: _rule_dec(c, oid, r), enc=lambda c, v: oc_enc_fields(c, oid, "office_bank_rules", v),
-             alias="row", public=lambda c, cur: br_public(cur))
+             public=lambda c, cur: br_public(cur))
     c.commit()
     return jsonify(rule=_one(c, oid, rid))
 

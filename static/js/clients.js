@@ -183,18 +183,20 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
         phone: v('#cl-phone'), display_name: v('#cl-dname'), note: v('#cl-note')};  // 2.99.0 D (#2188): + name_extra
       if ($('#cl-sc', md)) body.short_code = v('#cl-sc').trim().toUpperCase();  // 2.433.0 (#3604)
       if (!c && 'org_id' in o) body.org_id = o.org_id;
-      if (c?.updated_at) body.expect_updated_at = c.updated_at;  // 2.269.0 C (#3017): saved elsewhere meanwhile -> 409, never overwritten
       if (!o.quick && md._clkRm?.length) body.contacts_removed = md._clkRm.slice();  // only these are deleted (missing ones stay)
       if ($('#cl-rate', md)) Object.assign(body, {rate: num($('#cl-rate', md).value), budget_h: num($('#cl-bh', md).value), budget_amount: num($('#cl-ba', md).value)});
       if ($('#cl-arch', md)) body.archived = $('#cl-arch', md).checked;
       for (const el of md.querySelectorAll('[data-clb]')) if (!(el.dataset.clb === 'country' && !ctyValid(el.value) && el.value === (c?.billing?.country || ''))) body[el.dataset.clb] = el.dataset.clb === 'payment_terms_days' ? (el.value.trim() === '' ? null : +el.value.trim()) : el.value;
       let r, gone = false;
-      try { r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body); }
+      // 2.576.0 (#4794): a change through objsave.js (only the fields that differ from the client as opened, with
+      // expect_updated_at; saved elsewhere meanwhile -> the merge bar, never overwritten)
+      const send = async () => { if (!c) return rawFetch('POST', '/api/clients', body); await loadModule('objsave'); return (await objSaveForm(md, `/api/clients/${c.id}`, c, body)) || c; };
+      try { r = await send(); }
       catch (x) {
         // 2.81.0 (#1852): a linked contact was deleted elsewhere -> drop that link, save once more, tell the person
         if (x.data?.code !== 'contact_gone' || !body.contacts.some(k => k.contact_id === x.data.contact_id)) throw x;
         body.contacts = body.contacts.map(k => k.contact_id === x.data.contact_id ? {...k, contact_id: null} : k);
-        r = await rawFetch(c ? 'PATCH' : 'POST', c ? `/api/clients/${c.id}` : '/api/clients', body);
+        r = await send();
         gone = true;
       }
       md.remove(); await load(); render(); clReload();
@@ -202,7 +204,7 @@ function clientModal(c, o = {}) {  // 2.80.0 (#1842): o.org_id (the office's are
       if (!c && !o.stay) go('client/' + r.id);
       if (o.done) await o.done(r);
     } catch (x) {
-      if (x.status === 409 && x.data?.client) { cl_conflict(md, x.data.client, o); return; }
+      if (typeof objConflict === 'function' && await objConflict(md, x, rec => clientModal(rec, o))) return;  // 2.576.0 (#4794): the merge bar
       const el = $('.aerr', md); if (el) el.textContent = x.message || '';
     }
   });
@@ -223,11 +225,6 @@ function cl_fdPut(md, v) {
 }
 // 2.269.0 C (#3017): someone else saved the client in between -- a bar instead of overwriting; "Reload" opens the dialog with
 // the saved state (the own input of this dialog is not saved, the bar says so)
-function cl_conflict(md, cur, o) {
-  const el = $('.aerr', md); if (!el) return;
-  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cl-reload>${tr('Reload')}</button>`;
-  $('[data-cl-reload]', el).addEventListener('click', () => { md.remove(); clientModal(cur, o); });
-}
 // 2.272.0 D (#3029): the text of a delete dialog from GET /api/clients/usage (u: null = unknown -> the general rule)
 function cl_delText(u, n = 1) {
   const t = [u?.in_use === n ? tr('Clients used in quotations, invoices or contracts are archived instead. Their projects stay; they only lose the client.')

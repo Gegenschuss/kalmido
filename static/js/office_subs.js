@@ -119,7 +119,8 @@ function aboModal(f) {
       if (f) {
         const old = {label: f.label, amount: f.amount, repeat: f.repeat, start: f.start, until: f.until, category: f.category || '', vat_rate: f.vat_rate || 0, ...aboFields(f)};
         // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten)
-        const sv = await (f.updated_at ? rawFetch : api)('PATCH', `/api/office/fixed-costs/${f.id}`, f.updated_at ? {...body, expect_updated_at: f.updated_at} : body); md.remove(); aboReload();
+        const sv = await ofcSave(md, `/api/office/fixed-costs/${f.id}`, f, body); md.remove(); aboReload();  // 2.576.0 (#4794): only the changed fields (objsave.js)
+        if (!sv) return;
         const back = aboChanged(old, sv);
         if (Object.keys(back).length) toast(tr('Saved'), () => aboUndo(f.id, back, sv)); else toast(tr('Saved'));
       } else {
@@ -128,11 +129,7 @@ function aboModal(f) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-abo-reload>${tr('Reload')}</button>`;
-        $('[data-abo-reload]', el).addEventListener('click', () => { md.remove(); aboReload(); aboModal(x.data.current || x.data.row); });
-        return;
-      }
+      if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = aboModal(r); aboReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
       el.textContent = x.message || '';
     }
   });

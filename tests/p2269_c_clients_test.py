@@ -44,7 +44,8 @@ def clients(s, who):
     a = r.json()
     r = s.patch(B + f"/api/clients/{CL}", json={"note": "tab B", "expect_updated_at": base, "contacts": [{"id": K_ALT, "name": "Alt"}]})
     j = r.json()
-    check(r.status_code == 409 and j.get("client", {}).get("note") == "tab A" and names(j["client"]) == ["Alt", "Neu"] and j.get("error"),
+    # 2.576.0 (#4794): the current client under "current" only (the old key "client" went, the dialog reads "current")
+    check(r.status_code == 409 and j.get("current", {}).get("note") == "tab A" and names(j["current"]) == ["Alt", "Neu"] and j.get("error") and "client" not in j,
           f"{who}: tab B with the old base -> 409 with the current client ({r.status_code} {r.text[:300]})")
     cur = s.get(B + f"/api/clients/{CL}").json()
     check(cur["note"] == "tab A" and names(cur) == ["Alt", "Neu"], f"{who}: nothing of tab B was written {cur.get('note')} {names(cur)}")
@@ -99,7 +100,7 @@ def letter(s, who):
     r = s.patch(B + f"/api/office/letters/{d['id']}", json={"subject": "Tab A", "expect_updated_at": d["updated_at"]})
     check(r.ok and r.json()["subject"] == "Tab A", f"{who}: the letter saved with its base ({r.status_code} {r.text[:200]})")
     r = s.patch(B + f"/api/office/letters/{d['id']}", json={"subject": "Tab B", "expect_updated_at": d["updated_at"]})
-    check(r.status_code == 409 and r.json().get("letter", {}).get("subject") == "Tab A", f"{who}: letter, old base -> 409 ({r.status_code} {r.text[:200]})")
+    check(r.status_code == 409 and r.json().get("current", {}).get("subject") == "Tab A" and "letter" not in r.json(), f"{who}: letter, old base -> 409 with current ({r.status_code} {r.text[:200]})")  # 2.576.0 (#4794): the old key letter went
     check(s.get(B + f"/api/office/letters/{d['id']}").json()["subject"] == "Tab A", f"{who}: the letter kept tab A")
     check(s.patch(B + f"/api/office/letters/{d['id']}", json={"subject": "API"}).ok, f"{who}: letter without expect as before")
 

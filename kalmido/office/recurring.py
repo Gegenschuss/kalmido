@@ -645,7 +645,7 @@ def rin_patch(sid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     row, changed = ow_write(c, uid, "office_inv_series", sid, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
-                            alias="row", public=lambda c, cur: rin_public(c, oid, rin_row(c, oid, sid)))
+                            public=lambda c, cur: rin_public(c, oid, rin_row(c, oid, sid)))
     if changed:
         ofx_log(c, oid, "series_update", target="series", doc_id=row["template_id"], detail={"series_id": sid, "before": {k: v[0] for k, v in changed.items()},
                                                                                             "after": {k: v[1] for k, v in changed.items()}})

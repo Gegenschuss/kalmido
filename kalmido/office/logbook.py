@@ -253,8 +253,8 @@ def lb_vehicle_patch(vid):
         _veh_log(c, oid, "update", vid, before, after)
 
     dec, enc = ow_crypt("office_vehicles", oid)
-    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
-    ow_write(c, uid, "office_vehicle", vid, b, clean, oid=oid, dec=dec, enc=enc, alias="row",
+    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key row went); history, undo step
+    ow_write(c, uid, "office_vehicle", vid, b, clean, oid=oid, dec=dec, enc=enc,
              lock=f"office_vehicles-{int(vid)}", public=lambda c, cur: next(v for v in lb_vehicles(c, oid) if v["id"] == vid), extra=extra)
     c.commit()
     return jsonify(next(v for v in lb_vehicles(c, oid) if v["id"] == vid))
@@ -562,8 +562,8 @@ def lb_drive_patch(did):
         _log(c, oid, did, "change", st["prev"], uid)  # the logbook's own log: the values before of every changed field
 
     dec, enc = ow_crypt("office_drives", oid)
-    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
-    ow_write(c, uid, "office_drive", did, b, clean, oid=oid, dec=dec, enc=enc, alias="row", lock=f"office_drives-{int(did)}",
+    # 2.560.0 D (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key row went); history, undo step
+    ow_write(c, uid, "office_drive", did, b, clean, oid=oid, dec=dec, enc=enc, lock=f"office_drives-{int(did)}",
              public=lambda c, cur: _one(c, oid, uid, did), extra=extra)
     c.commit()
     return jsonify(_one(c, oid, uid, did))

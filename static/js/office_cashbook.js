@@ -171,11 +171,12 @@ async function cbEntryModal(e) {
       const body = {dir: val('#cb-edir'), amount: amount == null ? '' : String(amount), text: val('#cb-etext'), day: val('#cb-eday'), vat_pct: val('#cb-evat') || null,
         category: val('#cb-ecat'), node_id: +val('#cb-enode') || null, ...(noInv ? {} : {invoice_id: +val('#cb-einv') || null})};
       const old = {dir: e.dir, amount: e.amount, text: e.text, day: e.day, vat_pct: e.vat_pct, category: e.category, node_id: e.node_id, ...(noInv ? {} : {invoice_id: e.invoice_id})};
-      const j = await api('PATCH', `/api/office/cash-entries/${e.id}`, ofcVerBody(body, e)); md.remove(); cbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409 (still through api(): the cash book waits, running numbers)
+      const j = await ofcSave(md, `/api/office/cash-entries/${e.id}`, e, body); md.remove(); cbReload(true);  // 2.576.0 (#4794): only the changed fields; saved elsewhere meanwhile -> the merge bar
+      if (!j) return;
       // 2.533.0 (#4337): an entry that booked its invoice's payment just now has no undo (its amount / day / invoice are fixed: cancel it)
       if (j?.paid && !e.paid) toast(tr('Saved'));
       else toast(tr('Saved'), async () => { await undoWrite(`/api/office/cash-entries/${e.id}`, old, j?.updated_at, {now: body}).catch(() => null); cbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
-    } catch (x) { if (ofcVerConflict(md, x, row => { cbReload(true); cbEntryModal(row); })) return; const el = cb$('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
+    } catch (x) { ofcSaveErr(md, x, r => { const m2 = cbEntryModal(r); cbReload(true); return m2; }); }  // 2.576.0 (#4794)
   });
 }
 const CB_ACT = {create: N_('Created'), change: N_('Changed'), cancel: N_('Cancelled'), close: N_('Day closed'), book_create: N_('Cash box created'), book_change: N_('Cash box changed'), delete: N_('Deleted')};  // 2.162.0 A (#2603): test phase, with a deleted invoice

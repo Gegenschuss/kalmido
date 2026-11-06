@@ -179,14 +179,18 @@ async function ltSave(d, quiet) {
   const b = p ? p.b : null, old = LT.undo && LT.undo.id === t.id ? LT.undo.v : ltSnap(t);
   const same = !b || Object.keys(b).every(k => String(b[k] ?? '') === String(t[k] ?? ''));
   try {
-    if (!same) Object.assign(t, await rawFetch('PATCH', `/api/office/letters/${t.id}`, t.updated_at ? {...b, expect_updated_at: t.updated_at} : b));
+    if (!same) {  // 2.576.0 (#4794): objsave.js - only the fields that differ from the saved letter; a conflict -> the merge bar
+      await loadModule('objsave');
+      const j = await saveDialog(`/api/office/letters/${t.id}`, t, b);
+      if (j.conflict) { lt_conflict(t, j.conflict); return false; }
+      Object.assign(t, j);
+    }
     lt_keepDrop(t.id);
     if (!quiet) { LT.undo = null; const now = ltSnap(t), at = t.updated_at; toast(tr('Saved'), async () => { await undoWrite(`/api/office/letters/${t.id}`, old, at, {now, label: t.subject || tr('Letter')}); LT.cur = null; LT.data = null; ofcDraw(); }); }  // 2.566.0 (#4704): only the changed keys, against the own save's version
     else if (!same && !(LT.undo && LT.undo.id === t.id)) LT.undo = {id: t.id, v: old};
     const el = $('#lt-err'); if (el) el.textContent = '';
     return true;
   } catch (x) {
-    if (x.status === 409 && x.data?.letter) { lt_conflict(t, x.data.letter); return false; }
     if (!LT.pend && p) LT.pend = p;  // offline / signed out: it waits (and stays in this browser, lt_keep) for the next try
     const el = $('#lt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
     return false;
@@ -209,11 +213,14 @@ function lt_keepRestore(d) {
   LT.pend = {d, b};
   ltSave(d, true).then(ok => { if (ok) { toast(tr('Saved')); ofcDraw(); } });
 }
-function lt_conflict(d, cur) {
+// 2.576.0 (#4794): the shared merge bar (objsave.js objMerge): "Keep mine" = the next save goes against their version (only
+// what differs from theirs), "Take theirs" shows their letter (the fields first: the redraw keeps typed values)
+const lt_fill = cur => { for (const k of LT_FIELDS) { const el = $('#lt-' + k); if (el && el.type !== 'checkbox' && 'value' in el) el.value = cur[k] ?? ''; } };
+function lt_conflict(d, cf) {
   const el = $('#lt-err');
   if (!el || LT.cur !== d) { toast(tr('Changed in the meantime')); return; }  // the editor is gone: at least the hint
-  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-lt-reload>${tr('Reload')}</button>`;
-  $('[data-lt-reload]', el).addEventListener('click', () => { clearTimeout(ltSaveTimer); LT.pend = null; lt_keepDrop(d.id); LT.undo = null; LT.cur = cur; ofcDraw(); });
+  el.textContent = '';
+  objMerge(el.parentElement || el, cf, cur => { Object.assign(d, cur); }, {take: () => { clearTimeout(ltSaveTimer); LT.pend = null; lt_keepDrop(d.id); LT.undo = null; lt_fill(cf.cur); LT.cur = cf.cur; ofcDraw(); }});
 }
 // the app goes to the background (phone): saved at once; the tab closes: a fetch with keepalive outlives it (lt_keep holds the
 // input in case it does not arrive), a page shown again from the cache reloads the letter (its updated_at is the server's now)

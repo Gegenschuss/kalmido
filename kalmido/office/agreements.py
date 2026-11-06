@@ -499,10 +499,10 @@ def agr_patch(aid):
             fs_ref_rename(c, "office_agreement", aid, changed["name"][1])  # 2.351.0 B (#2749): the name on its folder node (office/agrref.py)
         _save_task(c, oid, uid, aid, b, revive=st["revive"], new_end=st["ends"])
 
-    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"), history,
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key row went), history,
     # undo step, updated_by; the deadline task follows also when only task / list_id were sent (force)
     ow_write(c, uid, "office_agreement", aid, b, clean, oid=oid, dec=lambda c, r: bk_dec(c, oid, r),
-             enc=lambda c, d: oc_enc_fields(c, oid, "office_agreements", d), alias="row", lock=f"office_agreements-{int(aid)}",
+             enc=lambda c, d: oc_enc_fields(c, oid, "office_agreements", d), lock=f"office_agreements-{int(aid)}",
              public=lambda c, cur: bk_public(c, oid, uid, _row(c, oid, aid)), extra=extra, force=True)
     c.commit()
     return jsonify(bk_public(c, oid, uid, _row(c, oid, aid)))

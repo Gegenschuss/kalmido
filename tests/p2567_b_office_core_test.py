@@ -5,7 +5,7 @@
 freelancer-matrix: office
  - per object (letter, client, business contract, document template, generated document, deal, letter block, vehicle,
    drive): two writers -- B saves without a version (old clients: as before), A with the version it opened -> 409 with the
-   current state under "current" (and under the route's old key), nothing written; only the fields sent change (another
+   current state under "current" (2.576.0 #4794: the route's old key went), nothing written; only the fields sent change (another
    field stays); the history (obj_history) has the change with before / after; updated_by names who saved
  - a letter: the session undo (header X-Kalmido-Undo, POST /api/office/undo/letter/<id>) takes the own step back; a
    change of someone else in between: 409
@@ -62,7 +62,7 @@ def two(s, who, what, kind, table, rid, url, b1, b2, alias="row", hist=None, kee
     r = s.request(method, B + url, json={**b2, "expect_updated_at": t0})
     j = r.json() if r.headers.get("content-type", "").startswith("application/json") else {}
     check(r.status_code == 409 and isinstance(j.get("current"), dict), p + f"an old version: 409 with the state under current {r.status_code} {r.text[:200]}")
-    check(r.status_code != 409 or alias is None or j.get(alias) == j.get("current"), p + f"the old key {alias} carries the same state")
+    check(r.status_code != 409 or alias is None or alias not in j, p + f"2.576.0 (#4794): the old key {alias} went (only current)")
     check(stored(table, rid) == snap, p + "the 409 wrote nothing")
     r = s.request(method, B + url, json={**b2, "expect_updated_at": t1})
     check(r.ok, p + f"the fresh version: 200 {r.status_code} {r.text[:200]}")

@@ -418,9 +418,9 @@ def ltb_patch(bid):
         out["row"] = office_update(c, oid, "texts", cur["id"], vals)  # it checks and seals the text (ltx_clean)
 
     # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- the lock of office_update; saved elsewhere meanwhile -> 409
-    # ("current" + "row"); only name / body (ltb_clean); history, undo step (kind of the master data "texts")
+    # ("current"; 2.576.0 #4794: the old key row went); only name / body (ltb_clean); history, undo step (kind of the master data "texts")
     cur, _ = ow_write(c, uid, "office_md_texts", bid, b, lambda c, b, cur: ltb_clean(b), oid=oid, dec=lambda c, r: ltb_row(c, oid, bid),
-                      public=lambda c, cur: ltb_public(cur), alias="row", lock=f"office_texts-{int(bid)}", write=write)
+                      public=lambda c, cur: ltb_public(cur), lock=f"office_texts-{int(bid)}", write=write)
     c.commit()
     return jsonify(ltb_public(ltb_row(c, oid, bid)))
 

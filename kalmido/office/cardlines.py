@@ -228,7 +228,7 @@ def cl_patch(lid):
                        orig_currency=v["orig_currency"], kind=v["kind"], state="noreceipt" if v["kind"] == "fee" else "open")
         return {k: z for k, z in out.items() if (z or None) != (cur.get(k) or None)}
     ow_write(c, uid, "office_cc_line", lid, b, clean, oid=oid, dec=lambda c, r: oc_dec_fields(c, oid, "office_cc_lines", r),
-             enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_lines", v), alias="row", public=lambda c, cur: _public(c, cl_row(c, oid, lid, uid, every)[0]))
+             enc=lambda c, v: oc_enc_fields(c, oid, "office_cc_lines", v), public=lambda c, cur: _public(c, cl_row(c, oid, lid, uid, every)[0]))
     c.commit()
     return _answer(c, oid, uid, lid, every)
 

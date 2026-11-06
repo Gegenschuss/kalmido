@@ -141,14 +141,10 @@ function agrModal(a) {
     try {
       if (m === 'del') { await agrDelete(a); md.remove(); return; }
       if (m === 'arch') { await agrArchive(a, !a.archived); md.remove(); return; }
-      await agrSave(a, read()); md.remove();
+      await agrSave(a, read(), md); md.remove();
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-agr-reload>${tr('Reload')}</button>`;
-        $('[data-agr-reload]', el).addEventListener('click', () => { md.remove(); agrReload(); agrModal(x.data.row); });
-        return;
-      }
+      if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = agrModal(r); agrReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
       el.textContent = x.message || '';
     }
   });
@@ -157,7 +153,7 @@ function agrModal(a) {
 const agrBody = a => ({kind: a.kind, name: a.name, provider: a.provider, number: a.number, cost: a.cost ?? '', per: a.per, vat_pct: a.vat_pct ?? null, start: a.start, ends: a.ends,
   notice: a.notice, notice_unit: a.notice_unit, renew_months: a.renew_months, lead_days: a.lead_days, cashflow: a.cashflow, task: a.task ? 1 : 0,
   list_id: a.task?.list_id || null, doc_node_id: a.doc_node_id || null, note: a.note});
-async function agrSave(a, body) {
+async function agrSave(a, body, md) {
   if (!a) {
     const j = await api('POST', '/api/office/agreements', body); agrReload();
     offerUndo(tr('Added'), histAdd({label: tr('Contract added'), undo: async () => { await api('DELETE', `/api/office/agreements/${j.id}`); agrReload(); },
@@ -167,7 +163,8 @@ async function agrSave(a, body) {
   // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar, never overwritten); undo / redo
   // write only the keys this save changed, each with the version the step before left
   const old = agrBody(a);
-  const j = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/agreements/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); agrReload();
+  const j = await ofcSave(md, `/api/office/agreements/${a.id}`, a, body); agrReload();  // 2.576.0 (#4794): only the changed fields (objsave.js), a 409 = the merge bar
+  if (!j) return a;
   const now = agrBody(j), keys = Object.keys(old).filter(k => JSON.stringify(old[k] ?? null) !== JSON.stringify(now[k] ?? null));
   let ver = j.updated_at;
   // 2.566.0 (#4704): core.js undoStep - changed elsewhere since -> "Changed elsewhere, not undone", the step leaves the history

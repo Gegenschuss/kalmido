@@ -393,7 +393,7 @@ def lt_update(c, oid, lid, data, draft_only=True, uid=None, version=False):
             oft_renamed(c, LT_KIND, lid, lt_title(c, lid))
 
     d, _ = ow_write(c, uid or lt_uid(), "office_letter", lid, data or {}, clean, oid=oid, dec=dec, enc=enc,
-                    public=lambda c, cur: lt_public(c, oid, cur), alias="letter", version=version, extra=extra,
+                    public=lambda c, cur: lt_public(c, oid, cur), version=version, extra=extra,
                     lock=f"office_letter_{int(lid)}")  # the lock of /sent, /delivered and the mail (lettermail.py)
     return d
 
@@ -866,7 +866,7 @@ def lt_patch(lid):
     cur = lt_row(c, oid, lid)
     if cur["status"] != "draft":
         return err(tr("A sent letter cannot be changed any more. Edit a copy instead."), 409)
-    # 2.269.0 C (#3017) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current" + "letter"); history, session undo
+    # 2.269.0 C (#3017) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key letter went); history, session undo
     d = lt_update(c, oid, lid, body(), uid=uid, version=True)
     c.commit()
     return jsonify(lt_public(c, oid, d))

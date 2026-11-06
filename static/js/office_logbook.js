@@ -128,13 +128,13 @@ function lbVehModal(v) {
       const body = {name: val('#lgb-vname'), plate: val('#lgb-vplate'), kind: val('#lgb-vkind'), odo_start: ofcNum(val('#lgb-vodo'))};
       if (v) {
         const old = {name: v.name, plate: v.plate, kind: v.kind, odo_start: v.odo_start};
-        const now = await (v.updated_at ? rawFetch : api)('PATCH', `/api/office/vehicles/${v.id}`, ofcVerBody(body, v)); md.remove(); lbReload(true);  // 2.560.0 D (#4700): saved elsewhere meanwhile -> 409
-        toast(tr('Saved'), async () => { await undoWrite(`/api/office/vehicles/${v.id}`, old, now?.updated_at, {now: body, label: v.name}).catch(() => null); lbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
+        const now = await ofcSave(md, `/api/office/vehicles/${v.id}`, v, body); md.remove(); lbReload(true);  // 2.576.0 (#4794): only the changed fields; saved elsewhere meanwhile -> the merge bar
+        if (now) toast(tr('Saved'), async () => { await undoWrite(`/api/office/vehicles/${v.id}`, old, now?.updated_at, {now: body, label: v.name}).catch(() => null); lbReload(true); });  // 2.566.0 (#4704): core.js undoWrite - only the keys this save changed, against its version; changed since -> said, kept
       } else {
         const j = await api('POST', '/api/office/vehicles', body); md.remove(); LB.vid = j.id; LB.view = 'drives'; lbReload(true);
         toast(tr('Added'), async () => { await api('PATCH', `/api/office/vehicles/${j.id}`, {archived: 1}); lbReload(true); });
       }
-    } catch (x) { if (ofcVerConflict(md, x, row => { lbReload(true); lbVehModal(row); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
+    } catch (x) { ofcSaveErr(md, x, r => { const m2 = lbVehModal(r); lbReload(true); return m2; }); }  // 2.576.0 (#4794)
   });
 }
 // 2.152.0 C (#2169): a closed drive (a week after it, or its month closed) is read-only; the fix is a new entry with a reason
@@ -213,10 +213,12 @@ function lbDriveModal(d, fix) {
         const old = {day: d.day, vehicle_id: d.vehicle_id, start_place: d.start_place, dest: d.dest, purpose: d.purpose, odo_start: d.odo_start, odo_end: d.odo_end,
           km: d.km, kind: d.kind, client_id: d.client_id, project: d.project, user_id: d.user_id};
         // 2.559.0 (#4660): the dialog closes at once, the row shows the new values; the server's hints come as the toast after it
-        // 2.560.0 D (#4700) kept: the save checks the version; a 409 (saved elsewhere meanwhile) puts the row back and opens the dialog again with the input and "Reload" (ofcVerLate)
+        // 2.576.0 (#4794): objsave.js - only the changed fields; a 409 puts the row back and opens the dialog again on the saved drive with the input and the merge bar
         md.remove();
-        let j; try { j = await optWrite(optSet(() => LB.drives?.find(x => x.id === d.id), lbRowVals(body)), () => (d.updated_at ? rawFetch : api)('PATCH', `/api/office/drives/${d.id}`, ofcVerBody(body, d)), ofcDraw); }
-        catch (x) { ofcVerLate(x, d.updated_at, () => lbDriveModal({...d, ...body}), row => { lbDriveModal(row); lbReload(); }); return; }
+        const d0 = ofcBase(md, d);  // before the row shows the new values (optSet changes the row object)
+        let j; try { j = await optWrite(optSet(() => LB.drives?.find(x => x.id === d.id), lbRowVals(body)), () => ofcSave(null, `/api/office/drives/${d.id}`, d0, body), ofcDraw); }
+        catch (x) { ofcSaveErr(null, x, r => { const m2 = lbDriveModal(r); lbReload(); return m2; }); return; }
+        if (!j) { ofcDraw(); return; }
         const x = LB.drives?.find(y => y.id === d.id); if (x && j?.id === d.id) Object.assign(x, j);
         ofcDraw(); lbRefresh();
         // 2.93.0 B (#1928 review): a taken-over drive with other km -> the trip keeps the old km, said once here
@@ -235,9 +237,9 @@ function lbDriveModal(d, fix) {
         if (other) lbReload(true); else { ofcDraw(); lbRefresh(); }
         toast(j.warn ? lbWarn(j.warn) : tr('Added'), async () => { await api('DELETE', `/api/office/drives/${j.id}`); lbReload(true); });
       }
-    } catch (x) { if (ofcVerConflict(md, x, row => { lbDriveModal(row); lbReload(); })) return; const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }  // 2.560.0 D (#4700)
+    } catch (x) { const el = $('.aerr', md); if (el) el.textContent = x.message || ''; }
   });
-  return md;  // 2.559.0 (#4660): ofcVerLate opens it again after a 409; "Reload" opens the saved drive before the list reloads
+  return md;  // 2.576.0 (#4794): objConflict opens it again after a 409 (the merge bar)
   // (lbReload(true) emptied LB.base first, the dialog then failed on the missing vehicles and never showed)
 }
 const LB_ACT = {create: N_('Created'), change: N_('Changed'), delete: N_('Deleted'), restore: N_('Restored'), trip: N_('Taken over into the travel expenses'),  // 2.93.0 B (#1928 review): trip

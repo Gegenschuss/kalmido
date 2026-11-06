@@ -239,12 +239,12 @@ def _one(c, oid, did):
 ow_kind("office_deal", "office_deals")  # 2.567.0 (#4711): history + undo of a deal / lead
 
 
-def pl2_write(c, oid, did, b, clean, uid=None, version=False, alias="row"):
+def pl2_write(c, oid, did, b, clean, uid=None, version=False):
     """2.567.0 (#4711): THE write of a deal (office/owrite.py ow_write: lock, version, history, undo step, updated_by, bump).
     clean(c, b, cur) -> the columns (cur = pl2_public of the row). Returns (row after as pl2_public, changed)."""
     return ow_write(c, uid or ow_uid(), "office_deal", did, b, clean, where="id=? AND org_id=? AND deleted_at IS NULL", oid=oid,
                     dec=lambda c, r: pl2_public(c, oid, r), enc=lambda c, d: oc_enc_fields(c, oid, "office_deals", d),
-                    public=lambda c, cur: _one(c, oid, did), alias=alias, version=version, lock=f"office_deals-{int(did)}")
+                    public=lambda c, cur: _one(c, oid, did), version=version, lock=f"office_deals-{int(did)}")
 
 
 def _update(c, oid, did, row, uid=None):
@@ -331,7 +331,7 @@ def pl2_patch(did):
         st["before"] = {k: cur.get(k) for k in row}
         return row
 
-    # 2.560.0 C (#4700) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current" + "row"); history, undo step
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key row went); history, undo step
     pl2_write(c, oid, did, b, clean, uid=uid, version=True)
     c.commit()
     before = st.get("before") or {}

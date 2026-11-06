@@ -144,7 +144,8 @@ function rk_fixedModal(f) {
         const old = {label: f.label, amount: f.amount, repeat: f.repeat, start: f.start, until: f.until, category: f.category || '', vat_rate: f.vat_rate || 0};
         // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> 409 and the bar); the undo writes back only
         // the changed keys, with the version this save left
-        const sv = await (f.updated_at ? rawFetch : api)('PATCH', `/api/office/fixed-costs/${f.id}`, f.updated_at ? {...body, expect_updated_at: f.updated_at} : body); md.remove(); rk_cfReload();
+        const sv = await ofcSave(md, `/api/office/fixed-costs/${f.id}`, f, body); md.remove(); rk_cfReload();  // 2.576.0 (#4794): only the changed fields (objsave.js)
+        if (!sv) return;
         const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => JSON.stringify(v ?? null) !== JSON.stringify(sv?.[k] ?? null)));
         if (Object.keys(back).length) toast(tr('Saved'), async () => { await undoWrite(`/api/office/fixed-costs/${f.id}`, back, sv.updated_at, {label: f.label}).catch(() => null); rk_cfReload(); });  // 2.566.0 (#4704): core.js undoWrite
         else toast(tr('Saved'));
@@ -154,11 +155,7 @@ function rk_fixedModal(f) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cf-reload>${tr('Reload')}</button>`;
-        $('[data-cf-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); rk_fixedModal(x.data.current || x.data.row); });
-        return;
-      }
+      if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = rk_fixedModal(r); rk_cfReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar, nothing typed is lost
       el.textContent = x.message || '';
     }
   });
@@ -310,7 +307,8 @@ function cfs_modal(a, mo) {
       if (a) {
         // 2.560.0 C (#4700): with expect_updated_at; undo / redo write only the changed keys, each with the version the step before left
         const old = keep(a);
-        const sv = await (a.updated_at ? rawFetch : api)('PATCH', `/api/office/cashflow/adjust/${a.id}`, a.updated_at ? {...body, expect_updated_at: a.updated_at} : body); md.remove(); rk_cfReload();
+        const sv = await ofcSave(md, `/api/office/cashflow/adjust/${a.id}`, a, body); md.remove(); rk_cfReload();  // 2.576.0 (#4794): only the changed fields (objsave.js)
+        if (!sv) return;
         const now = keep(sv), ks = Object.keys(old).filter(k => String(old[k] ?? '') !== String(now[k] ?? ''));
         let ver = sv.updated_at;
         // 2.566.0 (#4704): core.js undoStep - changed elsewhere since -> "Changed elsewhere, not undone" and the step leaves the history
@@ -325,11 +323,7 @@ function cfs_modal(a, mo) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && (x.data?.current || x.data?.row)) {  // 2.567.0 D (#4711): + "current" of the core's write layer; 2.560.0 C (#4700): "Reload" opens the saved state (this dialog's input is not saved)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-cfs-reload>${tr('Reload')}</button>`;
-        $('[data-cfs-reload]', el).addEventListener('click', () => { md.remove(); rk_cfReload(); cfs_modal(x.data.current || x.data.row); });
-        return;
-      }
+      if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = cfs_modal(r); rk_cfReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
       el.textContent = x.message || '';
     }
   });

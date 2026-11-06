@@ -233,7 +233,8 @@ function dtTplModal(t) {
         // 2.560.0 C (#4700): with expect_updated_at (saved elsewhere meanwhile -> the bar, never overwritten); the undo writes
         // back only the changed keys, again with the check
         const old = {name: t.name, kind: t.kind, lang: t.lang, sign: t.sign, body: t.body};
-        const sv = await (t.updated_at ? rawFetch : api)('PATCH', `/api/office/doc-templates/${t.id}`, t.updated_at ? {...body, expect_updated_at: t.updated_at} : body); md.remove(); dtReload();
+        const sv = await ofcSave(md, `/api/office/doc-templates/${t.id}`, t, body); md.remove(); dtReload();  // 2.576.0 (#4794): only the changed fields (objsave.js)
+        if (!sv) return;
         const back = Object.fromEntries(Object.entries(old).filter(([k, v]) => String(v ?? '') !== String(sv?.[k] ?? '')));
         if (Object.keys(back).length) toast(tr('Saved'), async () => { await undoWrite(`/api/office/doc-templates/${t.id}`, back, sv.updated_at, {label: t.name}).catch(() => null); dtReload(); });  // 2.566.0 (#4704): core.js undoWrite
         else toast(tr('Saved'));
@@ -243,11 +244,7 @@ function dtTplModal(t) {
       }
     } catch (x) {
       const el = $('.aerr', md); if (!el) return;
-      if (x.status === 409 && x.data?.row) {  // 2.560.0 C (#4700): "Reload" opens the saved state (like office.js ofcModal)
-        el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-dt-treload>${tr('Reload')}</button>`;
-        $('[data-dt-treload]', el).addEventListener('click', () => { md.remove(); dtReload(); dtTplModal(x.data.row); });
-        return;
-      }
+      if (typeof objConflict === 'function' && await objConflict(md, x, r => { const m2 = dtTplModal(r); dtReload(); return m2; })) return;  // 2.576.0 (#4794): the merge bar
       el.textContent = x.message || '';
     }
   });
@@ -297,7 +294,12 @@ async function dtSave(d, quiet) {
   try {
     // 2.560.0 C (#4700): with the updated_at this tab has (the answer brings the new one, so the own next autosave passes);
     // a second tab saved meanwhile -> 409 and the bar with "Reload" instead of overwriting each other
-    if (!same) Object.assign(d, await rawFetch('PATCH', `/api/office/gen-docs/${d.id}`, d.updated_at ? {...body, expect_updated_at: d.updated_at} : body));
+    if (!same) {  // 2.576.0 (#4794): objsave.js - only the fields that differ from the saved document; a conflict -> the merge bar
+      await loadModule('objsave');
+      const j = await saveDialog(`/api/office/gen-docs/${d.id}`, d, body);
+      if (j.conflict) { dtConflict(d, j.conflict); return false; }
+      Object.assign(d, j);
+    }
     if (!quiet) {
       DT.undo = null;
       const back = dtChangedKeys(old, d);  // the undo writes back only what this save changed, with the version check
@@ -307,7 +309,6 @@ async function dtSave(d, quiet) {
     const el = $('#dt-err'); if (el) el.textContent = '';
     return true;
   } catch (x) {
-    if (x.status === 409 && x.data?.row) { dtConflict(d, x.data.row); return false; }
     const el = $('#dt-err'); if (el && x.message !== 'auth') el.textContent = x instanceof Offline ? tr('Offline: only works again with a connection') : x.message || '';
     return false;
   }
@@ -315,12 +316,13 @@ async function dtSave(d, quiet) {
 // 2.560.0 C (#4700): the keys of an undo state that differ from the saved document now (sign_image: the own signature, as sent)
 const dtChangedKeys = (old, d) => Object.fromEntries(Object.entries(old).filter(([k, v]) => k === 'sign_image' ? v !== (d.sign_mine ? 1 : 0) : (v ?? null) !== (d[k] ?? null)));
 // 2.560.0 C (#4700): saved in another tab / on another device meanwhile: the bar like the letters (office_letters.js lt_conflict)
-function dtConflict(d, cur) {
+// 2.576.0 (#4794): the shared merge bar (objsave.js objMerge) like the letters: "Keep mine" = the next save against their version
+function dtConflict(d, cf) {
   clearTimeout(dtSaveTimer);
   const el = $('#dt-err');
   if (!el || S.route.id !== d.id) { toast(tr('Changed in the meantime')); return; }
-  el.innerHTML = `${esc(tr('Changed in the meantime'))} · ${esc(tr('Reload shows the saved version; your input here is not saved.'))} <button type="button" class="btn sm" data-dt-reload>${tr('Reload')}</button>`;
-  $('[data-dt-reload]', el).addEventListener('click', () => { clearTimeout(dtSaveTimer); DT.undo = null; Object.assign(d, cur); dtReload(); });
+  el.textContent = '';
+  objMerge(el.parentElement || el, cf, cur => { Object.assign(d, cur); }, {take: () => { clearTimeout(dtSaveTimer); DT.undo = null; Object.assign(d, cf.cur); dtReload(); }});
 }
 let dtSaveTimer = null;
 const dtSaveSoon = id => { clearTimeout(dtSaveTimer); dtSaveTimer = setTimeout(() => { const d = dtDoc(id); if (d && d.status === 'draft' && S.route.id === id) dtSave(d, true); }, 1500); };

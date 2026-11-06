@@ -826,8 +826,8 @@ def dt_tpl_patch(tid):
     if not isinstance(b, dict):
         raise BadInput(tr("Invalid data"))
     dec, enc = ow_crypt("office_doc_templates", oid)
-    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current" + "row"), history, undo step
-    ow_write(c, uid, "office_doctpl", tid, b, lambda c, b, cur: dt_tpl_clean(c, oid, b, cur), oid=oid, dec=dec, enc=enc, alias="row",
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): office/owrite.py -- saved elsewhere meanwhile -> 409 ("current"; 2.576.0 #4794: the old key row went), history, undo step
+    ow_write(c, uid, "office_doctpl", tid, b, lambda c, b, cur: dt_tpl_clean(c, oid, b, cur), oid=oid, dec=dec, enc=enc,
              lock=f"office_doc_templates-{int(tid)}", public=lambda c, cur: dt_tpl_public(cur))
     c.commit()
     return jsonify(dt_tpl_public(dt_tpl(c, oid, tid)))
@@ -1062,8 +1062,8 @@ def dt_doc_patch(gid):
             oft_renamed(c, GD_KIND, gid, changed["title"][1])
 
     dec, enc = ow_crypt("office_gen_docs", oid)
-    # 2.560.0 C (#4700) / 2.567.0 (#4711): two tabs' autosaves never overwrite each other (409 "current" + "row"); history, undo step
-    ow_write(c, uid, "office_gendoc", gid, b, clean, oid=oid, dec=dec, enc=enc, alias="row", lock=f"office_gen_doc_{int(gid)}",
+    # 2.560.0 C (#4700) / 2.567.0 (#4711): two tabs' autosaves never overwrite each other (409 "current"; 2.576.0 #4794: the old key row went); history, undo step
+    ow_write(c, uid, "office_gendoc", gid, b, clean, oid=oid, dec=dec, enc=enc, lock=f"office_gen_doc_{int(gid)}",
              public=lambda c, cur: dt_doc_public(c, oid, dt_doc(c, oid, gid)), extra=extra)
     c.commit()
     return jsonify(dt_doc_public(c, oid, dt_doc(c, oid, gid)))

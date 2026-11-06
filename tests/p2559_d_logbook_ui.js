@@ -97,20 +97,21 @@ async function round(who, ck) {
   check(await until(() => toastHas(/Saved/)), `${who}: "Saved" after the answer`);
   unhold(w);
 
-  // ================= saved elsewhere meanwhile (#4700 on the at-once path): the row goes back, the dialog opens again with the input and "Reload"
+  // ================= saved elsewhere meanwhile (#4700 on the at-once path): the row goes back, the dialog opens again with the input and
+  // 2.576.0 (#4794): the shared merge bar of objsave.js ("Take theirs" instead of the own "Reload")
   check(await until(() => (LBrow => LBrow && LBrow.updated_at)(w.eval(`LB.drives.find(x => x.id === ${kiel.id})`))), `${who}: the row knows its version`);
   const was = w.eval(`LB.drives.find(x => x.id === ${kiel.id}).updated_at`);
   let o = null, n = 0;  // the version has whole seconds: a new purpose each try until it differs
   check(await until(async () => { o = await call(ck, 'PATCH', `/api/office/drives/${kiel.id}`, {purpose: 'Other tab ' + ++n}); return o.http === 200 && o.updated_at && o.updated_at !== was; }), `${who}: another tab saved the drive`);
   click(w, rowOf(/Hamburg/)); await until(() => dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Hafen');
   dlg().querySelector('#lgb-dest').value = 'Kiel Nord'; click(w, dlg().querySelector('[data-m="save"]'));
-  check(await until(() => dlg()?.querySelector('[data-ofc-reload]')), `${who}: conflict: the dialog is open again with "Reload"`);
-  check(dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Nord' && /Changed in the meantime/.test(dlg()?.querySelector('.aerr')?.textContent || ''), `${who}: conflict: with the input of the person and the bar`);
+  check(await until(() => dlg()?.querySelector('.obj-merge [data-om="theirs"]')), `${who}: conflict: the dialog is open again with the merge bar`);
+  check(dlg()?.querySelector('#lgb-dest')?.value === 'Kiel Nord' && /Changed by someone else in the meantime/.test(dlg()?.querySelector('.obj-merge')?.textContent || ''), `${who}: conflict: with the input of the person and the bar`);
   check(await until(async () => (await onServer()).find(x => x.id === kiel.id)?.dest === 'Kiel Hafen'), `${who}: conflict: nothing was overwritten`);
   check(await until(() => rowOf(/Hamburg/) && !/Kiel Nord/.test(rowOf(/Hamburg/).textContent)), `${who}: conflict: the row is back`);
-  click(w, dlg().querySelector('[data-ofc-reload]'));
+  click(w, dlg().querySelector('.obj-merge [data-om="theirs"]'));
   const dests = () => [...d.querySelectorAll('.modal.ofcdlg #lgb-dest')].map(x => x.value);  // the old dialog may still be folding away
-  check(await until(() => dests().includes('Kiel Hafen')), `${who}: Reload opens the saved drive ` + JSON.stringify(dests()));
+  check(await until(() => dests().includes('Kiel Hafen')), `${who}: Take theirs opens the saved drive ` + JSON.stringify(dests()));
   for (const m of d.querySelectorAll('.modal.ofcdlg')) m.remove();
   await until(() => !dlg());
 

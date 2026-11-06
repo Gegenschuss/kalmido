@@ -1,10 +1,10 @@
 // 2.560.0 C (#4700) UI tests, own container (start.sh), jsdom, invented data only:
 // kalmido-suite: fresh
 // - a generated document's autosave takes the answer's updated_at: the own next autosave passes (no 409 against itself);
-//   another tab saved meanwhile -> the editor shows "Changed in the meantime" with "Reload", the other tab's text stays,
-//   "Reload" shows the saved text
-// - the deal dialog: saved elsewhere meanwhile -> the bar with "Reload" (the dialog stays, nothing overwritten); "Reload"
-//   opens the dialog with the saved state
+//   another tab saved meanwhile -> the editor shows the merge bar (2.576.0 #4794: objsave.js instead of "Reload"), the other
+//   tab's text stays, "Take theirs" shows the saved text
+// - the deal dialog: saved elsewhere meanwhile -> the merge bar (the dialog opens again with the input, nothing overwritten);
+//   "Take theirs" opens the dialog with the saved state
 const {execFileSync} = require('child_process');
 const path = require('path');
 const {boot, sleep, B, login} = require('./boot');
@@ -47,19 +47,20 @@ async function otherSave(url, body, was, method = 'PATCH') {
     check(await until(async () => (await call('GET', `/api/office/gen-docs/${G.id}`)).body === 'Tab A one', 60), 'the first autosave arrived');
     type(w, ta, 'Tab A two');
     check(await until(async () => (await call('GET', `/api/office/gen-docs/${G.id}`)).body === 'Tab A two', 60), 'the own next autosave passes (it took the new updated_at)');
-    check(!d.querySelector('[data-dt-reload]'), 'no conflict bar against the own saves');
+    check(!d.querySelector('.obj-merge'), 'no conflict bar against the own saves');
     const now = await call('GET', `/api/office/gen-docs/${G.id}`);
     const o = await otherSave(`/api/office/gen-docs/${G.id}`, {body: 'Other tab text'}, now.updated_at);
     check(o && o.body === 'Other tab text', 'the other tab saved');
     type(w, ta, 'Tab A three');
-    await until(() => d.querySelector('[data-dt-reload]'), 60);
-    check(/Changed in the meantime/.test(d.querySelector('#dt-err')?.textContent || '') && d.querySelector('[data-dt-reload]'),
-      'conflict: the editor shows "Changed in the meantime" with "Reload": ' + (d.querySelector('#dt-err')?.textContent || ''));
+    // 2.576.0 (#4794): the shared merge bar of objsave.js
+    await until(() => d.querySelector('.obj-merge [data-om="theirs"]'), 60);
+    check(/Changed by someone else in the meantime/.test(d.querySelector('.obj-merge')?.textContent || ''),
+      'conflict: the editor shows the merge bar: ' + (d.querySelector('.obj-merge')?.textContent || d.querySelector('#dt-err')?.textContent || ''));
     check((await call('GET', `/api/office/gen-docs/${G.id}`)).body === 'Other tab text', 'conflict: the other tab\'s text was not overwritten');
-    const rl = d.querySelector('[data-dt-reload]');
+    const rl = d.querySelector('.obj-merge [data-om="theirs"]');
     if (rl) {
       click(w, rl);
-      check(await until(() => d.querySelector('#dt-body')?.value === 'Other tab text', 60), 'reload: the editor shows the saved text ' + (d.querySelector('#dt-body')?.value || ''));
+      check(await until(() => d.querySelector('#dt-body')?.value === 'Other tab text', 60), 'take theirs: the editor shows the saved text ' + (d.querySelector('#dt-body')?.value || ''));
     }
   }
   w.close();
@@ -80,18 +81,19 @@ async function otherSave(url, body, was, method = 'PATCH') {
     md.querySelector('#pp-note').value = 'this tab';
     click(w, md.querySelector('[data-m="save"]'));
     // 2.559.0 (#4660): the dialog closes at once; the 409 opens it again with this tab's input and the bar (a new element)
-    await until(() => d.querySelector('.modal [data-pp-reload]'), 40);
-    md = d.querySelector('.modal [data-pp-reload]')?.closest('.modal') || md;
-    check(md.isConnected && /Changed in the meantime/.test(md.querySelector('.aerr')?.textContent || '') && md.querySelector('[data-pp-reload]') && md.querySelector('#pp-note')?.value === 'this tab',
-      'conflict: the dialog is open again with this tab\'s input, "Changed in the meantime" and "Reload": ' + (md.querySelector('.aerr')?.textContent || ''));
+    // 2.576.0 (#4794): opened again on the saved deal with this tab's input and the shared merge bar of objsave.js
+    await until(() => d.querySelector('.modal .obj-merge [data-om="theirs"]'), 40);
+    md = d.querySelector('.modal .obj-merge')?.closest('.modal') || md;
+    check(md.isConnected && /Changed by someone else in the meantime/.test(md.querySelector('.obj-merge')?.textContent || '') && md.querySelector('#pp-note')?.value === 'this tab' && md.querySelector('#pp-title')?.value === 'Other title',
+      'conflict: the dialog is open again on the saved deal with this tab\'s input and the merge bar: ' + (md.querySelector('.obj-merge')?.textContent || md.querySelector('.aerr')?.textContent || ''));
     const dj = (await call('GET', '/api/office/deals')).items.find(x => x.id === D.id);
     check(dj && dj.title === 'Other title' && dj.note !== 'this tab', 'conflict: nothing was overwritten ' + JSON.stringify(dj && [dj.title, dj.note]));
-    const rl = md.querySelector('[data-pp-reload]');
+    const rl = md.querySelector('.obj-merge [data-om="theirs"]');
     if (rl) {
       click(w, rl);
       await until(() => d.querySelector('.modal #pp-title') && d.querySelector('.modal #pp-title').closest('.modal') !== md, 30);
       md = d.querySelector('.modal #pp-title')?.closest('.modal');
-      check(md && md.querySelector('#pp-title').value === 'Other title', 'reload: the dialog shows the saved state');
+      check(md && md.querySelector('#pp-title').value === 'Other title' && md.querySelector('#pp-note').value !== 'this tab', 'take theirs: the dialog shows the saved state');
     }
   }
   w.close();

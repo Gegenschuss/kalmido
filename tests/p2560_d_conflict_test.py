@@ -134,12 +134,16 @@ run(A, "org", AID)
 # the dialogs send the version, show the conflict bar and undo only the changed keys (the client side, read from the files)
 tj = kt_src("static/js/office_travel.js")
 # 2.566.0 (#4704): ofcVerUndo went into core.js undoWrite (only the changed keys, against the save's version)
-check("function ofcVerBody" in tj and "function ofcVerConflict" in tj and "async function undoWrite" in kt_src("static/js/core.js"), "UI: the shared helpers are there")
-for f, n in (("office_travel.js", 2), ("office_logbook.js", 2), ("office_cashbook.js", 1), ("office_cards.js", 2), ("office_meals.js", 1)):
+# 2.576.0 (#4794): ofcVerBody / ofcVerConflict / ofcVerLate went: the dialogs save through objsave.js (ofcSave -> objSaveForm:
+# only the changed fields + expect_updated_at; a 409 -> objConflict, the shared merge bar)
+osj = kt_src("static/js/objsave.js")
+check("async function ofcSave" in tj and "async function ofcSaveErr" in tj and "function ofcVer" not in tj and "async function objSaveForm" in osj
+      and "async function objConflict" in osj and "async function undoWrite" in kt_src("static/js/core.js"), "UI: the shared helpers are there")
+for f, n in (("office_travel.js", 2), ("office_logbook.js", 2), ("office_cashbook.js", 1), ("office_cards.js", 2), ("office_meals.js", 2)):
     js = kt_src("static/js/" + f)
-    check(js.count("ofcVerBody(") >= n and js.count("ofcVerConflict(") >= n, f"UI: {f} sends expect_updated_at and shows the conflict bar")
+    check(js.count("await ofcSave(") + js.count("=> ofcSave(") >= n and "ofcVer" not in js, f"UI: {f} saves through objsave.js (version + the merge bar)")
 for f in ("office_travel.js", "office_logbook.js", "office_cashbook.js", "office_meals.js"):
     check("undoWrite(" in kt_src("static/js/" + f) and "{now: b" in kt_src("static/js/" + f), f"UI: {f}'s undo writes back only the changed keys")  # 2.566.0 (#4704)
-check("api('PATCH', `/api/office/cash-entries/${e.id}`, ofcVerBody(" in kt_src("static/js/office_cashbook.js"), "UI: the cash book still saves through the waiting api()")
+check("ofcSave(md, `/api/office/cash-entries/${e.id}`, e, body)" in kt_src("static/js/office_cashbook.js"), "UI: the cash book saves through objsave.js (2.576.0 #4794)")
 
 sys.exit(done("p2560_d_conflict"))
