@@ -104,7 +104,9 @@ first = td + timedelta(days=(0 - td.weekday()) % 7)
 check(len(sp) == 1 and sp[0]["num"] == 1 and sp[0]["state"] == "active", f"one active sprint: {sp}")
 check(sp[0]["start"] == first.isoformat() and sp[0]["end_day"] == (first + timedelta(days=13)).isoformat(),
       f"default: from the next Monday (or today), 2 weeks: {sp[0]['start']} - {sp[0]['end_day']} (today {td})")
-check(r.json()["settings"] == {"on": True, "weeks": 2, "dow": 0, "carry": True}, f"defaults stored: {r.json()['settings']}")
+# #4701: the settings carry their version (updated_at) for the version check of the next save
+check({k: v for k, v in r.json()["settings"].items() if k != "updated_at"} == {"on": True, "weeks": 2, "dow": 0, "carry": True}
+      and r.json()["settings"].get("updated_at"), f"defaults stored: {r.json()['settings']}")
 lp = lstate(Bo, P)
 check(lp and lp.get("sprint_cfg", {}).get("on") is True and any(s["id"] == S1 and s["state"] == "active" and s["title"] == "Sprint 1" for s in lp.get("sprints", [])),
       f"the state carries the settings and the active sprint: {lp and lp.get('sprints')}")
