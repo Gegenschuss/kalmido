@@ -10,6 +10,8 @@ freelancer-matrix: lists (a person without an organisation, the own project)
  - organisation boundary: a project of another organisation, a project moved to another workspace
  - deleted creator: the view stays; delta sync: full for the project's people only
 usage: p2577_a_views_api_test.py <datadir>      (KMT_NOSTART=1 / PR2472C_NOSTART=1: a running server)"""
+import sys
+
 import requests
 
 import kt
@@ -200,9 +202,25 @@ check(by_rules(C({"f": "kind", "op": "in", "v": ["done"]})) == [T9], "conds: the
 check(by_rules(C({"f": "kind", "op": "nin", "v": ["done", "rejected"]})) == [T1, T2, T3], "conds: the meaning is none of")
 check(by_rules(C({"f": "nonsense", "op": "in", "v": [1]}, {"f": "prio", "op": "zz", "v": [5]})) == [T1, T2, T3], "conds: unknown conditions are off")
 assert A.patch(B + f"/api/lists/{L}", json={"folder": "Work"}).ok
-check(by_rules(C({"f": "folder", "op": "in", "v": ["Work"]})) == [T1, T2, T3], "conds: the folder as the reader sees it (the owner's)")
-check(by_rules(C({"f": "folder", "op": "in", "v": ["Wor"]})) == [], "conds: a folder is a whole name")
-check(by_rules(C({"f": "folder", "op": "empty"})) == [], "conds: folder is empty")
+
+
+def by_own(rules, s=R, hdr=TR):
+    """a private filter of the reader (a shared view leaves project and folder conditions out)"""
+    fid = s.post(B + "/api/filters", json={"name": "Probe", "rules": rules}).json()["id"]
+    try:
+        return sorted(ids(hdr, filter_id=fid))
+    finally:
+        s.delete(B + f"/api/filters/{fid}")
+
+
+check(by_own(C({"f": "folder", "op": "in", "v": ["Work"]})) == [T1, T2, T3], "conds: the folder as the reader sees it (the owner's)")
+check(by_own(C({"f": "folder", "op": "in", "v": ["Wor"]})) == [], "conds: a folder is a whole name")
+check(by_own(C({"f": "folder", "op": "empty"})) == [], "conds: folder is empty")
+check(by_own(C({"f": "list", "op": "nin", "v": [L]})) == [], "conds: project is none of")
+r = E.post(B + "/api/filters", json={"name": "Probe", "list_id": L, "rules": C({"f": "folder", "op": "in", "v": ["x"]}, {"f": "prio", "op": "in", "v": [5]})})
+check([x["f"] for x in r.json().get("rules", {}).get("conds", [])] == ["prio"] if "rules" in r.json() else
+      [x["f"] for x in next(v for v in views(E) if v["id"] == r.json()["id"])["rules"]["conds"]] == ["prio"], "a shared view keeps no project / folder condition")
+E.delete(B + f"/api/filters/{r.json()['id']}")
 assert A.patch(B + f"/api/lists/{L}", json={"folder": ""}).ok
 check(ids(TR, filter_id=own["id"]) == [] and own["list_id"] is None and own["shared"] is False, "an own private filter works with filter_id")
 
@@ -284,4 +302,4 @@ check(A.patch(B + f"/api/lists/{L6}", json={"org_id": ORG}).ok, "the project mov
 check(requests.get(V + f"/lists/{L6}/views", headers=token(A)).json()["data"][0]["id"] == V6, "its view goes along")
 check(requests.get(V + "/tasks", headers=TG, params={"filter_id": V6}).status_code == 404, "and stays out of reach of the other organisation")
 
-done("p2577_a_views_api")
+sys.exit(done("p2577_a_views_api"))
