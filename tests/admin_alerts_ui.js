@@ -22,7 +22,8 @@ const api = async (w, m, u, b) => (await w.fetch(u, {method: m, headers: {'Conte
   const topic = md.querySelector('#aa-topic');
   check(topic && topic.readOnly && topic.value === 'env-admins' && [...box.querySelectorAll('.shint')].some(h => /Set by the server operator/.test(h.textContent) && /KALMIDO_ADMIN_TOPIC/.test(h.textContent) && h.classList.contains('iisrc')), 'env topic: read-only with a note (2.6.0, K23: plain words; 2.13.2 #478: note and variable behind the (i))');
   check(md.querySelectorAll('[data-aakind]').length === 6 && [...md.querySelectorAll('[data-aakind]')].every(x => x.checked), 'six kinds, all on');
-  check(md.querySelectorAll('.aarow').length > 0 && /share inbox was not started/.test(box.textContent), 'recent list shows the alerts');
+  // 2.574.0 (#3779): the share inbox is gone, so its alert too; the test alert of admin_alerts_test.py stays in the list
+  check(md.querySelectorAll('.aarow').length > 0 && [...md.querySelectorAll('.aarow b')].some(b => b.textContent === 'Test alert') && !/share inbox/.test(box.textContent), 'recent list shows the alerts');
   check(md.querySelector('#aa-dtime-w').hidden, 'summary time hidden in instant mode');
   // 1.5: every change is saved at once (no "Save alert settings")
   check(!md.querySelector('[data-aa="save"]'), 'no Save button');
