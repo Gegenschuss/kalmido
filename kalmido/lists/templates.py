@@ -20,6 +20,7 @@ from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
 from ..core.serializers import unlink_files
+from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
@@ -696,7 +697,6 @@ def _dup_locked(c, uid, tid=None, list_id=None):
     """2.574.0 (#3376): the ids of the subtasks below tid (or of the tasks of list list_id) that the data lock of uid (an agent)
     covers; they and their subtasks are left out of the copy (the copy would carry no lock tag any more and be readable).
     Empty for people / an agent without a lock."""
-    from ..core.dlock import dl_of, dl_tasks_locked
     if not dl_of(c, uid):
         return set()
     if list_id is not None:
