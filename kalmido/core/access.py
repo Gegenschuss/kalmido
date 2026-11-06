@@ -552,8 +552,17 @@ def plists(c, uid):
     """Ids of the lists in which uid is a participant (empty while collaboration is off: memberships are ignored)."""
     if not uid or not collab_all():
         return []
-    return [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND role='participant' ORDER BY list_id",
-                                    (int(uid),))]
+    # 2.602.0 D (#4507): kept per GET / HEAD like list_role (_lr_cache rules: forgotten by acx_drop(), no cache outside a
+    # request or in a write request); the key carries uid and the db context, the caller gets a fresh list every time
+    cache = _lr_cache(c)
+    key = ("plists", int(uid), getattr(c, "ctx", None)) if cache is not None else None
+    if cache is not None and key in cache:
+        return list(cache[key])
+    out = [r[0] for r in c.execute("SELECT list_id FROM list_members WHERE user_id=? AND role='participant' ORDER BY list_id",
+                                   (int(uid),))]
+    if cache is not None:
+        cache[key] = tuple(out)
+    return out
 
 
 def _pset_sql(uid, pl, write=False):
@@ -637,7 +646,7 @@ _LR_NO = object()
 
 
 def _lr_cache(c):
-    """2.280.0 B (#3116): the request cache of list_role ({_lr_key: role}) -- only while a GET / HEAD
+    """2.280.0 B (#3116): the request cache of list_role ({_lr_key: role}; 2.602.0 D, #4507: also plists ("plists", uid, ctx)) -- only while a GET / HEAD
     runs (reads change no membership; a write request always asks the database), forgotten by acx_drop()."""
     from flask import request
     if not has_request_context() or request.method not in ("GET", "HEAD"):
