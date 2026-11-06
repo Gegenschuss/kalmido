@@ -121,12 +121,6 @@ def react(c, k, uid, emoji, on):
             if st == "approved":  # 2.60.0 C (#1512): an approved pull request counts as the review (by someone who may approve it)
                 from ..tasks.review import rvw_approved_by_pr
                 rvw_approved_by_pr(c, t["id"], f"{sug.get('repo') or ''}#{sug.get('number') or ''}", sug.get("pr_url"), uid=uid)
-    # 2.126.0 review: logged only once the approval counts; 2.574.0 (#3376, review F3): after the gate, a first of two approvals as
-    # waiting (like the decide route), a blocked one not at all
-    if res["approval"]:
-        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
-    elif ap0 and "waiting" in (res.get("gate"), res.get("merge")):
-        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": True, "waiting": True})
     elif sug and sug.get("state") == "open" and emoji in ("up", "down") and not is_agent(g.user) \
             and task_visible(c, t["id"], uid, write=True) and not t["deleted_at"]:
         if emoji == "up":
@@ -135,6 +129,13 @@ def react(c, k, uid, emoji, on):
         else:
             c.execute("UPDATE comments SET suggestion=? WHERE id=?",
                       (json.dumps({**sug, "state": "rejected", "by": uid, "at": iso(now_utc())}, ensure_ascii=False), k["id"]))
+    # 2.126.0 review: logged only once the approval counts; 2.574.0 (#3376, review F3): after the gate, a first of two approvals as
+    # waiting (like the decide route), a blocked one not at all. Own block after the kinds: the plain apply / reject way above is
+    # the else of the kinds and never runs for a gate / merge request (#3506: as an elif here it applied a viewer's 👍)
+    if res["approval"]:
+        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": emoji == "up"})
+    elif ap0 and "waiting" in (res.get("gate"), res.get("merge")):
+        log_act(c, t["id"], "approval", {"agent": author["id"], "comment": k["id"], "ok": True, "waiting": True})
     if is_agent(author) and uid != author["id"] and task_visible(c, t["id"], author["id"], full=True):
         k2 = c.execute("SELECT * FROM comments WHERE id=?", (k["id"],)).fetchone()
         agent_emit(c, author["id"], "reaction", agent_task_data(
