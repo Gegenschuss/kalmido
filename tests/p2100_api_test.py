@@ -155,6 +155,20 @@ r = requests.get(pp + "/api/state", headers={"Remote-User": "bobsso", "X-Forward
 check(r.ok and r.json()["me"]["username"] == "bob", f"proxy login on the proxy port still works with X-Forwarded-For ({r.status_code})")
 r = requests.get(B + "/api/state", headers={"Remote-User": "bobsso", "X-Forwarded-For": "198.51.100.3"})
 check(r.status_code == 401, "the proxy header is still ignored on the app port")
+# 2.585.0 (#4290): a disabled proxy account (session.py authenticate): 403 "disabled", and a session cookie that comes along
+# (alice's) does not take over - the proxy header decides; an unknown proxy name: 403 "no_account"
+A.patch(B + "/api/users/2", json={"disabled": True})
+for ck, what in (({}, "alone"), (A.cookies.get_dict(), "with alice's session cookie")):
+    r = requests.get(pp + "/api/state", headers={"Remote-User": "bobsso", **H}, cookies=ck)
+    check(r.status_code == 403 and r.json().get("auth") == "disabled" and "me" not in r.json(),
+          f"#4290: a disabled proxy account {what}: 403 disabled ({r.status_code} {r.text[:80]})")
+r = requests.post(pp + "/api/tasks", json={"title": "proxy while disabled"}, headers={"Remote-User": "bobsso", **H})
+check(r.status_code == 403 and not dbx("SELECT 1 FROM tasks WHERE title='proxy while disabled'"), f"#4290: ... and writes nothing ({r.status_code})")
+r = requests.get(pp + "/api/state", headers={"Remote-User": "nobody-sso", **H})
+check(r.status_code == 403 and r.json().get("auth") == "no_account", f"#4290: an unknown proxy name: 403 no_account ({r.status_code})")
+A.patch(B + "/api/users/2", json={"disabled": False})
+r = requests.get(pp + "/api/state", headers={"Remote-User": "bobsso"})
+check(r.ok and r.json()["me"]["username"] == "bob", f"#4290: enabled again: the proxy login works ({r.status_code})")
 # CalDAV: http PUBLIC_URL, behind a TLS proxy -> https from X-Forwarded-Proto
 start("-e PUBLIC_URL=http://kalmido.example")
 setup()

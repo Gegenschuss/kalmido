@@ -339,6 +339,17 @@ r = Ca.delete(B + f"/api/orgs/{BETA}/members/{FR}")
 check(r.ok and not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (BETA, FR))
       and dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (BETA, CAROL))[0][0] == "admin",
       f"#4290: an organisation admin removes a disabled fellow admin, she stays the admin {r.status_code} {r.text[:100]}")
+# 2.585.0 (#4290): the self-lock of the user management: the instance admin cannot take her own admin rights away, not
+# even together with a change of her organisations - nothing of the request stays (memberships, admin flag)
+have = dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id")
+r = A.patch(B + "/api/users/1", json={"orgs": [], "is_admin": False})
+check(r.status_code == 400 and dbx("SELECT is_admin FROM users WHERE id=1")[0][0] == 1
+      and dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id") == have and have,
+      f"#4290: self-lock: no own admin rights away, the organisations stay {r.status_code} {have}")
+r = A.patch(B + "/api/users/1", json={"orgs": [], "disabled": True})
+check(r.status_code == 400 and dbx("SELECT disabled FROM users WHERE id=1")[0][0] == 0
+      and dbx("SELECT org_id, role FROM org_members WHERE user_id=1 ORDER BY org_id") == have and A.get(B + "/api/state").ok,
+      f"#4290: self-lock: not disabling oneself, the session and the organisations stay {r.status_code}")
 # the cross-tenant matrix: nothing of Beta reaches alice / bob
 # 2.30.0 (#1036, tests/tenant_coverage_test.py): tenant-matrix: aggregate, task, list, news, team, agent, people, org
 TBETA = Ca.post(B + "/api/tasks", json={"title": "Secret Beta plan", "list_id": LB["id"]}).json()["id"]

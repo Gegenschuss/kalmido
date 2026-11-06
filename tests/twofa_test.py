@@ -250,7 +250,29 @@ check(login("dave")[1].json().get("ok") is True, "login without a second step ag
 r = subprocess.run(["bash", os.path.join(N, "start.sh"), DATA], capture_output=True, text=True, env=dict(os.environ, KEEP="1"))
 assert r.returncode == 0, r.stdout + r.stderr
 dbx("DELETE FROM rate_hits")  # 2.306.0 (#2875): the failure counters live in the database too now (a restart keeps them)
+# 2.585.0 (#4290): TOTP only within now +-1 step (login.py totp_match), and an open ticket of an account that gets
+# disabled meanwhile signs nobody in (login.py _ticket); hank is an own user (no lock of the others)
+r = A.post(B + "/api/users", json={"username": "hank", "password": "password123"})
+HID = r.json()["id"]
+Hk = sess("hank", json_ok=True)
+hsec, _ = enrol_totp(Hk)
+while time.time() % 30 > 26:  # far enough from the next step: now+2 must not slide into the window during the request
+    time.sleep(0.2)
+s, r = login("hank")
+check(r.json().get("twofa"), "hank: second step")
+for off in (-2, 2):
+    rr = s.post(B + "/api/auth/2fa", json={"code": totp(hsec, now_step() + off)})
+    check(rr.status_code == 401 and "kalmido_session" not in rr.cookies, f"#4290: a code {off:+d} steps away is refused ({rr.status_code})")
+check(A.patch(B + f"/api/users/{HID}", json={"disabled": True}).ok, "hank disabled while his ticket is open")
+rr = s.post(B + "/api/auth/2fa", json={"code": totp(hsec, now_step() + 1)})
+check(rr.status_code == 401 and rr.json().get("expired") and "kalmido_session" not in rr.cookies and s.get(B + "/api/state").status_code == 401,
+      f"#4290: disabled with an open ticket: the right code signs nobody in ({rr.status_code} {rr.text[:80]})")
+assert A.patch(B + f"/api/users/{HID}", json={"disabled": False}).ok
+rr = s.post(B + "/api/auth/2fa", json={"code": totp(hsec, now_step() + 1)})
+check(rr.status_code == 401 and rr.json().get("expired"), f"#4290: the ticket stays gone after enabling again ({rr.status_code})")
+check(Hk.get(B + "/api/state").status_code == 401, "#4290: disabling ended hank's session")
 E = sess("erin", json_ok=True)
+E2 = sess("erin", json_ok=True)  # 2.585.0 (#4290): another device of erin (the first passkey ends it)
 k = Authenticator()
 check(E.post(B + "/api/me/passkeys/options", json={"password": "bad-password"}).status_code == 403, "passkey options need the password")
 o = E.post(B + "/api/me/passkeys/options", json={"password": "password123"}).json()
@@ -266,6 +288,7 @@ r = E.post(B + "/api/me/passkeys", json={"credential": k.register(o), "name": "L
 j = r.json()
 check(r.ok and len(j["passkeys"]) == 1 and j["passkeys"][0]["name"] == "Laptop <b>" and j["passkeys"][0]["discoverable"] == 1
       and len(j.get("recovery_codes") or []) == 10, f"passkey registered (+ recovery codes): {r.text[:200]}")
+check(E2.get(B + "/api/state").status_code == 401 and E.get(B + "/api/state").ok, "#4290: the first passkey ends the other sessions, keeps this one")
 row = dbx("SELECT transports, rp_id, sign_count FROM webauthn_creds")[0]
 check(row == ("internal,hybrid", RP, 0), f"stored: known transports only, RP ID, counter: {row}")
 check(E.post(B + "/api/me/passkeys", json={"credential": k.register(o)}).status_code == 409, "challenge is one-time")
@@ -296,6 +319,17 @@ F = sess("fred", json_ok=True)
 kf = Authenticator()
 o = F.post(B + "/api/me/passkeys/options", json={"password": "password123"}).json()
 assert F.post(B + "/api/me/passkeys", json={"credential": kf.register(o)}).ok
+# 2.585.0 (#4290): a second passkey is not a first factor: no new recovery codes, other sessions stay
+fs, _ = login("fred")
+o = fs.post(B + "/api/auth/2fa/passkey/options").json()
+assert fs.post(B + "/api/auth/2fa/passkey", json={"credential": kf.assert_(o)}).ok
+fcodes = dbx("SELECT code_hash FROM recovery_codes WHERE user_id=? ORDER BY code_hash", (IDS["fred"],))
+kf2 = Authenticator()
+o = F.post(B + "/api/me/passkeys/options", json={"password": "password123"}).json()
+r = F.post(B + "/api/me/passkeys", json={"credential": kf2.register(o), "name": "Second"})
+check(r.ok and len(r.json()["passkeys"]) == 2 and not r.json().get("recovery_codes") and fs.get(B + "/api/state").ok
+      and dbx("SELECT code_hash FROM recovery_codes WHERE user_id=? ORDER BY code_hash", (IDS["fred"],)) == fcodes and len(fcodes) == 10,
+      f"#4290: a second passkey: the recovery codes and the other session stay {r.text[:160]}")
 s, _ = login("erin")
 o = s.post(B + "/api/auth/2fa/passkey/options").json()
 check(s.post(B + "/api/auth/2fa/passkey", json={"credential": kf.assert_(o)}).status_code == 401, "another user's passkey is not erin's second factor")
@@ -344,6 +378,7 @@ check(t["qr"].startswith("data:image/svg+xml"), "enrolment via the ticket: QR co
 check(s.post(B + "/api/auth/enrol/totp/confirm", json={"code": "000000" if totp(gsec) != "000000" else "111111"}).status_code == 401, "wrong code at the enrolment")
 r = s.post(B + "/api/auth/enrol/totp/confirm", json={"code": totp(gsec)})
 check(r.ok and len(r.json().get("recovery_codes") or []) == 10 and s.get(B + "/api/state").ok, "enrolled -> session + recovery codes")
+genrol = r.json().get("recovery_codes") or []  # 2.585.0 (#4290): void after the renewal below
 check(requests.post(B + "/api/auth/enrol/totp", headers=H).status_code == 401, "enrolment endpoints need the ticket")
 # enrolment with a passkey
 kd = Authenticator()
@@ -356,8 +391,16 @@ check(r.ok and s.get(B + "/api/state").ok and len(r.json()["recovery_codes"]) ==
 sess_g, r = login("gwen")
 r = sess_g.post(B + "/api/auth/2fa", json={"code": totp(gsec, now_step() + 1)})
 check(r.ok, "gwen logs in with her code")
+# 2.585.0 (#4290): renewing the recovery codes (login.py me_recovery_new): the password is needed, without a second
+# factor there is nothing to renew, and the old codes stop working
+check(sess_g.post(B + "/api/me/2fa/recovery", json={"password": "wrong-password"}).status_code == 403
+      and sess_g.post(B + "/api/me/2fa/recovery", json={}).status_code == 403, "#4290: renewing the codes needs the password")
+check(A.post(B + "/api/me/2fa/recovery", json={"password": "password123"}).status_code == 409, "#4290: no second factor: no codes to renew")
 r = sess_g.post(B + "/api/me/2fa/recovery", json={"password": "password123"})
 gcodes = r.json()["recovery_codes"]
+check(r.ok and len(gcodes) == 10 and not set(gcodes) & set(genrol) and r.json()["recovery_left"] == 10, "#4290: ten new codes")
+r = sess_g.post(B + "/api/me/2fa/totp/disable", json={"password": "password123", "code": genrol[0]})
+check(r.status_code == 400, f"#4290: an old recovery code is void after the renewal ({r.status_code})")
 r = sess_g.post(B + "/api/me/2fa/totp/disable", json={"password": "password123", "code": gcodes[0]})
 check(r.status_code == 409, f"policy on: the last factor cannot be removed ({r.status_code})")
 # proxy logins are not affected

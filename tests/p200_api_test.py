@@ -157,6 +157,14 @@ A.patch(B + f"/api/users/{ids['conv']}", json={"proxy_login": "convproxy"})
 r = requests.get(PB + "/api/state", headers={"Remote-User": "convproxy"})
 check(r.status_code in (401, 403), f"agent: no proxy login ({r.status_code})")
 check(A.patch(B + "/api/users/1", json={"kind": "agent"}).status_code == 400, "cannot turn myself into an agent")
+# 2.585.0 (#4290): the other branches of the self-lock (users.py user_update / user_delete): only the agent branch was tested
+r = A.patch(B + "/api/users/1", json={"is_admin": False})
+check(r.status_code == 400 and dbx("SELECT is_admin FROM users WHERE id=1")[0][0] == 1, f"#4290: cannot remove my own admin rights {r.status_code}")
+r = A.patch(B + "/api/users/1", json={"disabled": True})
+check(r.status_code == 400 and dbx("SELECT disabled FROM users WHERE id=1")[0][0] == 0 and A.get(B + "/api/state").ok,
+      f"#4290: cannot disable myself, the session stays {r.status_code}")
+r = A.delete(B + "/api/users/1")
+check(r.status_code == 400 and dbx("SELECT 1 FROM users WHERE id=1") and A.get(B + "/api/state").ok, f"#4290: cannot delete myself {r.status_code}")
 A.post(B + "/api/users", json={"username": "adm2", "password": "password123", "is_admin": True})
 adm2 = [x["id"] for x in A.get(B + "/api/users").json()["users"] if x["username"] == "adm2"][0]
 check(A.patch(B + f"/api/users/{adm2}", json={"kind": "agent"}).status_code == 400, "an admin must lose admin rights first")

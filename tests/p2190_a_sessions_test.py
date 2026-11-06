@@ -103,6 +103,15 @@ r = By.patch(B + "/api/me", json={"password": "password456", "current_password":
 check(r.ok, "own password change " + r.text[:200])
 check(Bx.get(B + "/api/state").status_code == 401 and By.get(B + "/api/state").ok, "the other session ends, this one stays")
 check(not has_sub(sx) and has_sub(sy), "#1991: the subscription of the ended session goes, the own one stays")
+# 2.585.0 (#4290): a wrong or missing current password changes nothing (users.py me_update): 403, the hash stays, no
+# session ends (neither this one nor another)
+h0 = DB.execute("SELECT password_hash FROM users WHERE id=?", (uid["bob"],)).fetchone()[0]
+Bz = sess("bob", "password456")
+for cur in ("password123", "", None):
+    r = By.patch(B + "/api/me", json={"password": "password999", **({} if cur is None else {"current_password": cur})})
+    check(r.status_code == 403 and r.json().get("error") == "Current password is wrong", f"#4290: current password {cur!r}: 403 {r.status_code}")
+check(DB.execute("SELECT password_hash FROM users WHERE id=?", (uid["bob"],)).fetchone()[0] == h0
+      and By.get(B + "/api/state").ok and Bz.get(B + "/api/state").ok, "#4290: a refused change keeps the password and every session")
 
 # ================================================================== #1991: the admin disables the account
 Cx = sess("carol")
@@ -176,6 +185,22 @@ for origin in ("http://localhost:9", "http://evil.localhost"):
     rp = ((r.json() if r.ok else {}).get("rp") or {}).get("id")
     check(r.status_code == 403 or rp == "kalmido.example", f"#2496: {origin} is no passkey origin with PUBLIC_URL kalmido.example: {r.status_code} {rp}")
 
+# ================================================================== 2.585.0 (#4290): an ended session stays ended
+# (session.py authenticate, login.py auth_logout): the old cookie sent again after the logout, and an expired session
+L1, L2 = sess("dave", "password789"), sess("dave", "password789")
+old = L1.cookies.get("kalmido_session")
+check(old and L1.post(B + "/api/auth/logout").ok and L1.get(B + "/api/state").status_code == 401, "#4290: logout")
+r = requests.get(B + "/api/state", headers=H, cookies={"kalmido_session": old})
+check(r.status_code == 401 and r.json().get("auth") == "login", f"#4290: the old cookie after the logout: 401 {r.status_code}")
+r = requests.post(B + "/api/tasks", json={"title": "after logout"}, headers=H, cookies={"kalmido_session": old})
+check(r.status_code == 401 and not DB.execute("SELECT 1 FROM tasks WHERE title='after logout'").fetchone(), f"#4290: ... and writes nothing {r.status_code}")
+check(not DB.execute("SELECT 1 FROM sessions WHERE token_hash=?", (hashlib.sha256(old.encode()).hexdigest(),)).fetchone()
+      and L2.get(B + "/api/state").ok, "#4290: the logout ends only its own session (row gone, the other one stays)")
+t2 = L2.cookies.get("kalmido_session")
+DB.execute("UPDATE sessions SET expires_at=? WHERE token_hash=?", ("2020-01-01T00:00:00+00:00", hashlib.sha256(t2.encode()).hexdigest()))
+r = requests.get(B + "/api/state", headers=H, cookies={"kalmido_session": t2})
+check(r.status_code == 401 and r.json().get("auth") == "login", f"#4290: an expired session: 401 {r.status_code}")
+
 # ================================================================== #2496: a sign-in link with someone signed in
 tok = link_token(A, uid["erin"])
 Cz = sess("carol", "password321")
@@ -219,6 +244,10 @@ check(apppws(FID) == 0, "freelancer: the own password change ends the app passwo
 apppw(FID, "tablet")
 r = F2.patch(B + "/api/me", json={"password": "password789", "current_password": "password654", "revoke_tokens": False})
 check(r.ok and apppws(FID) == 1, "freelancer: revoke_tokens:false keeps a new app password " + r.text[:200])
+# 2.585.0 (#4290): the freelancer too: a wrong current password is refused and ends nothing
+r = F2.patch(B + "/api/me", json={"password": "password000", "current_password": "password654"})
+check(r.status_code == 403 and F2.get(B + "/api/state").ok and apppws(FID) == 1 and sess("frida", "password789", soft=True),
+      f"freelancer #4290: a wrong current password: 403, session, app password and password stay {r.status_code}")
 tok = link_token(A, uid["bob"])
 r = F2.post(B + "/api/auth/link", json={"token": tok})
 check(r.ok and r.json().get("switch") is True, "freelancer: a sign-in link of another account asks first " + r.text[:200])
