@@ -146,6 +146,7 @@ const NOTIF_ROWS = [
   ['errreport', N_('New error reports'), N_('a new error from a project’s error-report webhook became a ticket (repeats stay quiet)')]];  // 2.18.0
 // 2.425.0 (#3453 review): the receipt fetcher's row lives here (docfetch.js comes lazily with the documents: the row was missing until then)
 NOTIF_ROWS.push(['fetcher', N_('Receipt fetcher'), N_('a portal of your receipt fetcher reports an error, for example a sign-in that ran out'), 'office']);
+NOTIF_ROWS.push(['docflow', N_('Document flows'), N_('a flow of your documents tells you about a document')]);  // 2.581.0 (#4803): News only
 NOTIF_ROWS.push(['integration', N_('Integrations'), N_('a forwarding, webhook, mailbox or git connection of yours stopped working')]);  // 2.367.3 (#2971)
 NOTIF_ROWS.push(['limits', N_('E-mail limits of public pages'), N_('your client portal or booking page used up its sign-in or confirmation e-mails')]);  // 2.453.0 (#3781): News only
 NOTIF_ROWS.push(['notice', N_('Notices from the server'), N_('a maintenance notice sent as a push')]);  // 2.367.4 (#2974): push only

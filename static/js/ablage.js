@@ -391,7 +391,8 @@ const AB_ACT = {list: N_('opened the folder'), read: N_('read'), download: N_('d
   unshare: N_('stopped sharing'), org_access: N_('changed who in the organisation sees it'), create: N_('created'), link: N_('linked'),
   moved_space: N_('moved to another workspace'),  // 2.96.0 A (#1941)
   tags: N_('changed the tags'),  // 2.122.0 B (#2099)
-  recognise: N_('changed the recognition')};  // 2.353.0 D (#2759)
+  recognise: N_('changed the recognition'),  // 2.353.0 D (#2759)
+  flow: N_('ran a document flow'), 'flow-undo': N_('took a document flow back')};  // 2.581.0 (#4803): docs/flows.py
 // 2.123.0 C (#2103, #2107): the knowledge pages (that I may read) which show or link this file
 async function ab_wikiRefs(md, id) {
   let ps; try { ps = (await rawFetch('GET', '/api/wiki/refs?file=' + id)).pages || []; } catch { return; }

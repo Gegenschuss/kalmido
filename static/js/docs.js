@@ -514,8 +514,9 @@ function dc_mdDraw(md) {
       ${!ro && (noDue || noAmt) ? `<div class="dc-optbtn" role="group" aria-label="${esc(tr('Add'))}">${noDue ? `<button type="button" class="dc-chip" data-dc="showopt:due">${ic('plus', 's')} ${tr('Due')}</button>` : ''}${noAmt ? `<button type="button" class="dc-chip" data-dc="showopt:amount">${ic('plus', 's')} ${tr('Amount')}</button>` : ''}</div>` : '' /* 2.497.0 A (#4046): one chip per field */}
       ${(d.custom_fields || []).map(f => dc_cfRow(d, f, ro)).join('')}
     </div>
-    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details></div></div>`);
+    <details class="dc-text"><summary><h4>${tr('Recognised text')}</h4>${ic('chev', 's dc-chev')}</summary>${d.text ? `<pre>${esc(d.text)}</pre>` : `<p class="muted">${tr('No text recognised.')}</p>`}</details><div class="dc-flows"></div></div></div>`);
   dc_pvDraw(md, d);
+  if (typeof dfl_runs === 'function') dfl_runs(md, d);  // 2.581.0 (#4803): the runs of flows with Undo (docflows.js)
   if (DC.slide) dc_slideIn(md);  // 2.476.0 (#3935): the next document glides in from the side it was swiped to
 }
 // 2.430.0 (#3582): the preview at the top: the small picture at once, then an image as itself or a PDF's first page drawn sharp
@@ -816,8 +817,8 @@ function dc_sDraw(md) {
       asn: `<div class="row"><label for="dcs-asn">${tr('Prefix of the archive numbers')}</label><input id="dcs-asn" data-dcs="asnprefix" value="${esc(s.asn_prefix || 'ASN')}" maxlength="10" autocomplete="off" ${dis}></div>
         <p class="muted">${esc(tr('Next free number: {0}. A QR code or text like {1} on a scan fills it in.', s.asn_next, `${s.asn_prefix || 'ASN'}${String(s.asn_next).padStart(5, '0')}`))}</p>
         <p class="muted">${esc(tr('A stack scan with several codes can be split into documents; a separator sheet between two letters splits there too.'))} <a href="/api/docs/split-sheet.pdf" target="_blank" rel="noopener">${tr('Separator sheet to print (PDF)')}</a></p>${'' /* 2.154.0 A (#1111) */}`,
-      rules: `${s.rules.length ? `<ul class="dc-rules">${s.rules.map(rule).join('')}</ul>` : `<p class="muted">${tr('No rules yet. When you correct a document, Kalmido learns from it.')}</p>`}
-    ${can ? `<details class="dc-radd"><summary>${tr('New rule')}</summary>
+      rules: `${s.rules.length ? `<ul class="dc-rules">${s.rules.map(r => typeof dfl_ruleHtml === 'function' ? dfl_ruleHtml(r, can) : rule(r)).join('')}</ul>`  /* 2.581.0 (#4803): flows (docflows.js) */ : `<p class="muted">${tr('No rules yet. When you correct a document, Kalmido learns from it.')}</p>`}
+    ${can && typeof dfl_formHtml === 'function' ? dfl_formHtml(s) : can ? `<details class="dc-radd"><summary>${tr('New rule')}</summary>
       <div class="row"><label for="dcr-kind">${tr('If the document')}</label><select id="dcr-kind">${DC_KINDS.map(([v, l]) => `<option value="${v}">${tr(l)}</option>`).join('')}</select></div>
       <div class="row"><label for="dcr-match">${tr('Words or pattern')}</label><input id="dcr-match" maxlength="200" autocomplete="off"></div>
       <div class="row"><label for="dcr-sender">${tr('then sender')}</label><input id="dcr-sender" maxlength="120" list="dcr-sl" autocomplete="off"><datalist id="dcr-sl">${s.senders.map(x => `<option value="${esc(x.name)}">`).join('')}</datalist></div>
@@ -891,6 +892,7 @@ async function dc_cfAct(a, s, md) {  // 2.153.0 (#2179): add / rename / options 
   }
 }
 async function dc_sChange(e) {
+  if (typeof dfl_change === 'function' && dfl_change(e)) return;  // 2.581.0 (#4803): the parts of the flow form
   const s = DC.set, md = e.target.closest('.dc-smd');
   const l = e.target.closest('[data-dcl]');
   if (l) {
@@ -919,12 +921,20 @@ async function dc_sClick(e) {
   if (a === 'fadd' || /^f(ren|opt|del):/.test(a)) return dc_cfAct(a, s, md);  // 2.153.0 (#2179)
   if (a === 'radd') {
     const v = id => ($(`#${id}`, md)?.value || '').trim();
-    const r = {ws: s.ws, kind: v('dcr-kind'), match: v('dcr-match'), sender: v('dcr-sender'), type: v('dcr-type'), tags: v('dcr-tags'), folder: v('dcr-folder')};
+    const r = typeof dfl_collect === 'function' ? dfl_collect(md, s) : {ws: s.ws, kind: v('dcr-kind'), match: v('dcr-match'), sender: v('dcr-sender'), type: v('dcr-type'), tags: v('dcr-tags'), folder: v('dcr-folder')};  // 2.581.0 (#4803)
     let j; try { j = await api('POST', '/api/docs/rules', r); } catch { return; }
     s.rules = j.rules; dc_sDraw(md);
+    if (j.hook_secret && typeof dfl_secret === 'function') dfl_secret(j.hook_secret);  // 2.581.0 (#4803): shown once
     histToast(tr('Rule added'), histAdd({label: tr('Rule added'), sett: true,
       undo: async () => { const x = await api('DELETE', `/api/docs/rules/${j.id}`); if (DC.set) { DC.set.rules = x.rules; dc_sDraw($('.dc-smd')); } return {}; },
       redo: async () => { const x = await api('POST', '/api/docs/rules', r); j.id = x.id; if (DC.set) { DC.set.rules = x.rules; dc_sDraw($('.dc-smd')); } return {}; }}));
+    return;
+  }
+  if (a.startsWith('rtog:')) {  // 2.581.0 (#4803): a flow off / on again
+    const id = +a.slice(5), r = s.rules.find(x => x.id === id); if (!r) return;
+    const put = off => async () => { const x = await api('PATCH', `/api/docs/rules/${id}`, {...r, id: undefined, off}); if (DC.set) { DC.set.rules = x.rules; dc_sDraw($('.dc-smd')); } return {}; };
+    try { await put(!r.off)(); } catch { return; }
+    histToast(r.off ? tr('Turned on') : tr('Turned off'), histAdd({label: r.off ? tr('Turned on') : tr('Turned off'), sett: true, undo: put(!!r.off), redo: put(!r.off)}));
     return;
   }
   if (a.startsWith('rdel:')) {

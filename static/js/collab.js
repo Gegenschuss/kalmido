@@ -284,6 +284,7 @@ function newsText(it, U) {
     case 'filereq': { const d = it.data || {}; return trn('{0} file arrived through {1}', '{0} files arrived through {1}', d.n || 1, q(d.title || '')) + (d.name ? ' · ' + q(d.name) : ''); }  // 2.122.0 A (#2097)
     case 'integfail': return esc(d.text || '');  // 2.367.3 (#2971): written in the person's language by the server (collab/integfail.py)
     case 'fetcherr': return tr('Receipt fetcher {0}: {1}', q(d.portal || ''), esc(d.error || ''));  // 2.425.0 C (#3453): docfetch.js
+    case 'docflow': return d.flow ? tr('Flow {0}: {1}', q(d.flow), q(d.name || '')) : tr('Document flow: {0}', q(d.name || ''));  // 2.581.0 (#4803): docs/flows.py
     case 'orgkey': return ocNewsText(d, it.actor_id ? who : q(tr('The server admin')), q);  // 2.138.0 C (#1972): orgcrypt.js
     case 'apblimit': return tr('Your booking page reached its limit of {0} confirmation e-mails today. Further bookings work again tomorrow.', d.limit || '?');  // 2.360.2 L (#2561)
     case 'ptlimit': return d.org ? tr('The client portal of {0} reached its limit of {1} sign-in e-mails per hour. Further clients get a link again later.', q(d.org), d.limit || '?')
@@ -491,6 +492,7 @@ async function newsOpen(i, opts) {
   if (it.kind === 'filereq' && it.data?.node) { go('ablage/' + it.data.node); return; }  // 2.122.0 A (#2097): the folder the files went into
   if (it.kind === 'integfail') { const d = it.data || {}; if (d.list && listById(d.list)) go('l/' + d.list); else if (d.ws) loadModule('hubmailbox').then(hmb_load).then(() => hmb_dialog(d.ws)); else settingsModal(d.focus); return; }  // 2.367.3 (#2971): where to repair it
   if (it.kind === 'fetcherr') { settingsModal('fetcher'); return; }  // 2.425.0 C (#3453): the receipt fetcher's portals
+  if (it.kind === 'docflow' && it.data?.doc) { go('docs/' + it.data.doc); return; }  // 2.581.0 (#4803): the document
   if (it.kind === 'tsheet') { tsl_open(it.data); return; }  // 2.125.0 B (#2119): the time page on that month
   if (it.kind === 'wiki_shared') { if (feat('wiki')) { S.wshFocus = true; go('wiki'); } else toast(tr('Turn on the knowledge pages in the settings to read it.')); return; }  // 2.126.2 B (#2355): "Shared with me"
   if (it.kind === 'upscan' && it.data?.where === 'chat') { if (feat('agents') && agentsOn()) go('agents'); return; }

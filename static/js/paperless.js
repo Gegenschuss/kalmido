@@ -216,7 +216,9 @@ function pll_preview_html(p) {
   const r = p && p.rules; if (!r) return '';
   const n = r.convert || 0, bad = r.unsupported || [];
   if (!n && !r.dup && !r.auto && !bad.length) return '';
-  const WHY = {long: N_('pattern too long'), pattern: N_('pattern too complex'), unknown: N_('unknown kind'), limit: N_('rule limit reached')};
+  const WHY = {long: N_('pattern too long'), pattern: N_('pattern too complex'), unknown: N_('unknown kind'), limit: N_('rule limit reached'),
+    // 2.581.0 (#4803): workflows -> document flows: what is not taken over (the rest of the flow is)
+    trigger: N_('trigger not supported'), owner: N_('owner and rights not taken over'), webhook: N_('webhook not taken over'), email: N_('e-mail not taken over'), action: N_('action not taken over'), filter: N_('path or e-mail rule filter not taken over')};
   let h = `<div class="pll-rules">`;
   if (n) h += `<label class="chkl"><input type="checkbox" id="pll-rules" ${r.on === false ? '' : 'checked'}> ${tr('Take over the matching rules from Paperless-ngx ({0})', n)}</label>`;
   const notes = [];
