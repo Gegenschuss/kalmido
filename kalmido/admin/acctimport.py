@@ -1191,6 +1191,7 @@ class _Run:
         self.stats = {}
         self.warn = {}
         self.must = set()  # 2.531.0 (#4317) F4: the keys of warn the result always names, first and outside UMZ_WARN_MAX
+        self.after = []  # 2.574.0 (#4556): steps once the run is committed (fn(c)), e.g. telling the connection requests
         self._old = {}  # 2.531.0 (#4317) F16: kind -> the new ids of the rows of an earlier import (umz_have)
         self.done, self.total, self.tick = 0, max(1, total), 0
         self.task_list, self.field_list, self.list_org = {}, {}, {}
@@ -2177,6 +2178,8 @@ def umz_run(uid, iid, opts):
                 imp_prune(c, uid)
             c.commit()
             run.written = []  # committed: the files belong to their rows now
+            for fn in run.after:  # 2.574.0 (#4556): umz_more._conn_tell
+                fn(c)
             shared = []
             try:
                 shared = umz_share(c, run, uid, data, opts["people"], opts["can_invite"], umz_salt(man))

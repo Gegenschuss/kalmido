@@ -16592,6 +16592,7 @@
   "Integration, deployment and merge approvals need two people": "Le approvazioni di integrazione, rilascio e merge richiedono due persone",
   "Only useful with members: the second 👍 must come from another person who may approve (project owner, project admin or an admin). Share the project first.": "Utile solo con membri: il secondo 👍 deve arrivare da un’altra persona che può approvare (proprietario, admin del progetto o un admin). Condividi prima il progetto.",
   "{0} approved the comment of {1} (one of two approvals)": "{0} ha approvato il commento di {1} (una di due approvazioni)",
+  "Connections not asked again, more than {0} in one import (ask them by hand): {1}": "Connessioni non richieste di nuovo, più di {0} in un'importazione (richiedile a mano): {1}",
   "This module is not on your module card in this organisation.": "Questo modulo non è nella tua scheda dei moduli in questa organizzazione.",
   "At most {0} module cards": "Al massimo {0} schede dei moduli",
   "Module cards": "Schede dei moduli",

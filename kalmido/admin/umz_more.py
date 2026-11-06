@@ -7,12 +7,17 @@ touch with, saved arrangements of views and project pages, and the bells / follo
 Never an id of the old server: what points at something that did not come along is left out."""
 import json
 
-from ..core.db import iso, now_utc
+from flask import g
+
+from ..core.config import app
+from ..core.db import db_log_err, iso, now_utc
 from ..core.errors import BadInput
 from ..core.access import Denied
 from ..core.i18n import N_
 from ..accounts.layouts import clean_layout
 from ..accounts.layoutsets import lyv_key_ok, lyv_save
+from ..accounts.discover import _push as conn_push  # 2.574.0 (#4556): a request asked again is told like one asked by hand
+from ..collab.comments import send_pushes
 from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_STATES, BM_TITLE_MAX, bm_key, bm_norm_url, bm_site, bm_tags
 from ..notify.taskbell import TBL_LEVELS
 from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
@@ -22,6 +27,7 @@ from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_find, umz_insert,
 UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
             "kid_parents", "conn_links")  # 2.531.0 (#4317 F12)
 UMZ_NAMES_MAX = 20  # 2.531.0 (#4317 F12): names in one warning, the rest as a number
+UMZ_CONN_MAX = 50  # 2.574.0 (#4556): connection requests one import asks again at most (the rest is named, not asked)
 
 
 def umz_more_has(data):
@@ -161,16 +167,19 @@ def _family(c, run, uid, data, ts, salt):
     """2.531.0 (#4317 F12): the family links and connections of the file, the other person found by the address hash among the
     accounts the person may see (like the people of the preview). A family link hands a parent the care of a child account: only an
     admin sets it (Users), so the import never makes one and names who it was with. A connection is asked again: an open request
-    the other person confirms (never a connection without them); one that cannot be asked is named."""
+    the other person confirms (never a connection without them); one that cannot be asked is named.
+    2.574.0 (#4556): an open request is told to the other person the way discover.conn_request tells one (News + push, row
+    "share" of their notification settings); a hidden one (they blocked the person) stays silent. At most UMZ_CONN_MAX new
+    requests per run, the rest is not asked and named in its own warning."""
     fam = [r for r in data.get("kid_parents") or [] if isinstance(r, dict)]
     if fam:
         run.warning(N_("Family links do not move along, an admin of this server sets them up again: {0}"), _names(fam))
     links = [r for r in data.get("conn_links") or [] if isinstance(r, dict)]
     if not links:
         return
-    me_ = c.execute("SELECT kid, COALESCE(kind,'user') AS kind FROM users WHERE id=?", (uid,)).fetchone()
+    me_ = c.execute("SELECT kid, COALESCE(kind,'user') AS kind, display_name, username FROM users WHERE id=?", (uid,)).fetchone()
     seen = umz_seen(c, uid, salt) if me_ and not me_["kid"] and me_["kind"] == "user" else {}
-    asked, gone = [], []
+    asked, gone, over, tell = [], [], [], []
     for r in links:
         run.step()
         hit = umz_find(c, uid, r.get("email_hash") if isinstance(r.get("email_hash"), str) else "", seen)
@@ -183,17 +192,47 @@ def _family(c, run, uid, data, ts, salt):
                 c.execute("SELECT 1 FROM conn_requests WHERE (from_id=? AND to_id=?) OR (from_id=? AND to_id=? AND status='open')",
                           (uid, o["id"], o["id"], uid)).fetchone():
             continue  # connected or asked already (a request of mine keeps its state, as when asking again by hand)
+        if len(asked) >= UMZ_CONN_MAX:  # 2.574.0 (#4556): a hidden one counts too (the limit tells nothing about a block)
+            over.append(r)
+            continue
         blocked = c.execute("SELECT 1 FROM conn_blocks WHERE user_id=? AND blocked_id=?", (o["id"], uid)).fetchone()
         rid = umz_insert(c, "conn_requests", {"from_id": uid, "to_id": o["id"], "status": "hidden" if blocked else "open", "created_at": ts})
         if rid:
             _more(run, "conn_requests", rid)
             asked.append(r)
+            if not blocked:  # told once the run is committed (_conn_tell)
+                tell.append(o["id"])
         else:
             gone.append(r)
+    if tell:
+        run.after.append(lambda c2: _conn_tell(c2, uid, tell))
     if asked:
         run.warning(N_("Connections asked again, they count once the other person confirms: {0}"), _names(asked))
     if gone:
         run.warning(N_("Connections that do not move along (no account here you may see): {0}"), _names(gone))
+    if over:
+        run.warning(N_("Connections not asked again, more than {0} in one import (ask them by hand): {1}"), UMZ_CONN_MAX, _names(over), must=True)
+
+
+def _conn_tell(c, uid, to_ids):
+    """2.574.0 (#4556): after the run's commit (acctimport umz_run, run.after): the open requests the import asked again are told
+    to the other person like discover.conn_request tells one (News + push, row "share" of their notification settings). The import
+    runs without a request (a queue row): in one of its own, as the importing person (me() = the sender, as when asking by hand);
+    the pushes leave after the News are committed. A failure here costs only the News, never the committed import."""
+    u = c.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+    if not u:
+        return
+    with app.test_request_context("/api/account/import"):
+        g.pushes, g.user, g.auth_via = [], u, None  # not g.db: the context's end would close the run's connection
+        try:
+            for o in to_ids:
+                conn_push(c, o, "connreq", u["display_name"] or u["username"])
+            c.commit()
+        except Exception as e:  # noqa: BLE001 -- the import is committed already; only the News are lost
+            c.heal() or c.rollback()
+            print(f"account import of user {uid}: telling the connection requests failed: {db_log_err(e)}", flush=True)
+            return
+        send_pushes(g.pop("pushes", None))
 
 
 def umz_more_write(c, run, uid, me_old, data, salt=None):

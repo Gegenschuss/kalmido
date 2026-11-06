@@ -16591,6 +16591,7 @@
   "Integration, deployment and merge approvals need two people": "Goedkeuringen voor integratie, uitrol en merge hebben twee personen nodig",
   "Only useful with members: the second 👍 must come from another person who may approve (project owner, project admin or an admin). Share the project first.": "Alleen zinvol met leden: de tweede 👍 moet komen van een andere persoon die mag goedkeuren (projecteigenaar, projectbeheerder of een beheerder). Deel het project eerst.",
   "{0} approved the comment of {1} (one of two approvals)": "{0} heeft de opmerking van {1} goedgekeurd (een van twee goedkeuringen)",
+  "Connections not asked again, more than {0} in one import (ask them by hand): {1}": "Verbindingen niet opnieuw gevraagd, meer dan {0} in één import (vraag ze met de hand): {1}",
   "This module is not on your module card in this organisation.": "Deze module staat in deze organisatie niet op je modulekaart.",
   "At most {0} module cards": "Maximaal {0} modulekaarten",
   "Module cards": "Modulekaarten",
