@@ -1589,22 +1589,32 @@ def _pg_restore(dump):
     # it dropping the key it points at ("cannot drop constraint users_pkey"): such a backup could not be restored at all.
     # These go first like those of the tables the dump lacks; the dump brings its own, BK_DROPPED_FKS the rest (bk_fks_back)
     dump_fks = {(m.group(1), m.group(2)) for m in re.finditer(r"^\d+; \d+ \d+ FK CONSTRAINT public (\S+) (\S+) ", toc, re.M)}
-    c = _pg.connect_direct(DATABASE_URL)
-    try:
-        with _pg.system_ctx(c):  # the restore works on the whole database (every organisation)
-            c.execute("SET LOCAL statement_timeout = 0")
-            extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
-                     if r[0] not in tables]
-            dropped = []
-            for t, k, d in _fk_list(c):
-                if t in extra or (t, k) not in dump_fks:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
-                    if t not in extra:  # (the tables the dump lacks are built anew)
-                        dropped.append([t, k, d])
-                    c.execute(f"ALTER TABLE {_q(t)} DROP CONSTRAINT IF EXISTS {_q(k)}")
-            _fks_note(dropped)  # before the commit: a key noted and still there costs nothing
-        c.commit()
-    finally:
-        c.close()
+    # #3506 (CI red of 2.614.0): taking the keys away needs the strongest lock on each table; work outside the maintenance
+    # gate (as for pg_restore below) can hold a weaker one and wait for a table this transaction has: a deadlock rolls it
+    # back completely (nothing dropped, nothing noted yet), so it is tried again like pg_restore instead of ending the restore
+    for i in range(BK_RESTORE_TRIES):
+        c = _pg.connect_direct(DATABASE_URL)
+        try:
+            with _pg.system_ctx(c):  # the restore works on the whole database (every organisation)
+                c.execute("SET LOCAL statement_timeout = 0")
+                extra = [r[0] for r in c.execute("SELECT tablename FROM pg_tables WHERE schemaname='public'")
+                         if r[0] not in tables]
+                dropped = []
+                for t, k, d in _fk_list(c):
+                    if t in extra or (t, k) not in dump_fks:  # 2.273.0 A (#3050): only the keys now, the rows stay until pg_restore went through
+                        if t not in extra:  # (the tables the dump lacks are built anew)
+                            dropped.append([t, k, d])
+                        c.execute(f"ALTER TABLE {_q(t)} DROP CONSTRAINT IF EXISTS {_q(k)}")
+                _fks_note(dropped)  # before the commit: a key noted and still there costs nothing
+            c.commit()
+            break
+        except Exception as e:
+            if i + 1 >= BK_RESTORE_TRIES or getattr(e, "sqlstate", None) != "40P01":
+                raise
+            print(f"restore: deadlock while taking the keys away (nothing changed), try {i + 2} of {BK_RESTORE_TRIES}", flush=True)
+            time.sleep(2 * (i + 1))
+        finally:
+            c.close()
     _pool_renew()
     try:
         # 2.209.0 E (#1627): work that runs outside the maintenance gate (queued work, pushes after a request) can meet

@@ -134,6 +134,33 @@ check(j.get("stopped") == "restore", f"the restore stopped before pg_restore {j}
 q = sql("SELECT count(*) FROM zz_p2273", "SELECT note FROM zz_p2273")
 check(q[0] == [[1]] and q[1] == [["keep me"]], f"#3050: the table the backup does not have keeps its row {q}")
 
+# #3506 (CI red of 2.614.0): a deadlock while the keys are taken away (work outside the maintenance gate holds a table) is
+# tried again like one in pg_restore, instead of ending the restore with a database error
+DEAD = """
+import json, os, sys, tempfile
+from kalmido.admin import backup as bk
+work = tempfile.mkdtemp(prefix=".p2273-", dir=bk.BK_DIR)
+man, dbp = bk.bk_prepare(os.path.join(bk.BK_DIR, sys.argv[1]), "", work)
+class Dead(Exception):
+    sqlstate = "40P01"
+real, n = bk._fk_list, [0]
+def once(c):
+    n[0] += 1
+    if n[0] == 1:
+        raise Dead("deadlock detected")
+    return real(c)
+def stop(args, err_code="io", timeout=None):
+    raise bk.BackupError("restore", "stopped")
+bk._fk_list, bk._pg_run, bk.time.sleep = once, stop, lambda s: None
+try:
+    bk._pg_restore(dbp)
+    print(json.dumps({"stopped": False, "tries": n[0]}))
+except bk.BackupError as e:
+    print(json.dumps({"stopped": e.code, "tries": n[0]}))
+"""
+j = py(DEAD, BK1)
+check(j.get("stopped") == "restore" and j.get("tries") == 2, f"#3506: a deadlock while taking the keys away is tried again {j}")
+
 # ================================================================== #3051 p. 12 + 13: the restore names what it cannot bring back
 sql("INSERT INTO bg_jobs(kind, payload, state, run_after, created_at) VALUES ('p2273_test', '', 'wait', '2099-01-01T00:00:00Z', '2026-10-24T10:00:00Z')")
 r = A.post(B + "/api/admin/backups/restore", json={"password": "password123", "name": BK1, "confirm": "RESTORE"})
