@@ -123,6 +123,11 @@ c.commit()
   `current`, nothing written. People may leave it out (old clients); **agents must send it** (400 without).
 - Each change: `rev+1`, `updated_at`, `updated_by`, an entry in the history (one person's changes within ten minutes
   merge; an agent's are marked), the title on the reference node, `bump` of the area.
+- `obj_space_set(c, uid, kind, id, org_id)` (2.579.0, #4802): the object moves into an organisation or back into its owner's
+  own space -- e.g. a saved view an admin shares with everyone of the organisation (members then get the kind's `org_access`).
+  'manage', a person; into an organisation as for `obj_create`; out of one only its admin (logged, `accounts/orgout.py`); refused
+  (409) while its node carries shares. Register a kind with `org_join="admin"` when only admins may bring its objects into an
+  organisation (at creation too): a member's objects of it stay private.
 - `obj_create`, `obj_trash`, `obj_restore`, `obj_purge` (only from the trash), `obj_history`, `obj_undo`. `obj_trash` puts the
   object's reference node into the file store's trash with it and `obj_restore` brings that node back, so the folders and
   their searches hide a trashed object like any node in the trash (no extra clause per kind). Should the file store's
