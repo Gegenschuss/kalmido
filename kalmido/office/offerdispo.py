@@ -98,10 +98,20 @@ def _job_key(k):
     return ":".join(k.split(":")[:2])
 
 
+def odp_chain(c, oid, root):
+    """2.589.0 (review F1): SQL condition + args of the bookings of a quotation chain: its root, or any document of the chain
+    (deleting the first quotation moves the chain to the oldest remaining version, office/docs.py odoc_unlink_refs, like the
+    tasks' fallback in office/offertasks.py otk_links)."""
+    ids = [x[0] for x in c.execute("SELECT id FROM office_docs WHERE org_id=? AND kind='offer' AND (id=? OR version_of=?)", (oid, root, root))]
+    q = ",".join("?" * len(ids))
+    return (f"(offer_root=? OR offer_doc IN ({q}))" if ids else "offer_root=?"), [root, *ids]
+
+
 def odp_existing(c, oid, root):
     """{day key: [booking rows]} of the living bookings the chain root made."""
     out = {}
-    for b in c.execute("SELECT * FROM hub_bookings WHERE org_id=? AND offer_root=? AND deleted_at IS NULL ORDER BY id", (oid, root)):
+    w, wa = odp_chain(c, oid, root)
+    for b in c.execute(f"SELECT * FROM hub_bookings WHERE org_id=? AND {w} AND deleted_at IS NULL ORDER BY id", (oid, *wa)):
         out.setdefault(_job_key(b["offer_pos"] or ""), []).append(dict(b))
     return out
 
@@ -120,7 +130,8 @@ def odp_preview(c, oid, uid, r, root):
     if hint:
         return {"on": False, "hint": hint if want else "", "days": []}
     have = odp_existing(c, oid, root)
-    dropped = {_job_key(k or "") for (k,) in c.execute("SELECT DISTINCT offer_pos FROM hub_bookings WHERE org_id=? AND offer_root=? AND deleted_at IS NOT NULL", (oid, root))}
+    w, wa = odp_chain(c, oid, root)
+    dropped = {_job_key(k or "") for (k,) in c.execute(f"SELECT DISTINCT offer_pos FROM hub_bookings WHERE org_id=? AND {w} AND deleted_at IS NOT NULL", (oid, *wa))}
     out = []
     for d in want:
         bs = have.pop(d["key"], [])
@@ -130,9 +141,10 @@ def odp_preview(c, oid, uid, r, root):
             a = _span(bs)[0]
             n = _span([b for b in bs if not b["offer_mark"]] or bs)[1]  # a marked booking is done: it does not count again
             want_keys = {p["key"] for p in d["places"]}
-            same = n == d["days"] and {b["offer_pos"] for b in bs if b["offer_mark"] != "gone"} == want_keys
+            same = n == d["days"] and {b["offer_pos"] for b in bs if b["offer_mark"] != "gone"} == want_keys \
+                and (not d["start"] or d["start"] == a)  # 2.589.0 (review F2): a moved service period is a change too
             fixed = [b for b in bs if b["status"] == "firm" or (b["resource_kind"] != "slot" and b["offer_pos"] not in want_keys)]
-            x.update(start=a, need_date=False, job=bs[0]["job"], state="same" if same else "changed", pick=not same, firm=0 if same else len(fixed))
+            x.update(start=d["start"] or a, need_date=False, job=bs[0]["job"], state="same" if same else "changed", pick=not same, firm=0 if same else len(fixed))
         out.append(x)
     for k, bs in have.items():
         a, n = _span(bs)
@@ -192,8 +204,12 @@ def odp_apply(c, oid, uid, r, root, lid, pick, dates):
 
     def drop(b):
         nonlocal n_upd
-        c.execute("UPDATE hub_bookings SET deleted_at=? WHERE id=?", (ts, b["id"]))
-        n_upd += 1
+        # 2.589.0 (review F3): only while it is still an open pencilled-in place - filled meanwhile (dsp_fill) = marked instead
+        if c.execute("UPDATE hub_bookings SET deleted_at=? WHERE id=? AND resource_kind='slot' AND status='option' AND deleted_at IS NULL",
+                     (ts, b["id"])).rowcount:
+            n_upd += 1
+        else:
+            mark(b, "gone")
 
     for d in pv["days"]:
         if d["key"] not in pick or d["state"] == "same":
@@ -237,5 +253,6 @@ def odp_apply(c, oid, uid, r, root, lid, pick, dates):
             if p["key"] not in mine:
                 _insert(c, oid, uid, lid, r, root, d["job"], bs[0]["title"] if bs else d["title"], a, e, p)
                 n_new += 1
-    c.execute("UPDATE hub_bookings SET offer_doc=? WHERE org_id=? AND offer_root=? AND deleted_at IS NULL", (r["id"], oid, root))
+    w, wa = odp_chain(c, oid, root)
+    c.execute(f"UPDATE hub_bookings SET offer_doc=?, offer_root=? WHERE org_id=? AND {w} AND deleted_at IS NULL", (r["id"], root, oid, *wa))
     return {"booked": n_new, "adapted": n_upd, "marked": n_mark}

@@ -16,6 +16,9 @@ tenant-matrix: hub
  - rights: filling another organisation's place 404, a member filling an admin's place 403, without the module 409
  - a person without an organisation (her own area): the same flow
 usage: p2589_b_dispo_test.py <datadir>"""
+import os
+
+import dbx as dbxm  # 2.589.0 (review F1): a write in the suite's database
 import kt
 from kt import B, check, sess
 from freelancer_fixture import freelancer
@@ -31,6 +34,16 @@ CLIENT = {"name": "Beispiel Kunde AG", "street": "Marktstrasse 5", "zip": "50667
 
 def sql(q, args=()):
     return kt.dbx(q, args)
+
+
+def wsql(q, args=()):
+    """2.589.0 (review F1): a write in the suite's database (like tests/p3433_c_offer_tasks_test.py)."""
+    c = dbxm.connect(os.path.join(kt.DATA, "tasks.db"))
+    try:
+        c.execute(q, args)
+        c.commit()
+    finally:
+        c.close()
 
 
 def bookings(oid, root):
@@ -145,6 +158,17 @@ def scenario(S, who, oid, cam, lig, other=None, other_s=None):
           and sql("SELECT offer_mark FROM hub_bookings WHERE id=?", (ids[kam1],)) == [("",)], f"{who}: a change by hand takes the mark off")
     pv = S.get(B + f"{D}/{Q2}/tasks").json()
     check([x["state"] for x in pv["dispo"]["days"]] == ["same"], f"{who}: afterwards nothing left to do {pv['dispo']['days']}")
+    # 2.589.0 (review F2): a new service period with the same number of days is a change (red before: "same")
+    check(S.patch(B + f"{D}/{Q2}", json={"service_from": "2027-03-08", "service_to": "2027-03-17"}).ok, f"{who}: the period moved")
+    dd = S.get(B + f"{D}/{Q2}/tasks").json()["dispo"]["days"]
+    check([(x["state"], x["start"]) for x in dd] == [("changed", "2027-03-08")], f"{who}: a moved period: changed, the new start {dd}")
+    check(S.patch(B + f"{D}/{Q2}", json={"service_from": "2027-03-01", "service_to": "2027-03-10"}).ok, f"{who}: the period back")
+    # 2.589.0 (review F1): the first quotation deleted -> the chain moves to Q2 (office/docs.py odoc_unlink_refs); its bookings
+    # are still the chain's, not "new" (red before: every place booked a second time)
+    wsql("UPDATE office_docs SET version_of=NULL WHERE id=?", (Q2,))
+    dd = S.get(B + f"{D}/{Q2}/tasks").json()["dispo"]["days"]
+    check([x["state"] for x in dd] == ["same"], f"{who}: the moved chain finds its bookings {dd}")
+    wsql("UPDATE office_docs SET version_of=? WHERE id=?", (Q, Q2))
     # ------------------------------------------------------------ no date in the quotation: the preview asks
     Q3 = S.post(B + D, json={"kind": "offer", "lang": "de", "client_id": cl, "items": []}).json()["id"]
     shoot(S, who, Q3, "Dreh ohne Datum", 1, [{"role_id": cam, "qty": 1}])
