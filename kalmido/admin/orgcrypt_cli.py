@@ -804,7 +804,7 @@ def encrypt_org(c, oid, stop=None):
     emb_drop_org(c, oid, sealed=False)  # 2.59.0 B (#1375): plain task vectors go, the embedding worker computes them sealed
     c.commit()
     ns, bad = files_encrypt(c, oid, key, org_files(c, oid), stop)
-    if not (stop and stop()) and not bad:
+    if not (stop and stop()) and not bad and not tp["failed"]:  # 2.570.0 (#4716 review F4): a copy of the trash left plain is not done
         with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
             c.execute("UPDATE org_keys SET migrated_at=? WHERE org_id=?", (_now(), oid))
         c.commit()
@@ -1232,8 +1232,8 @@ def _snap_cost(key, oid, enc, row):
         try:
             if Decimal(str(row["cost"])) == 0:
                 return False
-        except InvalidOperation:
-            return False
+        except InvalidOperation:  # 2.570.0 (#4716 review F4): no number -- counted (trash_snap: bad), the plain value stays
+            raise ValueError("cost is no number") from None
         row["cost_enc"], row["cost"] = oc.oc_enc_k(key, oid, ctx, str(row["cost"])), 0
         return True
     v = row.get("cost_enc")
@@ -1280,7 +1280,9 @@ def trash_pass(c, oid, enc, key, stop=None):
     (office_trash.snap keeps the rows' columns as stored), so a restore after the switch brings readable values in the
     current form back; the trash is not emptied. -> {"changed": copies, "failed": values that did not open}."""
     bad = [0]
-    n = _trash_walk(c, oid, lambda snap: trash_snap(key, oid, enc, snap, bad), bad, stop, sealed=not enc)
+    # 2.570.0 (#4716 review F6): the way back walks every copy (once), also one whose only protected value is a cost_enc
+    # left plain (no sealed value for the filter, like _cost_pass's oc_is_enc case)
+    n = _trash_walk(c, oid, lambda snap: trash_snap(key, oid, enc, snap, bad), bad, stop)
     return {"changed": n, "failed": bad[0]}
 
 
