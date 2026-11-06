@@ -58,7 +58,7 @@ Kalmido's defaults (the operator can change them with the variables named; see [
 | Agent usage records / agent audit log | 400 / 90 days | `KALMIDO_USAGE_DAYS` / `KALMIDO_AUDIT_DAYS` |
 | Sessions | 1 day, or 30 days with "Stay logged in"; then a new sign-in | `AUTH_SESSION_DAYS` |
 | Account export / import archives | 24 hours | – |
-| Backups | every backup of the last 24 hours, one a day for 14 days, one a week for 8 weeks (at most 104 weeks, whatever is set; 52 with the retention switch) | Settings > Organisation > Data > Backups |
+| Backups | every backup of the last 24 hours, one a day for 14 days, one a week for 8 weeks (at most 104 weeks, whatever is set; 52 with the retention switch) | Settings > Server > Backup |
 | Safety backups (made before updates and restores) | 30 days | `KALMIDO_SAFETY_BACKUP_DAYS` |
 | Database copies made by `update.sh` / `update.ps1` (installer only; `data/backups/kalmido-*.dump`, **not encrypted**) | the last 10, however old they are | delete them by hand |
 | Journal of deleted accounts (salted hashes of user name and e-mail, no plain text) | until no backup can hold the account any more: older than 104 weeks and older than every backup on the server | `KALMIDO_PURGE_LOGS` |

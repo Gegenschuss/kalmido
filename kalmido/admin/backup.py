@@ -933,12 +933,12 @@ def bk_fail_tell(c, e):
         with system_ctx(c):  # every instance admin
             rows = c.execute("SELECT id, email FROM users WHERE is_admin=1 AND disabled=0 AND kind<>'agent' ORDER BY id").fetchall()
             langs = {r["id"]: usettings(c, r["id"]).get("lang") for r in rows}
-        integ_tell(c, [r["id"] for r in rows], "backup", e.text, click="settings/odata", focus="odata")
+        integ_tell(c, [r["id"] for r in rows], "backup", e.text, click="settings/backup", focus="backup")  # 2.582.0 (#4827): Server > Backup
         c.commit()
     except Exception as x:  # noqa: BLE001 -- no database: the log and the admin alert above are what is left
         print("backup: telling the admins failed:", type(x).__name__, flush=True)
         return
-    link = f"{PUBLIC_URL}/#settings/odata"
+    link = f"{PUBLIC_URL}/#settings/backup"
     for r in rows if "mail:security" in BGJ_FNS else ():  # the background mail of integrations/mail.py: only with outgoing mail
         if not (r["email"] or "").strip():
             continue

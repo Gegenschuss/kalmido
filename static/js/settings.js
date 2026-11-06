@@ -54,10 +54,10 @@ async function wpDraw(md) {
 // U05: 9 sections (8 without admin rights); Layout, Collaboration, Focus and Time tracking live in Modules now
 // 2.53.0 (#1410): SET_SECS lives in setcore.js (the command palette lists the sections)
 // 2.25.0 (UX-17): what each area holds, shown in the overview a phone opens with
-const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents, data and backups'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'), nav: N_('The menus of the areas and the tab bar'),
+const SET_DESC = {account: N_('Name, password, sign-in, storage'), org: N_('People, invitations, agents and data'), general: N_('Language, Today, dates and reminders'), look: N_('Theme, font size, tab bar and sidebar'), nav: N_('The menus of the areas and the tab bar'),
   modules: N_('What Kalmido shows'), notify: N_('Push, News and quiet hours'), integr: N_('Calendar on the phone, sharing, e-mail'), access: N_('API tokens, webhooks and agent tokens'), ai: N_('Agents and what they do'),
   biz: N_('Company, documents and numbers, invoices, taxes'), docs: N_('Sorting automatically, archive numbers, rules'),  // 2.365.2 (#2789)
-  data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log'), help: N_('How things work, about Kalmido')};
+  data: N_('Import, export, templates, backups'), users: N_('Sign-in, server, log, backups'), help: N_('How things work, about Kalmido')};
 // ---- UX1 (U03, owner decision 2): settings save themselves. Every control applies at once, "Saved · Undo" shows in the
 // dialog header and each change is one step in the undo history ("Changed setting: …"). Text, number and time fields save
 // on blur or Enter (and after a short pause while typing); closing the dialog saves whatever is still pending.
@@ -573,9 +573,12 @@ function aiSubShow(md, want, save) {
 // (users / agents / signin / server / log; the old "Organisation" sub-tab is split into People, Agents and Data = odata);
 // the 4th field is the area. A jump to a sub-tab of the other area (settingsModal focus, data-admsub, data-adopen) opens it.
 const ADM_SUBS = [['users', 'users', N_('People|admin'), 'org'], ['agents', 'bot', N_('Agents'), 'org'], ['odata', 'download', N_('Data'), 'org'],
-  ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Admin alerts'), 'users']];  // 2.555.0 C (#4664): the sub-tab holds only the admin alerts (key stays log)
+  ['signin', 'key', N_('Sign-in'), 'users'], ['server', 'grid', N_('Server'), 'users'], ['log', 'alert', N_('Admin alerts'), 'users'],  // 2.555.0 C (#4664): the sub-tab holds only the admin alerts (key stays log)
+  ['backup', 'download', N_('Backup'), 'users']];  // 2.582.0 (#4827): backups, off-site backup and the storage check are server-wide (were Organisation > Data)
 const ad_subSec = k => (ADM_SUBS.find(x => x[0] === k) || [])[3];
-const ad_admFocus = f => ({users: 'users', odata: 'odata', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
+// 2.582.0 (#4827): 'backup' = Server > Backup; the old jump 'odata' (the backup error's News item and mail link) leads a server
+// admin there, an organisation admin keeps Organisation > Data
+const ad_admFocus = f => ({users: 'users', odata: S.me?.is_admin ? 'backup' : 'odata', backup: 'backup', groups: 'users', activity: 'agents', agentpolicy: 'agents', server: 'server', signin: 'signin'})[f];  // settingsModal(focus) -> sub-tab
 const ad_subKey = sec => sec === 'org' ? 'orgSub' : 'admSub';  // remembered per device and area
 function admSubCur(sec, ks, want) { const k = (want && ad_subSec(want) === sec ? want : '') || LS.get(ad_subKey(sec), ks[0]); return ks.includes(k) ? k : ks[0]; }
 function admSubsHtml(sec, parts, want) {
@@ -696,7 +699,7 @@ function settingsModal(focus) {
     org: S.me && (lmOrgPaneOn() || S.me.is_admin) ? admSubsHtml('org', {
       users: (lmOrgPaneOn() ? wsPaneHtml(hint) : '') + (S.me.is_admin ? usersHtml() + grpHtml() + orphHtml() + orgsHtml() + actHtml() : ''),
       agents: S.me.is_admin ? ad_agentsHtml(hint) : '',  // 2.46.6 (#1710); 2.555.0 C (#4664): one switch for user_agents (s-uag), no second one
-      odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) + bkHtml() + stoHtml() : '')}, ad_admFocus(focus)) : '',
+      odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) : '')}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): backups + storage check under Server > Backup
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>
@@ -828,7 +831,8 @@ function settingsModal(focus) {
     users: S.me?.is_admin ? admSubsHtml('users', {  // 2.24.0 (#826): Administration in sub-tabs like Agents; 2.364.0 C (#3041): "Server"
       signin: `<div id="s-signin">${signinHtml(hint)}</div>`,
       server: serverPaneHtml(chk, hint),  // 2.555.0 C (#4664): one builder for the first draw and the redraw after "Publish"
-      log: aaHtml()}, ad_admFocus(focus)) : '',
+      log: aaHtml(),
+      backup: bkHtml() + stoHtml()}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): the server admins' backups (also without an organisation)
     help: `<h4>${tr('Getting started')}</h4>
       <div class="row"><button class="btn sm" data-m="tour">${ic('arrow', 's')} ${tr('Restart the welcome tour')}</button>${isMobile() ? '' : `<button class="btn sm" data-m="keys">${ic('help', 's')} ${tr('Keyboard shortcuts')} ${kb('?')}</button>`}<button class="btn sm" data-m="cele-try">${ic('check', 's')} ${tr('Show the celebration')}</button></div>
       <div class="row"><button class="btn sm" data-m="practice-add">${ic('plus', 's')} ${tr('Create the practice project')}</button>${S.sample ? '' : `<button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`}</div>
@@ -864,7 +868,7 @@ function settingsModal(focus) {
   pane.data += biz_dataHtml(); pane.integr += biz_integrHtml();  // 2.365.2 D (#2789): the office's data and its Peppol access (both live in Company & office)
   pane.help += aboutHtml(chk, hint);
   const secs = SET_SECS.filter(([k]) => pane[k]);
-  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', assistant: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: 'org', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation
+  let cur = {tabbar: 'look', sidebar: 'look', layout: 'modules', collab: 'modules', focus: 'modules', time: 'modules', templates: 'data', sample: 'data', newskinds: 'notify', agents: 'ai', agentdots: 'ai', usage: 'ai', activity: S.me?.is_admin ? 'org' : 'ai', agentpolicy: 'org', server: 'users', signin: 'users', agentsafe: 'ai', agentsetup: 'ai', assistant: 'ai', share: 'integr', ical: 'integr', calendars: 'integr', webhooks: 'access', caldav: 'integr', paperless: 'integr', scans: 'integr', tokens: 'access', apppw: 'account', about: 'help', groups: 'org', users: 'org', odata: S.me?.is_admin ? 'users' : 'org', backup: 'users', dayplan: 'general'}[focus] || (INTB_FOCUS[focus] ? 'integr' : focus);  // 2.364.0 C (#3041): people, groups, agent rules under Organisation; 2.582.0 (#4827): backup / old odata of a server admin = Server > Backup
   if (/^biz-/.test(focus || '')) { S.bizJump = focus.slice(4); cur = 'biz'; }  // 2.365.2 D (#2789): a part of Company & office (office.js biz_jump scrolls there)
   if (!secs.some(([k]) => k === cur)) cur = LS.get('settingsSec', 'general');
   if (!secs.some(([k]) => k === cur)) cur = 'general';

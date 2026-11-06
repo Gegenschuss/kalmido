@@ -217,7 +217,7 @@ const BASE = 'cal,comments,collab,time,progress,agents,kanban,timeline,matrix';
   w.eval(`settingsModal('users')`); await sleep(500);
   let md = d.querySelector('.smodal');
   const subs = [...md.querySelectorAll('[data-admsub]')].map(b => b.dataset.admsub);
-  check(subs.join() === 'users,agents,odata,signin,server,log', '#826: Administration in sub-tabs ' + subs.join());  // 2.364.0 C (#3041): Organisation (People, Agents, Data) + Server  // 2.46.6 (#1710): + agents (the API is on here)
+  check(subs.join() === 'users,agents,odata,signin,server,log,backup', '#826: Administration in sub-tabs ' + subs.join());  // 2.582.0 (#4827): + backup  // 2.364.0 C (#3041): Organisation (People, Agents, Data) + Server  // 2.46.6 (#1710): + agents (the API is on here)
   check(!md.querySelector('[data-admp="users"]').hidden && md.querySelector('[data-admp="server"]').hidden && md.querySelector('[data-admp="server"] #s-quota'), '#826: People shown, Server hidden (but there)');
   click(w, md.querySelector('[data-admsub="server"]')); await sleep(100);
   check(!md.querySelector('[data-admp="server"]').hidden && w.__store['tasks.admSub'] === '"server"', '#826: a sub-tab opens and is remembered');

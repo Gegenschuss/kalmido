@@ -473,7 +473,7 @@ deleted from `docker-compose.yml`, which every update restored). Needs Docker Co
 itself, in one transaction, and checks the result (row counts and checksums per table) before it commits. Plan a short
 maintenance window: the app is offline while it copies (seconds for a family instance, a few minutes for large ones).
 
-1. **Back up first.** In the app: *Back up now* (Settings > Organisation > Data > Backups) and copy the zip off the
+1. **Back up first.** In the app: *Back up now* (Settings > Server > Backup) and copy the zip off the
    server. Then stop Kalmido and keep a plain copy of the database file:
 
    ```bash
@@ -622,7 +622,7 @@ docker compose up -d kalmido
   every restore, so plan the size of the attachments once plus roughly 22 times the database (the backup page shows the
   size of each archive and the free space). A restore takes at most `KALMIDO_BACKUP_MAX_MB` (default 4096 MB, upload and
   unpacked, shared files included) and refuses a larger backup with a message; set it higher on the restoring server.
-  On a small disk keep fewer of them (Settings > Organisation > Data > Backups > *Keep*) or put the backup folder on another
+  On a small disk keep fewer of them (Settings > Server > Backup > *Keep*) or put the backup folder on another
   disk with `KALMIDO_BACKUP_DIR`; the backup page warns once less than about three more archives fit. Without *Encrypt
   backups* the archives are plain zips: anyone who can read the backup folder (or a copy of it) reads every task, file and
   account. Set a passphrase (or `KALMIDO_BACKUP_PASSPHRASE`) as soon as the archives leave the server, and keep it
@@ -702,7 +702,7 @@ docker compose up -d kalmido
 Data whose period ran out is deleted for good by background runs of the watchdog. Every run first **counts**: by default
 the switch is off and nothing is deleted (a dry run), so an update never removes anything by surprise. The admin reads the
 last result of every run as numbers only (no content) with `GET /api/admin/retention` (instance admins), and in the server
-log (`retention: trash would delete (dry run): files=3, wiki=1`), and under Settings > Organisation > Data > Deletion runs
+log (`retention: trash would delete (dry run): files=3, wiki=1`), and under Settings > Server > Backup > Deletion runs
 (per kind: deletes or counts only, the number of the last pass, the switch).
 
 *Since 2.223.3:* `docker-compose.yml` passes `KALMIDO_RETENTION_PURGE` through (default `0`). The installer writes
@@ -724,7 +724,7 @@ instead of naming a period, and no row counts down its days.
 
 **Legal periods (2.545).** What the law keeps (receipts and invoices 8 years, books 10, the logbook 8, sent business
 letters 6, from the end of the year) is locked for the law plus `KALMIDO_RETENTION_BUFFER_YEARS` (default 1 year; 0 =
-exactly the law, a negative value counts as 0). Settings > Organisation > Data > Deletion runs shows the buffer. An office whose admin
+exactly the law, a negative value counts as 0). Settings > Server > Backup > Deletion runs shows the buffer. An office whose admin
 switched on *Extend the lock* (office settings > Data, a tax audit is open) keeps all of it also after the period: no
 trash run, archive run, deletion of the organisation or of the account with that personal office removes it until the
 switch is off again (409 with the reason).

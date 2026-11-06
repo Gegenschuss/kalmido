@@ -44,7 +44,7 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   let md = await until(() => d.querySelector('.smodal'));
   check(secOn(md) === 'org', 'settingsModal(org) opens Organisation: ' + secOn(md));
   check(subs(md, 'org') === 'users,agents,odata', 'Organisation: People, Agents, Data: ' + subs(md, 'org'));
-  check(subs(md, 'users') === 'signin,server,log', 'Server: Sign-in, Server, Log: ' + subs(md, 'users'));
+  check(subs(md, 'users') === 'signin,server,log,backup', 'Server: Sign-in, Server, Log, Backup: ' + subs(md, 'users'));  // 2.582.0 (#4827): + Backup
   check(md.querySelector('.snav [data-sec="users"] span')?.textContent === 'Server' && ![...md.querySelectorAll('.snav [data-sec] span')].some(s => s.textContent === 'Administration'), 'the area is called Server, no "Administration"');
   const people = md.querySelector('#admp-users');
   check(people && !people.hidden && people.querySelector('#s-ws') && people.querySelector('#a-users') && people.querySelector('[data-acc="user-new"]'), 'People: the organisation\'s members and the server\'s users in one place');
@@ -79,7 +79,8 @@ const subs = (md, sec) => [...md.querySelectorAll(`[data-pane="${sec}"] [data-ad
   check(od && !od.hidden, 'Data opens');
   check(await until(() => od.querySelector(`#s-wsdata .ocbox[data-ocorg="${ORG}"]`) && od.querySelector(`#s-wsdata .oxbox[data-oxorg="${ORG}"]`)), 'Data: encryption + recovery key and the export of the organisation');
   check(!md.querySelector(`#s-ws .ocbox[data-ocorg="${ORG}"], #s-ws .oxbox, .ocadm`) && md.querySelectorAll(`.ocbox[data-ocorg="${ORG}"]`).length === 1, 'the recovery key once (not under People, not under the server switch)');
-  check(od.querySelector('#s-bk-h') && od.querySelector('#s-orgenc') && !md.querySelector('[data-pane="users"] #s-bk'), 'Data: backups and the encryption switch (no longer under Server)');
+  // 2.582.0 (#4827): the backups moved to Server > Backup, Data keeps the encryption switch
+  check(!od.querySelector('#s-bk-h, #s-bko, #s-sto-h') && od.querySelector('#s-orgenc') && md.querySelector('[data-pane="users"] #admp-backup #s-bk'), 'Data: the encryption switch, the backups under Server > Backup');
   // Agents: the members' switch and the server-wide rules together
   // 2.555.0 (#4664): one switch for user_agents (the second one, s-orgagents, is gone)
   check(!md.querySelector('#s-orgagents') && md.querySelectorAll('#admp-agents #s-uag').length === 1, 'Agents: one switch for personal agents and the rules for every agent');

@@ -2898,7 +2898,7 @@ address only), then `GET ...?t=<ticket>`; a `GET` without a ticket answers 403.
 
 New tables, all additive and keyed by `org_id` with `ON DELETE CASCADE`: `office_settings`, `office_services`,
 `office_equipment`, `office_sets`, `office_texts`, `office_contracts`, `office_numbers`, `office_docs`,
-`office_doc_items`. A backup (Settings > Organisation > Data > Backups) contains them; an older release runs on with them.
+`office_doc_items`. A backup (Settings > Server > Backup) contains them; an older release runs on with them.
 Since 2.36.2 also `office_company` and `office_doc_log`, the columns `locked_at`, `locked_by`, `sender`,
 `recipient_snapshot`, `tax_snapshot`, `pack_version`, `service_from`, `service_to` of `office_docs`, `org_id`,
 `tax_pct`, `net`, `tax_amount` of `office_doc_items` (positions written without `org_id` get it at the next start) and
