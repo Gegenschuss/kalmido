@@ -194,6 +194,29 @@ check(len(plog("vies.log")) == v1, "a broken number never went out")
 run = run_done(rid)
 check(run and run[1] == "done", f"the VIES run ended {run}")
 
+# ---------------------------------------------------------------- a team agent: a message to another person of its project by card
+# (a personal agent may only write to its owner anyway; a team agent reaches the people of its projects)
+r = A.post(B + "/api/users", json={"username": "hugo", "display_name": "Hugo", "password": kt.PASSWORD, "email": "hugo@example.com"})
+check(r.ok, f"another person in the admin's organisation {r.status_code} {r.text[:160]}")
+HID = r.json()["id"]
+AU = A.get(B + "/api/state").json()["me"]["id"]
+tm = A.post(B + "/api/admin/agents", json={"username": "teamweb", "display_name": "Team web", "provider": "kalmido-server"})
+check(tm.status_code == 201, f"a team agent {tm.status_code} {tm.text[:160]}")
+TMA = tm.json()["id"]
+check(A.put(B + f"/api/agents/{TMA}/server", json={"api_key": KEY1, "flow_web": {"other": True}}).ok, "the team agent with web research")
+LA = A.post(B + "/api/lists", json={"name": "Team web project"}).json()["id"]
+for uid, role in ((TMA, "edit"), (HID, "admin")):
+    r = A.put(B + f"/api/lists/{LA}/members", json={"user_id": uid, "role": role})
+    check(r.ok, f"member {uid} of the team project {r.status_code} {r.text[:120]}")
+TA = A.post(B + "/api/tasks", json={"title": "Team offer", "list_id": LA}).json()["id"]
+r = A.post(B + f"/api/agents/{TMA}/chat", json={"body": f"FAKEWEB_INJECT {TA} {HID} {AU}"})
+check(r.status_code == 201, f"the admin asks the team agent {r.status_code} {r.text[:120]}")
+ans = until(lambda: dbx("SELECT body FROM agent_chat WHERE agent_id=? AND user_id=? AND sender='agent' AND body LIKE 'FAKEWEB done%'", (TMA, AU)), 40)
+check(ans and ans[0][0].count("approval") >= 2 and "From the web" in ans[0][0], f"the team agent's answer: both refused, the sources named {(ans or [[''])[0][0][:300]}")
+check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TMA, HID)),
+      "no message from the page's orders to the other person of the project")
+check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TA, TMA)), "no comment of the team agent")
+
 # ---------------------------------------------------------------- without the switch the same comment is written (the gate ends)
 check(Fr.put(SRV, json={"flow_web": {"other": False}}).ok, "web off again")
 after, rid = chat(f"Again FAKEWEB_INJECT {T1} {GID} {FID}")
