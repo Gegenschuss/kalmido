@@ -38,6 +38,7 @@ from ..core.config import app, ATT_DIR, MAX_FILE_MB, PUBLIC_URL
 from ..core.config import USERNAME_RE  # 2.278.0 B (#3094)
 from ..accounts.orgs import visible_people as umz_visible  # 2.278.0 B (#3094)
 from ..core.serializers import unlink_files  # 2.464.0 (#3865)
+from ..api.common import hit_limit  # 2.585.0 (#4350, review 2)
 from ..files.upsafe import up_after_store, up_check, UploadRefused  # 2.464.0 (#3865): pulled up from functions
 from ..lists.projects import LIST_FILES_SUB
 from ..lists.tplextra import tx_import, tx_keys
@@ -70,7 +71,7 @@ from ..collab.e2e import _pub, e2e_has_keys, e2e_import_keys, e2e_same_keys  # 2
 from .oilock import oil_preview, OIL_NODES, OIL_LOCKS, OIL_KEYS  # #4300: locked folders of the file store
 from .acctexport import umz_email_hash  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgs import org_role, user_orgs, visible_people, _need_org_admin  # 2.369.5 (#2517): pulled up from functions
-from ..integrations.importers import ACCOUNT_IMPORT_UNDO_DAYS, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
+from ..integrations.importers import ACCOUNT_IMPORT_UNDO_DAYS, IMPORT_RATE, imp_undo_after, imp_undo_lists, imp_undo_split, imp_undo_trash  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import clean_folder, list_created, LIST_NAME_MAX, _folder_member_add  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.validation import CONTENT_MAX, TITLE_MAX  # 2.369.5 (#2517): pulled up from functions
 from ..contacts.bulk import bk_occ_drop, ctt_unlink  # 2.370.4 (#3089)
@@ -2797,6 +2798,8 @@ def umz_current():
 def umz_undo_plan_get(iid):
     """2.585.0 (#4350): what the undo of my account import iid would take back (umz_undo_preview), people only."""
     umz_person()
+    if hit_limit(f"import:{me()}", IMPORT_RATE, 600):  # 2.585.0 (#4350, review 2): the plan reads every imported row, rate limited like a preview
+        raise Denied(429, tr("Too many imports, please wait a few minutes"))
     return jsonify(umz_undo_preview(db(), me(), iid))
 
 
