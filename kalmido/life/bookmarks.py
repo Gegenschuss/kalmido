@@ -829,7 +829,8 @@ def bookmark_refresh(bid):
     bm_get(c, uid, bid, write=True)
     if not cal_rate(uid):
         raise Denied(429, tr("Too many requests, please slow down"))
-    c.execute("UPDATE bookmarks SET preview='pending', preview_error='', updated_at=? WHERE id=?", (iso_ms(now_utc()), bid))
+    # 2.570.0 (#4770): asking for the preview again changes none of the person's values: the version (updated_at) stays
+    c.execute("UPDATE bookmarks SET preview='pending', preview_error='' WHERE id=?", (bid,))
     bump(c)  # 2.566.0 (#4706): the area tick, other devices reload
     c.commit()
     bm_kick([bid])

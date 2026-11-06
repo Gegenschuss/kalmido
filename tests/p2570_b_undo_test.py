@@ -93,6 +93,9 @@ def bookmarks(s1, s2, who):
     in_app(f"from kalmido.life.bookmarks import bm_fetch_one\nbm_fetch_one({bid})\nout = 1")
     row = kt.dbx("SELECT preview, updated_at, fetched_at FROM bookmarks WHERE id=?", (bid,))[0]
     check(row[0] == "failed" and row[1] == u1 and row[2], f"{who}: the fetch ran, updated_at stays, fetched_at set {row} / {u1}")
+    r = s2.post(B + f"/api/bookmarks/{bid}/refresh", json={})
+    check(r.ok and r.json()["updated_at"] == u1, f"{who}: asking for the preview again leaves the version " + r.text[:160])
+    until(lambda: one("SELECT preview FROM bookmarks WHERE id=?", (bid,)) == "failed", 40)
     r = s1.patch(B + f"/api/bookmarks/{bid}", json={"title": "Erster Titel", "expect_updated_at": u1})
     check(r.ok and r.json()["title"] == "Erster Titel", f"{who}: A's undo after the fetch goes through (before: 409 for nothing) " + r.text[:160])
     u2 = r.json()["updated_at"]
