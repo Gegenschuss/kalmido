@@ -48,7 +48,7 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
     await ev(`(() => { document.querySelector('#side a.ntcard[href="#note/${N1}"]').click(); return 1; })()`);
     check(await until(`location.hash === '#note/${N1}' && !!document.querySelector('#view .ntedit #nt-title') && document.querySelector('#side a.ntcard.on')?.getAttribute('href') === '#note/${N1}'`), '1440: a card opens its note in the page, the card stays marked in the panel');
     { const x = await ev(`(() => { const v = ${R('#view .ntview')}, e = ${R('#view .ntedit')}; return v && e ? {v, e} : null; })()`);
-      check(x && Math.abs(x.v.w - x.e.w) <= 2, '1440: the open note takes the whole page (no list column beside it) ' + JSON.stringify(x)); }
+      check(x && Math.abs((x.e.l - x.v.l) - (x.v.r - x.e.r)) <= 2, '1440: the open note stands alone in the page (centred in its reading width, no list column beside it) ' + JSON.stringify(x)); }
     // the search in the panel keeps its focus while typing
     await ev(`(() => { const q = document.querySelector('#side #nt-q'); q.focus(); q.value = 'crew'; q.dispatchEvent(new Event('input', {bubbles: true})); return 1; })()`);
     check(await until(`document.querySelectorAll('#side .ntpan a.ntcard').length === 1 && document.activeElement?.id === 'nt-q'`), '1440: the panel search filters the cards, the field keeps the focus');
