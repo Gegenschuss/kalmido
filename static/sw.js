@@ -24,17 +24,17 @@ const SHELL = ['/', '/manifest.json', '/static/app.css', '/static/i18n.js', '/st
   '/static/js/lysets.js', '/static/js/tapdone.js', '/static/js/props.js', '/static/js/listhead.js', '/static/js/purposemods.js',
   '/static/js/calevents.js', '/static/js/davwrite.js', '/static/js/multisel.js', '/static/js/ctlinks.js', '/static/js/formguard.js',
   '/static/js/liveparts.js', '/static/js/countries.js', '/static/js/clients.js', '/static/js/agentplan.js', '/static/js/lyprop.js',
-  '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js',
-  '/static/js/notesall.js', '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js',
-  '/static/js/sheetgrid.js', '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js',
-  '/static/js/orgcrypt.js', '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js',
-  '/static/js/chatwin.js', '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js',
-  '/static/js/notelock.js', '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js',
-  '/static/js/liste2echan.js', '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/listcolor.js', '/static/js/wscolor.js',
-  '/static/js/rowsym.js', '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/oneway.js',
-  '/static/js/photometa.js', '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js',
-  '/static/js/dupprop.js', '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js',
-  '/static/js/assistant.js', '/static/js/main.js'];
+  '/static/js/portal.js', '/static/js/areas.js', '/static/js/multiedit.js', '/static/js/basket.js', '/static/js/sbnav.js', '/static/js/notesall.js',
+  '/static/js/favorites.js', '/static/js/favtiles.js', '/static/js/mineorder.js', '/static/js/tablecells.js', '/static/js/sheetgrid.js',
+  '/static/js/formula.js', '/static/js/listadmin.js', '/static/js/orgexport.js', '/static/js/move.js', '/static/js/orgcrypt.js',
+  '/static/js/cryptscope.js', '/static/js/sheetdrag.js', '/static/js/sheetmotion.js', '/static/js/miniwin.js', '/static/js/chatwin.js',
+  '/static/js/chatwins.js', '/static/js/chatplus.js', '/static/js/taskbell.js', '/static/js/e2e.js', '/static/js/notelock.js',
+  '/static/js/related.js', '/static/js/liste2e.js', '/static/js/liste2eui.js', '/static/js/liste2efile.js', '/static/js/liste2echan.js',
+  '/static/js/orgvis.js', '/static/js/discover.js', '/static/js/listcolor.js', '/static/js/wscolor.js', '/static/js/rowsym.js',
+  '/static/js/review.js', '/static/js/wip.js', '/static/js/swimlanes.js', '/static/js/points.js', '/static/js/oneway.js', '/static/js/photometa.js',
+  '/static/js/filetext.js', '/static/js/depchain.js', '/static/js/importprop.js', '/static/js/meetprop.js', '/static/js/dupprop.js',
+  '/static/js/contractprop.js', '/static/js/multilist.js', '/static/js/rules.js', '/static/js/supporter.js', '/static/js/assistant.js',
+  '/static/js/main.js'];
 // 2.53.0 (#1410): the modules loaded on demand (static/js/lazyload.js LD_MODS; no script tag in index.html, tools/check_layout.py
 // compares): cached right after the shell, so they open offline too; a failure there does not drop the install
 const LAZY = ['/static/js/acctset.js', '/static/js/sesview.js', '/static/js/supportview.js', '/static/js/oinvview.js', '/static/js/servers.js',
@@ -410,7 +410,7 @@ async function swOutboxSend() {
       // 2.359.0 A (#3023): a temporary id without its real one (its create failed or waits for the app): never sent as such
       if (/\/-\d+(?=[/?]|$)/.test(url) || (body && [body.parent_id, body.task_id, ...(body.ids || []), ...(body.items || []).map(it => it && it.id)].some(v => typeof v === 'number' && v < 0))) break;
       const opt = {method: e.method, credentials: 'same-origin', redirect: 'manual', headers: {'X-Requested-With': 'kalmido'}};
-      if (e.k) opt.headers['Idempotency-Key'] = String(e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice
+      if (e.ik || e.k) opt.headers['Idempotency-Key'] = String(e.ik || e.k);  // 2.270.0 C (#3022): stopped before the delete below = the tab's resend is not applied twice; 2.574.0 (#4692): ik = the rebased send's own key, as core.js outFlush
       if (body !== undefined) { opt.body = JSON.stringify(body); opt.headers['Content-Type'] = 'application/json'; }
       const r = await fetch(url, opt);  // offline again: throws, the browser tries again later
       // 2.359.0 A (#3023): a server error / too many requests: the browser tries the sync again later (the entry stays first)
