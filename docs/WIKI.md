@@ -30,6 +30,16 @@ Switch it on in **Settings > Modules > Knowledge pages**; it then has its own ro
 - **Daily notes (2.371).** *Today* next to *New page* opens the page `journal/YYYY-MM-DD` of the space and creates it
   when it is missing, from the template `Templates/Tagesnotiz` (or `Templates/Daily note`) when there is one. A daily
   note shows arrows to the previous and next day that has a note and a date field to jump to any day.
+- **Meeting minutes (2.384).** *Minutes* in the window of a calendar event makes the page
+  `Minutes/YYYY-MM-DD <title>` (German: `Protokolle/…`) in the workspace of the event's calendar (your private space when
+  you have no organisation or may not write there) and opens it for writing. It starts from the template
+  `Templates/Besprechung` (or `Protokoll`, `Meeting`, `Minutes`) when the space has one, otherwise from a built-in one with
+  the sections participants, agenda, notes, decisions and action items. Extra placeholders there: `{{termin}}`
+  (`{{event}}`) a link to the event, `{{zeit}}` (`{{time}}`), `{{ort}}` (`{{place}}`), `{{teilnehmer}}`
+  (`{{participants}}`) the attendees as a list and `{{tagesordnung}}` (`{{agenda}}`) the event's notes, one item per line;
+  `{{titel}}` is the event's title and `{{datum}}` its date. The page keeps the event in its frontmatter (`termin`, `datum`),
+  so *Minutes* on the same event (the same date of a series) opens that page again. Decisions and action items are
+  checkbox lines: *Open items as tasks* turns them into tasks.
 - **Saving** is automatic. When someone else saved the page in between, you choose which version stays.
 - **History (2.123.0).** *History* in the menu of a page lists its saved versions with date and person (saves of one
   person within ten minutes are one version, at most 100 per page, the oldest go). A version opens with a line
