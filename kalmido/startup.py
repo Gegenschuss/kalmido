@@ -14,6 +14,7 @@ from .notify.channels import chn_loop, CH_ON
 from .integrations.git import git_loop
 from .integrations.mail import MAIL_IN_ON, mail_loop
 from .hub.mailbox import mbx_loop
+from .integrations.docflowhook import dfh_loop  # 2.581.0 (#4803)
 from .events.model import migrate_family_events
 from .core.env import env_bool
 from .office.model import onc_long_report  # 2.312.0 C (#3265)
@@ -65,6 +66,7 @@ if env_bool("TASKS_WATCHDOG", True) and WRK_ROLE != "web":
         wrk_start("channels", chn_loop)
     if MAIL_IN_ON:  # 2.17.0 (#443): new tasks by e-mail (one mailbox, polled)
         wrk_start("mail-in", mail_loop)
+    wrk_start("docflows", dfh_loop)  # 2.581.0 (#4803): scheduled document flows + their webhook calls (idle without any)
     wrk_start("mailboxes", mbx_loop)  # 2.141.0 A (#2141): the own mailboxes of the workspaces (idle without any)
     wrk_start("git", git_loop)  # 2.2.0 (#271): repositories of project lists (idle without any)
     # 2.574.0 (#3779): the ntfy share inboxes (NTFY_INBOX_* and the personal ones) are gone: sharing goes through the share

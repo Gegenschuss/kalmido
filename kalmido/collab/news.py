@@ -60,6 +60,7 @@ NEWS_KINDS += ("docpaid", "docoverdue")  # 2.367.4 (#2972): a payment on an invo
 NEWS_KINDS += ("orglogin", "orgjoinres", "orgrole")  # 2.367.4 (#2974): an organisation admin signed in from a new address (row "usage"); the answer to my invitation; my role changed (row "share")
 NEWS_KINDS += ("integfail",)  # 2.367.3 (#2971): a channel, webhook, mailbox, git connection or inbox of mine stopped (row "integration", collab/integfail.py)
 NEWS_KINDS += ("job_watch",)  # 2.392.2 (#3366): the watchdog found a job of an agent stalled / its branch stranded (row "approval", agents/watch.py)
+NEWS_KINDS += ("docflow",)  # 2.581.0 (#4803): a document flow tells me about a document (row "docflow", docs/flows.py; News only)
 NEWS_KINDS += ("budgetwarn",)  # 2.555.0 (#4570): a project / task reached 80 % / 100 % of its "Budget h" (row "timebudget", personal/budgetwarn.py)
 NEWS_LIST_KINDS = ("share", "role", "unshare", "status", "owner", "evinvite", "evchange", "evshare", "abshare", "agentjoin", "playbook_proposal", "e2e_key")  # about a list (2.21: an event / calendar / address book), not a task
 NEWS_EXCERPT = 300
@@ -88,7 +89,7 @@ NEWS_FOR_ME += ("orgjoinres", "orgrole")  # 2.367.4 (#2974)
 
 def news_to_me(kind, actor_id, data, agents, s=None):
     # 2.61.0 (#1818): my own file was locked (no actor); 2.122.0 A (#2097): files for me; 2.138.0 C (#1972): recovery key
-    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
+    if kind in ("upscan", "filereq", "orgkey", "ptlimit", "apblimit", "fetcherr", "evchange", "apbooking", "calsub", "integfail", "docoverdue", "orglogin", "budgetwarn", "docflow"):  # 2.138.4 C (#2380): ptlimit = the portal's sign-in mails used up
         return True
     if kind in ("approval", "aprequest"):  # 2.147.1 C (#2405): an agent waits for MY approval (my own row): "For you", counted by the bell
         return True
@@ -197,6 +198,7 @@ NOTIF_ROWS += ("office",)  # 2.367.4 (#2972): payments and overdue invoices of m
 NOTIF_ROWS += ("notice",)  # 2.367.4 (#2974): the server's maintenance notice sent as a push (push only, on by default)
 NOTIF_ROWS += ("integration",)  # 2.367.3 (#2971): one of my integrations stopped working (News + push on by default)
 NOTIF_ROWS += ("timebudget",)  # 2.555.0 (#4570): a project / task of mine reached 80 % / 100 % of its budget (News + push on by default)
+NOTIF_ROWS += ("docflow",)  # 2.581.0 (#4803): a document flow of my workspace tells me about a document (News only, on by default)
 NOTIF_NEWS_GROUP = {"comment": "comment", "reply": "comment", "follow": "comment", "mention": "mention", "assign": "assign",
                     "complete": "complete", "status": "status", "share": "share", "unblock": "unblock"}
 NOTIF_NEWS_PRIMARY = ("comment", "mention", "assign", "complete", "status", "share", "unblock")  # News = news_kinds
@@ -212,6 +214,7 @@ NOTIF_NEWS_NEW["calsub"] = 1  # 2.367.2 (#2969)
 NOTIF_NEWS_NEW["office"] = 1  # 2.367.4 (#2972)
 NOTIF_NEWS_NEW["integration"] = 1  # 2.367.3 (#2971)
 NOTIF_NEWS_NEW["timebudget"] = 1  # 2.555.0 (#4570)
+NOTIF_NEWS_NEW["docflow"] = 1  # 2.581.0 (#4803)
 NOTIF_PUSH_DEFAULT = {"comment": 1, "reply": 1, "follow": 1, "mention": 1, "assign": 1, "newtask": 0, "complete": 1,
                       "status": 0, "share": 0, "unblock": 1, "approval": 1, "followup": 1, "reminder": 1, "usage": 1,
                       "proposal": 1, "nag": 1, "chat": 1, "errreport": 1}
@@ -227,8 +230,9 @@ NOTIF_PUSH_DEFAULT["office"] = 1  # 2.367.4 (#2972)
 NOTIF_PUSH_DEFAULT["notice"] = 1  # 2.367.4 (#2974)
 NOTIF_PUSH_DEFAULT["integration"] = 1  # 2.367.3 (#2971)
 NOTIF_PUSH_DEFAULT["timebudget"] = 1  # 2.555.0 (#4570)
+NOTIF_PUSH_DEFAULT["docflow"] = 0  # 2.581.0 (#4803): News only (NOTIF_NO_PUSH)
 NOTIF_NO_NEWS = ("reminder", "nag", "chat", "notice")
-NOTIF_NO_PUSH = ("limits", "calsub")  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
+NOTIF_NO_PUSH = ("limits", "calsub", "docflow")  # 2.453.0 (#3781): News only (the notes promise no push, no mail)
 NOTIF_UNMUTED = ("mention", "assign")        # still come through a muted list
 NOTIF_NO_BELL = ("reminder", "followup", "usage", "proposal")  # never changed by a list bell
 BELL_MODES = ("all", "default", "mute", "custom")
@@ -258,6 +262,7 @@ KIND_ROW["ptlimit"] = KIND_ROW["apblimit"] = "limits"  # 2.453.0 (#3781): one ro
 KIND_ROW["integfail"] = "integration"  # 2.367.3 (#2971)
 KIND_ROW["job_watch"] = "approval"  # 2.392.2 (#3366): the watchdog's finding about an agent's job ("An agent waits for me")
 KIND_ROW["budgetwarn"] = "timebudget"  # 2.555.0 (#4570)
+KIND_ROW["docflow"] = "docflow"  # 2.581.0 (#4803)
 KIND_ROW["wiki_shared"] = "share"  # 2.126.2 B (#2355): switched with the sharing row (News on, no push by default)
 
 
@@ -680,6 +685,14 @@ def news_items(c, uid, s=None, mentions_only=False, to_me=False):
             pass  # 2.380 G (#3391): whorgcut = webhook + organisation names in data, no task, no list
         elif kind in ("fetcherr", "integfail"):  # 2.425.0 C (#3453): my receipt fetcher's portal error (no task, no list)
             pass
+        elif kind == "docflow":  # 2.581.0 (#4803): a document flow's note, while I still see the document
+            from ..files.store import fs_role
+            try:
+                dn = int(json.loads(r["data"] or "{}").get("doc") or 0)
+            except (ValueError, TypeError, AttributeError):
+                continue
+            if not dn or not fs_role(c, dn, uid):
+                continue
         elif kind == "budgetwarn" and r["task_id"] is None:  # 2.555.0 (#4570): a project's budget, while I see the project
             if not r["list_id"] or not sees(r["list_id"]):
                 continue

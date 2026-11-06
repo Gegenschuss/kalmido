@@ -464,7 +464,7 @@ _LATER2 = "not yet in the export"  # follow-up task #3642: the 2.390 / 2.352 tab
 OX_LEFT = {
     # organisation column
     "task_offer_links": _DERIVED,  # 2.537.0 C (#3433): the quotation position of a task (ids are new on the target)
-    "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "file_text": _DERIVED,
+    "agents": _AGENT, "bg_jobs": _SERVER, "doc_mail": _SECRET, "doc_models": _DERIVED, "doc_flow_runs": _DERIVED, "file_text": _DERIVED,
     "doc_fetchers": "a person's receipt fetcher and its token (set up again on the target)", "doc_fetch_portals": _DERIVED,
     "fs_ext_links": _SECRET, "fs_upload_requests": _SECRET, "hub_tokens": _SECRET, "life_trip_costs": _PERSONAL,
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,

@@ -224,6 +224,7 @@ VARS = (
     _v("KALMIDO_PEPPOL_ALLOW_HOSTS", "", "Internal hosts the own Peppol endpoint of any office area may reach (the calendar allow list counts only when an instance admin sets the endpoint, 2.306.0).", "integrations"),
     _v("KALMIDO_WEBHOOK_BACKOFF", "60,300,1800,7200", "Seconds between the retries of a failed webhook, comma-separated.", "integrations"),
     _v("KALMIDO_WEBHOOK_TICK", "5", "Seconds between two looks at the webhook queue.", "integrations"),
+    _v("KALMIDO_DOCFLOW_TICK_S", "300", "Seconds between two looks at the scheduled document flows (their webhook calls: every 5 s or less).", "integrations"),  # 2.581.0 (#4803)
     _v("KALMIDO_HOOK_IN_PER_MIN", "60", "Incoming webhook calls per hook and minute.", "integrations"),
     _v("KALMIDO_HOOK_IN_PER_DAY", "1000", "Incoming webhook calls per hook and day.", "integrations"),
     _v("KALMIDO_CALDAV", "1", "Switch: the CalDAV server (/dav).", "integrations"),

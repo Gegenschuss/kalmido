@@ -240,6 +240,7 @@ an empty value counts as unset. See [SELF-HOSTING.md](SELF-HOSTING.md) for the c
 | `KALMIDO_CALENDAR_RATE` | `30` | Calendar adds, discoveries and manual refreshes per person in 15 minutes. |
 | `KALMIDO_CALENDAR_REFRESH_GAP` | `30` | Least seconds between two manual refreshes of one calendar. |
 | `KALMIDO_CALENDAR_TICK` | `60` | Seconds per minute of the refresh interval (tests use 1). |
+| `KALMIDO_DOCFLOW_TICK_S` | `300` | Seconds between two looks at the scheduled document flows (their webhook calls: every 5 s or less). |
 | `KALMIDO_ERROR_REPORTS_PER_HOUR` | `30` | New error reports per hour. |
 | `KALMIDO_GIT_POLL` | `180` | Seconds between two polls of a Git connection. |
 | `KALMIDO_GIT_SYNC_PUSH` | `30` | Seconds the changes of a task linked to a GitHub / GitLab issue are collected before they go out. |

@@ -11,6 +11,7 @@ Pure Python (standard library only). Kinds of match:
 Per feature (sender / type / tags / folder) the workspace chooses the level: "rules" (only rules), "learn" (rules
 first, then the learning classifier), "agent" (nothing automatic: left open for a connected agent) or "off"."""
 import difflib
+import fnmatch
 import json
 import os
 import re
@@ -83,34 +84,153 @@ def check_pattern(pat):
     return None
 
 
-def clean_rule(r):
-    """A rule dict from user input (raises RuleError with a reason)."""
+def clean_rule(r, extra=False):
+    """A rule dict from user input (raises RuleError with a reason).
+    2.581.0 (#4803): a rule is a flow ("Ablauf"): a trigger (received = as before, changed, scheduled), filters (the words
+    as before, now optional when another filter or trigger is given; source, file name, tag / type / sender) and actions
+    (set sender / type / folder / tags as before; remove tags, set custom fields, make a task; with extra=True also notify
+    people and call a webhook -- those need the checks of docs/flows.py fl_clean against the database, so an import of
+    rules (Paperless, organisation import) never brings them in). Old rules read as flows with trigger received."""
     kind = r.get("kind") or "any"
     if kind not in KINDS:
         raise RuleError("kind")
     match = str(r.get("match") or "").strip()[:PATTERN_MAX]
-    if not match:
+    trig = r.get("trigger") or "received"
+    if trig not in TRIGGERS:
+        raise RuleError("trigger")
+    out = {}
+    flt = _clean_filters(r)
+    if not match and trig == "received" and not flt:
         raise RuleError("empty")
-    if kind == "regex":
-        why = check_pattern(match)
-        if why:
-            raise RuleError(why)
-    out = {"kind": kind, "match": match}
-    if r.get("case") is True and kind != "fuzzy":  # 2.69.0 B (#1847): case-sensitive (Paperless-ngx "is_insensitive" off)
-        out["case"] = True
+    if match:
+        if kind == "regex":
+            why = check_pattern(match)
+            if why:
+                raise RuleError(why)
+        out = {"kind": kind, "match": match}
+        if r.get("case") is True and kind != "fuzzy":  # 2.69.0 B (#1847): case-sensitive (Paperless-ngx "is_insensitive" off)
+            out["case"] = True
     for k in ("sender", "type", "folder"):
         v = str(r.get(k) or "").strip()[:120]
         if v:
             out[k] = v
-    tags = r.get("tags") or []
-    if isinstance(tags, str):
-        tags = [t for t in tags.split(",")]
-    tags = [str(t).strip()[:60] for t in tags if str(t).strip()][:10]
+    tags = _names(r.get("tags"))
     if tags:
         out["tags"] = tags
-    if not any(k in out for k in ("sender", "type", "folder", "tags")):
+    if trig != "received":
+        out["trigger"] = trig
+    if trig == "changed":
+        on = r.get("on") or []
+        on = [x for x in ON_KINDS if x in (on if isinstance(on, list) else [on])]
+        if on:
+            out["on"] = on
+    if trig == "scheduled":
+        d = r.get("days")
+        if not isinstance(d, int) or isinstance(d, bool):
+            d = int(d) if str(d or "").strip().lstrip("-").isdigit() else None
+        if d is None or not 0 <= d <= DAYS_MAX:
+            raise RuleError("days")
+        frm = r.get("from") or "date"
+        if frm not in SCHED_FROM:
+            raise RuleError("from")
+        out["days"], out["from"] = d, frm
+    out.update(flt)
+    name = str(r.get("name") or "").strip()[:120]
+    if name:
+        out["name"] = name
+    if r.get("off") is True:
+        out["off"] = True
+    untag = _names(r.get("untag"))
+    if untag:
+        out["untag"] = untag
+    fields = r.get("fields")
+    if isinstance(fields, dict):
+        fl = {str(k).strip()[:60]: (None if v is None else str(v)[:500]) for k, v in list(fields.items())[:FIELDS_MAX] if str(k).strip()}
+        if fl:
+            out["fields"] = fl
+    task = r.get("task")
+    if task:
+        t = task if isinstance(task, dict) else {}
+        tv = {"title": str(t.get("title") or "").strip()[:200]}
+        to = t.get("to")
+        if isinstance(to, int) and not isinstance(to, bool) and to > 0:
+            tv["to"] = to
+        if t.get("due") is True:
+            tv["due"] = True
+        out["task"] = tv
+    if extra:
+        ppl = r.get("notify") or []
+        ppl = sorted({int(x) for x in (ppl if isinstance(ppl, list) else []) if isinstance(x, int) and not isinstance(x, bool) and x > 0})[:NOTIFY_MAX]
+        if ppl:
+            out["notify"] = ppl
+        url = str(r.get("webhook") or "").strip()
+        if url:
+            out["webhook"] = url[:2000]
+            if r.get("hook_secret"):
+                out["hook_secret"] = str(r["hook_secret"])[:100]
+    if not any(k in out for k in ACTIONS):
         raise RuleError("nothing")
     return out
+
+
+TRIGGERS = ("received", "changed", "scheduled")   # 2.581.0 (#4803)
+ON_KINDS = ("tags", "type", "sender", "field")   # what a change must touch for a "changed" flow (none chosen = any of them)
+SCHED_FROM = ("date", "due", "added")            # X days after the document's date / due date / the day it came in
+DAYS_MAX = 3650
+FIELDS_MAX = 5
+NOTIFY_MAX = 20
+ACTIONS = ("sender", "type", "folder", "tags", "untag", "fields", "task", "notify", "webhook")
+# the source filter: a group -> the values of doc_meta.source (docs/ingest.py docs_ingest callers); "mailbox" for the own
+# mailbox of a workspace (#4804) when it marks its documents apart from the document address
+SOURCES = {"upload": ("upload", "share", "api", "folder", "office", "payonline"), "mail": ("mail", "mailbox"), "scan": ("scan",),
+           "fetcher": ("abholer",), "import": ("paperless", "import")}
+
+
+def _names(v):
+    if isinstance(v, str):
+        v = v.split(",")
+    return [str(t).strip()[:60] for t in (v if isinstance(v, list) else []) if str(t).strip()][:10]
+
+
+def _clean_filters(r):
+    """The filters of a flow besides the words: {sources, filename, has_tags, has_type, has_sender} (only those given)."""
+    out = {}
+    src = r.get("sources") or []
+    src = [x for x in SOURCES if x in (src if isinstance(src, list) else [src])]
+    if src:
+        out["sources"] = src
+    fn = str(r.get("filename") or "").strip()[:PATTERN_MAX]
+    if fn:
+        out["filename"] = fn
+    ht = _names(r.get("has_tags"))
+    if ht:
+        out["has_tags"] = ht
+    for k in ("has_type", "has_sender"):
+        v = str(r.get(k) or "").strip()[:120]
+        if v:
+            out[k] = v
+    return out
+
+
+def trigger_of(r):
+    return r.get("trigger") if r.get("trigger") in TRIGGERS else "received"
+
+
+def flow_pass(r, facts):
+    """2.581.0 (#4803): do the filters of flow r besides the words hold for a document? facts = {source, name, tags: set of
+    folded tag names, type, sender: folded names or ''}. An old rule has none of them: always true. A flow switched off: false."""
+    if r.get("off"):
+        return False
+    if r.get("sources") and not any(facts.get("source") in SOURCES.get(g, ()) for g in r["sources"]):
+        return False
+    if r.get("filename") and not fnmatch.fnmatchcase(fold(facts.get("name") or ""), fold(r["filename"])):
+        return False
+    if r.get("has_tags") and not any(fold(t) in facts.get("tags", set()) for t in r["has_tags"]):  # one of them (like Paperless-ngx)
+        return False
+    for k, f in (("has_type", "type"), ("has_sender", "sender")):
+        if r.get(k) and fold(r[k]) != (facts.get(f) or ""):
+            return False
+    return True
 
 
 def _fuzzy_in(phrase, text_words):
@@ -169,7 +289,9 @@ def matches(rules, text):
     out = []
     for r in rules:
         kind, m = r.get("kind"), r.get("match") or ""
-        if kind == "regex":
+        if not m.strip():  # 2.581.0 (#4803): a flow without words (other filters only) holds for every text
+            ok = True
+        elif kind == "regex":
             ok = rhits.get(id(r), False)
         elif kind == "exact" and r.get("case"):  # 2.69.0 B (#1847)
             ok = bool(m.strip()) and re.search(r"(?<!\w)" + re.escape(m.strip()) + r"(?!\w)", text or "") is not None

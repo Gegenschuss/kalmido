@@ -422,12 +422,37 @@ def cfg_set(c, ws, data):
     return cur
 
 
-def rules_get(c, ws):
+def rules_get(c, ws, secret=False):
+    """The rules (flows, 2.581.0 #4803) of ws in their order. A flow's webhook secret only with secret=True (docs/flows.py)."""
     out = []
     for r in c.execute("SELECT id, pos, data FROM doc_rules WHERE ws=? ORDER BY pos, id", (ws,)):
         d = _jopen(c, ws, "doc_rules.data", r["data"], {})
         if d:
+            if not secret:
+                d.pop("hook_secret", None)
             out.append({"id": r["id"], **d})
+    return out
+
+
+def flow_facts(c, m, node):
+    """2.581.0 (#4803): what the filters of a flow look at (docs/rules.py flow_pass): source, file name, tag / type / sender names."""
+    return {"source": m["source"], "name": node["name"],
+            "tags": {RU.fold(t["name"]) for t in node_tags(c, m["node_id"])},
+            "type": RU.fold(label_name(c, m["ws"], "type", m["type_id"]) or ""),
+            "sender": RU.fold(label_name(c, m["ws"], "sender", m["sender_id"]) or "")}
+
+
+def rules_received(c, m, node):
+    """2.581.0 (#4803): the flows with the trigger "received" whose filters (besides the words) hold for the document --
+    every old rule (no trigger, no filters) as before."""
+    facts = None
+    out = []
+    for r in rules_get(c, m["ws"]):
+        if RU.trigger_of(r) != "received":
+            continue
+        facts = facts or flow_facts(c, m, node)
+        if RU.flow_pass(r, facts):
+            out.append(r)
     return out
 
 
@@ -849,7 +874,7 @@ def classify(c, m, node, text, given=None, seer=None):
     lv = cfg_get(c, ws)["levels"]
     given = given or {}
     out, sug, auto = {}, {}, {}
-    rr = RU.apply_rules(rules_get(c, ws), f"{node['name']}\n{text}") if any(lv[f] in ("rules", "learn") for f in lv) else {"tags": []}
+    rr = RU.apply_rules(rules_received(c, m, node), f"{node['name']}\n{text}") if any(lv[f] in ("rules", "learn") for f in lv) else {"tags": []}  # 2.581.0 (#4803)
     toks = CL.tokens(f"{node['name']}\n{text}")
     for f in ("sender", "type", "folder"):
         if f in given or lv[f] in ("agent", "off"):

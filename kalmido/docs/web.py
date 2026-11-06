@@ -469,6 +469,17 @@ def doc_amount(raw):
 
 
 def doc_update(c, nid, d, uid, by=None):
+    """doc_update_values + 2.581.0 (#4803): a saved change of tags / type / sender / custom fields starts the flows with the
+    trigger "changed" (docs/flows.py; never from a flow's own actions: depth 1)."""
+    from .flows import fl_before, fl_changed
+    before = fl_before(c, nid)
+    e = doc_update_values(c, nid, d, uid, by)
+    if e is None:
+        fl_changed(c, nid, before)
+    return e
+
+
+def doc_update_values(c, nid, d, uid, by=None):
     """Apply a change {name, date, due, amount, currency, sender, type, tags, folder} to document nid (rights checked by the
     caller). by=None: a person -- the changed features lose "automatic" and the models learn them; by="agent": the
     features are marked "agent" (or land as suggestions when the workspace has the feature on level agent)."""
@@ -844,9 +855,15 @@ def _settings_json(c, ws, uid):
     cfg = S.cfg_get(c, ws)
     from .fields import df_list  # 2.153.0 (#2179): the custom fields of the workspace
     return {"ws": f"org:{oid}" if oid else "private", "can_manage": can, "fields": df_list(c, ws), "levels": cfg["levels"], "inbox": cfg["inbox"],
-            "rules": S.rules_get(c, ws) if can else [], **_settings_labels(c, ws, uid, can), "folders": folders,
+            "rules": S.rules_get(c, ws) if can else [], **_flow_extra(c, ws, can), **_settings_labels(c, ws, uid, can), "folders": folders,
             "root_id": root, "inbox_path": S.inbox_path(c, root, uid), "ocr": ocr_available(), "ocr_missing": _ocr_missing(c, uid), "asn_prefix": cfg["asn_prefix"], "asn_next": S.asn_next(c, ws), "mail": {"enabled": MAIL_IN_ON, "address": mail_addr(tok[0]) if (tok and MAIL_IN_ON) else ""},
             "scan": _scan_json(c, uid, oid)}  # 2.207.0 A (#2763): scan inboxes, folder watcher downloads, the mail note
+
+
+def _flow_extra(c, ws, can):
+    """2.581.0 (#4803): for the flow form: the people a flow may notify / give a task, whether webhooks are on."""
+    from .flows import fl_people, FL_URL_CHECK
+    return {"people": fl_people(c, ws) if can else [], "hooks": bool(FL_URL_CHECK) and can}
 
 
 def _scan_json(c, uid, oid):
@@ -881,15 +898,20 @@ def docs_settings_put():
 
 
 def _rule_save(c, ws, d, rid=None):
+    from .flows import fl_clean, fl_rule_old  # 2.581.0 (#4803): a rule is a flow (trigger, filters, actions)
     try:
-        r = S.RU.clean_rule(d)
+        r, shown = fl_clean(c, ws, d, fl_rule_old(c, rid, ws) if rid else None)
     except S.RU.RuleError as e:
         why = str(e)
         msg = {"nested": tr("This pattern could take very long (nested repetition); please simplify it"),
                "backref": tr("Back references are not allowed in patterns"), "long": tr("The pattern is too long"),
                "invalid": tr("The pattern is not a valid regular expression"), "empty": tr("The condition is empty"),
-               "nothing": tr("The rule does not set anything")}.get(why, tr("Invalid value: {0}", "rule"))
+               "nothing": tr("The rule does not set anything"), "days": tr("Invalid value: {0}", "days"),
+               "person": tr("Only people of this workspace can be chosen"), "field": tr("Unknown field: {0}", ", ".join(d.get("fields") or {})[:60] if isinstance(d.get("fields"), dict) else ""),
+               "hooks_off": tr("Webhooks are turned off on this server")}.get(why, tr("Invalid value: {0}", "rule"))
         return None, err(msg)
+    if shown:
+        g.fl_secret = shown  # 2.581.0 (#4803): the webhook's secret, shown once
     data = S._jseal(c, ws, "doc_rules.data", r)
     if rid:
         c.execute("UPDATE doc_rules SET data=? WHERE id=? AND ws=?", (data, rid, ws))
@@ -901,7 +923,9 @@ def _rule_save(c, ws, d, rid=None):
 
 @app.post("/api/docs/rules")
 def docs_rule_add():
-    """{ws, kind: any|all|exact|regex|fuzzy, match, sender?, type?, tags?, folder?}"""
+    """{ws, kind: any|all|exact|regex|fuzzy, match, sender?, type?, tags?, folder?} -- 2.581.0 (#4803) + the flow keys of
+    docs/rules.py clean_rule (trigger, on, days, from, sources, filename, has_tags, has_type, has_sender, untag, fields, task,
+    notify, webhook, name, off); match is optional for a flow with other filters. A new webhook secret comes back once (hook_secret)."""
     c = db()
     _no_agent()
     uid = me()
@@ -911,7 +935,7 @@ def docs_rule_add():
     if e:
         return e
     c.commit()
-    return jsonify(id=rid, rules=S.rules_get(c, ws)), 201
+    return jsonify(id=rid, rules=S.rules_get(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {})), 201
 
 
 def _rule_ws(c, rid):
@@ -932,12 +956,12 @@ def docs_rule_edit(rid):
         if not -1e9 < d["pos"] < 1e9:  # 2.126.0 A (#1979 L4): also no Infinity / NaN
             return err(tr("Invalid value: {0}", "pos"))
         c.execute("UPDATE doc_rules SET pos=? WHERE id=?", (int(d["pos"]), rid))
-    if "match" in d:
+    if set(d) - {"pos", "ws"}:  # 2.581.0 (#4803): a flow may have no words ("match"); was: only with "match"
         _rid, e = _rule_save(c, ws, d, rid)
         if e:
             return e
     c.commit()
-    return jsonify(rules=S.rules_get(c, ws))
+    return jsonify(rules=S.rules_get(c, ws), **({"hook_secret": g.fl_secret} if g.get("fl_secret") else {}))
 
 
 @app.delete("/api/docs/rules/<int:rid>")
