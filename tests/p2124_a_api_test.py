@@ -255,7 +255,8 @@ check(get(A, SID)["chart"] == {"type": "bar", "x": COLS[0], "y": [COLS[1]]}, "GE
 check(get(Bo, SID)["chart"]["type"] == "bar", "a member of the organisation sees it")
 r = Bo.put(url, json={"chart": {"type": "line", "x": None, "y": [COLS[1], COLS[3], COLS[1]]}})
 check(r.ok and r.json()["chart"] == {"type": "line", "x": None, "y": [COLS[1], COLS[3]]}, "a member who writes changes it (doubles dropped) " + r.text[:200])
-for bad, what in (({"type": "pie", "y": [COLS[1]]}, "a kind it does not know"), ({"type": "bar", "y": []}, "no column"),
+# 2.578.0 (#3462): pie is a kind now (p2578_d_api), an unknown kind is "radar"
+for bad, what in (({"type": "radar", "y": [COLS[1]]}, "a kind it does not know"), ({"type": "bar", "y": []}, "no column"),
                   ({"type": "bar", "y": [COLS[1] + 99999]}, "a column that does not exist"),
                   ({"type": "bar", "y": COLS + [COLS[0]]}, "more than six columns"),
                   ({"type": "bar", "x": "A", "y": [COLS[1]]}, "x not an id"), ("bar", "not an object")):

@@ -1,9 +1,9 @@
 """2.124.0 A (#2115): the simple chart of a table -- bars or a line from its columns, drawn by the client (static/js/sheetchart.js).
 
-The setting lives in sheets.chart (JSON, '' = no chart): {type: bar | line, x: the column of the labels (null = the row
-numbers), y: [1..SHC_SERIES_MAX columns with the numbers]}. Everyone who reads the table sees it (GET /api/sheets/<id> answers
-it as "chart"); only who may write the table changes it, like every other change of the table (rev + the area counter, so the
-others redraw). The values are never stored: the client draws the evaluated cells it already has, so a chart shows exactly
+The setting lives in sheets.chart (JSON, '' = no chart): {type: bar | line | stacked | pie | donut (2.578.0, #3462), x: the
+column of the labels (null = the row numbers), y: [1..SHC_SERIES_MAX columns with the numbers; a pie / donut exactly one]}.
+Everyone who reads the table sees it (GET /api/sheets/<id> answers it as "chart"); only who may write the table changes it,
+like every other change of the table (rev + the area counter, so the others redraw). The values are never stored: the client draws the evaluated cells it already has, so a chart shows exactly
 what the viewer may see. Column ids only (no text of the person): moving the table between spaces (shmove.py) keeps it as is;
 a column that is deleted later simply drops out of the drawing.
 """
@@ -21,7 +21,8 @@ from .core import sh_need, sh_reload, sh_touch
 from ..core.pg import write_lock  # 2.564.0 (#4701)
 from .shhist import shh_meta  # 2.564.0 (#4701)
 
-SHC_TYPES = ("bar", "line")
+SHC_TYPES = ("bar", "line", "stacked", "pie", "donut")  # 2.578.0 (#3462): + stacked bars, pie, ring (donut)
+SHC_ONE = ("pie", "donut")  # kinds that show one column with numbers
 SHC_SERIES_MAX = 6
 
 
@@ -63,12 +64,15 @@ def shc_clean(c, sid, v):
             out.append(y)
     if not out:
         raise BadInput(tr("Choose one to {0} columns with numbers", SHC_SERIES_MAX))
+    if v["type"] in SHC_ONE and len(out) > 1:  # 2.578.0 (#3462): a pie shows the parts of one column
+        raise BadInput(tr("A pie or ring chart shows one column with numbers"))
     return {"type": v["type"], "x": x, "y": out}
 
 
 @app.put("/api/sheets/<int:sid>/chart")
 def sheets_chart_put(sid):
-    """{chart: {type: bar|line, x: column id|null, y: [column ids]} | null} -- the table's chart (null = none). Write right."""
+    """{chart: {type: bar|line|stacked|pie|donut, x: column id|null, y: [column ids]} | null} -- the table's chart (null = none).
+    Write right."""
     need_feat("sheets")
     c = db()
     sh_need(c, sid, write=True)

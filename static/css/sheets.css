@@ -186,6 +186,18 @@ html.mini-sheet .shvtop>a.btn{display:none}
 .shc-kind legend,.shc-ys legend{font-weight:600;margin-bottom:.25rem;width:100%}
 .shc-ys{max-height:14rem;overflow:auto}
 @media (max-width:40rem){ .shc-ys{flex-direction:column} }
+/* 2.578.0 (#3462): stacked bars, pie and ring - every second part hatched, the pie with a legend of value and share */
+.shc-hl{stroke:var(--bg2);stroke-width:1.5}
+.shc-svg .shc-hatch{pointer-events:none}
+.shc-key.shc-kh{background-image:repeating-linear-gradient(45deg,transparent 0 .1875rem,var(--bg2) .1875rem .28125rem)}
+.shc-piebox{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem 1.5rem}
+.shc-pie{flex:none}
+.shc-svg .shc-slhit{fill:transparent;cursor:pointer}
+.shc-svg .shc-slhit.on{fill:var(--text);fill-opacity:.12}
+.shc-total{font-size:var(--fs-m)}
+.shc-pleg{flex-direction:column;gap:.25rem}
+.shc-pleg li{cursor:pointer;border-radius:var(--r-s);padding:0 .25rem}
+.shc-pleg li.on{background:var(--bg3)}
 /* 2.124.0 B (#2110): checkbox, person, link and file cells */
 .shvc.shkcb{text-align:center;padding:0}
 .shkbox{display:inline-grid;place-items:center;width:1.25rem;height:1.25rem;border:.125rem solid var(--line2);border-radius:.3125rem;vertical-align:middle;cursor:pointer}

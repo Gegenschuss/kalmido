@@ -298,8 +298,8 @@ def sheets_spec(paths, schemas, op, ok, errs, ref, pid, q):
         "currency": {"type": "string"},
         "columns": {"type": "array", "items": {"type": "object", "description": "{id, pos, title, kind, options, color_mode, width, letter}"}},
         "rows": {"type": "array", "items": {"type": "object", "description": "{id, pos}"}},
-        "chart": {"type": ["object", "null"], "description": "2.124.0: the table's chart set in the app, {type: bar | line, x: column id of "
-                                                            "the labels | null, y: [column ids of the numbers]}; read only here"},
+        "chart": {"type": ["object", "null"], "description": "2.124.0: the table's chart set in the app, {type: bar | line | stacked | pie | donut (2.578.0), x: "
+                                                            "column id of the labels | null, y: [column ids of the numbers]}; read only here"},
         "cells": {"type": "array", "items": ref("SheetCell")}, "names": {"type": "object"},
         "sources": {"type": "array", "items": {"type": "object"}, "description": "The Kalmido variables used: {type p|l|k, id, label, fields, denied, deleted}"},
         "batches": {"type": "array", "items": {"type": "object"}, "description": "Agent calls on this table: {batch, agent_id, agent_name, created_at, count, undone}"},

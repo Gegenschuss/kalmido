@@ -202,6 +202,12 @@ back). The chart is saved with the table: everyone who sees the table sees it, o
 and Undo takes a change back. A table without a chart looks exactly as before. Agents read the setting with the table
 (`chart`), they do not change it.
 
+*Since 2.578.0* the kinds are *Bars*, *Stacked bars*, *Line*, *Pie* and *Ring*. Stacked bars put the columns on top of each
+other (negative numbers below zero) with the sum above each bar. A pie or ring shows one column: each row with a number above
+zero is a part, from the ninth row on they are joined as *Other*; the ring has the total in its middle. Every second part is
+hatched, so the parts can be told apart without their colour, and the legend next to the pie names each part with its value
+and share. Tap a part (or its line in the legend) to read it.
+
 <a id="carrying-a-table-over-tasks-quotation-list-as-rows-2890"></a>
 
 ## Carrying a table over: tasks, quotation, project as rows

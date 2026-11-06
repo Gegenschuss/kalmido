@@ -5,9 +5,19 @@
 // follows every change live. One accent: the first series lilac, the others lilac shades and grey, lines also dashed so a
 // series is never told by its colour alone; a legend from two series on. Tap (or hover) a column of the chart: its values.
 // Without a setting nothing is drawn and the table looks exactly as before. Writing it is one Undo step.
+// 2.578.0 (#3462): + stacked bars, pie and ring (donut): one accent and its shades again, every second part hatched so parts are
+// never told by colour alone; a pie shows one column (the parts of its positive numbers, from the ninth on as "Other") with a
+// legend of label, value and share.
 const SHC = {hide: /** @type {Record<number, boolean>} */ ({}), tip: /** @type {string|null} */ (null)};
 const SHC_MAX = 500;  // rows drawn at most (the note says so)
 const SHC_H = 200, SHC_L = 52, SHC_B = 40, SHC_T = 18;  // the drawing's height and margins (SVG units = px)
+const SHC_KINDS = ['bar', 'stacked', 'line', 'pie', 'donut'], SHC_ONE = ['pie', 'donut'], SHC_SLICES = 8;  // 2.578.0 (#3462)
+function shc_hatched(k) { return (k % 2 === 1) !== (k >= 6); }  // 2.578.0 (#3462): every second part (and the 7th on) hatched
+function shc_defs(sh) { return `<defs><pattern id="shc-h${sh.id}" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line class="shc-hl" x1="0" y1="0" x2="0" y2="6"></line></pattern></defs>`; }
+function shc_part(sh, k, d, extra) {  // one filled part (a stacked segment / a slice), hatched on top where shc_hatched says so
+  const p = `<path class="shc-s${k % 6}${extra ? ' ' + extra : ''}" d="${d}"></path>`;
+  return shc_hatched(k) ? p + `<path class="shc-hatch" fill="url(#shc-h${sh.id})" d="${d}"></path>` : p;
+}
 
 function shc_on(sh) { return !!(sh && sh.chart && Array.isArray(sh.chart.y) && sh.chart.y.length); }
 function shc_data(sh, ch) {  // {ys: [columns], pts: [{label, vals: [{v, d} | null]}], more}
@@ -40,12 +50,16 @@ function shc_num(v) {
 }
 function shc_cut(t, n) { return t.length > n ? t.slice(0, n - 1) + '…' : t; }
 function shc_svg(sh, ch, dt) {
-  const n = dt.pts.length, ns = dt.ys.length, bar = ch.type !== 'line';
+  if (SHC_ONE.includes(ch.type)) return shc_pieSvg(sh, ch, shc_slices(dt));  // 2.578.0 (#3462)
+  const n = dt.pts.length, ns = dt.ys.length, bar = ch.type !== 'line', stack = ch.type === 'stacked';
   const view = document.getElementById('view'), avail = Math.min(1400, Math.max(280, (view?.clientWidth || 600) - 64));  // the width there is
-  const gmin = bar ? Math.max(44, ns * 16 + 16) : 44, W = Math.max(avail, SHC_L + n * gmin + 12), gw = (W - SHC_L - 12) / Math.max(1, n);
+  const gmin = bar && !stack ? Math.max(44, ns * 16 + 16) : 44, W = Math.max(avail, SHC_L + n * gmin + 12), gw = (W - SHC_L - 12) / Math.max(1, n);
   const ph = SHC_H - SHC_T - SHC_B;
   let lo = Infinity, hi = -Infinity;
-  for (const p of dt.pts) for (const v of p.vals) if (v) { lo = Math.min(lo, v.v); hi = Math.max(hi, v.v); }
+  for (const p of dt.pts) {
+    if (stack) { let up = 0, dn = 0; for (const v of p.vals) if (v) { if (v.v >= 0) up += v.v; else dn += v.v; } if (p.vals.some(v => v)) { lo = Math.min(lo, dn); hi = Math.max(hi, up); } continue; }  // 2.578.0 (#3462): the sums
+    for (const v of p.vals) if (v) { lo = Math.min(lo, v.v); hi = Math.max(hi, v.v); }
+  }
   if (lo === Infinity) { lo = 0; hi = 1; }
   const [y0, y1, step] = shc_nice(lo, hi), Y = v => SHC_T + ph - (v - y0) / (y1 - y0) * ph;
   const out = [];
@@ -58,7 +72,19 @@ function shc_svg(sh, ch, dt) {
   dt.pts.forEach((p, i) => {
     const x0 = SHC_L + i * gw;
     if (i % every === 0) out.push(`<text class="shc-ax" x="${(x0 + gw / 2).toFixed(1)}" y="${SHC_H - SHC_B + 16}" text-anchor="middle">${esc(shc_cut(p.label, chars))}</text>`);
-    if (bar) p.vals.forEach((v, k) => {
+    if (stack) {  // 2.578.0 (#3462): the series on top of each other (negative numbers below zero), the sum above
+      const bw = Math.min(40, gw - 12), x = x0 + (gw - bw) / 2;
+      let up = 0, dn = 0;
+      p.vals.forEach((v, k) => {
+        if (!v || !v.v) return;
+        const a = v.v >= 0 ? up : dn, b = a + v.v;
+        if (v.v >= 0) up = b; else dn = b;
+        const ya = Y(Math.max(a, b)), yb = Y(Math.min(a, b));
+        out.push(shc_part(sh, k, `M${(x + 1).toFixed(1)} ${yb.toFixed(1)}V${ya.toFixed(1)}H${(x + bw - 1).toFixed(1)}V${yb.toFixed(1)}Z`));
+      });
+      if (lbl && (up || dn)) out.push(`<text class="shc-val" x="${(x + bw / 2).toFixed(1)}" y="${(Y(up) - 4).toFixed(1)}" text-anchor="middle">${esc(shc_num(up + dn))}</text>`);
+    }
+    if (bar && !stack) p.vals.forEach((v, k) => {
       if (!v) return;
       const bw = Math.min(32, (gw - 12) / ns), x = x0 + (gw - bw * ns) / 2 + k * bw, ya = Y(Math.max(0, v.v)), yb = Y(Math.min(0, v.v)), h = Math.max(1, yb - ya);
       const r = Math.min(4, (bw - 2) / 2, h);
@@ -77,15 +103,46 @@ function shc_svg(sh, ch, dt) {
     if (li != null && ns <= 4) out.push(`<text class="shc-val" x="${(SHC_L + li * gw + gw / 2).toFixed(1)}" y="${(Y(dt.pts[li].vals[k].v) - 9).toFixed(1)}" text-anchor="middle">${esc(shc_num(dt.pts[li].vals[k].v))}</text>`);
   });
   dt.pts.forEach((p, i) => out.push(`<rect class="shc-hit" data-shc-i="${i}" x="${SHC_L + i * gw}" y="${SHC_T}" width="${gw}" height="${ph}"><title>${esc(p.label)}</title></rect>`));
-  return `<svg class="shc-svg" viewBox="0 0 ${W} ${SHC_H}" style="width:${W / 16}rem;height:${SHC_H / 16}rem" role="img" aria-label="${esc(tr('Chart of {0}', sh.title || tr('Table')))}">${out.join('')}</svg>`;
+  return `<svg class="shc-svg" viewBox="0 0 ${W} ${SHC_H}" style="width:${W / 16}rem;height:${SHC_H / 16}rem" role="img" aria-label="${esc(tr('Chart of {0}', sh.title || tr('Table')))}">${stack ? shc_defs(sh) : ''}${out.join('')}</svg>`;
+}
+function shc_slices(dt) {  // 2.578.0 (#3462): the parts of a pie: the positive numbers of the first column, the ninth on as "Other"
+  const all = dt.pts.map((p, i) => ({label: p.label, v: p.vals[0] ? p.vals[0].v : 0, d: p.vals[0] ? p.vals[0].d : '', i})).filter(x => x.v > 0);
+  const total = all.reduce((a, x) => a + x.v, 0);
+  if (all.length <= SHC_SLICES) return {parts: all, total};
+  const rest = all.slice(SHC_SLICES - 1), v = rest.reduce((a, x) => a + x.v, 0);
+  return {parts: [...all.slice(0, SHC_SLICES - 1), {label: tr('Other'), v, d: shc_num(v), i: -1}], total};
+}
+function shc_pct(v, total) { try { return new Intl.NumberFormat(LOCALE(), {style: 'percent', maximumFractionDigits: 1}).format(v / total); } catch (e) { return Math.round(v / total * 1000) / 10 + ' %'; } }
+function shc_pieSvg(sh, ch, sl) {  // 2.578.0 (#3462): a pie / ring, the parts clockwise from twelve o'clock
+  const R = 88, C = SHC_H / 2, ri = ch.type === 'donut' ? 52 : 0, out = [];
+  let a = -Math.PI / 2;
+  const pt = (r, t) => `${(C + r * Math.cos(t)).toFixed(2)} ${(C + r * Math.sin(t)).toFixed(2)}`;
+  sl.parts.forEach((p, k) => {
+    const t = p.v / sl.total * 2 * Math.PI, b = a + t, big = t > Math.PI ? 1 : 0;
+    let d;
+    if (sl.parts.length === 1) d = ri ? `M${pt(R, -Math.PI / 2)}A${R} ${R} 0 1 1 ${pt(R, Math.PI * 1.5 - 1e-4)}ZM${pt(ri, -Math.PI / 2)}A${ri} ${ri} 0 1 0 ${pt(ri, Math.PI * 1.5 - 1e-4)}Z`
+      : `M${pt(R, -Math.PI / 2)}A${R} ${R} 0 1 1 ${pt(R, Math.PI * 1.5 - 1e-4)}Z`;
+    else d = ri ? `M${pt(R, a)}A${R} ${R} 0 ${big} 1 ${pt(R, b)}L${pt(ri, b)}A${ri} ${ri} 0 ${big} 0 ${pt(ri, a)}Z` : `M${C} ${C}L${pt(R, a)}A${R} ${R} 0 ${big} 1 ${pt(R, b)}Z`;
+    out.push(shc_part(sh, k, d, 'shc-sl'));
+    if (p.i >= 0) out.push(`<path class="shc-slhit" data-shc-i="${p.i}" d="${d}"><title>${esc(p.label)}: ${esc(p.d)} (${esc(shc_pct(p.v, sl.total))})</title></path>`);
+    a = b;
+  });
+  if (ri) out.push(`<text class="shc-val shc-total" x="${C}" y="${C}" text-anchor="middle" dy="0.32em">${esc(shc_num(sl.total))}</text>`);
+  return `<svg class="shc-svg shc-pie" viewBox="0 0 ${SHC_H} ${SHC_H}" style="width:${SHC_H / 16}rem;height:${SHC_H / 16}rem" role="img" aria-label="${esc(tr('Chart of {0}', sh.title || tr('Table')))}">${shc_defs(sh)}${out.join('')}</svg>`;
+}
+function shc_pieLegend(sh, sl) {  // label, value and share of every part (the colour is never the only hint)
+  return `<ul class="shc-leg shc-pleg">${sl.parts.map((p, k) => `<li${p.i >= 0 ? ` data-shc-i="${p.i}"` : ''}><i class="shc-key shc-s${k % 6}${shc_hatched(k) ? ' shc-kh' : ''}" aria-hidden="true"></i>${esc(p.label || '–')} <span class="muted">${esc(p.d)} · ${esc(shc_pct(p.v, sl.total))}</span></li>`).join('')}</ul>`;
 }
 function shc_html(sh) {  // the chart above the formula bar ('' without a setting or when hidden)
   if (!shc_on(sh) || SHC.hide[sh.id]) return '';
-  const ch = sh.chart, dt = shc_data(sh, ch);
-  const legend = dt.ys.length > 1 ? `<ul class="shc-leg">${dt.ys.map((c, k) => `<li><i class="shc-key shc-s${k}${ch.type === 'line' ? ' shc-kl' : ''}" aria-hidden="true"></i>${esc(c.title || c.letter || '')}</li>`).join('')}</ul>`
+  const ch = sh.chart, dt = shc_data(sh, ch), one = SHC_ONE.includes(ch.type);
+  if (one) dt.ys = dt.ys.slice(0, 1);  // 2.578.0 (#3462): a pie shows its first column
+  const sl = one ? shc_slices(dt) : null;
+  const legend = one ? `<span class="shc-one muted">${esc(dt.ys[0]?.title || '')}</span>` : dt.ys.length > 1 ? `<ul class="shc-leg">${dt.ys.map((c, k) => `<li><i class="shc-key shc-s${k}${ch.type === 'line' ? ' shc-kl' : ch.type === 'stacked' && shc_hatched(k) ? ' shc-kh' : ''}" aria-hidden="true"></i>${esc(c.title || c.letter || '')}</li>`).join('')}</ul>`
     : `<span class="shc-one muted">${esc(dt.ys[0]?.title || '')}</span>`;
   const body = !dt.ys.length ? `<p class="muted">${tr('The columns of the chart are gone. Choose new ones.')}</p>`
-    : !dt.pts.length ? `<p class="muted">${tr('No numbers to show yet.')}</p>`
+    : !dt.pts.length || (sl && !sl.parts.length) ? `<p class="muted">${tr('No numbers to show yet.')}</p>`
+      : sl ? `<div class="shc-piebox">${shc_pieSvg(sh, ch, sl)}${shc_pieLegend(sh, sl)}</div>`
       : `<div class="shc-scroll">${shc_svg(sh, ch, dt)}</div>${dt.more ? `<p class="muted shc-note">${tr('The first {0} rows are shown.', SHC_MAX)}</p>` : ''}`;
   return `<section class="shc" id="shc-box" aria-label="${esc(tr('Chart'))}"><div class="shc-head">${ic('chart', 's')}${legend}<span class="spacer"></span>
     ${sh.can_write ? `<button type="button" class="iconbtn" data-shc="edit" title="${esc(tr('Edit chart…'))}" aria-label="${esc(tr('Edit chart…'))}">${ic('edit', 's')}</button>` : ''}
@@ -103,10 +160,11 @@ function shc_patch(sh) {  // after a write merged into the open sheet: redraw th
 function shc_tipShow(i) {  // the values of one column of the chart (tap / hover)
   const sh = SHV.sh, tip = document.getElementById('shc-tip'); if (!shc_on(sh) || !tip) return;
   const dt = shc_data(sh, sh.chart), p = dt.pts[i]; if (!p) { tip.hidden = true; return; }
+  if (SHC_ONE.includes(sh.chart.type)) dt.ys = dt.ys.slice(0, 1);
   tip.innerHTML = `<b>${esc(p.label)}</b>${dt.ys.map((c, k) => `<span><i class="shc-key shc-s${k}${sh.chart.type === 'line' ? ' shc-kl' : ''}" aria-hidden="true"></i>${esc(c.title || c.letter || '')}: ${esc(p.vals[k] ? p.vals[k].d : '–')}</span>`).join('')}`;
   tip.hidden = false;
-  document.querySelectorAll('#shc-box .shc-hit.on').forEach(x => x.classList.remove('on'));
-  document.querySelector(`#shc-box .shc-hit[data-shc-i="${i}"]`)?.classList.add('on');
+  document.querySelectorAll('#shc-box [data-shc-i].on').forEach(x => x.classList.remove('on'));
+  document.querySelectorAll(`#shc-box [data-shc-i="${i}"]`).forEach(x => x.classList.add('on'));  // 2.578.0 (#3462): + pie parts
 }
 
 async function shc_save(sh, chart, label) {  // one Undo step (the old setting back)
@@ -122,7 +180,7 @@ function shc_dialog(sh) {  // kind, the labels' column, the columns with numbers
   const ys = ch.y.length ? ch.y : cols.filter(num).slice(0, 1).map(c => c.id);
   const xs = ch.y.length ? ch.x : (cols.find(c => !num(c)) || {id: null}).id;
   const md = modal(`<h3>${tr('Chart')}</h3>
-    <fieldset class="shc-kind"><legend>${tr('Kind')}</legend><label class="chkl"><input type="radio" name="shc-t" value="bar" ${ch.type !== 'line' ? 'checked' : ''}> ${tr('Bars')}</label><label class="chkl"><input type="radio" name="shc-t" value="line" ${ch.type === 'line' ? 'checked' : ''}> ${tr('Line|chart')}</label></fieldset>
+    <fieldset class="shc-kind"><legend>${tr('Kind')}</legend>${SHC_KINDS.map(k => `<label class="chkl"><input type="radio" name="shc-t" value="${k}" ${(SHC_KINDS.includes(ch.type) ? ch.type : 'bar') === k ? 'checked' : ''}> ${(/** @type {Record<string, string>} */ ({bar: tr('Bars'), stacked: tr('Stacked bars'), line: tr('Line|chart'), pie: tr('Pie|chart'), donut: tr('Ring|chart')}))[k]}</label>`).join('')}</fieldset>
     <div class="row"><label for="shc-x">${tr('Labels from')}</label><select id="shc-x"><option value="">${tr('Row numbers')}</option>${cols.map(c => `<option value="${c.id}" ${xs === c.id ? 'selected' : ''}>${esc(c.title || c.letter || '')}</option>`).join('')}</select></div>
     <fieldset class="shc-ys"><legend>${tr('Numbers from (up to 6 columns)')}</legend>${cols.map(c => `<label class="chkl"><input type="checkbox" value="${c.id}" ${ys.includes(c.id) ? 'checked' : ''}> ${esc(c.title || c.letter || '')}${num(c) ? '' : ` <small class="muted">${tr('Text')}</small>`}</label>`).join('')}</fieldset>
     <p class="muted mhint" id="shc-err" role="alert"></p>
@@ -137,7 +195,9 @@ function shc_dialog(sh) {  // kind, the labels' column, the columns with numbers
     const err = md.querySelector('#shc-err');
     if (!y.length || y.length > 6) { if (err) err.textContent = tr('Choose one to {0} columns with numbers', 6); return; }
     const xv = (/** @type {HTMLSelectElement|null} */ (md.querySelector('#shc-x')))?.value || '';
-    const t = (/** @type {HTMLInputElement|null} */ (md.querySelector('input[name="shc-t"]:checked')))?.value === 'line' ? 'line' : 'bar';
+    const tv = (/** @type {HTMLInputElement|null} */ (md.querySelector('input[name="shc-t"]:checked')))?.value || 'bar';
+    const t = SHC_KINDS.includes(tv) ? tv : 'bar';  // 2.578.0 (#3462): + stacked, pie, donut
+    if (SHC_ONE.includes(t) && y.filter(v => v !== (xv ? +xv : null)).length > 1) { if (err) err.textContent = tr('A pie or ring chart shows one column with numbers'); return; }
     const x = xv ? +xv : null;
     md.remove();
     await shc_save(sh, {type: t, x, y: y.filter(v => v !== x)}, sh.chart ? tr('Chart changed') : tr('Chart added'));
@@ -149,11 +209,11 @@ document.addEventListener('click', e => {
   const b = /** @type {HTMLElement|null} */ (t.closest('[data-shc]')), sh = SHV.sh; if (!sh) return;
   if (b?.dataset.shc === 'edit') shc_dialog(sh);
   else if (b?.dataset.shc === 'hide') { SHC.hide[sh.id] = true; document.getElementById('shc-box')?.remove(); }
-  else { const h = /** @type {HTMLElement|null} */ (t.closest('.shc-hit')); if (h) shc_tipShow(+(h.dataset.shcI || 0)); }
+  else { const h = /** @type {HTMLElement|null} */ (t.closest('[data-shc-i]')); if (h) shc_tipShow(+(h.dataset.shcI || 0)); }  // 2.578.0 (#3462): + pie parts and their legend
 });
 document.addEventListener('pointerover', e => {  // a mouse shows the values on hover too (touch: the tap above)
   if (e.pointerType !== 'mouse' || !(e.target instanceof Element)) return;
-  const h = /** @type {HTMLElement|null} */ (e.target.closest('#shc-box .shc-hit')); if (h) shc_tipShow(+(h.dataset.shcI || 0));
+  const h = /** @type {HTMLElement|null} */ (e.target.closest('#shc-box [data-shc-i]')); if (h) shc_tipShow(+(h.dataset.shcI || 0));
 });
 SHV_HOOKS.menu.push(sh => sh.can_write
   ? [{label: shc_on(sh) ? tr('Edit chart…') : tr('Chart…'), icon: 'chart', fn: () => shc_dialog(sh)}, ...(shc_on(sh) && SHC.hide[sh.id] ? [{label: tr('Show chart'), icon: 'chart', fn: () => { delete SHC.hide[sh.id]; shc_patch(sh); }}] : [])]
