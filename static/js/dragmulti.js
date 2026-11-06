@@ -149,9 +149,13 @@ function dgItem(t, d) {
   if (fields) { t.fields = {...(t.fields || {})}; for (const [k, v] of Object.entries(fields)) { if (v == null || v === '') delete t.fields[k]; else t.fields[k] = String(v); } }
 }
 // patch_each items at once; a task that moves to another list takes its subtasks along (the server does the same)
+// #3506 (CI red of 2.560.0 - 2.563.1, p2134_ui): a task made a subtask goes into its parent's list and section, as the server's
+// indent (tasks/lifecycle.py) does it; before, it kept its own list here until the next load (the move picker then left out
+// the list it had come from)
 function dgItemsPut(items) {
   const ch = new Map();
-  for (const [id, d] of Object.entries(items)) {
+  for (const [id, d0] of Object.entries(items)) {
+    const p = d0.parent_id ? S.tasks.get(d0.parent_id) : null, d = p ? {...d0, list_id: p.list_id, section_id: p.section_id ?? null} : d0;
     ch.set(+id, t => dgItem(t, d));
     if (d.list_id != null) for (const k of withKids(+id).slice(1)) if (!(k.id in items)) ch.set(k.id, t => { t.list_id = d.list_id; });
   }
