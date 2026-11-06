@@ -611,7 +611,7 @@ function ad_secDraw(md) {
 }
 // 2.364.0 C (#3041): Organisation > Data: the encryption, export and retention export of the organisations I administer
 // (wsPaneDraw fills it; before inside each organisation under People)
-const wsDataHtml = hint => `<h4 id="s-wsdata-h">${tr('Organisation data')}</h4>${hint(tr('Encryption, recovery key and export of each organisation you manage.'))}<div id="s-wsdata" class="wsdata" aria-labelledby="s-wsdata-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
+const wsDataHtml = hint => `<h4 id="s-wsdata-h">${tr('Organisation data')}</h4>${hint(tr('Encryption, recovery key and export of each organisation you manage.'))}${ocScopeSlotHtml()}<div id="s-wsdata" class="wsdata" aria-labelledby="s-wsdata-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;
 // Server: storage per person (#910), the support address, the daily e-mail limit (#899) and the notice above the app (#907)
 // 2.555.0 C (#4664): Settings > Server > Server in one place (first draw and the redraw after publishing a notice)
 // 2.75.0 (#1411): + asst_admHtml; 2.59.0 B (#1375): + related tasks; 2.46.6 (#1710): + the update check result (was Help)
@@ -699,7 +699,7 @@ function settingsModal(focus) {
     org: S.me && (lmOrgPaneOn() || S.me.is_admin) ? admSubsHtml('org', {
       users: (lmOrgPaneOn() ? wsPaneHtml(hint) : '') + (S.me.is_admin ? usersHtml() + grpHtml() + orphHtml() + orgsHtml() + actHtml() : ''),
       agents: S.me.is_admin ? ad_agentsHtml(hint) : '',  // 2.46.6 (#1710); 2.555.0 C (#4664): one switch for user_agents (s-uag), no second one
-      odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint) : '')}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): backups + storage check under Server > Backup
+      odata: (lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin') ? wsDataHtml(hint) : '') + (S.me.is_admin ? ocAdminHtml(hint, !(lmOrgPaneOn() && (S.me.workspaces || []).some(w => w.role === 'admin'))) : '')}, ad_admFocus(focus)) : '',  // 2.582.0 (#4827): backups + storage check under Server > Backup
     // 2.418.0 (#3560): the editor of every area's menu and the tab bar (navmenu.js nav_pageDraw)
     nav: S.me?.kid ? '' : `<h4 id="s-nav-h">${tr('Menus')}</h4>${hint(tr('The order and the points of each menu, for you on every device. Minus hides a point (the search still finds it), Plus brings it back, drag by the grip.'))}<div id="s-navmenus"><div class="muted mhint">${tr('Loading…')}</div></div>`,
     look: `<div id="s-lookin">${lookHtml()}</div>

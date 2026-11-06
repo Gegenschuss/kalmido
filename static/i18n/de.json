@@ -16791,6 +16791,7 @@
   "Web research per routine": "Web-Recherche je Ablauf",
   "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Nur lesend: im Web suchen, eine Seite lesen, eine USt-IdNr. über den EU-Dienst VIES prüfen. Standard aus. Ein Lauf mit Web sendet nie Formulare ab; jede Änderung und jede Nachricht an andere wartet dann auf deine Freigabe, und jeder Web-Fund nennt seine Quelle.",
   "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} Suchen, {1} Seiten, {2} USt-Prüfungen",
+  "What is encrypted?": "Was wird verschlüsselt?",
   "Split automatically from a stack": "Automatisch aus Stapel aufgeteilt",
   "Stack restored: {0}": "Stapel wiederhergestellt: {0}",
   "Backup": "Sicherung",

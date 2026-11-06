@@ -30,12 +30,20 @@ function ocNewsText(d, who, q) {
   if (d.action === 'renew') return tr('{0} saw the recovery key of {1} and is no longer an admin there: make a new recovery key under Organisation data.', q(d.by_name || tr('An admin')), org);  // 2.539.0 (#4373)
   return d.action === 'new' ? tr('{0} made a new recovery key for {1}', who, org) : tr('{0} looked at the recovery key of {1}', who, org);
 }
+// 2.580.0 (#4485): the overview of what is encrypted is ONE folded section per settings dialog (the slot #s-cryptscope, made by
+// ocScopeSlotHtml in Organisation > Data, or in the admin block when there is no Data area); the boxes show their own state only
+const ocScopeSlotHtml = () => `<details class="sdet pmcsd" id="s-cryptscope"><summary>${tr('What is encrypted?')}</summary><div class="pmcsb"></div></details>`;
+function ocScopeFill(sc) {
+  const slot = $('#s-cryptscope .pmcsb');
+  if (slot && !slot.firstChild) slot.innerHTML = pm_cryptScopeHtml(sc);
+}
 async function ocLoad(box) {
   const oid = +box.dataset.ocorg, st = $('.ocst', box);
   let j; try { j = oid ? await api('GET', `/api/orgs/${oid}/encryption`) : await rawFetch('GET', '/api/orgs/0/encryption'); } catch { if (!oid) box.hidden = true; else st.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   if (!oid && !j.has_key) { box.hidden = true; return; }  // 2.138.0 C (#1972): the personal office, once it holds encrypted data
   box._j = j;
-  st.innerHTML = ocStateHtml(j) + (st.closest('.ocadm') ? '' : pm_cryptScopeHtml(j.scope));  // 2.46.1 (#1641): once per page
+  st.innerHTML = ocStateHtml(j);
+  ocScopeFill(j.scope);  // 2.580.0 (#4485): what is encrypted stands ONCE per page (the fold "What is encrypted?"), not in every box
 }
 // 2.138.0 C (#1972): the step-up the server asks (status "step"): password, + code of the app / a recovery code (totp), + the
 // passkey (passkey); without a password a fresh sign-in (fresh); signed in by the login proxy: only the server admin (proxy)
@@ -113,15 +121,15 @@ function ocStepUpBack() {
 window.addEventListener('hashchange', ocStepUpBack);
 ocStepUpBack();
 // Administration > Organisation: the instance switch (with the boxes of the organisations I administer)
-const ocAdminHtml = hint => `<h4 id="s-orgenc-h">${tr('Encryption of organisation data')}</h4>
+const ocAdminHtml = (hint, withScope = false) => `<h4 id="s-orgenc-h">${tr('Encryption of organisation data')}</h4>
   ${hint(tr('Bank and tax data, purchase prices, framework contract rates and the files of organisations are stored encrypted with a key per organisation, made from the server key KALMIDO_SECRET_KEY. Switched off, new data is stored unencrypted; encrypted data stays readable.'))}
-  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div>`;  // 2.364.0 C (#3041): no .ocadm: the recovery keys are once, in Organisation > Data above
+  <div id="s-orgenc" aria-labelledby="s-orgenc-h"><div class="muted mhint">${tr('Loading…')}</div></div>${withScope ? ocScopeSlotHtml() : ''}`;  // 2.364.0 C (#3041): no .ocadm: the recovery keys are once, in Organisation > Data above
 async function ocAdminDraw(md) {
   const box = $('#s-orgenc', md); if (!box) return;
   let j, o; try { [j, o] = await Promise.all([api('GET', '/api/admin/orgcrypt'), api('GET', '/api/orgs')]); } catch { box.innerHTML = `<div class="muted mhint">${tr('Only available online.')}</div>`; return; }
   box.innerHTML = j.enabled ? `<div class="featgrid"><label class="wide"><input type="checkbox" id="s-orgenc-on" ${j.org_encrypt ? 'checked' : ''}><span>${tr('Encrypt organisation data')}<small class="muted">${tr('Recommended. Existing data is encrypted in the background.')}</small></span></label></div>`
     : `<div class="shint keep">${ic('alert', 's')} ${esc(tr('Off: the server has no key (KALMIDO_SECRET_KEY). Bank and tax data, purchase prices and files are stored unencrypted, see SELF-HOSTING.md.'))}</div>`;
-  box.insertAdjacentHTML('beforeend', pm_cryptScopeHtml(j.scope));  // 2.46.1 (#1641): what is encrypted, what not
+  ocScopeFill(j.scope);  // 2.46.1 (#1641): what is encrypted, what not; 2.580.0 (#4485): once, folded
   const adm = $('.ocadm', box.parentNode);
   if (adm && j.enabled) { const mine = (o.orgs || []).filter(x => x.role === 'admin'); adm.innerHTML = mine.map(x => `<div class="ocorg">${ocBoxHtml(x, {title: mine.length > 1 ? x.name : ''})}</div>`).join(''); ocDraw(adm); }  // 2.46.0 (#1563): one heading (the organisation's name only with several)
   if (!box._ocWired) {
