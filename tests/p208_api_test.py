@@ -196,7 +196,8 @@ long_ = [c for c in cm if c.get("truncated")]
 check(len(long_) == 1 and len(long_[0]["text"]) == 2000, "a text over 2,000 characters is cut and marked")
 check(cm and set(cm[0]) >= {"id", "author", "text", "created_at", "edited_at", "attachments"} and cm[0]["author"] == {"id": 1, "name": "Alice", "agent": False},
       f"comment shape: {cm[0] if cm else None}")
-check(d.get("list", {}).get("sections") == [{"id": S1, "name": "Ideas"}, {"id": S2, "name": "Doing"}] and d["list"].get("agent_tidy") == "off",
+# 2.577.0 (#3354): every section carries its column meaning section_kind (None = none)
+check(d.get("list", {}).get("sections") == [{"id": S1, "name": "Ideas", "section_kind": None}, {"id": S2, "name": "Doing", "section_kind": None}] and d["list"].get("agent_tidy") == "off",
       f"list with sections + agent_tidy: {d.get('list')}")
 check(d.get("comment", {}).get("text", "").startswith("@Claude"), "the triggering comment stays in data.comment")
 # assigned
@@ -228,7 +229,7 @@ Q = A.post(B + "/api/tasks", json={"title": "For the agent", "list_id": PART, "s
 A.post(B + "/api/tasks", json={"title": "Not for it", "list_id": PART, "section_id": P2})
 A.post(B + f"/api/tasks/{Q}/comments", json={"body": "context"})
 ev, cur7 = events(cur6, {"assigned"})
-check(ev and ev[-1]["data"]["list"]["sections"] == [{"id": P1, "name": "Mine"}] and ev[-1]["data"]["task"]["comments"] == [],
+check(ev and ev[-1]["data"]["list"]["sections"] == [{"id": P1, "name": "Mine", "section_kind": None}] and ev[-1]["data"]["task"]["comments"] == [],
       f"participant: only the section with its task: {ev[-1]['data']['list'] if ev else None}")
 A.patch(B + f"/api/tasks/{Q}", json={"assignee_id": None})
 ev, _ = events(cur7, {"unassigned"})
@@ -236,12 +237,12 @@ check(ev and "comments" not in ev[0]["data"]["task"] and "sections" not in ev[0]
 
 # ================================================================== #333 GET /api/v1/lists with sections, compact tasks
 ls = {x["id"]: x for x in cl.get("/lists").json()["data"]}
-check(ls[PROJ]["sections"] == [{"id": S1, "name": "Ideas"}, {"id": S2, "name": "Doing"}] and ls[PROJ]["agent_tidy"] == "suggest", "list_lists: sections + tidy")
+check(ls[PROJ]["sections"] == [{"id": S1, "name": "Ideas", "section_kind": None}, {"id": S2, "name": "Doing", "section_kind": None}] and ls[PROJ]["agent_tidy"] == "suggest", "list_lists: sections + tidy")
 check(ls[PART]["sections"] == [], f"participant list without its task: no sections: {ls[PART]['sections']}")
 tok = A.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read"]}).json()["token"]
 me = Api(tok)
 ul = me.get("/lists").json()["data"]
-check(all(isinstance(x.get("sections"), list) for x in ul) and next(x for x in ul if x["id"] == PART)["sections"] == [{"id": P1, "name": "Mine"}, {"id": P2, "name": "Others"}],
+check(all(isinstance(x.get("sections"), list) for x in ul) and next(x for x in ul if x["id"] == PART)["sections"] == [{"id": P1, "name": "Mine", "section_kind": None}, {"id": P2, "name": "Others", "section_kind": None}],
       "a person's lists: every list with its sections")
 full = me.get("/tasks", params={"list_id": PROJ}).json()["data"]
 comp = me.get("/tasks", params={"list_id": PROJ, "fields": "compact"}).json()["data"]
