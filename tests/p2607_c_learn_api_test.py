@@ -20,8 +20,9 @@ from kt import B, check, dbx, done, fresh, sess, setup, until
 DATA = sys.argv[1]
 fresh()
 A = setup()
-A.post(B + "/api/admin/setup", json={"org_name": "Alpha", "lang": "en", "collab_all": True})
-ORG = A.get(B + "/api/state").json()["me"]["workspaces"][0]["id"]
+r = A.post(B + "/api/orgs", json={"name": "Alpha"})
+assert r.ok, r.text
+ORG = r.json()["id"]
 uid = {"alice": 1}
 for u, orgs in (("bob", [ORG]), ("carol", [])):
     r = A.post(B + "/api/users", json={"orgs": orgs, "username": u, "display_name": u.title(), "password": "password123", "email": f"{u}@example.com"})
