@@ -16626,6 +16626,8 @@
   "Align right": "Rechtsbündig",
   "Merged": "Verbunden",
   "Format": "Format",
+  "Drag to fill": "Ziehen zum Ausfüllen",
+  "{0} cell filled": ["{0} Zelle ausgefüllt", "{0} Zellen ausgefüllt"],
   "SUMIFS(sum range; range 1; criterion 1; ...): sum of the values whose row meets every criterion": "SUMMEWENNS(Summenbereich; Bereich 1; Kriterium 1; ...): Summe der Werte, deren Zeile jedes Kriterium erfüllt",
   "COUNTIFS(range 1; criterion 1; ...): number of rows that meet every criterion": "ZÄHLENWENNS(Bereich 1; Kriterium 1; ...): Anzahl der Zeilen, die jedes Kriterium erfüllen",
   "AVERAGEIF(range; criterion; [average range]): average of the values whose cell meets the criterion": "MITTELWERTWENN(Bereich; Kriterium; [Mittelwertbereich]): Mittelwert der Werte, deren Zelle das Kriterium erfüllt",

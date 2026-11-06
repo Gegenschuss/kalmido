@@ -129,6 +129,7 @@ function shfm_sync() {
     x.disabled = !SHV.cur && k !== 'rules';
   });
   const ink = bar.querySelector('.shfm-ink'); if (ink) ink.className = 'shfm-ink' + (f.color ? ' shfm-c-' + f.color : '');
+  if (typeof shfl_place === 'function') shfl_place();  // the fill handle at the choice's corner (sheetfill.js)
 }
 
 // ---- writing: one step for the chosen cells

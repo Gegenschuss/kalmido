@@ -16626,6 +16626,8 @@
   "Align right": "Rechts uitlijnen",
   "Merged": "Samengevoegd",
   "Format": "Opmaak",
+  "Drag to fill": "Sleep om te vullen",
+  "{0} cell filled": ["{0} cel gevuld", "{0} cellen gevuld"],
   "SUMIFS(sum range; range 1; criterion 1; ...): sum of the values whose row meets every criterion": "SUMIFS(sombereik; bereik 1; criterium 1; ...): som van de waarden waarvan de rij aan elk criterium voldoet",
   "COUNTIFS(range 1; criterion 1; ...): number of rows that meet every criterion": "COUNTIFS(bereik 1; criterium 1; ...): aantal rijen dat aan elk criterium voldoet",
   "AVERAGEIF(range; criterion; [average range]): average of the values whose cell meets the criterion": "AVERAGEIF(bereik; criterium; [gemiddeldebereik]): gemiddelde van de waarden waarvan de cel aan het criterium voldoet",

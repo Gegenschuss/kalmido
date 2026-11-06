@@ -16626,6 +16626,8 @@
   "Align right": "Alinear a la derecha",
   "Merged": "Combinadas",
   "Format": "Formato",
+  "Drag to fill": "Arrastra para rellenar",
+  "{0} cell filled": ["{0} celda rellenada", "{0} celdas rellenadas"],
   "SUMIFS(sum range; range 1; criterion 1; ...): sum of the values whose row meets every criterion": "SUMIFS(rango de suma; rango 1; criterio 1; ...): suma de los valores cuya fila cumple todos los criterios",
   "COUNTIFS(range 1; criterion 1; ...): number of rows that meet every criterion": "COUNTIFS(rango 1; criterio 1; ...): número de filas que cumplen todos los criterios",
   "AVERAGEIF(range; criterion; [average range]): average of the values whose cell meets the criterion": "AVERAGEIF(rango; criterio; [rango promedio]): promedio de los valores cuya celda cumple el criterio",
