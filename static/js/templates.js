@@ -9,7 +9,10 @@ const tplOf = kind => (S.templates || []).filter(x => x.kind === kind);
 async function saveTemplate(src, def) {
   const name = await askPrompt(tr('Template name'), def || '', {ok: tr('Save as template')});
   if (name === null) return;
-  let j; try { j = await api('POST', '/api/templates', {...src, name: name.trim()}); } catch { return; }
+  // 2.609.0 (#3373): from a project of an organisation I administer: for the whole organisation, or as my own (logged)
+  const oid = listById(src.list_id || taskById(src.task_id)?.list_id)?.org_id, space = oid && tpl_adminOrgs().includes(oid)
+    && await askConfirm(tr('Save the template for the organisation?'), tr('Every member of “{0}” finds it under “From template”; its admins change it.', wsName('org:' + oid)), {ok: tr('For the organisation'), cancel: tr('Only for me')}) ? 'org:' + oid : undefined;
+  let j; try { j = await api('POST', '/api/templates', {...src, name: name.trim(), ...(space ? {space} : {})}); } catch { return; }
   await load(); render(); toast(tr('Saved as template')); tpl_skipped(j);
 }
 // 2.363.3 (#3134): files that could not be copied (storage full, infected, encrypted in the browser) are named, never lost silently
@@ -87,10 +90,10 @@ function listDuplicate(id) {
   $('#ld-name', md).addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go_(); } });
   if (!isTouch()) setTimeout(() => { const n = $('#ld-name', md); n.focus(); n.select(); }, 50);
 }
-function templateMenu(anchor, kind) {
+function templateMenu(anchor, kind) {  // 2.609.0 (#3373): a template of an organisation names it
   const ts = tplOf(kind);
   if (!ts.length) { toast(kind === 'list' ? tr('No project templates yet: project dialog > Save as template') : tr('No task templates yet: task menu > Save as template')); return; }
-  menu(anchor, [...ts.map(tp => ({label: tp.name, icon: kind === 'list' ? 'list' : 'copy', fn: () => useTemplate(tp)})), '-', {label: tr('Manage templates'), icon: 'edit', fn: () => settingsModal('templates')}]);
+  menu(anchor, [...ts.map(tp => ({label: tp.name + (tp.org_id ? ' · ' + wsName('org:' + tp.org_id) : ''), icon: kind === 'list' ? 'list' : 'copy', fn: () => useTemplate(tp)})), '-', {label: tr('Manage templates'), icon: 'edit', fn: () => settingsModal('templates')}]);
 }
 // outline editor: one task per line, two spaces = one level deeper, "# Name" = section (list templates).
 // Lines that keep their title keep their dates, priority, notes etc.
@@ -168,15 +171,9 @@ function templateModal(tp, done) {
   });
   if (!isTouch()) setTimeout(() => $('#tp-name', md).focus(), 50);  // 2.13.0: no keyboard popping up on touch
 }
-async function templatesDraw(md) {
-  const box = $('#s-tpls', md); if (!box) return;
-  let ts;
-  try { ts = (await api('GET', '/api/templates')).templates; } catch { box.innerHTML = `<div class="muted mhint">${tr('Templates are only available online.')}</div>`; return; }
-  box._t = ts;
-  box.innerHTML = ts.map(tp => `<div class="mrow" data-tpl="${tp.id}"><span class="tplic">${ic(tp.kind === 'list' ? 'list' : 'copy', 's')}</span><span class="n">${esc(tp.name)} <span class="muted">${tp.kind === 'list' ? (tp.data?.rel ? tr('Project') : tr('Project')) : tr('Task')} · ${trn('{0} task', '{0} tasks', tp.count)}</span></span><button class="iconbtn" data-tpl-use title="${tr('Use template')}">${ic('plus', 's')}</button><button class="iconbtn" data-tpl-edit title="${tr('Edit template')}">${ic('edit', 's')}</button></div>`).join('')
-    || `<div class="muted mhint">${tr('No templates yet. Save one from a task menu (…) or the project dialog: “Save as template”.')}</div>`;
-}
-
+// 2.609.0 (#3373): the organisations I administer (their templates are mine to manage)
+const tpl_adminOrgs = () => (S.me?.workspaces || []).filter(o => o.role === 'admin').map(o => o.id);
+// tpl_spaceMenu and templatesDraw (Settings > Data > Templates): settings.js (on demand with the dialog, start budget #4198)
 // ------------------------------------------------------------------ statistics (module "stats")
 // Numbers come from GET /api/stats (per user, last 12 weeks; definitions there), habit rates and streaks
 // from the habit history the client already has (same numbers as in the habit dialog). Charts are inline

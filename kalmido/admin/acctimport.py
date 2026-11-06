@@ -512,6 +512,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/notepads.json", N_("Notepads")), ("time_entries.json", N_("Time entries")),
     ("tasks/encrypted_notes.json", N_("Encrypted notes")), ("tasks/locked_notes.json", N_("Encrypted notes")),
     ("portal/", N_("Client reports")),  # 2.81.0 (#1866)
+    ("lists/ticket_types.json", N_("Ticket types")),  # 2.609.0 (#3372): own ticket types stay with the organisation
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
     ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
     ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),

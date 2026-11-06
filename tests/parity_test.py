@@ -248,6 +248,10 @@ APP_TO_API = {
     "GET /api/list-files/{}/preview": ["GET /lists/{}/files/{}"],
     # 2.48.0 (#1111): documents (agents read / set the fields of documents shared with them)
     "GET /api/docs": ["GET /documents"], "GET /api/docs/{}": ["GET /documents/{}"], "PATCH /api/docs/{}": ["PATCH /documents/{}"],
+    # 2.609.0 (#3372): own ticket types (people manage them in the app or with their own token; agents read)
+    "GET /api/ticket-types": ["GET /ticket-types"], "POST /api/ticket-types": ["POST /ticket-types"],
+    "PATCH /api/ticket-types/{}": ["PATCH /ticket-types/{}"], "DELETE /api/ticket-types/{}": ["DELETE /ticket-types/{}"],
+    "GET /api/lists/{}/ticket-types": ["GET /lists/{}/ticket-types"],
     # 2.60.0 (#343): sprints -- agents read the sprints of a shared list and put tasks into one (or back to the backlog)
     "GET /api/lists/{}/sprints": ["GET /lists/{}/sprints"], "GET /api/sprints/{}": ["GET /sprints/{}"],
     "POST /api/lists/{}/sprints/assign": ["POST /lists/{}/sprints/assign"],
@@ -781,6 +785,11 @@ APP_ONLY = [
     # 2.156.0 C (#2073): section templates are a person's shortcut in the app; agents create sections directly (sections API)
     ("2.156.0 (#2073): section templates (save a list's section names, add the missing ones to another list) are for people in the "
      "app; agents create and order sections with the sections tools", ("* /api/section-templates", "=POST /api/lists/{}/sections/from-template")),
+    # 2.609.0 (#3373): the fields and labels of an organisation are managed by its admins in the app; agents read the linked
+    # fields (key, required) in the list object and filter with fkey_<key>, and use the labels as project tags
+    ("2.609.0 (#3373): the field schema and the labels of an organisation are managed by its admins in the app; agents read the "
+     "linked fields in the list object (key, required), filter with fkey_<key> and set the labels as project tags",
+     ("* /api/org-fields", "* /api/org-labels", "=GET /api/lists/{}/org-fields", "=PUT /api/lists/{}/org-fields/{}")),
     # 2.89.0 (#1916, D): tables step 2 -- only a person by button (no approval pattern for agents in the agent API)
     ("2.89.0 (#1916, D): carrying table rows over into tasks / a quotation draft and a list as rows are a person's button press "
      "(each one undo step); agents work inside a sheet through the table tools and create tasks / office drafts their own ways",
@@ -891,6 +900,7 @@ def sample(schema):
 
 
 TOOL_VARIANTS = {  # extra arguments that reach other routes of the same tool
+    "list_ticket_types": [{"list_id": 1}],  # 2.609.0 (#3372): the keys one project offers
     "list_files": [{"folder_id": 1}], "read_file": [{"as": "base64"}], "write_file": [{"file_id": 1}],  # 2.48.0 (#1207)
     "get_attachment": [{"source": "chat"}, {"source": "project", "list_id": 1}, {"source": "team"}],  # 2.113.1 (#2059): team
     "react": [{"remove": True}],
@@ -920,6 +930,10 @@ for name, _, schema, fn in mcp.TOOLS:
             check(False, f"tool {name} {extra}: {e.message}")
 reached = {c for s in CALLS.values() for c in s}
 API_ONLY = {  # REST routes on purpose without an MCP tool (reason)
+    # 2.609.0 (#3372): agents read ticket types (list_ticket_types); managing them is a person's (app or own token)
+    "POST /ticket-types": "2.609.0 (#3372): agents only read ticket types; people manage them",
+    "PATCH /ticket-types/{}": "2.609.0 (#3372): agents only read ticket types; people manage them",
+    "DELETE /ticket-types/{}": "2.609.0 (#3372): agents only read ticket types; people manage them",
     "GET /tasks/{}/decisions": "2.392.0 C (#3370): get_task carries them",
     "GET /office/docs/{}/pdf": "2.51.0 (#1348): the PDF preview of a draft is binary; the chat card (notify) links it for the person",
     "GET /office/letters/{}": "2.153.0 (#2031): list_letter_drafts returns the agent's letters with every field; one letter by id is for scripts",

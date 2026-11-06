@@ -618,7 +618,7 @@ function fieldEditor(f, t, ro) {
     case 'url': c = `<span class="cfurl"><input id="${id}" type="url" inputmode="url" data-cf="${f.id}" value="${esc(v)}" placeholder="https://…" ${ro ? 'readonly' : ''}>${v ? flkLink(v, 'iconbtn', ic(flkIs(v) ? 'folder' : 'link', 's'), true) : ''}</span>`; break;
     default: c = `<input id="${id}" data-cf="${f.id}" value="${esc(v)}" maxlength="1000" ${ro ? 'readonly' : ''} placeholder="–">`;
   }
-  return `<label for="${id}" title="${esc(ftLabel(f.type))}">${esc(f.name)}</label>${c}` + (cfst_on(f) ? cfstWide(f, t) : '');  // 2.410.0 A (#3514)
+  return `<label for="${id}" title="${esc(ftLabel(f.type) + (f.required ? ' · ' + tr('Required') : ''))}">${esc(f.name)}${f.required ? '<span class="cfreq" aria-hidden="true"> *</span>' : ''}</label>${c}` + (cfst_on(f) ? cfstWide(f, t) : '');  // 2.410.0 A (#3514); 2.609.0 (#3373): required
 }
 // typed number -> "1234.5" (German "1.234,5" / "12,5", English "1,234.5"); 2.263.0 (#2976): through parseNum (core.js), the
 // decimal sign of every language (French "12,5" was 125); no number = the text as typed (the server says "number expected")
@@ -682,9 +682,9 @@ async function fdReal(fid) {
   if (FD_REAL.has(fid)) return FD_REAL.get(fid);
   return FD_TMP.has(fid) ? await FD_TMP.get(fid) : null;
 }
-const fdDef = j => ({id: j.id, list_id: j.list_id, name: j.name, type: j.type, options: j.options || {}, pinned: j.pinned, sort: j.sort});
+const fdDef = j => ({id: j.id, list_id: j.list_id, name: j.name, type: j.type, options: j.options || {}, pinned: j.pinned, sort: j.sort, required: !!j.required, org_field_id: j.org_field_id || null});  // 2.609.0 (#3373): + required, org_field_id
 // what POST /api/lists/{lid}/fields needs to make the field f again (undo of a delete, redo of an add)
-const fdBody = f => ({name: f.name, type: f.type, pinned: !!f.pinned, options: JSON.parse(JSON.stringify(f.options || {})), ...(f.type === 'formula' ? {formula: f.options?.formula || ''} : {})});
+const fdBody = f => ({name: f.name, type: f.type, pinned: !!f.pinned, ...(f.required ? {required: true} : {}), options: JSON.parse(JSON.stringify(f.options || {})), ...(f.type === 'formula' ? {formula: f.options?.formula || ''} : {})});
 function fdCreate(lid, body, done) {
   const tmp = -1e9 - (++fdSeq), k = 'f:' + tmp;
   const nf = {id: tmp, list_id: lid, name: body.name, type: body.type, options: JSON.parse(JSON.stringify(body.options || {})), pinned: body.pinned ? 1 : 0, sort: Math.max(0, ...fieldsAll(lid).map(x => +x.sort || 0)) + 1};
@@ -717,8 +717,11 @@ function fdCreate(lid, body, done) {
   return pr;
 }
 function fdEdit(f, body, done) {
-  const old = {name: f.name, options: JSON.parse(JSON.stringify(f.options || {})), pinned: f.pinned};
-  const vals = {name: body.name, pinned: body.pinned ? 1 : 0, ...(f.type === 'formula' ? {} : {options: JSON.parse(JSON.stringify(body.options || {}))})};  // a formula's options the server works out
+  const old = {name: f.name, options: JSON.parse(JSON.stringify(f.options || {})), pinned: f.pinned, required: !!f.required};
+  // 2.609.0 (#3373): a field linked to the organisation's schema sends only pinned / required (name and options stay the schema's)
+  const own = 'name' in body;
+  const vals = {...(own ? {name: body.name} : {}), pinned: body.pinned ? 1 : 0, ...('required' in body ? {required: !!body.required} : {}),
+    ...(f.type === 'formula' || !own ? {} : {options: JSON.parse(JSON.stringify(body.options || {}))})};  // a formula's options the server works out
   // 2.564.0 (#4701): the options seen go along (_prev): a list another admin changed meanwhile answers 409 with the current field
   const sel = (f.type === 'select' || f.type === 'multiselect') && body.options, seen = sel ? JSON.parse(JSON.stringify(f.options?.options || [])) : null;
   const pr = optWrite(optSet(() => fieldById(f.id), vals), () => api('PATCH', '/api/fields/' + f.id, sel ? {...body, _prev: {options: seen}} : body));
@@ -735,7 +738,8 @@ function fdEdit(f, body, done) {
     }
     if (f.type === 'formula') { try { await load(); } catch { /* offline */ } }  // the computed values
     render(); done?.(fieldById(f.id), true);
-    const back = {name: old.name, pinned: !!old.pinned, options: old.options, ...(f.type === 'formula' ? {formula: old.options.formula || ''} : {})};
+    const back = own ? {name: old.name, pinned: !!old.pinned, options: old.options, ...(f.type === 'formula' ? {formula: old.options.formula || ''} : {})} : {pinned: !!old.pinned};
+    if ('required' in body) back.required = old.required;
     const now = sel ? JSON.parse(JSON.stringify(x?.options?.options || [])) : null;  // what the server stored (undo / redo say what they saw)
     const go = (b, p) => async () => { await api('PATCH', '/api/fields/' + f.id, sel ? {...b, _prev: {options: p}} : b); return {}; };
     histAdd({label: tr('Edit field') + ': ' + qn(old.name), lids: [f.list_id], undo: go(back, now), redo: go(body, seen)});
@@ -775,13 +779,17 @@ function fdDelete(f, done) {
   }, () => done?.(fieldById(f.id), true));
   return pr;
 }
-function fieldModal(lid, f, done) {
-  const edit = !!f, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}])), stages: !!f?.options?.stages};  // 2.410.0 A (#3514): + stages
+// 2.609.0 (#3373): ep = the routes of a field of the organisation's schema {post, one: id => url, noType: [types]} instead of
+// the list's; a field linked to the schema (f.org_field_id) keeps its name and options here (pinned / required only)
+function fieldModal(lid, f, done, ep) {
+  const edit = !!f, linked = !ep && !!f?.org_field_id, st = {type: f?.type || 'text', opts: JSON.parse(JSON.stringify(f?.options?.options || [{id: '', name: '', color: LCOLORS[1]}])), stages: !!f?.options?.stages};  // 2.410.0 A (#3514): + stages
   const md = modal(`<h3>${edit ? tr('Edit field') : tr('New field')}</h3>
-    <div class="row"><label for="fd-name">${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}"></div>
-    <div class="row"><label for="fd-type">${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
-    <div id="fd-extra"></div>
-    <div class="row" ${colCfg(lid) ? 'hidden' : ''}><label>${tr('Task rows')}</label><label class="chkl"><input type="checkbox" id="fd-pin" ${f?.pinned ? 'checked' : ''}> ${tr('show in the task row (at most 2 fields)')}</label></div>
+    ${linked ? `<div class="shint keep ofslinked">${esc(tr('This field comes from the organisation: its name and options are changed there, for every project.'))}</div>` : ''}
+    <div class="row"><label for="fd-name">${tr('Name')}</label><input id="fd-name" value="${esc(f?.name || '')}" maxlength="60" placeholder="${tr('e.g. Budget, Stage, Client')}" ${linked ? 'readonly' : ''}></div>
+    <div class="row"><label for="fd-type">${tr('Type')}</label><select id="fd-type" ${edit ? 'disabled' : ''}>${FTYPES.filter(([k]) => !ep?.noType?.includes(k)).map(([k, n]) => `<option value="${k}" ${st.type === k ? 'selected' : ''}>${tr(n)}</option>`).join('')}</select></div>
+    <div id="fd-extra" ${linked ? 'hidden' : ''}></div>
+    <div class="row" id="fd-reqrow" ${ep || ['formula', 'checkbox'].includes(st.type) ? 'hidden' : ''}><label>${tr('Required')}</label><label class="chkl"><input type="checkbox" id="fd-req" ${f?.required ? 'checked' : ''}> ${tr('a new task needs a value')}</label></div>
+    <div class="row" ${colCfg(lid) || ep ? 'hidden' : ''}><label>${tr('Task rows')}</label><label class="chkl"><input type="checkbox" id="fd-pin" ${f?.pinned ? 'checked' : ''}> ${tr('show in the task row (at most 2 fields)')}</label></div>
     ${colCfg(lid) ? `<div class="shint keep lrcolhint">${tr('Whether the field shows in the task row is set in {0}.', `<button type="button" class="linkbtn" data-m="fd-cols">${esc(tr('Shown fields'))}</button>`)}</div>` : ''}
     <div class="foot">${edit ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const extra = () => {
@@ -795,7 +803,7 @@ function fieldModal(lid, f, done) {
   };
   extra();
   md.addEventListener('change', e => {
-    if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); }
+    if (e.target.id === 'fd-type') { st.type = e.target.value; extra(); const rr = $('#fd-reqrow', md); if (rr) rr.hidden = !!ep || ['formula', 'checkbox'].includes(st.type); }  // 2.609.0 (#3373)
     if (e.target.id === 'fd-stages') { st.stages = e.target.checked; st.pal = null; extra(); $('#fd-stages', md)?.focus(); }  // 2.410.0 A (#3514)
     if (e.target.dataset?.osp !== undefined) st.opts[+e.target.dataset.osp].special = e.target.value;
   });
@@ -813,6 +821,11 @@ function fieldModal(lid, f, done) {
     if ((a === 'del' || a === 'save') && edit && f.id < 0) { await fdReal(f.id); f = fieldById(FD_REAL.get(f.id)) || f; if (f.id < 0) return; }  // 2.554.0 B (#4658): a field still on its way: its real id first
     if (a === 'del') {
       // 2.40.0 (#1192): the server counts every task with a value (also those not loaded here); the local count if offline
+      if (ep) {  // 2.609.0 (#3373): the projects keep their linked fields as plain ones
+        if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Projects that use it keep it as their own field, with its values.'), {ok: tr('Delete'), danger: true})) return;
+        try { await api('DELETE', ep.one(f.id)); } catch { return; }
+        md.remove(); done && done(); return;
+      }
       const fc = await api('GET', `/api/fields/${f.id}/count`).catch(() => null), n = fc ? fc.tasks : [...S.tasks.values()].filter(t => t.fields?.[f.id] != null).length;  // 2.552.0 (#4561 B12): + moved
       if (!await askConfirm(tr('Delete the field “{0}”?', f.name), tr('Its values are deleted in all tasks.') + (n ? ' ' + trn('({0} task with a value)', '({0} tasks with a value)', n) : '') + fdMovedWarn(fc) + fxUsedWarn(f.id), {ok: tr('Delete'), danger: true})) return;
       md.remove(); fdDelete(f, done); return;  // 2.554.0 B (#4658): gone at once, the server follows (fdDelete)
@@ -820,8 +833,12 @@ function fieldModal(lid, f, done) {
     if (a === 'save') {
       const name = $('#fd-name', md).value.trim(); if (!name) { need($('#fd-name', md)); return; }
       const options = st.type === 'number' ? {unit: $('#fd-unit', md).value.trim()} : st.type === 'select' || st.type === 'multiselect' ? {options: st.opts.filter(o => o.name.trim()), ...(st.type === 'select' ? {stages: st.stages} : {})} : cfkModalOpts(md, st.type);  // 2.156.0 B (#2069)
-      const body = {name, options, pinned: $('#fd-pin', md).checked};
+      let body = {name, options, pinned: $('#fd-pin', md).checked};
       if (st.type === 'formula') Object.assign(body, fxModalBody(md));  // 2.43.0 (#1328): the server checks it (position / field name)
+      if (!ep && !['formula', 'checkbox'].includes(st.type)) body.required = $('#fd-req', md).checked;  // 2.609.0 (#3373)
+      if (linked) body = {pinned: body.pinned, required: body.required};
+      if (ep) { delete body.pinned; if (!edit) Object.assign(body, ep.extra || {}); }
+      if (ep) { try { await api(edit ? 'PATCH' : 'POST', edit ? ep.one(f.id) : ep.post, edit ? body : {...body, type: st.type}); } catch { return; } md.remove(); done && done(); return; }
       // 2.554.0 B (#4658): the dialog closes and the field shows at once (fdCreate / fdEdit); offline it stays open (fields need the server)
       // what the server would refuse is said here, the dialog stays: a selection without options, a third pinned field, field 21
       if (!OUT.online) { toast(tr('Offline: only works again with a connection')); return; }
@@ -866,7 +883,7 @@ function fieldModal(lid, f, done) {
 }
 function fieldsBox(lid) {
   const fs = fieldsAll(lid);
-  return fs.map((f, i) => `<div class="mrow" data-fid="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(ftLabel(f.type))}</span>
+  return fs.map((f, i) => `<div class="mrow" data-fid="${f.id}">${ic(FT_ICON[f.type] || 'edit', 's')}<span class="n">${esc(f.name)}</span><span class="muted">${esc(ftLabel(f.type))}${f.org_field_id ? ' · ' + esc(tr('linked')) : ''}</span>
     <button class="iconbtn ${f.pinned ? 'on' : ''}" data-fpin="${f.id}" title="${tr('Show in the task rows')}" aria-pressed="${!!f.pinned}">${ic(f.pinned ? 'pinf' : 'pin', 's')}</button>
     <button class="iconbtn" data-fup="${f.id}" title="${tr('move up')}" ${i ? '' : 'disabled'}>${ic('chev', 's up')}</button>
     <button class="iconbtn" data-fedit="${f.id}" title="${tr('Edit')}">${ic('edit', 's')}</button></div>`).join('') +

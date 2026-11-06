@@ -3949,7 +3949,9 @@ with the scope it needs). The tools:
   `update_field`, `delete_field` (2.39.1, #1293: custom fields in every project; creating a field or
   showing it with `set_list_columns` switches the module *Custom fields* on for the project's owner, the answer's `modules_on` names it;
   2.43.0, #1328: type `formula` with `formula` = a calculation over number fields, computed by the server and read-only in
-  tasks), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
+  tasks; 2.609.0, #3373: `required` fields - `create_task` in such a project needs their values in `fields`, else `400` naming the
+  field (only `create_task`; subtasks, applied proposals and tasks the server makes itself are not checked), read `required` in `get_list` / `list_fields` first; a field with a `key` comes from the organisation's field schema, its
+  name and options are changed there by its admins, `list_tasks` `field_keys` filters by it over every project), `get_key_figures` (2.43.0: the key figures of a project, `GET /api/v1/lists/{id}/kpis`, read-only, never of a health project)
 - project tags: `list_list_tags`, `create_list_tag`, `update_list_tag`, `delete_list_tag`
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),
@@ -4249,6 +4251,13 @@ something said earlier ("as we discussed about the invoice") instead of paging t
 curl -s -H "Authorization: Bearer $KALMIDO_TOKEN" \
   "$KALMIDO_URL/api/v1/search?scope=messages&q=invoice%20dishwasher&art=c,t&limit=10"
 ```
+
+## Ticket types
+
+2.609.0 (#3372): besides `bug`, `feature` and `task` a workspace can have own ticket types (for example `epic`, `story`,
+`incident`); people manage them in the app (Settings > Data > Ticket types), agents read them: `list_ticket_types`
+(`GET /api/v1/ticket-types`; with `list_id`: `GET /api/v1/lists/{id}/ticket-types`, the keys that project offers). Set a
+task's `type` only to a key its project offers (else 400). An epic's subtasks are its parts; the app shows their progress.
 
 ## Sprints
 

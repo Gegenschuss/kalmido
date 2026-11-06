@@ -332,7 +332,7 @@ had been made in the app. Webhooks fire too.
 | `POST /tasks/{id}/restore` | delete | 2.15.0: restore a task from the trash (`409` if it is not there) |
 | `GET /tasks/{id}/dependencies` · `POST …` · `DELETE …/{blocker_id}` | read · tasks:write | 2.15.0: `blocked_by` / `blocking`; add `{blocked_by}` (both tasks outside the basket, no cycles), remove |
 | `GET /tasks/{id}/relations` · `POST …` · `DELETE …/{other_id}` | read · tasks:write | 2.576.0 (#3371): saved relations `{task_id, relations: [{id, kind, title, status, list_id}], max}`, kind `relates` / `duplicate_of` / `has_duplicate`; add `{other_id, kind: relates \| duplicate, close?}` (write access to the task, the other one visible to you, at most 50; `close: true` with a duplicate also closes the task as won't do with a comment, answer `closed`), remove. Only relations to tasks you see; the task object carries them as `relations` |
-| `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (2.39.1: any list, owner / list admins; switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it: `["fields"]` or `[]`). Values: the task's `fields` |
+| `GET /lists/{id}/fields` · `POST …` | read · structure | 2.15.0: custom field definitions; create `{name, type, options?, pinned?}` (2.39.1: any list, owner / list admins; switches the module *Custom fields* on for the list's owner, the answer's `modules_on` names it: `["fields"]` or `[]`). Values: the task's `fields`. 2.609.0 (#3373): `required` (boolean, create and `PATCH /fields/{id}`; not for checkbox / formula): a new top-level task of the project created in the app or with `POST /tasks` (also through MCP) needs a value, else `400` naming the field; tasks the server makes itself (calendar sync, a chat saved as a task, an event's preparation task, milestones, incoming webhooks, templates, copies, repeats, applied agent proposals) are not checked; an existing task only when the value is cleared, completing never checks it. A field with `org_field_id` is linked to the organisation's field schema (managed by its admins in the app; without an organisation: the person's own field templates): its `name` and `options` change only there (`409` here), `pinned`, `sort` and `required` stay the project's; the list object's `fields` carry `key` and `required` |
 | Field types | structure | `text`, `number`, `select`, `date`, `checkbox`, `person`, `url`, `formula`; 2.156.0 B (#2069): `multiselect` (`options.options` like `select`; value = option ids joined by `,`, a list is accepted; a removed option leaves the values), `currency` (`options.currency`, ISO code, default `EUR`; value like a number), `rating` (`options.max` 3-10, default 5; value `"1"`..max, `0` / `null` clears), `task` (value = the id of a task you may see, else `400`; the web app shows its title only to people who may see that task, `GET /api/fields/task-refs?ids=` answers only those; agents read it with `GET /tasks/{id}`). Rules cannot set multiselect or task fields; a customer view never shows task fields. 2.410.0 A (#3514): a `select` with `options.stages: 1` is ordered and shows as a stage bar; an option with `special: "red"` / `"orange"` is a special state (no stage of its own, shown in its signal colour), any other `special` value is `400`; a change that leaves out `stages` / an option's `special` keeps the stored ones |
 | `PATCH /fields/{id}` · `DELETE …` | structure · delete | 2.15.0: change `{name?, options?, pinned?, sort?}` (the type stays); delete with its values (agents: approval) |
 | Formula fields | structure | 2.43.0 (#1328): `type: "formula"` with `formula` (create / change): `+ - * /`, brackets, numbers, `{Field name}` of number, formula or checkbox fields and `round(x, n)` (n 0-6). Stored with field ids (`options.expr`, `{#12}`), shown with today's names (`options.formula`), so renaming a field keeps it working; no field may use itself, circular references -> `400` naming the field, syntax errors -> `400` with the character. The server computes the value into the task's `fields` (as text like a number); empty fields count as 0 (`options.empty: "blank"`: the result stays empty), division by 0 = empty. Writing a formula value -> `400`. 2.156.0 B (#2070): the formula engine of tables: comparisons (`= <> < > <= >=`), `WENN/IF`, `SUMME/SUM`, `RUNDEN/ROUND`, `MIN`, `MAX`, `MITTELWERT/AVERAGE`, `ANZAHL/COUNT` (German and English names, `;` or `,` between arguments), `currency` / `rating` fields as numbers; an unknown function -> `400`; a calculation that fails gives `"#div0"` / `"#type"` in `fields` (empty while none of the fields it reads has a value) |
@@ -367,7 +367,8 @@ had been made in the app. Webhooks fire too.
 (an id or `none`), `sprint_id` (an id, `current` = the active sprint of the task's project, `none` = backlog), `created_by`
 (`me` or a user id), `reviewer` (`me`, `none` or a user id), `review` (`pending`, `approved`, `changes`, `none`),
 `field_<id>=value` (a custom field of a project you see, only its tasks: `select` = option id or name, `text` = contains,
-`number`, `checkbox` `true` / `false`, other types the stored value), `q` (all words in title or notes, each as a word start),
+`number`, `checkbox` `true` / `false`, other types the stored value; 2.609.0: `fkey_<key>=value` = the same over every project
+you see, through the fields linked to a field of the organisation's schema, the list object's `fields` carry `key`), `q` (all words in title or notes, each as a word start),
 `key` (a ticket key `APP-12`, current or old, see [Ticket keys](#ticket-keys)) and `sort` (`priority`, `due`, `created`, `updated`, `title`, `manual`; a leading `-` = descending, tasks without a due date
 stay last; ties by id). A `next_cursor` of a sorted page carries the sort value and the id, so pages stay stable with equal
 values; it only works with the same `sort`. 2.473.0: `delegate` (`me`, `none` or an agent id), `watcher` (`me` or a user id). Tasks carry `delegate_agent_id` (an agent of the
@@ -491,6 +492,24 @@ next one. A task carries `key` (`"APP-12"`, `null` without a key) next to its `i
   issue numbers do not complete tasks by accident.
 - The app shows the key in the task row, in the task's menu (*Copy link*), finds `APP-12` in the search and makes
   `APP-12` in comments a link to the task.
+
+## Ticket types
+
+2.609.0 (#3372): next to the built-in types `bug`, `feature` and `task` a workspace has **own ticket types** (at most 20): an
+organisation's (its admins manage them) or a person's (the private workspace, managed by that person). A type has a `key`
+(what a task's `type` holds, lower case, set once), `name`, `icon`, `color`, a note `template` for new tickets and `enabled`
+(off = kept on the tasks that have it, no longer offered). Epic (`epic`) and story (`story`) come as suggestions that are off
+until someone switches them on.
+
+- `GET /ticket-types` = every own type you can meet (yours, your organisations', the owners' of private projects you see);
+  `?space=private|org:<id>` = the ones of that workspace with their task counts (`tasks`), `can_edit` and the suggestions.
+- `POST /ticket-types` `{space?, name, key?, icon?, color?, template?, enabled?}` (or only `{space?, key: "epic"}` for a
+  suggestion), `PATCH /ticket-types/{id}`, `DELETE /ticket-types/{id}`: tasks of the type answer `409` (`has_tasks`, with
+  their number in `tasks`); again with `?confirm=1` they get no type and the projects forget it as their default / pick.
+  Agents only read (403).
+- A project offers all enabled types of its workspace or the ones it picked (`ttypes` of the list, `PATCH /lists/{id}`
+  in the app): `GET /lists/{id}/ticket-types` -> `{keys}`. A task gets an own type only where its project offers it (else
+  400); a built-in type is always taken. `GET /tasks?type=<key>` filters by an own type too.
 
 ## Notes and team chat
 

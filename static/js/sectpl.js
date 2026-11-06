@@ -4,6 +4,7 @@
    template - private or for an organisation (all its members see it, its creator and the admins change it) - and add a
    template's sections to this list: only the names it lacks are added at the end, nothing is removed or renamed
    (GET / POST /api/section-templates, PATCH / DELETE /api/section-templates/<id>, POST /api/lists/<id>/sections/from-template).
+   2.609.0 (#3372): also the project dialog's "Types and templates…" (ticketTplModal, from dialogs.js, start budget #4198).
    Classic script sharing the global scope with the others (load order: index.html, docs/ARCHITECTURE.md). */
 'use strict';
 
@@ -58,4 +59,38 @@ async function sct_open(lid) {
     }
   });
   draw();
+}
+
+// 2.4.0 (#340): the note templates of new bug / feature tickets of a list (empty = the built-in text)
+// 2.609.0 (#3372): + which types the project offers (none ticked = all of its workspace), templates of the own types
+function ticketTplModal(lid) {
+  const l = listById(lid); if (!l) return;
+  let cur = {}; try { cur = JSON.parse(l.ticket_tpl || '{}') || {}; } catch { /* bad json */ }
+  let pick = []; try { pick = JSON.parse(l.ttypes || '[]') || []; } catch { /* bad json */ }
+  const def = {bug: tr('**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n\n**Version / found in**\n'), feature: tr('**Goal**\n\n**Acceptance criteria**\n- [ ] \n')};
+  const own = tty_ofList(lid).filter(r => r.enabled), all = [...TTYPES.map(x => x[0]), ...own.map(r => r.key)];
+  for (const r of own) def[r.key] = r.template || '';
+  const tplKeys = ['bug', 'feature', ...own.map(r => r.key)];
+  /** @type {any} */
+  const md = modal(`<h3>${tr('Ticket types and templates')}</h3>
+    <div class="row"><label>${tr('Offered types')}</label><span class="ttpick">${all.map(k => ttInfo(k, lid)).map(x => `<label class="chkl"><input type="checkbox" data-ttk="${esc(x.key)}" ${pick.includes(x.key) ? 'checked' : ''}> ${ic(x.icon, 's')} ${esc(x.name)}</label>`).join('')}</span></div>
+    <div class="shint">${tr('None ticked = all types of the workspace (own types: Settings > Data > Ticket types).')}</div>
+    <div class="row"><label for="tt-def">${tr('Type of new tasks')}</label><select id="tt-def"><option value="">${tr('No type')}</option>${[...new Set([...all, ...(l.def_ttype ? [l.def_ttype] : [])])].map(k => ttInfo(k, lid)).map(x => `<option value="${esc(x.key)}" ${l.def_ttype === x.key ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+    <div class="shint">${tr('New tickets of this type start with these notes (Markdown) when their notes are empty. Empty = the built-in text.')}</div>
+    ${tplKeys.map(k => ttInfo(k, lid)).map(x => `<div class="row ppcol"><label for="tt-${esc(x.key)}">${ic(x.icon, 's')} ${esc(x.name)}</label><textarea id="tt-${esc(x.key)}" data-tpl="${esc(x.key)}" rows="6" maxlength="5000" placeholder="${esc(def[x.key] || '')}">${esc(cur[x.key] || '')}</textarea></div>`).join('')}
+    <div class="foot"><button class="btn" data-m="reset">${tr('Built-in texts')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+  md.classList.add('ttmodal');
+  md.addEventListener('click', async (/** @type {any} */ e) => {
+    const b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'close') { md.remove(); return; }
+    if (b.dataset.m === 'reset') { $$('[data-tpl]', md).forEach(x => { x.value = ''; }); return; }
+    if (b.dataset.m === 'save') {
+      // 2.46.2 (#1659): at once (optimistic), no reload of the whole state; an error puts the old templates back
+      const tpl = Object.fromEntries($$('[data-tpl]', md).map(x => [x.dataset.tpl, x.value])), dt = $('#tt-def', md).value;  // 2.483.0 (#3916): + the default type
+      const tk = $$('[data-ttk]:checked', md).map(x => x.dataset.ttk);  // 2.609.0 (#3372)
+      // the dialog closes once the server has it: on an error the typed texts are still there
+      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl), def_ttype: dt, ttypes: tk.length ? JSON.stringify(tk) : ''}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl, def_ttype: dt, ttypes: tk}))
+        .then(() => { md.remove(); toast(tr('Saved')); }).catch(() => {});
+    }
+  });
 }

@@ -850,7 +850,7 @@ def v1_field_create(lid):
     """{name, type: text | number | date | select | person | url | checkbox | formula, options?, pinned?, formula?} (owner; 2.39.1: any
     list; 2.43.0 (#1328): formula = the calculation with field names)."""
     v1_args(())
-    b = _v1_body(("name", "type", "options", "pinned", "formula"))
+    b = _v1_body(("name", "type", "options", "pinned", "formula", "required"))  # 2.609.0 (#3373): + required
     return jsonify(v1_call(field_create, lid, body=b)), 201
 
 
@@ -858,7 +858,7 @@ def v1_field_create(lid):
 @v1_view
 def v1_field_update(fid):
     v1_args(())
-    b = _v1_body(("name", "options", "pinned", "sort", "formula"))  # 2.43.0 (#1328): + formula
+    b = _v1_body(("name", "options", "pinned", "sort", "formula", "required"))  # 2.43.0 (#1328): + formula; 2.609.0 (#3373): + required
     return jsonify(v1_call(field_update, fid, body=b))
 
 
@@ -1370,6 +1370,9 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
     schemas["Field"] = {"type": "object", "properties": {"id": {"type": "integer"}, "list_id": {"type": "integer"}, "name": {"type": "string"},
                                                        "type": {"type": "string"}, "options": obj, "pinned": {"type": "integer"},
                                                        "sort": {"type": "number"},
+                                                       "required": {"type": "boolean", "description": "2.609.0 (#3373): a new task needs a value"},
+                                                       "org_field_id": {"type": ["integer", "null"], "description": "2.609.0 (#3373): linked to this field "
+                                                                        "of the organisation's schema (name and options change there)"},
                                                        "modules_on": {"type": "array", "items": {"type": "string"},
                                                                       "description": "2.39.1 (#1293): only when created: the modules switched on for the project's owner"}}}
     schemas["FieldPage"] = page("Field")
@@ -1468,6 +1471,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                     "multiselect = option ids joined by \",\" (a list is accepted too), rating = \"1\"..max (0 / null clears), "
                                     "task = the id of a task you may see (the value is shown to others only when they may see it as well)"},
                            "options": obj, "pinned": {"type": "boolean"},
+                           "required": {"type": "boolean", "description": "2.609.0 (#3373): a new task of the project needs a value (400 naming "
+                                        "the field; not for checkbox / formula); an existing task only when the value is cleared"},
                            "formula": {"type": "string", "maxLength": 500, "description": "2.43.0 (#1328), type formula: + - * / ( ), numbers, "
                                        "{Field name} of number / currency / rating / formula / checkbox fields; 2.156.0 B (#2070): comparisons, "
                                        "WENN/IF, SUMME/SUM, RUNDEN/ROUND, MIN, MAX, MITTELWERT/AVERAGE, ANZAHL/COUNT (\";\" or \",\" between arguments). "
@@ -1477,7 +1482,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "patch": op("Change a custom field (the type stays)", S, ok(ref("Field")) | errs("400", "403", "404"), [pid("id", "Field id")],
                         scope="structure", body={"type": "object", "properties": {"name": {"type": "string"}, "options": obj,
                                                                                   "pinned": {"type": "boolean"}, "sort": {"type": "number"},
-                                                                                  "formula": {"type": "string", "maxLength": 500}}}),
+                                                                                  "formula": {"type": "string", "maxLength": 500},
+                                                                                  "required": {"type": "boolean", "description": "2.609.0 (#3373): see create"}}}),
             "delete": op("Delete a custom field with its values", S, ok(obj) | acc | errs("403", "404"), [pid("id", "Field id")], scope="delete",
                          desc="Agents: waits for approval (202).")},
         "/templates": {

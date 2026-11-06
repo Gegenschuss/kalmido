@@ -823,6 +823,7 @@ function settingsModal(focus) {
       ${feat('videos') ? `<h4 id="s-vext-h">${tr('Videos')}</h4><div class="row">${chk('s-vext', s.video_ext_ok === '1', tr('Load YouTube and Vimeo videos without asking'))}</div>
       ${hint(tr('Off: a video first shows a note and loads the player only after your click. Loading sends data such as your IP address to the provider.'))}` : ''}${''/* 2.623.0 (#4765): only with the module Approval */}
       ${xl_stdHtml(hint)}${''/* 2.470.0 (#3596) */}
+      ${tty_html(hint)}${''/* 2.609.0 (#3372): own ticket types (below) */}
       ${typeof umzHtml === 'function' ? umzHtml(hint) : ''}
       <h4 id="s-tpl-h">${tr('Templates')}</h4>
       ${hint(tr('Private to you. Save from a task’s menu (…) or the project dialog; use via the template button or Projects > +.'))}
@@ -878,6 +879,7 @@ function settingsModal(focus) {
       <div class="spanes">${secs.map(([k]) => `<section class="spane ${k === cur ? '' : 'hidden'}" role="tabpanel" id="sp-${k}" aria-labelledby="st-${k}" data-pane="${k}">${pane[k]}</section>`).join('')}</div></div>`);
   md.classList.add('smodal');
   xl_stdMount(md);  // 2.470.0 (#3596): the sharing defaults of a workspace (ablinks.js)
+  tty_mount(md);  // 2.609.0 (#3372): own ticket types (below)
   $('[data-mv]', md)?.addEventListener('click', () => mvSet(false));  // 2.436.0 (#3620)
   mg_setSync(md);  // 2.171.0 (#2676): an area with only some parts on shows its switch half (indeterminate is no HTML attribute)
   modCountsSync(md);  // 2.364.0 A (#3015): "Switch on all modules" half too
@@ -1184,6 +1186,7 @@ function settingsModal(focus) {
       const tp = ($('#s-tpls', md)._t || []).find(x => x.id === +trw.dataset.tpl); if (!tp) return;
       if ('tplUse' in b.dataset) { md.remove(); useTemplate(tp); }
       if ('tplEdit' in b.dataset) templateModal(tp, () => templatesDraw(md));
+      if ('tplSpace' in b.dataset) tpl_spaceMenu(b, tp, () => templatesDraw(md));  // 2.609.0 (#3373)
       return;
     }
     const a = b.dataset.m;
@@ -1982,3 +1985,91 @@ function mc_editor(ws, cd) {
   setTimeout(() => $('#mced-n', md)?.focus(), 0);
   return md;
 }
+
+// ---- 2.609.0 (#3372) Settings > Data > Ticket types (own ticket types per workspace, ttypes.js has the rest; here since
+// the dialog loads on demand: start budget #4198)
+const TTY_ICONS = ['tsq', 'bug', 'bulb', 'flag', 'book', 'star', 'heart', 'target', 'rocket', 'zap', 'shield', 'bookmark', 'list', 'mindmap'];
+const tty_html = hint => S.me?.kid ? '' : `<h4 id="s-tty-h">${tr('Ticket types')}</h4>${hint(tr('Bug, feature and task are always there. Add own types (at most 20) or switch on epic and story; a project picks which ones it offers (project dialog > Types and templates).'))}<div id="s-tty"></div>`;
+function tty_mount(md) {
+  /** @type {any} */
+  const box = $('#s-tty', md); if (!box) return;
+  box.addEventListener('change', e => tty_change(box, /** @type {any} */ (e.target)));
+  box.addEventListener('click', e => tty_click(box, /** @type {any} */ (e.target)));
+  const w = wsOn() ? wsCur() : 'private';
+  tty_open(box, w === 'all' ? 'private' : w);
+}
+async function tty_open(box, ws) {
+  let j; try { j = await api('GET', `/api/ticket-types?space=${encodeURIComponent(ws)}`); } catch { box.innerHTML = `<p class="muted">${esc(tr('Only available online.'))}</p>`; return; }
+  if (box.isConnected) tty_draw(box, j);
+}
+function tty_draw(box, j) {
+  box._j = j;
+  const dis = j.can_edit ? '' : 'disabled', oid = j.space === 'private' ? '' : j.space.slice(4);
+  const row = t => `<div class="row ttyrow" data-tty="${t.id}">
+      <select data-f="icon" aria-label="${esc(tr('Symbol'))}" ${dis}>${TTY_ICONS.map(i => `<option value="${i}" data-ico="${i}" ${(t.icon || 'tsq') === i ? 'selected' : ''}>${esc(i)}</option>`).join('')}</select>
+      <input data-f="name" value="${esc(t.name)}" maxlength="40" aria-label="${esc(tr('Name'))}" ${dis}>
+      <input data-f="color" type="color" value="${esc(t.color || '#94a3b8')}" aria-label="${esc(tr('Colour'))}" ${dis}>
+      <label class="chkl"><input type="checkbox" data-f="enabled" ${t.enabled ? 'checked' : ''} ${dis}> ${tr('Offered')}</label>
+      <span class="muted">!${esc(t.key)}${t.tasks ? ' · ' + esc(trn('{0} task', '{0} tasks', t.tasks)) : ''}</span>
+      ${j.can_edit ? `<button type="button" class="btn sm" data-tty-tpl="${t.id}">${tr('Template…')}</button><button type="button" class="iconbtn" data-tty-del="${t.id}" aria-label="${esc(tr('Delete'))}" title="${esc(tr('Delete'))}">${ic('trash', 's')}</button>` : ''}</div>`;
+  box.innerHTML = `${wsOn() ? `<div class="row"><label for="s-tty-ws">${tr('Workspace')}</label>${wsSelectHtml('s-tty-ws', oid)}</div>` : ''}
+    <div class="members">${j.types.map(row).join('') || `<div class="muted mhint">${tr('No own ticket types yet.')}</div>`}</div>
+    ${j.can_edit ? `${j.types.length < j.max ? `<div class="row"><input id="s-tty-new" maxlength="40" placeholder="${esc(tr('New type, e.g. Incident'))}" aria-label="${esc(tr('New ticket type'))}"><button type="button" class="btn sm" data-tty-add="1">${tr('Add')}</button></div>
+      ${j.suggestions.length ? `<div class="row"><label>${tr('Suggestions')}</label>${j.suggestions.map(s => `<button type="button" class="btn sm" data-tty-sug="${esc(s.key)}">${ic(s.icon, 's')} ${esc(tr('Switch on {0}', s.name))}</button>`).join('')}</div>` : ''}` : `<div class="shint keep">${tr('At most {0} own ticket types', j.max)}</div>`}`
+      : `<div class="shint keep">${tr('Only an admin of this organisation can change it.')}</div>`}`;
+}
+async function tty_after(box) { await tty_open(box, box._j.space); tty_load(true); }
+async function tty_change(box, el) {
+  if (el.id === 's-tty-ws') { tty_open(box, el.value ? 'org:' + el.value : 'private'); return; }
+  const r = el.closest('[data-tty]'), f = el.dataset.f; if (!r || !f) return;
+  const v = f === 'enabled' ? el.checked : el.value.trim();
+  if (f === 'name' && !v) { tty_draw(box, box._j); return; }
+  try { await api('PATCH', '/api/ticket-types/' + r.dataset.tty, {[f]: v}); } catch { tty_draw(box, box._j); return; }
+  toast(tr('Saved')); tty_after(box);
+}
+async function tty_click(box, el) {
+  const add = el.closest('[data-tty-add]'), sug = el.closest('[data-tty-sug]'), del = el.closest('[data-tty-del]'), tpl = el.closest('[data-tty-tpl]');
+  const space = box._j?.space;
+  if (add) {
+    const n = $('#s-tty-new', box).value.trim(); if (!n) return;
+    try { await api('POST', '/api/ticket-types', {space, name: n}); } catch { return; }
+    tty_after(box);
+  } else if (sug) {
+    try { await api('POST', '/api/ticket-types', {space, key: sug.dataset.ttySug}); } catch { return; }
+    tty_after(box);
+  } else if (del) {
+    const t = box._j.types.find(x => x.id === +del.dataset.ttyDel); if (!t) return;
+    // with tasks of this type: ask first, with their number (they keep no type)
+    const ok = await askConfirm(tr('Delete the ticket type {0}?', t.name), t.tasks ? trn('{0} task will have no type.', '{0} tasks will have no type.', t.tasks) : '', {ok: tr('Delete'), danger: true});
+    if (!ok) return;
+    try { await api('DELETE', `/api/ticket-types/${t.id}${t.tasks ? '?confirm=1' : ''}`); } catch { return; }
+    tty_after(box);
+  } else if (tpl) {
+    const t = box._j.types.find(x => x.id === +tpl.dataset.ttyTpl); if (!t) return;
+    const md = modal(`<h3>${esc(tr('Template of {0}', t.name))}</h3><div class="shint">${tr('New tickets of this type start with these notes (Markdown) when their notes are empty. A project can have its own.')}</div>
+      <div class="row ppcol"><textarea id="tty-tpl" rows="8" maxlength="5000">${esc(t.template || '')}</textarea></div>
+      <div class="foot"><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
+    md.addEventListener('click', async e => {
+      const b = /** @type {any} */ (e.target).closest('[data-m]'); if (!b) return;
+      if (b.dataset.m === 'close') { md.remove(); return; }
+      try { await api('PATCH', '/api/ticket-types/' + t.id, {template: /** @type {any} */ ($('#tty-tpl', /** @type {any} */ (md))).value}); } catch { return; }
+      md.remove(); toast(tr('Saved')); tty_after(box);
+    });
+  }
+}
+
+// ---- Settings > Data > Templates (from templates.js, start budget #4198): 2.609.0 (#3373) who sees a template, the list
+function tpl_spaceMenu(anchor, tp, done) {
+  const set = async space => { try { await api('PATCH', '/api/templates/' + tp.id, {space}); } catch { return; } await load(); render(); done && done(); };
+  menu(anchor, [{label: tr('Only for me'), icon: tp.org_id ? 'user' : 'check', fn: () => set('private')},
+    ...tpl_adminOrgs().map(oid => ({label: wsName('org:' + oid), icon: tp.org_id === oid ? 'check' : 'users', fn: () => set('org:' + oid)}))]);
+}
+async function templatesDraw(md) {
+  const box = $('#s-tpls', md); if (!box) return;
+  let ts;
+  try { ts = (await api('GET', '/api/templates')).templates; } catch { box.innerHTML = `<div class="muted mhint">${tr('Templates are only available online.')}</div>`; return; }
+  box._t = ts;
+  box.innerHTML = ts.map(tp => `<div class="mrow" data-tpl="${tp.id}"><span class="tplic">${ic(tp.kind === 'list' ? 'list' : 'copy', 's')}</span><span class="n">${esc(tp.name)} <span class="muted">${tp.kind === 'list' ? (tp.data?.rel ? tr('Project') : tr('Project')) : tr('Task')} · ${trn('{0} task', '{0} tasks', tp.count)}${tp.org_id ? ' · ' + esc(wsName('org:' + tp.org_id)) : ''}</span></span><button class="iconbtn" data-tpl-use title="${tr('Use template')}">${ic('plus', 's')}</button>${tp.can_edit !== false ? `${tpl_adminOrgs().length ? `<button class="iconbtn" data-tpl-space title="${esc(tr('Who sees the template'))}">${ic('users', 's')}</button>` : ''}<button class="iconbtn" data-tpl-edit title="${tr('Edit template')}">${ic('edit', 's')}</button>` : ''}</div>`).join('')
+    || `<div class="muted mhint">${tr('No templates yet. Save one from a task menu (…) or the project dialog: “Save as template”.')}</div>`;
+}
+

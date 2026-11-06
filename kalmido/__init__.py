@@ -132,6 +132,8 @@ ORDER = (
     "lists.envs",  # 2.60.0 D (#1514)
     "lists.formula",  # 2.43.0 (#1328): the formula parser (no routes; used by lists.fields)
     "lists.fields",
+    "lists.orgfields",  # 2.609.0 (#3373): the field schema of an organisation (linked custom fields)
+    "lists.orglabels",  # 2.609.0 (#3373): labels of an organisation (linked project tags)
     "personal.stats",
     "calendars.icalfeed",
     "calendars.caldav",
@@ -440,6 +442,7 @@ ORDER = (
     "team.approvals",
     "tasks.review",  # 2.60.0 C (#1512): review step (reviewer, gate, list setting, API v1)
     "tasks.ticketkey",  # 2.390.0 (#3353): ticket keys APP-123 (no routes)
+    "tasks.ttypes",  # 2.609.0 (#3372): own ticket types per workspace (epic, story, ...), API v1
     "team.forms",
     "team.formq",  # 2.98.0 B (#1954): questionnaires (own questions in forms, answers become a task at the customer)
     "team.portal",  # 2.63.0 (#1513): customer reports (status link) and the customer portal

@@ -75,6 +75,8 @@ KINDS = {
                  "private workspace and the personal office of a person without an organisation"),  # 2.173.0 A (#2680)
     "reading": ("matrix", "p2172_b_reading_scope_test.py: feeds and read later (2.172.0) in the private workspace of a person without an organisation"),  # 2.172.0 B (#2677 #2679)
     "sectpl": ("matrix", "p2156_c_api_test.py: own section templates (save from a list, add to another, change, delete) of a person without an organisation"),  # 2.156.0 C (#2073)
+    "orgschema": ("matrix", "p2609_c_schema_api_test.py: own field templates linked into her projects, the key filter, required fields, own "
+                  "templates of a person without an organisation; no organisation space, no organisation labels"),  # 2.609.0 (#3373)
     "polls": ("matrix", "p298_a_api_test.py, p2484_a_polls_v1_test.py: scheduling polls (2.98.0) in the private workspace of a person without an organisation; 2.484.0: her personal agent over REST v1"),  # 2.98.0 A (#1953)
     # 2.138.0 (#1972): the recovery key of the own personal office (organisation id 0 in the route)
     "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
@@ -247,6 +249,16 @@ ROUTES = {
     # 2.156.0 C (#2073): section templates (p2156_c_api_test.py)
     "GET /api/section-templates": "sectpl", "POST /api/section-templates": "sectpl", "PATCH /api/section-templates/{}": "sectpl",
     "DELETE /api/section-templates/{}": "sectpl", "POST /api/lists/{}/sections/from-template": "sectpl",
+    # 2.609.0 (#3372): own ticket types of the private workspace (p2609_c_ttypes_api_test.py, freelancer-matrix: tasks)
+    "GET /api/ticket-types": "tasks", "POST /api/ticket-types": "tasks", "PATCH /api/ticket-types/{}": "tasks",
+    "DELETE /api/ticket-types/{}": "tasks", "GET /api/lists/{}/ticket-types": "tasks",
+    "GET /api/v1/ticket-types": "tasks", "POST /api/v1/ticket-types": "tasks", "PATCH /api/v1/ticket-types/{}": "tasks",
+    "DELETE /api/v1/ticket-types/{}": "tasks", "GET /api/v1/lists/{}/ticket-types": "tasks",
+    # 2.609.0 (#3373): fields, labels of an organisation / a person's own field templates (p2609_c_schema_api_test.py)
+    "GET /api/org-fields": "orgschema", "POST /api/org-fields": "orgschema", "PATCH /api/org-fields/{}": "orgschema",
+    "DELETE /api/org-fields/{}": "orgschema", "GET /api/lists/{}/org-fields": "orgschema", "PUT /api/lists/{}/org-fields/{}": "orgschema",
+    "GET /api/org-labels": "orgschema", "POST /api/org-labels": "orgschema", "PATCH /api/org-labels/{}": "orgschema",
+    "DELETE /api/org-labels/{}": "orgschema",
     # 2.96.0 C (#2015): job cards in the agent chat
     "GET /api/agents/{}/meeting-proposals": "agents", "GET /api/agents/{}/schedules": "agents",
     "GET /api/agents/{}/share": "agents", "GET /api/assistant": "agents", "GET /api/assistant/log": "agents",

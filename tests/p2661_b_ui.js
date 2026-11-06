@@ -81,7 +81,7 @@ const WS_VIEWS = {
   'static/js/paperless.js': 'draw',           // Settings > Integrations: the Paperless section takes the shown workspace when drawn (#1936)
   'static/js/docscan.js': 'draw',             // 2.207.0 A (#2763) / #2773: Settings > Integrations: the scans section loads the shown workspace's settings when drawn
   'static/js/docfetch.js': 'draw',            // 2.425.0 (#3453): Settings > Integrations: the receipt fetchers of the shown workspace, loaded when drawn
-  'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog)
+  'static/js/settings.js': 'helper',          // the task import's default target (#1940, confirmed in the dialog); 2.609.0 (#3372): wsCur only preselects the workspace of Settings > Data > Ticket types (no view keeping data)
   'static/js/listadmin.js': 'draw',           // 2.102.0 A (#1988): the deleted lists of the trash filtered by wsObjIn while drawing
   'static/js/dashboard.js': 'draw',           // 2.144.0 C (#2418): the start page names overdue tasks of other workspaces (wsCur / wsHidden while drawing)
   'static/js/collab.js': 'draw',              // 2.145.0 A (#2444): News names unread items of the other workspaces (wsCur while drawing)

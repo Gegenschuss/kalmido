@@ -144,6 +144,8 @@ KINDS = {
                 "unfollow, read mark, read later, OPML, the view); guests 404, members no sources, read-only no saving"),
     # 2.156.0 C (#2073): section templates belong to one person or one organisation (members read, its creator / admins change)
     "sectpl": ("matrix", "p2156_c_api_test.py: a section template of another organisation / person: 404 (list, use, change, delete, save into it)"),
+    # 2.609.0 (#3373): fields, labels and templates of an organisation (its admins change them, members read / use them)
+    "orgschema": ("matrix", "p2609_c_schema_api_test.py / p2609_c_ttypes_api_test.py: fields, labels, templates and ticket types of another organisation: never listed, 404 to use / change / save into"),
     # 2.98.0 A (#1953): scheduling polls belong to one organisation (every member reads, the owner / its admins change) or one person
     "poll": ("matrix", "p298_a_api_test.py: a poll of another organisation / person: 404 (read, change, delete, choose, move, list); "
                        "the public link reads inside the poll's organisation only; p2484_a_polls_v1_test.py (2.484.0): REST v1 of another "
@@ -334,6 +336,16 @@ ROUTES = {
     # 2.156.0 C (#2073): section templates (p2156_c_api_test.py)
     "GET /api/section-templates": "sectpl", "POST /api/section-templates": "sectpl", "PATCH /api/section-templates/{}": "sectpl",
     "DELETE /api/section-templates/{}": "sectpl", "POST /api/lists/{}/sections/from-template": "sectpl",
+    # 2.609.0 (#3373): fields, labels of an organisation / a person's own field templates (p2609_c_schema_api_test.py)
+    "GET /api/org-fields": "orgschema", "POST /api/org-fields": "orgschema", "PATCH /api/org-fields/{}": "orgschema",
+    "DELETE /api/org-fields/{}": "orgschema", "GET /api/lists/{}/org-fields": "orgschema", "PUT /api/lists/{}/org-fields/{}": "orgschema",
+    "GET /api/org-labels": "orgschema", "POST /api/org-labels": "orgschema", "PATCH /api/org-labels/{}": "orgschema",
+    "DELETE /api/org-labels/{}": "orgschema",
+    # 2.609.0 (#3372): own ticket types of an organisation / a person (p2609_c_ttypes_api_test.py: a stranger 404)
+    "GET /api/ticket-types": "orgschema", "POST /api/ticket-types": "orgschema", "PATCH /api/ticket-types/{}": "orgschema",
+    "DELETE /api/ticket-types/{}": "orgschema", "GET /api/lists/{}/ticket-types": "orgschema",
+    "GET /api/v1/ticket-types": "orgschema", "POST /api/v1/ticket-types": "orgschema", "PATCH /api/v1/ticket-types/{}": "orgschema",
+    "DELETE /api/v1/ticket-types/{}": "orgschema", "GET /api/v1/lists/{}/ticket-types": "orgschema",
     # 2.96.0 C (#2015): job cards in the agent chat (p296_c_api_test.py)
     "POST /api/agents/{}/chat/{}/reactions": "agent", "POST /api/agents/{}/wake": "agent",
     "GET /api/proposals/agents": "agent", "POST /api/proposals": "agent", "GET /api/proposals/{}": "agent",

@@ -47,6 +47,7 @@ SECRET_OK = {
     "portal_tickets.email_hash": "taken out by _ox_dec_row (the token columns by OX_SECRET_COLS)",
     "sched_poll_votes.edit_hash": "kept empty by _ox_dec_row (a voter's edit key never leaves)",
     "sched_poll_votes.ip_hash": "kept empty by _ox_dec_row",
+    "ticket_types.key": "the short word of an own ticket type (!key in quick add), no secret (2.609.0, #3372)",
 }
 # the parts umz_build writes itself: {part of the file: table}
 BUILD_PARTS = {"people": None, "server_links": "msv_links", "budgets": None}

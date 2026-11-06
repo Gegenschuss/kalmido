@@ -15,6 +15,7 @@ from ..tasks.tasks import one_task
 from ..tasks.lifecycle import apply_update
 from ..collab.comments import comment_plain, need_live_comment, need_task_say, user_names
 from ..core.errors import BadInput, UnknownFields
+from ..lists.orglabels import olb_match  # 2.609.0 (#3373)
 from ..api.v1 import _tag_arg, PRIO_NAMES, PRIO_VALUES
 from ..agents.core import (
     agent_emit, agent_ids, agent_task_data, is_agent, is_approver, list_agents, LTAG_MAX, LTAG_NAME_MAX,
@@ -322,7 +323,8 @@ def ltags_of_lists(c, lids):
     if not lids:
         return out
     for r in c.execute(f"SELECT * FROM list_tags WHERE list_id IN ({','.join('?' * len(lids))}) ORDER BY sort, lower(name), id", lids):
-        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "color": r["color"]})
+        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "color": r["color"],
+                                                 "org_tag_id": r["org_tag_id"]})  # 2.609.0 (#3373): a label of the organisation
     return out
 
 
@@ -345,11 +347,15 @@ def ltag_get_or_create(c, lid, name, create):
     r = c.execute("SELECT id FROM list_tags WHERE list_id=? AND lower(name)=lower(?)", (lid, name)).fetchone()
     if r:
         return r[0]
-    if not create:
+    ol = olb_match(c, lid, name)  # 2.609.0 (#3373): a label of the list's organisation is made here by whoever uses it
+    if not create and not ol:
         raise BadInput(tr("Unknown project tag: {0}", name))
     if c.execute("SELECT COUNT(*) FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0] >= LTAG_MAX:
         raise BadInput(tr("At most {0} project tags", LTAG_MAX))
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_tags WHERE list_id=?", (lid,)).fetchone()[0]
+    if ol:
+        return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at,org_tag_id) VALUES(?,?,?,?,?,?)",
+                         (lid, ol["name"], ol["color"], srt, iso(now_utc()), ol["id"]))
     return insert_id(c, "INSERT INTO list_tags(list_id,name,color,sort,created_at) VALUES(?,?,?,?,?)",
                      (lid, name, "", srt, iso(now_utc())))
 
@@ -429,6 +435,8 @@ def ltag_update(tag_id):
     c = db()
     r = need_ltag(c, tag_id)
     f = ltag_fields(body(), partial=True)
+    if r["org_tag_id"] and any(k in f and f[k] != r[k] for k in ("name", "color")):  # 2.609.0 (#3373)
+        return err(tr("This label belongs to the organisation: change it in the organisation's labels"), 409)
     if "name" in f and c.execute("SELECT 1 FROM list_tags WHERE list_id=? AND lower(name)=lower(?) AND id!=?",
                                  (r["list_id"], f["name"], tag_id)).fetchone():
         return err(tr("This tag already exists in the project"), 409)

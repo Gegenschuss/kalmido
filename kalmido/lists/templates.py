@@ -14,8 +14,9 @@ from ..core.access import Denied, list_role, MANAGE_ROLES, my_inbox, my_max_sort
 from ..core.pages import valid_link
 from ..lists.lists import list_created, clean_color, clean_folder, LIST_KINDS
 from ..tasks.validation import (
-    clean_reminders, clean_ticket_tpl, log_act, POINTS, PRIORITIES, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, valid_date,
+    clean_reminders, clean_ticket_tpl, log_act, POINTS, PRIORITIES, rr_feasible, rr_norm, rr_problem, TICKET_TPL, TICKET_TYPES, TT_KEY_RE, valid_date,
 )
+from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 from ..tasks.tasks import ms_target, one_task, set_tags
 from ..core.errors import BadInput
 from ..core.conflict import ccf_check  # 2.564.0 (#4701)
@@ -23,8 +24,8 @@ from ..core.serializers import unlink_files
 from ..core.dlock import dl_of, dl_tasks_locked  # 2.574.0 (#3376): data lock of a copying agent
 from .tplextra import tx_apply, tx_collect, tx_keys, tx_of_template, tx_paths, tx_prune, tx_same_list, tx_state, tx_store
 from ..accounts.layouts import LAYOUT_BLOCK_RE, LAYOUT_BLOCKS_MAX, WG_COLORS, WG_PAD_BODY_MAX, WG_PAD_TITLE_MAX, WG_PADS_MAX, clean_layout  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgroles import user_orgs_full  # 2.369.5 (#2517): pulled up from functions
-from ..accounts.orgs import ws_default_org  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgroles import org_writes, user_orgs_full  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.orgs import is_org_admin, ws_default_org  # 2.369.5 (#2517): pulled up from functions
 from ..accounts.orgout import org_out  # 2.369.5 (#2517): pulled up from functions
 
 
@@ -143,7 +144,8 @@ def tpl_clean_node(n, depth, count):
             "duration": num("duration", 5, 1440) if due_time and due_off is not None else None,
             "reminders": rems if due_off is not None else "", "repeat": rep if due_off is not None else "",
             "repeat_from": "done" if n.get("repeat_from") == "done" else "due",
-            **({"ttype": n["ttype"]} if n.get("ttype") in TICKET_TYPES else {}),
+            # 2.609.0 (#3372): + an own type's key (tpl_insert keeps it only where the target project offers it)
+            **({"ttype": n["ttype"]} if n.get("ttype") in TICKET_TYPES or (isinstance(n.get("ttype"), str) and TT_KEY_RE.match(n["ttype"])) else {}),
             **({"snippets": _snips_tpl(n["snippets"])} if n.get("snippets") else {}),  # 2.35.0 (#1095)
             **({"points": n["points"]} if n.get("points") in POINTS and not isinstance(n.get("points"), bool) else {}),  # 2.60.0 (#1511)
             # 2.18.0 (#430): a milestone (top level, without subtasks) / the node key of the milestone a task belongs to
@@ -319,20 +321,62 @@ def tpl_merge(kind, old, new):
 def tpl_dict(r):
     d = json.loads(r["data"] or "{}")
     return {"id": r["id"], "kind": r["kind"], "name": r["name"], "data": d, "count": tpl_count(d),
-            "created_at": r["created_at"], "updated_at": r["updated_at"]}
+            "created_at": r["created_at"], "updated_at": r["updated_at"], **tpl_org_of(r)}
 
 
-def need_template(c, tid):
-    r = c.execute("SELECT * FROM templates WHERE id=? AND user_id=? AND deleted_at IS NULL", (tid, me())).fetchone()  # 2.567.0 A (#4707)
-    if not r:
+# 2.609.0 (#3373): a template of an organisation (templates.org_id): every member with the full view reads and uses it, its
+# admins add, change and delete it; org_id NULL = the person's own as before. Never a template of another organisation (404).
+def tpl_org_of(r):
+    oid = r["org_id"] if "org_id" in r.keys() else None
+    return {"org_id": oid, "mine": r["user_id"] == me(), "can_edit": tpl_may_write(db(), r)}
+
+
+def tpl_may_write(c, r):
+    oid = r["org_id"] if "org_id" in r.keys() else None
+    if not oid:
+        return r["user_id"] == me()
+    return org_writes(c, me(), oid) and is_org_admin(c, me(), oid)
+
+
+def tpl_space(c, v):
+    """org id (None = private) of a space value "private" | "org:<id>" | <id>: 404 for an organisation the person does not fully
+    see, 403 for a member who is no admin of it."""
+    if v in (None, "", "private", 0, "0"):
+        return None
+    s = str(v)
+    try:
+        oid = int(s[4:] if s.startswith("org:") else s)
+    except ValueError:
+        raise BadInput(tr("Invalid value: {0}", "space")) from None
+    if oid not in user_orgs_full(c, me()):
         raise Denied(404)
+    if not (org_writes(c, me(), oid) and is_org_admin(c, me(), oid)):
+        raise Denied(403, tr("Only an administrator of the organisation can change its templates"))
+    return oid
+
+
+def need_template(c, tid, write=False):
+    r = c.execute("SELECT * FROM templates WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()  # 2.567.0 A (#4707)
+    if not r or (r["org_id"] is None and r["user_id"] != me()) or (r["org_id"] is not None and r["org_id"] not in user_orgs_full(c, me())):
+        raise Denied(404)
+    if write and not tpl_may_write(c, r):
+        raise Denied(403, tr("Only an administrator of the organisation can change its templates"))
     return r
+
+
+def tpl_visible_sql(c):
+    """(where, args) of the templates the person sees: their own private ones and those of their organisations (2.609.0)."""
+    orgs = user_orgs_full(c, me())
+    return ("deleted_at IS NULL AND ((org_id IS NULL AND user_id=?)" + (f" OR org_id IN ({','.join('?' * len(orgs))})" if orgs else "") + ")",
+            [me(), *orgs])
 
 
 @app.get("/api/templates")
 def templates_list():
-    return jsonify(templates=[tpl_dict(r) for r in db().execute(
-        "SELECT * FROM templates WHERE user_id=? AND deleted_at IS NULL ORDER BY kind DESC, lower(name), id", (me(),))])
+    c = db()
+    q, a = tpl_visible_sql(c)
+    return jsonify(templates=[tpl_dict(r) for r in c.execute(
+        f"SELECT * FROM templates WHERE {q} ORDER BY kind DESC, lower(name), id", a)])
 
 
 def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None, skip=()):
@@ -385,11 +429,12 @@ def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None, skip=()):
             "ticket_tpl": json.loads(lst["ticket_tpl"] or "{}") if role == "owner" else {}}
 
 
-def _tpl_org_out(c, lid, name):
-    """2.148.1 H (#2483): a template is a private copy -- of an organisation's list (or its task) only by its admin (logged)."""
+def _tpl_org_out(c, lid, name, to=None):
+    """2.148.1 H (#2483): a template is a private copy -- of an organisation's list (or its task) only by its admin (logged).
+    2.609.0 (#3373): to = the organisation the template is for (the same one: nothing to check)."""
     r = c.execute("SELECT org_id, name FROM lists WHERE id=?", (lid,)).fetchone()
     if r and r["org_id"]:
-        org_out(c, r["org_id"], None, "template", name or r["name"], list_id=lid)
+        org_out(c, r["org_id"], to, "template", name or r["name"], list_id=lid)
 
 
 @app.post("/api/templates")
@@ -401,6 +446,10 @@ def template_create():
     uid = me()
     if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
         return err(tr("At most {0} templates", TPL_MAX_PER_USER))
+    try:
+        to = tpl_space(c, b.get("space"))  # 2.609.0 (#3373): a template of an organisation (its admins)
+    except BadInput as e:
+        return err(str(e))
     base = local_now().date()
     extra = {}  # 2.363.3 (#3134): what stays on the server (tplextra)
     try:
@@ -413,7 +462,7 @@ def template_create():
             t = c.execute("SELECT * FROM tasks WHERE id=? AND deleted_at IS NULL", (tid,)).fetchone()
             if not t:
                 raise Denied(404)
-            _tpl_org_out(c, t["list_id"], t["title"])  # 2.148.1 H (#2483)
+            _tpl_org_out(c, t["list_id"], t["title"], to)  # 2.148.1 H (#2483)
             order = []
             kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid, order=order, skip=_dup_locked(c, uid, tid))}, t["title"]
             tx_collect(c, uid, t["list_id"], order, base, extra)
@@ -427,7 +476,7 @@ def template_create():
                 raise Denied(403, tr("Participants cannot save the whole project as a template"))
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
                 raise Denied(403, tr("Read-only: the project cannot be saved as a template"))
-            _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
+            _tpl_org_out(c, lid, None, to)  # 2.148.1 H (#2483)
             kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True, extra=extra, skip=_dup_locked(c, uid, list_id=lid))  # 2.352.0 B (#2752): dates always relative
             name = data["name"]
         else:
@@ -443,8 +492,8 @@ def template_create():
     if not name:
         return err(tr("Name missing"))
     ts = iso(now_utc())
-    cur_id = insert_id(c, "INSERT INTO templates(user_id,kind,name,data,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-                    (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts))
+    cur_id = insert_id(c, "INSERT INTO templates(user_id,kind,name,data,created_at,updated_at,org_id) VALUES(?,?,?,?,?,?,?)",
+                    (uid, kind, name, json.dumps(data, ensure_ascii=False), ts, ts, to))
     st = tx_state()
     try:
         tx_store(c, uid, cur_id, extra, st)
@@ -461,13 +510,22 @@ def template_create():
 def template_update(tid):
     b = body()
     c = db()
-    need_template(c, tid)
+    r = need_template(c, tid, write=True)
     # 2.564.0 (#4701): the merge into the stored data (tpl_merge) sees no other change in between; expect_updated_at (optional)
     # = the version the client read: changed meanwhile -> 409 {"template": the current one}
     write_lock(c, f"template-{tid}")
     r = c.execute("SELECT * FROM templates WHERE id=?", (tid,)).fetchone()
     ccf_check(b, r["updated_at"], "template", lambda: tpl_dict(r))
     gone = []
+    if "space" in b:  # 2.609.0 (#3373): into an organisation (its admin) / back to private (an admin of the old one, logged)
+        try:
+            to = tpl_space(c, b["space"])
+        except BadInput as e:
+            return err(str(e))
+        if to != r["org_id"]:
+            if r["org_id"]:
+                org_out(c, r["org_id"], to, "template", r["name"])
+            c.execute("UPDATE templates SET org_id=? WHERE id=?", (to, tid))
     if "name" in b:
         name = str(b["name"] or "").strip()[:200]
         if not name:
@@ -493,7 +551,7 @@ def template_delete(tid):
     """2.567.0 A (#4707): the template goes to the trash with its own file copies (no longer deleted at once); the undo is
     POST /api/templates/<id>/restore, after the trash period tpl_trash_tick deletes it for good -> {ok, id, trash}."""
     c = db()
-    need_template(c, tid)
+    need_template(c, tid, write=True)
     c.execute("UPDATE templates SET deleted_at=?, deleted_by=? WHERE id=?", (iso(now_utc()), me(), tid))
     bump(c)
     c.commit()
@@ -506,7 +564,9 @@ def template_restore(tid):
     c = db()
     uid = me()
     write_lock(c, f"templates-{int(tid)}")
-    if not c.execute("SELECT 1 FROM templates WHERE id=? AND user_id=? AND deleted_at IS NOT NULL", (tid, uid)).fetchone():
+    r = c.execute("SELECT * FROM templates WHERE id=? AND deleted_at IS NOT NULL", (tid,)).fetchone()
+    # 2.609.0 (#3373): an organisation's template: its admins (who may delete it) bring it back too
+    if not r or not (r["user_id"] == uid if r["org_id"] is None else r["org_id"] in user_orgs_full(c, uid) and tpl_may_write(c, r)):
         raise Denied(404)
     if c.execute("SELECT COUNT(*) FROM templates WHERE user_id=? AND deleted_at IS NULL", (uid,)).fetchone()[0] >= TPL_MAX_PER_USER:
         return err(tr("At most {0} templates", TPL_MAX_PER_USER))
@@ -529,6 +589,14 @@ def tpl_trash_tick(c, cut, purge):
     return len(ids), paths
 
 
+def tpl_ttype(c, lid, k):
+    """2.609.0 (#3372): the type a task made from a template / a copy gets in list lid: a built-in one always, an own type only
+    where that project offers it (a duplicated epic stays an epic; in another workspace it has no type)."""
+    if k in TICKET_TYPES:
+        return k
+    return k if isinstance(k, str) and TT_KEY_RE.match(k) and tt_check(c, lid, k) is None else ""
+
+
 def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, made=None):
     """Creates the task of one template node (and its subtasks); returns the new id. fmap (list templates):
     [new field rows by template index] for the node's custom field values (invalid ones are skipped). 2.4.0: scale
@@ -545,7 +613,7 @@ def tpl_insert(c, n, lid, sec, parent, base, sort, uid, fmap=None, scale=1.0, ma
          "priority": n.get("priority") or 0, "due": due, "due_time": tm, "start": start,
          "duration": n.get("duration") if tm else None, "reminders": n.get("reminders") or "" if due else "",
          "repeat": n.get("repeat") or "" if due else "", "repeat_from": n.get("repeat_from") or "due",
-         "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": n.get("ttype") if n.get("ttype") in TICKET_TYPES else "",
+         "url": n.get("url"), "sort": sort, "created_by": uid, "ttype": tpl_ttype(c, lid, n.get("ttype")),
          "ms": 1 if n.get("ms") and parent is None else 0}
     if n.get("points") in POINTS and not isinstance(n.get("points"), bool):  # 2.60.0 (#1511)
         f["points"] = n["points"]
@@ -621,7 +689,7 @@ def template_apply(tid):
     start, end = tpl_dates(b, base)
     st = tx_state()
     try:
-        lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id="auto",
+        lid = tpl_apply_list(c, uid, d, name, clean_folder(b.get("folder") or ""), start, end, org_id=r["org_id"] if r["org_id"] and org_writes(c, uid, r["org_id"]) else "auto",  # 2.609.0 (#3373)
                              color=clean_color(b["color"]) if b.get("color") else None, extra=tx_of_template(c, r), st=st)
         bump(c)
         c.commit()

@@ -423,8 +423,13 @@ def state():
         news={"unread": sum(1 for x in nitems if not x["read"]), "unread_me": news_unread_me(c, uid, s, nitems), "sig": news_sig(c, uid)},  # 2.28.0 (#987): + "For you"
         avatars=avatar_map(c, uid),
         colors=ac_color_map(c, uid),  # 2.47.1 (#1721): {user id: fixed account colour} of the accounts I see
-        templates=[dict(r) for r in c.execute("SELECT id, kind, name FROM templates WHERE user_id=? AND deleted_at IS NULL ORDER BY lower(name), id",
-                                              (uid,))],
+        # 2.609.0 (#3373): + the templates of the person's organisations (full view; lists/templates.py need_template decides)
+        templates=[dict(r) for r in c.execute("""SELECT id, kind, name, org_id FROM templates WHERE deleted_at IS NULL AND ((org_id IS NULL AND user_id=?) OR org_id IN
+                                                 (SELECT org_id FROM org_members WHERE user_id=? AND role IN ('admin', 'member', 'readonly')))
+                                                 ORDER BY lower(name), id""", (uid, uid))],
+        # 2.609.0 (#3373): the labels of the organisations whose projects the person sees (lists/orglabels.py)
+        org_labels=[dict(r) for r in c.execute(f"""SELECT id, org_id, name, color FROM org_tags WHERE org_id IN (SELECT org_id FROM lists
+                                                    WHERE id IN {vis_sql()} AND org_id IS NOT NULL) ORDER BY org_id, sort, lower(name), id""", (uid, uid))],
         timer=time_running(c, uid) if time_all() else None,
         time_totals=time_totals(c, uid) if time_all() else {},
         time_lists=time_list_totals(c, uid, own=True) if time_all() else {},  # 2.7.0 (#407); 2.144.5 C (#1523): own=True

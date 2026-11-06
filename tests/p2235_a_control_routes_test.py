@@ -118,6 +118,8 @@ ROUTES = {
     "POST /api/v1/tasks/{}/approval": "change", "POST /api/v1/tasks/{}/attachments": "change",
     "POST /api/v1/tasks/{}/attachments/text": "change", "POST /api/v1/tasks/{}/contacts": "change",
     "POST /api/v1/tasks/{}/dependencies": "change", "POST /api/v1/tasks/{}/links": "change",
+    # 2.609.0 (#3372): ticket types (agents get 403 on the type writes)
+    "POST /api/v1/ticket-types": "change", "PATCH /api/v1/ticket-types/{}": "change", "DELETE /api/v1/ticket-types/{}": "one_way",
     "POST /api/v1/tasks/{}/move": "change", "POST /api/v1/tasks/{}/restore": "change", "POST /api/v1/tasks/{}/review": "change",
     "POST /api/v1/tasks/{}/snippets": "change", "POST /api/v1/tasks/{}/take": "change", "POST /api/v1/tasks/{}/tidy": "change",
     "POST /api/v1/tasks/{}/to-shopping": "change", "POST /api/v1/team/channels": "change", "POST /api/v1/team/dm": "change",

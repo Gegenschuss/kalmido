@@ -3,7 +3,7 @@
 from ..core.config import API_PREFIX, APP_NAME
 from ..core.access import ROLES
 from ..lists.lists import COL_DOC, COL_MAX, LIST_KIND_ALIASES, LIST_KINDS, LIST_NAME_MAX, LIST_VIEWS, SORT_MODE_DOC
-from ..tasks.validation import NAG_VALUES, PRIORITIES, TICKET_TYPES
+from ..tasks.validation import NAG_VALUES, PRIORITIES, TICKET_TYPES, TT_KEY_RE
 from ..tasks.tasks import WAIT_NOTE_MAX
 from ..tasks.roadmap import ROADMAP_MAX_DAYS, SHIFT_MAX_DAYS, SHIFT_MAX_TASKS
 from ..collab.comments import MAX_COMMENT
@@ -24,6 +24,7 @@ from ..lists.envs import env_spec  # 2.369.5 (#2517): pulled up from functions
 from ..notify.caps import notif_tpl_spec  # 2.369.5 (#2517): pulled up from functions
 from ..tasks.briefing import briefing_spec  # 2.369.5 (#2517): pulled up from functions
 from ..lists.report import report_spec  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.ttypes import tt_spec  # 2.609.0 (#3372)
 
 
 RATE_HEADERS = ("RateLimit-Limit", "RateLimit-Remaining", "RateLimit-Reset", "X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Reset")
@@ -137,8 +138,9 @@ def openapi_spec():
         "completed_at": nul("string", format="date-time"), "deleted": {"type": "boolean"},
         "fields": {"type": "object", "additionalProperties": {"type": "string"}, "description": "Custom field values by field id"},
         "waiting": {"oneOf": [{"type": "null"}, ref("Waiting")], "description": "Waiting on someone outside (a client, an office, a delivery) with a follow-up day (2.1.0; called waiting on external before 2.25.0); null = not waiting"},
-        "type": nul("string", enum=[*TICKET_TYPES, None], description="Ticket type (2.4.0); a new bug / feature in a project with ticket "
-                    "types on gets the project's note template when its notes are empty"),
+        "type": nul("string", pattern=TT_KEY_RE.pattern, description="Ticket type (2.4.0): " + ", ".join(TICKET_TYPES) + " or, since 2.609.0, "
+                    "an own type of the project's workspace that the project offers (GET /lists/{id}/ticket-types); a new ticket in a project "
+                    "with ticket types on gets the project's (or the own type's) note template when its notes are empty"),
         "deadline": {"type": "boolean", "description": "2.7.0: the due date is a deadline (countdown, highlighted from the first reminder on)"},
         "deadline_in_today": {"type": "boolean", "description": "2.7.0: a deadline that shows on Today from its first reminder on "
                               "(setting it true also sets deadline)"},
@@ -353,7 +355,10 @@ def openapi_spec():
             "bug_list_id": {"type": "integer", "description": "2.473.0: only in the answer of POST /lists with bug_inbox: the id of the bug inbox list"}}},
         "ListDetail": {"allOf": [ref("List"), {"type": "object", "properties": {"sections": {"type": "array", "items": ref("Section")},
             "fields": {"type": "array", "description": "2.14.0: the project's custom fields (ids for the columns f:<id>)",
-                       "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"}}}},
+                       "items": {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "type": {"type": "string"},
+                                                                  "key": {"type": ["string", "null"], "description": "2.609.0 (#3373): the key of the "
+                                                                          "organisation's field it is linked to (filter fkey_<key>), null = the project's own"},
+                                                                  "required": {"type": "boolean", "description": "2.609.0 (#3373): a new task needs a value"}}}},
             "favorite": {"type": "boolean", "description": "2.46.1 (#1361): a favourite of the person (an agent: of the person it belongs to; a team agent: always false)"}}}]},
         "ListInput": {"type": "object", "additionalProperties": False, "required": ["name"], "properties": {
             "name": {"type": "string"}, "color": {"type": "string", "description": "#rgb / #rrggbb or empty"},
@@ -635,7 +640,7 @@ def openapi_spec():
                      q("pinned", "2.16.0: true = only pinned tasks, false = only the others", {"type": "boolean"}),
                      q("milestone", "2.18.0: true = only milestones, false = only the other tasks", {"type": "boolean"}),
                      q("milestone_id", "2.18.0: only the tasks of this milestone", {"type": "integer"}),
-                     q("type", "Ticket type: bug, feature, task or none (2.4.0)", {"type": "string", "enum": [*TICKET_TYPES, "none"]}),
+                     q("type", "Ticket type: bug, feature, task, an own type's key (2.609.0) or none (2.4.0)", {"type": "string", "pattern": TT_KEY_RE.pattern}),
                      # 2.390.0 B (#3355): the further filters and the sort
                      q("priority", "2.390.0: none, low, medium or high; several comma separated (or the parameter repeated)"),
                      q("priority_min", "2.390.0: at least this priority", {"type": "string", "enum": list(PRIO_VALUES)}),  # 2.574.0 (#3376): + urgent
@@ -697,7 +702,9 @@ def openapi_spec():
                                 q("include_done", "true = completed tasks too", {"type": "boolean"})])},
         "/tasks": {"get": op("Tasks you can see (not in the trash), filtered, oldest first (or by sort). 2.390.0: also "
                              "field_<id>=value, a custom field of a project you see (only its tasks): select = option id or name, "
-                             "text = contains, number, checkbox true / false, other types the stored value", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
+                             "text = contains, number, checkbox true / false, other types the stored value. 2.609.0 (#3373): fkey_<key>=value, "
+                             "the same over every project you see, through the fields linked to a field of the organisation's schema "
+                             "(the list object's fields carry key)", T, ok(ref("TaskPage")) | errs("400", "404"), tasks_filters),
                    "post": op("Create a task (default: your inbox)", T, ok(ref("Task"), "Created", "201") | ok(ref("Task"), "Already created with this client_ref") | errs("400", "403", "404"),
                               body=ref("TaskCreate"), scope="write")},
         "/tasks/{id}": {"get": op("One task (2.390.0: id may also be a ticket key like APP-12, a current or an old one)", T, ok(ref("Task")) | errs("404"), [pid()]),
@@ -913,6 +920,7 @@ def openapi_spec():
     rul_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.71.0 A (#1457)
     from ..api.v1setup import v1s_spec
     v1s_spec(paths, schemas, op, ok, errs, ref, pid)  # 2.391.0 (#3362): webhooks, tokens, repository connections
+    tt_spec(paths, schemas, op, ok, errs, ref, pid, q)  # 2.609.0 (#3372): own ticket types
     scope_refine(paths)
     _SPEC["s"] = {
         "openapi": "3.1.0",

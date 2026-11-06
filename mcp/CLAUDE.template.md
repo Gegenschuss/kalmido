@@ -576,6 +576,8 @@ Ask `list_tasks` precisely instead of reading whole projects: `priority` / `prio
 (`current` = the running sprint, `none` = backlog), `created_by`, `reviewer` + `review` (`reviewer: me, review: pending` = what
 waits for your review), `field_values` (custom fields), `q` (words in title or notes) and `sort` (`-priority`, `due`, ...).
 Tasks carry `sprint_id`, `reviewer_id` and `review`; `create_task` / `update_task` set `sprint_id` and `reviewer_id`.
+A project's `required` fields (`get_list` names them) need a value in `create_task`'s `fields`, else the answer is `400`
+naming the field: fill it, or ask. `field_keys` in `list_tasks` filters by a field of the organisation over every project.
 
 ### Reminders at a fixed time (2.138.1)
 "Remind me on Tuesday at 9" is `remind_at: "YYYY-MM-DDTHH:MM"` (local time, also without a due date; `null` removes it) in
@@ -779,7 +781,7 @@ MCP tool `wait_for_events`), see docs/AGENTS.md *Events* for the data of each:
   (or office groups with offers); `list_id` is null when the project is not shared with you
 - `review_requested`: you are the reviewer of a task that went into review (`review` {state, list_id, url}); check it, then
   `review_task` approve, or changes with a short note what should change. Never approve a task assigned to you
-- `sprint_started` / `sprint_closed`: a sprint of a project shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
+- `sprint_started` / `sprint_closed`: a sprint of a project shared with you started / was closed (`sprint`, with `review` when closed: done / moved / added task ids and points). Ticket types: `list_ticket_types` (2.609.0: the built-in and own types; with `list_id` the keys a project offers, use only those as a task's `type`). Sprints: `list_sprints`, `get_sprint` (tasks + burndown), `set_task_sprint` (into a sprint or back to the backlog; people plan and close sprints)
 - `chat_pinned`: the person pinned (`pinned: true`) or unpinned a message of your chat (`message`); information only, nothing to answer
   (the current pins of a conversation: `pins` in `GET /agent/chats?user_id=`)
 - `abort` (2.144.0): the person pressed **Stop** in your chat (`user`, `job_id` when it was in a job's history): end the answer

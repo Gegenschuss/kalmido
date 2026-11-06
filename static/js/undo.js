@@ -413,10 +413,14 @@ async function deleteTask(id) {
   offerUndo(tr('“{0}” deleted', t ? t.title.slice(0, 30) : ''), histTrash(tr('Deleted {0}', qn((t?.title || '').slice(0, 40))), [id], snaps, r));
 }
 async function createTask(body) {
-  const lid = body.list_id || (body.parent_id && taskById(body.parent_id)?.list_id), lt = listTags(lid);
+  const lid = body.list_id || (body.parent_id && taskById(body.parent_id)?.list_id), lt = [...listTags(lid), ...orgLabels(lid)];  // 2.609.0 (#3373): + the organisation's labels
   if (body.tags?.length && lt.length && !body.ltags) {  // 2.0.0: a #name of one of the list's tags is that list tag
     const m = g => lt.find(x => x.name.toLowerCase() === String(g).toLowerCase());
     body = {...body, ltags: body.tags.filter(m).map(g => m(g).name), tags: body.tags.filter(g => !m(g))};
+  }
+  if (!body.parent_id && lid && fieldsOf(lid).some(f => f.required && body.fields?.[f.id] == null)) {  // 2.609.0 (#3373): ask first
+    const fv = await rqf_ask(lid, body); if (!fv) throw new Error(tr('Not created: a required field is empty'));
+    body = {...body, fields: {...body.fields, ...fv}};
   }
   const t = await api('POST', '/api/tasks', body);
   putTask(t); render();

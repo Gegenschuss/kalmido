@@ -329,10 +329,14 @@ async function commentApply(cid) {
 
 // ---- shared list tags (tags of a list, visible to all its members; personal tags stay personal)
 const listTags = lid => listById(lid)?.tags || [];
-const ltagColor = (name, lid) => listTags(lid).find(x => x.name.toLowerCase() === String(name).toLowerCase())?.color || '';
+// 2.609.0 (#3373): the labels of the list's organisation not used in the list yet (the server makes them on first use)
+const orgLabels = lid => { const l = listById(lid), lt = listTags(lid); return !l?.org_id ? [] : (S.org_labels || []).filter(o => o.org_id === l.org_id && !lt.some(x => x.name.toLowerCase() === o.name.toLowerCase())); };
+const ltagTitle = x => x?.org_tag_id ? tr('Label of the organisation: the same in every project of the organisation') : tr('Project tag: visible to everyone in the project');
+const ltagColor = (name, lid) => ltagOf(name, lid)?.color || '';
+const ltagOf = (name, lid) => listTags(lid).find(x => x.name.toLowerCase() === String(name).toLowerCase());
 function ltagChip(g, lid, cls = 'tag ltag') {
   const c = cssColor(ltagColor(g, lid));
-  return `<span class="${cls}" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('Project tag: visible to everyone in the project'))}">#${esc(g)}</span>`;
+  return `<span class="${cls}" ${c ? `style="--tc:${c}"` : ''} title="${esc(ltagTitle(ltagOf(g, lid)))}">#${esc(g)}</span>`;
 }
 const ptagChip = (g, lid) => listById(lid)?.shared && collab() ? `<span class="tag ptag" title="${esc(tr('Personal tag: only visible to you'))}">${ic('user', 's')}#${esc(g)}</span>` : `<span class="tag">#${esc(g)}</span>`;
 const hasTag = (t, g) => t.tags.includes(g) || (t.ltags || []).some(x => x.toLowerCase() === String(g).toLowerCase());
@@ -340,13 +344,14 @@ const hasTag = (t, g) => t.tags.includes(g) || (t.ltags || []).some(x => x.toLow
 // a list tag when it matches one of the list, else a personal tag; a personal tag can be made a list tag (↑)
 function tagEditHtml(t, ro) {
   const l = listById(t.list_id), shared = !!l?.shared && collab(), lt = listTags(t.list_id), mayList = canEditList(t.list_id);
-  const lpills = (t.ltags || []).map(g => { const c = cssColor(ltagColor(g, t.list_id)); return `<span class="tagpill ltag" ${c ? `style="--tc:${c}"` : ''} title="${esc(tr('Project tag: visible to everyone in the project'))}">#${esc(g)}${ro ? '' : `<button data-act="ltag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`; }).join('');
+  const lpills = (t.ltags || []).map(g => { const c = cssColor(ltagColor(g, t.list_id)); return `<span class="tagpill ltag" ${c ? `style="--tc:${c}"` : ''} title="${esc(ltagTitle(ltagOf(g, t.list_id)))}">#${esc(g)}${ro ? '' : `<button data-act="ltag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`; }).join('');
   const ppills = t.tags.map(g => `<span class="tagpill ${shared ? 'ptag' : ''}" ${shared ? `title="${esc(tr('Personal tag: only visible to you'))}"` : ''}>${shared ? ic('user', 's') : ''}#${esc(g)}${ro ? '' : `${(shared || (collab() && l && !l.is_inbox)) && mayList ? `<button data-act="tag-promote" data-tag="${esc(g)}" title="${esc(tr('Make it a project tag (visible to everyone in the project)'))}" aria-label="${esc(tr('Make it a project tag'))}">${ic('users', 's')}</button>` : ''}<button data-act="tag-rm" data-tag="${esc(g)}" aria-label="${esc(tr('Remove'))}">${ic('x', 's')}</button>`}</span>`).join('');
-  const own = [...new Set([...S.tasks.values()].flatMap(x => x.tags))].filter(g => !lt.some(x => x.name.toLowerCase() === g.toLowerCase()));
-  return `<div class="tagedit">${lpills}${ppills}${ro ? '' : `<input id="d-tag" placeholder="${tr('+ Tag')}" aria-label="${esc(tr('Tags'))}" list="taglist" enterkeyhint="done" autocomplete="off">`}<datalist id="taglist">${lt.map(x => `<option value="${esc(x.name)}" label="${esc(tr('Project tag'))}">`).join('')}${own.map(g => `<option value="${esc(g)}" ${shared ? `label="${esc(tr('Personal'))}"` : ''}>`).join('')}</datalist></div>`;
+  const ol = orgLabels(t.list_id);  // 2.609.0 (#3373): organisation labels, project tags and personal tags named apart
+  const own = [...new Set([...S.tasks.values()].flatMap(x => x.tags))].filter(g => ![...lt, ...ol].some(x => x.name.toLowerCase() === g.toLowerCase()));
+  return `<div class="tagedit">${lpills}${ppills}${ro ? '' : `<input id="d-tag" placeholder="${tr('+ Tag')}" aria-label="${esc(tr('Tags'))}" list="taglist" enterkeyhint="done" autocomplete="off">`}<datalist id="taglist">${[...lt, ...ol.map(o => ({name: o.name, org_tag_id: o.id}))].map(x => `<option value="${esc(x.name)}" label="${esc(x.org_tag_id ? tr('Organisation label') : tr('Project tag'))}">`).join('')}${own.map(g => `<option value="${esc(g)}" ${shared ? `label="${esc(tr('Personal'))}"` : ''}>`).join('')}</datalist></div>`;
 }
 async function tagAdd(t, v) {
-  const lt = listTags(t.list_id).find(x => x.name.toLowerCase() === v.toLowerCase());
+  const lt = listTags(t.list_id).find(x => x.name.toLowerCase() === v.toLowerCase()) || orgLabels(t.list_id).find(x => x.name.toLowerCase() === v.toLowerCase());  // 2.609.0 (#3373)
   if (lt) { if (!(t.ltags || []).includes(lt.name)) await patchTask(t.id, {ltags: [...(t.ltags || []), lt.name]}); }
   else await patchTask(t.id, {tags: [...t.tags, v]});
 }
@@ -358,7 +363,9 @@ async function tagPromote(t, g) {
 // list dialog: the list tags (members with edit rights manage them) and "Agent may tidy up entries"
 function ltagsBoxHtml(l) {
   const lt = listTags(l.id), may = canEditList(l.id);
-  return `${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}</span>${may ? `<button class="iconbtn" data-lt="color" title="${tr('Colour')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
+  const adm = l.org_id && (S.me?.workspaces || []).some(o => o.id === l.org_id && o.role === 'admin');  // 2.609.0 (#3373)
+  return `${l.org_id && (adm || (S.org_labels || []).some(o => o.org_id === l.org_id)) ? `<div class="mrow olbhead"><span class="n muted">${esc(tr('Labels of the organisation: {0}', (S.org_labels || []).filter(o => o.org_id === l.org_id).map(o => '#' + o.name).join(', ') || tr('none yet')))}</span>${adm ? `<button type="button" class="btn sm" data-olb="manage">${esc(tr('Manage…'))}</button>` : ''}</div>` : ''}
+    ${lt.length ? lt.map(x => `<div class="mrow" data-ltid="${x.id}"><span class="ltsw" style="${cssColor(x.color) ? 'background:' + cssColor(x.color) : ''}"></span><span class="n">#${esc(x.name)}${x.org_tag_id ? ` <span class="muted">· ${esc(tr('Organisation'))}</span>` : ''}</span>${may && !x.org_tag_id ? `<button class="iconbtn" data-lt="color" title="${tr('Colour')}">${ic('palette', 's')}</button><button class="iconbtn" data-lt="ren" title="${tr('Rename')}">${ic('edit', 's')}</button><button class="iconbtn danger" data-lt="del" title="${tr('Delete')}">${ic('trash', 's')}</button>` : may ? `<button class="iconbtn danger" data-lt="del" title="${tr('Remove from this project')}">${ic('trash', 's')}</button>` : ''}</div>`).join('')
     : `<div class="muted mhint">${tr('No project tags yet.')}</div>`}${may ? `<div class="row"><input id="l-ltnew" placeholder="${tr('New project tag')}" maxlength="60"><button class="btn sm" data-lt="new">${ic('plus', 's')} ${tr('Add')}</button></div>` : ''}`;
 }
 // 2.41.2 (#1501): a list tag renamed (to = new name) or deleted (to = null) in the list and on its tasks, locally
@@ -373,6 +380,7 @@ function ltagPut(lid, from, to) {
 }
 function ltagsWire(md, lid) {
   const redraw = () => { const b = $('#l-ltags', md); if (b) b.innerHTML = ltagsBoxHtml(listById(lid)); };
+  md.addEventListener('click', e => { if (e.target.closest('[data-olb="manage"]')) olb_manage(listById(lid)?.org_id, redraw); });  // 2.609.0 (#3373)
   md.addEventListener('click', async e => {
     const b = e.target.closest('[data-lt]'); if (!b) return;
     const a = b.dataset.lt, tid = +b.closest('[data-ltid]')?.dataset.ltid, x = listTags(lid).find(y => y.id === tid);

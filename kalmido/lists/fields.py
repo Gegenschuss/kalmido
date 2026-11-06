@@ -41,10 +41,20 @@ FIELD_STAGE_SPECIAL = ("red", "orange")  # 2.410.0 A (#3514): the signal colours
 
 def field_dict(r, c=None):
     d = {"id": r["id"], "list_id": r["list_id"], "name": r["name"], "type": r["type"],
-         "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0), "sort": r["sort"]}
+         "options": json.loads(r["options"] or "{}"), "pinned": int(r["pinned"] or 0), "sort": r["sort"],
+         "org_field_id": fd_col(r, "org_field_id"),  # 2.609.0 (#3373): linked to a field of the organisation (lists/orgfields.py)
+         "required": bool(fd_col(r, "required", 0))}  # 2.609.0 (#3373): needed when a task is created (field_required_check)
     if r["type"] == "formula" and c is not None:  # 2.43.0 (#1328): the formula with today's field names
         d["options"]["formula"] = fx_display(d["options"].get("expr"), c.execute("SELECT id, name FROM list_fields WHERE list_id=?", (r["list_id"],)).fetchall())
     return d
+
+
+def fd_col(r, k, default=None):
+    """2.609.0 (#3373): column k of a list_fields row (None when the query did not select it)."""
+    try:
+        return r[k]
+    except (KeyError, IndexError):
+        return default
 
 
 def field_clean_def(b, old=None):
@@ -235,6 +245,7 @@ def set_field_values(c, tid, lid, vals, log=True):
         raise BadInput(tr("Invalid data"))
     fields = {r["id"]: r for r in c.execute("SELECT * FROM list_fields WHERE list_id=?", (lid,))}
     new = {}
+    top = None
     for k, v in list(vals.items())[:FIELD_MAX * 2]:
         try:
             fid = int(k)
@@ -243,6 +254,11 @@ def set_field_values(c, tid, lid, vals, log=True):
         if fid not in fields:
             raise BadInput(tr("Unknown field"))
         new[fid] = field_value(c, fields[fid], v, lid)
+        if new[fid] is None and fd_col(fields[fid], "required", 0):  # 2.609.0 (#3373): a required field is not cleared
+            if top is None:
+                top = not c.execute("SELECT parent_id FROM tasks WHERE id=?", (tid,)).fetchone()[0]
+            if top:
+                raise BadInput(tr("Required field missing: {0}", fields[fid]["name"]))
     for fid, v in new.items():
         old = c.execute("SELECT value FROM task_field_values WHERE task_id=? AND field_id=?", (tid, fid)).fetchone()
         if (old[0] if old else None) == v:
@@ -255,6 +271,29 @@ def set_field_values(c, tid, lid, vals, log=True):
         if log:
             log_act(c, tid, "field", field_act(c, fields[fid], v))
     return bool(new)
+
+
+FIELD_REQ_OFF = ("formula", "checkbox")  # 2.609.0 (#3373): computed / an unticked box is a value: never required
+
+
+def field_required_set(c, fid, ftype, v):
+    """2.609.0 (#3373): the required switch of field fid (BadInput for a formula / checkbox field)."""
+    on = 1 if v else 0
+    if on and ftype in FIELD_REQ_OFF:
+        raise BadInput(tr("This kind of field cannot be required"))
+    c.execute("UPDATE list_fields SET required=? WHERE id=?", (on, fid))
+
+
+def field_required_check(c, tid, lid):
+    """2.609.0 (#3373): a new top-level task of list lid needs a value in every required field (BadInput naming the missing
+    ones). Only when it is created in the app or through API v1 / MCP (tasks.py FREQ_ENDPOINTS); existing tasks only when the
+    field itself is changed (set_field_values); never when a task is completed. 2.609.0: a task an inner flow makes (CalDAV,
+    a saved chat, an event, git, an incoming webhook, a template, a copy, a repeat, an agent proposal) is not checked."""
+    miss = [r["name"] for r in c.execute("""SELECT f.name FROM list_fields f WHERE f.list_id=? AND f.required=1 AND NOT EXISTS
+                                            (SELECT 1 FROM task_field_values v WHERE v.task_id=? AND v.field_id=f.id) ORDER BY f.sort, f.id""",
+                                         (lid, tid))]
+    if miss:
+        raise BadInput(tr("Required field missing: {0}", ", ".join(miss)))
 
 
 def need_field(c, fid, owner=True):
@@ -301,6 +340,8 @@ def field_create(lid):
     srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM list_fields WHERE list_id=?", (lid,)).fetchone()[0]
     fid = insert_id(c, "INSERT INTO list_fields(list_id,name,type,options,pinned,sort,created_at) VALUES(?,?,?,?,?,?,?)",
                     (lid, name, ftype, json.dumps(opts, ensure_ascii=False), pinned, srt, iso(now_utc())))
+    if b.get("required"):
+        field_required_set(c, fid, ftype, True)  # 2.609.0 (#3373)
     cc = c.execute("SELECT col_cfg FROM lists WHERE id=?", (lid,)).fetchone()[0]
     if cc:  # 2.14.0 (#425): a list with its own columns shows a new field as its last column
         cols = columns_out(cc, {r[0] for r in c.execute("SELECT id FROM list_fields WHERE list_id=?", (lid,))})
@@ -331,6 +372,9 @@ def field_update(fid):
         if fd_opt_sig(have) != fd_opt_sig(seen):
             raise Conflict("field", field_dict(r, c))
     name, _, opts = field_clean_def(b, r)
+    if fd_col(r, "org_field_id") and (name != r["name"] or opts != json.loads(r["options"] or "{}")):
+        # 2.609.0 (#3373): name and options of a linked field are the organisation's (changed there for every project)
+        return err(tr("This field belongs to the organisation: change it in the organisation's fields"), 409)
     if r["type"] == "formula":
         fx_set(c, r["list_id"], b, opts, fid)
     if "pinned" in b:
@@ -343,14 +387,26 @@ def field_update(fid):
             c.execute("UPDATE list_fields SET sort=? WHERE id=?", (float(b["sort"]), fid))
         except (TypeError, ValueError):
             return err(tr("Invalid data"))
+    if "required" in b:
+        field_required_set(c, fid, r["type"], b["required"])  # 2.609.0 (#3373)
     # 2.564.0 (#4701): only now, under the lock and after the check above (with _prev the stored list is the seen one), so only
     # options this change removes lose their values, never one another admin added meanwhile
-    if r["type"] == "select":
+    field_prune_opts(c, fid, r["type"], opts)
+    c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
+    bump(c)
+    c.commit()
+    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
+
+
+def field_prune_opts(c, fid, ftype, opts):
+    """Removed select / multiselect options leave the values of field fid that hold them (2.609.0 (#3373): also used when a
+    field of the organisation changes its linked fields)."""
+    if ftype == "select":
         keep = {o["id"] for o in opts["options"]}
         for (oid,) in c.execute("SELECT DISTINCT value FROM task_field_values WHERE field_id=?", (fid,)).fetchall():
             if oid not in keep:
                 c.execute("DELETE FROM task_field_values WHERE field_id=? AND value=?", (fid, oid))
-    if r["type"] == "multiselect":  # 2.156.0 B (#2069): a removed option leaves the values that hold it
+    if ftype == "multiselect":  # 2.156.0 B (#2069): a removed option leaves the values that hold it
         keep = {o["id"] for o in opts["options"]}
         for (val,) in c.execute("SELECT DISTINCT value FROM task_field_values WHERE field_id=?", (fid,)).fetchall():
             left = ",".join(x for x in val.split(",") if x in keep)
@@ -359,10 +415,6 @@ def field_update(fid):
                     c.execute("UPDATE task_field_values SET value=? WHERE field_id=? AND value=?", (left, fid, val))
                 else:
                     c.execute("DELETE FROM task_field_values WHERE field_id=? AND value=?", (fid, val))
-    c.execute("UPDATE list_fields SET name=?, options=? WHERE id=?", (name, json.dumps(opts, ensure_ascii=False), fid))
-    bump(c)
-    c.commit()
-    return jsonify(field_dict(c.execute("SELECT * FROM list_fields WHERE id=?", (fid,)).fetchone(), c))
 
 
 def fd_seen_options(b):

@@ -11,8 +11,13 @@ const ticketsOn = lid => !!listById(lid)?.tickets;
 // 2.13.0: "Show task numbers" for any list (per device; lists with tickets always show them)
 const idsOn = lid => td_rc('ids' + lid, () => !!LS.get('ids.' + lid, false));  // 2.40.0 (#1430): once per render
 const ticketsAny = () => S.lists.some(l => l.tickets && !l.archived);
-const ttName = k => tr((TTYPES.find(x => x[0] === k) || [0, ''])[1]);
-const ttChip = t => { const x = TTYPES.find(y => y[0] === t.ttype); return x ? `<span class="ttchip tt-${x[0]}" title="${esc(tr('Type: {0}', tr(x[1])))}">${ic(x[2], 's')}${esc(tr(x[1]))}</span>` : ''; };
+// 2.609.0 (#3372): + own types of the workspace (ttypes.js ttInfo); an epic's chip carries its subtasks' progress
+const ttName = (k, lid) => ttInfo(k, lid)?.name || '';
+const ttChip = t => {
+  const x = ttInfo(t.ttype, t.list_id); if (!x) return '';
+  const p = ttEpicProg(t), pt = p ? ' ' + tr('{0} of {1} subtasks done', p.done, p.all) : '';
+  return `<span class="ttchip tt-${esc(x.key)}" ${cssColor(x.color) ? `style="color:${cssColor(x.color)}"` : ''} title="${esc(tr('Type: {0}', x.name) + pt)}">${ic(x.icon, 's')}${esc(x.name)}${p ? ` ${p.done}/${p.all}` : ''}</span>`;
+};
 // ---- 2.18.0 (#430): milestones are tasks (t.ms = 1): a diamond instead of the round status glyph, top level, no subtasks.
 // A task can belong to one milestone of its own list (t.milestone_id): the release / version it ships in.
 const isMs = t => !!t?.ms;
@@ -251,7 +256,9 @@ function parseQuick(text, ignore = new Set(), sub = false) {  // sub: a reminder
     return out.due_time;
   });
   // 2.4.0 (#340): ticket type, only while some list has ticket types on
-  if (ticketsAny() || ignore.has('ttype')) take(/\s!(bug|feature|task|fehler|funktion|wunsch|aufgabe)(?=\s)/i, 'ttype', m => { out.ttype = TT_WORDS[m[1].toLowerCase()]; return ttName(out.ttype); });
+  // 2.609.0 (#3372): + !<key> / !<name> of an own type (!epic, !story, ...)
+  const ttw = {...ttOwnWords(), ...TT_WORDS}, ttre = Object.keys(ttw).sort((x, y) => y.length - x.length).map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  if (ticketsAny() || ignore.has('ttype')) take(new RegExp(`\\s!(${ttre})(?=\\s)`, 'iu'), 'ttype', m => { out.ttype = ttw[m[1].toLowerCase()]; return ttName(out.ttype); });
   // 2.18.0 (#430): !milestone / !meilenstein / !ms makes the new task a milestone
   take(/\s!(milestone|meilenstein|ms)(?=\s)/i, 'ms', () => { out.ms = 1; return tr('Milestone'); });
   // 2.22.0 (#686): waiting on external right away: wartet:Kunde / waiting:client (a word, "in quotes" or with_underscores)

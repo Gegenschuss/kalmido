@@ -1,7 +1,7 @@
 """Creating and changing tasks: milestones, moving subtrees, tags, assignees, waiting on external."""
 from datetime import timedelta
 
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
 from ..core.pg import insert_id, st_ids, write_lock
@@ -23,6 +23,7 @@ from ..core.errors import BadInput, field_alias, UnknownFields, web_fields  # 2.
 from ..core.orgcrypt import oc_enabled, oc_list_space  # 2.369.5 (#2517): pulled up from functions
 from ..videos.vdrescue import vdr_rescue  # 2.530.0 D (#4316)
 from ..core.access import _org_list_writes  # 2.369.5 (#2517): pulled up from functions
+from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 
 
 # ---- 2.18.0 (#430): milestones. A milestone is a task with ms = 1 (top level, no subtasks, a date is optional); a task
@@ -219,12 +220,18 @@ def task_inherit(c, tid, src):
     c.execute("INSERT INTO task_people(task_id,user_id) SELECT ?, user_id FROM task_people WHERE task_id=? ON CONFLICT DO NOTHING", (tid, src))
 
 
+# 2.609.0 (#3373): required fields are checked only where a person or an agent creates a task on purpose: the app (POST
+# /api/tasks) and API v1 / MCP (POST /api/v1/tasks). Inner flows that run task_create from their own route (CalDAV sync, a chat
+# saved as a task, an event's task, the git rest task, milestones, copies to a server, incoming webhooks) are not checked.
+FREQ_ENDPOINTS = ("task_create", "v1_task_create")
+
+
 @app.post("/api/tasks")
 def task_create():
     from ..tasks.lifecycle import repeat_problem
     from ..collab.comments import task_event
     from ..tasks.dependencies import newtask_events
-    from ..lists.fields import set_field_values
+    from ..lists.fields import field_required_check, set_field_values
     from ..agents.core import agent_added_events, agent_task_mentions, agent_tidy_events
     from ..collab.reactions import set_ltags
     from ..family.family import is_shop, people_set, rot_apply, shop_area_of, shop_remember
@@ -313,6 +320,11 @@ def task_create():
         r = c.execute("SELECT tickets, def_ttype FROM lists WHERE id=?", (f["list_id"],)).fetchone()
         if r and r["tickets"] and r["def_ttype"]:
             f["ttype"] = r["def_ttype"]
+    e = tt_check(c, f["list_id"], f.get("ttype"))  # 2.609.0 (#3372): an own type only where the project offers it
+    if e:
+        if "ttype" in b:
+            return err(e)
+        f["ttype"] = ""  # a default type the project no longer offers: no type
     if f.get("ttype") and not (f.get("content") or "").strip() and not le2_on:  # 2.4.0 (#340): a new bug / feature gets its note template
         tpl = ticket_template(c, f["list_id"], f["ttype"])
         if tpl:
@@ -335,6 +347,8 @@ def task_create():
         set_ltags(c, cur_id, b["ltags"], log=False)  # BadInput: 400, nothing stored
     if b.get("fields"):
         set_field_values(c, cur_id, f["list_id"], b["fields"], log=False)  # BadInput: 400, nothing stored
+    if not f.get("parent_id") and has_request_context() and request.endpoint in FREQ_ENDPOINTS:
+        field_required_check(c, cur_id, f["list_id"])  # 2.609.0 (#3373): BadInput: 400 naming the field, nothing stored
     if b.get("people"):  # 2.19.0 (#653): who comes along
         e = people_set(c, cur_id, f["list_id"], b["people"])
         if e:

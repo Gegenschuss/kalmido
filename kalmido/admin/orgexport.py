@@ -256,6 +256,7 @@ OX_AREAS = (
     ("lists/playbooks.json", "playbooks", f"list_id IN ({LSQ})"),
     ("lists/sprints.json", "sprints", f"list_id IN ({LSQ})"),  # 2.137.0 C (#2344): sprints of the lists (tasks.sprint_id)
     ("lists/section_templates.json", "section_templates", "org_id=?"),  # 2.362.0 (#3096): section templates shared with the organisation
+    ("lists/ticket_types.json", "ticket_types", "org_id=?"),  # 2.609.0 (#3372): the organisation's own ticket types
     # 2.81.0 (#1866): customer reports of those lists (team/portal.py): the address in plain text, never the status link
     ("portal/tickets.json", "portal_tickets", f"list_id IN ({LSQ})"),
     ("lists/admin_log.json", "org_list_log", "org_id=?"),
@@ -482,6 +483,7 @@ OX_LEFT = {
     "merge_runs": _PERSONAL, "notify_channels": _SECRET, "support_grants": _SERVER, "office_peppol": _SECRET,
     "office_payonline": _SECRET, "office_pay_links": _SECRET, "office_pay_sessions": _ONLINEPAY, "office_pay_events": _ONLINEPAY, "office_pay_payouts": _ONLINEPAY,
     "office_trash": "the trash (not_included)",
+    "org_fields": _LATER2, "org_tags": _LATER2, "templates": _LATER2,  # 2.609.0 (#3373): the organisation's schema, labels, templates; follow-up #4031
     "office_undo": "undo steps of one day", "org_invites": "invitations (not_included)", "org_joins": "join requests (not_included)",
     "org_keys": _SERVER, "org_members": "members.json (with the role)", "org_out_requests": "requests of one person, short-lived",
     "pl_imported": _SECRET, "pl_rules": _SECRET, "pl_sources": _SECRET, "pl_uploads": _SECRET, "portal_logins": _SECRET,

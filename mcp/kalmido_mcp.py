@@ -216,8 +216,9 @@ TASK_FIELDS = {
     "duration": {"type": ["integer", "null"], "minimum": 1, "description": "minutes (the calendar block of a timed task)"},
     "list_tags": {**STRS, "description": "shared project tags (seen by every project member)"},
     "parent_id": S_ID,
-    "type": {"type": ["string", "null"], "enum": ["bug", "feature", "task", None],
-             "description": "ticket type (projects with ticket types on); a new bug / feature with empty notes gets the project's template"},
+    "type": {"type": ["string", "null"], "pattern": "^[a-z][a-z0-9_]{1,23}$",
+             "description": "ticket type (projects with ticket types on): bug, feature, task or, since 2.609.0, an own type the project "
+                            "offers (list_ticket_types); a new ticket with empty notes gets the project's / the type's template"},
     # 2.18.0 (#430): milestones are tasks; a task belongs to at most one milestone of its own list (e.g. a release / version)
     "milestone": {"type": "boolean", "description": "2.18.0: the task is a milestone (a diamond with a date, top level, no subtasks)"},
     "milestone_id": {"type": ["integer", "null"], "description": "2.18.0: the milestone task (same project) this task belongs to; null = none"},
@@ -293,6 +294,9 @@ def t_list_tasks(api, a):
         q["priority"] = ",".join(a["priority"]) if isinstance(a["priority"], list) else a["priority"]
     for fid, v in (a.get("field_values") or {}).items():
         q[f"field_{int(fid)}"] = ("true" if v else "false") if isinstance(v, bool) else v
+    for k, v in (a.get("field_keys") or {}).items():  # 2.609.0 (#3373): a field of the organisation's schema, over projects
+        if re.fullmatch(r"[a-z][a-z0-9_]{0,39}", str(k)):
+            q[f"fkey_{k}"] = ("true" if v else "false") if isinstance(v, bool) else v
     if a.get("compact") is True:
         q["fields"] = "compact"
     r = api.call("GET", "/tasks", q)
@@ -624,7 +628,7 @@ TOOLS = [
            "cursor": {"type": "string"}, "compact": {"type": "boolean"},
            "waiting": {"type": "boolean", "description": "true = only tasks waiting on someone, false = only the others"},
            "pinned": {"type": "boolean", "description": "2.16.0: true = only pinned tasks (the 'Pinned' view), false = only the others"},
-           "type": {"type": "string", "enum": ["bug", "feature", "task", "none"], "description": "only tickets of this type"},
+           "type": {"type": "string", "pattern": "^[a-z][a-z0-9_]{1,23}$", "description": "only tickets of this type (bug, feature, task, an own type's key or none)"},
            "assignee_group": {"type": "string", "description": "2.10.0: mine (assigned to one of your groups) or a group id"},
            "delegate": {"type": "string", "description": "2.473.0: me, none or an agent id (the task is delegated to it)"},
            "watcher": {"type": "string", "description": "2.473.0: me or a user id (who watches the task)"},
@@ -642,6 +646,9 @@ TOOLS = [
            "field_values": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]},
                             "description": "2.390.0: {custom field id: value} of a project's fields (only its tasks): select = option "
                                            "id or name, text = contains, number, checkbox true / false"},
+           "field_keys": {"type": "object", "additionalProperties": {"type": ["string", "number", "boolean"]},
+                          "description": "2.609.0: {field key: value} = the same over every project you see, through the fields "
+                                         "linked to a field of the organisation (list_fields / get_list show the key)"},
            "q": {"type": "string", "description": "2.390.0: words in the title or notes"},
            "key": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9]{1,5}-[0-9]{1,9}$", "description": "2.390.0: the task with this ticket key (APP-12)"},
            "delivery": {"oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string", "enum": ["in_progress", "parked", "waiting", "none"]}}],
@@ -1697,11 +1704,13 @@ TOOLS += [
                      "arguments). The server computes it, tasks show it in fields (a failed calculation: \"#div0\" / \"#type\"), nobody sets "
                      "it (options.empty = blank: empty when a field is empty, default 0).",
      _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "type": {"type": "string"}, "options": {"type": "object"},
-           "pinned": {"type": "boolean"}, "formula": {"type": "string"}}, ["list_id", "name", "type"]),
+           "pinned": {"type": "boolean"}, "formula": {"type": "string"},
+           "required": {"type": "boolean", "description": "2.609.0: a new task needs a value (not checkbox / formula)"}}, ["list_id", "name", "type"]),
      lambda api, a: api.call("POST", f"/lists/{_id(a, 'list_id')}/fields", body=_without(a, "list_id"))),
-    ("update_field", "Change a custom field (name, options, pinned, sort; 2.43.0: formula of a formula field); the type stays.",
+    ("update_field", "Change a custom field (name, options, pinned, sort; 2.43.0: formula of a formula field; 2.609.0: required); the type "
+     "stays. A field linked to the organisation's schema keeps its name and options (409).",
      _obj({"field_id": S_ID, "name": {"type": "string"}, "options": {"type": "object"}, "pinned": {"type": "boolean"}, "sort": {"type": "number"},
-           "formula": {"type": "string"}}, ["field_id"]),
+           "formula": {"type": "string"}, "required": {"type": "boolean"}}, ["field_id"]),
      lambda api, a: api.call("PATCH", f"/fields/{_id(a, 'field_id')}", body=_without(a, "field_id"))),
     ("delete_field", "Delete a custom field with all its values." + APPROVAL_NOTE, _obj({"field_id": S_ID}, ["field_id"]),
      lambda api, a: api.call("DELETE", f"/fields/{_id(a, 'field_id')}")),
@@ -1797,6 +1806,12 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}", body=_without(a, "list_id", "milestone_id"))),
     ("delete_milestone", "Remove a milestone.", _obj({"list_id": S_ID, "milestone_id": S_ID}, ["list_id", "milestone_id"]),
      lambda api, a: api.call("DELETE", f"/lists/{_id(a, 'list_id')}/milestones/{_id(a, 'milestone_id')}")),
+    # 2.609.0 (#3372): own ticket types of a workspace (people manage them in the app; agents read)
+    ("list_ticket_types", "2.609.0: the ticket types you can meet: built-in (bug, feature, task) and own types of your workspaces "
+                          "(key, name, icon, color, template, enabled). With list_id: only the keys that project offers (use them as a "
+                          "task's type).",
+     _obj({"list_id": S_ID}, []),
+     lambda api, a: api.call("GET", f"/lists/{_id(a, 'list_id')}/ticket-types") if a.get("list_id") else api.call("GET", "/ticket-types")),
     # 2.60.0 (#343): sprints of a project list (people switch them on, plan and close them; agents read and assign)
     ("list_sprints", "2.60.0: the sprints of a project (newest first): id, num, title, start, end, goal, state planned | active | "
                      "closed, progress (done / total, points), the review of closed sprints (done / moved / added task ids, counts, "
@@ -2803,7 +2818,7 @@ TOOLSETS = {
         get_roadmap get_dependencies add_dependency remove_dependency list_relations add_relation remove_relation list_fields create_field update_field delete_field get_key_figures create_list_tag
         update_list_tag delete_list_tag list_templates create_template update_template delete_template apply_template duplicate_list duplicate_task list_filters
         create_filter update_filter delete_filter upload_attachment create_text_file delete_attachment update_comment delete_comment set_project_overview
-        add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints
+        add_project_link update_project_link delete_project_link reorder_project_links add_milestone update_milestone delete_milestone list_sprints list_ticket_types
         get_sprint set_task_sprint set_project_status list_project_files upload_project_file delete_project_file export_data request_approval review_task
         set_list_review list_forms create_form update_form delete_form list_files read_file search_files write_file create_file_folder list_documents
         get_document update_document create_document list_notepads create_notepad update_notepad delete_notepad write_status_pad get_weekly_status

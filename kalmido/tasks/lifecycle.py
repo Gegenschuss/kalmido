@@ -30,6 +30,7 @@ from ..tasks.validation import lock_problem  # 2.369.5 (#2517): pulled up from f
 from ..tasks.validation import lock_done_problem  # 2.542.0 (#4609)
 from ..lists.listtrash import otr_err_task, otr_trash  # 2.369.5 (#2517): pulled up from functions; 2.530.0 B (#4315): otr_trash for accounts/onboarding.py
 from ..lists.listtrash import otr_need
+from ..tasks.ttypes import tt_check  # 2.609.0 (#3372)
 
 
 def _norm(v):
@@ -136,6 +137,10 @@ def apply_update(c, tid, b, conflicts=None, lock=False):
     e = ln_guard(c, tid, f)  # 2.48.0 (#1642): a note locked with a password is changed only through its own routes
     if e:
         return e
+    if f.get("ttype") and f["ttype"] != cur["ttype"]:  # 2.609.0 (#3372): an own type only where the project offers it
+        e = tt_check(c, f.get("list_id") or cur["list_id"], f["ttype"])
+        if e:
+            return e
     from ..collab.liste2e import le2a_task_write, le2e_mode
     if f.get("ttype") and f["ttype"] != cur["ttype"] and "content" not in f and not (cur["content"] or "").strip() \
             and not le2e_mode(c, f.get("list_id") or cur["list_id"]):  # 2.64.1 (#1817): no plain template in a list with the lock

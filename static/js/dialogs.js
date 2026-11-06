@@ -229,29 +229,7 @@ async function projectNextSteps(lid) {
     }
   });
 }
-// 2.4.0 (#340): the note templates of new bug / feature tickets of a list (empty = the built-in text)
-function ticketTplModal(lid) {
-  const l = listById(lid); if (!l) return;
-  let cur = {}; try { cur = JSON.parse(l.ticket_tpl || '{}') || {}; } catch { /* bad json */ }
-  const def = {bug: tr('**Steps to reproduce**\n1. \n\n**Expected**\n\n**Actual**\n\n**Environment**\n\n**Version / found in**\n'), feature: tr('**Goal**\n\n**Acceptance criteria**\n- [ ] \n')};
-  const md = modal(`<h3>${tr('Ticket templates')}</h3><div class="shint">${tr('New tickets of this type start with these notes (Markdown) when their notes are empty. Empty = the built-in text.')}</div>
-    <div class="row"><label for="tt-def">${tr('Type of new tasks')}</label><select id="tt-def"><option value="">${tr('No type')}</option>${TTYPES.map(x => `<option value="${x[0]}" ${l.def_ttype === x[0] ? 'selected' : ''}>${esc(tr(x[1]))}</option>`).join('')}</select></div>
-    ${['bug', 'feature'].map(k => `<div class="row ppcol"><label for="tt-${k}">${ic(k === 'bug' ? 'bug' : 'bulb', 's')} ${ttName(k)}</label><textarea id="tt-${k}" rows="6" maxlength="5000" placeholder="${esc(def[k])}">${esc(cur[k] || '')}</textarea></div>`).join('')}
-    <div class="foot"><button class="btn" data-m="reset">${tr('Built-in texts')}</button><span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
-  md.classList.add('ttmodal');
-  md.addEventListener('click', async e => {
-    const b = e.target.closest('[data-m]'); if (!b) return;
-    if (b.dataset.m === 'close') { md.remove(); return; }
-    if (b.dataset.m === 'reset') { $('#tt-bug', md).value = ''; $('#tt-feature', md).value = ''; return; }
-    if (b.dataset.m === 'save') {
-      // 2.46.2 (#1659): at once (optimistic), no reload of the whole state; an error puts the old templates back
-      const tpl = {bug: $('#tt-bug', md).value, feature: $('#tt-feature', md).value}, dt = $('#tt-def', md).value;  // 2.483.0 (#3916): + the default type
-      // the dialog closes once the server has it: on an error the typed texts are still there
-      optWrite(optSet(() => listById(lid), {ticket_tpl: JSON.stringify(tpl), def_ttype: dt}), () => api('PATCH', '/api/lists/' + lid, {ticket_tpl: tpl, def_ttype: dt}))
-        .then(() => { md.remove(); toast(tr('Saved')); }).catch(() => {});
-    }
-  });
-}
+// 2.4.0 (#340) ticketTplModal, the ticket types and templates of a project: sectpl.js (on demand, start budget #4198)
 function projectParts() {
   return [depsOn() && (feat('timeline') ? tr('dependencies with the Gantt timeline') : tr('dependencies')),
     progressOn() && tr('progress and status')].filter(Boolean);  // 2.39.1 (#1217): custom fields are in every list
@@ -984,7 +962,7 @@ function listModal(id, folder = '', o = {}) {
       <div class="row ptbug" ${o.ptype === 'software' ? '' : 'hidden'}><label class="chkl"><input type="checkbox" id="l-ptbug"> ${tr('With a bug inbox')}</label><span class="muted">${tr('A second project; bugs with a release move here by themselves')}</span></div>${''/* 2.473.0 (#3378) */}
       <div class="ptdates" hidden><div class="row"><label>${tr('Project start')}</label>${dateIn('l-pstart', today(), {label: tr('Project start'), clear: false})}</div><div class="row"><label>${tr('End (optional)')}</label>${dateIn('l-pend', '', {label: tr('End (optional)'), empty: tr('none')})}<span class="muted">${tr('stretches or squeezes the dates')}</span></div></div></div>`}
     ${id ? ptypeRowHtml(l) : ''}
-    ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Templates…')}</button>` : ''}</div>
+    ${own ? `<div class="row ltkrow" ${swArea(l) || l.tickets ? '' : 'hidden'}><label>${tr('Ticket types')}</label><label class="chkl"><input type="checkbox" id="l-tickets" ${l.tickets ? 'checked' : ''}> ${tr('Bug, feature, task')}</label>${id ? `<button class="btn sm" data-m="tt-tpl" type="button">${tr('Types and templates…')}</button>` : ''}</div>
     <div class="shint lhint ltkhint" ${swArea(l) || l.tickets ? '' : 'hidden'}>${tr('Tasks get a type with an icon, a filter and quick add !bug / !feature; new bugs and features start with a note template.')}</div>` : ''}
     ${tk_listRow(l)}${''/* 2.390.0 (#3353): ticket key (git.js) */}
     ${id ? spr_dlgRow(l) : ''}${''/* 2.60.0 (#343) */}
@@ -1181,7 +1159,8 @@ function listModal(id, folder = '', o = {}) {
     }
     sel?.focus();
   };
-  const drawFields = () => { const box = $('#l-fields', md); if (box) box.innerHTML = fieldsBox(id); };
+  const drawFields = () => { const box = $('#l-fields', md); if (box) { box.innerHTML = fieldsBox(id); ofs_mount(box, id, drawFields); } };  // 2.609.0 (#3373): + the organisation's fields
+  if (id && $('#l-fields', md)) ofs_mount($('#l-fields', md), id, drawFields);
   if (id) rul_mount(md, l);  // 2.71.0 A (#1457)
   if (id) whiMount(md, l);  // 2.115.0 A (#2061)
   md.addEventListener('click', async e => {

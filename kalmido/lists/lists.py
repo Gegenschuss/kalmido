@@ -17,7 +17,8 @@ from ..core.state import visible_lists
 from ..core.numtext import user_num  # 2.263.0 (#2976)
 from ..core.errors import BadInput, web_fields  # 2.149.0 G (#2517): pulled up from functions
 from ..tasks.ticketkey import tk_set  # 2.390.0 (#3353)
-from ..tasks.validation import TICKET_TYPES  # 2.483.0 (#3916)
+from ..tasks.validation import TICKET_TYPES, TT_KEY_RE  # 2.483.0 (#3916); 2.609.0 (#3372)
+from ..tasks.ttypes import tt_known  # 2.609.0 (#3372)
 from ..core.access import list_other_agent, ONE_AGENT_MSG  # 2.149.0 G (#2517): pulled up from functions
 from ..core.access import qn_is, qn_private  # 2.477.0 (#3881)
 from ..api.common import v1_call, V1Error  # 2.149.0 G (#2517): pulled up from functions
@@ -34,6 +35,7 @@ LIST_FIELDS += ("irreversible_needs_yes",)  # 2.392.0 C (#3370): one-way tasks w
 LIST_FIELDS += ("two_eyes",)  # 2.574.0 (#3376): gate and merge approvals need two different people (owner; default off)
 LIST_FIELDS += ("mail_guests",)  # 2.395.0 (#3380): guests of the project read its filed e-mails (owner + project admins; default off)
 LIST_FIELDS += ("def_ttype",)  # 2.483.0 (#3916): default type of new tasks (owner; '' | bug | feature | task, needs ticket types on)
+LIST_FIELDS += ("ttypes",)  # 2.609.0 (#3372): the ticket types the project offers (owner; json list of keys, '' = all of its workspace)
 LIST_KINDS = ("list", "project")
 # 2.7.2 (#414): the type "checklist" (2.7.0 "Shopping & packing list") is gone. Every list has the display option "Show
 # completed at the bottom" instead (column lists.checklist, API field done_at_bottom); kind "checklist" is still accepted
@@ -288,11 +290,17 @@ def clean_list_value(k, v, member=False):
         return 1 if v else 0
     if k in ("points_on", "irreversible_needs_yes", "two_eyes", "mail_guests"):  # 2.60.0 (#1511); 2.392.0 C (#3370); 2.395.0 (#3380); 2.574.0 (#3376)
         return 1 if v else 0
-    if k == "def_ttype":  # 2.483.0 (#3916)
+    if k == "def_ttype":  # 2.483.0 (#3916); 2.609.0 (#3372): or an own type (a new task drops one the project does not offer)
         v = v or ""
-        if v and v not in TICKET_TYPES:
+        if v and v not in TICKET_TYPES and not (isinstance(v, str) and TT_KEY_RE.match(v)):
             raise BadInput(tr("Invalid value: {0}", tr("Type")))
         return v
+    if k == "ttypes":  # 2.609.0 (#3372): list of type keys (built-in or own) -> json, empty = all
+        if v in (None, "", []):
+            return ""
+        if not isinstance(v, list) or len(v) > 40 or any(not isinstance(x, str) or not TT_KEY_RE.match(x) for x in v):
+            raise BadInput(tr("Invalid value: {0}", "ttypes"))
+        return json.dumps(list(dict.fromkeys(v)))
     if k == "kind":
         if v not in LIST_KINDS and v not in LIST_KIND_ALIASES:
             raise BadInput(tr("Invalid value: {0}", "kind"))
@@ -559,6 +567,8 @@ def list_update(lid):
     if "done_at_bottom" in b:  # 2.7.2 (#414): the API name of the display option (column checklist)
         b = {**{k: v for k, v in b.items() if k != "done_at_bottom"}, "checklist": b["done_at_bottom"]}
     vals = {k: clean_list_value(k, b[k], member=role != "owner") for k in LIST_FIELDS if k in b}  # BadInput: 400
+    if vals.get("def_ttype") and not tt_known(c, lid, vals["def_ttype"]):  # 2.609.0 (#3372): a type of the workspace
+        return err(tr("Invalid value: {0}", tr("Type")))
     if b.get("kind") == "checklist" and "checklist" not in vals:  # deprecated alias: a plain list with the option on
         vals["checklist"] = 1
     if vals.get("family") or vals.get("life"):  # 2.64.1 review (M3): their generators write plain texts -> not with the lock
@@ -590,6 +600,9 @@ def list_update(lid):
                 return err(tr("Hourly rate: number expected"))
             c.execute("UPDATE lists SET rate=? WHERE id=?", (rate, lid))
         if "ticket_tpl" in b:  # 2.4.0 (#340): {bug?, feature?} note templates of new tickets ('' / missing = built-in)
+            # 2.609.0 (#3372): + an own type of the workspace (another key = 400)
+            if isinstance(b["ticket_tpl"], dict) and any(k not in ("bug", "feature") and not tt_known(c, lid, k) for k in b["ticket_tpl"]):
+                return err(tr("Invalid value: {0}", "ticket_tpl"))
             c.execute("UPDATE lists SET ticket_tpl=? WHERE id=?", (clean_ticket_tpl(b["ticket_tpl"]), lid))
         if "day_hours" in b:  # 2.7.0 (#407): hours per day / shift of this list (None / '' = the instance's value)
             dh = clean_day_hours(b["day_hours"])

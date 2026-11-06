@@ -35,6 +35,8 @@ TASK_FIELDS += ("remind_at",)  # 2.111.0 C (#2057): a reminder at a fixed local 
 POINTS = (1, 2, 3, 5, 8, 13)
 # 2.4.0 (#340): ticket types of a task (API v1 / MCP / events: "type"); '' = none
 TICKET_TYPES = ("bug", "feature", "task")
+# 2.609.0 (#3372): the form of a type key, built-in or an own type of the workspace (tasks/ttypes.py checks it is offered)
+TT_KEY_RE = re.compile(r"^[a-z][a-z0-9_]{1,23}$")
 
 
 # ---------------------------------------------------------------- activity (task history)
@@ -367,10 +369,11 @@ TICKET_TPL_MAX = 5000
 
 
 def clean_ticket_tpl(v):
-    """{bug?, feature?} from a client -> the stored json ('' = both built-in)."""
+    """{bug?, feature?, <own type key>?} from a client -> the stored json ('' = all built-in / the type's own)."""
     if v in (None, ""):
         return ""
-    if not isinstance(v, dict) or any(k not in TICKET_TPL for k in v):
+    # 2.609.0 (#3372): + the keys of own types (a project's template wins over the type's)
+    if not isinstance(v, dict) or len(v) > 24 or any(k not in TICKET_TPL and (k in TICKET_TYPES or not TT_KEY_RE.match(str(k))) for k in v):
         raise BadInput(tr("Invalid value: {0}", "ticket_tpl"))
     out = {}
     for k, x in v.items():
@@ -384,7 +387,7 @@ def clean_ticket_tpl(v):
 
 def ticket_template(c, lid, kind):
     """The note template of a new ticket of this kind in list lid ('' when the list has ticket types off, or for "task")."""
-    if kind not in TICKET_TPL:
+    if kind not in TICKET_TPL and (kind in TICKET_TYPES or not TT_KEY_RE.match(kind or "")):
         return ""
     r = c.execute("SELECT tickets, ticket_tpl FROM lists WHERE id=?", (lid,)).fetchone()
     if not r or not r["tickets"]:
@@ -393,7 +396,13 @@ def ticket_template(c, lid, kind):
         own = json.loads(r["ticket_tpl"] or "{}").get(kind)
     except (ValueError, AttributeError):
         own = None
-    return own if isinstance(own, str) and own.strip() else tr(TICKET_TPL[kind])
+    if isinstance(own, str) and own.strip():
+        return own
+    if kind not in TICKET_TPL:  # 2.609.0 (#3372): an own type: its workspace's template (tasks/ttypes.py)
+        t = c.execute("""SELECT t.tpl FROM ticket_types t JOIN lists l ON l.id=? WHERE t.key=? AND
+                         (t.org_id=l.org_id OR (l.org_id IS NULL AND t.org_id IS NULL AND t.owner_id=l.owner_id))""", (lid, kind)).fetchone()
+        return t["tpl"] if t else ""
+    return tr(TICKET_TPL[kind])
 
 
 def spt_clean(v):
@@ -483,7 +492,7 @@ def clean_task(b):
                 v = snip_clean(v)
             if k == "ttype":
                 v = "" if v in (None, "") else v
-                if v and v not in TICKET_TYPES:
+                if v and v not in TICKET_TYPES and not (isinstance(v, str) and TT_KEY_RE.match(v)):  # 2.609.0 (#3372): + own types
                     raise BadInput(tr("Invalid value: {0}", tr("Type")))
             if k == "sort":
                 if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):

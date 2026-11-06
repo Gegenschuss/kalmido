@@ -28,7 +28,7 @@ from ..lists.groups import (
 )
 from ..lists.fields import fmt_num
 from ..lists.ownership import list_owner_set
-from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, valid_date
+from ..tasks.validation import as_int, NAG_VALUES, PRIORITIES, TICKET_TYPES, TT_KEY_RE, valid_date
 from ..tasks.tasks import clear_waiting, set_waiting, task_create, task_update
 from ..tasks.oneway import dec_list, irr_apply, irr_view  # 2.392.0 C (#3370)
 from ..tasks.deliver import dv_apply, dv_filter, dv_view  # 2.392.2 (#3365)
@@ -435,8 +435,8 @@ def v1_task_in(b, allowed=V1_TASK_IN):
             raise BadInput(tr("Invalid value: {0}", "fields"))
         elif k == "repeat_from" and v not in ("due", "done"):
             raise BadInput(tr("Invalid value: {0}", "repeat_from"))
-        elif k == "type":  # 2.4.0 (#340): bug | feature | task | null
-            if v is not None and v not in TICKET_TYPES:
+        elif k == "type":  # 2.4.0 (#340): bug | feature | task | null; 2.609.0 (#3372): or an own type the project offers
+            if v is not None and v not in TICKET_TYPES and not (isinstance(v, str) and TT_KEY_RE.match(v)):
                 raise BadInput(tr("Invalid value: {0}", "type"))
             out["ttype"] = v or ""
         elif k in ("deadline", "deadline_in_today"):  # 2.7.0 (#412): booleans -> the internal 0 / 1 / 2
@@ -750,11 +750,15 @@ def v1_lists():
 
 
 def v1_list_fields(c, lid=None):
-    """2.14.0 (#425): the custom fields of the visible lists {list_id: [{id, name, type}]} (for columns "f:<id>")."""
+    """2.14.0 (#425): the custom fields of the visible lists {list_id: [{id, name, type}]} (for columns "f:<id>").
+    2.609.0 (#3373): + key (the field of the organisation's schema it is linked to, null = a field of the project alone) and
+    required (a new task needs a value: 400 naming the field without it)."""
     out = {}
-    q = f"SELECT id, list_id, name, type FROM list_fields WHERE list_id IN {vis_sql()}" + (" AND list_id=?" if lid else "") + " ORDER BY sort, id"
+    q = (f"SELECT f.id, f.list_id, f.name, f.type, f.required, o.key FROM list_fields f LEFT JOIN org_fields o ON o.id=f.org_field_id "
+         f"WHERE f.list_id IN {vis_sql()}" + (" AND f.list_id=?" if lid else "") + " ORDER BY f.sort, f.id")
     for r in c.execute(q, (me(), me(), *((lid,) if lid else ()))):
-        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "type": r["type"]})
+        out.setdefault(r["list_id"], []).append({"id": r["id"], "name": r["name"], "type": r["type"], "key": r["key"],
+                                                  "required": bool(r["required"])})
     return out
 
 
@@ -928,7 +932,7 @@ def v1_tasks():
     section_id, sprint_id, created_by, reviewer, review, field_<id>, q and sort (see v1_tasks_more)."""
     a = v1_args(("list_id", "status", "due_from", "due_to", "tag", "list_tag", "assignee", "updated_since", "parent_id", "top_level",
                  "limit", "cursor", "fields", "waiting", "type", "assignee_group", "pinned", "milestone", "milestone_id",
-                 *V1_TASKS_MORE, *(k for k in request.args if V1_FIELD_ARG.fullmatch(k))))
+                 *V1_TASKS_MORE, *(k for k in request.args if V1_FIELD_ARG.fullmatch(k) or V1_FKEY_ARG.fullmatch(k))))
     if a.get("fields") not in (None, "", "full", "compact"):
         raise BadInput(tr("Invalid value: {0}", "fields"))
     c, uid = db(), me()
@@ -995,7 +999,7 @@ def v1_tasks():
         where.append("milestone_id=?")
         args.append(as_int(a["milestone_id"], "milestone_id", 1))
     if a.get("type") not in (None, ""):  # 2.4.0 (#340): bug | feature | task | none
-        if a["type"] not in (*TICKET_TYPES, "none"):
+        if a["type"] not in (*TICKET_TYPES, "none") and not TT_KEY_RE.match(a["type"]):  # 2.609.0 (#3372): + own types
             raise BadInput(tr("Invalid value: {0}", "type"))
         where.append("ttype=?")
         args.append("" if a["type"] == "none" else a["type"])
@@ -1023,6 +1027,7 @@ V1_TASKS_MORE = ("priority", "priority_min", "section_id", "sprint_id", "created
 V1_TASKS_MORE += ("delegate", "watcher")  # 2.473.0 (#3357)
 V1_TASKS_MORE += ("delivery",)  # 2.392.2 (#3365)
 V1_FIELD_ARG = re.compile(r"field_(\d{1,9})")
+V1_FKEY_ARG = re.compile(r"fkey_([a-z][a-z0-9_]{0,39})")  # 2.609.0 (#3373): a field of the schema, over projects
 # sort name -> (SQL expression ascending, ... descending): no due date last in both directions, the id breaks ties
 V1_SORTS = {"priority": ("priority", "priority"), "due": ("COALESCE(due, '9999-99-99')", "COALESCE(due, '')"),
             "created": ("created_at", "created_at"), "updated": ("updated_at", "updated_at"),
@@ -1105,12 +1110,32 @@ def v1_tasks_more(c, uid, a, where, args):
         m = V1_FIELD_ARG.fullmatch(k)
         if m:
             v1_field_filter(c, int(m.group(1)), a[k], where, args)
+        m = V1_FKEY_ARG.fullmatch(k)
+        if m:
+            v1_fkey_filter(c, m.group(1), a[k], where, args)
     if a.get("q") not in (None, ""):
         tsq = fts_query(fts_terms(a["q"]))
         if not tsq:
             raise BadInput(tr("Invalid value: {0}", "q"))
         where.append("id IN (SELECT f.task_id FROM task_fts f WHERE f.vec @@ to_tsquery('simple'::regconfig, ?))")
         args.append(tsq)
+
+
+def v1_fkey_filter(c, key, v, where, args):
+    """2.609.0 (#3373): fkey_<key>=v: tasks of every visible project whose field linked to the schema field <key> (of the
+    project's organisation, or its owner's own) matches v -- the same rules as field_<id> per field, joined with OR."""
+    fids = [r[0] for r in c.execute(f"""SELECT f.id FROM list_fields f JOIN org_fields o ON o.id=f.org_field_id
+                                       WHERE o.key=? AND f.list_id IN {vis_sql()} ORDER BY f.id""", (key, me(), me()))]
+    if not fids:
+        where.append("FALSE")
+        return
+    parts = []
+    for fid in fids:
+        w, a = [], []
+        v1_field_filter(c, fid, v, w, a)
+        parts.append("(" + " AND ".join(w) + ")")
+        args += a
+    where.append("(" + " OR ".join(parts) + ")")
 
 
 def v1_field_filter(c, fid, v, where, args):

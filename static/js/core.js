@@ -1324,11 +1324,13 @@ function applyState(j, w0) {  // w0: S.wseq when its GET /api/state started (ld_
   S.webpush = j.webpush || {enabled: false};
   S.news = j.news || {unread: 0, sig: ''};
   S.templates = j.templates || [];
+  S.org_labels = j.org_labels || [];  // 2.609.0 (#3373): the labels of the organisations whose projects I see
   S.timer = j.timer || null; S.timeTotals = j.time_totals || {};
   S.timeLists = j.time_lists || {}; S.timeDayH = +j.time_day_h || 8;  // 2.7.0 (#407)
   S.maxFileMb = +j.max_file_mb || 50;  // 2.273.0 D (#3051): server upload limit per file
   S.maxDepth = +j.max_depth || 3;  // 2.156.0 A (#1949): the levels of tasks (kalmido/core/schema.py MAX_DEPTH)
   S.fields = j.fields || [];
+  tty_load();  // 2.609.0 (#3372): the own ticket types (ttypes.js; at most every five minutes)
   S.folderOrders = j.folder_orders || {};  // 2.27.0 (#988): the order of other people's folders I see their lists in
   S.folderProps = j.folder_props || {}; S.foldersSharedIn = j.folders_shared_in || []; S.folderShares = j.folder_shares || {};  /* 2.41.0 (#1428) */  // 2.29.0 (#1030 / #929)
   S.collabAll = j.collab_all !== false; S.timeAll = j.time_all !== false; S.about = j.about || {};

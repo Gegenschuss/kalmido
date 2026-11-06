@@ -52,7 +52,7 @@ function flt_vals(c, cs) {
     case 'folder': o = folderNames().map(p => [p, fDisp(p)]); break;
     case 'date': o = DATE_OPTS.map(([v, n]) => [v, tr(n)]); break;
     case 'prio': o = [[7, tr('Urgent')], [5, tr('High')], [3, tr('Medium')], [1, tr('Low')], [0, tr('None')]]; break;  // 2.574.0 (#3376): + Urgent
-    case 'type': o = [...TTYPES.map(([k, n]) => [k, tr(n)]), ['', tr('No type')]]; break;
+    case 'type': o = [...TTYPES.map(([k, n]) => [k, tr(n)]), ...[...new Map(ttyRows().map(r => [r.key, r.name])).entries()].filter(([k]) => !TTYPES.some(x => x[0] === k)), ['', tr('No type')]]; break;  // 2.609.0 (#3372): + the own types
     case 'tag': o = [...new Set(tasks.flatMap(t => t.tags || []))].sort(cmpText).map(g => [g, '#' + g]); break;
     case 'who': {
       const ids = [...new Set(tasks.filter(t => t.assignee_id && t.assignee_id !== S.me?.id).map(t => t.assignee_id))];
