@@ -172,6 +172,16 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
         if stop and stop():
             break
         lid = lr["id"]
+        if commit:
+            # 2.585.0 (#4836): the background pass reads the list's space again, now, and keeps it until its commit: the list
+            # read above can be older than a deletion that handed the list on and resealed its rows meanwhile (then the
+            # rows came back sealed for the space read before -- a key that went with the deletion -- or plain). A list
+            # that a running transaction changes (moved, handed on, deleted) is left to that one (SKIP LOCKED)
+            with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
+                lr = c.execute("SELECT id, org_id, owner_id FROM lists WHERE id=? FOR SHARE SKIP LOCKED", (lid,)).fetchone()
+            if lr is None:
+                c.commit()
+                continue
         space = int(lr["org_id"]) if lr["org_id"] else (oc.oc_user_space(lr["owner_id"]) or 0)
         active = bool(space) and oc.oc_active_for(c, space)
         changed = 0
@@ -201,10 +211,12 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
                     if table == "budget_entries":
                         sets["dkey"] = bud_dkey(c, lid, used, d["day"], d["amount"], d["kind"], d["title"])
                     cols = list(sets)
-                    c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=?", [sets[k] for k in cols] + [r["id"]])
-                    changed += 1
-        if changed and commit:
-            c.commit()
+                    # 2.585.0 (#4836): only the row as it was read (a deletion's resealing that committed meanwhile stays)
+                    upd = c.execute(f"UPDATE {table} SET {', '.join(k + '=?' for k in cols)} WHERE id=? AND sid IS NOT DISTINCT FROM ?",
+                                    [sets[k] for k in cols] + [r["id"], r["sid"]])
+                    changed += 1 if upd.rowcount else 0
+        if commit:
+            c.commit()  # 2.585.0 (#4836): also when nothing changed -- ends the list's FOR SHARE
             n += changed
     return n
 

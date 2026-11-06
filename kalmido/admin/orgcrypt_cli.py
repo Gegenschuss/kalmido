@@ -29,6 +29,7 @@ is sealed with the key of the space it lies in now: plain files of private space
 moved (task into another list, list into / out of an organisation, a new list owner) is resealed for its new space. In
 portions of BATCH files with a short pause (KALMIDO_ORGCRYPT_PAUSE seconds, default 0.2) when it runs in the background.
 """
+import contextlib
 import json
 import os
 import re
@@ -438,9 +439,45 @@ def _row_space(r):
     return int(r["org_id"]) if r["org_id"] else oc.oc_user_space(r["owner_id"])
 
 
-def space_rows(c, list_ids=None, commit=False):
+# 2.585.0 (#4836): an account / organisation deletion reseals the files that live on for their space now and then drops its key,
+# all in one transaction (the files on the disk at once, the rows at its COMMIT). A background pass that read the spaces before
+# that COMMIT sealed a file again for the space it had read -- with the key that the COMMIT then dropped (lost for good). The
+# deletion holds this lock until its COMMIT (oc_spaces_lock), the background pass holds it while it reads and works one portion
+# (oc_spaces_held): it waits for the COMMIT and reads what is true then; the deletion waits at most for one portion
+OC_SPACES_LOCK = "orgcrypt:spaces"
+
+
+def oc_spaces_lock(c):
+    """2.585.0 (#4836): until the end of c's transaction no background pass reads or reseals files of any space."""
+    write_lock(c, OC_SPACES_LOCK)
+
+
+class oc_spaces_held:  # noqa: N801 -- used like a function (with oc_spaces_held(c): ...)
+    """2.585.0 (#4836): the background pass's side of oc_spaces_lock, as a session lock: it outlives the commits inside a
+    portion (key rows, the read transaction) and ends at the end of the block."""
+
+    def __init__(self, c):
+        self.c = c
+
+    def __enter__(self):
+        self.c.execute("SELECT pg_advisory_lock(hashtext(?))", (OC_SPACES_LOCK,)).fetchone()
+        return self
+
+    def __exit__(self, *exc):
+        try:
+            self.c.rollback()  # an aborted statement inside would refuse the unlock
+            self.c.execute("SELECT pg_advisory_unlock(hashtext(?))", (OC_SPACES_LOCK,)).fetchone()
+            self.c.commit()
+        except Exception as e:  # noqa: BLE001 -- the connection closes at the end of the pass (and the lock with it)
+            print(TAG, "spaces lock not released:", type(e).__name__, flush=True)
+        return False
+
+
+def space_rows(c, list_ids=None, commit=False, held=False, pause=0.0):
     """Yields lists of (full path, space id) in portions of BATCH rows (list_ids: only the files of these lists).
-    commit: end the read transaction after each portion (the background pass; never inside a caller's transaction)."""
+    commit: end the read transaction after each portion (the background pass; never inside a caller's transaction).
+    held (2.585.0, #4836): each portion is read and worked under oc_spaces_held (the caller resealing files); pause = the wait
+    between two portions, outside the lock (was files_settle's)."""
     for table, idc, sql, lcol in SPACE_SQL:
         if list_ids is not None and lcol is None:
             continue
@@ -451,11 +488,14 @@ def space_rows(c, list_ids=None, commit=False):
                 ids = sorted({int(x) for x in list_ids})
                 q += f" AND {lcol} IN ({','.join('?' * len(ids)) or 'NULL'})"
                 args += ids
-            with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
-                rows = c.execute(q + f" ORDER BY {idc} LIMIT {BATCH}", args).fetchall()
-            if commit:
-                c.commit()
-            yield [(os.path.join(ATT_DIR, r["path"]), _row_space(r)) for r in rows]
+            with oc_spaces_held(c) if held else contextlib.nullcontext():
+                with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
+                    rows = c.execute(q + f" ORDER BY {idc} LIMIT {BATCH}", args).fetchall()
+                if commit:
+                    c.commit()
+                yield [(os.path.join(ATT_DIR, r["path"]), _row_space(r)) for r in rows]  # held: the caller works it under the lock
+            if pause:
+                time.sleep(pause)
             if len(rows) < BATCH:
                 break
             last = rows[-1]["rid"]
@@ -683,7 +723,7 @@ def files_settle(c, stop=None, list_ids=None, pause=0.0):
             keys[sid] = oc.oc_key(c, sid, create=create)
             c.commit()
         return keys[sid]
-    for part in space_rows(c, list_ids, commit=True):
+    for part in space_rows(c, list_ids, commit=True, held=True, pause=pause):  # 2.585.0 (#4836): not next to a deletion's resealing
         if stop and stop():  # once per portion (the start-up pass asks the database)
             return out
         for p, sid in part:
@@ -719,8 +759,6 @@ def files_settle(c, stop=None, list_ids=None, pause=0.0):
             except (OSError, oc.OrgCryptError) as e:
                 out["failed"] += 1
                 print(TAG, "cannot seal a file:", str(e) if isinstance(e, oc.OrgCryptError) else type(e).__name__, flush=True)
-        if pause:
-            time.sleep(pause)
     return out
 
 
@@ -766,6 +804,7 @@ def before_user_delete(c, uid):
     if not oc.oc_enabled():
         return 0, 0
     me_sid = oc.oc_user_space(uid)
+    oc_spaces_lock(c)  # 2.585.0 (#4836): no background pass reseals a file for the space it read before this COMMIT
     with system_ctx(c):  # orgcrypt: key rows / server-side bulk work are infrastructure, never content handed to a person
         if not c.execute("SELECT 1 FROM user_keys WHERE user_id=?", (int(uid),)).fetchone():
             return 0, 0
@@ -900,6 +939,7 @@ def before_org_delete(c, oid):
     list gets the owner's account key (when private files are sealed), the chat / file store files count as well."""
     if not oc.oc_enabled():
         return 0, 0
+    oc_spaces_lock(c)  # 2.585.0 (#4836): no background pass reseals a file for the space it read before this COMMIT
     att = {}
     for part in space_rows(c):
         att.update(part)
