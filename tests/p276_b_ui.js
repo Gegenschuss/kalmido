@@ -91,6 +91,9 @@ function writeCatalogue() {
   // search
   // 2.555.0 (#4664): the field fresh each time - the settings form may be drawn anew once the catalogue is there (a held
   // element would be a detached copy on a slow machine)
+  // #3506 (CI red of 2.563.1): the office's own packs (pkc_loadPacks) answer after the catalogue on a slow runner and draw the
+  // settings again too: the search starts once they are there
+  await until(() => w.eval('!!PKC.packs && !PKC.packsBusy'), 80);
   const typeQ = v => { const q = d.querySelector('#pkc-q'); q.value = v; q.dispatchEvent(new w.Event('input', {bubbles: true})); };
   typeQ('austr');
   check(await until(() => cards(d).length === 1 && cards(d)[0] === 'country/AT'), 'search "austr": only AT ' + cards(d));
