@@ -13,10 +13,17 @@ preview moves / removes / sets cuts and drops blank pages, POST .../split makes 
 process like tasks/attachtext.py) in the stack's folder, with its shares, through the same recognition (ingest); the
 stack goes to the trash. POST .../unsplit is the undo (the new documents into the trash, the stack back with its archive
 number). Agents never reach these routes; the workspace boundary stays (the folder of the stack, never another one).
+2.580.0 (#4401): a clear stack (sp_clear: every document starts with an archive number code, no pages before the first code,
+no number twice in the stack nor already taken in the workspace, at most SP_PAGES pages) is split without a person: the
+recognition marks it "auto", the queue (docs/ingest.py, sp_auto_queued) splits it as its owner with the proposed cuts
+(separator sheets and blank pages left out) through the same core as the route (_sp_do); its parts carry "auto" (the hint
+"Split automatically from a stack - Undo"). Anything else (or a failure of the automatic split) stays "open" as before; the
+undo of an automatic split marks the stack "hand" (never split automatically again).
 
 doc_meta.split_scan: JSON (no content of the document, only numbers): {v, n (pages), pages: [{asn, sep, ink, blank}],
-state: open | none | single | long | done, parts? (ids after a split), asn? (the stack's own number before it), from?
-(a part: the stack's id), no_asn? (a part: the pages before the first code)}."""
+state: open | auto | none | single | long | done, parts? (ids after a split), asn? (the stack's own number before it), from?
+(a part: the stack's id), no_asn? (a part: the pages before the first code), auto? (2.580.0 #4401: split automatically -- stack and parts), hand? (the
+undo of an automatic split: the stack waits for a person)}."""
 import base64
 import json
 import os
@@ -36,7 +43,7 @@ from ..core.db import body, bump, db, err, iso, now_utc
 from ..core.i18n import tr
 from ..core.access import Denied
 from ..accounts.session import me
-from ..files.store import fs_log_add, fs_read, need_node
+from ..files.store import fs_log_add, fs_read, fs_role, need_node
 from . import store as S
 from . import ocr as O
 from ..office.periodlock import pl_tree_need_open  # 2.237.0
@@ -266,6 +273,31 @@ def sp_plan(pages):
     return starts, drop, codes >= 2 or (bool(drop) and len(starts) >= 2)
 
 
+def sp_clear(c, ws, nid, pages):
+    """2.580.0 (#4401): the parts ([[1-based page, ...], ...]) of a stack clear enough to split without a person, else None.
+    Clear: two documents or more, each starting with an archive number code (no pages without one before the first code,
+    no separator sheet followed by a page without a code), no number twice in the stack, none already taken by another
+    document of workspace ws, at most SP_PAGES pages. Separator sheets and blank pages are left out (as in the preview)."""
+    if not isinstance(pages, list) or not 2 <= len(pages) <= SP_PAGES:
+        return None
+    starts, drop, stack = sp_plan(pages)
+    if not stack or len(starts) < 2:
+        return None
+    asns = [pages[i].get("asn") for i in starts]
+    if any(a is None for a in asns) or len(set(asns)) != len(asns):
+        return None
+    if any(S.asn_taken(c, ws, a, nid) for a in asns):
+        return None
+    parts = []
+    for k, s in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(pages)
+        ps = [i + 1 for i in range(s, end) if i not in drop and not pages[i].get("blank")]
+        if not ps:
+            return None
+        parts.append(ps)
+    return parts
+
+
 def _get(m):
     try:
         v = json.loads(m["split_scan"] or "{}")
@@ -292,7 +324,7 @@ def sp_detect(c, nid, data, res):
         return
     if cur.get("state") in ("none", "done"):
         return
-    keep = {k: cur[k] for k in ("from", "no_asn") if k in cur}
+    keep = {k: cur[k] for k in ("from", "no_asn", "auto") if k in cur}  # 2.580.0 (#4401): a part keeps its "auto" hint
     n = int(res.get("pages") or 0)
     if n > SP_PAGES:
         _put(c, nid, {**keep, "v": 1, "n": n, "state": "long"})
@@ -301,8 +333,13 @@ def sp_detect(c, nid, data, res):
     if pages is None:
         return
     stack = sp_plan(pages)[2]
-    _put(c, nid, {**keep, "v": 1, "n": n, "pages": pages, "state": "open" if stack else "single", "at": _now()})
-    if stack:
+    # 2.580.0 (#4401): a clear stack is split by the queue (sp_auto_queued), not in this recognition run; a stack whose
+    # automatic split was undone (hand) waits for a person
+    auto = stack and not cur.get("hand") and sp_clear(c, m["ws"], nid, pages) is not None
+    if cur.get("hand"):
+        keep["hand"] = 1
+    _put(c, nid, {**keep, "v": 1, "n": n, "pages": pages, "state": "auto" if auto else "open" if stack else "single", "at": _now()})
+    if stack and not auto:
         c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
 
 
@@ -337,12 +374,14 @@ def sp_view(m):
     """What a document's JSON carries: {stack} while it waits for a decision, {from, no_asn} on a part; None else."""
     v = _get(m)
     out = {}
-    if v.get("state") == "open":
+    if v.get("state") in ("open", "auto"):  # 2.580.0 (#4401): "auto" = about to be split by the queue (a stack till then)
         out["stack"] = True
     if v.get("from"):
         out["from"] = v["from"]
         if v.get("no_asn"):
             out["no_asn"] = True
+        if v.get("auto"):
+            out["auto"] = True
     return out or None
 
 
@@ -368,8 +407,8 @@ def _sp_trash_need(c, uid, n):
 @app.get("/api/docs/<int:nid>/split")
 def docs_split_get(nid):
     """The pages of a PDF document with the proposed cuts: {pages: n, scan: [{asn, sep, blank}], starts, drop, stack,
-    prefix}. A document never scanned (older than 2.154): 2.209.0 C (#2589) 202 {scanning, pages} -- the queue reads its
-    pages (sp_scan_queued), the preview asks again."""
+    prefix, clear (2.580.0 #4401: the parts of a clear stack, sp_clear, else null), name}. A document never scanned (older
+    than 2.154): 2.209.0 C (#2589) 202 {scanning, pages} -- the queue reads its pages (sp_scan_queued), the preview asks again."""
     _no_agent()
     c = db()
     m, n = _stack(c, nid, write=True)
@@ -394,7 +433,8 @@ def docs_split_get(nid):
         return jsonify(scanning=True, pages=m["pages"]), 202
     starts, drop, stack = sp_plan(pages)
     return jsonify(pages=len(pages), scan=[{"asn": p.get("asn"), "sep": bool(p.get("sep")), "blank": bool(p.get("blank"))} for p in pages],
-                   starts=starts, drop=drop, stack=stack, prefix=S.cfg_get(c, m["ws"])["asn_prefix"])
+                   starts=starts, drop=drop, stack=stack, prefix=S.cfg_get(c, m["ws"])["asn_prefix"],
+                   clear=sp_clear(c, m["ws"], nid, pages) if stack else None, name=n["name"])  # 2.580.0 (#4401): the cuts of a clear stack
 
 
 @app.get("/api/docs/<int:nid>/split/thumbs")
@@ -479,12 +519,60 @@ def _cut(data, parts):
     return out
 
 
+class _SpCut(Exception):
+    """2.580.0 (#4401): the stack could not be cut (encrypted / unreadable / too large) -- its code is the S.ERRORS key."""
+
+
+def _sp_do(c, uid, nid, m, n, v, parts, data, auto=False):
+    """2.580.0 (#4401): the split itself, shared by the route (a person) and the queue (sp_auto_queued, the stack's owner):
+    cut the PDF in a limited child process (_cut), store the parts in the stack's folder (with its shares) through the same
+    recognition (docs_ingest as account uid), give each part the archive number of its code, move the stack into the trash
+    (deleted_by = uid, so its owner can undo it). The caller holds write_lock docs_split_<nid>, checked the state, the right
+    (_sp_trash_need) and the parts, and commits; on an exception (_SpCut, QuotaExceeded, ValueError, Denied) it rolls back.
+    Returns the new ids."""
+    from .ingest import docs_ingest
+    try:
+        pdfs = _cut(data, parts)
+    except (ValueError, OSError, subprocess.SubprocessError) as e:
+        raise _SpCut(str(e)) from None
+    scan = v.get("pages") if isinstance(v.get("pages"), list) else []
+    asn_of = lambda ps: next((scan[p - 1].get("asn") for p in ps if p - 1 < len(scan) and scan[p - 1].get("asn") is not None), None)  # noqa: E731
+    own_asn = m["asn"]
+    stem = re.sub(r"\.pdf$", "", n["name"], flags=re.I)[:110] or "document"
+    ids, have_code = [], False
+    with c.savepoint():
+        c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part (2.154.0 E: undone on a failure)
+        for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
+            pid = docs_ingest(c, uid, n["org_id"], f"{stem} ({i}).pdf", pdf, "application/pdf", m["source"], parent_id=n["parent_id"])
+            fs_log_add(c, pid, "upload", "split")
+            c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
+                      "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
+            ids.append(pid)
+        S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): only around the numbers, after the parts are stored: a save with "next" waits
+        for ps, pid in zip(parts, ids):
+            a = asn_of(ps)
+            extra = {"from": nid, **({"auto": 1} if auto else {})}
+            if a is not None and not S.asn_taken(c, m["ws"], a, pid):
+                c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (a, json.dumps({"asn": "code"}), pid))
+                have_code = True
+            elif not have_code:
+                extra["no_asn"] = True  # the pages before the first code
+                c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (pid,))
+            _put(c, pid, extra)
+    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
+    fs_log_add(c, nid, "trash", "split")
+    _put(c, nid, {**v, "state": "done", "parts": ids, "asn": own_asn, **({"auto": 1} if auto else {})})
+    c.execute("UPDATE doc_meta SET review=0 WHERE node_id=?", (nid,))
+    bump(c)
+    return ids
+
+
 @app.post("/api/docs/<int:nid>/split")
 def docs_split(nid):
     """{parts: [[1, 2], [3], ...]} (1-based pages; pages left out are dropped: blank pages, separator sheets) -> the new
     documents in the stack's folder (with its shares), the stack into the trash. 201 {ids, stack_id}."""
     from ..admin.hosting import QuotaExceeded
-    from .ingest import docs_ingest, docs_kick
+    from .ingest import docs_kick
     _no_agent()
     c = db()
     uid = me()
@@ -507,34 +595,10 @@ def docs_split(nid):
     if data is None:
         return err(tr("Only a PDF with two pages or more can be split"), 409)
     try:
-        pdfs = _cut(data, parts)
-    except (ValueError, OSError, subprocess.SubprocessError) as e:
+        ids = _sp_do(c, uid, nid, m, n, v, parts, data)
+    except _SpCut as e:
+        c.rollback()
         return err(tr(S.ERRORS.get(str(e), S.ERRORS["unreadable"])), 422)
-    scan = v.get("pages") if isinstance(v.get("pages"), list) else []
-    asn_of = lambda ps: next((scan[p - 1].get("asn") for p in ps if p - 1 < len(scan) and scan[p - 1].get("asn") is not None), None)  # noqa: E731
-    own_asn = m["asn"]
-    stem = re.sub(r"\.pdf$", "", n["name"], flags=re.I)[:110] or "document"
-    ids, have_code = [], False
-    try:
-        with c.savepoint():
-            c.execute("UPDATE doc_meta SET asn=NULL WHERE node_id=?", (nid,))  # the stack's number goes to its part (2.154.0 E: undone on a failure)
-            for i, (ps, pdf) in enumerate(zip(parts, pdfs), 1):
-                pid = docs_ingest(c, uid, n["org_id"], f"{stem} ({i}).pdf", pdf, "application/pdf", m["source"], parent_id=n["parent_id"])
-                fs_log_add(c, pid, "upload", "split")
-                c.execute("INSERT INTO fs_shares(node_id, user_id, group_id, agent_id, role, expires_at, created_by, created_at) "
-                          "SELECT ?, user_id, group_id, agent_id, role, expires_at, created_by, created_at FROM fs_shares WHERE node_id=?", (pid, nid))
-                ids.append(pid)
-            S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): only around the numbers, after the parts are stored: a save with "next" waits
-            for ps, pid in zip(parts, ids):
-                a = asn_of(ps)
-                extra = {"from": nid}
-                if a is not None and not S.asn_taken(c, m["ws"], a, pid):
-                    c.execute("UPDATE doc_meta SET asn=?, auto=? WHERE node_id=?", (a, json.dumps({"asn": "code"}), pid))
-                    have_code = True
-                elif not have_code:
-                    extra["no_asn"] = True  # the pages before the first code
-                    c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (pid,))
-                _put(c, pid, extra)
     except QuotaExceeded:
         c.rollback()
         return err(tr("Your storage is full"), 413)
@@ -544,14 +608,57 @@ def docs_split(nid):
     except Denied as e:  # 2.154.0 E (#1111): e.g. no write right in the stack's folder
         c.rollback()
         return err(e.msg or tr("No permission (view only)"), 403)
-    c.execute("UPDATE fs_nodes SET deleted_at=?, deleted_by=? WHERE id=?", (_now(), uid, nid))
-    fs_log_add(c, nid, "trash", "split")
-    _put(c, nid, {**v, "state": "done", "parts": ids, "asn": own_asn})
-    c.execute("UPDATE doc_meta SET review=0 WHERE node_id=?", (nid,))
-    bump(c)
     c.commit()
     docs_kick()
     return jsonify(ids=ids, stack_id=nid), 201
+
+
+def sp_auto_queued(c):
+    """2.580.0 (#4401): the queue (docs/ingest.py) splits one stack the recognition found clear (state "auto") as its owner
+    -- the same core as the route (_sp_do), the same checks (trash rules, rights in the stack's folder through docs_ingest /
+    fs_put of the owner: never another folder). Checked once more right before (sp_clear: a number may have been taken
+    meanwhile); anything that keeps it from splitting leaves it "open" (Stack - split?, To review). Returns 1 when it took one."""
+    r = c.execute("SELECT d.node_id FROM doc_meta d JOIN fs_nodes n ON n.id=d.node_id WHERE d.split_scan ILIKE '%\"state\":\"auto\"%' "
+                  "AND d.state='done' AND n.deleted_at IS NULL ORDER BY d.node_id LIMIT 1").fetchone()
+    if not r:
+        return 0
+    nid = r[0]
+    write_lock(c, f"docs_split_{int(nid)}")  # with a person's click on "Split" at the same time: one of them splits
+    m = S.meta_row(c, nid)
+    v = _get(m) if m else {}
+    if not m or v.get("state") != "auto":
+        c.commit()
+        return 1
+    n = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
+    uid = n["owner_id"] if n and not n["deleted_at"] and n["kind"] == "file" else None
+    parts = sp_clear(c, m["ws"], nid, v.get("pages")) if uid and m["state"] == "done" else None
+    why = "unclear"
+    if parts and fs_role(c, nid, uid) in ("owner", "edit"):
+        try:
+            _sp_trash_need(c, uid, n)
+            data = _pdf_of(c, nid, m, n)
+            if data is None:
+                raise _SpCut("unreadable")
+            _sp_do(c, uid, nid, m, n, v, parts, data, auto=True)
+            c.commit()
+            from .ingest import docs_kick
+            docs_kick()
+            return 1
+        except Exception as e:  # noqa: BLE001 -- _SpCut, Denied (locked month, receipt, rights), quota, a broken file: a person decides
+            why = type(e).__name__
+            c.rollback()
+            write_lock(c, f"docs_split_{int(nid)}")
+            m = S.meta_row(c, nid)
+            v = _get(m) if m else {}
+            if not m or v.get("state") != "auto":
+                c.commit()
+                return 1
+    print("docs: automatic split left to a person", nid, why, flush=True)
+    _put(c, nid, {**v, "state": "open"})
+    c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
+    bump(c)
+    c.commit()
+    return 1
 
 
 @app.post("/api/docs/<int:nid>/unsplit")
@@ -593,7 +700,9 @@ def docs_unsplit(nid):
         S.asn_lock(c, m["ws"], nid)  # 2.363.3 (#3133): as in the split
         if not S.asn_taken(c, m["ws"], a, nid):
             c.execute("UPDATE doc_meta SET asn=? WHERE node_id=?", (a, nid))
-    rest = {k: x for k, x in v.items() if k not in ("parts", "asn")}
+    rest = {k: x for k, x in v.items() if k not in ("parts", "asn", "auto")}
+    if v.get("auto"):
+        rest["hand"] = 1  # 2.580.0 (#4401): an automatic split undone -- the stack waits for a person, never split automatically again
     _put(c, nid, {**rest, "state": "open"})
     c.execute("UPDATE doc_meta SET review=1 WHERE node_id=?", (nid,))
     bump(c)

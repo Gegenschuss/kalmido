@@ -184,7 +184,15 @@ def docs_run_once():
                 S.redo_purge(c)  # 2.363.3 (#3134)
             c.commit()
         docs_take_up(c)
-        stale = iso(now_utc() - timedelta(minutes=RUN_STALE))
+        from .split import sp_auto_queued  # 2.580.0 (#4401): a clear stack is split out of its recognition run, before the next document
+        try:
+            with system_ctx(c):  # docs queue: splits a clear stack as its owner (rights of the owner, the stack's folder), nothing handed to another person
+                if sp_auto_queued(c):
+                    return 1
+        except Exception as e:  # noqa: BLE001 -- the queue never dies (sp_auto_queued leaves a stack it cannot split "open")
+            c.rollback()
+            print("docs: automatic split", type(e).__name__, e, flush=True)
+        stale =iso(now_utc() - timedelta(minutes=RUN_STALE))
         with system_ctx(c):  # docs queue: server-side recognition of every workspace's documents, nothing handed to a person
             r = None
             # 2.149.0 C (#2516): the three writes below only touch waiting / running rows: none (the usual idle tick) -> no writes

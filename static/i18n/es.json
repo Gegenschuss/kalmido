@@ -16791,6 +16791,8 @@
   "Web research per routine": "Búsqueda web por rutina",
   "Read only: search the web, read a page, check a VAT number with the EU service VIES. Off by default. A run with the web never sends forms; every change and every message to someone else then waits for your approval, and each web find names its source.": "Solo lectura: buscar en la web, leer una página, comprobar un NIF-IVA con el servicio VIES de la UE. Desactivado por defecto. Una ejecución con web nunca envía formularios; cada cambio y cada mensaje a otra persona espera entonces tu aprobación, y cada hallazgo web indica su fuente.",
   "Web: {0} searches, {1} pages, {2} VAT checks": "Web: {0} búsquedas, {1} páginas, {2} comprobaciones de IVA",
+  "Split automatically from a stack": "Dividido automáticamente de una pila",
+  "Stack restored: {0}": "Pila restaurada: {0}",
   "Backup": "Copia de seguridad",
   "People, invitations, agents and data": "Personas, invitaciones, agentes y datos",
   "Sign-in, server, log, backups": "Inicio de sesión, servidor, registro, copias de seguridad",

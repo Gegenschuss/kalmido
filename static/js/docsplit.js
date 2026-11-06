@@ -18,6 +18,8 @@ function dsp_sheetHtml(d, w) {
   // in the box "To review" the stack question is part of the box (docs.js sugHtml); here only without a review
   if (d.split?.stack && w && !d.review) out.push(`<div class="dc-due dsp-hint" role="group" aria-label="${esc(tr('Stack - split?'))}"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Stack - split? Several archive numbers were found on its pages.'))}</span></span>
     ${dsp_stackBtns()}</div>`);
+  // 2.580.0 (#4401): a part of a stack the queue split without a person: the hint with its undo (the whole stack comes back)
+  if (d.split?.auto && d.split.from) out.push(`<div class="dc-due muted dsp-auto"><span class="dc-ht">${ic('scissors', 's')} <span>${esc(tr('Split automatically from a stack'))}</span></span>${w ? `<button type="button" class="btn sm" data-dsp="unsplit">${tr('Undo')}</button>` : ''}</div>`);
   if (d.split?.no_asn) out.push(`<div class="dc-due muted dsp-noasn"><span class="dc-ht">${ic('info', 's')} <span>${esc(tr('Without an archive number: the pages before the first code of a stack.'))}</span></span></div>`);
   if (d.task) {
     out.push(`<div class="dc-due dsp-task"><span class="dc-ht">${ic(d.task.done ? 'done' : 'check', 's')} <span>${tr('Task')}: <a href="#t/${+d.task.id}">${esc(d.task.title)}</a></span></span>${w ? `<button type="button" class="btn sm" data-dsp="unlink">${tr('Unlink')}</button>` : ''}</div>`);
@@ -50,6 +52,7 @@ document.addEventListener('click', async e => {
     return;
   }
   b.disabled = true;
+  if (act === 'unsplit') { dsp_unsplit(d, b); return; }  // 2.580.0 (#4401)
   if (act === 'dismiss') {
     const go = undo => async () => { await api('POST', `/api/docs/${d.id}/split/dismiss`, undo ? {undo: true} : {}); await dsp_redraw(d.id); dc_load(); return {}; };
     try { await go(false)(); } catch { b.disabled = false; return; }
@@ -63,6 +66,19 @@ document.addEventListener('click', async e => {
     histToast(label, histAdd({label, undo: go(true), redo: go(false)}));
   }
 });
+
+// 2.580.0 (#4401): undo an automatic split from one of its parts -- the parts into the trash, the stack back ("Stack - split?");
+// its own undo splits it again with the cuts the server proposes (GET .../split clear)
+async function dsp_unsplit(d, b) {
+  const sid = +d.split.from;
+  let j; try { await api('POST', `/api/docs/${sid}/unsplit`); j = await api('GET', `/api/docs/${sid}/split`); } catch { b.disabled = false; return; }
+  $('.dc-md')?.remove();
+  dc_load();
+  const parts = j?.clear || null, label = tr('Stack restored: {0}', j?.name || d.name);
+  const unsplit = async () => { await api('POST', `/api/docs/${sid}/unsplit`); dc_load(); return {}; };
+  if (!parts) { toast(label); return; }
+  histToast(label, histAdd({label, undo: async () => { await api('POST', `/api/docs/${sid}/split`, {parts}); dc_load(); return {}; }, redo: unsplit}));
+}
 
 // ---- link with an existing task: the open tasks I may change, this workspace's (a private document: private lists only)
 function dsp_pick(d) {

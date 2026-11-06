@@ -58,12 +58,14 @@ const FEAT = 'cal,comments,collab,office,clients,docs,files';
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT});
   check(((await call(CF, 'GET', '/api/state')).me?.workspaces || []).length === 0, 'frida is in no organisation');
+  // 2.580.0 (#4401): a clear stack is split without a person -- the letter holds number 202 first, so this stack waits for "Split"
+  const ONE = await up(CF, 'brief.pdf', stackPdf(['Ein Brief\nBeispiel Verein e.V.']));
+  for (let i = 0; i < 240 && !['done', 'failed'].includes((await call(CF, 'GET', `/api/docs/${ONE}`)).state); i++) await sleep(500);
+  check((await call(CF, 'PATCH', `/api/docs/${ONE}`, {asn: 202})).http < 300, 'the letter takes archive number 202');
   const SID = await up(CF, 'stapel.pdf', stackPdf(['qr:ASN00201\nRechnung Eins\nBeispiel Strom GmbH', 'Seite zwei der Rechnung\nSumme 12,00 EUR',
     'qr:ASN00202\nVertrag Zwei\nBeispiel Versicherung AG', 'Anlage zum Vertrag\nSeite vier']));
   let d; for (let i = 0; i < 240 && !['done', 'failed'].includes((d = await call(CF, 'GET', `/api/docs/${SID}`)).state); i++) await sleep(500);
   check(d.split?.stack === true, 'the stack is marked ' + JSON.stringify(d.split));
-  const ONE = await up(CF, 'brief.pdf', stackPdf(['Ein Brief\nBeispiel Verein e.V.']));
-  for (let i = 0; i < 240 && !['done', 'failed'].includes((await call(CF, 'GET', `/api/docs/${ONE}`)).state); i++) await sleep(500);
   const st = await call(CF, 'GET', '/api/state');
   const INB = (st.lists || []).find(l => l.is_inbox)?.id;
   const TID = (await call(CF, 'POST', '/api/tasks', {title: 'Vereinsbeitrag zahlen', list_id: INB})).id;
