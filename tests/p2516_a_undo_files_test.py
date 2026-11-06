@@ -78,7 +78,9 @@ LOGO_USED, LOGO_FREE, LHS_USED = "logo-" + "a" * 16 + ".png", "logo-" + "b" * 16
 # invoice 2 (not of the import: finalised after it) names the logo and the letterhead copy in its sealed sender
 snd = json.dumps({{"name": "Studio Beispiel", "logo": LOGO_USED, "letterhead": {{"file": LHS_USED}}}})
 enc = oc_enc_fields(c, OID, "office_docs", {{"sender": snd}})["sender"]
-c.execute("UPDATE office_docs SET sender=? WHERE id=?", (enc, I2))
+from kalmido.office.model import ofx_release
+with ofx_release(c):  # the hand-made setup writes a finalised row: past the trigger of #4598, like the app's deliberate exceptions
+    c.execute("UPDATE office_docs SET sender=? WHERE id=?", (enc, I2))
 c.commit()
 out["sealed"] = LOGO_USED not in str(c.execute("SELECT sender FROM office_docs WHERE id=?", (I2,)).fetchone()[0])
 # the recording of _a_doc: the real path -> its rows
