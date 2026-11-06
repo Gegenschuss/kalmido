@@ -49,6 +49,7 @@ DL_TABLES = {
     "group_shares": "full", "group_members": "full", "folder_people": "full",
     "org_members": "full",  # 2.46.0 (#1603): lists seen by the whole organisation follow its members
     "list_keys": "full", "list_key_pending": "full",  # 2.64.1 (#1817): a list key handed out / the waiting list of the lock
+    "filters": "full",  # 2.577.0 (#3356): a shared view is in the state of everyone in its project
 }
 # 2.280.0 A (#3109): "full" tables of one list: (list column, person column or "", the person's own columns or ""). A change
 # there is "full" only for whoever sees that list now (row list_id, task_id NULL) and for that person (row user_id, list_id
@@ -58,6 +59,7 @@ DL_SCOPE = {
     "lists": ("id", "", ""), "sections": ("list_id", "", ""), "list_fields": ("list_id", "", ""), "list_tags": ("list_id", "", ""),
     "list_members": ("list_id", "user_id", "folder,sort,view"), "list_keys": ("list_id", "user_id", ""),
     "list_key_pending": ("list_id", "user_id", ""),
+    "filters": ("list_id", "user_id", ""),  # 2.577.0 (#3356): a private filter: its person only
 }
 DL_LIST_VIS = "owner_id,org_id,org_visibility,life,family,deleted_at,e2e"  # the columns of lists the list scope reads (access.py)
 # one function for all of them; TG_ARGV = the id columns (to_jsonb reads a column by name from any row type)

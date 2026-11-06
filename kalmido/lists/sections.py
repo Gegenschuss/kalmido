@@ -8,43 +8,95 @@ from ..core.pg import insert_id, write_lock
 from ..core.i18n import tr
 from ..core.db import body, bump, db, err, iso, now_utc, uset, usettings
 from ..accounts.session import me
-from ..core.access import Denied, need_list
+from ..core.access import Denied, is_project, need_list
 from ..lists.lists import clean_folder, FOLDER_DEPTH, FOLDER_SEP, folder_under
 from ..lists.groups import grp_list_ids, grp_sync, grp_touch
 from ..core.errors import BadInput  # 2.149.0 G (#2517): pulled up from functions
 from ..lists.lists import lp_folder_rename  # 2.369.5 (#2517): pulled up from functions
 from ..lists.seckind import sk_clean  # 2.577.0 (#3354)
+from ..tasks.validation import as_int
+
+
+def view_rules(rules):
+    """2.577.0 (#3356): a shared view is the view of its one project: no other project in its rules (old rules.lists, a
+    project / folder condition of the dialog since 2.521.0)."""
+    out = {k: v for k, v in (rules or {}).items() if k != "lists"}
+    if isinstance(out.get("conds"), list):
+        out["conds"] = [x for x in out["conds"] if not (isinstance(x, dict) and x.get("f") in ("list", "folder"))]
+    return out
+
+
+def view_plain(c, lid, name, rules):
+    """2.577.0 (#3356): a view's name and text rule are stored readable: refused in a project encrypted in the browser, like a
+    notepad (its text rule could not match there anyway)."""
+    from ..collab.liste2e import le2a_locked_text
+    le2a_locked_text(c, lid, name, (rules or {}).get("text") if isinstance(rules, dict) else None)
 
 
 @app.post("/api/filters")
 def filter_create():
+    """2.577.0 (#3356): with list_id a shared view of that project (shared: true, the default then), for its editors."""
     b = body()
     name = (b.get("name") or "").strip()
     if not name:
         return err(tr("Name missing"))
     c = db()
-    srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE user_id=?", (me(),)).fetchone()[0]
-    cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id) VALUES(?,?,?,?,?)",
-                    (name, json.dumps(b.get("rules") or {}), srt, iso(now_utc()), me()))
+    if b.get("list_id") is None:
+        if b.get("shared"):
+            raise BadInput(tr("Invalid value: {0}", "shared"))
+        srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE user_id=? AND list_id IS NULL", (me(),)).fetchone()[0]
+        cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id) VALUES(?,?,?,?,?)",
+                           (name, json.dumps(b.get("rules") or {}), srt, iso(now_utc()), me()))
+    else:
+        lid = as_int(b["list_id"], "list_id", 1)
+        if b.get("shared") is False:
+            raise BadInput(tr("Invalid value: {0}", "shared"))
+        need_list(c, lid)
+        view_plain(c, lid, name, b.get("rules"))
+        if not is_project(c, lid):
+            raise BadInput(tr("Invalid value: {0}", "list_id"))
+        if not isinstance(b.get("rules") or {}, dict):
+            raise BadInput(tr("Invalid value: {0}", "rules"))
+        srt = c.execute("SELECT COALESCE(MAX(sort),0)+1 FROM filters WHERE list_id=? AND shared=1", (lid,)).fetchone()[0]
+        cur_id = insert_id(c, "INSERT INTO filters(name,rules,sort,created_at,user_id,list_id,shared) VALUES(?,?,?,?,?,?,1)",
+                           (name, json.dumps(view_rules(b.get("rules"))), srt, iso(now_utc()), me(), lid))
     bump(c)
     c.commit()
     return jsonify(id=cur_id)
 
 
-def need_filter(c, fid):
-    if not c.execute("SELECT 1 FROM filters WHERE id=? AND user_id=?", (fid, me())).fetchone():
+def filter_read(c, fid):
+    """2.577.0 (#3356): the filter row for whoever may read it: an own private filter, or a shared view of a project the person
+    sees right now. Anything else is 404 (a filter of someone else, a project left, moved out of reach or in the trash)."""
+    r = c.execute("SELECT * FROM filters WHERE id=?", (fid,)).fetchone()
+    if r and r["shared"]:
+        need_list(c, r["list_id"], write=False)
+    elif not r or r["user_id"] != me():
         raise Denied(404)
+    return r
+
+
+def need_filter(c, fid):
+    """Change / delete: an own private filter; a shared view for the project's editors (a reader: 403)."""
+    r = filter_read(c, fid)
+    if r["shared"]:
+        need_list(c, r["list_id"])
+    return r
 
 
 @app.patch("/api/filters/<int:fid>")
 def filter_update(fid):
     b = body()
     c = db()
-    need_filter(c, fid)
+    f = need_filter(c, fid)
+    if f["shared"]:
+        view_plain(c, f["list_id"], b.get("name"), b.get("rules"))
     if "name" in b and (b["name"] or "").strip():
         c.execute("UPDATE filters SET name=? WHERE id=?", (b["name"].strip(), fid))
     if "rules" in b:
-        c.execute("UPDATE filters SET rules=? WHERE id=?", (json.dumps(b["rules"] or {}), fid))
+        if f["shared"] and not isinstance(b["rules"] or {}, dict):
+            raise BadInput(tr("Invalid value: {0}", "rules"))
+        c.execute("UPDATE filters SET rules=? WHERE id=?", (json.dumps(view_rules(b["rules"]) if f["shared"] else b["rules"] or {}), fid))
     if "sort" in b:
         c.execute("UPDATE filters SET sort=? WHERE id=?", (b["sort"], fid))
     bump(c)

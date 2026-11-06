@@ -247,6 +247,7 @@ _OX_CORE_MEMBER = ("(NOT EXISTS (SELECT 1 FROM fs_nodes n WHERE n.kind='ref' AND
 OX_AREAS = (
     ("lists.json", "lists", f"id IN ({LSQ})"),  # 2.223.3 B (#2879, #2880): the lists of LSQ (ox_lsq), not the trash
     ("lists/sections.json", "sections", f"list_id IN ({LSQ})"),
+    ("lists/views.json", "filters", f"list_id IN ({LSQ})"),  # 2.577.0 (#3356): the shared views of a project (a private filter has no list_id)
     ("lists/members.json", "list_members", f"list_id IN ({LSQ})"),
     ("lists/fields.json", "list_fields", f"list_id IN ({LSQ})"),
     ("lists/tags.json", "list_tags", f"list_id IN ({LSQ})"),

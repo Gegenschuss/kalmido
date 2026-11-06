@@ -1163,14 +1163,14 @@ def v1_filter(r):
         rules = json.loads(r["rules"] or "{}")
     except ValueError:
         rules = {}
-    return {"id": r["id"], "name": r["name"], "rules": rules, "sort": r["sort"]}
+    return {"id": r["id"], "name": r["name"], "rules": rules, "sort": r["sort"], "list_id": r["list_id"], "shared": bool(r["shared"])}
 
 
 @app.get("/api/v1/filters")
 @v1_view
 def v1_filters():
     v1_args(())
-    return jsonify(data=[v1_filter(r) for r in db().execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (me(),))], next_cursor=None)
+    return jsonify(data=[v1_filter(r) for r in db().execute("SELECT * FROM filters WHERE user_id=? AND list_id IS NULL ORDER BY sort, id", (me(),))], next_cursor=None)
 
 
 @app.post("/api/v1/filters")
@@ -1205,6 +1205,29 @@ def v1_filter_delete(fid):
     v1_args(())
     v1_call(filter_delete, fid, body={})
     return Response(status=204)
+
+
+# 2.577.0 (#3356): the shared views of a project: read with the project, written by its editors (PATCH / DELETE: /filters/{id})
+@app.get("/api/v1/lists/<int:lid>/views")
+@v1_view
+def v1_list_views(lid):
+    v1_args(())
+    c = db()
+    need_list(c, lid, write=False)
+    return jsonify(data=[v1_filter(r) for r in c.execute("SELECT * FROM filters WHERE list_id=? AND shared=1 ORDER BY sort, id", (lid,))],
+                   next_cursor=None)
+
+
+@app.post("/api/v1/lists/<int:lid>/views")
+@v1_view
+def v1_list_view_create(lid):
+    """{name, rules}: rules like a saved filter, plus sort, group and display; any project in them is left out."""
+    v1_args(())
+    b = _v1_body(("name", "rules"))
+    if "rules" in b and not isinstance(b["rules"], dict):
+        raise BadInput(tr("Invalid value: {0}", "rules"))
+    j = v1_call(filter_create, body={**b, "list_id": lid})
+    return jsonify(v1_filter(db().execute("SELECT * FROM filters WHERE id=?", (j["id"],)).fetchone())), 201
 
 
 # News
@@ -1393,7 +1416,8 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
                                                         "role": {"type": "string", "enum": ["owner", *ROLES]}, "agent": {"type": "boolean"},
                                                         "via_group": {"type": "boolean"}}}
     schemas["MemberPage"] = page("Member")
-    schemas["Filter"] = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "rules": obj, "sort": {"type": "number"}}}
+    schemas["Filter"] = {"type": "object", "properties": {"id": {"type": "integer"}, "name": {"type": "string"}, "rules": obj, "sort": {"type": "number"},
+                                                  "list_id": {"type": ["integer", "null"]}, "shared": {"type": "boolean"}}}
     schemas["FilterPage"] = page("Filter")
     schemas["Folder"] = {"type": "object", "properties": {"path": {"type": "string"}, "lists": {"type": "integer"}}}
     schemas["FolderPage"] = page("Folder")
@@ -1581,6 +1605,11 @@ def api479_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "patch": op("Change a saved filter", S, ok(ref("Filter")) | errs("400", "404"), [pid("id", "Filter id")], scope="structure",
                         body={"type": "object", "properties": {"name": {"type": "string"}, "rules": obj, "sort": {"type": "number"}}}),
             "delete": op("Delete a saved filter", S, nobody | errs("404"), [pid("id", "Filter id")], scope="delete")},
+        # 2.577.0 (#3356)
+        "/lists/{id}/views": {
+            "get": op("The shared views of a project", L, ok(ref("FilterPage")) | errs("404"), [lp]),
+            "post": op("Save a shared view of a project", L, ok(ref("Filter"), "Created", "201") | errs("400", "403", "404"), [lp], scope="structure",
+                       body={"type": "object", "required": ["name"], "properties": {"name": {"type": "string"}, "rules": obj}})},
         "/news": {"get": op("Your News, newest first", "Account", ok(obj) | errs("400"), [q("filter", "mentions | me")])},
         "/news/read": {"post": op("Mark News read", "Account", ok(obj) | errs("400"), scope="comments",
                                   body={"type": "object", "properties": {"ids": ids, "all": {"type": "boolean"}}})},

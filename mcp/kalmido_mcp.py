@@ -288,7 +288,7 @@ def t_list_tasks(api, a):
     if a.get("milestone_id"):
         q["milestone_id"] = a["milestone_id"]
     # 2.390.0 B (#3355): priority, column, sprint, creator, reviewer, review state, custom field values, text, sort
-    q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key")))
+    q.update(_pick(a, ("priority_min", "section_id", "sprint_id", "created_by", "reviewer", "review", "q", "sort", "key", "filter_id")))
     if a.get("section_kind"):  # 2.577.0 (#3354)
         q["section_kind"] = ",".join(a["section_kind"]) if isinstance(a["section_kind"], list) else a["section_kind"]
     if a.get("delivery"):  # 2.392.2 (#3365)
@@ -644,6 +644,7 @@ TOOLS = [
            "priority": {"oneOf": [{"type": "string"}, {"type": "array", "items": PRIO}],
                         "description": "2.390.0: none | low | medium | high | urgent, several as a list or comma separated"},
            "priority_min": {**PRIO, "description": "2.390.0: at least this priority"},
+           "filter_id": {**S_ID, "description": "2.577.0: apply a saved filter or a shared view of a project (see list_views); brings its sort along"},
            "section_id": {"type": "string", "description": "2.390.0: a column (section) id, or none"},
            "section_kind": {"oneOf": [{"type": "string"}, {"type": "array", "items": S_KIND}],
                             "description": "2.577.0: the task's state: open | progress | review | done | rejected, several as a list or "
@@ -1772,6 +1773,12 @@ TOOLS += [
      lambda api, a: api.call("PATCH", f"/filters/{_id(a, 'filter_id')}", body=_without(a, "filter_id"))),
     ("delete_filter", "Delete a saved filter.", _obj({"filter_id": S_ID}, ["filter_id"]),
      lambda api, a: api.call("DELETE", f"/filters/{_id(a, 'filter_id')}")),
+    # 2.577.0 (#3356): shared views of a project; apply one with list_tasks(filter_id), change it with update_filter / delete_filter
+    ("list_views", "The shared views of a project (name + rules: filters, plus sort, group, display). Apply one with list_tasks filter_id.",
+     _obj({"list_id": S_ID}, ["list_id"]), lambda api, a: api.call("GET", f"/lists/{int(a['list_id'])}/views")),
+    ("create_view", "Save a shared view of a project (you need edit rights there): rules as for create_filter, plus sort, group, display.",
+     _obj({"list_id": S_ID, "name": {"type": "string", "minLength": 1}, "rules": {"type": "object"}}, ["list_id", "name"]),
+     lambda api, a: api.call("POST", f"/lists/{int(a['list_id'])}/views", body=_without(a, "list_id"))),
     # ---- files + comments
     ("upload_attachment", "Attach files to a task: files = [{name, base64, mime?}] (at most 10, each within the server's upload limit).",
      _obj({"task_id": S_ID, "files": FILES}, ["task_id", "files"]), t_upload_attachment),
@@ -2796,7 +2803,7 @@ TOOL_SCOPES = {
     "structure": ("create_trip", "add_shop_areas", "create_packing_list", "set_list_columns", "create_list", "update_list", "share_list", "unshare_list", "share_list_with_group",
                   "unshare_list_from_group", "create_section", "rename_section", "reorder_sections", "rename_folder", "delete_folder",
                   "create_field", "update_field", "create_list_tag", "update_list_tag", "delete_list_tag", "create_template",
-                  "update_template", "apply_template", "create_filter", "update_filter", "set_project_overview", "add_project_link",
+                  "update_template", "apply_template", "create_filter", "update_filter", "create_view", "set_project_overview", "add_project_link",
                   "update_project_link", "delete_project_link", "reorder_project_links", "set_project_status", "add_milestone", "update_milestone",
                   "delete_milestone", "create_client", "update_client", "delete_client", "bulk_clients", "create_form", "update_form", "delete_form"),
     "delete": ("delete_reward", "delete_note", "delete_list", "delete_section", "delete_task", "restore_task", "empty_trash", "delete_field", "delete_template",

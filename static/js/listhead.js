@@ -181,3 +181,41 @@ function o3c_ring(l, bar) {
   const v = Math.max(0, Math.min(100, Math.round(p.done / p.total * 100))), lab = tr('{0} of {1} done ({2}%)', p.done, p.total, v);
   return `<span class="o3c-ring" role="img" style="--p:${v}" aria-label="${esc(lab)}" title="${esc(lab)}"></span>`;
 }
+
+// ---- 2.577.0 (#3356): the shared views of a project (GET /api/state views, lists/sections.py; the server decides who sees and
+// changes them). A view is a saved filter of one project, plus sort, grouping and display; it opens in the project's own
+// page, per device, and stays a look at the project: everything else of the page keeps working. Not in the sidebar's filters
+const lv_of = lid => (S.views || []).filter(v => v.list_id === lid);
+const lv_cur = lid => { const id = (LS.get('lview', {}) || {})[lid]; return id ? (S.views || []).find(v => v.id === id && v.list_id === lid) || null : null; };
+const lv_keep = (t, lid) => { const v = lv_cur(lid); return !v || filterMatch(t, v.rules); };
+const lv_group = lid => { const g = lv_cur(lid)?.rules.group; return ['date', 'person', 'none'].includes(g) ? g : 'section'; };
+const lv_sorted = lid => !!lv_cur(lid)?.rules.sort;
+const lv_disp = l => { const d = lv_cur(l.id)?.rules.display; return d && !S.lvFree?.[l.id] ? d : ''; };  // a view tab chosen by hand wins until the next pick
+// open a view (id) or the whole project (null): its sort is put over the person's own one and given back afterwards
+function lv_pick(l, id) {
+  const k = 'sort2.l:' + l.id, o = LS.get('lview', {}) || {}, sv = LS.get('lvsort', {}) || {}, s = id ? (S.views || []).find(v => v.id === id)?.rules.sort : '';
+  if (l.id in sv) { if (sv[l.id] == null) LS.del(k); else LS.set(k, sv[l.id]); delete sv[l.id]; }
+  if (id) o[l.id] = id; else delete o[l.id];
+  if (s) { sv[l.id] = LS.get(k, null); LS.set(k, s); }
+  LS.set('lview', o); LS.set('lvsort', sv);
+  if (S.lvFree) delete S.lvFree[l.id];
+  render();
+}
+function lv_btn(l) {
+  if (l.is_inbox || l.archived || !lv_of(l.id).length) return '';
+  const cur = lv_cur(l.id), n = cur ? cur.name : tr('Views');
+  return `<button class="iconbtn tf shbtn lvbtn ${cur ? 'on' : ''}" data-act="lviews" data-ico="filter" data-id="${l.id}" aria-haspopup="menu" title="${esc(tr('Shared views') + (cur ? ': ' + cur.name : ''))}" aria-label="${esc(tr('Shared views') + (cur ? ': ' + cur.name : ''))}">${ic('filter', 's')}<span class="bl">${esc(n)}</span></button>`;
+}
+function lv_menu(anchor, l) {
+  if (!l) return;
+  const cur = lv_cur(l.id), ed = canEditList(l.id);
+  menu(anchor, [{label: tr('All tasks'), icon: 'list', on: !cur, fn: () => lv_pick(l, null)},
+    ...lv_of(l.id).map(v => ({label: v.name, icon: 'filter', on: cur?.id === v.id, fn: () => lv_pick(l, v.id)})),
+    ...(ed ? ['-', ...(cur ? [{label: tr('Edit view…'), icon: 'edit', fn: () => filterModal(cur.id, l.id)}] : []), {label: tr('New shared view…'), icon: 'plus', fn: () => filterModal(0, l.id)}] : [])]);
+}
+// the "…" menu: the way to the views where the header has no button (phones), the first view of a project
+function lv_items(l, inTop) {
+  if (l.is_inbox || l.archived || inTop) return [];
+  if (lv_of(l.id).length) return [{label: tr('Shared views'), icon: 'filter', fn: () => lv_menu($('#top [data-act="top-more"]') || $('#top h1'), l)}];
+  return canEditList(l.id) ? [{label: tr('New shared view…'), icon: 'filter', fn: () => filterModal(0, l.id)}] : [];
+}

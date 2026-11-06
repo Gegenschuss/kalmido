@@ -654,6 +654,8 @@ def openapi_spec():
                      q("review", "2.390.0: the review state", {"type": "string", "enum": ["pending", "approved", "changes", "none"]}),
                      q("q", "2.390.0: words in the title or notes (all of them, each as a word start)"),
                      q("key", "2.390.0: the task with this ticket key (APP-12; a current or an old key)"),
+                     q("filter_id", "2.577.0: an own saved filter or a shared view of a project you can read (else 404); combines with "
+                                    "the other parameters and brings its sort along", {"type": "integer"}),
                      q("sort", "2.390.0: priority, due, created, updated, title or manual; a leading - sorts descending (tasks "
                                "without a due date stay last). The cursor keeps the sort, pages stay stable with equal values",
                        {"type": "string", "enum": [x for k in ("priority", "due", "created", "updated", "title", "manual") for x in (k, "-" + k)]}),

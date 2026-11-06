@@ -136,7 +136,7 @@ const S = {
   route: {mod: 'tasks', key: 'inbox'}, sel: null, extra: null,
   collapsed: new Set(LS.get('collapsed', []).filter(x => x !== 'side:arch-open')),  // 1.6.1: the archive fold is gone
   calMonth: null, calSel: today(), quick: {ignore: new Set()},
-  filters: [], multi: new Set(), multiMode: false, occ: {key: '', items: []}, cal: {key: '', loading: '', items: [], subs: {}, evcals: {}}, calendars: {enabled: false, subs: 0},
+  filters: [], views: [], multi: new Set(), multiMode: false, occ: {key: '', items: []}, cal: {key: '', loading: '', items: [], subs: {}, evcals: {}}, calendars: {enabled: false, subs: 0},
   calMode: LS.get('calMode', 'month'), tlStart: null, quickPreset: {}, editContent: false,
   tl: {id: null}, drafts: {}, cfiles: {}, cedit: null, editLink: false,  // comments timeline of the open task
 };
@@ -1349,6 +1349,7 @@ function applyState(j, w0) {  // w0: S.wseq when its GET /api/state started (ld_
   S.tasks = new Map(j.tasks.map(t => { if (!('content' in t)) { const o = was?.get(t.id); if (o && 'content' in o && o.updated_at === t.updated_at && (String(o.content).length === t.content_n || tkNoteBusy(t.id))) t.content = o.content; } return [t.id, t]; }));
   lzTake(j);  // 2.369.2 (#3136): the lists whose tasks are not all here (liveparts.js)
   S.filters = j.filters || [];
+  S.views = j.views || [];  // 2.577.0 (#3356): the shared views of the projects I see
   S.notify = j.notify || null;  // 2.1.0 (#317) the notification matrix (the server's view)
   S.webpush = j.webpush || {enabled: false};
   S.news = j.news || {unread: 0, sig: ''};

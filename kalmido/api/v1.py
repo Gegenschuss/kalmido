@@ -41,6 +41,8 @@ from ..personal.habits import habit_log, habit_times, need_habit
 from ..personal.timetrack import clean_day_hours, entry_out, time_create, time_rounding, time_rows, vis_ids
 from ..core.errors import BadInput, field_alias, reject_unknown, UnknownFields
 from ..core.conflict import need_version, version_rule, VersionRequired  # 2.564.0 (#4702)
+from ..lists.filterrules import filter_where, rule_kinds, rule_sort  # 2.577.0 (#3356)
+from ..lists.sections import filter_read  # 2.577.0 (#3356)
 from ..lists.seckind import SEC_KINDS, sk_derive, sk_filter, sk_first, sk_of, sk_task, SK_STATUS
 from ..lists.templates import PTYPES
 from ..lists.projects import bell_store, ms_report
@@ -945,7 +947,8 @@ def v1_tasks():
         need_list(c, lid, write=False)
         where.append("list_id=?")
         args.append(lid)
-    st = a.get("status", "open")
+    # 2.577.0 (#3354): section_kind=done means the completed ones, the same for a saved filter with a column meaning (#3356)
+    st = a.get("status", "all" if a.get("section_kind") or rule_kinds(_v1_filter(c, a)[1]) else "open")
     if st not in ("open", "done", "wont_do", "all"):
         raise BadInput(tr("Invalid value: {0}", "status"))
     if st != "all":
@@ -1006,9 +1009,9 @@ def v1_tasks():
             raise BadInput(tr("Invalid value: {0}", "type"))
         where.append("ttype=?")
         args.append("" if a["type"] == "none" else a["type"])
-    v1_tasks_more(c, uid, a, where, args)
-    if a.get("sort"):
-        return v1_tasks_sorted(c, a, where, args)
+    rsort = v1_tasks_more(c, uid, a, where, args)
+    if a.get("sort") or rsort:
+        return v1_tasks_sorted(c, a, where, args, a.get("sort") or rsort)
     after, limit = cursor_dec("i", a.get("cursor")), v1_limit(a)
     where.append("id>?")
     args += [after, limit + 1]
@@ -1046,6 +1049,18 @@ def _v1_who(a, k, uid, none=True):
     return "=?", [uid if v == "me" and uid else as_int(v, k, 1)]
 
 
+def _v1_filter(c, a):
+    """2.577.0 (#3356): the row and rules of ?filter_id= (404 unless readable), (None, {}) without it."""
+    if not a.get("filter_id"):
+        return None, {}
+    f = filter_read(c, as_int(a["filter_id"], "filter_id", 1))
+    try:
+        rules = json.loads(f["rules"] or "{}")
+    except ValueError:
+        rules = {}
+    return f, rules if isinstance(rules, dict) else {}
+
+
 def _v1_multi(a, k):
     """A parameter given repeatedly or comma separated -> its values."""
     return [x.strip() for v in a.getlist(k) for x in v.split(",") if x.strip()]
@@ -1056,8 +1071,22 @@ def v1_tasks_more(c, uid, a, where, args):
     sprint_id (id | current = the active sprint of the task's list | none = backlog), created_by (me | id), reviewer
     (me | none | id), review (pending | approved | changes | none), field_<id> (a custom field of a list you see: select =
     option id or name, text = contains, number, checkbox true / false, other types the stored value), q (words in title
-    or notes, the full-text index), key (2.390.0: a ticket key APP-12, current or old)."""
+    or notes, the full-text index), key (2.390.0: a ticket key APP-12, current or old), section_kind (2.577.0: open |
+    progress | review | done | rejected, several allowed; without status it looks at every status), filter_id (2.577.0, #3356:
+    an own saved filter or a shared view of a project you see, 404 otherwise; it only narrows what the caller sees). Returns the
+    sort the filter brings along, or None."""
     from ..tasks.ftsearch import fts_query, fts_terms
+    rsort = None
+    if a.get("filter_id"):
+        f, rules = _v1_filter(c, a)
+        w, x = filter_where(c, uid, rules)
+        if w:
+            where.append(w)
+            args += x
+        if f["shared"]:  # a shared view shows its project, whatever its rules say
+            where.append("list_id=?")
+            args.append(f["list_id"])
+        rsort = rule_sort(rules)
     if a.get("priority"):
         ps = _v1_multi(a, "priority")
         if not ps or any(p not in PRIO_VALUES for p in ps):
@@ -1125,6 +1154,7 @@ def v1_tasks_more(c, uid, a, where, args):
             raise BadInput(tr("Invalid value: {0}", "q"))
         where.append("id IN (SELECT f.task_id FROM task_fts f WHERE f.vec @@ to_tsquery('simple'::regconfig, ?))")
         args.append(tsq)
+    return rsort
 
 
 V1_FKEY_MAX = 200  # 2.609.0 (#3373, review F9): projects one fkey_ filter spans (each is a part of the query)
@@ -1198,10 +1228,9 @@ def _v1_scur(sort, s):
     raise BadInput(tr("Invalid value: {0}", "cursor"))
 
 
-def v1_tasks_sorted(c, a, where, args):
+def v1_tasks_sorted(c, a, where, args, sort):
     """sort = priority | due | created | updated | title | manual, "-" before it = descending (no due date stays last); the
     id breaks ties. The cursor carries the last row's sort value and id, so pages stay stable with equal values."""
-    sort = a["sort"]
     desc = sort.startswith("-")
     if sort.lstrip("-") not in V1_SORTS:
         raise BadInput(tr("Invalid value: {0}", "sort"))

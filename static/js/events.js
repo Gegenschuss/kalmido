@@ -420,6 +420,7 @@ document.addEventListener('click', async e => {
     case 'agent-chip': agentChipMenu(a); break;
     case 'st-chip': stChipMenu(a); break;
     case 'share-list': shareModal(+a.dataset.id); break;
+    case 'lviews': lv_menu(a, listById(+a.dataset.id)); break;  // 2.577.0 (#3356)
     case 'dm': dmOpen(+a.dataset.uid, personNameAny(+a.dataset.uid)); break;  // 2.24.0 (#906)
     case 'ws-set': wsSet(a.dataset.ws); break;  // 2.28.0 (#935)
     case 'ws-menu': wsMenu(a); break;

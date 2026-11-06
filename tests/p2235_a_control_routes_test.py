@@ -108,6 +108,7 @@ ROUTES = {
     "POST /api/v1/lists/{}/join": "change", "POST /api/v1/lists/{}/links": "change", "POST /api/v1/lists/{}/milestones": "change",
     "POST /api/v1/lists/{}/notepads": "change", "POST /api/v1/lists/{}/notes": "change", "POST /api/v1/lists/{}/owner": "change",
     "POST /api/v1/lists/{}/sections": "change", "POST /api/v1/lists/{}/shift": "change",
+    "POST /api/v1/lists/{}/views": "change",  # 2.577.0 (#3356): a shared view of a project
     "POST /api/v1/lists/{}/shop-areas": "change", "POST /api/v1/lists/{}/sprints/assign": "change",
     "POST /api/v1/lists/{}/tags": "change", "POST /api/v1/me/app-passwords": "change", "POST /api/v1/me/purpose": "change",
     "POST /api/v1/notes/{}/restore": "change", "POST /api/v1/office/leads": "change", "POST /api/v1/office/letters": "change",

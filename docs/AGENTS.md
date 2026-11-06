@@ -3962,7 +3962,7 @@ with the scope it needs). The tools:
 - sections: `list_sections`, `create_section`, `rename_section`, `reorder_sections`, `delete_section`
 - tasks: `list_tasks` (`compact: true` for a short form; without it, pages of more than 25 tasks come back compact; 2.390.0
   filters `priority`, `priority_min`, `section_id`, `sprint_id` (`current`), `created_by`, `reviewer`, `review`, `field_values`,
-  `q` and `sort`, see *Task filters* in docs/API.md),
+  `q` and `sort`, see *Task filters* in docs/API.md; 2.577.0: `filter_id` applies a saved filter or a shared view),
   `search_tasks` (2.59.0: `semantic: true` = also tasks of similar meaning; 2.138.1: `fulltext: true` = ranked, also finds a task by its comments, with a snippet), `related_tasks` (2.59.0: up to 5 related tasks, `dup` = probably a duplicate), `search_messages` (2.33.0: comments, team chat, your chats), `get_task`, `create_task`, `update_task`, `add_snippet` (2.35.0), `complete_task`, `reopen_task`, `delete_task`,
   `move_task` (project / section / parent + `before_id` / `after_id` / `position`), `link_task_to_list` /
   `unlink_task_from_list` (2.71.0: a task also in another project, see below), `batch_tasks`, `skip_occurrence`,
@@ -3984,7 +3984,8 @@ with the scope it needs). The tools:
 - templates and filters: `list_templates`, `create_template`, `update_template`, `delete_template`, `apply_template`,
   `duplicate_list` (2.78.0: a copy of a project with its tasks, dates and notepads, without members; 2.363.3: everything except comments and times, files as copies, people only where they may be assigned in the copy),
   `duplicate_task` (2.574.0: a copy of a task right below it with subtasks, type, points, assignee, fields, snippets and files; open, without comments and times),
-  `list_filters`, `create_filter`, `update_filter`, `delete_filter`
+  `list_filters`, `create_filter`, `update_filter`, `delete_filter`, `list_views`, `create_view` (2.577.0: the shared views of a
+  project, only when the project is shared with the agent; writing needs edit rights there and the scope `structure`)
 - comments and reactions: `add_comment`, `update_comment`, `delete_comment`, `react`
 - decisions and one-way steps (2.392.0): `add_decision`, `update_task` with `irreversible`
 - delivery state (2.392.2): `set_delivery` (in progress, parked with a reason, waiting for a task), `list_tasks` with `delivery`
@@ -4029,7 +4030,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `add_subtask`, `add_time_entry`, `add_upkeep`, `apply_template`, `batch_tasks`, `bulk_clients`, `bulk_contacts`,
 `chat_typing`, `check_in_habit`, `clear_plan_usage`, `clear_waiting`, `comment_typing`, `complete_task`, `confirm_abort`,
 `create_address_book`, `create_client`, `create_contact`, `create_document`, `create_event`, `create_event_calendar`, `create_field`,
-`create_file_folder`, `create_filter`, `create_form`, `create_habit`, `create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
+`create_file_folder`, `create_filter`, `create_form`, `create_view`, `create_habit`, `create_invoice_draft`, `create_job`, `create_letter_draft`, `create_list`, `create_list_tag`,
 `create_note`, `create_offer_draft`, `create_office_deal`, `create_office_lead`, `create_packing_list`, `create_poll`, `create_section`, `create_task`, `create_template`,
 `create_text_file`, `create_trip`, `decide_reward`, `delete_address_book`, `delete_attachment`,
 `delete_chat_attachment`, `delete_client`, `delete_comment`, `delete_contact`, `delete_event`, `delete_event_calendar`,
@@ -4044,7 +4045,7 @@ endpoint is named somewhere in this guide or in [AGENT-SETUP.md](AGENT-SETUP.md)
 `get_timer`, `get_usage`, `get_waiting`, `get_workload`, `give_stars`, `import_ics`, `import_vcards`, `ingredients_to_shopping`,
 `freebusy`, `link_contact`, `link_letter_document`, `link_task_to_list`, `list_address_books`, `list_agents`, `list_attachments`, `list_build_status`, `list_calendar_events`, `list_chats`,
 `list_clients`, `list_deadline_types`, `list_documents`, `list_event_calendars`, `list_events`, `list_fields`,
-`list_filed_mails`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_invoice_series`, `list_jobs`, `list_kids`,
+`list_filed_mails`, `list_files`, `list_filters`, `list_folders`, `list_forms`, `list_groups`, `list_habits`, `list_invoice_series`, `list_jobs`, `list_kids`, `list_views`,
 `list_letter_drafts`, `list_list_groups`, `list_list_tags`, `list_lists`, `list_members`, `list_news`, `list_notes`, `list_office_data`,
 `list_office_deals`, `list_office_documents`, `list_office_leads`, `list_packing_templates`, `list_payment_suggestions`, `list_polls`, `list_project_files`,
 `list_receipt_suggestions`, `list_relations`, `list_repos`, `list_schedules`, `list_sections`, `list_stale_tasks`, `list_subtasks`,

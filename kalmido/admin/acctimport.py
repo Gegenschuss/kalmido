@@ -515,6 +515,7 @@ UMZ_ORG_SKIP = (  # archive prefix -> what the preview names as not taken over
     ("lists/ticket_types.json", N_("Ticket types")),  # 2.609.0 (#3372): own ticket types stay with the organisation
     ("sheets/", N_("Tables")), ("videos/", N_("Video sign-offs")),  # 2.137.0 (#2344): named too
     ("lists/sprints.json", N_("Sprints")), ("tasks/people.json", N_("People on tasks")),  # 2.273.0 A (#3030)
+    ("lists/views.json", N_("Shared views")),  # 2.577.0 (#3356): in the archive, not taken over (they name columns and people of the old ids)
     ("lists/history.json", N_("History")), ("tasks/history.json", N_("History")),
     ("bookings/", N_("Booking page")),  # 2.362.0 (#3096): in the archive, not taken over (a booking page is one person's)
 )
@@ -1794,6 +1795,12 @@ def umz_write(c, run, uid, man, zf, files, data, people):
             if table == "filters":  # 2.362.4 (#3100): their ids are the old server's
                 extra["rules"] = umz_filter_rules(run, r.get("rules"), who)
                 if extra["rules"] is None:
+                    run.warning(N_("A saved filter pointed at projects or people that did not come along and was left out: {0}"), _txt(r.get("name"), 80))
+                    continue
+                # 2.577.0 (#3356): a shared view only with its project, under its new id; never a list id or a share from the file
+                extra["list_id"] = run.m("lists", r["list_id"]) if r.get("list_id") else None
+                extra["shared"] = 1 if extra["list_id"] else 0
+                if r.get("list_id") and not extra["list_id"]:
                     run.warning(N_("A saved filter pointed at projects or people that did not come along and was left out: {0}"), _txt(r.get("name"), 80))
                     continue
             elif table == "templates":

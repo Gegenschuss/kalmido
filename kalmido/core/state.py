@@ -402,7 +402,10 @@ def state():
         folder_shares=sh_folder_shares(c, uid),  # 2.41.0 (#1428)
         inbox_names=inbox_names(),  # 2.15.0 (#632): default names of an inbox (shown in the UI language)
         filters=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
-                 for r in c.execute("SELECT * FROM filters WHERE user_id=? ORDER BY sort, id", (uid,))],
+                 for r in c.execute("SELECT * FROM filters WHERE user_id=? AND list_id IS NULL ORDER BY sort, id", (uid,))],
+        # 2.577.0 (#3356): the shared views of the projects this person sees (in the project's head, never with the filters)
+        views=[{**dict(r), "rules": json.loads(r["rules"] or "{}")}
+               for r in c.execute(f"SELECT * FROM filters WHERE shared=1 AND list_id IN {vis_sql()} ORDER BY sort, id", (uid, uid))],
         sections=visible_sections(c, uid),
         fields=field_dicts(c.execute(f"SELECT * FROM list_fields WHERE list_id IN {vis_sql()} ORDER BY sort, id",
                                      (uid, uid)).fetchall()),  # 2.43.0 (#1328): formula text with names; 2.640.0 (#4185): from these rows

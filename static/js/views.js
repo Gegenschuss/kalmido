@@ -32,13 +32,14 @@ function viewTasks() {
     return {...pick(t => t.assignee_group_id === gid, 'list'), done: []};
   }
   if (k === 'inbox' || k.startsWith('l:')) {
-    const lid = k === 'inbox' ? inbox().id : +k.slice(2), inL = t => t.list_id === lid || ml_in(t, lid), done = doneRecent.filter(inL);  // 2.71.0 B (#1459): + the linked tasks
+    const lid = k === 'inbox' ? inbox().id : +k.slice(2), inL = t => t.list_id === lid || ml_in(t, lid), done = doneRecent.filter(t => inL(t) && lv_keep(t, lid));  // 2.71.0 B (#1459): + the linked tasks; 2.577.0 (#3356): the open shared view
+    const grp = lv_group(lid);  // 2.577.0 (#3356)
     // 2.36.2 (#1136): "Keep completed in their section": the completed tasks go into their sections (inSec), not into "Completed"
-    if (dsxOn(listById(lid))) {  // (an open subtask of a shown completed task stays below it, not a second time at the top)
+    if (grp === 'section' && dsxOn(listById(lid))) {  // (an open subtask of a shown completed task stays below it, not a second time at the top)
       const p = pick(inL, 'section', {list: lid}), dn = showDone() ? done : [], dids = new Set(dn.map(t => t.id));
       return {...p, open: p.open.filter(t => !dids.has(t.parent_id)), done: [], inSec: dn, dsx: true};
     }
-    return {...pick(inL, 'section', {list: lid}), done};
+    return {...pick(inL, grp, {list: lid}), done};
   }
   if (k === 'byme') return {...pick(dsxByMe, 'person'), done: []};  // 2.36.2 (#1138): "Assigned by me", by person
   if (k.startsWith('who:')) {  // 2.7.2 (#418): open tasks assigned to one person, in the lists I see
@@ -220,7 +221,7 @@ const sortList = k => k.startsWith('l:') ? listById(+k.slice(2)) : null;
 const sortShared = (k = S.route.key) => { const l = sortList(k); return l && l.sort_mode && !(l.sort_mode === 'flow' && !depsOn()) ? l.sort_mode : null; };
 const sortMode = (k = S.route.key) => {
   const l = sortList(k), m = LS.get('sort2.' + k, null), own = m && !(m === 'flow' && !depsOn()) ? m : null;
-  if (l && canManage(l) && l.sort_mode) return sortShared(k) || sortDefault(k);
+  if (l && canManage(l) && l.sort_mode && !lv_sorted(l.id)) return sortShared(k) || sortDefault(k);  // 2.577.0 (#3356): an open shared view brings its sort
   return own || sortShared(k) || sortDefault(k);
 };
 const sortOwn = (k = S.route.key) => { const l = sortList(k); return !!l && l.shared && !canManage(l) && !!LS.get('sort2.' + k, null) && sortMode(k) !== (sortShared(k) || sortDefault(k)); };

@@ -613,6 +613,7 @@ function renderTop0() {
       if (vc.length > 1 && !isMobile()) acts += `<div class="seg vseg ttabs" role="group" aria-label="${esc(tr('View'))}">${vc.map(([k, n, i]) => `<button class="${v === k ? 'on' : ''}" data-act="view-${k}" data-ico="${i}" title="${esc(tr(n))}" aria-label="${esc(tr(n))}" aria-pressed="${v === k}">${ic(i, 's')}<span class="vtl">${esc(tr(n))}</span></button>`).join('')}</div>`;
       // 2.14.0 (#425): "Columns…" (the list's columns for every member) replaces the per-device field-column switch
       if (td_colsWide() && v === 'list' && !l.archived) acts += `<button class="iconbtn tf ${listCols(l) ? 'on' : ''}" data-act="cols" data-ico="columns" data-id="${l.id}" title="${esc(tr('Shown fields…'))}" aria-label="${esc(tr('Shown fields…'))}" aria-haspopup="dialog">${ic('columns')}</button>`;
+      if (!isMobile()) acts += lv_btn(l);  // 2.577.0 (#3356): the project's shared views (phones: in "…")
       // 2.6.0 (K12): Share next to the title (desktop / tablets; phones: in "…")
       if (!l.is_inbox && !l.archived && collab() && !isMobile()) acts += `<button class="iconbtn tf shbtn" data-act="share-list" data-ico="users" data-id="${l.id}" title="${esc(tr('Share…'))}" aria-label="${esc(tr('Share…'))}">${ic('users', 's')}<span class="bl">${tr('Share')}</span></button>`;
     }
@@ -814,6 +815,7 @@ function topMoreItems0() {
   // 2.31.0 (#1056): in a list two groups with a small heading each: View (incl. the folded header buttons) and List; then
   // archive / delete, set apart (listMenuSort)
   const li = l ? listMenuItems(l.id, () => $('#top [data-act="top-more"]') || $('#top h1')).filter(x => !(x.cls === 'mcols' && (inTop('cols') || sec.some(y => y.cls === 'mcols'))) && !(x.cls === 'mshare' && inTop('share-list'))) : [];
+  if (l) sec.push(...lv_items(l, inTop('lviews')));  // 2.577.0 (#3356)
   const heads = li.length > 0 && (sec.length > 0 || fold.length > 0);
   if (heads) { fold.unshift({head: tr('View')}); sec.push({head: tr('Project')}); }
   else if (l && sec.length && sec[sec.length - 1] !== '-') sec.push('-');
@@ -875,7 +877,7 @@ function routeList() {
   if (S.route.mod !== 'tasks') return null;
   return k === 'inbox' ? inbox() : k.startsWith('l:') ? listById(+k.slice(2)) : null;
 }
-const listView = l => !l.is_inbox && ((l.view === 'kanban' && feat('kanban')) || (l.view === 'timeline' && feat('timeline')) || l.view === 'mindmap' || (l.view === 'calendar' && feat('cal'))) ? l.view : 'list';  // 2.156.0 C (#2071): + calendar  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
+const listView = (l, w = lv_disp(l) || l.view) => !l.is_inbox && ((w === 'kanban' && feat('kanban')) || (w === 'timeline' && feat('timeline')) || w === 'mindmap' || (w === 'calendar' && feat('cal'))) ? w : 'list';  // 2.577.0 (#3356): an open shared view brings its display  // 2.156.0 C (#2071): + calendar  // 2.49.0 (#1201): + mind map  // 2.25.0 (UX-38): the inbox is always a list
 function isKanban() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'kanban'; }
 function isTimeline() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'timeline'; }
 function isMindmap() { const l = routeList(); return !!l && !povOn(l) && listView(l) === 'mindmap'; }  // 2.49.0 (#1201)

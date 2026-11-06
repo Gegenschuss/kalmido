@@ -757,6 +757,7 @@ ROUTES = {
     "GET /api/lists/{}/sprints": "list", "POST /api/lists/{}/sprints": "list", "PUT /api/lists/{}/sprint-settings": "list",
     "POST /api/lists/{}/sprints/assign": "list", "GET /api/sprints/{}": "list", "PATCH /api/sprints/{}": "list",
     "DELETE /api/sprints/{}": "list", "POST /api/sprints/{}/start": "list", "POST /api/sprints/{}/close": "list",
+    "GET /api/v1/lists/{}/views": "list", "POST /api/v1/lists/{}/views": "list",  # 2.577.0 (#3356): p2577_a_views_api_test.py
     "GET /api/v1/lists/{}/sections": "list", "POST /api/v1/lists/{}/sections": "list", "PATCH /api/v1/sections/{}": "list",
     "PUT /api/v1/lists/{}/sections/order": "list", "DELETE /api/v1/sections/{}": "list",
     "GET /api/v1/lists/{}/fields": "list", "POST /api/v1/lists/{}/fields": "list", "PATCH /api/v1/fields/{}": "list",

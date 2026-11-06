@@ -29,7 +29,9 @@ const spr_tasks = sid => [...S.tasks.values()].filter(t => t.sprint_id === sid &
 
 // ---- the list filter "Current sprint" / "Backlog" (views.js pick, calendar.js Kanban)
 function sprKeep(t, rk = S.route.key) {
-  if (!rk || !rk.startsWith('l:') || t.list_id !== +rk.slice(2)) return true;
+  if (!rk || !rk.startsWith('l:')) return true;
+  if (!lv_keep(t, +rk.slice(2))) return false;  // 2.577.0 (#3356): the open shared view
+  if (t.list_id !== +rk.slice(2)) return true;
   const l = spr_list(t.list_id); if (!spr_on(l)) return true;
   const f = spr_flt(l.id); if (!f) return true;
   const a = spr_active(l);

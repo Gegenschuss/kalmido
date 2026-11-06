@@ -32,7 +32,8 @@ KINDS = {
     "tasks": ("matrix", SUITE + ": tasks, comments, subtasks, attachments, tags, notes, search, trash, day plan, roadmap, export "
                         "and import in the private workspace; every GET of the area as the freelancer (no 403 / 5xx); "
                         "p2477_quicknote_api_test.py: her private list Notes of the quick note, sharing refused, an empty note gone for good (2.477.0)"),
-    "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET"),
+    "lists": ("matrix", SUITE + ": private lists and folders, sections, fields, templates, filters, forms, rules, views; every GET; "
+                        "p2577_a_views_api_test.py: shared views of the own project (2.577.0)"),
     "office": ("matrix", SUITE + ", p2199_b_office_test.py (2.199.0: a quotation of the personal office in a private folder, the folder routes, her agent), p2473_a_api_test.py, p288_a_api_test.py, p293_a_api_test.py, p293_b_api_test.py, p294_a_api_test.py, p295_a_api_test.py, p295_b_api_test.py, p2111_a_api_test.py, p2113c_a_api_test.py, p2110_b_api_test.py: the personal office (the freelancer is its admin): settings, company "
                          "fields, private clients, quotation, invoice, finalising, PDF, e-invoice; receipts, newsletter, Paperless; document "
                          "templates with signature, logbook (2.93.0); travel expenses with the per diem, its report and import (2.95.0); undo of the editors (2.111.0); "
@@ -447,7 +448,7 @@ ROUTES = {
     "GET /api/v1/lists/{}/milestones": "lists", "GET /api/v1/lists/{}/notepads": "lists",
     "GET /api/v1/lists/{}/notes": "lists", "GET /api/v1/lists/{}/notify-template": "lists",
     "GET /api/v1/lists/{}/overview": "lists", "GET /api/v1/lists/{}/playbook": "lists", "GET /api/v1/lists/{}/repos": "lists",
-    "GET /api/v1/lists/{}/rules": "lists", "GET /api/v1/lists/{}/sections": "lists", "GET /api/v1/lists/{}/sprints": "lists",
+    "GET /api/v1/lists/{}/rules": "lists", "GET /api/v1/lists/{}/sections": "lists", "GET /api/v1/lists/{}/views": "lists", "GET /api/v1/lists/{}/sprints": "lists",
     "GET /api/v1/lists/{}/status-report": "lists", "GET /api/v1/lists/{}/tags": "lists",
     "GET /api/v1/lists/{}/delivery-report": "lists",  # 2.392.0 D (#3369)
     "POST /api/tasks/brief": "tasks", "POST /api/v1/tasks/brief": "tasks",  # 2.392.3 (#3368)
@@ -494,7 +495,7 @@ ROUTES = {
     "POST /api/v1/lists/{}/join": "lists", "POST /api/v1/lists/{}/links": "lists", "POST /api/v1/lists/{}/milestones": "lists",
     "POST /api/v1/lists/{}/notepads": "lists", "POST /api/v1/lists/{}/notes": "lists", "POST /api/v1/lists/{}/owner": "lists",
     "POST /api/v1/lists/{}/playbook/proposals": "lists", "POST /api/v1/lists/{}/rules/proposals": "lists",
-    "POST /api/v1/lists/{}/sections": "lists", "POST /api/v1/lists/{}/shift": "lists",
+    "POST /api/v1/lists/{}/sections": "lists", "POST /api/v1/lists/{}/shift": "lists", "POST /api/v1/lists/{}/views": "lists",
     "POST /api/v1/lists/{}/shop-areas": "lists", "POST /api/v1/lists/{}/sprints/assign": "lists",
     "POST /api/v1/lists/{}/tags": "lists", "POST /api/v1/templates": "lists", "POST /api/v1/templates/{}/apply": "lists",
     "PUT /api/folder-heads": "lists", "PUT /api/folders/agents": "lists", "PUT /api/folders/groups/{}": "lists",
@@ -1272,7 +1273,6 @@ DELETE /api/envs/{}
 DELETE /api/family/contacts/{}
 DELETE /api/family/kids/{}/pin
 DELETE /api/family/rewards/{}
-DELETE /api/filters/{}
 DELETE /api/folders/agents
 DELETE /api/folders/groups/{}
 DELETE /api/forms/{}
@@ -1324,7 +1324,6 @@ DELETE /api/v1/event-calendars/{}/members/{}
 DELETE /api/v1/events/{}
 DELETE /api/v1/family/rewards/{}
 DELETE /api/v1/fields/{}
-DELETE /api/v1/filters/{}
 DELETE /api/v1/forms/{}
 DELETE /api/v1/lists/{}
 DELETE /api/v1/lists/{}/files/{}
@@ -1348,7 +1347,6 @@ PATCH /api/books/{}/org
 PATCH /api/calendars/{}/events
 PATCH /api/docs/labels/{}/{}
 PATCH /api/family/rewards/{}
-PATCH /api/filters/{}
 PATCH /api/layouts/saved/{}
 PATCH /api/list-checks/{}
 PATCH /api/list-tags/{}
@@ -1371,7 +1369,6 @@ PATCH /api/v1/comments/{}
 PATCH /api/v1/event-calendars/{}
 PATCH /api/v1/family/rewards/{}
 PATCH /api/v1/fields/{}
-PATCH /api/v1/filters/{}
 PATCH /api/v1/forms/{}
 PATCH /api/v1/lists/{}/error-hook
 PATCH /api/v1/lists/{}/links/{}
@@ -1420,7 +1417,6 @@ POST /api/family/packing
 POST /api/family/rewards/{}/decide
 POST /api/family/rewards/{}/request
 POST /api/favorites/suggestion
-POST /api/filters
 POST /api/folders/delete
 POST /api/folders/playbook/restore
 POST /api/folders/rename
@@ -1566,7 +1562,6 @@ POST /api/v1/family/occasions
 POST /api/v1/family/packing
 POST /api/v1/family/rewards/{}/decide
 POST /api/v1/family/rewards/{}/request
-POST /api/v1/filters
 POST /api/v1/folders/delete
 POST /api/v1/folders/rename
 POST /api/v1/imports/{}/undo

@@ -61,7 +61,7 @@ function flt_vals(c, cs) {
       break;
     }
     case 'sec': {  // the chosen projects' columns, else all
-      const pick = cs.filter(x => x.f === 'list' && x.op === 'in').flatMap(x => x.v || []);
+      const pick = cs.lid ? [cs.lid] : cs.filter(x => x.f === 'list' && x.op === 'in').flatMap(x => x.v || []);  // 2.577.0 (#3356): a shared view: its project's
       o = [...S.sections.filter(s => flt_live(s.list_id) && (!pick.length || pick.includes(s.list_id))).map(s => [String(s.id), `${lname(flt_live(s.list_id))} › ${s.name}`]), ['none', tr('No column')]];
       break;
     }
@@ -132,15 +132,23 @@ function flt_valMenu(btn, c, cs, done) {
   setTimeout(() => { if (p.contains(document.activeElement) || isTouch()) return; ($('#mq-q', p) || items()[0])?.focus({preventScroll: true}); }, 0);
   return p;
 }
-function filterModal(id) {
-  const f = id ? S.filters.find(x => x.id === id) : {name: '', rules: {}};
+// 2.577.0 (#3356): with lid the shared view of that project (S.views): no project / folder conditions (the view is its project),
+// plus sort, grouping and display (listhead.js); everyone in the project sees it, its editors change it (the server decides)
+function filterModal(id, lid = 0) {
+  const f = id ? (lid ? S.views || [] : S.filters).find(x => x.id === id) : {name: '', rules: {}};
   if (!f) return;
   const r0 = f.rules && typeof f.rules === 'object' ? f.rules : {};
   const r = {op: r0.op === 'or' ? 'or' : 'and'};
   // an old filter opens converted; a condition of a gone field was off and stays out
-  const cs = JSON.parse(JSON.stringify(flt_conds(r0))).filter(c => c && (c.f !== 'cf' || (c.fid ? fieldById(+c.fid) : true)));
-  const md0 = modal(`<h3>${id ? tr('Edit filter') : tr('New filter')}</h3>
-    <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>
+  const cs = JSON.parse(JSON.stringify(flt_conds(r0))).filter(c => c && (c.f !== 'cf' || (c.fid ? fieldById(+c.fid) : true)) && (!lid || !['list', 'folder'].includes(c.f)));
+  if (lid) cs.lid = lid;
+  const pick = (k, label, opts) => `<div class="row"><label for="f-${k}">${label}</label><select id="f-${k}">${opts.map(([v, n]) => `<option value="${v}" ${(r0[k] || '') === v ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></div>`;
+  const vopts = !lid ? '' : `<div class="shint">${tr('Everyone in this project sees this view. Each person only sees the tasks they may see.')}</div>`
+    + pick('sort', tr('Sorting'), [['', tr('As in the project')], ['prio', tr('Priority')], ['custom', tr('Manual only')], ['date', tr('Date')], ['title', tr('Title')], ['created', tr('Newest first')], ['created_asc', tr('Oldest first')]])
+    + pick('group', tr('Grouping'), [['', tr('Column')], ['date', tr('Date')], ['person', tr('Person')], ['none', tr('No grouping')]])
+    + (feat('kanban') || r0.display ? pick('display', tr('Display'), [['', tr('As in the project')], ['list', tr('List')], ['kanban', tr('Kanban')]]) : '');
+  const md0 = modal(`<h3>${lid ? (id ? tr('Edit view') : tr('New shared view')) : id ? tr('Edit filter') : tr('New filter')}</h3>
+    <div class="row"><label for="f-name">${tr('Name')}</label><input id="f-name" value="${esc(f.name)}" placeholder="${tr('e.g. Important this week')}"></div>${vopts}
     <div class="row"><label>${tr('Match')}</label><div class="seg" id="f-op"><button data-op="and" class="${r.op !== 'or' ? 'on' : ''}">${tr('AND: all conditions')}</button><button data-op="or" class="${r.op === 'or' ? 'on' : ''}">${tr('OR: any one')}</button></div></div>
     <div id="f-conds" class="fconds" role="group" aria-label="${esc(tr('Conditions'))}"></div>
     <div><button type="button" class="btn sm" data-m="cond-add">${ic('plus', 's')} ${tr('Condition')}</button></div>
@@ -148,15 +156,16 @@ function filterModal(id) {
     <div class="foot">${id ? `<button class="btn danger" data-m="del">${tr('Delete')}</button>` : ''}<span class="spacer"></span><button class="btn" data-m="close">${tr('Cancel')}</button><button class="btn pri" data-m="save">${tr('Save')}</button></div>`);
   const md = /** @type {any} */ (md0);  // $() / $$() are typed for a Document root
   md.classList.add('fltdlg');
-  const rules = () => ({op: r.op, conds: cs.filter(c => flt_cond(c)).map(c => ({...c}))});
+  const rules = () => ({op: r.op, conds: cs.filter(c => flt_cond(c)).map(c => ({...c})),
+    ...(lid ? Object.fromEntries(['sort', 'group', 'display'].map(k => [k, $('#f-' + k, md)?.value || '']).filter(x => x[1])) : {})});
   const count = () => {
-    const n = openTasks().filter(t => !t.parent_id && filterMatch(t, rules())).length;
+    const n = openTasks().filter(t => !t.parent_id && (!lid || t.list_id === lid) && filterMatch(t, rules())).length;  // 2.577.0 (#3356): a view counts in its project
     const hint = r.op === 'or' && cs.some(c => c.op === 'nin' && flt_cond(c)) ? ' ' + tr('“is none of” always applies on top, also with OR.') : '';
     $('#f-count', md).textContent = trn('{0} task matches', '{0} tasks match', n) + hint;
   };
   const draw = (focus = null) => {
     const groups = flt_cfGroups();
-    $('#f-conds', md).innerHTML = cs.map((c, i) => flt_rowHtml(c, i, cs, groups)).join('');
+    $('#f-conds', md).innerHTML = cs.map((c, i) => flt_rowHtml(c, i, cs, groups, lid)).join('');
     if (focus) $(`.fcond[data-i="${focus[0]}"] ${focus[1]}`, md)?.focus();
     count();
   };
@@ -185,14 +194,21 @@ function filterModal(id) {
     if (b.classList.contains('fc-x')) { cs.splice(+b.dataset.i, 1); draw(cs.length ? [Math.max(0, +b.dataset.i - 1), '.fc-x'] : null); if (!cs.length) $('[data-m="cond-add"]', md)?.focus(); return; }
     if (b.dataset.op) { r.op = b.dataset.op === 'or' ? 'or' : 'and'; $$('#f-op button', md).forEach(x => x.classList.toggle('on', x === b)); count(); return; }
     const a = b.dataset.m;
-    if (a === 'cond-add') { cs.push(flt_new('list')); draw([cs.length - 1, '.fc-f']); return; }
+    if (a === 'cond-add') { cs.push(flt_new(lid ? 'date' : 'list')); draw([cs.length - 1, '.fc-f']); return; }
     if (a === 'close') md.remove();
     if (a === 'save') {
       const name = $('#f-name', md).value.trim(); if (!name) return $('#f-name', md).focus();
+      if (lid) {  // 2.577.0 (#3356): the view opens in its project
+        const j = id ? (await api('PATCH', '/api/filters/' + id, {name, rules: rules()}), {id}) : await api('POST', '/api/filters', {name, rules: rules(), list_id: lid});
+        md.remove(); await load(); lv_pick(listById(lid), j.id); return;
+      }
       if (id) { await api('PATCH', '/api/filters/' + id, {name, rules: rules()}); md.remove(); await load(); render(); }
       else { const j = await api('POST', '/api/filters', {name, rules: rules()}); md.remove(); await load(); go('f/' + j.id); }
     }
-    if (a === 'del' && await askConfirm(tr('Delete filter “{0}”?', f.name), tr('Tasks are kept.'), {ok: tr('Delete'), danger: true})) { await api('DELETE', '/api/filters/' + id); md.remove(); await load(); go('today'); }
+    if (a === 'del' && await askConfirm(lid ? tr('Delete view “{0}”?', f.name) : tr('Delete filter “{0}”?', f.name), tr('Tasks are kept.'), {ok: tr('Delete'), danger: true})) {
+      await api('DELETE', '/api/filters/' + id); md.remove(); await load();
+      if (lid) lv_pick(listById(lid), null); else go('today');  // 2.577.0 (#3356): back to the whole project
+    }
   });
   if (!id) setTimeout(() => $('#f-name', md)?.focus(), 50);
   return md;

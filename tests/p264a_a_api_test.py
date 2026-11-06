@@ -273,6 +273,8 @@ check(A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FT): "Plain variety"}
 check(A.patch(B + f"/api/tasks/{T1}", json={"fields": {str(FT): ct(1), str(FN): 5}}).ok, "field: ciphertext + a readable number")
 r = A.put(B + f"/api/tasks/{T1}/waiting", json={"note": "the supplier"})
 check(r.status_code == 409 and code(r) == "list_e2e_plain", "waiting: a note is not encrypted: refused")
+r = A.post(B + "/api/filters", json={"name": "Secret plan", "list_id": L, "rules": {"text": "severance"}})  # 2.577.0 (#3356): name and text rule are stored readable
+check(r.status_code == 409 and code(r) == "list_e2e_plain", "shared view: refused in a locked project " + r.text[:200])
 check(A.put(B + f"/api/tasks/{T1}/waiting", json={}).ok, "waiting: without a note fine")
 check(A.put(B + f"/api/tasks/{T1}/note-lock", json={"body": {"v": 1, "iv": b64(12), "ct": b64(64)}}).status_code == 409, "note lock: not in a list with the lock")
 tok = A.post(B + "/api/me/tokens", json={"name": "script", "scopes": ["read", "write"]})

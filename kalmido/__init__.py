@@ -74,6 +74,7 @@ ORDER = (
     "lists.groups",
     "lists.grouppics",  # 2.46.0 (#1605)
     "lists.ownership",
+    "lists.filterrules",  # 2.577.0 (#3356): the rules of a saved filter as SQL (no routes)
     "lists.sections", "lists.seckind",
     "lists.sectpl",  # 2.156.0 C (#2073)
     "lists.folders",
