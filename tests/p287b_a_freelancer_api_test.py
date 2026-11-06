@@ -301,6 +301,15 @@ _tr = ok(F.post(B + "/api/office/trips", json={"date_from": TODAY, "date_to": TO
                                                "items": [{"date": TODAY, "category": "taxi", "amount": 12, "text": "Taxi"}]}),
          "sweep setup: a trip", (200, 201))
 IDS["trip"], IDS["tripitem"] = _tr.get("id"), ((_tr.get("items") or [{}])[0]).get("id")
+# 2.602.0 (job/3106): the sweep grew past MAX_SKIPPED with routes of other packages (84 > 80) - their objects here instead of a
+# higher threshold: a sprint of the private project (/api(/v1)/sprints/{}), a field (/api/fields/{}/count), a saved
+# documents view on the shared core (/api/docs/views/{}/hits)
+IDS["sprint"] = ok(F.put(B + f"/api/lists/{IDS['list']}/sprint-settings", json={"on": True}), "sweep setup: sprints on").get("started_id")
+IDS["field"] = _id(ok(F.post(B + f"/api/lists/{IDS['list']}/fields", json={"name": "Shoot day", "type": "text"}),
+                      "sweep setup: a field", (200, 201)))
+IDS["docview"] = _id(ok(F.post(B + "/api/obj/docview", json={"title": "Receipts", "query": "q=Koala", "ws": "private"}),
+                        "sweep setup: a saved documents view", (200, 201)))
+check(all(IDS.get(k) for k in ("sprint", "field", "docview")), f"sweep setup: sprint / field / view {[IDS.get(k) for k in ('sprint', 'field', 'docview')]}")
 for key, path, payload, sub in (
         ("trippurpose", "/trips/purposes", {"name": "Fair"}, None),
         ("fixedcost", "/fixed-costs", {"label": "Rent", "amount": "500", "start": TODAY[:7] + "-01", "repeat": "monthly"}, None),
@@ -337,6 +346,7 @@ SUBST = [
     (r"/api/v1/agent/objects/$", "objkind"), (r"/api/v1/agent/objects/objprobe/$", "list"),
     # 2.421.0 A (#2936): own objects of the setup above; file ids of other stores than the file store: none (skipped)
     (r"/me/webhooks/$", "webhook"),  # 2.391.0 (#3362)
+    (r"/sprints/$", "sprint"), (r"/api/fields/$", "field"), (r"/api/docs/views/$", "docview"),  # 2.602.0 (job/3106)
     (r"/api/v1/agent/chats/$", "me"),  # 2.491.0 (#2849): the agent (its token) reads the reply style wishes of its own person
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
