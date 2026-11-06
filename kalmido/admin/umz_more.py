@@ -23,16 +23,25 @@ from ..life.bookmarks import BM_DESC_MAX, BM_MAX, BM_NOTE_MAX, BM_SITE_MAX, BM_S
 from ..notify.taskbell import TBL_LEVELS
 from ..integrations.importers import imp_undo_after  # 2.506.0 (#4299)
 from .acctimport import _iso_ts, _oid, _txt, tr, umz_cols, umz_find, umz_insert, umz_row, umz_seen
+from ..life.budget import bud_import  # 2.584.0 (#3965)
+from ..lists.lists import clean_folder  # 2.584.0 (#3965)
+from ..lists.playbook import PB_KEEP, PB_SOURCES, pb_text  # 2.584.0 (#3965)
 
 # the parts written here (each also in acctimport.UMZ_READ)
 UMZ_MORE = ("bookmarks", "pomos", "contact_care", "view_layouts", "list_layouts", "task_bell", "task_watchers",
-            "kid_parents", "conn_links")  # 2.531.0 (#4317 F12)
+            "kid_parents", "conn_links",  # 2.531.0 (#4317 F12)
+            "budgets")  # 2.584.0 (#3965); + a folder's playbooks (rows of "playbooks" without a project, umz_more_has)
 UMZ_NAMES_MAX = 20  # 2.531.0 (#4317 F12): names in one warning, the rest as a number
 UMZ_CONN_MAX = 50  # 2.574.0 (#4556): connection requests one import asks again at most (the rest is named, not asked)
 
 
 def umz_more_has(data):
-    return any(data.get(p) for p in UMZ_MORE)
+    return any(data.get(p) for p in UMZ_MORE) or bool(_folder_rows(data))
+
+
+def _folder_rows(data):
+    """2.584.0 (#3965): the playbook versions of my folders in the file (list_id empty)."""
+    return [r for r in data.get("playbooks") or [] if isinstance(r, dict) and r.get("list_id") is None]
 
 
 def umz_more_space(run, oi):
@@ -251,9 +260,66 @@ def _conn_tell(c, uid, to_ids):
         send_pushes(g.pop("pushes", None))
 
 
+def _budgets(c, run, uid, data):
+    """2.584.0 (#3965): the household budgets (life/budget.py bud_export) into their budget list that came along with this run
+    (one of an earlier import of the file keeps what it has); nothing goes into a list of somebody else (bud_import checks it)."""
+    for b in data.get("budgets") or []:
+        run.step()
+        lid = run.m("lists", b.get("list_id")) if isinstance(b, dict) else None
+        if not lid or run.old("lists", lid):
+            if isinstance(b, dict) and not lid:
+                run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+            continue
+        try:
+            made, bad = bud_import(c, uid, lid, b, lambda t: run.m("tasks", t))
+        except Denied:  # not a budget list of mine (the file's list is no budget, or it did not come along as mine)
+            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+            continue
+        for table, nid in made:
+            _more(run, table, nid)
+        for _ in range(bad):
+            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Household budget")))
+
+
+def _folder_pbs(c, run, uid, me_old, data):
+    """2.584.0 (#3965): the playbooks of my folders (owner + folder path, every version in its order). A folder that has a
+    playbook here already keeps it (named); the author is me or nobody, never an id of the old server."""
+    by = {}
+    for r in _folder_rows(data):
+        run.step()
+        try:
+            folder = clean_folder(_txt(r.get("folder"), 1000), strict=False)
+            text = pb_text(r.get("body"))
+        except Exception:  # noqa: BLE001 -- a broken folder path / text: left out like a row that does not fit
+            folder, text = "", ""
+        v = r.get("version")
+        if not folder or not text or not isinstance(v, int) or isinstance(v, bool) or v < 1:
+            run.warning(N_("A row could not be taken over: {0}"), tr(N_("Playbooks")))
+            continue
+        by.setdefault(folder, {})[v] = (r, text)
+    here = []
+    for folder, vers in sorted(by.items()):
+        if c.execute("SELECT 1 FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=? LIMIT 1", (uid, folder)).fetchone():
+            here.append(folder)
+            continue
+        for v in sorted(vers)[-PB_KEEP:]:
+            r, text = vers[v]
+            src = r.get("source") if r.get("source") in PB_SOURCES else "import"
+            d = {"list_id": None, "owner_id": uid, "folder": folder, "version": v, "body": text, "source": src,
+                 "author_id": uid if _oid(r.get("author_id")) == me_old else None,
+                 "created_at": r.get("created_at") if _iso_ts(r.get("created_at")) else iso(now_utc())}
+            nid = umz_insert(c, "playbooks", d)
+            if nid:
+                _more(run, "playbooks", nid)
+    if here:
+        run.warning(N_("Folders that have a playbook here already keep it: {0}"), ", ".join(here[:UMZ_NAMES_MAX]))
+
+
 def umz_more_write(c, run, uid, me_old, data, salt=None):
     """Inside the run's transaction (the caller commits). salt: the export's people_salt (2.531.0 #4317)."""
     ts = iso(now_utc())
+    _budgets(c, run, uid, data)  # 2.584.0 (#3965)
+    _folder_pbs(c, run, uid, me_old, data)
     _bookmarks(c, run, uid, data, ts)
     _pomos(c, run, uid, data, ts)
     _care(c, run, uid, data, ts)
@@ -264,7 +330,11 @@ def umz_more_write(c, run, uid, me_old, data, salt=None):
 
 # what the undo removes: always only the importing person's row
 _UNDO = {"bookmarks": "id", "pomos": "id", "view_layouts": "id", "contact_care": "contact_id", "list_layouts": "list_id",
-         "task_bell": "task_id", "task_watchers": "task_id", "conn_requests": "id"}
+         "task_bell": "task_id", "task_watchers": "task_id", "conn_requests": "id",
+         "budget_cats": "id", "budget_recurring": "id", "budget_entries": "id", "playbooks": "id"}  # 2.584.0 (#3965)
+# 2.584.0 (#3965): rows without a person column -> the condition that they are still the importing person's
+_UNDO_MINE = {"budget_cats": "list_id IN (SELECT id FROM lists WHERE owner_id=?)", "budget_recurring": "list_id IN (SELECT id FROM lists WHERE owner_id=?)",
+              "budget_entries": "list_id IN (SELECT id FROM lists WHERE owner_id=?)", "playbooks": "list_id IS NULL AND owner_id=?"}
 
 
 def umz_more_there(c, uid, cr):
@@ -293,6 +363,7 @@ def umz_more_undo(c, uid, cr, since, plan):
     Bookmarks: the plan judges them (their preview fetch writes the time columns) and counts them. A focus session is finished and
     has no way to change."""
     kept = 0
+    pbs = {x[1] for x in cr.get("more") or [] if isinstance(x, list) and len(x) == 2 and x[0] == "playbooks"}  # 2.584.0 (#3965)
     for item in reversed(cr.get("more") or []):
         if not (isinstance(item, list) and len(item) == 2 and item[0] in _UNDO):
             continue
@@ -306,6 +377,20 @@ def umz_more_undo(c, uid, cr, since, plan):
             if c.execute("UPDATE conn_requests SET status='wd_' || status WHERE id=? AND from_id=? AND status IN ('open','hidden')",
                          (v, uid)).rowcount == 0:
                 kept += 1 if c.execute("SELECT 1 FROM conn_requests WHERE id=? AND from_id=?", (v, uid)).fetchone() else 0
+            continue
+        if table in _UNDO_MINE:  # 2.584.0 (#3965): a budget row changed since / a folder written on since stays (own work now)
+            mine = _UNDO_MINE[table]
+            if table == "playbooks":  # a version saved since on that folder (one this import did not make) keeps the folder's history
+                r = c.execute(f"SELECT folder FROM playbooks WHERE id=? AND {mine}", (v, uid)).fetchone()
+                gone = r is not None and not any(x["id"] not in pbs for x in c.execute(
+                    "SELECT id FROM playbooks WHERE list_id IS NULL AND owner_id=? AND folder=?", (uid, r["folder"])))
+                kept += r is not None and not gone
+            else:
+                r = c.execute(f"SELECT updated_at FROM {table} WHERE id=? AND {mine}", (v, uid)).fetchone()
+                gone = r is not None and not imp_undo_after(r["updated_at"], since)
+                kept += r is not None and not gone
+            if gone:
+                c.execute(f"DELETE FROM {table} WHERE id=? AND {mine}", (v, uid))
             continue
         if table == "bookmarks":
             if not plan.goes(table, v):

@@ -3,8 +3,8 @@
 """2.363.4 (#3127): the account import takes over the rest of the person's own content. Invented names only (example.com).
 A crafted account export (old account id 1000) into a person without an organisation (freelancer_fixture):
  - the preview no longer names mails, video sign-offs, bookmarks, focus sessions, notepads, playbooks, staying in touch,
-   saved arrangements or task bells as staying behind; a notepad on a project of somebody else and a folder's playbook are
-   named (they stay)
+   saved arrangements or task bells as staying behind; a notepad on a project of somebody else is named (it stays; 2.584.0
+   #3965: a folder's playbook comes along now)
  - after the run: the filed mail with its .eml and attachment in the private space (sealed fields, its files point at it),
    the video sign-off with version and comment, the notepad and the playbook on the new project, the bookmark (the same link
    saved here already is not doubled), the finished focus session (a running one stays behind), staying in touch with the
@@ -126,7 +126,8 @@ check(j.get("state") == "preview", f"preview {j.get('state')} {j.get('error')}")
 nt = {x.get("what"): x.get("count") for x in (j.get("preview") or {}).get("not_taken") or []}
 gone = {"E-mails", "Video sign-offs", "Bookmarks", "Focus sessions", "Staying in touch", "Saved arrangements", "Task bells"} & set(nt)
 check(not gone, f"#3127 the preview no longer names them as staying behind {gone}")
-check(nt.get("Notepads") == 1 and nt.get("Playbooks") == 1, f"#3127 ... but the notepad of another project and the folder's playbook {nt}")
+# 2.584.0 (#3965): a folder's playbook comes along now (tests/p2584_d_umz_rest_test.py), only the other project's notepad stays
+check(nt.get("Notepads") == 1 and not nt.get("Playbooks"), f"#3127 ... but the notepad of another project {nt}")
 r = Gi.post(B + f"/api/account/import/{iid}/run", json={"target": "private", "people": {}})
 check(r.status_code == 202, f"the run starts {r.status_code} {r.text[:200]}")
 j = until(lambda: state_of(Gi, iid), 180) or {}
@@ -162,8 +163,10 @@ check(one("SELECT COUNT(*) FROM video_versions WHERE review_id=? AND provider='v
 # notepad, playbook
 check(one("SELECT COUNT(*) FROM list_notepads WHERE list_id=? AND title='Umzug Notiz'", (LID or 0,)) == 1
       and one("SELECT COUNT(*) FROM list_notepads WHERE title='Fremde Notiz'") == 0, "#3127 the notepad of my project arrives, the other one not")
+# 2.584.0 (#3965): the folder's playbook arrives too
 check(one("SELECT COUNT(*) FROM playbooks WHERE list_id=? AND body='Umzug Playbook'", (LID or 0,)) == 1
-      and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner'") == 0, "#3127 the project's playbook arrives, the folder's not")
+      and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner' AND list_id IS NULL AND owner_id=?", (GID,)) == 1,
+      "#3127 the project's playbook arrives, #3965 the folder's too")
 # bookmarks
 bm = kt.dbx("SELECT url_key, state, preview FROM bookmarks WHERE user_id=? AND deleted_at IS NULL ORDER BY id", (GID,))
 check(len(bm) == 2 and bm[1][0].endswith("example.com/umzug-neu") and bm[1][1] == "read",
@@ -190,8 +193,9 @@ left = {t: one(f"SELECT COUNT(*) FROM {t} WHERE {col}=?", (GID,)) for t, col in 
     ("hub_mails", "owner_id"), ("video_reviews", "owner_id"), ("pomos", "user_id"), ("contact_care", "user_id"), ("view_layouts", "user_id"),
     ("list_layouts", "user_id"), ("task_bell", "user_id"), ("task_watchers", "user_id"))}
 check(not any(left.values()), f"#3127 the undo takes them away again {left}")
-check(one("SELECT COUNT(*) FROM list_notepads WHERE title='Umzug Notiz'") == 0 and one("SELECT COUNT(*) FROM playbooks WHERE body='Umzug Playbook'") == 0,
-      "#3127 ... the notepad and the playbook too")
+check(one("SELECT COUNT(*) FROM list_notepads WHERE title='Umzug Notiz'") == 0 and one("SELECT COUNT(*) FROM playbooks WHERE body='Umzug Playbook'") == 0
+      and one("SELECT COUNT(*) FROM playbooks WHERE body='Ordner'") == 0,  # 2.584.0 (#3965): + the folder's
+      "#3127 ... the notepad and the playbooks too")
 check([r[0] for r in kt.dbx("SELECT id FROM bookmarks WHERE user_id=? AND deleted_at IS NULL", (GID,))] == [BEFORE],
       "#3127 ... the imported bookmark too, the one saved before stays")
 st = Gi.get(B + "/api/state").json().get("settings") or {}
