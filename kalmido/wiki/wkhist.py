@@ -185,8 +185,8 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
             last, ltext = None, prev[0]
     if last is not None and ltext == text:
         return  # nothing changed (2.571.0 #4766: a new name alone is no version, it is in obj_history: wkh_rename)
-    if prev is not None and last is None and ltext == text:
-        return
+    if prev is not None and last is None and (ltext if ltext is not None else prev[0]) == text:
+        return  # 2.571.0 (#4766): a page without history renamed: its text is the one before
     if (last is not None and not fresh and last["created_by"] == uid and 0 <= _ts(ts) - _ts(last["created_at"]) < WKH_MERGE
             and not last["wkx_held_at"]):  # 2.528.0 D (#4306): a version held at a lock takes no new text
         c.execute("UPDATE wiki_versions SET path=?, body=?, size=?, updated_at=? WHERE id=?",
