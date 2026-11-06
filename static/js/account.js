@@ -803,6 +803,23 @@ async function authPasskey(errEl, remember) {
     location.replace('/');
   } catch (x) { errEl.textContent = x instanceof Error && x.j ? x.message : pkErr(x); }
 }
+// 2.611.0 (#4019): an admin without a password: the server asks a fresh sign-in (403 reauth_needed) before a switch that
+// opens the server. Passkey: signed in again here, true = send the switch again. OIDC: the step-up at the provider
+// (prompt=login), back on the page the switch is turned again by hand (ocStepUpBack: "Confirmed. Now try the step again.")
+async function reauthFresh(d) {
+  if (d.stepup !== 'oidc' && !d.passkey) { toast(d.error || tr('Please sign in again, then try again.')); return false; }
+  if (!await askConfirm(tr('Sign in again'), d.error, {ok: tr('Sign in again')})) return false;
+  if (d.stepup === 'oidc') {
+    try { sessionStorage.setItem('rck-stepup', '0:su'); } catch { /* storage off: no message on the way back */ }
+    location.href = '/api/auth/oidc/start?stepup=su&org=0';
+    return false;
+  }
+  try {
+    const j = await authPost('/api/auth/passkey', {credential: await pkGet(await authPost('/api/auth/passkey/options', {remember: true}))});
+    if (S.me && j.user?.id !== S.me.id) { location.replace('/'); return false; }  // another account's passkey: that account now
+    return true;
+  } catch (x) { toast(x instanceof Error && x.j ? x.message : pkErr(x)); return false; }
+}
 // ---- 2.23.0 (#711): registration on the login page (admins): the mode and the e-mail domains
 const SIGNUP_UI = [['off', N_('Off: only admins add people')], ['domain', N_('Only addresses of certain e-mail domains')], ['approval', N_('Anyone, after an admin approves')], ['open', N_('Anyone with a confirmed e-mail address')]];
 function signupAdminHtml(a) {
@@ -823,9 +840,10 @@ document.addEventListener('change', async e => {
     const b = id === 's-signup' ? {signup_mode: e.target.value} : id === 's-oinv' ? {org_invites: e.target.checked} : id === 's-spriv' ? {signup_private: e.target.checked} : {signup_domains: e.target.value};  // 2.115.0 B (#2062): + s-oinv; 2.422.0 (#2937): + s-spriv
     const ask = id === 's-signup' || id === 's-spriv';
     let j; try { j = await (ask ? rawFetch : api)('PATCH', '/api/admin/settings', b); } catch (x) {  // 2.360.0 A (#2496): the mode asks for the password
+      if (ask && x.data?.reauth_needed) { if (!await reauthFresh(x.data)) throw x; j = await api('PATCH', '/api/admin/settings', b); } else {  // 2.611.0 (#4019)
       if (!x.data?.password_needed) { if (ask) toast(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); throw x; }
       const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw x;
-      j = await api('PATCH', '/api/admin/settings', {...b, password: p.password});
+      j = await api('PATCH', '/api/admin/settings', {...b, password: p.password}); }
     }
     if (j && j.version) S.about = j;
     const r = $('#s-sdomrow'); if (r) r.hidden = (S.about?.signup_mode || 'off') !== 'domain';
@@ -974,12 +992,13 @@ function oidcWire(md) {
       if (!i.checked) return;
       i.disabled = true;
       // 2.306.0 D1 (#2875): a change of who becomes an admin asks for the account password
-      const apply = async b => { try { return await rawFetch('POST', '/api/admin/oidc/draft/apply', b); } catch (x) { if (x.data?.password_needed) throw x; throw new Error(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); } };
+      const apply = async b => { try { return await rawFetch('POST', '/api/admin/oidc/draft/apply', b); } catch (x) { if (x.data?.password_needed || x.data?.reauth_needed) throw x; throw new Error(x instanceof Offline ? tr('Offline: only works again with a connection') : x.message); } };
       try {
         let j; try { j = await apply({}); } catch (x) {
+          if (x.data?.reauth_needed) { if (!await reauthFresh(x.data)) throw new Error(tr('Cancelled|dialog')); j = await apply({}); } else {  // 2.611.0 (#4019)
           if (!x.data?.password_needed) throw x;
           const p = await pwPrompt(tr('Confirm with your password')); if (!p) throw new Error(tr('Cancelled|dialog'));
-          j = await apply({password: p.password});
+          j = await apply({password: p.password}); }
         }
         took(j, true); toast(tr('The sign-in uses the new settings'));
       }

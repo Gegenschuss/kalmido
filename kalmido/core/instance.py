@@ -191,7 +191,7 @@ def admin_settings():
     srv_was = gsetting(c, "server_agents_off") == "1"  # 2.557.0 (#4670): its alert below ("1" = off, the other way round)
     # 2.306.0 Fix-1 (#2875 review): auto-created accounts by the admin rule ask for the account password. 2.360.0 A (#2496):
     # every switch that opens the server (from its value in effect), so a stolen admin session alone cannot (an account
-    # without a password: its session)
+    # without a password: its session; 2.611.0 (#4019): a fresh sign-in, oidc.oidc_reauth -> reauth_needed)
     eff = {"twofa_required": gsetting(c, "twofa_required") == "1", "oidc_autocreate": gsetting(c, "oidc_autocreate") == "1",
            "public_links": gsetting(c, "public_links") != "0"}
     pub_off, pub_new = pub_kinds_off(c), None

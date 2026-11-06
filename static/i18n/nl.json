@@ -16977,5 +16977,6 @@
   "The year before comes from the DATEV booking archive (sums of the profit and loss accounts and the VAT accounts); it is not added to figures in Kalmido.": "Het vorige jaar komt uit het DATEV-boekingsarchief (sommen van de resultatenrekeningen en de btw-rekeningen); het wordt niet bij cijfers in Kalmido opgeteld.",
   "Input tax": "Voorbelasting",
   "Accounts of the DATEV archive {0}": "Rekeningen van het DATEV-archief {0}",
-  "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Geen cijfers voor {0}, niet in Kalmido en niet in het DATEV-archief."
+  "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Geen cijfers voor {0}, niet in Kalmido en niet in het DATEV-archief.",
+  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Meld je opnieuw aan om dit te bevestigen (hoogstens {0} minuten geleden)."
 }

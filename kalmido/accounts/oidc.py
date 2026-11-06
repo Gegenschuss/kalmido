@@ -10,6 +10,7 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import timedelta  # 2.611.0 (#4019): reauth_fresh
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature, InvalidTag
 from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
@@ -654,7 +655,7 @@ def oidc_admin_rule(c, vals=None):
 
 def _oidc_admin_reauth(c, vals, b):
     """2.306.0 D1 (#2875): a change of who becomes an admin through the sign-on asks for the account password like the
-    other security steps (collab/e2e.py e2e_reauth: an account without one relies on its session). Fix-1 (#2875 review):
+    other security steps (2.611.0, #4019: an account without one needs a fresh sign-in, oidc_reauth). Fix-1 (#2875 review):
     any field of OIDC_ADMIN_KEYS while an admin rule is set before or after the change. An error response or None;
     {password_needed: true} = ask and send it again with {password}."""
     if all(str(vals.get(k, "")).strip() == (gsetting(c, "oidc_" + k) or "").strip() for k in OIDC_ADMIN_KEYS if k in vals):
@@ -664,11 +665,44 @@ def _oidc_admin_reauth(c, vals, b):
     return oidc_reauth(c, b)
 
 
+# 2.611.0 (#4019): an account without a password confirms a switch that opens the server with a sign-in at most this long ago
+REAUTH_FRESH_MIN = 10
+# 2.611.0 (#4019): the sign-ins that count as fresh by their age: someone signed in again. An OIDC session alone does not
+# (it may come from a live session at the provider without anyone typing anything, as orgcrypt._rck_fresh): it counts
+# through its step-up (?stepup=su: prompt=login + a fresh auth_time); a restored backup's or a support session never
+REAUTH_FRESH_VIA = ("password", "2fa", "passkey", "link", "invite")
+
+
+def reauth_fresh(c):
+    """2.611.0 (#4019): this browser's session (cookie) was signed in at most REAUTH_FRESH_MIN minutes ago with a sign-in of
+    REAUTH_FRESH_VIA, or confirmed with the OIDC step-up "0:su" in that time."""
+    tok = request.cookies.get(COOKIE) if g.get("auth_via") == "session" else None
+    r = c.execute("SELECT created_at, via, stepup_at, stepup_for FROM sessions WHERE token_hash=? AND user_id=?",
+                  (_token_hash(tok), g.user["id"])).fetchone() if tok else None
+    if not r:
+        return False
+    since = iso(now_utc() - timedelta(minutes=REAUTH_FRESH_MIN))
+    return (r[1] in REAUTH_FRESH_VIA and str(r[0] or "") >= since) or (r[3] == "0:su" and str(r[2] or "") >= since)
+
+
 def oidc_reauth(c, b):
-    """2.306.0 Fix-1 (#2875 review): the password step of _oidc_admin_reauth (also for the autocreate switch)."""
+    """2.306.0 Fix-1 (#2875 review): the password step of _oidc_admin_reauth (also for the autocreate switch).
+    2.611.0 (#4019): an account without a password (OIDC / passkey) needs a fresh sign-in (reauth_fresh), else 403
+    {reauth_needed, stepup: "oidc" | "", passkey}: the client signs in again and sends the switch once more."""
     u = c.execute("SELECT * FROM users WHERE id=?", (g.user["id"],)).fetchone()
-    if not u or not u["password_hash"]:
+    if not u:
         return None
+    if not u["password_hash"]:
+        if g.get("auth_via") == "proxy":
+            # the login proxy signs in on every request (no session row, no age): it is the sign-in the server admin set up;
+            # its account relies on it as before (collab/e2e.py e2e_reauth, offsite.stepup_need proxy_ok)
+            return None
+        if reauth_fresh(c):
+            return None
+        # anything but a cookie session (an API / agent token never reaches these routes: /api/v1 only) is refused too
+        pk = gsetting(c, "passkey_login") != "0" and bool(c.execute("SELECT 1 FROM webauthn_creds WHERE user_id=? LIMIT 1", (u["id"],)).fetchone())
+        return jsonify(error=tr("To change this, please sign in again to confirm (at most {0} minutes ago).", REAUTH_FRESH_MIN), reauth_needed=True,
+                       stepup="oidc" if u["oidc_subject"] and oidc_cfg(c)["on"] else "", passkey=pk), 403
     if not isinstance(b.get("password"), str):
         return jsonify(error=tr("Confirm with your password"), password_needed=True), 403
     return _reauth(u, b)

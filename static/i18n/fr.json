@@ -16977,5 +16977,6 @@
   "The year before comes from the DATEV booking archive (sums of the profit and loss accounts and the VAT accounts); it is not added to figures in Kalmido.": "L’année précédente provient de l’archive des écritures DATEV (sommes des comptes de résultat et des comptes de TVA) ; elle ne s’ajoute pas aux chiffres de Kalmido.",
   "Input tax": "TVA déductible",
   "Accounts of the DATEV archive {0}": "Comptes de l’archive DATEV {0}",
-  "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Aucun chiffre pour {0}, ni dans Kalmido ni dans l’archive DATEV."
+  "No figures for {0}, neither in Kalmido nor in the DATEV archive.": "Aucun chiffre pour {0}, ni dans Kalmido ni dans l’archive DATEV.",
+  "To change this, please sign in again to confirm (at most {0} minutes ago).": "Pour modifier ceci, reconnecte-toi pour confirmer (il y a au plus {0} minutes)."
 }
