@@ -5,6 +5,8 @@
 //   field asks for numbers): parseDMY understands 6.11. / 06.11.2026 / 6.11.26 / 61126 / 06112026 / 2026-11-06 / 11/6/2026
 //   (by the date order), today / tomorrow / +3 / -2 (de, en); without a year this year, on a due date the next time;
 //   31.02. and outside min / max = nothing. Typing moves the month, Enter takes it, an invalid text turns red and takes nothing
+//   E: the task's date dialog (datePop, own month) has the same field: focused, typing moves its month, "6.11." + Enter sets
+//   the due date and closes, invalid = red and nothing; on a phone numbers, no focus
 // - #4612 a right click on a contact row opens its menu: the name, "Select", Open; "Select" starts the selection
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -30,6 +32,8 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   const CF = await login('frida');
   await call(CF, 'PATCH', '/api/settings', {lang: 'en', tour: 'done', features: 'contacts'});
   check(((await call(CF, 'GET', '/api/state')).me.workspaces || []).length === 0, 'frida is in no organisation');
+  const TD = (await call(CF, 'POST', '/api/tasks', {title: 'Water the plants'})).id;  // #4867 E: the task's date dialog
+  check(TD, 'a task for the date dialog');
 
   // ================= #4867 parseDMY
   let w = await boot({user: 'frida', hash: 'today'}), d = w.document;
@@ -98,6 +102,31 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   const expDue = w.eval(`(() => { const y = addDays(today(), -1), Y = +today().slice(0, 4), c = Y + y.slice(4); return c < today() ? (Y + 1) + y.slice(4) : c; })()`);
   type(w, din, y0); key(w, din, 'Enter');
   check(await until(() => d.querySelector('#tst-due').value === expDue), 'a due field: yesterday\'s day / month without a year = next year ' + y0 + ' -> ' + d.querySelector('#tst-due').value);
+
+  // ================= #4867 E the task's date dialog (datePop, own month) has the same text field
+  await until(() => w.eval(`!!S.tasks.get(${TD})`));
+  w.eval(`datePop(document.querySelector('#top h1'), ${TD})`);
+  din = await until(() => d.activeElement?.id === 'p-din' && d.activeElement);
+  check(din && din.closest('#pop .dpk') && din.classList.contains('tpin') && d.querySelector('#pop .dpk + .quick') && din.value === '' && din.getAttribute('inputmode') === 'text' && din.placeholder === w.eval(`dpTxt(today())`),
+    'E: the date dialog opens with the text field on top (the picker\'s classes), focused, empty without a date');
+  type(w, din, '15.03.2027');
+  check(await until(() => /2027/.test(d.querySelector('#pop .mcal .mh')?.textContent || '') && d.querySelector('#pop .mcal .d.sel')?.dataset.d === '2027-03-15') && d.activeElement === din && din.value === '15.03.2027',
+    'E: typing moves the month along (March 2027, the day marked), the field keeps focus and text');
+  type(w, din, '31.02.');
+  check(din.classList.contains('bad') && din.getAttribute('aria-invalid') === 'true', 'E: 31.02. turns the field red');
+  key(w, din, 'Enter'); await sleep(400);
+  check(!d.querySelector('#pop').classList.contains('hidden') && !w.eval(`S.tasks.get(${TD}).due`), 'E: Enter on an invalid text takes nothing, the dialog stays');
+  type(w, din, '6.11.');
+  const expE = w.eval(`parseDMY('6.11.', {future: true})`);
+  check(!din.classList.contains('bad') && d.querySelector('#pop .mcal .d.sel')?.dataset.d === expE, 'E: a valid text clears the red, the day is marked');
+  key(w, din, 'Enter');
+  check(await until(() => d.querySelector('#pop').classList.contains('hidden') && w.eval(`S.tasks.get(${TD}).due`) === expE), 'E: "6.11." + Enter sets the due date (the next 6 November) and closes ' + expE);
+  check(await until(async () => ((await call(CF, 'GET', '/api/state')).tasks || []).find(x => x.id === TD)?.due === expE), 'E: the server has the due date');
+  w.eval(`datePop(document.querySelector('#top h1'), ${TD})`);
+  din = await until(() => d.activeElement?.id === 'p-din' && d.activeElement);
+  const shE = w.eval(`dpTxt(${JSON.stringify(expE)})`);
+  check(din && din.value === shE && din.selectionStart === 0 && din.selectionEnd === shE.length && d.querySelector('#pop .mcal .d.sel')?.dataset.d === expE, 'E: reopened, the field holds the due date selected ' + din?.value);
+  w.eval(`popOnClose = null; closePop()`);
   w.close();
 
   // ================= #4867 the phone: the grid keeps the focus (no keyboard on its own), the field asks for numbers
@@ -111,6 +140,13 @@ const type = (w, el, v) => { el.value = v; el.dispatchEvent(new w.Event('input',
   w.eval(`S.settings.date_order = 'dmy'`);
   din.focus(); type(w, din, '61126'); key(w, din, 'Enter');
   check(await until(() => !d.querySelector('#dpop') && d.querySelector('#tst-p').value === '2026-11-06'), 'phone: "61126" + Enter -> 06.11.2026');
+  // E: the task's date dialog on a phone: the field asks for numbers, no keyboard on its own
+  await until(() => w.eval(`!!S.tasks.get(${TD})`));
+  w.eval(`datePop(document.querySelector('#top h1'), ${TD})`);
+  const pdin = await until(() => d.querySelector('#pop.sheet:not(.hidden) #p-din'));
+  await sleep(100);
+  check(pdin && pdin.getAttribute('inputmode') === 'numeric' && d.activeElement !== pdin, 'E phone: the date dialog\'s field asks for numbers and does not take the focus');
+  w.eval(`popOnClose = null; closePop()`);
   w.close();
 
   // ================= #4612 contacts: a right click on a row opens its menu, "Select" on top

@@ -259,11 +259,15 @@ function datePop(anchor, id) {
     cu.times = ts.filter(Boolean).sort(); st.repeat = rrSetEnd(rrBuild(cu), rrEnd(st.repeat));
     if (cu.times.length) { st.due_time = cu.times[0]; if (!st.due) st.due = today(); }
   };
-  const draw = () => {
-    const [y, m] = st.month.split('-').map(Number);
+  // 2.607.0 (#4867): the month on its own, so typing in the text field redraws only it (the field keeps focus and text)
+  const calHtml = () => {
+    const [y, m] = st.month.split('-').map(Number), sel = st.typed || st.due;
     const start = weekStartOf(`${st.month}-01`);
     let g = wdOrder().map(i => `<div class="wd" aria-label="${esc(WDL[i])}">${WD[i]}</div>`).join('');
-    for (let i = 0; i < 42; i++) { const d = addDays(start, i); if (i === 35 && pd(d).getMonth() !== m - 1) break; g += `<button class="d ${pd(d).getMonth() !== m - 1 ? 'out' : ''} ${d === today() ? 'today' : ''} ${d === st.due ? 'sel' : ''}" data-d="${d}" aria-label="${esc(pd(d).toLocaleDateString(LOCALE(), {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}))}${d === today() ? ' · ' + esc(tr('Today')) : ''}">${pd(d).getDate()}</button>`; }  // 2.218.0 B (#2805): the full date for screen readers, not just "28"
+    for (let i = 0; i < 42; i++) { const d = addDays(start, i); if (i === 35 && pd(d).getMonth() !== m - 1) break; g += `<button class="d ${pd(d).getMonth() !== m - 1 ? 'out' : ''} ${d === today() ? 'today' : ''} ${d === sel ? 'sel' : ''}" data-d="${d}" aria-label="${esc(pd(d).toLocaleDateString(LOCALE(), {weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'}))}${d === today() ? ' · ' + esc(tr('Today')) : ''}">${pd(d).getDate()}</button>`; }  // 2.218.0 B (#2805): the full date for screen readers, not just "28"
+    return `<div class="mcal"><div class="mh"><button class="iconbtn" data-mm="-1" title="${esc(tr('Previous month'))}" aria-label="${esc(tr('Previous month'))}">${ic('left')}</button>${MON[m - 1]} ${y}<button class="iconbtn" data-mm="1" title="${esc(tr('Next month'))}" aria-label="${esc(tr('Next month'))}">${ic('right')}</button></div><div class="grid">${g}</div></div>`;
+  };
+  const draw = () => {
     const rems = new Set((st.reminders || '').split(',').filter(Boolean));
     const wd = st.due ? RR_WD[pd(st.due).getDay()] : 'MO', md = st.due ? pd(st.due).getDate() : 1;
     const presets = [['', tr('None')], ['FREQ=DAILY', tr('Daily')], ['FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR', tr('Weekdays')], [`FREQ=WEEKLY;BYDAY=${wd}`, tr('Weekly ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=WEEKLY;INTERVAL=2;BYDAY=${wd}`, tr('Every 2 weeks ({0})', WD[RR_WD.indexOf(wd)])], [`FREQ=MONTHLY;BYMONTHDAY=${md}`, tr('Monthly (on day {0})', md)], ['FREQ=YEARLY', tr('Yearly')]];
@@ -271,9 +275,10 @@ function datePop(anchor, id) {
     const cur = rrBase(st.repeat), end = rrEnd(st.repeat);
     const custom = cur && !presets.some(p => p[0] === cur);
     const cu = st.cust ? rrForm(cur) : null;
-    return `<div class="quick">
+    return `<div class="dpk"><input id="p-din" class="tpin" value="${esc(dpTxt(st.due))}" inputmode="${isMobile() ? 'numeric' : 'text'}" autocomplete="off" enterkeyhint="done" spellcheck="false" placeholder="${esc(dpTxt(today()))}" aria-label="${esc(tr('Date'))}"></div>
+      <div class="quick">
         <button data-q="0">${ic('sun')}${tr('Today')}</button><button data-q="1">${ic('sunrise')}${tr('Tomorrow')}</button><button data-q="w">${ic('week')}${tr('Next week')}</button><button data-q="x">${ic('ban')}${tr('No date|clear')}</button></div>
-      <div class="mcal"><div class="mh"><button class="iconbtn" data-mm="-1" title="${esc(tr('Previous month'))}" aria-label="${esc(tr('Previous month'))}">${ic('left')}</button>${MON[m - 1]} ${y}<button class="iconbtn" data-mm="1" title="${esc(tr('Next month'))}" aria-label="${esc(tr('Next month'))}">${ic('right')}</button></div><div class="grid">${g}</div></div>
+      ${calHtml()}
       <div class="prow">${ic('clock', 's')}${timeIn('p-time', st.due_time || '', {label: tr('Time'), empty: tr('all day')})}${st.due_time ? `<button class="iconbtn" data-q="notime" title="${tr('All day')}" aria-label="${tr('All day')}">${ic('x', 's')}</button>` : ''}</div>
       ${st.due_time ? `<div class="prow">${ic('timer', 's')}<select id="p-dur" aria-label="${esc(tr('Duration'))}">${[15, 30, 45, 60, 90, 120, 180, 240].map(v => `<option value="${v}" ${(st.duration || 30) === v ? 'selected' : ''}>${tr('Duration {0}', v < 60 ? v + ' min' : fmtNum(v / 60) + ' h')}</option>`).join('')}</select></div>` : ''}
       <div class="prow">${ic('timeline', 's')}<span class="muted" style="font-size:var(--fs-s)">${tr('Start|date')}</span>${dateIn('p-start', st.start || '', {max: st.due || '', label: tr('Start|date'), empty: tr('none')})}${st.start ? `<button class="iconbtn" data-q="nostart" title="${tr('No date range')}" aria-label="${tr('No date range')}">${ic('x', 's')}</button>` : ''}</div>
@@ -295,7 +300,29 @@ function datePop(anchor, id) {
     : `<div class="popfoot"><button class="btn" data-q="cancel">${tr('Cancel')}</button><button class="btn pri" data-q="ok">${tr('OK')}</button></div>`}`;
   };
   const p = openPop(anchor, draw(), instant ? () => { finish(); } : null);
-  const redraw = () => { p.innerHTML = draw(); };
+  const redraw = () => { st.typed = null; p.innerHTML = draw(); };
+  // 2.607.0 (#4867): the text field on top (parseDMY of the shared picker, a due date without a year = the next one): on a
+  // computer focused with the day selected, on a phone not (no keyboard on its own); typing moves the month, an invalid
+  // text turns red; Enter takes the day and closes like Done / OK (invalid: nothing taken, the dialog stays)
+  const dinParse = inp => parseDMY(inp.value, {future: true});
+  setTimeout(() => { const f = $('#p-din', p); if (f && !p.classList.contains('hidden') && !p.classList.contains('sheet')) { f.focus(); f.select(); } }, 20);
+  p.oninput = e => {
+    if (e.target.id !== 'p-din') return;
+    const v = dinParse(e.target); e.target.classList.toggle('bad', v === null); e.target.setAttribute('aria-invalid', v === null ? 'true' : 'false');
+    const tv = v || null;
+    if (tv === (st.typed || null)) return;
+    st.typed = tv; if (tv) st.month = tv.slice(0, 7);
+    const c = $('.mcal', p); if (c) c.outerHTML = calHtml();
+  };
+  p.onkeydown = async e => {
+    if (e.target.id !== 'p-din' || e.key !== 'Enter') return;
+    e.preventDefault(); e.stopPropagation();
+    const v = dinParse(e.target);
+    if (!v) { e.target.classList.add('bad'); e.target.setAttribute('aria-invalid', 'true'); return; }  // empty: "No date" stays its own button
+    st.due = v; st.month = v.slice(0, 7); st.typed = null;
+    closePop();  // instant: popOnClose -> finish() saves
+    if (!instant) await patchUndoable(id, body(), msgOf());
+  };
   p.onclick = async e => {
     await dateClick(e);
     changed();
