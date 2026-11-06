@@ -31,7 +31,7 @@ async function bg_load() {
     const j = BG.lid ? await api('GET', `${bg_url()}?month=${BG.month}`) : null;
     if (seq === BG.seq) { BG.data = j; BG.stale = false; }
   } catch (e) { if (seq === BG.seq) { BG.data = null; if (e.status === 404) { BG.lid = null; BG.home = null; } } }
-  BG.loading = false; BG.done = true;
+  if (seq === BG.seq) { BG.loading = false; BG.done = true; }  // 2.607.0 (#4925): an outdated load must not mark a newer budget as loaded
   if (seq === BG.seq && S.route.mod === 'budget') { const el = $('#view'); if (el) keepFocus(el, () => setHtml(el, mg_wrap('budget', viewBudget()))); }
 }
 async function bg_homeLoad() {
@@ -674,11 +674,14 @@ async function bg_cmpModal() {
 }
 
 // ---- new budget list
+// 2.607.0 (#4925): switching to another (new) budget = load it again; BG.done stayed true from the empty view, so the
+// view kept the intro text until a reload. ++seq drops a load still under way for the old state.
+function bg_reset(lid) { BG.seq++; BG.home = null; BG.lid = lid; BG.data = null; BG.loading = false; BG.done = false; }
 async function bg_create() {
   let j; try { j = await api('POST', '/api/budget/lists', {}); } catch { return; }
-  await load(); BG.home = null; BG.lid = j.list_id; BG.data = null; BG.month = bg_month();
+  await load(); bg_reset(j.list_id); BG.month = bg_month();
   // undo = archive (a list is only deleted from the archive), redo = out of the archive again
-  const arch = async v => { await api('PATCH', `/api/lists/${j.list_id}`, {archived: v}); await load(); BG.home = null; BG.data = null; BG.lid = v ? null : j.list_id; v ? render() : go(`budget/${j.list_id}`); };
+  const arch = async v => { await api('PATCH', `/api/lists/${j.list_id}`, {archived: v}); await load(); bg_reset(v ? null : j.list_id); v ? render() : go(`budget/${j.list_id}`); };
   histAdd({label: tr('New budget'), undo: () => arch(1), redo: () => arch(0)});
   go(`budget/${j.list_id}`);
 }

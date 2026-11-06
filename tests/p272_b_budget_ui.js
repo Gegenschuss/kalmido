@@ -48,6 +48,19 @@ const DE = d => `${d.slice(8, 10)}.${d.slice(5, 7)}.${d.slice(0, 4)}`;
   w.close();
   await call('PATCH', '/api/settings', {features: FEAT});
 
+  // ================= 2.607.0 (#4925): the empty budget view creates a budget and shows it without a reload
+  { await call('POST', '/api/users', {username: 'carol', display_name: 'Carol', password: 'password123', email: 'carol@example.com'});
+    const CC = await login('carol');
+    await call('PATCH', '/api/settings', {lang: 'en', tour: 'done', features: FEAT}, CC);
+    const wc = await boot({user: 'carol', hash: 'budget'}), dc = wc.document;
+    await until(() => dc.querySelector('.bgview [data-bg="create"]'));
+    check(dc.querySelector('.bgview [data-bg="create"]'), '#4925: without a budget the view offers "Create a budget"');
+    click(wc, dc.querySelector('.bgview [data-bg="create"]'));
+    await until(() => /^#budget\/\d+/.test(wc.location.hash) && dc.querySelector('.bgview .bgadd'));
+    check(/^#budget\/\d+/.test(wc.location.hash), '#4925: created, the address names the new budget ' + wc.location.hash);
+    check(dc.querySelector('.bgview .bgadd') && dc.querySelector('.bgview .bgtiles') && !dc.querySelector('.bgview .empty.eact'), '#4925: the month view of the new budget shows without a reload');
+    wc.close(); }
+
   // ================= the card on Home & life creates a budget
   w = await boot({user: 'alice', hash: 'life'}); d = w.document;
   await until(() => d.querySelector('.lc-budget [data-bg="create"]'));
