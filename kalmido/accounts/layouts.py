@@ -9,11 +9,12 @@ from flask import g, jsonify
 
 from ..core.config import app
 from ..core.i18n import tr
-from ..core.db import body, bump, db, iso, now_utc, gset, gsetting
+from ..core.db import body, bump, db, iso, iso_ms, now_utc, gset, gsetting
+from ..core.conflict import ccf_check  # 2.570.0 (#4770)
 from ..core.access import Denied, need_list, WRITE_ROLES
 from ..accounts.session import me
 from ..core.errors import BadInput
-from ..core.pg import insert_id  # 2.149.0 G (#2517): pulled up from functions
+from ..core.pg import insert_id, write_lock  # 2.149.0 G (#2517): pulled up from functions
 
 LAYOUT_KEYS = ("view_today", "view_time", "view_agents", "view_projects",
                "view_review",  # 2.43.0 (#1452): the review (and its journal) on the builder
@@ -96,11 +97,13 @@ def need_person():
 # ---------------------------------------------------------------- the project page (#983)
 
 def page_layouts(c, lid, uid, role):
-    """{std, mine, can_std} of the project page of list lid: the standard for everyone, the person's own override."""
-    r = c.execute("SELECT page_layout FROM lists WHERE id=?", (lid,)).fetchone()
-    m = c.execute("SELECT layout FROM list_layouts WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
+    """{std, mine, can_std, std_at, mine_at} of the project page of list lid: the standard for everyone, the person's own
+    override; 2.570.0 (#4770): std_at / mine_at = their versions (expect_updated_at of PUT .../layout; '' = none yet)."""
+    r = c.execute("SELECT * FROM lists WHERE id=?", (lid,)).fetchone()
+    m = c.execute("SELECT layout, updated_at FROM list_layouts WHERE list_id=? AND user_id=?", (lid, uid)).fetchone()
     out = {"std": (r["page_layout"] if r else "") or "", "mine": (m["layout"] if m else "") or "",
-           "can_std": role in ("owner", "admin")}
+           "can_std": role in ("owner", "admin"),
+           "std_at": (r["page_layout_at"] if r and "page_layout_at" in r.keys() else "") or "", "mine_at": (m["updated_at"] if m else "") or ""}
     out.update(wg_pinboard(c, lid, role))  # 2.43.0 (#1346): block colours + the notepads
     return out
 
@@ -110,10 +113,12 @@ def list_layout_put(lid):
     """The project page arrangement. {layout: json | '' | null, scope: 'mine' (default) | 'standard' | 'promote'}.
     promote (2.43.0, #1452): layout becomes the standard and the person's own arrangement goes (owner / admins).
     mine: the person's own arrangement ('' / null = back to the standard); standard: for everyone in the project, only the
-    owner and admins ('' / null = the built-in default). Agents: 403."""
+    owner and admins ('' / null = the built-in default). Agents: 403.
+    2.570.0 (#4770): expect_updated_at = the version of the part this scope writes (std_at for standard / promote, mine_at
+    for mine); someone changed it since -> 409 with the arrangements under "current"; missing -> as before."""
     need_person()
     b = body()
-    if set(b) - {"layout", "scope"}:
+    if set(b) - {"layout", "scope", "expect_updated_at"}:
         raise BadInput(tr("Invalid layout"))
     scope = b.get("scope") or "mine"
     if scope not in ("mine", "standard", "promote"):
@@ -122,10 +127,14 @@ def list_layout_put(lid):
     from ..lists.projects import need_overview
     role = need_overview(c, lid, write=False)
     v = clean_layout(b.get("layout"))
+    write_lock(c, f"list-layout-{int(lid)}")
+    cur = page_layouts(c, lid, me(), role)
+    ccf_check(b, cur["mine_at"] if scope == "mine" else cur["std_at"], "current", lambda: cur)
+    ts = iso_ms(now_utc())
     if scope in ("standard", "promote"):
         if role not in ("owner", "admin"):
             raise Denied(403, tr("Only the owner or an admin of the project can change the default"))
-        c.execute("UPDATE lists SET page_layout=? WHERE id=?", (v, lid))
+        c.execute("UPDATE lists SET page_layout=?, page_layout_at=? WHERE id=?", (v, ts, lid))
         if scope == "promote":  # 2.43.0 (#1452): my arrangement becomes the standard, I follow it from now on
             c.execute("DELETE FROM list_layouts WHERE list_id=? AND user_id=?", (lid, me()))
             from .layoutsets import lyv_follow  # 2.55.0 (#1069): no own arrangement now -> none saved is active
@@ -133,7 +142,7 @@ def list_layout_put(lid):
     elif v:
         c.execute("""INSERT INTO list_layouts(list_id,user_id,layout,updated_at) VALUES(?,?,?,?)
                      ON CONFLICT(list_id,user_id) DO UPDATE SET layout=excluded.layout, updated_at=excluded.updated_at""",
-                  (lid, me(), v, iso(now_utc())))
+                  (lid, me(), v, ts))
     else:
         c.execute("DELETE FROM list_layouts WHERE list_id=? AND user_id=?", (lid, me()))
     if scope == "mine":  # 2.55.0 (#1069): the active saved arrangement follows
@@ -165,35 +174,46 @@ def wg_std_all(c):
     return {k: gsetting(c, "lystd_" + k) or "" for k in WG_STD_KEYS}
 
 
+def wg_std_vers(c):
+    """2.570.0 (#4770): the version of each standard (global setting lystd_at_<key>, '' = not set since): expect_updated_at of
+    PUT /api/layouts/std/<key>, like the other arrangements' updated_at."""
+    return {k: gsetting(c, "lystd_at_" + k) or "" for k in WG_STD_KEYS}
+
+
 @app.get("/api/layouts/std")
 def wg_std_get():
     c = db()
-    return jsonify({"layouts": wg_std_all(c), "can": bool(g.user["is_admin"])})
+    return jsonify({"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": bool(g.user["is_admin"])})
 
 
 @app.put("/api/layouts/std/<key>")
 def wg_std_put(key):
     """{layout: json | '' | null, promote: bool}: the standard of a view for everyone (instance admins only; agents 403).
-    promote: the admin's own value of that view goes back to '' as well (they follow the standard from now on)."""
+    promote: the admin's own value of that view goes back to '' as well (they follow the standard from now on).
+    2.570.0 (#4770): expect_updated_at = versions[key] of the last answer; set since -> 409 with the standards under "current"."""
     need_person()
     if key not in WG_STD_KEYS:
         raise BadInput(tr("Invalid layout"))
     if not g.user["is_admin"]:
         raise Denied(403, tr("Only an admin can change the default"))
     b = body()
-    if set(b) - {"layout", "promote"}:
+    if set(b) - {"layout", "promote", "expect_updated_at"}:
         raise BadInput(tr("Invalid layout"))
     from ..accounts.settings import DASH_WIDGETS
     v = clean_layout(b.get("layout"), DASH_WIDGETS if key == "dashboard" else None)
     c = db()
+    write_lock(c, f"lystd-{key}")
+    ccf_check(b, gsetting(c, "lystd_at_" + key), "current",
+              lambda: {"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
     gset(c, "lystd_" + key, v)
+    gset(c, "lystd_at_" + key, iso_ms(now_utc()))
     if b.get("promote"):
         c.execute("DELETE FROM user_settings WHERE user_id=? AND key=?", (me(), key))
         from .layoutsets import lyv_follow  # 2.55.0 (#1069)
         lyv_follow(c, me(), key, "")
     bump(c)
     c.commit()
-    return jsonify({"layouts": wg_std_all(c), "can": True})
+    return jsonify({"layouts": wg_std_all(c), "versions": wg_std_vers(c), "can": True})
 
 
 # ---------------------------------------------------------------- 2.43.0 (#1346): the project page as a pin board
