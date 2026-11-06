@@ -22,7 +22,9 @@ CREATE INDEX IF NOT EXISTS ix4804_rules_target ON hub_mailbox_rules(target_id) W
 CREATE INDEX IF NOT EXISTS ix4804_rules_created_by ON hub_mailbox_rules(created_by) WHERE created_by IS NOT NULL;
 CREATE TABLE IF NOT EXISTS hub_mailbox_docs (
   box_id BIGINT NOT NULL REFERENCES hub_mailboxes(id) ON DELETE CASCADE, mid TEXT NOT NULL,
-  rule_id BIGINT REFERENCES hub_mailbox_rules(id) ON DELETE SET NULL, node_id BIGINT, at TEXT NOT NULL, PRIMARY KEY (box_id, mid));
+  rule_id BIGINT REFERENCES hub_mailbox_rules(id) ON DELETE SET NULL,
+  node_id BIGINT, -- no FK (2.581.0 #4804): the first document made of the mail, a note only (the marker stays when the document goes)
+  at TEXT NOT NULL, PRIMARY KEY (box_id, mid));
 CREATE INDEX IF NOT EXISTS ix4804_docs_rule ON hub_mailbox_docs(rule_id) WHERE rule_id IS NOT NULL;
 """
 MIGRATIONS = [
