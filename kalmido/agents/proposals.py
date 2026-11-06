@@ -2,7 +2,7 @@
 import json
 import re
 import time
-from datetime import timedelta
+from datetime import date, timedelta
 from flask import g, jsonify, request
 
 from ..core.config import app, PUBLIC_URL
@@ -28,7 +28,7 @@ from ..lists.projects import list_purge_files, list_row_purge
 from ..notify.push import push_prio, push_reachable
 from ..api.v1 import _v1_live, PRIO_VALUES, v1_one
 from ..api.common import v1_args, v1_err, v1_json, v1_view
-from ..tasks.dayplan import dayplan_day, dayplan_input, dayplan_mode, dayplan_validate, dayplan_want
+from ..tasks.dayplan import dayplan_day, dayplan_events, dayplan_input, dayplan_mode, dayplan_validate, dayplan_want
 from ..agents.core import (
     agent_active, agent_emit, agent_ids, agent_online, agent_public, agent_row, agent_shares, AGENT_TYPING_S,
     agent_typing_to, agents_for, is_agent, need_person, job_dict, JOB_TITLE_MAX, list_sections, need_agent, need_chat_agent,
@@ -389,12 +389,25 @@ def prop_validate(kind, b, inp):
 
 
 # ---- the request (a person asks an agent)
-def dp_agent_input(c, inp):
+def dp_agent_input(c, uid, inp):
     """2.582.0 (#4380, audit #2483 M4): a day plan's input without the tasks of lists that never reach an agent
-    (agent_never_lids: health, budget, ...), like extract / triage; the built-in plan's hint loses them too."""
+    (agent_never_lids: health, budget, ...), like extract / triage; the built-in plan's hint loses them too.
+    2.582.0 (fable review F5): the time stays busy, as assistant/web.py asst_dayplan_input does: a left-out fixed entry
+    and an event at a task of such a list remain as a block titled "Busy" (no task, no title)."""
+    evs = dayplan_events(c, uid, date.fromisoformat(inp["date"]))
     off = agent_never_lids(c, [x.get("list_id") for k in ("tasks", "fixed") for x in inp.get(k) or []])
+    tids, etl = sorted({e["tid"] for e in evs if e.get("tid")}), {}
+    if tids:  # the lists of the events' tasks (an event at a health task keeps no title)
+        etl = {r[0]: r[1] for r in c.execute(f"SELECT id, list_id FROM tasks WHERE id IN ({','.join('?' * len(tids))})", tids)}
+        off |= agent_never_lids(c, etl.values())
     if not off:
         return inp
+    busy = tr("Busy")
+    hide = {(e["title"], e["all_day"], e["start"], e["end"]) for e in evs if etl.get(e.get("tid")) in off}
+    inp["events"] = [{**e, "title": busy} if (e.get("title"), e.get("all_day"), e.get("start"), e.get("end")) in hide else e
+                     for e in inp.get("events") or []]
+    inp["events"] += [{"title": busy, "all_day": False, "start": x["start"], "end": x["end"]}
+                      for x in inp.get("fixed") or [] if x.get("list_id") in off and x.get("start")]
     gone = {x.get("task_id") for k in ("tasks", "fixed") for x in inp.get(k) or [] if x.get("list_id") in off}
     for k in ("tasks", "fixed"):
         inp[k] = [x for x in inp.get(k) or [] if x.get("list_id") not in off]
@@ -430,7 +443,9 @@ def prop_input(c, uid, kind, b):
             raise BadInput(tr("Only open tasks can be broken down"))
         if list_role(c, t["list_id"]) not in WRITE_ROLES:
             raise Denied(403)
-        if agent_never_lids(c, [t["list_id"]]):  # 2.582.0 (#4380, audit #2483 M4): as extract - health / budget never reach an agent
+        # 2.582.0 (#4380, audit #2483 M4): as extract - health / budget never reach an agent; 2.582.0 (fable review F6): only
+        # these get this text, a list lock / an organisation's trip / read later go on to proposal_request's own check (409)
+        if (c.execute("SELECT life FROM lists WHERE id=?", (t["list_id"],)).fetchone() or [None])[0] in ("health", "budget"):
             raise BadInput(tr("Health projects and budgets never reach an agent"))
         e = check_parent(c, None, tid)
         if e:
@@ -475,7 +490,7 @@ def prop_input(c, uid, kind, b):
     if kind == "dayplan":  # 2.10.0 (#440): the same input the built-in planner uses
         _p_keys(b, "", ("agent_id", "kind", "date", "mode"))
         day = dayplan_day(b.get("date"))
-        inp = dp_agent_input(c, dayplan_input(c, uid, day, dayplan_mode(b.get("mode"))))  # 2.582.0 (#4380): without health / budget
+        inp = dp_agent_input(c, uid, dayplan_input(c, uid, day, dayplan_mode(b.get("mode"))))  # 2.582.0 (#4380): without health / budget
         if not inp["tasks"]:
             raise BadInput(tr("There are no open tasks to plan"))
         return inp, tr(PROP_TITLES["dayplan"], day.isoformat(), lg=lg), None, None

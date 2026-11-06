@@ -73,13 +73,14 @@ def plan_cals_off(c, uid):
 def dayplan_events(c, uid, day):
     """The day's events of uid's visible calendar subscriptions and own calendars: [{title, start, end (local minutes), all_day}].
     2.36.1 (#956): calendars switched off for planning (setting plan_cals_off) are left out; all-day events are listed but
-    never count as busy (the planner only takes the timed ones)."""
+    never count as busy (the planner only takes the timed ones). 2.582.0 (#4380): tid = the own event's task (None: none /
+    a subscription), internal - dayplan_compute's answer leaves it out."""
     out = []
     ds = day.isoformat()
     off = plan_cals_off(c, uid)
     rows = []
     if CAL_ON:
-        rows = [(r["title"], r["all_day"], r["start"], r["end"]) for r in c.execute(
+        rows = [(r["title"], r["all_day"], r["start"], r["end"], None) for r in c.execute(
             """SELECT e.title, e.all_day, e.start, e."end", s.id AS sid FROM cal_events e JOIN cal_subs s ON s.id=e.sub_id
                WHERE s.user_id=? AND s.visible=1 AND e.d1>=? AND e.d0<=? ORDER BY e.start LIMIT ?""",
             (uid, ds, ds, DAYPLAN_MAX_EVENTS)) if f"s:{r['sid']}" not in off]
@@ -88,12 +89,12 @@ def dayplan_events(c, uid, day):
         for o in ev_range(c, uid, day, day):
             if o.get("status") == "cancelled" or (o.get("cal") is not None and f"e:{o['cal']}" in off):
                 continue
-            rows.append((o["title"], o["all_day"], o["start"], o["end"]))
+            rows.append((o["title"], o["all_day"], o["start"], o["end"], o.get("task_id")))  # 2.582.0 (#4380): + its task (dp_agent_input)
             if len(rows) >= DAYPLAN_MAX_EVENTS * 2:
                 break
-    for title, all_day, start, end in rows:
+    for title, all_day, start, end, tid in rows:
         if all_day:
-            out.append({"title": title, "all_day": True, "start": None, "end": None})
+            out.append({"title": title, "all_day": True, "start": None, "end": None, "tid": tid})
             continue
         try:
             a = parse_iso(start).astimezone(TZ)
@@ -105,7 +106,7 @@ def dayplan_events(c, uid, day):
         sb = min(1440, int((b - day0).total_seconds() // 60))
         if sb > sa:
             out.append({"title": title, "all_day": False, "start": _min_hm(sa), "end": _min_hm(sb) if sb < 1440 else "24:00",
-                        "s": sa, "e": sb})
+                        "s": sa, "e": sb, "tid": tid})
     out.sort(key=lambda e: (not e["all_day"], e.get("s") or 0, e["title"]))
     return out
 
