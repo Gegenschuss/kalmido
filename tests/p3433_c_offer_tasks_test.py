@@ -105,7 +105,7 @@ def scenario(S, who, shoot=False, member=None):
     check({k: (x["section"], x["hours"]) for k, x in rb.items()} == want, f"{who}: rows, sections and hours {[(k, x['section'], x['hours']) for k, x in rb.items()]}")
     check("Hinweis: Preise netto" not in rb and "Postproduktion" not in rb, f"{who}: no text / heading rows")
     check(rb["Konzept"]["text"] == "Idee und Treatment" and all(x["state"] == "new" and x["pick"] for x in pv["rows"]), f"{who}: description, all new and ticked")
-    check(not any(k in x for x in pv["rows"] for k in ("rate", "net", "total", "price")) and "800" not in str(pv["rows"]), f"{who}: no price in the rows")
+    check(not any(k in x for x in pv["rows"] for k in ("rate", "net", "total", "price")) and "800" not in str([{k: v for k, v in x.items() if k != "key"} for x in pv["rows"]]), f"{who}: no price in the rows")  # 2.589.0: the keys carry a random hex uid (s:<part>:<uid>) that may hold "800"
     check(pv.get("net_text") and pv.get("total_h") == round(sum(v[1] or 0 for v in want.values()), 2), f"{who}: the sums {pv.get('total_h')} {pv.get('net_text')}")
     # ------------------------------------------------------------ apply: a new project
     pick = [x["key"] for x in pv["rows"] if x["title"] != "Druckdaten"]
