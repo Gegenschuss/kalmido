@@ -550,7 +550,7 @@ APP_ONLY = [
     ("2.19.0: address books (CardDAV) for birthdays: their passwords are entered by people, like calendar subscriptions", ("* /api/family/contacts",)),
     ("2.49.0 (#1551): the parents' PIN of a child account: a secret people type in the app (the parent sets it, the child opens "
      "its settings with it), never an agent", ("* /api/family/kids/{}/pin", "* /api/me/pin/")),
-    ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample")),
+    ("the app's personal settings, onboarding and sample data", ("PATCH /api/settings", "POST /api/briefing/read", "POST /api/onboarding", "* /api/sample", "* /api/industry")),  # 2.578.0 (#4573): + the app's industry
     ("2.32.0 (#1063, #983): how a person arranges their views and the project page: people only, never agents", ("* /api/lists/{}/layout",)),
     ("the focus timer is a personal on-screen timer; time is tracked with /time/timer; 2.116.0 (#2067): persons' scripts reach it "
      "as /api/v1/focus (agent tokens are refused)", ("* /api/pomo/",)),

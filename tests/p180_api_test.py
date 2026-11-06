@@ -6,7 +6,7 @@ checklist "Example: Shoot day packing list"; idempotent (also two requests at on
 other users), quiet (no pushes, News, activity, not in the daily digest), in the user's language, a simpler version
 without the project modules. DELETE /api/sample removes exactly what it created: edited sample tasks and the done copy
 of the repeating task go, tasks the user added (also below a sample task) stay with their list, section and field.
-The setup's {sample} flag creates it / stops the tour from asking."""
+The setup's {sample} flag creates it / stops the tour from asking. 2.578.0 (#4573): with the industry Film & Video (chosen first)."""
 import json, os, sys, threading, time
 from datetime import date, timedelta
 import requests
@@ -42,6 +42,9 @@ BOB = A.post(B + "/api/users", json={"username": "bob", "display_name": "Bob", "
 Bb = sess("bob")
 A.patch(B + "/api/settings", json={"features": ALL, "push_channel": "ntfy"})
 Bb.patch(B + "/api/settings", json={"features": ALL, "lang": "de"})
+# 2.578.0 (#4573): the image film is the sample of the industry Film & Video only (default none: the neutral website relaunch,
+# tests/p2578_b_industry_test.py) -- both choose it, this suite keeps testing the film sample
+check(A.put(B + "/api/industry", json={"industry": "film"}).ok and Bb.put(B + "/api/industry", json={"industry": "film"}).ok, "industry Film & Video chosen")
 st = lambda s=A: s.get(B + "/api/state").json()  # noqa: E731
 T0 = testclock.today()
 D = lambda n: (T0 + timedelta(days=n)).isoformat()  # noqa: E731

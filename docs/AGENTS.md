@@ -883,6 +883,10 @@ of the organisation, also one of another person. Private projects, private shari
 a project admin may archive and delete a shared project too (the tasks go to the owner's trash, the owner is told). This is people's work only: there is no agent API for it, and an agent account gets
 `403` even with admin rights. For an agent in such a project it is the same as when the owner archives, hands over or deletes it.
 
+**Industry (2.578.0).** An organisation (or a person without one) may choose an industry for the whole app (default none;
+Film & Video adds the shoot calculation of the office and the image film sample). It is chosen by people only
+(`PUT /api/industry`, agents `403`); the agent API, the MCP tools and the events are unchanged.
+
 ## Events
 
 The agent never gets events about its own actions. Task payloads are the task as the agent sees it (the same shape as `GET /api/v1/tasks/{id}`). `list` is `{"id", "name", "agent_tidy", "tidy_agent_id", "project_type", "listen_agent_ids"}` (the last two since 2.30.0).

@@ -1191,6 +1191,7 @@ async function setupChoices(el, logo) {
   const askOrg = st.about?.instance_mode !== 'shared' && !st.about?.org_name_env && !st.about?.has_orgs;  // 2.23.0 (#799): asked once; 2.46.0 (#1592): creates the first organisation
   // 2.24.0 (UX-23): the purpose first; the name of the organisation only for a team / company, empty allowed (the
   // instance's default name is not offered as a value), changeable later under Administration > Organisation
+  let industry = st.industry?.code || '';  // 2.578.0 (#4573): the app's industry, default none
   let orgName = (st.me?.orgs?.[0] || '').toLowerCase() === APP_NAME.toLowerCase() ? '' : st.me?.orgs?.[0] || '';
   // 2.46.1 (#1591): "Switch on all modules" (null = untouched: the presets decide as before); it sets the modules below,
   // never the two server switches on top (collaboration, time for everyone)
@@ -1207,7 +1208,7 @@ async function setupChoices(el, logo) {
     preset = fits(st.settings?.purpose || '-') ? st.settings.purpose : Object.keys(SETUP_PRESETS).find(fits) || '';  // 2.364.0 A (#3015): the chosen start, not the first fitting
   }
   // 2.7.0 (K21): one question "Start with": empty, the sample project, or a project of a built-in type (agency, software, personal)
-  const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data')],
+  const STARTS = [['', N_('Empty|start'), 'list', N_('Your Basket and Today, nothing else')], ['sample', N_('Sample project'), 'eye', N_('A small client project with dates and a checklist, to look around; remove it any time under Settings > Data')],  // 2.578.0 (#4573): the film text only with Film & Video (draw)
     ...PTYPE_UI.slice(1).map(([k, n, i, d]) => [k, n, i, d]),
     ['import', N_('Import from another app'), 'download', N_('Todoist, Trello, Asana, Notion and more: you start empty and the import opens right away')]];  // 2.538.0 (#4361)
   const row = ([k, n, d]) => `<label class="suse"><input type="checkbox" data-use="${k}" ${picked.has(k) ? 'checked' : ''}><span><b>${tr(n)}</b><small class="muted">${tr(d)}</small></span></label>`;
@@ -1235,7 +1236,8 @@ async function setupChoices(el, logo) {
       <div class="suse-main">${SETUP_MAIN.map(row).join('')}</div>
       <div class="suse-list">${SETUP_MODS.map(row).join('')}</div></details>
       <h3 id="su-start-h">${tr('Start with')}</h3>
-      <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${tr(d)}</small></button>`).join('')}</div>
+      <div class="sustarts ptcards" role="radiogroup" aria-labelledby="su-start-h">${STARTS.map(([k, n, i, d]) => `<button type="button" class="ptcard ${k === start ? 'on' : ''}" role="radio" aria-checked="${k === start}" data-su-start="${k}">${ic(i, 's')}<b>${tr(n)}</b><small class="muted">${k === 'sample' && industry === 'film' ? tr('A small video production with dates and a packing list, to look around; remove it any time under Settings > Data') : tr(d)}</small></button>`).join('')}</div>
+      ${st.industry?.choices?.length ? `<h3><label for="su-ind">${tr('Industry')}</label></h3><select id="su-ind" class="suind">${indOpts(st.industry, industry)}</select><p class="muted">${tr('Adds the functions of one industry to the whole app, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None: everything stays general.')}</p>` : ''}${''/* 2.578.0 (#4573) */}
       <div class="aerr" role="alert" id="su-err"></div>
       <div class="sufoot"><button type="button" class="btn pri" data-su="go">${tr('Start')}</button></div></div>`;
     $('.sucust', el)?.addEventListener('toggle', e => { custOpen = e.target.open; });
@@ -1245,6 +1247,7 @@ async function setupChoices(el, logo) {
   el.addEventListener('input', e => { if (e.target.id === 'su-org') orgName = e.target.value; });
   el.addEventListener('change', e => {
     if (e.target.id === 'su-modsall') { modsAll = e.target.checked; pm_su(); draw(); return; }
+    if (e.target.id === 'su-ind') { industry = e.target.value; draw(); return; }  // 2.578.0 (#4573)
     const c = e.target.closest('[data-use]'); if (!c) return;
     c.checked ? picked.add(c.dataset.use) : picked.delete(c.dataset.use);
     $$('[data-su-preset]', el).forEach(b => { b.classList.toggle('on', isOn(b.dataset.suPreset)); b.setAttribute('aria-pressed', isOn(b.dataset.suPreset)); });
@@ -1264,7 +1267,7 @@ async function setupChoices(el, logo) {
     }
     const post = async (url, body) => { const r = await fetch(url, {method: url.endsWith('settings') ? 'PATCH' : 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify(body)}); if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || httpErrText(r.status)); };
     try {
-      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: suMods(), sample: start === 'sample', ...(start && start !== 'sample' && start !== 'import' ? {project_type: start} : {}), ...(suPurpose() ? {purpose: suPurpose()} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
+      if (b.dataset.su === 'go') await post('/api/admin/setup', {lang, collab_all: picked.has('collab'), time_all: picked.has('a:time'), modules: suMods(), sample: start === 'sample', ...(industry ? {industry} : {}), ...(start && start !== 'sample' && start !== 'import' ? {project_type: start} : {}), ...(suPurpose() ? {purpose: suPurpose()} : {}), ...(modsAll !== null ? {all_modules: modsAll} : {}), examples: start === 'sample', ...(askOrg && ['team', 'software', 'office'].includes(preset) && orgName.trim() ? {org_name: orgName.trim()} : {})});
       else return;
       if (start === 'import') { try { sessionStorage.setItem('kalmido-suimport', '1'); LS.set('settingsSec', 'data'); } catch { /* private mode: the card only starts empty */ } }  // 2.538.0 (#4361): main.js opens Settings > Data > Import
       location.replace('/');

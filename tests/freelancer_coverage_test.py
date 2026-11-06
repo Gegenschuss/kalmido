@@ -79,6 +79,7 @@ KINDS = {
     "orgcrypt": ("matrix", "p2138_c_api_test.py: the encryption state and the recovery key (step-up) of the personal office of a "
                            "person without an organisation"),
     "own": ("matrix", SUITE + ": the own settings, profile, tokens, app passwords, push, account export / import"),
+    "industry": ("matrix", "p2578_b_industry_test.py: the app's industry (2.578.0) of a person without an organisation: chosen for her own area, the sample follows it"),  # 2.578.0 (#4573)
     # ---- nothing to check without an organisation (with the reason)
     "auth": ("n/a", "signing in, setting up and securing the own account: the same for every person, before any workspace"),
     "public": ("n/a", "pages and facts without data of a person (app shell, health, version, manifest, share target, QR code)"),
@@ -106,6 +107,7 @@ KINDS = {
 ROUTES = {
     # 2.575.0 (#3778): own module cards of the private workspace (p2575_a_api_test.py, freelancer-matrix: modcards)
     "GET /api/modcards": "modcards", "POST /api/modcards": "modcards", "PATCH /api/modcards/{}": "modcards", "DELETE /api/modcards/{}": "modcards",
+    "GET /api/industry": "industry", "PUT /api/industry": "industry",  # 2.578.0 (#4573): p2578_b_industry_test.py
     # 2.570.0 (#4783): the history of an office row / a client (office/owrite.py ow_history, the rights of the save route): p2570_a_office_test.py
     "GET /api/office/trips/{}/history": "office", "GET /api/office/trips/{}/items/{}/history": "office", "GET /api/office/trips/purposes/{}/history": "office", "GET /api/office/fixed-costs/{}/history": "office",
     "GET /api/office/cashflow/adjust/{}/history": "office", "GET /api/office/cards/{}/history": "office", "GET /api/office/cards/lines/{}/history": "office", "GET /api/office/bank/rules/{}/history": "office",

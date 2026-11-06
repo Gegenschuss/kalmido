@@ -1,16 +1,21 @@
-"""Onboarding and the sample project."""
+"""Onboarding, the sample project and the app's industry (2.578.0, #4573)."""
 import json
+import os
+import re
 from datetime import datetime, timedelta, timezone
-from flask import g, has_request_context, jsonify
+from flask import g, has_request_context, jsonify, request
 
 from ..core.config import app, TZ
 from ..core.pg import insert_id, system_ctx
 from ..core.i18n import lang, N_, tr
-from ..core.db import body, bump, db, err, iso, local_now, now_utc, uset, usettings, write_lock
+from ..core.db import body, bump, db, err, iso, iso_ms, local_now, now_utc, uset, usettings, write_lock
 from ..accounts.session import me
 from ..accounts.pictures import list_icon_drop_file
-from ..core.access import collab_all, list_role, my_max_sort, time_all, WRITE_ROLES
+from ..core.access import acx_drop, collab_all, list_role, my_max_sort, time_all, WRITE_ROLES
 from ..core.serializers import unlink_files
+from ..core.errors import BadInput, Denied  # 2.578.0 (#4573)
+from ..core.conflict import ccf_check  # 2.578.0 (#4573)
+from ..core.orgcrypt import oc_json_store  # 2.578.0 (#4573)
 from ..tasks.validation import log_act
 from ..tasks.tasks import set_tags
 
@@ -106,7 +111,8 @@ def onboarding():
 
 
 # ---------------------------------------------------------------- sample project (1.8.0)
-# "Example: Image film for client Muster": a realistic project list (sections, dates around today, start dates for the
+# 2.578.0 (#4573): the variant follows the app's industry (SAMPLE_VARIANTS): "Example: Website relaunch for client Muster"
+# without one, "Example: Image film for client Muster" with Film & Video. The film one: a realistic project list (sections, dates around today, start dates for the
 # timeline, dependencies, all four matrix quadrants, subtasks, a Markdown checklist, tags, a repeating task, a comment,
 # custom fields, a time entry, a project status) plus a checklist "Example: Shoot day packing list". Offered in the
 # first-run setup and the welcome tour, created / removed under Settings > Data. Only uses the modules the user has
@@ -151,6 +157,58 @@ SAMPLE_PACKING = (N_("Camera and three batteries"), N_("Memory cards (formatted)
                   N_("Shooting schedule and contact list"), N_("Release forms"), N_("Water and snacks"))
 
 
+# 2.578.0 (#4573): the neutral sample (no industry chosen): "Example: Website relaunch for client Muster" with the same
+# building blocks as the film one (sections, dependencies, subtasks, a checklist in the description, tags, budget, effort,
+# a timed appointment, a repeating task, a comment, a time entry, a project status) plus a launch checklist. The image film
+# with its shoot days and packing list is the sample of the industry Film & Video only (app_industry).
+def _sample_tasks_neutral():
+    """As _sample_tasks: the neutral client project."""
+    return [
+        ("brief", 0, N_("Kick-off with the client"), 3, -9, -8, {"done": -8, "tags": [N_("client")]}),
+        ("concept", 0, N_("Write the concept and sitemap"), 5, -5, -1, {
+            "tags": [N_("concept")], "content": N_("**Goal:** a clearer, faster website that brings more enquiries.\n\n- [x] Read the briefing notes\n- [ ] First draft of the sitemap\n- [ ] Internal review\n- [ ] Send it to the client\n\nPages: home, services, references and contact."),
+            "subs": [(N_("Define the target audience"), True), (N_("Phrase the key message"), False),
+                     (N_("Collect reference websites"), False)], "effort": "m"}),
+        ("budget", 0, N_("Get the quotation and budget approved"), 5, None, 0, {
+            "tags": [N_("client")], "budget": 9800,
+            "comment": N_("The client agreed to the budget on the phone, the written approval follows.")}),
+        ("content", 1, N_("Collect texts and pictures from the client"), 3, 1, 3, {"tags": [N_("client")]}),
+        ("design", 1, N_("Design the page layouts"), 3, 0, 4, {"effort": "m"}),
+        ("access", 1, N_("Get access to domain and hosting"), 1, None, 5, {"tags": [N_("organisation")]}),
+        ("redirects", 1, N_("List the old pages for redirects"), 1, None, 2, {"tags": [N_("organisation")]}),
+        ("workshop", 2, N_("Content workshop with the client"), 5, None, 8, {"time": "10:00", "dur": 180, "budget": 1200, "effort": "l"}),
+        ("build", 2, N_("Build the pages"), 3, 9, 13, {"budget": 3600, "effort": "l"}),
+        ("test", 3, N_("Test on phones and browsers"), 3, 14, 15, {"budget": 800, "effort": "m"}),
+        ("legal", 3, N_("Check imprint and privacy policy"), 0, None, None, {}),
+        ("speed", 3, N_("Optimise the loading speed"), 1, 15, 17, {"effort": "m"}),
+        ("feedback", 4, N_("Feedback round with the client"), 5, None, 19, {"tags": [N_("client")]}),
+        ("golive", 4, N_("Go live and switch the domain"), 3, None, 21, {}),
+        ("call", None, N_("Weekly status call with the client"), 0, None, "tue", {"time": "10:00", "dur": 30,
+                                                                                  "repeat": "FREQ=WEEKLY;BYDAY=TU"}),
+    ]
+
+
+SAMPLE_SECTIONS_NEUTRAL = (N_("Concept"), N_("Design|website project phase"), N_("Build|website project phase"),
+                           N_("Test|website project phase"), N_("Approval"))
+SAMPLE_DEPS_NEUTRAL = (("budget", "concept"), ("design", "budget"), ("build", "design"), ("test", "build"))
+SAMPLE_CHECKLIST_NEUTRAL = (N_("Back up the old website"), N_("Set up the redirects"), N_("Send every form once"),
+                            N_("Check phone, tablet and desktop"), N_("Check imprint and privacy policy"),
+                            N_("Connect the visitor statistics"), N_("Submit the sitemap to search engines"),
+                            N_("Tell the client's team"))
+# per variant: project name, colour, tasks, sections, dependencies, checklist name + items, the time entry (task title,
+# note), the project status note
+SAMPLE_VARIANTS = {
+    "film": {"name": N_("Example: Image film for client Muster"), "tasks": _sample_tasks, "sections": SAMPLE_SECTIONS,
+             "deps": SAMPLE_DEPS, "check_name": N_("Example: Shoot day packing list"), "check": SAMPLE_PACKING,
+             "time": (N_("Write the concept and treatment"), N_("First draft of the treatment")),
+             "status": N_("Shoot dates confirmed with the client")},
+    "": {"name": N_("Example: Website relaunch for client Muster"), "tasks": _sample_tasks_neutral,
+         "sections": SAMPLE_SECTIONS_NEUTRAL, "deps": SAMPLE_DEPS_NEUTRAL, "check_name": N_("Example: Launch checklist"),
+         "check": SAMPLE_CHECKLIST_NEUTRAL, "time": (N_("Write the concept and sitemap"), N_("First draft of the sitemap")),
+         "status": N_("Launch date confirmed with the client")},
+}
+
+
 def sample_state(c, uid):
     """What the sample left behind, for the client (Settings > Data, the removal dialog), or None."""
     tasks = c.execute("""SELECT COUNT(*) FROM tasks WHERE id IN
@@ -164,8 +222,10 @@ def sample_state(c, uid):
 
 
 def sample_create(c, uid):
-    """Creates the sample for uid (caller commits). Returns the id of the project list."""
+    """Creates the sample for uid (caller commits). Returns the id of the project list. 2.578.0 (#4573): the variant of the
+    app's industry (app_industry): the image film only with Film & Video, else the neutral website relaunch."""
     from ..lists.fields import fmt_num
+    var = SAMPLE_VARIANTS.get(app_industry(c, uid)) or SAMPLE_VARIANTS[""]
     c.execute("DELETE FROM sample_items WHERE user_id=?", (uid,))  # leftovers of a sample removed by hand
     lg = lang(c, uid)
     s = usettings(c, uid)
@@ -180,13 +240,13 @@ def sample_create(c, uid):
     srt = my_max_sort(c, uid)
     # 2.352.0 B (#2752): priority is every list's default sort now - the sample keeps Flow as its own sort (it shows the chain)
     lid = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind,sort_mode) VALUES(?,?,?,?,?,?,?,?,?,?)",
-                    (tr("Example: Image film for client Muster", lg=lg), "#8b5cf6", "", srt + 1, "list", ts, uid, 0,
+                    (tr(var["name"], lg=lg), "#8b5cf6", "", srt + 1, "list", ts, uid, 0,
                      "project" if project else "list", "flow" if "deps" in feats else ""))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, lid)  # 2.28.0 (#935): the default workspace
     track("list", lid)
     secs = []
-    for i, n in enumerate(SAMPLE_SECTIONS):
+    for i, n in enumerate(var["sections"]):
         secs.append(insert_id(c, "INSERT INTO sections(list_id,name,sort) VALUES(?,?,?)", (lid, tr(n, lg=lg), i + 1)))
         track("section", secs[-1])
     fields = {}
@@ -201,7 +261,7 @@ def sample_create(c, uid):
         for f in fields.values():
             track("field", f)
     ids = {}
-    for i, (key, sec, title, prio, start, due, x) in enumerate(_sample_tasks()):
+    for i, (key, sec, title, prio, start, due, x) in enumerate(var["tasks"]()):
         if due == "tue":  # the next Tuesday (today, if it is one)
             due = (1 - today.weekday()) % 7
         done = x.get("done")
@@ -230,29 +290,29 @@ def sample_create(c, uid):
             c.execute("INSERT INTO comments(task_id,user_id,body,mentions,created_at) VALUES(?,?,?,?,?)",
                       (tid, uid, tr(x["comment"], lg=lg), "", iso(now_utc() - timedelta(hours=3))))
     if project and "deps" in feats:
-        for a, b in SAMPLE_DEPS:
+        for a, b in var["deps"]:
             c.execute("INSERT INTO task_deps(task_id,blocker_id,created_by,created_at) VALUES(?,?,?,?) ON CONFLICT DO NOTHING",
                       (ids[a], ids[b], uid, ts))
     if project and "time" in feats:  # 1.5 h on the treatment yesterday afternoon
         st = datetime.combine(today - timedelta(days=1), datetime.min.time().replace(hour=14), TZ).astimezone(timezone.utc)
         eid = insert_id(c, """INSERT INTO time_entries(user_id,task_id,list_id,task_title,start,"end",seconds,note,source,created_at,updated_at)
                            VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                        (uid, ids["concept"], lid, tr("Write the concept and treatment", lg=lg), iso(st),
-                         iso(st + timedelta(minutes=90)), 5400, tr("First draft of the treatment", lg=lg), "manual", ts, ts))
+                        (uid, ids["concept"], lid, tr(var["time"][0], lg=lg), iso(st),
+                         iso(st + timedelta(minutes=90)), 5400, tr(var["time"][1], lg=lg), "manual", ts, ts))
         track("time", eid)
         c.execute("UPDATE lists SET time_tracking=1 WHERE id=?", (lid,))  # 2.41.0 (#1471): the sample tracks time
     if project and "progress" in feats:
-        note = tr("Shoot dates confirmed with the client", lg=lg)
+        note = tr(var["status"], lg=lg)
         c.execute("UPDATE lists SET status='on_track', status_note=?, status_by=?, status_at=? WHERE id=?", (note, uid, ts, lid))
         c.execute("INSERT INTO list_status(list_id,user_id,status,note,created_at) VALUES(?,?,?,?,?)", (lid, uid, "on_track", note, ts))
-    # the packing list: a plain list with "Show completed at the bottom" (2.7.2, #414; ticked items stay below and can be
-    # reused for the next shoot)
+    # the packing list (2.578.0 #4573: the neutral sample's launch checklist): a plain list with "Show completed at the bottom"
+    # (2.7.2, #414; ticked items stay below and can be reused for the next shoot)
     cl = insert_id(c, "INSERT INTO lists(name,color,folder,sort,view,created_at,owner_id,checklist,kind) VALUES(?,?,?,?,?,?,?,?,?)",
-                   (tr("Example: Shoot day packing list", lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list"))
+                   (tr(var["check_name"], lg=lg), "#f59e0b", "", srt + 2, "list", ts, uid, 1, "list"))
     from ..accounts.orgs import ws_apply_default
     ws_apply_default(c, uid, cl)  # 2.28.0 (#935): the default workspace
     track("list", cl)
-    for i, n in enumerate(SAMPLE_PACKING):
+    for i, n in enumerate(var["check"]):
         track("task", insert_id(c, "INSERT INTO tasks(list_id,title,sort,created_at,updated_at,created_by) VALUES(?,?,?,?,?,?)",
                                 (cl, tr(n, lg=lg), i + 1, ts, ts, uid)))
     uset(c, uid, "sample_ask", "0")
@@ -350,3 +410,155 @@ def sample_delete():
         list_icon_drop_file(lid, icon)
     print("sample removed, user", uid, "tasks", counts["tasks"], flush=True)
     return jsonify(ok=True, **counts)
+
+
+# ---------------------------------------------------------------- the app's industry (2.578.0, #4573)
+# Decided 04.11.2026: the industry is one switch for the whole app (default: none). Its one truth is the setting
+# industry_packs of the office area (office/model.py office_settings, the same list the pack cards of Office > Settings
+# switch): the industry = the first built-in pack in it ("film"); own packs of the data folder stay office extras. The area
+# is the one office/model.py office_where picks (the workspace's organisation, else the person's own office), read here
+# without creating anything. Only with Film & Video: the image film sample with its packing list and the shoot calculation
+# (office/sheet.py dk_enabled reads the same list). Accounts and organisations that use the film pack today keep it: their
+# list holds "film" already, so nothing is migrated; new ones start without.
+IND_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "office", "packs", "industry")
+IND_NO_RIGHT = N_("Only an admin of the organisation chooses its industry")
+IND_NO_AREA = N_("Choose a workspace first: the industry belongs to an organisation or to your own area")
+_ind_cache = {}
+
+
+def ind_codes():
+    """The industries one can choose: the shipped industry packs (office/packs/industry/<code>.json), e.g. ("film",)."""
+    if "codes" not in _ind_cache:
+        try:
+            _ind_cache["codes"] = tuple(sorted(f[:-5] for f in os.listdir(IND_DIR) if f.endswith(".json")))
+        except OSError:
+            _ind_cache["codes"] = ()
+    return _ind_cache["codes"]
+
+
+def ind_choices(lg):
+    """[{code, name}] of the industries in language lg (the pack's own name; English when the language is missing)."""
+    out = []
+    for code in ind_codes():
+        if code not in _ind_cache:
+            try:
+                with open(os.path.join(IND_DIR, code + ".json"), encoding="utf-8") as f:
+                    _ind_cache[code] = json.load(f).get("name") or {}
+            except (OSError, ValueError):
+                _ind_cache[code] = {}
+        nm = _ind_cache[code]
+        out.append({"code": code, "name": nm.get(lg) or nm.get("en") or code})
+    return out
+
+
+def ind_area(c, uid):
+    """(office area id | None, may choose) of uid's industry: the area office/model.py office_where picks; the person's own
+    office may be None while it was never made (then it is made on the first choice). A kid or an agent never chooses."""
+    from ..accounts.orgs import org_role, user_orgs  # orgs comes later in ORDER
+    u = getattr(g, "user", None) if has_request_context() else None
+    may = u is None or not (("kid" in u.keys() and u["kid"]) or (u["kind"] if "kind" in u.keys() else "user") == "agent")
+    orgs = user_orgs(c, uid)
+    ws = (usettings(c, uid).get("workspace") or "").strip()
+    m = re.fullmatch(r"org:(\d{1,9})", ws)
+    if m and int(m.group(1)) in orgs:
+        oid = int(m.group(1))
+    elif ws == "private" or not orgs:
+        with system_ctx(c):  # the person's own hidden area (office/model.py pb_personal)
+            r = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()
+        return (r[0] if r else None), may
+    elif len(orgs) == 1:
+        oid = orgs[0]
+    else:
+        return None, False
+    return oid, may and org_role(c, uid, oid) == "admin"
+
+
+def _ind_data(c, oid):
+    """(office_settings.data of area oid as stored, its updated_at); the encrypted keys stay as they are. Read as structure:
+    oid is uid's own area (ind_area checked the membership), also an organisation the setup made in this transaction."""
+    if not oid:
+        return {}, None
+    with system_ctx(c):
+        r = c.execute("SELECT data, updated_at FROM office_settings WHERE org_id=?", (oid,)).fetchone()
+    try:
+        d = json.loads(r["data"]) if r and r["data"] else {}
+    except ValueError:
+        d = {}
+    return (d if isinstance(d, dict) else {}), (r["updated_at"] if r else None)
+
+
+def ind_of_area(c, oid):
+    """The industry of office area oid: the first built-in pack switched on there, "" = none."""
+    packs = _ind_data(c, oid)[0].get("industry_packs")
+    return next((x for x in packs if x in ind_codes()), "") if isinstance(packs, list) else ""
+
+
+def app_industry(c, uid):
+    """THE read point of the app's industry for uid ("" = none, "film" = Film & Video): the industry of uid's area."""
+    return ind_of_area(c, ind_area(c, uid)[0])
+
+
+def ind_state(c, uid):
+    """The field industry of /api/state and GET /api/industry."""
+    oid, may = ind_area(c, uid)
+    return {"code": ind_of_area(c, oid), "can_set": bool(may), "choices": ind_choices(lang(c, uid)),
+            "updated_at": _ind_data(c, oid)[1]}
+
+
+def ind_set(c, uid, code, b=None):
+    """Sets uid's industry ("" = none; caller commits). Only the built-in packs change in industry_packs, own packs stay.
+    b: the request body (expect_updated_at = the version read, 409 when the settings moved on). -> True when it changed."""
+    code = (code or "").strip().lower() if isinstance(code, str) else code
+    if code not in ("",) + ind_codes():
+        raise BadInput(tr("Invalid value: {0}", "industry"))
+    oid, may = ind_area(c, uid)
+    if not may:
+        raise Denied(403, tr(IND_NO_AREA if oid is None and _ind_orgs(c, uid) else IND_NO_RIGHT))
+    if oid is None:  # the person's own office, made on the first choice (as office/model.py pb_personal)
+        with system_ctx(c):
+            c.execute("INSERT INTO orgs(name,icon,created_at,personal_of) VALUES(?,?,?,?) ON CONFLICT (personal_of) WHERE personal_of IS NOT NULL DO NOTHING",
+                      (f"private-{int(uid)}", "", iso(now_utc()), uid))
+            oid = c.execute("SELECT id FROM orgs WHERE personal_of=?", (uid,)).fetchone()[0]
+        c.commit()  # the area exists before anything is written into it
+        acx_drop()
+    write_lock(c, f"office_packs_{int(oid)}")  # the locks of PUT /api/office/settings, in its order
+    write_lock(c, f"office_settings_{int(oid)}")
+    d, at = _ind_data(c, oid)
+    ccf_check(b, at, "industry", lambda: ind_state(c, uid))
+    cur = [x for x in d.get("industry_packs") or [] if isinstance(x, str)] if isinstance(d.get("industry_packs"), list) else []
+    new = [x for x in cur if x not in ind_codes()] + ([code] if code else [])
+    if new == cur:
+        return False
+    d["industry_packs"] = new
+    with system_ctx(c):  # as _ind_data: the area is uid's own, the admin role was checked (ind_area)
+        c.execute("INSERT INTO office_settings(org_id, data, updated_at) VALUES(?,?,?) ON CONFLICT(org_id) DO UPDATE SET data=excluded.data, "
+                  "updated_at=excluded.updated_at", (oid, json.dumps(oc_json_store(c, oid, "office_settings", "data", d), ensure_ascii=False), iso_ms(now_utc())))
+    return True
+
+
+def _ind_orgs(c, uid):
+    """True when uid has several organisations (the workspace "all" names no area)."""
+    from ..accounts.orgs import user_orgs  # orgs comes later in ORDER
+    return len(user_orgs(c, uid)) > 1
+
+
+@app.get("/api/industry")
+def industry_get():
+    """{industry: {code, can_set, choices: [{code, name}], updated_at}} -- the app's industry of my area."""
+    c = db()
+    return jsonify(industry=ind_state(c, me()))
+
+
+@app.put("/api/industry")
+def industry_put():
+    """{industry: "" | "film", expect_updated_at?} -- chooses the industry of my area (an organisation's admin, a person
+    without organisation for her own area). 403 for members, kids and agents; 409 {industry: the current} when the
+    settings changed since expect_updated_at."""
+    c, uid, b = db(), me(), body()
+    if not isinstance(b, dict) or "industry" not in b:
+        return err(tr("Invalid value: {0}", "industry"))
+    changed = ind_set(c, uid, b.get("industry"), b)
+    if changed:
+        bump(c)
+    c.commit()
+    return jsonify(ok=True, changed=changed, industry=ind_state(c, uid))

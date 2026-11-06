@@ -3,7 +3,8 @@
 // app: Flow order + "Next", "Now doable" skips the waiting task. Settings > Data: remove (own dialog naming the lists and
 // the number of tasks; Cancel keeps it), create again (opens the list), the command palette entry. Welcome tour (own
 // container with KALMIDO_ONBOARDING=1): the first card offers it (preticked with the project modules, unticked without,
-// German), Next / Esc create it, unticked or Skip do not, it is asked only once.
+// German), Next / Esc create it, unticked or Skip do not, it is asked only once. 2.578.0 (#4573): the setup and the tour offer
+// the industry (none preselected); the setup picks Film & Video, so parts 1-3 keep the image film; the tour's sample is neutral.
 // Restarts the test container (start.sh) for the setup and the tour parts.
 const {execFileSync} = require('child_process');
 const path = require('path');
@@ -63,6 +64,12 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   check(card('agency').classList.contains('on') && card('agency').getAttribute('aria-checked') === 'true', 'setup: a project type can be picked');
   click(w, card('sample')); await until(() => card('sample').classList.contains('on'));
   check(card('sample').classList.contains('on') && !card('agency').classList.contains('on'), 'setup: one start at a time');
+  // 2.578.0 (#4573): the industry (default none, the sample card speaks of a client project); Film & Video keeps the image
+  // film this suite checks below
+  check(d.querySelector('#su-ind')?.value === '' && /client project/.test(card('sample').textContent), 'setup: industry offered, none preselected');
+  const ind = d.querySelector('#su-ind'); ind.value = 'film'; ind.dispatchEvent(new w.Event('change', {bubbles: true}));
+  await until(() => d.querySelector('#su-ind')?.value === 'film' && /video production/.test(card('sample')?.textContent || ''));
+  check(/video production/.test(card('sample').textContent), 'setup: Film & Video -> the sample card names the video production');
   click(w, d.querySelector('[data-su="go"]'));
   await until(async () => { const s = await call('GET', '/api/state', null, jar.c); return s.sample && s.settings?.sample_ask === '0'; });
   let st = await call('GET', '/api/state', null, jar.c);
@@ -129,10 +136,13 @@ async function openSetup(jar) {  // the app with a cookie jar of its own (the se
   await toLast();
   // 2.46.1 (#1602): the sample project is off by default, also with the project modules; ticked by hand it comes
   check(tb() && !tb().checked && /Create a sample project/.test(tb().closest('label').textContent), 'tour: the last card offers the sample, unticked (2.46.1)');
+  // 2.578.0 (#4573): the industry next to it (none preselected): the neutral client project
+  check(d.querySelector('.tour #t-industry')?.value === '' && /client project/.test(tb().closest('label').textContent), 'tour: industry offered (none), the neutral sample named');
   click(w, tb());
   click(w, d.querySelector('[data-tour="next"]'));
   check(await until(() => w.eval('S.sample')), 'tour: Done created it');
   check(w.eval('S.lists').some(l => l.name === 'Getting started') && w.eval('S.sample.lists').length === 2, 'Getting started list + the sample');
+  check(w.eval('S.sample.lists').some(l => l.name === 'Example: Website relaunch for client Muster'), 'tour without an industry: the website relaunch');  // 2.578.0 (#4573)
   w.close();
   // bob: German, no project modules -> unticked, Done creates nothing
   const BK = await login('bob');

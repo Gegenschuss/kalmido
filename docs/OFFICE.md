@@ -515,7 +515,11 @@ page. Three layers, no code plugin:
 - **Industry pack** (`kalmido/office/packs/industry/<code>.json`, `film` = Film & Video): data only, checked like the
   country packs (`dk_pack_validate`) - labels DE / EN, print order of the blocks, defaults (meal rates 28 / 14,
   surcharges 25 / 75 %, producing share 0.2, km rate 0.35), suggested crew functions. Switched on per organisation in
-  the office settings (`industry_packs: ["film"]`); without a pack there is no shoot calculation.
+  the office settings (`industry_packs: ["film"]`); without a pack there is no shoot calculation. Since 2.578.0 (#4573)
+  the first built-in pack of that list is the **industry of the whole app** (default: none): chosen in the first-run setup,
+  the welcome tour and Settings > General (`PUT /api/industry`, see API.md) as well; with Film & Video the sample project is
+  the image film with its packing list, without an industry a neutral website relaunch. Accounts and organisations that
+  had the film pack on keep it (nothing is migrated).
 
 Purchase, surplus, markup and internal / external are for the organisation's admins only: members edit the sheet but
 get none of these values (the price of a row with a markup is shown including it) and cannot set them; the server keeps

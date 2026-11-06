@@ -291,7 +291,7 @@ def admin_setup():
     Sets the instance switches, the modules of new users (default_features; the admin gets them too) and the
     language. Collaboration and time tracking stay in the modules list: the instance switch alone decides, so
     turning one on later in Settings makes it available to everyone at once. Admin only; all changeable later."""
-    from ..accounts.onboarding import sample_create, sample_state
+    from ..accounts.onboarding import ind_set, sample_create, sample_state  # 2.578.0 (#4573): + ind_set
     from ..accounts.users import need_admin
     from ..lists.templates import ptype_create, PTYPE_NAMES, PTYPES
     from ..family.family import family_examples, PURPOSES
@@ -340,6 +340,8 @@ def admin_setup():
             uset(c, me(), "features", ",".join([x for x in fs.split(",") if x] + on))
         if b["purpose"] == "family":  # 2.46.1 (#1615): the two starter lists; their examples only with "Sample project" (#1602)
             family_examples(c, me(), tasks=b.get("examples") is True)
+    if b.get("industry") not in (None, ""):  # 2.578.0 (#4573): the industry (default none), after the organisation above: its area
+        ind_set(c, me(), b["industry"])
     if b.get("sample") is True and not sample_state(c, me()):  # 1.8.0: "Create a sample project"
         sample_create(c, me())
     elif "sample" in b:

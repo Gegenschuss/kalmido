@@ -777,8 +777,28 @@ const sampleDefault = () => depsOn() || fieldsOn() || timeOn() || progressOn(); 
 const sampleRowHtml = () => S.sample ? `<label>${tr('Sample')}</label><button class="btn sm danger" data-m="sample-rm">${ic('trash', 's')} ${tr('Remove sample project')}</button><span class="muted" style="font-size:var(--fs-s)">${esc(S.sample.lists.map(l => l.name).join(', '))}</span>`
   : `<label>${tr('Sample')}</label><button class="btn sm" data-m="sample-add">${ic('plus', 's')} ${tr('Create sample project')}</button>`;
 const sampleHtml = hint => `<h4 id="s-sample-h">${tr('Sample project')}</h4>
-      ${hint(tr('An example video production to look around. Private to you, without reminders.'))}
+      ${hint(S.industry?.code === 'film' ? tr('An example video production to look around. Private to you, without reminders.') : tr('An example client project to look around. Private to you, without reminders.'))}
       <div class="row" id="s-sample">${sampleRowHtml()}</div>`;
+// ---- 2.578.0 (#4573): the app's industry (Settings > General; also the welcome tour and the first-run setup). One switch for
+// the whole app, stored for the organisation (its admins choose) or for a person without one: the same list as the pack
+// cards of Settings > Company & office (industry_packs). None = everything general, Film & Video = the shoot calculation
+// and the image film sample. The options: indOpts (palette.js, the tour needs them before this file).
+function ind_setHtml(hint) {
+  const d = S.industry; if (!d || !(d.choices || []).length || S.me?.kid) return '';
+  return `<h4 id="s-industry-h">${tr('Industry')}</h4>
+      <div class="row"><label for="s-industry">${tr('Industry')}</label><select id="s-industry" ${d.can_set ? '' : 'disabled'}>${indOpts(d, d.code)}</select></div>
+      ${hint(d.can_set ? tr('Adds the functions of one industry to the whole app, e.g. Film & Video: the shoot calculation in quotations and the image film as sample project. None: everything stays general.') : tr('The admins of your organisation choose its industry.'))}`;
+}
+async function ind_save(md, el) {
+  const old = S.industry?.code || '';
+  try {
+    const j = await api('PUT', '/api/industry', {industry: el.value, ...(S.industry?.updated_at ? {expect_updated_at: S.industry.updated_at} : {})});
+    S.industry = j.industry; toast(tr('Saved'));
+  } catch {  // api() showed why (409: changed meanwhile); show what holds now
+    try { S.industry = (await api('GET', '/api/industry')).industry; } catch { /* offline */ }
+    el.value = S.industry?.code ?? old;
+  }
+}
 // ---- 2.88.0 (#1980): the user management for hundreds of accounts -- search (after a short pause in typing), filter,
 // pages of 50, several accounts at once (disable / enable / add to an organisation) and deleting an account that owns lists
 function ua8_wire(md, us, draw) {

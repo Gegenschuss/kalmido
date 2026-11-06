@@ -129,7 +129,7 @@ check(db("SELECT COUNT(*) FROM lists WHERE kind='checklist'")[0][0] == 0, "no li
 # the sample: its packing list is a plain list with the option
 sm = A.post(B + "/api/sample").json()
 st = A.get(B + "/api/state").json()["lists"]
-pk = [x for x in st if "packing" in x["name"].lower()]
+pk = [x for x in st if "packing" in x["name"].lower() or "launch checklist" in x["name"].lower()]  # 2.578.0 (#4573): without an industry the sample's checklist is the launch checklist
 check(pk and pk[0]["kind"] == "list" and pk[0]["checklist"] == 1, f"sample: packing list with the option: {[(x['name'], x['kind'], x['checklist']) for x in pk]}")
 
 # ================================================================== 2.7.1 leftover: project files on disk

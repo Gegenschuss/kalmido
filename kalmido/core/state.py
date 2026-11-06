@@ -281,7 +281,7 @@ def state():
     from ..collab.news import news_items, news_sig, news_unread, news_unread_me, notif_matrix
     from ..personal.habits import habits_trash, pomo_stats
     from ..personal.timetrack import time_day_h, time_list_totals, time_running, time_totals
-    from ..accounts.onboarding import sample_state
+    from ..accounts.onboarding import ind_state, sample_state  # 2.578.0 (#4573): + the app's industry
     from ..lists.fields import field_dict
     from ..calendars.caldav import dav_info
     from ..notify.push import vapid_public, webpush_count, WEBPUSH_ON
@@ -391,6 +391,7 @@ def state():
         caldav=dav_info(u), public_links=public_links_on(c), public_links_off=sorted(pub_kinds_off(c)),  # 2.489.0 C (#2656)
         share={"drop_url": PUBLIC_URL.rstrip("/") + "/drop", "ios_shortcut": IOS_SHORTCUT_URL},
         sample=sample_state(c, uid),
+        industry=ind_state(c, uid),  # 2.578.0 (#4573): the app's industry {code: "" | "film", can_set, choices, updated_at}
         notes=notes_brief(c, uid),  # 2.17.0 (#442)
         team=dict(zip(("enabled", "unread", "dm_unread"), (tchat_on(c, uid), *tchat_unread_both(c, uid)))),  # 2.17.0 (#419); 2.28.0 (#987): + DMs; 2.149.0 C (#2507): one tchat_rooms
         agents=agents_for(c, uid),

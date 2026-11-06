@@ -736,6 +736,7 @@ function settingsModal(focus) {
       ${hint(tr('Quick add understands English, German and the language chosen here.'))}
       <h4 id="s-startpg-h">${tr('Start page')}</h4>
       <div class="row"><label for="s-startpg">${tr('Open the app on')}</label><select id="s-startpg">${START_PAGES.map(([v, n]) => `<option value="${v}" ${(s.start_page || 'home') === v ? 'selected' : ''}>${esc(tr(n))}</option>`).join('')}${st_areaOpts(s.start_page) /* 2.575.0 D (#4051) */}</select></div>
+      ${typeof ind_setHtml === 'function' ? ind_setHtml(hint) : '' /* 2.578.0 (#4573): acctset.js */}
       ${fmtSetHtml(s, hint) /* 2.368.0 B (#2982) */}
       <h4 id="s-today-h">${tr('Today')}</h4>
       <div class="row">${chk('s-tinbox', s.today_inbox === '1', tr('Show the basket in Today'))}</div>
@@ -998,6 +999,7 @@ function settingsModal(focus) {
     setSaved(histAdd({label: tr('Changed setting: {0}', tr('Hours per day')), sett: true, undo: () => put(from), redo: () => put(to)}));
   });
   md.addEventListener('change', e => { if (e.target.id === 's-cerlist') cer_setList(e.target); });  // 2.102.0 E (#1999)
+  md.addEventListener('change', e => { if (e.target.id === 's-industry' && typeof ind_save === 'function') ind_save(md, e.target); });  // 2.578.0 (#4573)
   // 2.359.0 A (#3024): the page goes away within the 0.9 s of typing: the text fields waiting are sent with keepalive (core.js
   // keepSend). 2.527.0 (#4304 A6): and kept for the next start (core.js fdWrite): sent again after the sign-in should the
   // keepalive not arrive, unless the setting was changed elsewhere meanwhile (sv = the value this page saw)
