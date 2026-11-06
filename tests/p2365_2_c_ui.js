@@ -38,7 +38,8 @@ const change = (w, el, v) => { if (typeof v === 'boolean') el.checked = v; else 
 
   // ================= time + focus: a way to Settings
   let w = await boot({user: 'alice', hash: 'time'}), d = w.document;
-  const tb = await until(() => d.querySelector('#view .tvbar [data-act="mod-settings"][data-sec="time"]'), 60);
+  // 2.586.0 (#4818): the time view's bar is .tmvbar (.tvbar is the file view's)
+  const tb = await until(() => d.querySelector('#view .tmvbar [data-act="mod-settings"][data-sec="time"]'), 60);
   check(!!tb, '#2789: Time tracking has a Settings button');
   click(w, tb);
   check(!!(await until(() => d.querySelector('.smodal'))), '#2789: it opens the Settings dialog');

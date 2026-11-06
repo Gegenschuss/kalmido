@@ -45,7 +45,8 @@ const DIAG = ev => ev(`JSON.stringify({h: location.hash, k: S?.route?.key, n: S?
   const place = async (o, name, hash, waitExpr, root, bars) => {
     await o.nav(B + hash);
     check(await ready(o.ev, waitExpr, 60), name + ': the place is up ' + await DIAG(o.ev));
-    const a = await o.ev(AUDIT(root || '#view', bars || '.tvbar, .calbar, .ntbar, .povh, .ofcbar, .tvr-acts'));
+    // 2.586.0 (#4818): the time view's bar is .tmvbar now, audited too
+    const a = await o.ev(AUDIT(root || '#view', bars || '.tvbar, .tmvbar, .calbar, .ntbar, .povh, .ofcbar, .tvr-acts'));
     check(a && a.page <= a.vw, name + ': the page does not scroll sideways ' + JSON.stringify(a));
     check(a && !a.over.length, name + ': nothing over the right edge ' + JSON.stringify(a));
     check(a && !a.lap.length, name + ': buttons of a bar do not overlap ' + JSON.stringify(a));
