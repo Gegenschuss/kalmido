@@ -43,6 +43,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   // ================= jsdom: save, open, sidebar, menu, favourite, Today, delete + undo
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => w.eval(`typeof DC !== 'undefined' && DC.total === 2 && typeof dcv_barHtml === 'function'`), 100);
+  w.eval(`(() => { let v = DC.q; Object.defineProperty(DC, 'q', {get: () => v, set: x => { v = x; (window.__qlog ||= []).push(JSON.stringify(x) + ' @ ' + String(new Error().stack).split('\\n').slice(1, 5).map(l => l.trim().slice(0, 90)).join(' | ')); }, configurable: true}); })()`);
   w.eval(`DC.q = 'Koala'; dc_load()`);
   await until(() => w.eval(`DC.total === 1 && !DC.loading`));
   const save = await until(() => d.querySelector('[data-dcv="save"]'));
@@ -61,7 +62,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(d.querySelector('.dcv-name')?.textContent.includes('Koala docs') && !d.querySelector('[data-dcv="update"]'), 'the bar names the open view, nothing changed yet');
   // leaving the view empties the search, the row brings it back
   w.location.hash = 'docs';
-  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`)), 'back to Documents: the whole list again ' + st());
+  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`)), 'back to Documents: the whole list again ' + st() + ' LOG ' + w.eval('JSON.stringify(window.__qlog || [])'));
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   check(await until(() => w.eval(`DC.q === 'Koala' && DC.total === 1 && !DC.loading`)), 'the sidebar row applies the view again');
   // a changed search: "Update view" takes it over
