@@ -336,7 +336,7 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   such a run is on, every change waits for an approval card** - also for an agent whose control level would let it act or
   that has none - and so does every chat message to someone other than the people of the run (who asked, the owner, the
   people whose events started it), a standing rule and every proposal route except a proposal for a job and a task
-  proposal (409 `approval_required`, as in [Control](#control)). Every chat message, approval card and proposal of the
+  proposal (409 `approval_required`, as in [Control level](#control-level)). Every chat message, approval card and proposal of the
   run names the web sources it used under *From the web* (a proposal also as `web_sources: [{url, label}]`). The runs show
   the searches, pages and VAT checks; `GET /api/agents/usage` counts `web_searches` and `web_fetches`.
 - **The key**: stored encrypted, never returned, never written to a log. The app shows only its last four characters
