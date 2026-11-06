@@ -43,7 +43,7 @@ from ..tasks.dependencies import dep_add, dep_remove, deps_get
 from ..lists.projects import list_status_set, LIST_STATUSES
 from ..lists.fields import field_create, field_delete, field_dict, field_update, need_field
 from ..api.v1 import (
-    _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
+    _V1_FIELD_OUT, _v1_live, API_SCOPES, api_scopes, SCOPES, SCOPES_AGENT_DEFAULT, SCOPES_AGENT_NEVER, SCOPES_AGENT_ONLY, SCOPES_WRITE, STATUS_NAMES, v1_comment, v1_entry, v1_habit, v1_limit, v1_one, v1_prev_in, v1_task,
     V1_TASK_IN, v1_task_in,
 )
 from ..api.v1 import V1_TASK_VERSIONED  # 2.564.0 (#4702)
@@ -159,6 +159,9 @@ def scopes_clean(v, u, agent=False):
         raise BadInput(tr("Invalid value: {0}", "scopes"))
     if "docs:upload" in v:  # 2.207.0 A (#2763): only a scan inbox (Documents > Settings) gets this key, alone and bound to a place
         raise BadInput(tr("“{0}” is only given by a scan inbox (document settings)", tr(SCOPE_LABELS["docs:upload"])))
+    only = sorted(set(v) & set(SCOPES_AGENT_ONLY))
+    if only and not (agent or is_agent(u)):  # 2.595.0 (#4505): office / layouts / import are agents' scopes, a personal token never has them
+        raise BadInput(tr("Only agents can get the permission “{0}”", tr(SCOPE_LABELS[only[0]])))
     s = set(v) | {"read"}
     if agent and s & set(SCOPES_AGENT_NEVER):
         raise BadInput(tr("Agents cannot get the permission “{0}”", tr(SCOPE_LABELS[sorted(s & set(SCOPES_AGENT_NEVER))[0]])))
@@ -222,9 +225,16 @@ def scopes_effective(c, row, u):
     s &= set(scope_cap(c, "agents" if agent else "tokens"))
     if agent:
         s -= set(SCOPES_AGENT_NEVER)
+    else:  # 2.595.0 (#4505): a personal token saved before keeps no agent scope (office / layouts / import)
+        s -= set(SCOPES_AGENT_ONLY)
     if "admin-read" in s and not u["is_admin"]:
         s.discard("admin-read")
     return s | {"read"}
+
+
+def scopes_shown(stored, u):
+    """2.595.0 (#4505): the stored scopes of a token as shown (sorted): a personal token saved before shows no agent scope."""
+    return sorted(api_scopes(stored) - (set() if is_agent(u) else set(SCOPES_AGENT_ONLY)))
 
 
 def scopes_offer(c, u, agent=False):
@@ -234,7 +244,7 @@ def scopes_offer(c, u, agent=False):
     for s in SCOPES:
         if s == "docs:upload":  # 2.207.0 A (#2763): only through a scan inbox
             continue
-        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s in ("office", "layouts", "import") and not agent):  # 2.51.0 A: office = agents only; 2.55.0 (#1066): layouts too; 2.68.0 (#1839): import too
+        if (agent and s in SCOPES_AGENT_NEVER) or (s == "admin-read" and not u["is_admin"]) or (s in SCOPES_AGENT_ONLY and not agent):  # 2.51.0 A: office = agents only; 2.55.0 (#1066): layouts too; 2.68.0 (#1839): import too
             continue
         out.append({"scope": s, "label": tr(SCOPE_LABELS[s]), "help": tr(SCOPE_HELP[s]), "allowed": s in cap})
     return out

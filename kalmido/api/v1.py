@@ -107,6 +107,7 @@ SCOPES_WRITE = tuple(s for s in SCOPES if s not in ("read", "admin-read", "conta
 SCOPES_AGENT_NEVER = ("account", "admin-read", "private", "docs:upload", "integrations")   # never for an agent: credentials / settings of the account, admin data, health + journal (2.22.0); 2.207.0 A (#2763): scan inboxes; 2.391.0 (#3362): setting up webhooks / tokens / repositories
 # 2.48.0 (#1207): a new agent may use the file store: it sees only what is shared with it (and its own folder) anyway
 SCOPES_AGENT_DEFAULT = ("read", "tasks:write", "comments", "files:read", "files:write")
+SCOPES_AGENT_ONLY = ("office", "layouts", "import")   # 2.595.0 (#4505): agents only - a personal token is refused them (400), a stored one never shows nor has them
 API_SCOPES = SCOPES + ("write",)
 # 2.207.0 A (#2763): the only routes a "docs:upload" key may call (common contract with the folder watcher)
 UPLOAD_HASH_PREFIX = "u:"
@@ -531,10 +532,10 @@ def need_api():
 def token_public(r):
     """2.15.0 (#479): scopes = as stored ("write" = the legacy umbrella), effective_scopes = what the token may do now
     (the legacy umbrella expanded, the admin's limit and the agent rules applied), allowed_ips = the address restriction."""
-    from ..api.scopes import scopes_effective
+    from ..api.scopes import scopes_effective, scopes_shown
     c = db()
     u = c.execute("SELECT * FROM users WHERE id=?", (r["user_id"],)).fetchone()
-    return {"id": r["id"], "name": r["name"], "prefix": r["prefix"], "scopes": sorted(api_scopes(r["scopes"])),
+    return {"id": r["id"], "name": r["name"], "prefix": r["prefix"], "scopes": scopes_shown(r["scopes"], u),  # 2.595.0 (#4505)
             "effective_scopes": [x for x in SCOPES if x in scopes_effective(c, r, u)] if u else [],
             "allowed_ips": [x for x in (r["allowed_ips"] or "").split(",") if x],
             "list_ids": sorted(int(x) for x in (r["list_ids"] if "list_ids" in r.keys() else "").split(",") if x.strip().isdigit()),  # 2.30.0 (#919)
@@ -647,7 +648,8 @@ def v1_me():
     fs = (usettings(c, u["id"]).get("features") or "").split(",")
     return jsonify(id=u["id"], username=u["username"], display_name=u["display_name"] or u["username"], is_admin=bool(u["is_admin"]),
                    kind="agent" if is_agent(u) else "user",
-                   token={"id": t["id"], "name": t["name"], "scopes": sorted(api_scopes(t["scopes"])), "expires_at": t["expires_at"],
+                   token={"id": t["id"], "name": t["name"], "scopes": sorted(api_scopes(t["scopes"]) - (set() if is_agent(u) else set(SCOPES_AGENT_ONLY))),  # 2.595.0 (#4505)
+                          "expires_at": t["expires_at"],
                           "effective_scopes": [s for s in SCOPES if s in g.get("scopes", set())],  # 2.15.0 (#479)
                           "list_ids": sorted(token_lists() or [])},  # 2.30.0 (#919): [] = all lists
                    features={"collaboration": collab_all() and "collab" in fs, "time_tracking": time_all() and "time" in fs,
