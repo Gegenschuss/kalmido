@@ -214,6 +214,19 @@ kt.dbx("UPDATE wiki_versions SET created_by=? WHERE page_id=?", (ag.get("id"), p
 vs = Fr.get(B + f"/api/wiki/pages/{pv}/versions").json().get("versions") or []
 check(vs and vs[0].get("agent") is True, f"(4) a version an agent account wrote is marked as an agent's {vs[:1]}")
 
+# ================================================================== (5) a letter's change in the office log (as documents)
+Fr.patch(B + "/api/settings", json={"features": FEATURES + ",office,clients", "workspace": "private"})
+r = Fr.post(B + "/api/office/letters", json={"subject": "Anfrage 4708", "body": "Erster Text"})
+LT = (r.json().get("id") or (r.json().get("letter") or {}).get("id") or 0) if r.status_code in (200, 201) else 0
+check(bool(LT), f"(5) setup: a letter in the personal office {r.status_code} {r.text[:120]}")
+cur = Fr.get(B + f"/api/office/letters/{LT}").json()
+r = Fr.patch(B + f"/api/office/letters/{LT}", json={"subject": "Anfrage 4708 B", "expect_updated_at": cur.get("updated_at") or (cur.get("letter") or {}).get("updated_at")})
+check(r.ok, f"(5) the letter changes {r.status_code} {r.text[:120]}")
+logs = kt.dbx("SELECT action, user_id FROM office_doc_log WHERE target='letter' AND action='update'")
+check(len(logs) == 1 and logs[0][1] == FID, f"(5) the change is in the office log with its writer {logs}")
+h = Fr.get(B + f"/api/office/letters/{LT}/history")
+check(h.ok and "subject" in h.text, f"(5) ... and in the letter's history (#4711) {h.status_code}")
+
 # @@NEXT@@
 
 sys.exit(kt.done("p2577_d_audit"))

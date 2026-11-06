@@ -38,7 +38,7 @@ from .contacts_cl import fk_contacts  # 2.369.5 (#2517): pulled up from function
 from .pdf import pdf_image_object  # 2.369.5 (#2517): pulled up from functions
 from ..files.upsafe import UploadRefused  # 2.369.5 (#2517): pulled up from functions
 from .docs import _fmt_date  # 2.369.5 (#2517): pulled up from functions
-from .ledger import ofx_sender_line  # 2.369.5 (#2517): pulled up from functions
+from .ledger import ofx_diff, ofx_log, ofx_sender_line  # 2.369.5 (#2517): pulled up from functions
 from ..files.store import fs_read, fs_role  # 2.369.5 (#2517): pulled up from functions
 
 LT_CHANNELS = (("post", N_("Post")), ("email", N_("E-mail")), ("registered", N_("Registered mail")), ("fax", N_("Fax")))
@@ -391,6 +391,9 @@ def lt_update(c, oid, lid, data, draft_only=True, uid=None, version=False):
     def extra(c, cur, changed):
         if "letter_date" in changed:  # 2.351.0 A (#2823): its node in a folder is named by the date
             oft_renamed(c, LT_KIND, lid, lt_title(c, lid))
+        diff = ofx_diff({k: o for k, (o, _) in changed.items()}, {k: n for k, (_, n) in changed.items()})
+        if diff["after"]:  # 2.577.0 (#4708 5): the office log names the change as for documents (sealed in an encrypted office)
+            ofx_log(c, oid, "update", target="letter", detail={"letter": int(lid), **diff})
 
     d, _ = ow_write(c, uid or lt_uid(), "office_letter", lid, data or {}, clean, oid=oid, dec=dec, enc=enc,
                     public=lambda c, cur: lt_public(c, oid, cur), version=version, extra=extra,
