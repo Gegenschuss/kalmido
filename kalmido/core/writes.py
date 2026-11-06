@@ -542,11 +542,14 @@ def _undo_args(sess, op):
     return tok
 
 
-def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None):
+def obj_undo_run(c, uid, kind, rid, oid, sess, op="undo", fix=None, keep=None):
     """2.567.0 (#4711): obj_undo without its rights check -- the caller checked them (an obj_track kind: the area's own,
-    office/undo.py). oid = the object's workspace now; fix(c) runs after each write back (the sums of a document)."""
+    office/undo.py). oid = the object's workspace now; fix(c) runs after each write back (the sums of a document).
+    2.577.0 (#3964): keep {table: {column}} = columns that stay as they are now on top of undo_keep (fields uid may not change)."""
     tok = _undo_args(sess, op)
     reg = _reg(kind)
+    if keep:
+        reg = {**reg, "undo_keep": {t: set(reg["undo_keep"].get(t, ())) | set(v) for t, v in {**reg["undo_keep"], **keep}.items()}}
     if obj_is_agent(c, uid):
         raise Denied(403)
     write_lock(c, f"obj-{kind}-{int(rid)}")

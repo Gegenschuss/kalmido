@@ -27,7 +27,7 @@ from .model import MD, office_role, office_row, sr_public  # 2.369.5 (#2517): pu
 from .ledger import ofx_locked, ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .owrite import OW_UNDO_CTX, ow_kind
 from ..accounts.session import me  # 2.369.5 (#2517): pulled up from functions
-from ..team.clients import _gate, client_public, need_client  # 2.369.5 (#2517): pulled up from functions
+from ..team.clients import CLIENT_BILL_GATED, _gate, cl_bill_ok, client_public, need_client  # 2.369.5 (#2517): pulled up from functions
 
 HDR = "X-Kalmido-Undo"
 KEEP_H = UNDO_KEEP_H
@@ -143,7 +143,10 @@ def oun_restore(kind, ref):
     if kind == "doc":
         from .docs import recalc
         fix = lambda c: recalc(c, oid, ref)  # noqa: E731 -- the sums and the parts' title page lines, as after a normal change
-    left = obj_undo_run(c, uid, oun_kind(kind), ref, oid, b.get("sess"), op, fix=fix)
+    keep = None
+    if kind == "client" and not cl_bill_ok(c, uid, need_client(c, ref, uid)["org_id"], "edit"):
+        keep = {"clients": set(CLIENT_BILL_GATED)}  # 2.577.0 (#3964): like cl_bill_strip -- fields uid may not change stay as they are
+    left = obj_undo_run(c, uid, oun_kind(kind), ref, oid, b.get("sess"), op, fix=fix, keep=keep)
     if oid is not None:
         if kind == "doc":
             ofx_log(c, oid, "update", doc_id=ref, detail={"undo": op})
