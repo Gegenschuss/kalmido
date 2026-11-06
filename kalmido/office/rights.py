@@ -28,6 +28,7 @@ from ..core.db import body, db, iso, now_utc
 from ..core.errors import BadInput, Denied
 from ..core.i18n import N_, tr
 from ..core.pg import insert_id, system_ctx
+from ..core.rls import rls_org_open  # 2.602.0 (#4729)
 from ..accounts.orgs import org_role
 from ..accounts.orgroles import office_allowed
 from .model import office_gate, office_on, office_where, pb_owner
@@ -274,15 +275,27 @@ def ofr_need(admin=False):
 
 # ---------------------------------------------------------------- what a person may
 def _is_agent(c, uid):
-    with system_ctx(c):
-        r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
-    return bool(r) and r[0] == "agent"
+    # 2.602.0 (#4729, CI red p2369_6_api): the signed-in account's kind from its session row, another account's once per
+    # request - the folder listings ask it for every kind of filed object (/api/state: three times, each a switch to system)
+    u = getattr(g, "user", None) if has_request_context() else None
+    if u is not None and u["id"] == uid and "kind" in u.keys():
+        return u["kind"] == "agent"
+    cache = g.setdefault("ofr_kind", {}) if has_request_context() else {}
+    if uid not in cache:
+        with system_ctx(c):
+            r = c.execute("SELECT kind FROM users WHERE id=?", (uid,)).fetchone()
+        cache[uid] = bool(r) and r[0] == "agent"
+    return cache[uid]
 
 
 def ofr_groups_of(c, oid, uid):
     """The group refs of uid in office area oid: 'tpl:<key>' / 'g:<id>' ([] = no row)."""
-    with system_ctx(c):  # structure of the area's rights (also asked for other people on the rights page)
-        rows = c.execute("SELECT tpl, group_id FROM office_rgroup_members WHERE org_id=? AND user_id=? ORDER BY id", (oid, uid)).fetchall()
+    q = "SELECT tpl, group_id FROM office_rgroup_members WHERE org_id=? AND user_id=? ORDER BY id"
+    if rls_org_open(c, oid):  # 2.602.0 (#4729): an organisation of the request's context reads without a switch (CI red p2369_6_api)
+        rows = c.execute(q, (oid, uid)).fetchall()
+    else:
+        with system_ctx(c):  # structure of the area's rights (also asked for other people on the rights page)
+            rows = c.execute(q, (oid, uid)).fetchall()
     return [f"g:{r[1]}" if r[1] else f"tpl:{r[0]}" for r in rows]
 
 

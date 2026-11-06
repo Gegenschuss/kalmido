@@ -19,6 +19,7 @@ from ..core.pg import DatabaseError, insert_id, like_escape, table_columns, syst
 from ..core.db import db, iso, local_now, now_utc, usettings
 from ..accounts.session import me
 from ..core.access import Denied, acx_drop
+from ..core.rls import rls_org_open  # 2.602.0 (#4729)
 from ..core.errors import BadInput, DeniedKey
 from .packs import office_pack, office_pack_codes, office_pack_for, office_feature_on, office_path_feature
 from .homecur import HC_LOCKED, hc_bookings, hc_code, hc_home_of  # 2.189.0 (#2475)
@@ -289,8 +290,12 @@ def pb_owner(c, oid):
         return None
     cache = g.setdefault("pb_owner", {}) if has_request_context() else {}
     if oid not in cache:
-        with system_ctx(c):  # instance structure: which person a personal office belongs to
-            r = c.execute("SELECT personal_of FROM orgs WHERE id=?", (oid,)).fetchone()
+        q = "SELECT personal_of FROM orgs WHERE id=?"
+        if rls_org_open(c, oid):  # 2.602.0 (#4729): an organisation of the request's context reads without a switch (CI red p2369_6_api)
+            r = c.execute(q, (oid,)).fetchone()
+        else:
+            with system_ctx(c):  # instance structure: which person a personal office belongs to
+                r = c.execute(q, (oid,)).fetchone()
         cache[oid] = r[0] if r else None
     return cache[oid]
 

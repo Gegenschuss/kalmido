@@ -18,7 +18,7 @@ them and the office's agent switches (hidden, like docref.ofd_hidden); a token w
 """
 from flask import g, has_request_context
 
-from ..core.access import Denied
+from ..core.access import Denied, acx_warm_register
 from ..core.orgcrypt import oc_dec_fields
 from ..core.i18n import N_, tr
 from ..core.pg import system_ctx
@@ -180,6 +180,37 @@ def _receipt_locked(c, uid, org, created_by):
     return not (LV[lv] >= LV["view"] or (lv == "own" and created_by == uid))
 
 
+def _oft_rows(c, kind):
+    """[(ref id, workspace / org id, filed by)] of every filed object of kind (structure: ids only, read as system; once per
+    request - 2.602.0 (#4729): GET /api/state reads it in the warm-up below)."""
+    cache = g.setdefault("oft_rows", {}) if has_request_context() else {}
+    if kind in cache:
+        return cache[kind]
+    with system_ctx(c):  # the offices of the filed objects (structure: ids only)
+        if kind == RC_KIND:
+            rows = [(x[0], x[1], x[2]) for x in c.execute(
+                "SELECT n.ref_id, r.ws, COALESCE(f.created_by, f.owner_id) FROM fs_nodes n JOIN rc_receipts r ON r.node_id=n.ref_id "
+                "JOIN fs_nodes f ON f.id=r.node_id WHERE n.kind='ref' AND n.ref_kind=?", (kind,)).fetchall()]
+        else:
+            tbl = "office_gen_docs" if kind == GD_KIND else "office_letters"
+            rows = [(x[0], x[1], None) for x in c.execute(
+                f"SELECT n.ref_id, d.org_id FROM fs_nodes n JOIN {tbl} d ON d.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=?",
+                (kind,)).fetchall()]
+    cache[kind] = rows
+    return rows
+
+
+def oft_warm(c, uid):
+    """2.602.0 (#4729, CI red p2369_6_api): GET /api/state asks the folder visibility (the calendars' shares on the shared core,
+    fs_visible_sql) and with it hidden() below; its structure read runs in the context hook's "system" phase (core/access.py
+    acx_warm_register) instead of one switch to system and back in the middle of the state. Only the rows, as hidden() reads
+    them: people the receipts, agents every kind."""
+    if fs_ref_token_lacks(uid, "office"):
+        return
+    for kind in ((RC_KIND, GD_KIND, LT_KIND) if _is_agent(c, uid) else (RC_KIND,)):
+        _oft_rows(c, kind)
+
+
 def _hidden(kind, area):
     """What a folder never opens to uid: a token without the scope office every filed object of kind; an agent the objects
     of every office it may not read; receipts: also the receipts lock of the office groups (people and agents)."""
@@ -192,16 +223,7 @@ def _hidden(kind, area):
         key = ("oft_hidden", kind, int(uid))
         if has_request_context() and key in g.setdefault("oft_cache", {}):
             return g.oft_cache[key]
-        with system_ctx(c):  # the offices of the filed objects (structure: ids only)
-            if kind == RC_KIND:
-                rows = [(x[0], x[1], x[2]) for x in c.execute(
-                    "SELECT n.ref_id, r.ws, COALESCE(f.created_by, f.owner_id) FROM fs_nodes n JOIN rc_receipts r ON r.node_id=n.ref_id "
-                    "JOIN fs_nodes f ON f.id=r.node_id WHERE n.kind='ref' AND n.ref_kind=?", (kind,)).fetchall()]
-            else:
-                tbl = "office_gen_docs" if kind == GD_KIND else "office_letters"
-                rows = [(x[0], x[1], None) for x in c.execute(
-                    f"SELECT n.ref_id, d.org_id FROM fs_nodes n JOIN {tbl} d ON d.id=n.ref_id WHERE n.kind='ref' AND n.ref_kind=?",
-                    (kind,)).fetchall()]
+        rows = _oft_rows(c, kind)
         ok, bad = {}, []
         for rid, where, by in rows:
             if kind == RC_KIND:
@@ -341,6 +363,7 @@ fs_ref_register(LT_KIND, label=N_("Letter"), open_url=lambda rid: f"office/lette
 fs_ref_register(RC_KIND, label=N_("Receipt"), open_url=lambda rid: f"docs/{int(rid)}", base_role=rc_base, space=rc_space,
                 protect=rc_protect, title=rc_title, content=rc_content, content_gate=_gate(_rc_row_oid, "receipts"),
                 hidden=_hidden(RC_KIND, "receipts"), cap=rc_cap)
+acx_warm_register("/api/state", oft_warm)  # 2.602.0 (#4729)
 
 
 def oft_renamed(c, kind, rid, title):

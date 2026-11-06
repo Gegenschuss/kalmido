@@ -308,3 +308,16 @@ def enter_store(v):
 
 def enter_forget():
     _ENTER["v"] = None
+
+
+def rls_org_open(c, oid):
+    """2.602.0 (#4729): True when the policy above already lets the request's context read the rows of organisation oid
+    (org_id = ANY (app.org_ids), orgs: id = ANY (app.org_ids)) - then a read of them needs no switch to "system" (two
+    set_config in a transaction, audit Q budget of /api/state). The rows read are the same either way; outside a request,
+    or for an organisation the context does not hold (the own hidden area, one made in this transaction), False: the caller
+    keeps its system_ctx() block."""
+    if not oid:
+        return False
+    from .access import acx_conn_hook  # core/access imports this module's neighbours; late, no cycle
+    ctx = acx_conn_hook(c)
+    return ctx is not None and int(oid) in (ctx[1] or ())

@@ -16,6 +16,7 @@ from ..core.serializers import unlink_files
 from ..core.errors import BadInput, Denied  # 2.578.0 (#4573)
 from ..core.conflict import ccf_check  # 2.578.0 (#4573)
 from ..core.orgcrypt import oc_json_store  # 2.578.0 (#4573)
+from ..core.rls import rls_org_open  # 2.602.0 (#4729)
 from ..tasks.validation import log_act
 from ..tasks.tasks import set_tags
 
@@ -478,8 +479,12 @@ def _ind_data(c, oid):
     oid is uid's own area (ind_area checked the membership), also an organisation the setup made in this transaction."""
     if not oid:
         return {}, None
-    with system_ctx(c):
-        r = c.execute("SELECT data, updated_at FROM office_settings WHERE org_id=?", (oid,)).fetchone()
+    q = "SELECT data, updated_at FROM office_settings WHERE org_id=?"
+    if rls_org_open(c, oid):  # 2.602.0 (#4729): an organisation of the request's context reads without a switch (CI red p2369_6_api)
+        r = c.execute(q, (oid,)).fetchone()
+    else:
+        with system_ctx(c):
+            r = c.execute(q, (oid,)).fetchone()
     try:
         d = json.loads(r["data"]) if r and r["data"] else {}
     except ValueError:

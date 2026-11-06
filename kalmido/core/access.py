@@ -330,8 +330,10 @@ def acx_warm_register(path, fn):
     """2.369.6 (#3139): fn(c, uid) fills request caches of structure read as "system" (memberships, visible people) for a
     GET of path. It runs in acx_conn_hook's lookup phase, which reads as "system" anyway, so the request needs no further
     context switches for them. fn must only read and cache, never hand rows to the person by itself; it runs inside the
-    request's first statement, so an error in it surfaces there (fn reads only what the route reads anyway)."""
-    _ACX_WARM[path] = fn
+    request's first statement, so an error in it surfaces there (fn reads only what the route reads anyway).
+    2.602.0 (#4729): several areas may register for one path; they run in the order registered."""
+    prev = _ACX_WARM.get(path)
+    _ACX_WARM[path] = fn if prev is None or prev is fn else (lambda c, uid: (prev(c, uid), fn(c, uid)))
 
 
 def _acx_hook_register():
