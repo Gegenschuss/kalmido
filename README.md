@@ -19,11 +19,9 @@
 
 ## What's new
 
-**2.575.0** (2026-11-06):
-- **Agents**: the Kalmido AI can research the web read-only per routine and check VAT IDs; every change then needs an approval.
-- **Tasks**: new priority "Urgent"; duplicate a task with its subtasks; a browser save button with "Read later".
-- **Settings**: own module cards for Private and organisations; area symbols in the sidebar have a menu (move, hide, start area).
-- **Performance**: the start state shrinks from 5.5 MB to 1.94 MB in the 20,600-task measurement.
+**2.587.0** (2026-11-06):
+- **Tables**: cell format, colour rules, fill handle, print as PDF, pie / ring / stacked charts and 20 more functions.
+- **Industry**: one switch for the whole app (default none); Film unlocks the film features, new accounts get a neutral sample project.
 
 Full history: [CHANGELOG.md](CHANGELOG.md).
 
