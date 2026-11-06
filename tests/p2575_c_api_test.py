@@ -34,7 +34,7 @@ V = B + "/api/v1"
 
 
 def tok(**extra):
-    r = F.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "account"], **extra})
+    r = F.post(B + "/api/me/tokens", json={"name": "t", "scopes": ["read", "account", "integrations"], **extra})
     assert r.status_code == 201, r.text
     return r.json()
 
