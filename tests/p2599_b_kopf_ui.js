@@ -100,7 +100,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
           check(Math.abs(m2.tl - m2.el) <= 2 && Math.abs(m2.tr - m2.er) <= 2, `#4814 ${vw}px ${name}: #top has the edges of the content ` + JSON.stringify(m2));
           check(m2.w === (kind === 'eigen' ? 'eigen' : kind), `#4814 ${vw}px ${name}: #main data-w = ${kind} ` + JSON.stringify(m2));
         } else if (vw >= 1700) {  // voll: #top as before
-          check(Math.abs(m.pl - 2 * m.rem) < 1 && m.w === 'voll', `#4814 ${vw}px ${name}: voll keeps #top as before ` + JSON.stringify(m));
+          const m3 = await until(`(() => { const x = ${EDGES(sel)}; return x && Math.abs(x.pl - 2 * x.rem) < 1 ? x : null; })()`, {timeout: 5000}) || await ev(`[${EDGES(sel)}, document.querySelector('#top').className, document.querySelector('#main').getAttribute('style')]`);
+          check(m3 && Math.abs(m3.pl - 2 * m3.rem) < 1 && m3.w === 'voll', `#4814 ${vw}px ${name}: voll keeps #top as before ` + JSON.stringify(m3));
         } else if (vw >= 768) {
           check(m.pl === 2 * m.rem && m.pr === 2 * m.rem && m.w === 'voll', `#4814 ${vw}px ${name}: #top keeps its padding 2rem (app.css) ` + JSON.stringify(m));
         } else check(m.pl <= 0.5 * m.rem + 1, `#4814 ${vw}px ${name}: the phone's #top as before ` + JSON.stringify(m));
@@ -137,7 +138,9 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       }
       // the reading style Notepad: its own paper and border, no second one
       await ev(`(() => { LS.set('wkSt', 'notepad'); renderView(); return 1; })()`);
-      const np = await until(`(() => { const a = document.querySelector('#view article.wkpage.wkst-notepad'); if (!a) return null; const s = getComputedStyle(a), m = getComputedStyle(document.querySelector('#wk-md')); return {a: s.borderTopColor, bg: s.backgroundColor, md: parseFloat(m.borderTopWidth)}; })()`);
+      const NP = `(() => { const a = document.querySelector('#view article.wkpage.wkst-notepad'); if (!a) return null; const s = getComputedStyle(a), m = getComputedStyle(document.querySelector('#wk-md')); return {a: s.borderTopColor, bg: s.backgroundColor, md: parseFloat(m.borderTopWidth), cls: a.className, wrap: a.parentElement.className, n: document.querySelectorAll('#view article.wkpage').length}; })()`;
+      const np = await until(`(() => { const x = ${NP}; return x && /rgba\\(0, 0, 0, 0\\)|transparent/.test(x.a) ? x : null; })()`, {timeout: 5000}) || await ev(NP);
+      await shot('p2599b-wiki-2560-notepad.png');
       check(np && /rgba\(0, 0, 0, 0\)|transparent/.test(np.a) && /rgba\(0, 0, 0, 0\)|transparent/.test(np.bg) && np.md >= 1, `#4808 2560px: Notepad keeps its own border, the sheet none ` + JSON.stringify(np));
       await ev(`(() => { LS.del('wkSt'); renderView(); return 1; })()`);
       // the width switch: this page Wide -> Full -> like the default; the default for knowledge pages Wide (the account)

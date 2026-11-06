@@ -1057,6 +1057,7 @@ function topw_sync() {
       for (const e of lv) { const k = named.get(Math.round(parseFloat(getComputedStyle(e).maxWidth))); if (k) { hit = e; key = k; break; } }
       lv = lv.flatMap(e => [...e.children]).slice(0, 80);
     }
+    topw_watch(hit);
     const mw = hit ? parseFloat(getComputedStyle(hit).maxWidth) : NaN;
     if (hit && mw > 0 && mid(hit)) { w = key === 'eigen' ? named.get(Math.round(mw)) || 'eigen' : key; px = mw; }
   }
@@ -1067,6 +1068,14 @@ function topw_sync() {
   if (m.style.getPropertyValue('--pw-sb') !== sb) m.style.setProperty('--pw-sb', sb);
 }
 let topw_raf = 0;
+// the measured element changes its size later (its width switched, a style that arrives after the render): measure again
+let topw_ro = null, topw_el = null;
+function topw_watch(el) {
+  if (el === topw_el || typeof ResizeObserver !== 'function') return;
+  topw_ro ||= new ResizeObserver(() => topw_later());
+  if (topw_el) topw_ro.unobserve(topw_el);
+  topw_el = el; if (el) topw_ro.observe(el);
+}
 // once more after the next frame: a part of the page drawn later (a page loaded, a patched view, a menu's choice) counts too
 const topw_later = () => { if (!topw_raf) topw_raf = requestAnimationFrame(() => { topw_raf = 0; topw_sync(); }); };
 window.addEventListener('resize', () => { if (S.booted) topw_later(); });  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)

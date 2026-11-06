@@ -10,9 +10,9 @@
 @media (min-width:1700px){
   .ntwrap{--ntpad:2rem;--ntsheet:calc(var(--ntpw) + 2 * var(--ntpad) + 2px)}
   .ntwrap.pgw-voll{--ntsheet:none}
-  .ntwrap .ntedit:not(.wktagview){padding:1.25rem var(--ntpad) 1.75rem;background:var(--bg2);border:1px solid var(--line2);border-radius:var(--radius)}
-  /* the reading style Notepad keeps its own paper and border (wiki.css): no second one around it */
-  .ntwrap .ntedit.wkst-notepad{background:none;border-color:transparent}
+  .ntwrap .ntedit:not(.wktagview){padding:1.25rem var(--ntpad) 1.75rem;border:1px solid transparent;border-radius:var(--radius)}
+  /* the surface and its border; the reading style Notepad keeps its own paper and border (wiki.css): no second one around it */
+  .ntwrap .ntedit:not(.wktagview):not(.wkst-notepad){background:var(--bg2);border-color:var(--line2)}
   /* Read: code blocks and tables may reach into the sheet's inner space (and scroll sideways beyond it, .mdtbl / pre.mdpre) */
   .ntwrap.pgw-lesen .ntedit:not(.wkst-notepad) :is(.wkmd,.ntmd) > :is(.mdtbl,pre.mdpre,.mdcode){margin-inline:calc(-1 * var(--ntpad));max-width:calc(100% + 2 * var(--ntpad))}
   /* knowledge, a page open: the bar (Find a page, New page, Today, New folder) and the hints above it in the middle and width
