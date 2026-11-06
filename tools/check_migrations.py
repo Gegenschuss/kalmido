@@ -130,6 +130,25 @@ def index_finding(stmt, own, ok):
     return None
 
 
+# 2.585.0 (#4841): the start keeps a trigger in place when its statement equals pg_get_triggerdef (core/db.py tg_same, #2731);
+# a WHEN written otherwise than Postgres prints it never matches, and every start replaces the trigger under a SHARE ROW EXCLUSIVE
+# lock on its table (4712_a: `IN ('evcal', ...)` and `'ref'` without its type)
+TRIGGER_WHEN = re.compile(r"CREATE\s+OR\s+REPLACE\s+TRIGGER\s+(\w+)\b.*?\bWHEN\s*\((.*)\)\s*EXECUTE\s+(?:FUNCTION|PROCEDURE)\b", re.I | re.S)
+
+
+def trigger_when_finding(stmt):
+    """Why the WHEN of a CREATE OR REPLACE TRIGGER (comments / texts blanked by sql_bare) never equals what Postgres prints (None: fine)."""
+    m = TRIGGER_WHEN.match(stmt)
+    if not m:
+        return None
+    w = m.group(2)
+    if re.search(r"\bIN\s*\(", w, re.I):
+        return "WHEN with IN (...): Postgres prints = ANY (ARRAY[...]), write it that way (else every start replaces it)"
+    if re.search(r"''(?!::)", w):
+        return "WHEN with a text without its type: Postgres prints 'x'::text, write it that way (else every start replaces it)"
+    return None
+
+
 def content_findings(n, values, src):
     """2.509.0 (#4285): what a fragment's statements do. values = {name: (literal value, line)}."""
     bad = []
@@ -146,6 +165,10 @@ def content_findings(n, values, src):
             why = index_finding(x, own, ok)
             if why:
                 bad.append(f"{n}:{sl}: SCHEMA: {why}")
+        elif TRIGGER_WHEN.match(x):  # 2.585.0 (#4841)
+            why = trigger_when_finding(x)
+            if why:
+                bad.append(f"{n}:{sl}: SCHEMA: trigger {TRIGGER_WHEN.match(x).group(1)}: {why}")
     steps, ml = values.get("MIGRATIONS", ([], 0))
     for table, col, ddl in steps:
         why = step_finding(table, col, ddl)

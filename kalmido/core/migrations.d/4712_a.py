@@ -22,6 +22,9 @@ fallback reader then gives exactly what the node gave -- a share taken back in t
 New columns, functions and triggers only (nullable or with a DEFAULT): an older version ignores the columns -- its calendars
 in the trash would show again --, the trigger keeps mirroring for it, nothing breaks; a backup restores them (kalmido_*).
 """
+# 2.585.0 (#4841): the WHEN of the two fs_nodes triggers is written as Postgres prints it (pg_get_triggerdef): core/db.py tg_same
+# compares the text, so `IN (...)` / an untyped literal counted as changed and every start replaced both under a SHARE ROW EXCLUSIVE
+# lock on fs_nodes (tools/check_migrations.py now flags that)
 SCHEMA = """
 CREATE OR REPLACE FUNCTION kalmido_kern_mirror() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE r JSONB; rid BIGINT; who BIGINT; nid BIGINT; ag BOOLEAN; prev TEXT;
@@ -66,7 +69,7 @@ BEGIN
   PERFORM set_config('app.role', COALESCE(prev, ''), true);
   RETURN NULL;
 END $$;
-CREATE OR REPLACE TRIGGER kalmido_kern_node_made AFTER INSERT ON fs_nodes FOR EACH ROW WHEN (NEW.kind = 'ref' AND NEW.ref_kind IN ('evcal', 'address_book')) EXECUTE FUNCTION kalmido_kern_node_made();
+CREATE OR REPLACE TRIGGER kalmido_kern_node_made AFTER INSERT ON fs_nodes FOR EACH ROW WHEN (NEW.kind = 'ref'::text AND (NEW.ref_kind = ANY (ARRAY['evcal'::text, 'address_book'::text]))) EXECUTE FUNCTION kalmido_kern_node_made();
 CREATE OR REPLACE FUNCTION kalmido_kern_node_gone() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE prev TEXT; ts TEXT;
 BEGIN
@@ -99,7 +102,7 @@ BEGIN
   PERFORM set_config('app.role', COALESCE(prev, ''), true);
   RETURN OLD;
 END $$;
-CREATE OR REPLACE TRIGGER kalmido_kern_node_gone BEFORE DELETE ON fs_nodes FOR EACH ROW WHEN (OLD.kind = 'ref' AND OLD.ref_kind IN ('evcal', 'address_book')) EXECUTE FUNCTION kalmido_kern_node_gone();
+CREATE OR REPLACE TRIGGER kalmido_kern_node_gone BEFORE DELETE ON fs_nodes FOR EACH ROW WHEN (OLD.kind = 'ref'::text AND (OLD.ref_kind = ANY (ARRAY['evcal'::text, 'address_book'::text]))) EXECUTE FUNCTION kalmido_kern_node_gone();
 """
 MIGRATIONS = [
     ("ev_cals", "rev", "ALTER TABLE ev_cals ADD COLUMN IF NOT EXISTS rev BIGINT NOT NULL DEFAULT 1"),
