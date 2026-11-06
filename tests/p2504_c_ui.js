@@ -162,7 +162,9 @@ const RED = {dark: 'rgb(248, 113, 113)', light: 'rgb(196, 48, 43)'};  // LP_TONE
       // a marked row is tinted with its own tone (.trow.msel; the tick's edge is not the accent there)
       const rows2 = `[${TW}, ${TP}].map(id => document.querySelector('#view .trow[data-id="' + id + '"]'))`;
       await ev(`(() => { ${rows2}.forEach(r => r.classList.add('msel')); return 1; })()`);
-      const msel = await u(`(() => { const [a, b] = ${rows2}.map(r => getComputedStyle(r).backgroundColor); return a !== b ? [a, b] : null; })()`, {timeout: 3000});
+      // CI red of 2.570.0: on the slower CI runner a late redraw of the list replaced the rows (their msel gone) and the
+      // row's background transition outlasted 3 s - mark the rows again on every look, wait longer
+      const msel = await u(`(() => { const rs = ${rows2}; if (rs.some(r => !r)) return null; rs.forEach(r => r.classList.add('msel')); const [a, b] = rs.map(r => getComputedStyle(r).backgroundColor); return a !== b ? [a, b] : null; })()`, {timeout: 10000});
       await ev(`(() => { ${rows2}.forEach(r => r.classList.remove('msel')); return 1; })()`);
       check(msel, `${theme}: #4222 a marked row in its workspace's tone ` + JSON.stringify(msel));
       const rowQ = await ev(PROBE(`document.querySelector('#view .trow[data-id="${TP}"]')`));
