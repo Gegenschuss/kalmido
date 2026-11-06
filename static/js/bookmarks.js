@@ -56,7 +56,7 @@ function viewBookmarks() {
   if (!BM.loading && (!BM.done || Date.now() - BM.at > 60000 || BM.sp !== bm_sp())) setTimeout(bm_reload, 0);  // 2.172.0 B (#2679): + another workspace shown
   const add = `<form class="bmadd" data-bm-form><label class="sr" for="bm-url">${tr('Link')}</label><input id="bm-url" type="url" inputmode="url" autocomplete="off" placeholder="${esc(tr('Paste a link'))}" maxlength="2000"><button type="submit" class="btn pri" ${BM.busy ? 'disabled' : ''}>${ic('plus', 's')}<span>${tr('Add')}</span></button></form>`;
   const menu = `<details class="bgmenu bmmenu"><summary class="iconbtn" aria-label="${esc(tr('More'))}" title="${esc(tr('More'))}">${ic('dots')}</summary><div class="bgmenul" role="menu">
-    <button type="button" role="menuitem" data-bm="bmlet">${ic('bookmark', 's')}<span>${tr('Bookmark button for the browser')}</span></button>
+    <button type="button" role="menuitem" data-bm="bmlet">${ic('bookmark', 's')}<span>${tr('Save button for the browser')}</span></button>
     <button type="button" role="menuitem" data-bm="kk">${ic('link', 's')}<span>${tr('Karakeep…')}</span></button></div></details>`;
   const view = bm_view();
   const bar = `<div class="bmbar"><input type="search" class="bmq" data-bm-q value="${esc(BM.q)}" placeholder="${esc(tr('Search bookmarks'))}" aria-label="${esc(tr('Search bookmarks'))}">

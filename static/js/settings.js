@@ -1675,7 +1675,7 @@ const SS_SYN = [  // [the words in every language, the label(s) to look for inst
   // 2.365.2 (#2789): the setups that moved from the modules into Integrations
   [['carddav', 'geburtstag', 'geburtstage', 'birthday', 'birthdays', 'adressbuch', 'address book', 'cumpleaños', 'anniversaire', 'compleanno', 'verjaardag'], () => [tr('Birthdays from your contacts')]],
   [['newsletter', 'listmonk', 'brevo', 'cleverreach', 'rundbrief'], () => [tr('Newsletter service')]],
-  [['lesezeichen', 'bookmarklet', 'bookmark', 'marcador', 'marque-page', 'segnalibro', 'bladwijzer'], () => [tr('Bookmark button for the browser')]],
+  [['lesezeichen', 'bookmarklet', 'bookmark', 'marcador', 'marque-page', 'segnalibro', 'bladwijzer'], () => [tr('Save button for the browser')]],
   [['buchungsseite', 'termin buchen', 'booking', 'reservierung', 'reserva', 'réservation', 'prenotazione', 'boekingspagina'], () => [tr('Booking page')]],
   [['urlaub', 'abwesenheit', 'krank', 'frei', 'vacation', 'absence', 'holiday', 'sick', 'leave', 'vacaciones', 'ausencia', 'congé', 'ferie', 'assenza', 'vakantie', 'afwezig'], 'absence']];
 // the text of an element with a blank between its parts (textContent glues "Title" + "explanation" together)

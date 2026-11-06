@@ -661,10 +661,11 @@ const nwls_html = () => feat('contacts') ? `<h4 id="s-nwl-h">${tr('Newsletter se
 const nwls_impLinkHtml = () => feat('contacts') ? `<div class="row"><span class="muted">${tr('Consents to the newsletter from a CSV file: Contacts > Newsletter.')}</span><button type="button" class="btn sm" data-intb="nwl">${ic('mail', 's')} ${tr('Newsletter…')}</button></div>` : '';
 // ---- the bookmark button for the browser (opens /share?bm=1 with the page in a small window; the normal sign-in, no token)
 const bm_bookmarklet = () => `javascript:(()=>{window.open(${JSON.stringify(location.origin + '/share')}+'?bm=1&title='+encodeURIComponent(document.title)+'&url='+encodeURIComponent(location.href),'kalmido_bm','popup,width=560,height=680')})()`;
-const bmls_html = () => feat('reading') ? `<h4 id="s-bmlet-h">${tr('Bookmark button for the browser')}</h4>
+// 2.574.0 (#4023): "Save button for the browser": its window offers Read later (Private preselected, per organisation) or a bookmark
+const bmls_html = () => feat('reading') ? `<h4 id="s-bmlet-h">${tr('Save button for the browser')}</h4>
   <div class="row caprow"><a class="btn pri capbm" href="${esc(bm_bookmarklet())}" data-intb="bmhint" draggable="true">${ic('bookmark', 's')} ${tr('Save to Kalmido')}</a></div>
-  <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page, Save keeps it as a bookmark and opens it for tags and a note. It runs no code of ours on that page and uses your normal sign-in.')}</div>
-  <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Save as bookmark”.')}</div>` : '';
+  <div class="shint">${tr('Drag the button to your bookmarks bar. On any page, click it: a small window shows the page and asks where it goes: “Read later · Private” (Enter), “Read later” in one of your organisations, or a bookmark. A link you already saved there is not saved twice. It runs no code of ours on that page and uses your normal sign-in.')}</div>
+  <div class="shint keep">${tr('On the phone: share a link from any app to Kalmido and choose “Read later” or “Save as bookmark”.')}</div>` : '';
 // ---- the booking page (its own dialog, apptbook.js; the calendars dialog keeps its button)
 const apbs_html = () => feat('events') && !S.me?.kid ? `<h4 id="s-apb-h">${tr('Booking page')}</h4>
   <div class="row"><span class="muted">${tr('A public page where others book an appointment with you: times, appointment types, the calendar it goes into.')}</span><button type="button" class="btn sm" data-intb="apb">${ic('cal', 's')} ${tr('Booking page…')}</button></div>` : '';

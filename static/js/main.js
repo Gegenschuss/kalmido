@@ -99,8 +99,12 @@ function bootDone() {
     const [u, rest] = shareLink(text, (q.get('url') || '').trim());
     // 2.97.0 A (#1950): the bookmark button of the browser (?bm=1) saves a bookmark; a shared link offers "Save as bookmark"
     const bmU = /^https?:\/\//i.test(u) ? u.slice(0, 2000) : '';
-    const [sd, sdSp] = rd_destSplit(bmU && q.get('bm') !== '1' && feat('reading') ? await shareDest([], false, true) : '');  // 2.172.0 B (#2679): + read later; 2.490.0 C (#4025): + the space
-    if (bmU && q.get('bm') === '1') bm_confirmSave(bmU, (q.get('title') || '').trim().slice(0, 300));
+    // 2.574.0 (#4023): the save button of the browser (?bm=1, also the ones already in the bar) asks the same: "Read later ·
+    // Private" preselected, per organisation "· <Org> (Team)", or a bookmark; nothing is saved without a click
+    const bm1 = q.get('bm') === '1', bmT = (q.get('title') || '').trim().slice(0, 300);
+    const [sd, sdSp] = rd_destSplit(bmU && feat('reading') ? await shareDest([], false, true, null, bm1 ? {url: bmU, title: bmT} : null) : '');  // 2.172.0 B (#2679): + read later; 2.490.0 C (#4025): + the space
+    if (bmU && bm1 && !feat('reading')) bm_confirmSave(bmU, bmT);  // Reading off: as before (it says where bookmarks are)
+    else if (bm1 && bmU && !sd) { /* closed: nothing saved */ }
     else if (sd === 'bookmark') await bm_shareSave(bmU, (q.get('title') || '').trim(), sdSp);
     else if (sd === 'later') await rdl_shareSave(bmU, (q.get('title') || '').trim(), sdSp);
     else openQuickSheet((q.get('title') || '').trim() || rest || (u ? urlTitle(u) : ''), {url: u, list_id: inbox().id, ...(S.me ? {assignee_id: S.me.id} : {})});  // 2.27.0 (#1001): yours

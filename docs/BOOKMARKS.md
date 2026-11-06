@@ -8,9 +8,12 @@ the module **Read later** (*Settings > Modules > Reading > Read later*, off by d
 
 - Open **Bookmarks** and paste a link (`https://…`; a bare `example.com/page` gets `https://`), then tap **Save**.
 - **From another app (phone):** share a link to Kalmido and choose **Save as bookmark** (next to *New task*).
-- **From the browser (computer):** menu **…** > *Bookmark button for the browser* gives you a button to drag to your
-  bookmarks bar. On any page it opens a small Kalmido window with the page; **Save** keeps it and shows it for tags and a
-  note. It uses your normal sign-in and runs no code of ours on the page.
+- **From the browser (computer):** menu **…** > *Save button for the browser* (also in Settings > Integrations) gives you
+  a button to drag to your bookmarks bar. On any page it opens a small Kalmido window with the page and asks where it goes:
+  **Read later · Private** (preselected, Enter), *Read later · <organisation> (Team)* for each organisation, or a bookmark
+  (which then opens for tags and a note). Nothing is saved without a click; a link already saved there is reported, not
+  saved twice. Buttons dragged before 2.574 keep working and show the new choice. It uses your normal sign-in and runs no
+  code of ours on the page.
 - The same link is not saved twice: saving it again (also with tracking parameters such as `utm_source`) shows the one you
   already have.
 - With organisations: a bookmark is saved in the workspace you are looking at (in *All workspaces*: your private space).

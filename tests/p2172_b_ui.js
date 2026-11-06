@@ -6,6 +6,8 @@
 //       and the bookmark button), no longer the shown workspace; Reading off in an organisation = no button; three
 //       organisations: one "… in team…"; the server refuses an organisation without membership / with Reading off;
 //       a person without an organisation sees only the plain buttons (freelancer parity)
+// 2.574.0 (#4023): the bookmark button of the browser (?bm=1) asks the same: "Read later · Private" preselected (Enter),
+//       per organisation, bookmarks; a link saved twice is reported; Reading off: the hint as before
 // #2677 Feeds in an organisation's view: no longer hidden there (O3A_PRIV), only the organisation's feeds; a member who
 //       is no admin sees no address field / unfollow; the private view shows none of them
 // Firefox 390 touch: the view "Read later" has no horizontal scrolling, the buttons are >= 40 px, screenshot.
@@ -145,14 +147,33 @@ const FEAT = 'cal,comments,collab,contracts,feeds,reading';
   check(await bms(SP, 'http://127.0.0.1:8098/team.xml') && !await bms('private', 'http://127.0.0.1:8098/team.xml'), '#4025: the bookmark went to Alpha');
   check(/Saved in “Alpha”/.test(d.querySelector('#toast')?.textContent || ''), '#4025: the bookmark toast names Alpha ' + (d.querySelector('#toast')?.textContent || '').slice(0, 120));
   w.close();
+  // 2.574.0 (#4023): the bookmark button (?bm=1, also one dragged before) asks like the share question: "Read later ·
+  // Private" first and preselected (Enter), "· Alpha (Team)", the bookmark targets; no "New task" (before: a select of
+  // the bookmark targets, #bmc-sp)
   await shareAt('http://127.0.0.1:8098/mine.xml', 'bob', 'bm=1&');
-  const sel = d.querySelector('#bmc-sp');
-  check(sel && sel.value === 'private' && [...sel.options].map(o => o.textContent).join('|') === 'Bookmark · Private|Bookmark · Alpha (Team)', '#4025: the bookmark button: Private preselected, Alpha (Team) ' + (sel ? [...sel.options].map(o => o.value + '=' + o.textContent).join('|') : 'none'));
-  if (sel) sel.value = SP;
-  d.querySelector('.bmconfdlg form').dispatchEvent(new w.Event('submit', {bubbles: true, cancelable: true}));
+  await until(() => d.activeElement?.dataset?.sd);
+  check(d.querySelector('.bmconfdlg [data-sd="later"]') && d.querySelector(`.bmconfdlg [data-sd="later:${SP}"]`) && d.querySelector('.bmconfdlg [data-sd="bookmark"]') && d.querySelector(`.bmconfdlg [data-sd="bookmark:${SP}"]`) && !d.querySelector('[data-sd="task"]'),
+    '#4023: the bookmark button offers Read later and bookmarks per target, no new task ' + [...d.querySelectorAll('[data-sd]')].map(b => b.dataset.sd).join('|'));
+  check(d.activeElement?.dataset?.sd === 'later' && /Read later · Private/.test(sdTxt('[data-sd="later"]')) && d.querySelector('[data-sd="later"]').classList.contains('pri'), '#4023: "Read later · Private" preselected (Enter) ' + d.activeElement?.dataset?.sd);
+  check(/Shared article/.test(d.querySelector('.bmconfdlg')?.textContent || '') && /mine\.xml/.test(d.querySelector('.bmconfdlg .bmcurl')?.textContent || ''), '#4023: the window shows the page');
+  check(!await bms('private', 'http://127.0.0.1:8098/mine.xml') && !await has('private', 'http://127.0.0.1:8098/mine.xml'), '#4023: nothing saved without a click');
+  click(w, d.querySelector(`[data-sd="bookmark:${SP}"]`));
   await until(() => d.querySelector('.modal.bmdlg:not(.bmconfdlg)'));
   check(await bms(SP, 'http://127.0.0.1:8098/mine.xml'), '#4025: the bookmark button saved into the picked organisation');
   w.close();
+  // 2.574.0 (#4023): Enter on the preselected button -> Read later in Private (the toast names it); the same link again is
+  // reported, not saved twice
+  for (const again of [false, true]) {
+    await shareAt('https://example.org/bm-later', 'bob', 'bm=1&');
+    await until(() => d.activeElement?.dataset?.sd === 'later');
+    click(w, d.activeElement);
+    await until(() => w.eval('S.route.mod') === 'reading' && /Private/.test(d.querySelector('#toast')?.textContent || ''));
+    const tt = d.querySelector('#toast')?.textContent || '';
+    check(again ? /Already in “Read later” in “Private”/.test(tt) : /Saved to “Read later” in “Private”/.test(tt), `#4023: the bookmark button, ${again ? 'the same link again: reported' : 'Enter: Read later · Private'} ` + tt.slice(0, 120));
+    const n = ((await call('GET', '/api/reading?space=private', null, CB)).items || []).filter(x => x.url === 'https://example.org/bm-later').length;
+    check(n === 1 && !await has(SP, 'https://example.org/bm-later'), '#4023: once in Private, not in Alpha ' + n);
+    w.close();
+  }
   // 2.490.0 (#4025): an organisation with Reading switched off by its admin has no button; the server refuses it too
   await call('PATCH', `/api/settings`, {workspace: 'private'}, CB);
   check((await call('PATCH', `/api/orgs/${ORG}`, {areas_off: ['reading']})).status === 200, 'Alpha: Reading off');
@@ -194,6 +215,22 @@ const FEAT = 'cal,comments,collab,contracts,feeds,reading';
   check(await has('private', 'https://example.org/fred', CF), '#4025: without an organisation: saved privately');
   w.close();
   check((await call('POST', '/api/reading', {url: 'https://example.org/y', space: SP}, CF)).status === 404, '#4025: without an organisation: Alpha refused (404)');
+  // 2.574.0 (#4023): the bookmark button without an organisation: the plain "Read later" preselected; with Reading off the
+  // window says where bookmarks are, as before
+  await shareAt('https://example.org/fred-bm', 'fred', 'bm=1&');
+  await until(() => d.activeElement?.dataset?.sd === 'later');
+  check(/^Read later$/.test(sdTxt('[data-sd="later"]')) && d.querySelector('[data-sd="bookmark"]') && !d.querySelector('[data-sd^="later:"], [data-sd^="bookmark:"], [data-sd="task"]'), '#4023: without an organisation: "Read later" (preselected) and "Save as bookmark"');
+  click(w, d.activeElement);
+  await until(() => w.eval('S.route.mod') === 'reading');
+  await until(async () => has('private', 'https://example.org/fred-bm', CF));
+  check(await has('private', 'https://example.org/fred-bm', CF), '#4023: without an organisation: saved privately');
+  w.close();
+  await call('PATCH', '/api/settings', {features: FEAT.replace(',reading', '')}, CF);
+  w = await boot({user: 'fred', path: 'share?bm=1&title=x&url=' + encodeURIComponent('https://example.org/fred-off')}); d = w.document;
+  await until(() => /Bookmarks are part of the module/.test(d.querySelector('#toast')?.textContent || ''));
+  check(/Bookmarks are part of the module/.test(d.querySelector('#toast')?.textContent || '') && !d.querySelector('[data-sd]'), '#4023: Reading off: no choice, the hint as before');
+  w.close();
+  await call('PATCH', '/api/settings', {features: FEAT}, CF);
 
   // ================= Firefox 390 touch
   await call('PATCH', '/api/settings', {workspace: 'private'});

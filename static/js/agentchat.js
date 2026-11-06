@@ -534,19 +534,22 @@ function chatAddFiles(files, aid = S.chat.aid) {
   const box = $('#chat-files'); if (box && S.chat.aid === aid) box.innerHTML = chatFilesHtml(aid);
 }
 // 2.13.1 (#465): where a shared file / text goes: a new task (default: Esc, a click next to it) or an agent's chat
-function shareDest(ags, docs, bm, imp) {  // 2.48.0 (#1111): docs = offer "File as document" (shared files); 2.97.0 A (#1950): bm = "Save as bookmark"; 2.143.0 C (#2154): imp = {contacts, calendar} (shared .vcf / .ics); 2.172.0 B (#2679): bm also offers "Read later"
+function shareDest(ags, docs, bm, imp, pg = null) {  // 2.48.0 (#1111): docs = offer "File as document" (shared files); 2.97.0 A (#1950): bm = "Save as bookmark"; 2.143.0 C (#2154): imp = {contacts, calendar} (shared .vcf / .ics); 2.172.0 B (#2679): bm also offers "Read later"
   const ts = bm ? rd_targets() : [];  // 2.490.0 C (#4025): Private + the organisations the link may go to
+  // 2.574.0 (#4023): pg = {url, title}: the window of the save button for the browser (/share?bm=1): the page first, no
+  // "New task", "Read later · Private" first and preselected (Enter), then the bookmark; closing it saves nothing ('')
   return new Promise(res => {
     let done = false;
-    const md = modal(`<h3 id="shd-t">${tr('Share to')}</h3><div class="shdest" role="group" aria-labelledby="shd-t">
-      <button type="button" class="btn pri" data-sd="task">${ic('plus', 's')} ${tr('New task')}</button>
+    const md = modal(`<h3 id="shd-t">${pg ? tr('Save to Kalmido') : tr('Share to')}</h3>${pg ? `<p class="bmctitle"><b>${esc(pg.title || pg.url)}</b></p><p class="muted bmcurl">${esc(pg.url)}</p>` : ''}<div class="shdest" role="group" aria-labelledby="shd-t">
+      ${pg ? shd_rdBtns(ts, 'later').replace('class="btn"', 'class="btn pri"') : `<button type="button" class="btn pri" data-sd="task">${ic('plus', 's')} ${tr('New task')}</button>`}
       ${docs ? `<button type="button" class="btn" data-sd="doc">${ic('file', 's')} ${tr('File as document')}</button>` : ''}
       ${bm ? shd_rdBtns(ts, 'bookmark') : ''}
-      ${bm ? shd_rdBtns(ts, 'later') : ''}
+      ${bm && !pg ? shd_rdBtns(ts, 'later') : ''}
       ${imp?.contacts ? `<button type="button" class="btn" data-sd="contacts">${ic('users', 's')} ${tr('Add to contacts')}</button>` : ''}
       ${imp?.calendar ? `<button type="button" class="btn" data-sd="calendar">${ic('cal', 's')} ${tr('Add to calendar')}</button>` : ''}
       ${ags.map(a => `<button type="button" class="btn" data-sd="${a.id}">${ic('send', 's')} ${esc(tr('Send to agent {0}', a.name))}</button>`).join('')}</div>`);
     md.setAttribute('role', 'dialog'); md.setAttribute('aria-modal', 'true'); md.setAttribute('aria-labelledby', 'shd-t');
+    if (pg) md.classList.add('bmdlg', 'bmconfdlg');
     const fin = v => { if (done) return; done = true; res(v); if (md.isConnected) md.remove(); };
     md.addEventListener('click', e => {
       const b = e.target.closest('[data-sd]'); if (!b) return;
@@ -559,8 +562,8 @@ function shareDest(ags, docs, bm, imp) {  // 2.48.0 (#1111): docs = offer "File 
       }
       fin(['task', 'doc', 'bookmark', 'later', 'contacts', 'calendar'].includes(v) || /^(bookmark|later):org:\d+$/.test(v) ? v : +v);
     });
-    onRemove(md, () => fin('task'));
-    setTimeout(() => $('[data-sd="task"]', md)?.focus(), 30);
+    onRemove(md, () => fin(pg ? '' : 'task'));
+    setTimeout(() => $(pg ? '[data-sd^="later"]' : '[data-sd="task"]', md)?.focus(), 30);
   });
 }
 // 2.490.0 C (#4025): the buttons of "Read later" / "Save as bookmark" in the share question: with Private only the plain one
