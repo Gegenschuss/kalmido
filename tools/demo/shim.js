@@ -415,6 +415,8 @@
     'GET /api/me/channels': () => ({enabled: false, channels: [], mail: {}}),
     'GET /api/account/export': () => ({state: 'none'}), 'GET /api/account/import': () => ({current: null}), 'GET /api/videos/signoffs/orphaned': () => ({signoffs: []}),
     'GET /api/hubmail/mailboxes': () => ({spaces: []}),
+    // 2.575.0 (#3778 #4802, #3506 CI red): own module cards (Settings > Modules) and saved document views - none in the demo
+    'GET /api/modcards': () => ({space: 'private', admin: true, cap: null, cards: []}), 'GET /api/docs/views': () => ({items: []}),
     'GET /api/proposals/agents': () => ({agents: []}),  // 2.126.3 (#2123 #2124): the office / documents / status report ask which agents may draft - none in the demo
     'GET /api/pomo/stats': () => ({per_day: {}, today: {count: 0, minutes: 0}, week: {count: 0, minutes: 0}, per_task: [], recent: []}), 'GET /api/stale': () => ({tasks: [], count: 0, default_days: 7}),
     'GET /api/briefing': () => ({}), 'GET /api/inbox': () => ({total: 0, counts: {}, items: []}), 'GET /api/layouts/saved': () => ({saved: []}), 'GET /api/layouts/std': () => ({layouts: {}, can: false}),
