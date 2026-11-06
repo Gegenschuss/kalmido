@@ -10,6 +10,10 @@ the job names of a green run (the shard jobs "Test suites N/M full ..." = the fu
 Exit 0 = a run of SHA is green and was the full stage; 1 = the CI of SHA is red / cancelled / only the push stage /
 no CI run within --no-run-min / still running at --timeout-min. While a run of SHA is queued or running it waits.
 A red or cancelled run that is re-run by hand (same run, new attempt) counts again; re-run this workflow afterwards.
+2.595.0 (#4905): when the tagged commit itself has no green full run, a green full CI run of ANOTHER commit with the same
+tree (identical files: the version commit back on main, a nightly / dispatched full run, a hotfix branch) counts as well -
+the CI tests files, not commit ids. Read from head_commit.tree_id of the run list (GET .../runs?status=success), no extra
+request per run. Not a loosening: the code of the tag has to have passed the full stage.
 Env: GITHUB_TOKEN (or GH_TOKEN), GITHUB_REPOSITORY, GITHUB_SHA, GITHUB_API_URL (all set on GitHub Actions)."""
 import argparse
 import json
@@ -50,6 +54,24 @@ def decide(runs, jobs_of):
     return "red", "; ".join(why)
 
 
+def same_tree(runs, tree, sha):
+    """The green, finished CI runs of OTHER commits whose tree equals `tree` (the files of the tagged commit)."""
+    if not tree:
+        return []
+    return [r for r in runs if r.get("head_sha") != sha and (r.get("head_commit") or {}).get("tree_id") == tree
+            and r.get("status") == "completed" and r.get("conclusion") == "success"]
+
+
+def decide_tree(res, txt, tree_runs, jobs_of):
+    """#4905: (res, txt) of the tagged commit; a green FULL run with the same tree turns red / none / wait into green."""
+    if res == "green":
+        return res, txt
+    for r in tree_runs:
+        if stage(jobs_of(r["id"])) == "full":
+            return "green", "CI run %s of %s is green (full stage) on the same tree as the tag" % (r["id"], str(r.get("head_sha"))[:12])
+    return res, txt
+
+
 def api(path):
     base = os.environ.get("GITHUB_API_URL", "https://api.github.com")
     tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN") or ""
@@ -70,6 +92,12 @@ def main():
     if not (a.sha and repo):
         print("ci_gate: GITHUB_SHA / GITHUB_REPOSITORY missing"); return 1
     t0 = time.time()
+    tree = [None]
+
+    def tree_of():  # the tree of the tagged commit (from its own run, else the git commit), asked once
+        if tree[0] is None:
+            tree[0] = (api("/repos/%s/git/commits/%s" % (repo, a.sha)).get("tree") or {}).get("sha") or ""
+        return tree[0]
 
     def jobs_of(rid):
         return [j.get("name") for j in api("/repos/%s/actions/runs/%s/jobs?per_page=100" % (repo, rid)).get("jobs", [])]
@@ -78,6 +106,14 @@ def main():
         try:
             runs = api("/repos/%s/actions/workflows/ci.yml/runs?head_sha=%s&per_page=50" % (repo, a.sha)).get("workflow_runs", [])
             res, txt = decide(runs, jobs_of)
+            if res != "green":  # #4905: a green full run of the same files on another commit
+                own = [(r.get("head_commit") or {}).get("tree_id") for r in runs if r.get("head_sha") == a.sha]
+                if own and own[0] and tree[0] is None:
+                    tree[0] = own[0]
+                tr = tree_of()
+                if tr:
+                    ok = api("/repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=100" % repo).get("workflow_runs", [])
+                    res, txt = decide_tree(res, txt, same_tree(ok, tr, a.sha), jobs_of)
         except Exception as e:  # a hiccup of the API: ask again at the next poll
             res, txt = "wait", "API: %s" % e
         mins = (time.time() - t0) / 60

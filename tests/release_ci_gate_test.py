@@ -5,7 +5,9 @@ FULL run of the workflow CI on the tagged commit (tools/ci_gate.py). Without a s
   needs it;
 - tools/ci_gate.py: green full run = go; a run still queued / running = wait; red, cancelled, only the push stage = stop;
   one green full run beside a red one (re-run, nightly run of the same commit) = go; the loop in main() waits on the
-  stubbed API state, not on a fixed time."""
+  stubbed API state, not on a fixed time;
+- 2.595.0 (#4905): a green full run of ANOTHER commit with the same tree counts (same files), one of another tree or only
+  the push stage does not; release.yml can be re-run on a tag by workflow_dispatch and skips any other ref."""
 import importlib.util
 import os
 import re
@@ -69,18 +71,28 @@ check(res == "none", "no CI run yet = none (%s)" % res)
 states = []
 
 
-def fake_api(seq, names):
+def fake_api(seq, names, tree="", same=()):
+    # 2.595.0 (#4905): the gate also asks the tree of the tag and the green runs; they do not count as polls
     def api(path):
         if "/jobs" in path:
             return {"jobs": [{"name": n} for n in names]}
+        if "/git/commits/" in path:
+            asked.append(path)
+            return {"tree": {"sha": tree}}
+        if "status=success" in path:
+            asked.append(path)
+            return {"workflow_runs": list(same)}
         states.append(path)
         return {"workflow_runs": seq[min(len(states), len(seq)) - 1]}
     return api
 
 
-def main_rc(seq, names, *extra):
-    del states[:]
-    gate.api = fake_api(seq, names)
+asked = []
+
+
+def main_rc(seq, names, *extra, tree="", same=()):
+    del states[:], asked[:]
+    gate.api = fake_api(seq, names, tree, same)
     old = sys.argv, dict(os.environ)
     sys.argv = ["ci_gate.py", "--sha", "abc123", "--poll-s", "0"] + list(extra)
     os.environ["GITHUB_REPOSITORY"] = "owner/repo"
@@ -101,6 +113,33 @@ rc = main_rc([[]], FULL, "--no-run-min", "0")
 check(rc == 1, "main gives up when no CI run shows up (rc %s)" % rc)
 rc = main_rc([[run(7, "in_progress")]], FULL, "--timeout-min", "0")
 check(rc == 1, "main gives up at the time limit while the CI still runs (rc %s)" % rc)
+
+# ------------------------------------------------------------------ 2.595.0 (#4905): same tree, re-run on a tag
+def trun(i, sha, tree, conclusion="success"):
+    return dict(run(i, conclusion=conclusion), head_sha=sha, head_commit={"tree_id": tree})
+
+
+tagrun = trun(1, "abc123", "T1", "failure")
+st = gate.same_tree([tagrun, trun(2, "def456", "T1"), trun(3, "fff000", "T2"), trun(4, "aaa111", "T1", "failure")], "T1", "abc123")
+check([r["id"] for r in st] == [2], "same_tree: only green runs of other commits with the same tree (%s)" % [r["id"] for r in st])
+check(gate.same_tree([trun(2, "def456", "T1")], "", "abc123") == [], "same_tree: no tree known = nothing")
+res, txt = gate.decide_tree("red", "run 1 failure", [trun(2, "def456", "T1")], jobs_of({2: FULL}))
+check(res == "green" and "same tree" in txt, "red tag commit + green full run of the same tree = go (%s, %s)" % (res, txt))
+res, _ = gate.decide_tree("red", "run 1 failure", [trun(2, "def456", "T1")], jobs_of({2: PUSH}))
+check(res == "red", "same tree but only the push stage = still no release (%s)" % res)
+res, _ = gate.decide_tree("red", "x", [], jobs_of({}))
+check(res == "red", "no run of the same tree = red stays (%s)" % res)
+rc = main_rc([[tagrun]], FULL, tree="T9", same=[trun(2, "def456", "T1")])
+check(rc == 0 and "git/commits/abc123" not in " ".join(asked), "main: the tree comes from the tag's own run, a green full run of it = go (rc %s, %s)" % (rc, asked))
+rc = main_rc([[run(7, conclusion="failure")]], FULL, tree="T1", same=[trun(2, "def456", "T1")])
+check(rc == 0 and any("git/commits/abc123" in x for x in asked), "main: without head_commit the tree comes from the git commit (rc %s)" % rc)
+rc = main_rc([[tagrun]], FULL, same=[trun(2, "def456", "T2")])
+check(rc == 1, "main: a green run of another tree does not count (rc %s)" % rc)
+rc = main_rc([[]], FULL, "--no-run-min", "60", tree="T1", same=[trun(2, "def456", "T1")])
+check(rc == 0, "main: no run of the tag yet, but the same tree is green = go (rc %s)" % rc)
+
+check(re.search(r"^on:\n(?:  .*\n)*  workflow_dispatch:", rel, re.M) is not None, "#4905: release.yml can be re-run on a tag (workflow_dispatch)")
+check("if: startsWith(github.ref, 'refs/tags/v')" in gtxt, "#4905: a dispatch on a branch is skipped (only refs/tags/v...)")
 
 print("release_ci_gate: %d ok, %d failed" % (OKS[0], len(FAILS)))
 sys.exit(1 if FAILS else 0)
