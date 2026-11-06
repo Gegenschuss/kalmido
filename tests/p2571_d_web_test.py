@@ -249,6 +249,19 @@ check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body 
       "no message from the page's orders to the other person of the project")
 check(not dbx("SELECT 1 FROM comments WHERE task_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TA, TMA)), "no comment of the team agent")
 
+# review F2 (decision 06.11.2026): without a card only the person who asked and the owner; a person whose event lies in the
+# bundle (here Hugo's mention) is reached only by card
+until(lambda: not dbx("SELECT 1 FROM agent_runs WHERE agent_id=? AND state='run'", (TMA,)), 40)
+r0 = dbx("SELECT COALESCE(MAX(id), 0) FROM agent_runs WHERE agent_id=?", (TMA,))[0][0]
+Hu = kt.sess("hugo")
+r = Hu.post(B + f"/api/tasks/{TA}/comments", json={"body": f"<@{TMA}> FAKEWEB_INJECT {TA} {HID} {AU}"})
+check(r.ok, f"Hugo mentions the team agent {r.status_code} {r.text[:120]}")
+hr = until(lambda: dbx("SELECT id, cause, web FROM agent_runs WHERE agent_id=? AND id>? AND state<>'run'", (TMA, r0)), 40)
+hst = json.loads(hr[0][2]) if hr and hr[0][2] else {}
+check(hr and hr[0][1] == "mention" and HID not in hst.get("to", [0]), f"the mention run: Hugo is not among the people without a card {hr} {hst}")
+check(not dbx("SELECT 1 FROM agent_chat WHERE agent_id=? AND user_id=? AND body LIKE 'INJECTED%'", (TMA, HID)),
+      "the person whose mention started the web run gets no message without a card")
+
 # ---------------------------------------------------------------- without the switch the same comment is written (the gate ends)
 check(Fr.put(SRV, json={"flow_web": {"other": False}}).ok, "web off again")
 after, rid = chat(f"Again FAKEWEB_INJECT {T1} {GID} {FID}")

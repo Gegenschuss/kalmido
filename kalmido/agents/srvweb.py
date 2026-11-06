@@ -16,8 +16,8 @@ gets three tools more, all of them read only:
 Every web result is foreign data: the system text says so, a reminder follows each step with web results, VIES answers are
 marked in the tool result. While such a run is on (agent_runs.web = its state json), the control gate (agents/control.py
 ctl_gate -> srvweb_gate_step) turns every change into one that needs an approval card, also for an agent that may act freely
-or has no control level, and its own channel too: chat messages only to the people of the run (the person who asked, the owner,
-the people whose events started it), standing rules and the other proposal routes only by card. What the run found on the web
+or has no control level, and its own channel too: chat messages without a card only to the person who asked and the owner
+(review F2, 06.11.2026: the people whose other events lie in the bundle only by card), standing rules and the other proposal routes only by card. What the run found on the web
 (fetched and cited addresses, VIES checks) is appended as "From the web" to every chat message and approval card it posts and
 to its proposals (proposals.py: web_sources + the summary), so each web find shows its source."""
 import ipaddress

@@ -314,7 +314,7 @@ def _run(aid, rid):
         tools, allowed = _tools(mod, api)
         wst = None
         if srv_web_on(row, flow):  # 2.571.0 D (#4676): read-only web research for this routine
-            wst = srv_web_state([asker, a["owner_id"], *_actors(work)])
+            wst = srv_web_state([asker, a["owner_id"]])  # review F2 (06.11.2026): the people of other events of the bundle by card
             _db(lambda c: c.execute("UPDATE agent_runs SET web=? WHERE id=?", (json.dumps(wst), rid)))  # the gate holds from here
             system += "\n\n" + SRV_WEB_FRAME
             tools = tools + srv_web_tools(model)
@@ -366,16 +366,6 @@ def _finish(aid, rid, tok, state, text, asker, lang):
         elif c.execute("SELECT status FROM agents WHERE user_id=?", (aid,)).fetchone()[0] != "paused":
             c.execute("UPDATE agent_server SET paused='' WHERE agent_id=?", (aid,))
     _db(tidy)
-
-
-def _actors(work):
-    """2.571.0 D (#4676): the people whose events started the run (a web run writes to them without a card)."""
-    out = []
-    for e in work:
-        x = e.get("actor") if isinstance(e.get("actor"), dict) else {}
-        if x.get("kind") != "agent" and isinstance(x.get("id"), int):
-            out.append(x["id"])
-    return out
 
 
 def _asker(work):

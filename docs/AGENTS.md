@@ -334,8 +334,8 @@ model itself. No computer of your own, no launcher, no `CLAUDE.md` file.
   valid, name and address come back; `KALMIDO_VIES_URL`, time limit `KALMIDO_VIES_S`, answers kept 6 hours, at most 10
   checks per run). Web content is foreign data: the frame and a reminder after each step with web results say so. **While
   such a run is on, every change waits for an approval card** - also for an agent whose control level would let it act or
-  that has none - and so does every chat message to someone other than the people of the run (who asked, the owner, the
-  people whose events started it), a standing rule and every proposal route except a proposal for a job and a task
+  that has none - and so does every chat message to someone other than the person who asked and the agent's owner
+  (2.571.0: a person whose mention, assignment or comment lies in the same run gets a message only by card), a standing rule and every proposal route except a proposal for a job and a task
   proposal (409 `approval_required`, as in [Control level](#control-level)). Every chat message, approval card and proposal of the
   run names the web sources it used under *From the web* (a proposal also as `web_sources: [{url, label}]`). The runs show
   the searches, pages and VAT checks; `GET /api/agents/usage` counts `web_searches` and `web_fetches`.
