@@ -723,7 +723,16 @@ def files_settle(c, stop=None, list_ids=None, pause=0.0):
             keys[sid] = oc.oc_key(c, sid, create=create)
             c.commit()
         return keys[sid]
-    for part in space_rows(c, list_ids, commit=True, held=True, pause=pause):  # 2.585.0 (#4836): not next to a deletion's resealing
+    parts = space_rows(c, list_ids, commit=True, held=True, pause=pause)  # 2.585.0 (#4836): not next to a deletion's resealing
+    try:
+        return _files_settle_parts(c, parts, stop, out, key, active)
+    finally:
+        parts.close()  # 2.585.0 (#4836, review 2): the session lock orgcrypt:spaces goes on every way out, not when the generator is collected
+
+
+def _files_settle_parts(c, parts, stop, out, key, active):
+    """files_settle's work over the portions of space_rows (split off so the generator is always closed)."""
+    for part in parts:
         if stop and stop():  # once per portion (the start-up pass asks the database)
             return out
         for p, sid in part:

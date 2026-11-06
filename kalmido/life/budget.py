@@ -180,6 +180,7 @@ def bud_settle(c, list_ids=None, plain=None, force_from=None, stop=None, commit=
             with system_ctx(c):  # orgcrypt: server-side bulk work over every space (no content leaves this function)
                 lr = c.execute("SELECT id, org_id, owner_id FROM lists WHERE id=? FOR SHARE SKIP LOCKED", (lid,)).fetchone()
             if lr is None:
+                print("[orgcrypt] budget list left to a running transaction:", lid, flush=True)  # 2.585.0 (#4836, review 2): visible, the next pass takes it
                 c.commit()
                 continue
         space = int(lr["org_id"]) if lr["org_id"] else (oc.oc_user_space(lr["owner_id"]) or 0)
