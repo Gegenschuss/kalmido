@@ -515,10 +515,14 @@ async function r81b_archEdit(id) {
     if (inv && adm && $('#r81b-paid', m).checked !== !!d.paid) { b.paid = $('#r81b-paid', m).checked ? 1 : 0; old.paid = d.paid ? 1 : 0; }
     if (!Object.keys(b).length) return;
     const url = `/api/office/legacy/archive/${id}`, after = () => { OIM.list = null; if (typeof ofdDraw === 'function') ofdDraw(); return {}; };
-    await api('PATCH', url, b);
+    const sv = await api('PATCH', url, d.updated_at ? {...b, expect_updated_at: d.updated_at} : b);  // 2.570.0 (#4770): 409 = corrected elsewhere (api() says it)
     after();
-    const name = d.number || d.file_name || '';
-    offerUndo(tr('Saved'), histAdd({label: tr('Correct archived document') + (name ? ` “${name}”` : ''), undo: () => api('PATCH', url, old).then(after), redo: () => api('PATCH', url, b).then(after)}));
+    const name = d.number || d.file_name || '', lbl = tr('Correct archived document') + (name ? ` “${name}”` : '');
+    // 2.570.0 (#4770): undo / redo against the version the step before left (core.js undoStep, full: old and b may name other keys,
+    // amount vs tax_lines): corrected elsewhere since -> said, kept
+    let ver = sv?.updated_at || '';
+    const st = (v, from) => undoStep(url, v, ver, {now: from, full: true, label: lbl, then: j => { ver = j?.updated_at || ver; }}).finally(after);
+    offerUndo(tr('Saved'), histAdd({label: lbl, undo: () => st(old, b), redo: () => st(b, old)}));
   });
   md.classList.add('r81b-dlg');
   paint(md);
