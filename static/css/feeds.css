@@ -1,6 +1,6 @@
 /* Kalmido web client: the styles of the feeds (feeds.js, module "feeds", loaded on demand with it). */
 /* 2.85.0 B (#1162): the add form, the filter bar, the articles (unread = accent bar), the feed list */
-.rssview{max-width:var(--w-lesen);margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
+.rssview{max-width:var(--w-lesen);margin:0 auto;padding:0;display:flex;flex-direction:column;gap:.75rem}
 .rsshead{display:flex;gap:.5rem;align-items:center}
 .rssadd{display:flex;gap:.5rem;flex:1;min-width:0}
 .rssadd input{flex:1;min-width:0}

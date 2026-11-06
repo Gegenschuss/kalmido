@@ -42,7 +42,8 @@ execFileSync('bash', [path.join(__dirname, 'start.sh'), DATA], {stdio: 'ignore'}
       await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: w, height: h}});
       await o.nav(B); await ready(ev);
       const p = await ev(PROBE);
-      check(p && p.heads.every(x => x === p.top), `${tag}: page heads = #top h1 ${JSON.stringify(p)}`);
+      // 2.586.0 (#4818): a title in the content is --fs-l (16 px), never as big as #top h1
+      check(p && p.heads.every(x => x === 16), `${tag}: page heads in the content = --fs-l ${JSON.stringify(p)}`);
       check(p && p.top === (w < 768 ? 18 : 24), `${tag}: #top h1 size ${p && p.top}`);
       check(p && p.mgh === 'none' && p.hhead === 'none', `${tag}: menu group labels without uppercase`);
       check(p && p.dlg.every(x => x === p.modal), `${tag}: dialog sub-heads = .modal h4 ${JSON.stringify(p)}`);

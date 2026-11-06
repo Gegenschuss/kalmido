@@ -1,6 +1,6 @@
 /* Kalmido web client: the styles of the module "docs" (2.65.0, #1824), loaded with it (static/js/lazyload.js LD_CSS).
    Moved unchanged from app.css (same order); later than app.css in the cascade. */
-.dc-view{position:relative;max-width:68.75rem;margin:0 auto;padding:0 .75rem 5rem}
+.dc-view{position:relative;max-width:68.75rem;margin:0 auto;padding:0}
 .dc-up,.dc-acts2 [data-dc="scan"]{min-height:2.75rem}
 .dc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;padding:.75rem 0 .25rem}
 .dc-acts2{display:inline-flex;align-items:center;gap:.25rem;margin-left:auto}

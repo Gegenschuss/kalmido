@@ -2,7 +2,7 @@
    LD_CSS). One accent: Kalmido values in the accent, formulas in the second text colour, frozen values grey, errors red. */
 .shvwrap{display:flex;flex-direction:column;gap:.5rem;min-height:0;padding-bottom:1rem}
 .shvtop{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;min-height:2.25rem}
-.shvh{margin:0;font-size:var(--fs-h);font-weight:650;min-width:0;overflow-wrap:anywhere}
+.shvh{margin:0;font-size:var(--fs-l);font-weight:600;min-width:0;overflow-wrap:anywhere}
 .shvtitle{font:inherit;color:inherit;text-align:left;padding:.125rem .25rem;border-radius:var(--r-s)}
 .shvtitle:not([disabled]):hover{background:var(--bg3)}
 .shvro{display:inline-flex;align-items:center;gap:.25rem;font-size:var(--fs-s);color:var(--muted)}

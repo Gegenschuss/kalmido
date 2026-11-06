@@ -1066,7 +1066,7 @@ button.whob:hover .who.none{opacity:1;border-color:var(--accent);color:var(--acc
 /* ---------- settings: sectioned dialog ---------- */
 .smodal .card{width:min(55rem,100%);height:min(43.75rem,90dvh);max-height:none;padding:0;display:flex;flex-direction:column;overflow:hidden}
 .shdr{display:flex;align-items:center;gap:.5rem;padding:.875rem .875rem .75rem 1.375rem;border-bottom:1px solid var(--line)}
-.shdr h3{margin:0;flex:1}
+.shdr h3{margin:0;flex:1;font-size:var(--fs-l);font-weight:600}
 .snav{flex:none;width:12.5rem;display:flex;flex-direction:column;gap:2px;padding:.625rem .5rem;border-right:1px solid var(--line);overflow-y:auto}
 .snav button{display:flex;align-items:center;gap:.625rem;padding:.4375rem .625rem;border-radius:var(--radius);color:var(--text2);font-size:var(--fs-m);text-align:left;white-space:nowrap}
 .snav button:hover{background:var(--bg3);color:var(--text)}
@@ -1109,10 +1109,10 @@ details.sdet summary{cursor:pointer;color:var(--accent);font-size:var(--fs-m);ma
 @media (pointer:coarse){ details.sdet>summary{line-height:2.75rem} }  /* 2.366.0 (#3001): a folded help is a touch target too (p260 44 px rule) */
 
 /* ---------- statistics ---------- */
-.stats{max-width:var(--w-seite);padding-bottom:1.875rem}
+.stats{max-width:var(--w-seite)}
 .sttiles{display:grid;grid-template-columns:repeat(4,1fr);gap:.625rem;margin:.375rem 0 .25rem}
 .sttiles div{background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius);padding:.75rem .875rem;display:flex;flex-direction:column;gap:2px;min-width:0}
-.sttiles b{font:600 1.375rem/var(--lh-tight) var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.sttiles b{font:600 var(--fs-xl)/var(--lh-tight) var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em}
 .sttiles span{font-size:var(--fs-m)}
 .sttiles small{font-size:var(--fs-xs);color:var(--muted)}
 .stcard{background:var(--bg2);border:1px solid var(--line);border-radius:var(--r-l);padding:.875rem 1rem .75rem;margin-top:.75rem;overflow:hidden}
@@ -1175,7 +1175,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
 .terow:hover .teacts,.terow .teacts:focus-within{opacity:1}
 .terow .teacts .iconbtn{width:1.75rem;height:1.75rem}
 .telink{margin-top:.375rem}
-.timev .tvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .625rem}
+.timev .tmvbar{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin:0 0 .625rem}
 .timev .tvseg{flex-wrap:wrap}
 .timev .tvlabel{font-size:var(--fs-m)}
 .tvrange{display:inline-flex;align-items:center;gap:.375rem}
@@ -1209,7 +1209,7 @@ svg.chart{display:block;max-width:100%;overflow:visible}
   .terow .ted{min-width:0}
   .terow .ten{flex-basis:100%;order:9;white-space:normal}
   .terow .teacts{opacity:1}
-  .timev .tvbar .spacer{display:none}
+  .timev .tmvbar .spacer{display:none}
   .tmini .tmt{display:none}
 }
 /* printable timesheet: overlay in the app, only the page itself is printed */
@@ -2024,9 +2024,9 @@ button.tvr-task:hover{color:var(--accent)}
 }
 /* 1.5.2: archived lists fold into one row in the sidebar footer */
 /* 1.6.1: "Archived" view (rows of archived lists) */
-.archv{display:flex;flex-direction:column;gap:.5rem;padding:.5rem 0 2rem}
+.archv{display:flex;flex-direction:column;gap:.5rem;padding:0}
 /* 2.417.0 A (#3559): the start page of Projects (#projects): the sidebar's groups as full-width rows */
-.pstart{display:flex;flex-direction:column;gap:1.25rem;padding:.5rem 0 2rem;max-width:var(--w-seite)}
+.pstart{display:flex;flex-direction:column;gap:1.25rem;padding:0;max-width:var(--w-seite)}
 .psg .pshead{margin:0 0 .25rem;padding:0 .5rem;font-size:var(--fs-s);font-weight:400;color:var(--muted)}
 .psg .psfold{display:inline-flex;align-items:center;gap:.375rem;min-height:2rem;color:var(--muted);text-align:left}
 .psg .psfold:hover span{text-decoration:underline}
@@ -2214,7 +2214,7 @@ button.tvr-task:hover{color:var(--accent)}
 .ltsw{width:.75rem;height:.75rem;border-radius:50%;background:var(--bg4);flex:none}
 .ltcols{display:flex;gap:.375rem;padding:.5rem;flex-wrap:wrap;max-width:14rem}
 .ltcols button{width:1.5rem;height:1.5rem;border-radius:50%;border:2px solid transparent}.ltcols button.on{border-color:var(--text)}
-.agview{max-width:var(--w-seite);margin:0 auto;padding:.75rem 1rem 6rem;display:flex;flex-direction:column;gap:.75rem}
+.agview{max-width:var(--w-seite);margin:0 auto;padding:0;display:flex;flex-direction:column;gap:.75rem}  /* 2.586.0 (#4818): no own padding, #view gives it; merged with the second .agview rule */
 .agcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr));gap:.625rem;align-items:start}/* 2.505 (#4325): an opened "Projects" makes only its own card longer */
 .agcard{display:flex;align-items:center;align-content:flex-start;gap:.75rem;padding:.75rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);flex-wrap:wrap}
 .agcard.off{opacity:.6}
@@ -3037,7 +3037,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 @media (pointer:coarse){ .bphl{min-height:2.75rem;min-width:2.75rem} }
 @media (prefers-reduced-motion:reduce){ .bphl .bpchev{transition:none} }
 /* 2.7.1 (#410): the overview of a project list */
-.pov{max-width:var(--w-seite);padding-bottom:6rem}
+.pov{max-width:var(--w-seite)}
 .povg{display:grid;grid-template-columns:minmax(0,1fr);gap:0 1.25rem}
 @media (min-width:1100px){ .povg{grid-template-columns:minmax(0,1fr) minmax(16rem,22rem)} }
 .povc{min-width:0}
@@ -3207,8 +3207,7 @@ button.mention.mlink:hover,button.mention.mlink:focus-visible{text-decoration:un
 #top h1{letter-spacing:-.025em;align-items:center;gap:.75rem}
 #top h1 .hn{font-size:var(--fs-s)}
 /* 2.417.0 B (#3497): one page-head size (= #top h1) for every area head */
-:is(.dashhead,.kidtop,.shophead,.ofchead,.clhead,.calbar) h2{font-size:var(--fs-page)}
-@media (max-width:767px){ :is(.dashhead,.kidtop,.shophead,.ofchead,.clhead,.calbar) h2{font-size:var(--fs-page-m)} }
+:is(.dashhead,.kidtop,.shophead,.ofchead,.clhead,.calbar) h2{font-size:var(--fs-l);font-weight:600}  /* 2.586.0 (#4818): a title in the content is never as big as the page title in #top */
 #top .hms{font:500 var(--fs-s)/1 var(--mono);color:var(--accent);letter-spacing:0;white-space:nowrap;flex:none}
 #top .hms.over{color:var(--p5)}
 #top:is(.tl2,.tl3,.tl4) .hms{display:none}
@@ -3396,7 +3395,8 @@ body.in-chat #top{display:none}
 @media (max-width:767px){ .bplist .nitem{padding:.4375rem .5rem;gap:.625rem} .bplist .nitem .avatar{width:1.75rem;height:1.75rem} }
 /* A6: Today: the card "N jobs wait for you" */
 .waitcard{border:1px solid var(--line2);border-left:.1875rem solid var(--st-wait);border-radius:var(--r-l);background:var(--bg2);padding:.625rem .75rem;margin:.25rem 0 .75rem}
-.waitcard h3{margin:0 0 .375rem;font-size:var(--fs-l);display:flex;align-items:center;gap:.5rem}
+.mwv .waitcard{margin:0}  /* 2.586.0 (#4818): the gap of .mwv already spaces the cards */
+.waitcard h3{margin:0 0 .375rem;font-size:var(--fs-b);font-weight:600;display:flex;align-items:center;gap:.5rem}
 .wcrow{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;padding:.375rem 0;border-top:1px solid var(--line)}
 .wcrow:first-of-type{border-top:0}
 .wci{display:flex;flex-direction:column;min-width:0;flex:1 1 12rem}
@@ -4632,7 +4632,6 @@ body.kidmode #top{padding-left:1rem}
 .evatp.ps-declined>span:not(.evps){text-decoration:line-through}
 .evmore{margin:.25rem 0 .5rem}.evmore>summary{cursor:pointer;color:var(--muted);font-size:var(--fs-m);min-height:2rem;display:flex;align-items:center}
 .qevbtn{flex:none}
-.agview{display:flex;flex-direction:column;gap:.75rem;padding-bottom:2rem}
 .agday h3{font-size:var(--fs-b);margin:.25rem 0}
 .agday.today h3{color:var(--accent)}
 .agrange{font-size:var(--fs-m);font-weight:400}
@@ -7277,7 +7276,7 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .lkcpv{display:flex;flex-direction:column;gap:.375rem;padding:.625rem;border:1px solid var(--line);border-radius:var(--r-l);background:var(--bg)}
 .lkswd{border:1px dashed var(--line2);box-sizing:border-box}
 .cmsg.agc.apv{background:var(--agent-bg)}
-.tgview{padding:1rem}
+.tgview{padding:0}
 .tggrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(14rem,1fr));gap:.625rem}
 .tgcard{display:flex;flex-direction:column;gap:.375rem;align-items:flex-start;text-align:left;padding:.75rem .875rem;min-height:3.5rem;border:1px solid var(--line2);border-radius:var(--r-l);background:var(--bg2);color:var(--text);font-size:var(--fs-m)}
 .tgcard:hover{background:var(--bg3)}
@@ -7956,7 +7955,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .rul-prop{display:flex;gap:.5rem;align-items:flex-start;margin:.75rem 0;padding:.75rem;border-radius:.5rem;background:var(--bg3)}
 .rul-dlg #rul-text{width:100%;box-sizing:border-box;resize:vertical}
 /* 2.72.0 B (#1333) the household budget (budget.js): view, card on Home & life, dialogs; phone first, one accent */
-.bgview{max-width:var(--w-seite);margin:0 auto;padding:.75rem .75rem 5rem;display:flex;flex-direction:column;gap:.875rem;min-width:0}
+.bgview{max-width:var(--w-seite);margin:0 auto;padding:0;display:flex;flex-direction:column;gap:.875rem;min-width:0}
 .bghead{display:flex;align-items:center;gap:.5rem;min-width:0}
 .bgname{margin:0;font-size:var(--fs-l);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .bglist{max-width:100%;min-width:0;font-size:var(--fs-b)}
@@ -7984,7 +7983,7 @@ label.pmsw>span:last-child>b,label.pmsw>span:last-child>small{display:block;widt
 .bgtb i.in{background:var(--accent)}
 .bgtb i.out{background:var(--muted);opacity:.6}
 .bgtm.on .bgtb i.out{opacity:1}
-.bgadd{align-self:stretch;justify-content:center;min-height:3rem;font-size:var(--fs-l)}
+.bgadd{align-self:stretch;max-width:var(--w-seite);justify-content:center;min-height:3rem;font-size:var(--fs-l)}
 .bgro{display:flex;align-items:center;gap:.375rem;margin:0}
 .bgsec h3{margin:.75rem 0 .375rem;font-size:var(--fs-b);font-weight:600}
 .bgcats,.bgents,.bgcrs,.bgprev,.bgctr{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.25rem}
@@ -8265,7 +8264,7 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 .hbmproj{font-size:var(--fs-xs);display:inline-flex;align-items:center;gap:.25rem}
 .hbmacts{display:flex;align-items:center;gap:.25rem;flex:none}
 .hbmempty{margin:.25rem 0}
-.hbmhub{max-width:var(--w-seite);padding:0 1rem 2rem}
+.hbmhub{max-width:var(--w-seite);padding:0}
 .hbmhub h4{margin:1rem 0 .375rem;font-size:var(--fs-m);color:var(--muted)}
 .hbmsp{display:flex;align-items:center;gap:.5rem;padding:.375rem 0;border-bottom:1px solid var(--line)}
 .hbmspn{flex:1;min-width:0;display:flex;flex-direction:column}
