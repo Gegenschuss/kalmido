@@ -215,6 +215,7 @@ ORDER = (
     "wiki.outline",  # 2.49.0 C (#1201): outline import of the mind map (no storage)
     "sheets.formula",  # 2.89.0 (#1916): tables -- the formula engine (no routes)
     "sheets.shfuncs",  # 2.124.0 A (#2109): SUMMEWENN, SVERWEIS, text and date functions of formulas (no routes)
+    "sheets.shfuncs2",  # 2.578.0 (#3462): SUMMEWENNS, VERGLEICH, WENNFEHLER, work days, TEXT ... of formulas (no routes)
     "sheets.vars",  # 2.89.0 (#1916): Kalmido variables of formulas, evaluated per viewer (no routes)
     "sheets.shkinds",  # 2.124.0 B (#2110, #2111): column kinds checkbox / person / link / file, rows / columns kept in view
     "sheets.shhist",  # 2.124.0 B (#2112): the change history of the cells (people and agents)
