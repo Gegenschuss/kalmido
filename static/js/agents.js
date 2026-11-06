@@ -261,6 +261,7 @@ function reactHtml(c, ro) {
   const apvOpen = !!(c.choices?.approval || c.choices?.permission) && typeof ccCmtState === 'function' && ccCmtState(c) === 'open';
   const rs = (c.reactions || []).filter(r => !(apvOpen && (r.emoji === 'up' || r.emoji === 'down')));
   if (S.me && c.user_id === S.me.id) ro = true;  // 2.23.0 (#823): no reactions on my own comment (the others' stay visible)
+  if (typeof cmSayNo === 'function' && cmSayNo(taskById(c.task_id || S.tl.id))) ro = true;  // 2.607.0 (#4549): a guest / read-only person only reads
   const pill = r => {
     const mine = r.users.some(u => S.me && u.id === S.me.id), names = r.users.map(u => u.name).join(', ');
     return `<button class="rx ${mine ? 'on' : ''}" data-act="c-react" data-cid="${c.id}" data-e="${esc(r.emoji)}" title="${esc(`${names} · ${rxName(r.emoji)}`)}" aria-label="${esc(rxName(r.emoji) + ': ' + names)}" aria-pressed="${mine}" ${ro ? 'disabled' : ''}>${esc(rxEmoji(r.emoji))}<span class="rxn" data-act="c-react-who" data-cid="${c.id}" data-e="${esc(r.emoji)}">${r.count}</span></button>`;
