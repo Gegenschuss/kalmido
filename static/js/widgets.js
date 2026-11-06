@@ -10,7 +10,7 @@ const WG_W = [2, 3, 4, 6];
 const WG_WN = [[2, '⅓', N_('A third')], [3, '½', N_('Half')], [4, '⅔', N_('Two thirds')], [6, N_('Full'), N_('Full width')]];
 const WG_HN = [[1, N_('Compact')], [2, N_('Normal')], [3, N_('Tall')]];
 const WG = {pad: null, mv: null, rs: null};
-S.lyStd = null; S.lyStdCan = false;
+S.lyStd = null; S.lyStdCan = false; S.lyStdV = {};  // 2.570.0 (#4770): S.lyStdV = the standards' versions
 
 // ---- the stored value: widths / heights live in opts (lw, lh); the other opts are a block's switches
 const wgHasLayout = o => !!(o && (o.order || o.hidden || o.half?.length || o.full?.length || o.mobile || Object.values(o.opts || {}).some(x => x && (x.lw != null || x.lh != null))));
@@ -56,7 +56,7 @@ function wgStdLoad(force) {
   WG.stdBusy = true;
   api('GET', '/api/layouts/std').then(j => {
     const ch = JSON.stringify(j.layouts) !== JSON.stringify(S.lyStd) || !!j.can !== S.lyStdCan;
-    S.lyStd = j.layouts || {}; S.lyStdCan = !!j.can; WG.stdAt = Date.now();
+    S.lyStd = j.layouts || {}; S.lyStdV = j.versions || {}; S.lyStdCan = !!j.can; WG.stdAt = Date.now();  // 2.570.0 (#4770): + their versions
     if (ch) viewSafeRender();
   }).catch(() => { WG.stdAt = Date.now(); S.lyStd ||= {}; }).finally(() => { WG.stdBusy = false; });
 }
@@ -140,18 +140,30 @@ async function wgPromote(v) {
   const d = LY[v];
   if (d.src) {
     const l = routeList(), dd = l && S.povD[l.id], y = dd?.j?.layout; if (!y) return;
-    const put = async (std, mine) => { await api('PUT', `/api/lists/${l.id}/layout`, {layout: std, scope: 'standard'}); const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: mine, scope: 'mine'}); if (dd.j) { dd.j.layout = r; renderView(); } return {}; };
+    // 2.570.0 (#4770): undo / redo of the standard against the version the step before left (std_at; core.js undoWrite):
+    // someone else set the default since -> "Changed elsewhere, not undone", theirs stays
+    const url = `/api/lists/${l.id}/layout`, lbl = tr('Default changed'), show = r => { ver = r?.std_at || ver; if (dd.j && r) { dd.j.layout = r; renderView(); } };
+    let ver = '';
+    const put = async (std, mine) => { const a = await undoWrite(url, {layout: std, scope: 'standard'}, ver, {method: 'PUT', label: lbl, hist: true}); if (a === null) return {none: true, skipped: [lbl]}; show(a); show(await api('PUT', url, {layout: mine, scope: 'mine'})); return {}; };
     const old = {std: y.std, mine: y.mine};
-    try { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: y.mine, scope: 'promote'}); dd.j.layout = r; renderView(); } catch { return; }
-    const e = histAdd({label: tr('Default changed'), undo: () => put(old.std, old.mine), redo: async () => { const r = await api('PUT', `/api/lists/${l.id}/layout`, {layout: old.mine, scope: 'promote'}); if (dd.j) { dd.j.layout = r; renderView(); } return {}; }});
+    try { const r = await api('PUT', url, {layout: y.mine, scope: 'promote'}); show(r); } catch { return; }
+    const e = histAdd({label: lbl, undo: () => put(old.std, old.mine), redo: async () => { const r = await undoWrite(url, {layout: old.mine, scope: 'promote'}, ver, {method: 'PUT', label: lbl, hist: true}); if (r === null) return {none: true, skipped: [lbl]}; show(r); return {}; }});
     histToast(tr('This is the default for everyone in the project now'), e);
     return;
   }
   const raw = wgJ(LY_PEND[d.key] ?? S.settings?.[d.key]), oldStd = S.lyStd?.[d.key] || '', oldOwn = wgStr(raw);
-  const go = async (std, own) => { const j = await api('PUT', `/api/layouts/std/${d.key}`, {layout: std}); S.lyStd = j.layouts; S.settings[d.key] = own; lyPatch(d.key, own); renderView(); return {}; };
+  // 2.570.0 (#4770): undo / redo against the version of the standard the step before left (versions[key]; core.js undoWrite):
+  // another admin set the default since -> "Changed elsewhere, not undone", theirs stays
+  const url = `/api/layouts/std/${d.key}`, lbl = tr('Default changed');
+  let ver = '';
+  const go = async (std, own, chk) => {
+    const j = chk ? await undoWrite(url, {layout: std}, ver, {method: 'PUT', label: lbl, hist: true}) : await api('PUT', url, {layout: std});
+    if (j === null) return {none: true, skipped: [lbl]};
+    S.lyStd = j.layouts; S.lyStdV = j.versions || S.lyStdV; ver = j.versions?.[d.key] || ver; S.settings[d.key] = own; lyPatch(d.key, own); renderView(); return {};
+  };
   const sw = wgSwitches(raw.opts), newStd = wgStr(wgLayoutOnly(raw)), newOwn = sw ? JSON.stringify({opts: sw}) : '';
   try { await go(newStd, newOwn); } catch { return; }
-  const e = histAdd({label: tr('Default changed'), undo: () => go(oldStd, oldOwn), redo: () => go(newStd, newOwn)});
+  const e = histAdd({label: lbl, undo: () => go(oldStd, oldOwn, true), redo: () => go(newStd, newOwn, true)});
   histToast(tr('This is the default for everyone now'), e);
 }
 function wgReset(v) {
