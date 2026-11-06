@@ -80,7 +80,7 @@ EXPECT_4XX = {
     "GET /api/v1/agent/objects/{}/{}": (404, "no area is registered on the shared core yet (kind objprobe only in the core suites)"),
 }
 # 2.421.0 A (#2936): GET routes of the matrix areas the sweep cannot fill (no id of an own object): may only shrink
-MAX_SKIPPED = 87  # 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires; 02.11.2026: 88 before the own webhook (2.391.0 #3362)
+MAX_SKIPPED = 80  # 06.11.2026: 102 before the office rows of the history routes (2.570.0 #4783); 29.10.2026: 108 before the setup made tables, polls, bookmarks, letters, contracts, questionnaires; 02.11.2026: 88 before the own webhook (2.391.0 #3362)
 
 
 def ok(r, what, codes=(200, 201, 204)):
@@ -293,6 +293,34 @@ IDS["collection"] = "wiki"  # 2.429.0 (#3580): a collection of the file store (e
 # 2.391.0 (#3362): GET /api/v1/me/webhooks/{}/log is new: an own webhook (never called: no invoice gets paid after this)
 IDS["webhook"] = _id(ok(F.post(B + "/api/me/webhooks", json={"name": "Sweep", "url": "https://hooks.example.com/frida", "events": ["invoice.paid"]}),
                         "sweep setup: a webhook", (200, 201)))
+# 2.570.0 (#4783): GET <save path>/history for every office kind on ow_write: one own row of each kind (payloads as
+# p2570_a_office_test.py), so the sweep reads their histories (and the other GETs of the same rows)
+TODAY = time.strftime("%Y-%m-%d")
+_tr = ok(F.post(B + "/api/office/trips", json={"date_from": TODAY, "date_to": TODAY, "dest": "Kernstadt",
+                                               "items": [{"date": TODAY, "category": "taxi", "amount": 12, "text": "Taxi"}]}),
+         "sweep setup: a trip", (200, 201))
+IDS["trip"], IDS["tripitem"] = _tr.get("id"), ((_tr.get("items") or [{}])[0]).get("id")
+for key, path, payload, sub in (
+        ("trippurpose", "/trips/purposes", {"name": "Fair"}, None),
+        ("fixedcost", "/fixed-costs", {"label": "Rent", "amount": "500", "start": TODAY[:7] + "-01", "repeat": "monthly"}, None),
+        ("cfadjust", "/cashflow/adjust", {"month": TODAY[:7], "dir": "in", "amount": "100", "note": "expected"}, None),
+        ("bankrule", "/bank/rules", {"name": "Fees", "counterpart": "bank example", "action": "private"}, "rule"),
+        ("meal", "/meals", {"occasion": "Kick-off", "note": "n"}, None),
+        ("mealchoice", "/meals/choices", {"kind": "place", "name": "Kernlokal", "extra": "Weg 1"}, None),
+        ("doctpl", "/doc-templates", {"name": "Confirmation", "kind": "other", "body": "Hello {{client.name}}", "sign": 0}, None),
+        ("gendoc", "/gen-docs", {"title": "Note", "body": "First text", "client_id": IDS["client"]}, None),
+        ("deal", "/deals", {"title": "Image film", "stage": "lead"}, None),
+        ("letterblock", "/letter-blocks", {"name": "Objection", "body": "I object."}, None),
+        ("vehicle", "/vehicles", {"name": "Van", "kind": "company"}, None),
+        ("series", "/series", None, None),
+        ("drive", "/drives", None, None)):
+    if key == "series":
+        payload = {"template_id": _id(ok(F.post(B + "/api/office/docs", json={"kind": "invoice", "client_id": IDS["client"]}),
+                                         "sweep setup: a draft invoice for a series", (200, 201))), "every": "monthly", "start": "2030-03-01"}
+    if key == "drive":
+        payload = {"vehicle_id": IDS["vehicle"], "day": TODAY, "dest": "Client", "purpose": "Meeting", "km": 20, "kind": "business"}
+    x = ok(F.post(B + "/api/office" + path, json=payload), f"sweep setup: {key}", (200, 201))
+    IDS[key] = (x.get(sub) or {}).get("id") if sub else _id(x)
 for _ in range(480):  # the account export of "own" runs in the background: its file once it is done
     if F.get(B + "/api/account/export").json().get("state") != "running":
         break
@@ -312,6 +340,12 @@ SUBST = [
     (r"/sheets/\d+/files/$", None), (r"/sheets/$", "sheet"), (r"/polls/$", "poll"), (r"/bookmarks/$", "bookmark"),
     (r"/office/letters/$", "letter"), (r"/office/packs/$", "pack"), (r"/office/agreements/$", "agreement"), (r"/forms/$", "form"),
     (r"/office/cashbooks/$", "cashbook"),
+    # 2.570.0 (#4783): the office rows of the history routes
+    (r"/office/trips/\d+/items/$", "tripitem"), (r"/office/trips/purposes/$", "trippurpose"), (r"/office/trips/$", "trip"),
+    (r"/office/fixed-costs/$", "fixedcost"), (r"/office/cashflow/adjust/$", "cfadjust"), (r"/office/bank/rules/$", "bankrule"),
+    (r"/office/series/$", "series"), (r"/office/meals/choices/$", "mealchoice"), (r"/office/meals/$", "meal"),
+    (r"/office/doc-templates/$", "doctpl"), (r"/office/gen-docs/$", "gendoc"), (r"/office/deals/$", "deal"),
+    (r"/office/letter-blocks/$", "letterblock"), (r"/office/vehicles/$", "vehicle"), (r"/office/drives/$", "drive"),
     (r"/office/cards/lines/$", "cardline"), (r"/office/cards/statements/$", "cardstmt"), (r"/office/cards/$", "card"), (r"/files/collections/$", "collection"),
     (r"/api/v1/wiki/files/$", "wikifile"),  # 2.488.0 (#2209): the file of the own knowledge page
     (r"/budget/files/$", None), (r"/team/files/$", None), (r"/wiki/files/$", None), (r"/wiki/shared/files/$", None),
