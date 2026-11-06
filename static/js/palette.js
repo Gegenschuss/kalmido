@@ -390,7 +390,9 @@ function palSubLoad() {
   if (PALX.ws === ws && Date.now() - PALX.at < 60000) return;
   PALX.ws = ws; PALX.at = Date.now(); PALX.docs = null; PALX.folders = []; PALX.sheets = [];
   if (feat('sheets') && !S.me?.kid) rawFetch('GET', '/api/sheets?space=all').then(j => { if (PALX.ws === ws) { PALX.sheets = (j.sheets || []).filter(x => ws === 'all' || !wsOn() || x.space === ws || x.shared_in); redraw(); } }).catch(() => {});  // 2.124.0 C (#2113): the index, no cells
-  const redraw = () => { if (PALX.ws === ws && $('.palette') && PAL.q.trim()) { PAL.all = null; palDraw(); } };  // 2.579.0 (#4199): the set again with the new parts
+  // 2.579.0 (#4199): the set again with the new parts; 2.595.0 (#4896): also while the field is still empty (the set of the
+  // opening is kept per key, so a part that came before the first key was never searched), drawn again only while typing
+  const redraw = () => { if (PALX.ws === ws && $('.palette')) { PAL.all = null; if (PAL.q.trim()) palDraw(); } };
   if (feat('docs') && !S.me?.kid) rawFetch('GET', `/api/docs?ws=${encodeURIComponent(ws)}&limit=1`).then(j => { if (PALX.ws === ws) { PALX.docs = j.facets || null; redraw(); } }).catch(() => {});
   if (typeof ab_on === 'function' && ab_on()) {
     const sps = ws === 'all' || !wsOn() ? ['private', ...(wsOn() ? (S.me?.workspaces || []).map(w => 'org:' + w.id) : [])] : [ws];
