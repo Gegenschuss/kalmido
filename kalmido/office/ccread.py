@@ -9,7 +9,11 @@ The Mastercard reader works line by line on the text layer, as the German issuer
 belong to the position above: the foreign amount ("USD 12,00", "12,00 USD") and the foreign fee ("Auslandseinsatzentgelt
 0,19"), which becomes its own position. Which sign means "charged" differs per issuer: S / H are taken as printed, otherwise
 the direction that fits the printed total (no total: the larger side). Balances, carried amounts and the payment of the last
-statement are no positions. Fees, interest and the foreign fee are kind "fee"; money back is kind "credit"."""
+statement are no positions. Fees, interest and the foreign fee are kind "fee"; money back is kind "credit".
+2.595.0 (#4903): a fee line that names the conversion ("2,5% für Währungsumrechnung 0,11", Umrechnungsentgelt / -gebühr /
+-aufschlag, Fremdwährungszuschlag) is a fee position like the Auslandseinsatzentgelt; any other line under a position with an
+amount of its own that is neither the foreign amount nor the rate is never dropped: it becomes a position (kind by its sign,
+so it asks for a receipt) - unless the printed total already fits without such lines (then it was a footer, no position)."""
 import io
 import re
 from datetime import date
@@ -32,14 +36,20 @@ TAIL_RE = re.compile(rf"^(?P<text>\S.*?)\s+(?P<pre>[+-]\s?)?(?:EUR\s+)?(?P<amt>{
 FX_RE = re.compile(rf"\b(?:(?P<c1>[A-Z]{{3}})\s+(?P<a1>{_NUM})|(?P<a2>{_NUM})\s+(?P<c2>[A-Z]{{3}}))\b")
 RATE_RE = re.compile(r"\b(?:Kurs|Umrechnungskurs|Wechselkurs)\b.*$", re.I)
 SKIP_RE = re.compile(r"^(?:(?:neuer|alter|letzter|bisheriger|vorheriger)\s+)?(?:saldo|kontostand|übertrag|uebertrag|zwischensumme|summe|gesamt|"
-                     r"zahlung|ihre zahlung|zahlungseingang|lastschrift|einzug|abbuchung|ausgleich|abrechnung|rechnungsbetrag|abrechnungsbetrag|verfügungsrahmen|kreditrahmen)\b", re.I)
-FEE_RE = re.compile(r"auslandseinsatz|auslandsentgelt|fremdw(?:ä|ae)hrung\w*\s*(?:entgelt|geb)|fremdw(?:ä|ae)hrungs(?:entgelt|geb)|jahres(?:entgelt|geb|preis)|"
+                     r"zahlung|ihre zahlung|zahlungseingang|lastschrift|einzug|abbuchung|ausgleich|abrechnung|rechnungsbetrag|abrechnungsbetrag|verfügungsrahmen|kreditrahmen|"
+                     r"mindestzahlung|mindestbetrag|verfügbar\w*|verfuegbar\w*|kreditlimit|kartenlimit)\b", re.I)  # 2.595.0 (#4903): + footer amounts
+# 2.595.0 (#4903): + the conversion fee by its many names (Währungsumrechnung, Umrechnungsentgelt / -gebühr / -aufschlag /
+# -zuschlag, Fremdwährungszuschlag / -aufschlag, Auslands(-)zuschlag); "Umrechnungskurs" is the rate, no fee
+FEE_RE = re.compile(r"w(?:ä|ae)hrungsumrechnung|umrechnungs(?:entgelt|geb|aufschlag|zuschlag)|fremdw(?:ä|ae)hrungs?(?:zuschlag|aufschlag)|"
+                    r"auslands?(?:zuschlag|aufschlag)|auslandseinsatz|auslandsentgelt|fremdw(?:ä|ae)hrung\w*\s*(?:entgelt|geb)|fremdw(?:ä|ae)hrungs(?:entgelt|geb)|jahres(?:entgelt|geb|preis)|"
                     r"karten(?:preis|entgelt|geb)|sollzins|\bzinsen\b|bargeld\w*\s*(?:entgelt|geb)|bargeld(?:entgelt|geb)|\bentgelt\b|geb(?:ü|ue)hr", re.I)
 TOTAL_RE = re.compile(rf"(?:neuer saldo|neuer kontostand|rechnungsbetrag|abrechnungsbetrag|gesamtbetrag|einzugsbetrag|lastschriftbetrag|"
                       rf"zu zahlender betrag|wird .{{0,40}}eingezogen|wird .{{0,40}}belastet)\D{{0,40}}(?P<amt>{_NUM})", re.I)
 # the amount in front: "wird am 15.11. mit 1.234,56 EUR eingezogen"
 TOTAL2_RE = re.compile(rf"(?P<amt>{_NUM})\s*(?:EUR|€)?\s+(?:\S+\s+){{0,6}}(?:eingezogen|belastet)\b", re.I)
 HEAD_DAY_RE = re.compile(r"(?:abrechnungsdatum|abrechnung vom|abrechnung per|rechnungsdatum|datum der abrechnung|kartenabrechnung vom|abrechnung)\D{0,20}(\d{2}\.\d{2}\.\d{4})", re.I)
+# 2.595.0 (#4903): a bare rate printed right after the foreign amount ("USD 5,00 1,119801") is no part of the merchant
+BARE_RATE_RE = re.compile(r"^\s*\d{1,6},\d{3,8}\b")
 LAST4_RE = re.compile(r"(?:\d{4}|[xX*•]{4})[ -]?(?:\d{2}[xX*•]{2}|[xX*•]{4})[ -]?[xX*•]{4}[ -]?(\d{4})\b")
 LAST4_WORD_RE = re.compile(r"karten-?\s?(?:nummer|nr\.?)\D{0,30}(\d{4})\b", re.I)
 
@@ -95,7 +105,18 @@ def _fx(text):
             m = x
     if m is None:
         return text, None, None
-    return (text[:m.start()] + text[m.end():]).strip(" ,;·-"), _num(m["a1"] or m["a2"]), m["c1"] or m["c2"]
+    return (text[:m.start()] + BARE_RATE_RE.sub("", text[m.end():])).strip(" ,;·-"), _num(m["a1"] or m["a2"]), m["c1"] or m["c2"]
+
+
+def _sure(lines, total):
+    """2.595.0 (#4903): the kept unknown lines (key "unsure", its value = the line's sign was S / H) go when the printed total
+    fits the other positions exactly (either sign): then they were no positions (a footer, a limit); else they stay and the sum
+    check shows the person what does not fit."""
+    if total is not None and any("unsure" in r for r in lines):
+        rest = [r for r in lines if "unsure" not in r]
+        if rest and abs(sum((r["raw"] for r in rest), Decimal(0))) == total:
+            return rest
+    return lines
 
 
 def ccr_mastercard(text):
@@ -141,10 +162,20 @@ def ccr_mastercard(text):
             letters = letters or by
             lines.append({"day": cur["day"], "booked": cur["booked"], "merchant": m["text"][:CCR_TEXT_MAX], "raw": raw, "orig_amount": None, "orig_currency": None, "fee": True})
             continue
-        if cur["orig_amount"] is None:
-            _t, oa, oc = _fx(x)
-            if oa is not None:
+        _t, oa, oc = _fx(x)
+        if oa is not None:
+            if cur["orig_amount"] is None:
                 cur["orig_amount"], cur["orig_currency"] = oa, oc
+            continue
+        # 2.595.0 (#4903): a line with an amount of its own that is no foreign amount, no rate and not only "EUR": kept, never dropped
+        if m and not RATE_RE.search(x) and not re.fullmatch(r"(?:EUR|€)?", m["text"]):
+            raw, by = _signed(m)
+            lines.append({"day": cur["day"], "booked": cur["booked"], "merchant": m["text"][:CCR_TEXT_MAX], "raw": raw, "orig_amount": None,
+                          "orig_currency": None, "fee": False, "unsure": by})
+            if len(lines) >= CCR_LINES_MAX:
+                break
+    lines = _sure(lines, total)
+    letters = letters or any(r.get("unsure") for r in lines)
     s = Decimal(1)
     if not letters and lines:
         raw = sum((r["raw"] for r in lines), Decimal(0))
