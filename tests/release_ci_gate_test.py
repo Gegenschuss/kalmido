@@ -115,14 +115,18 @@ rc = main_rc([[run(7, "in_progress")]], FULL, "--timeout-min", "0")
 check(rc == 1, "main gives up at the time limit while the CI still runs (rc %s)" % rc)
 
 # ------------------------------------------------------------------ 2.595.0 (#4905): same tree, re-run on a tag
-def trun(i, sha, tree, conclusion="success"):
-    return dict(run(i, conclusion=conclusion), head_sha=sha, head_commit={"tree_id": tree})
+def trun(i, sha, tree, conclusion="success", event="push", repo="owner/repo"):
+    return dict(run(i, conclusion=conclusion), head_sha=sha, head_commit={"tree_id": tree}, event=event, head_repository={"full_name": repo})
 
 
 tagrun = trun(1, "abc123", "T1", "failure")
-st = gate.same_tree([tagrun, trun(2, "def456", "T1"), trun(3, "fff000", "T2"), trun(4, "aaa111", "T1", "failure")], "T1", "abc123")
+st = gate.same_tree([tagrun, trun(2, "def456", "T1"), trun(3, "fff000", "T2"), trun(4, "aaa111", "T1", "failure")], "T1", "abc123", "owner/repo")
 check([r["id"] for r in st] == [2], "same_tree: only green runs of other commits with the same tree (%s)" % [r["id"] for r in st])
-check(gate.same_tree([trun(2, "def456", "T1")], "", "abc123") == [], "same_tree: no tree known = nothing")
+check(gate.same_tree([trun(2, "def456", "T1")], "", "abc123", "owner/repo") == [], "same_tree: no tree known = nothing")
+# review 2.595.0 (#4905): a pull_request run (it tests the merge commit) and a run of a fork never count
+check(gate.same_tree([trun(5, "def456", "T1", event="pull_request"), trun(6, "def456", "T1", repo="x/fork"),
+                      trun(7, "def456", "T1", event="workflow_dispatch")], "T1", "abc123", "owner/repo") == [trun(7, "def456", "T1", event="workflow_dispatch")],
+      "same_tree: only push / schedule / dispatch runs of the own repository")
 res, txt = gate.decide_tree("red", "run 1 failure", [trun(2, "def456", "T1")], jobs_of({2: FULL}))
 check(res == "green" and "same tree" in txt, "red tag commit + green full run of the same tree = go (%s, %s)" % (res, txt))
 res, _ = gate.decide_tree("red", "run 1 failure", [trun(2, "def456", "T1")], jobs_of({2: PUSH}))

@@ -53,6 +53,7 @@ jobs:
         id: v
         run: |
           ver="${GITHUB_REF_NAME#v}"
+          [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag $GITHUB_REF_NAME is no release tag vX.Y.Z"; exit 1; }  # 2.595.0 (#4905): dispatch on any v* ref
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           test "$(cat VERSION)" = "$ver" || { echo "VERSION file ($(cat VERSION)) does not match tag $GITHUB_REF_NAME"; exit 1; }
       - name: Release notes from CHANGELOG.md

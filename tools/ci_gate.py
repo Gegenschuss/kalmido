@@ -54,12 +54,17 @@ def decide(runs, jobs_of):
     return "red", "; ".join(why)
 
 
-def same_tree(runs, tree, sha):
-    """The green, finished CI runs of OTHER commits whose tree equals `tree` (the files of the tagged commit)."""
-    if not tree:
+TREE_EVENTS = ("push", "schedule", "workflow_dispatch")  # review 2.595.0 (#4905): a pull_request run tests the merge commit, other files
+
+
+def same_tree(runs, tree, sha, repo):
+    """The green, finished CI runs of OTHER commits whose tree equals `tree` (the files of the tagged commit); only runs of this
+    repository that tested the commit itself (push / schedule / dispatch), never pull_request runs or forks."""
+    if not tree or not repo:
         return []
     return [r for r in runs if r.get("head_sha") != sha and (r.get("head_commit") or {}).get("tree_id") == tree
-            and r.get("status") == "completed" and r.get("conclusion") == "success"]
+            and r.get("status") == "completed" and r.get("conclusion") == "success" and r.get("event") in TREE_EVENTS
+            and (r.get("head_repository") or {}).get("full_name") == repo]
 
 
 def decide_tree(res, txt, tree_runs, jobs_of):
@@ -113,7 +118,7 @@ def main():
                 tr = tree_of()
                 if tr:
                     ok = api("/repos/%s/actions/workflows/ci.yml/runs?status=success&per_page=100" % repo).get("workflow_runs", [])
-                    res, txt = decide_tree(res, txt, same_tree(ok, tr, a.sha), jobs_of)
+                    res, txt = decide_tree(res, txt, same_tree(ok, tr, a.sha, repo), jobs_of)
         except Exception as e:  # a hiccup of the API: ask again at the next poll
             res, txt = "wait", "API: %s" % e
         mins = (time.time() - t0) / 60
