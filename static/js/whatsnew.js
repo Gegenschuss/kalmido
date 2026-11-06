@@ -20,6 +20,8 @@ function wn_open(j) {
     <div class="shint lhint keep">${tr('You can switch this off in Settings > Help.')}</div>
     <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-m="close">${tr('Got it')}</button></div>`);
   md.classList.add('wnmd');
+  const wl = md.querySelector('.wnlist'), wnMore = () => wl.classList.toggle('wnmore', wl.scrollTop + wl.clientHeight < wl.scrollHeight - 1);  // #4822: line only while more can be scrolled
+  wl.addEventListener('scroll', wnMore, {passive: true}); wnMore();
   md.addEventListener('click', e => { if (/** @type {HTMLElement} */ (e.target).closest?.('[data-m="close"]')) md.remove(); });
   onRemove(md, () => api('POST', '/api/whatsnew/seen').then(r => { S.settings.whatsnew_seen = r.seen; }, () => { /* offline: shown again on the next start */ }));
 }
