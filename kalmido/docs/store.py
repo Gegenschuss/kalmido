@@ -1065,7 +1065,7 @@ def process(c, nid):
     try:
         data = fs_read(c, nid)
     except (Denied, OSError, OrgCryptError):
-        c.execute("UPDATE doc_meta SET state='failed', error='missing', updated_at=? WHERE node_id=?", (_now(), nid))
+        c.execute("UPDATE doc_meta SET state='failed', error='missing', run_at=? WHERE node_id=?", (_now(), nid))  # 2.570.0 (#4770)
         return "failed"
     ei = None
     if not given.get("text"):
@@ -1178,12 +1178,14 @@ def process(c, nid):
         auto_all["_was"] = was
     review = 1 if sug or not (m2["sender_id"] or m2["type_id"]) else 0
     state = "failed" if res.get("error") else "done"
+    # 2.570.0 (#4770): the run stamps done_at / run_at, not updated_at (the version of people's changes: an undo checked
+    # against it is not refused because a recognition finished)
     # 2.90.0 A (#1921): a date / an amount typed in while the run was busy wins (the columns' values at the time of the
     # write, not those read at the start of the run: the receipt sheet saves while the recognition still runs)
     c.execute("""UPDATE doc_meta SET state=?, error=?, method=?, pages=?, text=?,
                  doc_date=CASE WHEN doc_date IS NOT NULL AND doc_date<>'' THEN doc_date ELSE ? END, due_date=?,
                  amount=CASE WHEN amount<>'' AND method='' THEN amount ELSE ? END, currency=?,
-                 auto=?, suggest=?, review=?, version=?, done_at=?, updated_at=? WHERE node_id=?""",
+                 auto=?, suggest=?, review=?, version=?, done_at=?, run_at=? WHERE node_id=?""",
               (state, res.get("error") or "", res.get("method") or "", int(res.get("pages") or 0), doc_seal(c, ws, "doc_meta.text", text),
                vals["doc_date"], vals["due_date"], doc_seal(c, ws, "doc_meta.amount", vals["amount"]), vals["currency"],
                json.dumps(auto_all, separators=(",", ":")), _jseal(c, ws, "doc_meta.suggest", sug) if sug else "", review, node["cur_version"],

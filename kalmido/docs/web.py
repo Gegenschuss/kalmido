@@ -604,22 +604,23 @@ def _reindex(c, nid):
 @app.patch("/api/docs/<int:nid>")
 def docs_patch(nid):
     """{name?, date?, due?, amount?, currency?, sender? (name | id | null), type?, tags? [names | ids], folder? (name | id | ""),
-    custom_fields? {field id: value | null} (2.153.0)}"""
+    custom_fields? {field id: value | null} (2.153.0), expect_updated_at?}
+    2.570.0 (#4770): expect_updated_at set and the document changed since -> 409 with it under "doc" (2.564.0 D #4701; an undo never
+    overwrites another session's change; the recognition queue no longer moves updated_at); missing -> the old behaviour.
+    Every change of a person stamps updated_at (also name, tags, folder, custom fields), so the version names them all."""
     c = db()
     _no_agent()
-    _doc(c, nid, write=True)
+    write_lock(c, f"doc_meta-{int(nid)}")
+    m, n = _doc(c, nid, write=True)
     d = body()
-    # 2.564.0 D (#4701): the version the document sheet works on (expect_updated_at); saved meantime -> 409 + the document
-    write_lock(c, f"doc_meta-{nid}")
-    m0, n0 = _doc(c, nid)
-    if m0["state"] not in ("wait", "run"):  # the recognition moves updated_at too, but keeps values set by hand (HAND_FIELDS): no conflict
-        ccf_check(d, m0["updated_at"], "doc", lambda: doc_json(c, m0, n0, full=True, role=n0["role"]))
-    if isinstance(d, dict):
+    if isinstance(d, dict) and "expect_updated_at" in d:
+        ccf_check(d, m["updated_at"], "doc", lambda: doc_json(c, m, n, full=True, role=n["role"]))
         d = {k: v for k, v in d.items() if k != "expect_updated_at"}
     e = doc_update(c, nid, d, me())
     if e:
         return e
-    c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))  # every saved change is a new version (tags, folder ...)
+    if isinstance(d, dict) and d:
+        c.execute("UPDATE doc_meta SET updated_at=? WHERE node_id=?", (iso_ms(now_utc()), nid))
     if isinstance(d, dict) and {"amount", "date", "sender"} & set(d):  # 2.146.0 B (#2452): corrected values: look for a duplicate again
         dup_on_done(c, nid, False)
     fs_log_add(c, nid, "edit")
