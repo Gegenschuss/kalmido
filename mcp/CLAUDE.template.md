@@ -354,7 +354,8 @@ Task lists are called projects; the API still says list (`list_id`, `/api/v1/lis
 - **Documents and receipts (2.48.0).** Documents are files of the file store with recognised text and fields (date, due,
   amount, sender, type, tags; 2.153.0 also the workspace's custom fields, `custom_fields` by name): `list_documents`,
   `get_document`, where you may edit `update_document` (only fields that exist; you never add fields), and `create_document` (a new file into a folder you may edit, or your own result folder). Kalmido sorts
-  them in without you; your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
+  them in without you (2.580.0: a scanned stack whose documents each start with their own archive number code is split into
+  them in the same folder, the stack goes to the trash -- `get_document` of the stack then answers `404`, look in the folder); your values are marked as set by an agent and may wait in *To review*. For a receipt or incoming
   invoice only **suggest** project, category, amount and VAT rate (`suggest_receipt`, event `document_added`); a person accepts it, you never
   set, move or delete it yourself.
 - **Office (2.51.0).** Where the office lets you in (scope `office`, your switch *May draft office documents* and the
