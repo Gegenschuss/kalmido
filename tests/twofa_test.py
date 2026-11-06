@@ -191,10 +191,12 @@ check("HttpOnly" in r.headers.get("Set-Cookie", "") and "SameSite=Strict" in r.h
       f"ticket cookie: HttpOnly, SameSite=Strict, path /api/auth: {r.headers.get('Set-Cookie')}")
 check(s.get(B + "/api/state").status_code == 401, "the ticket is not a session")
 check(s.post(B + "/api/auth/2fa", json={"code": totp(sec, st0)}).status_code == 401, "the code used at the enrolment cannot be replayed")
-r = s.post(B + "/api/auth/2fa", json={"code": totp(sec, now_step() + 1)})
+# #3506 (CI red of 2.614.0): the step of the code is taken once, before the login - read again after it, a 30 s edge in
+# between named the step after the used one: the "replay" was a fresh code that signed s2 in (and its ticket was gone)
+used = now_step() + 1
+r = s.post(B + "/api/auth/2fa", json={"code": totp(sec, used)})
 check(r.ok and r.json()["ok"] and "kalmido_session" in r.cookies, f"login with the next code: {r.text[:120]}")
 check(s.get(B + "/api/me").json()["via"] == "2fa", "session marked as a two-factor login")
-used = now_step() + 1
 s2, _ = login("bob")
 check(s2.post(B + "/api/auth/2fa", json={"code": totp(sec, used)}).status_code == 401, "a used code is refused in the next login too (replay)")
 check(requests.post(B + "/api/auth/2fa", json={"code": totp(sec)}, headers=H).status_code == 401, "second step without a ticket -> 401")
