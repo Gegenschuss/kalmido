@@ -125,6 +125,10 @@ check(Bo.get(B + "/api/wiki").status_code == 403, "Bob: the setting workspace co
 # the main switch on (what an agent's setup proposal writes) does not reach past the cap
 Bo.patch(B + "/api/settings", json={"features": FEAT + ",reading"})
 check(Bo.get(B + "/api/wiki").status_code == 403, "the main switch does not reach past the cap")
+# review job 2963: the budget has its own routes and is refused outside the cap as well (it was only hidden in the app)
+Bo.patch(B + "/api/settings", json={"features": FEAT + ",reading,budget"})
+check(Bo.get(B + f"/api/budget?space={WS}").status_code == 403, "Bob: the budget of the organisation refused (not on his cards)")
+check(Bo.get(B + "/api/budget?space=private").status_code != 403, "Bob: his own budget in Private stays")
 Bo.patch(B + "/api/settings", json={"workspace": "private"})
 check(sql("SELECT COUNT(*) FROM wiki_pages WHERE id=?", (PG,))[0][0] == 1, "nothing is deleted")
 
@@ -144,6 +148,11 @@ r = A.patch(B + f"/api/modcards/{C2}", json={"name": "Tables", "expect_updated_a
 check(r.status_code == 409 and r.json().get("card", {}).get("id") == C2, "an old version is a 409 with the current card")
 r = A.patch(B + f"/api/modcards/{C2}", json={"name": "Tables and more", "expect_updated_at": c2["updated_at"]})
 check(r.ok and r.json()["card"]["new_mods"] == [] and r.json()["card"]["name"] == "Tables and more", "saved: no new module any more")
+# review job 2963: a person on the card disabled later - the admin can still save the card as it is
+sql("UPDATE users SET disabled=1 WHERE id=?", (BOB,), write=True)
+r = A.patch(B + f"/api/modcards/{C2}", json={"people": [BOB]})
+sql("UPDATE users SET disabled=0 WHERE id=?", (BOB,), write=True)
+check(r.ok, "a disabled person on the card does not block saving it " + r.text[:160])
 r = A.patch(B + f"/api/modcards/{C3}", json={"people": []})
 check(r.ok and r.json()["card"]["people"] == [], "admin: the people of a card change")
 check(Bo.get(B + f"/api/modcards?space={WS}").json().get("cap") == ["sheets"], "Bob: the cap follows")

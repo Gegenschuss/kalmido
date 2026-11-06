@@ -56,13 +56,14 @@ MC_PATHS = (("/api/office/", "office"), ("/api/time", "time"), ("/api/pomo", "po
             ("/api/life/upkeep", "home"), ("/api/life/upkeep-presets", "home"), ("/api/life/health", "health"),
             ("/api/life/trips", "travel"), ("/api/reading", "reading"), ("/api/bookmarks", "reading"), ("/api/feeds", "feeds"),
             ("/api/files", "files"), ("/api/docs", "docs"), ("/api/wiki", "wiki"), ("/api/sheets", "sheets"),
-            ("/api/clients", "clients"), ("/api/workload", "workload"), ("/api/team/dispo", "dispo"), ("/api/forms", "forms"),
+            ("/api/clients", "clients"), ("/api/budget", "budget"), ("/api/workload", "workload"), ("/api/team/dispo", "dispo"), ("/api/forms", "forms"),
             ("/api/habits", "habits"))
 # the file store: only its own views (like wsareas.py WSA_ABLAGE_VIEWS: the office, letters, pages use the file routes too)
 MC_FILE_VIEWS = ("/api/files", "/api/files/folders", "/api/files/search", "/api/files/tagged")
 # an object of an organisation opened by its id: its own organisation counts, whatever the workspace is
 MC_OBJ = (("wiki", re.compile(r"/api/wiki/pages/(\d+)"), "wiki_pages"), ("sheets", re.compile(r"/api/sheets/(\d+)"), "sheets"),
-          ("reading", re.compile(r"/api/bookmarks/(\d+)"), "bookmarks"), ("files", re.compile(r"/api/files/nodes/(\d+)"), "fs_nodes"))
+          ("reading", re.compile(r"/api/bookmarks/(\d+)"), "bookmarks"), ("files", re.compile(r"/api/files/nodes/(\d+)"), "fs_nodes"),
+          ("budget", re.compile(r"/api/budget/(\d+)"), "lists"))  # job 2963 review: the budget has its own routes too
 
 
 def _csv(v):
@@ -264,7 +265,9 @@ def _org_members(c, oid):
 def _clean_people(c, oid, v):
     if not isinstance(v, list) or len(v) > MC_PEOPLE_MAX or any(isinstance(x, bool) or not isinstance(x, int) for x in v):
         raise BadInput(tr("Invalid value: {0}", "people"))
-    ok = {m["id"] for m in _org_members(c, oid)}
+    # members incl. disabled ones (review job 2963): a card that names a person disabled later must stay savable as it is
+    ok = {r[0] for r in c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? "
+                                  "AND COALESCE(u.kind,'')!='agent'", (oid,))}
     if any(x not in ok for x in v):
         raise BadInput(tr("Invalid value: {0}", "people"))
     return list(dict.fromkeys(v))
@@ -333,7 +336,7 @@ def modcards_new():
     people = _clean_people(c, oid, b.get("people") or []) if oid is not None else []
     if oid is None and (f.get("dflt") or b.get("people")):
         raise BadInput(tr("Invalid value: {0}", "dflt" if f.get("dflt") else "people"))
-    write_lock(c, f"module_cards-{oid or 'u' + str(uid)}")
+    write_lock(c, f"module_cards-org-{oid}" if oid else f"module_cards-u{uid}")  # own names: card 5 is not organisation 5
     n = c.execute("SELECT COUNT(*) FROM module_cards WHERE " + ("org_id=?" if oid else "org_id IS NULL AND user_id=?"),
                   (oid or uid,)).fetchone()[0]
     if n >= MC_MAX:
@@ -359,7 +362,9 @@ def modcards_edit(cid):
     since expect_updated_at). Saving takes the modules there are now as known: "new module available" goes away."""
     c, uid = db(), _person()
     b = body()
-    _card(c, uid, cid)
+    _r0, oid0 = _card(c, uid, cid)
+    if oid0 is not None:  # review job 2963: the organisation's lock first (as modcards_new) - two admins setting two
+        write_lock(c, f"module_cards-org-{oid0}")  # different default cards at once left two defaults
     write_lock(c, f"module_cards-{cid}")
     r, oid = _card(c, uid, cid)
     ccf_check(b, r["updated_at"], "card", lambda: mc_json(r, _people_of(c, [cid])[cid] if oid else None))
