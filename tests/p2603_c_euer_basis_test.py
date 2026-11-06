@@ -133,7 +133,8 @@ def inc(eu, key):
 def office(s, who, ws, me):
     """The whole flow in the office s works in (an organisation or the personal office)."""
     check(s.put(B + O + "/settings", json={"lang": "de", "currency": "EUR",
-                                           "company_fields": {"name": f"{who} Beispiel GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE"}}).ok,
+                                           "company_fields": {"name": f"{who} Beispiel GmbH", "street": "Musterweg 1", "zip": "12345", "city": "Musterstadt", "country": "DE",
+                                                              "tax_number": "12/345/67890", "iban": "DE02120300000000202051"}}).ok,
           f"{who}: office settings")
     b = s.get(B + O + f"/books/basis?year={Y}").json()
     check(b.get("basis") == "receipts" and b.get("years") == {} and b.get("locked") is False, f"{who}: the default is receipts {b}")
@@ -260,14 +261,19 @@ def office(s, who, ws, me):
     ei = s.get(B + O + f"/books/euer?year={TODAY.year}").json()
     check(inc(ei, "vat19")["net"] == "1500.00" and ei.get("basis") == "receipts", f"{who}: this year by receipts again")
     check(s.get(B + O + f"/books/euer?year={Y}").json().get("basis") == "bank", f"{who}: {Y} stays bank and cash")
+    return mid
 
 
-office(A, "org", f"org:{ORG}", ALICE)
+MID = office(A, "org", f"org:{ORG}", ALICE)
 
 # ---------------------------------------------------------------- a person without an organisation  # freelancer-matrix: office
 FID, Fr = freelancer(B, A)
 Fr.patch(B + "/api/settings", json={"features": FEAT})
 office(Fr, "freelancer", "private", FID)
+# tenant-matrix: office -- the meal of another office area: 404, never its line
+check(Fr.get(B + O + f"/meals/{MID}/payment").status_code == 404, "another office's meal: 404")
+check(Fr.put(B + O + f"/meals/{MID}/payment", json={"kind": None}).status_code == 404, "another office's meal cannot be unlinked: 404")
+check(A.get(B + O + f"/meals/{MID}/payment").json()["current"]["kind"] == "bank", "the organisation's link stays")
 check(A.get(B + O + f"/books/basis?year={Y}").json()["years"] == {str(Y): "bank", str(TODAY.year): "receipts"}, "the organisation keeps its own setting")
 
 print(f"p2603_c_euer_basis: {OKS[0]} ok, {len(FAILS)} failed")
