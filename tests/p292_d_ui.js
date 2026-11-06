@@ -63,16 +63,23 @@ const call = async (method, url, body, ck = CK) => { const r = await fetch(B + u
     for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('.cf8sec .seg')`).catch(() => false)); i++) await sleep(250);
     await ev(`(document.querySelector('.cf8sec .seg').scrollIntoView({block: 'end'}), toast('Saved', () => {}), 1)`);
     await sleep(400);
-    const t = await ev(`(() => { const a = document.querySelector('#toast').getBoundingClientRect(), b = document.querySelector('.cf8sec .seg').getBoundingClientRect(); return {at: Math.round(a.top), ab: Math.round(a.bottom), bt: Math.round(b.top), bb: Math.round(b.bottom)}; })()`);
+    for (let i = 0; i < 20 && !(await ev(`!!document.querySelector('#toast') && !!document.querySelector('.cf8sec .seg')`).catch(() => false)); i++) await sleep(150);
+    const t = await ev(`(() => { const ta = document.querySelector('#toast'), sg = document.querySelector('.cf8sec .seg'); if (!ta || !sg) return {missing: !ta ? '#toast' : '.cf8sec .seg', hash: location.hash}; const a = ta.getBoundingClientRect(), b = sg.getBoundingClientRect(); return {at: Math.round(a.top), ab: Math.round(a.bottom), bt: Math.round(b.top), bb: Math.round(b.bottom)}; })()`);
     check(t && (t.ab <= t.bt || t.at >= t.bb), 'phone: the toast does not cover the cash flow choice ' + JSON.stringify(t));
     await shot('p292d-toast-390.png');
 
     await nav(B + '#today');
-    for (let i = 0; i < 40 && !(await ev(`typeof settingsModal === 'function' && !!document.querySelector('#side')`).catch(() => false)); i++) await sleep(250);
+    for (let i = 0; i < 40 && !(await ev(`typeof settingsModal === 'function' && !!document.querySelector('#side') && !!S.me?.is_admin`).catch(() => false)); i++) await sleep(250);
+    // the people pane needs S.me (is_admin): opened before the start's /api/me answered, the dialog showed General
     await ev(`(settingsModal('users'), 1)`);
     for (let i = 0; i < 40 && !(await ev(`!!document.querySelector('#a-users .ua8chk:not(:disabled)')`).catch(() => false)); i++) await sleep(250);
-    const top0 = await ev(`Math.round(document.querySelector('#a-users').getBoundingClientRect().top)`);
-    await ev(`(() => { const c = document.querySelector('#a-users .ua8chk:not(:disabled)'); c.click(); return 1; })()`);
+    // CI red of 2.570.0: on the slower CI runner the dialog was still laying out (2890 -> 3039 without the tick's doing):
+    // measure only once the list's place has stood still for a moment
+    const topNow = () => ev(`(e => e ? Math.round(e.getBoundingClientRect().top) : 'no #a-users')(document.querySelector('#a-users'))`);
+    let top0 = await topNow();
+    for (let i = 0, still = 0; i < 40 && still < 3; i++) { await sleep(150); const t2 = await topNow(); still = t2 === top0 ? still + 1 : 0; top0 = t2; }
+    const clicked = await ev(`(() => { const c = document.querySelector('#a-users .ua8chk:not(:disabled)'); if (!c) return JSON.stringify({modals: [...document.querySelectorAll('.modal')].map(m => m.className + ':' + (m.querySelector('h3')?.textContent || '')), users: document.querySelector('#a-users')?.textContent.slice(0, 200), hash: location.hash}); c.click(); return 1; })()`);
+    check(clicked === 1, 'phone: a box of the list to tick ' + clicked);
     await sleep(400);
     const top1 = await ev(`Math.round(document.querySelector('#a-users').getBoundingClientRect().top)`);
     const bar = await ev(`(() => { const r = document.querySelector('#ua-sbar').getBoundingClientRect(); return {hidden: document.querySelector('#a-usel').hidden, b: Math.round(r.bottom), vh: innerHeight}; })()`);
