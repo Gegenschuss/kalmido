@@ -1035,7 +1035,38 @@ function keepFocus(root, fn) {
   return r;
 }
 function renderView() { FL.vlast = Date.now(); return td_rcRun(() => { const r = an_view(() => keepFocus($('#view'), renderView0));  // 2.46.1 (#1560): a view change / a new empty hint fades in
-    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); return r; }); }  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
+    rowRove(); rowMoreWatch(); agb_after(); vl_after(); vm_after(); td_lcSweep(); topw_sync(); return r; }); }
+// ---- 2.599.0 (#4814): the page reports its width once to #main: data-w = lesen | form | seite (the widths of :root,
+// static/css/start-breite.css), eigen (an element with data-pw: its own centred block, e.g. notes / a knowledge page) or voll;
+// --pw = that width in px, --pw-sb = the scrollbar of #view. static/css/start-kopf-4814.css gives #top the same middle and
+// width (only from 1700 px: 1440 x 900, tablets and phones stay as they were). Read from the drawn page (its computed
+// max-width), so start-breite.css stays the one place that assigns the widths. An element that is not in the middle = voll.
+const TOPW_MIN = 1700;
+function topw_sync() {
+  const m = $('#main'), v = $('#view'); if (!m || !v) return;
+  let w = 'voll', px = 0;
+  if (innerWidth >= TOPW_MIN && !isMobile()) {
+    const rs = getComputedStyle(document.documentElement), rem = parseFloat(rs.fontSize) || 16;
+    const named = new Map(['lesen', 'form', 'seite'].map(k => [Math.round(parseFloat(rs.getPropertyValue('--w-' + k)) * rem), k]));
+    const vr = v.getBoundingClientRect(), vs = getComputedStyle(v), l0 = vr.left + parseFloat(vs.paddingLeft), r0 = vr.left + v.clientWidth - parseFloat(vs.paddingRight);
+    const mid = e => { const r = e.getBoundingClientRect(); return r.width > 0 && Math.abs((r.left - l0) - (r0 - r.right)) < 2; };
+    const own = v.querySelector('[data-pw]');
+    let hit = null, key = '';
+    if (own) { hit = own; key = 'eigen'; }
+    else for (let d = 0, lv = [...v.children]; d < 3 && !hit && lv.length; d++) {
+      for (const e of lv) { const k = named.get(Math.round(parseFloat(getComputedStyle(e).maxWidth))); if (k) { hit = e; key = k; break; } }
+      lv = lv.flatMap(e => [...e.children]).slice(0, 80);
+    }
+    const mw = hit ? parseFloat(getComputedStyle(hit).maxWidth) : NaN;
+    if (hit && mw > 0 && mid(hit)) { w = key === 'eigen' ? named.get(Math.round(mw)) || 'eigen' : key; px = mw; }
+  }
+  if (m.dataset.w !== w) m.dataset.w = w;
+  const pw = px ? Math.round(px) + 'px' : '', sb = Math.max(0, v.offsetWidth - v.clientWidth) + 'px';
+  if (m.style.getPropertyValue('--pw') !== pw) { if (pw) m.style.setProperty('--pw', pw); else m.style.removeProperty('--pw'); }
+  if (m.style.getPropertyValue('--pw-sb') !== sb) m.style.setProperty('--pw-sb', sb);
+}
+let topw_raf = 0;
+window.addEventListener('resize', () => { if (S.booted && !topw_raf) topw_raf = requestAnimationFrame(() => { topw_raf = 0; topw_sync(); }); });  // 2.65.0 (#1825): vl_after = the window of a long list; 2.413.0 A (#3439): vm_after = a view entered again gets its place back (viewmem.js)
 function renderView0() {
   const m = S.route.mod, el = $('#view');
   lzGate();  // 2.369.2 (#3136): a view of the start set loads the lists it shows first (liveparts.js)
