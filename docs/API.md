@@ -394,7 +394,7 @@ that person may not see. Besides the filter rules, `rules` holds `sort` (`prio`,
 `created_asc`), `group` (`date`, `person`, `none`; default the columns) and `display` (`list`, `kanban`); `rules.lists` is left
 out. Leaving a project ends access to its views; they go with the project. `GET /filters` does not list them.
 
-**Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `parent_id`,
+**Compact tasks** (2.0.8): `GET /tasks?fields=compact` returns only `id`, `title`, `list_id`, `section_id`, `section_kind` (2.577), `parent_id`,
 `status`, `due`, `due_time`, `priority`, `tags`, `list_tags` and `assignee_id` per task, for scanning a large project
 (an agent, a script). `fields=full` (the default) returns everything; any other value is a `400`.
 

@@ -128,7 +128,8 @@ def run(who, s, uid):
     check(walk("created", L) == ALL and walk("-updated", L) and len(walk("manual", L)) == 5, f"{who}: sort created / updated / manual")
     r = get(list_id=L, sort="-priority", limit=2, fields="compact")
     cur = r.json().get("next_cursor")
-    check(r.ok and set(r.json()["data"][0]) == {"id", "title", "list_id", "section_id", "parent_id", "status", "due", "due_time",
+    # 2.577.0 (#3354): compact carries the column's meaning section_kind too
+    check(r.ok and set(r.json()["data"][0]) == {"id", "title", "list_id", "section_id", "section_kind", "parent_id", "status", "due", "due_time",
                                                 "priority", "tags", "list_tags", "assignee_id"} and cur, f"{who}: sorted + compact")
     check(get(list_id=L, sort="due", cursor=cur).status_code == 400, f"{who}: a cursor of another sort = 400")
     plain = get(list_id=L, limit=1).json()["next_cursor"]

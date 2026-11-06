@@ -246,7 +246,8 @@ check(all(isinstance(x.get("sections"), list) for x in ul) and next(x for x in u
 full = me.get("/tasks", params={"list_id": PROJ}).json()["data"]
 comp = me.get("/tasks", params={"list_id": PROJ, "fields": "compact"}).json()["data"]
 check(full and "notes" in full[0] and "created_at" in full[0], "default: full tasks")
-KEYS = {"id", "title", "list_id", "section_id", "parent_id", "status", "due", "due_time", "priority", "tags", "list_tags", "assignee_id"}
+KEYS = {"id", "title", "list_id", "section_id", "section_kind", "parent_id",  # 2.577.0 (#3354): + the column meaning
+        "status", "due", "due_time", "priority", "tags", "list_tags", "assignee_id"}
 check(comp and all(set(x) == KEYS for x in comp) and [x["id"] for x in comp] == [x["id"] for x in full], f"compact: exactly the short keys: {sorted(comp[0]) if comp else None}")
 check(me.get("/tasks", params={"fields": "full"}).ok and me.get("/tasks", params={"fields": "all"}).status_code == 400, "fields=full ok, another value 400")
 spec = requests.get(V + "/openapi.json").json()
