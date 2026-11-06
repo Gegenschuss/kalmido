@@ -720,7 +720,9 @@ function lcap_close(root) {
 // add projects (ids in the order given); the status line follows
 function lcap_add(root, ids) {
   const all = LCAP.get(root.id) || [], ul = root.querySelector('.lcapsel'), on = new Set(listCapVal(root, root.id));
-  for (const id of ids) { const l = all.find(x => x.id === id); if (l && !on.has(id)) { ul.insertAdjacentHTML('beforeend', lcap_row(l)); on.add(id); } }
+  // the row's names are escaped by lcap_row; built in a box and moved over (like the boxes' innerHTML elsewhere here)
+  const box = document.createElement('ul');
+  for (const id of ids) { const l = all.find(x => x.id === id); if (l && !on.has(id)) { box.innerHTML = lcap_row(l); if (box.firstElementChild) ul.append(box.firstElementChild); on.add(id); } }
   root.querySelector('.lcapst').textContent = lcap_st(on.size);
 }
 function lcap_pick(o) {
