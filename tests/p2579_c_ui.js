@@ -44,6 +44,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   let w = await boot({user: 'alice', hash: 'docs'}), d = w.document;
   await until(() => w.eval(`typeof DC !== 'undefined' && DC.total === 2 && typeof dcv_barHtml === 'function'`), 100);
   const type = q => { const qi = d.querySelector('#dc-q'); qi.value = q; qi.dispatchEvent(new w.Event('input', {bubbles: true})); };  // as a person types (docs.js: 300 ms later the list loads)
+  w.eval(`document.addEventListener('input', e => { if (e.target.id === 'dc-q') (window.__qlog ||= []).push(JSON.stringify([e.target.value, e.isTrusted, e.target.isConnected, document.querySelectorAll('#dc-q').length, String(new Error().stack).split('\\n').slice(2, 7).map(l => l.trim().slice(0, 80)).join(' | ')])); }, true)`);
   type('Koala');
   await until(() => w.eval(`DC.total === 1 && !DC.loading`));
   const save = await until(() => d.querySelector('[data-dcv="save"]'));
@@ -62,7 +63,7 @@ const docNew = async (name, text, ws = 'private', ck = CK) => {
   check(d.querySelector('.dcv-name')?.textContent.includes('Koala docs') && !d.querySelector('[data-dcv="update"]'), 'the bar names the open view, nothing changed yet');
   // leaving the view empties the search, the row brings it back
   w.location.hash = 'docs';
-  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`) && d.querySelector('#dc-q')?.value === ''), 'back to Documents: the whole list again ' + st());
+  check(await until(() => w.eval(`DC.q === '' && DC.total === 2 && !DC.loading`) && d.querySelector('#dc-q')?.value === ''), 'back to Documents: the whole list again ' + st() + ' LOG ' + w.eval('JSON.stringify(window.__qlog || [])'));
   click(w, d.querySelector(`#side [data-dcvid="${VID}"]`));
   check(await until(() => w.eval(`DC.q === 'Koala' && DC.total === 1 && !DC.loading`)), 'the sidebar row applies the view again');
   // a changed search: "Update view" takes it over
