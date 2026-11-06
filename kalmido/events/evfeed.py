@@ -9,17 +9,15 @@ does (series with rule, left-out and changed dates; events are stored in plain t
 to open), without attendees (their addresses stay inside Kalmido) and without alarms of the person (2.190.0 D, #2496: also
 none kept from an imported event). The token never goes into
 a log line; answers are Cache-Control private, no-store."""
-import hmac
-import secrets
-
 from flask import jsonify, Response
 
 from ..core.config import app, APP_NAME, PUBLIC_URL
 from ..core.i18n import tr
-from ..core.db import body, db, iso, now_utc, usettings
+from ..core.db import body, db, usettings
 from ..accounts.session import _rate_blocked, _rate_fail, client_ip, me
 from ..core.access import need_feat, acx_token_bind
 from ..core.errors import BadInput
+from ..core.tokenhash import tkh_match, tkh_set_evfeed
 from ..events.model import ev_role, need_evcal
 from ..calendars.icalfeed import ics_text  # 2.369.5 (#2517): pulled up from functions
 from ..events.ics import ev_dl_drop, ev_lines, wrap  # 2.369.5 (#2517): pulled up from functions
@@ -29,8 +27,14 @@ EVF_FAIL_LIMIT = 30  # wrong links per client address within the login fail wind
 EVF_MAX = 20000
 
 
-def evf_url(row):
-    return f"{PUBLIC_URL}/ical/ev/{row['id']}.{row['secret']}.ics" if row else None
+def evf_url(fid, secret):
+    """2.577.0 (#4708 6): the address with its secret (only in the answer that made it; the server keeps the hash)."""
+    return f"{PUBLIC_URL}/ical/ev/{fid}.{secret}.ics"
+
+
+def evf_state(row):
+    """2.577.0 (#4708 6): whether the person has a link and since when (the address itself is shown once, as GET /api/ical)."""
+    return {"active": bool(row), "created_at": (row["created_at"] or "") if row else ""}
 
 
 def evf_row(c, cid, uid):
@@ -90,7 +94,7 @@ def evf_feed(token):
     f = None
     if fid.isdigit() and len(fid) < 19 and secret:
         r = c.execute("SELECT f.*, u.disabled FROM ev_cal_feeds f JOIN users u ON u.id=f.user_id WHERE f.id=?", (int(fid),)).fetchone()
-        if r and not r["disabled"] and hmac.compare_digest(r["secret"].encode(), secret.encode()):
+        if r and not r["disabled"] and tkh_match(secret, r["secret_hash"]):  # 2.577.0 (#4708 6): compared with the stored hash
             f = r
     if not f:
         _rate_fail(keys)
@@ -111,7 +115,7 @@ def evf_feed(token):
 def evf_info(cid):
     c = db()
     need_evcal(c, cid)
-    return jsonify(url=evf_url(evf_row(c, cid, me())))
+    return jsonify(url=None, **evf_state(evf_row(c, cid, me())))  # 2.577.0 (#4708 6): the address is in the answer of create / rotate only
 
 
 @app.post("/api/evcals/<int:cid>/feed")
@@ -124,16 +128,17 @@ def evf_set(cid):
     need_evcal(c, cid)
     b = body()
     a = b.get("action") if isinstance(b, dict) else None  # 2.111.0 review: no 500 on a non-object body
-    row = evf_row(c, cid, uid)
+    row, tok = evf_row(c, cid, uid), None
     if a == "off":
         c.execute("DELETE FROM ev_cal_feeds WHERE cal_id=? AND user_id=?", (cid, uid))
     elif a == "rotate" and row:
-        c.execute("UPDATE ev_cal_feeds SET secret=?, created_at=? WHERE id=?", (secrets.token_urlsafe(32), iso(now_utc()), row["id"]))
+        tok = tkh_set_evfeed(c, fid=row["id"])
     elif a in ("create", "rotate") and not row:
-        c.execute("INSERT INTO ev_cal_feeds(cal_id, user_id, secret, created_at) VALUES(?,?,?,?)",
-                  (cid, uid, secrets.token_urlsafe(32), iso(now_utc())))
+        tok = tkh_set_evfeed(c, cal_id=cid, uid=uid)
     elif a != "create":
         raise BadInput(tr("Invalid value: {0}", "action"))
     c.commit()
-    return jsonify(url=evf_url(evf_row(c, cid, uid)))
+    row = evf_row(c, cid, uid)
+    # 2.577.0 (#4708 6): only the hash is stored: the new address is in this answer once; create with a link answers url null
+    return jsonify(url=evf_url(row["id"], tok) if tok and row else None, **evf_state(row))
 

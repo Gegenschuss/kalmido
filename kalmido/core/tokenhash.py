@@ -51,4 +51,27 @@ def tkh_migrate(c):
         n += 1
     if n:
         print("tokens: stored", n, "accounts' upload / calendar tokens as hashes", flush=True)
+    return n + tkh_migrate_evfeeds(c)
+
+
+def tkh_set_evfeed(c, fid=None, cal_id=None, uid=None):
+    """2.577.0 (#4708 6): a new secret for an event calendar's subscription link: row fid gets it (the old address stops at
+    once), else a new row for (cal_id, uid). Only its hash is stored. Returns the secret (shown once)."""
+    tok = secrets.token_urlsafe(TKH_ICAL_BYTES)
+    if fid:
+        c.execute("UPDATE ev_cal_feeds SET secret='', secret_hash=?, created_at=? WHERE id=?", (tkh_hash(tok), iso(now_utc()), fid))
+    else:
+        c.execute("INSERT INTO ev_cal_feeds(cal_id, user_id, secret, secret_hash, created_at) VALUES(?,?,'',?,?)",
+                  (cal_id, uid, tkh_hash(tok), iso(now_utc())))
+    return tok
+
+
+def tkh_migrate_evfeeds(c):
+    """2.577.0 (#4708 6), at every start (idempotent): the plain secrets of the event calendars' links (from before 2.577, or
+    written by an older version after a roll-back) become hashes, the plain value goes. The links keep working. A one-way
+    step: a version before 2.577 no longer opens these links (they answer 404 there until a new link is made)."""
+    n = c.execute("UPDATE ev_cal_feeds SET secret_hash=encode(sha256(convert_to(secret, 'UTF8')), 'hex'), secret='' "
+                  "WHERE secret<>''").rowcount
+    if n:
+        print("tokens: stored", n, "event calendar links as hashes", flush=True)
     return n

@@ -223,7 +223,10 @@ check(A.get(B + f"/api/evcals/{CAL}/feed").json()["url"] is None, "no link befor
 j = A.post(B + f"/api/evcals/{CAL}/feed", json={"action": "create"}).json()
 U1 = j["url"]
 check(bool(U1) and re.search(r"/ical/ev/\d+\.[A-Za-z0-9_-]{30,}\.ics$", U1) is not None, "create: a secret link " + str(U1))
-check(A.post(B + f"/api/evcals/{CAL}/feed", json={"action": "create"}).json()["url"] == U1, "create again keeps the link")
+# 2.577.0 (#4708 6): only the hash is stored: create again keeps the link but answers url null (active: true)
+j2 = A.post(B + f"/api/evcals/{CAL}/feed", json={"action": "create"}).json()
+check(j2["url"] is None and j2.get("active") is True and A.get(B + f"/api/evcals/{CAL}/feed").json().get("active") is True,
+      "create again keeps the link (shown once: url null, active)")
 pub = requests.Session()
 r = pub.get(B + feed_path(U1))
 check(r.status_code == 200 and r.headers.get("Content-Type", "").startswith("text/calendar") and "no-store" in r.headers.get("Cache-Control", ""),

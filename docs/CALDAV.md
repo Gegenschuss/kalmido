@@ -327,7 +327,8 @@ secret link (`…/ical/ev/<id>.<secret>.ics`) for calendar apps that only read: 
 new one (the old one stops at once) or turn it off. Anyone with the link sees this calendar's events, so treat it like a
 password. Every person who sees the calendar has their own link, and it only works while that person still sees the
 calendar (sharing ended, organisation left: the link stops). The feed lists the events with their repeat rules, without
-attendees and without your reminders; the subscribing app refreshes about every 15 minutes.
+attendees and without your reminders; the subscribing app refreshes about every 15 minutes. The server keeps only a hash of the
+secret (2.577): the link is shown once, when it is made; later the dialog says since when it is active - lost it? Make a new one.
 
 **Holidays and absences (2.155).** The calendar views show the public holidays of your state and your own absences
 (vacation, days off, ...) as quiet all-day entries; with *Team absences* switched on also your colleagues' absences, only as

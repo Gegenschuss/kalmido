@@ -163,6 +163,34 @@ check(r.status_code == 201 and cur_version() == 3, f"(3) without expect_version 
 r = Fr.post(B + f"/api/files/nodes/{FN}/versions/1/restore", json={"expect_version": 3})
 check(r.ok and cur_version() == 4, f"(3) a restore with the current version {r.status_code} {r.text[:120]}")
 
+# ================================================================== (6) the event calendar link's secret as a hash
+import requests  # noqa: E402 (only this block reads the feed without login)
+from urllib.parse import urlparse  # noqa: E402
+
+pub = requests.Session()
+FCAL = Fr.post(B + "/api/evcals", json={"name": "Frida Kalender"}).json()["id"]
+Fr.post(B + "/api/events", json={"cal_id": FCAL, "title": "Feedtermin", "start": "2026-11-20T10:00", "end": "2026-11-20T11:00"})
+j = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "create"}).json()
+U = j.get("url") or ""
+fid, sec = (urlparse(U).path.rsplit("/", 1)[-1][:-4].split(".", 1) + [""])[:2] if U else ("0", "")
+row = (kt.dbx("SELECT secret, secret_hash FROM ev_cal_feeds WHERE id=?", (int(fid or 0),)) or [["?", None]])[0]
+check(bool(sec) and row[0] == "" and row[1] and sec not in (row[1] or ""), f"(6) the link's secret is stored only as a hash: {row[0]!r}")
+r = pub.get(B + urlparse(U).path) if U else None
+check(r is not None and r.status_code == 200 and "Feedtermin" in r.text, f"(6) the link works with the hashed secret {r.status_code if r is not None else '-'}")
+g = Fr.get(B + f"/api/evcals/{FCAL}/feed").json()
+check(g.get("url") is None and g.get("active") is True and g.get("created_at"), f"(6) later the app sees 'active since', not the address: {g}")
+check(pub.get(B + f"/ical/ev/{fid}.{'x' * len(sec)}.ics").status_code == 404, "(6) a wrong secret: 404")
+# a link from before (plain secret in the row): the start turns it into a hash, the address keeps working (one-way step)
+kt.dbx("UPDATE ev_cal_feeds SET secret=?, secret_hash=NULL WHERE id=?", ("altesGeheimnis4708abcdefghijklmnopqrstuv", int(fid or 0)))
+out = box("from kalmido.core.tokenhash import tkh_migrate\nprint('migrated', tkh_migrate(c))")
+row = (kt.dbx("SELECT secret, secret_hash FROM ev_cal_feeds WHERE id=?", (int(fid or 0),)) or [["?", None]])[0]
+check("migrated 1" in out and row[0] == "" and row[1], f"(6) the start hashes a plain secret left from before {out[-200:]} {row[0]!r}")
+r = pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics")
+check(r.status_code == 200, f"(6) ... and the old address still works {r.status_code}")
+U2 = Fr.post(B + f"/api/evcals/{FCAL}/feed", json={"action": "rotate"}).json().get("url") or ""
+check(U2 and pub.get(B + urlparse(U2).path).status_code == 200 and r.status_code == 200
+      and pub.get(B + f"/ical/ev/{fid}.altesGeheimnis4708abcdefghijklmnopqrstuv.ics").status_code == 404, "(6) rotate: a new address, the old one stops")
+
 # @@NEXT@@
 
 sys.exit(kt.done("p2577_d_audit"))
