@@ -33,6 +33,7 @@ from ..team.portal import pt_email_hash, pt_email_norm  # 2.369.5 (#2517): pulle
 from ..accounts.orgs import is_org_admin  # 2.369.5 (#2517): pulled up from functions
 from ..hub.absence import ABS_STATES  # 2.369.5 (#2517): pulled up from functions
 from ..lists.lists import LIST_COLOR_RE  # 2.369.5 (#2517): pulled up from functions
+from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods  # 2.575.0 (#3778)
 
 # the person columns of the rows of one person (the row is left out when the person does not map)
 _W_PEOPLE = N_("Entries of people who were not chosen were not taken over: {0}")
@@ -544,7 +545,6 @@ def _not_me(c, run, src, d, ctx):
 def _modcard(c, run, src, d, ctx):
     """2.575.0 (#3778): a module card of the organisation: only known modules (accounts/modcards.py), never a person's
     private card; a module unknown here is dropped (it counts as new on the card, off)."""
-    from ..accounts.modcards import MC_ICON_RE, MC_NAME_MAX, mc_mods
     if not run.org or src.get("org_id") is None:
         return False
     name = _txt(src.get("name"), MC_NAME_MAX)
