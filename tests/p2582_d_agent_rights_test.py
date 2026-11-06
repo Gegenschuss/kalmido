@@ -8,6 +8,15 @@ freelancer-matrix: agents (the person who set the agent up has no organisation)
  - with the scope time and scope=all: other people's entries only where the agent is a project admin AND the person who set
    it up is one too (the freelancer's own project: yes; a colleague's project where the freelancer only edits: no)
  - MCP: an agent token without time does not get list_time_entries, a person's read token does
+ fable review (2.582.0):
+ - F1 scope=all with task_id: an agent still gets no other people's entries outside its owner's admin projects; a person's
+   task view keeps everyone's (counter-check)
+ - F2 without time: the project overview's time is null for the agent (with time: filled, counter-check); /clients carries
+   no hours / amounts for it
+ - F3 GET /time/gaps: an agent without time -> 403 required_scope time, with time 200; MCP get_time_gaps follows
+ - F4 the owner's account disabled: the agent sees no other people's entries any more
+ - F5 day plan: a timed task of a health project and an event at a health task stay as "Busy" (no title)
+ - F6 break down a task of a project with the lock -> 409 (the lock's own check, not the health text)
  M4 proposals:
  - "Break down" a task of a health / a budget project -> 400 (as extract), a plain task -> 201 (counter-check)
  - "Plan my day" and "Sort the basket": no task / no target project of a health or budget project in the job's input
@@ -52,6 +61,13 @@ for uid, lid, note in ((FID, P, "ZQXF-P"), (BOB, P, "ZQXBOB-P"), (BOB, Q, "ZQXBO
            VALUES (?, ?, ?, ?, 1800, ?, ?, ?)""", (uid, lid, s.isoformat(), (s + timedelta(minutes=30)).isoformat(), note,
                                                    NOW.isoformat(), NOW.isoformat()))
 check(len(dbx("SELECT id FROM time_entries WHERE note LIKE 'ZQX%'")) == 3, "three entries")
+# 2.582.0 (fable review F1): an entry on a task of Bobby's project
+TQ = Bo.post(B + "/api/tasks", json={"title": "ZQXTASK-Q", "list_id": Q}).json()["id"]
+s = NOW - timedelta(days=1, hours=4)
+dbx("""INSERT INTO time_entries(user_id, list_id, task_id, start, "end", seconds, note, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, 1800, 'ZQXBOB-QT', ?, ?)""", (BOB, Q, TQ, s.isoformat(), (s + timedelta(minutes=30)).isoformat(),
+                                                         NOW.isoformat(), NOW.isoformat()))
+dbx("UPDATE lists SET time_tracking=1 WHERE id=?", (P,))  # F2: the overview's "Tracked"
 
 r = requests.get(V + "/time/entries?scope=all", headers=FH)
 check(r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") == "time",
@@ -64,6 +80,19 @@ spec = requests.get(V + "/openapi.json", timeout=30).json()
 check(spec["paths"]["/time/entries"]["get"].get("x-kalmido-agent-scope") == "time"
       and spec["paths"]["/time/entries"]["get"].get("x-kalmido-scope") == "read", "OpenAPI: read for people, time for agents")
 
+# 2.582.0 (fable review F3): the time gaps need time too
+r = requests.get(V + f"/time/gaps?user_id={FID}", headers=FH)
+check(r.status_code == 403 and (r.json().get("error") or {}).get("required_scope") == "time",
+      f"F3: time gaps without the scope time: 403 required_scope time {r.status_code} {r.text[:200]}")
+check(spec["paths"]["/time/gaps"]["get"].get("x-kalmido-agent-scope") == "time", "F3: OpenAPI names it")
+# 2.582.0 (fable review F2): no hours / amounts without time
+r = requests.get(V + f"/lists/{P}/overview", headers=FH)
+check(r.status_code == 200 and r.json().get("time") is None, f"F2: overview without time: time null {r.status_code} {r.text[:200]}")
+check(F.get(B + f"/api/lists/{P}/overview").json().get("time") is not None, "F2: the person's overview keeps it (counter-check)")
+r = requests.get(V + "/clients", headers=FH)
+check(r.status_code == 200 and '"seconds"' not in r.text and '"amount"' not in r.text,
+      f"F2: clients without time: no hours / amounts {r.status_code} {r.text[:200]}")
+
 r = F.patch(B + f"/api/my/agents/{FA}", json={"scopes": ["read", "tasks:write", "time"]})
 check(r.ok, f"the owner grants the scope time {r.status_code} {r.text[:160]}")
 r = requests.get(V + "/time/entries?scope=all", headers=FH)
@@ -74,6 +103,14 @@ check("ZQXBOB-Q" not in notes, f"a project where only the agent is admin, not it
 r = requests.get(V + f"/time/entries?scope=all&list_id={Q}", headers=FH)
 check(r.status_code == 200 and not r.json().get("data"), f"list_id of that project: empty {r.text[:200]}")
 check("ZQXBOB-Q" in Bo.get(B + "/api/time/entries?scope=all").text, "Bobby still sees his own entry (counter-check)")
+# 2.582.0 (fable review F1): task_id no longer opens other people's entries for an agent
+r = requests.get(V + f"/time/entries?scope=all&task_id={TQ}", headers=FH)
+check(r.status_code == 200 and "ZQXBOB-QT" not in r.text, f"F1: agent, task_id of that project: no other people's entries {r.text[:200]}")
+check("ZQXBOB-QT" in F.get(B + f"/api/time/entries?task_id={TQ}").text, "F1: the person's task view keeps everyone's (counter-check)")
+r = requests.get(V + f"/lists/{P}/overview", headers=FH)
+check(r.status_code == 200 and r.json().get("time") is not None, f"F2: overview with time: filled (counter-check) {r.text[:200]}")
+r = requests.get(V + f"/time/gaps?user_id={FID}", headers=FH)
+check(r.status_code == 200, f"F3: time gaps with time: 200 {r.status_code} {r.text[:160]}")
 
 
 # ---------------------------------------------------------------- M3: MCP tool list (static, the module's own check)
@@ -94,6 +131,8 @@ check(not allowed("agent", ["read", "tasks:write"], "list_time_entries"), "MCP: 
 check(allowed("agent", ["read", "time"], "list_time_entries"), "MCP: an agent with time has it")
 check(allowed("user", ["read"], "list_time_entries"), "MCP: a person's read token keeps it (counter-check)")
 check(allowed("agent", ["read"], "get_timer"), "MCP: get_timer stays read")
+check(not allowed("agent", ["read"], "get_time_gaps") and allowed("agent", ["read", "time"], "get_time_gaps")
+      and allowed("user", ["read"], "get_time_gaps"), "F3: MCP get_time_gaps needs time for an agent only")
 
 # ---------------------------------------------------------------- M4: health / budget never reach an agent through a proposal
 HL = F.post(B + "/api/lists", json={"name": "ZQXHEALTH doctors"}).json()["id"]
@@ -131,12 +170,26 @@ for tid, what in ((T_H, "health"), (T_B, "budget")):
 r = ask(kind="subtasks", task_id=T_OK)
 check(r.status_code == 201, f"break down a plain task: 201 (counter-check) {r.status_code} {r.text[:160]}")
 
+# 2.582.0 (fable review F5): a timed health task and an event at a health task keep their time as "Busy"
+TODAY = F.get(B + "/api/dayplan").json()["date"]
+task("ZQXHEALTH dentist", list_id=HL, due=TODAY, due_time="06:00", duration=30)
+cal = F.post(B + "/api/evcals", json={"name": "ZQX cal"}).json()
+cal = cal.get("id") or (cal.get("cal") or {}).get("id")
+r = F.post(B + "/api/events", json={"title": "ZQXHEALTHEV checkup", "cal_id": cal, "start": TODAY + "T07:00", "end": TODAY + "T07:30",
+                                     "task_id": T_H})
+check(r.status_code in (200, 201), f"F5: an event at the health task {r.status_code} {r.text[:160]}")
+check(any(e["title"] == "ZQXHEALTHEV checkup" for e in F.get(B + "/api/dayplan").json()["events"]),
+      "F5: the person's own day plan shows the event's title (counter-check)")
+
 r = ask(kind="dayplan")
 check(r.status_code == 201, f"dayplan: 201 {r.status_code} {r.text[:200]}")
 txt = job_text(r.json()["id"])
 check("ZQXPLAIN" in txt, f"dayplan: the plain task is there (counter-check) {txt[:300]}")
 check("ZQXHEALTH" not in txt and "ZQXBUDGET" not in txt, f"dayplan: no health / budget task {txt[:400]}")
 check(f'"task_id": {T_H}' not in txt and f'"task_id": {T_B}' not in txt, "dayplan: nor their ids")
+jinp = requests.get(V + f"/agent/jobs/{r.json()['id']}", headers=FH).json().get("input") or {}
+busy = [(e.get("start"), e.get("end")) for e in jinp.get("events") or [] if e.get("title") == "Busy"]
+check(("06:00", "06:30") in busy and len(busy) >= 2, f"F5: both stay busy without a title {jinp.get('events')}")
 
 task("ZQXPLAIN call the printer")
 r = ask(kind="triage")
@@ -144,4 +197,16 @@ check(r.status_code == 201, f"triage: 201 {r.status_code} {r.text[:200]}")
 txt = job_text(r.json()["id"])
 check("Frida's project" in txt, f"triage: a plain project is a target (counter-check) {txt[:300]}")
 check("ZQXHEALTH" not in txt and "ZQXBUDGET" not in txt, f"triage: no health / budget project as a target {txt[:400]}")
+
+# 2.582.0 (fable review F6): a project with the lock keeps its own answer (409), not the health text
+LL = F.post(B + "/api/lists", json={"name": "ZQXLOCK"}).json()["id"]
+T_L = task("ZQXLOCK secret", list_id=LL)
+dbx("UPDATE lists SET e2e='on' WHERE id=?", (LL,))
+r = ask(kind="subtasks", task_id=T_L)
+check(r.status_code == 409 and "Health" not in r.text, f"F6: break down a task with the lock: 409 {r.status_code} {r.text[:160]}")
+
+# 2.582.0 (fable review F4): the owner's account disabled -> no other people's entries any more
+dbx("UPDATE users SET disabled=1 WHERE id=?", (FID,))
+r = requests.get(V + "/time/entries?scope=all", headers=FH)
+check(r.status_code == 200 and "ZQXBOB-P" not in r.text, f"F4: disabled owner: no other people's entries {r.status_code} {r.text[:200]}")
 sys.exit(done("p2582_d_agent_rights"))
