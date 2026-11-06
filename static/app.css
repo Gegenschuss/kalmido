@@ -7477,7 +7477,6 @@ a.rfcard:hover{border-color:var(--muted);text-decoration:none}
 .fv2bar .fv2-tile .fv2-av{width:1.375rem;height:1.375rem;font-size:var(--fs-xs)}
 .fv2bar .fv2-tile .fv2-st{position:absolute;right:.125rem;bottom:.125rem;display:flex}
 .fv2bar .fv2-tile .fv2-st .hdot{width:.4375rem;height:.4375rem}
-.fv2bar .fv2-bdg{position:absolute;left:.0625rem;bottom:.0625rem;min-width:.875rem;height:.875rem;padding:0 .125rem;display:flex;align-items:center;justify-content:center;border:1px solid var(--line2);border-radius:.25rem;background:var(--bg3);color:var(--text);font-size:.5625rem;font-weight:600;line-height:1;pointer-events:none}  /* 2.572.0 (#4749): equal symbols told apart */
 .fv2bar .fv2-wsd{position:absolute;top:.125rem;right:.125rem;display:flex}
 .fv2bar .fv2-wsd .wsp-dot{width:.375rem;height:.375rem}
 .fv2bar .fv2-sep{flex:none;width:.5625rem;height:1.125rem;background:linear-gradient(var(--line2),var(--line2)) center/1px 100% no-repeat;cursor:grab}
@@ -8690,8 +8689,6 @@ button.bgent:hover,button.bgent:focus-visible{background:var(--bg3)}
 #kbar .kbsrch{display:flex;align-items:center;gap:.5rem;margin-left:auto;width:12rem;min-width:7rem;flex:0 1000 12rem;height:1.875rem;padding:0 .625rem;border:1px solid var(--line2);border-radius:.5rem;background:var(--kbsr);color:var(--muted);font-size:var(--fs-s);cursor:text}
 #kbar .kbsrch>span:not(.kbs){flex:1;min-width:0;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #kbar .kbsrch:hover{border-color:var(--bg4)}
-#kbar.kb-mini .kbsrch{width:1.875rem;min-width:1.875rem;flex:none;justify-content:center;padding:0}  /* 2.572.0 (#4746): the search shrinks first (12rem down to 7rem), then it is the loupe only (favtiles.js fv2_fit), only then +N */
-#kbar.kb-mini .kbsrch>span,#kbar.kb-mini .kbsrch>kbd{display:none}
 #kbar .kbend{display:flex;align-items:center;gap:.375rem;flex:none}
 #kbar .netdot{flex:none;width:.5rem;height:.5rem;border-radius:50%;--nd:var(--st-ready);background:var(--nd)}
 #kbar .netdot.n-on{display:none}
