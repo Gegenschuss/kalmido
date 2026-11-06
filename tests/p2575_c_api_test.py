@@ -63,6 +63,6 @@ check("counter lives in each server process" in src("docs", "API.md"), "L4: API.
 ps = src("static", "agent", "setup.ps1")
 check("Read-Host (M 'ask_tool')" not in ps and "AddSeconds(120)" in ps, "L5: setup.ps1 asks the tool with a 120 s timeout")
 check("(\\s+#.*)?$" in ps and "-replace '\\s+#.*$'" in ps, "L5: the Codex wrapper cuts comments behind values")
-check("function TomlS" in ps and "mcp_servers.kalmido.args=['" not in ps and "$InnerArg" in ps, "L5: TOML basic strings, quotes escaped for -Command")
+check("function TomlS" in ps and "TomlS $_" in ps and "$InnerArg" in ps, "L5: TOML basic strings, quotes escaped for -Command")
 
 sys.exit(done("p2575_c_api"))
