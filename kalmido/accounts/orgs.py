@@ -1567,8 +1567,10 @@ def org_role_news(c, oid, uid, role):
     news_add(c, uid, "orgrole", row="share", data={"org_id": oid, "name": name, "role": role})
 
 
-def _admins(c, oid):
-    return c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0", (oid,)).fetchone()[0]
+def _admins(c, oid, besides=0):
+    """The active admins of organisation oid; 2.585.0 (#4290): besides = without this person."""
+    return c.execute("SELECT COUNT(*) FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0"
+                     " AND m.user_id<>?", (oid, besides)).fetchone()[0]
 
 
 def ol_client_fit(c, lid, oid):
@@ -1722,7 +1724,8 @@ def org_member_remove(oid, uid):
         _no_change()
     if not c.execute("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (oid, uid)).fetchone():
         return err(tr("unknown"), 404)
-    if uid != me() and org_role(c, uid, oid) == "admin" and _admins(c, oid) <= 1:
+    # 2.585.0 (#4290): the active admins besides the person (a disabled admin counted against the remover)
+    if uid != me() and org_role(c, uid, oid) == "admin" and _admins(c, oid, besides=uid) < 1:
         return err(tr("The last admin of an organisation cannot leave it: make somebody else an admin first"), 409)
     heir = me() if uid != me() else (c.execute("SELECT m.user_id FROM org_members m JOIN users u ON u.id=m.user_id WHERE m.org_id=? AND m.role='admin' AND u.disabled=0 AND m.user_id!=? ORDER BY m.user_id LIMIT 1", (oid, uid)).fetchone() or [None])[0]
     if uid != me() and request.args.get("to"):  # 2.88.0 (#1980): the admin hands the person's lists to another active member

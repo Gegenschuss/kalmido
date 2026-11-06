@@ -329,6 +329,16 @@ check(Ca.put(B + f"/api/lists/{LB['id']}/members", json={"user_id": DAVE, "role"
 r = Ca.put(B + f"/api/orgs/{BETA}/members", json={"user_id": CAROL, "role": "member"})
 check(r.status_code == 409 and dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (BETA, CAROL))[0][0] == "admin",
       f"review 12: the last admin of an organisation cannot step down {r.status_code} {r.text[:100]}")
+# 2.585.0 (#4290): the DELETE route's own last-admin guard (orgs.py org_member_remove). An organisation admin removes a
+# fellow admin whose account is disabled: carol stays the active admin, so the removal goes through (it was refused as
+# "the last admin" because the guard counted only active admins and carol was the only one)
+FR = A.post(B + "/api/users", json={"username": "frank", "display_name": "Frank", "password": "password123", "orgs": []}).json()["id"]
+dbx("INSERT INTO org_members(org_id,user_id,role) VALUES(?,?,'admin')", (BETA, FR), write=True)
+dbx("UPDATE users SET disabled=1 WHERE id=?", (FR,), write=True)
+r = Ca.delete(B + f"/api/orgs/{BETA}/members/{FR}")
+check(r.ok and not dbx("SELECT 1 FROM org_members WHERE org_id=? AND user_id=?", (BETA, FR))
+      and dbx("SELECT role FROM org_members WHERE org_id=? AND user_id=?", (BETA, CAROL))[0][0] == "admin",
+      f"#4290: an organisation admin removes a disabled fellow admin, she stays the admin {r.status_code} {r.text[:100]}")
 # the cross-tenant matrix: nothing of Beta reaches alice / bob
 # 2.30.0 (#1036, tests/tenant_coverage_test.py): tenant-matrix: aggregate, task, list, news, team, agent, people, org
 TBETA = Ca.post(B + "/api/tasks", json={"title": "Secret Beta plan", "list_id": LB["id"]}).json()["id"]
