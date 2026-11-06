@@ -28,7 +28,7 @@ from freelancer_fixture import freelancer
 
 TIMING = re.compile(r'db;dur=([\d.]+);desc="n=(\d+)"')
 # budget (#3136, decision 28.10.2026): above 2 MB or 1 s the start state has to be split
-BUDGET_BYTES = int(os.environ.get("P3136_BUDGET_BYTES", "0"))  # 0 = only measure
+BUDGET_BYTES = int(os.environ.get("P3136_BUDGET_BYTES", "2000000"))  # 0 = only measure; 2.575.0 (#3966): 2 MB set (td=1, 1,94 MB on 06.11.2026)
 
 
 def measure(s, who, n=3):
@@ -118,10 +118,24 @@ check("lz" not in st and len(full) == len(st["tasks"]) > 16000, "without lz=1: t
 d8 = kt.dbx("SELECT to_char(current_date + 7, 'YYYY-MM-DD')")[0][0]
 
 
+def tdfill(j):
+    """2.575.0 (#3966): as the client's tdFill (liveparts.js): the keys left out at their default back from the answer's tdef."""
+    for t in j.get("tasks", []):
+        for k, v in (j.get("tdef") or {}).items():
+            if k not in t and not (k == "content" and "content_n" in t):
+                t[k] = type(v)() if isinstance(v, (list, dict)) else v
+    return j
+
+
 def lzcheck(s, who, full, me_id, lz_lists=()):
-    r = s.get(B + "/api/state?lz=1&lzl=" + ",".join(map(str, lz_lists)))
+    # 2.575.0 (#3966): measured as the client asks (td=1: without the defaults, filled back here as the client does)
+    r = s.get(B + "/api/state?td=1&lz=1&lzl=" + ",".join(map(str, lz_lists)))
     j = r.json()
     raw = len(r.content)
+    check(isinstance(j.get("tdef"), dict) and any(len(t) < len(j["tdef"]) for t in j["tasks"]), f"{who}: td=1 leaves the defaults out (+ tdef)")
+    old = s.get(B + "/api/state?lz=1&lzl=" + ",".join(map(str, lz_lists))).json()  # an older client (lz=1, no td): every key
+    check("tdef" not in old and {t["id"]: t for t in old["tasks"]} == {t["id"]: t for t in tdfill(j)["tasks"]},
+          f"{who}: lz=1 without td = every key, the same tasks as td=1 filled back")
     m = TIMING.search(r.headers.get("Server-Timing", ""))
     print(f"PERF {who} /api/state?lz=1: {raw / 1e6:.2f} MB, gzip {len(gzip.compress(r.content, 6)) / 1e6:.2f} MB, "
           f"{r.elapsed.total_seconds():.2f} s, {m.group(2) if m else '?'} statements, {len(j.get('tasks', []))} tasks, "
@@ -169,8 +183,8 @@ check("lz" not in rr.json() and len(rr.json()["tasks"]) == len(full), "lzl=all: 
 
 # GET /api/state/lists: one list, several, all = as in the whole state
 for ids in ([lids[10]], [lids[11], lids[12], lids[7]]):
-    rr = Bo.get(B + "/api/state/lists?ids=" + ",".join(map(str, ids)))
-    got = {t["id"]: t for t in rr.json()["tasks"]}
+    rr = Bo.get(B + "/api/state/lists?td=1&ids=" + ",".join(map(str, ids)))  # 2.575.0 (#3966): as the client asks
+    got = {t["id"]: t for t in tdfill(rr.json())["tasks"]}
     want = {i for i, t in full.items() if t["list_id"] in ids}
     check(rr.ok and want <= set(got) and all(got[i] == full[i] for i in got), f"/api/state/lists?ids={ids}: those lists as in the whole state")
 rr = Bo.get(B + "/api/state/lists?ids=all")

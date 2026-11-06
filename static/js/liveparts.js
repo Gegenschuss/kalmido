@@ -135,6 +135,7 @@ async function lpDelta(v, ch, n, since) {
   S.lpN.delta++;
   const side = lpSideCnt() + (wside ? lpSideSig() : ''), sel = S.sel, changed = new Set();
   if (wside && j.team) lpSideTake(j);
+  tdFill(j.tasks);  // 2.575.0 B (#3966): the delta sends whole tasks; filled all the same (one way in)
   for (const t of j.tasks || []) { S.tasks.set(t.id, t); changed.add(t.id); }
   for (const id of j.gone || []) if (S.tasks.delete(id)) changed.add(id);
   _kidsIx = null;
@@ -211,6 +212,16 @@ const LZ_FREE = new Set([...LP_NOTASKS, 'news', 'contacts', 'budget', 'feeds', '
 function lzTake(j) {
   S.lz = j.lz ? {pending: new Set(j.lz.pending || []), counts: j.lz.counts || {}} : null;
 }
+// 2.575.0 B (#3966): an answer asked with td=1 leaves out the keys a task holds at their default; its table (tdef, the server's
+// serializers.TD_DEFAULTS) puts them back before anything reads the tasks (applyState, lzLoad, the delta), so a task is the one
+// the whole state has (t.x === null, 'x' in t). content stays out where the note is long (content_n). The one fill function.
+S.tdef = null;
+function tdFill(ts, def = S.tdef) {
+  if (!def || !ts) return ts;
+  const ks = Object.keys(def);
+  for (const t of ts) for (const k of ks) if (!(k in t) && !(k === 'content' && 'content_n' in t)) { const v = def[k]; t[k] = v !== null && typeof v === 'object' ? (Array.isArray(v) ? [] : {}) : v; }
+  return ts;
+}
 // the query of the next /api/state: the lists this window has whole (all = every one, nothing is pending)
 function lzQuery() {
   if (!S.lz) return S.booted && S.tasks.size ? 'lz=1&lzl=all' : 'lz=1&lzl=' + lzRecent().join(',');
@@ -250,7 +261,7 @@ async function lzLoad(want) {
   if (key) lzBusy.add(key);
   ids.forEach(id => lzBusy.add(id));
   let j;
-  try { j = await api('GET', '/api/state/lists?ids=' + (key || ids.join(','))); }
+  try { j = await api('GET', '/api/state/lists?td=1&ids=' + (key || ids.join(','))); tdFill(j.tasks, j.tdef || S.tdef); }  // 2.575.0 B (#3966): + td
   catch { return false; }  // offline: the view shows what it has
   finally { if (key) lzBusy.delete(key); ids.forEach(id => lzBusy.delete(id)); }
   if (!S.lz) return true;  // a whole state came meanwhile

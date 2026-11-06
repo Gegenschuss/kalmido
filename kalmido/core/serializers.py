@@ -320,6 +320,36 @@ def load_tasks(c, where, args=(), full_snips=False, lean_notes=False):
     return out
 
 
+# 2.575.0 B (#3966): the start state without the values every task has. A client that asks for it (td=1 on GET /api/state and
+# GET /api/state/lists) gets the tasks without the keys below while they hold their default (None / '' / 0 / [] / {}) and this
+# table as "tdef" in the same answer; it fills them back before any use (liveparts.js tdFill), so the task it works with is the
+# one the whole state has. Only keys every task of load_tasks carries are in it (one that is sometimes absent -- milestone_id,
+# review, fam, snippets_n, content of a long note ... -- would come back where it was absent on purpose); content only when the
+# task has no content_n (a long note). Never in the agent API (/api/v1 serializes its own fields) nor without td=1.
+TD_DEFAULTS = {
+    "section_id": None, "parent_id": None, "content": "", "priority": 0, "status": 0, "due": None, "due_time": None,
+    "reminders": "", "repeat": "", "repeat_from": "due", "completed_at": None, "deleted_at": None, "tt_id": None,
+    "trash_section": None, "assigned_by": None, "assignee_group_id": None, "assignee_id": None, "budget_warn": 0,
+    "completed_by": None, "created_by": None, "deadline": 0, "delivery": "", "delivery_at": None, "delivery_by": None,
+    "delivery_job_id": None, "delivery_note": "", "delivery_task_id": None, "duration": None, "irreversible": 0,
+    "irreversible_reason": "", "irreversible_yes_at": None, "irreversible_yes_by": None, "locked": 0, "nag": "", "pinned": 0,
+    "plan_start": None, "remind_at": None, "start": None, "ticket_no": None, "ttype": "", "url": None, "wait_by": None,
+    "wait_fired": "", "waiting_at": None, "wait_note": "", "wait_until": None,
+    "tags": [], "ltags": [], "attachments": [], "comment_count": 0, "unread": 0, "fields": {}, "blocked": 0, "blockers": [],
+    "blocking": 0,
+}
+
+
+def td_lean(tasks):
+    """2.575.0 B (#3966): drop the keys of TD_DEFAULTS that hold their default (same type: 0 is not False) from these task
+    dicts (in place) -> tasks."""
+    for d in tasks:
+        for k, v in TD_DEFAULTS.items():
+            if k in d and type(d[k]) is type(v) and d[k] == v and not (k == "content" and "content_n" in d):
+                del d[k]
+    return tasks
+
+
 def attachment_files(c, task_ids):
     """Paths of all attachments of these tasks (and their subtasks), to unlink after a hard delete."""
     from ..tasks.validation import descendants

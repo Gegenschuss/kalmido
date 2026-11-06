@@ -1281,6 +1281,7 @@ function applyState(j) {
   // 2.280.0 F (#3108): ... and its length is the server's (a save that failed, two changes in one second: loaded again), unless
   // it is being typed / waits to be saved
   const was = S.tasks, tkNoteBusy = id => !!saveTimers[id + ':content'] || (S.sel === id && document.activeElement?.id === 'd-content');
+  if (j.tdef) S.tdef = j.tdef; tdFill(j.tasks);  // 2.575.0 B (#3966): the defaults back first (liveparts.js; the offline cache is filled too)
   S.tasks = new Map(j.tasks.map(t => { if (!('content' in t)) { const o = was?.get(t.id); if (o && 'content' in o && o.updated_at === t.updated_at && (String(o.content).length === t.content_n || tkNoteBusy(t.id))) t.content = o.content; } return [t.id, t]; }));
   lzTake(j);  // 2.369.2 (#3136): the lists whose tasks are not all here (liveparts.js)
   S.filters = j.filters || [];
@@ -1369,7 +1370,7 @@ async function ld_go(auto) {
     let crossed = false;
     for (let i = 0; i < 3; i++) {  // 2.13.4: an answer that a write overtook is fetched again (see rawFetch)
       const w0 = S.wseq || 0;
-      j = await api('GET', (auto && !i ? '/api/state?auto=1&' : '/api/state?') + lzQuery());  // 2.369.2 (#3136): + the start set  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
+      j = await api('GET', (auto && !i ? '/api/state?auto=1&' : '/api/state?') + 'td=1&' + lzQuery());  // 2.575.0 B (#3966): + td  // 2.369.2 (#3136): + the start set  // 2.280.0 F (#3109): a repeat is no herd reload (it would brake itself)
       crossed = (S.wseq || 0) !== w0;
       if (!crossed) break;
     }
