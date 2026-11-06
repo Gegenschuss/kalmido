@@ -134,7 +134,7 @@ const TXT = 'Rental contract, invented words';
     check(k0 && k0.wrapped_by == null && k0.aad_w > 1, 'the copy lena wrapped has no wrapper here ' + JSON.stringify(k0 && {b: k0.wrapped_by, w: k0.aad_w}));
     await ev('(() => { localStorage.clear(); return 1; })()');
     check(await signIn('alice') === 200, 'Firefox: alice again');
-    await boot('#ablage');
+    await boot('#ablage/s/private');  // 2.540.0 (#4575): alice is in an organisation now, plain #ablage is the overview (loads no fslock.js)
     check(await ev(`(async () => { await e2eLoad(true); await e2eAdopt(await e2eUnwrapPass(E2E.st.bundle_pass, 'a long passphrase of alice here')); return e2eUnlocked(); })()`), 'alice unlocks');
     const oread = `(async () => { const n = (await rawFetch('GET', '/api/files?parent=${OT}')).items[0]; const name = await fslNameDec(${OT}, n.name, true);
       const f = await fslFileDec(${OT}, await (await fetch('/api/files/lock/${OT}/raw/' + n.id, {headers: {'X-Requested-With': 'kalmido'}})).arrayBuffer()); return name + '|' + new TextDecoder().decode(f.data); })().catch(e => 'ERR ' + (e.code || e.message))`;
