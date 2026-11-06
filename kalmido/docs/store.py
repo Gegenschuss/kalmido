@@ -1315,6 +1315,8 @@ def process(c, nid):
     # 2.607.0 (#4872): a value set by hand / imported stays, an automatic one may be found anew; the tags found are added
     # (was: every feature with a value fixed, the tags as a whole as soon as there was one)
     fixed = learn_fixed(cur, auto_all, imported)
+    if given.get("folder"):  # 2.577.0 C (#4466): a named mail address's target folder stays (docs/mailaddr.py)
+        fixed.add("folder")
     newv, sug, auto = classify(c, m, node, text, given=fixed)
     new_tags = learn_merge(c, nid, newv, auto, sug)  # auto["tags"] only when tags were added (the marks of all)
     sug = {**sug, **agent_sug}

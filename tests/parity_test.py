@@ -444,6 +444,10 @@ APP_ONLY = [
     ("2.425.0 C (#3453): receipt fetchers (a helper program with its own key kind: setup code, portals on / off, disconnect) are a "
      "person's setup in Settings > Integrations; agents never connect, see or switch them",
      ("* /api/docs/fetchers",)),
+    # 2.577.0 C (#4466)
+    ("2.577.0 C (#4466): named document addresses (a folder and tags per address, on / off, renew) are a person's setup in "
+     "Settings > Integrations like the general address; agents add files with /documents and never see or make an address",
+     ("* /api/docs/mail-addresses",)),
     # 2.353.0 D (#2759)
     ("2.353.0 D (#2759): recognition per folder / file of the file store is a person's setup in the app (which folders become "
      "documents); agents keep their shares, read and change documents with /documents and files with /files",

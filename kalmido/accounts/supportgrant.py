@@ -160,7 +160,7 @@ SGA_NOT_CONTENT = frozenset((
     "public-link", "public-links", "regenerate", "members", "people", "groups", "owner", "org", "shares", "ext-links", "portal-link",
     "requests", "signoff", "signoffs", "agent", "agents", "ask-agent", "hooks-in", "error-hook", "repos", "folder-repo", "envs", "rules",
     "forms", "e2e", "keys", "lock", "scan-keys", "feed", "fetchers", "rights", "settings", "payonline", "peppol", "mail", "mail-notice",
-    "mail-profile", "receipt-mail", "notify-template", "send", "send-mail", "purge", "anonymize", "pay-online", "move-space"))
+    "mail-profile", "receipt-mail", "mail-addresses", "notify-template", "send", "send-mail", "purge", "anonymize", "pay-online", "move-space"))
 SGA_PLAIN = frozenset(("/api/auth/logout", "/api/client-errors", "/api/settings", "/api/me"))  # /api/me: never SGA_GUARD_ME
 SGA_GUARD_ME = {"password", "email", "username", "current_password", "new_password"}
 SGA_GUARD_SCOPE = {"org_id", "org_visibility", "org_edit"}  # review F2: a PATCH that carries contents out of the account's scope

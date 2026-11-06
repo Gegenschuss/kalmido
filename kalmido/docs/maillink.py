@@ -226,6 +226,6 @@ def ml_token_new(c, uid, org):
     """A new forwarding address token of uid's documents space (org None = the private one); the old one stops working.
     Used by the documents settings (POST /api/docs/mail) and the office settings (POST /api/office/receipt-mail)."""
     tok = "d" + secrets.token_urlsafe(14).replace("-", "x").replace("_", "y")
-    c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, org))
+    c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, org))  # 2.577.0 C (#4466): the named ones stay
     c.execute("INSERT INTO doc_mail(token, user_id, org_id, created_at) VALUES(?,?,?,?)", (tok, uid, org, now_iso()))
     return tok

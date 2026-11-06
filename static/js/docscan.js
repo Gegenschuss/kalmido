@@ -15,6 +15,7 @@ async function dsc_integrDraw(md) {
   const box = md.querySelector('#s-scan'); if (!box) return;
   const cur = typeof wsCur === 'function' ? wsCur() : 'private', ws = cur.startsWith('org:') ? cur : 'private';
   try { DSCN.es = await api('GET', `/api/docs/settings?ws=${encodeURIComponent(ws)}`); } catch { box.innerHTML = ''; return; }
+  if (DSCN.es?.mail?.enabled) DSCN.es.named = await dsc_namedLoad(ws);  // 2.577.0 C (#4466)
   if (!box.isConnected) return;
   dsc_embedDraw(box);
 }
@@ -76,10 +77,48 @@ function dsc_mailHtml(s, sc) {
       <p><button type="button" class="linkbtn" data-dsc="mailnew">${tr('New address')}</button> · <button type="button" class="linkbtn" data-dsc="maildel">${tr('Switch off')}</button></p>
       <p class="muted">${tr('Scanner: in the scan software select “Send by e-mail” and send to this address.')}</p>`
       : `<button type="button" class="btn sm" data-dsc="mailnew">${tr('Create address')}</button>`}
+    ${dsc_namedHtml(s)}
     ${big ? `<div class="dsc-note" role="note">${ic('info', 's')}<div><p>${tr('E-mail is not end-to-end encrypted. E-mail providers on the way can read the content and the attachments, like a postcard. For confidential papers use the folder watcher.')}</p>
       <button type="button" class="btn sm" data-dsc="notice">${tr('Got it')}</button></div></div>`
       : `<p class="muted dsc-hint">${tr('E-mail is not end-to-end encrypted; confidential papers better via the folder watcher.')}</p>`}
     ${sc.encrypted ? `<p class="muted">${tr('E-mails into this encrypted area were unencrypted on their way before they were filed.')}</p>` : ''}</div>`;
+}
+// 2.577.0 C (#4466): named addresses next to the general one: a name, a fixed folder, fixed tags, on / off, a new address
+async function dsc_namedLoad(ws) {
+  try { return (await api('GET', `/api/docs/mail-addresses?ws=${encodeURIComponent(ws)}`)).addresses.filter(a => !a.general); } catch { return null; }
+}
+function dsc_namedForm(s, a) {
+  const k = a ? a.id : 'new', folders = [{id: 0, path: tr('Documents (directly)')}, ...(s.folders || [])];
+  return `<div class="row"><label for="dsn-name-${k}">${tr('Name')}</label><input id="dsn-name-${k}" maxlength="60" value="${esc(a ? a.name : '')}" placeholder="${esc(tr('for example Bank statements'))}" autocomplete="off"></div>
+    <div class="row"><label for="dsn-folder-${k}">${tr('Into folder')}</label><select id="dsn-folder-${k}">${folders.map(f => `<option value="${f.id}"${a && (a.target_folder || 0) === f.id ? ' selected' : ''}>${esc(f.path || f.name)}</option>`).join('')}</select></div>
+    <div class="row"><label for="dsn-tags-${k}">${tr('Tags')}</label><input id="dsn-tags-${k}" maxlength="400" value="${esc(a ? a.tags.join(', ') : '')}" placeholder="${esc(tr('comma separated'))}" autocomplete="off"></div>
+    <div class="foot"><span class="spacer"></span><button type="button" class="btn pri" data-dsc="${a ? 'nsave:' + a.id : 'nnew'}">${a ? tr('Save') : tr('Create address')}</button></div>`;
+}
+function dsc_namedHtml(s) {
+  const list = s.named; if (!Array.isArray(list)) return '';
+  const row = a => `<li class="dc-rule dsn-addr${a.ok && a.active ? '' : ' off'}" data-aid="${esc(a.id)}"><span><b>${esc(a.name)}</b> <span class="muted">${esc(a.target || tr('Documents (directly)'))}${a.tags.length ? ' · ' + esc(a.tags.join(', ')) : ''}</span>
+      ${a.address ? `<code class="dsn-code">${esc(a.address)}</code>` : ''}${a.note ? `<small class="muted">${esc(a.note)}</small>` : ''}</span>
+    <span class="dsn-acts"><label class="chkl"><input type="checkbox" data-dsc="non:${esc(a.id)}" ${a.active ? 'checked' : ''}> ${tr('On')}</label>
+      <button type="button" class="iconbtn" data-dsc="ncopy:${esc(a.id)}" aria-label="${esc(tr('Copy {0}', a.name))}" title="${esc(tr('Copy'))}">${ic('copy')}</button>
+      <button type="button" class="iconbtn" data-dsc="nrenew:${esc(a.id)}" aria-label="${esc(tr('New address for {0}', a.name))}" title="${esc(tr('New address'))}">${ic('sync')}</button>
+      <button type="button" class="iconbtn danger" data-dsc="ndel:${esc(a.id)}" aria-label="${esc(tr('Delete {0}', a.name))}" title="${esc(tr('Delete'))}">${ic('trash')}</button></span>
+    <details class="dc-radd dsn-edit"><summary>${tr('Edit')}</summary>${dsc_namedForm(s, a)}</details></li>`;
+  return `<div class="dsn-named"><h5>${tr('Named addresses')}</h5>
+    <p class="muted">${tr('Each address files into its own folder with fixed tags, for example one for bank statements and one for the credit card.')}</p>
+    ${list.length ? `<ul class="dc-rules">${list.map(row).join('')}</ul>` : ''}
+    <details class="dc-radd dsn-new"><summary>${tr('New named address')}</summary>${dsc_namedForm(s, null)}</details></div>`;
+}
+function dsc_namedVals(md, k) {
+  const q = sel => /** @type {HTMLInputElement|null} */ (md.querySelector(sel));
+  return {name: (q(`#dsn-name-${k}`)?.value || '').trim(), target_folder: +(q(`#dsn-folder-${k}`)?.value || 0) || null,
+    tags: (q(`#dsn-tags-${k}`)?.value || '').split(',').map(t => t.trim()).filter(Boolean)};
+}
+async function dsc_namedSave(md, a, patch) {  // PATCH with the version read; changed meanwhile (409) -> the current state
+  const s = DSCN.es;
+  try { await api('PATCH', `/api/docs/mail-addresses/${encodeURIComponent(a.id)}`, {...patch, expect_updated_at: a.updated_at}); }
+  catch { s.named = await dsc_namedLoad(s.ws); dsc_embedDraw(md); return false; }
+  s.named = await dsc_namedLoad(s.ws); dsc_embedDraw(md);
+  return true;
 }
 async function dsc_reload(md) {
   const s = DSCN.es; if (!s) return;
@@ -112,6 +151,7 @@ document.addEventListener('click', async e => {
     s.mail.address = ''; dsc_embedDraw(md);
     return;
   }
+  if (a === 'nnew' || a.startsWith('n') && a.includes(':')) { await dsc_namedClick(md, b, a); return; }
   if (a === 'new') {
     const name = (/** @type {HTMLInputElement|null} */ (md.querySelector('#dsc-name'))?.value || '').trim();
     if (!name) { /** @type {HTMLElement|null} */ (md.querySelector('#dsc-name'))?.focus(); return; }
@@ -141,6 +181,42 @@ document.addEventListener('click', async e => {
     toast(tr('Revoked: {0}', k.name));
     await dsc_reload(md);
   }
+});
+async function dsc_namedClick(md, b, a) {
+  const s = DSCN.es, id = a.slice(a.indexOf(':') + 1), x = (s.named || []).find(n => n.id === id);
+  if (a === 'nnew') {
+    const v = dsc_namedVals(md, 'new');
+    if (!v.name) { /** @type {HTMLElement|null} */ (md.querySelector('#dsn-name-new'))?.focus(); return; }
+    b.setAttribute('disabled', '');
+    try { await api('POST', '/api/docs/mail-addresses', {ws: s.ws, ...v}); } catch { b.removeAttribute('disabled'); return; }
+    s.named = await dsc_namedLoad(s.ws); dsc_embedDraw(md);
+    return;
+  }
+  if (!x) return;
+  if (a.startsWith('ncopy:')) { dsc_copy(x.address); return; }
+  if (a.startsWith('nsave:')) {
+    const v = dsc_namedVals(md, x.id); if (!v.name) return;
+    if (await dsc_namedSave(md, x, v)) toast(tr('Saved'));
+    return;
+  }
+  if (a.startsWith('nrenew:')) {
+    if (!await askConfirm(tr('New address?'), tr('The old address stops working.'), {ok: tr('New address')})) return;
+    try { await api('POST', `/api/docs/mail-addresses/${encodeURIComponent(x.id)}/renew`, {}); } catch { return; }
+    s.named = await dsc_namedLoad(s.ws); dsc_embedDraw(md);
+    return;
+  }
+  if (a.startsWith('ndel:')) {
+    if (!await askConfirm(tr('Delete the address “{0}”?', x.name), tr('E-mails to it no longer arrive.'), {ok: tr('Delete'), danger: true})) return;
+    try { await api('DELETE', `/api/docs/mail-addresses/${encodeURIComponent(x.id)}`); } catch { return; }
+    s.named = await dsc_namedLoad(s.ws); dsc_embedDraw(md);
+  }
+}
+document.addEventListener('change', async e => {  // 2.577.0 C (#4466): a named address on / off
+  const el = /** @type {HTMLInputElement} */ (e.target); if (!el.matches?.('.dsc-embed [data-dsc^="non:"]')) return;
+  const s = DSCN.es, id = (el.dataset.dsc || '').slice(4), x = (s?.named || []).find(n => n.id === id), md = /** @type {HTMLElement|null} */ (el.closest('.dsc-embed'));
+  if (!x || !md) return;
+  if (!await dsc_namedSave(md, x, {active: el.checked})) return;
+  toast(el.checked ? tr('Address on: {0}', x.name) : tr('Address off: {0}', x.name));
 });
 document.addEventListener('change', async e => {  // 2.365.2 B (#2789): the folder of the file store (was in the document settings)
   const el = /** @type {HTMLInputElement} */ (e.target); if (!el.matches?.('.dsc-embed [data-dsc="inbox"]')) return;

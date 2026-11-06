@@ -867,7 +867,7 @@ def _settings_json(c, ws, uid):
     can = True
     if oid:
         can = is_org_admin(c, uid, oid)
-    tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, oid)).fetchone()
+    tok = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, oid)).fetchone()  # 2.577.0 C (#4466): the general one
     root = S.root_id(c, ws)  # 2.48.0 review: the marked documents folder; only the folders uid can see (L4)
     vis = fs_visible_ids(c, uid) if root else set()
     # 2.199.0 B (#2742): the whole tree below the documents folder (path, depth, parent), not only the first level
@@ -1089,6 +1089,6 @@ def docs_mail_del():
     _no_agent()
     uid = me()
     org, _ws = ws_param(c, request.args.get("ws"), uid)
-    c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (uid, org))
+    c.execute("DELETE FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (uid, org))  # 2.577.0 C (#4466): the named ones stay
     c.commit()
     return jsonify(ok=True)

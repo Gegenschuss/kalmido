@@ -176,6 +176,15 @@
 .dsc-steps li{margin:.25rem 0}
 .dsc-key small{display:block}
 .dsc-key.off b{text-decoration:line-through}
+/* 2.577.0 C (#4466): named document addresses (docscan.js dsc_namedHtml) */
+.dsn-addr{flex-wrap:wrap}
+.dsn-addr>span:first-child{flex:1 1 12rem;min-width:0}
+.dsn-addr small,.dsn-code{display:block}
+.dsn-code{word-break:break-all;font-size:var(--fs-xs)}
+.dsn-addr.off b{text-decoration:line-through}
+.dsn-acts{display:flex;align-items:center;gap:.25rem;flex:none}
+.dsn-edit{flex:1 1 100%}
+.dsn-named{margin-top:.75rem}
 .dsc-note{display:flex;gap:.5rem;align-items:flex-start;margin:.5rem 0;padding:.625rem .75rem;border-left:.2rem solid var(--accent);border-radius:var(--r-s);background:var(--bg3)}
 .dsc-note p{margin:0 0 .375rem}
 .dsc-hint{font-size:var(--fs-xs)}

@@ -1809,6 +1809,18 @@ was read); `GET /api/docs/folder-watcher/{file}` (signed in) sends one of `kalmi
 `404` when missing). The setup code is shown once: `kalmido-scan:1:` + base64url without padding of
 `{"url": "https://example.com", "key": "abk_…", "name": "Scanner"}`. A version before 2.207 does not know such a key (`401`).
 
+2.577.0 (#4466): named document addresses beside the general one (`/api/docs/mail`, shown as "General"): each with a name, a
+fixed target folder below the documents folder and fixed tags, on / off and renewable; the same plus address scheme, the hourly
+budget per address. What arrives there lands exactly in that folder with those tags (no area sorting); every mail is checked with
+the person's rights at that moment: the folder gone, in the trash, locked or no longer editable -> the documents folder of the
+space, tagged "Target folder unavailable"; a switched-off address takes nothing. Web routes only (people, never agents or a
+support session): `GET /api/docs/mail-addresses?ws=private|org:<id>` -> `{enabled, max, addresses: [{id, general, name,
+address, active, target_folder, target, ok, note, tags, created_at, updated_at}]}` (the general one with `id` `general`);
+`POST /api/docs/mail-addresses {ws, name, target_folder?, tags?}` -> `201` the address (`409` without the mail input or at
+`max`); `PATCH /api/docs/mail-addresses/{id} {name?, target_folder?, tags?, active?, expect_updated_at?}` (`409 {error,
+address}` when it changed meanwhile); `POST /api/docs/mail-addresses/{id}/renew` (a new address, the old one stops at once);
+`DELETE /api/docs/mail-addresses/{id}`. Only one's own addresses: another person's id is `404`.
+
 ## Receipt fetcher
 
 *Since 2.425.0.*

@@ -357,6 +357,9 @@ ROUTES = {
     # 2.207.0 A (#2763): scan inboxes of the own documents, the upload key, the mail note, the folder watcher downloads
     "GET /api/docs/scan-keys": "files", "POST /api/docs/scan-keys": "files", "DELETE /api/docs/scan-keys/{}": "files", "PATCH /api/docs/scan-keys/{}": "files",  # 2.591.0 (#4886)
     "GET /api/v1/documents/upload-target": "files", "POST /api/docs/mail-notice": "files", "GET /api/docs/folder-watcher/{}": "files",
+    # 2.577.0 C (#4466): named document addresses (p2577_c_docmail_test.py as the person without an organisation)
+    "GET /api/docs/mail-addresses": "files", "POST /api/docs/mail-addresses": "files", "PATCH /api/docs/mail-addresses/{}": "files",
+    "POST /api/docs/mail-addresses/{}/renew": "files", "DELETE /api/docs/mail-addresses/{}": "files",
     # 2.425.0 C (#3453): receipt fetchers of the personal office (p2425_c_api_test.py, freelancer-matrix: files)
     "GET /api/docs/fetchers": "files", "POST /api/docs/fetchers": "files", "DELETE /api/docs/fetchers/{}": "files",
     "PATCH /api/docs/fetchers/{}/portals/{}": "files", "GET /api/v1/fetcher": "files", "PUT /api/v1/fetcher/status": "files",
@@ -1264,7 +1267,6 @@ DELETE /api/deps/{}/{}
 DELETE /api/disc/blocks/{}
 DELETE /api/disc/connections/{}
 DELETE /api/disc/requests/{}
-DELETE /api/docs/mail
 DELETE /api/e2e/keys
 DELETE /api/envs/{}
 DELETE /api/family/contacts/{}

@@ -60,7 +60,7 @@ def ltm_reply_address(c, oid, uid, lid=None, info=None):
     if not MAIL_IN_ON:
         return ""
     who, org = ltm_space(c, oid, uid)
-    r = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (who, org)).fetchone()
+    r = c.execute("SELECT token FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (who, org)).fetchone()  # 2.577.0 C (#4466): the general one
     if r and lid:
         return mail_addr(ltm_letter_token(c, lid, uid))
     return mail_addr(r[0]) if r else ""
@@ -138,7 +138,7 @@ def ltm_token_space(c, tok):
         return None
     who, org = ltm_space(c, r[0], uid)
     # 2.312.0 (#3265, review): only while that space still has its document address (removing it stops letter replies too)
-    if not c.execute("SELECT 1 FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ?", (who, org)).fetchone():
+    if not c.execute("SELECT 1 FROM doc_mail WHERE user_id=? AND org_id IS NOT DISTINCT FROM ? AND aid=''", (who, org)).fetchone():  # 2.577.0 C (#4466)
         return None
     return who, org, lid
 

@@ -20,7 +20,8 @@ LAYERS = (
     ("agents", ("agents", "assistant", "startup")),
 )
 LAYER_OF = {"admin.migrate": "core", "api.common": "core", "accounts.orgback": "domain",
-            "core.objects": "domain", "core.writes": "domain", "core.objweb": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
+            "core.objects": "domain", "core.writes": "domain", "core.objweb": "integrations",
+            "docs.mailnamed": "integrations"}  # the move from SQLite runs inside init_db; 2.149.0 G (#2517): the v1 helpers are infrastructure; 2.365.1 (#3395): orgback calls every area; 2.558.0 (#4709): the shared core stands on the file store and accounts, its routes on the API
 
 ORDER = (
     "core.env",  # 2.149.0 D (#2511): the registry of the environment variables (no imports from the app)
@@ -488,6 +489,7 @@ ORDER = (
     "docs.ocr",  # 2.48.0 (#1111): text recognition + preview images (no routes)
     "docs.store",  # 2.48.0 (#1111): documents: tables, sealing, word index, recognition run (no routes)
     "docs.maillink",  # 2.424.0 B (#3450): invoice download links of a mail to the document address (no routes)
+    "docs.mailaddr",  # 2.577.0 C (#4466): named document addresses: target folder, tags, the rights check of a delivery (no routes)
     "docs.ingest",  # 2.48.0 (#1111): docs_ingest + the background queue, mail / inbox folder
     "docs.thumbfill",  # 2.66.1 (#1944): one-time catch-up of the previews of imported documents (no routes)
     "docs.unpack",  # 2.146.0 B (#2453): ZIP / winmail.dat of an upload or a mail -> its files (no routes)
@@ -506,6 +508,7 @@ ORDER = (
     "docs.tasklink",  # 2.154.0 A (#1111): a document linked with an existing task, the documents of a task
     "docs.v1",  # 2.48.0 (#1111): documents for agents (API v1 + OpenAPI)
     "docs.scankeys",  # 2.207.0 A (#2763): scan inboxes (upload-only keys) + the folder watcher downloads
+    "docs.mailnamed",  # 2.577.0 C (#4466): the settings routes of the named document addresses (integrations layer, LAYER_OF)
     "docs.fetcher",  # 2.425.0 C (#3453): receipt fetchers (own key kind: upload receipts + report the portals' state)
     "docs.csvx",  # 2.122.0 (#2100): the documents list as CSV
     "docs.dviews",  # 2.579.0 (#4802): saved views of the documents search (a kind of the shared core + their counts / hits)

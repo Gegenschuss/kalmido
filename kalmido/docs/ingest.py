@@ -25,6 +25,7 @@ from ..core.i18n import lang, tr  # 2.353.0 (#2769)
 from ..office.lettermail import ltm_token_space  # 2.312.0 C (#3265)
 from ..files.fslock import fl_is_locked  # 2.353.0 (#2769)
 from .maillink import ML_TAG, ml_budget, ml_collect, ml_links, ml_mail_name  # 2.424.0 B (#3450)
+from .mailaddr import dmn_dest  # 2.577.0 C (#4466)
 
 IDLE = 5             # s the queue sleeps when there is nothing to do (a new document wakes it at once)
 SCAN_EVERY = max(1, int(os.environ.get("KALMIDO_DOCS_SCAN_S", "60") or 60))  # s between two looks into the inbox folders
@@ -95,7 +96,7 @@ def docs_ingest(c, uid, org_id, name, data, mime=None, source="upload", meta=Non
 def doc_add(c, nid, org_id, owner_id, uid, source="upload", ext=None, meta=None):
     """The doc_meta row of an existing file node (state wait)."""
     ws = S.doc_ws(org_id, owner_id)
-    given = {k: v for k, v in (meta or {}).items() if k in ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "_by") and v}
+    given = {k: v for k, v in (meta or {}).items() if k in ("date", "due", "amount", "currency", "sender", "type", "tags", "text", "_by", "folder") and v}  # 2.577.0 C (#4466): + folder
     if isinstance(given.get("tags"), str):
         given["tags"] = [t.strip() for t in given["tags"].split(",") if t.strip()]
     for k in ("date", "due"):
@@ -366,8 +367,8 @@ def docs_mail_prefetch(msg):
             with system_ctx(c):  # resolving the secret address token, like docs_mail_import
                 r = next((x for x in (c.execute("SELECT * FROM doc_mail WHERE token=?", (t,)).fetchone() for t in toks) if x), None)
                 u = r and c.execute("SELECT disabled FROM users WHERE id=?", (r["user_id"],)).fetchone()
-                if u and not u["disabled"] and (not r["org_id"] or int(r["org_id"]) in acx_of(c, r["user_id"]).org_ids):
-                    k = ml_budget(c, r["token"], "links", len(links))
+                if u and not u["disabled"] and r["active"] and (not r["org_id"] or int(r["org_id"]) in acx_of(c, r["user_id"]).org_ids):
+                    k = ml_budget(c, r["token"], "links", len(links))  # 2.577.0 C (#4466): r["active"] -- a switched-off address fetches nothing
             c.commit()
         finally:
             c.close()
@@ -400,11 +401,23 @@ def docs_mail_import(c, msg, raw, pre=None):
             return 0
         if org and int(org) not in acx_of(c, uid).org_ids:
             return 0  # no longer a member: nothing goes in
+        if r and not r["active"]:
+            print("docs: mail to a switched-off address refused", flush=True)  # 2.577.0 C (#4466): never the address itself
+            return 0
         # 2.522.0 (#4433): the person's own general document address sorts; an organisation's address and the answer
         # address of a letter are bound (they land where they belong)
         sort = "sort" if r and not org and letter is None else None
+        # 2.577.0 C (#4466): a named address (aid) files into its target folder with its tags, checked with the person's
+        # rights now (docs/mailaddr.py dmn_dest: gone / no right -> the documents folder, tagged); no area sorting
+        dest, fixed = None, {}
+        if r and r["aid"]:
+            dest, tags, _gone = dmn_dest(c, r)
+            sort, fixed = None, ({"tags": tags} if tags else {})
+            if dest:
+                fixed["folder"] = str(dest)
         budget = (lambda kind, n=1: ml_budget(c, r["token"], kind, n)) if r else None
-        first, _made = _docs_mail_into(c, msg, raw, uid, org, sort=sort, letter=letter, budget=budget, pre=pre)
+        first, _made = _docs_mail_into(c, msg, raw, uid, org, sort=sort, letter=letter, budget=budget, pre=pre,
+                                       meta_add=fixed, parent_id=dest)
     c.commit()
     if first:
         docs_kick()
