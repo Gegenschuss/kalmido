@@ -5,13 +5,14 @@
 // - the switch off (Settings > Help): no dialog, the seen version follows; the switch in the settings stores it
 // - no file at all: no dialog and no script error
 // kalmido-suite: fresh
-const {boot, errs, B, login, until} = require('./boot');
+const {boot, errs, B, login, until, sleep} = require('./boot');
 const fs = require('fs');
 const path = require('path');
 const {execFileSync} = require('child_process');
 const DATA = process.argv[2];
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const firefox = require('./ff')({tag: 'p2556_b_whatsnew_ui', check, shots: 'P2556B_SHOTS'});  // 2.615.0 (#4938)
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 let CK;
 const call = async (method, url, body, ck = CK) => { const r = await fetch(B + url.replace(/^\//, ''), {method, headers: {...H, Cookie: ck}, body: body ? JSON.stringify(body) : undefined}); return {status: r.status, ...(await r.json().catch(() => ({})))}; };
@@ -84,6 +85,32 @@ const setSeen = (uid, v) => dbx("INSERT INTO user_settings(user_id, key, value) 
   check(!d.querySelector('.wnmd'), 'no file: no dialog');
   check(errs.length === e0, 'no file: no script error ' + errs.slice(e0).join(' | '));
   w.close();
+
+  // ================= 2.615.0 (#4938) Firefox: the dialog on a phone is a sheet like the others (full width, as high as its content,
+  // a gap before the hint) and on a desktop keeps its width
+  fs.writeFileSync(WN, JSON.stringify({versions: [{version: CUR, date: '2026-11-05', items: [{en: 'Newest sentence'}, {en: 'Second sentence'}]}]}));
+  await call('PATCH', '/api/settings', {whatsnew_on: '1'});
+  const MEAS = `(() => { const m = document.querySelector('.wnmd'); if (!m) return null; const c = m.querySelector(':scope > .card').getBoundingClientRect(), h = m.querySelector('.shint').getBoundingClientRect(), l = m.querySelector('.wnlist').getBoundingClientRect();
+    return {cw: Math.round(c.width), ch: Math.round(c.height), cl: Math.round(c.left), cb: Math.round(c.bottom), gap: Math.round(h.top - l.bottom), iw: innerWidth, ih: innerHeight, rem: parseFloat(getComputedStyle(document.documentElement).fontSize)}; })()`;
+  const wnShow = async ev => { setSeen(ME, V(MI - 3)); await ev(`location.reload()`); for (let i = 0; i < 60 && !(await ev(`!!document.querySelector('.wnmd')`).catch(() => false)); i++) await sleep(300); await sleep(500); };
+  await firefox(async ({cmd, ev, nav, ctx, shot}) => {
+    await nav(B + 'static/icon.svg');
+    await ev(`(() => { localStorage.clear(); localStorage.setItem('tasks.theme', '"light"'); return 1; })()`);
+    check(await ev(`fetch('/api/auth/login', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'}, body: JSON.stringify({username: 'alice', password: 'password123'})}).then(r => r.status)`) === 200, 'Firefox: login');
+    await nav(B + '#today');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 700, height: 900}});
+    await wnShow(ev);
+    const p = await ev(MEAS);
+    check(p && p.cw === p.iw && p.cl === 0, 'phone: the dialog has the full width ' + JSON.stringify(p));
+    check(p && p.ch < p.ih * 0.6, 'phone: a short list = a sheet only as high as its content, not the full height ' + JSON.stringify(p));
+    check(p && p.cb === p.ih, 'phone: the sheet sits at the bottom ' + JSON.stringify(p));
+    check(p && p.gap >= p.rem * 0.5, 'phone: a gap before the hint under the list ' + JSON.stringify(p));
+    await shot('p2556b-phone-700.png');
+    await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 1280, height: 900}}); await sleep(600);
+    const dk = await ev(MEAS);
+    check(dk && Math.abs(dk.cw - 32.5 * dk.rem) < 2, 'desktop: the dialog keeps its width (32.5 rem) ' + JSON.stringify(dk));
+    await shot('p2556b-desktop-1280.png');
+  });
 
   check(!errs.length, 'no script errors: ' + errs.join(' | '));
   console.log(`p2556_b_whatsnew_ui: ${ok} ok, ${F.length} failed`);
