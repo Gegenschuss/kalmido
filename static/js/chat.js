@@ -1320,12 +1320,17 @@ function chatSaveModal(kind, m, done) {
   return md;
 }
 // 2.46.2 (#1666): every comment (also another person's, also in a read-only list) can be copied like a chat message
+function cmCopyMenu(a, anchor = a) {  // 2.571.0 (#4608): also by a long press / right click on the comment (multisel.js lm_*); the reactions are an item here now
+  const m = (S.tl?.comments || []).find(x => x.id === +a.dataset.cid); if (!m) return false;
+  menu(anchor, [{label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment')},
+    {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment', true)},
+    ...(anchor.closest('.cm') ? [rxMenuItem(anchor.closest('.cm'))] : [])]);
+  return true;
+}
 document.addEventListener('click', e => {
   const a = e.target.closest?.('[data-act="cm-copy"]'); if (!a) return;
   e.preventDefault(); e.stopPropagation();
-  const m = (S.tl?.comments || []).find(x => x.id === +a.dataset.cid); if (!m) return;
-  menu(a, [{label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment')},
-    {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.tl.comments, m, 'comment', true)}]);
+  cmCopyMenu(a);
 });
 // 2.42.0 (#1383): "Save as task" under an agent's comment in a task (collab.js commentHtml) and its "Saved" mark
 document.addEventListener('click', e => {
@@ -1364,19 +1369,24 @@ async function chatCopy(msgs, m, kind, md) {  // 2.41.0 (#1374): with formatting
   const {text, n} = chatCopyText(msgs, m, kind);
   toast(await (md ? clipCopy(text) : rcpCopy(text)) ? (n > 1 ? tr('Copied ({0} parts)', n) : tr('Copied')) : tr('Copy failed, select the text by hand'));
 }
-document.addEventListener('click', e => {
-  const a = e.target.closest?.('[data-act="csave-open"],[data-act="chat-save"],[data-act="chat-msg-menu"]'); if (!a) return;
-  e.preventDefault(); e.stopPropagation();
-  if (a.dataset.act === 'csave-open') { chatSaveOpen(+a.dataset.tid); return; }
-  const m = (S.chat?.msgs || []).find(x => x.id === +a.dataset.mid); if (!m) return;
-  if (a.dataset.act === 'chat-save') { chatSaveModal('agent', m, () => chatPatch()); return; }
+// 2.571.0 (#4608): the menu of an agent-chat message is a function: the "…" button and a long press / right click (multisel.js lm_*) open the same one
+function acMsgMenu(a, m) {
   const ag = agentById(S.chat.aid);
   menu(a, [ag?.enabled ? {label: tr('Reply'), icon: 'reply', fn: () => replyStart('a', m.id)} : null, m.kind === 'notice' ? null : cpnItem('a', m),  // 2.62.0 (#1848)
     {label: tr('Copy'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent')},  // 2.37.0 (#1165)
     {label: tr('Copy as Markdown'), icon: 'copy', fn: () => chatCopy(S.chat.msgs, m, 'agent', true)},  // 2.41.0 (#1374)
     {label: m.saved_task_id ? tr('Saved as a task: open it') : tr('Save as task'), icon: 'bookmark', fn: () => m.saved_task_id ? chatSaveOpen(m.saved_task_id) : chatSaveModal('agent', m, () => chatPatch())},
     m.from !== 'agent' && ag?.enabled ? {label: tr('Edit'), icon: 'edit', fn: () => chatEditStart(m.id)} : null,  // 2.39.0 (#1179): my own messages
+    ...(a.closest('.cmsg.ag') ? [rxMenuItem(a.closest('.cmsg'))] : []),  // 2.571.0 (#4608): the reactions of an agent's message (before: the long press)
     {label: tr('Delete message'), icon: 'trash', fn: () => acdDeleteMsg(m.id)}]);  // 2.152.0 D (#2175)
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest?.('[data-act="csave-open"],[data-act="chat-save"],[data-act="chat-msg-menu"]'); if (!a) return;
+  e.preventDefault(); e.stopPropagation();
+  if (a.dataset.act === 'csave-open') { chatSaveOpen(+a.dataset.tid); return; }
+  const m = (S.chat?.msgs || []).find(x => x.id === +a.dataset.mid); if (!m) return;
+  if (a.dataset.act === 'chat-save') { chatSaveModal('agent', m, () => chatPatch()); return; }
+  acMsgMenu(a, m);
 });
 
 // 2.172.0 A (#2683): in edit mode the text field of a note / wiki page fills the free height down to the footer line

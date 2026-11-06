@@ -135,11 +135,11 @@ function ms_merge(o) {
 // long press (phone) on a row matching sel: one menu, two ways, no own right-click list. open(row) -> true when a menu
 // came, otherwise the browser's menu stays. Shared by the file store and the knowledge folders (later the office documents).
 // 2.428.0 A (#3581): pick(row) given = a long press selects the row (like everywhere), the right click keeps the menu
-function cm_bind(sel, open, pick) {
+function cm_bind(sel, open, pick, keep) {  // 2.571.0 (#4608): keep(e, row) true = the browser's menu stays for this right click
   const lp = r => { if (pick) { pick(r); return true; } return open(r); };
   const st = ms_longPress(sel, () => false, lp);
   document.addEventListener('contextmenu', e => {
-    const r = e.target.closest?.(sel); if (!r || e.target.closest('input, textarea, [contenteditable="true"]')) return;
+    const r = e.target.closest?.(sel); if (!r || e.target.closest('input, textarea, [contenteditable="true"]') || keep?.(e, r)) return;
     if (st.lp) { clearTimeout(st.lp.t); st.lp = null; st.done = Date.now(); if (lp(r)) { e.preventDefault(); navigator.vibrate?.(10); } return; }  // Android: its menu event comes before the timer - one menu, not two
     if (ms_lpRecent(st)) { e.preventDefault(); return; }
     if (open(r)) e.preventDefault();
@@ -147,3 +147,17 @@ function cm_bind(sel, open, pick) {
   window.addEventListener('click', e => { if (ms_lpRecent(st) && e.target.closest?.(sel)) { e.preventDefault(); e.stopPropagation(); } }, true);  // the click ending the press does not open the row
   return st;
 }
+// 2.571.0 (#4608): a long press (phone) / a right click (computer) opens the row's own "…" menu everywhere the row has one (like tasks
+// since 2.25.0); where a long press drags or selects (calendar grid, timeline, roadmap, tiles, tables, file store, knowledge,
+// contacts, clients, documents #3581) nothing changes. open(row) finds the row's menu button and returns true when a menu came.
+// A right click on a link inside the row or with selected text in it keeps the browser's menu (copy, open link); a row in edit
+// mode (textarea) has no row menu. Rows: team chat messages (also in a thread), comments of a task, agent chat messages, the
+// section heads of a list, the calendar names of the timeline.
+const lm_btn = (r, sel) => r.querySelector('textarea, input') ? null : r.querySelector(sel);
+const lm_keep = (e, r) => { const a = e.target.closest?.('a[href]'); if (a && a !== r) return true; const s = getSelection?.(); return !!s && !s.isCollapsed && r.contains(s.anchorNode); };
+const lm_open = (sel, fn) => r => { const b = lm_btn(r, sel); if (!b) return false; return fn(b, r) !== false; };  // the menu sits at the row (its "…" button can be hidden)
+cm_bind('#tc-msgs .cmsg, .tthview .cmsg', lm_open('[data-act="tc-msg-menu"]', (b, r) => tcMsgMenu(r, +b.dataset.mid)), null, lm_keep);
+cm_bind('#detail .cm:not(.cedit)', lm_open('[data-act="cm-copy"]', (b, r) => cmCopyMenu(b, r)), null, lm_keep);
+cm_bind('#chat-msgs .cmsg', lm_open('[data-act="chat-msg-menu"]', (b, r) => { const m = (S.chat?.msgs || []).find(x => x.id === +b.dataset.mid); if (!m) return false; acMsgMenu(r, m); }), null, lm_keep);
+cm_bind('#view .ghead[data-section]', lm_open('[data-act="section-menu"]', (b, r) => sectionMenu(r, +b.dataset.id)), null, lm_keep);
+cm_bind('#view .tl-cal .tl-name', lm_open('[data-act="cvx-tlmenu"]', (b, r) => cvxTlMenu(r, b.dataset.key, b.dataset.name)), null, lm_keep);

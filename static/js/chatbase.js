@@ -79,17 +79,12 @@ function rxRefocus(sel, mid, emoji) {
   const b = $$(`${sel} .rxrow .rx[data-mid="${mid}"]`).find(x => x.dataset.e === emoji); if (!b) return;
   $$('.rx', b.closest('.rxrow')).forEach(x => x.tabIndex = x === b ? 0 : -1); b.focus({preventScroll: true});
 }
-// touch: a long press on an agent message opens its reaction bar (another tap elsewhere closes it)
+// 2.571.0 (#4608): the hidden reaction bar of a comment / an agent message (smiley on hover, 2.32.0 #1062): "React" in the message's
+// menu opens it; a long press (phone) or a right click opens that menu (multisel.js lm_*; before, the long press opened the bar
+// itself). Another tap elsewhere closes it.
+function rxOpenOn(m) { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); S.rxOpen = rxKey(m); }
+const rxMenuItem = m => ({label: tr('React'), icon: 'smile', fn: () => rxOpenOn(m)});
 {
-  let lp = null;
-  document.addEventListener('touchstart', e => {
-    // 2.18.0 (#651): chat messages show their reactions anyway; the long press stays for comments in the task panel
-    // 2.32.0 (#1062): an agent chat message too -- its smiley shows only on hover (desktop) or after a long press (touch)
-    const m = e.target.closest?.('#detail .cm:not(.cedit), #chat-msgs .cmsg.ag'); if (!m || e.touches.length !== 1 || e.target.closest('button, a, textarea, input')) { lp = null; return; }
-    const p = e.touches[0]; lp = {m, x: p.clientX, y: p.clientY, t: setTimeout(() => { $$('.rxshow').forEach(x => x !== m && x.classList.remove('rxshow')); m.classList.add('rxshow'); S.rxOpen = rxKey(m); if (navigator.vibrate) navigator.vibrate(10); lp = null; }, 450)};
-  }, {passive: true});
-  document.addEventListener('touchmove', e => { if (lp && Math.hypot(e.touches[0].clientX - lp.x, e.touches[0].clientY - lp.y) > 8) { clearTimeout(lp.t); lp = null; } }, {passive: true});
-  document.addEventListener('touchend', () => { if (lp) { clearTimeout(lp.t); lp = null; } }, {passive: true});
   document.addEventListener('click', e => { if (!e.target.closest?.('.rxshow .chrxq, .rxshow .cmrxq')) $$('.rxshow').forEach(x => { if (!x.contains(e.target)) { x.classList.remove('rxshow'); if (S.rxOpen === rxKey(x)) S.rxOpen = null; } }); }, true);
 }
 S.jobSteps = {}; S.jobOpen = {};
