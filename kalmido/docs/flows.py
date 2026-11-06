@@ -412,7 +412,9 @@ def _undo_vals(c, nid, b, a):
     for f, col in (("sender", "sender_id"), ("type", "type_id")):
         if a.get(f) != b.get(f) and cur[f] == a.get(f):
             c.execute(f"UPDATE doc_meta SET {col}=? WHERE node_id=?", (b.get(f), nid))
-    if a.get("folder") != b.get("folder") and str(cur["folder"]) == str(a.get("folder")) and b.get("folder"):
+    # 2.581.0 (#4803 review): back into the old folder only when the person who takes the run back may edit it there
+    if (a.get("folder") != b.get("folder") and str(cur["folder"]) == str(a.get("folder")) and b.get("folder")
+            and fs_role(c, int(b["folder"]), me()) in ("owner", "edit")):
         node = c.execute("SELECT * FROM fs_nodes WHERE id=?", (nid,)).fetchone()
         S.move_to_folder(c, node, int(b["folder"]))
     added, gone = set(a.get("tags") or []) - set(b.get("tags") or []), set(b.get("tags") or []) - set(a.get("tags") or [])
