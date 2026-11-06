@@ -92,11 +92,13 @@ const V = B + 'api/v1';
   w.eval(`api('GET', '/api/admin/agents').then(j => { S.agOffer = j.scopes; agModal(j.agents.find(x => x.id === ${AG}), () => {}); })`);
   await until(() => d.querySelector('.modal #ag-lcap'));
   md = d.querySelector('.modal');
-  const caps = [...md.querySelectorAll('#ag-lcap [data-lcap]')].map(x => x.nextElementSibling.textContent);
-  check(caps.includes('Team Bob') && caps.includes('Team Carol') && !md.querySelector('#ag-lcap [data-lcap]:checked'), '#919: the agent dialog lists its lists, none ticked = all ' + caps.join('|'));
+  // 2.580.0 (#4488): the projects are offered by the field "Add projects" (a search), none added = all
+  const lq = md.querySelector('#ag-lcap .lcapq'); lq.focus(); lq.dispatchEvent(new w.FocusEvent('focusin', {bubbles: true}));
+  const caps = [...md.querySelectorAll('#ag-lcap [data-lcapo]')].map(x => x.textContent);
+  check(caps.includes('Team Bob') && caps.includes('Team Carol') && !md.querySelector('#ag-lcap [data-lcap]') && /All its projects/.test(md.querySelector('#ag-lcap .lcapst').textContent), '#919: the agent dialog offers its lists, none added = all ' + caps.join('|'));
   // 2.152.2 (#2624): project instead of list
   check(/Connects projects with different people/.test(md.querySelector('.agbridges')?.textContent || '') && /approved by Alice/.test(md.querySelector('.agbridges').textContent), '#919: ... and names the approved bridge');
-  md.querySelector(`#ag-lcap [data-lcap="${AB}"]`).checked = true;
+  click(w, md.querySelector(`#ag-lcap [data-lcapo="${AB}"]`));  // 2.580.0 (#4488): added instead of ticked
   click(w, md.querySelector('[data-m="ok"]'));
   await until(async () => (await call('GET', '/api/admin/agents')).agents.find(a => a.id === AG).list_ids?.length === 1);
   check((await call('GET', '/api/admin/agents')).agents.find(a => a.id === AG).list_ids[0] === AB, '#919: Save limits it to the ticked list');
@@ -106,7 +108,8 @@ const V = B + 'api/v1';
   // ================= token dialog + list menu "Agent access"
   w.eval(`tokModal(() => {}, [])`);
   await until(() => d.querySelector('.modal #tk-lcap'));
-  check([...d.querySelectorAll('.modal #tk-lcap [data-lcap]')].length >= 2, '#919: the token dialog offers the list limit');
+  d.querySelector('.modal #tk-lcap .lcapq').dispatchEvent(new w.Event('input', {bubbles: true}));  // 2.580.0 (#4488): the offers of the search
+  check([...d.querySelectorAll('.modal #tk-lcap [data-lcapo]')].length >= 2, '#919: the token dialog offers the list limit');
   d.querySelectorAll('.modal').forEach(m => m.remove());
   const items = w.eval(`listMenuItems(${AB}).flatMap(x => x.more || [x]).filter(x => x && x.label).map(x => x.label)`);
   check(items.includes('Agent access'), '#919: the list menu has "Agent access" ' + items.join('|'));

@@ -5427,9 +5427,6 @@ a.nitem.ndm{text-decoration:none;color:inherit}
 .agsafe-admin{margin:.25rem 0 .75rem;padding-left:1.25rem;display:grid;gap:.375rem}
 .lcap{flex:1;min-width:0}
 .lcap summary{min-height:2.75rem;display:flex;align-items:center;cursor:pointer}
-.lcapgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(10.5rem,1fr));gap:0 .75rem;max-height:14rem;overflow:auto}
-.lcapgrid .chkl{display:flex;align-items:center;gap:.5rem;min-height:2.75rem;cursor:pointer;min-width:0}
-.lcapgrid .chkl span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .agbridges ul{margin:.375rem 0;padding-left:1.25rem}
 
 /* 2.30.0 (#1036): the workspace of a new calendar / address book (askDialog) */

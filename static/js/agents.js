@@ -985,14 +985,7 @@ async function agAccessModal(lid) {
   md.classList.add('agaccmd');
   md.addEventListener('click', e => { if (e.target.closest('[data-m="close"]')) md.remove(); });
 }
-// the lists an agent / a token is limited to (none ticked = all of its lists)
-function listCapHtml(sel, lists, id) {
-  const on = new Set(sel || []);
-  return `<details class="sdet lcap" ${on.size ? 'open' : ''}><summary>${esc(on.size ? trn('Limited to {0} project', 'Limited to {0} projects', on.size) : tr('All its projects'))}</summary>
-    <p class="lcaphint muted">${esc(tr('Tick projects to limit access to them; nothing ticked = every project it is in. Other projects then do not exist for it, and it gets no events about them.'))}</p>
-    <div class="lcapgrid" id="${id}">${(lists || []).map(l => `<label class="chkl"><input type="checkbox" data-lcap="${l.id}" ${on.has(l.id) ? 'checked' : ''}><span>${esc(l.name)}</span></label>`).join('') || `<span class="muted">${esc(tr('No projects yet.'))}</span>`}</div></details>`;
-}
-const listCapVal = (md, id) => $$(`#${id} [data-lcap]:checked`, md).map(x => +x.dataset.lcap);
+// 2.580.0 (#4488): listCapHtml / listCapVal (the project limit) are in integrations.js (module integrations, loaded with every dialog that shows it)
 // the agent's dialog: the lists it connects although their people differ (approved or from before 2.30)
 function bridgesHtml(a) {
   const bs = a?.bridges || []; if (!bs.length) return '';

@@ -677,3 +677,81 @@ document.addEventListener('click', e => {
   if (a === 'apb') apbOpen();
   if (a === 'nwl') loadModule('contacts').then(() => nwl_open()).catch(() => {});
 });
+// ---- 2.580.0 (#4488): the project limit of an API token / an agent (New API token, the token's rights, Edit agent, Settings >
+// Agents): one field "Add projects" with a search instead of a grid of ticks of every project. The offers are grouped by folder
+// (a whole folder can be added: its projects and those of its subfolders), the projects added stand below as rows with a
+// Remove button; none added = every project it is in, as before. listCapVal gives the same list of ids as the old ticks did,
+// so the API data stay as they were (list_ids). One delegated set of listeners for every such field (the dialogs build it as html).
+const LCAP = new Map();  // the field's id -> its projects [{id, name, folder}]
+const lcap_row = l => `<li class="lcaprow" data-lcap="${l.id}"><span class="lcapn">${esc(l.name)}</span>${l.folder ? `<span class="lcapf muted">${esc(fDisp(l.folder))}</span>` : ''}<button type="button" class="iconbtn lcapx" data-lcapx="${l.id}" title="${esc(tr('Remove {0}', l.name))}" aria-label="${esc(tr('Remove {0}', l.name))}">${ic('x', 's')}</button></li>`;
+const lcap_st = n => n ? trn('Limited to {0} project', 'Limited to {0} projects', n) : tr('All its projects');
+function listCapHtml(sel, lists, id) {
+  const all = (lists || []).map(l => ({id: +l.id, name: String(l.name ?? ''), folder: listById(+l.id)?.folder || ''}));
+  LCAP.set(id, all);
+  if (!all.length) return `<div class="lcap" id="${id}"><span class="muted">${esc(tr('No projects yet.'))}</span></div>`;
+  const on = new Set((sel || []).map(Number)), rows = all.filter(l => on.has(l.id));
+  return `<div class="lcap" id="${id}"><p class="lcapst" aria-live="polite">${esc(lcap_st(rows.length))}</p><ul class="lcapsel">${rows.map(lcap_row).join('')}</ul>
+    <div class="lcapadd"><input type="search" class="lcapq" data-lcapq="${id}" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="${id}-res" aria-label="${esc(tr('Add projects'))}" placeholder="${esc(tr('Add projects'))} …" autocomplete="off" enterkeyhint="done">
+    <div class="lcapres" id="${id}-res" role="listbox" aria-label="${esc(tr('Add projects'))}" hidden></div></div>
+    <p class="lcaphint muted">${esc(tr('Add projects to limit access to them; none added = every project it is in. Other projects then do not exist for it, and it gets no events about them.'))}</p></div>`;
+}
+const listCapVal = (md, id) => $$(`#${id} [data-lcap]`, md).map(x => +x.dataset.lcap);
+// the offers for the typed words: the projects not added yet whose name or folder holds them, grouped by folder (folder order of
+// the sidebar, projects without a folder first); a group's head adds the whole folder
+function lcap_draw(q) {
+  const root = q.closest('.lcap'), box = root?.querySelector('.lcapres'); if (!box) return;
+  const all = LCAP.get(root.id) || [], on = new Set(listCapVal(root, root.id)), w = q.value.trim().toLowerCase();
+  const hit = all.filter(l => !on.has(l.id) && (!w || l.name.toLowerCase().includes(w) || fDisp(l.folder).toLowerCase().includes(w)));
+  const fo = folderNames(), groups = new Map(), rank = f => f ? fo.indexOf(f) + 1 || fo.length + 1 : 0;
+  for (const l of hit) { if (!groups.has(l.folder)) groups.set(l.folder, []); groups.get(l.folder).push(l); }
+  const keys = [...groups.keys()].sort((a, b) => rank(a) - rank(b) || a.localeCompare(b));
+  let k = 0;
+  const opt = (attr, html) => `<div role="option" class="lcapo" id="${root.id}-o${k++}" aria-selected="false" ${attr}>${html}</div>`;
+  box.innerHTML = keys.map(f => {
+    const ls = groups.get(f), inF = f ? all.filter(l => !on.has(l.id) && fUnder(l.folder, f)).length : 0;
+    return `<div role="group" class="lcapgrp"${f ? ` aria-label="${esc(fDisp(f))}"` : ''}>${f ? opt(`data-lcapf="${esc(f)}"`, `${ic('folder', 's')}<span>${esc(tr('Whole folder {0}', fDisp(f)))}</span><span class="muted">${inF}</span>`) : ''}${ls.map(l => opt(`data-lcapo="${l.id}"`, `<span>${esc(l.name)}</span>`)).join('')}</div>`;
+  }).join('') || `<div class="lcapnone muted">${esc(tr('No matching project'))}</div>`;
+  box.hidden = false; q.setAttribute('aria-expanded', 'true'); q.removeAttribute('aria-activedescendant');
+}
+function lcap_close(root) {
+  const box = root?.querySelector('.lcapres'), q = root?.querySelector('.lcapq'); if (!box || !q) return;
+  box.hidden = true; box.textContent = ''; q.setAttribute('aria-expanded', 'false'); q.removeAttribute('aria-activedescendant');
+}
+// add projects (ids in the order given); the status line follows
+function lcap_add(root, ids) {
+  const all = LCAP.get(root.id) || [], ul = root.querySelector('.lcapsel'), on = new Set(listCapVal(root, root.id));
+  for (const id of ids) { const l = all.find(x => x.id === id); if (l && !on.has(id)) { ul.insertAdjacentHTML('beforeend', lcap_row(l)); on.add(id); } }
+  root.querySelector('.lcapst').textContent = lcap_st(on.size);
+}
+function lcap_pick(o) {
+  const root = o.closest('.lcap'), all = LCAP.get(root.id) || [], q = root.querySelector('.lcapq');
+  lcap_add(root, o.dataset.lcapf != null ? all.filter(l => fUnder(l.folder, o.dataset.lcapf)).map(l => l.id) : [+o.dataset.lcapo]);
+  q.value = ''; q.focus(); lcap_draw(q);
+}
+document.addEventListener('input', e => { const q = e.target.closest?.('[data-lcapq]'); if (q) lcap_draw(q); });
+document.addEventListener('focusin', e => { const q = e.target.closest?.('[data-lcapq]'); if (q) lcap_draw(q); });
+document.addEventListener('focusout', e => { const a = e.target.closest?.('.lcapadd'); if (a && !a.contains(/** @type {any} */ (e.relatedTarget))) lcap_close(a.closest('.lcap')); });
+document.addEventListener('mousedown', e => { if (e.target.closest?.('.lcapres')) e.preventDefault(); });  // the field keeps the focus
+document.addEventListener('click', e => {
+  const o = e.target.closest?.('.lcap .lcapo'); if (o) { lcap_pick(o); return; }
+  const x = e.target.closest?.('.lcap [data-lcapx]'); if (!x) return;
+  const root = x.closest('.lcap'); x.closest('.lcaprow').remove();
+  root.querySelector('.lcapst').textContent = lcap_st(listCapVal(root, root.id).length);
+  root.querySelector('.lcapq')?.focus();
+});
+// keys in the field (capture: before the dialog's own Escape / Enter): arrows walk the offers, Enter adds, Escape closes them
+document.addEventListener('keydown', e => {
+  const q = e.target.closest?.('[data-lcapq]'); if (!q) return;
+  const root = q.closest('.lcap'), box = root.querySelector('.lcapres'), os = [...box.querySelectorAll('.lcapo')];
+  const cur = os.findIndex(o => o.id === q.getAttribute('aria-activedescendant'));
+  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+    e.preventDefault(); if (box.hidden) lcap_draw(q);
+    const all = [...box.querySelectorAll('.lcapo')]; if (!all.length) return;
+    const n = cur < 0 ? (e.key === 'ArrowDown' ? 0 : all.length - 1) : (cur + (e.key === 'ArrowDown' ? 1 : -1) + all.length) % all.length;
+    all.forEach((o, i) => o.setAttribute('aria-selected', String(i === n)));
+    q.setAttribute('aria-activedescendant', all[n].id); all[n].scrollIntoView?.({block: 'nearest'});
+  } else if (e.key === 'Enter' && !box.hidden) {
+    e.preventDefault(); e.stopPropagation();
+    const o = os[cur] || (os.length === 1 ? os[0] : null); if (o) lcap_pick(o);
+  } else if (e.key === 'Escape' && !box.hidden) { e.preventDefault(); e.stopPropagation(); lcap_close(root); }
+}, true);
