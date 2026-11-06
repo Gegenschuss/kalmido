@@ -224,6 +224,9 @@ async function dc_open(id, o = {}) {  // 2.353.0 D (#2759): o.keep = opened from
   DC.opening = id;
   let d;
   try { d = await api('GET', `/api/docs/${id}`); } catch { if (DC.opening === id) DC.opening = null; if (dc_hashId() === id) history.replaceState(null, '', DC.paneId ? `#docs/${DC.paneId}` : '#docs'); return; }
+  // 2.603.0 (#4912): a redraw while the module still loads (docs.js runs before receipts.js ...) drew the sheet without its
+  // later parts (receipt hints, suggestions) and a phone's sheet is never drawn again: first the whole module
+  if (typeof LD_P === 'object' && LD_P.docs) await LD_P.docs.catch(() => {});
   if (DC.opening !== id) return;
   const ws = d.org_id ? 'org:' + d.org_id : 'private';
   if (!DC.set || DC.set.ws !== ws) { const s = await api('GET', `/api/docs/settings?ws=${ws}`).catch(() => null); if (DC.opening !== id) return; DC.set = s; }

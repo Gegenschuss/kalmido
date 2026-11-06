@@ -82,9 +82,18 @@ async function upload(name, text, amount) {
   w.close();
 
   // ================= phone width
+  // 2.603.0 (#4912, red only in the CI): wait for real states instead of one 16 s window - the undo's "show" is on the server
+  // (the phone loads the receipt fresh), then the slot of the recognised values, then the block; a miss prints what was drawn
+  const srv = await until(async () => { const x = await call('GET', `/api/docs/${D}`); return x.checks?.items?.length && !x.checks.hidden ? x : null; }, 150);
+  check(srv, 'phone setup: the undo reached the server (checks shown) ' + JSON.stringify((await call('GET', `/api/docs/${D}`)).checks || {}).slice(0, 200));
   const m = await boot({user: 'alice', hash: `docs/${D}`, mobile: true}), f = m.document;
-  const mb = await until(() => f.querySelector('details.rck > summary'), 80);
-  check(mb && f.querySelector('details.rck'), 'phone: the block is there');
+  await until(() => f.querySelector('.rx-slot'), 150);
+  const mb = await until(() => f.querySelector('details.rck > summary'), 150);
+  const ev = q => { try { return JSON.stringify(m.eval(q)); } catch (x) { return String(x); } };
+  const why = mb ? '' : ' route ' + m.window.location.hash + ' ' + String(ev('S.route')).slice(0, 160) +
+    ' doc ' + String(ev('typeof DC === "object" && DC.doc ? {id: DC.doc.id, checks: DC.doc.checks} : null')).slice(0, 200) +
+    ' slot ' + (f.querySelector('.rx-slot')?.outerHTML || '(none)').slice(0, 300) + ' md ' + (f.querySelector('.dc-md')?.textContent || '(none)').replace(/\s+/g, ' ').slice(0, 200);
+  check(mb && f.querySelector('details.rck'), 'phone: the block is there' + why);
   console.log(`p2299_d_ui: ${ok} ok, ${F.length} failed`);
   m.close();
   process.exit(F.length ? 1 : 0);
