@@ -477,7 +477,8 @@ ROUTES = {
     "POST /api/office/meals/{}/file/{}/restore": "office", "GET /api/office/meals/{}/pdf": "office", "GET /api/office/meals/report": "office",
     "GET /api/office/meals/choices": "office", "POST /api/office/meals/choices": "office", "PATCH /api/office/meals/choices/{}": "office",
     "DELETE /api/office/meals/choices/{}": "office",
-    "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office", "POST /api/office/fixed-costs/category-rename": "office",  # 2.581.0 (#4820)
+    "POST /api/office/fixed-costs": "office", "PATCH /api/office/fixed-costs/{}": "office", "DELETE /api/office/fixed-costs/{}": "office",
+    "POST /api/office/fixed-costs/category-rename": "office",  # 2.581.0 (#4820): p2581_a_fixedcat_test.py (another organisation 404, nothing changed)
     # 2.67.0 (#1838): the import of fixed costs, its template, the undo of an import, the monthly check task (office admins)
     "POST /api/office/fixed-costs/import/preview": "office", "POST /api/office/fixed-costs/import": "office", "GET /api/office/fixed-costs/import/template": "office",
     "POST /api/office/fixed-costs/delete": "office", "GET /api/office/cashflow/check": "office", "PUT /api/office/cashflow/check": "office",
