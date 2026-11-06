@@ -116,6 +116,8 @@ const stub = w => { const calls = [], of = w.fetch; w.fetch = (u, o = {}) => { c
   check(lb === 'true,true,true,true,true,true', '#4199: listById follows S.lists (push, swap, id change, new array, unknown) ' + lb);
   // the command field: its set once per opening, the search after a short pause in typing, Enter takes the typed text at once
   w.eval(`window.__pa = 0; window.__pd = 0; (() => { const a = palAll, b = palDraw; palAll = function (...x) { window.__pa++; return a.apply(this, x); }; palDraw = function (...x) { window.__pd++; return b.apply(this, x); }; })()`);
+  // 2.595.0 (#4896): a fetched part (tables, document facets, folders) that arrives after the set was built resets it - count those
+  w.eval(`window.__pr = 0; (() => { let v = PAL.all; Object.defineProperty(PAL, 'all', {configurable: true, get: () => v, set: x => { if (x === null && v) window.__pr++; v = x; }}); })()`);
   w.eval('openPalette()');
   const pin = await until(() => d.querySelector('.palette .pqin'));
   const typeIn = v => { pin.value = v; pin.dispatchEvent(new w.Event('input', {bubbles: true})); };
@@ -129,7 +131,8 @@ const stub = w => { const calls = [], of = w.fetch; w.fetch = (u, o = {}) => { c
   pin.dispatchEvent(new w.KeyboardEvent('keydown', {key: 'Enter', bubbles: true, cancelable: true}));
   check(await until(() => w.eval('S.sel') === PRUNE), '#4199: palette: Enter right after typing runs the typed hit (not the list of before) ' + w.eval('S.sel'));
   console.log(`perf: palAll per opening with 4 searches = ${w.eval('window.__pa')}`);
-  check(w.eval('window.__pa') === 1, '#4199: palette: the set is built once per opening ' + w.eval('window.__pa'));
+  // 2.595.0 (#4896): once per opening, plus at most once again per fetched part that came in after it (not per key)
+  check(w.eval('window.__pa') >= 1 && w.eval('window.__pa') <= 1 + w.eval('window.__pr'), '#4199: palette: the set is built once per opening (+ once per arrived part) ' + w.eval('window.__pa') + ' / ' + w.eval('window.__pr'));
   w.eval('closeDetail && closeDetail()');
   // the board: every task in its column as before (one pass)
   await w.eval(`setListView(listById(${LS2[0]}), 'kanban')`); w.eval(`go('l/${LS2[0]}')`);
