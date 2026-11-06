@@ -1,6 +1,28 @@
 {
  "versions": [
   {
+   "version": "2.579.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "Aufgaben lassen sich als „hängt zusammen“ oder „Duplikat von“ verknüpfen und als Duplikat schließen.",
+     "en": "Tasks can be linked as \"relates to\" or \"duplicate of\" and closed as a duplicate."
+    },
+    {
+     "de": "Ändert jemand anderes gleichzeitig dasselbe, bleiben deine Eingaben in Dialogen erhalten und die geänderten Felder sind markiert.",
+     "en": "When someone else changes the same thing at the same time, your input in dialogs stays and their fields are marked."
+    },
+    {
+     "de": "Unter Büro > Belege stehen auch die noch nicht erfassten Büro-Dokumente.",
+     "en": "Office > Receipts also lists the office documents not recorded yet."
+    },
+    {
+     "de": "Dokumente: Suchen und Filter lassen sich als Ansicht mit Namen speichern, mit Zähler in der Seitenleiste, als Favorit und auf Heute.",
+     "en": "Documents: searches and filters can be saved as a named view, with a count in the sidebar, as a favourite and on Today."
+    }
+   ]
+  },
+  {
    "version": "2.575.0",
    "date": "2026-11-06",
    "items": [
