@@ -348,7 +348,7 @@ body.pgdrag .dc-grid:not(.dc-selon) .dc-card:not(.dc-cur){content-visibility:aut
   .dc-rd .dc-rzp{min-width:4.5rem;font-variant-numeric:tabular-nums}
   .dc-rd .dc-rv{display:flex;flex-direction:column;align-items:center;gap:.75rem;flex:1;min-height:0;overflow:auto;scrollbar-gutter:stable;padding:.75rem;border:1px solid var(--line);border-radius:var(--r-s);background:var(--bg3);overscroll-behavior:contain}
   .dc-rd .dc-rv:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
-  .dc-rpg{flex:none;background:#fff;box-shadow:var(--shadow);border-radius:.125rem;overflow:hidden}
+  .dc-rpg{flex:none;background:#fff;box-shadow:var(--shadow);border-radius:var(--r-s);overflow:hidden}
   .dc-rpg canvas,.dc-rpg img{display:block;width:100%;height:100%}
   .dc-rimg{background:none}
   .dc-rd .dc-rv>.dc-ph{flex:1;min-height:10rem}

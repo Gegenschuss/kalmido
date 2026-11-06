@@ -4,7 +4,7 @@
 .pvbar .pvnav,.pvbar .pvzoom{display:flex;align-items:center;gap:.125rem;flex:none}
 .pvbar [hidden]{display:none}
 .pvno{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:5.5rem;text-align:center;white-space:nowrap}
-.pvpct{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:3.5rem;padding:.375rem .25rem;border-radius:.375rem;background:none;border:0;cursor:pointer}
+.pvpct{font-size:var(--fs-s);color:var(--text2);font-variant-numeric:tabular-nums;min-width:3.5rem;padding:.375rem .25rem;border-radius:var(--r-s);background:none;border:0;cursor:pointer}
 .pvpct:hover{background:var(--bg3);color:var(--text)}
 .pvbody{padding:.75rem;background:var(--bg3);touch-action:pan-x pan-y;scrollbar-gutter:stable}
 .pvpages{display:flex;flex-direction:column;align-items:center;gap:.75rem;transform-origin:top center;min-width:min-content}
@@ -36,7 +36,7 @@
 .dpvdoc .dpvh:first-child{margin-top:0}
 .dpvlist{margin:0 0 .75rem;padding-inline-start:1.5rem}
 .dpvlist li{margin:.125rem 0}
-.dpvtwrap{overflow:auto;margin:0 0 .75rem;border:1px solid var(--line);border-radius:var(--r-s,.375rem)}
+.dpvtwrap{overflow:auto;margin:0 0 .75rem;border:1px solid var(--line);border-radius:var(--r-s)}
 .dpvtbl{border-collapse:collapse;font-size:var(--fs-s);min-width:100%}
 .dpvtbl td,.dpvtbl th{border:1px solid var(--line);padding:.375rem .5rem;text-align:start;vertical-align:top;white-space:pre-wrap;max-width:24rem}
 .dpvsheet td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:16rem}
@@ -47,7 +47,7 @@
 .dpvgrid{max-height:100%}
 .dpvtabs{display:flex;gap:.25rem;padding:.375rem .5rem;border-bottom:1px solid var(--line);overflow-x:auto;flex:none;align-items:center}
 .dpvtabs[hidden]{display:none}
-.dpvtab{flex:none;border:0;background:none;color:var(--text2);padding:.5rem .75rem;border-radius:.375rem;cursor:pointer;font:inherit;min-height:2.5rem}
+.dpvtab{flex:none;border:0;background:none;color:var(--text2);padding:.5rem .75rem;border-radius:var(--r-s);cursor:pointer;font:inherit;min-height:2.5rem}
 .dpvtab.on{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .dpvmore{font-size:var(--fs-s);padding:0 .5rem;white-space:nowrap}
 .dpvcut{font-size:var(--fs-s);text-align:center;margin:.75rem 0 0}
@@ -55,7 +55,7 @@
 .dpvfoot{display:flex;align-items:center;gap:.5rem;padding:.5rem 1rem;border-top:1px solid var(--line);font-size:var(--fs-s);color:var(--text2);flex:none}
 .dpvfoot[hidden]{display:none}
 .dpvpick{display:flex;flex-direction:column;gap:.25rem;margin:.5rem 0}
-.dpvag{display:flex;align-items:center;gap:.5rem;padding:.5rem;border-radius:.375rem;cursor:pointer;min-height:2.75rem}
+.dpvag{display:flex;align-items:center;gap:.5rem;padding:.5rem;border-radius:var(--r-s);cursor:pointer;min-height:2.75rem}
 .dpvag:has(input:checked){background:var(--accent-soft)}
 @media (max-width:767px) {
   .dpvbox{height:100%}
