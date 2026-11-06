@@ -1830,7 +1830,8 @@ TOOLS += [
      lambda api, a: api.call("POST", "/time/timer", body=a)),
     ("stop_timer", "Stop the running timer.", _obj({}), lambda api, a: api.call("DELETE", "/time/timer")),
     ("list_time_entries", "Time entries (from / to YYYY-MM-DD, default the last 7 days; scope mine | all; list_id, task_id). "
-                          "2.582.0: an agent needs the scope time; scope all shows others only where you and the person who set you up are project admins.",
+                          "2.582.0: an agent needs the scope time; scope all (task_id too) shows others only where you and the person who set you up are project admins "
+                          "(a team agent: where you are).",
      _obj({"from": {"type": "string"}, "to": {"type": "string"}, "scope": {"type": "string", "enum": ["mine", "all"]}, "list_id": S_ID,
            "task_id": S_ID, "limit": {"type": "integer", "minimum": 1, "maximum": 500}, "cursor": {"type": "string"}}),
      lambda api, a: api.call("GET", "/time/entries", a)),
@@ -1838,7 +1839,7 @@ TOOLS += [
                       "tasks of projects with time tracking on (2.41.0: time_tracking; completed, commented, changed) but tracked no time there: {user_id, from, to, days: [{date, "
                       "count, tasks: [{id, title, list_id}]}]}. user_id = the person you work for (someone who may chat with you; "
                       "default: yourself); only projects you and the person both see. Suggest entries to the person; never add time for "
-                      "them without asking.",
+                      "them without asking. 2.582.0: an agent needs the scope time.",
      _obj({"user_id": S_ID, "days": {"type": "integer", "minimum": 1, "maximum": 31}}),
      lambda api, a: api.call("GET", "/time/gaps", _pick(a, ("user_id", "days")))),
     ("add_time_entry", "Add a time entry: task_id or list_id, start (YYYY-MM-DDTHH:MM), end or minutes, note; billable (2.144.6, "
@@ -2773,7 +2774,7 @@ TOOL_SCOPES["integrations"] = ("list_webhooks", "create_webhook", "update_webhoo
                                "update_repo_connection", "remove_repo_connection", "set_repo_version_field")
 TOOL_SCOPE = {n: s for s, names in TOOL_SCOPES.items() for n in names}   # every other tool: read
 # 2.582.0 (#4380): an agent token needs a stricter scope for these (the server's x-kalmido-agent-scope)
-TOOL_SCOPE_AGENT = {"list_time_entries": "time"}
+TOOL_SCOPE_AGENT = {"list_time_entries": "time", "get_time_gaps": "time"}  # 2.582.0 (fable review F3): + get_time_gaps
 
 
 # 2.391.0 B (#3358): toolsets. --toolsets tickets,code,... / KALMIDO_TOOLSETS limits tools/list and tools/call to those packages

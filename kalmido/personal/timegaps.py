@@ -105,11 +105,13 @@ def timegaps_spec(paths, schemas, op, ok, errs, ref, pid, nul, page, q):
             "tasks": {"type": "array", "items": {"type": "object", "properties": {
                 "id": {"type": "integer"}, "title": {"type": "string"}, "list_id": {"type": "integer"}}},
                       "description": f"At most {GAP_TASKS} examples"}}}}}}
-    paths["/time/gaps"] = {"get": op(
+    paths["/time/gaps"] = {"get": {**op(
         "Working days without tracked time although the person worked on tasks (maybe forgotten)", "Time tracking",
         ok(ref("TimeGaps")) | errs("400", "403", "404"),
         [q("days", f"Look back this many days before today (1-{GAP_DAYS_MAX}, default {GAP_DAYS})", {"type": "integer", "minimum": 1, "maximum": GAP_DAYS_MAX}),
          q("user_id", "An agent: the person it works for (someone who may chat with it); default: the token's user", {"type": "integer"})],
         desc="2.34.0 (#269). Monday to Friday of the last days (not today) on which the person completed, commented or changed tasks "
              "of project lists but has no time entry there. For an agent only lists that the agent and the person both see count "
-             "(tasks and entries). Pure data: suggest entries to the person, never add time for them without asking.")}
+             "(tasks and entries). Pure data: suggest entries to the person, never add time for them without asking. "
+             "2.582.0: an agent token needs the scope time (x-kalmido-agent-scope)."),
+        "x-kalmido-agent-scope": "time"}}  # 2.582.0 (#4380, fable review F3): which days someone tracked time is time data
