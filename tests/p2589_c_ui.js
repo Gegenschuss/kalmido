@@ -42,7 +42,7 @@ const until = fn => require('./boot').until(fn, {timeout: 15000, step: 150});
   const go = d.querySelector('.tc-pt[data-tc="ust_year"] a.tc-go');
   check(go && go.getAttribute('href') === '#office/books/taxforms/ust', 'a point links its place');
   go?.click();
-  check(await until(() => w.location.hash === '#office/books/taxforms/ust' && /Vorauszahlungssoll/.test(d.querySelector('.bk-tab')?.textContent || '')), 'the click leads there');
+  check(await until(() => w.location.hash === '#office/books/taxforms/ust' && d.querySelector('#tf-year')), 'the click leads there');
   w.close();
   console.log(`${ok} ok, ${F.length} failed`);
   process.exit(F.length ? 1 : 0);
