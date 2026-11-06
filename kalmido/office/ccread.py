@@ -52,6 +52,7 @@ HEAD_DAY_RE = re.compile(r"(?:abrechnungsdatum|abrechnung vom|abrechnung per|rec
 BARE_RATE_RE = re.compile(r"^\s*\d{1,6},\d{3,8}\b")
 # 2.595.0 (#4903, review): footer words anywhere in a line - such a line is never kept as an unknown position
 NOTPOS_RE = re.compile(r"%|\bp\.\s?a\.|zins|rahmen|limit|betr(?:ä|ae)gt|\bbitte\b", re.I)
+RATEPCT_RE = re.compile(r"\bp\.\s?a\.|zinssatz|jahreszins", re.I)  # 2.595.0 (#4903, review): an interest RATE line is no fee
 UNSURE_MAX = 3  # the unknown lines are kept only within this many lines under their position
 LAST4_RE = re.compile(r"(?:\d{4}|[xX*•]{4})[ -]?(?:\d{2}[xX*•]{2}|[xX*•]{4})[ -]?[xX*•]{4}[ -]?(\d{4})\b")
 LAST4_WORD_RE = re.compile(r"karten-?\s?(?:nummer|nr\.?)\D{0,30}(\d{4})\b", re.I)
@@ -162,7 +163,7 @@ def ccr_mastercard(text):
             continue
         after += 1
         m = TAIL_RE.match(x)
-        if m and FEE_RE.search(m["text"]):  # the foreign fee under its position: a position of its own
+        if m and FEE_RE.search(m["text"]) and not RATEPCT_RE.search(x):  # the foreign fee under its position: a position of its own
             raw, by = _signed(m)
             letters = letters or by
             lines.append({"day": cur["day"], "booked": cur["booked"], "merchant": m["text"][:CCR_TEXT_MAX], "raw": raw, "orig_amount": None, "orig_currency": None, "fee": True})
