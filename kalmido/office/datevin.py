@@ -263,11 +263,11 @@ def _dup_of_receipt(c, ids):
 
 
 def dv_receipt_rows(c, oid, d_from, d_to, st, s):
-    from .books import bk_receipts
+    from .books import bk_receipts_basis
     small = bool(s.get("small_business"))
     from .cardnorc import cc_dv_nodes
     gegen = dv_counter(st)
-    receipts = bk_receipts(c, oid, d_from, d_to, by="doc")
+    receipts = bk_receipts_basis(c, oid, d_from, d_to, by="doc")  # 2.603.0 (#4927): a year "bank and cash": only receipts with their line
     own = dv_supplier_accounts(c, oid, st, [rc["node_id"] for rc in receipts])  # 2.148.0 D (#2458)
     own.update(dict.fromkeys(cc_dv_nodes(c, oid), dv_card_account(st)))  # 2.444.0 (#3447): paid by card: the card account, not the creditor
     bu_in = {**DV_BU_IN, **(st.get("bu_in") or {})}

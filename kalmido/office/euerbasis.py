@@ -191,6 +191,18 @@ def eb_flows(c, oid, frm, to):
     return out
 
 
+def eb_segments(s, frm, to):
+    """[(first day, last day, strict)] of [frm, to] (ISO days, both included) cut at the year ends -- for readers over several
+    years (the cash flow)."""
+    out, y = [], int(frm[:4])
+    while f"{y}-01-01" <= to:
+        a, b = max(frm, f"{y}-01-01"), min(to, f"{y}-12-31")
+        if a <= b:
+            out.append((a, b, eb_basis_of(s, y) == "bank"))
+        y += 1
+    return out
+
+
 def eb_income_payment_ids(c, oid):
     """The office_payments ids that came in through the bank or the cash book (point 6): the payment of a bank booking matched
     with an invoice (and the parts of a split), the payment of a cash entry, the payments of the online payment provider; the

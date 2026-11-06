@@ -28,6 +28,7 @@ from ..core.orgcrypt import oc_dec_fields  # 2.355.0 E (#2841)
 from .calc import dec, money
 from .homecur import hc_home
 from .abschlag import abs_skonto_rows  # 2.355.0 C (#2840)
+from .euerbasis import eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
 from .model import office_gate, office_need_feature, office_org, office_settings
 from .ledger import ofx_log
 
@@ -306,11 +307,15 @@ def dx_rows(c, oid, d_from, d_to, s=None, inside=True, hints_out=None):
                         "Belegdatum": _ddmm(sk["day"]), "Belegfeld 1": dx_beleg(r["number"]),
                         "Buchungstext": ("Skonto " + (r["number"] or "") + " " + name).strip()[:60], "Festschreibung": "0",
                         "_date": sk["day"], "_kind": "skonto"})
-    pays = c.execute("SELECT p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
+    segs = eb_segments(s, d_from, d_to)  # 2.603.0 (#4927): a year "bank and cash" exports only payments of a bank / cash booking
+    inc_ids = eb_income_payment_ids(c, oid) if any(x[2] for x in segs) else None
+    pays = c.execute("SELECT p.id AS p_id, p.date AS p_date, p.amount AS p_amount, p.method AS p_method, d.*, cl.customer_no AS dx_customer_no, "
                      "cl.name AS dx_client_name FROM office_payments p JOIN office_docs d ON d.id=p.doc_id "
                      "LEFT JOIN clients cl ON cl.id=d.client_id WHERE p.org_id=? AND d.org_id=? AND p.date>=? AND p.date<=? "
                      "AND d.trial=0 ORDER BY p.date, p.id", (oid, oid, d_from, d_to)).fetchall()
     for r in pays:
+        if inc_ids is not None and r["p_id"] not in inc_ids and any(a <= r["p_date"] <= b for a, b, x in segs if x):
+            continue
         t = _j(r["totals"])
         amount = money(dec(r["p_amount"] or 0) / _fx(r, t, home))
         if amount == 0:

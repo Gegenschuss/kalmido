@@ -32,6 +32,7 @@ from .costs import ek_purchases  # 2.369.5 (#2517): pulled up from functions
 from .travel import rk_trips  # 2.369.5 (#2517): pulled up from functions
 from .cashflow import rk_cashflow  # 2.369.5 (#2517): pulled up from functions
 from .pipeline import pl2_weighted  # 2.369.5 (#2517): pulled up from functions
+from .euerbasis import eb_basis_of, eb_income_payment_ids  # 2.603.0 (#4927): the basis of the EUeR per year
 
 
 def _j(s):
@@ -61,11 +62,17 @@ def kpi_revenue(c, oid, home, docs, year, today):
     to_date = year == int(today[:4])
     sums, ytd = {}, {}
     from .books import BK_PAY_DAY  # 2.355.0 C (#2841): a reversal line on the day of its payment, as the books
-    for p in c.execute(f"SELECT p.doc_id, {BK_PAY_DAY} AS date, p.amount FROM office_payments p LEFT JOIN office_payments o "
+    # 2.603.0 (#4927): a year with the basis "bank and cash" counts only payments of a bank / cash booking (office/euerbasis.py)
+    st = office_settings(c, oid)
+    strict = {y: eb_basis_of(st, y) == "bank" for y in (year - 1, year)}
+    inc_ids = eb_income_payment_ids(c, oid) if any(strict.values()) else None
+    for p in c.execute(f"SELECT p.id, p.doc_id, {BK_PAY_DAY} AS date, p.amount FROM office_payments p LEFT JOIN office_payments o "
                        f"ON o.id=p.reverses_id AND o.org_id=p.org_id WHERE p.org_id=? AND {BK_PAY_DAY}>=? AND {BK_PAY_DAY}<?",
                        (oid, f"{year - 1}-01-01", f"{year + 1}-01-01")):
         r = by_id.get(p["doc_id"])
         if r is None or not p["date"]:
+            continue
+        if inc_ids is not None and strict.get(int(p["date"][:4])) and p["id"] not in inc_ids:
             continue
         a = dec(p["amount"]) * _net_share(r) / _fx(r, home)
         if r["kind"] == "credit":

@@ -60,7 +60,7 @@ from .travel import rk_cat_label, rk_trips  # 2.369.5 (#2517): pulled up from fu
 from .meals import BW_SHARE, ofc_bw_booked  # 2.534.0 (#4333): the approved entertainment receipts (layers budget: module level)
 from ..core.serializers import csv_cell  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
-from .euerbasis import EB_MISSING, eb_basis_of, eb_flows, eb_income_payment_ids  # 2.603.0 (#4927): the basis of the EUeR per year
+from .euerbasis import EB_MISSING, eb_basis_of, eb_flows, eb_income_payment_ids, eb_segments  # 2.603.0 (#4927): the basis of the EUeR per year
 
 
 def _j(s):
@@ -205,6 +205,18 @@ def bk_receipts(c, oid, frm, to, uid=None, by="paid", gaps=None, paid=None):
                 gaps["hidden"] = gaps.get("hidden", 0) + 1
                 continue
             gaps.setdefault("no_date", []).append(r["name"] or "")
+    return out
+
+
+def bk_receipts_basis(c, oid, frm, to, by="doc", uid=None):
+    """2.603.0 (#4927): the receipts of [frm, to] by the basis of each year (office/euerbasis.py): "receipts" = bk_receipts(by);
+    "bank and cash" = only those with a bank / card / cash line, on its day with its amount (the DATEV export)."""
+    segs = eb_segments(office_settings(c, oid), frm, to)
+    if not any(x[2] for x in segs):
+        return bk_receipts(c, oid, frm, to, uid=uid, by=by)
+    out = []
+    for a, b, strict in segs:
+        out += bk_receipts(c, oid, a, b, uid=uid, paid=eb_flows(c, oid, a, b)["paid"]) if strict else bk_receipts(c, oid, a, b, uid=uid, by=by)
     return out
 
 

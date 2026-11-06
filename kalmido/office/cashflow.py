@@ -46,6 +46,7 @@ from .docs import doc_row  # 2.369.5 (#2517): pulled up from functions
 from .ledger import ofx_log  # 2.369.5 (#2517): pulled up from functions
 from .owrite import ow_history_answer, ow_kind, ow_write  # 2.567.0 D (#4711): the saves go through the core's write layer
 from .otrash import OTB_UNDO, otb_put  # noqa: E402  2.567.0 (#4707): a deleted fixed cost goes into the office trash
+from .euerbasis import eb_flows, eb_income_payment_ids, eb_segments  # noqa: E402  2.603.0 (#4927): the basis of the EUeR per year
 
 RK_FIXED_TRASH = "fixed_cost"  # 2.567.0 (#4707): kind of a deleted fixed cost / subscription in the office trash
 OTB_UNDO[RK_FIXED_TRASH] = _ctx  # the toast's undo: the office admin, as deleting it
@@ -382,13 +383,21 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
     inv = [r for r in docs if r["kind"] == "invoice" and r["locked_at"] and r["status"] not in ("draft", "cancelled")]
     pm = inv_paid_map(c, oid, [r["id"] for r in inv])
     by_id = {r["id"]: r for r in docs}
+    # 2.603.0 (#4927): the years with the basis "bank and cash" (office/euerbasis.py) count only what flowed through the bank,
+    # the cash book or a card -- as the income statement
+    segs = eb_segments(st, first, _add_months(last_month, 1) + "-00")
+    strict_any = any(x[2] for x in segs)
+    inc_ids = eb_income_payment_ids(c, oid) if strict_any else None
+    is_strict = lambda day: any(a <= day <= b for a, b, x in segs if x)  # noqa: E731
     # in: payments of invoices (actual; out: refunds on credit notes). 2.161.0 (#2016 after #2168): a reversed payment and its
     # reversal line stay in the books (GoBD), but no money moved: both leave the cash flow
-    for p in c.execute("SELECT doc_id, date, amount FROM office_payments p WHERE org_id=? AND date>=? AND date<? AND reverses_id IS NULL "
+    for p in c.execute("SELECT id, doc_id, date, amount FROM office_payments p WHERE org_id=? AND date>=? AND date<? AND reverses_id IS NULL "
                        "AND NOT EXISTS (SELECT 1 FROM office_payments x WHERE x.org_id=p.org_id AND x.reverses_id=p.id)", (oid, first, last)):
         r = by_id.get(p["doc_id"])
         if r is None:
             continue
+        if strict_any and p["id"] not in inc_ids and is_strict(p["date"]):
+            continue  # 2.603.0 (#4927): a payment without its bank / cash booking
         cr = r["kind"] == "credit"  # a refund paid on a credit note goes out
         if not cr and dec(p["amount"]) < 0:  # 2.545.0 (#4387): the refund of a final invoice with a negative rest goes out
             put(p["date"], "out", "actual", "refund", -dec(p["amount"]) / _fx(r, home) * nf(r), r["project_title"] or "",
@@ -455,7 +464,16 @@ def rk_cashflow(c, oid, first_month, months, today=None, basis="gross", cfs=True
         t = oc_dec_fields(c, oid, "office_bank_tx", t)
         if (t["currency"] or home).upper() == home:
             bfb_paid[t["match_id"]] = abs(dec(t["amount"], "0"))
-    for rc in bk_receipts(c, oid, first, _add_months(last_month, 1) + "-00"):
+    rcs = bk_receipts(c, oid, first, _add_months(last_month, 1) + "-00") if not strict_any else []
+    for a, b, strict in (segs if strict_any else []):  # 2.603.0 (#4927): per year, the strict ones through their lines
+        if not strict:
+            rcs += bk_receipts(c, oid, a, b)
+            continue
+        fl = eb_flows(c, oid, a, b)
+        rcs += bk_receipts(c, oid, a, b, paid=fl["paid"])
+        for x in fl["norc"]:  # bookings without a receipt are money out all the same
+            put(x["day"], "out", "actual" if x["day"] <= today else "plan", "norc", x["amount"], x.get("text") or "", src=x["src"], ref=x["ref"])
+    for rc in rcs:
         g_ = bfb_paid.get(rc["node_id"]) or rc["amount"]
         put(rc["date"], "out", "actual" if rc["date"] <= today else "plan", "receipt", g_ * rc["net"] / rc["amount"] if net and rc["amount"] else g_,
             " · ".join(x for x in (rc["title"], rc["category"]) if x), node_id=rc["node_id"], category=rc["category"])
