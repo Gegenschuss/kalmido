@@ -13,11 +13,13 @@ from flask import jsonify
 from ..core.config import app
 from ..core.access import Denied
 from ..core.i18n import tr
-from ..core.db import iso, now_utc
+from ..core.db import iso, iso_ms, now_utc
+from ..core.conflict import ccf_check  # 2.570.0 (#4770)
+from ..core.pg import write_lock
 from ..core.errors import BadInput
 from .model import OFFICE_ADMIN_ONLY, office_role, pb_cl_sql
 from .rights import ofr_admin_or
-from .legacyimport import _amount, _archive_fields  # 2.369.5 (#2517): pulled up from functions
+from .legacyimport import _amount, _archive_fields, _archive_public  # 2.369.5 (#2517): pulled up from functions
 
 R81B_RATES = {"19": 19, "7": 7, "0": 0, "rc": 0}  # rc = reverse charge: the client pays the tax, none on the document
 R81B_LINES_MAX = 10
@@ -50,8 +52,15 @@ def r81b_lines(r):
     return v if isinstance(v, list) else None
 
 
+def r81b_ver(r):
+    """2.570.0 (#4770): the version of an entry: its last correction (fragment 4770_a), never corrected = its created_at."""
+    return str((r["updated_at"] if "updated_at" in r.keys() else "") or r["created_at"] or "")
+
+
 def r81b_public(d, r):
-    """The tax lines + net / tax sums into the public dict of an entry (_archive_public); None = only the gross known."""
+    """The tax lines + net / tax sums into the public dict of an entry (_archive_public); None = only the gross known.
+    2.570.0 (#4770): + updated_at, the version a correction / its undo sends back as expect_updated_at."""
+    d["updated_at"] = r81b_ver(r)
     lines = r81b_lines(r) if "tax_lines" in r.keys() else None
     if lines:  # review: the gross changed without them (an older version) -> they no longer fit, tax unknown again
         try:
@@ -79,10 +88,14 @@ def _amount_val(gross, lines):
 def r81b_archive_patch(c, oid, uid, aid, b):
     """Apply {client_id?, tax_lines? | amount?, paid?} to entry aid of office area oid; one history row per changed field.
     Returns the names of the changed fields. tax_lines win over amount; amount alone = gross only (tax unknown).
-    #1968: amount / tax_lines / paid only an office admin (403), a negative amount 400."""
+    #1968: amount / tax_lines / paid only an office admin (403), a negative amount 400.
+    2.570.0 (#4770): expect_updated_at set and the entry corrected since -> 409 with the entry under "current"; missing -> as
+    before. A change stamps updated_at."""
+    write_lock(c, f"office_archive-{int(aid)}")
     r = c.execute("SELECT * FROM office_archive WHERE id=? AND org_id=?", (aid, oid)).fetchone()
     if not r:
         raise Denied(404)
+    ccf_check(b, r81b_ver(r), "current", lambda: _archive_public(r))
     if "copy_of" in r.keys() and r["copy_of"]:  # 2.97.0 C (#2049): a copy taken along by a move is view / PDF only
         from .officemove import OFM_RO
         raise Denied(409, tr(OFM_RO))
@@ -111,6 +124,7 @@ def r81b_archive_patch(c, oid, uid, aid, b):
         log.append(("paid", int(r["paid"] or 0), int(f["paid"])))
     if not log:
         return []
+    f["updated_at"] = iso_ms(now_utc())  # 2.570.0 (#4770): the new version
     c.execute(f"UPDATE office_archive SET {', '.join(k + '=?' for k in f)} WHERE id=? AND org_id=?", [*f.values(), aid, oid])
     for field, old, new in log:
         c.execute("INSERT INTO office_archive_log(org_id, archive_id, at, user_id, field, old, new, role) VALUES(?,?,?,?,?,?,?,?)",
