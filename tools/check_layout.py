@@ -95,6 +95,25 @@ _cache = re.search(r"const CACHE = 'tasks-shell-v\d+';\s*// app (\S+)", sw)
 _ver = read("VERSION").strip()
 if not _cache or _cache.group(1) != _ver:
     ERR.append(f"static/sw.js: count CACHE up for version {_ver} and name it in the comment of that line (// app {_ver})")
+# 2.579.0 (#4283): the service worker and the page open the same IndexedDB databases (the offline queue "kalmido-outbox"):
+# the same name, the same version and the same stores - a version counted up on one side only makes the other side's open()
+# fail (VersionError) or run an upgrade without its stores, and the queue falls back to localStorage without a word
+_IDB_RE = re.compile(r"indexedDB\.open\('([\w-]+)',\s*(\d+)\);[^\n]*\n([^\n]*)")
+_idb_store = lambda line: sorted(set(re.findall(r"createObjectStore\('([\w-]+)'(?:,\s*(\{[^}]*\}))?", line)))
+_idb_page = {}
+for p in sorted(glob.glob(os.path.join(ROOT, "static", "js", "*.js"))):
+    for m in _IDB_RE.finditer(read("static", "js", os.path.basename(p))):
+        _idb_page.setdefault(m.group(1), set()).add((int(m.group(2)), tuple(_idb_store(m.group(3))), os.path.basename(p)))
+_idb_sw = [(m.group(1), int(m.group(2)), tuple(_idb_store(m.group(3)))) for m in _IDB_RE.finditer(sw)]
+if "indexedDB" in sw and not _idb_sw:
+    ERR.append("static/sw.js uses IndexedDB, but tools/check_layout.py finds no indexedDB.open('<name>', <version>) there (keep that form)")
+for _n, _v, _st in _idb_sw:
+    _pg = _idb_page.get(_n, set())
+    if not _pg:
+        ERR.append(f"static/sw.js opens the IndexedDB database {_n!r}, no file of static/js does: the worker and the page must share it")
+    for _pv, _pst, _pf in sorted(_pg):
+        if (_pv, _pst) != (_v, _st):
+            ERR.append(f"IndexedDB {_n!r}: static/sw.js opens version {_v} with the stores {list(_st)}, static/js/{_pf} version {_pv} with {list(_pst)} (count both up together)")
 
 init = read("kalmido", "__init__.py")
 m = re.search(r"ORDER = \((.*?)\n\)", init, re.S)
