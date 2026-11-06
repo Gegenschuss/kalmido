@@ -105,7 +105,7 @@ Stop / SubagentStop hook in its run settings). The setup prints who answers and 
 
 2.157.0 (#1517): on a Mac set up over SSH (nobody logged in at the screen) the agent starts in the background at once and at every screen login after a restart. After *Remove computer* the launcher stops the agent with one log line and waits quietly until you run the uninstall command.
 
-2.46.6 (#1713): the command carries the language of your account (`--lang de` / `-Lang de`); the script's messages are then German, in every other language English.
+2.46.6 (#1713): the command carries the language of your account (`--lang de` / `-Lang de`); the script's messages are then German; 2.574.0 (#3759): also Spanish, French, Italian and Dutch (`--lang es|fr|it|nl`), in every other language English (a text missing in a language shows the English one).
 
 ## Path A: let Claude Code set it up
 
