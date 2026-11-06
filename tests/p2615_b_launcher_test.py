@@ -185,7 +185,8 @@ check(ar.match_approval("Release the new invoice layout now", part)[0] is None, 
 # ================================================================ #3753 / #2390 approval_check
 for t in ("Das empfehle ich gerade nicht.", "I would not recommend that.", 'Die Aufgabe "Soll ich das umsetzen?" ist erledigt.',
           "Titel „Vorschlag: Fix übernehmen?“ steht in der Liste.", "Deine Freigabe ist eingetragen.", "Your approval is noted.",
-          "Nach deiner Freigabe habe ich gebaut."):
+          "Nach deiner Freigabe habe ich gebaut.", 'Die Aufgabe "Ich empfehle Dark Mode" ist erledigt.',
+          "Erledigt: „Vorschlag: neue Farben“ und „mitzunehmen“."):
     check(ar.asks_without_card(t, "de") == ("", ""), f"no ask: {t!r}")
 for t in ("Der Demo-Upload braucht deine Website-Freigabe.", "Sobald du freigibst, lade ich hoch.", "Ist das deine Freigabe?",
           "This needs your approval before it goes out.", "Once you approve, I upload it.", "Ich empfehle, das in 2.40 mitzunehmen."):
