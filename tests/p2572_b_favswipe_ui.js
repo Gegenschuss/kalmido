@@ -9,6 +9,7 @@ const {execFileSync} = require('child_process');
 const {sleep, B, login} = require('./boot');
 const F = []; let ok = 0;
 const check = (c, what) => { if (c) ok++; else { F.push(what); console.log('FAIL:', what); } };
+const {realClick} = require('./ff');
 const firefox = require('./ff')({tag: 'p2572_b_favswipe_ui', check, shots: 'P2572B_SHOTS'});
 const H = {'Content-Type': 'application/json', 'X-Requested-With': 'kalmido'};
 const DATA = process.argv[2] || path.join(__dirname, '.data');
@@ -41,7 +42,8 @@ const GRIP = `!document.querySelector('#favgrip').classList.contains('hidden') &
   await call(CF, 'PATCH', '/api/settings', {fav_items: ['v:today', 'v:week', 'v:all', `l:${FL}`]});
   const ready = async (ev, expr, n = 60) => { for (let i = 0; i < n; i++) { if (await ev(expr).catch(() => false)) return true; await sleep(100); } return false; };
 
-  await firefox(async ({cmd, ev, ctx, nav, shot, drag}) => {
+  await firefox(async o => {
+    const {cmd, ev, ctx, nav, shot, drag} = o;
     await cmd('browsingContext.setViewport', {context: ctx, viewport: {width: 390, height: 760}});
     await nav(B + 'static/icon.svg');
     await ev(`(() => { localStorage.clear(); sessionStorage.clear(); return 1; })()`);
@@ -108,11 +110,15 @@ const GRIP = `!document.querySelector('#favgrip').classList.contains('hidden') &
     // a field with the focus (the keyboard is up): no grip, an open row closes
     await ev(`(() => { document.querySelector('#favgrip').click(); return 1; })()`);
     await ready(ev, OPEN);
-    await ev(`(() => { const i = document.createElement('input'); i.id = 'p2572b-in'; document.querySelector('#view').prepend(i); i.focus(); return 1; })()`);
-    check(await ready(ev, `${SHUT} && document.querySelector('#favgrip').classList.contains('hidden')`), 'a field has the focus: no grip, the row closed');
+    await ev(`(() => { const i = document.createElement('input'); i.id = 'p2572b-in'; i.style.cssText = 'position:fixed;top:7rem;left:1rem;z-index:99'; document.addEventListener('focusin', () => { window.__fi = (window.__fi || 0) + 1; }, true); document.body.append(i); return 1; })()`);
+    const rc = await realClick(o, '#p2572b-in', {kind: 'touch'});  // a real tap: the browser focuses the field as a phone does
+    check(rc.ok && await ready(ev, `document.activeElement?.id === 'p2572b-in'`), 'the field has the focus ' + rc.on);
+    // a headless Firefox without the window's focus moves the focus but sends no focus events (seen on the Mac runner): the one a phone sends
+    await ev(`(() => { if (!window.__fi) { window.__fake = 1; document.activeElement.dispatchEvent(new FocusEvent('focusin', {bubbles: true})); } return 1; })()`);
+    check(await ready(ev, `${SHUT} && document.querySelector('#favgrip').classList.contains('hidden')`), 'a field has the focus: no grip, the row closed ' + await ev(`JSON.stringify({fi: window.__fi || 0, a: document.activeElement?.id, ef: editFocused(), can: fvd_can(), n: FVD.n, mob: isMobile(), g: document.querySelector('#favgrip').className, open: fvd_isOpen()})`));
     await ev(SWIPE('#tabs button', -70));
     check(await ev(SHUT), 'a field has the focus: a swipe opens nothing');
-    await ev(`(() => { document.querySelector('#p2572b-in').blur(); document.querySelector('#p2572b-in').remove(); return 1; })()`);
+    await ev(`(() => { const i = document.querySelector('#p2572b-in'); i.blur(); if (window.__fake) i.dispatchEvent(new FocusEvent('focusout', {bubbles: true})); i.remove(); return 1; })()`);
     check(await ready(ev, GRIP), 'the focus left the field: the grip is back');
 
     // the tab "Favourites" pinned: neither grip nor row
