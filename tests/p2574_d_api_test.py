@@ -13,6 +13,8 @@
      the first stays open (state open, suggestion.approvals), the same person again never approves (decide and reaction), the
      second person approves, a 👎 rejects at once, a thumb taken back takes the approval back; off = one 👍 as before; a person
      without an organisation alone in the project never gets past the first 👍 (the app shows a hint)
+ (5) review F1: an agent duplicating a task / project or saving a template leaves out the tasks its data lock covers (with
+     their subtasks; the copy would carry no lock tag any more); the person duplicating in the web keeps them (freelancer)
 tenant-matrix: org
 usage: p2574_d_api_test.py <datadir>      (KMT_NOSTART=1 / P2574D_NOSTART=1: a running server)"""
 import json
@@ -250,6 +252,41 @@ r = decide(F, KF)
 check(r.ok and r.json()["state"] == "waiting" and sugg(KF)["state"] == "open", f"freelancer alone: never past the first approval {r.text[:120]}")
 check(F.patch(B + f"/api/lists/{LF}", json={"two_eyes": False}).ok and decide(F, KF).json()["state"] == "approved",
       "freelancer: switched off, the next approval decides")
+
+
+# ---------------------------------------------------------------- (5) review F1 (#3376): an agent's data lock and duplicating
+A.put(B + "/api/admin/agent-policy", json={"user_agents": True})
+r = F.post(B + "/api/my/agents", json={"username": "lockbot", "display_name": "Lock Bot", "scopes": ["read", "tasks:write", "structure"]})
+check(r.status_code in (200, 201), f"F1: a personal agent {r.status_code} {r.text[:120]}")
+LB, LH = r.json()["id"], {"Authorization": "Bearer " + r.json()["token"]}
+LL = F.post(B + "/api/lists", json={"name": "Shared plan", "kind": "project"}).json()["id"]
+check(F.put(B + f"/api/lists/{LL}/members", json={"user_id": LB, "role": "edit"}).ok, "F1: the agent in the project")
+mkf = lambda t, **o: F.post(B + "/api/tasks", json={"title": t, "list_id": LL, **o}).json()["id"]
+PT = mkf("Trip plan")
+mkf("Book train", parent_id=PT)
+SEC = mkf("ZQXLOCK health note", parent_id=PT, tags=["Privat"])
+mkf("ZQXLOCK below the note", parent_id=SEC)
+TOP = mkf("ZQXLOCK top secret", tags=["Privat"])
+check(F.patch(B + f"/api/agents/{LB}/data-lock", json={"tags": ["privat"]}).ok, "F1: the lock on the tag privat")
+check(requests.get(V + f"/tasks/{SEC}", headers=LH).status_code == 404, "F1: the locked subtask is 404 for the agent")
+r = requests.post(V + f"/tasks/{PT}/duplicate", headers=LH)
+check(r.status_code == 201, f"F1: the agent duplicates the parent ({r.status_code} {r.text[:160]})")
+CP = r.json().get("id")
+allt = lambda: dbx("SELECT id, parent_id, title FROM tasks WHERE list_id=? AND deleted_at IS NULL", (LL,))
+kids = sorted(x[2] for x in allt() if x[1] == CP)
+check(kids == ["Book train"], f"F1: the copy without the locked subtask {kids}")
+check(sum(1 for x in allt() if "ZQXLOCK" in x[2]) == 3, "F1: no copy of the locked subtask or its child")
+r = requests.post(V + f"/lists/{LL}/duplicate", headers=LH, json={"name": "Plan copy"})
+check(r.status_code == 201, f"F1: the agent duplicates the project ({r.status_code} {r.text[:160]})")
+got = [x[0] for x in dbx("SELECT title FROM tasks WHERE list_id=?", (r.json()["list_id"],))]
+check(got and not any("ZQXLOCK" in x for x in got), f"F1: the project copy has no locked task {got}")
+r = requests.post(V + "/templates", headers=LH, json={"task_id": PT})
+check(r.status_code == 201 and "ZQXLOCK" not in json.dumps(requests.get(V + "/templates", headers=LH).json()),
+      f"F1: a template of the agent has no locked subtask ({r.status_code} {r.text[:120]})")
+r = F.post(B + f"/api/tasks/{PT}/duplicate", json={})
+check(r.ok, f"F1: the owner duplicates in the web ({r.status_code} {r.text[:120]})")
+kids = sorted(x[2] for x in allt() if x[1] == r.json()["task"]["id"])
+check(kids == ["Book train", "ZQXLOCK health note"], f"F1: a person keeps every subtask (the lock is the agent's) {kids}")
 
 sch = requests.get(V + "/openapi.json").json()
 check("urgent" in str(sch["components"]["schemas"]), "OpenAPI: urgent in the priority enum")

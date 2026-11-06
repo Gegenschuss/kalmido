@@ -39,7 +39,7 @@ TPL_MAX_PER_USER = 200
 HHMM_RE = re.compile(r"(?:[01]\d|2[0-3]):[0-5]\d")
 
 
-def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None):
+def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None, skip=()):
     """fidx (list templates): ({field id: index}, {field id: type}) -> the node keeps its custom field values
     as fv {index: value} (dates as days after use, people are not kept). order (2.4.0, list templates): collects
     (task id, node key) so the dependencies between the tasks can be kept (deps: [[waiting key, blocker key], ...]).
@@ -49,6 +49,8 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None
     tags = [r[0] for r in c.execute("SELECT tag FROM task_tags WHERE task_id=? AND user_id=? ORDER BY tag", (t["id"], uid))]
     kids = c.execute(f"""SELECT * FROM tasks WHERE parent_id=? AND deleted_at IS NULL{' AND status=0' if dup is not None and not dup.get('done') else ''}
                          ORDER BY sort, id""", (t["id"],)).fetchall() if depth < MAX_DEPTH - 1 else []
+    if skip:  # 2.574.0 (#3376): subtasks the data lock of the copying agent covers stay out (with theirs; _dup_locked)
+        kids = [k for k in kids if k["id"] not in skip]
     n = {"title": t["title"], "content": t["content"] or "", "priority": t["priority"] or 0, "tags": tags,
          "url": t["url"], "due_offset": off(t["due"]), "start_offset": off(t["start"]) if t["due"] else None,
          "due_time": t["due_time"] if t["due"] else None, "duration": t["duration"] if t["due_time"] else None,
@@ -66,7 +68,7 @@ def tpl_node_from_task(c, t, base, uid, depth=0, fidx=None, order=None, dup=None
         order.append((t["id"], n["k"]))
         if t["milestone_id"]:  # 2.18.0 (#430): resolved to the milestone's node key once the whole list is read
             n["mid"] = t["milestone_id"]
-    n["children"] = [tpl_node_from_task(c, k, base, uid, depth + 1, fidx, order, dup) for k in kids]
+    n["children"] = [tpl_node_from_task(c, k, base, uid, depth + 1, fidx, order, dup, skip) for k in kids]
     if fidx:
         fv = {}
         for r in c.execute("SELECT field_id, value FROM task_field_values WHERE task_id=?", (t["id"],)):
@@ -332,7 +334,7 @@ def templates_list():
         "SELECT * FROM templates WHERE user_id=? AND deleted_at IS NULL ORDER BY kind DESC, lower(name), id", (me(),))])
 
 
-def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None):
+def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None, skip=()):
     """The list template of list lid as uid sees it (sections, open tasks with subtasks, fields, dependencies, Playbook, page).
     rel (2.4.0, #328): the dates relative to the project start instead of base. dup (2.78.0, #1881, "Duplicate list"):
     {"done": bool} = exact dates (also past ones), the task states kept, completed tasks only with done (else not even as
@@ -349,7 +351,9 @@ def tpl_list_data(c, lid, uid, base, rel=False, dup=None, extra=None):
     tasks, order = [], []
     for t in c.execute(f"""SELECT * FROM tasks WHERE list_id=? AND parent_id IS NULL{'' if dup and dup.get('done') else ' AND status=0'}
                            AND deleted_at IS NULL ORDER BY sort, id""", (lid,)).fetchall():
-        n = tpl_node_from_task(c, t, base, uid, fidx=(fidx, ftypes), order=order, dup=dup)
+        if t["id"] in skip:  # 2.574.0 (#3376): a task the data lock of the copying agent covers
+            continue
+        n = tpl_node_from_task(c, t, base, uid, fidx=(fidx, ftypes), order=order, dup=dup, skip=skip)
         n["section"] = sidx.get(t["section_id"])
         tasks.append(n)
     keys = dict(order)
@@ -410,7 +414,7 @@ def template_create():
                 raise Denied(404)
             _tpl_org_out(c, t["list_id"], t["title"])  # 2.148.1 H (#2483)
             order = []
-            kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid, order=order)}, t["title"]
+            kind, data, name = "task", {"task": tpl_node_from_task(c, t, base, uid, order=order, skip=_dup_locked(c, uid, tid))}, t["title"]
             tx_collect(c, uid, t["list_id"], order, base, extra)
         elif b.get("list_id"):
             lid = int(b["list_id"])
@@ -423,7 +427,7 @@ def template_create():
             if role not in WRITE_ROLES:  # 2.126.0 D (#1992 A6): view only
                 raise Denied(403, tr("View only: the project cannot be saved as a template"))
             _tpl_org_out(c, lid, None)  # 2.148.1 H (#2483)
-            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True, extra=extra)  # 2.352.0 B (#2752): dates always relative
+            kind, data = "list", tpl_list_data(c, lid, uid, base, rel=True, extra=extra, skip=_dup_locked(c, uid, list_id=lid))  # 2.352.0 B (#2752): dates always relative
             name = data["name"]
         else:
             kind = b.get("kind") if b.get("kind") in ("task", "list") else None
@@ -654,7 +658,8 @@ def list_duplicate(lid):
         return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     base = local_now().date()
     extra = {}
-    d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))}, extra=extra)
+    d = tpl_list_data(c, lid, uid, base, dup={"done": bool(b.get("done"))}, extra=extra,
+                      skip=_dup_locked(c, uid, list_id=lid))
     if tpl_count(d) > DUP_MAX_NODES:
         return err(tr("Project too large to duplicate (at most {0} tasks)", DUP_MAX_NODES))
     try:
@@ -687,6 +692,22 @@ def list_duplicate(lid):
     return jsonify(list_id=new, skipped_files=st["skipped"])
 
 
+def _dup_locked(c, uid, tid=None, list_id=None):
+    """2.574.0 (#3376): the ids of the subtasks below tid (or of the tasks of list list_id) that the data lock of uid (an agent)
+    covers; they and their subtasks are left out of the copy (the copy would carry no lock tag any more and be readable).
+    Empty for people / an agent without a lock."""
+    from ..core.dlock import dl_of, dl_tasks_locked
+    if not dl_of(c, uid):
+        return set()
+    if list_id is not None:
+        ids = [r[0] for r in c.execute("SELECT id FROM tasks WHERE list_id=? AND deleted_at IS NULL", (list_id,))]
+        return dl_tasks_locked(c, uid, ids) if ids else set()
+    ids = [r[0] for r in c.execute("""WITH RECURSIVE r(id) AS (SELECT id FROM tasks WHERE parent_id=? AND deleted_at IS NULL
+                                        UNION SELECT t.id FROM tasks t JOIN r ON t.parent_id=r.id WHERE t.deleted_at IS NULL)
+                                      SELECT id FROM r""", (tid,))]
+    return dl_tasks_locked(c, uid, ids) if ids else set()
+
+
 @app.post("/api/tasks/<int:tid>/duplicate")
 def task_duplicate(tid):
     """2.363.3 (#3134): a copy of the task with its subtasks right below it: open, everything else as it is except comments and
@@ -701,7 +722,7 @@ def task_duplicate(tid):
     if not t:
         raise Denied(404)
     base, order, x = local_now().date(), [], {}
-    n = tpl_node_from_task(c, t, base, uid, order=order, dup={"done": True})
+    n = tpl_node_from_task(c, t, base, uid, order=order, dup={"done": True}, skip=_dup_locked(c, uid, tid))
     n.pop("st", None)
     n.pop("done_at", None)
     if len(order) > DUP_MAX_NODES:
