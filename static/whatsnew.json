@@ -1,6 +1,36 @@
 {
  "versions": [
   {
+   "version": "2.575.0",
+   "date": "2026-11-06",
+   "items": [
+    {
+     "de": "Die Kalmido-KI kann je Ablauf nur lesend im Web recherchieren und USt-IdNr. prüfen; jede Änderung braucht dann deine Freigabe.",
+     "en": "The Kalmido AI can research the web read-only per routine and check VAT IDs; every change then needs your approval."
+    },
+    {
+     "de": "Langes Drücken oder Rechtsklick öffnet jetzt auch bei Chat-Nachrichten, Kommentaren und Abschnittsköpfen das Menü.",
+     "en": "A long press or right click now opens the menu on chat messages, comments and section heads too."
+    },
+    {
+     "de": "Unter Einstellungen > Module legst du eigene Modul-Karten an; Org-Admins weisen Karten Personen zu.",
+     "en": "In Settings > Modules you create your own module cards; organisation admins assign cards to people."
+    },
+    {
+     "de": "Rechtsklick oder langes Drücken auf ein Bereichs-Symbol öffnet ein Menü: verschieben, ausblenden, Startbereich.",
+     "en": "Right click or long press on an area symbol opens a menu: move, hide, start area."
+    },
+    {
+     "de": "Aufgaben können die Priorität „Dringend“ bekommen, über „Hoch“.",
+     "en": "Tasks can get the priority \"Urgent\", above \"High\"."
+    },
+    {
+     "de": "Der Speichern-Knopf im Browser legt Seiten auf Wunsch unter „Später lesen“ ab, privat oder fürs Team.",
+     "en": "The save button in the browser can put pages into \"Read later\", private or for the team."
+    }
+   ]
+  },
+  {
    "version": "2.573.0",
    "date": "2026-11-06",
    "items": [
