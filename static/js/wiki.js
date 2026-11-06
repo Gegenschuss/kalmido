@@ -1286,6 +1286,22 @@ async function wko_queue(p, patch) {
   if (cp) { cp.body = b.body; await wko_put(c); }
   wk_savedHint(OUT.online ? tr('Saved') : tr('Saved on this device, sent when online'));
 }
+// 2.577.0 (#4708 9): core.js outFlush, right before a waiting text of a locked space goes out: sealed with an older key
+// generation (a key change since it was queued) -> opened with that key and sealed again with the current one, so the stored
+// text never depends on a generation that may be gone. Without the key (locked, not fetched): it goes as it is (the server
+// takes an older generation and marks the re-encryption due). -> the body to send.
+async function wkoReseal(e) {
+  const c = e.body?.body, o = typeof le2eParse === 'function' ? le2eParse(c) : null;
+  if (!o || typeof wkeOn !== 'function') return e.body;
+  const id = +(e.url.match(/\/(\d+)$/) || [])[1], sp = wk_spaces().find(s => wk_pages(s).some(p => p.id === id));
+  if (sp == null || !wkeOn(sp) || WKE.st[sp].gen == null || o.g === WKE.st[sp].gen) return e.body;
+  if (typeof e2eUnlocked === 'function' && !e2eUnlocked()) return e.body;
+  const plain = await wkeTry(sp, c, 'body', await wkeKeys(sp));
+  if (typeof plain !== 'string') return e.body;
+  const b = {...e.body, body: await wkeEnc(sp, 'body', plain)};
+  outSave(() => { e.body = b; });
+  return b;
+}
 // core.js outFlush: a sent change came back -- the copy's text and the base of the changes still waiting
 async function wkoSent(e, j) {
   if (!j?.id) return;

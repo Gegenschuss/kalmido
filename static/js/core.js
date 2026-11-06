@@ -1057,6 +1057,7 @@ async function outFlush() {
       if (tmpLeft) { console.warn('outbox: its new task was not created', e); dropped++; outReject(e, new Error(tr('The new task could not be created'))); outSave(() => { OUT.q = OUT.q.filter(x => x !== e); }); e.res = null; e.done = true; outAnswer(e, null); continue; }
       const wiki = /^\/api\/wiki\/pages\/\d+$/.test(e.url);  // 2.169.0 (#2671): a knowledge page's text (wiki.js, loaded for it)
       if (wiki && typeof wkoSent !== 'function' && typeof loadModule === 'function') await loadModule('wiki').catch(() => {});
+      if (wiki && typeof wkoReseal === 'function') body = await wkoReseal(e).catch(() => body);  // 2.577.0 (#4708 9): the current key generation
       try {
         let j = await rawFetch(e.method, url, body, e.ik || e.k, e.osp || '');  // 2.577.0 (#4638): + its office area (never the one open now)  // 2.270.0 C (#3022): the same key as the service worker's send; 2.551.0 (#4646): ik = the rebased send's own
         sent++; OUT.tries = 0; OUT.retryAt = 0;
