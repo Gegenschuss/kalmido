@@ -38,7 +38,7 @@ sys.path.insert(0, N)
 import kt  # noqa: E402
 from freelancer_fixture import FEATURES, freelancer  # noqa: E402
 from kt import B, CT, DATA, PASSWORD, check, sess, su_get, until  # noqa: E402
-from upgrade_views import data_checks, docs, schema, schema_gaps  # noqa: E402
+from upgrade_views import data_checks, docs, schema, schema_gaps, state_all  # noqa: E402
 
 BK = os.path.join(DATA, "backups")
 ST = os.path.join(BK, ".store")
@@ -164,7 +164,7 @@ def snap(users):
     """What people see, through the API: lists, tasks, comments, clients, office documents and the bytes of every file."""
     out = {}
     for u, s in users.items():
-        st = s.get(B + "/api/state").json()
+        st = state_all(s)  # 2.570.0 (#3506): with the completed tasks older than the start state's 14 days
         lists = {x["id"]: x["name"] for x in st["lists"]}
         tasks = []
         for t in st["tasks"]:

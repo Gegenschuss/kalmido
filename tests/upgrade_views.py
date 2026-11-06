@@ -38,8 +38,19 @@ def schema_gaps(ref, got):
 
 
 # --- the API views: the same shapes as upgrade_seed.py wrote
-def view(s):
+def state_all(s):
+    """/api/state with every completed task: the start state carries completed tasks only for 14 days (core/state.py st_where),
+    so the old fixture's done task left it 14 days after it was written (2.570.0, #3506: red from 06.11.2026 06:08 UTC on, the
+    fixture's completed_at is 23.10.2026). The rest comes from the completed page (GET /api/tasks?scope=done), as the app's
+    "Completed" view loads it -- the comparison no longer depends on the day it runs."""
     st = s.get(B + "/api/state").json()
+    seen = {t["id"] for t in st["tasks"]}
+    st["tasks"] = st["tasks"] + [t for t in s.get(B + "/api/tasks?scope=done&limit=2000").json()["tasks"] if t["id"] not in seen]
+    return st
+
+
+def view(s):
+    st = state_all(s)
     lists = {x["id"]: x["name"] for x in st["lists"]}
     tasks = sorted([lists.get(t["list_id"], "?"), t["title"], t.get("due") or "", t.get("due_time") or "", t.get("repeat") or "",
                     bool(t.get("parent_id")), t.get("status") or 0, sorted(a["name"] for a in t.get("attachments") or [])]
