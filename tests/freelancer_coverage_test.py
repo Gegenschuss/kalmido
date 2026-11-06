@@ -1284,7 +1284,6 @@ DELETE /api/v1/templates/{}
 DELETE /api/v1/time/timer
 DELETE /api/v1/trash
 PATCH /api/books/{}/org
-PATCH /api/budget/recurring/{}
 PATCH /api/calendars/{}/events
 PATCH /api/docs/labels/{}/{}
 PATCH /api/family/rewards/{}
