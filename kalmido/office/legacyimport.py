@@ -70,6 +70,7 @@ FI_NAME_MAX = 80  # clients.name
 FI_CELLS_MAX = 200_000  # filled cells of all sheets together
 XL_STRINGS_MAX = 200_000  # entries of sharedStrings.xml (sheets/io.py uses the same reader)
 XL_TREE_MAX = 200_000  # elements of a part kept as a whole tree (workbook, styles, relations, tables)
+XL_DEPTH_MAX = 64  # 2.576.0 (#4188): open elements at once (OOXML needs fewer than 10); deeper = not a spreadsheet
 XL_CHUNK = 1 << 16  # bytes fed to the parser at once
 XL_IMPORTS_AT_ONCE = 2  # .xlsx files read at the same time (per app process); one more = 429 at once, no waiting
 _XL_SLOTS = threading.BoundedSemaphore(XL_IMPORTS_AT_ONCE)
@@ -113,14 +114,15 @@ def xl_events(z, name, budget, most, events=("start", "end")):
     """2.576.0 (#4188): a part of the archive as (event, element) pairs of ET.XMLPullParser, read in XL_CHUNK pieces. The
     unpacked size counts against budget (at most `most` for the whole file); the guards against entity tricks stay
     (no DOCTYPE in the first 4 KB, no ENTITY anywhere, single-byte encodings only), checked on every piece BEFORE the
-    parser sees it. The caller clears what it has read; stopping early stops reading the part."""
+    parser sees it. The caller clears what it has read; stopping early stops reading the part. Open elements nest at
+    most XL_DEPTH_MAX deep (counted here for every reader: elements that never end hold memory no end event counts)."""
     info = z.getinfo(name)
     if info.file_size + budget[0] > most:
         raise BadInput(tr("The file is too large"))
     budget[0] += info.file_size
     bad = BadInput(tr("This is not a spreadsheet file (.xlsx)"))
-    p = ET.XMLPullParser(events)
-    seen, tail = 0, b""
+    p = ET.XMLPullParser(("start", "end"))
+    seen, tail, depth = 0, b"", 0
     with z.open(name) as fh:  # ZipExtFile reads at most file_size bytes
         while True:
             chunk = fh.read(XL_CHUNK)
@@ -134,19 +136,27 @@ def xl_events(z, name, budget, most, events=("start", "end")):
             seen += len(chunk)
             tail = chunk[-16:]
             p.feed(chunk)
-            yield from p.read_events()
+            for ev, el in p.read_events():
+                depth += 1 if ev == "start" else -1
+                if depth > XL_DEPTH_MAX:
+                    raise bad
+                if ev in events:
+                    yield ev, el
     p.close()
-    yield from p.read_events()
+    for ev, el in p.read_events():
+        if ev in events:
+            yield ev, el
 
 
 def _xml(z, name, budget, most=FI_XLSX_UNZIPPED_MAX):
-    """A (small) part as a whole tree; 2.576.0 (#4188): streamed, at most XL_TREE_MAX elements."""
+    """A (small) part as a whole tree; 2.576.0 (#4188): streamed, at most XL_TREE_MAX elements (counted when they start:
+    an element without its end holds memory as well)."""
     root, n = None, 0
     for ev, el in xl_events(z, name, budget, most):
-        if ev == "start":
-            if root is None:
-                root = el
+        if ev == "end":
             continue
+        if root is None:
+            root = el
         n += 1
         if n > XL_TREE_MAX:
             raise BadInput(tr("The file is too large"))
@@ -157,25 +167,29 @@ def _xml(z, name, budget, most=FI_XLSX_UNZIPPED_MAX):
 
 def xl_strings(z, budget, most):
     """2.576.0 (#4188): the texts of xl/sharedStrings.xml, one <si> after the other (plain <t> or rich text runs <r><t>;
-    phonetic hints <rPh> are not text); at most XL_STRINGS_MAX entries."""
-    out, sst, n = [], None, 0
+    phonetic hints <rPh> are not text); at most XL_STRINGS_MAX entries. Every child of <sst> leaves the tree when it ends;
+    n counts the elements since the last <si> left (fable review: not reset by anything else)."""
+    out, open_, n = [], [], 0
     for ev, el in xl_events(z, "xl/sharedStrings.xml", budget, most):
         if ev == "start":
-            if sst is None:
-                sst = el
+            open_.append(el)
             continue
+        open_.pop()
         n += 1
-        if n > XL_TREE_MAX:  # one <si> with endless runs
+        if n > XL_TREE_MAX:  # one <si> with endless runs, or anything else between the entries
             raise BadInput(tr("The file is too large"))
-        if el is sst or _local(el.tag) != "si":
+        if len(open_) != 1:  # inside an entry (kept until it ends) or the root itself
             continue
-        out.append("".join(t.text or "" for t in el.iter() if _local(t.tag) == "t" and not _in_rph(el, t)))
-        if len(out) > XL_STRINGS_MAX:
-            raise BadInput(tr("Too many filled cells (at most {0})", XL_STRINGS_MAX))
-        el.clear()
-        if len(sst) and sst[0] is el:
-            del sst[0]
-        n = 0
+        sst = open_[0]
+        if _local(el.tag) == "si":
+            out.append("".join(t.text or "" for t in el.iter() if _local(t.tag) == "t" and not _in_rph(el, t)))
+            if len(out) > XL_STRINGS_MAX:
+                raise BadInput(tr("Too many filled cells (at most {0})", XL_STRINGS_MAX))
+            el.clear()
+            sst.remove(el)
+            n = 0
+        else:
+            sst.remove(el)  # not an entry: gone, still counted until the next <si>
     return out
 
 
@@ -301,26 +315,40 @@ def _fmt_zeros(z, names, budget):
 
 def _sheet(z, path, strings, budget, zeros=None, filled=None):
     """2.576.0 (#4188): streamed, one cell after the other: reading stops after FI_ROWS_MAX + 50 rows; the filled cells of
-    the workbook (filled = [count] shared by its sheets) stop at FI_CELLS_MAX."""
+    the workbook (filled = [count] shared by its sheets) stop at FI_CELLS_MAX. Every child of the root, of <sheetData> and
+    of a <row> leaves the tree when it ends; n counts the elements since the last row left (fable review: a cell does not
+    reset it, so nothing between the cells or rows piles up uncounted)."""
     rows, filled = {}, [0] if filled is None else filled
     sd = row = cells = None
+    open_ = []  # the open elements, root first
     k = r = n = 0
     for ev, el in xl_events(z, path, budget, FI_XLSX_UNZIPPED_MAX):
         tag = _local(el.tag)
         if ev == "start":
-            if tag == "sheetData":
+            if len(open_) == 1 and sd is None and tag == "sheetData":
                 sd = el
-            elif tag == "row" and sd is not None and row is None:
+            elif sd is not None and open_[-1] is sd and tag == "row":
                 r = int(el.get("r") or (max(rows) + 1 if rows else 1))
                 if r > FI_ROWS_MAX + 50:
                     break
                 row, cells, k = el, {}, 0
+            open_.append(el)
             continue
+        open_.pop()
         n += 1
-        if n > XL_TREE_MAX:  # one cell or row with endless children
+        if n > XL_TREE_MAX:  # one cell or row with endless children, or anything else between them
             raise BadInput(tr("The file is too large"))
-        if row is not None and tag == "c" and el in row:
-            n = 0
+        parent = open_[-1] if open_ else None
+        if parent is None:
+            continue
+        if parent is not row and parent is not sd and len(open_) != 1:
+            continue  # inside a cell or another element: kept until that one ends
+        if el is sd:
+            break  # the rest of the sheet (merged cells, tables, ...) is not read
+        if el is not row and (parent is not row or tag != "c"):
+            parent.remove(el)  # not a row / cell (or a part of the sheet before <sheetData>): gone, still counted
+            continue
+        if parent is row:
             cel, k = el, k + 1
             ref = cel.get("r")
             ci = _col_index(ref) if ref else k - 1
@@ -353,15 +381,12 @@ def _sheet(z, path, strings, budget, zeros=None, filled=None):
                 if filled[0] > FI_CELLS_MAX:
                     raise BadInput(tr("Too many filled cells (at most {0})", FI_CELLS_MAX))
             cells[ci] = v
-        elif el is row:
+        else:  # the row ends
             rows[r] = cells
             row.clear()
-            if len(sd) and sd[0] is row:
-                del sd[0]
+            sd.remove(row)
             row = cells = None
             n = 0
-        elif el is sd:
-            break  # the rest of the sheet (merged cells, tables, ...) is not read
     if not rows:
         return []
     width = max((max(c) + 1 for c in rows.values() if c), default=0)

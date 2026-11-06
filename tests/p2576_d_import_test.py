@@ -8,6 +8,9 @@ imports read at the same time. Own container (start.sh). Invented names only, th
    stops reading after its row limit; a sharedStrings part with too many entries is refused early as well
  - the guards stay: DOCTYPE, ENTITY (also cut between two read pieces), two-byte encodings = 400
  - a third import while two read: 429 with a clear text (the app's error answer), afterwards it reads again
+ - fable review (limits made small in the probe): other elements between the cells of a row count until the row ends
+   (too large); other elements between rows / shared strings leave the tree; nesting deeper than 64 is refused; one cell
+   with ever new shared formulas is bounded
  - over HTTP: a normal file (shared strings, a drop-down list from another sheet, a shared formula) still imports; a file
    with too many cells is a 400 naming the limit; the legacy preview of a person without an organisation still reads
 usage: p2576_d_import_test.py <datadir>      (P2576D_NOSTART=1 = the server already runs)"""
@@ -150,6 +153,59 @@ with app.test_request_context("/", headers={"Accept-Language": "en"}):
         li._XL_SLOTS.release()
         li._XL_SLOTS.release()
     out["free_again"] = len(sio.shx_read_xlsx_all(small, 5)[0].rows)
+    # 6. fable review H1/H2/M1: limits made small here, the patterns scaled down the same way
+    keep = (li.XL_TREE_MAX, sio.XL_TREE_MAX, sio.SHX_STORED_MAX, li.xl_events, sio.xl_events)
+    live = {"max": 0}
+    def counting(z, name, budget, most, events=("start", "end")):  # the reader's own events; counts what still hangs in the tree
+        root, i = None, 0
+        for ev, el in keep[3](z, name, budget, most, events):
+            if root is None:
+                root = el
+            i += 1
+            if i % 50 == 0:
+                live["max"] = max(live["max"], sum(1 for _x in root.iter()))
+            yield ev, el
+    def live_max(fn):
+        live["max"] = 0
+        r = measure(fn)
+        return [r[0] if r[1] is None else r[1], live["max"]]
+    junk = "<x>" + "<y/>" * 500 + "</x>"
+    li.XL_TREE_MAX = sio.XL_TREE_MAX = 1000
+    li.xl_events = sio.xl_events = counting
+    try:
+        # H1: something between the cells of one row: n is not reset by a cell -> too large
+        in_row = '<row r="1">' + "".join(junk + f'<c r="{col(i)}1"><v>{i}</v></c>' for i in range(5)) + "</row>"
+        out["h1_row_legacy"] = measure(lambda: li.fi_xlsx_read(xlsx(xlsx_parts([("Contacts", in_row, "")]))))[1]
+        out["h1_row_sheet"] = measure(lambda: sio.shx_read_xlsx(xlsx(xlsx_parts([("T", in_row, "")]))))[1]
+        # H1: something between the rows / the shared strings: it leaves the tree, the tree stays small
+        between = "".join(junk + f'<row r="{i}"><c r="A{i}"><v>{i}</v></c></row>' for i in range(1, 6))
+        raw6 = xlsx(xlsx_parts([("Contacts", between, "")]))
+        out["h1_rows_legacy"] = live_max(lambda: len(li.fi_xlsx_read(raw6)["contacts"]))
+        out["h1_rows_sheet"] = live_max(lambda: len(sio.shx_read_xlsx(raw6).rows))
+        z6 = zipfile.ZipFile(io.BytesIO(raw6))
+        out["h1_rows_dv"] = live_max(lambda: sio._dv_labels(z6, set(z6.namelist()), [0], [("Contacts", "xl/worksheets/sheet1.xml", False)],
+                                                            "Contacts!$A$1:$A$9", []))
+        sst = ('<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+               + "".join(junk + f"<si><t>s{i}</t></si>" for i in range(5)) + "</sst>").encode()
+        raw7 = xlsx(xlsx_parts([("S", '<row r="1"><c r="A1" t="s"><v>4</v></c></row>', "")], extra={"xl/sharedStrings.xml": sst}))
+        out["h1_sst"] = live_max(lambda: sio.shx_read_xlsx(raw7).rows[0][0]["v"])
+    finally:
+        li.XL_TREE_MAX, sio.XL_TREE_MAX, sio.SHX_STORED_MAX, li.xl_events, sio.xl_events = keep
+    # H2: nested deeper than any real file -> refused (sheet, workbook)
+    deep = '<row r="1"><c r="A1"><v>1</v></c></row>' + "<x>" * 100 + "</x>" * 100
+    out["h2_sheet"] = measure(lambda: sio.shx_read_xlsx(xlsx(xlsx_parts([("D", deep, "")]))))[1]
+    out["h2_legacy"] = measure(lambda: li.fi_xlsx_read(xlsx(xlsx_parts([("Contacts", deep, "")]))))[1]
+    q = xlsx_parts([("W", '<row r="1"><c r="A1"><v>1</v></c></row>', "")])
+    q["xl/workbook.xml"] = q["xl/workbook.xml"].replace(b"</workbook>", b"<x>" * 100 + b"</x>" * 100 + b"</workbook>")
+    out["h2_workbook"] = measure(lambda: sio.shx_read_xlsx(xlsx(q)))[1]
+    out["h2_shallow"] = measure(lambda: sio.shx_read_xlsx(xlsx(xlsx_parts([("D", deep.replace("<x>" * 100, "<x>" * 50).replace("</x>" * 100, "</x>" * 50), "")]))))[1]
+    # M1: the same cell again and again, each time with a new shared formula: the formulas are bounded as well
+    sio.SHX_STORED_MAX = 50
+    try:
+        rep = '<row r="1">' + "".join(f'<c r="A1"><f t="shared" ref="A1:A2" si="{i}">B1+{i}</f></c>' for i in range(80)) + "</row>"
+        out["m1_shared"] = measure(lambda: sio.shx_read_xlsx(xlsx(xlsx_parts([("F", rep, "")]))))[1]
+    finally:
+        sio.SHX_STORED_MAX = keep[2]
 print(json.dumps(out))
 '''
 
@@ -186,6 +242,16 @@ for which in ("sheet", "legacy"):
     b = P.get(f"busy_{which}") or [0, "", 99]
     check(b[0] == 429 and "Two spreadsheet imports" in (b[1] or "") and b[2] < 1, f"#4188 a third import ({which}): 429 at once {b}")
 check(P.get("free_again") == 2, f"#4188 the places are free again afterwards {P.get('free_again')}")
+# 6. fable review (limits scaled down to 1000 elements in the probe)
+for key in ("h1_row_legacy", "h1_row_sheet"):
+    check("too large" in (P.get(key) or ""), f"#4188 H1 other elements between the cells of a row count until the row ends ({key}): {P.get(key)}")
+for key, want in (("h1_rows_legacy", 5), ("h1_rows_sheet", 5), ("h1_rows_dv", ["1", "2", "3", "4", "5"]), ("h1_sst", "s4")):
+    v = P.get(key) or [None, 99999]
+    check(v[0] == want and v[1] < 800, f"#4188 H1 other elements between rows / entries leave the tree ({key}): result {v[0]}, at most {v[1]} elements held")
+for key in ("h2_sheet", "h2_legacy", "h2_workbook"):
+    check("not a spreadsheet" in (P.get(key) or ""), f"#4188 H2 nested 100 deep: refused ({key}) {P.get(key)}")
+check(P.get("h2_shallow") is None, f"#4188 H2 nested 50 deep still reads {P.get('h2_shallow')}")
+check("Too many filled cells" in (P.get("m1_shared") or ""), f"#4188 M1 one cell with ever new shared formulas: bounded {P.get('m1_shared')}")
 
 # ---------------------------------------------------------------- over HTTP
 ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"

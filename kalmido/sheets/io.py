@@ -641,36 +641,42 @@ def _read_xlsx(z, names, budget, which=0, ctx=None):
     cells, shared = {}, {}
     full = ctx.setdefault("full", [0])  # filled cells of every sheet read so far
     dvs, cfs = [], []
+    # fable review: every child of <sheetData> and of a <row> leaves the tree when it ends (also what is not a row / cell),
+    # rows count only directly in <sheetData>, n counts the elements since the last row left (a cell does not reset it)
     root = sd = row = None
-    depth = k = r = n = 0
+    open_ = []  # the open elements, root first
+    k = r = n = 0
     for ev, cel in xl_events(z, path, budget, SHX_UNZIPPED_MAX):
         if ev == "start":
-            depth += 1
             if root is None:
                 root = cel
-            elif depth == 2 and _local(cel.tag) == "sheetData":
+            elif len(open_) == 1 and sd is None and _local(cel.tag) == "sheetData":
                 sd = cel
-            elif depth == 3 and sd is not None and cel.tag == f"{{{_MAIN}}}row":
+            elif sd is not None and open_[-1] is sd and cel.tag == f"{{{_MAIN}}}row":
                 r = int(cel.get("r") or (r + 1))
                 if r > SH_ROWS_MAX + 1:
                     raise BadInput(tr("Too many rows (at most {0})", SH_ROWS_MAX))
                 row, k = cel, 0
+            open_.append(cel)
             continue
-        depth -= 1
+        open_.pop()
+        depth = len(open_)
         n += 1
-        if n > XL_TREE_MAX:  # one cell / row / part with endless children
+        if n > XL_TREE_MAX:  # one cell / row / part with endless children, or anything else between them
             raise BadInput(tr("The file is too large"))
-        if row is not None and depth == 3 and _local(cel.tag) == "c":
-            n = 0
+        parent = open_[-1] if open_ else None
+        if parent is not None and parent is row:
             row.remove(cel)
-            k += 1
-            _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full)
+            if _local(cel.tag) == "c":
+                k += 1
+                _shx_cell(cel, k - 1, r, cells, shared, strings, fmts, full)
             continue
         if cel is row:
             row.clear()
-            if len(sd) and sd[0] is row:
-                del sd[0]
+            sd.remove(row)
             row, n = None, 0
+        elif parent is not None and parent is sd:
+            sd.remove(cel)  # not a row: gone, still counted until the next row
         elif cel is sd:
             sd.clear()
             n = 0
@@ -758,6 +764,8 @@ def _shx_cell(cel, k, r, cells, shared, strings, fmts, full):
             if ch.get("t") == "shared":
                 si = ch.get("si")
                 if ch.text:
+                    if si not in shared and len(shared) >= SHX_STORED_MAX:  # 2.576.0 (#4188, fable review): bounded
+                        raise _shx_too_many()
                     shared[si] = (ch.text, r, ci)
                     f = ch.text
                 elif si in shared:
@@ -825,17 +833,28 @@ def _dv_labels(z, names, budget, sheets, f1, strings=None):
         return []
     if strings is None:
         strings = xl_strings(z, budget, SHX_UNZIPPED_MAX) if "xl/sharedStrings.xml" in names else []
-    out, sd, row, n = {}, None, None, 0
+    # fable review: like _read_xlsx, every child of the root, of <sheetData> and (when not a cell) of a <row> leaves the tree
+    # when it ends; n counts the elements since the last row left
+    out, sd, row, n, open_ = {}, None, None, 0, []
     for ev, el in xl_events(z, path, budget, SHX_UNZIPPED_MAX):
         if ev == "start":
-            if sd is None and _local(el.tag) == "sheetData":
+            if len(open_) == 1 and sd is None and _local(el.tag) == "sheetData":
                 sd = el
-            elif el.tag == f"{{{_MAIN}}}row" and row is None:
+            elif sd is not None and open_[-1] is sd and el.tag == f"{{{_MAIN}}}row":
                 row = el
+            open_.append(el)
             continue
+        open_.pop()
         n += 1
         if n > XL_TREE_MAX:
             raise BadInput(tr("The file is too large"))
+        parent = open_[-1] if open_ else None
+        if el is sd:
+            break
+        if parent is not None and (len(open_) == 1 or parent is sd or (parent is row and _local(el.tag) != "c")):
+            if el is not row:
+                parent.remove(el)
+                continue
         if el is not row:
             continue
         n, row = 0, None
@@ -860,8 +879,7 @@ def _dv_labels(z, names, budget, sheets, f1, strings=None):
                 if v:
                     out[r] = v.strip()
         el.clear()
-        if sd is not None and len(sd) and sd[0] is el:
-            del sd[0]
+        sd.remove(el)
     return [out[k] for k in sorted(out)][:100]
 
 
