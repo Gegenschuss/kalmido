@@ -23,7 +23,7 @@ from ..core.retention import ret_on, ret_trash_days
 from ..core.serializers import unlink_files
 from ..accounts.orgs import is_org_admin
 from .core import sh_list_title, sh_may, sh_space, sh_space_key, sh_to_display
-from .shhist import shh_meta  # 2.564.0 (#4701/#4702)
+from .shhist import shh_meta_write  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_write
 
 
 def _int(v, what):
@@ -95,35 +95,30 @@ def sheets_get(sid):
 
 @app.patch("/api/sheets/<int:sid>")
 def sheets_patch(sid):
-    """{title?, list_id? (null = detach)}"""
+    """{title?, list_id? (null = detach), expect_updated_at? (the updated_at read: changed since -> 409 with "current")}.
+    2.571.0 (#4766): through the core's write layer (sheets/shhist.py shh_meta_write: lock, version, obj_history, bump)."""
     c = db()
     _need_w(c, sid)
-    write_lock(c, "sheet:" + str(sid))  # 2.564.0 (#4701): the table's own fields under its lock too, and in its history
-    r = _need_w(c, sid)
     uid = me()
     b = body()
-    f = {}
-    if "title" in b:
-        f["title"] = sh_clean_title(b["title"]) or r["title"]
-    if "list_id" in b and b["list_id"] != r["list_id"]:
-        from .shshare import shs_need_own
-        shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
-        if not sh_may_rebind(c, uid, r):
-            raise Denied(403)  # detaching opens the table to the whole space: its creator or the list's owner / admins only
-        f["list_id"] = sh_check_list(c, r["org_id"], b["list_id"], uid)
-    from .shbook import shb_patch, shb_sync
-    f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
-    if f:
-        c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
-        k = "tab_name" if "tab_name" in f else "title" if "title" in f else None  # 2.564.0 (#4701): a further sheet: its name
-        if k:
-            shh_meta(c, sid, "tab" if k == "tab_name" else "title", r[k], f[k], uid)
-        if "list_id" in f:
-            shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list
-        if "title" in f and not r["book_id"]:
-            from ..files.fsref import fs_ref_rename
-            fs_ref_rename(c, "sheet", sid, f["title"])  # 2.199.0 C (#2742): the table's name in its folder
-        sh_touch(c, sid, uid)
+    if not isinstance(b, dict):
+        raise BadInput(tr("Invalid data"))
+
+    def clean(c, b, cur):
+        r = _need_w(c, sid)  # again under the table's lock
+        f = {}
+        if "title" in b:
+            f["title"] = sh_clean_title(b["title"]) or r["title"]
+        if "list_id" in b and b["list_id"] != r["list_id"]:
+            from .shshare import shs_need_own
+            shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
+            if not sh_may_rebind(c, uid, r):
+                raise Denied(403)  # detaching opens the table to the whole space: its creator or the list's owner / admins only
+            f["list_id"] = sh_check_list(c, r["org_id"], b["list_id"], uid)
+        from .shbook import shb_patch
+        return shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
+
+    shh_meta_write(c, uid, _need_w(c, sid), b, clean, lambda c, cur: sh_dict(c, sh_reload(c, sid)))
     c.commit()
     return jsonify(sh_dict(c, sh_reload(c, sid)))
 
@@ -531,6 +526,9 @@ def shx_purge(c, ids):
         c.execute(f"DELETE FROM upload_scan WHERE kind='sheet' AND ref_id IN ({fq})", fids)
         c.execute(f"DELETE FROM file_text WHERE kind='sheet' AND ref_id IN ({fq})", fids)
     c.execute(f"DELETE FROM fs_nodes WHERE kind='ref' AND ref_kind='sheet' AND ref_id IN ({q})", ids)
+    # 2.571.0 (#4766): the core's history of the table's own fields (no FK) goes with it
+    c.execute(f"DELETE FROM obj_history WHERE kind='sheet' AND ref_id IN (SELECT id FROM sheets WHERE book_id IN ({q}) "
+              f"OR (id IN ({q}) AND deleted_at IS NOT NULL))", [*ids, *ids])
     c.execute(f"DELETE FROM sheets WHERE book_id IN ({q})", ids)
     c.execute(f"DELETE FROM sheets WHERE id IN ({q}) AND deleted_at IS NOT NULL", ids)
     return [x["path"] for x in fr]

@@ -556,7 +556,7 @@ def wiki_update(pid):
     if exp and exp != r["updated_at"] and ("body" in b or "path" in b):
         return conflict(r)
     f, ts, n = {}, iso_ms(now_utc()), 0
-    from .wkhist import wkh_body, wkh_note, wkh_prev, wkh_seal  # 2.123.0 A (#2105, #2102, #2106)
+    from .wkhist import wkh_body, wkh_note, wkh_prev, wkh_rename, wkh_seal  # 2.123.0 A (#2105, #2102, #2106); 2.571.0 (#4766): wkh_rename
     from .wksearch import wks_index
     from .wikie2e import wke_guard  # 2.64.3 A (#1817): a locked space takes ciphertexts only, its links stay in the browser
     locked = wke_guard(c, r["org_id"], r["owner_id"], b.get("path"), b.get("body"), "update")
@@ -592,6 +592,8 @@ def wiki_update(pid):
             return conflict(wiki_need(c, pid))
         if "body" in f:
             wiki_set_links(c, pid, plain)
+        if "path" in f:
+            wkh_rename(c, r, f["path"], uid)  # 2.571.0 (#4766): the new name in the core's history (obj_history)
         if not locked:  # 2.123.0 A (#2102, #2106): the history and the word index
             wkh_note(c, pid, uid, ts, prev=prev)
             wks_index(c, pid, r["org_id"], r["owner_id"], plain if plain is not None else wkh_body(c, r), ts)
@@ -779,6 +781,7 @@ def wiki_purge(c, ids):
               "AND COALESCE(s.org_id,0)=COALESCE(p.org_id,0) AND COALESCE(s.owner_id,0)=COALESCE(p.owner_id,0) AND lower(s.path)=lower(p.path) "
               "AND NOT EXISTS (SELECT 1 FROM wiki_pages x WHERE x.deleted_at IS NULL AND COALESCE(x.org_id,0)=COALESCE(p.org_id,0) "
               "AND COALESCE(x.owner_id,0)=COALESCE(p.owner_id,0) AND lower(x.path)=lower(p.path))", [iso(now_utc()), *ids])
+    c.execute(f"DELETE FROM obj_history WHERE kind='wiki' AND ref_id IN ({q})", ids)  # 2.571.0 (#4766): its renames (no FK)
     c.execute(f"DELETE FROM wiki_pages WHERE id IN ({q})", ids)  # links, files, versions, word index: ON DELETE CASCADE
     from .wkfolder import wkf_drop
     wkf_drop(c, ids)  # 2.200.0 A (#2747): their nodes in the tree

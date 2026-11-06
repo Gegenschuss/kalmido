@@ -19,14 +19,13 @@ from ..core.db import db
 from ..core.i18n import tr
 from ..core.conflict import Conflict, need_version  # 2.564.0 (#4702)
 from ..core.db import write_lock  # 2.564.0 (#4702)
-from .shhist import shh_meta  # 2.564.0 (#4702)
+from .shhist import shh_meta_write  # 2.564.0 (#4702); 2.571.0 (#4766): shh_meta_write
 from ..accounts.session import me
 from ..api.v1 import BadInput, UnknownFields
 from ..api.common import v1_args, v1_err, v1_json, v1_view
-from ..files.fsref import fs_ref_rename  # 2.199.0 C (#2742)
 from .core import (SH_KINDS, sh_add_col, sh_add_rows, sh_brief, sh_check_list, sh_clean_title, sh_create, sh_dict, sh_index,
                    sh_may_rebind, sh_need, sh_reload, sh_rev_conflict, sh_set_cells, sh_touch, sh_undo_batch, sh_vars)
-from .shbook import shb_patch, shb_sync, shb_spec  # 2.369.5 (#2517): pulled up from functions
+from .shbook import shb_patch, shb_spec  # 2.369.5 (#2517): pulled up from functions
 from .shshare import shs_need_own  # 2.369.5 (#2517): pulled up from functions
 
 SHX_CREATE_FIELDS = ("title", "space", "list_id", "columns", "rows")
@@ -144,27 +143,22 @@ def v1_sheet_patch(sid):
             raise BadInput(tr("Invalid value: {0}", "expect_rev"))
         if er != r["rev"]:
             raise Conflict("current", _v1_sheet(c, r))
-    f = {}
-    if "title" in b:
-        f["title"] = sh_clean_title(b["title"]) or r["title"]
-    if "list_id" in b:
-        lid = _int_or_none(b["list_id"], "list_id")
-        if lid != r["list_id"]:
-            shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
-            if not sh_may_rebind(c, me(), r):
-                raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
-            f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
-    f = shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
-    if f:
-        c.execute(f"UPDATE sheets SET {','.join(k + '=?' for k in f)} WHERE id=?", [*f.values(), sid])
-        k = "tab_name" if "tab_name" in f else "title" if "title" in f else None  # 2.564.0 (#4702): in the table's history
-        if k:
-            shh_meta(c, sid, "tab" if k == "tab_name" else "title", r[k], f[k], me())
-        if "list_id" in f:
-            shb_sync(c, sid)  # 2.124.0 E (#2116)
-        if "title" in f and not r["book_id"]:
-            fs_ref_rename(c, "sheet", sid, f["title"])  # 2.199.0 C (#2742): the table's name in its folder
-        sh_touch(c, sid, me())
+
+    def clean(c, b, cur):
+        f = {}
+        if "title" in b:
+            f["title"] = sh_clean_title(b["title"]) or r["title"]
+        if "list_id" in b:
+            lid = _int_or_none(b["list_id"], "list_id")
+            if lid != r["list_id"]:
+                shs_need_own(c, r)  # 2.124.0 C (#2113): never through a share
+                if not sh_may_rebind(c, me(), r):
+                    raise Denied(403)  # 2.89.0 (#1916): review 2, the rule of the web route; agents only on their own sheets
+                f["list_id"] = sh_check_list(c, r["org_id"], lid, me())
+        return shb_patch(c, r, f)  # 2.124.0 E (#2116): the list on the first sheet only; a further sheet's title = its name in the bar
+
+    # 2.571.0 (#4766): the core's write layer (obj_history, bump); the version was checked above (expect_rev, as before)
+    shh_meta_write(c, me(), r, {k: v for k, v in b.items() if k != "expect_rev"}, clean, lambda c, cur: _v1_sheet(c, r), version=False)
     c.commit()
     return jsonify(_v1_sheet(c, sh_reload(c, sid)))
 

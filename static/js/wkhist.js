@@ -46,15 +46,16 @@ async function wkh_dlg(p) {
     <div class="foot"><span class="spacer"></span><button type="button" class="btn" data-wkh="close">${esc(tr('Close'))}</button></div>`);
   md.classList.add('wkhdlg');
   const box = $('#wkh-b', md), may = WK.idx[p.space]?.mayWrite !== false;
-  let vs = [];
+  let vs = [], rn = [];  // 2.571.0 (#4766): rn = the page's renames (the core's history)
   const list = () => {
     box.innerHTML = vs.length ? `<p class="shint">${esc(tr('Saves of one person within ten minutes are one version.'))}</p><ul class="wkhlist">${vs.map(v => `<li><button type="button" class="wkhitem" data-wkh="open" data-id="${v.id}">${ic('clock', 's')}<span class="wkhwhen">${esc(fmtWhen(v.updated_at))}</span><span class="muted">${esc(v.by_name || '')}</span>${v.current ? `<span class="wkhcur">${esc(tr('current'))}</span>` : ''}</button></li>`).join('')}</ul>`
       : `<div class="muted mhint">${esc(tr('No earlier versions yet.'))}</div>`;
+    if (rn.length) box.insertAdjacentHTML('beforeend', `<p class="shint">${esc(tr('Renamed'))}</p><ul class="wkhlist">${rn.map(x => `<li class="muted">${ic(x.agent ? 'bot' : 'edit', 's')} ${esc(fmtWhen(x.at))} · ${esc(x.by_name || '')}: ${esc(wk_base(x.from))} → ${esc(wk_base(x.to))}</li>`).join('')}</ul>`);  // 2.571.0 (#4766)
   };
   try {
     const j = await rawFetch('GET', `/api/wiki/pages/${p.id}/versions`);
     if (j.e2e) { box.innerHTML = `<div class="muted mhint">${esc(tr('Workspaces encrypted in the browser keep no history: the server cannot read their texts.'))}</div>`; return; }
-    vs = j.versions || []; list();
+    vs = j.versions || []; rn = j.renames || []; list();
   } catch (e) { box.innerHTML = `<div class="muted mhint">${esc(e.message)}</div>`; return; }
   md.addEventListener('click', async e => {
     const a = /** @type {any} */ (e.target).closest('[data-wkh]'); if (!a) return;

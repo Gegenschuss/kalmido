@@ -917,9 +917,12 @@ def files_share_delete(sid):
     s = c.execute("SELECT * FROM fs_shares WHERE id=? AND COALESCE(list_own, 0)=0", (sid,)).fetchone()  # #4739: the members dialog's
     if not s:
         raise Denied(404)
-    _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
-    c.execute("DELETE FROM fs_shares WHERE id=?", (sid,))
-    fs_log_add(c, s["node_id"], "unshare", str(sid))
+    n = _need_share_node(c, s["node_id"])  # 2.200.0 B (#2747)
+    # 2.571.0 (#4766): taken back like in the other areas -- the row goes into obj_revoked (restorable), a share on a
+    # reference node keeps its object's kind / id; the log line as before (core/objects.py obj_node_unshare)
+    from ..core.objects import obj_node_unshare  # core/objects.py imports this module at its top
+    ref = (n["ref_kind"], n["ref_id"]) if n["kind"] == "ref" else (None, None)
+    obj_node_unshare(c, me(), n, sid, kind=ref[0], ref_id=ref[1], org=n["org_id"] or None)
     bump(c)
     c.commit()
     return jsonify(shares=_shares(c, s["node_id"]))

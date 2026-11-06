@@ -18,6 +18,7 @@ version before the next save. Restoring = the old text saved as a new version (U
 Spaces with the lock keep no history (the server cannot read their texts; switching the lock on holds the history of the
 space until the trash period ends, 2.528.0 D #4306: wkx_hold_space / wkx_tick). The rows go with their page (trash -> final deletion), its organisation or its owner.
 """
+import json
 import os
 import re
 from datetime import datetime
@@ -36,6 +37,7 @@ from ..core.serializers import unlink_files  # 2.528.0 D (#4306)
 from ..core.access import Denied
 from ..accounts.session import me
 from ..collab.comments import user_names
+from ..core.writes import obj_history_add, obj_track  # 2.571.0 (#4766)
 from ..collab.liste2e import le2e_is_cipher
 from .pages import wiki_need, wiki_dict, wiki_frontmatter, wiki_set_links  # 2.369.5 (#2517): pulled up from functions
 from .wikie2e import wke_page_mode, wke_denied  # 2.369.5 (#2517): pulled up from functions
@@ -182,9 +184,9 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
         if last is not None or fresh or prev[2] != uid or not 0 <= _ts(ts) - _ts(prev[3]) < WKH_MERGE:
             _ins(c, r, prev[1], prev[0], prev[2], prev[3])
             last, ltext = None, prev[0]
-    if last is not None and ltext == text and last["path"] == r["path"]:
-        return  # nothing changed
-    if prev is not None and last is None and ltext == text and prev[1] == r["path"]:
+    if last is not None and ltext == text:
+        return  # nothing changed (2.571.0 #4766: a new name alone is no version, it is in obj_history: wkh_rename)
+    if prev is not None and last is None and ltext == text:
         return
     if (last is not None and not fresh and last["created_by"] == uid and 0 <= _ts(ts) - _ts(last["created_at"]) < WKH_MERGE
             and not last["wkx_held_at"]):  # 2.528.0 D (#4306): a version held at a lock takes no new text
@@ -195,6 +197,34 @@ def wkh_note(c, pid, uid, ts, prev=None, fresh=False):
     cut = c.execute("SELECT id FROM wiki_versions WHERE page_id=? ORDER BY id DESC LIMIT 1 OFFSET ?", (pid, WKH_KEEP - 1)).fetchone()
     if cut:
         c.execute("DELETE FROM wiki_versions WHERE page_id=? AND id<?", (pid, cut["id"]))
+
+
+# 2.571.0 (#4766): a page's name is its own field: a rename goes into the core's history (obj_history, kind "wiki"), the
+# versions above stay for its text (a save that changes only the name makes no version any more)
+WKH_KIND = "wiki"
+obj_track(WKH_KIND, "wiki_pages")
+
+
+def wkh_rename(c, r, path, uid):
+    """2.571.0 (#4766): page row r (before the save) is now called path -> obj_history (not for a space with the lock: its
+    names are ciphertexts)."""
+    if path != r["path"] and not _locked(r):
+        obj_history_add(c, uid, WKH_KIND, r["id"], {"path": r["path"]}, {"path": path}, org_id=r["org_id"] or None)
+
+
+def wkh_renames(c, r, uid, info=None, limit=100):
+    """2.571.0 (#4766): the renames of page row r, newest first: [{at, by_name, agent, from, to}] -- the paths as uid sees
+    them (through a share from the shared node down, wkfolder.wkf_shown_path)."""
+    from .wkfolder import wkf_shown_path
+    rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (WKH_KIND, r["id"], int(limit))).fetchall()
+    names = user_names(c, {x["user_id"] for x in rows if x["user_id"]})
+    out = []
+    for x in rows:
+        a, z = json.loads(x["vals_before"] or "{}").get("path"), json.loads(x["vals_after"] or "{}").get("path")
+        if a and z:
+            out.append({"at": x["updated_at"], "by_name": names.get(x["user_id"], ""), "agent": bool(x["agent"]),
+                        "from": wkf_shown_path(c, uid, r, info, a), "to": wkf_shown_path(c, uid, r, info, z)})
+    return out
 
 
 def wkh_prev(c, r):
@@ -228,6 +258,8 @@ def wkx_hold_space(c, sp, users, ts):
     oid, owner = sp["org_id"], sp["owner_id"]
     w, a = _wkx_where(oid, owner)
     c.execute(f"DELETE FROM wiki_words WHERE page_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
+    # 2.571.0 (#4766): the names of its pages in the core's history are plain words too
+    c.execute(f"DELETE FROM obj_history WHERE kind='wiki' AND ref_id IN (SELECT id FROM wiki_pages WHERE {w})", a)
     row = c.execute("SELECT wkx_holds FROM wiki_spaces WHERE id=?", (sp["id"],)).fetchone()
     try:
         holds = json.loads(row[0] or "{}") if row else {}
@@ -440,9 +472,9 @@ def wkh_list(pid):
     uid = me()
     info = wkf_shared(c, uid)  # 2.200.0 F (#2747, review B3): through a share the paths start at the shared node
     out = [{"id": x["id"], "path": wkf_shown_path(c, uid, r, info, x["path"]), "size": x["size"], "created_at": x["created_at"],
-            "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""), "current": i == 0 and x["path"] == r["path"] and same(x)}
-           for i, x in enumerate(rows)]
-    return jsonify(versions=out, e2e=False)
+            "updated_at": x["updated_at"], "by_name": names.get(x["created_by"], ""), "current": i == 0 and same(x)}
+           for i, x in enumerate(rows)]  # 2.571.0 (#4766): a rename since makes no version: the text alone says current
+    return jsonify(versions=out, e2e=False, renames=wkh_renames(c, r, uid, info))  # 2.571.0 (#4766): + the renames
 
 
 @app.get("/api/wiki/pages/<int:pid>/versions/<int:vid>")

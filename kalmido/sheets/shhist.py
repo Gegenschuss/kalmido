@@ -6,6 +6,7 @@ is. Inputs are stored as the cells keep them (sheet_cells.raw is not sealed at r
 formulas with the names they may see, options / people / files by their names. Read = the right to read the table; the
 rows hang on the sheet, so they move with it (private <-> organisation) and go with it.
 """
+import json
 from datetime import timedelta
 
 from flask import jsonify, request
@@ -15,6 +16,7 @@ from ..core.db import db, iso_ms, now_utc
 from ..core.i18n import N_, tr
 from ..accounts.session import me
 from ..collab.comments import user_names
+from ..core.writes import obj_history_add, obj_track  # 2.571.0 (#4766)
 from .shkinds import SHK_FILE_RE, shk_bool, shk_people  # 2.369.5 (#2517): pulled up from functions
 
 SHH_KEEP = 200
@@ -52,6 +54,65 @@ def shh_meta(c, sid, what, old, new, uid, cell=None):
     c.execute("INSERT INTO sheet_hist(sheet_id,cell_id,row_id,col_id,user_id,agent_id,old_raw,new_raw,at,what) VALUES(?,?,?,?,?,?,?,?,?,?)",
               (sid, cell["id"] if cell else None, cell["row_id"] if cell else None, cell["col_id"] if cell else None, uid, None,
                old, new, iso_ms(now_utc()), what))
+
+
+# 2.571.0 (#4766): the table's own fields (its title, a sheet's name, the project it hangs on) are written through the core's
+# write layer (office/owrite.py ow_write on the tracked kind "sheet": the table's lock, the version, the history, bump) and noted
+# in the core's history obj_history, no longer in sheet_hist. Rows of sheet_hist with what title / tab written by 2.564-2.570
+# stay and read as before; GET /api/sheets/<id>/history shows both, newest first (shh_core_entries).
+SHH_KIND = "sheet"
+SHH_CORE = {"title": "title", "tab_name": "tab", "list_id": "list"}  # column of sheets -> what (SHH_META)
+SHH_META["list"] = N_("Project")
+obj_track(SHH_KIND, "sheets")
+
+
+def shh_meta_write(c, uid, r, b, clean, public, version=True):
+    """2.571.0 (#4766): change the table's own fields of sheet row r: clean(c, b, cur) -> {column: value} under the lock (its
+    checks may refuse), public(c, cur) -> the current state of a 409 ("current"); version=False: the caller checked its own
+    version (API v1: expect_rev). The table's name in its folder, the list on its other sheets, rev + the area follow.
+    Returns {column: (before, after)}. The caller commits."""
+    from ..office.owrite import ow_write
+    from ..files.fsref import fs_ref_rename
+    from .core import sh_touch
+    from .shbook import shb_sync
+    sid = int(r["id"])
+    _, ch = ow_write(c, uid, SHH_KIND, sid, b, clean, where="id=? AND deleted_at IS NULL", args=(sid,), public=public,
+                     version=version, lock="sheet:" + str(sid))
+    if ch:
+        if "list_id" in ch:
+            shb_sync(c, sid)  # 2.124.0 E (#2116): every sheet of the table hangs on the same list
+        if "title" in ch and not r["book_id"]:
+            fs_ref_rename(c, "sheet", sid, ch["title"][1])  # 2.199.0 C (#2742): the table's name in its folder
+        sh_touch(c, sid, uid)
+    return ch
+
+
+def shh_meta_note(c, sid, col, old, new, uid):
+    """2.571.0 (#4766): a change of one own field of table sid written by a route of its own (a sheet's name in the bar) ->
+    the core's history (the changes of one person within ten minutes merge there)."""
+    if ("" if old is None else str(old)) != ("" if new is None else str(new)):
+        obj_history_add(c, uid, SHH_KIND, sid, {col: old}, {col: new})
+
+
+def shh_core_entries(c, sheet, uid, limit):
+    """2.571.0 (#4766): the entries of obj_history of table sheet in the form of shh_entries (what = title | tab | list)."""
+    from .core import sh_list_title
+    rows = c.execute("SELECT * FROM obj_history WHERE kind=? AND ref_id=? ORDER BY id DESC LIMIT ?", (SHH_KIND, sheet["id"], int(limit))).fetchall()
+    names = user_names(c, {r["user_id"] for r in rows if r["user_id"]})
+
+    def txt(col, v):
+        if col == "list_id":  # only a project the viewer may see is named
+            return (sh_list_title(c, {"list_id": v}, uid) or "?") if v else ""
+        return "" if v is None else str(v)
+    out = []
+    for r in rows:
+        before, after = json.loads(r["vals_before"] or "{}"), json.loads(r["vals_after"] or "{}")
+        for col in [k for k in SHH_CORE if k in before or k in after]:
+            out.append({"id": f"h{r['id']}:{col}", "at": r["updated_at"], "user_id": r["user_id"],
+                        "user_name": names.get(r["user_id"], "") or tr("Unknown"), "agent": bool(r["agent"]), "cell_id": None,
+                        "row_id": None, "col_id": None, "addr": None, "what": SHH_CORE[col], "col_title": tr(SHH_META[SHH_CORE[col]]),
+                        "old": txt(col, before.get(col)), "new": txt(col, after.get(col))})
+    return out
 
 
 def _meta_text(c, what, raw, cols):
@@ -132,7 +193,9 @@ def shh_sheet(sid):
     except ValueError:
         n = 100
     rows = c.execute("SELECT * FROM sheet_hist WHERE sheet_id=? ORDER BY id DESC LIMIT ?", (sid, n)).fetchall()
-    return jsonify(entries=shh_entries(c, r, rows, me()))
+    out = shh_entries(c, r, rows, me()) + shh_core_entries(c, r, me(), n)  # 2.571.0 (#4766): + the table's own fields
+    out.sort(key=lambda x: str(x["at"] or ""), reverse=True)
+    return jsonify(entries=out[:n])
 
 
 @app.get("/api/sheets/<int:sid>/cells/<int:cid>/history")

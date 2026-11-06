@@ -29,7 +29,7 @@ from .formula import ShErr
 from .shfuncs import _Grid, _book_of, shf_spend, SHF_WORK_BUDGET  # 2.369.5 (#2517): pulled up from functions
 from .shkinds import shk_move_files  # 2.369.5 (#2517): pulled up from functions
 from ..core.pg import write_lock  # 2.564.0 (#4701/#4702)
-from .shhist import shh_meta  # 2.564.0 (#4701/#4702)
+from .shhist import shh_meta_note  # 2.564.0 (#4701/#4702); 2.571.0 (#4766): shh_meta_note
 
 SHB_TABS_MAX = 30          # sheets of one table
 SHB_NAME_MAX = 100
@@ -464,7 +464,7 @@ def sheets_tabs_patch(sid, tid):
             c.execute("UPDATE sheets SET tab_name=?, title=? WHERE id=?", (name, name, tid))
         else:
             c.execute("UPDATE sheets SET tab_name=? WHERE id=?", (name, tid))
-        shh_meta(c, tid, "tab", shb_label(r), name, uid)  # 2.564.0 (#4701): in the sheet's history
+        shh_meta_note(c, tid, "tab_name", shb_label(r), name, uid)  # 2.564.0 (#4701); 2.571.0 (#4766): in the core's history
     if "pos" in b:
         p = b.get("pos")
         if isinstance(p, bool) or not isinstance(p, int) or not 0 <= p < len(tabs):
